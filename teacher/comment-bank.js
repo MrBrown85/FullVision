@@ -9,7 +9,9 @@
    data layer; it never reads the page. Everything after it is pure:
    context() turns the facts and the teacher's picks (habits, Focus Area, I
    Can, the note to quote) into the slot values, and fits(), fill() and
-   parts() decide what the Comment Bank column shows. */
+   parts() decide what the Comment Bank column shows. draft() returns each
+   sentence's provenance with the comment; verify() re-checks a draft's
+   claims against the facts. */
 window.CommentBank = (function () {
   'use strict';
 
@@ -258,7 +260,7 @@ window.CommentBank = (function () {
           tagScoresByAssessment(cid, sid, tag.id).forEach(function (sc) {
             var a = byId[sc.assessmentId];
             if (!(sc.score > 0) || !inTerm(a) || !dateOf(a)) return;
-            scores.push({ v: Number(sc.score), d: dateOf(a), title: a.title || '' });
+            scores.push({ id: a.id, v: Number(sc.score), d: dateOf(a), title: a.title || '' });
           });
         });
         scores.sort(function (x, y) {
@@ -368,7 +370,7 @@ window.CommentBank = (function () {
           return s.id === secId;
         });
         var c = refl[secId] && Number(refl[secId].confidence);
-        return sec && c > 0 ? { name: sec.name, c: c } : null;
+        return sec && c > 0 ? { id: secId, name: sec.name, c: c } : null;
       })
       .filter(Boolean)
       .sort(function (a, b) {
@@ -449,6 +451,38 @@ window.CommentBank = (function () {
 
   /* ── The slots ─────────────────────────────────────────────────────── */
 
+  /* The picture of the term that picks an opening: early with no levels to
+     compare; challenge when any competency is Developing or Emerging now;
+     strong when one is Extending or more rose than fell; else steady. */
+  function pictureOf(comps) {
+    var withLevels = comps.filter(function (c) {
+      return c.start > 0 && c.now > 0;
+    });
+    if (!withLevels.length) return 'early';
+    var nowWords = withLevels.map(function (c) {
+      return word(c.now);
+    });
+    if (
+      nowWords.some(function (w) {
+        return w === 'Developing' || w === 'Emerging';
+      })
+    )
+      return 'challenge';
+    var rises = withLevels.filter(function (c) {
+      return tenths(c.now) > tenths(c.start);
+    }).length;
+    var drops = withLevels.filter(function (c) {
+      return tenths(c.now) < tenths(c.start);
+    }).length;
+    return nowWords.indexOf('Extending') >= 0 || rises > drops ? 'strong' : 'steady';
+  }
+
+  /* What the assessed work shows overall, from the overall level. */
+  function evidenceOf(f) {
+    if (!f.work.length) return '';
+    return f.overall >= 2.5 ? 'a solid grasp of the material' : 'progress toward understanding the key concepts';
+  }
+
   /* Every value a bank sentence can ask for, from the facts and the
      teacher's picks { habits, focus, ican, note }. An empty value means the
      sentences that need it are not offered. */
@@ -460,7 +494,7 @@ window.CommentBank = (function () {
       return c.start > 0 && c.now > 0;
     });
 
-    // The picture of the term that picks an opening.
+    // The picture of the term (pictureOf), what rose and what fell.
     var nowWords = withLevels.map(function (c) {
       return word(c.now);
     });
@@ -474,15 +508,7 @@ window.CommentBank = (function () {
     var drops = withLevels.filter(function (c) {
       return tenths(c.now) < tenths(c.start);
     });
-    var picture = !withLevels.length
-      ? 'early'
-      : nowWords.some(function (w) {
-            return w === 'Developing' || w === 'Emerging';
-          })
-        ? 'challenge'
-        : nowWords.indexOf('Extending') >= 0 || rises.length > drops.length
-          ? 'strong'
-          : 'steady';
+    var picture = pictureOf(f.comps);
     var fell = withLevels.filter(function (c) {
       return word(c.start) === 'Extending' && word(c.now) === 'Proficient';
     });
@@ -507,6 +533,16 @@ window.CommentBank = (function () {
         return tenths(c.level) < highest;
       })
       .slice(0, 2);
+    var strongest = byNow
+      .filter(function (c) {
+        return lowest.indexOf(c) < 0;
+      })
+      .slice(0, 2);
+    var fallen = drops.length
+      ? drops.slice().sort(function (a, b) {
+          return tenths(a.start) - tenths(a.now) - (tenths(b.start) - tenths(b.now));
+        })[0]
+      : null;
 
     // Work: best and lowest this term.
     var best = f.work.slice().sort(function (a, b) {
@@ -528,6 +564,8 @@ window.CommentBank = (function () {
     // to Support at Home block's rule).
     var seeWork = '';
     var aboutWork = '';
+    var seeId = null;
+    var aboutId = null;
     if (focus) {
       var fw = {};
       focus.scores.forEach(function (s) {
@@ -546,6 +584,8 @@ window.CommentBank = (function () {
         if (fb !== fo) {
           seeWork = fb.title;
           aboutWork = fo.title;
+          seeId = fb.id;
+          aboutId = fo.id;
         }
       }
     }
@@ -609,6 +649,67 @@ window.CommentBank = (function () {
       );
     var growing = withHabit(2).concat(withHabit(1));
     var conf = f.confidence;
+    var selfStrong = conf.length > 1 && conf[0].c >= 3 ? conf[0] : null;
+    var selfLow = conf.length > 1 && conf[conf.length - 1].c <= 2 ? conf[conf.length - 1] : null;
+
+    // The facts behind each slot, for the draft's provenance and verify():
+    // 'comp:<section id>', 'work:<assessment id>', 'obs:<id>',
+    // 'habit:<key>', 'confidence:<section id>', or a field of the facts.
+    var keys = function (kind, xs) {
+      return xs.filter(Boolean).map(function (x) {
+        return kind + ':' + (x.id != null ? x.id : x);
+      });
+    };
+    var habitKeys = function (hs) {
+      return keys(
+        'habit',
+        hs.map(function (h) {
+          return h.key;
+        }),
+      );
+    };
+    var strongHabits = withHabit(4).concat(withHabit(3));
+    var focusKeys = keys('comp', [focus]);
+    var noteKeys = keys('obs', [note]);
+    var concernKeys = keys('obs', [concern]);
+    var factsOf = {
+      standing: ['overall'],
+      letterStanding: ['letter'],
+      evidence: ['overall', 'work'],
+      strengths: keys('comp', strongest),
+      growthAreas: keys('comp', lowest),
+      even: keys('comp', withLevels),
+      rise: keys('comp', [rises[0]]),
+      fall: keys('comp', [fallen]),
+      fellCount: keys('comp', fell),
+      assignment: keys('work', [top]),
+      level: keys('work', [top]),
+      assignment2: keys('work', [weak]),
+      level2: keys('work', [weak]),
+      strongWorks: keys('work', best.slice(0, 2)),
+      weakWorks: keys('work', weakTwo.slice(0, 2)),
+      note: noteKeys,
+      when: noteKeys,
+      concernNote: concernKeys,
+      concernWhen: concernKeys,
+      selfGood: ['voice.good'],
+      selfHard: ['voice.hard'],
+      selfStrong: keys('confidence', [selfStrong]),
+      selfLow: keys('confidence', [selfLow]),
+      goal: ['voice.goal'],
+      plan: ['voice.plan'],
+      focus: focusKeys,
+      focusLow: focusKeys,
+      nextStep: focusKeys,
+      seeWork: focusKeys.concat(keys('work', [seeId])),
+      aboutWork: focusKeys.concat(keys('work', [aboutId])),
+      strengthHabits: habitKeys(strongHabits),
+      strengthHabitNames: habitKeys(strongHabits),
+      growthHabits: habitKeys(growing),
+      growthHabitNames: habitKeys(growing),
+      absent: ['attendance.absent'],
+      late: ['attendance.late'],
+    };
 
     return {
       _p: p,
@@ -618,20 +719,16 @@ window.CommentBank = (function () {
       _options: options,
       _focus: focus || null,
       _note: note || null,
+      _facts: factsOf,
       name: f.name,
       course: f.course,
       picture: picture,
       standing: f.standing ? (/^[AEIOU]/.test(f.standing) ? 'an ' : 'a ') + f.standing + ' level' : '',
       letterStanding: f.letter,
       strengths: list(
-        byNow
-          .filter(function (c) {
-            return lowest.indexOf(c) < 0;
-          })
-          .slice(0, 2)
-          .map(function (c) {
-            return c.name;
-          }),
+        strongest.map(function (c) {
+          return c.name;
+        }),
       ),
       growthAreas: list(
         lowest.map(function (c) {
@@ -646,11 +743,7 @@ window.CommentBank = (function () {
           ? 'yes'
           : '',
       rise: rises.length ? rises[0].name : '',
-      fall: drops.length
-        ? drops.slice().sort(function (a, b) {
-            return tenths(a.start) - tenths(a.now) - (tenths(b.start) - tenths(b.now));
-          })[0].name
-        : '',
+      fall: fallen ? fallen.name : '',
       fellCount: fell.length > 1 ? NUM[fell.length] || String(fell.length) : '',
       assignment: top ? top.title : '',
       level: top ? f.levelText(top.v) : '',
@@ -658,19 +751,15 @@ window.CommentBank = (function () {
       level2: weak ? f.levelText(weak.v) : '',
       strongWorks: list(best.slice(0, 2).map(the)),
       weakWorks: list(weakTwo.slice(0, 2).map(the)),
-      evidence: f.work.length
-        ? f.overall >= 2.5
-          ? 'a solid grasp of the material'
-          : 'progress toward understanding the key concepts'
-        : '',
+      evidence: evidenceOf(f),
       note: note ? _ended(note.text) : '',
       when: note && note.day ? 'on ' + note.day : '',
       concernNote: concern ? _ended(concern.text) : '',
       concernWhen: concern && concern.day ? concern.day : '',
       selfGood: _quote(f.voice.good),
       selfHard: _quote(f.voice.hard),
-      selfStrong: conf.length > 1 && conf[0].c >= 3 ? conf[0].name : '',
-      selfLow: conf.length > 1 && conf[conf.length - 1].c <= 2 ? conf[conf.length - 1].name : '',
+      selfStrong: selfStrong ? selfStrong.name : '',
+      selfLow: selfLow ? selfLow.name : '',
       goal: _quote(f.voice.goal),
       plan: _quote(f.voice.plan),
       focus: focus ? focus.name : '',
@@ -960,10 +1049,64 @@ window.CommentBank = (function () {
     plan: 'plan',
   };
 
+  /* The data slots a sentence names, in its own order: every {slot} but the
+     pronouns, then any it needs without printing ("even"). */
+  var PRONOUN_SLOTS = { He: 1, he: 1, him: 1, His: 1, his: 1, himself: 1 };
+  function slotsOf(s) {
+    var out = [];
+    String(s.text).replace(/\{(\w+)\}/g, function (m, k) {
+      if (!PRONOUN_SLOTS[k] && out.indexOf(k) < 0) out.push(k);
+      return m;
+    });
+    (s.needs || []).forEach(function (k) {
+      if (out.indexOf(k) < 0) out.push(k);
+    });
+    return out;
+  }
+
+  /* Where one sentence of a draft came from: its claims (from the bank), the
+     facts behind it (factKeys, see context's _facts), and the values it was
+     filled with ('when.<key>' for a `when` it matched). `sources` keeps the
+     fact keys per slot, for verify(). */
+  var CLAIM_FACTS = { lateWork: 'record.late', notHandedIn: 'notHandedIn' };
+  function provenance(s, ctx) {
+    var own = Object.prototype.hasOwnProperty;
+    var values = {};
+    var sources = {};
+    var factKeys = [];
+    var add = function (k) {
+      if (factKeys.indexOf(k) < 0) factKeys.push(k);
+    };
+    slotsOf(s).forEach(function (k) {
+      values[k] = own.call(ctx, k) && ctx[k] != null ? String(ctx[k]) : '';
+      var fk = ctx._facts && own.call(ctx._facts, k) ? ctx._facts[k] : k === 'name' || k === 'course' ? [] : [k];
+      sources[k] = fk.slice();
+      fk.forEach(add);
+    });
+    var when = s.when || {};
+    Object.keys(when).forEach(function (k) {
+      values['when.' + k] = when[k];
+      add(k === 'picture' ? 'picture' : k === 'standing' ? 'overall' : 'habit:' + k);
+    });
+    (s.claims || []).forEach(function (c) {
+      if (CLAIM_FACTS[c]) add(CLAIM_FACTS[c]);
+    });
+    return {
+      sentenceId: s.id,
+      part: s.part,
+      claims: (s.claims || []).slice(),
+      factKeys: factKeys,
+      values: values,
+      sources: sources,
+    };
+  }
+
   /* A draft from the bank for one student: the sentences that fit, one per
      step, the least used for classmates first, a repeatable pick among the
      ties by `seed` (a new seed gives a new mix), never two in a row that
-     start with the same word. Returns { text, ids }. */
+     start with the same word. Returns { text, ids, sentences, provenance }:
+     the comment, the sentence ids, each sentence { id, part, text } in
+     order, and where each came from (provenance()), in the same order. */
   function draft(ctx, opts) {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
@@ -973,6 +1116,8 @@ window.CommentBank = (function () {
     var said = {};
     var out = [];
     var got = [];
+    var sentences = [];
+    var prov = [];
     DRAFT_STEPS.forEach(function (step, i) {
       if (step.unless != null && got[step.unless]) return;
       var cands = bank.sentences.filter(function (s) {
@@ -1025,11 +1170,15 @@ window.CommentBank = (function () {
         if (NO_REPEAT[k]) said[NO_REPEAT[k]] = true;
       });
       out.push(pick.t);
+      sentences.push({ id: pick.s.id, part: pick.s.part, text: pick.t });
+      prov.push(provenance(pick.s, ctx));
       got[i] = true;
     });
     return {
       text: out.join(' '),
       ids: Object.keys(taken),
+      sentences: sentences,
+      provenance: prov,
     };
   }
 
@@ -1038,6 +1187,403 @@ window.CommentBank = (function () {
     return (bank || COMMENT_BANK).sentences.filter(function (s) {
       return fits(s, ctx);
     }).length;
+  }
+
+  /* ── Verify ────────────────────────────────────────────────────────── */
+
+  /* What each claim a bank sentence makes needs to be true, checked against
+     the facts (not the context the draft was filled from). Each check reads
+     the sentence's provenance: its values and the fact keys behind each
+     slot. A claim with nothing to check fails. */
+  function _has(pv, k) {
+    return Object.prototype.hasOwnProperty.call(pv.values || {}, k);
+  }
+  function _ids(pv, slot, kind) {
+    return ((pv.sources || {})[slot] || [])
+      .filter(function (k) {
+        return k.indexOf(kind + ':') === 0;
+      })
+      .map(function (k) {
+        return k.slice(kind.length + 1);
+      });
+  }
+  function _byId(xs, id) {
+    return (xs || []).find(function (x) {
+      return String(x.id) === String(id);
+    });
+  }
+  function _maxTenths(xs, key) {
+    return xs.reduce(function (m, x) {
+      return Math.max(m, tenths(x[key]));
+    }, -Infinity);
+  }
+  /* The named items are at the top: none left out is higher than the
+     lowest named. */
+  function _atTop(named, all, key) {
+    if (!named.length || !named.every(Boolean)) return false;
+    var floor = Math.min.apply(
+      null,
+      named.map(function (x) {
+        return tenths(x[key]);
+      }),
+    );
+    return all.every(function (x) {
+      return named.indexOf(x) >= 0 || tenths(x[key]) <= floor;
+    });
+  }
+  function _article(w) {
+    return (/^[AEIOU]/.test(w) ? 'an ' : 'a ') + w;
+  }
+  /* Work labelled Missing this term (facts().notHandedIn; the record's
+     count for facts built without it). */
+  function _missingCount(f) {
+    if (f.notHandedIn && f.notHandedIn.count != null) return Number(f.notHandedIn.count) || 0;
+    return (f.record && f.record.missing) || 0;
+  }
+
+  var CLAIMS = {
+    // The overall standing: the letter, the proficiency word, or what the
+    // work shows overall.
+    grade: function (pv, f) {
+      var v = pv.values;
+      var now = f.overall > 0 ? word(f.overall) : '';
+      var checks = [];
+      if (_has(pv, 'letterStanding')) checks.push(!!f.letter && v.letterStanding === f.letter);
+      if (_has(pv, 'standing')) checks.push(!!now && f.standing === now && v.standing === _article(now) + ' level');
+      if (_has(pv, 'when.standing')) checks.push(!!now && f.standing === now && v['when.standing'] === now);
+      if (_has(pv, 'evidence')) checks.push(!!v.evidence && v.evidence === evidenceOf(f));
+      return checks.length > 0 && checks.every(Boolean);
+    },
+    // Results are even: every competency with a start and now is at the
+    // same proficiency word now.
+    even: function (pv, f) {
+      var withLevels = f.comps.filter(function (c) {
+        return c.start > 0 && c.now > 0;
+      });
+      var named = _ids(pv, 'even', 'comp');
+      return (
+        withLevels.length > 1 &&
+        named.length === withLevels.length &&
+        withLevels.every(function (c) {
+          return named.indexOf(String(c.id)) >= 0 && word(c.now) === word(withLevels[0].now);
+        })
+      );
+    },
+    // The strongest competencies, or the one the student feels strongest in
+    // when the sentence says the work agrees.
+    strength: function (pv, f) {
+      var ids = _ids(pv, 'strengths', 'comp').concat(_ids(pv, 'selfStrong', 'confidence'));
+      return _atTop(
+        ids.map(function (id) {
+          return _byId(f.comps, id);
+        }),
+        f.comps,
+        'level',
+      );
+    },
+    // Competencies to build: each below the highest now.
+    growthArea: function (pv, f) {
+      var ids = _ids(pv, 'growthAreas', 'comp')
+        .concat(_ids(pv, 'focusLow', 'comp'))
+        .concat(_ids(pv, 'selfLow', 'confidence'));
+      var top = _maxTenths(f.comps, 'level');
+      return (
+        ids.length > 0 &&
+        ids.every(function (id) {
+          var c = _byId(f.comps, id);
+          return !!c && tenths(c.level) < top;
+        })
+      );
+    },
+    improved: function (pv, f) {
+      var ids = _ids(pv, 'rise', 'comp');
+      return (
+        ids.length > 0 &&
+        ids.every(function (id) {
+          var c = _byId(f.comps, id);
+          return !!c && c.start > 0 && c.now > 0 && tenths(c.now) > tenths(c.start);
+        })
+      );
+    },
+    slipped: function (pv, f) {
+      var checks = [];
+      _ids(pv, 'fall', 'comp').forEach(function (id) {
+        var c = _byId(f.comps, id);
+        checks.push(!!c && c.start > 0 && c.now > 0 && tenths(c.now) < tenths(c.start));
+      });
+      if (_has(pv, 'fellCount')) {
+        var fell = f.comps.filter(function (c) {
+          return c.start > 0 && c.now > 0 && word(c.start) === 'Extending' && word(c.now) === 'Proficient';
+        });
+        checks.push(fell.length > 1 && pv.values.fellCount === (NUM[fell.length] || String(fell.length)));
+      }
+      return checks.length > 0 && checks.every(Boolean);
+    },
+    // The highest-marked work this term, with the proficiency it reached.
+    bestPiece: function (pv, f) {
+      var top = _maxTenths(f.work, 'v');
+      var checks = [];
+      ['assignment', 'seeWork'].forEach(function (slot) {
+        if (!_has(pv, slot)) return;
+        var w = _byId(f.work, _ids(pv, slot, 'work')[0]);
+        checks.push(!!w && w.title === pv.values[slot] && tenths(w.v) === top);
+        if (w && slot === 'assignment' && _has(pv, 'level')) checks.push(pv.values.level === f.levelText(w.v));
+      });
+      if (_has(pv, 'strongWorks'))
+        checks.push(
+          _atTop(
+            _ids(pv, 'strongWorks', 'work').map(function (id) {
+              return _byId(f.work, id);
+            }),
+            f.work,
+            'v',
+          ),
+        );
+      return checks.length > 0 && checks.every(Boolean);
+    },
+    // Work marked below the best this term.
+    weakPiece: function (pv, f) {
+      var top = _maxTenths(f.work, 'v');
+      var checks = [];
+      if (_has(pv, 'assignment2')) {
+        var w = _byId(f.work, _ids(pv, 'assignment2', 'work')[0]);
+        checks.push(!!w && w.title === pv.values.assignment2 && tenths(w.v) < top);
+        if (w && _has(pv, 'level2')) checks.push(pv.values.level2 === f.levelText(w.v));
+      }
+      if (_has(pv, 'weakWorks'))
+        checks.push(
+          _ids(pv, 'weakWorks', 'work').length > 0 &&
+            _ids(pv, 'weakWorks', 'work').every(function (id) {
+              var x = _byId(f.work, id);
+              return !!x && tenths(x.v) < top;
+            }),
+        );
+      return checks.length > 0 && checks.every(Boolean);
+    },
+    // Two pieces in the Focus Area: the one to show is marked at least as
+    // high there as the one to talk about.
+    focusWork: function (pv, f) {
+      var compId = _ids(pv, 'seeWork', 'comp').concat(_ids(pv, 'aboutWork', 'comp'))[0];
+      var c = _byId(f.comps, compId);
+      if (!c) return false;
+      var marks = function (slot) {
+        var id = _ids(pv, slot, 'work')[0];
+        return c.scores
+          .filter(function (sc) {
+            return id != null && String(sc.id) === id && sc.title === pv.values[slot];
+          })
+          .map(function (sc) {
+            return sc.v;
+          });
+      };
+      var see = _has(pv, 'seeWork') ? marks('seeWork') : null;
+      var about = _has(pv, 'aboutWork') ? marks('aboutWork') : null;
+      if ((see && !see.length) || (about && !about.length) || (!see && !about)) return false;
+      return !see || !about || Math.max.apply(null, see) >= Math.min.apply(null, about);
+    },
+    // The Focus Area and its I Can statement.
+    nextStep: function (pv, f) {
+      var compId = _ids(pv, 'focus', 'comp').concat(_ids(pv, 'nextStep', 'comp'))[0];
+      var c = _byId(f.comps, compId);
+      if (!c) return false;
+      if (_has(pv, 'focus') && pv.values.focus !== c.name) return false;
+      if (_has(pv, 'nextStep'))
+        return (
+          c.iCans
+            .map(function (t) {
+              return _ended(t);
+            })
+            .indexOf(pv.values.nextStep) >= 0
+        );
+      return true;
+    },
+    // The habit ratings the sentence was matched on or names.
+    habits: function (pv, f, ctx) {
+      var eff = ctx._habits || {};
+      var checks = [];
+      Object.keys(pv.values).forEach(function (k) {
+        var m = k.match(/^when\.(\w+)$/);
+        if (m && m[1] !== 'picture' && m[1] !== 'standing') checks.push(eff[m[1]] === pv.values[k]);
+      });
+      ['strengthHabits', 'strengthHabitNames', 'growthHabits', 'growthHabitNames'].forEach(function (slot) {
+        if (!_has(pv, slot)) return;
+        var ok = /^strength/.test(slot) ? [3, 4] : [1, 2];
+        var ids = _ids(pv, slot, 'habit');
+        checks.push(
+          ids.length > 0 &&
+            ids.every(function (k) {
+              return ok.indexOf(eff[k]) >= 0;
+            }),
+        );
+      });
+      return checks.length > 0 && checks.every(Boolean);
+    },
+    lateWork: function (pv, f) {
+      return !!f.record && f.record.late > 0;
+    },
+    notHandedIn: function (pv, f) {
+      return _missingCount(f) > 0;
+    },
+    attendance: function (pv, f) {
+      var checks = [];
+      if (_has(pv, 'absent')) checks.push(f.absent > 0 && pv.values.absent === String(f.absent));
+      if (_has(pv, 'late')) checks.push(f.late > 0 && pv.values.late === String(f.late));
+      return checks.length > 0 && checks.every(Boolean);
+    },
+    // An observation, quoted as written: never a private one; a thing to
+    // work on is a Growth note.
+    note: function (pv, f) {
+      var checks = [];
+      var one = function (textSlot, daySlot, dayText, growth) {
+        if (!_has(pv, textSlot) && !_has(pv, daySlot)) return;
+        var o = _byId(f.obs, _ids(pv, textSlot, 'obs')[0] || _ids(pv, daySlot, 'obs')[0]);
+        var ok = !!o && !isPrivateObservation(o) && (!growth || o.sentiment === 'growth');
+        if (ok && _has(pv, textSlot)) ok = pv.values[textSlot] === _ended(o.text);
+        if (ok && _has(pv, daySlot)) ok = pv.values[daySlot] === (o.day ? dayText(o.day) : '');
+        checks.push(ok);
+      };
+      one(
+        'note',
+        'when',
+        function (d) {
+          return 'on ' + d;
+        },
+        false,
+      );
+      one(
+        'concernNote',
+        'concernWhen',
+        function (d) {
+          return d;
+        },
+        true,
+      );
+      return checks.length > 0 && checks.every(Boolean);
+    },
+    // The student's own words and self-assessment.
+    studentWords: function (pv, f) {
+      var checks = [];
+      var said = { selfGood: 'good', selfHard: 'hard', goal: 'goal', plan: 'plan' };
+      Object.keys(said).forEach(function (slot) {
+        if (_has(pv, slot)) checks.push(!!pv.values[slot] && pv.values[slot] === _quote(f.voice[said[slot]]));
+      });
+      var conf = f.confidence || [];
+      [
+        ['selfStrong', 1],
+        ['selfLow', -1],
+      ].forEach(function (pair) {
+        if (!_has(pv, pair[0])) return;
+        var e = _byId(conf, _ids(pv, pair[0], 'confidence')[0]);
+        checks.push(
+          !!e &&
+            conf.length > 1 &&
+            e.name === pv.values[pair[0]] &&
+            (pair[1] > 0 ? e.c >= 3 : e.c <= 2) &&
+            conf.every(function (x) {
+              return pair[1] > 0 ? x.c <= e.c : x.c >= e.c;
+            }),
+        );
+      });
+      return checks.length > 0 && checks.every(Boolean);
+    },
+    // The picture of the term an opening or closer was written for.
+    picture: function (pv, f) {
+      return _has(pv, 'when.picture') && pv.values['when.picture'] === pictureOf(f.comps);
+    },
+    // "Benefits from extra support": nothing in FullVision says so.
+    support: function () {
+      return false;
+    },
+  };
+
+  /* The claims that fail for one sentence, and 'slots' when a value it was
+     filled with is no longer what the facts give or it no longer fits. */
+  function _failed(s, pv, f, ctx) {
+    var own = Object.prototype.hasOwnProperty;
+    var out = [];
+    var stale =
+      !fits(s, ctx) ||
+      Object.keys(pv.values || {}).some(function (k) {
+        if (/^when\./.test(k)) return false;
+        var now = own.call(ctx, k) && ctx[k] != null ? String(ctx[k]) : '';
+        return now !== pv.values[k];
+      });
+    if (stale) out.push('slots');
+    if (!Array.isArray(s.claims)) return out.concat('claims');
+    s.claims.forEach(function (c) {
+      if (!CLAIMS[c] || !CLAIMS[c](pv, f, ctx)) out.push(c);
+    });
+    return out;
+  }
+
+  /* The no-claim sentence that stands in for a failed one: one in the same
+     part that claims nothing, fits, and is not in the draft yet, its own
+     group first, then bank order. None when the part has no such sentence. */
+  function _fallback(s, ctx, bank, used) {
+    var cands = bank.sentences.filter(function (x) {
+      return x.part === s.part && Array.isArray(x.claims) && !x.claims.length && !used[x.id] && fits(x, ctx);
+    });
+    return (
+      cands.find(function (x) {
+        return x.group === s.group;
+      }) ||
+      cands[0] ||
+      null
+    );
+  }
+
+  /* Re-check a draft against the facts. Builds the slots afresh from the
+     facts and the same picks the draft was made with (context(f, picks)),
+     then checks every sentence: each value it was filled with must still be
+     what the facts give, and each claim it makes must hold (CLAIMS). A
+     sentence that fails is replaced by its part's no-claim sentence, or
+     left out when the part has none. Returns the draft's shape { text, ids,
+     sentences, provenance } plus `replaced`: [{ sentenceId, failed, by }],
+     `by` the stand-in's id or null. opts: { bank }. */
+  function verify(d, f, picks, opts) {
+    opts = opts || {};
+    var bank = opts.bank || COMMENT_BANK;
+    var ctx = context(f, picks);
+    var byId = {};
+    bank.sentences.forEach(function (s) {
+      byId[s.id] = s;
+    });
+    var used = {};
+    var prov = (d && d.provenance) || [];
+    prov.forEach(function (pv) {
+      used[pv.sentenceId] = true;
+    });
+    var sentences = [];
+    var out = [];
+    var replaced = [];
+    prov.forEach(function (pv, i) {
+      var s = byId[pv.sentenceId];
+      var failed = s ? _failed(s, pv, f, ctx) : ['unknown'];
+      if (!failed.length) {
+        sentences.push(d.sentences[i]);
+        out.push(pv);
+        return;
+      }
+      var stand = s ? _fallback(s, ctx, bank, used) : null;
+      replaced.push({ sentenceId: pv.sentenceId, failed: failed, by: stand ? stand.id : null });
+      if (!stand) return;
+      used[stand.id] = true;
+      sentences.push({ id: stand.id, part: stand.part, text: fill(stand, ctx) });
+      out.push(provenance(stand, ctx));
+    });
+    return {
+      text: sentences
+        .map(function (x) {
+          return x.text;
+        })
+        .join(' '),
+      ids: sentences.map(function (x) {
+        return x.id;
+      }),
+      sentences: sentences,
+      provenance: out,
+      replaced: replaced,
+    };
   }
 
   return {
@@ -1063,6 +1609,10 @@ window.CommentBank = (function () {
     familyOf: familyOf,
     forFamily: forFamily,
     draft: draft,
+    provenance: provenance,
+    verify: verify,
+    CLAIMS: CLAIMS,
+    pictureOf: pictureOf,
     seedFor: seedFor,
     DRAFT_STEPS: DRAFT_STEPS,
     list: list,

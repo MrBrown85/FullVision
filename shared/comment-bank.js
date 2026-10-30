@@ -10,6 +10,13 @@
    line of tqAutoNarrative the sentence came from on main before Oct 28 2026,
    or "new".
 
+   `claims` names what a sentence asserts about the student, for
+   CommentBank.verify(): grade, even, strength, growthArea, improved,
+   slipped, bestPiece, weakPiece, focusWork, nextStep, habits, lateWork,
+   notHandedIn, attendance, note, studentWords, picture, support. [] is a
+   sentence that asserts nothing, the stand-in for a sentence of its part
+   whose claim fails. Every sentence has the field; a test fails without it.
+
    Grown 2026-10-28 (Colin: "a large, high-quality bank" behind Generate):
    every habit at every level, openings and closers for each picture of the
    term, Overall by the proficiency word (`when.standing`), a competency
@@ -51,6 +58,7 @@ var COMMENT_BANK = {
       group: 'From Your Ratings',
       text: '{name} {strengthHabits}.',
       needs: ['strengthHabits'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -59,6 +67,7 @@ var COMMENT_BANK = {
       group: 'From Your Ratings',
       text: '{He} [is|are] working on {growthHabits}.',
       needs: ['growthHabits'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -67,6 +76,7 @@ var COMMENT_BANK = {
       group: 'From Your Ratings',
       text: 'In work habits, {name} is strongest at {strengthHabitNames}.',
       needs: ['strengthHabitNames'],
+      claims: ['habits'],
       src: '665',
     },
     {
@@ -75,6 +85,7 @@ var COMMENT_BANK = {
       group: 'From Your Ratings',
       text: 'Next to build in work habits: {growthHabitNames}.',
       needs: ['growthHabitNames'],
+      claims: ['habits'],
       src: '1241',
     },
     {
@@ -83,6 +94,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} comes prepared and takes an active, thoughtful part in class discussions.',
       when: { completes: 4, part: 4 },
+      claims: ['habits'],
       src: '728',
       except: ['pe', 'arts'],
     },
@@ -92,6 +104,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} hands in careful work on time and brings the same focus to class discussions.',
       when: { completes: 4, part: 4 },
+      claims: ['habits'],
       src: '729',
       except: ['pe', 'arts'],
     },
@@ -101,6 +114,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} completes work carefully and on time, and contributes regularly to class discussions.',
       when: { completes: 4, part: 3 },
+      claims: ['habits'],
       src: '733',
       except: ['pe', 'arts'],
     },
@@ -110,6 +124,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} is well prepared each day and adds thoughtful ideas when {he} [joins|join] a discussion.',
       when: { completes: 4, part: 3 },
+      claims: ['habits'],
       src: '735',
       except: ['pe', 'arts'],
     },
@@ -119,6 +134,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} completes work carefully and on time, and is working on sharing {his} ideas more often in class discussions.',
       when: { completes: 4, part: 2 },
+      claims: ['habits'],
       src: '738',
       except: ['pe', 'arts'],
     },
@@ -128,6 +144,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{His} written work shows strong understanding, and {he} [is|are] working on bringing that understanding into class discussions.',
       when: { completes: 4, part: 2 },
+      claims: ['habits'],
       src: '740',
       except: ['pe', 'arts'],
     },
@@ -137,6 +154,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} does careful independent work and is quiet in class discussions; sharing {his} ideas aloud is a next step.',
       when: { completes: 4, part: 1 },
+      claims: ['habits'],
       src: '743',
       except: ['pe', 'arts'],
     },
@@ -146,6 +164,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} keeps up with {his} work and is quick to share ideas and ask questions in class.',
       when: { completes: 3, part: 4 },
+      claims: ['habits'],
       src: '747',
       except: ['pe', 'arts'],
     },
@@ -155,6 +174,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} comes to class prepared, keeps up with {his} work and takes part in discussions.',
       when: { completes: 3, part: 3 },
+      claims: ['habits'],
       src: '751',
       except: ['pe', 'arts'],
     },
@@ -164,6 +184,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} keeps up with {his} work and tends to be quiet in discussions; sharing ideas more often is a next step.',
       when: { completes: 3, part: 2 },
+      claims: ['habits'],
       src: '756',
       except: ['pe', 'arts'],
     },
@@ -173,6 +194,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} keeps up with the work and rarely speaks in class discussions; building confidence to share is a next step.',
       when: { completes: 3, part: 1 },
+      claims: ['habits'],
       src: '760',
       except: ['pe', 'arts'],
     },
@@ -182,6 +204,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} takes an active part in class discussions; completing assignments as consistently is the next step.',
       when: { completes: 2, part: 4 },
+      claims: ['habits'],
       src: '764',
       except: ['pe', 'arts'],
     },
@@ -191,6 +214,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{His} contributions in class show understanding, and handing in work more consistently would let {his} assignments show it too.',
       when: { completes: 2, part: 4 },
+      claims: ['habits'],
       src: '765',
       except: ['pe', 'arts'],
     },
@@ -200,6 +224,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} takes part well in class, and {his} work completion has been uneven this term.',
       when: { completes: 2, part: 3 },
+      claims: ['habits'],
       src: '769',
       except: ['pe', 'arts'],
     },
@@ -209,6 +234,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: "{name}'s work completion and participation have been uneven this term.",
       when: { completes: 2, part: 2 },
+      claims: ['habits'],
       src: '773',
       except: ['pe', 'arts'],
     },
@@ -218,6 +244,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} is working on completing assignments and joining class discussions more often.',
       when: { completes: 2, part: 1 },
+      claims: ['habits'],
       src: '777',
       except: ['pe', 'arts'],
     },
@@ -227,6 +254,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} contributes often in class discussions, and missing or late assignments are making it hard for {him} to show what {he} [knows|know].',
       when: { completes: 1, part: 4 },
+      claims: ['habits', 'notHandedIn'],
       src: '781',
       except: ['pe', 'arts'],
     },
@@ -236,6 +264,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: '{name} takes part in class, and keeping up with assignments has been difficult this term.',
       when: { completes: 1, part: 3 },
+      claims: ['habits'],
       src: '785',
       except: ['pe', 'arts'],
     },
@@ -245,6 +274,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: 'Completing work and taking part in class have both been difficult for {name} this term.',
       when: { completes: 1, part: 2 },
+      claims: ['habits'],
       src: '789',
       except: ['pe', 'arts'],
     },
@@ -254,6 +284,7 @@ var COMMENT_BANK = {
       group: 'Completes Work and Takes Part',
       text: 'Completing work and taking part in class have both been difficult for {name} this term, and a plan for both is the next step.',
       when: { completes: 1, part: 1 },
+      claims: ['habits'],
       src: '793',
       except: ['pe', 'arts'],
     },
@@ -263,6 +294,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: '{name} hands in careful work on time.',
       when: { completes: 4 },
+      claims: ['habits'],
       src: '804',
       except: ['pe', 'arts'],
     },
@@ -272,6 +304,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: '{He} [is|are] reliable about finishing work well and on time.',
       when: { completes: 4 },
+      claims: ['habits'],
       src: '805',
       except: ['pe', 'arts'],
     },
@@ -281,6 +314,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: '{name} generally hands in work on time and with care.',
       when: { completes: 3 },
+      claims: ['habits'],
       src: '808',
       except: ['pe', 'arts'],
     },
@@ -290,6 +324,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: '{name} is dependable with {his} assignments.',
       when: { completes: 3 },
+      claims: ['habits'],
       src: '809',
       except: ['pe', 'arts'],
     },
@@ -299,6 +334,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: "{name}'s work completion has been uneven: some assignments are complete and others are not finished.",
       when: { completes: 2 },
+      claims: ['habits'],
       src: '813',
       except: ['pe', 'arts'],
     },
@@ -308,6 +344,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: '{name} has had trouble completing assignments on time.',
       when: { completes: 2 },
+      claims: ['habits'],
       src: '1211',
       except: ['pe', 'arts'],
     },
@@ -317,6 +354,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: 'Handing in work has been difficult for {name} this term.',
       when: { completes: 1 },
+      claims: ['habits'],
       src: '817',
       except: ['pe', 'arts'],
     },
@@ -326,6 +364,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: 'Completing and handing in work is the main habit to build this term.',
       when: { completes: 1 },
+      claims: ['habits'],
       src: '816',
       except: ['pe', 'arts'],
     },
@@ -335,6 +374,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name} brings ideas and questions to class discussions.',
       when: { part: 4 },
+      claims: ['habits'],
       src: '825',
     },
     {
@@ -343,6 +383,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{His} contributions add to class discussions.',
       when: { part: 4 },
+      claims: ['habits'],
       src: '824',
     },
     {
@@ -351,6 +392,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name} takes part regularly, and {his} contributions show engagement with the material.',
       when: { part: 3 },
+      claims: ['habits'],
       src: '829',
     },
     {
@@ -359,6 +401,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name} takes part when asked; volunteering ideas more often is a next step.',
       when: { part: 2 },
+      claims: ['habits'],
       src: '832',
     },
     {
@@ -367,6 +410,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name} is often quiet in class and is working on sharing {his} thinking.',
       when: { part: 2 },
+      claims: ['habits'],
       src: '833',
     },
     {
@@ -375,6 +419,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name} rarely speaks in class discussions; finding comfortable ways to contribute is a next step.',
       when: { part: 1 },
+      claims: ['habits'],
       src: '837',
     },
     {
@@ -383,6 +428,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: '{name} needs regular check-ins to stay focused during work time.',
       when: { ready: 2 },
+      claims: ['habits'],
       src: '1209',
     },
     {
@@ -391,6 +437,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: '{name} can drift off task during work time and needs reminders to get back to it.',
       when: { ready: 1 },
+      claims: ['habits'],
       src: '1213',
     },
     {
@@ -399,6 +446,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: '{name} is working on keeping {his} materials and work organized.',
       when: { ready: 2 },
+      claims: ['habits'],
       src: '1212',
     },
     {
@@ -407,6 +455,7 @@ var COMMENT_BANK = {
       group: 'Works With Others',
       text: '{name} is working on handling disagreements with classmates calmly.',
       when: { others: 2 },
+      claims: ['habits'],
       src: '1214',
     },
     {
@@ -415,6 +464,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: '{name} sometimes avoids challenging tasks and sticks to what feels safe.',
       when: { feedback: 2 },
+      claims: ['habits'],
       src: '1216',
     },
     {
@@ -423,6 +473,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: '{name} sometimes rushes through work without taking time to check it.',
       when: { feedback: 2 },
+      claims: ['habits'],
       src: '1217',
     },
     {
@@ -431,6 +482,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: '{name} is building confidence to trust {his} own ideas.',
       when: { feedback: 1 },
+      claims: ['habits'],
       src: '1215',
     },
     {
@@ -439,6 +491,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name} sometimes has difficulty managing {his} device during class time.',
       when: { devices: 2 },
+      claims: ['habits'],
       src: '1208',
     },
     {
@@ -447,6 +500,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name} uses {his} device for learning and puts {his} phone away when asked.',
       when: { devices: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -454,6 +508,7 @@ var COMMENT_BANK = {
       part: 'habits',
       group: 'Support',
       text: '{name} benefits from extra support and encouragement.',
+      claims: ['support'],
       src: '1206',
     },
     {
@@ -462,6 +517,7 @@ var COMMENT_BANK = {
       group: 'Attendance',
       text: '{name} has been absent from {absent} classes this term, which has affected {his} continuity in class.',
       needs: ['absent'],
+      claims: ['attendance'],
       src: '1210',
     },
     {
@@ -470,6 +526,7 @@ var COMMENT_BANK = {
       group: 'Attendance',
       text: '{name} has arrived late {late} times this term.',
       needs: ['late'],
+      claims: ['attendance'],
       src: '1207',
     },
     {
@@ -478,6 +535,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} has had a strong term in {course}.',
       when: { picture: 'strong' },
+      claims: ['picture'],
       src: '580',
     },
     {
@@ -486,6 +544,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} has done good work in {course} this term.',
       when: { picture: 'strong' },
+      claims: ['picture'],
       src: '583',
     },
     {
@@ -494,6 +553,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: "There is a lot to recognize in {name}'s work in {course} this term.",
       when: { picture: 'strong' },
+      claims: ['picture'],
       src: '584',
     },
     {
@@ -502,6 +562,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} has had a steady term in {course}.',
       when: { picture: 'steady' },
+      claims: ['picture'],
       src: '588',
     },
     {
@@ -510,6 +571,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} has made steady progress in {course}, with clear highlights along the way.',
       when: { picture: 'steady' },
+      claims: ['picture'],
       src: '591',
     },
     {
@@ -518,6 +580,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: "{name}'s skills in {course} are getting stronger.",
       when: { picture: 'steady' },
+      claims: ['picture'],
       src: '592',
     },
     {
@@ -526,6 +589,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} has worked through some challenges in {course} this term.',
       when: { picture: 'challenge' },
+      claims: ['picture'],
       src: '596',
     },
     {
@@ -534,6 +598,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: 'This term in {course} has had ups and downs for {name}, with clear things to build on.',
       when: { picture: 'challenge' },
+      claims: ['picture'],
       src: '597',
     },
     {
@@ -542,6 +607,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} is early in {course}, and {his} strengths are still coming into view.',
       when: { picture: 'early' },
+      claims: ['picture'],
       src: '603',
     },
     {
@@ -550,6 +616,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} is working at {standing} overall. {His} strongest work is in {strengths}, with more room to grow in {growthAreas}.',
       needs: ['standing', 'strengths', 'growthAreas'],
+      claims: ['grade', 'strength', 'growthArea'],
       src: '865',
     },
     {
@@ -558,6 +625,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} is working at {standing} overall, with {his} strongest results in {strengths}.',
       needs: ['standing', 'strengths'],
+      claims: ['grade', 'strength'],
       src: '881',
     },
     {
@@ -566,6 +634,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} is working at {standing} overall. {He} [does|do] {his} best work in {strengths} and could use more support in {growthAreas}.',
       needs: ['standing', 'strengths', 'growthAreas'],
+      claims: ['grade', 'strength', 'growthArea'],
       src: '866',
     },
     {
@@ -574,6 +643,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} is working at {standing} overall, with fairly even results across the competencies.',
       needs: ['standing', 'even'],
+      claims: ['grade', 'even'],
       src: '898',
     },
     {
@@ -582,6 +652,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} has {letterStanding} overall, with {his} strongest work in {strengths}.',
       needs: ['letterStanding', 'strengths'],
+      claims: ['grade', 'strength'],
       src: '875',
     },
     {
@@ -590,6 +661,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{He} [has|have] shown particular strength in {strengths}.',
       needs: ['strengths'],
+      claims: ['strength'],
       src: '940',
     },
     {
@@ -598,6 +670,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} does {his} best work in {strengths}.',
       needs: ['strengths'],
+      claims: ['strength'],
       src: '942',
     },
     {
@@ -606,6 +679,7 @@ var COMMENT_BANK = {
       group: 'Growth This Term',
       text: 'This term {he} [has|have] grown most in {rise}.',
       needs: ['rise'],
+      claims: ['improved'],
       src: 'new',
     },
     {
@@ -614,6 +688,7 @@ var COMMENT_BANK = {
       group: 'Growth This Term',
       text: '{His} results in {rise} have moved up since the start of the term.',
       needs: ['rise'],
+      claims: ['improved'],
       src: 'new',
     },
     {
@@ -622,6 +697,7 @@ var COMMENT_BANK = {
       group: 'Growth This Term',
       text: '{He} began the term at Extending in {fellCount} competencies and is now Proficient in each.',
       needs: ['fellCount'],
+      claims: ['slipped'],
       src: 'new',
     },
     {
@@ -630,6 +706,7 @@ var COMMENT_BANK = {
       group: 'Growth This Term',
       text: '{He} [is|are] also growing in {growthHabitNames}.',
       needs: ['growthHabitNames'],
+      claims: ['habits'],
       src: '713',
     },
     {
@@ -638,6 +715,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: 'For example, {he} did well on the {assignment} ({level}), while the {assignment2} was more of a challenge ({level2}).',
       needs: ['assignment', 'level', 'assignment2', 'level2'],
+      claims: ['bestPiece', 'weakPiece'],
       src: '958',
     },
     {
@@ -646,6 +724,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: 'A highlight was the {assignment}, where {he} reached {level}.',
       needs: ['assignment', 'level'],
+      claims: ['bestPiece'],
       src: '973',
     },
     {
@@ -654,6 +733,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: '{He} did particularly well on the {assignment} ({level}).',
       needs: ['assignment', 'level'],
+      claims: ['bestPiece'],
       src: '974',
     },
     {
@@ -662,6 +742,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: 'The {assignment} showed clear understanding, at {level}.',
       needs: ['assignment', 'level'],
+      claims: ['bestPiece'],
       src: '975',
     },
     {
@@ -670,6 +751,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: 'Results were strongest on {strongWorks}; {weakWorks} showed what still needs work.',
       needs: ['strongWorks', 'weakWorks'],
+      claims: ['bestPiece', 'weakPiece'],
       src: '967',
     },
     {
@@ -678,6 +760,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: 'Across {his} assessed work this term, {he} [has|have] shown {evidence}.',
       needs: ['evidence'],
+      claims: ['grade'],
       src: '1010',
     },
     {
@@ -686,6 +769,7 @@ var COMMENT_BANK = {
       group: 'From Your Notes',
       text: 'For example, {when} I noted: “{note}”',
       needs: ['note'],
+      claims: ['note'],
       src: '1061',
     },
     {
@@ -694,6 +778,7 @@ var COMMENT_BANK = {
       group: 'From Your Notes',
       text: 'One moment from class {when}: “{note}”',
       needs: ['note'],
+      claims: ['note'],
       src: '1046',
     },
     {
@@ -702,6 +787,7 @@ var COMMENT_BANK = {
       group: 'From Your Notes',
       text: 'A recent observation: “{note}”',
       needs: ['note'],
+      claims: ['note'],
       src: '1063',
     },
     {
@@ -710,6 +796,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: 'In {his} own words, {he} [is|are] good at this: {selfGood}',
       needs: ['selfGood'],
+      claims: ['studentWords'],
       src: 'new',
     },
     {
@@ -718,6 +805,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: '{name} says {his} biggest challenge right now is this: {selfHard}',
       needs: ['selfHard'],
+      claims: ['studentWords'],
       src: 'new',
     },
     {
@@ -726,6 +814,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: 'In {his} self-assessment, {name} feels confident about {selfStrong} and less sure about {selfLow}.',
       needs: ['selfStrong', 'selfLow'],
+      claims: ['studentWords'],
       src: '1165',
     },
     {
@@ -734,6 +823,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: "{name}'s self-assessment shows confidence in {selfStrong}, which matches {his} work this term.",
       needs: ['selfStrong'],
+      claims: ['strength', 'studentWords'],
       src: '1178',
     },
     {
@@ -742,6 +832,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: '{His} next step is in {focus}: “{nextStep}”',
       needs: ['focus', 'nextStep'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -750,6 +841,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'Next, {he} will work toward this goal in {focus}: “{nextStep}”',
       needs: ['focus', 'nextStep'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -758,6 +850,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'The main areas to focus on next are {growthAreas}.',
       needs: ['growthAreas'],
+      claims: ['growthArea'],
       src: '947',
       except: ['pe', 'career'],
     },
@@ -767,6 +860,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'For next term, the priority areas are {growthAreas}.',
       needs: ['growthAreas'],
+      claims: ['growthArea'],
       src: '949',
       except: ['pe', 'career'],
     },
@@ -776,6 +870,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'Next term, the focus will be on building {his} skills in {growthAreas}.',
       needs: ['growthAreas'],
+      claims: ['growthArea'],
       src: '1265',
       except: ['pe', 'career'],
     },
@@ -785,6 +880,7 @@ var COMMENT_BANK = {
       group: 'Work to Revisit',
       text: 'The {assignment2} ({level2}) is a good piece to revisit.',
       needs: ['assignment2', 'level2'],
+      claims: ['weakPiece'],
       src: '987',
       except: ['pe'],
     },
@@ -794,6 +890,7 @@ var COMMENT_BANK = {
       group: 'From Your Notes',
       text: 'One thing to work on, from {concernWhen}: “{concernNote}”',
       needs: ['concernNote'],
+      claims: ['note'],
       src: '1055',
     },
     {
@@ -802,6 +899,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: '{His} own goal is this: {goal}',
       needs: ['goal'],
+      claims: ['studentWords'],
       src: 'new',
     },
     {
@@ -810,6 +908,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'At home, ask {him} to show you {his} {seeWork} and to talk about how {he} could improve {his} {aboutWork}.',
       needs: ['seeWork', 'aboutWork'],
+      claims: ['focusWork'],
       src: 'new',
       except: ['pe'],
     },
@@ -819,6 +918,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'A good conversation at home: ask {name} to explain {his} {seeWork}, then what {he} would change in {his} {aboutWork}.',
       needs: ['seeWork', 'aboutWork'],
+      claims: ['focusWork'],
       src: 'new',
       except: ['pe'],
     },
@@ -828,6 +928,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: "{name}'s plan: {plan}",
       needs: ['plan'],
+      claims: ['studentWords'],
       src: 'new',
     },
     {
@@ -836,6 +937,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, {he} will get targeted practice in {growthAreas}.',
       needs: ['growthAreas'],
+      claims: ['growthArea'],
       src: '1255',
       except: ['pe', 'career'],
     },
@@ -845,6 +947,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, {he} will get feedback on {his} {focus} work and a chance to revise it.',
       needs: ['focus'],
+      claims: ['nextStep'],
       src: '1263',
       except: ['pe'],
     },
@@ -853,6 +956,7 @@ var COMMENT_BANK = {
       part: 'how',
       group: 'Looking Ahead',
       text: 'Next term, the goal is to build on what is working and keep using feedback.',
+      claims: [],
       src: '1274',
     },
     {
@@ -860,6 +964,7 @@ var COMMENT_BANK = {
       part: 'how',
       group: 'Looking Ahead',
       text: 'With continued effort, {name} is well placed to keep growing in {course}.',
+      claims: [],
       src: '1296',
     },
     {
@@ -867,6 +972,7 @@ var COMMENT_BANK = {
       part: 'how',
       group: 'Looking Ahead',
       text: '{name} is building {his} skills step by step, and steady progress counts.',
+      claims: [],
       src: '1299',
     },
     {
@@ -874,6 +980,7 @@ var COMMENT_BANK = {
       part: 'how',
       group: 'Looking Ahead',
       text: 'With consistent effort and support, {name} can make real progress next term.',
+      claims: [],
       src: '1304',
     },
     {
@@ -882,6 +989,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: '{name} finishes {his} work and hands it in on time, every time.',
       when: { completes: 4 },
+      claims: ['habits'],
       src: 'new',
       except: ['pe', 'arts'],
     },
@@ -891,6 +999,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: 'Work comes in complete, on time and done with care.',
       when: { completes: 4 },
+      claims: ['habits'],
       src: 'new',
       except: ['pe', 'arts'],
     },
@@ -900,6 +1009,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: '{name} can be counted on to finish what {he} [starts|start].',
       when: { completes: 4 },
+      claims: ['habits'],
       src: 'new',
       except: ['pe', 'arts'],
     },
@@ -909,6 +1019,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: 'Most of {name}’s work comes in on time, and it is usually complete.',
       when: { completes: 3 },
+      claims: ['habits'],
       src: 'new',
       except: ['pe', 'arts'],
     },
@@ -918,6 +1029,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: '{name} keeps up with the work, with the occasional late piece.',
       when: { completes: 3 },
+      claims: ['habits', 'lateWork'],
       src: 'new',
       except: ['pe', 'arts'],
     },
@@ -927,6 +1039,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: 'Some assignments come in on time and complete; others arrive late or unfinished.',
       when: { completes: 2 },
+      claims: ['habits'],
       src: 'new',
       except: ['pe', 'arts'],
     },
@@ -936,6 +1049,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: '{name} is working on finishing assignments before they are due.',
       when: { completes: 2 },
+      claims: ['habits'],
       src: 'new',
       except: ['pe', 'arts'],
     },
@@ -945,6 +1059,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: 'Several assignments have not come in, which makes it hard to see what {name} knows.',
       when: { completes: 1 },
+      claims: ['habits', 'notHandedIn'],
       src: 'new',
       except: ['pe', 'arts'],
     },
@@ -954,6 +1069,7 @@ var COMMENT_BANK = {
       group: 'Completes Work',
       text: 'Getting work finished and handed in is the first thing for {name} to work on.',
       when: { completes: 1 },
+      claims: ['habits'],
       src: 'new',
       except: ['pe', 'arts'],
     },
@@ -963,6 +1079,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: '{name} arrives ready to work and uses class time well.',
       when: { ready: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -971,6 +1088,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: '{name} settles into work quickly and stays with it for the whole period.',
       when: { ready: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -979,6 +1097,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: '{He} [comes|come] with what {he} [needs|need], and {he} [gets|get] started without being asked.',
       when: { ready: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -987,6 +1106,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: '{name} usually comes prepared and makes good use of class time.',
       when: { ready: 3 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -995,6 +1115,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: '{name} gets to work most days and needs only the odd reminder to stay with it.',
       when: { ready: 3 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1003,6 +1124,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: '{name} sometimes arrives without materials, which slows {his} start.',
       when: { ready: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1011,6 +1133,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: 'Class time is not always used well; {name} is working on starting sooner and staying on task.',
       when: { ready: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1019,6 +1142,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: '{name} often arrives without what {he} [needs|need] and loses work time as a result.',
       when: { ready: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1027,6 +1151,7 @@ var COMMENT_BANK = {
       group: 'Comes Ready and Uses Class Time',
       text: 'Staying on task during work time is hard for {name} right now, and it is the habit to build first.',
       when: { ready: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1035,6 +1160,7 @@ var COMMENT_BANK = {
       group: 'Works With Others',
       text: '{name} works well in a group: {he} [listens|listen], {he} [shares|share] the work, and {he} [helps|help] others along.',
       when: { others: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1043,6 +1169,7 @@ var COMMENT_BANK = {
       group: 'Works With Others',
       text: 'Classmates like working with {name}, who pulls {his} weight and listens to other ideas.',
       when: { others: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1051,6 +1178,7 @@ var COMMENT_BANK = {
       group: 'Works With Others',
       text: '{name} is a steady partner who helps a group get its work done.',
       when: { others: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1059,6 +1187,7 @@ var COMMENT_BANK = {
       group: 'Works With Others',
       text: '{name} usually works well with others and shares the work in a group.',
       when: { others: 3 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1067,6 +1196,7 @@ var COMMENT_BANK = {
       group: 'Works With Others',
       text: 'In groups {name} does {his} share and is learning to listen as much as {he} [talks|talk].',
       when: { others: 3 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1075,6 +1205,7 @@ var COMMENT_BANK = {
       group: 'Works With Others',
       text: 'Group work is uneven for {name}: some days {he} [leads|lead] well, other days {he} [lets|let] others carry it.',
       when: { others: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1083,6 +1214,7 @@ var COMMENT_BANK = {
       group: 'Works With Others',
       text: '{name} is working on sharing the work more evenly with a group.',
       when: { others: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1091,6 +1223,7 @@ var COMMENT_BANK = {
       group: 'Works With Others',
       text: 'Working with others is hard for {name} right now, and group tasks often stall.',
       when: { others: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1099,6 +1232,7 @@ var COMMENT_BANK = {
       group: 'Works With Others',
       text: '{name} needs support to take a fair part in group work.',
       when: { others: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1107,6 +1241,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name} asks good questions and adds to class discussions every day.',
       when: { part: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1115,6 +1250,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name}’s questions often move the whole class forward.',
       when: { part: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1123,6 +1259,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name} joins in discussions and asks questions when something is unclear.',
       when: { part: 3 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1131,6 +1268,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name} speaks up in small groups more than with the whole class, and both are growing.',
       when: { part: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1139,6 +1277,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name} listens closely and is working on adding {his} own ideas out loud.',
       when: { part: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1147,6 +1286,7 @@ var COMMENT_BANK = {
       group: 'Takes Part',
       text: '{name} takes little part in discussions; a question or an idea a day would be a good start.',
       when: { part: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1155,6 +1295,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: '{name} reads feedback carefully and uses it the next time.',
       when: { feedback: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1163,6 +1304,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: 'When work comes back with comments, {name} revises it and the next piece is better for it.',
       when: { feedback: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1171,6 +1313,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: '{name} asks for help when stuck and keeps going until the work is right.',
       when: { feedback: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1179,6 +1322,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: '{name} usually acts on feedback and is learning to ask for help sooner.',
       when: { feedback: 3 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1187,6 +1331,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: '{name} takes feedback well and is starting to use it before handing work in.',
       when: { feedback: 3 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1195,6 +1340,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: '{name} reads feedback but does not always go back and fix the work.',
       when: { feedback: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1203,6 +1349,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: 'Asking for help is a next step for {name}, who often waits too long when stuck.',
       when: { feedback: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1211,6 +1358,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: 'Feedback is not yet changing {name}’s work; revising one piece with help would be a good start.',
       when: { feedback: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1219,6 +1367,7 @@ var COMMENT_BANK = {
       group: 'Uses Feedback',
       text: '{name} tends to give up when a task gets hard, and we are working on asking for help instead.',
       when: { feedback: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1227,6 +1376,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name} uses {his} device for the task at hand and puts it away when asked.',
       when: { devices: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1235,6 +1385,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: 'Devices are a tool for {name}, not a distraction.',
       when: { devices: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1243,6 +1394,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name} usually uses {his} device for learning and needs only the odd reminder.',
       when: { devices: 3 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1251,6 +1403,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name} mostly keeps {his} phone away and uses the laptop for the work.',
       when: { devices: 3 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1259,6 +1412,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name}’s phone sometimes pulls {his} attention away from the work.',
       when: { devices: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1267,6 +1421,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: 'Keeping {his} device on task is a habit {name} is still building.',
       when: { devices: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1275,6 +1430,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name}’s device is often a distraction, and managing it is the first habit to work on.',
       when: { devices: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1283,6 +1439,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: 'Phone use during class is getting in the way of {name}’s learning.',
       when: { devices: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1291,6 +1448,7 @@ var COMMENT_BANK = {
       group: 'From Your Ratings',
       text: 'What stands out in {name}’s work habits: {strengthHabitNames}.',
       needs: ['strengthHabitNames'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1299,6 +1457,7 @@ var COMMENT_BANK = {
       group: 'From Your Ratings',
       text: 'The work habit to grow next: {growthHabitNames}.',
       needs: ['growthHabitNames'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1307,6 +1466,7 @@ var COMMENT_BANK = {
       group: 'From Your Ratings',
       text: '{name} {strengthHabits}. {He} [is|are] working on {growthHabits}.',
       needs: ['strengthHabits', 'growthHabits'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1315,6 +1475,7 @@ var COMMENT_BANK = {
       group: 'Support',
       text: '{name} does best with a clear routine and a check-in partway through a task.',
       when: { ready: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1323,6 +1484,7 @@ var COMMENT_BANK = {
       group: 'Support',
       text: 'A quiet check-in at the start of work time helps {name} get going.',
       when: { ready: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1331,6 +1493,7 @@ var COMMENT_BANK = {
       group: 'Attendance',
       text: '{name} has missed {absent} classes and been late {late} times this term, and the gaps show in {his} work.',
       needs: ['absent', 'late'],
+      claims: ['attendance'],
       src: 'new',
     },
     {
@@ -1339,6 +1502,7 @@ var COMMENT_BANK = {
       group: 'Attendance',
       text: '{name} has missed {absent} classes this term; catching up on what was missed is part of the plan.',
       needs: ['absent'],
+      claims: ['attendance'],
       src: 'new',
     },
     {
@@ -1347,6 +1511,7 @@ var COMMENT_BANK = {
       group: 'Attendance',
       text: 'Being in class matters: {name} has been absent {absent} times this term.',
       needs: ['absent'],
+      claims: ['attendance'],
       src: 'new',
     },
     {
@@ -1355,6 +1520,7 @@ var COMMENT_BANK = {
       group: 'Attendance',
       text: 'Arriving late ({late} times this term) means {name} misses the start of the lesson, which is where the instructions are.',
       needs: ['late'],
+      claims: ['attendance'],
       src: 'new',
     },
     {
@@ -1363,6 +1529,7 @@ var COMMENT_BANK = {
       group: 'Attendance',
       text: '{name} has been late {late} times this term, and being on time would help {him} start with everyone else.',
       needs: ['late'],
+      claims: ['attendance'],
       src: 'new',
     },
     {
@@ -1371,6 +1538,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} has done strong work in {course} this term.',
       when: { picture: 'strong' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1379,6 +1547,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: 'This has been a good term for {name} in {course}.',
       when: { picture: 'strong' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1387,6 +1556,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} is doing well in {course} and growing in confidence.',
       when: { picture: 'strong' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1395,6 +1565,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} has had a solid term in {course}.',
       when: { picture: 'steady' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1403,6 +1574,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} has kept a steady pace in {course} this term.',
       when: { picture: 'steady' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1411,6 +1583,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: 'In {course}, {name} is building skills step by step.',
       when: { picture: 'steady' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1419,6 +1592,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} has found parts of {course} hard this term, and there are clear places to build from.',
       when: { picture: 'challenge' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1427,6 +1601,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: 'This term in {course} has been a mix for {name}: some real strengths and some areas that need work.',
       when: { picture: 'challenge' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1435,6 +1610,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} is working hard in {course}, and some skills are still coming together.',
       when: { picture: 'challenge' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1443,6 +1619,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: 'It has been a demanding term for {name} in {course}, with progress in some areas and more needed in others.',
       when: { picture: 'challenge' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1451,6 +1628,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} is just getting started in {course}, and the first results are in.',
       when: { picture: 'early' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1459,6 +1637,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: 'With only a few assessments so far, {name}’s picture in {course} is still forming.',
       when: { picture: 'early' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1467,6 +1646,7 @@ var COMMENT_BANK = {
       group: 'Openings',
       text: '{name} has made a start in {course}; the next few weeks will show more.',
       when: { picture: 'early' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -1475,6 +1655,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} is working at an Extending level overall, beyond what the course expects at this point.',
       when: { standing: 'Extending' },
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -1484,6 +1665,7 @@ var COMMENT_BANK = {
       text: 'Overall, {name} is Extending: {his} work in {strengths} goes well past the expected level.',
       needs: ['strengths'],
       when: { standing: 'Extending' },
+      claims: ['grade', 'strength'],
       src: 'new',
     },
     {
@@ -1493,6 +1675,7 @@ var COMMENT_BANK = {
       text: 'Across the competencies {name} is at an Extending level, with the deepest work in {strengths}.',
       needs: ['strengths'],
       when: { standing: 'Extending' },
+      claims: ['grade', 'strength'],
       src: 'new',
     },
     {
@@ -1501,6 +1684,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} is working at a Proficient level overall, meeting the course expectations.',
       when: { standing: 'Proficient' },
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -1510,6 +1694,7 @@ var COMMENT_BANK = {
       text: 'Overall, {name} is Proficient: {he} [meets|meet] the expectations, with the strongest results in {strengths}.',
       needs: ['strengths'],
       when: { standing: 'Proficient' },
+      claims: ['grade', 'strength'],
       src: 'new',
     },
     {
@@ -1519,6 +1704,7 @@ var COMMENT_BANK = {
       text: '{name} is Proficient overall, and the next growth will come in {growthAreas}.',
       needs: ['growthAreas'],
       when: { standing: 'Proficient' },
+      claims: ['grade', 'growthArea'],
       src: 'new',
     },
     {
@@ -1527,6 +1713,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} is working at a Developing level overall, partway to the course expectations.',
       when: { standing: 'Developing' },
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -1536,6 +1723,7 @@ var COMMENT_BANK = {
       text: 'Overall, {name} is Developing: {he} [shows|show] partial understanding, strongest in {strengths}.',
       needs: ['strengths'],
       when: { standing: 'Developing' },
+      claims: ['grade', 'strength'],
       src: 'new',
     },
     {
@@ -1545,6 +1733,7 @@ var COMMENT_BANK = {
       text: '{name} is Developing overall, and {growthAreas} need the most attention.',
       needs: ['growthAreas'],
       when: { standing: 'Developing' },
+      claims: ['grade', 'growthArea'],
       src: 'new',
     },
     {
@@ -1553,6 +1742,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} is at an Emerging level overall, at the start of the course’s expectations.',
       when: { standing: 'Emerging' },
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -1562,6 +1752,7 @@ var COMMENT_BANK = {
       text: 'Overall, {name} is Emerging: the understanding is beginning, with the firmest ground so far in {strengths}.',
       needs: ['strengths'],
       when: { standing: 'Emerging' },
+      claims: ['grade', 'strength'],
       src: 'new',
     },
     {
@@ -1571,6 +1762,7 @@ var COMMENT_BANK = {
       text: '{name} is Emerging overall, so the focus is on the basics in {growthAreas}.',
       needs: ['growthAreas'],
       when: { standing: 'Emerging' },
+      claims: ['grade', 'growthArea'],
       src: 'new',
     },
     {
@@ -1579,6 +1771,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name} has {letterStanding} overall. {His} best results are in {strengths}; {growthAreas} need more work.',
       needs: ['letterStanding', 'strengths', 'growthAreas'],
+      claims: ['grade', 'strength', 'growthArea'],
       src: 'new',
     },
     {
@@ -1587,6 +1780,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: 'Overall, {name} has {letterStanding}, with fairly even results across the competencies.',
       needs: ['letterStanding', 'even'],
+      claims: ['grade', 'even'],
       src: 'new',
     },
     {
@@ -1595,6 +1789,7 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: '{name}’s results are even across the competencies, with no one area far ahead or behind.',
       needs: ['even'],
+      claims: ['even'],
       src: 'new',
     },
     {
@@ -1603,6 +1798,7 @@ var COMMENT_BANK = {
       group: 'Growth This Term',
       text: 'The biggest change this term is in {rise}, where {name}’s results have climbed.',
       needs: ['rise'],
+      claims: ['improved'],
       src: 'new',
     },
     {
@@ -1611,6 +1807,7 @@ var COMMENT_BANK = {
       group: 'Growth This Term',
       text: '{name}’s work in {rise} is stronger now than at the start of the term.',
       needs: ['rise'],
+      claims: ['improved'],
       src: 'new',
     },
     {
@@ -1619,6 +1816,7 @@ var COMMENT_BANK = {
       group: 'Growth This Term',
       text: 'Results in {fall} have slipped since the start of the term, and that is where we will look first.',
       needs: ['fall'],
+      claims: ['slipped'],
       src: 'new',
     },
     {
@@ -1627,6 +1825,7 @@ var COMMENT_BANK = {
       group: 'Growth This Term',
       text: '{name} started the term strongly in {fall}, and the more recent work there has not matched it.',
       needs: ['fall'],
+      claims: ['slipped'],
       src: 'new',
     },
     {
@@ -1635,6 +1834,7 @@ var COMMENT_BANK = {
       group: 'Growth This Term',
       text: '{name} has grown in {rise} while holding steady elsewhere.',
       needs: ['rise', 'even'],
+      claims: ['even', 'improved'],
       src: 'new',
     },
     {
@@ -1643,6 +1843,7 @@ var COMMENT_BANK = {
       group: 'Growth This Term',
       text: '{He} began the term at Extending in {fellCount} competencies; the recent work there is Proficient, so the next step is to get back to that earlier standard.',
       needs: ['fellCount'],
+      claims: ['slipped'],
       src: 'new',
     },
     {
@@ -1651,6 +1852,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: 'The {assignment} was {name}’s best work this term, at {level}.',
       needs: ['assignment', 'level'],
+      claims: ['bestPiece'],
       src: 'new',
     },
     {
@@ -1659,6 +1861,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: 'On the {assignment}, {name} reached {level}, which shows what {he} can do.',
       needs: ['assignment', 'level'],
+      claims: ['bestPiece'],
       src: 'new',
     },
     {
@@ -1667,6 +1870,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: 'The {assignment2} ({level2}) shows where the understanding is still thin.',
       needs: ['assignment2', 'level2'],
+      claims: ['weakPiece'],
       src: 'new',
     },
     {
@@ -1675,6 +1879,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: 'The gap between the {assignment} ({level}) and the {assignment2} ({level2}) shows where to focus.',
       needs: ['assignment', 'level', 'assignment2', 'level2'],
+      claims: ['bestPiece', 'weakPiece'],
       src: 'new',
     },
     {
@@ -1683,6 +1888,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: '{name}’s strongest pieces were {strongWorks}.',
       needs: ['strongWorks'],
+      claims: ['bestPiece'],
       src: 'new',
     },
     {
@@ -1691,6 +1897,7 @@ var COMMENT_BANK = {
       group: 'Examples From Work',
       text: 'Harder for {name} this term: {weakWorks}. That is where the next work will go.',
       needs: ['weakWorks'],
+      claims: ['weakPiece'],
       src: 'new',
     },
     {
@@ -1699,6 +1906,7 @@ var COMMENT_BANK = {
       group: 'From Your Notes',
       text: 'From class {when}: “{note}”',
       needs: ['note', 'when'],
+      claims: ['note'],
       src: 'new',
     },
     {
@@ -1707,6 +1915,7 @@ var COMMENT_BANK = {
       group: 'From Your Notes',
       text: 'One thing I saw {when}: “{note}”',
       needs: ['note', 'when'],
+      claims: ['note'],
       src: 'new',
     },
     {
@@ -1715,6 +1924,7 @@ var COMMENT_BANK = {
       group: 'From Your Notes',
       text: 'A note from my records: “{note}”',
       needs: ['note'],
+      claims: ['note'],
       src: 'new',
     },
     {
@@ -1723,6 +1933,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: 'Asked what {he} [is|are] good at, {name} said: {selfGood}',
       needs: ['selfGood'],
+      claims: ['studentWords'],
       src: 'new',
     },
     {
@@ -1731,6 +1942,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: '{name} knows what is hard right now: {selfHard}',
       needs: ['selfHard'],
+      claims: ['studentWords'],
       src: 'new',
     },
     {
@@ -1739,6 +1951,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: '{name} sees {himself} as strongest in {selfStrong}, and {his} work agrees.',
       needs: ['selfStrong'],
+      claims: ['strength', 'studentWords'],
       src: 'new',
     },
     {
@@ -1747,6 +1960,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: '{name} feels least sure about {selfLow}, which matches what I see and gives us a clear place to work.',
       needs: ['selfLow'],
+      claims: ['growthArea', 'studentWords'],
       src: 'new',
     },
     {
@@ -1755,6 +1969,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'The next step for {name} is in {focus}: “{nextStep}”',
       needs: ['focus', 'nextStep'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -1763,6 +1978,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'In {focus}, {name} is working toward this: “{nextStep}”',
       needs: ['focus', 'nextStep'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -1771,6 +1987,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'The goal we have set together is in {focus}: “{nextStep}”',
       needs: ['focus', 'nextStep'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -1779,6 +1996,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: '{focusLow} is the area to build next.',
       needs: ['focusLow'],
+      claims: ['growthArea'],
       src: 'new',
       except: ['pe', 'career'],
     },
@@ -1788,6 +2006,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'The next push is in {focusLow}, where the results have the most room to grow.',
       needs: ['focusLow'],
+      claims: ['growthArea'],
       src: 'new',
       except: ['pe', 'career'],
     },
@@ -1797,6 +2016,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'For the rest of the term, {name}’s work will centre on {growthAreas}.',
       needs: ['growthAreas'],
+      claims: ['growthArea'],
       src: 'new',
       except: ['pe', 'career'],
     },
@@ -1806,6 +2026,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'Growth in {growthAreas} would lift {name}’s overall standing.',
       needs: ['growthAreas'],
+      claims: ['growthArea'],
       src: 'new',
       except: ['pe', 'career'],
     },
@@ -1815,6 +2036,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'Getting back to the earlier standard in {fall} is the first goal.',
       needs: ['fall'],
+      claims: ['slipped'],
       src: 'new',
     },
     {
@@ -1823,6 +2045,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'Keeping up the growth in {rise}, and bringing the same approach to {growthAreas}, is the next step.',
       needs: ['rise', 'growthAreas'],
+      claims: ['growthArea', 'improved'],
       src: 'new',
       except: ['pe', 'career'],
     },
@@ -1832,6 +2055,7 @@ var COMMENT_BANK = {
       group: 'Work to Revisit',
       text: 'Revising the {assignment2} would be a good way to work on {focus}.',
       needs: ['assignment2', 'focus'],
+      claims: ['weakPiece', 'nextStep'],
       src: 'new',
       except: ['pe'],
     },
@@ -1841,6 +2065,7 @@ var COMMENT_BANK = {
       group: 'Work to Revisit',
       text: 'A second try at the {assignment2} ({level2}) would show what {name} has learned since.',
       needs: ['assignment2', 'level2'],
+      claims: ['weakPiece'],
       src: 'new',
       except: ['pe'],
     },
@@ -1850,6 +2075,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: '{name}’s own goal fits well: {goal}',
       needs: ['goal'],
+      claims: ['studentWords'],
       src: 'new',
     },
     {
@@ -1858,6 +2084,7 @@ var COMMENT_BANK = {
       group: "In the Student's Words",
       text: '{name} has set {himself} a goal: {goal} It is the right one.',
       needs: ['goal'],
+      claims: ['studentWords'],
       src: 'new',
     },
     {
@@ -1866,6 +2093,7 @@ var COMMENT_BANK = {
       group: 'From Your Notes',
       text: 'Something to keep working on, from {concernWhen}: “{concernNote}”',
       needs: ['concernNote', 'concernWhen'],
+      claims: ['note'],
       src: 'new',
     },
     {
@@ -1874,6 +2102,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'At home, ask {name} to walk you through {his} {seeWork}; it is {his} best work this term.',
       needs: ['seeWork'],
+      claims: ['bestPiece', 'focusWork'],
       src: 'new',
       except: ['pe'],
     },
@@ -1883,6 +2112,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'Ask {name} what {he} would do differently on the {aboutWork}; talking it through helps.',
       needs: ['aboutWork'],
+      claims: ['focusWork'],
       src: 'new',
       except: ['pe'],
     },
@@ -1891,6 +2121,7 @@ var COMMENT_BANK = {
       part: 'how',
       group: 'At Home',
       text: 'A good question at home: “What are you working on in {course} this week?”',
+      claims: [],
       src: 'new',
     },
     {
@@ -1898,6 +2129,7 @@ var COMMENT_BANK = {
       part: 'how',
       group: 'At Home',
       text: 'At home, ask {name} to explain one idea from {course} in {his} own words.',
+      claims: [],
       src: 'new',
     },
     {
@@ -1906,6 +2138,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'Asking {name} to show you {his} {focus} work, and what {he} [is|are] trying to improve, keeps the goal in view.',
       needs: ['focus'],
+      claims: ['nextStep'],
       src: 'new',
       except: ['pe'],
     },
@@ -1915,6 +2148,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: '{name}’s plan is a good one to ask about at home: {plan}',
       needs: ['plan'],
+      claims: ['studentWords'],
       src: 'new',
     },
     {
@@ -1923,6 +2157,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'A regular time and place for homework would help {name} keep up.',
       when: { completes: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1931,6 +2166,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'Checking the due dates together each week would help {name} get work in on time.',
       when: { completes: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1939,6 +2175,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'Keeping the phone out of the room during homework would help {name} focus.',
       when: { devices: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1947,6 +2184,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, {name} will get more practice in {focus} and feedback on each piece.',
       needs: ['focus'],
+      claims: ['nextStep'],
       src: 'new',
       except: ['pe'],
     },
@@ -1956,6 +2194,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'I will check in with {name} on {his} {focus} work and point to the next thing to try.',
       needs: ['focus'],
+      claims: ['nextStep'],
       src: 'new',
       except: ['pe'],
     },
@@ -1965,6 +2204,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, we will work on {growthAreas} with short, focused tasks and quick feedback.',
       needs: ['growthAreas'],
+      claims: ['growthArea'],
       src: 'new',
       except: ['pe', 'career'],
     },
@@ -1974,6 +2214,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: '{name} and I have agreed on a next step and will check it at the next assessment.',
       needs: ['nextStep'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -1982,6 +2223,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, I will ask {name} for one question or idea each lesson to build {his} confidence in discussions.',
       when: { part: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1990,6 +2232,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'A short check-in at the start of work time will help {name} get going.',
       when: { ready: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -1998,6 +2241,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'I will ask {name} to revise one piece with the feedback before the next assessment.',
       when: { feedback: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2006,6 +2250,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: '{name} is well set up for the rest of the year in {course}.',
       when: { picture: 'strong' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -2014,6 +2259,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'The challenge now is to keep stretching: {name} is ready for more.',
       when: { picture: 'strong' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -2022,6 +2268,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'With this start, {name} can aim high for the rest of the term.',
       when: { picture: 'strong' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -2030,6 +2277,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'Steady work like this will keep {name} moving forward in {course}.',
       when: { picture: 'steady' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -2038,6 +2286,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'If {name} keeps this up, the next report should show more growth.',
       when: { picture: 'steady' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -2046,6 +2295,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'With the next step in view, {name} has a clear path for the rest of the term.',
       when: { picture: 'steady' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -2054,6 +2304,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'With support at home and in class, {name} can turn this term’s challenges around.',
       when: { picture: 'challenge' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -2063,6 +2314,7 @@ var COMMENT_BANK = {
       text: 'The next few weeks matter: a focused effort in {growthAreas} would make a real difference for {name}.',
       needs: ['growthAreas'],
       when: { picture: 'challenge' },
+      claims: ['growthArea', 'picture'],
       src: 'new',
       except: ['pe', 'career'],
     },
@@ -2072,6 +2324,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'Small, steady steps are the way forward for {name}, and the plan above is where to start.',
       when: { picture: 'challenge' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -2080,6 +2333,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'It is early, and the next assessments will give {name} a chance to show more.',
       when: { picture: 'early' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -2088,6 +2342,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'As more work comes in, {name}’s strengths in {course} will become clearer.',
       when: { picture: 'early' },
+      claims: ['picture'],
       src: 'new',
     },
     {
@@ -2095,6 +2350,7 @@ var COMMENT_BANK = {
       part: 'how',
       group: 'Looking Ahead',
       text: 'I look forward to seeing what {name} does with the next step.',
+      claims: [],
       src: 'new',
     },
     {
@@ -2102,6 +2358,7 @@ var COMMENT_BANK = {
       part: 'how',
       group: 'Looking Ahead',
       text: 'Please get in touch if you would like to talk about {name}’s progress.',
+      claims: [],
       src: 'new',
     },
     {
@@ -2111,6 +2368,7 @@ var COMMENT_BANK = {
       text: '{name} takes part in every activity and gives full effort from warm-up to the end.',
       when: { completes: 4 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2120,6 +2378,7 @@ var COMMENT_BANK = {
       text: '{name} is dressed, ready and in the game every class.',
       when: { completes: 4 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2129,6 +2388,7 @@ var COMMENT_BANK = {
       text: '{name} takes part most days and is building the habit of full effort every time.',
       when: { completes: 3 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2138,6 +2398,7 @@ var COMMENT_BANK = {
       text: 'Participation is uneven: some classes {name} is fully in, and in others {he} [sits|sit] out or {he} [holds|hold] back.',
       when: { completes: 2 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2147,6 +2408,7 @@ var COMMENT_BANK = {
       text: '{name} often misses activities or sits out, and taking part is the first thing to work on.',
       when: { completes: 1 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2156,6 +2418,7 @@ var COMMENT_BANK = {
       text: '{name} arrives changed and ready and is moving as soon as the activity starts.',
       when: { ready: 4 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2165,6 +2428,7 @@ var COMMENT_BANK = {
       text: '{name} usually comes ready for activity and needs only the odd reminder to get going.',
       when: { ready: 3 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2174,6 +2438,7 @@ var COMMENT_BANK = {
       text: '{name} sometimes arrives without gear, which costs {him} the start of the activity.',
       when: { ready: 2 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2183,6 +2448,7 @@ var COMMENT_BANK = {
       text: '{name} often arrives without gear and loses most of the activity as a result.',
       when: { ready: 1 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2192,6 +2458,7 @@ var COMMENT_BANK = {
       text: '{name} plays fair, passes the ball and includes classmates of every skill level.',
       when: { others: 4 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2201,6 +2468,7 @@ var COMMENT_BANK = {
       text: '{name} is a good teammate who encourages others and shares the play.',
       when: { others: 4 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2210,6 +2478,7 @@ var COMMENT_BANK = {
       text: '{name} usually plays fair and is learning to include everyone on the team.',
       when: { others: 3 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2219,6 +2488,7 @@ var COMMENT_BANK = {
       text: '{name} is working on sharing the play and keeping {his} cool when a game gets close.',
       when: { others: 2 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2228,6 +2498,7 @@ var COMMENT_BANK = {
       text: 'Fair play and including others are hard for {name} right now, and we are working on both.',
       when: { others: 1 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2237,6 +2508,7 @@ var COMMENT_BANK = {
       text: '{name} is first to volunteer for demonstrations and keeps the energy up in every activity.',
       when: { part: 4 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2246,6 +2518,7 @@ var COMMENT_BANK = {
       text: '{name} joins in readily and asks for a turn when one comes up.',
       when: { part: 3 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2255,6 +2528,7 @@ var COMMENT_BANK = {
       text: '{name} takes part when asked and is building the confidence to volunteer.',
       when: { part: 2 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2264,6 +2538,7 @@ var COMMENT_BANK = {
       text: '{name} listens to coaching, tries the correction right away and keeps practising it.',
       when: { feedback: 4 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2273,6 +2548,7 @@ var COMMENT_BANK = {
       text: '{name} usually tries a correction when it is given and is learning to ask for one.',
       when: { feedback: 3 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2282,6 +2558,7 @@ var COMMENT_BANK = {
       text: '{name} hears the coaching but does not always try the change; one skill worked on with help would be a good start.',
       when: { feedback: 2 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2291,6 +2568,7 @@ var COMMENT_BANK = {
       text: '{name} leaves {his} phone in the change room and is fully present for the activity.',
       when: { devices: 4 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2300,6 +2578,7 @@ var COMMENT_BANK = {
       text: '{name}’s phone comes out between activities and sometimes during them, which breaks {his} focus.',
       when: { devices: 2 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2309,6 +2588,7 @@ var COMMENT_BANK = {
       text: '{name}’s phone is in {his} hand during activities, and keeping it away is the first habit to build.',
       when: { devices: 1 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2318,6 +2598,7 @@ var COMMENT_BANK = {
       text: '{name} is working at an Extending level in PE: the skills are strong, and {he} [applies|apply] them well in games.',
       when: { standing: 'Extending' },
       subjects: ['pe'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2327,6 +2608,7 @@ var COMMENT_BANK = {
       text: '{name} is Proficient in PE: {he} [meets|meet] the expectations for skills, effort and fair play.',
       when: { standing: 'Proficient' },
       subjects: ['pe'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2336,6 +2618,7 @@ var COMMENT_BANK = {
       text: '{name} is Developing in PE: the skills are coming, and consistent effort will bring them along.',
       when: { standing: 'Developing' },
       subjects: ['pe'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2345,6 +2628,7 @@ var COMMENT_BANK = {
       text: '{name} is Emerging in PE: the basic skills are at an early stage, and regular participation is the way to build them.',
       when: { standing: 'Emerging' },
       subjects: ['pe'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2354,6 +2638,7 @@ var COMMENT_BANK = {
       text: '{name}’s best unit was the {assignment}, at {level}.',
       needs: ['assignment', 'level'],
       subjects: ['pe'],
+      claims: ['bestPiece'],
       src: 'new',
     },
     {
@@ -2363,6 +2648,7 @@ var COMMENT_BANK = {
       text: 'In the {assignment} {name} showed {level} skills; the {assignment2} was harder ({level2}).',
       needs: ['assignment', 'level', 'assignment2', 'level2'],
       subjects: ['pe'],
+      claims: ['bestPiece', 'weakPiece'],
       src: 'new',
     },
     {
@@ -2372,6 +2658,7 @@ var COMMENT_BANK = {
       text: 'The next step for {name} in PE is in the {focus} competency: “{nextStep}”',
       needs: ['focus', 'nextStep'],
       subjects: ['pe'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -2380,6 +2667,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'For the rest of the term, {name}’s focus in PE is steady effort and trying each skill with full attention.',
       subjects: ['pe'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2389,6 +2677,7 @@ var COMMENT_BANK = {
       text: 'Moving every class, not just on the days {he} [enjoys|enjoy], is the next step for {name}.',
       when: { completes: 2 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2398,6 +2687,7 @@ var COMMENT_BANK = {
       text: 'Being dressed and ready for every class is the first goal; the skills follow from being there.',
       when: { ready: 1 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2406,6 +2696,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'At home, ask {name} which activity {he} [enjoys|enjoy] most in PE and what {he} [is|are] working on in it.',
       subjects: ['pe'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2414,6 +2705,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'Any activity outside school, from a walk to a team sport, builds what we work on in PE.',
       subjects: ['pe'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2423,6 +2715,7 @@ var COMMENT_BANK = {
       text: 'Having PE gear packed the night before would help {name} start every class with everyone else.',
       when: { ready: 2 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2431,6 +2724,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, I will give {name} one skill to focus on each unit and check it with {him} as we go.',
       subjects: ['pe'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2440,6 +2734,7 @@ var COMMENT_BANK = {
       text: 'In class, I will put {name} with partners who bring out {his} best effort.',
       when: { others: 2 },
       subjects: ['pe'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2448,6 +2743,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'With steady participation, {name} will see the skills improve by the next report.',
       subjects: ['pe'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2457,6 +2753,7 @@ var COMMENT_BANK = {
       text: '{name} is prepared for every rehearsal and completes each stage of a project on time.',
       when: { completes: 4 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2466,6 +2763,7 @@ var COMMENT_BANK = {
       text: '{name} keeps {his} practice and project work up to date most weeks.',
       when: { completes: 3 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2475,6 +2773,7 @@ var COMMENT_BANK = {
       text: '{name}’s project work is uneven: some stages come in finished, others fall behind.',
       when: { completes: 2 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2484,6 +2783,7 @@ var COMMENT_BANK = {
       text: 'Finishing pieces and keeping up with rehearsal preparation is the first thing for {name} to work on.',
       when: { completes: 1 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2493,6 +2793,7 @@ var COMMENT_BANK = {
       text: '{name} comes with {his} materials ready and uses studio and rehearsal time to the full.',
       when: { ready: 4 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2502,6 +2803,7 @@ var COMMENT_BANK = {
       text: '{name} usually settles into studio work quickly and makes good use of the time.',
       when: { ready: 3 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2511,6 +2813,7 @@ var COMMENT_BANK = {
       text: '{name} sometimes drifts during studio time; a clear goal for each session helps.',
       when: { ready: 2 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2520,6 +2823,7 @@ var COMMENT_BANK = {
       text: '{name} is a generous collaborator who listens, supports others’ ideas and holds up {his} part of a group piece.',
       when: { others: 4 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2529,6 +2833,7 @@ var COMMENT_BANK = {
       text: 'In ensemble work {name} usually does {his} share and is learning to build on others’ ideas.',
       when: { others: 3 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2538,6 +2843,7 @@ var COMMENT_BANK = {
       text: 'Group and ensemble work is hard for {name} right now; sharing the lead is the next step.',
       when: { others: 2 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2547,6 +2853,7 @@ var COMMENT_BANK = {
       text: '{name} takes creative risks and is willing to share work in progress.',
       when: { part: 4 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2556,6 +2863,7 @@ var COMMENT_BANK = {
       text: '{name} shares {his} work when asked and is growing more willing to volunteer.',
       when: { part: 3 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2565,6 +2873,7 @@ var COMMENT_BANK = {
       text: '{name} is cautious about sharing work and taking creative risks; a safe way to try both is the next step.',
       when: { part: 2 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2574,6 +2883,7 @@ var COMMENT_BANK = {
       text: '{name} rarely shares work or ideas, and building the confidence to do so is the first goal.',
       when: { part: 1 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2583,6 +2893,7 @@ var COMMENT_BANK = {
       text: '{name} takes critique well and {his} next piece shows it.',
       when: { feedback: 4 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2592,6 +2903,7 @@ var COMMENT_BANK = {
       text: '{name} usually acts on critique and is learning to seek it out before a piece is finished.',
       when: { feedback: 3 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2601,6 +2913,7 @@ var COMMENT_BANK = {
       text: '{name} hears critique but tends to leave the piece as it is; revising one work with help would be a good start.',
       when: { feedback: 2 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2610,6 +2923,7 @@ var COMMENT_BANK = {
       text: '{name} is working at an Extending level: the technique is strong and the work shows a voice of {his} own.',
       when: { standing: 'Extending' },
       subjects: ['arts'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2619,6 +2933,7 @@ var COMMENT_BANK = {
       text: '{name} is Proficient: the technique is sound and the work meets the expectations of the course.',
       when: { standing: 'Proficient' },
       subjects: ['arts'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2628,6 +2943,7 @@ var COMMENT_BANK = {
       text: '{name} is Developing: the technique is coming along and the ideas are starting to show in the work.',
       when: { standing: 'Developing' },
       subjects: ['arts'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2637,6 +2953,7 @@ var COMMENT_BANK = {
       text: '{name} is Emerging: the basic technique is at an early stage, and regular practice is the way forward.',
       when: { standing: 'Emerging' },
       subjects: ['arts'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2646,6 +2963,7 @@ var COMMENT_BANK = {
       text: 'The {assignment} was {name}’s strongest piece this term, at {level}.',
       needs: ['assignment', 'level'],
       subjects: ['arts'],
+      claims: ['bestPiece'],
       src: 'new',
     },
     {
@@ -2655,6 +2973,7 @@ var COMMENT_BANK = {
       text: '{name}’s {assignment} reached {level}; the {assignment2} ({level2}) shows where the technique is still growing.',
       needs: ['assignment', 'level', 'assignment2', 'level2'],
       subjects: ['arts'],
+      claims: ['bestPiece', 'weakPiece'],
       src: 'new',
     },
     {
@@ -2664,6 +2983,7 @@ var COMMENT_BANK = {
       text: 'The next step for {name} is in {focus}: “{nextStep}”, which the next piece will give {him} a chance to show.',
       needs: ['focus', 'nextStep'],
       subjects: ['arts'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -2673,6 +2993,7 @@ var COMMENT_BANK = {
       text: 'For the next project, {name}’s focus is on {growthAreas}.',
       needs: ['growthAreas'],
       subjects: ['arts'],
+      claims: ['growthArea'],
       src: 'new',
     },
     {
@@ -2682,6 +3003,7 @@ var COMMENT_BANK = {
       text: 'Reworking the {assignment2} ({level2}) with what {he} [has|have] learned since would be a good next piece.',
       needs: ['assignment2', 'level2'],
       subjects: ['arts'],
+      claims: ['weakPiece'],
       src: 'new',
     },
     {
@@ -2691,6 +3013,7 @@ var COMMENT_BANK = {
       text: 'Regular practice outside class is the next step; the technique grows between lessons as much as in them.',
       when: { completes: 2 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2700,6 +3023,7 @@ var COMMENT_BANK = {
       text: 'At home, ask {name} to show you {his} {seeWork} and talk about the choices {he} made in it.',
       needs: ['seeWork'],
       subjects: ['arts'],
+      claims: ['focusWork'],
       src: 'new',
     },
     {
@@ -2708,6 +3032,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'Ask {name} what {he} [is|are] rehearsing or making right now, and what {he} [wants|want] it to say.',
       subjects: ['arts'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2716,6 +3041,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'A regular practice time at home, even fifteen minutes, would move {name}’s technique along.',
       subjects: ['arts'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2724,6 +3050,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, {name} will get critique on each piece and time to act on it before it is finished.',
       subjects: ['arts'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2733,6 +3060,7 @@ var COMMENT_BANK = {
       text: 'In class, I will give {name} a role in the next ensemble piece that stretches {him} a little.',
       when: { part: 2 },
       subjects: ['arts'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2741,6 +3069,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'With steady practice and a willingness to take risks, {name}’s work will keep growing.',
       subjects: ['arts'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2750,6 +3079,7 @@ var COMMENT_BANK = {
       text: '{name} completes the practice every day and comes to class with questions from it.',
       when: { completes: 4 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2759,6 +3089,7 @@ var COMMENT_BANK = {
       text: '{name} keeps up with the practice most days, which shows in {his} tests.',
       when: { completes: 3 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2768,6 +3099,7 @@ var COMMENT_BANK = {
       text: '{name}’s practice is uneven, and the gaps show up on tests.',
       when: { completes: 2 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2777,6 +3109,7 @@ var COMMENT_BANK = {
       text: 'Doing the practice is the first thing for {name} to work on; the skills do not stick without it.',
       when: { completes: 1 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2786,6 +3119,7 @@ var COMMENT_BANK = {
       text: '{name} explains {his} thinking to the class and asks when a step is unclear.',
       when: { part: 4 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2795,6 +3129,7 @@ var COMMENT_BANK = {
       text: '{name} asks questions when stuck and is willing to try a problem at the board.',
       when: { part: 3 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2804,6 +3139,7 @@ var COMMENT_BANK = {
       text: '{name} works quietly and rarely asks when stuck; one question a class would be a good start.',
       when: { part: 2 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2813,6 +3149,7 @@ var COMMENT_BANK = {
       text: '{name} reads the corrections on {his} work, reworks the problems and learns from the mistakes.',
       when: { feedback: 4 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2822,6 +3159,7 @@ var COMMENT_BANK = {
       text: '{name} usually looks at corrections and is learning to rework the problems {he} got wrong.',
       when: { feedback: 3 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2831,6 +3169,7 @@ var COMMENT_BANK = {
       text: '{name} checks the mark but not the corrections; reworking the missed problems would help the next test.',
       when: { feedback: 2 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2840,6 +3179,7 @@ var COMMENT_BANK = {
       text: '{name} gives up quickly on a hard problem; staying with it and asking for a hint is the habit to build.',
       when: { feedback: 1 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2849,6 +3189,7 @@ var COMMENT_BANK = {
       text: '{name} is working at an Extending level: {he} [solves|solve] problems in more than one way and {he} [explains|explain] the reasoning clearly.',
       when: { standing: 'Extending' },
       subjects: ['math'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2858,6 +3199,7 @@ var COMMENT_BANK = {
       text: '{name} is Proficient: {he} [understands|understand] the concepts and {he} [shows|show] {his} steps clearly.',
       when: { standing: 'Proficient' },
       subjects: ['math'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2867,6 +3209,7 @@ var COMMENT_BANK = {
       text: '{name} is Developing: {he} can do the procedures with support and is building the understanding behind them.',
       when: { standing: 'Developing' },
       subjects: ['math'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2876,6 +3219,7 @@ var COMMENT_BANK = {
       text: '{name} is Emerging: the basic skills are at an early stage, and daily practice is the way to build them.',
       when: { standing: 'Emerging' },
       subjects: ['math'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -2885,6 +3229,7 @@ var COMMENT_BANK = {
       text: '{name}’s best result was the {assignment}, at {level}.',
       needs: ['assignment', 'level'],
       subjects: ['math'],
+      claims: ['bestPiece'],
       src: 'new',
     },
     {
@@ -2894,6 +3239,7 @@ var COMMENT_BANK = {
       text: 'The {assignment} ({level}) went well; the {assignment2} ({level2}) shows the skills still to firm up.',
       needs: ['assignment', 'level', 'assignment2', 'level2'],
       subjects: ['math'],
+      claims: ['bestPiece', 'weakPiece'],
       src: 'new',
     },
     {
@@ -2903,6 +3249,7 @@ var COMMENT_BANK = {
       text: 'The next step for {name} is in {focus}: “{nextStep}”',
       needs: ['focus', 'nextStep'],
       subjects: ['math'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -2912,6 +3259,7 @@ var COMMENT_BANK = {
       text: 'Showing every step, not just the answer, is the next thing for {name} to work on.',
       when: { feedback: 2 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2921,6 +3269,7 @@ var COMMENT_BANK = {
       text: 'Checking an answer before moving on would catch most of the mistakes {name} makes.',
       when: { feedback: 2 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2930,6 +3279,7 @@ var COMMENT_BANK = {
       text: 'Reworking the {assignment2} ({level2}) problem by problem would show {name} where the gaps are.',
       needs: ['assignment2', 'level2'],
       subjects: ['math'],
+      claims: ['weakPiece'],
       src: 'new',
     },
     {
@@ -2938,6 +3288,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'At home, ask {name} to explain one problem from this week’s practice, step by step.',
       subjects: ['math'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2947,6 +3298,7 @@ var COMMENT_BANK = {
       text: 'A set time for the practice each evening, phone in another room, would help {name} keep up.',
       when: { completes: 2 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2956,6 +3308,7 @@ var COMMENT_BANK = {
       text: 'Ask {name} to show you a problem {he} got wrong and how {he} would do it now.',
       when: { feedback: 2 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2965,6 +3318,7 @@ var COMMENT_BANK = {
       text: 'In class, {name} will get extra practice on {focus} and feedback on the steps, not just the answer.',
       needs: ['focus'],
       subjects: ['math'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -2974,6 +3328,7 @@ var COMMENT_BANK = {
       text: 'In class, I will check in with {name} during practice time so a hard problem gets a hint before it becomes a wall.',
       when: { feedback: 1 },
       subjects: ['math'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -2982,6 +3337,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'With the practice done daily, {name}’s results should climb by the next report.',
       subjects: ['math'],
+      claims: [],
       src: 'new',
     },
     {
@@ -2991,6 +3347,7 @@ var COMMENT_BANK = {
       text: '{name} works through each stage of a project and finishes to a good standard.',
       when: { completes: 4 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3000,6 +3357,7 @@ var COMMENT_BANK = {
       text: '{name} keeps projects moving and finishes most stages on time.',
       when: { completes: 3 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3009,6 +3367,7 @@ var COMMENT_BANK = {
       text: '{name}’s projects stall partway; finishing each stage before starting the next is the habit to build.',
       when: { completes: 2 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3018,6 +3377,7 @@ var COMMENT_BANK = {
       text: 'Finishing projects is the first thing for {name} to work on this term.',
       when: { completes: 1 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3027,6 +3387,7 @@ var COMMENT_BANK = {
       text: '{name} follows the safety rules every time and uses tools and equipment with care.',
       when: { ready: 4 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3036,6 +3397,7 @@ var COMMENT_BANK = {
       text: '{name} usually follows the safety rules and needs only the odd reminder about setup and cleanup.',
       when: { ready: 3 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3045,6 +3407,7 @@ var COMMENT_BANK = {
       text: '{name} needs reminders about safety and cleanup, which is the first thing to work on in the shop.',
       when: { ready: 2 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3054,6 +3417,7 @@ var COMMENT_BANK = {
       text: 'Safety rules are not yet a habit for {name}, and that comes before anything else.',
       when: { ready: 1 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3063,6 +3427,7 @@ var COMMENT_BANK = {
       text: '{name} shares tools and space well and helps classmates with a technique when asked.',
       when: { others: 4 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3072,6 +3437,7 @@ var COMMENT_BANK = {
       text: '{name} is learning to share tools and space and to keep a group project moving.',
       when: { others: 2 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3081,6 +3447,7 @@ var COMMENT_BANK = {
       text: '{name} tests, adjusts and tries again until the design works.',
       when: { feedback: 4 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3090,6 +3457,7 @@ var COMMENT_BANK = {
       text: '{name} usually adjusts a design when something does not work and is learning to plan for that.',
       when: { feedback: 3 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3099,6 +3467,7 @@ var COMMENT_BANK = {
       text: '{name} tends to push on with a design that is not working; stopping to test and adjust is the next step.',
       when: { feedback: 2 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3108,6 +3477,7 @@ var COMMENT_BANK = {
       text: '{name} is working at an Extending level: the work is careful, the designs are {his} own and the finish is strong.',
       when: { standing: 'Extending' },
       subjects: ['adst'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3117,6 +3487,7 @@ var COMMENT_BANK = {
       text: '{name} is Proficient: {he} [follows|follow] the process, {he} [uses|use] the tools well and {he} [finishes|finish] to the standard.',
       when: { standing: 'Proficient' },
       subjects: ['adst'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3126,6 +3497,7 @@ var COMMENT_BANK = {
       text: '{name} is Developing: the skills are coming along and the finish will improve with practice and care.',
       when: { standing: 'Developing' },
       subjects: ['adst'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3135,6 +3507,7 @@ var COMMENT_BANK = {
       text: '{name} is Emerging: the basic skills are at an early stage, and safe, careful practice is the way forward.',
       when: { standing: 'Emerging' },
       subjects: ['adst'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3144,6 +3517,7 @@ var COMMENT_BANK = {
       text: 'The {assignment} was {name}’s best project this term, at {level}.',
       needs: ['assignment', 'level'],
       subjects: ['adst'],
+      claims: ['bestPiece'],
       src: 'new',
     },
     {
@@ -3153,6 +3527,7 @@ var COMMENT_BANK = {
       text: 'The next step for {name} is in {focus}: “{nextStep}”, which the next project will call for.',
       needs: ['focus', 'nextStep'],
       subjects: ['adst'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -3162,6 +3537,7 @@ var COMMENT_BANK = {
       text: 'Planning the whole project before cutting, cooking or coding is the next step for {name}.',
       when: { feedback: 2 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3171,6 +3547,7 @@ var COMMENT_BANK = {
       text: 'Measuring twice and checking the plan would lift the finish of {name}’s work.',
       when: { feedback: 2 },
       subjects: ['adst'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3179,6 +3556,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'At home, ask {name} to show you a project and explain how {he} planned and made it.',
       subjects: ['adst'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3187,6 +3565,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'Any making at home, from cooking a meal to fixing a bike, builds what we do in class.',
       subjects: ['adst'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3195,6 +3574,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, {name} will get a check-in at each stage of the next project before moving to the next.',
       subjects: ['adst'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3203,6 +3583,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'With careful, safe work and projects finished, {name} is set up well for the next unit.',
       subjects: ['adst'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3212,6 +3593,7 @@ var COMMENT_BANK = {
       text: '{name} keeps up with the reading and hands in writing on time and revised.',
       when: { completes: 4 },
       subjects: ['ela'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3221,6 +3603,7 @@ var COMMENT_BANK = {
       text: '{name} keeps up with most of the reading and writing, with the occasional late piece.',
       when: { completes: 3 },
       subjects: ['ela'],
+      claims: ['habits', 'lateWork'],
       src: 'new',
     },
     {
@@ -3230,6 +3613,7 @@ var COMMENT_BANK = {
       text: '{name} falls behind on the reading, which makes the class discussions and writing harder.',
       when: { completes: 2 },
       subjects: ['ela'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3239,6 +3623,7 @@ var COMMENT_BANK = {
       text: '{name} revises after feedback, and each draft is better than the last.',
       when: { feedback: 4 },
       subjects: ['ela'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3248,6 +3633,7 @@ var COMMENT_BANK = {
       text: '{name} usually makes the revisions suggested and is learning to revise before handing in.',
       when: { feedback: 3 },
       subjects: ['ela'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3257,6 +3643,7 @@ var COMMENT_BANK = {
       text: '{name} hands in first drafts as finished work; revising one piece with the feedback would be a good start.',
       when: { feedback: 2 },
       subjects: ['ela'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3266,6 +3653,7 @@ var COMMENT_BANK = {
       text: '{name} contributes thoughtful ideas to discussions and listens closely to others.',
       when: { part: 4 },
       subjects: ['ela'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3275,6 +3663,7 @@ var COMMENT_BANK = {
       text: '{name} shares ideas in small groups more readily than with the whole class, and both are growing.',
       when: { part: 2 },
       subjects: ['ela'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3284,6 +3673,7 @@ var COMMENT_BANK = {
       text: '{name} is working at an Extending level: the reading is insightful and the writing is controlled and {his} own.',
       when: { standing: 'Extending' },
       subjects: ['ela'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3293,6 +3683,7 @@ var COMMENT_BANK = {
       text: '{name} is Proficient: {he} [reads|read] with understanding and {he} [writes|write] clearly, with ideas supported by evidence.',
       when: { standing: 'Proficient' },
       subjects: ['ela'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3302,6 +3693,7 @@ var COMMENT_BANK = {
       text: '{name} is Developing: the ideas are there, and organizing and supporting them in writing is the work ahead.',
       when: { standing: 'Developing' },
       subjects: ['ela'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3311,6 +3703,7 @@ var COMMENT_BANK = {
       text: '{name} is Emerging: reading and writing are at an early stage for this grade, and regular practice is the way forward.',
       when: { standing: 'Emerging' },
       subjects: ['ela'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3320,6 +3713,7 @@ var COMMENT_BANK = {
       text: '{name}’s strongest piece was the {assignment}, at {level}.',
       needs: ['assignment', 'level'],
       subjects: ['ela'],
+      claims: ['bestPiece'],
       src: 'new',
     },
     {
@@ -3329,6 +3723,7 @@ var COMMENT_BANK = {
       text: 'The next step for {name} is in {focus}: “{nextStep}”',
       needs: ['focus', 'nextStep'],
       subjects: ['ela'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -3338,6 +3733,7 @@ var COMMENT_BANK = {
       text: 'Supporting each idea with evidence from the text is the next step in {name}’s writing.',
       when: { feedback: 2 },
       subjects: ['ela'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3347,6 +3743,7 @@ var COMMENT_BANK = {
       text: 'Revising the {assignment2} ({level2}) with the feedback would show what {name} has learned since.',
       needs: ['assignment2', 'level2'],
       subjects: ['ela'],
+      claims: ['weakPiece'],
       src: 'new',
     },
     {
@@ -3355,6 +3752,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'At home, ask {name} what {he} [is|are] reading and what {he} [thinks|think] of it; talking about a book builds the thinking we want in writing.',
       subjects: ['ela'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3364,6 +3762,7 @@ var COMMENT_BANK = {
       text: 'Reading anything for twenty minutes a day, {his} own choice, would do more for {name}’s writing than any single assignment.',
       when: { completes: 2 },
       subjects: ['ela'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3372,6 +3771,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, {name} will get feedback on each draft and time to revise before the final copy.',
       subjects: ['ela'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3380,6 +3780,7 @@ var COMMENT_BANK = {
       group: 'Looking Ahead',
       text: 'With revision becoming a habit, {name}’s writing will keep improving.',
       subjects: ['ela'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3389,6 +3790,7 @@ var COMMENT_BANK = {
       text: '{name} brings evidence to class discussions and is willing to change {his} mind when it points the other way.',
       when: { part: 4 },
       subjects: ['socials'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3398,6 +3800,7 @@ var COMMENT_BANK = {
       text: '{name} takes part in discussions and is learning to back {his} views with evidence.',
       when: { part: 3 },
       subjects: ['socials'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3407,6 +3810,7 @@ var COMMENT_BANK = {
       text: '{name} uses feedback to strengthen {his} arguments and sources in the next piece.',
       when: { feedback: 4 },
       subjects: ['socials'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3416,6 +3820,7 @@ var COMMENT_BANK = {
       text: '{name} is learning to revise an argument, not just the wording, after feedback.',
       when: { feedback: 2 },
       subjects: ['socials'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3425,6 +3830,7 @@ var COMMENT_BANK = {
       text: '{name} is working at an Extending level: {he} [weighs|weigh] evidence carefully and {he} [builds|build] arguments of {his} own.',
       when: { standing: 'Extending' },
       subjects: ['socials'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3434,6 +3840,7 @@ var COMMENT_BANK = {
       text: '{name} is Proficient: {he} [uses|use] evidence to support a clear position and can explain more than one perspective.',
       when: { standing: 'Proficient' },
       subjects: ['socials'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3443,6 +3850,7 @@ var COMMENT_BANK = {
       text: '{name} is Developing: {he} can describe events and ideas, and using evidence to argue a position is the work ahead.',
       when: { standing: 'Developing' },
       subjects: ['socials'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3452,6 +3860,7 @@ var COMMENT_BANK = {
       text: '{name} is Emerging: the understanding is beginning, and working with sources step by step is the way forward.',
       when: { standing: 'Emerging' },
       subjects: ['socials'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3461,6 +3870,7 @@ var COMMENT_BANK = {
       text: 'The next step for {name} is in {focus}: “{nextStep}”',
       needs: ['focus', 'nextStep'],
       subjects: ['socials'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -3470,6 +3880,7 @@ var COMMENT_BANK = {
       text: 'Citing the source for each claim is the next step in {name}’s work.',
       when: { feedback: 2 },
       subjects: ['socials'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3478,6 +3889,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'At home, ask {name} about something in the news and what evidence would change {his} view of it.',
       subjects: ['socials'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3486,6 +3898,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, {name} will get practice weighing sources and feedback on how {he} [uses|use] them.',
       subjects: ['socials'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3495,6 +3908,7 @@ var COMMENT_BANK = {
       text: '{name} follows lab safety every time and records data carefully as {he} [goes|go].',
       when: { ready: 4 },
       subjects: ['science'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3504,6 +3918,7 @@ var COMMENT_BANK = {
       text: '{name} needs reminders about lab safety and setup, which comes first in a lab.',
       when: { ready: 2 },
       subjects: ['science'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3513,6 +3928,7 @@ var COMMENT_BANK = {
       text: '{name} is a reliable lab partner who shares the work and keeps the group on task.',
       when: { others: 4 },
       subjects: ['science'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3522,6 +3938,7 @@ var COMMENT_BANK = {
       text: 'In labs {name} sometimes lets a partner do the work; taking a full share is the next step.',
       when: { others: 2 },
       subjects: ['science'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3531,6 +3948,7 @@ var COMMENT_BANK = {
       text: '{name} is working at an Extending level: {he} [designs|design] sound investigations and {he} [explains|explain] the results with evidence.',
       when: { standing: 'Extending' },
       subjects: ['science'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3540,6 +3958,7 @@ var COMMENT_BANK = {
       text: '{name} is Proficient: {he} [understands|understand] the concepts and can plan, carry out and explain an investigation.',
       when: { standing: 'Proficient' },
       subjects: ['science'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3549,6 +3968,7 @@ var COMMENT_BANK = {
       text: '{name} is Developing: {he} can carry out an investigation with support, and explaining the results is the work ahead.',
       when: { standing: 'Developing' },
       subjects: ['science'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3558,6 +3978,7 @@ var COMMENT_BANK = {
       text: '{name} is Emerging: the understanding is beginning, and careful work in each lab is the way to build it.',
       when: { standing: 'Emerging' },
       subjects: ['science'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3567,6 +3988,7 @@ var COMMENT_BANK = {
       text: 'The next step for {name} is in {focus}: “{nextStep}”',
       needs: ['focus', 'nextStep'],
       subjects: ['science'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -3576,6 +3998,7 @@ var COMMENT_BANK = {
       text: 'Explaining what the data shows, not just recording it, is the next step for {name}.',
       when: { feedback: 2 },
       subjects: ['science'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3584,6 +4007,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'At home, ask {name} to explain one lab from this term: what the question was and what the results showed.',
       subjects: ['science'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3592,6 +4016,7 @@ var COMMENT_BANK = {
       group: 'In Class',
       text: 'In class, {name} will get feedback on each lab write-up and a chance to improve the next one.',
       subjects: ['science'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3601,6 +4026,7 @@ var COMMENT_BANK = {
       text: '{name} is working at an Extending level: {his} reflections are honest and detailed and {his} plans are {his} own.',
       when: { standing: 'Extending' },
       subjects: ['career'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3610,6 +4036,7 @@ var COMMENT_BANK = {
       text: '{name} is Proficient: {he} [reflects|reflect] thoughtfully and has a clear sense of the next steps.',
       when: { standing: 'Proficient' },
       subjects: ['career'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3619,6 +4046,7 @@ var COMMENT_BANK = {
       text: '{name} is Developing: the reflections are brief, and going deeper into {his} own goals is the work ahead.',
       when: { standing: 'Developing' },
       subjects: ['career'],
+      claims: ['grade'],
       src: 'new',
     },
     {
@@ -3628,6 +4056,7 @@ var COMMENT_BANK = {
       text: 'The next step for {name} is in the {focus} competency: “{nextStep}”',
       needs: ['focus', 'nextStep'],
       subjects: ['career'],
+      claims: ['nextStep'],
       src: 'new',
     },
     {
@@ -3637,6 +4066,7 @@ var COMMENT_BANK = {
       text: 'Reflecting in more depth on what {he} [learns|learn] about {himself} is the next step for {name}.',
       when: { feedback: 2 },
       subjects: ['career'],
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3645,6 +4075,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'At home, ask {name} about {his} goals for after school and what {he} [is|are] doing now that leads there.',
       subjects: ['career'],
+      claims: [],
       src: 'new',
     },
     {
@@ -3653,6 +4084,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name} keeps {his} phone away during instruction and work time without being asked.',
       when: { devices: 4 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3661,6 +4093,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name} puts {his} phone away the first time {he} [is|are] asked and gets back to work.',
       when: { devices: 3 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3669,6 +4102,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name}’s phone comes out during instruction, so {he} [misses|miss] parts of the lesson and has to catch up.',
       when: { devices: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3677,6 +4111,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: 'In group work, {name}’s phone takes {his} attention from the group, and classmates notice.',
       when: { devices: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3685,6 +4120,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name} has been asked to put {his} phone away in most classes this term; the pattern has not changed yet.',
       when: { devices: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3693,6 +4129,7 @@ var COMMENT_BANK = {
       group: 'Uses Devices Well',
       text: '{name}’s phone use is the biggest thing between {him} and better results this term.',
       when: { devices: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3701,6 +4138,7 @@ var COMMENT_BANK = {
       group: 'Next Step',
       text: 'Keeping the phone put away for a whole class is the first goal for {name}; the rest follows from it.',
       when: { devices: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3709,6 +4147,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'We have agreed that {name}’s phone stays in {his} bag during class; a reminder at home would back that up.',
       when: { devices: 1 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3717,6 +4156,7 @@ var COMMENT_BANK = {
       group: 'At Home',
       text: 'Keeping the phone out of the room during homework would help {name} get the work done in less time.',
       when: { devices: 2 },
+      claims: ['habits'],
       src: 'new',
     },
     {
@@ -3726,6 +4166,7 @@ var COMMENT_BANK = {
       text: '{name} is Emerging: the reflections are at an early stage, and short, honest answers each week are the way to build them.',
       when: { standing: 'Emerging' },
       subjects: ['career'],
+      claims: ['grade'],
       src: 'new',
     },
   ],
