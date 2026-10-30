@@ -594,13 +594,20 @@ window.GradeReport = (function () {
         String(n.textContent)
           .split(/\s+/)
           .forEach(function (w) {
-            w.split(/(?<=-)/).forEach(function (part) {
-              var px = part ? _textWidth(font, part) : 0;
-              if (px > room) max = Math.min(max, (size * room) / px + extra);
-            });
+            w.replace(/-/g, '-\u0000')
+              .split('\u0000')
+              .forEach(function (part) {
+                var px = part ? _textWidth(font, part) : 0;
+                if (px > room) max = Math.min(max, (size * room) / px + extra);
+              });
           });
       }
     };
+    // The heading row is half a point larger than the cells (reports.css),
+    // so its words need half a point less than the cells' size allows.
+    Array.prototype.forEach.call(table.querySelectorAll('thead th'), function (cell) {
+      fit(cell, null, -0.5);
+    });
     Array.prototype.forEach.call(table.querySelectorAll('tbody tr:not(.fb-cm) > *'), function (cell) {
       fit(cell, '.fb-mk, .fb-cks', 0);
       Array.prototype.forEach.call(cell.querySelectorAll('.fb-ck > span:last-child'), function (label) {
@@ -840,7 +847,10 @@ window.GradeReport = (function () {
     }
     var sides = bodies.length;
     var sheets = Math.ceil(sides / 2);
-    var over = cut > 0 || !!(fb && fb.over);
+    // over: the grade sheet's rows don't all fit. feedbackOver: a feedback
+    // card is taller than a page even after splitting.
+    var feedbackOver = !!(fb && fb.over);
+    var over = cut > 0 || feedbackOver;
     var name = fullName(student);
     var badge = over ? 'Too long' : sheets === 1 ? '1 sheet' : sheets + ' sheets';
     var html =
@@ -882,6 +892,7 @@ window.GradeReport = (function () {
       continued: [],
       after: [],
       over: over,
+      feedbackOver: feedbackOver,
       used: 0,
       free: [],
       commentLines: 0,
