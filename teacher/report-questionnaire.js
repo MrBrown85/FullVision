@@ -400,15 +400,13 @@ window.ReportQuestionnaire = (function () {
     return best;
   }
 
-  /* Work with no mark this term: labelled Missing, or past its due date
-     with nothing entered (the Missing Work block's rule, as facts() counts
-     it). */
+  /* Work labelled Missing this term (status NS), whatever its due date:
+     the one rule everywhere (Decision 4; facts().notHandedIn counts the
+     same work). */
   function notHandedIn(cid, sid) {
     return (getAssessments(cid) || [])
       .filter(function (a) {
-        if (!assessmentInActiveTerm(cid, a)) return false;
-        var cell = assessmentCellValue(cid, sid, a);
-        return cell.kind === 'missing' || cell.status === 'NS';
+        return assessmentInActiveTerm(cid, a) && assessmentCellValue(cid, sid, a).status === 'NS';
       })
       .map(function (a) {
         return a.title || '';
@@ -659,7 +657,7 @@ window.ReportQuestionnaire = (function () {
     ['Grade', 'Your gradebook: this term’s marks, with your category weights.', 'FullVision'],
     ['Work Habits', 'Your six ratings, Rarely to Consistently.', 'You'],
     ['Best Piece', 'The highest-marked assignment this term.', 'FullVision'],
-    ['Not Handed In', 'Assignments labelled Missing, or past the due date with no mark.', 'FullVision'],
+    ['Not Handed In', 'Assignments labelled Missing.', 'FullVision'],
     ['Skills', 'This term’s competency scores.', 'FullVision'],
     ['Goal and Voice', 'Answers to About Me and the goal check-in, sent from the student’s phone.', 'Student'],
     [

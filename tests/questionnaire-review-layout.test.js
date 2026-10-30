@@ -147,9 +147,10 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     }
   });
 
-  it('notHandedIn agrees with the record the comment counts', () => {
+  it('notHandedIn is the work labelled Missing, as facts() lists it', () => {
     const st = cece();
     const f = CommentBank.facts(cid, st, 'term-2');
+    expect(RQ.notHandedIn(cid, st.id)).toEqual(f.notHandedIn.titles);
     expect(RQ.notHandedIn(cid, st.id)).toHaveLength(f.record.missing);
   });
 
@@ -193,6 +194,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   });
 
   it('the sources sheet names every part on the screen without MyEd or pronouns', () => {
+    expect(RQ.SCREEN_SOURCES[3][1]).toBe('Assignments labelled Missing.');
     expect(RQ.SCREEN_SOURCES.map(r => r[0])).toEqual([
       'Grade',
       'Work Habits',
