@@ -4788,6 +4788,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 .gr-r {
   text-align: right;
 }
+.gr-n,
 .gr-missing .gr-note,
 .gr-note {
   font-weight: 700;

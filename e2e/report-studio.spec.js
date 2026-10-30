@@ -1230,7 +1230,9 @@ test.describe('Grade Report', () => {
     await expect(page.locator('.gr-term')).toContainText('Term Grade');
     // Grades only: no comment, attendance or other feedback on the sheet.
     await expect(page.locator('.gr-sheet .report-comment-box, .gr-sheet .report-attendance')).toHaveCount(0);
-    await expect(page.getByRole('checkbox')).toHaveCount(2);
+    await expect(page.getByRole('checkbox')).toHaveCount(3);
+    await expect(page.getByRole('checkbox', { name: 'Assignment Numbers' })).not.toBeChecked();
+    await expect(sheet.locator('.gr-head').first()).not.toContainText('#');
     await expect(page.getByRole('checkbox', { name: 'Ungraded Assignments' })).toBeChecked();
     // No Proficiency column, nothing cut off in a row, and no + Page.
     await expect(sheet.locator('.gr-head').first()).not.toContainText('Proficiency');
@@ -1253,7 +1255,26 @@ test.describe('Grade Report', () => {
     expect(countPages(pdf)).toBe(STUDENTS * 2);
   });
 
-  test('Include takes the summary off; the choice and Build Your Own are remembered', async ({ page }) => {
+  test('Assignment Numbers adds a # column and numbers the rows 1, 2, 3', async ({ page }) => {
+    await openGrade(page);
+    await expect(page.locator('.gr-n')).toHaveCount(0);
+    await page.getByRole('checkbox', { name: 'Assignment Numbers' }).check();
+    const sheet = page.locator('.gr-sheet').first();
+    await expect(sheet.locator('.gr-head .gr-n').first()).toHaveText('#');
+    const nums = await sheet.locator('.gr-row:not(.gr-head) .gr-n').allTextContents();
+    expect(nums.length).toBeGreaterThan(3);
+    expect(nums.slice(0, 3)).toEqual(['1', '2', '3']);
+    const cut = await page
+      .locator('.gr-sheet .gr-row:not(.gr-head) .gr-c')
+      .evaluateAll(cells => cells.filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.textContent));
+    expect(cut).toEqual([]);
+    // Still two Letter pages per student, nothing overflowing.
+    await showEveryone(page);
+    expect(await overflowing(page)).toEqual([]);
+    expect(countPages(await printToPdf(page))).toBe(STUDENTS * 2);
+  });
+
+  test('Grade Sheet takes the summary off; the choice and Build Your Own are remembered', async ({ page }) => {
     await openGrade(page);
     await expect(page.locator('.gr-summary')).toHaveCount(1);
     await page.getByRole('checkbox', { name: 'Category Summary' }).uncheck();

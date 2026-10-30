@@ -20,7 +20,9 @@ window.GradeReport = (function () {
   var ROW_W = 720;
   // ungraded: list this term's work with no mark yet, a dash for its score
   // (Colin, Oct 29: leaving it off can mislead), up to today.
-  var DEFAULTS = { summary: true, ungraded: true, order: 'oldest', name: 'preferred' };
+  // numbers: a "#" column numbering the rows in the order they print, off
+  // until the teacher ticks Assignment Numbers.
+  var DEFAULTS = { summary: true, ungraded: true, numbers: false, order: 'oldest', name: 'preferred' };
   /* The table's sizes, largest first: row height and type in px, and
      whether each side holds two columns of rows. */
   var TIERS = [
@@ -35,6 +37,7 @@ window.GradeReport = (function () {
     if (saved && typeof saved === 'object') {
       if (typeof saved.summary === 'boolean') o.summary = saved.summary;
       if (typeof saved.ungraded === 'boolean') o.ungraded = saved.ungraded;
+      if (typeof saved.numbers === 'boolean') o.numbers = saved.numbers;
       if (saved.order === 'newest' || saved.order === 'oldest') o.order = saved.order;
       if (saved.name === 'first' || saved.name === 'preferred') o.name = saved.name;
     }
@@ -56,7 +59,8 @@ window.GradeReport = (function () {
   /* One student's rows: this term's assessments that have a mark or are
      Missing or Excused, and with Ungraded Assignments on, the work dated up
      to today with no mark yet, its score a dash. Work not yet due is left
-     off. { date, title, category, score, outOf, percent, note }. */
+     off. { n, date, title, category, score, outOf, percent, note }, n the
+     row's number, 1, 2, 3 in the order the rows print. */
   function rows(cid, student, opts) {
     opts = options(opts);
     var cats = {};
@@ -117,6 +121,9 @@ window.GradeReport = (function () {
       } else return;
       out.push(row);
     });
+    out.forEach(function (r, i) {
+      r.n = i + 1;
+    });
     return out;
   }
 
@@ -152,10 +159,11 @@ window.GradeReport = (function () {
   var COL_GAP = 6; // reports.css .gr-row column-gap
   function _cols(show, tier) {
     var two = tier.cols === 2;
-    var cols = [
-      ['date', 'Date', '42px', ''],
-      ['title', 'Assignment', 'minmax(0,1fr)', ''],
-    ];
+    var cols = [];
+    // Assignment Numbers: a narrow bold column, wide enough for the
+    // highest number (show.numPx, set in layoutStudent).
+    if (show.numbers) cols.push(['n', '#', (show.numPx || 22) + 'px', 'r']);
+    cols.push(['date', 'Date', '42px', ''], ['title', 'Assignment', 'minmax(0,1fr)', '']);
     if (!two) cols.push(['category', 'Category', null, '']);
     // Score holds "Incomplete"; the note "Excused" in bold.
     cols.push(['score', 'Score', two ? '54px' : '64px', 'r']);
@@ -215,7 +223,7 @@ window.GradeReport = (function () {
         c[0] +
         (c[3] ? ' gr-' + c[3] : '') +
         '">' +
-        (head ? c[1] : esc(v[c[0]] || '')) +
+        (head ? c[1] : esc(String(v[c[0]] || ''))) +
         '</span>'
       );
     };
@@ -369,6 +377,10 @@ window.GradeReport = (function () {
     var list = rows(cid, student, o);
     var letterhead = ReportBlocks.renderBlockHeader(cid, student, ctx, { name: o.name });
     var tail = _tailHtml(cid, student, o);
+    if (o.numbers) {
+      show.numbers = true;
+      show.numPx = 8 + 7 * String(Math.max(1, list.length)).length;
+    }
     var own = !opts.stage;
     var stage = opts.stage || _stage(document.body);
     var chosen = null;
