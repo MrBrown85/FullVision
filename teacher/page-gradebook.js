@@ -702,6 +702,13 @@ window.PageGradebook = (function () {
   }
 
   /* A student's name in the grid's left column: a link to their page. */
+  /* Whether a student's grade shows a reporting basis (IE, or No Letter
+     Grade for goals) for the term in view. That row keeps the name whole and
+     shortens the grade with an ellipsis instead, the full text on hover. */
+  function _basisRow(cid, sid) {
+    return reportingBasis(cid, sid, viewedReportTerm(cid)) !== 'grade';
+  }
+
   function _rowheadNameOpen(cid, s) {
     return (
       '<a class="gb-grid-rowhead-name" role="link" tabindex="0" data-sid="' +
@@ -971,18 +978,22 @@ window.PageGradebook = (function () {
       var grade = studentGradeSummary(cid, s.id, viewedReportTerm(cid));
       var color = PROF_COLORS[grade.level] || PROF_COLORS[0];
       var label = levelWord(cid, overall);
+      var basisRow = _basisRow(cid, s.id);
       _setNameTip(cid, s, sections);
       html +=
         '<div class="gb-grid-rowhead gb-grid-rowhead-comp' +
         altClass +
+        (basisRow ? ' gb-row-basis' : '') +
         '">' +
         _rowheadNameOpen(cid, s) +
         esc(fullName(s)) +
         '</a>' +
         '<span class="gb-grid-rowhead-overall" style="color:' +
         color +
-        '">' +
-        (grade.text || '\u2014') +
+        '"' +
+        (basisRow ? ' title="' + esc(grade.text) + '"' : '') +
+        '>' +
+        (basisRow ? '<span class="gb-grade-text">' + esc(grade.text) + '</span>' : grade.text || '\u2014') +
         (label ? '<small>' + label + '</small>' : '') +
         '</span>' +
         '</div>';
@@ -1254,10 +1265,12 @@ window.PageGradebook = (function () {
           );
         })
         .join('');
+      var basisRow = _basisRow(cid, s.id);
       _setNameTip(cid, s, sections);
       html +=
         '<div class="gb-grid-rowhead' +
         altClass +
+        (basisRow ? ' gb-row-basis' : '') +
         '">' +
         _rowheadNameOpen(cid, s) +
         esc(fullName(s)) +
@@ -1268,7 +1281,13 @@ window.PageGradebook = (function () {
           ? gradeParts
               .map(function (p) {
                 return (
-                  '<span style="color:' + (PROF_COLORS[p.level] || PROF_COLORS[0]) + '">' + esc(p.text) + '</span>'
+                  '<span class="gb-grade-text" style="color:' +
+                  (PROF_COLORS[p.level] || PROF_COLORS[0]) +
+                  '"' +
+                  (basisRow ? ' title="' + esc(p.text) + '"' : '') +
+                  '>' +
+                  esc(p.text) +
+                  '</span>'
                 );
               })
               .join('')

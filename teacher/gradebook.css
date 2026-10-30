@@ -1565,3 +1565,27 @@ th.gb-group-alt {
 .gb-scores-cell.gb-col-menu {
   background: var(--active-light) !important;
 }
+
+/* A row whose grade is IE or No Letter Grade (a reporting basis for the
+   term in view): the name stays whole at every column width and the grade
+   takes what is left, ending in an ellipsis; the full text is on hover. */
+.gb-row-basis .gb-grid-rowhead-name {
+  flex: 0 0 auto;
+}
+.gb-row-basis .gb-grid-rowhead-grade,
+.gb-row-basis .gb-grid-rowhead-overall {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.gb-row-basis .gb-grid-rowhead-grade {
+  align-items: stretch;
+  text-align: right;
+}
+.gb-row-basis .gb-grade-text,
+.gb-row-basis .gb-grid-rowhead-overall small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
