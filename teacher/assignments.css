@@ -5373,6 +5373,16 @@
 .grdl-level.is-on.l1 {
   background: var(--score-1);
 }
+/* A competency whose criteria disagree: the lowest, striped as in the grid. */
+.grdl-level.is-on.mixed {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 3px,
+    rgba(255, 255, 255, 0.2) 3px,
+    rgba(255, 255, 255, 0.2) 5px
+  );
+}
 .grdl-stepper {
   display: flex;
   align-items: center;
