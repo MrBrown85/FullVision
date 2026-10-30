@@ -74,6 +74,7 @@ const PRECACHE_URLS = [
   '/teacher/student-overrides.js',
   '/teacher/rubric-print.js',
   '/teacher/report-feedback.js',
+  '/teacher/report-feedback-cards.js',
   '/teacher/grades-print.js',
   '/teacher/rubric-library.js',
   '/teacher/rubric-bank.js',

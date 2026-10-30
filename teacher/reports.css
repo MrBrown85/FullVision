@@ -4826,3 +4826,293 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 8pt;
   font-style: italic;
 }
+
+/* ── Feedback cards (Quick Report, Feedback Pages) ──────────────────────
+   One bordered card per assessment, built by ReportFeedback.cardHtml
+   (teacher/report-feedback-cards.js). Black and white only: it is
+   photocopied. Every rule is under .fb-card so nothing leaks into the
+   other report blocks. The look is the Full Record mockup (layout B). */
+.fb-card {
+  box-sizing: border-box;
+  border: 1.5px solid #000;
+  padding: 0 8px 8px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 10.5px;
+  line-height: 1.25;
+  color: #000;
+  background: #fff;
+  break-inside: avoid;
+}
+.fb-card .fb-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  background: #ececec;
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border-bottom: 1.5px solid #000;
+}
+.fb-card .fb-id {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.fb-card .fb-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fb-card .fb-title {
+  font-size: 15px;
+  line-height: 1.2;
+}
+.fb-card .fb-meta {
+  color: #333;
+}
+.fb-card .fb-num {
+  display: inline-block;
+  flex: 0 0 auto;
+  min-width: 20px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border: 1.5px solid #000;
+  border-radius: 4px;
+  background: #fff;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+.fb-card .fb-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: 0 0 auto;
+}
+.fb-card .fb-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #000;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.fb-card .fb-status {
+  border: 1px solid #000;
+  padding: 0 5px;
+  margin-top: 2px;
+  font-weight: 700;
+  background: #fff;
+}
+.fb-card .fb-feedback {
+  border: 1px solid #000;
+  padding: 4px 6px;
+  font-size: 11px;
+  white-space: pre-line;
+}
+.fb-card .fb-more {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px dashed #000;
+}
+/* Points and Complete/Incomplete: the box beside the Feedback. */
+.fb-card .fb-split {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: start;
+}
+.fb-card .fb-split.is-alone {
+  grid-template-columns: 130px;
+}
+.fb-card .fb-score {
+  border: 1px solid #000;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fb-card .fb-score-main {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.fb-card .fb-score-n {
+  font-size: 22px;
+  font-weight: 700;
+}
+.fb-card .fb-score-of {
+  font-size: 12px;
+}
+.fb-card .fb-complete {
+  border: 1px solid #000;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fb-card .fb-sq {
+  display: inline-flex;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #000;
+  background: #fff;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.fb-card .fb-sq.is-on {
+  background: #000;
+}
+.fb-card .fb-complete-word {
+  font-size: 15px;
+  font-weight: 700;
+}
+/* The rubric table. */
+.fb-card .fb-rb {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 9px;
+  line-height: 1.25;
+}
+.fb-card .fb-rb th,
+.fb-card .fb-rb td {
+  border: 1px solid #000;
+  padding: 3px;
+  vertical-align: top;
+  text-align: left;
+  hyphens: manual;
+  overflow-wrap: break-word;
+}
+.fb-card .fb-rb thead th {
+  background: #f1f1f1;
+  text-align: center;
+  font-size: 9.5px;
+  hyphens: none;
+}
+.fb-card .fb-rb .fb-c1 {
+  width: 23%;
+}
+.fb-card .fb-rb .fb-c2 {
+  width: 24%;
+}
+.fb-card .fb-rb .fb-c3 {
+  width: 30%;
+}
+.fb-card .fb-rb .fb-crit {
+  font-weight: 700;
+  background: #fff;
+  overflow-wrap: normal;
+  word-break: keep-all;
+}
+.fb-card .fb-rb .fb-on {
+  position: relative;
+  background: #e2e2e2;
+  outline: 2.5px solid #000;
+  outline-offset: -2.5px;
+}
+/* The mark sits in the top-right corner over its own line, so it never
+   narrows the descriptor beside it and splits a word ("Separate s"). */
+.fb-card .fb-rb .fb-on:has(> .fb-mk) {
+  padding-top: 16px;
+}
+.fb-card .fb-rb .fb-mk {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #000;
+  color: #fff;
+  font-weight: 700;
+}
+.fb-card .fb-rb .fb-lvl {
+  display: block;
+  margin-bottom: 2px;
+}
+.fb-card .fb-rb tr:has(+ tr.fb-cm) > * {
+  border-bottom: 1px dashed #000;
+}
+.fb-card .fb-rb .fb-cm td {
+  border-top: 1px dashed #000;
+  border-bottom: 1.5px solid #000;
+  font-size: 9.5px;
+  padding: 2px 4px 3px;
+}
+/* Advanced Rubric checks: every check at every level, ticked or not. */
+.fb-card .fb-cks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+  padding-top: 3px;
+  border-top: 1px solid #9a9a9a;
+  font-weight: 400;
+  font-size: 8.5px;
+}
+.fb-card .fb-ck {
+  display: flex;
+  gap: 3px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.fb-card .fb-ck > span:last-child {
+  min-width: 0;
+}
+.fb-card .fb-bx {
+  box-sizing: content-box;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 1px;
+  border: 1px solid #000;
+  background: #fff;
+  color: #fff;
+  font-size: 8px;
+  line-height: 9px;
+  text-align: center;
+  font-weight: 700;
+}
+.fb-card .fb-bx.is-on {
+  background: #000;
+}
+/* Observations and the Term Comment. */
+.fb-card .fb-obs {
+  padding: 3px 0;
+  border-bottom: 1px dashed #000;
+  font-size: 10.5px;
+  white-space: pre-line;
+}
+.fb-card .fb-obs:last-child {
+  border-bottom: 0;
+}
+.fb-card .fb-tags {
+  color: #333;
+  font-size: 9.5px;
+}
+.fb-card .fb-para {
+  margin: 0;
+  font-size: 11px;
+}
+@media print {
+  .fb-card .fb-head,
+  .fb-card .fb-rb thead th,
+  .fb-card .fb-rb .fb-on,
+  .fb-card .fb-rb .fb-mk,
+  .fb-card .fb-pill,
+  .fb-card .fb-sq.is-on,
+  .fb-card .fb-bx.is-on {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
