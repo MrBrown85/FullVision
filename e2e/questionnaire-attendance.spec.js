@@ -55,5 +55,6 @@ test('Generate Comment uses the attendance totals once they are entered', async 
   await expect(page.locator('#tq-att-note')).toHaveText('Optional. Left out until entered.');
   await enter(page, 4, 2);
   await page.locator('#tq-generate').click();
-  await expect(page.locator('#tq-narrative')).toHaveValue(/absent[^.]*4|late[^.]*2/);
+  // One attendance sentence (plan, Sentence grammar): numbers in words.
+  await expect(page.locator('#tq-narrative')).toHaveValue(/missed four classes and been late twice this term\./);
 });

@@ -64,16 +64,17 @@ function fullContext(p, habits) {
     habitsToBuild: 'using feedback and taking part in class',
     habitStrengths: 'Noor comes to class ready.',
     absent: '4',
+    attendance: 'missed four classes and been late twice',
     late: '2',
     bestPiece: 'Her best piece was “Energy Lab”, where she measured every trial.',
   };
 }
 
 describe('the bank', () => {
-  it('has 239 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(239);
+  it('has 233 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(233);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(239);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(233);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -116,11 +117,11 @@ describe('the bank', () => {
     );
   });
 
-  it('puts a [singular|plural] verb only right after a pronoun', () => {
+  it('puts a [singular|plural] verb only after the student as subject, which it agrees with', () => {
     COMMENT_BANK.sentences.forEach(s => {
       const re = /\[[^\]]*\]/g;
       let m;
-      while ((m = re.exec(s.text))) expect(s.text.slice(0, m.index), s.id).toMatch(/\{[Hh]e\} $/);
+      while ((m = re.exec(s.text))) expect(s.text.slice(0, m.index), s.id).toMatch(/\{[Hh]e\}/);
     });
   });
 
@@ -170,6 +171,7 @@ describe('the bank', () => {
       habitsToBuild: 'habits',
       habitStrengths: 'habits',
       absent: 'attendance',
+      attendance: 'attendance',
       late: 'attendance',
       selfGood: 'studentWords',
       selfHard: 'studentWords',
@@ -251,8 +253,8 @@ describe('fill', () => {
 
   it('conjugates for singular they', () => {
     const ie04 = COMMENT_BANK.sentences.find(s => s.id === 'ie04');
-    expect(CommentBank.fill(ie04, fullContext(P.they))).toBe('To earn a grade, they need to hand in the missing work.');
-    expect(CommentBank.fill(ie04, fullContext(P.she))).toBe('To earn a grade, she needs to hand in the missing work.');
+    expect(CommentBank.fill(ie04, fullContext(P.they))).toBe('To earn a grade, they need to submit the missing work.');
+    expect(CommentBank.fill(ie04, fullContext(P.she))).toBe('To earn a grade, she needs to submit the missing work.');
   });
 
   it('puts a habit phrase in as the context gives it', () => {
@@ -332,7 +334,7 @@ describe('fits', () => {
     expect(CommentBank.fits(n31, ctx)).toBe(true);
     expect(CommentBank.fits(n31, { ...ctx, assignment: '' })).toBe(false);
     const h60 = COMMENT_BANK.sentences.find(s => s.id === 'h60');
-    expect(CommentBank.fits(h60, { ...ctx, absent: '' })).toBe(false);
+    expect(CommentBank.fits(h60, { ...ctx, attendance: '' })).toBe(false);
   });
 
   it('filters by habit level with `when`', () => {
@@ -562,8 +564,10 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
-    expect(habits.fit).toBe(1 + 7);
-    expect(habits.rows.filter(r => r.group === 'Attendance')).toHaveLength(7);
+    expect(habits.fit).toBe(1 + 1);
+    // One attendance sentence (plan, Sentence grammar), both halves said.
+    const att = habits.rows.filter(r => r.group === 'Attendance');
+    expect(att.map(r => r.text)).toEqual(['She has missed four classes and been late twice this term.']);
     saveTermAttendance(cid, st.id, 'term-2', null, null);
   });
 
@@ -613,12 +617,14 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(other.sentences[1].text).not.toBe(mine.sentences[1].text);
   });
 
-  it('drafts for every Demo student: five or more sentences, nothing unfilled, nothing quoted twice', () => {
+  it('drafts for every Demo student: four or more sentences, nothing unfilled, nothing quoted twice', () => {
     getStudents(cid).forEach(st => {
       const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
       const d = CommentBank.draft(ctx, { seed: CommentBank.seedFor(st.id) });
       // The Demo class has no closing sentence or support lines (plan PR 8).
-      expect(d.ids.length, st.firstName).toBeGreaterThanOrEqual(5);
+      // Titles are quoted (the realiser), so a piece already named is never
+      // named again: Liv's revisit sentence would repeat one, and is left out.
+      expect(d.ids.length, st.firstName).toBeGreaterThanOrEqual(4);
       expect(d.text, st.firstName).not.toMatch(/[{}[\]]|  /);
       const quotes = d.text.match(/“[^”]+”/g) || [];
       expect(new Set(quotes).size, st.firstName).toBe(quotes.length);
@@ -713,7 +719,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(v.replaced).toEqual([{ sentenceId: 'w120', failed: ['slots', 'picture'], by: 'w06' }]);
     expect(byId('w06').claims).toEqual([]);
     expect(v.ids).toEqual(['w06']);
-    expect(v.text).toBe('Next term, the goal is to build on what is working and keep using feedback.');
+    expect(v.text).toBe('Next term, the goal is to continue what is working and to keep using feedback.');
     expect(v.provenance[0]).toMatchObject({ sentenceId: 'w06', claims: [], factKeys: [] });
   });
 

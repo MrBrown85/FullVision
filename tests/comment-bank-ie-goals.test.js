@@ -101,22 +101,21 @@ describe('the IE and goals sentences in the bank', () => {
 
   it('words the IE grade sentence, the plan, the deadline and the meeting as the mockup', () => {
     const ctx = ctxFor(HE);
-    expect(CommentBank.fill(byId('gr06'), ctx)).toBe(
+    // The grade sentence comes first, so it names the student.
+    expect(CommentBank.fill(byId('gr06'), ctx, { first: true })).toBe(
       'Jack’s mark this term is IE, which means there is not yet enough evidence for a letter grade.',
     );
-    expect(CommentBank.fill(byId('ie04'), ctx)).toBe('To earn a grade, he needs to hand in the missing work.');
+    expect(CommentBank.fill(byId('ie04'), ctx)).toBe('To earn a grade, he needs to submit the missing work.');
     expect(CommentBank.fill(byId('ie07'), ctx)).toBe('The deadline to replace this IE with a grade is December 18.');
     expect(CommentBank.fill(byId('ie08'), ctx)).toBe('Please contact me so we can talk about this plan together.');
-    expect(CommentBank.fill(byId('ie04'), ctxFor(THEY))).toBe(
-      'To earn a grade, they need to hand in the missing work.',
-    );
+    expect(CommentBank.fill(byId('ie04'), ctxFor(THEY))).toBe('To earn a grade, they need to submit the missing work.');
   });
 
   it('words the language and IEP goals statements as the plan', () => {
-    expect(CommentBank.fill(byId('gr07'), ctxFor(HE))).toBe(
+    expect(CommentBank.fill(byId('gr07'), ctxFor(HE), { first: true })).toBe(
       'This term, Jack is assessed in relation to his goals for English language proficiency.',
     );
-    expect(CommentBank.fill(byId('gr08'), ctxFor(THEY))).toBe(
+    expect(CommentBank.fill(byId('gr08'), ctxFor(THEY), { first: true })).toBe(
       'This term, Jack is assessed in relation to the goals in their IEP.',
     );
   });
@@ -239,7 +238,7 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     expect(CommentBank.ieProblemOf(f)).toBe('missing');
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
     expect(d.text).toContain('Three assignments are not handed in, including three Current Events assignments.');
-    expect(d.text).toContain('To earn a grade, she needs to hand in the missing work.');
+    expect(d.text).toContain('To earn a grade, she needs to submit the missing work.');
     expect(d.replaced).toEqual([]);
   });
 

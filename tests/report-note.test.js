@@ -199,7 +199,7 @@ describe('the best-piece sentence', () => {
     );
   });
 
-  it('uses the name again when no pronouns are on file, with ’s', () => {
+  it('uses the name again when no pronouns are on file, with ’s, never they', () => {
     expect(S({ title: 'Trench Letter', note: 'wrote from a soldier’s view', name: 'Chris', pronouns: they })).toBe(
       'Chris’s best piece was “Trench Letter”, where Chris wrote from a soldier’s view.',
     );

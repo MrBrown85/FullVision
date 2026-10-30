@@ -152,10 +152,13 @@ describe('Reports questionnaire in a Letter class', () => {
     ReportQuestionnaire.tqStudentIndex = 0;
   }
 
-  /* The Comment Bank's sentences that fit Noor, filled in. */
+  /* The Comment Bank's sentences that fit Noor, each filled as the comment's
+     first sentence (naming her). */
   function bankSentences() {
     const ctx = CommentBank.context(CommentBank.facts(CID, NOOR, TERM), {});
-    return COMMENT_BANK.sentences.filter(s => CommentBank.fits(s, ctx)).map(s => CommentBank.fill(s, ctx));
+    return COMMENT_BANK.sentences
+      .filter(s => CommentBank.fits(s, ctx))
+      .map(s => CommentBank.fill(s, ctx, { first: true }));
   }
 
   beforeEach(() => localStorage.clear());

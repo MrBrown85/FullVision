@@ -45,6 +45,7 @@ function facts(over) {
       course: 'History 12',
       family: 'socials',
       pronouns: THEY,
+      pronounsOnFile: true,
       comps: [comp('c1', 'Evidence', 3.5), comp('c2', 'Perspective', 3), comp('c3', 'Significance', 2.5)],
       work: [],
       voice: {},

@@ -454,7 +454,7 @@ window.CommentBank = (function () {
      class); `fits` names the skills (SKILLS keys) and habits (HABITS keys)
      the line helps with, so each student gets the one that fits. */
   var SUPPORT_LINES = [
-    { id: 'sl-missing', text: 'In class, I will check in about missing work each week.', fits: ['completes'] },
+    { id: 'sl-missing', text: 'In class, I will ask about missing work each week.', fits: ['completes'] },
     {
       id: 'sl-revise',
       text: 'In class, there will be time to revise one piece using feedback.',
@@ -564,7 +564,7 @@ window.CommentBank = (function () {
     {
       id: 'sl-stages',
       families: ['adst'],
-      text: 'In class, I will check in at each stage of a project.',
+      text: 'In class, I will check each stage of a project with the student.',
       fits: ['designing', 'making', 'testing'],
     },
     {
@@ -576,7 +576,7 @@ window.CommentBank = (function () {
     {
       id: 'sl-goals',
       families: ['career'],
-      text: 'In class, I will check in about goals and plans each month.',
+      text: 'In class, I will talk about goals and plans each month.',
       fits: ['planning', 'self', 'exploring'],
     },
   ];
@@ -652,13 +652,11 @@ window.CommentBank = (function () {
   var USED_BY = 3;
   var NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 
-  /* "a", "a and b", "a, b and c"; a name given twice once. */
-  function list(xs) {
-    xs = (xs || []).filter(function (x, i, all) {
-      return x && all.indexOf(x) === i;
-    });
-    return xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1];
-  }
+  /* The realiser (teacher/comment-realiser.js) owns the sentence grammar:
+     lists, numbers, a or an, titles, the name and pronouns (plan PR 9). */
+  var R = window.CommentRealiser;
+  /* "a", "a and b", "a, b and c" (no serial comma); a name given twice once. */
+  var list = R.list;
 
   /* A level rounded as it prints (3.07 and 3.1 are the same figure). */
   function tenths(v) {
@@ -739,22 +737,27 @@ window.CommentBank = (function () {
   /* The IE comment's habits sentence: the habits rated Consistently (keys,
      at most three, the grid's order) as one sentence, "He comes to class
      ready, takes part and works well with others." The name in place of
-     the pronoun when none is on file. '' with none. */
-  function strengthsSentence(f, ks) {
-    if (!ks || !ks.length) return '';
+     the pronoun when none is on file. '' with none. As tokens for the
+     realiser (strengthsTokens), the verb agreeing with whoever starts it. */
+  function strengthsTokens(f, ks) {
+    if (!ks || !ks.length) return null;
     var p = f.pronouns || { subj: 'they', poss: 'their' };
-    var onFile = !!f.pronounsOnFile;
-    var form = onFile && p.subj === 'they' ? 'do' : 'does';
-    return (
-      _cap(onFile ? p.subj : f.name) +
-      ' ' +
-      list(
+    var phrases = function (form) {
+      return list(
         ks.map(function (k) {
           return habitWords(k, form, f.family || '', p);
         }),
-      ) +
-      '.'
-    );
+      );
+    };
+    return [{ ref: 'subj' }, ' ', { verb: [phrases('does'), phrases('do')] }, '.'];
+  }
+  function strengthsSentence(f, ks) {
+    var toks = strengthsTokens(f, ks);
+    return toks ? R.render(toks, _whoOfFacts(f), { named: true }) : '';
+  }
+  /* Who a comment is about, for the realiser: { name, p, onFile }. */
+  function _whoOfFacts(f) {
+    return { name: f.name, p: f.pronouns, onFile: !!f.pronounsOnFile };
   }
 
   /* Text that ends a sentence: its own . ! ? or … kept, else a period. */
@@ -775,16 +778,7 @@ window.CommentBank = (function () {
 
   /* A title as a comment quotes it: the lesson number ("4.3 ", "Lesson 2:")
      dropped. A title that is only a number keeps it. */
-  function workTitle(title) {
-    var t = String(title || '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    var bare = t.replace(
-      /^(?:lesson\s+\d+(?:\.\d+)*[a-z]?\s*[.:)\-\u2013\u2014]?|\d+(?:\.\d+)+[a-z]?\s*[.:)\-\u2013\u2014]?|\d+[a-z]?\s*[.:)\-\u2013\u2014])\s+/i,
-      '',
-    );
-    return bare || t;
-  }
+  var workTitle = R.workTitle;
 
   /* The teacher's Note for the Report as the sentence uses it: one line,
      its first letter lower case when it starts a plain word ("Linked" →
@@ -798,79 +792,40 @@ window.CommentBank = (function () {
     return t;
   }
 
-  /* Who the sentence is about: the student's pronouns when on file, else
-     the preferred first name again. */
-  function _whose(o) {
-    if (!o.onFile || !o.pronouns) return o.name + '\u2019s';
-    var poss = String(o.pronouns.poss || 'their');
-    return poss.charAt(0).toUpperCase() + poss.slice(1);
-  }
-  function _who(o) {
-    return o.onFile && o.pronouns ? String(o.pronouns.subj || 'they') : o.name;
-  }
-
   /* "{His} best piece was “{title}”, where {he} {note}." With no note:
      "{His} best piece was “{title}.”" A title's own ? or ! stays inside the
      quotes; the period ends inside the closing quote, any comma after it.
-     o: { title, note, name, pronouns, onFile }. '' with no title. */
-  function bestPieceSentence(o) {
+     As tokens for the realiser, so the name moves to it when it comes
+     first. o: { title, note }. null with no title. */
+  function bestPieceTokens(o) {
     o = o || {};
     var title = workTitle(o.title);
-    if (!title) return '';
+    if (!title) return null;
     var note = reportNoteText(o.note);
-    var start = _whose(o) + ' best piece was \u201C';
-    if (note)
-      return (
-        start +
-        title.replace(/\.+$/, '') +
-        '\u201D, where ' +
-        _who(o) +
-        ' ' +
-        note +
-        (/[!?\u2026]$/.test(note) ? '' : '.')
-      );
-    return start + title + (/[.!?\u2026]$/.test(title) ? '' : '.') + '\u201D';
+    var piece = { value: title, title: true };
+    if (!note) return [{ ref: 'poss' }, ' best piece was ', piece, '.'];
+    return [
+      { ref: 'poss' },
+      ' best piece was ',
+      piece,
+      ', where ',
+      { ref: 'subj' },
+      ' ' + note + (/[!?…]$/.test(note) ? '' : '.'),
+    ];
+  }
+  /* The best-piece sentence where it usually sits, after the first: the
+     student's pronouns when on file, else the name again. o: { title, note,
+     name, pronouns, onFile }. '' with no title. */
+  function bestPieceSentence(o) {
+    o = o || {};
+    var toks = bestPieceTokens(o);
+    return toks ? R.render(toks, { name: o.name, p: o.pronouns, onFile: !!o.onFile }, { named: true }) : '';
   }
 
   /* ── The work-not-handed-in sentence (plan, Sentence grammar) ──────── */
 
-  var ONES = [
-    'zero',
-    'one',
-    'two',
-    'three',
-    'four',
-    'five',
-    'six',
-    'seven',
-    'eight',
-    'nine',
-    'ten',
-    'eleven',
-    'twelve',
-    'thirteen',
-    'fourteen',
-    'fifteen',
-    'sixteen',
-    'seventeen',
-    'eighteen',
-    'nineteen',
-  ];
-  var TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
-  /* A whole number in words, up to 99 ("fifteen", "twenty-one"); numerals
-     past that. */
-  function numberWords(n) {
-    n = Math.floor(Number(n));
-    if (!(n >= 0)) return '';
-    if (n < 20) return ONES[n];
-    if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? '-' + ONES[n % 10] : '');
-    return String(n);
-  }
-  /* A number inside a sentence: words from one to ten, numerals from 11. */
-  function numberIn(n) {
-    n = Math.floor(Number(n));
-    return n >= 0 && n <= 10 ? ONES[n] : String(n);
-  }
+  var numberWords = R.numberWords;
+  var numberIn = R.numberIn;
   function _cap(w) {
     return w ? w.charAt(0).toUpperCase() + w.slice(1) : '';
   }
@@ -878,12 +833,9 @@ window.CommentBank = (function () {
   /* A title in quotes as the end of a sentence: the period inside the
      closing quote, a title's own ? or ! in place of it. */
   function _quotedEnd(title) {
-    var t = workTitle(title);
-    return '\u201C' + t + (/[.!?\u2026]$/.test(t) ? '' : '.') + '\u201D';
+    return R.finish(R.quoteTitle(title) + '.');
   }
-  function _quotedMid(title) {
-    return '\u201C' + workTitle(title).replace(/\.+$/, '') + '\u201D';
-  }
+  var _quotedMid = R.quoteTitle;
 
   /* The work labelled Missing as one sentence: "One assignment is not
      handed in: “{title}.”"; two titles joined with "and"; three or more
@@ -1270,9 +1222,13 @@ window.CommentBank = (function () {
   }
 
   /* What the assessed work shows overall, from the overall level. */
+  var EVIDENCE = {
+    solid: 'a good understanding of the course material',
+    growing: 'progress toward understanding the key concepts',
+  };
   function evidenceOf(f) {
     if (!f.work.length) return '';
-    return f.overall >= 2.5 ? 'a solid grasp of the material' : 'progress toward understanding the key concepts';
+    return f.overall >= 2.5 ? EVIDENCE.solid : EVIDENCE.growing;
   }
 
   /* ── The grade sentence ────────────────────────────────────────────── */
@@ -1286,14 +1242,9 @@ window.CommentBank = (function () {
   var CLOSE_PIECES = 6;
 
   /* "a" or "an" by sound: a letter grade or initialism is said letter by
-     letter ("an A", "a B", "an IE"); a word by its first letter ("an
-     Extending", "a Proficient"). */
-  function aOrAn(w) {
-    var t = String(w || '');
-    var spelled = /^[A-Z]{1,3}[+-]?$/.test(t);
-    var vowel = spelled ? /^[AEFHILMNORSX]/.test(t) : /^[aeiou]/i.test(t);
-    return (vowel ? 'an ' : 'a ') + t;
-  }
+     letter ("an A", "a B", "an IE"); a word by its first sound ("an
+     Extending", "a Proficient"). The realiser's rule (R.article). */
+  var aOrAn = R.aOrAn;
 
   function _median(xs) {
     var s = xs.slice().sort(function (a, b) {
@@ -1699,8 +1650,9 @@ window.CommentBank = (function () {
     });
     var top = best[0];
     var weak = low[0] && top && tenths(low[0].v) < tenths(top.v) ? low[0] : null;
+    // Titles in quotes, the lesson number dropped (the realiser's rule).
     var the = function (w) {
-      return 'the ' + w.title;
+      return R.quoteTitle(w.title);
     };
     var weakTwo = low.filter(function (w) {
       return top && tenths(w.v) < tenths(top.v);
@@ -1805,14 +1757,12 @@ window.CommentBank = (function () {
       nextSkill: keys('comp', [next && next.comp]),
       seeWork: focusKeys.concat(keys('work', [seeId])),
       aboutWork: focusKeys.concat(keys('work', [aboutId])),
-      whose: [],
       habitsExcellent: habitKeys(hsum.seen),
       habitsGood: habitKeys(hsum.seen),
       habitToBuild: habitKeys(hsum.build),
       habitsToBuild: habitKeys(hsum.build),
       habitStrengths: habitKeys(strongThree),
-      absent: ['attendance.absent'],
-      late: ['attendance.late'],
+      attendance: ['attendance.absent', 'attendance.late'],
     };
 
     return {
@@ -1831,10 +1781,18 @@ window.CommentBank = (function () {
       _focus: focus || null,
       _facts: factsOf,
       _bestNote: !!(top && reportNoteText(top.note)),
+      // Who the comment is about, and the slots built as whole sentences
+      // about them, as tokens: the realiser names the student in the first
+      // sentence that mentions them (plan PR 9).
+      _who: _whoOfFacts(f),
+      _toks: {
+        bestPiece: top ? bestPieceTokens({ title: top.title, note: top.note }) : null,
+        habitStrengths: hsum.excellent ? null : strengthsTokens(f, strongThree),
+      },
       name: f.name,
       course: f.course,
       picture: picture,
-      standing: f.standing ? (/^[AEIOU]/.test(f.standing) ? 'an ' : 'a ') + f.standing + ' level' : '',
+      standing: f.standing ? aOrAn(f.standing) + ' level' : '',
       letterStanding: f.letter,
       gradeLetter: gslots.gradeLetter,
       gradeStanding: gslots.gradeStanding,
@@ -1906,17 +1864,27 @@ window.CommentBank = (function () {
       lateLine: lines.late || '',
       seeWork: seeWork,
       aboutWork: aboutWork,
-      // Whose habits: the pronoun when on file, else the name again
-      // ("his work habits", "Gabriel’s work habits").
-      whose: f.pronounsOnFile ? p.poss : f.name + '\u2019s',
       habitsExcellent: hsum.excellent ? 'yes' : '',
       habitsGood: hsum.good ? 'yes' : '',
       habitToBuild: buildWords.length === 1 ? buildWords[0] : '',
       habitsToBuild: buildWords.length === 2 ? list(buildWords) : '',
       habitStrengths: hsum.excellent ? '' : strengthsSentence(f, strongThree),
-      absent: f.absent > 0 ? String(f.absent) : '',
-      late: f.late > 0 ? String(f.late) : '',
+      // "missed three classes and been late once", either half left out
+      // when its field is empty or zero (plan, Sentence grammar).
+      attendance: attendanceText(f.absent, f.late),
     };
+  }
+
+  /* What the attendance sentence says after "{He} has": "missed three
+     classes and been late once"; "missed 12 classes"; "been late twice".
+     '' when neither field has a count. */
+  function attendanceText(absent, late) {
+    var a = Math.floor(Number(absent)) || 0;
+    var l = Math.floor(Number(late)) || 0;
+    var bits = [];
+    if (a > 0) bits.push('missed ' + numberIn(a) + (a === 1 ? ' class' : ' classes'));
+    if (l > 0) bits.push('been late ' + R.times(l));
+    return bits.join(' and ');
   }
 
   /* ── Offering and filling ──────────────────────────────────────────── */
@@ -1949,30 +1917,53 @@ window.CommentBank = (function () {
     });
   }
 
-  /* One pass over the sentence's own text: a pronoun slot, a data slot, or a
-     [singular|plural] verb after a pronoun ("she is", "they are"); a capital
-     to start. Values go in as written: a note or a student's answer that
-     happens to hold "{name}" or "[a|b]" is never read as a slot. */
-  function fill(s, ctx) {
-    var p = ctx._p || { subj: 'they', obj: 'them', poss: 'their', refl: 'themselves' };
-    var cap = function (w) {
-      return w.charAt(0).toUpperCase() + w.slice(1);
-    };
-    var pron = {
-      He: cap(p.subj),
-      he: p.subj,
-      him: p.obj,
-      His: cap(p.poss),
-      his: p.poss,
-      himself: p.refl,
-    };
+  /* A bank sentence as the realiser's tokens (CommentRealiser.tokens):
+     the student in each role, a data slot's value as written (a note or a
+     student's answer that holds "{name}" or "[a|b]" is never read as a
+     slot), a [singular|plural] verb, and the slots built whole (the best
+     piece, the strong habits) as their own tokens. */
+  function sentenceTokens(s, ctx) {
     var own = Object.prototype.hasOwnProperty;
-    var t = String(s.text).replace(/\{(\w+)\}|\[([^|\]]*)\|([^\]]*)\]/g, function (m, k, one, many) {
-      if (k === undefined) return p.subj === 'they' ? many : one;
-      if (own.call(pron, k)) return pron[k];
+    var toks = ctx._toks || {};
+    return R.tokens(s.text, function (k) {
+      if (own.call(toks, k) && toks[k] && own.call(ctx, k) && ctx[k]) return toks[k];
       return own.call(ctx, k) && ctx[k] != null ? String(ctx[k]) : '';
     });
-    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  /* Who a context is about: { name, p, onFile }. A context built by hand
+     with pronouns counts them as on file. */
+  function whoOf(ctx) {
+    if (ctx._who) return ctx._who;
+    return { name: ctx.name || '', p: ctx._p, onFile: !!ctx._p };
+  }
+
+  /* One sentence filled for the student where a sentence usually sits,
+     after the first: their pronouns when on file, else the name. A draft
+     puts each sentence in its place with realise(), which names the
+     student in the first sentence that mentions them. opts.first: fill it
+     as the comment's first sentence, naming the student. */
+  function fill(s, ctx, opts) {
+    return R.render(sentenceTokens(s, ctx), whoOf(ctx), { named: !(opts && opts.first) });
+  }
+
+  /* A comment's sentences put in order and filled for their places (the
+     realiser, plan PR 9): the student named in the first sentence that
+     mentions them, pronouns after; teacher text as typed. order: positions
+     or sentence ids; the screen calls this when the teacher moves a
+     sentence. Returns { text, sentences }. */
+  function realise(sentences, order) {
+    return R.realise(sentences, order);
+  }
+  /* A draft with its sentences realised in their order. */
+  function _realised(d) {
+    var r = R.realise(d.sentences);
+    return Object.assign({}, d, {
+      text: r.text,
+      sentences: r.sentences,
+      ids: r.sentences.map(function (x) {
+        return x.id;
+      }),
+    });
   }
 
   /* A sentence as a pattern with its slots as wildcards, to find it in a
@@ -2809,7 +2800,7 @@ window.CommentBank = (function () {
       if (!tier.length) return;
       var last = out.length ? out[out.length - 1].split(/\s+/)[0] : '';
       var sofar = out.join(' ');
-      var scored = tier.map(function (s) {
+      var score = function (s) {
         var t = fill(s, ctx);
         // A quotation already in the draft (the same words twice) is out.
         var quotes = t.match(/“[^”]+”/g) || [];
@@ -2820,6 +2811,9 @@ window.CommentBank = (function () {
           s: s,
           t: t,
           dup: dup ? 1 : 0,
+          // A sentence over 20 words (a quoted title as one) only when
+          // nothing shorter fits (the realiser's length rule).
+          long: R.tooLong(t) ? 1 : 0,
           // Exhaust before repeat: a sentence no classmate has comes before
           // any a classmate has, the least used next.
           used: usage[s.id] || 0,
@@ -2831,9 +2825,25 @@ window.CommentBank = (function () {
           // number, so the rest of the draft's mix is as it was.
           r: step.says ? 0 : rand(),
         };
-      });
+      };
+      // A quotation already in the draft is out: now that every title is
+      // quoted (the realiser), the same piece is never named twice. When
+      // the whole tier repeats one, a sentence that asserts nothing stands
+      // in, as for an excluded tier.
+      var fresh = function (x) {
+        return !x.dup;
+      };
+      var scored = tier.map(score).filter(fresh);
+      if (!scored.length)
+        scored = _standIns(step, ctx, bank, taken, exclude)
+          .filter(function (s) {
+            return tier.indexOf(s) < 0;
+          })
+          .map(score)
+          .filter(fresh);
+      if (!scored.length) return;
       scored.sort(function (a, b) {
-        return a.dup - b.dup || a.used - b.used || a.general - b.general || a.repeats - b.repeats || a.r - b.r;
+        return a.long - b.long || a.used - b.used || a.general - b.general || a.repeats - b.repeats || a.r - b.r;
       });
       var pick = scored[0];
       taken[pick.s.id] = true;
@@ -2842,7 +2852,14 @@ window.CommentBank = (function () {
       });
       if (step.says) said[step.says] = true;
       out.push(pick.t);
-      sentences.push({ id: pick.s.id, part: pick.s.part, step: key, text: pick.t });
+      sentences.push({
+        id: pick.s.id,
+        part: pick.s.part,
+        step: key,
+        text: pick.t,
+        toks: sentenceTokens(pick.s, ctx),
+        who: whoOf(ctx),
+      });
       prov.push(provenance(pick.s, ctx));
       got[key] = true;
     });
@@ -2908,7 +2925,9 @@ window.CommentBank = (function () {
     var seed = base;
     for (var k = 0; k < RETRIES; k++) {
       seed = base + k * 7919;
-      d = _compose(ctx, bank, seq, kept, seed, usage, exclude);
+      // Selection, then the realiser (each sentence filled for its place),
+      // then verify.
+      d = _realised(_compose(ctx, bank, seq, kept, seed, usage, exclude));
       if (f) d = verify(d, f, ctx._picks, { bank: bank });
       else d.replaced = [];
       if (!previous || d.text !== previous) break;
@@ -3041,14 +3060,25 @@ window.CommentBank = (function () {
     bank = bank || COMMENT_BANK;
     var path = ctx && ctx._path;
     var list = path === 'ie' ? REQUIRED_PARTS.ie : path ? REQUIRED_PARTS.goals : [];
-    return list.map(function (p) {
+    var parts = list.map(function (p) {
       var step = DRAFT_STEPS.find(function (x) {
         return x.key === p[0];
       });
       var s = bank.sentences.find(function (x) {
         return x.part === step.part && step.groups.indexOf(x.group) >= 0 && fits(x, ctx);
       });
-      return { key: p[0], label: p[1], id: s ? s.id : null, text: s ? fill(s, ctx) : '' };
+      return {
+        key: p[0],
+        label: p[1],
+        id: s ? s.id : null,
+        text: '',
+        toks: s ? sentenceTokens(s, ctx) : null,
+        who: whoOf(ctx),
+      };
+    });
+    // Filled in the comment's order, as the draft fills them (realise()).
+    return R.realise(parts).sentences.map(function (x) {
+      return { key: x.key, label: x.label, id: x.id, text: x.id ? x.text : '' };
     });
   }
 
@@ -3194,9 +3224,7 @@ window.CommentBank = (function () {
       return named.indexOf(x) >= 0 || tenths(x[key]) <= floor;
     });
   }
-  function _article(w) {
-    return (/^[AEIOU]/.test(w) ? 'an ' : 'a ') + w;
-  }
+  var _article = R.aOrAn;
   /* Work labelled Missing this term (facts().notHandedIn; the record's
      count for facts built without it). */
   function _missingCount(f) {
@@ -3456,11 +3484,11 @@ window.CommentBank = (function () {
         pv.values.ieDeadline === deadlineText(f.grade && f.grade.ieDeadline)
       );
     },
+    // The absences and lates as said: "missed three classes and been late
+    // once", from the teacher's attendance for the term.
     attendance: function (pv, f) {
-      var checks = [];
-      if (_has(pv, 'absent')) checks.push(f.absent > 0 && pv.values.absent === String(f.absent));
-      if (_has(pv, 'late')) checks.push(f.late > 0 && pv.values.late === String(f.late));
-      return checks.length > 0 && checks.every(Boolean);
+      var want = attendanceText(f.absent, f.late);
+      return _has(pv, 'attendance') && !!want && pv.values.attendance === want;
     },
     // The student's own words and self-assessment.
     studentWords: function (pv, f) {
@@ -3577,24 +3605,19 @@ window.CommentBank = (function () {
       replaced.push({ sentenceId: pv.sentenceId, failed: failed, by: stand ? stand.id : null });
       if (!stand) return;
       used[stand.id] = true;
-      var x = { id: stand.id, part: stand.part, text: fill(stand, ctx) };
+      var x = {
+        id: stand.id,
+        part: stand.part,
+        text: fill(stand, ctx),
+        toks: sentenceTokens(stand, ctx),
+        who: whoOf(ctx),
+      };
       if (d.sentences[i] && d.sentences[i].step) x.step = d.sentences[i].step;
       sentences.push(x);
       out.push(provenance(stand, ctx));
     });
-    return {
-      text: sentences
-        .map(function (x) {
-          return x.text;
-        })
-        .join(' '),
-      ids: sentences.map(function (x) {
-        return x.id;
-      }),
-      sentences: sentences,
-      provenance: out,
-      replaced: replaced,
-    };
+    // A stand-in is filled for its place like the rest (the realiser).
+    return _realised({ sentences: sentences, provenance: out, replaced: replaced });
   }
 
   return {
@@ -3648,6 +3671,11 @@ window.CommentBank = (function () {
     pictureOf: pictureOf,
     seedFor: seedFor,
     workTitle: workTitle,
+    realise: realise,
+    EVIDENCE: EVIDENCE,
+    HABIT_FAMILY_WORDS: HABIT_FAMILY_WORDS,
+    sentenceTokens: sentenceTokens,
+    attendanceText: attendanceText,
     reportNoteText: reportNoteText,
     bestPieceSentence: bestPieceSentence,
     studentRef: studentRef,
