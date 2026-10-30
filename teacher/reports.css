@@ -4582,6 +4582,12 @@ body.qn-roster #gb-sidebar .student-row-note {
   border-color: var(--active);
   background: var(--active-light);
 }
+/* A private note is listed but cannot be quoted. */
+.qn-choice:disabled {
+  cursor: not-allowed;
+  color: var(--text-3);
+  background: transparent;
+}
 .qn-group {
   font-size: var(--text-xs);
   font-weight: 700;

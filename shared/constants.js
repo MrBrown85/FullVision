@@ -778,6 +778,25 @@ const OBS_SENTIMENTS = {
   note: { label: 'Note', color: 'var(--obs-note)', tint: 'rgba(242,194,0,0.14)', border: '#f2c200' },
 };
 
+/* Concern and Note observations are private: they can be about a vacation,
+   a meeting with parents or a worry, so they never print or go home on any
+   report, and the screens that list them say "Private" (Colin, Oct 29). */
+const PRIVATE_OBS_SENTIMENTS = ['concern', 'note'];
+function isPrivateObservation(ob) {
+  return !!ob && PRIVATE_OBS_SENTIMENTS.indexOf(ob.sentiment) >= 0;
+}
+/* The small "Private" label every observation list shows on a private one
+   (styled in teacher/obs-capture.css, which the desktop and phone apps
+   both load). '' for any other observation. */
+function obsPrivateLabelHtml(ob) {
+  if (!isPrivateObservation(ob)) return '';
+  return (
+    '<span class="obs-private" title="Private: never printed or sent home">' +
+    (typeof LINE_ICONS !== 'undefined' ? LINE_ICONS.lock : '') +
+    'Private</span>'
+  );
+}
+
 const OBS_CONTEXTS = {
   'whole-class': { label: 'Whole class' },
   'small-group': { label: 'Small group' },

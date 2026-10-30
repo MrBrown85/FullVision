@@ -764,6 +764,7 @@ window.PageStudent = (function () {
       );
     return (
       '<span class="stu-note">' +
+      (linked.length && String(linked[0].text || '').split('\n')[0] ? obsPrivateLabelHtml(linked[0]) + ' ' : '') +
       esc(text) +
       (linked.length > 1 ? ' <span class="stu-sub-inline">+' + (linked.length - 1) + ' more</span>' : '') +
       '</span>'
@@ -2342,9 +2343,19 @@ window.PageStudent = (function () {
             '" style="left:' +
             xAt(t).toFixed(2) +
             '%" title="' +
-            esc(_shortDay(_obDay(o)) + ': ' + String(o.text || '').split('\n')[0]) +
+            esc(
+              _shortDay(_obDay(o)) +
+                (isPrivateObservation(o) ? ' (Private)' : '') +
+                ': ' +
+                String(o.text || '').split('\n')[0],
+            ) +
             '" aria-label="' +
-            esc(_shortDay(_obDay(o)) + ': ' + String(o.text || '').split('\n')[0]) +
+            esc(
+              _shortDay(_obDay(o)) +
+                (isPrivateObservation(o) ? ' (Private)' : '') +
+                ': ' +
+                String(o.text || '').split('\n')[0],
+            ) +
             '"></button>';
         });
         html += '</span></div>';

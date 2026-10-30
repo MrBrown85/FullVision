@@ -377,6 +377,7 @@ window.StudentEvidence = (function () {
     var s = ob.sentiment && OBS_SENTIMENTS[ob.sentiment];
     var parts = [shortDate(obDay(ob), today)];
     if (s) parts.push(s.label);
+    if (isPrivateObservation(ob)) parts.push('Private');
     if (isAssessmentLinked(ob)) parts.push(ObsCard.assessmentTitle(_cid, ob) || 'Assessment');
     return parts.join(' · ') + ': ' + firstLine(ob.text);
   }

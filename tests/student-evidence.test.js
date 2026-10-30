@@ -226,7 +226,9 @@ describe('Evidence panel in the page', () => {
   it('draws a mark per observation and labels the gap', () => {
     expect($$('.ev-tl-mark').map(m => m.getAttribute('data-obid'))).toEqual(['o1', 'o2', 'o3']);
     expect($('.ev-tl-mark[data-obid="o2"]').getAttribute('data-shape')).toBe('square');
-    expect($('.ev-tl-mark[data-obid="o3"]').getAttribute('aria-label')).toBe('Oct 16 · Concern: Left the lab early');
+    expect($('.ev-tl-mark[data-obid="o3"]').getAttribute('aria-label')).toBe(
+      'Oct 16 · Concern · Private: Left the lab early',
+    );
     // Sep 20 → Oct 1 is 11 days, Oct 1 → Oct 16 is 15, Oct 16 → today is 2.
     expect($$('.ev-tl-gap-label').map(g => g.textContent)).toEqual(['No observations for 15 days']);
     expect($('.ev-tl-range').textContent).toBe('All time · Sep 20 to today');

@@ -237,6 +237,8 @@ window.ReportFeedback = (function () {
       })
       .filter(function (x) {
         if (!x.ob || x.ob.assignmentContext || !String(x.ob.text || '').trim()) return false;
+        // Private observations never go home (isPrivateObservation).
+        if (isPrivateObservation(x.ob)) return false;
         return !range || (!!x.day && x.day >= range.from && x.day <= range.to);
       })
       .sort(function (x, y) {

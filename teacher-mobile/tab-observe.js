@@ -63,6 +63,7 @@ window.MObserve = (function () {
     var when = opts.when === 'date' ? ObsCard.cardWhen(ob) : ObsCard.cardTime(ob);
     var tags = tagChips(ob.dims);
     var meta =
+      obsPrivateLabelHtml(ob) +
       (p.context ? '<span class="m-obs-context">' + MC.esc(p.context) + '</span>' : '') +
       (p.assessment ? '<span class="m-obs-assessment">' + MC.esc(p.assessment) + '</span>' : '') +
       ObsCapture.linkPillsHtml(cid, ob, 'm-obs-link') +

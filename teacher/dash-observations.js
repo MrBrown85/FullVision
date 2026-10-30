@@ -898,6 +898,7 @@ window.DashObservations = (function () {
         '">' +
         TYPE_LABEL[t] +
         '</span><span>' +
+        (isPrivateObservation(o) ? obsPrivateLabelHtml(o) + ' ' : '') +
         esc(line) +
         '</span></div>';
     });
