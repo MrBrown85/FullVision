@@ -702,6 +702,13 @@ window.PageGradebook = (function () {
   }
 
   /* A student's name in the grid's left column: a link to their page. */
+  /* Whether a student's grade shows a reporting basis (IE, or No Letter
+     Grade for goals) for the term in view. That row keeps the name whole and
+     shortens the grade with an ellipsis instead, the full text on hover. */
+  function _basisRow(cid, sid) {
+    return reportingBasis(cid, sid, viewedReportTerm(cid)) !== 'grade';
+  }
+
   function _rowheadNameOpen(cid, s) {
     return (
       '<a class="gb-grid-rowhead-name" role="link" tabindex="0" data-sid="' +
@@ -967,21 +974,26 @@ window.PageGradebook = (function () {
     sortedStudents.forEach(function (s, si) {
       var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
       var overall = getOverallProficiency(cid, s.id);
-      var grade = studentGradeSummary(cid, s.id);
+      // The term in view's reporting basis (IE, or No Letter Grade for goals).
+      var grade = studentGradeSummary(cid, s.id, viewedReportTerm(cid));
       var color = PROF_COLORS[grade.level] || PROF_COLORS[0];
       var label = levelWord(cid, overall);
+      var basisRow = _basisRow(cid, s.id);
       _setNameTip(cid, s, sections);
       html +=
         '<div class="gb-grid-rowhead gb-grid-rowhead-comp' +
         altClass +
+        (basisRow ? ' gb-row-basis' : '') +
         '">' +
         _rowheadNameOpen(cid, s) +
         esc(fullName(s)) +
         '</a>' +
         '<span class="gb-grid-rowhead-overall" style="color:' +
         color +
-        '">' +
-        (grade.text || '\u2014') +
+        '"' +
+        (basisRow ? ' title="' + esc(grade.text) + '"' : '') +
+        '>' +
+        (basisRow ? '<span class="gb-grade-text">' + esc(grade.text) + '</span>' : grade.text || '\u2014') +
         (label ? '<small>' + label + '</small>' : '') +
         '</span>' +
         '</div>';
@@ -1232,8 +1244,9 @@ window.PageGradebook = (function () {
     sortedStudents.forEach(function (s, si) {
       var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
       // The overall grade as the class is set to show it (calc.js): the
-      // proficiency, the letter and %, or both stacked, each in its colour.
-      var badges = studentGradeBadges(cid, s.id);
+      // proficiency, the letter and %, or both stacked, each in its colour,
+      // with the term in view's reporting basis (IE, or No Letter Grade).
+      var badges = studentGradeBadges(cid, s.id, viewedReportTerm(cid));
       var gradeParts = [badges.prof, badges.letter].filter(Boolean);
       var desTags = (s.designations || [])
         .map(function (code) {
@@ -1252,10 +1265,12 @@ window.PageGradebook = (function () {
           );
         })
         .join('');
+      var basisRow = _basisRow(cid, s.id);
       _setNameTip(cid, s, sections);
       html +=
         '<div class="gb-grid-rowhead' +
         altClass +
+        (basisRow ? ' gb-row-basis' : '') +
         '">' +
         _rowheadNameOpen(cid, s) +
         esc(fullName(s)) +
@@ -1266,7 +1281,13 @@ window.PageGradebook = (function () {
           ? gradeParts
               .map(function (p) {
                 return (
-                  '<span style="color:' + (PROF_COLORS[p.level] || PROF_COLORS[0]) + '">' + esc(p.text) + '</span>'
+                  '<span class="gb-grade-text" style="color:' +
+                  (PROF_COLORS[p.level] || PROF_COLORS[0]) +
+                  '"' +
+                  (basisRow ? ' title="' + esc(p.text) + '"' : '') +
+                  '>' +
+                  esc(p.text) +
+                  '</span>'
                 );
               })
               .join('')
@@ -1375,7 +1396,7 @@ window.PageGradebook = (function () {
   // in a Letter class.
   function renderOverallCell(cid, sid) {
     var val = getOverallProficiency(cid, sid);
-    var grade = courseGradeMode(cid) === 'letter' ? studentGradeSummary(cid, sid) : null;
+    var grade = courseGradeMode(cid) === 'letter' ? studentGradeSummary(cid, sid, viewedReportTerm(cid)) : null;
     var r = grade ? grade.level : Math.round(val);
     var color = PROF_COLORS[r] || PROF_COLORS[0];
     var label = levelWord(cid, val);
@@ -1402,7 +1423,7 @@ window.PageGradebook = (function () {
      have evidence. Every value comes from calc.js. Kept in a map, not an
      attribute, so the HTML never round-trips through the DOM. */
   function _setNameTip(cid, student, sections) {
-    var grade = studentGradeSummary(cid, student.id);
+    var grade = studentGradeSummary(cid, student.id, viewedReportTerm(cid));
     var word = levelWord(cid, getOverallProficiency(cid, student.id));
     var tip =
       '<div class="gb-tip-head">Course Grade</div>' +

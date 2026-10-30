@@ -484,9 +484,13 @@ create table term_rating (
   lates                 integer     check (lates >= 0),               -- times late, total to date at this report
   habits                jsonb       not null default '{}',             -- six work habits {completes, ready, others, part, feedback, devices}: 1 Rarely … 4 Consistently, 5 Not Seen
   approved_at           timestamptz,                                  -- the teacher approved the comment; cleared when it changes
+  reporting_basis       text        not null default 'grade'          -- what the report prints for the grade (20261031_term_rating_reporting_basis)
+                        check (reporting_basis in ('grade', 'ie', 'language_goals', 'iep_goals')), -- grade = as calculated; ie = IE; *_goals = no letter
+  ie_deadline           date,                                         -- the date an IE must become a grade by; required when reporting_basis = 'ie'
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
-  unique (enrollment_id, term)
+  unique (enrollment_id, term),
+  constraint term_rating_ie_needs_deadline check (reporting_basis <> 'ie' or ie_deadline is not null)
 );
 
 create table term_rating_dimension (
@@ -839,7 +843,7 @@ create table phone_report_student (
 --   list_course_core_self_assessments(p_course_id uuid)   -- {enrollment_id: {term_key: {core_id: {level, text, goal, date}}}}
 --
 -- Term rating:
---   save_term_rating(p_enrollment_id uuid, p_term integer, p_payload jsonb)  -- payload may carry habits {…} and approved true/false
+--   save_term_rating(p_enrollment_id uuid, p_term integer, p_payload jsonb)  -- payload may carry habits {…} and approved true/false, reporting_basis and ie_deadline (an IE needs a deadline; 20261031)
 --   save_term_attendance(p_enrollment_id uuid, p_term integer, p_absences int, p_lates int)
 --   list_course_term_attendance(p_course_id uuid)  -- {enrollment_id: {term: {absences, lates}}}
 --
@@ -906,7 +910,7 @@ create table phone_report_student (
 -- Reads (hot path):
 --   list_teacher_courses()                                             -- includes block (20261020_course_block)
 --   get_gradebook(p_course_id uuid)                                    -- the single boot-path RPC
---   get_class_bundle(p_course_id uuid, p_if_version bigint)            -- one class in one call; includes observation_templates and withdrawn_students (20261019); score_rows carry report_note as a 7th element (20261031)
+--   get_class_bundle(p_course_id uuid, p_if_version bigint)            -- one class in one call; includes observation_templates and withdrawn_students (20261019); score_rows carry report_note as a 7th element (20261031); term_ratings carry reporting_basis and ie_deadline (20261031)
 --   get_class_dashboard(p_course_id uuid)
 --   get_student_profile(p_enrollment_id uuid)
 --   list_course_student_profiles(p_course_id uuid)

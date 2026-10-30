@@ -151,7 +151,8 @@ var PhoneReports = (function () {
     var course = COURSES[cid] || {};
     var mode = courseGradeMode(cid);
     var overallV = getOverallProficiency(cid, st.id);
-    var summary = studentGradeSummary(cid, st.id);
+    // With the report's reporting basis: IE, or No Letter Grade for goals.
+    var summary = studentGradeSummary(cid, st.id, ctx.termId);
     var term = termNumber(ctx.termId);
     var data = {
       v: 1,

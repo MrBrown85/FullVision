@@ -295,10 +295,11 @@ window.GradeReport = (function () {
   }
 
   /* Everything after the table: the summary by category, the term grade
+     (with the report's reporting basis: IE, or No Letter Grade for goals)
      and the missing work count. */
-  function _tailHtml(cid, student, opts) {
+  function _tailHtml(cid, student, opts, ctx) {
     var html = '';
-    var term = studentGradeSummary(cid, student.id).text;
+    var term = studentGradeSummary(cid, student.id, ctx && ctx.termId).text;
     if (opts.summary) {
       var cats = categorySummary(cid, student);
       if (cats.length) {
@@ -848,7 +849,7 @@ window.GradeReport = (function () {
     var show = columnsFor(cid);
     var list = rows(cid, student, o);
     var letterhead = ReportBlocks.renderBlockHeader(cid, student, ctx, { name: o.name });
-    var tail = _tailHtml(cid, student, o);
+    var tail = _tailHtml(cid, student, o, ctx);
     if (o.numbers) {
       show.numbers = true;
       show.numPx = 8 + 7 * String(Math.max(1, list.length)).length;

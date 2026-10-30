@@ -4306,7 +4306,9 @@ function _fillOverrideCalculated(cid) {
 /* Term ratings from the server, merged into this device's copy. The server's
    fields win; the nine "dims" the old questionnaire rated were never stored
    on the server, so this device keeps its own (read by old reports only).
-   The six habits and the approval are on the server since Oct 28 2026. A
+   The six habits and the approval are on the server since Oct 28 2026; the
+   reporting basis and the IE deadline since Oct 31 2026 (a server without
+   those columns sends neither, and this device's copy is kept). A
    rating this device has and the server doesn't was written while saves
    never reached the server (term ids read as NaN until Oct 2026): it is sent
    now, once. */
@@ -4327,6 +4329,9 @@ function _applyBundleTermRatings(cid, rows) {
       narrative: r.narrative_html || '',
       habits: r.habits && typeof r.habits === 'object' ? r.habits : {},
       approvedAt: r.approved_at || null,
+      reportingBasis: 'reporting_basis' in r ? r.reporting_basis || 'grade' : prev.reportingBasis || 'grade',
+      ieDeadline:
+        'ie_deadline' in r ? (r.ie_deadline ? String(r.ie_deadline).slice(0, 10) : null) : prev.ieDeadline || null,
       workHabits: r.work_habits_rating || 0,
       participation: r.participation_rating || 0,
       socialTraits: r.social_traits || [],
@@ -11440,6 +11445,11 @@ window.v2.saveTermRating = function (enrollmentId, term, payload) {
   if ('socialTraits' in payload) wire.social_traits = payload.socialTraits || [];
   if (payload.habits && typeof payload.habits === 'object') wire.habits = _habitsWire(payload.habits);
   if ('approved' in payload) wire.approved = !!payload.approved;
+  // What the report prints for the grade, and the IE's deadline
+  // (20261031_term_rating_reporting_basis). A server without the columns
+  // ignores both keys.
+  if ('reportingBasis' in payload) wire.reporting_basis = payload.reportingBasis || 'grade';
+  if ('ieDeadline' in payload) wire.ie_deadline = payload.ieDeadline || null;
   if (Array.isArray(payload.dimensions)) {
     wire.dimensions = payload.dimensions.map(function (d) {
       return { section_id: d.sectionId, rating: Number(d.rating) };
@@ -11910,6 +11920,8 @@ var _TERM_RATING_WIRE = {
   mentionObs: 'mentionObservationIds',
   habits: 'habits',
   approvedAt: 'approved',
+  reportingBasis: 'reportingBasis',
+  ieDeadline: 'ieDeadline',
 };
 function _termRatingPatch(data) {
   var payload = {};
@@ -11921,6 +11933,15 @@ function _termRatingPatch(data) {
     if (key === 'approvedAt') value = !!value;
     payload[wireKey] = value;
   });
+  // The reporting basis and the IE deadline go together. The server refuses
+  // an IE without a deadline, so until the teacher picks a date the choice
+  // stays on this device (term_rating_ie_needs_deadline).
+  if ('reportingBasis' in payload || 'ieDeadline' in payload) {
+    if (payload.reportingBasis === 'ie' && !payload.ieDeadline) {
+      delete payload.reportingBasis;
+      delete payload.ieDeadline;
+    }
+  }
   return payload;
 }
 

@@ -1722,12 +1722,28 @@ window.PageReports = (function () {
       return;
     }
 
+    // A click outside the IE deadline calendar closes it.
+    if (RQ.deadlineOpen() && !e.target.closest('#tq-cal, #tq-deadline-btn')) RQ.tqCloseDeadline();
+
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
     var handlers = {
       switchTab: function () {
         switchTab(el.dataset.tab);
+      },
+      tqSetBasis: function () {
+        RQ.tqSetBasis(el.dataset.basis);
+      },
+      tqOpenDeadline: function () {
+        if (RQ.deadlineOpen()) RQ.tqCloseDeadline();
+        else RQ.tqOpenDeadline();
+      },
+      tqDeadlineMonth: function () {
+        RQ.tqDeadlineMonth(el.dataset.dir);
+      },
+      tqPickDeadline: function () {
+        RQ.tqPickDeadline(el.dataset.date);
       },
       tqAddReportNote: function () {
         RQ.tqAddReportNote(el.dataset.aid);
@@ -1978,6 +1994,11 @@ window.PageReports = (function () {
     // The questionnaire's attendance boxes save when they change.
     if (el.dataset.tqAtt) {
       RQ.tqSetAttendance(el.dataset.sid);
+      return;
+    }
+    // "I checked this" on an IE comment's missing-work row.
+    if (el.dataset.tqCheck) {
+      RQ.tqSetCheck(el.dataset.tqCheck, !!el.checked);
       return;
     }
     var a = el.dataset.action;
