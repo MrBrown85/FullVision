@@ -739,8 +739,38 @@ window.DashInsights = (function () {
   /* A row per student (the filtered, sorted list), a column per competency
      with a count of students at each proficiency over it, and the class
      average under it. */
-  function studentGridHtml(cid, students, allStudents) {
+  /* The grid's column headings sort the list (the dashboard's sortMode):
+     Student by last name, Overall and each competency by proficiency, Last
+     Observed by days since. A second click turns the order round. */
+  function gridSortOf(sortMode) {
+    var m = /^(?:col:(.+)|obs):(asc|desc)$/.exec(sortMode || '');
+    if (m) return { key: m[1] ? 'col:' + m[1] : 'obs', dir: m[2] };
+    if (sortMode === 'last-asc' || sortMode === 'last-desc') return { key: 'name', dir: sortMode.slice(5) };
+    if (sortMode === 'overall-asc' || sortMode === 'overall-desc') return { key: 'overall', dir: sortMode.slice(8) };
+    return null;
+  }
+  function _sortHead(key, label, current) {
+    var on = current && current.key === key;
+    return (
+      '<button type="button" class="dash-sg-sort' +
+      (on ? ' is-on' : '') +
+      '" data-action="gridSort" data-key="' +
+      esc(key) +
+      '">' +
+      esc(label) +
+      '<span class="dash-sg-arrow" aria-hidden="true">' +
+      (on ? (current.dir === 'asc' ? '\u2191' : '\u2193') : '') +
+      '</span></button>'
+    );
+  }
+  function _ariaSort(key, current) {
+    if (!current || current.key !== key) return '';
+    return ' aria-sort="' + (current.dir === 'asc' ? 'ascending' : 'descending') + '"';
+  }
+
+  function studentGridHtml(cid, students, allStudents, sortMode) {
     var cols = columns(cid);
+    var current = gridSortOf(sortMode);
     var allIds = _ids(allStudents);
     var prof = showsProficiency(cid);
     var dists = cols.map(function (col) {
@@ -749,7 +779,16 @@ window.DashInsights = (function () {
     var today = getTodayStr();
     var term = getActiveTerm(cid);
     var html = '<div class="dash-section"><div class="dash-sg-wrap"><table class="dash-sg"><thead><tr>';
-    html += '<th scope="col" class="dash-sg-name-h">Student</th><th scope="col">Overall</th>';
+    html +=
+      '<th scope="col" class="dash-sg-name-h"' +
+      _ariaSort('name', current) +
+      '>' +
+      _sortHead('name', 'Student', current) +
+      '</th><th scope="col"' +
+      _ariaSort('overall', current) +
+      '>' +
+      _sortHead('overall', 'Overall', current) +
+      '</th>';
     cols.forEach(function (col, i) {
       var d = dists[i];
       var max = Math.max.apply(
@@ -758,7 +797,7 @@ window.DashInsights = (function () {
           return b.ids.length;
         }),
       );
-      html += '<th scope="col" title="' + esc(col.title) + '">';
+      html += '<th scope="col" title="' + esc(col.title) + '"' + _ariaSort('col:' + col.key, current) + '>';
       if (prof) {
         html +=
           '<span class="dash-sg-hist" role="img" aria-label="' +
@@ -787,9 +826,14 @@ window.DashInsights = (function () {
             .join('') +
           '</span>';
       }
-      html += '<span class="dash-sg-col">' + esc(col.label) + '</span></th>';
+      html += '<span class="dash-sg-col">' + _sortHead('col:' + col.key, col.label, current) + '</span></th>';
     });
-    html += '<th scope="col" class="dash-sg-obs-h">Last Observed</th></tr></thead><tbody>';
+    html +=
+      '<th scope="col" class="dash-sg-obs-h"' +
+      _ariaSort('obs', current) +
+      '>' +
+      _sortHead('obs', 'Last Observed', current) +
+      '</th></tr></thead><tbody>';
     students.forEach(function (st) {
       var grade = studentGradeSummary(cid, st.id);
       var sum = DashStudentCards.obsSummary(getStudentQuickObs(cid, st.id), today, term);
@@ -859,5 +903,6 @@ window.DashInsights = (function () {
     belowCounts: belowCounts,
     studentsHeaderHtml: studentsHeaderHtml,
     studentGridHtml: studentGridHtml,
+    gridSortOf: gridSortOf,
   };
 })();

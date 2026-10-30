@@ -1003,6 +1003,35 @@ a.dash-ins-name:hover {
   background: var(--bg);
   border-bottom: 1px solid var(--divider-strong);
 }
+/* A heading is a sort button: grey until it is the sort, then dark with
+   its arrow. */
+.dash-sg-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px;
+  margin: 0 -4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.dash-sg-sort:hover {
+  color: var(--text);
+  background: var(--overlay-hover);
+}
+.dash-sg-sort:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 0;
+}
+.dash-sg-sort.is-on {
+  color: var(--text);
+}
+.dash-sg-arrow:empty {
+  display: none;
+}
 .dash-sg th.dash-sg-name-h,
 .dash-sg th.dash-sg-name,
 .dash-sg tfoot th {

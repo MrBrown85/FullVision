@@ -45,6 +45,9 @@ window.DashOverview = (function () {
       '" data-action-input="dashSearch" aria-label="Search students">' +
       '</div>' +
       '<select class="term-select dash-sort-select" data-action="dashSort" aria-label="Sort students">' +
+      (opts.extraSort
+        ? '<option value="' + esc(opts.extraSort.value) + '" selected>' + esc(opts.extraSort.label) + '</option>'
+        : '') +
       '<option value="last-asc"' +
       (sortMode === 'last-asc' ? ' selected' : '') +
       '>Last Name A\u2192Z</option>' +

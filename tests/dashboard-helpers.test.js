@@ -32,6 +32,27 @@ describe('DashOverview.renderDashToolbar', () => {
     expect(html).toContain('value="noor"');
     expect(html).toContain('Flagged (3)');
   });
+
+  it('shows a grid column sort as the selected line of the sort menu', () => {
+    const html = DashOverview.studentControlsHtml({
+      sortMode: 'col:s:QAP:desc',
+      extraSort: { value: 'col:s:QAP:desc', label: 'Questioning High\u2192Low' },
+      searchQuery: '',
+      showFlaggedOnly: false,
+      flagCount: 0,
+    });
+    expect(html).toContain('<option value="col:s:QAP:desc" selected>Questioning High\u2192Low</option>');
+  });
+});
+
+describe('DashInsights.gridSortOf', () => {
+  it('reads the column and direction from the sort mode', () => {
+    expect(DashInsights.gridSortOf('last-asc')).toEqual({ key: 'name', dir: 'asc' });
+    expect(DashInsights.gridSortOf('overall-desc')).toEqual({ key: 'overall', dir: 'desc' });
+    expect(DashInsights.gridSortOf('col:s:QAP:asc')).toEqual({ key: 'col:s:QAP', dir: 'asc' });
+    expect(DashInsights.gridSortOf('obs:desc')).toEqual({ key: 'obs', dir: 'desc' });
+    expect(DashInsights.gridSortOf('flagged')).toBeNull();
+  });
 });
 
 describe('DashStudentCards.renderStudentCards', () => {

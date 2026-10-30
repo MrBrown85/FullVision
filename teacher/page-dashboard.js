@@ -88,6 +88,64 @@ window.PageDashboard = (function () {
     }, 150);
   }
 
+  /* ── Sorting by a grid column ───────────────────────────── */
+  /* A competency (col:KEY:dir) by its proficiency, or Last Observed
+     (obs:dir) by days since. Ties and unscored students keep last-name
+     order; unscored students and the never-observed go last, except that
+     Longest Ago First puts the never-observed first. */
+  function _gridSorted(cid, students) {
+    var sort = DashInsights.gridSortOf(sortMode);
+    var byLast = sortStudents(students, 'lastName');
+    if (!sort) return byLast;
+    var sign = sort.dir === 'asc' ? 1 : -1;
+    var val = {};
+    if (sort.key === 'obs') {
+      var today = getTodayStr();
+      var term = getActiveTerm(cid);
+      byLast.forEach(function (st) {
+        var d = DashStudentCards.obsSummary(getStudentQuickObs(cid, st.id), today, term).daysSince;
+        val[st.id] = d == null ? Infinity : d;
+      });
+    } else {
+      var col = _gridColumn(cid, sort.key.slice(4));
+      if (!col) return byLast;
+      byLast.forEach(function (st) {
+        var v = col.which.groupId
+          ? getGroupProficiency(cid, st.id, col.which.groupId)
+          : getSectionProficiency(cid, st.id, col.which.sectionId);
+        val[st.id] = v > 0 ? v : null;
+      });
+    }
+    return byLast.sort(function (a, b) {
+      var va = val[a.id];
+      var vb = val[b.id];
+      if (va === vb) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      return (va - vb) * sign;
+    });
+  }
+  function _gridColumn(cid, key) {
+    return (
+      DashInsights.columns(cid).filter(function (c) {
+        return c.key === key;
+      })[0] || null
+    );
+  }
+  // The sort menu's line for a column sort the menu has no option for.
+  function _gridSortOption(cid) {
+    var sort = DashInsights.gridSortOf(sortMode);
+    if (!sort || (sort.key !== 'obs' && sort.key.indexOf('col:') !== 0)) return null;
+    if (sort.key === 'obs')
+      return {
+        value: sortMode,
+        label: sort.dir === 'desc' ? 'Last Observed, Longest Ago First' : 'Last Observed, Most Recent First',
+      };
+    var col = _gridColumn(cid, sort.key.slice(4));
+    if (!col) return null;
+    return { value: sortMode, label: col.label + (sort.dir === 'desc' ? ' High\u2192Low' : ' Low\u2192High') };
+  }
+
   /* ── switchCourse ───────────────────────────────────────── */
   async function switchCourse(cid) {
     activeCourse = cid;
@@ -187,6 +245,8 @@ window.PageDashboard = (function () {
           );
         });
         break;
+      default:
+        students = _gridSorted(cid, students);
     }
 
     // Search filter
@@ -469,12 +529,14 @@ window.PageDashboard = (function () {
         studentView,
         Overview.studentControlsHtml({
           sortMode: sortMode,
+          extraSort: _gridSortOption(cid),
           searchQuery: searchQuery,
           showFlaggedOnly: showFlaggedOnly,
           flagCount: flagCount,
         }),
       );
-    if (studentView === 'grid' && students.length) html += DashInsights.studentGridHtml(cid, students, allStudents);
+    if (studentView === 'grid' && students.length)
+      html += DashInsights.studentGridHtml(cid, students, allStudents, sortMode);
     else html += StudentCards.renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags);
 
     // The open segment's students, placed under it once it is drawn.
@@ -949,6 +1011,25 @@ window.PageDashboard = (function () {
               ? '.dash-mix-below[data-key="' + key + '"]'
               : '[data-action="naFilter"][data-filter="' + naFilter + '"]',
         );
+      },
+      // A grid heading: its column, or the other way round if it is already
+      // the sort. Names start A→Z, Last Observed with the longest ago, the
+      // rest High→Low.
+      gridSort: function () {
+        var key = el.dataset.key;
+        var cur = DashInsights.gridSortOf(sortMode);
+        var dir = cur && cur.key === key ? (cur.dir === 'asc' ? 'desc' : 'asc') : key === 'name' ? 'asc' : 'desc';
+        sortMode =
+          key === 'name'
+            ? 'last-' + dir
+            : key === 'overall'
+              ? 'overall-' + dir
+              : key === 'obs'
+                ? 'obs:' + dir
+                : key + ':' + dir;
+        render();
+        var again = document.querySelector('.dash-sg-sort[data-key="' + CSS.escape(key) + '"]');
+        if (again) again.focus();
       },
       studentView: function () {
         studentView = el.dataset.view === 'grid' ? 'grid' : 'cards';
