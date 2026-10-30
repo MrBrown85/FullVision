@@ -147,6 +147,13 @@ test('the roster marks survive a sidebar redraw; arrows move without approving a
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('#gb-sidebar .student-row.selected')).toHaveAttribute('data-sid', sam);
   await expect(page.locator('.qn-name')).toHaveText('Sam Blackwood');
+  // Sam's Demo comment has a sentence over 20 words, so the Ready count
+  // gives way to why Approve and Next is off (PR 11c, the States mockup).
+  await expect(page.locator('#tq-ready')).toHaveText('Approve and Next is off until the comment fits.');
+  await expect(page.locator('#tq-limit-text')).toHaveText(' · one sentence is over 20 words');
+  await expect(page.locator('#tq-count-btn')).toHaveClass(/over/);
+  await expect(page.locator('#tq-approve-next')).toBeDisabled();
+  await row(noor).click();
   await expect(page.locator('#tq-ready')).toHaveText('2 of 27 Ready');
   // Leaving the questionnaire gives the grades back.
   await page.locator('[data-action="tqRosterFilter"][data-filter="all"]').click();
@@ -331,6 +338,131 @@ test('the circled question mark opens Where This Information Comes From', async 
   await expect(sheet).toContainText('Student Voice answers marked Private.');
   await page.keyboard.press('Escape');
   await expect(sheet).toHaveCount(0);
+});
+
+/* Checks and approval (fullvision-generate-plan PR 11c, the "Review-screen
+   states" mockup). */
+test.describe('checks and approval', () => {
+  test('before Generate: No comment yet with the habits rated; it goes once there is text', async ({ page }) => {
+    await open(page);
+    await page.evaluate(() => {
+      const el = document.getElementById('tq-narrative');
+      el.value = '';
+      ReportQuestionnaire.tqNarrativeInput();
+      ReportQuestionnaire.tqSaveNarrative();
+    });
+    await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
+    await page.locator('#tq-empty').waitFor();
+    await expect(page.locator('#tq-empty')).toContainText('No comment yet');
+    await expect(page.locator('#tq-empty')).toContainText(
+      'Rate the six work habits, then press Generate Comment. You can also type here.',
+    );
+    await expect(page.locator('#tq-empty-rated')).toHaveText('0 of 6 habits rated');
+    await page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]').click();
+    await expect(page.locator('#tq-empty-rated')).toHaveText('1 of 6 habits rated');
+    // Clicking it puts the cursor in the box; typing hides it.
+    await page.locator('#tq-empty').click();
+    await expect(page.locator('#tq-narrative')).toBeFocused();
+    await page.keyboard.type('Cece had a good term.');
+    await expect(page.locator('#tq-empty')).toBeHidden();
+    await expect(page.locator('#tq-approve-next')).toBeEnabled();
+  });
+
+  test('the missing-work row waits for I checked this; a sentence over 20 words keeps Approve off', async ({
+    page,
+  }) => {
+    await open(page);
+    // One assignment labelled Missing for Cece.
+    const title = await page.evaluate(() => {
+      const dated = getAssessments('sci8')
+        .filter(x => x.date)
+        .sort((x, y) => x.date.localeCompare(y.date));
+      const a = dated[dated.length - 1];
+      _cache.scores['sci8']['st1'] = (_cache.scores['sci8']['st1'] || []).filter(e => e.assessmentId !== a.id);
+      clearProfCache();
+      setAssignmentStatus('sci8', 'st1', a.id, 'NS');
+      return a.title;
+    });
+    await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st2');
+    await page.locator('#tq-narrative').waitFor();
+    await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
+    await page.locator('#tq-narrative').waitFor();
+    await page.locator('#tq-generate').click();
+    const row = page.locator('#tq-row-missing');
+    await expect(row).toHaveClass(/flag/);
+    await expect(row.locator('.qn-req-text')).toContainText(title);
+    await expect(row.locator('.qn-req-source').last()).toHaveText(
+      '1 of 22 · check that it is really missing before you approve',
+    );
+    const approve = page.locator('#tq-approve-next');
+    await expect(approve).toBeDisabled();
+    await expect(approve).toHaveAttribute(
+      'title',
+      'Saves this comment to the report card and opens the next student. Tick “I checked this” on the highlighted sentence first.',
+    );
+    await row.locator('[data-tq-check="missing"]').check();
+    await expect(row).not.toHaveClass(/flag/);
+    await expect(row.locator('.qn-req-ctrl')).toHaveClass(/on/);
+    await expect(row.locator('.qn-req-source').last()).toHaveText('1 of 22 · checked');
+    await expect(approve).toBeEnabled();
+    // A sentence over 20 words: the count turns orange and says why.
+    await toEnd(page);
+    await page.keyboard.type(' She ' + 'really '.repeat(19) + 'tries.');
+    await expect(page.locator('#tq-count-btn')).toHaveClass(/over/);
+    await expect(page.locator('#tq-limit-text')).toHaveText(' · one sentence is over 20 words');
+    await expect(page.locator('#tq-ready')).toHaveText('Approve and Next is off until the comment fits.');
+    await expect(approve).toBeDisabled();
+    await expect(approve).toHaveAttribute(
+      'title',
+      'Saves this comment to the report card and opens the next student. Shorten the sentence over 20 words first.',
+    );
+    // Over the class's limit, the count says so instead.
+    await page.evaluate(() => ReportQuestionnaire.tqLineChange({ dataset: { tqLimit: '1' }, value: '200' }));
+    await expect(page.locator('#tq-count')).toHaveText(/^\d{3} of 200 characters$/);
+    await expect(page.locator('#tq-limit-text')).toHaveText(' · remove or shorten a sentence');
+    await page.evaluate(() => ReportQuestionnaire.tqLineChange({ dataset: { tqLimit: '1' }, value: '' }));
+    // Shortened: Approve and Next is back, and approving ticks the roster.
+    await page.evaluate(() => {
+      const el = document.getElementById('tq-narrative');
+      el.value = el.value.replace(/ She really.*$/, '');
+      ReportQuestionnaire.tqNarrativeInput();
+    });
+    await expect(page.locator('#tq-ready')).toHaveText('0 of 27 Ready');
+    await expect(approve).toBeEnabled();
+    await approve.click();
+    await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
+    await expect(page.locator('#tq-ready')).toHaveText('1 of 27 Ready');
+    await expect(page.locator('#gb-sidebar .student-row[data-sid="st1"] .student-row-mark')).toHaveText('✓');
+  });
+
+  test('a near-identical comment shows the class warning with Show Both', async ({ page }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    const cece = await page.locator('#tq-narrative').inputValue();
+    await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st2');
+    await page.locator('#tq-narrative').waitFor();
+    await expect(page.locator('#tq-warn')).toHaveCount(0);
+    await page.evaluate(
+      t => {
+        const el = document.getElementById('tq-narrative');
+        el.value = t;
+        ReportQuestionnaire.tqNarrativeInput();
+      },
+      cece.replace(/Cece/g, 'Noor'),
+    );
+    await expect(page.locator('#tq-warn')).toContainText(
+      /[A-Z][a-z]+ of these sentences are also in Cece Adeyemi’s comment\. Press Generate Comment for another version, or change a sentence\./,
+    );
+    await page.locator('[data-action="tqShowBoth"]').click();
+    const both = page.locator('#tq-both-overlay');
+    await expect(both.locator('#tq-both-title')).toHaveText('Both Comments');
+    await expect(both.locator('.qn-both-name').nth(0)).toHaveText('Noor Al-Rashid');
+    await expect(both.locator('.qn-both-name').nth(1)).toHaveText('Cece Adeyemi');
+    expect(await both.locator('.qn-both-s.shared').count()).toBeGreaterThanOrEqual(10);
+    await page.keyboard.press('Escape');
+    await expect(both).toHaveCount(0);
+    await expect(page.locator('[data-action="tqShowBoth"]')).toBeFocused();
+  });
 });
 
 test('no overflow at 1440 × 900', async ({ page }) => {

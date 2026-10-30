@@ -162,14 +162,42 @@ window.ReportQuestionnaire = (function () {
     return n + ' ' + (n === 1 ? one : many);
   }
   function _countText(text) {
-    return _plural(String(text || '').length, 'character', 'characters');
+    var n = String(text || '').length;
+    var lim = _limit();
+    // Over the limit: "1,032 of 1,000 characters" (the States mockup).
+    if (lim && n > lim) return _thousands(n) + ' of ' + _thousands(lim) + ' characters';
+    return _plural(n, 'character', 'characters');
+  }
+  function _thousands(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+  /* The sentences of a comment over 20 words, a quoted title counting as
+     one (the realiser's rule; a teacher's edit can pass it). */
+  function longSentences(text) {
+    return sentencesOf(text).filter(function (t) {
+      return CommentRealiser.tooLong(t);
+    });
+  }
+  /* After the count: why Approve and Next is off (the count turns orange),
+     else the class's limit. */
+  function _countTail(text) {
+    if (_overLimit(text)) return ' · remove or shorten a sentence';
+    var n = longSentences(text).length;
+    if (n === 1) return ' · one sentence is over 20 words';
+    if (n > 1) return ' · ' + CommentBank.numberWords(n) + ' sentences are over 20 words';
+    return _limitText();
+  }
+  function _countFlag(text) {
+    return _overLimit(text) || longSentences(text).length > 0;
   }
   function _syncCount() {
     var el = _box();
     var out = document.getElementById('tq-count');
     if (el && out) out.textContent = _countText(el.value);
+    var tail = document.getElementById('tq-limit-text');
+    if (el && tail) tail.textContent = _countTail(el.value);
     var btn = document.getElementById('tq-count-btn');
-    if (el && btn) btn.classList.toggle('over', _overLimit(el.value));
+    if (el && btn) btn.classList.toggle('over', _countFlag(el.value));
     syncApprove();
   }
 
@@ -198,14 +226,12 @@ window.ReportQuestionnaire = (function () {
           <span class="qn-limit-hint">The longest comment your school’s report card allows. Approve stays off past it.</span>
         </div>`
       : '';
-    return `<span class="qn-count-wrap"><button type="button" class="qn-count-btn${_overLimit(text) ? ' over' : ''}" id="tq-count-btn" data-action="tqLine" data-do="limitMenu" aria-haspopup="dialog" aria-expanded="${_limitOpen}" title="The comment’s length. Click to set the longest comment ${esc(course)} allows."><span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span><span id="tq-limit-text">${esc(_limitText())}</span> ▾</button>${pop}</span>`;
+    return `<span class="qn-count-wrap"><button type="button" class="qn-count-btn${_countFlag(text) ? ' over' : ''}" id="tq-count-btn" data-action="tqLine" data-do="limitMenu" aria-haspopup="dialog" aria-expanded="${_limitOpen}" title="The comment’s length. Click to set the longest comment ${esc(course)} allows."><span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span><span id="tq-limit-text">${esc(_countTail(text))}</span> ▾</button>${pop}</span>`;
   }
   /* A limit typed: saved for the class (empty: no limit). */
   function _setLimit(value) {
     var n = Math.floor(Number(value));
     _saveSettings({ charLimit: value !== '' && n > 0 ? n : null });
-    var t = document.getElementById('tq-limit-text');
-    if (t) t.textContent = _limitText();
     _syncCount();
   }
 
@@ -265,13 +291,33 @@ window.ReportQuestionnaire = (function () {
   }
   function _syncNote() {
     _fitBox();
+    _syncEmpty();
     _syncCount();
     _syncQuotedSoon();
+    _syncWarnSoon();
   }
 
   /* The Ready count and the roster. */
   function _syncStatus() {
     syncRoster();
+  }
+
+  /* ── Before Generate (the States mockup) ─────────────────── */
+
+  /* "No comment yet" over the empty box, with the habits rated so far.
+     Clicking it puts the cursor in the box (it is the box's label). */
+  function _emptyHtml(cid, student, text) {
+    var habits = (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || {};
+    return `<label class="qn-empty" id="tq-empty" for="tq-narrative"${String(text || '').trim() ? ' hidden' : ''}>
+          <span class="qn-empty-title">No comment yet</span>
+          <span class="qn-empty-hint">Rate the six work habits, then press Generate Comment. You can also type here.</span>
+          <span class="qn-empty-chip" id="tq-empty-rated">${_ratedCount(habits)} of 6 habits rated</span>
+        </label>`;
+  }
+  function _syncEmpty() {
+    var el = _box();
+    var box = document.getElementById('tq-empty');
+    if (el && box) box.hidden = !!el.value.trim();
   }
 
   /* ── The roster (the app's sidebar) ───────────────────────── */
@@ -285,8 +331,8 @@ window.ReportQuestionnaire = (function () {
     var ready = students.filter(function (s) {
       return _approved(s.id);
     }).length;
-    var line = document.getElementById('tq-ready');
-    if (line) line.textContent = ready + ' of ' + students.length + ' Ready';
+    _readyText = ready + ' of ' + students.length + ' Ready';
+    _syncReadyLine();
     var cur = _current();
     var annotate = function (sid) {
       var ok = _approved(sid);
@@ -307,6 +353,15 @@ window.ReportQuestionnaire = (function () {
       row.classList.toggle('selected', !!cur && cur.id === row.getAttribute('data-sid'));
     });
     document.body.classList.add('qn-roster');
+  }
+  /* The toolbar's Ready count; while the comment is over the limit or has
+     a sentence over 20 words, "Approve and Next is off until the comment
+     fits." in its place (the States mockup). */
+  var _readyText = '';
+  var _fitsBlocked = false;
+  function _syncReadyLine() {
+    var line = document.getElementById('tq-ready');
+    if (line) line.textContent = _fitsBlocked ? 'Approve and Next is off until the comment fits.' : _readyText;
   }
   function restoreRoster() {
     if (typeof setSidebarAnnotator === 'function') setSidebarAnnotator(null);
@@ -443,6 +498,8 @@ window.ReportQuestionnaire = (function () {
     });
     var rated = document.getElementById('tq-rated');
     if (rated) rated.textContent = _ratedCount(habits) + ' of 6 rated';
+    var chip = document.getElementById('tq-empty-rated');
+    if (chip) chip.textContent = _ratedCount(habits) + ' of 6 habits rated';
     _facts(st, true);
     _redrawHabits(st);
   }
@@ -922,8 +979,130 @@ window.ReportQuestionnaire = (function () {
         return k !== sid && all[k] && all[k][termId] && all[k][termId].narrative;
       })
       .map(function (k) {
-        return { sid: k, text: plainComment(all[k][termId].narrative) };
+        var s = getStudents(cid).find(function (x) {
+          return x.id === k;
+        });
+        return { sid: k, text: plainComment(all[k][termId].narrative), names: s ? _namesOf(s) : [] };
       });
+  }
+  function _namesOf(student) {
+    return [student.firstName, student.lastName, student.preferredName, _first(student)].filter(Boolean);
+  }
+
+  /* ── Class warnings (plan PR 5, PR 11c) ──────────────────── */
+
+  /* The classmate whose comment shares the most sentences with this one
+     (CommentBank.nearIdentical, five or more), as { student, shared,
+     pairs: [[mine, theirs]] by sentence index }, else null. */
+  function nearTwin(cid, student, text) {
+    if (!String(text || '').trim()) return null;
+    var termId = getTermId();
+    var mine = { sid: student.id, text: text, names: _namesOf(student) };
+    var out = CommentBank.nearIdentical([mine].concat(_classmateComments(cid, student.id, termId)));
+    var hit = out.find(function (p) {
+      return p.a === student.id || p.b === student.id;
+    });
+    if (!hit) return null;
+    var other = hit.a === student.id ? hit.b : hit.a;
+    var twin = getStudents(cid).find(function (s) {
+      return s.id === other;
+    });
+    if (!twin) return null;
+    var pairs = hit.pairs.map(function (pr) {
+      return hit.a === student.id ? pr : [pr[1], pr[0]];
+    });
+    return { student: twin, shared: hit.shared, pairs: pairs };
+  }
+  /* "Five of these sentences are also in Ava Martin’s comment. Press
+     Generate Comment for another version, or change a sentence." with Show
+     Both (the States mockup). Nothing when no comment is that alike. */
+  function _warnHtml(cid, student, text) {
+    var w = nearTwin(cid, student, text);
+    if (!w) return '';
+    var who = displayNameWithLast(w.student);
+    var n = w.shared.toString();
+    var count = CommentBank.numberWords(w.shared);
+    count = count.charAt(0).toUpperCase() + count.slice(1);
+    return `<div class="qn-warn" id="tq-warn" role="status">
+        <span class="qn-warn-text">${esc(count)} of these sentences are also in ${esc(who)}’s comment. Press Generate Comment for another version, or change a sentence.</span>
+        <button type="button" class="qn-warn-link" data-action="tqShowBoth" data-sid="${esc(w.student.id)}" aria-haspopup="dialog" title="Shows this comment beside ${esc(who)}’s, with the ${esc(n)} shared sentences marked.">Show Both</button>
+      </div>`;
+  }
+  var _warnTimer = null;
+  function _syncWarnSoon() {
+    clearTimeout(_warnTimer);
+    _warnTimer = setTimeout(_syncWarn, 300);
+  }
+  function _syncWarn() {
+    var st = _current();
+    var el = _box();
+    var wrap = document.getElementById('tq-warn-wrap');
+    if (!st || !el || !wrap || String(el.dataset.sid) !== String(st.id)) return;
+    wrap.innerHTML = _warnHtml(_activeCourse, st, el.value);
+  }
+
+  /* Show Both: the two comments side by side, each shared sentence marked. */
+  var BOTH_ID = 'tq-both-overlay';
+  function _bothColumn(student, text, marks, grade) {
+    var parts = sentencesOf(text).map(function (t, i) {
+      return `<span class="qn-both-s${marks[i] ? ' shared' : ''}">${esc(t)}</span>`;
+    });
+    return `<div class="qn-both-col">
+        <div class="qn-both-head"><span class="qn-both-name">${esc(displayNameWithLast(student))}</span>${grade ? `<span class="qn-both-grade">${esc(grade)}</span>` : ''}</div>
+        <p class="qn-both-text">${parts.join(' ')}</p>
+      </div>`;
+  }
+  function _bothHtml(cid, student, text, w) {
+    var mine = {};
+    var theirs = {};
+    w.pairs.forEach(function (pr) {
+      mine[pr[0]] = true;
+      theirs[pr[1]] = true;
+    });
+    var other = plainComment((getStudentTermRating(cid, w.student.id, getTermId()) || {}).narrative || '');
+    var gradeOf = function (s) {
+      var h = headerGrade(cid, s.id, _facts(s, true), getTermId());
+      return h && h.big ? h.big : '';
+    };
+    var g1 = gradeOf(student);
+    var g2 = gradeOf(w.student);
+    _facts(student, true);
+    var n = CommentBank.numberWords(w.shared);
+    return `<div class="qn-info qn-both" role="document">
+      <div class="qn-info-top"><span class="qn-info-title" id="tq-both-title">Both Comments</span><span class="qn-sub">${esc(n.charAt(0).toUpperCase() + n.slice(1))} shared sentences are marked.</span><button type="button" class="qn-btn" data-action="tqCloseBoth">Done</button></div>
+      <div class="qn-both-cols">${_bothColumn(student, text, mine, g1)}${_bothColumn(w.student, other, theirs, g2)}</div>
+    </div>`;
+  }
+  function tqShowBoth() {
+    var st = _current();
+    var el = _box();
+    if (!st) return;
+    var text = el
+      ? el.value
+      : plainComment((getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).narrative || '');
+    var w = nearTwin(_activeCourse, st, text);
+    if (!w) return;
+    tqCloseBoth();
+    var overlay = document.createElement('div');
+    overlay.id = BOTH_ID;
+    overlay.className = 'confirm-overlay qn-info-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'tq-both-title');
+    overlay.innerHTML = _bothHtml(_activeCourse, st, text, w);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) tqCloseBoth();
+    });
+    document.body.appendChild(overlay);
+    var done = overlay.querySelector('[data-action="tqCloseBoth"]');
+    if (done) done.focus();
+  }
+  function tqCloseBoth() {
+    var o = document.getElementById(BOTH_ID);
+    if (!o) return;
+    o.remove();
+    var link = document.querySelector('[data-action="tqShowBoth"]');
+    if (link) link.focus();
   }
 
   function _bankContext(cid, student, f) {
@@ -1036,7 +1215,7 @@ window.ReportQuestionnaire = (function () {
       : '';
     var body;
     if (thisTab) {
-      body = `<textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea>
+      body = `${_emptyHtml(cid, student, text)}<textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea>
         <div class="qn-comment-foot">
           ${_countHtml(cid, text)}
           <button type="button" class="qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${COPY_ICON}<span class="qn-copy-label">Copy</span></button>
@@ -1058,6 +1237,7 @@ window.ReportQuestionnaire = (function () {
           ${thisTab ? '<button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="Writes the comment from the gradebook, your ratings and Student Voice. Press again for another version. Sentences you edited and your order stay.">Generate Comment</button>' : ''}
         </div>
         ${thisTab ? _basisHtml(cid, student, _facts(student)) : ''}
+        ${thisTab ? '<div id="tq-warn-wrap">' + _warnHtml(cid, student, text) + '</div>' : ''}
         ${body}
       </div>`;
   }
@@ -1191,64 +1371,132 @@ window.ReportQuestionnaire = (function () {
   /* ── Checks before approving ─────────────────────────────── */
 
   /* Rows the teacher ticks "I checked this" on before Approve and Next
-     (plan PR 3; PR 11c adds the general checks). Only the missing-work row
-     of an IE comment for now. Ticks last for this session. */
+     (plan PR 3 and PR 11c): the missing-work row, an IE comment's Problem
+     row and the grade row of a low grade are highlighted until ticked.
+     Ticks last for this session. */
   var _checked = {};
   function _checkKey(sid, id) {
     return _activeCourse + '|' + sid + '|' + getTermId() + '|' + id;
   }
-  function _checksFor(f) {
-    return CommentBank.ieProblemOf(f) === 'missing' ? ['missing'] : [];
+  /* A low grade: C- (or F) in a Letter or Both class, Emerging in a
+     Proficiency class. */
+  function lowGrade(f) {
+    var g = (f && f.grade) || {};
+    if (g.mode === 'proficiency') return /^Emerging/.test(String(f.standing || ''));
+    return g.letter === 'C-' || g.letter === 'F';
   }
+  /* The checks a comment needs: 'missing' on the missing-work row (Not
+     Handed In, or an IE comment's Problem row when its problem is the
+     missing work), 'ie' on an IE comment's Problem row otherwise, 'low' on
+     the grade row (once the comment has one) when the grade is low. A goals
+     comment has no grade sentence to check. */
+  function _checksFor(f, rows) {
+    var path = CommentBank.reportPath(f);
+    if (path === 'ie') return [CommentBank.ieProblemOf(f) === 'missing' ? 'missing' : 'ie'];
+    if (path) return [];
+    var out = [];
+    if (f.notHandedIn && f.notHandedIn.count > 0) out.push('missing');
+    var hasGrade = (rows || []).some(function (r) {
+      return r.step === 'grade';
+    });
+    if (hasGrade && lowGrade(f)) out.push('low');
+    return out;
+  }
+  var CHECK_TIPS = {
+    missing: 'Tick once you have checked these are really missing. Approve and Next stays off until you do.',
+    ie: 'Tick once you have checked that IE is right for this student. Approve and Next stays off until you do.',
+    low: 'Tick once you have checked this grade is right. Approve and Next stays off until you do.',
+  };
+  /* The "I checked this" box on a row, green once ticked. */
+  function _checkHtml(sid, id, tip) {
+    var on = !!_checked[_checkKey(sid, id)];
+    return `<label class="qn-req-ctrl${on ? ' on' : ''}" title="${esc(tip || CHECK_TIPS[id])}"><input type="checkbox" data-tq-check="${id}"${on ? ' checked' : ''}>I checked this</label>`;
+  }
+  function _isChecked(sid, id) {
+    return !!_checked[_checkKey(sid, id)];
+  }
+  /* The row's source line with its check: "2 of 28 · check that both are
+     really missing before you approve" until ticked, then "2 of 28 ·
+     checked" (the States mockup). */
+  function _checkSourceHtml(sid, id, off, on) {
+    return `<span class="qn-req-source" data-check-source="${id}" data-check-off="${esc(off)}" data-check-on="${esc(on)}">${esc(_isChecked(sid, id) ? on : off)}</span>`;
+  }
+  /* A box ticked: the row's highlight, the box and its source line change
+     in place, and Approve and Next follows. */
   function tqSetCheck(id, on) {
     var st = _current();
     if (!st) return;
     _checked[_checkKey(st.id, id)] = !!on;
+    document.querySelectorAll('[data-tq-check="' + id + '"]').forEach(function (input) {
+      input.checked = !!on;
+      var label = input.closest('.qn-req-ctrl');
+      if (label) label.classList.toggle('on', !!on);
+      var row = input.closest('.qn-req-row');
+      if (row) row.classList.toggle('flag', !on);
+      var src = row && row.querySelector('[data-check-source]');
+      if (src) src.textContent = on ? src.dataset.checkOn : src.dataset.checkOff;
+    });
     syncApprove();
   }
 
   /* What keeps Approve and Next off for the student on screen: 'deadline'
-     until an IE's deadline is picked, and each check not yet ticked. */
+     until an IE's deadline is picked, each check not yet ticked, 'limit'
+     past the class's character limit (plan PR 8) and 'long' while a
+     sentence is over 20 words. */
   function approveBlockers(st) {
     if (!st) return [];
     var f = _facts(st);
     var out = [];
-    if (CommentBank.reportPath(f) === 'ie') {
-      if (!f.grade.ieDeadline) out.push('deadline');
-      _checksFor(f).forEach(function (id) {
-        if (!_checked[_checkKey(st.id, id)]) out.push(id);
-      });
-    }
-    // Past the class's character limit (plan PR 8).
+    if (CommentBank.reportPath(f) === 'ie' && !f.grade.ieDeadline) out.push('deadline');
+    _checksFor(f, _rowsFor(st, f)).forEach(function (id) {
+      if (!_checked[_checkKey(st.id, id)]) out.push(id);
+    });
     var el = _box();
     var text =
       el && el.dataset.sid === String(st.id)
         ? el.value
         : plainComment((getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).narrative || '');
-    if (_overLimit(text.replace(/\s+$/, ''))) out.push('limit');
+    text = text.replace(/\s+$/, '');
+    if (_overLimit(text)) out.push('limit');
+    if (longSentences(text).length) out.push('long');
     return out;
   }
 
   var APPROVE_TIP = 'Saves this comment to the report card and opens the next student.';
   function syncApprove() {
     var btn = document.getElementById('tq-approve-next');
+    var st = _current();
+    var blocked = approveBlockers(st);
+    _fitsBlocked = blocked.indexOf('limit') >= 0 || blocked.indexOf('long') >= 0;
+    _syncReadyLine();
     if (!btn) return;
-    var blocked = approveBlockers(_current());
     var date = blocked.indexOf('deadline') >= 0;
-    var tick = blocked.some(function (b) {
-      return b !== 'deadline' && b !== 'limit';
+    var ticks = blocked.filter(function (b) {
+      return b !== 'deadline' && b !== 'limit' && b !== 'long';
     });
+    var ie = st && CommentBank.reportPath(_facts(st)) === 'ie';
     var tail =
-      date && tick
+      date && ticks.length
         ? ' Pick the deadline and tick “I checked this” first.'
         : date
           ? ' Pick the deadline first.'
-          : tick
-            ? ' Tick “I checked this” first.'
+          : ticks.length
+            ? ie
+              ? ' Tick “I checked this” first.'
+              : ' Tick “I checked this” on the highlighted sentence' + (ticks.length > 1 ? 's' : '') + ' first.'
             : '';
     if (blocked.indexOf('limit') >= 0) tail += ' Shorten the comment to ' + _limit() + ' characters first.';
+    var long = blocked.indexOf('long') >= 0 ? longSentences(_boxText(st)).length : 0;
+    if (long) tail += ' Shorten the sentence' + (long > 1 ? 's' : '') + ' over 20 words first.';
     btn.disabled = blocked.length > 0;
     btn.title = APPROVE_TIP + (tail || ' ⌘ Return');
+  }
+  /* The comment on screen for the student, else as saved. */
+  function _boxText(st) {
+    var el = _box();
+    if (!st) return '';
+    if (el && el.dataset.sid === String(st.id)) return el.value;
+    return plainComment((getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).narrative || '');
   }
 
   /* ── The deadline calendar ───────────────────────────────── */
@@ -1470,17 +1718,25 @@ window.ReportQuestionnaire = (function () {
   function _requiredRowHtml(cid, student, f, p, path, i, handle) {
     var checks = _checksFor(f);
     var picked = (f.grade && f.grade.ieDeadline) || '';
-    var check = p.key === 'ieProblem' && checks.indexOf('missing') >= 0;
+    var check = p.key === 'ieProblem' && checks.length ? checks[0] : '';
     var date = p.key === 'ieDeadline';
-    var flag = check || (date && !picked);
+    var flag = (check && !_isChecked(student.id, check)) || (date && !picked);
+    var source = _requiredSource(cid, student, f, p.key);
+    var sourceHtml = check
+      ? _checkSourceHtml(student.id, check, source, source.replace(/ · check that .*$/, '') + ' · checked')
+      : `<span class="qn-req-source">${esc(source)}</span>`;
     var ctrl = check
-      ? `<label class="qn-req-ctrl" title="Tick once you have checked these are really missing."><input type="checkbox" data-tq-check="missing"${_checked[_checkKey(student.id, 'missing')] ? ' checked' : ''}>I checked this</label>`
+      ? _checkHtml(
+          student.id,
+          check,
+          check === 'missing' ? 'Tick once you have checked these are really missing.' : CHECK_TIPS.ie,
+        )
       : date
         ? `<button type="button" class="qn-req-ctrl" id="tq-deadline-btn" data-action="tqOpenDeadline" aria-haspopup="dialog" aria-expanded="${!!_cal}" title="Pick the date by which the IE must become a grade.">${CAL_ICON}${picked ? esc(_longDay(picked)) : 'Pick a Date'}</button>`
         : '';
     return `<div class="qn-req-row${flag ? ' flag' : ''}${path !== 'ie' ? ' statement' : ''}${date ? ' has-cal' : ''}"${_rowAttr(i)}>
           ${handle || ''}<div class="qn-req-part"><span class="qn-req-label">${esc(p.label)}</span><span class="qn-req-chip">Required</span></div>
-          <div class="qn-req-body"><span class="qn-req-text">${esc(p.text)}</span><span class="qn-req-source">${esc(_requiredSource(cid, student, f, p.key))}</span></div>
+          <div class="qn-req-body"><span class="qn-req-text">${esc(p.text)}</span>${sourceHtml}</div>
           ${ctrl}
           ${date ? _calendarHtml(picked) : ''}
         </div>`;
@@ -2374,15 +2630,17 @@ window.ReportQuestionnaire = (function () {
         handle,
       );
     var open = !!_wording && _wording.index === i;
+    var low = row.step === 'grade' && _checksFor(f, rows).indexOf('low') >= 0;
     var act = row.edited
       ? '<span class="qn-edited" title="You changed this sentence. Generate Comment keeps it.">Edited</span>'
       : row.step && row.s
         ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Shows other ways to say this sentence. Pick one to use it.">Other Wording ▾</button>`
         : '';
-    return `<div class="qn-req-row qn-srow${row.step === 'example' ? ' best' : ''}${open ? ' has-menu' : ''}"${_rowAttr(i)}>
+    return `<div class="qn-req-row qn-srow${row.step === 'example' ? ' best' : ''}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
       ${handle}<div class="qn-req-part"><span class="qn-req-label">${esc(rowLabel(row, path))}</span></div>
       <div class="qn-req-body"><span class="qn-req-text">${esc(row.text)}</span><span class="qn-req-source">${esc(rowSource(row, cid, student, f, ctx))}</span></div>
       ${act}
+      ${low ? _checkHtml(student.id, 'low') : ''}
       ${open ? _wordingMenuHtml(cid, student, ctx, rows, i) : ''}
     </div>`;
   }
@@ -2918,13 +3176,16 @@ window.ReportQuestionnaire = (function () {
       late && _lineEdit !== 'late'
         ? ` <button type="button" class="qn-line-text" data-action="tqLine" data-do="editLate" title="Change ${esc(course)}’s late-work line. It is the class’s Late Work Policy.">${esc(late)}</button>`
         : '';
-    return `<div class="qn-req-row flag qn-line-row" id="tq-row-missing"${_rowAttr(i)}>
+    var n = (f.notHandedIn && f.notHandedIn.count) || 0;
+    var total = (f.record && f.record.total) || n;
+    return `<div class="qn-req-row${_isChecked(f.sid, 'missing') ? '' : ' flag'} qn-line-row" id="tq-row-missing"${_rowAttr(i)}>
       ${handle || ''}<div class="qn-req-part"><span class="qn-req-label">Not Handed In</span></div>
       <div class="qn-req-body">
         <span class="qn-req-text">${esc(sentence)}${lateBtn}</span>
         ${line}
-        <span class="qn-req-source">${esc(_missingSource(f))}</span>
+        ${_checkSourceHtml(f.sid, 'missing', _missingSource(f), n + ' of ' + total + ' · checked')}
       </div>
+      ${_checkHtml(f.sid, 'missing')}
     </div>`;
   }
 
@@ -3406,14 +3667,15 @@ window.ReportQuestionnaire = (function () {
     if (window.PageAssignments && PageAssignments.graderOpen && PageAssignments.graderOpen()) return;
     var t = e.target;
     if (e.key === 'Escape') {
-      if (document.getElementById(INFO_ID)) tqCloseInfo();
+      if (document.getElementById(BOTH_ID)) tqCloseBoth();
+      else if (document.getElementById(INFO_ID)) tqCloseInfo();
       else if (browseOpen()) {
         if (!closeLines()) _closeBrowse();
       } else if (_cal) tqCloseDeadline();
       else closeLines();
       return;
     }
-    if (document.getElementById(INFO_ID)) return;
+    if (document.getElementById(INFO_ID) || document.getElementById(BOTH_ID)) return;
     if (browseOpen()) {
       // ↑ ↓ on the sheet's bottom edge make the list shorter or taller.
       if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && t && t.id === 'tq-browse-handle') {
@@ -3520,6 +3782,15 @@ window.ReportQuestionnaire = (function () {
     closeLines: closeLines,
     approveBlockers: approveBlockers,
     syncApprove: syncApprove,
+    checksFor: _checksFor,
+    lowGrade: lowGrade,
+    longSentences: longSentences,
+    nearTwin: nearTwin,
+    tqShowBoth: tqShowBoth,
+    tqCloseBoth: tqCloseBoth,
+    bothOpen: function () {
+      return !!document.getElementById(BOTH_ID);
+    },
     schoolYear: schoolYear,
     basisChoices: basisChoices,
     renderTermQuestionnaire: renderTermQuestionnaire,

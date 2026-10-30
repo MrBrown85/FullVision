@@ -466,7 +466,11 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(btn.title).toBe(
       'Saves this comment to the report card and opens the next student. Shorten the comment to 100 characters first.',
     );
-    expect(RQ.renderTermQuestionnaire(CID)).toContain(' · limit 100</span>');
+    // Over the limit, the count says why (the States mockup).
+    expect(RQ.renderTermQuestionnaire(CID)).toContain(
+      '<span class="qn-count-text" id="tq-count">120 of 100 characters</span><span id="tq-limit-text"> · remove or shorten a sentence</span>',
+    );
+    expect(RQ.renderTermQuestionnaire(CID)).toContain('class="qn-count-btn over"');
     RQ.tqLineChange({ dataset: { tqLimit: '1' }, value: '' });
     expect(settings().charLimit).toBeNull();
     expect(RQ.approveBlockers(st)).toEqual([]);

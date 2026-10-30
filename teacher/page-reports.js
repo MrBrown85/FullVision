@@ -1997,6 +1997,12 @@ window.PageReports = (function () {
       tqCloseInfo: function () {
         RQ.tqCloseInfo();
       },
+      tqShowBoth: function () {
+        RQ.tqShowBoth();
+      },
+      tqCloseBoth: function () {
+        RQ.tqCloseBoth();
+      },
       tqEditStudent: function () {
         RQ.tqEditStudent();
       },
@@ -2022,7 +2028,7 @@ window.PageReports = (function () {
       RQ.tqLineChange(el);
       return;
     }
-    // "I checked this" on an IE comment's missing-work row.
+    // "I checked this" on a highlighted row of the Sentences card.
     if (el.dataset.tqCheck) {
       RQ.tqSetCheck(el.dataset.tqCheck, !!el.checked);
       return;

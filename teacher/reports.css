@@ -4274,6 +4274,118 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-copy:hover {
   background: var(--overlay-hover);
 }
+/* Before Generate: "No comment yet" over the empty box (the States mockup). */
+.qn-empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  cursor: text;
+}
+.qn-empty[hidden] {
+  display: none;
+}
+.qn-empty-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.qn-empty-hint {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.qn-empty-chip {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--score-2-text);
+  background: var(--score-2-bg);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+/* A class warning in the Teacher Comment card: a near-identical comment. */
+.qn-warn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--report-callout-bg);
+  border-radius: 10px;
+  font-size: var(--text-sm);
+  color: var(--score-2-text);
+}
+.qn-warn-text {
+  flex: 1;
+  line-height: 1.4;
+}
+.qn-warn-link {
+  flex: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+.qn-warn-link:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Show Both: the two comments side by side, shared sentences marked. */
+.qn-info.qn-both {
+  width: min(1100px, 100%);
+}
+.qn-both .qn-info-top .qn-sub {
+  flex: 1;
+}
+.qn-both-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.qn-both-col {
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.qn-both-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.qn-both-name {
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.qn-both-grade {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.qn-both-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.75;
+}
+.qn-both-s.shared {
+  background: var(--score-2-bg);
+  box-shadow: 0 0 0 2px var(--score-2-bg);
+  border-radius: 4px;
+}
+@media (max-width: 760px) {
+  .qn-both-cols {
+    grid-template-columns: 1fr;
+  }
+}
 .qn-hint {
   font-size: var(--text-xs);
   color: var(--text-2);
@@ -5009,6 +5121,11 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-req-ctrl input {
   margin: 0;
+}
+/* Ticked: green, and the row's highlight goes (the States mockup). */
+.qn-req-ctrl.on {
+  color: var(--score-3-text);
+  border-color: var(--score-3-bg);
 }
 .qn-req-ctrl:focus-visible,
 .qn-req-ctrl:focus-within {
