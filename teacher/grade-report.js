@@ -18,7 +18,9 @@ window.GradeReport = (function () {
   var PX_PER_IN = 96;
   var GAP = 12;
   var ROW_W = 720;
-  var DEFAULTS = { summary: true, order: 'oldest', name: 'preferred' };
+  // ungraded: list this term's work with no mark yet, a dash for its score
+  // (Colin, Oct 29: leaving it off can mislead), up to today.
+  var DEFAULTS = { summary: true, ungraded: true, order: 'oldest', name: 'preferred' };
   /* The table's sizes, largest first: row height and type in px, and
      whether each side holds two columns of rows. */
   var TIERS = [
@@ -32,6 +34,7 @@ window.GradeReport = (function () {
     var o = Object.assign({}, DEFAULTS);
     if (saved && typeof saved === 'object') {
       if (typeof saved.summary === 'boolean') o.summary = saved.summary;
+      if (typeof saved.ungraded === 'boolean') o.ungraded = saved.ungraded;
       if (saved.order === 'newest' || saved.order === 'oldest') o.order = saved.order;
       if (saved.name === 'first' || saved.name === 'preferred') o.name = saved.name;
     }
@@ -51,8 +54,9 @@ window.GradeReport = (function () {
   }
 
   /* One student's rows: this term's assessments that have a mark or are
-     Missing or Excused. Work not yet marked and not yet due is left off.
-     { date, title, category, score, outOf, percent, note }. */
+     Missing or Excused, and with Ungraded Assignments on, the work dated up
+     to today with no mark yet, its score a dash. Work not yet due is left
+     off. { date, title, category, score, outOf, percent, note }. */
   function rows(cid, student, opts) {
     opts = options(opts);
     var cats = {};
@@ -70,6 +74,7 @@ window.GradeReport = (function () {
         return x.d.localeCompare(y.d) || String(x.a.title || '').localeCompare(String(y.a.title || ''));
       });
     if (opts.order === 'newest') list.reverse();
+    var today = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
     var out = [];
     list.forEach(function (x) {
       var a = x.a;
@@ -84,8 +89,12 @@ window.GradeReport = (function () {
         percent: '',
         note: cv.late ? 'Late' : '',
       };
-      if (cv.kind === 'none' || cv.kind === 'dibels') return;
-      if (cv.kind === 'status') {
+      if (cv.kind === 'dibels') return;
+      var ungraded = cv.kind === 'none' || (cv.kind === 'level' && !(cv.value > 0));
+      if (ungraded) {
+        if (!opts.ungraded || (x.d && x.d > today)) return;
+        row.score = '\u2014';
+      } else if (cv.kind === 'status') {
         row.note = cv.status === 'EXC' ? 'Excused' : 'Missing';
       } else if (cv.kind === 'missing') {
         row.note = 'Missing';

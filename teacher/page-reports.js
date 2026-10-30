@@ -1199,6 +1199,7 @@ window.PageReports = (function () {
       '<div class="gr-panel">' +
       '<h4>Include</h4>' +
       check('summary', 'Category Summary') +
+      check('ungraded', 'Ungraded Assignments') +
       '<h4>Order</h4>' +
       '<div class="seg seg-sm" role="radiogroup" aria-label="Order">' +
       order('oldest', 'Oldest First') +
