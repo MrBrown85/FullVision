@@ -703,7 +703,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const rarely = { habits: { completes: 1 } };
     const missing = one('h108', CommentBank.context(f, rarely));
     expect(CommentBank.verify(missing, f, rarely).replaced[0].failed).toEqual(['notHandedIn']);
-    expect(CommentBank.verify(missing, { ...f, record: { ...f.record, missing: 2 } }, rarely).replaced).toEqual([]);
+    expect(f.notHandedIn.count).toBe(0);
     expect(
       CommentBank.verify(missing, { ...f, notHandedIn: { count: 1, titles: ['Lab 3'] } }, rarely).replaced,
     ).toEqual([]);

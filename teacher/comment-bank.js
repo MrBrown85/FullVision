@@ -1234,8 +1234,8 @@ window.CommentBank = (function () {
   function _article(w) {
     return (/^[AEIOU]/.test(w) ? 'an ' : 'a ') + w;
   }
-  /* Work labelled Missing this term: notHandedIn's count once facts() has
-     it, else the record's. */
+  /* Work labelled Missing this term (facts().notHandedIn; the record's
+     count for facts built without it). */
   function _missingCount(f) {
     if (f.notHandedIn && f.notHandedIn.count != null) return Number(f.notHandedIn.count) || 0;
     return (f.record && f.record.missing) || 0;
