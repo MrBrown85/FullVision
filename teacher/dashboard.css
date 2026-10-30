@@ -2092,7 +2092,8 @@ a.dash-ins-name:hover {
   position: absolute;
   top: 100%;
   left: 50%;
-  transform: translateX(-50%);
+  /* --tip-shift keeps it inside the card (page-dashboard.js _keepTipInside). */
+  transform: translateX(calc(-50% + var(--tip-shift, 0px)));
   margin-top: 8px;
   padding: 8px 12px;
   background: var(--surface);
