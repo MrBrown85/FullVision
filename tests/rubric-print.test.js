@@ -146,6 +146,26 @@ describe('sheetData and renderSheet', () => {
     expect(html).not.toContain('rubric-lines');
   });
 
+  it('adds the Next Steps Reflection with lines to write on only when included', () => {
+    const data = Object.assign({}, RubricPrint.sheetData(CID, AID, SID), { feedback: 'Clear method.' });
+    expect(RubricPrint.renderSheet(data, { include })).not.toContain('Next Steps');
+    const html = RubricPrint.renderSheet(data, { include: Object.assign({}, include, { nextSteps: true }) });
+    expect(html).toContain('rubric-reflect');
+    expect(html).toContain('What will you work on next, and how will you do it?');
+    expect(html).toContain('rubric-lines');
+  });
+
+  it('lets a long rubric shrink further on half and quarter sheets, never below the layout floor', () => {
+    const full = RubricPrint.shrinkSteps(RubricPrint.LAYOUTS.full);
+    const half = RubricPrint.shrinkSteps(RubricPrint.LAYOUTS.half);
+    const quarter = RubricPrint.shrinkSteps(RubricPrint.LAYOUTS.quarter);
+    expect(full[0]).toBe(1);
+    expect(full[full.length - 1] * 12.5).toBeCloseTo(9, 1);
+    expect(half[half.length - 1] * 10).toBeCloseTo(6.5, 1);
+    expect(quarter[quarter.length - 1] * 8).toBeCloseTo(5.5, 1);
+    expect(quarter.every((f, i) => i === 0 || f < quarter[i - 1])).toBe(true);
+  });
+
   it('prints the criterion comment under its row and leaves it out when not included', () => {
     saveRubricCriterionComment(CID, SID, AID, CRIT_A, 'Label the variables next time.');
     const data = RubricPrint.sheetData(CID, AID, SID);
