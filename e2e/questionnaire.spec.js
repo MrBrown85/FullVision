@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
-/* The Term Questionnaire, rebuilt around the comment (DECISIONS 14,
-   docs/questionnaire-plan.md), in Demo Mode on Science 8's Report 2. */
+/* The Term Questionnaire's review screen (fullvision-generate-plan PR 11a,
+   the "Review screen" mockup), in Demo Mode on Science 8's Report 2. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function open(page, student = 'st1') {
@@ -16,17 +16,6 @@ async function open(page, student = 'st1') {
   await page.locator('#tq-narrative').waitFor();
   await page.locator('#report-period').selectOption('Report 2');
   await page.locator('#tq-narrative').waitFor();
-}
-
-/* The comment card reaches the bottom of the right column (its 20 px
-   foot), and the box in it is most of the card. */
-async function commentFill(page) {
-  return page.evaluate(() => {
-    const side = document.querySelector('.qn-side').getBoundingClientRect();
-    const card = document.querySelector('.qn-comment-card').getBoundingClientRect();
-    const box = document.querySelector('#tq-narrative').getBoundingClientRect();
-    return { gap: Math.round(side.bottom - card.bottom), boxTall: box.height > card.height * 0.6 };
-  });
 }
 
 /* The cursor at the end of the comment (End only reaches the end of a
@@ -55,23 +44,49 @@ async function overflow(page) {
   });
 }
 
-test('Approve sets Ready and the roster tick; an edit clears it', async ({ page }) => {
+test('the toolbar: Approve and Next, the two icons; no Questions, no Save and Next', async ({ page }) => {
+  await open(page);
+  await expect(page.locator('#tq-approve-next')).toHaveText('Approve and Next ›');
+  await expect(page.locator('#tq-edit-student-btn')).toBeVisible();
+  await expect(page.locator('#tq-info-btn')).toBeVisible();
+  await expect(page.locator('#tq-questions-btn, #tq-save-next, #tq-approve, .qn-bottom')).toHaveCount(0);
+  await expect(page.locator('#tq-bank, .qn-ev-tabs, [data-tq-card]')).toHaveCount(0);
+});
+
+test('the header: name, pronouns, the Student Dashboard link there and back, the grade and the count', async ({
+  page,
+}) => {
+  await open(page);
+  await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
+  await expect(page.locator('.qn-head-sub')).toHaveText('she/her · Student Dashboard ›');
+  await expect(page.locator('.qn-grade-big')).toHaveText(/^\d\.\d$/);
+  await expect(page.locator('.qn-grade-sub')).toHaveText(
+    /^(Emerging|Developing|Proficient|Extending) · \d+ of \d+ assignments$/,
+  );
+  await page.locator('.qn-head-link').click();
+  await page.waitForURL(/\/student\?id=st1/);
+  await page.getByRole('link', { name: 'Term Questionnaire' }).click();
+  await page.locator('#tq-narrative').waitFor();
+  await expect(page.locator('.qn-name')).toHaveText('Cece Adeyemi');
+});
+
+test('Approve and Next sets Ready and the roster tick and opens the next student; an edit clears it', async ({
+  page,
+}) => {
   await open(page);
   const cece = page.locator('#gb-sidebar .student-row[data-sid="st1"]');
   await expect(page.locator('#tq-ready')).toHaveText('0 of 27 Ready');
   await expect(cece.locator('.student-row-note')).toHaveText('Needs Approval');
-  await expect(cece.locator('.student-row-note')).toBeVisible();
 
-  await page.locator('#tq-approve').click();
-  await expect(page.locator('#tq-approve')).toHaveText('✓ Approved');
+  await page.locator('#tq-approve-next').click();
+  await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
   await expect(page.locator('#tq-ready')).toHaveText('1 of 27 Ready');
   await expect(cece.locator('.student-row-mark')).toHaveText('✓');
   await expect(cece.locator('.student-row-note')).toHaveCount(0);
 
-  // Not Ready leaves Cece out once another student is on screen.
+  // Not Ready leaves Cece out while another student is on screen.
   await page.locator('[data-action="tqRosterFilter"][data-filter="not-ready"]').click();
   await expect(page.locator('[data-filter="not-ready"]')).toHaveText('Not Ready 26');
-  await page.locator('#gb-sidebar .student-row[data-sid="st7"]').click();
   await expect(cece).toBeHidden();
   await page.locator('[data-action="tqRosterFilter"][data-filter="all"]').click();
   await cece.click();
@@ -79,7 +94,6 @@ test('Approve sets Ready and the roster tick; an edit clears it', async ({ page 
   // An edit after approval clears it.
   await toEnd(page);
   await page.keyboard.type(' One more sentence.');
-  await expect(page.locator('#tq-approve')).toHaveText('Approve Comment');
   await expect(page.locator('#tq-ready')).toHaveText('0 of 27 Ready');
   await expect(cece.locator('.student-row-note')).toHaveText('Needs Approval');
 
@@ -110,21 +124,22 @@ test('typing just before leaving is saved: Progress Reports, another report, ano
   expect(saved[1]).not.toContain('Kept with Report 2');
 });
 
-test('the roster marks survive a sidebar redraw; arrows skip students Not Ready hides', async ({ page }) => {
+test('the roster marks survive a sidebar redraw; arrows move without approving and skip students Not Ready hides', async ({
+  page,
+}) => {
   await open(page);
-  await page.locator('#tq-approve').click();
+  await page.locator('#tq-approve-next').click();
   await page.evaluate(() => refreshSidebar());
   const cece = page.locator('#gb-sidebar .student-row[data-sid="st1"]');
   await expect(cece.locator('.student-row-mark')).toHaveText('✓');
   await expect(page.locator('#gb-sidebar .student-row[data-sid="st7"] .student-row-note')).toHaveText('Needs Approval');
-  await expect(page.locator('#gb-sidebar .student-row[data-sid="st7"] .student-row-note')).toBeVisible();
   await expect(page.locator('#gb-sidebar-extra [data-filter="not-ready"]')).toHaveText('Not Ready 26');
   // Approve Hannah; with Not Ready on, ↓ from Noor (just above her) skips her.
   const row = sid => page.locator(`#gb-sidebar .student-row[data-sid="${sid}"]`);
   const ids = await page.evaluate(() => ReportQuestionnaire.getTqStudents().map(s => s.id));
   const [noor, hannah, sam] = [ids[1], ids[2], ids[3]];
   await row(hannah).click();
-  await page.locator('#tq-approve').click();
+  await page.locator('#tq-approve-next').click();
   await row(noor).click();
   await page.locator('[data-action="tqRosterFilter"][data-filter="not-ready"]').click();
   await expect(row(hannah)).toBeHidden();
@@ -132,6 +147,7 @@ test('the roster marks survive a sidebar redraw; arrows skip students Not Ready 
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('#gb-sidebar .student-row.selected')).toHaveAttribute('data-sid', sam);
   await expect(page.locator('.qn-name')).toHaveText('Sam Blackwood');
+  await expect(page.locator('#tq-ready')).toHaveText('2 of 27 Ready');
   // Leaving the questionnaire gives the grades back.
   await page.locator('[data-action="tqRosterFilter"][data-filter="all"]').click();
   await page.locator('.report-seg-btn[data-tab="progress"]').click();
@@ -140,7 +156,7 @@ test('the roster marks survive a sidebar redraw; arrows skip students Not Ready 
   await expect(cece.locator('.student-row-prof').first()).toBeVisible();
 });
 
-test('Generate drafts the comment from the bank; ⌘Z brings the old text back; every student drafts', async ({
+test('Generate Comment drafts from the bank; the box grows, the count follows, ⌘Z brings the old text back', async ({
   page,
 }) => {
   await open(page);
@@ -150,12 +166,11 @@ test('Generate drafts the comment from the bank; ⌘Z brings the old text back; 
   const first = await box.inputValue();
   expect(first).not.toBe(before);
   expect(first).toContain('Cece');
-  expect(first.split(/(?<=[.!?”])\s+(?=[A-Z“])/).length).toBeGreaterThanOrEqual(8);
   expect(first).not.toMatch(/[{}[\]]/);
   expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').narrative)).toBe(first);
-  // The rows that made the draft say Added; the meter counts it.
-  await expect(page.locator('#tq-bank .qn-row.added').first()).toBeVisible();
-  await expect(page.locator('#tq-meter-label')).toHaveText(/^\d+ of 10 lines$/);
+  await expect(page.locator('#tq-count')).toHaveText(first.length + ' characters');
+  // The comment grows with its text: nothing scrolls inside the box.
+  expect(await box.evaluate(el => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
   // Again: a different mix. Undo: the previous draft, then the original.
   await page.locator('#tq-generate').click();
   const second = await box.inputValue();
@@ -178,6 +193,15 @@ test('Generate drafts the comment from the bank; ⌘Z brings the old text back; 
   expect(bad).toEqual([]);
 });
 
+test('Copy puts the comment on the clipboard and says Copied', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await open(page);
+  const text = await page.locator('#tq-narrative').inputValue();
+  await page.locator('#tq-copy-btn').click();
+  await expect(page.locator('#tq-copy-btn .qn-copy-label')).toHaveText('Copied');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+});
+
 test('a comment saved as HTML reads as text', async ({ page }) => {
   await open(page);
   await page.evaluate(() =>
@@ -189,238 +213,144 @@ test('a comment saved as HTML reads as text', async ({ page }) => {
   await expect(page.locator('#tq-narrative')).toHaveValue('Jas drew careful diagrams.\nNext: labels.');
 });
 
-test('the line meter reads the form’s Lines', async ({ page }) => {
+test('↑ ↓ change the student only outside a text field; ⌘ Return approves and moves on', async ({ page }) => {
   await open(page);
-  await expect(page.locator('#tq-meter-label')).toHaveText(/^\d+ of 10 lines$/);
-  await page.evaluate(() => {
-    const cfg = getReportConfig('sci8') || {};
-    const form = ReportSheets.setLines(ReportSheets.formFor(cfg), 'teacher-narrative', 6);
-    saveReportConfig('sci8', Object.assign({}, cfg, { form }));
-  });
-  await page.reload();
-  await page.locator('#report-period').selectOption('Report 2');
-  await expect(page.locator('#tq-meter-label')).toHaveText(/^\d+ of 6 lines$/);
-});
-
-test('↑ ↓ change the student only outside a text field; ⌘ Return saves and moves on', async ({ page }) => {
-  await open(page);
-  await page.locator('.qn-evidence').click({ position: { x: 20, y: 200 } });
+  await page.locator('.qn-glance .qn-band').first().click();
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
+  await expect(page.locator('#tq-ready')).toHaveText('0 of 27 Ready');
   await page.locator('#tq-narrative').click();
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
   await page.keyboard.press('Meta+Enter');
   await expect(page.locator('.qn-name')).toHaveText('Hannah Berg');
-  await expect(page.locator('.qn-bottom-hint')).toContainText('3 of 27');
+  await expect(page.locator('#tq-ready')).toHaveText('1 of 27 Ready');
 });
 
 test('earlier reports are read only', async ({ page }) => {
   await open(page);
   await page.locator('[data-action="tqCommentTab"]').nth(1).click();
-  await expect(page.locator('.qn-comment-card .qn-hint')).toContainText('Went home in');
+  await expect(page.locator('.qn-comment .qn-hint')).toContainText('Went home in');
   await expect(page.locator('#tq-narrative')).toHaveCount(0);
   await expect(page.locator('.qn-earlier')).toContainText('consistent, dependable student');
 });
 
-test('Growth: every score as a dot, Start → Now as the Progress in One Area block prints them', async ({ page }) => {
+test('Work Habits: a rating saves in place and the count follows; nothing redraws', async ({ page }) => {
   await open(page);
-  const rows = page.locator('.qn-growth-row');
-  await expect(rows).toHaveCount(6);
-  await expect(rows.first().locator('.qn-dot')).toHaveCount(13);
-  await expect(rows.first().locator('.qn-growth-sn')).toHaveText('2.9 → 2.9');
-  // Dots sit on three rows by level and never overlap.
-  const overlaps = await page.evaluate(() =>
-    [...document.querySelectorAll('.qn-dots')].some(strip => {
-      const boxes = [...strip.children].map(d => d.getBoundingClientRect());
-      return boxes.some((b, i) => i && b.left < boxes[i - 1].right - 0.5);
-    }),
-  );
-  expect(overlaps).toBe(false);
-  // The report's Progress in One Area, for each competency, prints the same Start and Now.
-  const fromBlock = await page.evaluate(() => {
-    const st = getStudents('sci8').find(s => s.id === 'st1');
-    return CommentBank.facts('sci8', st, 'term-2').comps.map(c => {
-      const rating = getStudentTermRating('sci8', 'st1', 'term-2') || {};
-      upsertTermRating('sci8', 'st1', 'term-2', { focusSectionId: c.id });
-      const html = ReportBlocks.renderBlockProgress('sci8', st, { termId: 'term-2' }, {});
-      upsertTermRating('sci8', 'st1', 'term-2', { focusSectionId: rating.focusSectionId || null });
-      const d = document.createElement('div');
-      d.innerHTML = html;
-      const facts = [...d.querySelectorAll('.report-progress-facts span')].map(x => x.textContent);
-      const start = facts[facts.indexOf('Start of term') + 1].split(' ')[0];
-      const now = facts[facts.indexOf('Now') + 1].split(' ')[0];
-      return start + ' → ' + now;
-    });
-  });
-  expect(await page.locator('.qn-growth-sn').allTextContents()).toEqual(fromBlock);
-  await expect(page.locator('.qn-record')).toContainText('22 of 22');
-});
-
-test('a note quoted in the comment says In the Comment; the private note is marked', async ({ page }) => {
-  await open(page);
-  const first = page.locator('.qn-obs').first();
-  await expect(first.locator('.qn-quoted')).toHaveCount(0);
-  const text = await first.locator('.qn-obs-text').textContent();
-  await toEnd(page);
-  await page.keyboard.type(' I noted: “' + text.trim() + '”');
-  await expect(first.locator('.qn-quoted')).toHaveText('In the Comment');
-  await expect(page.locator('.qn-private')).toContainText('Private · Never Printed');
-  await expect(page.locator('.qn-private')).toContainText('grandma');
-});
-
-test('a student with no observations this term gets the one-line explanation', async ({ page }) => {
-  await open(page);
-  await page.evaluate(() => getStudentQuickObs('sci8', 'st1').forEach(o => deleteQuickOb('sci8', 'st1', o.id)));
-  await page.locator('#gb-sidebar .student-row[data-sid="st7"]').click();
-  await page.locator('#gb-sidebar .student-row[data-sid="st1"]').click();
-  await expect(page.locator('[data-card="obs"] .qn-empty')).toHaveText(
-    'None this term. The comment works without them: Work Habits is built from your habit ratings.',
-  );
-});
-
-test('Jasper: nothing from his phone yet, his forms Not Answered, his goal Not set yet', async ({ page }) => {
-  await open(page, 'st7');
-  await expect(page.locator('[data-card="voice"] .qn-card-sub')).toHaveText('Nothing from his phone yet');
-  await expect(page.locator('[data-card="voice"] .qn-form').first()).toContainText('Not Answered');
-  await expect(page.locator('.qn-goal-text')).toHaveText('Not set yet');
-  await expect(page.locator('.qn-about')).toHaveText('Goes by Jas · he/him · STU-207');
-});
-
-test('Add appends the filled sentence; the row shows ✓ Added in place, nothing redrawn', async ({ page }) => {
-  await open(page);
-  await expect(page.locator('.qn-bank-card .qn-card-sub').first()).toHaveText('434 sentences · 100 fit Cece');
-  const row = page.locator('.qn-part[data-part="now"] .qn-row').first();
-  const text = await row.getAttribute('data-text');
-  await row.evaluate(el => (el.__mark = 'same'));
-  await row.click();
-  await expect(page.locator('#tq-narrative')).toHaveValue(
-    new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$'),
-  );
-  await expect(row.locator('.qn-pill')).toHaveText('✓ Added');
-  expect(await row.evaluate(el => el.__mark)).toBe('same');
-  // Saved, and a second Add of the same sentence adds nothing.
-  await row.click();
-  const value = await page.locator('#tq-narrative').inputValue();
-  expect(value.split(text).length - 1).toBe(1);
-  expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').narrative)).toBe(value);
-  // Deleting it from the box gives the row back its Add.
-  await page.locator('#tq-narrative').fill(value.replace(text, '').trim());
-  await expect(row.locator('.qn-pill')).toHaveText('Add');
-});
-
-test('Focus Area changes the next-step sentences; a habit picked changes what fits', async ({ page }) => {
-  await open(page);
-  const go = page.locator('.qn-part[data-part="go"]');
-  const first = await go.locator('.qn-row').first().textContent();
-  const focus = go.locator('[data-action="tqPickFocus"]');
-  await focus.nth(1).click();
-  await expect(focus.nth(1)).toHaveAttribute('aria-pressed', 'true');
-  const name = (await focus.nth(1).textContent()).replace(/ \d.*$/, '');
-  await expect(go.locator('.qn-row').first()).toContainText('next step is in ' + name);
-  expect(await go.locator('.qn-row').first().textContent()).not.toBe(first);
-  // I Can picks the statement quoted.
-  const ican = go.locator('[data-action="tqPickICan"]');
-  await ican.nth(1).click();
-  await expect(go.locator('.qn-row').first()).toContainText((await ican.nth(1).textContent()).trim());
-  // Completes Work starts from the record; Takes Part picked at Consistently adds its sentences.
-  const habits = page.locator('.qn-part[data-part="habits"]');
-  await expect(habits.locator('.qn-rate').first()).toContainText('From assignments · 22 of 22, 0 late, 0 missing');
-  await expect(habits.locator('.qn-part-head .qn-card-sub')).toHaveText('9 fit Cece');
-  await page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]').click();
-  await expect(habits.locator('.qn-part-head .qn-card-sub')).toHaveText('15 fit Cece');
-  await expect(page.locator('.qn-rates-head .qn-card-sub')).toHaveText('2 of 6 rated');
+  await expect(page.locator('#tq-rated')).toHaveText('0 of 6 rated');
+  const grid = page.locator('.qn-habits');
+  await grid.evaluate(el => (el.__mark = 'same'));
+  const part = page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]');
+  await part.click();
+  await expect(part).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('#tq-rated')).toHaveText('1 of 6 rated');
   expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({ part: 4 });
+  expect(await grid.evaluate(el => el.__mark)).toBe('same');
+  await expect(page.locator('.qn-habit-name').nth(1)).toHaveText('Comes Ready, Uses Class Time');
 });
 
-test('no overflow at 1440 × 900, with every part of the bank shown in full', async ({ page }) => {
+test('At a Glance: the best piece and the skills with Strongest and Next step', async ({ page }) => {
   await open(page);
-  expect(await overflow(page)).toEqual([]);
-  for (const part of ['habits', 'now', 'go', 'how']) {
-    const more = page.locator(`[data-action="tqMore"][data-part="${part}"]`);
-    if (await more.count()) await more.click();
-  }
+  const expected = await page.evaluate(() => {
+    const st = getStudents('sci8').find(s => s.id === 'st1');
+    const f = CommentBank.facts('sci8', st, 'term-2');
+    const best = ReportQuestionnaire.bestPiece(f.work);
+    const tags = ReportQuestionnaire.skillTags(f.comps);
+    return {
+      best: best.title,
+      comps: f.comps.length,
+      strongest: Object.values(tags).filter(t => t === 'Strongest').length,
+    };
+  });
+  await expect(page.locator('.qn-best .qn-fact-body')).toContainText(expected.best);
+  await expect(page.locator('.qn-skill')).toHaveCount(expected.comps);
+  await expect(page.locator('.qn-tag.strongest')).toHaveCount(expected.strongest);
+  await expect(page.locator('.qn-tag:not(.strongest)')).toHaveText(['Next step']);
+});
+
+test('Cece’s Voice: the answers, the private one marked, a quoted answer says In the comment', async ({ page }) => {
+  await open(page);
+  await expect(page.locator('.qn-voice .qn-card-title')).toHaveText('Cece’s Voice');
+  const priv = page.locator('.qn-voice-row', { has: page.locator('.qn-chip-private') });
+  await expect(priv.locator('.qn-fact-label')).toHaveText('To you only');
+  await expect(priv).toContainText('grandma');
+  const good = page.locator('.qn-voice-row', { hasText: 'Good at' });
+  await expect(good.locator('.qn-chip-quoted')).toBeHidden();
+  const text = await good.locator('.qn-voice-text').textContent();
+  await toEnd(page);
+  await page.keyboard.type(' She says: “' + text.trim() + '”');
+  await expect(good.locator('.qn-chip-quoted')).toHaveText('In the comment');
+});
+
+test('Jasper: nothing from his phone yet, so Goal · Not set yet only', async ({ page }) => {
+  await open(page, 'st7');
+  await expect(page.locator('.qn-voice-row')).toHaveCount(1);
+  await expect(page.locator('.qn-voice-row .qn-voice-text')).toHaveText('Not set yet');
+  await expect(page.locator('.qn-head-sub')).toHaveText('he/him · Student Dashboard ›');
+});
+
+test('the Edit Student icon opens the dialog; a save redraws the name', async ({ page }) => {
+  await open(page);
+  await page.locator('#tq-edit-student-btn').click();
+  const dialog = page.getByRole('dialog', { name: 'Edit Student' });
+  await expect(dialog).toBeVisible();
+  await dialog.locator('#edit-first').fill('Cecilia');
+  await dialog.locator('[data-action="saveEditStudent"]').click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.qn-name')).toHaveText('Cecilia Adeyemi');
+  await expect(page.locator('#gb-sidebar .student-row[data-sid="st1"] .student-row-name')).toHaveText(
+    'Cecilia Adeyemi',
+  );
+});
+
+test('the circled question mark opens Where This Information Comes From', async ({ page }) => {
+  await open(page);
+  await page.locator('#tq-info-btn').click();
+  const sheet = page.getByRole('dialog', { name: 'Where This Information Comes From' });
+  await expect(sheet).toBeVisible();
+  const cards = sheet.locator('.qn-info-card');
+  await expect(cards.nth(0).locator('.qn-info-row .qn-info-part')).toHaveText([
+    'Grade',
+    'Work Habits',
+    'Best Piece',
+    'Not Handed In',
+    'Skills',
+    'Goal and Voice',
+    'Attendance',
+    'Teacher Comment',
+  ]);
+  const blocks = await page.evaluate(() =>
+    ReportSheets.onForm(ReportSheets.formFor(getReportConfig('sci8') || {})).map(id => ReportSheets.BLOCKS[id].label),
+  );
+  await expect(cards.nth(1).locator('.qn-info-row .qn-info-part')).toHaveText(blocks);
+  await expect(cards.nth(1).locator('.qn-info-off')).toContainText('Add them in Progress Reports.');
+  await expect(sheet).toContainText('Student Voice answers marked Private.');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+});
+
+test('no overflow at 1440 × 900', async ({ page }) => {
+  await open(page);
   expect(await overflow(page)).toEqual([]);
 });
 
 test.describe('on a 1366 × 768 laptop', () => {
   test.use({ viewport: { width: 1366, height: 768 } });
 
-  test('no bottom bar, the comment fills the right column, no overflow', async ({ page }) => {
+  test('no overflow; the page scrolls as one', async ({ page }) => {
     await open(page);
-    await expect(page.locator('.qn-bottom')).toBeHidden();
-    expect(await commentFill(page)).toEqual({ gap: 20, boxTall: true });
-    await expect(page.locator('#tq-save-next')).toBeVisible();
     expect(await overflow(page)).toEqual([]);
-  });
-
-  test('What FullVision Has is three tabs, one card at a time, none overflowing', async ({ page }) => {
-    await open(page);
-    await expect(page.locator('.qn-ev-tabs')).toBeVisible();
-    for (const [tab, card] of [
-      ['Observations', 'obs'],
-      ['Voice', 'voice'],
-      ['Growth', 'growth'],
-    ]) {
-      await page.locator('.qn-ev-tabs').getByRole('button', { name: tab }).click();
-      await expect(page.locator(`[data-card="${card}"]`)).toBeVisible();
-      await expect(page.locator('.qn-ev-card:visible')).toHaveCount(1);
-      expect(await overflow(page)).toEqual([]);
-    }
+    await expect(page.locator('#tq-approve-next')).toBeVisible();
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('.qn')).overflowY)).toBe('auto');
   });
 });
 
-test('the Teacher Comment fills the right column; there is no BC card', async ({ page }) => {
-  await open(page);
-  await expect(page.locator('#tq-bc-card, .qn-bc-btn')).toHaveCount(0);
-  expect(await commentFill(page)).toEqual({ gap: 20, boxTall: true });
-});
-
-test('a form with no Teacher Comment block has no line meter', async ({ page }) => {
-  await open(page);
-  await expect(page.locator('#tq-meter')).toBeVisible();
-  await page.evaluate(() => {
-    const cfg = getReportConfig('sci8') || {};
-    const form = ReportSheets.removeCell(ReportSheets.formFor(cfg), 'teacher-narrative');
-    saveReportConfig('sci8', Object.assign({}, cfg, { form }));
-  });
-  await page.reload();
-  await page.locator('#report-period').selectOption('Report 2');
-  await expect(page.locator('#tq-narrative')).toBeVisible();
-  await expect(page.locator('#tq-meter')).toBeHidden();
-});
-
-test('Questions lists exactly the form’s blocks; its boxes turn cards off', async ({ page }) => {
-  await open(page);
-  await page.locator('#tq-questions-btn').click();
-  const sheet = page.getByRole('dialog', { name: 'Questions' });
-  await expect(sheet).toBeVisible();
-  const blocks = await page.evaluate(() =>
-    ReportSheets.onForm(ReportSheets.formFor(getReportConfig('sci8') || {})).map(id => ReportSheets.BLOCKS[id].label),
-  );
-  await expect(sheet.locator('.qn-q-row:not(.qn-q-head) .qn-q-block')).toHaveText(blocks);
-  await expect(sheet.locator('.qn-q-row', { hasText: 'Teacher Comment' })).toContainText('You');
-  await sheet.locator('[data-tq-card="obs"]').uncheck();
-  await expect(page.locator('[data-card="obs"]')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await expect(sheet).toHaveCount(0);
-  await page.reload();
-  await page.locator('#report-period').selectOption('Report 2');
-  await expect(page.locator('[data-card="obs"]')).toHaveCount(0);
-  expect(await overflow(page)).toEqual([]);
-});
-
-test('end to end: rate, write from the bank, approve, move on, and the report prints it', async ({ page }) => {
+test('end to end: rate, generate, approve, move on, and the report prints it', async ({ page }) => {
   await open(page);
   await page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]').click();
-  const added = [];
-  for (const part of ['habits', 'now', 'go', 'how']) {
-    const row = page.locator(`.qn-part[data-part="${part}"] .qn-row:not(.added)`).first();
-    added.push(await row.getAttribute('data-text'));
-    await row.click();
-  }
-  await page.locator('#tq-approve').click();
-  await page.locator('#tq-save-next').click();
+  await page.locator('#tq-generate').click();
+  const draft = await page.locator('#tq-narrative').inputValue();
+  await page.locator('#tq-approve-next').click();
   await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
   await expect(page.locator('#tq-ready')).toHaveText('1 of 27 Ready');
   await expect(page.locator('#gb-sidebar .student-row[data-sid="st1"] .student-row-mark')).toHaveText('✓');
@@ -429,5 +359,5 @@ test('end to end: rate, write from the bank, approve, move on, and the report pr
   await page.locator('#gb-sidebar .student-row[data-sid="st1"]').click();
   await expect(page.locator('#picker-label')).toHaveText('Cece Adeyemi');
   const comment = page.locator('.report-sheet').first().locator('.report-comment-text');
-  for (const t of added) await expect(comment).toContainText(t);
+  await expect(comment).toContainText(draft.split('. ')[0]);
 });

@@ -2590,10 +2590,17 @@ window.DashClassManager = (function () {
     }, Promise.resolve());
   }
 
-  function openClassManager() {
+  /* `tab` opens the manager on that tab (a link from another page). */
+  function openClassManager(tab) {
     classManagerOpen = true;
     cmSelectedCourse = _activeCourse;
     cmMode = 'edit';
+    if (
+      CM_TABS.some(function (t) {
+        return t.id === tab;
+      })
+    )
+      cmTab = tab;
     renderClassManager();
     _cmFollowLoads();
   }
