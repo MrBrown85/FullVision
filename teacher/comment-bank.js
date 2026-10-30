@@ -3671,6 +3671,7 @@ window.CommentBank = (function () {
     aOrAn: aOrAn,
     trendingDown: trendingDown,
     closeTo: closeTo,
+    workMark: workMark,
     gradeOf: gradeOf,
     ieAllowed: ieAllowed,
     markedCounts: markedCounts,
