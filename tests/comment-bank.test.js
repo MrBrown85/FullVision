@@ -448,18 +448,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 96 sentences (9, 42, 19, 26)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 84 sentences (9, 31, 18, 26)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 42, 19, 26]);
-    expect(CommentBank.fitCount(ctx)).toBe(96);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 31, 18, 26]);
+    expect(CommentBank.fitCount(ctx)).toBe(84);
   });
 
-  it('offers Jasper 83 (9, 35, 15, 24), by the name he goes by', () => {
+  it('offers Jasper 77 (9, 29, 15, 24), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 35, 15, 24]);
-    expect(CommentBank.fitCount(ctx)).toBe(83);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 29, 15, 24]);
+    expect(CommentBank.fitCount(ctx)).toBe(77);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -626,7 +626,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       factKeys: ['work:' + top.id],
       values: { assignment: top.title, level: ctx.level },
     });
-    expect(CommentBank.provenance(byId('n20'), ctx).factKeys).toEqual(['comp:SC']);
+    // Cece has no competency past the "improved" gate; Mateo's Scientific
+    // Communication is.
+    expect(ctx.rise).toBe('');
+    const mateo = getStudents(cid).find(s => s.firstName === 'Mateo');
+    const mctx = CommentBank.context(CommentBank.facts(cid, mateo, 'term-2'), {});
+    expect(CommentBank.provenance(byId('n20'), mctx).factKeys).toEqual(['comp:SC']);
     expect(CommentBank.provenance(byId('h03'), ctx).factKeys).toEqual(['habit:completes']);
     expect(CommentBank.provenance(byId('n04'), ctx).values['when.picture']).toBe('steady');
   });
@@ -712,7 +717,10 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   });
 
   it('re-checks the letter grade against the facts', () => {
-    const f = { ...cece(), letter: 'a B (78%)' };
+    // Scientific Communication raised past the "strongest" gate, so n14 fits.
+    const base = cece();
+    const comps = base.comps.map(c => (c.id === 'SC' ? { ...c, level: 3.9 } : c));
+    const f = { ...base, comps, letter: 'a B (78%)' };
     const d = one('n14', CommentBank.context(f, {}));
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     expect(CommentBank.verify(d, { ...f, letter: 'a C+ (68%)' }, {}).replaced[0].failed).toEqual(['slots', 'grade']);

@@ -110,11 +110,25 @@ describe('angle', () => {
     expect(CommentBank.angle(f, { habits: { feedback: 2, devices: 1 } }).id).toBe('habits');
   });
 
-  it('a climb needs four weeks and six pieces, so the earliest third never rests on one score', () => {
-    const short = facts({ grade: { pieces: [60, 62, 64, 70, 78, 82].map((p, i) => piece(i * 4, p)) } });
-    expect(CommentBank.angle(short, {}).id).toBe('steady');
-    const few = facts({ grade: { pieces: [50, 70, 80, 82, 84].map((p, i) => piece(i * 10, p)) } });
-    expect(CommentBank.angle(few, {}).id).toBe('steady');
+  it('a climb passes the "improved" evidence gate: four pieces over four weeks, not resting on one low start', () => {
+    const at = (pcts, gap) => facts({ grade: { pieces: pcts.map((p, i) => piece(i * gap, p)) } });
+    expect(CommentBank.angle(at([60, 62, 64, 70, 78, 82], 4), {}).id).toBe('steady');
+    expect(CommentBank.angle(at([70, 74, 78, 80], 9), {}).id).toBe('steady');
+    expect(CommentBank.angle(at([70, 74, 78, 80], 10), {}).id).toBe('climb');
+    expect(CommentBank.angle(at([70, 72, 76], 14), {}).id).toBe('steady');
+    // The gain rests on the one low first score: no climb.
+    expect(CommentBank.angle(at([40, 78, 80, 82], 10), {}).id).toBe('steady');
+    // A slide is the same trend, down five points or more.
+    expect(CommentBank.angle(at([76, 74, 72, 71], 10), {}).id).toBe('slide');
+    expect(CommentBank.angle(at([76, 74, 72, 72], 10), {}).id).toBe('steady');
+  });
+
+  it('a split needs a skill past the "strongest" gate', () => {
+    const at = comps => CommentBank.angle(facts({ comps }), {}).id;
+    expect(at([comp('c1', 3.8, 3), comp('c2', 2.0, 3)])).toBe('split');
+    expect(at([comp('c1', 3.8, 2), comp('c2', 2.0, 3)])).toBe('steady');
+    // A full proficiency over the lowest, but no skill half a step clear of the next.
+    expect(at([comp('c1', 3.8, 3), comp('c3', 3.6, 3), comp('c4', 3.4, 3), comp('c2', 2.0, 3)])).toBe('steady');
   });
 
   it('is new to the class only when joining two weeks after the class began, inside this term', () => {

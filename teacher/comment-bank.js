@@ -650,6 +650,137 @@ window.CommentBank = (function () {
     };
   }
 
+  /* ── Evidence gates ────────────────────────────────────────────────── */
+
+  /* Every "strongest" and "improved" claim passes its gate here, and only
+     here (plan PR 6; research report, section D, recommendation 6). The
+     story picker (angle()), the slots (context()), selection (fits()), the
+     verifier (CLAIMS) and the At a Glance tags all read these. Below a gate
+     the claiming sentence is not eligible, and verify() fails it. */
+  // Strongest needs 3+ scored pieces: the 3-score minimum used in practice (report D6).
+  var STRONGEST_PIECES = 3;
+  // And half a proficiency step over the next competency, a gap larger than one mark's noise (report D6).
+  var STRONGEST_GAP = 0.5;
+  // Improved needs 4+ pieces, so the change is not one mark against another (report D6).
+  var IMPROVED_PIECES = 4;
+  // Over 4+ weeks, so a few days of marks are not a trend (report D6).
+  var IMPROVED_DAYS = 28;
+  // The smallest change that counts, in proficiency (half a step, as for strongest) or in % (#554's 5 points).
+  var IMPROVED_LEVEL = 0.5;
+  var IMPROVED_POINTS = 5;
+
+  function _days(a, b) {
+    var x = typeof parseLocalDate === 'function' ? parseLocalDate(a) : new Date(a);
+    var y = typeof parseLocalDate === 'function' ? parseLocalDate(b) : new Date(b);
+    return (y - x) / 86400000;
+  }
+  function _byDate(points) {
+    return (points || []).slice().sort(function (a, b) {
+      return String(a.d).localeCompare(String(b.d));
+    });
+  }
+  /* The median of the latest third less the median of the earliest third,
+     in date order (thirds of at least one point). */
+  function _thirdsChange(xs) {
+    var n = Math.floor(xs.length / 3);
+    if (n < 1) return null;
+    var val = function (p) {
+      return Number(p.v);
+    };
+    return _median(xs.slice(-n).map(val)) - _median(xs.slice(0, n).map(val));
+  }
+  // Compare in thousandths, so 3.3 - 2.8 counts as half a step.
+  function _atLeast(change, step) {
+    return change != null && Math.round(change * 1000) >= Math.round(step * 1000);
+  }
+
+  /* The change over the term, comparing the medians of the earliest and
+     latest thirds by date: 4+ pieces over 4+ weeks (report D6), else null.
+     points: [{ d, v }], v a proficiency or a %. */
+  function trendOf(points) {
+    var xs = _byDate(points);
+    if (xs.length < IMPROVED_PIECES || !(_days(xs[0].d, xs[xs.length - 1].d) >= IMPROVED_DAYS)) return null;
+    return _thirdsChange(xs);
+  }
+
+  /* "Improved": the trend is up by `step` or more, and still is with the
+     earliest third's lowest score left out, so a gain that rests on one low
+     early score (regression to the mean, report D6) is not claimed. */
+  function improvedGate(points, step) {
+    if (!_atLeast(trendOf(points), step)) return false;
+    var xs = _byDate(points);
+    var early = xs.slice(0, Math.floor(xs.length / 3));
+    var low = early.reduce(function (m, p) {
+      return Number(p.v) < Number(m.v) ? p : m;
+    }, early[0]);
+    return _atLeast(
+      _thirdsChange(
+        xs.filter(function (p) {
+          return p !== low;
+        }),
+      ),
+      step,
+    );
+  }
+
+  /* A competency's scores as points: { d, v } with v its proficiency. */
+  function improvedComp(c) {
+    return !!c && improvedGate(c.scores, IMPROVED_LEVEL);
+  }
+
+  /* The scored pieces' % as points, for the climb and slide stories. */
+  function _pctPoints(pieces) {
+    return (pieces || []).map(function (p) {
+      return { d: p.d, v: Number(p.pct) };
+    });
+  }
+  function climbed(pieces) {
+    return improvedGate(_pctPoints(pieces), IMPROVED_POINTS);
+  }
+  function slid(pieces) {
+    var t = trendOf(_pctPoints(pieces));
+    return t != null && _atLeast(-t, IMPROVED_POINTS);
+  }
+
+  /* "Strongest": the top competency, or the top two when the first is not
+     half a step clear of the second, resting on 3+ scored pieces each and
+     half a proficiency step or more over the next competency (report D6).
+     [] when none passes. */
+  function strongestOf(comps) {
+    var xs = (comps || [])
+      .filter(function (c) {
+        return c.level > 0;
+      })
+      .sort(function (a, b) {
+        return b.level - a.level;
+      });
+    for (var k = 1; k <= 2 && xs.length > k; k++) {
+      var top = xs.slice(0, k);
+      var enough = top.every(function (c) {
+        return (c.scores || []).length >= STRONGEST_PIECES;
+      });
+      if (enough && _atLeast(top[k - 1].level - xs[k].level, STRONGEST_GAP)) return top;
+    }
+    return [];
+  }
+
+  /* The claims a gate decides, and whether a sentence passes them for this
+     context: a sentence claiming one below its gate is not eligible. A
+     context built by hand, without facts, has nothing to gate. */
+  var GATED = ['strength', 'improved'];
+  function passesGates(s, ctx) {
+    var f = ctx && ctx._f;
+    if (!f || !ctx._facts) return true;
+    var cs = (s.claims || []).filter(function (c) {
+      return GATED.indexOf(c) >= 0;
+    });
+    if (!cs.length) return true;
+    var pv = provenance(s, ctx);
+    return cs.every(function (c) {
+      return CLAIMS[c](pv, f, ctx);
+    });
+  }
+
   /* Every value a bank sentence can ask for, from the facts and the
      teacher's picks { habits, focus, ican }. An empty value means the
      sentences that need it are not offered. */
@@ -665,13 +796,11 @@ window.CommentBank = (function () {
     var nowWords = withLevels.map(function (c) {
       return word(c.now);
     });
-    var rises = withLevels
-      .filter(function (c) {
-        return tenths(c.now) > tenths(c.start);
-      })
-      .sort(function (a, b) {
-        return tenths(b.now) - tenths(b.start) - (tenths(a.now) - tenths(a.start));
-      });
+    // What rose: only competencies past the "improved" gate (improvedComp),
+    // the biggest change first.
+    var rises = f.comps.filter(improvedComp).sort(function (a, b) {
+      return trendOf(b.scores) - trendOf(a.scores);
+    });
     var drops = withLevels.filter(function (c) {
       return tenths(c.now) < tenths(c.start);
     });
@@ -687,8 +816,8 @@ window.CommentBank = (function () {
       }) || options[0];
     var iCan =
       focus && focus.iCans.length ? _ended(focus.iCans[Math.min(picks.ican || 0, focus.iCans.length - 1)]) : '';
-    // Strengths are the highest levels now; the areas to grow, the two
-    // lowest (only below the highest, so an even term names none).
+    // Strengths pass the "strongest" gate (strongestOf); the areas to grow
+    // are the two lowest (only below the highest, so an even term names none).
     var byNow = f.comps.slice().sort(function (a, b) {
       return b.level - a.level;
     });
@@ -700,11 +829,7 @@ window.CommentBank = (function () {
         return tenths(c.level) < highest;
       })
       .slice(0, 2);
-    var strongest = byNow
-      .filter(function (c) {
-        return lowest.indexOf(c) < 0;
-      })
-      .slice(0, 2);
+    var strongest = strongestOf(f.comps);
     var fallen = drops.length
       ? drops.slice().sort(function (a, b) {
           return tenths(a.start) - tenths(a.now) - (tenths(b.start) - tenths(b.now));
@@ -975,7 +1100,12 @@ window.CommentBank = (function () {
     return true;
   }
 
+  /* A sentence fits when its class, slots and conditions match and every
+     gated claim it makes passes its evidence gate (passesGates). */
   function fits(s, ctx) {
+    return _fitsSlots(s, ctx) && passesGates(s, ctx);
+  }
+  function _fitsSlots(s, ctx) {
     if (!forFamily(s, ctx._family || '')) return false;
     var needs = s.needs || [];
     for (var i = 0; i < needs.length; i++) if (!ctx[needs[i]]) return false;
@@ -1309,8 +1439,6 @@ window.CommentBank = (function () {
      (Completes Work from the record until rated), and the enrolment date.
      The lowest tier that holds wins; inside a tier, the story used least in
      the class, then this order. "Angle" is never shown. */
-  var ANGLE_DAYS = 28; // a climb or a slide spans four weeks or more
-  var ANGLE_POINTS = 5; // and moves the median by five points or more
   var NEW_DAYS = 14; // joined two weeks or more after the class began
   var THIN = 3; // fewer scored pieces than this is too little to judge
 
@@ -1376,11 +1504,12 @@ window.CommentBank = (function () {
       order: ['example', 'overall', 'completes', 'growingHabits', 'attendance', 'nextStep', 'home', 'closer'],
     },
     {
-      // The marks climbed over the term: the growth leads.
+      // The marks climbed over the term, past the "improved" gate
+      // (climbed()): the growth leads.
       id: 'climb',
       tier: 4,
       when: function (a) {
-        return a.trend >= ANGLE_POINTS;
+        return a.climb;
       },
       order: [
         'growth',
@@ -1396,11 +1525,12 @@ window.CommentBank = (function () {
       ],
     },
     {
-      // The marks slid over the term: the best piece first, then the slide.
+      // The marks slid over the term, by the same trend (slid()): the best
+      // piece first, then the slide.
       id: 'slide',
       tier: 4,
       when: function (a) {
-        return a.trend <= -ANGLE_POINTS;
+        return a.slide;
       },
       order: [
         'example',
@@ -1417,8 +1547,9 @@ window.CommentBank = (function () {
       ],
     },
     {
-      // Strong in one skill, weak in another (a full proficiency apart, each
-      // on three or more pieces): the strengths and the area to build lead.
+      // Strong in one skill (past the "strongest" gate), weak in another a
+      // full proficiency below it on three or more pieces: the strengths and
+      // the area to build lead.
       id: 'split',
       tier: 4,
       when: function (a) {
@@ -1463,7 +1594,7 @@ window.CommentBank = (function () {
       id: 'strength',
       tier: 5,
       when: function (a) {
-        return a.high && !a.missing && a.trend > -ANGLE_POINTS;
+        return a.high && !a.missing && !a.slide;
       },
       order: [
         'example',
@@ -1511,28 +1642,6 @@ window.CommentBank = (function () {
     },
   ];
 
-  function _days(a, b) {
-    var x = typeof parseLocalDate === 'function' ? parseLocalDate(a) : new Date(a);
-    var y = typeof parseLocalDate === 'function' ? parseLocalDate(b) : new Date(b);
-    return (y - x) / 86400000;
-  }
-
-  /* The change over the term in points: the median % of the latest third of
-     the scored pieces less the earliest third's. Zero with fewer than six
-     pieces (so the earliest third never rests on one score) or under four
-     weeks between the first and last. */
-  function _trend(pieces) {
-    var xs = (pieces || []).slice().sort(function (a, b) {
-      return String(a.d).localeCompare(String(b.d));
-    });
-    var n = Math.floor(xs.length / 3);
-    if (n < 2 || !(_days(xs[0].d, xs[xs.length - 1].d) >= ANGLE_DAYS)) return 0;
-    var pct = function (p) {
-      return Number(p.pct);
-    };
-    return _median(xs.slice(-n).map(pct)) - _median(xs.slice(0, n).map(pct));
-  }
-
   /* What the stories are told from, all read off the facts. */
   function angleFacts(f, picks) {
     var g = f.grade || {};
@@ -1542,12 +1651,14 @@ window.CommentBank = (function () {
     var habits = effectiveHabits((picks && picks.habits) || f.habits, rec);
     var letterMode = g.mode === 'letter' || g.mode === 'both';
     var level = Number(f.overall) || 0;
-    var judged = (f.comps || []).filter(function (c) {
-      return (c.scores || []).length >= THIN;
-    });
-    var levels = judged.map(function (c) {
-      return tenths(c.level);
-    });
+    // Strong in one skill (the "strongest" gate) and a full proficiency
+    // lower in another judged on three or more pieces.
+    var top = strongestOf(f.comps)[0];
+    var split =
+      !!top &&
+      (f.comps || []).some(function (c) {
+        return (c.scores || []).length >= THIN && tenths(top.level) - tenths(c.level) >= 10;
+      });
     // The handed-in work on its own: its median %, else its median level.
     var strongWork = pieces.length
       ? pieces.length >= THIN &&
@@ -1574,8 +1685,9 @@ window.CommentBank = (function () {
       missing: _missingCount(f),
       total: rec.total || 0,
       strongWork: strongWork,
-      trend: _trend(pieces),
-      split: levels.length >= 2 && Math.max.apply(null, levels) - Math.min.apply(null, levels) >= 10,
+      climb: climbed(pieces),
+      slide: slid(pieces),
+      split: split,
       growing: Object.keys(habits).filter(function (k) {
         return habits[k] === 1 || habits[k] === 2;
       }).length,
@@ -2174,15 +2286,18 @@ window.CommentBank = (function () {
       );
     },
     // The strongest competencies, or the one the student feels strongest in
-    // when the sentence says the work agrees.
+    // when the sentence says the work agrees: each past the "strongest"
+    // gate (strongestOf).
     strength: function (pv, f) {
       var ids = _ids(pv, 'strengths', 'comp').concat(_ids(pv, 'selfStrong', 'confidence'));
-      return _atTop(
-        ids.map(function (id) {
-          return _byId(f.comps, id);
-        }),
-        f.comps,
-        'level',
+      var gated = strongestOf(f.comps).map(function (c) {
+        return String(c.id);
+      });
+      return (
+        ids.length > 0 &&
+        ids.every(function (id) {
+          return gated.indexOf(String(id)) >= 0;
+        })
       );
     },
     // Competencies to build: each below the highest now.
@@ -2199,13 +2314,13 @@ window.CommentBank = (function () {
         })
       );
     },
+    // A competency that rose: past the "improved" gate (improvedComp).
     improved: function (pv, f) {
       var ids = _ids(pv, 'rise', 'comp');
       return (
         ids.length > 0 &&
         ids.every(function (id) {
-          var c = _byId(f.comps, id);
-          return !!c && c.start > 0 && c.now > 0 && tenths(c.now) > tenths(c.start);
+          return improvedComp(_byId(f.comps, id));
         })
       );
     },
@@ -2392,7 +2507,7 @@ window.CommentBank = (function () {
     var own = Object.prototype.hasOwnProperty;
     var out = [];
     var stale =
-      !fits(s, ctx) ||
+      !_fitsSlots(s, ctx) ||
       Object.keys(pv.values || {}).some(function (k) {
         if (/^when\./.test(k)) return false;
         var now = own.call(ctx, k) && ctx[k] != null ? String(ctx[k]) : '';
@@ -2527,6 +2642,13 @@ window.CommentBank = (function () {
     DRAFT_STEPS: DRAFT_STEPS,
     ANGLES: ANGLES,
     angle: angle,
+    trendOf: trendOf,
+    improvedGate: improvedGate,
+    improvedComp: improvedComp,
+    climbed: climbed,
+    slid: slid,
+    strongestOf: strongestOf,
+    passesGates: passesGates,
     angleFacts: angleFacts,
     stepOf: stepOf,
     list: list,

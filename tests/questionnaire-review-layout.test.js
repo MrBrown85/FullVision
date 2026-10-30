@@ -39,15 +39,21 @@ describe('bestPiece', () => {
 });
 
 describe('skillTags', () => {
-  it('marks every competency at the top level Strongest and the lowest Next step', () => {
-    const comps = [
-      { id: 'a', level: 4 },
-      { id: 'b', level: 4 },
-      { id: 'c', level: 3 },
-      { id: 'd', level: 2.7 },
-      { id: 'e', level: 2.7 },
-    ];
+  const scored = (id, level, n = 3) => ({ id, level, scores: Array.from({ length: n }, () => ({ v: level })) });
+  it('marks Strongest by the comment’s evidence gate and the lowest Next step', () => {
+    const comps = [scored('a', 4), scored('b', 4), scored('c', 3), scored('d', 2.7), scored('e', 2.7)];
     expect(RQ.skillTags(comps)).toEqual({ a: 'Strongest', b: 'Strongest', d: 'Next step' });
+    expect(Object.keys(RQ.skillTags(comps)).filter(k => RQ.skillTags(comps)[k] === 'Strongest')).toEqual(
+      CommentBank.strongestOf(comps).map(c => c.id),
+    );
+  });
+  it('tags no Strongest below the gate: fewer than three pieces, or under half a step clear', () => {
+    expect(RQ.skillTags([scored('a', 4, 2), scored('b', 3), scored('c', 2)])).toEqual({ c: 'Next step' });
+    expect(RQ.skillTags([scored('a', 3.4), scored('b', 3), scored('c', 2.8)])).toEqual({ c: 'Next step' });
+    expect(RQ.skillTags([scored('a', 3.5), scored('b', 3), scored('c', 2)])).toEqual({
+      a: 'Strongest',
+      c: 'Next step',
+    });
   });
   it('tags nothing when every level is the same, or with one competency', () => {
     expect(RQ.skillTags([{ id: 'a', level: 3 }])).toEqual({});
