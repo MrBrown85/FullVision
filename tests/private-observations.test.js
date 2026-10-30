@@ -1,7 +1,7 @@
 /**
  * Concern and Note observations are private (Colin, Oct 29 2026): they never
- * print or go home on a report, Generate never quotes them, and every list of
- * observations marks them "Private".
+ * print or go home on a report, and every list of observations marks them
+ * "Private". Generate quotes no observation at all (Colin, Oct 30).
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -68,47 +68,27 @@ describe('printed blocks', () => {
 });
 
 describe('Generate', () => {
-  const facts = obs => ({
-    name: 'Ava',
-    pronouns: { subj: 'she', obj: 'her', poss: 'her', refl: 'herself' },
-    comps: [],
-    work: [],
-    record: { total: 0, handed: 0, late: 0, missing: 0 },
-    obs,
-    voice: {},
-    confidence: [],
-    habits: {},
-    levelText: () => '',
-  });
-  const o = (id, sentiment, text) => ({ id, text, day: 'Oct 24', sentiment });
-
-  it('never quotes a private note, even when it is the newest or picked', () => {
-    const f = facts([
-      o('n', 'note', 'Away on vacation.'),
-      o('c', 'concern', 'Parent meeting.'),
-      o('s', 'strength', 'Led the group.'),
-    ]);
-    expect(CommentBank.context(f, {}).note).toBe('Led the group.');
-    expect(CommentBank.context(f, { note: 'n' }).note).toBe('Led the group.');
-    expect(CommentBank.context(f, { note: 'c' }).note).toBe('Led the group.');
-  });
-
-  it('has no note when every observation is private', () => {
-    const f = facts([o('n', 'note', 'Away on vacation.'), o('c', 'concern', 'Parent meeting.')]);
-    const ctx = CommentBank.context(f, {});
-    expect(ctx.note).toBe('');
-    expect(ctx.concernNote).toBe('');
-  });
-
-  it('takes the work-on pick from Growth only', () => {
-    const f = facts([
-      o('c', 'concern', 'Parent meeting.'),
-      o('s', 'strength', 'Led the group.'),
-      o('g', 'growth', 'Check the units.'),
-    ]);
-    expect(CommentBank.context(f, {}).concernNote).toBe('Check the units.');
-    const none = facts([o('c', 'concern', 'Parent meeting.'), o('s', 'strength', 'Led the group.')]);
-    expect(CommentBank.context(none, {}).concernNote).toBe('');
+  /* Colin, Oct 30: Generate never uses observations, private or not. The
+     wider check (every Demo draft, every observation) is in
+     comment-bank-selection.test.js. */
+  it('has no slot for an observation, whatever the facts hold', () => {
+    const f = {
+      name: 'Ava',
+      pronouns: { subj: 'she', obj: 'her', poss: 'her', refl: 'herself' },
+      comps: [],
+      work: [],
+      record: { total: 0, handed: 0, late: 0, missing: 0 },
+      obs: [{ id: 's', text: 'Led the group.', day: 'Oct 24', sentiment: 'strength' }],
+      voice: {},
+      confidence: [],
+      habits: {},
+      levelText: () => '',
+    };
+    const ctx = CommentBank.context(f, { note: 's' });
+    ['note', 'when', 'concernNote', 'concernWhen'].forEach(k => expect(ctx[k], k).toBeUndefined());
+    Object.keys(ctx)
+      .filter(k => typeof ctx[k] === 'string')
+      .forEach(k => expect(ctx[k], k).not.toMatch(/Led the group/));
   });
 });
 

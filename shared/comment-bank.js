@@ -15,16 +15,20 @@
    `claims` names what a sentence asserts about the student, for
    CommentBank.verify(): grade, even, strength, growthArea, improved,
    slipped, bestPiece, weakPiece, focusWork, nextStep, habits, lateWork,
-   notHandedIn, attendance, note, studentWords, picture, support. [] is a
+   notHandedIn, attendance, studentWords, picture, support. [] is a
    sentence that asserts nothing, the stand-in for a sentence of its part
    whose claim fails. Every sentence has the field; a test fails without it.
 
    Grown 2026-10-28 (Colin: "a large, high-quality bank" behind Generate):
    every habit at every level, openings and closers for each picture of the
    term, Overall by the proficiency word (`when.standing`), a competency
-   that slipped (`fall`), and more for examples, notes, the student's words,
+   that slipped (`fall`), and more for examples, the student's words,
    next steps, home and class. The old generator's lines were cut as below;
    nothing here brings back a superlative, the teacher's feelings or filler.
+
+   Cut 2026-10-30 (Colin: Generate never uses observations): the eight
+   "From Your Notes" sentences that quoted an observation (n40-n42,
+   n141-n143, g07, g114).
 
    Cut from tqAutoNarrative, and why:
      572-577: Superlatives and teacher-centred praise ('outstanding', 'makes teaching rewarding', 'can't say enough good things').
@@ -826,33 +830,6 @@ var COMMENT_BANK = {
       src: '1010',
     },
     {
-      id: 'n40',
-      part: 'now',
-      group: 'From Your Notes',
-      text: 'For example, {when} I noted: “{note}”',
-      needs: ['note'],
-      claims: ['note'],
-      src: '1061',
-    },
-    {
-      id: 'n41',
-      part: 'now',
-      group: 'From Your Notes',
-      text: 'One moment from class {when}: “{note}”',
-      needs: ['note'],
-      claims: ['note'],
-      src: '1046',
-    },
-    {
-      id: 'n42',
-      part: 'now',
-      group: 'From Your Notes',
-      text: 'A recent observation: “{note}”',
-      needs: ['note'],
-      claims: ['note'],
-      src: '1063',
-    },
-    {
       id: 'n50',
       part: 'now',
       group: "In the Student's Words",
@@ -945,15 +922,6 @@ var COMMENT_BANK = {
       claims: ['weakPiece'],
       src: '987',
       except: ['pe'],
-    },
-    {
-      id: 'g07',
-      part: 'go',
-      group: 'From Your Notes',
-      text: 'One thing to work on, from {concernWhen}: “{concernNote}”',
-      needs: ['concernNote'],
-      claims: ['note'],
-      src: '1055',
     },
     {
       id: 'g08',
@@ -1963,33 +1931,6 @@ var COMMENT_BANK = {
       src: 'new',
     },
     {
-      id: 'n141',
-      part: 'now',
-      group: 'From Your Notes',
-      text: 'From class {when}: “{note}”',
-      needs: ['note', 'when'],
-      claims: ['note'],
-      src: 'new',
-    },
-    {
-      id: 'n142',
-      part: 'now',
-      group: 'From Your Notes',
-      text: 'One thing I saw {when}: “{note}”',
-      needs: ['note', 'when'],
-      claims: ['note'],
-      src: 'new',
-    },
-    {
-      id: 'n143',
-      part: 'now',
-      group: 'From Your Notes',
-      text: 'A note from my records: “{note}”',
-      needs: ['note'],
-      claims: ['note'],
-      src: 'new',
-    },
-    {
       id: 'n144',
       part: 'now',
       group: "In the Student's Words",
@@ -2147,15 +2088,6 @@ var COMMENT_BANK = {
       text: '{name} has set {himself} a goal: {goal} It is the right one.',
       needs: ['goal'],
       claims: ['studentWords'],
-      src: 'new',
-    },
-    {
-      id: 'g114',
-      part: 'go',
-      group: 'From Your Notes',
-      text: 'Something to keep working on, from {concernWhen}: “{concernNote}”',
-      needs: ['concernNote', 'concernWhen'],
-      claims: ['note'],
       src: 'new',
     },
     {

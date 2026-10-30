@@ -816,7 +816,8 @@ window.ReportQuestionnaire = (function () {
 
   /* ── The Teacher Comment ─────────────────────────────────── */
 
-  /* Classmates' comments this report, for the bank's least-used order. */
+  /* Classmates' comments this report as { sid, text }, for the bank's
+     least-used order (CommentBank.classUsage). */
   function _classmateComments(cid, sid, termId) {
     var all = getTermRatings(cid) || {};
     return Object.keys(all)
@@ -824,7 +825,7 @@ window.ReportQuestionnaire = (function () {
         return k !== sid && all[k] && all[k][termId] && all[k][termId].narrative;
       })
       .map(function (k) {
-        return plainComment(all[k][termId].narrative);
+        return { sid: k, text: plainComment(all[k][termId].narrative) };
       });
   }
 
@@ -854,6 +855,9 @@ window.ReportQuestionnaire = (function () {
       comments: _classmateComments(_activeCourse, st.id, termId),
       // Each press gives another version: never the text already in the box.
       previous: el.value,
+      // Last term's approved sentences are left out once each approval
+      // stores its sentence ids (draft_meta); none are stored yet.
+      exclude: [],
     });
     if (!d.text) return;
     el.focus();

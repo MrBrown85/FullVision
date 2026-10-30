@@ -43,10 +43,6 @@ function fullContext(p, habits) {
     strongWorks: 'the Energy Lab',
     weakWorks: 'the Map Quiz',
     evidence: 'a solid grasp of the material',
-    note: 'Asked a good question.',
-    when: 'on Oct 24',
-    concernNote: 'Left the lab early.',
-    concernWhen: 'Oct 2',
     selfGood: '“Labs.”',
     selfHard: '“Deadlines.”',
     selfStrong: 'Evaluating',
@@ -68,10 +64,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 440 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(440);
+  it('has 432 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(432);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(440);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(432);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -163,10 +159,6 @@ describe('the bank', () => {
       growthHabitNames: 'habits',
       absent: 'attendance',
       late: 'attendance',
-      note: 'note',
-      when: 'note',
-      concernNote: 'note',
-      concernWhen: 'note',
       selfGood: 'studentWords',
       selfHard: 'studentWords',
       selfStrong: 'studentWords',
@@ -275,30 +267,6 @@ describe('fill takes values as written', () => {
     const ctx = CommentBank.context(f, {});
     expect(ctx.strengthHabits).toBe('consistently uses feedback to improve her work');
     expect(ctx.growthHabits).toBe('using devices for learning and putting her phone away when asked');
-  });
-});
-
-describe('the note keeps its own ending', () => {
-  const f = note => ({
-    name: 'Ava',
-    pronouns: { subj: 'she', obj: 'her', poss: 'her', refl: 'herself' },
-    comps: [],
-    work: [],
-    record: { total: 0, handed: 0, late: 0, missing: 0 },
-    obs: [{ id: 'o1', text: note, day: 'Oct 24', sentiment: 'growth' }],
-    voice: {},
-    confidence: [],
-    habits: {},
-    levelText: () => '',
-  });
-
-  it('adds a period only when the note has no . ! or ?', () => {
-    expect(CommentBank.context(f('Asked why the ice melted faster?'), {}).note).toBe(
-      'Asked why the ice melted faster?',
-    );
-    expect(CommentBank.context(f('Helped a classmate!'), {}).note).toBe('Helped a classmate!');
-    expect(CommentBank.context(f('Finished the lab  '), {}).note).toBe('Finished the lab.');
-    expect(CommentBank.context(f('Left early?'), {}).concernNote).toBe('Left early?');
   });
 });
 
@@ -480,18 +448,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 102 sentences (9, 48, 19, 26)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 96 sentences (9, 42, 19, 26)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 48, 19, 26]);
-    expect(CommentBank.fitCount(ctx)).toBe(102);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 42, 19, 26]);
+    expect(CommentBank.fitCount(ctx)).toBe(96);
   });
 
-  it('offers Jasper 89 (9, 41, 15, 24), by the name he goes by', () => {
+  it('offers Jasper 83 (9, 35, 15, 24), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 41, 15, 24]);
-    expect(CommentBank.fitCount(ctx)).toBe(89);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 35, 15, 24]);
+    expect(CommentBank.fitCount(ctx)).toBe(83);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -530,11 +498,11 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     }
   });
 
-  it('keeps the private note out of the bank: never an observation, never the note slot', () => {
+  it('keeps the private note out of the bank: no observations read, never the note slot', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
     const f = CommentBank.facts(cid, st, 'term-2');
     expect(f.voice.private).toMatch(/grandma/);
-    expect(f.obs.some(o => /grandma/.test(o.text))).toBe(false);
+    expect(f.obs).toBeUndefined();
     const ctx = CommentBank.context(f, {});
     Object.keys(ctx)
       .filter(k => typeof ctx[k] === 'string')
@@ -606,7 +574,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(other.sentences[1].text).not.toBe(mine.sentences[1].text);
   });
 
-  it('drafts for every Demo student: six or more sentences, nothing unfilled, no note quoted twice', () => {
+  it('drafts for every Demo student: six or more sentences, nothing unfilled, nothing quoted twice', () => {
     getStudents(cid).forEach(st => {
       const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
       const d = CommentBank.draft(ctx, { seed: CommentBank.seedFor(st.id) });

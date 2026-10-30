@@ -5,10 +5,11 @@
    value and its `when` matches. Nothing here assembles a paragraph.
 
    Two layers. facts() reads what FullVision has for one student this term
-   (scores, assignments, observations, Student Voice, attendance) from the
-   data layer; it never reads the page. Everything after it is pure:
-   context() turns the facts and the teacher's picks (habits, Focus Area, I
-   Can, the note to quote) into the slot values, and fits(), fill() and
+   (scores, assignments, Student Voice, attendance) from the data layer; it
+   never reads the page or the observations (Colin, Oct 30: Generate never
+   quotes an observation). Everything after it is pure: context() turns
+   the facts and the teacher's picks (habits, Focus Area, I Can) into the
+   slot values, and fits(), fill() and
    parts() decide what the Comment Bank column shows. draft() returns each
    sentence's provenance with the comment; verify() re-checks a draft's
    claims against the facts. */
@@ -184,10 +185,6 @@ window.CommentBank = (function () {
   function _quote(text) {
     var t = _ended(text);
     return t ? '“' + t + '”' : '';
-  }
-  function _day(d) {
-    var date = typeof parseLocalDate === 'function' ? parseLocalDate(String(d).slice(0, 10)) : new Date(d);
-    return isNaN(date) ? '' : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
   function _answer(it) {
     return it && it.v && it.v.text ? String(it.v.text).trim() : '';
@@ -403,28 +400,7 @@ window.CommentBank = (function () {
       return String(x.d).localeCompare(String(y.d));
     });
 
-    // Observations this term, newest first.
     var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
-    var obs = (getStudentQuickObs(cid, sid) || [])
-      .map(function (o) {
-        return { o: o, d: String(o.date || o.created || '').slice(0, 10) };
-      })
-      .filter(function (x) {
-        return !term || (x.d && x.d >= term.startsOn && x.d <= term.endsOn);
-      })
-      .sort(function (x, y) {
-        return y.d.localeCompare(x.d);
-      })
-      .map(function (x) {
-        return {
-          id: x.o.id,
-          text: String(x.o.text || '').trim(),
-          d: x.d,
-          day: _day(x.d),
-          sentiment: x.o.sentiment || null,
-          dims: x.o.dims || [],
-        };
-      });
 
     // Student Voice.
     var entries =
@@ -493,7 +469,6 @@ window.CommentBank = (function () {
       work: work,
       record: rec,
       notHandedIn: notHandedIn(notIn, dateOf),
-      obs: obs,
       voice: voice,
       confidence: conf,
       overall: overall,
@@ -676,7 +651,7 @@ window.CommentBank = (function () {
   }
 
   /* Every value a bank sentence can ask for, from the facts and the
-     teacher's picks { habits, focus, ican, note }. An empty value means the
+     teacher's picks { habits, focus, ican }. An empty value means the
      sentences that need it are not offered. */
   function context(f, picks) {
     picks = picks || {};
@@ -782,25 +757,6 @@ window.CommentBank = (function () {
       }
     }
 
-    // Private observations (Concern, Note) are never quoted: not as the note
-    // and not as something to work on.
-    var quotable = f.obs.filter(function (o) {
-      return !isPrivateObservation(o);
-    });
-    var note =
-      quotable.find(function (o) {
-        return o.id === picks.note;
-      }) || quotable[0];
-    // Something to work on: a Growth note other than the one being quoted,
-    // so a draft never quotes the same note twice.
-    var isGrowth = function (o) {
-      return o.sentiment === 'growth';
-    };
-    var concern =
-      quotable.find(function (o) {
-        return isGrowth(o) && (!note || o.id !== note.id);
-      }) || quotable.find(isGrowth);
-
     var withHabit = function (lvl) {
       return HABITS.filter(function (h) {
         return habits[h.key] === lvl;
@@ -853,7 +809,7 @@ window.CommentBank = (function () {
     var selfLow = conf.length > 1 && conf[conf.length - 1].c <= 2 ? conf[conf.length - 1] : null;
 
     // The facts behind each slot, for the draft's provenance and verify():
-    // 'comp:<section id>', 'work:<assessment id>', 'obs:<id>',
+    // 'comp:<section id>', 'work:<assessment id>',
     // 'habit:<key>', 'confidence:<section id>', or a field of the facts.
     var keys = function (kind, xs) {
       return xs.filter(Boolean).map(function (x) {
@@ -870,8 +826,6 @@ window.CommentBank = (function () {
     };
     var strongHabits = withHabit(4).concat(withHabit(3));
     var focusKeys = keys('comp', [focus]);
-    var noteKeys = keys('obs', [note]);
-    var concernKeys = keys('obs', [concern]);
     var gr = gradeOf(f);
     var gslots = gradeSlots(gr);
     var factsOf = {
@@ -895,10 +849,6 @@ window.CommentBank = (function () {
       level2: keys('work', [weak]),
       strongWorks: keys('work', best.slice(0, 2)),
       weakWorks: keys('work', weakTwo.slice(0, 2)),
-      note: noteKeys,
-      when: noteKeys,
-      concernNote: concernKeys,
-      concernWhen: concernKeys,
       selfGood: ['voice.good'],
       selfHard: ['voice.hard'],
       selfStrong: keys('confidence', [selfStrong]),
@@ -930,7 +880,6 @@ window.CommentBank = (function () {
       _grade: gr ? gr.kind : '',
       _options: options,
       _focus: focus || null,
-      _note: note || null,
       _facts: factsOf,
       _bestNote: !!(top && reportNoteText(top.note)),
       name: f.name,
@@ -973,10 +922,6 @@ window.CommentBank = (function () {
       strongWorks: list(best.slice(0, 2).map(the)),
       weakWorks: list(weakTwo.slice(0, 2).map(the)),
       evidence: evidenceOf(f),
-      note: note ? _ended(note.text) : '',
-      when: note && note.day ? 'on ' + note.day : '',
-      concernNote: concern ? _ended(concern.text) : '',
-      concernWhen: concern && concern.day ? concern.day : '',
       selfGood: _quote(f.voice.good),
       selfHard: _quote(f.voice.hard),
       selfStrong: selfStrong ? selfStrong.name : '',
@@ -1072,10 +1017,15 @@ window.CommentBank = (function () {
   /* A sentence as a pattern with its slots as wildcards, to find it in a
      classmate's comment. A sentence that is mostly slots ("{name}
      {strengthHabits}.") would match any comment, so one with fewer than
-     four words of its own has none. */
+     four words of its own has none. Cached by id and wording, with the
+     wording's own pieces (_literals), which a comment must hold before the
+     pattern is tried: a pattern with several wildcards is slow on a long
+     comment that does not hold it. */
   var _patterns = {};
+  var _literals = {};
   function pattern(s) {
-    if (s.id in _patterns) return _patterns[s.id];
+    var key = s.id + '\u0000' + s.text;
+    if (key in _patterns) return _patterns[key];
     var fixed = String(s.text)
       .replace(/\{\w+\}/g, ' ')
       .replace(/\[[^\]]*\]/g, ' ')
@@ -1084,6 +1034,7 @@ window.CommentBank = (function () {
         return /[a-z]{2}/i.test(w);
       });
     var re = null;
+    var lits = [];
     if (fixed.length >= 4) {
       var src = String(s.text)
         .split(/(\{\w+\}|\[[^\]]*\])/)
@@ -1091,13 +1042,33 @@ window.CommentBank = (function () {
           if (/^\{\w+\}$/.test(part)) return '.+?';
           var alt = part.match(/^\[([^|\]]*)\|([^\]]*)\]$/);
           if (alt) return '(?:' + alt[1] + '|' + alt[2] + ')';
+          var lit = part.trim().toLowerCase();
+          if (lit.length >= 3) lits.push(lit);
           return part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         })
         .join('');
       re = new RegExp(src, 'i');
     }
-    _patterns[s.id] = re;
+    _patterns[key] = re;
+    _literals[key] = lits;
     return re;
+  }
+
+  /* Whether a comment holds the sentence: its pattern found in the text.
+     lower: the text in lower case, for the quick check of its pieces. */
+  function _holds(s, text, lower) {
+    var re = pattern(s);
+    if (!re) return false;
+    var lits = _literals[s.id + '\u0000' + s.text];
+    for (var i = 0; i < lits.length; i++) if (lower.indexOf(lits[i]) < 0) return false;
+    return re.test(text);
+  }
+
+  /* A classmate's comment as { sid, text }: the screen passes { sid, text };
+     a plain string has no sid. */
+  function _comment(c) {
+    if (c && typeof c === 'object') return { sid: c.sid != null ? String(c.sid) : null, text: String(c.text || '') };
+    return { sid: null, text: String(c == null ? '' : c) };
   }
 
   /* How many classmates' comments this term hold the sentence. */
@@ -1105,7 +1076,8 @@ window.CommentBank = (function () {
     var re = pattern(s);
     if (!re) return 0;
     return (comments || []).filter(function (c) {
-      return re.test(c);
+      var t = _comment(c).text;
+      return _holds(s, t, t.toLowerCase());
     }).length;
   }
 
@@ -1252,10 +1224,10 @@ window.CommentBank = (function () {
     { key: 'completes', part: 'habits', groups: ['Completes Work and Takes Part'], unless: 'growingHabits' },
     { key: 'attendance', part: 'habits', groups: ['Attendance'] },
     { key: 'overall', part: 'now', groups: ['Overall'] },
-    { key: 'example', part: 'now', groups: ['Examples From Work', 'From Your Notes', "In the Student's Words"] },
+    { key: 'example', part: 'now', groups: ['Examples From Work', "In the Student's Words"] },
     { key: 'growth', part: 'now', groups: ['Growth This Term'] },
     { key: 'nextStep', part: 'go', groups: ['Next Step'] },
-    { key: 'goWords', part: 'go', groups: ["In the Student's Words", 'Work to Revisit', 'From Your Notes'] },
+    { key: 'goWords', part: 'go', groups: ["In the Student's Words", 'Work to Revisit'] },
     { key: 'home', part: 'how', groups: ['At Home', 'In Class', "In the Student's Words"] },
     { key: 'closer', part: 'how', groups: ['Looking Ahead'] },
   ];
@@ -1267,8 +1239,6 @@ window.CommentBank = (function () {
     strengthHabitNames: 'strong',
     growthHabits: 'growing',
     growthHabitNames: 'growing',
-    note: 'note',
-    concernNote: 'concern',
     rise: 'rise',
     fall: 'fall',
     fellCount: 'fell',
@@ -1732,8 +1702,88 @@ window.CommentBank = (function () {
       .filter(Boolean);
   }
 
-  /* One pass of the draft over the steps in `seq`. */
-  function _compose(ctx, bank, seq, kept, seed, comments) {
+  /* ── Selection: most specific wins, exhaust before repeat ──────────── */
+
+  /* How specific a sentence is for this student: the `when` conditions it
+     meets (fits() needs every one met), plus one for the sentence that
+     carries the teacher's Note for the Report on the best piece. Each step
+     keeps only the sentences at its top score. */
+  function specificity(s, ctx) {
+    var n = Object.keys(s.when || {}).length;
+    if (ctx._bestNote && (s.needs || []).indexOf('bestPiece') >= 0) n++;
+    return n;
+  }
+
+  /* The sentences that stand in when a step's top tier is all excluded:
+     ones in the step's part that assert nothing (claims []), fit, and are
+     not in the draft or excluded, from the step's own groups when it has
+     any there. */
+  function _standIns(step, ctx, bank, taken, exclude) {
+    var ok = bank.sentences.filter(function (s) {
+      return (
+        s.part === step.part &&
+        Array.isArray(s.claims) &&
+        !s.claims.length &&
+        !taken[s.id] &&
+        !exclude[s.id] &&
+        fits(s, ctx)
+      );
+    });
+    var own = ok.filter(function (s) {
+      return step.groups && step.groups.indexOf(s.group) >= 0;
+    });
+    return own.length ? own : ok;
+  }
+
+  /* The sentences of each student's latest draft this session, per class:
+     { cid: { sid: [{ id, text }] } }. A sentence that is mostly slots has
+     no pattern to find in a saved comment (pattern()), so its use is known
+     only from this record, and only while that classmate's saved comment
+     still holds the text drafted. Kept in memory only. */
+  var _drafted = {};
+
+  /* How many classmates have each bank sentence: { sentence id: n }. Read
+     off their saved comments for this report, so it survives a reload: a
+     sentence counts for a classmate when its pattern is in their comment,
+     or, for a sentence with no pattern, when this session drafted it for
+     them and their comment still holds that text. comments: [{ sid, text }]
+     (or plain strings, which only patterns can match). */
+  function classUsage(bank, comments, cid, sid) {
+    var mine = sid == null ? null : String(sid);
+    var list = (comments || [])
+      .map(_comment)
+      .filter(function (c) {
+        return c.sid == null || c.sid !== mine;
+      })
+      .map(function (c) {
+        c.lower = c.text.toLowerCase();
+        return c;
+      });
+    var out = {};
+    var add = function (id) {
+      out[id] = (out[id] || 0) + 1;
+    };
+    bank.sentences.forEach(function (s) {
+      list.forEach(function (c) {
+        if (_holds(s, c.text, c.lower)) add(s.id);
+      });
+    });
+    var record = (cid != null && _drafted[cid]) || {};
+    list.forEach(function (c) {
+      var seen = {};
+      (record[c.sid] || []).forEach(function (x) {
+        var s = _bankSentence(bank, x.id);
+        if (!s || seen[x.id] || pattern(s) || c.text.indexOf(x.text) < 0) return;
+        seen[x.id] = true;
+        add(x.id);
+      });
+    });
+    return out;
+  }
+
+  /* One pass of the draft over the steps in `seq`. usage: { sentence id:
+     classmates } (classUsage()); exclude: { sentence id: true }. */
+  function _compose(ctx, bank, seq, kept, seed, usage, exclude) {
     var rand = _rng(seed);
     var byKey = {};
     DRAFT_STEPS.forEach(function (s) {
@@ -1776,7 +1826,7 @@ window.CommentBank = (function () {
       if (step.unless && got[step.unless]) return;
       var cands = bank.sentences.filter(function (s) {
         if (s.part !== step.part || taken[s.id] || !fits(s, ctx)) return false;
-        // A fact the draft already states (the growing habits, the note, the
+        // A fact the draft already states (the growing habits, the goal, the
         // competency that rose) is not said twice.
         if (
           (s.needs || []).some(function (k) {
@@ -1794,33 +1844,47 @@ window.CommentBank = (function () {
         return true;
       });
       if (!cands.length) return;
+      // Most specific wins: only the top tier is kept.
+      var top = Math.max.apply(
+        null,
+        cands.map(function (s) {
+          return specificity(s, ctx);
+        }),
+      );
+      var tier = cands.filter(function (s) {
+        return specificity(s, ctx) === top && !exclude[s.id];
+      });
+      // Every sentence of the top tier is excluded: a sentence that asserts
+      // nothing stands in, never a vaguer claim.
+      if (!tier.length) tier = _standIns(step, ctx, bank, taken, exclude);
+      if (!tier.length) return;
       var last = out.length ? out[out.length - 1].split(/\s+/)[0] : '';
       var sofar = out.join(' ');
-      var scored = cands.map(function (s) {
+      var scored = tier.map(function (s) {
         var t = fill(s, ctx);
-        var used = usedBy(s, comments);
-        // Wording written for this kind of class comes before the general.
-        if (s.subjects) used -= 0.5;
-        // The teacher wrote a Note for the Report on the best piece: the
-        // sentence that carries it comes first.
-        if (ctx._bestNote && (s.needs || []).indexOf('bestPiece') >= 0) used -= 1;
-        // A quotation already in the draft (the same note twice) is out.
+        // A quotation already in the draft (the same words twice) is out.
         var quotes = t.match(/“[^”]+”/g) || [];
-        if (
-          quotes.some(function (q) {
-            return sofar.indexOf(q) >= 0;
-          })
-        )
-          used += 100;
-        // An opening a classmate already has reads as a form letter.
-        if (key === 'opening' && used) used += 10;
-        if (repeatsLast(t, last)) used += 5;
-        // The grade step has one sentence that fits and draws no random
-        // number, so the rest of the draft's mix is as it was.
-        return { s: s, t: t, used: used, r: step.says ? 0 : rand() };
+        var dup = quotes.some(function (q) {
+          return sofar.indexOf(q) >= 0;
+        });
+        return {
+          s: s,
+          t: t,
+          dup: dup ? 1 : 0,
+          // Exhaust before repeat: a sentence no classmate has comes before
+          // any a classmate has, the least used next.
+          used: usage[s.id] || 0,
+          // At equal use, wording written for this kind of class first, then
+          // a sentence that does not start like the one before it.
+          general: s.subjects ? 0 : 1,
+          repeats: repeatsLast(t, last) ? 1 : 0,
+          // The grade step has one sentence that fits and draws no random
+          // number, so the rest of the draft's mix is as it was.
+          r: step.says ? 0 : rand(),
+        };
       });
       scored.sort(function (a, b) {
-        return a.used - b.used || a.r - b.r;
+        return a.dup - b.dup || a.used - b.used || a.general - b.general || a.repeats - b.repeats || a.r - b.r;
       });
       var pick = scored[0];
       taken[pick.s.id] = true;
@@ -1845,18 +1909,24 @@ window.CommentBank = (function () {
 
   /* A draft from the bank for one student: what the Generate Comment button
      puts in the box. The angle (angle(), from the facts the context was
-     built from) sets the steps and their order, the grade sentence first;
-     each step takes a sentence that fits, the least used for classmates
-     first, a repeatable pick among the ties by `seed`, never two in a row
-     that start with the same word. Every draft is verified (verify())
-     before it is returned, so the screen only ever gets text the facts back.
+     built from) sets the steps and their order, the grade sentence first.
+     Each step takes, of the sentences that fit, the most specific
+     (specificity()); of those, one no classmate has before any a classmate
+     has, the least used next (classUsage()), so no sentence repeats in the
+     class until that tier is used up; then wording for this kind of class,
+     then one that does not start like the sentence before it, then a
+     repeatable pick by `seed`. Every draft is verified (verify()) before
+     it is returned, so the screen only ever gets text the facts back.
 
-     opts: { seed; comments: classmates' comments this term; previous: the
-     text on screen, so each press gives another version (the next seeds
-     are tried until the text differs); kept: { step key or sentence id:
-     the teacher's text }, kept as written in its step; order: step keys or
-     sentence ids in the teacher's order; angleUses: { angle id: n } in the
-     class (else this session's drafts in the class); bank }.
+     opts: { seed; comments: classmates' comments this term, [{ sid, text }]
+     or plain strings; previous: the text on screen, so each press gives
+     another version (the next seeds are tried until the text differs);
+     kept: { step key or sentence id: the teacher's text }, kept as written
+     in its step; order: step keys or sentence ids in the teacher's order;
+     angleUses: { angle id: n } in the class (else this session's drafts in
+     the class); exclude: sentence ids never to use (last term's approved
+     sentences, once draft_meta stores them; the screen passes none yet);
+     bank }.
 
      Returns { text, ids, sentences, provenance, replaced, angle, seed }:
      each sentence { id, part, step, text, kept? } in order, where each came
@@ -1879,12 +1949,17 @@ window.CommentBank = (function () {
       _orderSteps(opts.order, bank),
     );
     var previous = String(opts.previous == null ? '' : opts.previous).trim();
+    var usage = classUsage(bank, opts.comments, cid, sid);
+    var exclude = {};
+    (opts.exclude || []).forEach(function (id) {
+      exclude[id] = true;
+    });
     var base = Number(opts.seed) || 1;
     var d;
     var seed = base;
     for (var k = 0; k < RETRIES; k++) {
       seed = base + k * 7919;
-      d = _compose(ctx, bank, seq, kept, seed, opts.comments || []);
+      d = _compose(ctx, bank, seq, kept, seed, usage, exclude);
       if (f) d = verify(d, f, ctx._picks, { bank: bank });
       else d.replaced = [];
       if (!previous || d.text !== previous) break;
@@ -1892,6 +1967,17 @@ window.CommentBank = (function () {
     if (story && tally) {
       _told[cid] = _told[cid] || {};
       _told[cid][sid] = story.id;
+    }
+    // This draft's bank sentences, for classmates' usage (classUsage()).
+    if (tally) {
+      _drafted[cid] = _drafted[cid] || {};
+      _drafted[cid][String(sid)] = d.sentences
+        .filter(function (x) {
+          return !x.kept;
+        })
+        .map(function (x) {
+          return { id: x.id, text: x.text };
+        });
     }
     d.angle = story ? story.id : null;
     d.seed = seed;
@@ -1903,6 +1989,99 @@ window.CommentBank = (function () {
     return (bank || COMMENT_BANK).sentences.filter(function (s) {
       return fits(s, ctx);
     }).length;
+  }
+
+  /* ── Near-identical comments ───────────────────────────────────────── */
+
+  /* A comment's sentences: split after . ! ? or … (and a closing quote)
+     where the next sentence starts. No lookbehind (Safari before 16.4). */
+  function _sentencesOf(text) {
+    var t = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    var out = [];
+    var re = /[.!?…]+["”]?\s+(?=["“]?[A-Z0-9])/g;
+    var from = 0;
+    var m;
+    while ((m = re.exec(t))) {
+      out.push(t.slice(from, m.index + m[0].length).trim());
+      from = m.index + m[0].length;
+    }
+    if (from < t.length) out.push(t.slice(from).trim());
+    return out.filter(Boolean);
+  }
+
+  /* A sentence's runs of four words, as a set: lower case, punctuation
+     out, the student's own name as one word so classmates' sentences
+     compare. */
+  var RUN = 4;
+  function _runs(sentence, names) {
+    var t = String(sentence).toLowerCase();
+    (names || []).forEach(function (n) {
+      var name = String(n || '')
+        .trim()
+        .toLowerCase();
+      if (!name) return;
+      t = t.replace(new RegExp('\\b' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), ' \u0001 ');
+    });
+    var words = t
+      .replace(/[’']s\b/g, ' s')
+      .replace(/[^a-z0-9\u0001%+\- ]+/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    var out = {};
+    for (var i = 0; i + RUN <= words.length; i++) out[words.slice(i, i + RUN).join(' ')] = true;
+    return out;
+  }
+  function _sharesRun(a, b) {
+    for (var k in a) if (b[k]) return true;
+    return false;
+  }
+
+  /* After the drafts exist for a class: the pairs of comments that read
+     alike, each sharing five or more sentences, a sentence shared when it
+     has a run of four words in common with a sentence of the other comment
+     (each sentence paired once). comments: [{ sid, name, text }], `name`
+     (or a list, `names`) the student's names to set aside. Returns [{ a, b,
+     shared, pairs: [[sentence in a, sentence in b]] }] by sid, most shared
+     first. opts: { min: 5 }. The warning on screen is a later change. */
+  var NEAR_MIN = 5;
+  function nearIdentical(comments, opts) {
+    var min = (opts && opts.min) || NEAR_MIN;
+    var docs = (comments || [])
+      .filter(function (c) {
+        return c && String(c.text || '').trim();
+      })
+      .map(function (c) {
+        var names = (c.names || []).concat(c.name ? [c.name] : []);
+        return {
+          sid: c.sid,
+          runs: _sentencesOf(c.text).map(function (s) {
+            return _runs(s, names);
+          }),
+        };
+      });
+    var out = [];
+    for (var i = 0; i < docs.length; i++) {
+      for (var j = i + 1; j < docs.length; j++) {
+        var a = docs[i];
+        var b = docs[j];
+        var taken = {};
+        var pairs = [];
+        a.runs.forEach(function (ra, x) {
+          for (var y = 0; y < b.runs.length; y++) {
+            if (taken[y] || !_sharesRun(ra, b.runs[y])) continue;
+            taken[y] = true;
+            pairs.push([x, y]);
+            return;
+          }
+        });
+        if (pairs.length >= min) out.push({ a: a.sid, b: b.sid, shared: pairs.length, pairs: pairs });
+      }
+    }
+    return out.sort(function (x, y) {
+      return y.shared - x.shared;
+    });
   }
 
   /* ── Verify ────────────────────────────────────────────────────────── */
@@ -2171,36 +2350,6 @@ window.CommentBank = (function () {
       if (_has(pv, 'late')) checks.push(f.late > 0 && pv.values.late === String(f.late));
       return checks.length > 0 && checks.every(Boolean);
     },
-    // An observation, quoted as written: never a private one; a thing to
-    // work on is a Growth note.
-    note: function (pv, f) {
-      var checks = [];
-      var one = function (textSlot, daySlot, dayText, growth) {
-        if (!_has(pv, textSlot) && !_has(pv, daySlot)) return;
-        var o = _byId(f.obs, _ids(pv, textSlot, 'obs')[0] || _ids(pv, daySlot, 'obs')[0]);
-        var ok = !!o && !isPrivateObservation(o) && (!growth || o.sentiment === 'growth');
-        if (ok && _has(pv, textSlot)) ok = pv.values[textSlot] === _ended(o.text);
-        if (ok && _has(pv, daySlot)) ok = pv.values[daySlot] === (o.day ? dayText(o.day) : '');
-        checks.push(ok);
-      };
-      one(
-        'note',
-        'when',
-        function (d) {
-          return 'on ' + d;
-        },
-        false,
-      );
-      one(
-        'concernNote',
-        'concernWhen',
-        function (d) {
-          return d;
-        },
-        true,
-      );
-      return checks.length > 0 && checks.every(Boolean);
-    },
     // The student's own words and self-assessment.
     studentWords: function (pv, f) {
       var checks = [];
@@ -2358,6 +2507,9 @@ window.CommentBank = (function () {
     familyOf: familyOf,
     forFamily: forFamily,
     draft: draft,
+    specificity: specificity,
+    classUsage: classUsage,
+    nearIdentical: nearIdentical,
     provenance: provenance,
     verify: verify,
     CLAIMS: CLAIMS,
