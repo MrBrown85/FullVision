@@ -193,6 +193,43 @@ window.CommentBank = (function () {
 
   /* ── What FullVision has ───────────────────────────────────────────── */
 
+  /* The work labelled Missing, oldest first: { count, titles, groups }.
+     A group is three or more titles sharing the words before a colon
+     ("Current Events: Week 3"), as { name, count }, largest first. */
+  function notHandedIn(list, dateOf) {
+    var sorted = list.slice().sort(function (x, y) {
+      return (
+        String(dateOf(x)).localeCompare(String(dateOf(y))) || String(x.title || '').localeCompare(String(y.title || ''))
+      );
+    });
+    var titles = sorted.map(function (a) {
+      return String(a.title || '').trim();
+    });
+    var byName = {};
+    var order = [];
+    titles.forEach(function (t) {
+      var i = t.indexOf(':');
+      var name = i > 0 ? t.slice(0, i).trim() : '';
+      if (!name) return;
+      if (!byName[name]) {
+        byName[name] = 0;
+        order.push(name);
+      }
+      byName[name]++;
+    });
+    var groups = order
+      .filter(function (name) {
+        return byName[name] >= 3;
+      })
+      .map(function (name) {
+        return { name: name, count: byName[name] };
+      })
+      .sort(function (x, y) {
+        return y.count - x.count;
+      });
+    return { count: titles.length, titles: titles, groups: groups };
+  }
+
   /* One student's term, from the data layer. Reads no DOM. */
   function facts(cid, student, termId) {
     var sid = student.id;
@@ -266,11 +303,14 @@ window.CommentBank = (function () {
       })
       .filter(Boolean);
 
-    // Handed In, Late, Missing: the Missing Work block's rule.
+    // Handed In, Late, Missing: the Missing Work block's rule. Work is
+    // missing only when it is labelled Missing, whatever its due date.
     var rec = { total: 0, handed: 0, late: 0, missing: 0 };
+    var notIn = [];
     assessments.filter(inTerm).forEach(function (a) {
       var cell = assessmentCellValue(cid, sid, a);
-      var missing = cell.kind === 'missing' || cell.status === 'NS';
+      var missing = cell.status === 'NS';
+      if (missing) notIn.push(a);
       var scored = ['level', 'points', 'complete'].indexOf(cell.kind) >= 0;
       if (!missing && !scored) return;
       rec.total++;
@@ -356,6 +396,7 @@ window.CommentBank = (function () {
       comps: comps,
       work: work,
       record: rec,
+      notHandedIn: notHandedIn(notIn, dateOf),
       obs: obs,
       voice: voice,
       confidence: conf,
@@ -1007,6 +1048,7 @@ window.CommentBank = (function () {
     completesFromRecord: completesFromRecord,
     effectiveHabits: effectiveHabits,
     facts: facts,
+    notHandedIn: notHandedIn,
     focusOptions: focusOptions,
     context: context,
     fits: fits,

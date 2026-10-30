@@ -114,12 +114,9 @@ window.DashStudentCards = (function () {
         var flagged = isStudentFlagged(cid, st.id);
         var pct = getCompletionPct(cid, st.id);
 
+        // Work labelled Missing, whatever its due date.
         var missingCount = assessments.filter(function (a) {
-          if (!a.dueDate || new Date(a.dueDate) >= new Date()) return false;
-          var sc = allScores[st.id] || [];
-          return !sc.some(function (x) {
-            return x.assessmentId === a.id && x.score > 0;
-          });
+          return getAssignmentStatus(cid, st.id, a.id) === 'NS';
         }).length;
 
         var allSc = (allScores[st.id] || []).filter(function (sc) {
@@ -223,7 +220,7 @@ window.DashStudentCards = (function () {
           (missingCount > 0
             ? '<span class="dash-card-missing" title="' +
               missingCount +
-              ' past-due unscored">\u26A0\uFE0E' +
+              ' labelled Missing">\u26A0\uFE0E' +
               missingCount +
               '</span>'
             : '') +

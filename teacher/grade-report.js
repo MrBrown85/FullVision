@@ -123,13 +123,6 @@ window.GradeReport = (function () {
         row.score = '\u2014';
       } else if (cv.kind === 'status') {
         row.note = cv.status === 'EXC' ? 'Excused' : 'Missing';
-      } else if (cv.kind === 'missing') {
-        row.note = 'Missing';
-        if (cv.zero && isPointsScored(a)) {
-          row.score = '0';
-          row.outOf = formatPoints(Number(a.maxPoints) || 100);
-          row.percent = '0%';
-        }
       } else if (cv.kind === 'complete') {
         row.score = cv.mark === 'complete' ? 'Complete' : 'Incomplete';
       } else if (cv.kind === 'points') {

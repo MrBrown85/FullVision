@@ -288,6 +288,33 @@ describe('Completes Work from the record', () => {
   });
 });
 
+describe('work not handed in', () => {
+  it('lists the titles oldest first and groups three or more sharing the words before a colon', () => {
+    const dateOf = a => a.date;
+    const list = [
+      { title: 'Current Events: Week 3', date: '2026-10-15' },
+      { title: 'Poster', date: '2026-09-20' },
+      { title: 'Current Events: Week 1', date: '2026-10-01' },
+      { title: 'Lab: Density', date: '2026-10-02' },
+      { title: 'Current Events: Week 2', date: '2026-10-08' },
+      { title: 'Lab: Heat', date: '2026-10-09' },
+    ];
+    expect(CommentBank.notHandedIn(list, dateOf)).toEqual({
+      count: 6,
+      titles: [
+        'Poster',
+        'Current Events: Week 1',
+        'Lab: Density',
+        'Current Events: Week 2',
+        'Lab: Heat',
+        'Current Events: Week 3',
+      ],
+      groups: [{ name: 'Current Events', count: 3 }],
+    });
+    expect(CommentBank.notHandedIn([], dateOf)).toEqual({ count: 0, titles: [], groups: [] });
+  });
+});
+
 describe('parts', () => {
   const bank = {
     parts: [{ id: 'now', title: 'Where They Are Now' }],
@@ -395,6 +422,32 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(f.record).toEqual({ total: 22, handed: 22, late: 0, missing: 0 });
     expect(CommentBank.context(f, {})._habits).toEqual({ completes: 4 });
     expect(CommentBank.context(f, { habits: { completes: 2 } })._habits).toEqual({ completes: 2 });
+  });
+
+  it('counts only work labelled Missing, whatever its due date', () => {
+    const st = getStudents(cid).find(s => s.firstName === 'Cece');
+    const term = getAssessments(cid).filter(a => assessmentInActiveTerm(cid, a));
+    const empty = Object.assign({}, term[0], { id: 'past-due-empty', title: 'Past Due', dueDate: '2026-01-05' });
+    const savedWork = _cache.assessments[cid];
+    const savedStatuses = _cache.statuses[cid];
+    try {
+      // An empty cell past its due date is not missing.
+      _cache.assessments[cid] = savedWork.concat([empty]);
+      clearProfCache();
+      let f = CommentBank.facts(cid, st, 'term-2');
+      expect(f.record.missing).toBe(0);
+      expect(f.notHandedIn).toEqual({ count: 0, titles: [], groups: [] });
+      // Labelled Missing counts, due date or not.
+      _cache.statuses[cid] = Object.assign({}, savedStatuses, { [st.id + ':' + empty.id]: 'NS' });
+      clearProfCache();
+      f = CommentBank.facts(cid, st, 'term-2');
+      expect(f.record.missing).toBe(1);
+      expect(f.notHandedIn).toEqual({ count: 1, titles: ['Past Due'], groups: [] });
+    } finally {
+      _cache.assessments[cid] = savedWork;
+      _cache.statuses[cid] = savedStatuses;
+      clearProfCache();
+    }
   });
 
   it('keeps the private note out of the bank: never an observation, never the note slot', () => {

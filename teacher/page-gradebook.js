@@ -1313,12 +1313,6 @@ window.PageGradebook = (function () {
           var dl = { above: 4, core: 3, strategic: 2, intensive: 1 }[cell.dibels.level] || 0;
           cellStyle = dl ? 'background:' + PROF_TINT[dl] + ';color:' + PROF_COLORS[dl] : 'color:var(--text-3)';
           display = '<span class="gb-scores-dibels">' + esc(cell.text) + '</span>';
-        } else if (cell.kind === 'missing' && cell.zero) {
-          cellStyle = 'color:var(--score-1)';
-          display = '<span class="gb-scores-zero">0</span>';
-        } else if (cell.kind === 'missing') {
-          cellStyle = 'background:rgba(255,149,0,0.06);color:var(--text-3)';
-          display = '<span class="gb-scores-missing">\u2014</span>';
         } else {
           cellStyle = 'color:var(--text-3)';
           display = '\u2014';
@@ -2022,7 +2016,6 @@ window.PageGradebook = (function () {
     if (cell.kind === 'complete') return cell.mark === 'complete' ? 'Complete' : 'Incomplete';
     if (cell.kind === 'points') return formatPoints(cell.value);
     if (cell.kind === 'level') return formatLevelAs(null, cell.value, 'proficiency');
-    if (cell.kind === 'missing' && cell.zero) return '0';
     if (cell.kind === 'dibels') return cell.dibels ? cell.text : '';
     return '';
   }
@@ -2303,11 +2296,7 @@ window.PageGradebook = (function () {
           document.querySelectorAll('.gb-scores-row[data-sid]').forEach(function (row) {
             var sid = row.dataset.sid;
             var cell = assessmentCellValue(activeCourse, sid, assess);
-            if (
-              (cell.kind === 'none' || cell.kind === 'missing') &&
-              !cell.status &&
-              canSetAssignmentStatus(activeCourse, sid, aid, next)
-            ) {
+            if (cell.kind === 'none' && !cell.status && canSetAssignmentStatus(activeCourse, sid, aid, next)) {
               statuses[sid + ':' + aid] = next;
               undo.push({ sid: sid, status: next });
               changed = true;

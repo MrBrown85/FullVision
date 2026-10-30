@@ -1849,9 +1849,9 @@ function formatPointsPercent(points, maxPoints) {
 }
 
 /* What one gradebook cell shows: one student on one assessment, as the
-   Scores view draws it and the printed grade sheet prints it. `today`
-   (YYYY-MM-DD) decides whether a missing score is past due; it defaults to
-   today's date as the Scores view reads it.
+   Scores view draws it and the printed grade sheet prints it. Work is
+   missing only when it is labelled Missing (status 'NS'), whatever its due
+   date; an empty cell past its due date is still kind 'none'.
 
    Returns { kind, value, level, text, status, late, mark, outOfRange }:
    - kind 'status': Not submitted or Excused replaces the score (status 'NS'
@@ -1861,11 +1861,9 @@ function formatPointsPercent(points, maxPoints) {
    - kind 'points' or 'level': a score; value is the points or the level
      (with its ±), level the 1-4 band the cell's colour comes from, text
      through formatPoints or formatLevel.
-   - kind 'missing': no score past the due date; text '0' when the missing
-     policy counts it as zero (zero true), else '—'.
    - kind 'none': no score yet, text '—'.
    `late` is true when the cell is marked Late (it keeps its score). */
-function assessmentCellValue(cid, sid, assessment, today) {
+function assessmentCellValue(cid, sid, assessment) {
   var a = assessment;
   var entries = getScores(cid)[sid] || [];
   var tagScores = scoreTagIds(a, cid)
@@ -1901,7 +1899,6 @@ function assessmentCellValue(cid, sid, assessment, today) {
     status: status || null,
     late: status === 'LATE',
     mark: null,
-    zero: false,
     outOfRange: false,
   };
   if (status === 'NS' || status === 'EXC') {
@@ -1942,14 +1939,6 @@ function assessmentCellValue(cid, sid, assessment, today) {
     out.text = isPoints ? formatPoints(val) : formatLevel(cid, val);
     out.outOfRange = isScoreOutOfRange(a, val);
     return out;
-  }
-  var cc = getCourseConfig(cid) || {};
-  var missingPolicy = a.missingPolicy || cc.missingPolicy || 'exclude';
-  var day = today || new Date().toISOString().slice(0, 10);
-  if (a.dueDate && a.dueDate < day) {
-    out.kind = 'missing';
-    out.zero = missingPolicy === 'zero';
-    out.text = out.zero ? '0' : '—';
   }
   return out;
 }

@@ -472,7 +472,7 @@
     var out = { text: cell.text, mark: '' };
     if (cell.kind === 'status') out.mark = cell.text;
     else if (cell.kind === 'complete') out.mark = cell.text;
-    else if (cell.kind === 'none' || (cell.kind === 'missing' && !cell.zero)) out.mark = '—';
+    else if (cell.kind === 'none') out.mark = '—';
     var as = opts.scoresAs || defaultScoresAs(cid);
     if (cell.kind === 'points' && as === 'percent') {
       out.text = formatPointsPercent(cell.value, col.outOf);
