@@ -5020,9 +5020,16 @@ body.qn-roster #gb-sidebar .student-row-note {
   outline: 2.5px solid #000;
   outline-offset: -2.5px;
 }
+/* The mark sits in the top-right corner over its own line, so it never
+   narrows the descriptor beside it and splits a word ("Separate s"). */
+.fb-card .fb-rb .fb-on:has(> .fb-mk) {
+  position: relative;
+  padding-top: 16px;
+}
 .fb-card .fb-rb .fb-mk {
-  float: right;
-  margin: 0 0 2px 4px;
+  position: absolute;
+  top: 3px;
+  right: 3px;
   padding: 0 3px;
   border-radius: 3px;
   background: #000;
