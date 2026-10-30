@@ -251,10 +251,18 @@ window.ReportStudio = (function () {
       return summary.perStudent[id].over;
     }).length;
     if (over) {
+      // The Grade Report tells its two causes apart: the grade sheet cannot
+      // hold the rows, or a feedback card is taller than a page.
+      var feedbackOver = ids.filter(function (id) {
+        return summary.perStudent[id].feedbackOver;
+      }).length;
+      // over also holds the feedback cases: the rest are the grade sheet's.
+      var gradeOver = over - feedbackOver;
+      var useFeedback = !!(text && text.feedbackOver && feedbackOver && !gradeOver);
       return (
         '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">' +
-        ((text && text.over) || 'A block is taller than a page for ') +
-        students(over) +
+        (useFeedback ? text.feedbackOver : (text && text.over) || 'A block is taller than a page for ') +
+        students(useFeedback ? feedbackOver : text && text.feedbackOver ? gradeOver : over) +
         '</button>'
       );
     }

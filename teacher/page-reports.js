@@ -750,16 +750,32 @@ window.PageReports = (function () {
       .filter(Boolean)
       .map(esc)
       .join(' \u00B7 ');
-    var onOne = n - c.summary.continued.length;
+    // Students grouped by sheets: "24 on 1 sheet, 3 on 2, 1 on 3".
+    var bySheets = {};
+    c.ids.forEach(function (sid) {
+      var k = c.summary.perStudent[sid].sheets;
+      bySheets[k] = (bySheets[k] || 0) + 1;
+    });
+    var counts = Object.keys(bySheets)
+      .map(Number)
+      .sort(function (a, b) {
+        return a - b;
+      });
     var studentsLine =
       n +
       (n === 1 ? ' student' : ' students') +
       ' \u00B7 ' +
-      (c.summary.continued.length
-        ? onOne + ' on 1 sheet, ' + c.summary.continued.length + ' on 2'
-        : n === 1
-          ? '1 sheet'
-          : '1 sheet each');
+      (counts.length > 1
+        ? counts
+            .map(function (k) {
+              return bySheets[k] + ' on ' + k + (k === 1 ? ' sheet' : '');
+            })
+            .join(', ')
+        : counts[0] > 1
+          ? counts[0] + ' sheets' + (n === 1 ? '' : ' each')
+          : n === 1
+            ? '1 sheet'
+            : '1 sheet each');
     var form = ReportSheets.formFor(reportConfig);
     var grade = _isGrade();
     var html = '<div class="confirm-card issue-card">';
@@ -1158,12 +1174,15 @@ window.PageReports = (function () {
   }
   function _gradePanelHtml() {
     var o = _gradeOpts();
-    var check = function (key, label) {
+    var check = function (key, label, off) {
       return (
-        '<label class="studio-check"><input type="checkbox" data-action="gradeOption" data-key="' +
+        '<label class="studio-check' +
+        (off ? ' is-off' : '') +
+        '"><input type="checkbox" data-action="gradeOption" data-key="' +
         key +
         '"' +
         (o[key] ? ' checked' : '') +
+        (off ? ' disabled' : '') +
         '><span>' +
         label +
         '</span></label>'
@@ -1188,6 +1207,16 @@ window.PageReports = (function () {
       check('summary', 'Category Summary') +
       check('ungraded', 'Ungraded Assignments') +
       check('numbers', 'Assignment Numbers') +
+      // The Feedback Pages switch. Off greys the choices under it and keeps
+      // their ticks: their saved values are not touched.
+      '<div class="gr-switch-row"><h4>Feedback Pages</h4>' +
+      '<button type="button" class="gr-switch" role="switch" data-action="gradeFeedback" aria-label="Feedback Pages" aria-checked="' +
+      !!o.feedback +
+      '"><span class="gr-switch-knob"></span></button></div>' +
+      '<div class="gr-sub">' +
+      check('rubrics', 'Rubrics', !o.feedback) +
+      check('comments', 'Assignment Comments', !o.feedback) +
+      '</div>' +
       '<h4>Order</h4>' +
       '<div class="seg seg-sm" role="radiogroup" aria-label="Order">' +
       order('oldest', 'Oldest First') +
@@ -1234,7 +1263,12 @@ window.PageReports = (function () {
     line.innerHTML = ReportStudio.fitLineHtml(
       _classFitKey === _classFitKeyNow() ? _classFit : null,
       _isGrade() ? null : _formOf(),
-      _isGrade() ? { over: 'Too many assessments to fit on one sheet for ' } : null,
+      _isGrade()
+        ? {
+            over: 'Too many assessments to fit on one sheet for ',
+            feedbackOver: 'A feedback card is taller than a page for ',
+          }
+        : null,
     );
     line.classList.toggle('ok', !!line.textContent && !line.firstElementChild);
   }
@@ -1809,6 +1843,11 @@ window.PageReports = (function () {
       },
       progressMode: function () {
         _setProgressMode(el.dataset.mode);
+      },
+      gradeFeedback: function () {
+        _setGradeOption('feedback', !_gradeOpts().feedback);
+        var sw = document.querySelector('#studio-palette .gr-switch');
+        if (sw) sw.focus();
       },
       gradeOrder: function () {
         _setGradeOption('order', el.dataset.value === 'newest' ? 'newest' : 'oldest');

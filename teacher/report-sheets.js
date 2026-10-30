@@ -1750,6 +1750,7 @@ window.ReportSheets = (function () {
       sheets: r.sheets,
       sides: r.sides,
       over: r.over,
+      feedbackOver: !!r.feedbackOver,
       continued: r.continued,
       after: r.after,
       badge: r.badge,
