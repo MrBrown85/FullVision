@@ -2151,6 +2151,17 @@ var _LETTER_BANDS = [
   { label: 'F', min: 0 }, // IE until the course ends (percentageToLetter)
 ];
 
+/* The letter band above a course % (as shown): { letter, min }, the next
+   letter up and the % it starts at (82.9 → A at 86). Null at A or with no
+   %. Under 50 the next letter is C-. */
+function nextLetterBand(R) {
+  if (R == null || isNaN(Number(R))) return null;
+  for (var i = _LETTER_BANDS.length - 1; i >= 0; i--) {
+    if (_LETTER_BANDS[i].min > Number(R)) return { letter: _LETTER_BANDS[i].label, min: _LETTER_BANDS[i].min };
+  }
+  return null;
+}
+
 function classGradeDistribution(cid, studentIds) {
   var bands;
   if (courseGradeMode(cid) === 'letter') {

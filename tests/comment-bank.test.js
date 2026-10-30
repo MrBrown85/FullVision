@@ -25,6 +25,10 @@ function fullContext(p, habits) {
     picture: 'steady',
     standing: 'a Proficient level',
     letterStanding: 'a B (78%)',
+    gradeLetter: 'a B',
+    gradeStanding: 'very good',
+    gradeNext: 'an A',
+    gradeWord: 'Proficient',
     strengths: 'Evaluating',
     growthAreas: 'Communicating',
     even: 'yes',
@@ -63,10 +67,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 434 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(434);
+  it('has 439 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(439);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(434);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(439);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -129,6 +133,10 @@ describe('the bank', () => {
     const SLOT = {
       standing: 'grade',
       letterStanding: 'grade',
+      gradeLetter: 'grade',
+      gradeStanding: 'grade',
+      gradeNext: 'grade',
+      gradeWord: 'grade',
       evidence: 'grade',
       even: 'even',
       strengths: 'strength',
@@ -172,7 +180,7 @@ describe('the bank', () => {
       });
       Object.keys(s.when || {}).forEach(k =>
         expect(s.claims, s.id + ' when ' + k).toContain(
-          k === 'picture' ? 'picture' : k === 'standing' ? 'grade' : 'habits',
+          k === 'picture' ? 'picture' : k === 'standing' || k === 'grade' ? 'grade' : 'habits',
         ),
       );
       if (!s.claims.length) {
@@ -191,6 +199,7 @@ describe('the bank', () => {
       Object.entries(s.when || {}).forEach(([k, v]) => {
         if (k === 'picture') expect(['strong', 'steady', 'challenge', 'early']).toContain(v);
         else if (k === 'standing') expect(['Emerging', 'Developing', 'Proficient', 'Extending']).toContain(v);
+        else if (k === 'grade') expect(['letter', 'letterClose', 'cminus', 'cminusClose', 'proficiency']).toContain(v);
         else {
           expect(keys, s.id).toContain(k);
           expect(v).toBeGreaterThanOrEqual(1);
@@ -469,18 +478,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 100 sentences (9, 46, 19, 26)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 101 sentences (9, 47, 19, 26)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 46, 19, 26]);
-    expect(CommentBank.fitCount(ctx)).toBe(100);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 47, 19, 26]);
+    expect(CommentBank.fitCount(ctx)).toBe(101);
   });
 
-  it('offers Jasper 87 (9, 39, 15, 24), by the name he goes by', () => {
+  it('offers Jasper 88 (9, 40, 15, 24), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 39, 15, 24]);
-    expect(CommentBank.fitCount(ctx)).toBe(87);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 15, 24]);
+    expect(CommentBank.fitCount(ctx)).toBe(88);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -586,9 +595,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const ctx = ctxFor('Cece');
     expect(CommentBank.draft(ctx, { seed: 7 }).text).toBe(CommentBank.draft(ctx, { seed: 7 }).text);
     expect(CommentBank.draft(ctx, { seed: 7 }).text).not.toBe(CommentBank.draft(ctx, { seed: 8 }).text);
-    const mine = CommentBank.draft(ctx, { seed: 7 }).text;
-    const other = CommentBank.draft(ctx, { seed: 7, comments: [mine] }).text;
-    expect(other.split('. ')[0]).not.toBe(mine.split('. ')[0]);
+    // The grade sentence leads both; the opening after it differs.
+    const opening = d => d.sentences.find(x => byId(x.id).group === 'Openings').text;
+    const mine = CommentBank.draft(ctx, { seed: 7 });
+    const other = CommentBank.draft(ctx, { seed: 7, comments: [mine.text] });
+    expect(other.sentences[0].text).toBe(mine.sentences[0].text);
+    expect(opening(other)).not.toBe(opening(mine));
   });
 
   it('drafts for every Demo student: six or more sentences, nothing unfilled, no note quoted twice', () => {
