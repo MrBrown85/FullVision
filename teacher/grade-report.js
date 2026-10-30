@@ -893,6 +893,7 @@ window.GradeReport = (function () {
       after: [],
       over: over,
       feedbackOver: feedbackOver,
+      gradeOver: cut > 0,
       used: 0,
       free: [],
       commentLines: 0,

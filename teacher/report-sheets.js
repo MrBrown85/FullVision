@@ -1751,6 +1751,7 @@ window.ReportSheets = (function () {
       sides: r.sides,
       over: r.over,
       feedbackOver: !!r.feedbackOver,
+      gradeOver: !!r.gradeOver,
       continued: r.continued,
       after: r.after,
       badge: r.badge,

@@ -251,19 +251,23 @@ window.ReportStudio = (function () {
       return summary.perStudent[id].over;
     }).length;
     if (over) {
-      // The Grade Report tells its two causes apart: the grade sheet cannot
-      // hold the rows, or a feedback card is taller than a page.
-      var feedbackOver = ids.filter(function (id) {
-        return summary.perStudent[id].feedbackOver;
-      }).length;
-      // over also holds the feedback cases: the rest are the grade sheet's.
-      var gradeOver = over - feedbackOver;
-      var useFeedback = !!(text && text.feedbackOver && feedbackOver && !gradeOver);
+      // The Grade Report tells its two causes apart, each counted on its
+      // own flag (a student can have both): the grade sheet cannot hold
+      // the rows, or a feedback card is taller than a page.
+      var line = (text && text.over) || 'A block is taller than a page for ';
+      if (text && text.feedbackOver) {
+        var count = function (key) {
+          return ids.filter(function (id) {
+            return summary.perStudent[id][key];
+          }).length;
+        };
+        var parts = [];
+        if (count('gradeOver')) parts.push(text.over + students(count('gradeOver')));
+        if (count('feedbackOver')) parts.push(text.feedbackOver + students(count('feedbackOver')));
+        line = parts.join('; ') || line + students(over);
+      } else line += students(over);
       return (
-        '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">' +
-        (useFeedback ? text.feedbackOver : (text && text.over) || 'A block is taller than a page for ') +
-        students(useFeedback ? feedbackOver : text && text.feedbackOver ? gradeOver : over) +
-        '</button>'
+        '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">' + line + '</button>'
       );
     }
     if (more) {

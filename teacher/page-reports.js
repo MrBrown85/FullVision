@@ -847,11 +847,23 @@ window.PageReports = (function () {
           ' Their reports print without it. <button type="button" data-issue="attendance">Enter it now</button>',
       );
     }
-    if (c.summary.over && c.summary.over.length) {
-      warn.push(
-        esc(c.summary.over.join(', ')) +
-          (grade ? ': too many assessments to fit on one sheet.' : ': a block is taller than a page.'),
-      );
+    if (grade) {
+      // The Quick Report names each cause on its own: a student can have both.
+      var named = function (key) {
+        return Object.keys(c.summary.perStudent || {})
+          .filter(function (sid) {
+            return c.summary.perStudent[sid][key];
+          })
+          .map(function (sid) {
+            return c.summary.perStudent[sid].name;
+          });
+      };
+      var cut = named('gradeOver');
+      var tall = named('feedbackOver');
+      if (cut.length) warn.push(esc(cut.join(', ')) + ': too many assessments to fit on one sheet.');
+      if (tall.length) warn.push(esc(tall.join(', ')) + ': a feedback card is taller than a page.');
+    } else if (c.summary.over && c.summary.over.length) {
+      warn.push(esc(c.summary.over.join(', ')) + ': a block is taller than a page.');
     }
     if (warn.length) {
       html +=
@@ -1235,8 +1247,22 @@ window.PageReports = (function () {
     return rc;
   }
 
+  /* A control in the palette that has focus, as a selector that finds the
+     same control after the palette is redrawn (the class fit redraws it a
+     moment after an option changes). */
+  function _focusedPaletteControl(palette) {
+    var el = document.activeElement;
+    if (!palette || !el || !palette.contains(el) || !el.dataset || !el.dataset.action) return null;
+    var sel = '[data-action="' + el.dataset.action + '"]';
+    ['key', 'value', 'mode', 'tab', 'block'].forEach(function (k) {
+      if (el.dataset[k] != null) sel += '[data-' + k + '="' + el.dataset[k] + '"]';
+    });
+    return sel;
+  }
+
   function renderStudioPanels() {
     var palette = document.getElementById('studio-palette');
+    var refocus = _focusedPaletteControl(palette);
     if (palette && _isGrade()) {
       palette.innerHTML = _modeSwitchHtml() + _gradePanelHtml();
       palette.setAttribute('aria-label', 'Quick Report');
@@ -1254,6 +1280,8 @@ window.PageReports = (function () {
       palette.insertAdjacentHTML('afterbegin', _modeSwitchHtml());
       ReportStudio.fitThumbs(palette);
     }
+    var again = refocus && palette && palette.querySelector(refocus);
+    if (again && again.focus) again.focus();
     _renderFitLine();
   }
 

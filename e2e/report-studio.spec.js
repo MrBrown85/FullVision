@@ -1341,10 +1341,21 @@ test.describe('Grade Report', () => {
     await openFeedback(page);
     await page.getByRole('button', { name: 'Print Reports' }).click();
     const dialog = page.locator('.issue-card');
-    const total = await totalSheets(page);
-    const each = total / 27;
-    if (Number.isInteger(each)) await expect(dialog).toContainText(`27 students · ${each} sheets each`);
-    else await expect(dialog).toContainText(/27 students · \d+ on 1 sheet|27 students · \d+ on \d+/);
+    // Every student's own sheet count, from the canvas.
+    const counts = await page.locator('.sheet-student').evaluateAll(list => list.map(el => Number(el.dataset.sheets)));
+    expect(counts).toHaveLength(27);
+    if (new Set(counts).size === 1) await expect(dialog).toContainText(`27 students · ${counts[0]} sheets each`);
+    else {
+      // "23 on 2, 4 on 3": how many students on each sheet count, fewest sheets first.
+      const by = {};
+      counts.forEach(n => (by[n] = (by[n] || 0) + 1));
+      const line = Object.keys(by)
+        .map(Number)
+        .sort((x, y) => x - y)
+        .map(k => by[k] + ' on ' + k + (k === 1 ? ' sheet' : ''))
+        .join(', ');
+      await expect(dialog).toContainText('27 students · ' + line);
+    }
     await expect(dialog).not.toContainText('1 sheet each');
   });
 

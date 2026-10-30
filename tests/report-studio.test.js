@@ -23,6 +23,25 @@ describe('ReportStudio', () => {
     expect(html).not.toContain('studio-inspector');
   });
 
+  it('the Quick Report fit line names each cause on its own flag, a student with both counted in each', () => {
+    const text = {
+      over: 'Too many assessments to fit on one sheet for ',
+      feedbackOver: 'A feedback card is taller than a page for ',
+    };
+    const both = { over: true, gradeOver: true, feedbackOver: true };
+    const cut = { over: true, gradeOver: true };
+    const tall = { over: true, feedbackOver: true };
+    expect(ReportStudio.fitLineHtml(fit([both, cut]), null, text)).toContain(
+      'Too many assessments to fit on one sheet for 2 students; A feedback card is taller than a page for 1 student<',
+    );
+    const mixed = ReportStudio.fitLineHtml(fit([both]), null, text);
+    expect(mixed).toContain(
+      'Too many assessments to fit on one sheet for 1 student; A feedback card is taller than a page for 1 student',
+    );
+    const apart = ReportStudio.fitLineHtml(fit([cut, tall]), null, text);
+    expect(apart).toContain('for 1 student; A feedback card is taller than a page for 1 student');
+  });
+
   it('the fit line counts sheets: one for all, or how many need more (a link to Everyone)', () => {
     const f = ReportSheets.form();
     expect(ReportStudio.fitLineHtml(fit([{}, {}, {}]), f)).toBe('1 sheet for all 3 students');
