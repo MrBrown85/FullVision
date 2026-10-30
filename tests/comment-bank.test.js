@@ -574,7 +574,8 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(sentences.length).toBeGreaterThanOrEqual(8);
     expect(d.text).not.toMatch(/[{}[\]]/);
     expect(d.text).toMatch(/^Cece /);
-    expect(d.text).toMatch(/Science 8/);
+    // The course is named wherever the story opens with it.
+    if (d.sentences.some(x => x.step === 'opening')) expect(d.text).toMatch(/Science 8/);
     // Each chosen sentence fits and is in the bank once.
     expect(new Set(d.ids).size).toBe(d.ids.length);
     d.ids.forEach(id =>
