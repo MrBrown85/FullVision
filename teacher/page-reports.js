@@ -1765,6 +1765,10 @@ window.PageReports = (function () {
       tqLine: function () {
         RQ.tqLine(el.dataset.do, el);
       },
+      // The Sentences card's rows, Other Wording and Browse Sentences.
+      tqSentences: function () {
+        RQ.tqSentences(el.dataset.do, el);
+      },
       toggleStudentPicker: function () {
         toggleStudentPicker(e);
       },
@@ -2039,6 +2043,7 @@ window.PageReports = (function () {
   // The CSP blocks inline on* attributes, so the comment box's typing is heard here.
   function _handleNarrativeInput(e) {
     if (e.target && e.target.id === 'tq-narrative') RQ.tqNarrativeInput();
+    else if (e.target && e.target.id === 'tq-browse-search') RQ.tqSentences('search', e.target);
   }
 
   /* ⌘ Return and the arrow keys on the questionnaire. */
