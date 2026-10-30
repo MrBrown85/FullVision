@@ -8,21 +8,35 @@ import { loadClass } from './app.mjs';
 
 export function generateClass(classData, report) {
   const { cid, termId, students } = loadClass(classData, report);
+  return { cid, termId, students, drafts: draftStudents(cid, termId, students) };
+}
+
+/* The drafts for a class already loaded (loadClass(), or Demo Mode's
+   seeded class): press 1 is the first press of Generate Comment, press 2
+   the second, and so on. Each draft keeps its sentences ({ id, step, text
+   }) as draft() gives them. */
+export function draftStudents(cid, termId, students, press) {
   const CB = globalThis.CommentBank;
   const comments = [];
-  const drafts = students.map(student => {
+  return students.map(student => {
     const f = CB.facts(cid, student, termId);
     const rating = globalThis.getStudentTermRating(cid, student.id, termId) || {};
     const ctx = CB.context(f, { habits: rating.habits || {}, focus: rating.focusSectionId || f.focusId });
     const d = CB.draft(ctx, {
-      seed: CB.seedFor(student.id + '|' + termId) + 1,
+      seed: CB.seedFor(student.id + '|' + termId) + (press || 1),
       comments: comments.slice(),
       exclude: [],
     });
     comments.push({ sid: student.id, text: d.text });
-    return { student, facts: f, text: d.text, angle: d.angle, replaced: d.replaced || [] };
+    return {
+      student,
+      facts: f,
+      text: d.text,
+      angle: d.angle,
+      replaced: d.replaced || [],
+      sentences: d.sentences || [],
+    };
   });
-  return { cid, termId, students, drafts };
 }
 
 /* Folds a name for matching: case, accents and spacing. */
