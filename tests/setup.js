@@ -256,6 +256,7 @@ load('teacher/competency-evidence.js');
 load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
 load('teacher/report-feedback.js');
+load('teacher/report-feedback-cards.js');
 load('teacher/grades-print.js');
 load('teacher/rubric-library.js');
 load('teacher/rubric-bank.js');
