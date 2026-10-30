@@ -39,16 +39,22 @@ describe('course blocks', () => {
     expect(sortCoursesByBlock(list).map(c => c.id)).toEqual(['a', 'b', 'd', 'x', 'club', 'none']);
   });
 
-  it('class pickers list classes in block order with the block shown', () => {
+  it('class pickers list classes in block order with the block code shown', () => {
     saveCourses({
       c1: { id: 'c1', name: 'English 10', block: 'D' },
       c2: { id: 'c2', name: 'Philosophy 12', block: 'B' },
       c3: { id: 'c3', name: 'Philosophy 12', block: 'A' },
     });
     expect(getPickerCourses('c1').map(c => c.name)).toEqual([
-      'Block A \u00B7 Philosophy 12',
-      'Block B \u00B7 Philosophy 12',
-      'Block D \u00B7 English 10',
+      'A \u00B7 Philosophy 12',
+      'B \u00B7 Philosophy 12',
+      'D \u00B7 English 10',
     ]);
+  });
+
+  it('a picker shows a longer label or a name that carries its block as before', () => {
+    expect(coursePickerName({ name: 'Chess', block: 'Lunch club' })).toBe('Lunch club \u00B7 Chess');
+    expect(coursePickerName({ name: 'Philosophy 12 - Block A', block: 'A' })).toBe('Philosophy 12 - Block A');
+    expect(coursePickerName({ name: 'Homeroom' })).toBe('Homeroom');
   });
 });

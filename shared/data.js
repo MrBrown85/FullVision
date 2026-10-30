@@ -9231,6 +9231,17 @@ function courseDisplayName(course) {
   return label + ' \u00B7 ' + name;
 }
 
+/** The class as the class pickers show it: "A · Philosophy 12", the block
+ * code alone since the menu is a list of blocks. A longer label, or a name
+ * that already says its block, reads as courseDisplayName does. */
+function coursePickerName(course) {
+  var b = normalizeCourseBlock(course && course.block);
+  if (!/^[A-Z0-9]{1,2}$/.test(b)) return courseDisplayName(course);
+  var name = (course && course.name) || '';
+  if (name.toLowerCase().indexOf(courseBlockLabel(course).toLowerCase()) >= 0) return name;
+  return b + ' \u00B7 ' + name;
+}
+
 /** Sort key: lettered and numbered blocks in order, then labels, then none. */
 function _courseBlockRank(course) {
   var b = normalizeCourseBlock(course && course.block);
@@ -9262,7 +9273,7 @@ function getPickerCourses(activeCid) {
       return Object.assign({}, COURSES[cid], { id: cid });
     });
   return sortCoursesByBlock(list).map(function (c) {
-    return { id: c.id, name: courseDisplayName(c) };
+    return { id: c.id, name: coursePickerName(c) };
   });
 }
 
