@@ -1504,7 +1504,7 @@ window.ReportBlocks = (function () {
         word: _profWord(cv.value),
       };
     }
-    return { score: 'Not assessed', percent: '', word: '' };
+    return { score: '\u2014', percent: '', word: '' };
   }
 
   function renderBlockGradeTable(cid, student, options) {
