@@ -1108,14 +1108,18 @@ describe('stage 3 blocks', () => {
   it('Assignment Grades offers Last 10, This Term and Year to Date; Year to Date is the default', () => {
     const f = S.insert(S.form(), 'grade-table', { side: 1 });
     expect(S.optionsFor(S.cellOf(f, 'grade-table')).range).toBe('all');
-    const pop = ReportStudio.popoverHtml(f, 'grade-table');
+    const pop = ReportStudio.blockToolbarHtml(f, 'grade-table', null);
     expect(pop).toContain('aria-label="Range"');
     expect(pop).toContain('aria-label="Organize By"');
-    expect(pop).toContain('starts from the class grading setting');
+    expect(pop).toContain('Percent and Proficiency Word start from the class grading setting.');
+    // Per Competency shows only when organized by competency.
+    expect(pop).not.toContain('aria-label="Per Competency"');
+    const byComp = S.setOption(f, 'grade-table', 'organize', 'competency');
+    expect(ReportStudio.blockToolbarHtml(byComp, 'grade-table', null)).toContain('aria-label="Per Competency"');
     // Percent and Proficiency Word start from the class setting: unticked
     // until the class says, ticked when it does.
     expect(pop).toMatch(/data-key="percent"> Percent/);
-    const auto = ReportStudio.popoverHtml(f, 'grade-table', { percent: true, word: true });
+    const auto = ReportStudio.blockToolbarHtml(f, 'grade-table', null, { percent: true, word: true });
     expect(auto).toMatch(/data-key="percent" checked> Percent/);
     expect(S.optionsFor(S.cellOf(f, 'grade-table'), { percent: true, word: false })).toMatchObject({
       percent: true,
@@ -1125,7 +1129,7 @@ describe('stage 3 blocks', () => {
     expect(pop).toMatch(/data-value="last10"[^>]*>Last 10</);
     expect(pop).toMatch(/data-value="term"[^>]*>This Term</);
     expect(pop).toMatch(/data-value="all" role="radio" aria-checked="true">Year to Date</);
-    const sup = ReportStudio.popoverHtml(S.insert(S.form(), 'support-home', { side: 1 }), 'support-home');
+    const sup = ReportStudio.blockToolbarHtml(S.insert(S.form(), 'support-home', { side: 1 }), 'support-home', null);
     expect(sup).toContain('Your Own Line');
     expect(sup).toContain('data-action="studioText" data-block="support-home" data-key="note"');
   });

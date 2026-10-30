@@ -266,8 +266,8 @@ window.ReportSheets = (function () {
           label: 'Columns',
           def: 'one',
           choices: [
-            { v: 'two', label: 'Two' },
             { v: 'one', label: 'One' },
+            { v: 'two', label: 'Two' },
           ],
         },
         {
@@ -280,7 +280,13 @@ window.ReportSheets = (function () {
             { v: 'all', label: 'Year to Date' },
           ],
         },
-        { key: 'per', label: 'Per Competency', def: 5, choices: [3, 5, 8] },
+        {
+          key: 'per',
+          label: 'Per Competency',
+          def: 5,
+          choices: [3, 5, 8],
+          showIf: { key: 'organize', v: 'competency' },
+        },
       ],
     },
     'term-glance': { label: 'This Term at a Glance', group: 'Grades', retired: true },

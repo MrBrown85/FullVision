@@ -337,12 +337,14 @@ window.ReportStudio = (function () {
     return 'Page ' + (s + 1);
   }
 
-  /* The selected block's card, in the gutter beside the page: where it
-     is, its Lines (fill blocks), Size (Row | Side by Side), Move Up, Move
-     Down, Move to Back / Front, Options ▾, Leave Off <first name> and
-     Remove. The letterhead and the pinned Response say why they don't
-     move. who: { id, name } of the previewed student, or null. */
-  function blockToolbarHtml(form, id, who) {
+  /* The selected block's inspector, pinned at the top right of the canvas
+     (Colin, Oct 29: mockup A). Where the block is and its name; Place: its
+     Lines (fill blocks), Size (Row | Side by Side) and Move (up, down, to
+     the other side); its options in sections (_optionsHtml); Leave Off
+     <first name> and Remove at the foot. The letterhead and the pinned
+     Response say why they don't move. who: { id, name } of the previewed
+     student, or null. autos: ReportBlocks.showDefaults for the class. */
+  function blockToolbarHtml(form, id, who, autos) {
     var sheets = S();
     var def = sheets.BLOCKS[id];
     var at = sheets.locate(form, id);
@@ -353,18 +355,19 @@ window.ReportStudio = (function () {
     var html =
       '<div class="studio-bar no-print" data-block="' +
       id +
-      '" role="toolbar" aria-label="' +
+      '" role="region" aria-label="' +
       esc(def.label) +
-      '">' +
-      '<div class="studio-bar-where">On the ' +
+      ' Settings">' +
+      '<div class="studio-insp-head"><div class="studio-bar-where">On the ' +
       esc(_sideName(form, at.side)) +
       '</div>' +
       '<div class="studio-bar-name">' +
       esc(def.label) +
-      '</div>';
+      '</div></div>';
+    var place = '';
     if (def.fill && def.lines) {
       var n = opts.lines;
-      html +=
+      place +=
         '<div class="studio-bar-lines"><span>' +
         esc(def.linesLabel || 'Lines') +
         '</span><span class="studio-bar-step">' +
@@ -382,13 +385,13 @@ window.ReportStudio = (function () {
         (n >= (def.maxLines || 30) ? ' disabled' : '') +
         '>+</button></span></div>';
       if (id === 'teacher-narrative') {
-        html +=
+        place +=
           '<div class="studio-bar-hint">Room for the longest comment in the class. A student with no comment yet gets these as ruled lines.</div>';
       }
     }
     if (sheets.canHalf(id)) {
       var half = cell.size === 'half';
-      html +=
+      place +=
         '<div class="studio-bar-size"><span>Size</span><span class="seg seg-sm" role="radiogroup" aria-label="Size">' +
         '<button type="button" class="seg-btn' +
         (half ? '' : ' active') +
@@ -405,48 +408,48 @@ window.ReportStudio = (function () {
         half +
         '">Side by Side</button></span></div>';
     }
-    if (def.locked) html += '<div class="studio-bar-hint">Always first on the Front. Options sets what it shows.</div>';
-    if (pinned) html += '<div class="studio-bar-hint">Always last on the Back.</div>';
-    html += '<div class="studio-bar-acts">';
     if (!def.locked && !pinned) {
       var rows = form.sides[at.side].rows;
       var lo = at.side === 0 ? 1 : 0;
       var hi = rows.length - (form.pinned && sheets.locate(form, form.pinned).side === at.side ? 2 : 1);
-      html +=
-        '<button type="button" class="studio-bar-btn" data-action="studioMove" data-block="' +
+      place +=
+        '<div class="studio-bar-move"><span>Move</span><span class="studio-bar-moves">' +
+        '<button type="button" class="studio-bar-btn studio-bar-arrow" data-action="studioMove" data-block="' +
         id +
-        '" data-dir="-1"' +
+        '" data-dir="-1" aria-label="Move Up" title="Move Up"' +
         (at.row <= lo ? ' disabled' : '') +
-        '>Move Up</button>' +
-        '<button type="button" class="studio-bar-btn" data-action="studioMove" data-block="' +
+        '>↑</button>' +
+        '<button type="button" class="studio-bar-btn studio-bar-arrow" data-action="studioMove" data-block="' +
         id +
-        '" data-dir="1"' +
+        '" data-dir="1" aria-label="Move Down" title="Move Down"' +
         (at.row >= hi ? ' disabled' : '') +
-        '>Move Down</button>';
+        '>↓</button>';
       if (form.sides.length > 1) {
         var to = at.side === 0 ? 1 : 0;
-        html +=
+        place +=
           '<button type="button" class="studio-bar-btn" data-action="studioMoveSide" data-block="' +
           id +
           '" data-side="' +
           to +
-          '">Move to ' +
+          '" aria-label="Move to ' +
+          esc(_sideName(form, to)) +
+          '">To ' +
           esc(_sideName(form, to)) +
           '</button>';
       }
+      place += '</span></div>';
     }
-    if (hasOptions(id)) {
-      html +=
-        '<button type="button" class="studio-bar-btn" data-action="studioOptions" data-block="' +
-        id +
-        '" aria-haspopup="dialog" aria-expanded="false">Options ▾</button>';
-    }
+    if (def.locked) place += '<div class="studio-bar-hint">Always first on the Front.</div>';
+    if (pinned) place += '<div class="studio-bar-hint">Always last on the Back.</div>';
+    if (place) html += '<div class="studio-insp-sec"><div class="studio-insp-title">Place</div>' + place + '</div>';
+    if (hasOptions(id)) html += _optionsHtml(id, cell, def, autos);
+    var foot = '';
     if (!def.locked && who && who.id) {
       var off = sheets.hiddenFor(form, who.id).indexOf(id) >= 0;
       var first = String(who.name || '')
         .trim()
         .split(/\s+/)[0];
-      html +=
+      foot +=
         '<button type="button" class="studio-bar-btn' +
         (off ? ' active' : '') +
         '" data-action="studioLeaveOff" data-block="' +
@@ -460,47 +463,33 @@ window.ReportStudio = (function () {
         '</button>';
     }
     if (!def.locked) {
-      html +=
+      foot +=
         '<button type="button" class="studio-bar-btn studio-bar-x" data-action="studioRemove" data-block="' +
         id +
         '">Remove</button>';
     }
-    return html + '</div></div>';
+    if (foot) html += '<div class="studio-bar-acts">' + foot + '</div>';
+    return html + '</div>';
   }
 
-  /* The Options popover: the block's Show checkboxes, its choices, the
-     no-evidence rule and the Text Block's title and text. */
-  function popoverHtml(form, id, autos) {
-    var sheets = S();
-    var def = sheets.BLOCKS[id];
-    var cell = sheets.cellOf(form, id);
-    if (!def || !cell) return '';
-    return (
-      '<div class="studio-pop no-print" id="studio-pop" role="dialog" aria-label="' +
-      esc(def.label) +
-      ' Options" data-block="' +
-      id +
-      '">' +
-      _optionsHtml(id, cell, def, autos) +
-      '</div>'
-    );
-  }
-
-  /* Show, choices, No Evidence and the text block's words. */
+  /* The inspector's option sections: the text block's words, Show
+     (checkboxes), then each choice, No Evidence. A choice with showIf
+     shows only while another option has that value (Per Competency under
+     Organize By Competency). */
   function _optionsHtml(id, cell, def, autos) {
     var sheets = S();
     var opts = sheets.optionsFor(cell, autos || {});
     var html = '';
     if (id === 'text-block') {
       html +=
-        '<div class="studio-field"><label for="studio-text-title">Title</label>' +
+        '<div class="studio-insp-sec"><div class="studio-field"><label for="studio-text-title">Title</label>' +
         '<input type="text" class="studio-text" id="studio-text-title" maxlength="80" data-action="studioText" data-block="text-block" data-key="title" value="' +
         esc((cell.options && cell.options.title) || '') +
         '">' +
         '<label for="studio-text-body">Text</label>' +
         '<textarea class="studio-text" id="studio-text-body" maxlength="1500" data-action="studioText" data-block="text-block" data-key="text">' +
         esc((cell.options && cell.options.text) || '') +
-        '</textarea></div>';
+        '</textarea></div></div>';
     }
     (def.options || [])
       .filter(function (o) {
@@ -509,7 +498,7 @@ window.ReportStudio = (function () {
       .forEach(function (o) {
         var fid = 'studio-opt-' + id + '-' + o.key;
         html +=
-          '<div class="studio-field"><label for="' +
+          '<div class="studio-insp-sec"><div class="studio-field"><label for="' +
           fid +
           '">' +
           esc(o.label) +
@@ -521,7 +510,7 @@ window.ReportStudio = (function () {
           o.key +
           '" value="' +
           esc(opts[o.key] || '') +
-          '"></div>';
+          '"></div></div>';
       });
     var bools = (def.options || []).filter(function (o) {
       return !o.choices && !o.text;
@@ -530,10 +519,7 @@ window.ReportStudio = (function () {
       var auto = bools.some(function (o) {
         return o.def === 'auto';
       });
-      html +=
-        '<div class="studio-field"><label>Show' +
-        (auto ? ' <span class="studio-field-note">(starts from the class grading setting)</span>' : '') +
-        '</label><div class="studio-checks">';
+      html += '<div class="studio-insp-sec"><div class="studio-insp-title">Show</div><div class="studio-checks">';
       bools.forEach(function (o) {
         html +=
           '<label class="studio-check"><input type="checkbox" data-action="studioOption" data-block="' +
@@ -546,44 +532,61 @@ window.ReportStudio = (function () {
           esc(o.label) +
           '</label>';
       });
-      html += '</div></div>';
-    }
-    (def.options || [])
-      .filter(function (o) {
-        return o.choices;
-      })
-      .forEach(function (o) {
+      html += '</div>';
+      if (auto) {
         html +=
-          '<div class="studio-field"><label>' +
-          esc(o.label) +
-          '</label><span class="seg seg-sm" role="radiogroup" aria-label="' +
-          esc(o.label) +
-          '">';
-        o.choices.forEach(function (choice) {
-          var c = typeof choice === 'object' ? choice.v : choice;
-          var text = typeof choice === 'object' ? choice.label : c === 0 ? 'None' : c;
-          var on = String(opts[o.key]) === String(c);
-          html +=
-            '<button type="button" class="seg-btn' +
-            (on ? ' active' : '') +
-            '" data-action="studioChoice" data-block="' +
-            id +
-            '" data-key="' +
-            o.key +
-            '" data-value="' +
-            c +
-            '" role="radio" aria-checked="' +
-            on +
-            '">' +
-            esc(text) +
-            '</button>';
-        });
-        html += '</span></div>';
+          '<div class="studio-bar-hint">' +
+          esc(
+            bools
+              .filter(function (o) {
+                return o.def === 'auto';
+              })
+              .map(function (o) {
+                return o.label;
+              })
+              .join(' and '),
+          ) +
+          ' start from the class grading setting.</div>';
+      }
+      html += '</div>';
+    }
+    var choices = (def.options || []).filter(function (o) {
+      return o.choices && (!o.showIf || String(opts[o.showIf.key]) === String(o.showIf.v));
+    });
+    if (choices.length) html += '<div class="studio-insp-sec">';
+    choices.forEach(function (o) {
+      html +=
+        '<div class="studio-field"><label>' +
+        esc(o.label) +
+        '</label><span class="seg seg-sm" role="radiogroup" aria-label="' +
+        esc(o.label) +
+        '">';
+      o.choices.forEach(function (choice) {
+        var c = typeof choice === 'object' ? choice.v : choice;
+        var text = typeof choice === 'object' ? choice.label : c === 0 ? 'None' : c;
+        var on = String(opts[o.key]) === String(c);
+        html +=
+          '<button type="button" class="seg-btn' +
+          (on ? ' active' : '') +
+          '" data-action="studioChoice" data-block="' +
+          id +
+          '" data-key="' +
+          o.key +
+          '" data-value="' +
+          c +
+          '" role="radio" aria-checked="' +
+          on +
+          '">' +
+          esc(text) +
+          '</button>';
       });
+      html += '</span></div>';
+    });
+    if (choices.length) html += '</div>';
     if (def.noEvidence) {
       var hide = opts.noEvidence === 'hide';
       html +=
-        '<div class="studio-field"><label>When a Student Has No Evidence</label><span class="seg seg-sm" role="radiogroup" aria-label="When a student has no evidence">' +
+        '<div class="studio-insp-sec"><div class="studio-field"><label>When a Student Has No Evidence</label><span class="seg seg-sm" role="radiogroup" aria-label="When a student has no evidence">' +
         '<button type="button" class="seg-btn' +
         (!hide ? ' active' : '') +
         '" data-action="studioNoEvidence" data-block="' +
@@ -597,15 +600,15 @@ window.ReportStudio = (function () {
         id +
         '" data-rule="hide" role="radio" aria-checked="' +
         hide +
-        '">Hide Row</button></span></div>';
+        '">Hide Row</button></span></div></div>';
     }
     return html;
   }
 
   /* The pages scale to the canvas, leaving the gutter for the selected
-     block's card: two side by side at up to 62%, never below 45%;
+     block's inspector: two side by side at up to 62%, never below 45%;
      narrower than that, one above the other. */
-  var GUTTER_W = 240;
+  var GUTTER_W = 264;
   function fitZoom(canvasWidth, paper) {
     var sheetW = 8.5 * 96;
     var two = Math.min(0.62, (canvasWidth - 72 - GUTTER_W) / (2 * sheetW));
@@ -759,8 +762,7 @@ window.ReportStudio = (function () {
       });
     }
     function blockOf(el) {
-      if (el.closest('.studio-bar, .studio-pop, .studio-page-add, .studio-page-empty, .studio-tpl, .studio-tpl-del'))
-        return null;
+      if (el.closest('.studio-bar, .studio-page-add, .studio-page-empty, .studio-tpl, .studio-tpl-del')) return null;
       var src = el.closest(
         '.studio-blk[data-block], .studio-pages:not(.studio-all) .sheet-body .sheet-cell[data-block]',
       );
@@ -1032,7 +1034,6 @@ window.ReportStudio = (function () {
     orderBySheets: orderBySheets,
     hasOptions: hasOptions,
     blockToolbarHtml: blockToolbarHtml,
-    popoverHtml: popoverHtml,
     placeText: placeText,
     fitZoom: fitZoom,
     initKeys: initKeys,

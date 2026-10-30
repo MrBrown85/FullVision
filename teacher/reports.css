@@ -2181,14 +2181,14 @@
    on screen exactly as the engine measured it (zoom re-wraps text in
    WebKit). The wrapper takes the scaled size so the pages sit together. */
 /* The pages are centred in the room left of the gutter, where the selected
-   block's card sits (report-studio.js GUTTER_W). */
+   block's inspector sits (report-studio.js GUTTER_W). */
 .rb-preview.studio-pages:not(.studio-all) .sheet-student {
   display: flex;
   flex-wrap: wrap;
   gap: 22px;
   justify-content: center;
   align-items: flex-start;
-  padding-right: 232px;
+  padding-right: 256px;
 }
 .rb-preview.studio-pages:not(.studio-all) .sheet-zoom {
   zoom: 1;
@@ -2522,22 +2522,73 @@
     transition: none;
   }
 }
-/* The selected block's card, in the gutter beside the page. */
+/* The selected block's inspector, pinned at the top right of the canvas
+   over the gutter the pages leave (report-studio.js GUTTER_W). Sections
+   under the name: Place, Show, the choices; Leave Off and Remove at the
+   foot. It scrolls inside itself when it is taller than the canvas. */
 .studio-bar {
   position: absolute;
+  right: 14px;
   z-index: 7;
-  width: 216px;
+  width: 240px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  padding: 12px;
+  overflow-y: auto;
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 6px 20px rgba(0, 0, 0, 0.08);
   font-size: 12.5px;
   color: var(--text);
+}
+.studio-insp-head {
+  padding: 12px 14px 10px;
+}
+.studio-insp-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--divider-medium);
+}
+.studio-insp-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.studio-bar .studio-field {
+  margin: 0;
+}
+.studio-bar .studio-field > label {
+  font-weight: 500;
+  font-size: 12.5px;
+  color: var(--text);
+}
+/* A choice fills the inspector's width, its options sharing it. */
+.studio-bar .studio-field .seg {
+  display: flex;
+}
+.studio-bar .studio-field .seg-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+.studio-bar-move {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.studio-bar-moves {
+  display: flex;
+  gap: 4px;
+}
+.studio-bar-moves .studio-bar-btn {
+  padding: 4px 9px;
 }
 .studio-bar-where {
   font-size: 11px;
@@ -2593,6 +2644,8 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--divider-medium);
 }
 .studio-bar-btn {
   font: inherit;
@@ -2621,17 +2674,6 @@
 }
 .studio-bar-x {
   color: var(--danger);
-}
-.studio-pop {
-  position: absolute;
-  z-index: 7;
-  width: 300px;
-  max-width: calc(100% - 24px);
-  padding: 14px 14px 2px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
 }
 /* + Page after the last page; Empty · Remove on an empty page. */
 .studio-page-add {
@@ -2675,7 +2717,6 @@
 @media print {
   .studio-live,
   .studio-bar,
-  .studio-pop,
   .studio-page-add,
   .studio-page-empty {
     display: none !important;
