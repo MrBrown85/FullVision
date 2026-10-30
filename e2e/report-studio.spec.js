@@ -86,6 +86,12 @@ async function applyTemplate(page, id) {
   await page.locator('[data-action="studioTab"][data-tab="blocks"]').click();
 }
 
+/* Every student's sheets on the page, however many sides each has. */
+async function showAllStudents(page) {
+  await page.locator('.studio-view [data-view="all"]').click();
+  await expect(page.locator('.sheet-student')).toHaveCount(STUDENTS);
+}
+
 /* Sheets whose body or a cell overflows, named by student and block. */
 async function overflowing(page) {
   return page.locator('.report-sheet').evaluateAll(sheets =>
@@ -1230,8 +1236,8 @@ test.describe('Grade Report', () => {
     await expect(page.locator('.gr-term')).toContainText('Term Grade');
     // Grades only: no comment, attendance or other feedback on the sheet.
     await expect(page.locator('.gr-sheet .report-comment-box, .gr-sheet .report-attendance')).toHaveCount(0);
-    // Three Grade Sheet choices and the two Feedback Pages choices (greyed while the switch is off).
-    await expect(page.getByRole('checkbox')).toHaveCount(5);
+    // Three Grade Sheet choices and the four Feedback Pages choices (greyed while the switch is off).
+    await expect(page.getByRole('checkbox')).toHaveCount(7);
     await expect(page.getByRole('checkbox', { name: 'Assignment Numbers' })).not.toBeChecked();
     await expect(sheet.locator('.gr-head').first()).not.toContainText('#');
     await expect(page.getByRole('checkbox', { name: 'Ungraded Assignments' })).toBeChecked();
@@ -1282,8 +1288,13 @@ test.describe('Grade Report', () => {
     const sw = page.getByRole('switch', { name: 'Feedback Pages' });
     const rubrics = page.getByRole('checkbox', { name: 'Rubrics' });
     const comments = page.getByRole('checkbox', { name: 'Assignment Comments' });
-    // The Observations and Term Comment choices are a later change.
-    await expect(page.getByRole('checkbox', { name: 'Observations' })).toHaveCount(0);
+    // Observations and Term Comment: unticked, and greyed with the switch off.
+    const obsBox = page.getByRole('checkbox', { name: 'Observations' });
+    const termBox = page.getByRole('checkbox', { name: 'Term Comment' });
+    await expect(obsBox).toBeDisabled();
+    await expect(termBox).toBeDisabled();
+    await expect(obsBox).not.toBeChecked();
+    await expect(termBox).not.toBeChecked();
     await expect(sw).toHaveAttribute('aria-checked', 'false');
     await expect(rubrics).toBeDisabled();
     await expect(comments).toBeDisabled();
@@ -1295,6 +1306,8 @@ test.describe('Grade Report', () => {
     await expect(sw).toHaveAttribute('aria-checked', 'true');
     await expect(rubrics).toBeEnabled();
     await expect(comments).toBeEnabled();
+    await expect(obsBox).toBeEnabled();
+    await expect(termBox).toBeEnabled();
     const student = page.locator('.sheet-student').first();
     await expect(student.locator('.fb-sheet').first()).toBeVisible();
     // The cards come after the grade sheet.
@@ -1335,6 +1348,119 @@ test.describe('Grade Report', () => {
     await expect(page.getByRole('checkbox', { name: 'Assignment Comments' })).toBeChecked();
     await page.getByRole('switch', { name: 'Feedback Pages' }).click();
     await expect(page.getByRole('checkbox', { name: 'Rubrics' })).not.toBeChecked();
+  });
+
+  test('Observations and Term Comment add a card each after the assessments, only where the student has something', async ({
+    page,
+  }) => {
+    await openFeedback(page);
+    await showAllStudents(page);
+    const titles = () =>
+      page.locator('.sheet-student').evaluateAll(list =>
+        list.map(st => ({
+          sid: st.dataset.sid,
+          titles: [...st.querySelectorAll('.fb-card .fb-title')].map(t => t.textContent),
+        })),
+      );
+    // Off by default: no such cards.
+    expect((await titles()).flatMap(s => s.titles).filter(t => /^(Observations|Term Comment)/.test(t))).toEqual([]);
+
+    const expected = await page.evaluate(() => {
+      const cid = getActiveCourse();
+      const termId = ReportBlocks.reportContext().termId;
+      return getStudents(cid).map(st => ({
+        sid: st.id,
+        obs: ReportFeedback.observations(cid, st, termId).map(o => o.text),
+        term: ReportFeedback.termComment(cid, st, termId),
+      }));
+    });
+    expect(expected.some(e => e.obs.length)).toBe(true);
+    expect(expected.some(e => e.term)).toBe(true);
+
+    await page.getByRole('checkbox', { name: 'Observations' }).check();
+    await expect(page.locator('.fb-card.fb-observations').first()).toBeVisible();
+    let now = await titles();
+    for (const e of expected) {
+      const mine = now.find(s => s.sid === e.sid).titles.filter(t => t.startsWith('Observations'));
+      expect(mine.length > 0, e.sid).toBe(e.obs.length > 0);
+    }
+    expect(now.flatMap(s => s.titles).filter(t => t.startsWith('Term Comment'))).toEqual([]);
+    // The card lists the student's observations with date, text and tags.
+    const withObs = expected.find(e => e.obs.length);
+    const card = page.locator(`.sheet-student[data-sid="${withObs.sid}"] .fb-card.fb-observations`).first();
+    await expect(card.locator('.fb-obs')).not.toHaveCount(0);
+    await expect(card.locator('.fb-obs b').first()).toHaveText(/^[A-Z][a-z]{2} \d{1,2}$/);
+    await expect(card).toContainText(withObs.obs[0].slice(0, 40));
+
+    await page.getByRole('checkbox', { name: 'Term Comment' }).check();
+    await expect(page.locator('.fb-card.fb-term').first()).toBeVisible();
+    now = await titles();
+    for (const e of expected) {
+      const mine = now.find(s => s.sid === e.sid).titles;
+      expect(
+        mine.some(t => t.startsWith('Term Comment')),
+        e.sid,
+      ).toBe(!!e.term);
+      // After the assessments, Observations before the Term Comment.
+      const o = mine.findIndex(t => t.startsWith('Observations'));
+      const t = mine.findIndex(t => t.startsWith('Term Comment'));
+      if (o >= 0 && t >= 0) expect(o).toBeLessThan(t);
+      if (t >= 0) expect(t).toBe(mine.length - 1);
+    }
+    const withTerm = expected.find(e => e.term);
+    await expect(page.locator(`.sheet-student[data-sid="${withTerm.sid}"] .fb-card.fb-term`).first()).toContainText(
+      withTerm.term.split('\n')[0].slice(0, 40),
+    );
+
+    expect(await cardSpill(page)).toEqual([]);
+    expect(await overflowing(page)).toEqual([]);
+
+    // Off with the switch: the cards go, the ticks stay.
+    await page.getByRole('switch', { name: 'Feedback Pages' }).click();
+    await expect(page.locator('.fb-sheet')).toHaveCount(0);
+    await expect(page.getByRole('checkbox', { name: 'Observations' })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: 'Observations' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Term Comment' })).toBeChecked();
+  });
+
+  test('a long Observations card splits between entries, its title repeated with (continued)', async ({ page }) => {
+    await openFeedback(page);
+    await showAllStudents(page);
+    // A student with observations gets forty entries.
+    await page.evaluate(() => {
+      const orig = ReportFeedback.observations;
+      ReportFeedback.observations = (cid, st, termId) =>
+        orig(cid, st, termId).length
+          ? Array.from({ length: 40 }, (_, i) => ({
+              id: 'x' + i,
+              date: 'Oct ' + ((i % 28) + 1),
+              dateIso: '',
+              text: 'Entry ' + i + ': works with others, explains the steps and checks the result before moving on.',
+              tags: ['Collaboration'],
+            }))
+          : [];
+    });
+    await page.getByRole('checkbox', { name: 'Observations' }).check();
+    await expect(page.locator('.fb-card.fb-observations').first()).toBeVisible();
+    const titles = await page.locator('.fb-card.fb-observations .fb-title').allTextContents();
+    expect(titles.length).toBeGreaterThan(1);
+    const per = await page.locator('.sheet-student').evaluateAll(list =>
+      list
+        .map(st => ({
+          titles: [...st.querySelectorAll('.fb-card.fb-observations .fb-title')].map(t => t.textContent),
+          entries: st.querySelectorAll('.fb-card.fb-observations .fb-obs').length,
+        }))
+        .filter(x => x.titles.length),
+    );
+    expect(per.some(x => x.titles.length > 1)).toBe(true);
+    for (const x of per) {
+      expect(x.titles[0]).toBe('Observations');
+      expect(x.titles.slice(1).every(t => t === 'Observations (continued)')).toBe(true);
+      // Every entry prints once across the pieces.
+      expect(x.entries).toBe(40);
+    }
+    expect(await cardSpill(page)).toEqual([]);
+    expect(await overflowing(page)).toEqual([]);
   });
 
   test('the print dialog counts every student by their sheets with Feedback Pages on', async ({ page }) => {

@@ -9,8 +9,10 @@
 
    cardHtml(item, opts): opts.number is the grade sheet's row number
    (Assignment Numbers), shown in a small outlined box before the title.
-   observationsCardHtml(list): the list from ReportFeedback.observations.
-   termCommentCardHtml(text): the text from ReportFeedback.termComment.
+   observationsCardHtml(list, opts): the list from ReportFeedback.observations.
+   termCommentCardHtml(text, opts): the text from ReportFeedback.termComment.
+   opts.continued: the title ends "(continued)" (a later piece of a card
+   the layout split between entries or paragraphs).
    Each returns '' when there is nothing to print. */
 (function () {
   'use strict';
@@ -227,8 +229,13 @@
     return '<div class="fb-card fb-' + _e(item.kind || 'general') + '">' + bar + body + '</div>';
   }
 
+  /* opts.continued: the later piece of a card split across columns. */
+  function _continued(opts) {
+    return opts && opts.continued ? ' (continued)' : '';
+  }
+
   /* The student's observations: a row each, date first, tags after. */
-  function observationsCardHtml(list) {
+  function observationsCardHtml(list, opts) {
     if (!list || !list.length) return '';
     var rows = list
       .map(function (o) {
@@ -236,11 +243,16 @@
         return '<div class="fb-obs"><b>' + _e(o.date) + '</b> ' + _e(String(o.text || '').trim()) + tags + '</div>';
       })
       .join('');
-    return '<div class="fb-card fb-observations">' + _titleBar('Observations', '', null, '', null) + rows + '</div>';
+    return (
+      '<div class="fb-card fb-observations">' +
+      _titleBar('Observations' + _continued(opts), '', null, '', null) +
+      rows +
+      '</div>'
+    );
   }
 
   /* The Term Questionnaire's comment, a paragraph per line. */
-  function termCommentCardHtml(text) {
+  function termCommentCardHtml(text, opts) {
     var paras = String(text || '')
       .split(/\n+/)
       .map(function (p) {
@@ -253,7 +265,12 @@
         return '<p class="fb-para">' + _e(p) + '</p>';
       })
       .join('');
-    return '<div class="fb-card fb-term">' + _titleBar('Term Comment', '', null, '', null) + body + '</div>';
+    return (
+      '<div class="fb-card fb-term">' +
+      _titleBar('Term Comment' + _continued(opts), '', null, '', null) +
+      body +
+      '</div>'
+    );
   }
 
   window.ReportFeedback = window.ReportFeedback || {};

@@ -31,8 +31,8 @@ window.GradeReport = (function () {
   // numbers: a "#" column numbering the rows in the order they print, off
   // until the teacher ticks Assignment Numbers.
   // feedback: the Feedback Pages after the grade sheet, off until the
-  // teacher turns them on. rubrics and comments say what the cards show;
-  // observations and termComment are saved for their own cards.
+  // teacher turns them on. rubrics and comments say what the assessment
+  // cards show; observations and termComment add a card each after them.
   var DEFAULTS = {
     summary: true,
     ungraded: true,
@@ -514,6 +514,39 @@ window.GradeReport = (function () {
       });
   }
 
+  /* The cards after the assessments, in order: Observations, then the Term
+     Comment, each only when ticked and the student has something. rows:
+     the entries the card splits between (an observation, a paragraph). */
+  function extraCards(cid, student, ctx, o) {
+    var out = [];
+    if (typeof ReportFeedback === 'undefined') return out;
+    var termId = ctx && ctx.termId;
+    if (o.observations && ReportFeedback.observations) {
+      var obs = ReportFeedback.observations(cid, student, termId);
+      if (obs && obs.length) out.push({ kind: 'observations', rows: obs });
+    }
+    if (o.termComment && ReportFeedback.termComment) {
+      var text = ReportFeedback.termComment(cid, student, termId);
+      var paras = String(text || '')
+        .split(/\n+/)
+        .map(function (t) {
+          return t.trim();
+        })
+        .filter(Boolean);
+      if (paras.length) out.push({ kind: 'term', rows: paras });
+    }
+    return out;
+  }
+
+  /* One piece of an extra card; part > 0 is a later piece. */
+  function _extraHtml(x, p) {
+    var rows = p ? x.rows.slice(p.from, p.to) : x.rows;
+    var opts = { continued: !!(p && p.part > 0) };
+    return x.kind === 'observations'
+      ? ReportFeedback.observationsCardHtml(rows, opts)
+      : ReportFeedback.termCommentCardHtml(rows.join('\n'), opts);
+  }
+
   /* One piece of a split rubric as its own card. */
   function _pieceItem(item, p) {
     var x = Object.assign({}, item, {
@@ -665,13 +698,48 @@ window.GradeReport = (function () {
     };
   }
 
+  /* An Observations or Term Comment card's parts for splitRows, measured
+     like _rubricParts: each entry's height (to the next entry's top), the
+     head above the first, the foot under the last, and the head of a
+     "(continued)" piece. */
+  function _extraParts(stage, x, h) {
+    var cont = _extraHtml(x, { from: 0, to: 1, part: 1 });
+    stage.innerHTML = '<div class="fb-col" style="width:' + FB_COL_W + 'px">' + _extraHtml(x) + cont + '</div>';
+    var k = _scale(stage);
+    var sel = x.kind === 'observations' ? '.fb-obs' : '.fb-para';
+    var part = function (card) {
+      var els = card.querySelectorAll(sel);
+      var tops = Array.prototype.map.call(els, function (el) {
+        return el.getBoundingClientRect().top;
+      });
+      var last = els[els.length - 1];
+      return { box: card.getBoundingClientRect(), tops: tops, bottom: last ? last.getBoundingClientRect().bottom : 0 };
+    };
+    var full = part(stage.firstChild.children[0]);
+    var one = part(stage.firstChild.children[1]);
+    if (full.tops.length !== x.rows.length || !full.tops.length) return h;
+    var rows = full.tops.map(function (t, i) {
+      return ((i + 1 < full.tops.length ? full.tops[i + 1] : full.bottom) - t) / k;
+    });
+    var foot = (full.box.bottom - full.bottom) / k;
+    return {
+      h: h,
+      rows: rows,
+      head: (full.tops[0] - full.box.top) / k,
+      tail: foot,
+      contHead: (one.tops[0] - one.box.top) / k,
+      foot: foot,
+    };
+  }
+
   /* The Feedback Pages for one student, measured in `stage`, or null with
      no cards: { count (sides), over, cards, colPx, body(page, total) },
      body giving each side's HTML, numbered from `page` of `total`. H is a
      side's height. */
   function _feedbackPages(cid, student, ctx, o, list, stage, H) {
     var items = feedbackItems(cid, student, o);
-    if (!items.length) return null;
+    var extras = extraCards(cid, student, ctx, o);
+    if (!items.length && !extras.length) return null;
     var nums = {};
     if (o.numbers) {
       list.forEach(function (r) {
@@ -685,11 +753,12 @@ window.GradeReport = (function () {
       return FB_RB_SIZES[0];
     });
     var cardOf = function (i, piece) {
+      if (i >= items.length) return _extraHtml(extras[i - items.length], piece);
       var it = items[i];
       var html = ReportFeedback.cardHtml(piece ? _pieceItem(it, piece) : it, { number: numberOf(it) });
       return _withTextSize(html, sizes[i]);
     };
-    var htmls = items.map(function (it, i) {
+    var htmls = items.concat(extras).map(function (it, i) {
       return cardOf(i);
     });
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
@@ -703,7 +772,7 @@ window.GradeReport = (function () {
     var heights = _measureCards(stage, htmls);
     var smaller = false;
     Array.prototype.forEach.call(stage.firstChild.children, function (el, i) {
-      if (!items[i].rubric) return;
+      if (!items[i] || !items[i].rubric) return;
       sizes[i] = _rubricTextSize(el);
       if (sizes[i] < FB_RB_SIZES[0]) {
         htmls[i] = cardOf(i);
@@ -712,6 +781,10 @@ window.GradeReport = (function () {
     });
     if (smaller) heights = _measureCards(stage, htmls);
     var entries = heights.map(function (h, i) {
+      if (i >= items.length)
+        return h > colH && extras[i - items.length].rows.length > 1
+          ? _extraParts(stage, extras[i - items.length], h)
+          : h;
       var it = items[i];
       return h > colH && it.rubric && it.rubric.rows && it.rubric.rows.length > 1
         ? _rubricParts(stage, it, numberOf(it), h, sizes[i])
@@ -752,7 +825,7 @@ window.GradeReport = (function () {
     return {
       count: packed.sides.length,
       over: packed.over,
-      cards: items.length,
+      cards: items.length + extras.length,
       colPx: colH,
       body: function (page, total) {
         return packed.sides.map(function (sd, s) {
@@ -926,6 +999,8 @@ window.GradeReport = (function () {
     packColumns: packColumns,
     splitRows: splitRows,
     feedbackItems: feedbackItems,
+    extraCards: extraCards,
+    extraHtml: _extraHtml,
     FB_COL_W: FB_COL_W,
     layoutStudent: layoutStudent,
     layoutWith: layoutWith,
