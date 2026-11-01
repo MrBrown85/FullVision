@@ -224,7 +224,7 @@ describe('class usage for a sentence that is mostly slots', () => {
 
 describe('near-identical comments', () => {
   const same = [
-    '{n} is earning a B this term, which is very good work.',
+    '{n} explains each result in a lab report with care.',
     '{n} comes to class ready and uses class time well.',
     'Work habits are a strength this term in every way.',
     'The next step is to support each claim with evidence from a source.',
@@ -388,12 +388,14 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       expect(p.shared).toBeGreaterThanOrEqual(5);
       if (i) expect(p.shared).toBeLessThanOrEqual(pairs[i - 1].shared);
     });
-    // The same comment for two students is flagged with every sentence.
+    // The same comment for two students is flagged with every sentence
+    // but the grade sentence, which every student gets (set aside).
     const twin = Object.assign({}, comments[0], { sid: 'twin' });
     const n = twin.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/).length;
+    expect(twin.text).toMatch(/on the BC proficiency scale this term/);
     const flagged = CommentBank.nearIdentical([comments[0], twin]);
-    expect(flagged).toHaveLength(n >= 5 ? 1 : 0);
-    if (n >= 5) expect(flagged[0].shared).toBe(n);
+    expect(flagged).toHaveLength(n - 1 >= 5 ? 1 : 0);
+    if (n - 1 >= 5) expect(flagged[0].shared).toBe(n - 1);
   });
 
   it('never repeats an opening in the class until every opening that fits is used', () => {

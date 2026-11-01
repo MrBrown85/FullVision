@@ -998,7 +998,8 @@ window.ReportQuestionnaire = (function () {
     if (!String(text || '').trim()) return null;
     var termId = getTermId();
     var mine = { sid: student.id, text: text, names: _namesOf(student) };
-    var out = CommentBank.nearIdentical([mine].concat(_classmateComments(cid, student.id, termId)));
+    // The class's own lines and the grade sentence never count as shared.
+    var out = CommentBank.nearIdentical([mine].concat(_classmateComments(cid, student.id, termId)), { cid: cid });
     var hit = out.find(function (p) {
       return p.a === student.id || p.b === student.id;
     });
@@ -1758,14 +1759,15 @@ window.ReportQuestionnaire = (function () {
 
   /* The parts a sentence is labelled with, each the draft's steps it
      covers (CommentBank.DRAFT_STEPS). Browse Sentences is split the same
-     way (the Browse Sentences mockup). */
+     way (the Browse Sentences mockup). `word`: the part in a thin-part
+     line ("Only 4 habit sentences fit …"). */
   var PARTS = [
     { id: 'grade', label: 'Grade', steps: ['grade'] },
-    { id: 'bestPiece', label: 'Best Piece', steps: ['example'] },
-    { id: 'strengths', label: 'Strengths', steps: ['opening', 'overall', 'growth'] },
-    { id: 'habits', label: 'Habits', steps: ['habits', 'attendance', 'strongHabits'] },
+    { id: 'bestPiece', label: 'Best Piece', word: 'best piece', steps: ['example'] },
+    { id: 'strengths', label: 'Strengths', word: 'strength', steps: ['opening', 'overall', 'growth'] },
+    { id: 'habits', label: 'Habits', word: 'habit', steps: ['habits', 'attendance', 'strongHabits'] },
     { id: 'notHandedIn', label: 'Not Handed In', steps: ['notHandedIn', 'lateWork'] },
-    { id: 'nextStep', label: 'Next Step', steps: ['nextStep', 'goWords', 'home'] },
+    { id: 'nextStep', label: 'Next Step', word: 'next step', steps: ['nextStep', 'goWords', 'home'] },
     { id: 'support', label: 'Support', steps: ['support'] },
     { id: 'closing', label: 'Closing', steps: ['closer'] },
   ];
@@ -2600,6 +2602,53 @@ window.ReportQuestionnaire = (function () {
     return bits.join(' · ') || 'A general sentence. It states no fact about ' + first + '.';
   }
 
+  /* ── Thin parts of the bank (plan PR 13) ─────────────────── */
+
+  /* The class's bank strength (CommentBank.bankStrength), worked out once
+     per drawing of the page and again when a habit rating changes. */
+  var _strength = null;
+  function _bankStrength(cid) {
+    var termId = getTermId();
+    var students = getTqStudents();
+    var key =
+      cid +
+      '|' +
+      termId +
+      '|' +
+      students
+        .map(function (s) {
+          return s.id + ':' + JSON.stringify((getStudentTermRating(cid, s.id, termId) || {}).habits || {});
+        })
+        .join('|');
+    if (!_strength || _strength.key !== key) {
+      _strength = { key: key, r: CommentBank.bankStrength(cid, { termId: termId, students: students }) };
+    }
+    return _strength.r;
+  }
+
+  /* Under a row's source line, when its part of the bank is thin for this
+     student (the class warnings mockup): how many sentences fit how many
+     students, and a link to Browse Sentences on that part. A sentence the
+     teacher edited is their own, so it has none. */
+  function thinLine(st, part) {
+    return (
+      'Only ' +
+      st.sentences +
+      ' ' +
+      part.word +
+      (st.sentences === 1 ? ' sentence fits ' : ' sentences fit ') +
+      st.students +
+      ' students, so some will repeat.'
+    );
+  }
+  function _thinHtml(cid, student, row, i) {
+    if (row.edited || !row.step || !row.s) return '';
+    var part = partOf(row.step);
+    var st = (_bankStrength(cid).byStudent[student.id] || {})[row.step];
+    if (!part || !part.word || !st || !st.thin) return '';
+    return `<span class="qn-req-thin">${esc(thinLine(st, part))} <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="all" data-row="${i}" title="Opens Browse Sentences on ${esc(part.label)}, where you can pick another sentence for this part.">Write one of your own</button> to add more.</span>`;
+  }
+
   /* ── The card ────────────────────────────────────────────── */
 
   var DOTS_ICON =
@@ -2638,7 +2687,7 @@ window.ReportQuestionnaire = (function () {
         : '';
     return `<div class="qn-req-row qn-srow${row.step === 'example' ? ' best' : ''}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
       ${handle}<div class="qn-req-part"><span class="qn-req-label">${esc(rowLabel(row, path))}</span></div>
-      <div class="qn-req-body"><span class="qn-req-text">${esc(row.text)}</span><span class="qn-req-source">${esc(rowSource(row, cid, student, f, ctx))}</span></div>
+      <div class="qn-req-body"><span class="qn-req-text">${esc(row.text)}</span><span class="qn-req-source">${esc(rowSource(row, cid, student, f, ctx))}</span>${_thinHtml(cid, student, row, i)}</div>
       ${act}
       ${low ? _checkHtml(student.id, 'low') : ''}
       ${open ? _wordingMenuHtml(cid, student, ctx, rows, i) : ''}
@@ -3633,6 +3682,8 @@ window.ReportQuestionnaire = (function () {
     if (tqStudentIndex >= students.length) tqStudentIndex = 0;
     var student = students[tqStudentIndex];
     var f = _facts(student, true);
+    // Marks may have changed since the page was last drawn.
+    _strength = null;
     var comment = plainComment((getStudentTermRating(cid, student.id, getTermId()) || {}).narrative || '');
     return `<div class="qn" data-sid="${student.id}">
       <div class="qn-left">
@@ -3776,6 +3827,7 @@ window.ReportQuestionnaire = (function () {
     useSentence: useSentence,
     browseList: browseList,
     rowSource: rowSource,
+    thinLine: thinLine,
     sheetHeight: sheetHeight,
     linesOpen: linesOpen,
     clickOutside: clickOutside,

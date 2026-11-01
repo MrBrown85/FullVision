@@ -2483,9 +2483,8 @@ window.CommentBank = (function () {
   /* The story for one student: { id, order, lead }. order is the steps
      after the grade sentence; lead is the first of them. opts.uses: how
      many classmates' drafts told each story ({ id: n }), for the tie. */
-  function angle(f, picks, opts) {
-    var a = angleFacts(f, picks);
-    var uses = (opts && opts.uses) || {};
+  /* The stories that fit, at the best tier: angle() picks one of them. */
+  function _topAngles(a) {
     var fit = ANGLES.filter(function (x) {
       return x.when(a);
     });
@@ -2495,10 +2494,15 @@ window.CommentBank = (function () {
         return x.tier;
       }),
     );
-    var pick = fit
-      .filter(function (x) {
-        return x.tier === tier;
-      })
+    return fit.filter(function (x) {
+      return x.tier === tier;
+    });
+  }
+  function angle(f, picks, opts) {
+    var a = angleFacts(f, picks);
+    var uses = (opts && opts.uses) || {};
+    var pick = _topAngles(a)
+      .slice()
       .sort(function (x, y) {
         return (uses[x.id] || 0) - (uses[y.id] || 0) || ANGLES.indexOf(x) - ANGLES.indexOf(y);
       })[0];
@@ -2631,6 +2635,36 @@ window.CommentBank = (function () {
     var n = Object.keys(s.when || {}).length;
     if (ctx._bestNote && (s.needs || []).indexOf('bestPiece') >= 0) n++;
     return n;
+  }
+
+  /* Whether a sentence can fill a step for this student, before the rest of
+     the draft is known: its part and group, it fits, it names the step's
+     preferred slot when that has a value, and no slot the step rules out. */
+  function _stepFits(s, step, ctx) {
+    if (s.part !== step.part || !fits(s, ctx)) return false;
+    if (step.groups && step.groups.indexOf(s.group) < 0) return false;
+    if (step.prefer && ctx[step.prefer] && (s.needs || []).indexOf(step.prefer) < 0) return false;
+    if (
+      step.never &&
+      slotsOf(s).some(function (k) {
+        return step.never.indexOf(k) >= 0;
+      })
+    )
+      return false;
+    return true;
+  }
+  /* Of some sentences, the ones at the top specificity. */
+  function _topTier(list, ctx) {
+    if (!list.length) return [];
+    var top = Math.max.apply(
+      null,
+      list.map(function (s) {
+        return specificity(s, ctx);
+      }),
+    );
+    return list.filter(function (s) {
+      return specificity(s, ctx) === top;
+    });
   }
 
   /* The sentences that stand in when a step's top tier is all excluded:
@@ -2768,7 +2802,7 @@ window.CommentBank = (function () {
         return;
       }
       var cands = bank.sentences.filter(function (s) {
-        if (s.part !== step.part || taken[s.id] || !fits(s, ctx)) return false;
+        if (taken[s.id] || !_stepFits(s, step, ctx)) return false;
         // A fact the draft already states (the growing habits, the goal, the
         // competency that rose) is not said twice.
         if (
@@ -2785,29 +2819,12 @@ window.CommentBank = (function () {
           })
         )
           return false;
-        if (step.groups && step.groups.indexOf(s.group) < 0) return false;
-        // The step's preferred slot, when it has a value, and never a slot
-        // the step rules out.
-        if (step.prefer && ctx[step.prefer] && (s.needs || []).indexOf(step.prefer) < 0) return false;
-        if (
-          step.never &&
-          slotsOf(s).some(function (k) {
-            return step.never.indexOf(k) >= 0;
-          })
-        )
-          return false;
         return true;
       });
       if (!cands.length) return;
       // Most specific wins: only the top tier is kept.
-      var top = Math.max.apply(
-        null,
-        cands.map(function (s) {
-          return specificity(s, ctx);
-        }),
-      );
-      var tier = cands.filter(function (s) {
-        return specificity(s, ctx) === top && !exclude[s.id];
+      var tier = _topTier(cands, ctx).filter(function (s) {
+        return !exclude[s.id];
       });
       // Every sentence of the top tier is excluded: a sentence that asserts
       // nothing stands in, never a vaguer claim.
@@ -3104,6 +3121,143 @@ window.CommentBank = (function () {
     }).length;
   }
 
+  /* ── Bank strength (plan PR 13) ───────────────────────────────────── */
+
+  /* Steps whose wording does not come from choosing among bank sentences
+     are left out: the grade sentence, the attendance sentence and the work
+     not handed in each have one wording per fact (the sentence grammar),
+     class lines are the teacher's own text, and the IE path's Required
+     parts are set. */
+  var FIXED_STEPS = { grade: true, attendance: true, notHandedIn: true };
+  function _strengthSteps() {
+    return DRAFT_STEPS.filter(function (s) {
+      return !!s.groups && !s.line && !s.ie && !s.says && !FIXED_STEPS[s.key];
+    });
+  }
+
+  /* The sentences a step of the student's draft picks from: those that can
+     fill it (_stepFits), at the top specificity, before the rest of the
+     draft is chosen. */
+  function stepPool(step, ctx, bank) {
+    var def =
+      typeof step === 'string'
+        ? DRAFT_STEPS.find(function (x) {
+            return x.key === step;
+          })
+        : step;
+    if (!def || !def.groups) return [];
+    return _topTier(
+      (bank || COMMENT_BANK).sentences.filter(function (s) {
+        return _stepFits(s, def, ctx);
+      }),
+      ctx,
+    );
+  }
+
+  /* The steps the comment runs whichever story it tells: those in every
+     story that fits at the best tier (the least-used tie can pick any). */
+  function _sureSteps(f, picks) {
+    var tops = _topAngles(angleFacts(f, picks));
+    var out = {};
+    _strengthSteps().forEach(function (s) {
+      out[s.key] = tops.every(function (x) {
+        return _withClassSteps(x.order, x.id === 'ie').indexOf(s.key) >= 0;
+      });
+    });
+    return out;
+  }
+
+  /* How strong the bank is for a class: for each part (a draft step that
+     picks among bank sentences), how many sentences fit how many students.
+     A student's sentences for a part are their pool (stepPool()); the
+     students counted with them are every student in the class whose own
+     pool is wholly inside it, since those draw only from these sentences.
+     When there are more such students than sentences, some sentence must
+     repeat, and the part is thin for that student. A student counts for a
+     part only when every story their comment can tell runs it; an IE
+     comment counts for none.
+
+     opts: { termId (the report picker's when left out), students (the
+     roster when left out), bank }.
+
+     Returns { students: n, parts: [{ step, part, sentences, students,
+     thin, worst: { sentences, students } | null }], byStudent: { sid: {
+     step: { sentences, students, thin } } } }. A part's `sentences` and
+     `students` are the sentences that fit anyone and the students it fits;
+     `worst` is its thin group with the most students over sentences. */
+  function bankStrength(cid, opts) {
+    opts = opts || {};
+    var bank = opts.bank || COMMENT_BANK;
+    var termId =
+      'termId' in opts
+        ? opts.termId
+        : typeof ReportBlocks !== 'undefined' && ReportBlocks.getTermId
+          ? ReportBlocks.getTermId()
+          : null;
+    var roster = opts.students || (typeof getStudents === 'function' ? getStudents(cid) : []) || [];
+    var kids = roster.map(function (st) {
+      var f = facts(cid, st, termId);
+      var rating = (typeof getStudentTermRating === 'function' && getStudentTermRating(cid, st.id, termId)) || {};
+      var picks = { habits: rating.habits || {}, focus: rating.focusSectionId || f.focusId };
+      return {
+        sid: String(st.id),
+        ctx: context(f, picks),
+        sure: reportPath(f) === 'ie' ? {} : _sureSteps(f, picks),
+      };
+    });
+    var byStudent = {};
+    kids.forEach(function (k) {
+      byStudent[k.sid] = {};
+    });
+    var parts = _strengthSteps().map(function (step) {
+      var pools = kids.map(function (k) {
+        if (!k.sure[step.key]) return null;
+        var set = {};
+        var n = 0;
+        stepPool(step, k.ctx, bank).forEach(function (s) {
+          set[s.id] = true;
+          n++;
+        });
+        return n ? { set: set, n: n } : null;
+      });
+      var inside = function (a, b) {
+        for (var id in a.set) if (!b.set[id]) return false;
+        return true;
+      };
+      var all = {};
+      var students = 0;
+      var worst = null;
+      pools.forEach(function (p, i) {
+        if (!p) return;
+        students++;
+        Object.keys(p.set).forEach(function (id) {
+          all[id] = true;
+        });
+        var with_ = pools.filter(function (q) {
+          return q && q.n <= p.n && inside(q, p);
+        }).length;
+        var row = { sentences: p.n, students: with_, thin: with_ > p.n };
+        byStudent[kids[i].sid][step.key] = row;
+        if (
+          row.thin &&
+          (!worst ||
+            row.students - row.sentences > worst.students - worst.sentences ||
+            (row.students - row.sentences === worst.students - worst.sentences && row.students > worst.students))
+        )
+          worst = { sentences: row.sentences, students: row.students };
+      });
+      return {
+        step: step.key,
+        part: step.part,
+        sentences: Object.keys(all).length,
+        students: students,
+        thin: !!worst,
+        worst: worst,
+      };
+    });
+    return { students: kids.length, parts: parts, byStudent: byStudent };
+  }
+
   /* ── Near-identical comments ───────────────────────────────────────── */
 
   /* A comment's sentences: split after . ! ? or … (and a closing quote)
@@ -3151,16 +3305,73 @@ window.CommentBank = (function () {
     return false;
   }
 
+  /* Sentences every student must get, which say nothing about how alike
+     two comments read: the grade sentence (any wording of the bank's Grade
+     group, the IE and goals statements too) and the class's own lines,
+     used exactly as typed (the closing sentence, the support lines, the
+     late-work line). A class line is matched whole, case, quotes and
+     spacing aside. */
+  function _lineKey(t) {
+    return String(t || '')
+      .replace(/[’‘]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[.!?…]+$/, '')
+      .toLowerCase();
+  }
+  function _classLineKeys(cid, lines) {
+    var texts = (lines || []).slice();
+    if (cid != null) {
+      var cs = classSettings(cid);
+      texts.push(cs.closing);
+      supportChecklist(cid, familyOf(cid)).forEach(function (l) {
+        texts.push(l.text);
+      });
+      var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
+      texts.push(course.lateWorkPolicy);
+    }
+    var out = {};
+    texts.forEach(function (t) {
+      _sentencesOf(t).forEach(function (x) {
+        var k = _lineKey(x);
+        if (k) out[k] = true;
+      });
+    });
+    return out;
+  }
+  function _gradeSentences(bank) {
+    var step = DRAFT_STEPS[0];
+    return bank.sentences.filter(function (s) {
+      return s.part === step.part && step.groups.indexOf(s.group) >= 0;
+    });
+  }
+
   /* After the drafts exist for a class: the pairs of comments that read
      alike, each sharing five or more sentences, a sentence shared when it
      has a run of four words in common with a sentence of the other comment
-     (each sentence paired once). comments: [{ sid, name, text }], `name`
-     (or a list, `names`) the student's names to set aside. Returns [{ a, b,
-     shared, pairs: [[sentence in a, sentence in b]] }] by sid, most shared
-     first. opts: { min: 5 }. The warning on screen is a later change. */
+     (each sentence paired once). Sentences every student must get (the
+     grade sentence, the class's closing, support and late-work lines) are
+     set aside and never count as shared. comments: [{ sid, name, text }],
+     `name` (or a list, `names`) the student's names to set aside. Returns
+     [{ a, b, shared, pairs: [[sentence in a, sentence in b]] }] by sid,
+     most shared first, positions counting every sentence. opts: { min: 5,
+     cid: the class, whose lines are set aside; lines: more teacher text to
+     set aside; bank }. */
   var NEAR_MIN = 5;
   function nearIdentical(comments, opts) {
-    var min = (opts && opts.min) || NEAR_MIN;
+    opts = opts || {};
+    var min = opts.min || NEAR_MIN;
+    var bank = opts.bank || COMMENT_BANK;
+    var grades = _gradeSentences(bank);
+    var lineKeys = _classLineKeys(opts.cid, opts.lines);
+    var mustGet = function (sentence) {
+      if (lineKeys[_lineKey(sentence)]) return true;
+      var lower = sentence.toLowerCase();
+      return grades.some(function (s) {
+        return _holds(s, sentence, lower);
+      });
+    };
     var docs = (comments || [])
       .filter(function (c) {
         return c && String(c.text || '').trim();
@@ -3170,7 +3381,7 @@ window.CommentBank = (function () {
         return {
           sid: c.sid,
           runs: _sentencesOf(c.text).map(function (s) {
-            return _runs(s, names);
+            return mustGet(s) ? {} : _runs(s, names);
           }),
         };
       });
@@ -3664,6 +3875,8 @@ window.CommentBank = (function () {
     specificity: specificity,
     classUsage: classUsage,
     nearIdentical: nearIdentical,
+    bankStrength: bankStrength,
+    stepPool: stepPool,
     provenance: provenance,
     verify: verify,
     CLAIMS: CLAIMS,
