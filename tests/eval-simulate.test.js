@@ -9,9 +9,9 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-// These simulate whole classes; one test takes about 5 s, over vitest's
-// default timeout on a slower CI runner.
-vi.setConfig({ testTimeout: 30000 });
+// These simulate whole classes: one test and the setup hook each take about
+// 5–10 s, over vitest's default limits on a slower CI runner.
+vi.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
 import { formatReport, main, simulate } from '../scripts/eval/simulate.mjs';
 import { KINDS, syntheticClass } from '../scripts/eval/synthetic.mjs';
 import { loadClass, ROOT } from '../scripts/eval/app.mjs';
