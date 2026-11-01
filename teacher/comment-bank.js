@@ -2876,6 +2876,19 @@ window.CommentBank = (function () {
   /* Facts a draft states once, by topic. */
   var NO_REPEAT = { nextStep: 'nextStep' };
 
+  /* A sentence that gives the student a next step: a Next Step sentence
+     (the group the Next Step step draws from) or one flagged `advises:
+     true`, which every sentence whose text says "next step" or "to do
+     next" must carry (the lint test fails an undeclared one:
+     CommentLint.advisesText). A For the Family sentence bound to the next
+     step's skill (when.nextSkill) does not advise. A comment holds one
+     such sentence, the Next Step step's (2026-11-01, the review of #603:
+     a Habit Ratings frame was printed right before the Next Step sentence
+     as a second next step). */
+  function advises(s) {
+    return !!s && (s.advises === true || s.group === 'Next Step');
+  }
+
   /* The data slots a sentence names, in its own order: every {slot} but the
      pronouns, then any it needs without printing ("even"). */
   var PRONOUN_SLOTS = { He: 1, he: 1, him: 1, His: 1, his: 1, himself: 1 };
@@ -3453,13 +3466,14 @@ window.CommentBank = (function () {
         if (NO_REPEAT[n]) said[NO_REPEAT[n]] = true;
       });
       if (byKey[k].says) said[byKey[k].says] = true;
+      if (advises(s)) said.advice = true;
     });
     // The Not Handed In sentence states the work not handed in, and the
     // grade sentence the grade, so no other sentence says either, wherever
     // the teacher's order puts them.
     if (seq.indexOf('notHandedIn') >= 0 && ctx.missingWork) said.notHandedIn = true;
     if (seq.indexOf('grade') >= 0 && ctx._grade) said.grade = true;
-    seq.forEach(function (key) {
+    seq.forEach(function (key, at) {
       var step = byKey[key];
       // A class line: the teacher's text, as typed (plan PR 8).
       if (step.line && !kept[key]) {
@@ -3517,6 +3531,10 @@ window.CommentBank = (function () {
           })
         )
           return false;
+        // One next step a comment (advises): an advising sentence is out
+        // once one is in, and out of every step before the Next Step step,
+        // which gives the comment its one.
+        if (advises(s) && (said.advice || (key !== 'nextStep' && seq.indexOf('nextStep') > at))) return false;
         // Once the grade sentence leads, no other sentence states the grade;
         // with a Not Handed In sentence, no other states the missing work.
         if (
@@ -3599,6 +3617,7 @@ window.CommentBank = (function () {
         if (NO_REPEAT[k]) said[NO_REPEAT[k]] = true;
       });
       if (step.says) said[step.says] = true;
+      if (advises(pick.s)) said.advice = true;
       out.push(pick.t);
       sentences.push({
         id: pick.s.id,
@@ -5019,6 +5038,7 @@ window.CommentBank = (function () {
     effectiveHabits: effectiveHabits,
     habitSummary: habitSummary,
     habitCellFits: habitCellFits,
+    advises: advises,
     habitWords: habitWords,
     facts: facts,
     notHandedIn: notHandedIn,

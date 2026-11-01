@@ -126,7 +126,7 @@ describe('the Habit Ratings cells', () => {
     });
   });
 
-  it('names what the student does, or one next step, never a deficit or a claim about the future', () => {
+  it('names what the student does, or one thing to do, never a deficit, a second next step or a claim about the future', () => {
     cells().forEach(s => {
       expect(s.text, s.id).not.toMatch(
         /\b(rarely|fails?|needs? to|still|again|only|finally|unfortunately|at least)\b/i,
@@ -134,7 +134,24 @@ describe('the Habit Ratings cells', () => {
       expect(s.text, s.id).not.toMatch(/\b(will|should)\b/i);
       expect(s.text, s.id).not.toMatch(/hand(s|ed|ing)? in/i);
       expect(s.text, s.id).not.toMatch(/!/);
-      if (s.level <= 2) expect(s.text, s.id).toMatch(/next step|thing (to do|for \{him\} to do)/);
+      // The Next Step sentence is the comment's one next step (the review of
+      // #603): no frame says "next step" or "to do next", and none advises.
+      expect(CommentLint.advisesText(s.text), s.id).toBe(false);
+      expect(CommentBank.advises(s), s.id).toBe(false);
+      expect(s.text, s.id).not.toMatch(/^\{His\} next step/);
+    });
+  });
+
+  it('does not assume a phone: a devices frame about the phone put away when asked says so (`phone`), the rest say device', () => {
+    cells().forEach(s => {
+      if (s.habit !== 'devices') expect(s.text, s.id).not.toMatch(/phone/i);
+      else expect(!!s.phone, s.id).toBe(/\bphone\b/i.test(s.text));
+    });
+    LEVELS.forEach(level => {
+      const mine = cell('devices', level);
+      expect(mine.filter(s => !s.phone).length, 'devices ' + level + ' frames without a phone').toBeGreaterThanOrEqual(
+        2,
+      );
     });
   });
 
@@ -294,6 +311,71 @@ describe('Other Wording and the Habit Ratings frames', () => {
       expect(s.group).toBe('Habit Ratings');
       expect(CommentBank.fits(s, ctx)).toBe(true);
     });
+  });
+});
+
+describe('one next step a comment (advises)', () => {
+  const adv = {
+    id: 'zz-adv',
+    part: 'habits',
+    group: 'Habit Ratings',
+    text: 'The next step for {him} is one thing.',
+    when: { feedback: 2 },
+    habit: 'feedback',
+    level: 2,
+    claims: ['habits'],
+    advises: true,
+    src: 'new',
+  };
+  const next = {
+    id: 'zz-next',
+    part: 'go',
+    group: 'Next Step',
+    text: 'Next, {he} can try one thing.',
+    claims: [],
+    advises: true,
+    src: 'new',
+  };
+  const habits = { ...all(4), feedback: 2 };
+  const bank = () => ({ parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([adv, next]) });
+  const exclude = () =>
+    summaries()
+      .concat(cell('feedback', 2))
+      .map(s => s.id);
+  const advising = d => d.sentences.filter(x => CommentBank.advises(bank().sentences.find(s => s.id === x.id)));
+
+  it('advises: the Next Step sentence (claims nextStep) and a sentence flagged advises; no Habit Ratings frame', () => {
+    expect(CommentBank.advises(adv)).toBe(true);
+    expect(CommentBank.advises(next)).toBe(true);
+    COMMENT_BANK.sentences
+      .filter(s => s.group === 'Next Step')
+      .forEach(s => expect(CommentBank.advises(s), s.id).toBe(true));
+    cells().forEach(s => expect(CommentBank.advises(s), s.id).toBe(false));
+  });
+
+  it('a draft never holds two advising sentences: the Next Step step keeps the one, whatever the order', () => {
+    const ctx = ctxFor(habits);
+    const d = CommentBank.draft(ctx, { seed: 1, bank: bank(), exclude: exclude() });
+    expect(d.sentences.some(x => x.step === 'nextStep')).toBe(true);
+    expect(d.ids).not.toContain('zz-adv');
+    expect(advising(d)).toHaveLength(1);
+    const first = CommentBank.draft(ctx, { seed: 1, bank: bank(), exclude: exclude(), order: ['nextStep', 'habits'] });
+    expect(first.sentences.some(x => x.step === 'nextStep')).toBe(true);
+    expect(first.ids).not.toContain('zz-adv');
+    expect(advising(first)).toHaveLength(1);
+    // With no Next Step sentence in the draft, an advising habits frame after
+    // the Next Step step's place is allowed, and it is the one.
+    const alone = CommentBank.draft(ctx, {
+      seed: 1,
+      bank: bank(),
+      exclude: exclude().concat(
+        ['zz-next'],
+        COMMENT_BANK.sentences.filter(s => s.group === 'Next Step').map(s => s.id),
+      ),
+      order: ['nextStep', 'habits'],
+    });
+    expect(alone.ids).toContain('zz-adv');
+    expect(advising(alone)).toHaveLength(1);
   });
 });
 

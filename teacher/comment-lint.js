@@ -37,6 +37,7 @@ window.CommentLint = (function () {
     ['come', 'in'],
     ['come', 'into'],
     ['come', 'out'],
+    ['come', 'back'],
     ['come', 'together'],
     ['come', 'up'],
     ['end', 'up'],
@@ -404,6 +405,16 @@ window.CommentLint = (function () {
       .filter(Boolean);
   }
 
+  /* Whether a template gives the student a next step in so many words
+     ("next step", "to do next"). A bank sentence that does must declare it
+     (claims nextStep, or advises: true): tests/comment-bank-lint.test.js
+     fails an undeclared one, and the draft holds one such sentence
+     (CommentBank.advises). */
+  var ADVICE_RE = /\bnext step\b|\bto do next\b/i;
+  function advisesText(text) {
+    return ADVICE_RE.test(plain(text));
+  }
+
   /* What the lint finds in one template or sentence: [] when it passes,
      else one line per finding ("phrasal verb: keep up"). */
   // The plan's own Not Handed In wording (Sentence grammar: "One assignment
@@ -508,6 +519,7 @@ window.CommentLint = (function () {
     plain: plain,
     words: words,
     findings: findings,
+    advisesText: advisesText,
     PAST_FORMS: PAST_FORMS,
     startsPastTense: startsPastTense,
   };
