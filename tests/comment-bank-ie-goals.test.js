@@ -15,7 +15,15 @@
 import './setup.js';
 import { readFileSync } from 'fs';
 import { runInThisContext } from 'vm';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The deadlines below fall in this school year: today is pinned to
+// November 1, 2026 (a saved deadline that has passed counts as none).
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-01T19:00:00Z'));
+});
+afterAll(() => vi.useRealTimers());
 
 const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
 const words = t => t.trim().split(/\s+/).length;

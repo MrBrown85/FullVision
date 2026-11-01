@@ -108,3 +108,52 @@ test('a saved [date] comment is shown without that sentence, written only when a
   expect(text).toContain(label);
   await expect(page.locator('#tq-narrative')).toHaveValue(text);
 });
+
+test('the calendar keeps the focus: ‹ and › with clicks and keys, then ↓ ↑ never move to another student', async ({
+  page,
+}) => {
+  await open(page);
+  const name = page.locator('.qn-name');
+  const who = await name.textContent();
+  const url = page.url();
+  await page.locator('#tq-deadline-btn').click();
+  await expect(page.locator('#tq-cal')).toHaveCount(1);
+  const inCal = () => page.evaluate(() => !!document.activeElement && !!document.activeElement.closest('#tq-cal'));
+  const title = () => page.locator('#tq-cal .qn-cal-title').textContent();
+  const first = await title();
+
+  // A real click on ›: the month moves, the focus stays in the calendar,
+  // and ↓ ↑ stay with this student.
+  await page.locator('#tq-cal [data-dir="1"]').click();
+  expect(await title()).not.toBe(first);
+  expect(await inCal()).toBe(true);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await expect(name).toHaveText(who);
+  await expect(page.locator('#tq-cal')).toHaveCount(1);
+  expect(page.url()).toBe(url);
+
+  // ‹ by click, then › by Enter on the focused button.
+  await page.locator('#tq-cal [data-dir="-1"]').click();
+  expect(await title()).toBe(first);
+  expect(await inCal()).toBe(true);
+  await page.keyboard.press('ArrowDown');
+  await expect(name).toHaveText(who);
+  await page.locator('#tq-cal [data-dir="1"]').focus();
+  await page.keyboard.press('Enter');
+  expect(await title()).not.toBe(first);
+  expect(await inCal()).toBe(true);
+  await page.keyboard.press('ArrowDown');
+  await expect(name).toHaveText(who);
+
+  // A click on the calendar's title (no control) keeps the focus there too.
+  await page.locator('#tq-cal .qn-cal-title').click();
+  expect(await inCal()).toBe(true);
+  await page.keyboard.press('ArrowDown');
+  await expect(name).toHaveText(who);
+
+  // Escape closes it and gives the focus back to Pick a Date.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#tq-cal')).toHaveCount(0);
+  await expect(page.locator('#tq-deadline-btn')).toBeFocused();
+});
