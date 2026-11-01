@@ -79,7 +79,9 @@ const tieComps = () => [
   comp('d', 'Inquiry', 2.6),
 ];
 const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
-const topFrames = COMMENT_BANK.sentences.filter(s => s.group === 'Overall' && s.when && s.when.topSkill);
+// The languages hidden and newcomer frames are bound to a skill (topSkill)
+// but need their story too (tests/comment-bank-languages-frames.test.js).
+const topFrames = COMMENT_BANK.sentences.filter(s => s.group === 'Overall' && s.when && s.when.topSkill && !s.story);
 const strongFrames = COMMENT_BANK.sentences.filter(s => s.group === 'Overall' && s.when && s.when.strongSkill);
 const skillWords = key => CommentBank.SKILLS.socials.find(r => r.key === key).skill;
 const wc = t => CommentRealiser.wordCount(t);
@@ -174,8 +176,10 @@ describe('the strength named (topSkillOf)', () => {
 });
 
 describe('the per-skill frames under a tie', () => {
-  it('splits the 129 frames: 43 that claim a strength (topSkill), 86 that assert the strongest (strongSkill)', () => {
-    expect(topFrames.length).toBe(43);
+  it('splits the 344 frames: 258 that claim a strength (topSkill), 86 that assert the strongest (strongSkill)', () => {
+    // 43 tie-safe frames from lane G, then round three (lane I): 129 for the
+    // 43 skills lane H added and 86 more for the original 43, all tie-safe.
+    expect(topFrames.length).toBe(258);
     expect(strongFrames.length).toBe(86);
     topFrames.forEach(s => {
       expect(s.needs, s.id).toEqual(['topSkill']);
@@ -183,13 +187,14 @@ describe('the per-skill frames under a tie', () => {
       expect(s.text, s.id).not.toMatch(/strongest|highest|\bmost\b|\bbest\b|\btop\b/i);
     });
     strongFrames.forEach(s => expect(s.text, s.id).toMatch(/strongest|highest|\bmost\b|\bbest\b|\btop\b/i));
-    // Every skill with frames has one that fits a tie.
-    const covered = new Set(strongFrames.map(s => s.subjects[0] + '.' + s.when.strongSkill));
-    covered.forEach(k =>
-      expect(
-        topFrames.some(s => s.subjects[0] + '.' + s.when.topSkill === k),
-        k,
-      ).toBe(true),
+    // Every skill in the table has three or more frames that fit a tie.
+    Object.entries(CommentBank.SKILLS).forEach(([family, rows]) =>
+      rows.forEach(row =>
+        expect(
+          topFrames.filter(s => s.subjects[0] === family && s.when.topSkill === row.key).length,
+          family + '.' + row.key,
+        ).toBeGreaterThanOrEqual(3),
+      ),
     );
   });
 

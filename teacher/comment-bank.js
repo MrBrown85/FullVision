@@ -1146,6 +1146,82 @@ window.CommentBank = (function () {
       fits: ['technique', 'creating'],
       src: 'GHS 238, 475',
     },
+    // Second languages (round three, lane I, Nov 1): lines in the same
+    // shape for a French, Spanish, Punjabi, Japanese or ASL class. Each
+    // says "the language" and "use the language", so it holds for a
+    // signed language as for a spoken one.
+    {
+      id: 'sl-lang-turn',
+      families: ['languages'],
+      text: 'In class, I will give the student a turn to use the language with a partner each lesson.',
+      fits: ['speaking', 'communicating', 'part'],
+    },
+    {
+      id: 'sl-lang-words',
+      families: ['languages'],
+      text: 'In class, I will review the new words from each unit with the student each week.',
+      fits: ['vocabulary'],
+    },
+    {
+      id: 'sl-lang-message',
+      families: ['languages'],
+      text: 'In class, I will play or show a short message in the language and check its main idea.',
+      fits: ['listening', 'understanding'],
+    },
+    {
+      id: 'sl-lang-text',
+      families: ['languages'],
+      text: 'In class, I will read a short text in the language with the student and ask what it is about.',
+      fits: ['reading', 'understanding'],
+    },
+    {
+      id: 'sl-lang-paragraph',
+      families: ['languages'],
+      text: 'In class, I will look at one paragraph in the language with the student before the final copy.',
+      fits: ['writing', 'grammar'],
+    },
+    {
+      id: 'sl-lang-form',
+      families: ['languages'],
+      text: 'In class, I will give one verb form or marker to practise each week and check it with the student.',
+      fits: ['grammar'],
+    },
+    {
+      id: 'sl-lang-guess',
+      families: ['languages'],
+      text: 'In class, I will model how to guess an unknown word from the words around it.',
+      fits: ['understanding', 'vocabulary'],
+    },
+    {
+      id: 'sl-lang-gesture',
+      families: ['languages'],
+      text: 'In class, I will model another word or a gesture to use when a word in the language is missing.',
+      fits: ['communicating', 'speaking'],
+    },
+    {
+      id: 'sl-lang-custom',
+      families: ['languages'],
+      text: 'In class, I will give time each unit to explore one custom from a community that uses the language.',
+      fits: ['culture'],
+    },
+    {
+      id: 'sl-lang-partner',
+      families: ['languages'],
+      text: 'In class, I will pair the student with a partner for practice in the language.',
+      fits: ['speaking', 'listening', 'communicating', 'others'],
+    },
+    {
+      id: 'sl-lang-question',
+      families: ['languages'],
+      text: 'In class, I will ask the student one question in the language in each lesson.',
+      fits: ['speaking', 'listening', 'part'],
+    },
+    {
+      id: 'sl-lang-feedback',
+      families: ['languages'],
+      text: 'In class, I will give feedback on each piece in the language before the next one is due.',
+      fits: ['writing', 'grammar', 'feedback'],
+    },
   ];
 
   /* ── Language Goals (plan PR 3b; the school's ELL lines) ────────────── */
