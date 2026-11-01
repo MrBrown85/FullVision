@@ -3,6 +3,7 @@
 -- reporting terms, course soft-delete, and core_self_assessment.
 alter table public.student add column if not exists preferred_name text;
 alter table public.student add column if not exists date_of_birth date;
+alter table public.student add column if not exists student_number text;
 alter table public.course add column if not exists timezone text not null default 'America/Vancouver';
 alter table public.course add column if not exists reporting_terms jsonb;
 alter table public.course add column if not exists block text;

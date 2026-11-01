@@ -60,6 +60,10 @@ var StudentPage = (function () {
     report_closed: 'This report link has closed. Your official report card is in MyEd.',
     no_birthday: "Your teacher hasn't added your birthday yet, so this report can't open. Ask your teacher.",
     wrong_birthday: "That birthday doesn't match. Check the month, day and year.",
+    wrong_identity: "That doesn't match. Check your birthday or student number.",
+    wrong_password: "That password doesn't match. Check the password on your slip.",
+    slip_locked: 'This slip is locked after too many wrong tries. Ask your teacher for a new slip.',
+    reprint: 'This slip needs to be printed again. Ask your teacher for a new slip.',
   };
   var MONTHS = [
     'January',
@@ -90,6 +94,8 @@ var StudentPage = (function () {
       sending: false,
       demo: false,
       birthday: '', // a phone report's birthday, kept to open again if the session runs out
+      ident: null, // what matched on a questionnaire slip, kept to open again if the session runs out
+      number: '', // the student number or slip password as typed
       bday: { m: '', d: '', y: '' }, // the pickers as chosen
       report: null, // the report as the teacher sent it
       reply: null, // the Reply to Report questions, until replied
@@ -242,7 +248,7 @@ var StudentPage = (function () {
       '<input id="sp-code" class="sp-input" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="9" value="' +
       esc(state.typed) +
       '"><button type="submit" class="sp-btn sp-btn-quiet sp-btn-small">Open</button></div>' +
-      (state.message && (state.screen === 'start' || state.screen === 'confirm')
+      (state.message && (state.screen === 'start' || (state.screen === 'confirm' && !(state.data && state.data.check)))
         ? '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>'
         : '') +
       '</form>'
@@ -273,11 +279,49 @@ var StudentPage = (function () {
     }).length;
   }
 
+  /* Before the check the slip shows only what the questions are called and
+     how many there are (open's preview); after it, the questions. */
+  function slipParts(d) {
+    if (d.parts) {
+      return d.parts.map(function (p) {
+        return { title: p.title, count: partCount(p) };
+      });
+    }
+    return d.preview || [];
+  }
+
+  /* Who are you? A birthday or student number, or the slip's password. */
+  function identityFields(state) {
+    var by = state.data.check;
+    var msg = state.message ? '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>' : '';
+    if (by === 'password') {
+      return (
+        '<p class="sp-lead">To make sure it\u2019s you, type the password printed on your slip.</p>' +
+        '<label class="sp-sub-label" for="sp-ident">Password</label>' +
+        '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="16" value="' +
+        esc(state.number) +
+        '">' +
+        msg
+      );
+    }
+    return (
+      '<p class="sp-lead">To make sure it\u2019s you, enter your birthday or your student number.</p>' +
+      birthdayPickers(state) +
+      '<div class="sp-or" aria-hidden="true">or</div>' +
+      '<label class="sp-sub-label" for="sp-ident">Student Number</label>' +
+      '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="32" value="' +
+      esc(state.number) +
+      '">' +
+      msg
+    );
+  }
+
   function renderConfirm(state) {
     var d = state.data;
     var first = (d.student && d.student.first_name) || '';
-    var n = d.parts.reduce(function (sum, p) {
-      return sum + partCount(p);
+    var parts = slipParts(d);
+    var n = parts.reduce(function (sum, p) {
+      return sum + (p.count || 0);
     }, 0);
     var minutes = Math.max(2, Math.round((n * 1.4) / 5) * 5 || 5);
     return (
@@ -293,7 +337,7 @@ var StudentPage = (function () {
       '<p class="sp-lead">Is this you? Your teacher made these questions just for you.</p>' +
       '<div class="sp-will"><div class="sp-head-sub">You will answer</div><strong>' +
       esc(
-        d.parts
+        parts
           .map(function (p) {
             return p.title;
           })
@@ -301,8 +345,14 @@ var StudentPage = (function () {
       ) +
       '</strong><div class="sp-head-sub">' +
       esc('About ' + minutes + ' minutes \u00b7 ' + n + ' question' + (n === 1 ? '' : 's')) +
-      '</div></div></section>' +
-      '<button type="button" class="sp-btn sp-btn-primary" data-act="start">Yes, Start</button>' +
+      '</div></div>' +
+      (d.check ? '<div class="sp-ident">' + identityFields(state) + '</div>' : '') +
+      '</section>' +
+      '<button type="button" class="sp-btn sp-btn-primary" data-act="start"' +
+      (state.sending ? ' disabled' : '') +
+      '>' +
+      (state.sending ? 'Checking\u2026' : 'Yes, Start') +
+      '</button>' +
       '<button type="button" class="sp-btn sp-btn-line" data-act="notme">No, That\u2019s Not Me</button>' +
       codeBox(state, 'No camera? Type the code on your slip') +
       '</main>'
@@ -1167,7 +1217,7 @@ var StudentPage = (function () {
         S.data = res;
         S.part = 0;
         S.answers = {};
-        loadDraft();
+        if (res.parts) loadDraft();
         S.screen = 'confirm';
         S.message = '';
         paint();
@@ -1210,6 +1260,12 @@ var StudentPage = (function () {
           return call({ route: 'open', code: S.code }).then(function (again) {
             if (!again || !again.ok) return again;
             S.data.token = again.token;
+            // A slip that asks who you are asks again on the new session.
+            if (!isReport && again.check && S.ident) {
+              return call(Object.assign({ route: 'verify', token: again.token }, S.ident)).then(function (ok) {
+                return ok && ok.ok ? attempt(true) : ok;
+              });
+            }
             // A report reply needs the birthday check on the new session too.
             if (!isReport) return attempt(true);
             return call({ route: 'check', token: again.token, birthday: S.birthday }).then(function (ok) {
@@ -1242,6 +1298,86 @@ var StudentPage = (function () {
       }
       paint();
     });
+  }
+
+  /* A questionnaire slip: the birthday, student number or slip password
+     hands over the questions. A session that ran out opens again from the
+     code, once. */
+  function verifyIdentity() {
+    var by = S.data.check;
+    var typed = ((root.querySelector('#sp-ident') || {}).value || '').trim();
+    var m = (root.querySelector('#sp-bm') || {}).value || '';
+    var dd = (root.querySelector('#sp-bd') || {}).value || '';
+    var y = (root.querySelector('#sp-by') || {}).value || '';
+    S.number = typed;
+    S.bday = { m: m, d: dd, y: y };
+    var ident = { birthday: null, student_number: null, password: null };
+    if (by === 'password') {
+      if (!typed) {
+        S.message = 'Type the password printed on your slip.';
+        paint('#sp-ident');
+        return Promise.resolve();
+      }
+      ident.password = typed;
+    } else {
+      var some = m || dd || y;
+      if (some && !(m && dd && y)) {
+        S.message = 'Choose the month, day and year you were born.';
+        paint();
+        return Promise.resolve();
+      }
+      if (some) ident.birthday = y + '-' + String(m).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
+      if (typed) ident.student_number = typed;
+      if (!some && !typed) {
+        S.message = 'Choose your birthday or type your student number.';
+        paint();
+        return Promise.resolve();
+      }
+    }
+    S.message = '';
+    var done = function (res) {
+      S.sending = false;
+      if (res && res.ok) {
+        S.ident = ident;
+        S.data.parts = res.parts || [];
+        S.data.context = res.context || {};
+        S.data.check = null;
+        S.part = 0;
+        S.answers = {};
+        loadDraft();
+        S.screen = 'part';
+        paint();
+        window.scrollTo(0, 0);
+        return;
+      }
+      var e = res && res.error;
+      if (e === 'wrong_identity') {
+        S.message =
+          MESSAGES[by === 'password' ? 'wrong_password' : 'wrong_identity'] +
+          (res.tries_left != null ? ' ' + res.tries_left + (res.tries_left === 1 ? ' try' : ' tries') + ' left.' : '');
+      } else {
+        S.message = messageFor(res);
+        if (e !== 'network' && e !== 'busy') S.screen = 'message';
+      }
+      paint();
+    };
+    if (S.demo) {
+      return Promise.resolve(done({ ok: true, parts: S.demoParts, context: S.demoContext }));
+    }
+    S.sending = true;
+    paint();
+    return call(Object.assign({ route: 'verify', token: S.data.token }, ident))
+      .then(function (res) {
+        if (res && res.error === 'expired') {
+          return call({ route: 'open', code: S.code }).then(function (again) {
+            if (!again || !again.ok) return again;
+            S.data.token = again.token;
+            return call(Object.assign({ route: 'verify', token: again.token }, ident));
+          });
+        }
+        return res;
+      })
+      .then(done);
   }
 
   /* The birthday opens a phone report. A session that ran out opens again
@@ -1320,7 +1456,9 @@ var StudentPage = (function () {
     if (!el || !root.contains(el)) return;
     var act = el.dataset.act;
     var q = el.dataset.q ? questionById(el.dataset.q) : null;
-    if (act === 'start') {
+    if (act === 'start' && S.data && S.data.check) {
+      verifyIdentity();
+    } else if (act === 'start') {
       S.screen = 'part';
       S.part = 0;
       paint();
@@ -1428,6 +1566,10 @@ var StudentPage = (function () {
       S.typed = el.value;
       return;
     }
+    if (el.id === 'sp-ident') {
+      S.number = el.value;
+      return;
+    }
     if (!el.dataset || !el.dataset.q) return;
     var q = questionById(el.dataset.q);
     if (!q) return;
@@ -1488,7 +1630,17 @@ var StudentPage = (function () {
       paint();
       loadDemoTemplates(function () {
         S.data = demoData(/about/i.test(h) ? 'about' : 'reflection');
-        S.screen = S.data.parts.length ? 'confirm' : 'start';
+        // The reflection asks who you are, as a real slip does (any answer
+        // passes in Demo Mode); About Me shows the screen after the check.
+        if (!/about/i.test(h) && S.data.parts.length) {
+          S.demoParts = S.data.parts;
+          S.demoContext = S.data.context;
+          S.data.preview = slipParts(S.data);
+          delete S.data.parts;
+          delete S.data.context;
+          S.data.check = 'identity';
+        }
+        S.screen = S.data.parts || S.data.check ? 'confirm' : 'start';
         paint();
       });
       return;

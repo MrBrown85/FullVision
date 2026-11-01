@@ -166,12 +166,13 @@ ok('and turns the reply off', one('select is_on from questionnaire where id = :q
 sp(); as_teacher(A)
 expect_error('no new slips for a closed report', lambda: c.run('select issue_report_codes(:r, null, :k)', r=rid, k=key()), 'closed')
 
-# ── Questionnaire codes are unchanged ──────────────────────────────────
+# ── Questionnaire codes open to the identity check (20261101) ──────────
 as_teacher(A)
 q = c.run("select upsert_questionnaire(:c, 'about_me', 'About Me', 'about-me', p_idempotency_key => :k)", c=COURSE_A, k=key())[0][0]
 qc = c.run('select issue_access_codes(:q, null, :k)', q=q['id'], k=key())[0][0][0]['code']
 r = open_(qc)
-ok('a questionnaire code still opens straight to its questions', r.get('kind') == 'questionnaire' and len(r['parts']) == 1, r)
+ok('a questionnaire code opens to the identity check, not its questions',
+   r.get('kind') == 'questionnaire' and r.get('check') == 'identity' and 'parts' not in r, r)
 
 c.run('rollback')
 print('\n'.join('PASS ' + p for p in passed))

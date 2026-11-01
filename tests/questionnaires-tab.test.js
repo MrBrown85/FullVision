@@ -112,6 +112,29 @@ describe('QR slips', () => {
   });
 });
 
+describe('QR slips: the slip password', () => {
+  it('prints the password under the code only when there is one', () => {
+    var slips = QrSlips.buildSlips(
+      students(),
+      [
+        { enrollment_id: 'e1', code: 'K7M-4QX', password: '4821' },
+        { enrollment_id: 'e2', code: 'ABC-234', password: null },
+      ],
+      'https://fullvision.ca',
+    );
+    var box = dom().createElement('div');
+    box.innerHTML = QrSlips.buildPages(slips, { title: 'About Me' }, 'Science 8', () => '');
+    var bySlip = Array.from(box.querySelectorAll('.qs-slip')).map(el => ({
+      name: el.querySelector('.qs-name').textContent,
+      pass: el.querySelector('.qs-pass strong') ? el.querySelector('.qs-pass strong').textContent : null,
+    }));
+    expect(bySlip).toEqual([
+      { name: 'Jay Lee', pass: null },
+      { name: 'Maya Ross', pass: '4821' },
+    ]);
+  });
+});
+
 describe('Questionnaires tab', () => {
   var originals;
   var root;

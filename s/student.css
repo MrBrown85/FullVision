@@ -556,6 +556,25 @@ button {
   padding: 0 8px;
   background: #fff;
 }
+/* Who are you? Under the "You will answer" box on a questionnaire slip. */
+.sp-ident {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin-top: 16px;
+  text-align: left;
+}
+.sp-ident .sp-lead {
+  margin: 0 0 4px;
+  text-align: center;
+}
+.sp-or {
+  margin: 4px 0;
+  text-align: center;
+  font-size: 14px;
+  color: #636366;
+}
 .sp-fine {
   margin: auto 0 0;
   font-size: 13px;

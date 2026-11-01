@@ -44,7 +44,9 @@ var QrSlips = (function () {
     return '';
   }
 
-  /* One slip per code, in roster order: { name, code, url }. */
+  /* One slip per code, in roster order: { name, code, url, password }. The
+     password is there only for a student with no birthday or student number
+     (the phone asks for those instead). */
   function buildSlips(students, codes, origin) {
     var byId = {};
     (students || []).forEach(function (s) {
@@ -62,6 +64,7 @@ var QrSlips = (function () {
           sortName: ((st.lastName || '') + ' ' + first).toLowerCase(),
           code: c.code,
           url: slipUrl(c.code, origin),
+          password: c.password || '',
         };
       })
       .sort(function (a, b) {
@@ -96,7 +99,11 @@ var QrSlips = (function () {
       ) +
       ' and type</span><strong>' +
       esc(slip.code) +
-      '</strong></div><div class="qs-once">' +
+      '</strong></div>' +
+      (slip.password
+        ? '<div class="qs-type qs-pass"><span>Password</span><strong>' + esc(slip.password) + '</strong></div>'
+        : '') +
+      '<div class="qs-once">' +
       esc(q.slipNote || 'This code works once and only for you.') +
       '</div></div></div>' +
       '</div>'
