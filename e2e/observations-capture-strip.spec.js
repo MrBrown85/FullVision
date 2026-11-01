@@ -2,9 +2,10 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, seedAssessments, gotoApp, TEST_COURSE } from './helpers.js';
 
 /* One capture strip on every surface (docs/DECISIONS.md, "Observations
-   (2026-10-18)"). A comment captured from the Assignments popover (the
-   one-student grader's Comment button) is a full observation: it shows on
-   the Observations page with its type, tags and assessment. */
+   (2026-10-18)"). An observation added from a gradebook cell's menu is a
+   full observation linked to the work: it shows on the Observations page
+   with its type, tags and assessment. (The grading views carry only the
+   Overall Comment field: "Assignment feedback (2026-11-01)".) */
 
 async function storedObs(page) {
   return page.evaluate(cid => {
@@ -21,31 +22,29 @@ test.describe('Observation capture strip', () => {
     await seedAssessments(page);
   });
 
-  test('a comment from the Assignments popover shows on the Observations page with its type and tags', async ({
+  test('an observation added from a gradebook cell shows on the Observations page with its type and tags', async ({
     page,
   }) => {
-    await gotoApp(page, '/assignments?open=assess-001');
-    await page.locator('#gb-roster-list .student-row[data-sid="stu-001"]').click();
-    await page.locator('.grader-inline .grader-add-comment[data-sid="stu-001"]').first().click();
+    await gotoApp(page, '/gradebook');
+    await page.locator('[data-action="setView"][data-mode="scores"]').click();
+    await page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-001"]').click({ button: 'right' });
+    await page.locator('.gb-ctx-item[data-ctx="addObservation"]').click();
 
-    const pop = page.locator('#comment-popover-overlay .comment-popover');
+    const pop = page.locator('.obsc-dialog');
     await expect(pop).toBeVisible();
-    // Student and assessment are fixed by the popover.
+    // Student and assessment are fixed by the dialog.
     await expect(pop.locator('.obsc-chip-student')).toContainText('Alice');
     await expect(pop.locator('.obsc-chip-assessment')).toContainText('Lab Report 1');
-    await expect(pop.locator('#asg-student-btn')).toHaveCount(0);
+    await expect(pop.locator('#dlg-student-btn')).toHaveCount(0);
 
     await pop.getByRole('button', { name: 'Strength' }).click();
-    await pop.locator('#asg-tag-btn').click();
-    await pop.locator('#asg-tag-dropdown .obsc-menu-search').fill('collab');
-    await pop.locator('#asg-tag-dropdown .obsc-item', { hasText: 'Collaboration' }).first().click();
-    await pop.locator('#asg-capture-input').click();
-    await pop.locator('#asg-capture-input').fill('Explained the method to her group');
+    await pop.locator('#dlg-tag-btn').click();
+    await pop.locator('#dlg-tag-dropdown .obsc-menu-search').fill('collab');
+    await pop.locator('#dlg-tag-dropdown .obsc-item', { hasText: 'Collaboration' }).first().click();
+    await pop.locator('#dlg-capture-input').click();
+    await pop.locator('#dlg-capture-input').fill('Explained the method to her group');
     await page.keyboard.press('Enter');
-
-    await expect(pop.locator('.comment-entry-text')).toHaveText('Explained the method to her group');
-    await expect(pop.locator('.comment-entry .obs-pill-type')).toHaveText('Strength');
-    await expect(page.locator('.grader-add-comment[data-sid="stu-001"] .comment-count').first()).toHaveText('1');
+    await expect(pop).toHaveCount(0);
 
     const saved = await storedObs(page);
     expect(saved).toHaveLength(1);
@@ -56,7 +55,6 @@ test.describe('Observation capture strip', () => {
       assignmentContext: { assessmentId: 'assess-001', assessmentTitle: 'Lab Report 1' },
     });
 
-    await page.locator('.comment-popover-close').click();
     await page.evaluate(r => window.Router.navigate(r), `/observations?course=${TEST_COURSE.id}`);
     const card = page.locator('.obs-card', { hasText: 'Explained the method to her group' });
     await expect(card).toBeVisible();
