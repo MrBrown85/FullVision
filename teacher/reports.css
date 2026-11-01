@@ -723,45 +723,6 @@
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
-.report-learner-dims {
-  display: flex;
-  flex-wrap: wrap;
-  padding: 14px 18px;
-  gap: 0;
-}
-.report-learner-dim {
-  flex: 1 1 33%;
-  padding: 8px 10px;
-  min-width: 140px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.report-learner-dim-info {
-  flex: 1;
-}
-.report-learner-dim-label {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  margin-bottom: 2px;
-}
-.report-learner-dim-value {
-  font-family: var(--font-base);
-  font-size: var(--text-md);
-  font-weight: 600;
-}
-.report-learner-dim-bar {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--divider-subtle);
-  margin-top: 3px;
-}
-.report-learner-dim-fill {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.3s;
-}
 .report-obs-notes {
   padding: 12px 18px;
   border-top: 1px solid var(--border);
@@ -1016,29 +977,16 @@
     font-size: var(--text-sm) !important;
     padding: 6px 14px !important;
   }
-  .report-learner-dims {
-    padding: 6px 14px !important;
-    gap: 4px 10px !important;
-  }
   /* Three dimensions per row in print; two left a third of the width empty
      and pushed the block onto a third page. The description line stays on
      screen and is left off paper: with the wider fonts of Linux and Windows
      it tipped three students onto a third page. */
-  .report-learner-dim {
-    flex: 1 1 30% !important;
-  }
   .report-dim-desc {
     display: none !important;
   }
   .report-section-chart > div[style*='margin-top:12px'] {
     margin-top: 7px !important;
     padding-top: 6px !important;
-  }
-  .report-learner-dim-label {
-    font-size: var(--text-sm) !important;
-  }
-  .report-learner-dim-value {
-    font-size: var(--text-sm) !important;
   }
   .report-next-steps {
     margin-bottom: 10px !important;
@@ -1150,7 +1098,6 @@
   .report-overall-label {
     color: #ddd !important;
   }
-  .report-learner-dim-fill,
   .report-outcome-bar-fill,
   .report-next-step-bullet,
   [data-prof-bg][style*='height:100%'] {
@@ -1158,7 +1105,6 @@
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  .report-learner-dim-bar,
   .report-outcome-bar {
     background: #e2e2e2 !important;
     -webkit-print-color-adjust: exact !important;
@@ -1639,25 +1585,12 @@
   font-size: var(--text-sm) !important;
   padding: 6px 14px !important;
 }
-.report-sheet .report-learner-dims {
-  padding: 6px 14px !important;
-  gap: 4px 10px !important;
-}
-.report-sheet .report-learner-dim {
-  flex: 1 1 30% !important;
-}
 .report-sheet .report-dim-desc {
   display: none !important;
 }
 .report-sheet .report-section-chart > div[style*='margin-top:12px'] {
   margin-top: 7px !important;
   padding-top: 6px !important;
-}
-.report-sheet .report-learner-dim-label {
-  font-size: var(--text-sm) !important;
-}
-.report-sheet .report-learner-dim-value {
-  font-size: var(--text-sm) !important;
 }
 .report-sheet .report-next-steps {
   margin-bottom: 10px !important;
@@ -1757,7 +1690,6 @@
 .report-photocopy .report-overall-label {
   color: #ddd !important;
 }
-.report-photocopy .report-learner-dim-fill,
 .report-photocopy .report-outcome-bar-fill,
 .report-photocopy .report-next-step-bullet,
 .report-photocopy [data-prof-bg][style*='height:100%'] {
@@ -1765,7 +1697,6 @@
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
 }
-.report-photocopy .report-learner-dim-bar,
 .report-photocopy .report-outcome-bar {
   background: #e2e2e2 !important;
   -webkit-print-color-adjust: exact !important;
@@ -3005,11 +2936,6 @@ textarea.studio-text {
     flex: 0 0 50%;
     min-width: 0;
     box-sizing: border-box;
-  }
-}
-@container (width < 400px) {
-  .report-sheet .report-learner-dim {
-    flex: 1 1 100% !important;
   }
 }
 @container (width < 380px) {

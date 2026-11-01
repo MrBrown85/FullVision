@@ -223,8 +223,6 @@
 
   async function _doRefresh() {
     _refreshing = true;
-    // Also flush any pending failed syncs — pull-to-refresh is the mobile recovery trigger
-    if (window.GB && window.GB.retrySyncs) window.GB.retrySyncs();
     try {
       // refreshFromSupabase was removed, so this used to reload nothing and
       // still say "Synced". It now reloads the class and reports the result.

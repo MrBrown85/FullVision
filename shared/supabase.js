@@ -128,24 +128,6 @@
     return data;
   };
 
-  /**
-   * Re-checks the current account password before a sensitive action.
-   * Uses the signed-in user's email as the identity source of truth.
-   * @param {string} password - The current account password
-   * @returns {Promise<object>} The refreshed Supabase sign-in payload
-   */
-  window.reauthenticateWithPassword = async function (password) {
-    const sb = getSupabase();
-    if (!sb) throw new Error('Supabase not initialized');
-    const user = await getCurrentUser();
-    const email = (user && user.email) || '';
-    if (!email) throw new Error('Could not verify the current account email.');
-    if (!password) throw new Error('Enter your password to continue.');
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    return data;
-  };
-
   window.refreshSupabaseSession = async function () {
     const sb = getSupabase();
     if (!sb) throw new Error('Supabase not initialized');
