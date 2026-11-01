@@ -6351,7 +6351,33 @@ window.CommentBank = (function () {
     return out;
   }
 
+  /* The sentence bank (shared/comment-bank.js, about 550 KB) is only read
+     on the Term Questionnaire, so it is fetched when Reports first needs it
+     rather than on every page. Resolves true once COMMENT_BANK exists, false
+     if it couldn't be loaded. The teacher's own sentences are installed into
+     it as soon as it arrives. sw.js still precaches it for offline use. */
+  var _bankLoading = null;
+  function loadBank() {
+    if (typeof COMMENT_BANK !== 'undefined') return Promise.resolve(true);
+    if (_bankLoading) return _bankLoading;
+    _bankLoading = new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = '/shared/comment-bank.js';
+      s.onload = function () {
+        if (window.CommentPersonal && typeof CommentPersonal.install === 'function') CommentPersonal.install();
+        resolve(typeof COMMENT_BANK !== 'undefined');
+      };
+      s.onerror = function () {
+        _bankLoading = null;
+        resolve(false);
+      };
+      document.head.appendChild(s);
+    });
+    return _bankLoading;
+  }
+
   return {
+    loadBank: loadBank,
     SCALE: SCALE,
     HABITS: HABITS,
     NOT_SEEN: NOT_SEEN,
