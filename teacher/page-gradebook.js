@@ -301,31 +301,21 @@ window.PageGradebook = (function () {
       '<div class="seg gb-seg-control" role="tablist" aria-label="View mode">' +
       '<button class="seg-btn gb-seg-btn' +
       (viewMode === 'scores' ? ' active' : '') +
-      '" data-action="setView" data-mode="scores" role="tab" aria-selected="' +
+      '" data-action="setView" data-mode="scores" data-label="Scores" role="tab" aria-selected="' +
       (viewMode === 'scores') +
       '">Scores</button>' +
       '<button class="seg-btn gb-seg-btn' +
       (viewMode === 'detailed' ? ' active' : '') +
-      '" data-action="setView" data-mode="detailed" role="tab" aria-selected="' +
+      '" data-action="setView" data-mode="detailed" data-label="Competencies" role="tab" aria-selected="' +
       (viewMode === 'detailed') +
       '">Competencies</button>' +
       '</div>';
 
-    var hasRubricAssessment = allAssessments.some(function (a) {
+    // The Rubric Columns picker sits in the Competencies corner, beside
+    // Newest First, so the toolbar is the same in both views.
+    _hasRubricWork = allAssessments.some(function (a) {
       return rubricCriterionColumns(a, cid).length > 0;
     });
-    if (viewMode === 'detailed' && hasRubricAssessment) {
-      var rubricCols = rubricColumnsMode(cid);
-      html +=
-        '<select class="class-picker gb-rubric-cols-select" data-action="setRubricColumns" aria-label="Rubric columns">' +
-        '<option value="competencies"' +
-        (rubricCols === 'competencies' ? ' selected' : '') +
-        '>Rubrics by Competency</option>' +
-        '<option value="criteria"' +
-        (rubricCols === 'criteria' ? ' selected' : '') +
-        '>Rubrics by Criterion</option>' +
-        '</select>';
-    }
 
     html += typeof renderTermPicker === 'function' ? renderTermPicker(cid) : '';
 
@@ -364,10 +354,10 @@ window.PageGradebook = (function () {
           undatedCount +
           ' Undated Not Shown</span>'
         : '') +
-      (viewMode === 'scores'
-        ? '<button class="tb-toggle-btn" data-action="exportScoresCSV" title="Export CSV">\u2913 Export</button>'
-        : '') +
-      '<button class="tb-action-btn tb-action-secondary" data-action="printGrades">Print Grades</button>' +
+      '<button class="tb-toggle-btn" data-action="exportScoresCSV" title="Export CSV" aria-label="Export">\u2913<span class="gb-tb-text"> Export</span></button>' +
+      '<button class="tb-action-btn tb-action-secondary" data-action="printGrades" aria-label="Print Grades" title="Print Grades"><span class="gb-tb-icon" aria-hidden="true">' +
+      LINE_ICONS.print +
+      '</span><span class="gb-tb-text">Print Grades</span></button>' +
       '<a class="tb-action-btn" role="link" tabindex="0" data-href="/assignments?course=' +
       activeCourse +
       '&new=1">+ New Assessment</a>' +
@@ -620,6 +610,26 @@ window.PageGradebook = (function () {
     else if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) col = Math.min(col + 1, cols - 1);
     else col = Math.max(col - 1, 0);
     if (rows[row][col]) _selectCell(rows[row][col]);
+  }
+
+  var _hasRubricWork = false;
+  /* The corner's view options: Newest First, and in Competencies the Rubric
+     Columns picker when the class has rubric work. */
+  function _cornerTools(withRubricCols) {
+    var html = '<div class="gb-corner-tools">' + _newestFirstButton();
+    if (withRubricCols && _hasRubricWork) {
+      var rubricCols = rubricColumnsMode(activeCourse);
+      html +=
+        '<select class="class-picker gb-rubric-cols-select" data-action="setRubricColumns" aria-label="Rubric columns">' +
+        '<option value="competencies"' +
+        (rubricCols === 'competencies' ? ' selected' : '') +
+        '>Rubrics by Competency</option>' +
+        '<option value="criteria"' +
+        (rubricCols === 'criteria' ? ' selected' : '') +
+        '>Rubrics by Criterion</option>' +
+        '</select>';
+    }
+    return html + '</div>';
   }
 
   function _newestFirstButton() {
@@ -1084,7 +1094,7 @@ window.PageGradebook = (function () {
     // Q1: Corner (Student + Overall labels)
     html +=
       '<div class="gb-grid-corner gb-grid-corner-comp">' +
-      _newestFirstButton() +
+      _cornerTools(true) +
       '<div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
       sortArrow('name') +
       '</button><span class="gb-grid-corner-label">Overall</span></div>' +
@@ -1413,7 +1423,7 @@ window.PageGradebook = (function () {
     // Q1: Corner (top-left, fixed)
     html +=
       '<div class="gb-grid-corner gb-grid-corner-comp">' +
-      _newestFirstButton() +
+      _cornerTools(false) +
       '<div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
       sortArrow('name') +
       '</button><span class="gb-grid-corner-label">Overall</span></div></div>';
