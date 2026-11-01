@@ -3309,7 +3309,7 @@ window.ReportQuestionnaire = (function () {
      a slot) is listed under every case it serves, previewed for that case.
      Headings are plain words in Title Case: no competency codes, no
      pronouns. */
-  var FAMILY_ORDER = ['socials', 'science', 'math', 'ela', 'arts', 'pe', 'adst', 'career'];
+  var FAMILY_ORDER = ['socials', 'science', 'math', 'ela', 'arts', 'pe', 'adst', 'career', 'languages'];
   var FAMILY_NAMES = {
     socials: 'Social Studies',
     science: 'Science',
@@ -3319,6 +3319,7 @@ window.ReportQuestionnaire = (function () {
     pe: 'Physical and Health Education',
     adst: 'Applied Design, Skills and Technologies',
     career: 'Career Education',
+    languages: 'Languages',
   };
   var LEVEL_WORDS = { 4: 'Consistently', 3: 'Usually', 2: 'Sometimes', 1: 'Rarely' };
   // The letter grades by standing (the Letter Grades Order), and the next

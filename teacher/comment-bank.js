@@ -104,14 +104,18 @@ window.CommentBank = (function () {
   }
 
   /* The kind of class, for the bank's subject wording: one of adst, arts,
-     career, ela, math, pe, science, socials, or '' when unknown. From the
-     learning map's subject (its BC subject area, or its course tag), else
-     the class's name. */
+     career, ela, languages, math, pe, science, socials, or '' when
+     unknown. From the learning map's subject (its BC subject area, or its
+     course tag), else the class's name. Languages (lane H, Nov 1) are the
+     second-language courses: French, Spanish, Punjabi, Japanese, Mandarin,
+     Korean, German, Italian, ASL and the like. */
   var FAMILIES = {
     'Applied Design, Skills and Technologies': 'adst',
     'Arts Education': 'arts',
     'Career Education': 'career',
     'English Language Arts': 'ela',
+    Languages: 'languages',
+    'Second Languages': 'languages',
     Mathematics: 'math',
     'Physical and Health Education': 'pe',
     Science: 'science',
@@ -121,6 +125,7 @@ window.CommentBank = (function () {
     [/^(PHE|AL|FC|ODED)\d/, 'pe'],
     [/^(SCI|ANAT|BIO|CHEM|EARTH|ENVSCI|GEO|LS\d+SCI|PHYS|SFC)/, 'science'],
     [/^(MATH|APPM|CALC|CS\d|FOM|FPC|HOM|PC\d|STAT|WPM)/, 'math'],
+    [/^(FR|FRAL|FRSL|SPAN|SPN|PUNJ|PUN|JAPN|JPN|MAND|MAN|KOR|KORN|GERM|GER|ITAL|ITL|ASL|HIND|ARAB)\d/, 'languages'],
     [/^(ELA|COMP\d|CW|EFP|ES12|LS\d|NM|NMED|SL|SPKN|HUM)/, 'ela'],
     [/^(SS|ASIA|BCFP|CC12|CIS12|ECON|ESS|GEN|HGEO|HIST|INDS|LAW|PGEO|PHIL|PHYG|POL|REL|SJ|URB)/, 'socials'],
     [/^(CAREE|CLC|CLE)/, 'career'],
@@ -133,6 +138,10 @@ window.CommentBank = (function () {
     [/\b(pe|p\.e\.|phys(ical)?\s*(and health )?ed|fitness|outdoor|active living|health)\b/i, 'pe'],
     [/\b(science|biology|chemistry|physics|earth|geology|environmental)\b/i, 'science'],
     [/\b(math|calculus|pre-?calc|statistics|foundations|workplace math)/i, 'math'],
+    [
+      /\b(french|français|francais|spanish|punjabi|japanese|mandarin|korean|german|italian|hindi|arabic|asl|sign language|immersion)\b/i,
+      'languages',
+    ],
     [/\b(english|ela|literary|composition|creative writing|spoken language|new media|humanities)\b/i, 'ela'],
     [
       /\b(social|socials|history|geography|law|philosophy|economics|political|psychology|genocide|justice)\b/i,
@@ -248,6 +257,45 @@ window.CommentBank = (function () {
       },
     ],
     math: [
+      // The sub-skills a grade 8–12 math teacher names (lane H, Nov 1),
+      // before the four curriculum strands so a specific label finds its
+      // own skill first. "reasonabl" sits before "reason".
+      {
+        key: 'estimating',
+        name: 'Estimating',
+        match: /estimat|mental math|reasonabl|number sense/i,
+        skill: 'estimate the answer first and use the estimate to check the result',
+      },
+      {
+        key: 'patterns',
+        name: 'Logic and Patterns',
+        match: /pattern|logic|puzzle|conjecture|generali[sz]/i,
+        skill: 'find the rule behind a pattern and use it to predict the next case',
+      },
+      {
+        key: 'graphs',
+        name: 'Graphs and Tables',
+        match: /graph|table|diagram|chart|plot/i,
+        skill: 'show the numbers in a graph or table and say what the shape means',
+      },
+      {
+        key: 'notation',
+        name: 'Notation and Units',
+        match: /notation|symbol|equation|formula|algebra|expression|\bunits?\b/i,
+        skill: 'write each line of math with the right symbols, signs and units',
+      },
+      {
+        key: 'wordProblems',
+        name: 'Word Problems',
+        match: /word problem|real.?world|real.?life|context|situation|applied|application/i,
+        skill: 'change a word problem into an equation and explain what the answer means',
+      },
+      {
+        key: 'procedures',
+        name: 'Procedures',
+        match: /procedur|fluenc|accura|calculat|operation|arithmetic|computation|basic skill/i,
+        skill: 'follow each step of a procedure in order and check the arithmetic',
+      },
       {
         key: 'communicating',
         name: 'Communicating and Representing',
@@ -318,6 +366,53 @@ window.CommentBank = (function () {
       },
     ],
     arts: [
+      // Dance, drama, music, visual arts and photography sub-skills (lane
+      // H, Nov 1), before the four curriculum strands. "documenting" must
+      // not take "Communicate and Document", so it matches the -ing form,
+      // the noun and the studio words only.
+      {
+        key: 'planning',
+        name: 'Planning a Piece',
+        match: /\bplan|sketch\b|thumbnail|storyboard|draft|outline|brainstorm/i,
+        skill: 'plan a piece with a sketch or an outline before starting the final version',
+      },
+      {
+        key: 'revising',
+        name: 'Using Feedback',
+        match: /revis|feedback|critique|refin|improv|\bedit/i,
+        skill: 'use feedback on a draft to change one part of the piece',
+      },
+      {
+        key: 'elements',
+        name: 'Elements and Principles',
+        match: /element|principle|colou?r|\bline\b|shape|texture|rhythm|dynamics|tempo|pitch|harmony|melody/i,
+        skill: 'name the elements used in a piece and the effect of each',
+      },
+      {
+        key: 'performing',
+        name: 'Performing',
+        match:
+          /\bperform|rehears|\bstage|ensemble|\bchoir|\bband\b|\bacting|\bvoice\b|choreograph|\bdance\b|\bplay(ing)?\b|instrument/i,
+        skill: 'rehearse a part until the whole piece can be performed without a stop',
+      },
+      {
+        key: 'notation',
+        name: 'Reading Notation',
+        match: /notation|sight-?read|read(ing)? music|\bscore|theory|\bscales?\b/i,
+        skill: 'read a line of music or a rhythm and play or clap it in time',
+      },
+      {
+        key: 'camera',
+        name: 'Camera and Light',
+        match: /photo|camera|lens|exposure|lighting|\bfilm|video|\bshot/i,
+        skill: 'control the light and the framing before taking a photo or a shot',
+      },
+      {
+        key: 'documenting',
+        name: 'Documenting the Process',
+        match: /portfolio|artist statement|journal|sketchbook|documenting|documentation/i,
+        skill: 'keep a record of each stage of a piece, with a note on what changed',
+      },
       {
         key: 'reflecting',
         name: 'Reason and Reflect',
@@ -350,6 +445,53 @@ window.CommentBank = (function () {
       },
     ],
     pe: [
+      // Physical literacy, healthy living, social and community health and
+      // mental well-being sub-skills (lane H, Nov 1), before the five
+      // broad ones. Outdoor sits before strategy so "Outdoor
+      // Decision-Making" is outdoor, not a game plan.
+      {
+        key: 'outdoor',
+        name: 'Outdoor Activities',
+        match: /outdoor|land-based|wilderness|expedition|hik|camp|navigat/i,
+        skill: 'plan the route, the weather and the gear before an outdoor activity',
+      },
+      {
+        key: 'strategy',
+        name: 'Game Strategy',
+        match: /strateg|tactic|game sense|decision|rules|offen[cs]|defen[cs]/i,
+        skill: 'read the play in a game and move to open space before the pass',
+      },
+      {
+        key: 'nutrition',
+        name: 'Healthy Eating',
+        match: /nutrition|eating|\bfood|diet|sleep|hydrat/i,
+        skill: 'plan a day of food and water that gives the body what an active day needs',
+      },
+      {
+        key: 'relationships',
+        name: 'Healthy Relationships',
+        match:
+          /relationship|consent|respect|bully|conflict|friend|social and community|social health|community health/i,
+        skill: 'describe what a healthy relationship looks like and where to ask for help',
+      },
+      {
+        key: 'substances',
+        name: 'Substance Use',
+        match: /substance|\bdrug|alcohol|vap(e|ing)|tobacco|addict|cannabis/i,
+        skill: 'explain the risks of a substance and practise a way to say no',
+      },
+      {
+        key: 'pacing',
+        name: 'Endurance and Pacing',
+        match: /endur|pacing|\bpace\b|cardio|\brun(ning)?\b|aerobic|stamina/i,
+        skill: 'hold a steady pace for a whole run rather than starting fast and fading',
+      },
+      {
+        key: 'stress',
+        name: 'Managing Stress',
+        match: /stress|anxiety|coping|emotion|resilien|mindful|self-?regulat/i,
+        skill: 'name one way to lower stress and use it before a test or a game',
+      },
       { key: 'safety', name: 'Safety', match: /safe|risk|injur/i, skill: 'explain how to stay safe in an activity' },
       {
         key: 'wellbeing',
@@ -377,6 +519,71 @@ window.CommentBank = (function () {
       },
     ],
     adst: [
+      // Every ADST course family (lane H, Nov 1): foods, textiles, woodwork
+      // and metalwork, drafting, coding, business, media, plus safety,
+      // materials and teamwork on a build. Before the five broad ones, so
+      // "Cooking Methods" is food preparation, not making.
+      {
+        key: 'safety',
+        name: 'Safety',
+        match: /safe|hazard|sanitation|hygiene|whmis|\bppe\b/i,
+        skill: 'follow every safety step before and while using a tool or machine',
+      },
+      {
+        key: 'foodPrep',
+        name: 'Food Preparation',
+        match: /\bfood|cook|recipe|knife|kitchen|meal|nutrition|culinary|bak(e|ing)|menu/i,
+        skill: 'follow a recipe in order, measuring each ingredient and timing each step',
+      },
+      {
+        key: 'sewing',
+        name: 'Sewing and Textiles',
+        match: /\bsew|textile|garment|stitch|fabric\b|pattern|fashion|cloth/i,
+        skill: 'read a pattern and sew each seam in the order it gives',
+      },
+      {
+        key: 'fabricating',
+        name: 'Cutting and Joining',
+        match: /wood|metal|join|\bcut|weld|machin|lathe|\bsaw\b|drill|fabricat|cabinet|furniture|shaping/i,
+        skill: 'measure and cut each piece to the plan before joining it',
+      },
+      {
+        key: 'drafting',
+        name: 'Drafting',
+        match: /draft|drawing|\bcad\b|sketch|blueprint|orthographic|isometric|dimension|technical draw/i,
+        skill: 'draw a plan to scale with every measurement labelled',
+      },
+      {
+        key: 'coding',
+        name: 'Coding',
+        match: /\bcod(e|ing)|program|algorithm|debug|software|script|robot|comput|\bdata\b/i,
+        skill: 'test a program in small parts and fix one error at a time',
+      },
+      {
+        key: 'media',
+        name: 'Media Design',
+        match: /media|photo|video|\bfilm|animat|graphic|layout|typograph|\bweb|multimedia|podcast|audio|brand/i,
+        skill: 'plan a media piece for one audience and edit it until the message is clear',
+      },
+      {
+        key: 'business',
+        name: 'Business',
+        match:
+          /business|market|entrepreneur|account|financ|budget|customer|sales|e-?commerce|tourism|hospitality|enterprise|\bcost/i,
+        skill: 'explain who a product is for and how its price covers its costs',
+      },
+      {
+        key: 'materials',
+        name: 'Materials',
+        match: /material|ingredient|supplies|\bstock|fibre|fiber|resource/i,
+        skill: 'choose the right material for a job and say why it suits the job',
+      },
+      {
+        key: 'collaborating',
+        name: 'Teamwork',
+        match: /collaborat|\bteam|\bgroup|cooperat|partner/i,
+        skill: 'share the work in a group build and keep to the agreed plan',
+      },
       {
         key: 'testing',
         name: 'Testing',
@@ -409,6 +616,32 @@ window.CommentBank = (function () {
       },
     ],
     career: [
+      // Career Life Education sub-skills (lane H, Nov 1), before the four
+      // broad ones.
+      {
+        key: 'influences',
+        name: 'Influences on Decisions',
+        match: /influenc|examin|decision|\bvalues?\b|role model|\bmedia/i,
+        skill: 'explain how family, friends and media shape a choice about the future',
+      },
+      {
+        key: 'interview',
+        name: 'Résumés and Interviews',
+        match: /r[ée]sum|interview|cover letter|job search|job application|hiring|employab|portfolio/i,
+        skill: 'show in a résumé or an interview how past experience fits a job posting',
+      },
+      {
+        key: 'budgeting',
+        name: 'Budgeting',
+        match: /budget|financ|money|\bcost|income|saving|spending/i,
+        skill: 'make a simple budget and say what each spending choice leaves for the others',
+      },
+      {
+        key: 'postSecondary',
+        name: 'Post-Secondary Options',
+        match: /post-?secondary|graduat|transition|pathway|apprentice|college|universit|training|scholarship/i,
+        skill: 'compare two options for after graduation by cost, time and entry requirements',
+      },
       {
         key: 'self',
         name: 'Self-Awareness',
@@ -432,6 +665,68 @@ window.CommentBank = (function () {
         name: 'Planning',
         match: /plan|life/i,
         skill: 'set a goal for after school and the steps toward it',
+      },
+    ],
+    // Second languages (lane H, Nov 1): French, Spanish, Punjabi, Japanese
+    // and the rest share one table. The skills say "the language", never
+    // which one, and assume nothing about which languages the family
+    // speaks. Listening sits before reading so "Listening Comprehension"
+    // is listening; communicating before understanding so "Thinking and
+    // Communicating" is communicating.
+    languages: [
+      {
+        key: 'listening',
+        name: 'Listening',
+        match: /listen|audio|oral comprehen|comprehen.*(spoken|oral)/i,
+        skill: 'find the main idea in a short spoken message in the language',
+      },
+      {
+        key: 'speaking',
+        name: 'Speaking',
+        match: /speak|\boral|conversation|pronunc|dialogue|present/i,
+        skill: 'ask and answer simple questions in the language in a short conversation',
+      },
+      {
+        key: 'reading',
+        name: 'Reading',
+        match: /\bread|\btext|comprehen/i,
+        skill: 'read a short text in the language and say what it is about',
+      },
+      {
+        key: 'writing',
+        name: 'Writing',
+        match: /writ|compos|paragraph|sentence/i,
+        skill: 'write a short paragraph in the language with the words in the right order',
+      },
+      {
+        key: 'vocabulary',
+        name: 'Vocabulary',
+        match: /vocab|\bwords?\b|lexic/i,
+        skill: 'use the new words from each unit in sentences, not just in a list',
+      },
+      {
+        key: 'grammar',
+        name: 'Grammar',
+        match: /grammar|\bverb|tense|structure|accura|conjugat|agreement/i,
+        skill: 'use the right verb form for the person and the time',
+      },
+      {
+        key: 'culture',
+        name: 'Culture',
+        match: /cultur|communit|tradition|awareness|identity|perspective|\bsocial/i,
+        skill: 'describe one custom from a community that speaks the language and what it shows',
+      },
+      {
+        key: 'communicating',
+        name: 'Communicating',
+        match: /communicat|interact|exchange|express|respond|engag/i,
+        skill: 'say what is meant in the language, with another word or a gesture when one is missing',
+      },
+      {
+        key: 'understanding',
+        name: 'Understanding',
+        match: /understand|meaning|interpret|gist|negotiat|think/i,
+        skill: 'use the words around an unknown word to guess its meaning',
       },
     ],
   };
