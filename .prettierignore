@@ -7,3 +7,6 @@ node_modules/
 
 # Archived mockups, kept as they were drawn
 docs/plans/*.html
+
+# Ministry text built by scripts/bc_curriculum.py; written as json.dump output
+data/bc-curriculum-*.json

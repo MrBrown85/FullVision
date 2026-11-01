@@ -1,0 +1,1401 @@
+{
+  "matched": [
+    {
+      "key": "ACCT11",
+      "official": "Accounting 11",
+      "bank": "Accounting 11",
+      "page": "adst/11/accounting"
+    },
+    {
+      "key": "ACCT12",
+      "official": "Accounting 12",
+      "bank": "Accounting 12",
+      "page": "adst/12/accounting"
+    },
+    {
+      "key": "ADST8",
+      "official": "Applied Design, Skills and Technologies 8",
+      "bank": "Applied Design, Skills and Technologies 8",
+      "page": "adst/8/core"
+    },
+    {
+      "key": "ADST9",
+      "official": "Applied Design, Skills and Technologies 9",
+      "bank": "Applied Design, Skills and Technologies 9",
+      "page": "adst/9/core"
+    },
+    {
+      "key": "AL11",
+      "official": "Active Living 11",
+      "bank": "Active Living 11",
+      "page": "physical-health-education/11/active-living"
+    },
+    {
+      "key": "AL12",
+      "official": "Active Living 12",
+      "bank": "Active Living 12",
+      "page": "physical-health-education/12/active-living"
+    },
+    {
+      "key": "AMJ12",
+      "official": "Art Metal and Jewellery 12",
+      "bank": "Art Metal and Jewellery 12",
+      "page": "adst/12/art-metal-and-jewellery"
+    },
+    {
+      "key": "ANAT12",
+      "official": "Anatomy and Physiology 12",
+      "bank": "Anatomy and Physiology 12",
+      "page": "science/12/anatomy-and-physiology"
+    },
+    {
+      "key": "APPM12",
+      "official": "Apprenticeship Mathematics 12",
+      "bank": "Apprenticeship Mathematics 12",
+      "page": "mathematics/12/apprenticeship-mathematics"
+    },
+    {
+      "key": "ARTS8",
+      "official": "Arts Education 8",
+      "bank": "Arts Education 8",
+      "page": "arts-education/8/core"
+    },
+    {
+      "key": "ARTS9",
+      "official": "Arts Education 9",
+      "bank": "Arts Education 9",
+      "page": "arts-education/9/core#General"
+    },
+    {
+      "key": "ARTSTUDIO10",
+      "official": "Art Studio 10",
+      "bank": "Art Studio 10",
+      "page": "arts-education/10/art-studio"
+    },
+    {
+      "key": "ARTSTUDIO11",
+      "official": "Art Studio 11",
+      "bank": "Art Studio 11",
+      "page": "arts-education/11/art-studio"
+    },
+    {
+      "key": "ARTSTUDIO12",
+      "official": "Art Studio 12",
+      "bank": "Art Studio 12",
+      "page": "arts-education/12/art-studio"
+    },
+    {
+      "key": "ASIA12",
+      "official": "Asian Studies 12",
+      "bank": "Asian Studies 12",
+      "page": "social-studies/12/asian-studies"
+    },
+    {
+      "key": "AUTO11",
+      "official": "Automotive Technology 11",
+      "bank": "Automotive Technology 11",
+      "page": "adst/11/automotive-technology"
+    },
+    {
+      "key": "AUTO12",
+      "official": "Automotive Technology 12",
+      "bank": "Automotive Technology 12",
+      "page": "adst/12/automotive-technology"
+    },
+    {
+      "key": "BCA12",
+      "official": "Business Computer Applications 12",
+      "bank": "Business Computer Applications 12",
+      "page": "adst/12/business-computer-applications"
+    },
+    {
+      "key": "BCFP12",
+      "official": "B.C. First Peoples 12",
+      "bank": "B.C. First Peoples 12",
+      "page": "social-studies/12/bc-first-peoples"
+    },
+    {
+      "key": "CALC12",
+      "official": "Calculus 12",
+      "bank": "Calculus 12",
+      "page": "mathematics/12/calculus"
+    },
+    {
+      "key": "CAREE8",
+      "official": "Career Education 8",
+      "bank": "Career Education 8",
+      "page": "career-education/8/core"
+    },
+    {
+      "key": "CAREE9",
+      "official": "Career Education 9",
+      "bank": "Career Education 9",
+      "page": "career-education/9/core"
+    },
+    {
+      "key": "CC12",
+      "official": "Comparative Cultures 12",
+      "bank": "Comparative Cultures 12",
+      "page": "social-studies/12/comparative-cultures"
+    },
+    {
+      "key": "CDC12",
+      "official": "Child Development and Caregiving 12",
+      "bank": "Child Development and Caregiving 12",
+      "page": "adst/12/child-development-and-caregiving"
+    },
+    {
+      "key": "CHEM11",
+      "official": "Chemistry 11",
+      "bank": "Chemistry 11",
+      "page": "science/11/chemistry"
+    },
+    {
+      "key": "CHEM12",
+      "official": "Chemistry 12",
+      "bank": "Chemistry 12",
+      "page": "science/12/chemistry"
+    },
+    {
+      "key": "CHOR11",
+      "official": "Choral Music 11",
+      "bank": "Choral Music 11",
+      "page": "arts-education/11/choral-music"
+    },
+    {
+      "key": "CHOR12",
+      "official": "Choral Music 12",
+      "bank": "Choral Music 12",
+      "page": "arts-education/12/choral-music"
+    },
+    {
+      "key": "CHORUS10",
+      "official": "Choral Music 10",
+      "bank": "Choral Music 10",
+      "page": "arts-education/10/choral-music"
+    },
+    {
+      "key": "CIS11",
+      "official": "Computer Information Systems 11",
+      "bank": "Computer Information Systems 11",
+      "page": "adst/11/computer-information-systems"
+    },
+    {
+      "key": "CIS12",
+      "official": "Contemporary Indigenous Studies 12",
+      "bank": "Contemporary Indigenous Studies 12",
+      "page": "social-studies/12/contemporary-indigenous-studies"
+    },
+    {
+      "key": "CLC12",
+      "official": "Career-Life Connections",
+      "bank": "Career-Life Connections",
+      "page": "career-education/all/career-life-connections"
+    },
+    {
+      "key": "CLE10",
+      "official": "Career-Life Education",
+      "bank": "Career-Life Education",
+      "page": "career-education/all/career-life-education"
+    },
+    {
+      "key": "CMUSIC10",
+      "official": "Contemporary Music 10",
+      "bank": "Contemporary Music 10",
+      "page": "arts-education/10/contemporary-music"
+    },
+    {
+      "key": "CMUSIC11",
+      "official": "Contemporary Music 11",
+      "bank": "Contemporary Music 11",
+      "page": "arts-education/11/contemporary-music"
+    },
+    {
+      "key": "CMUSIC12",
+      "official": "Contemporary Music 12",
+      "bank": "Contemporary Music 12",
+      "page": "arts-education/12/contemporary-music"
+    },
+    {
+      "key": "COMP10",
+      "official": "Composition 10",
+      "bank": "Composition 10",
+      "page": "english-language-arts/10/composition"
+    },
+    {
+      "key": "COMP11",
+      "official": "Composition 11",
+      "bank": "Composition 11",
+      "page": "english-language-arts/11/composition"
+    },
+    {
+      "key": "COMP12",
+      "official": "Composition 12",
+      "bank": "Composition 12",
+      "page": "english-language-arts/12/composition"
+    },
+    {
+      "key": "COMP_PROD11",
+      "official": "Composition & Production 11",
+      "bank": "Composition and Production 11",
+      "page": "arts-education/11/composition-and-production"
+    },
+    {
+      "key": "CP12",
+      "official": "Composition & Production 12",
+      "bank": "Composition and Production 12",
+      "page": "arts-education/12/composition-and-production"
+    },
+    {
+      "key": "CPROG11",
+      "official": "Computer Programming 11",
+      "bank": "Computer Programming 11",
+      "page": "adst/11/computer-programming"
+    },
+    {
+      "key": "CPROG12",
+      "official": "Computer Programming 12",
+      "bank": "Computer Programming 12",
+      "page": "adst/12/computer-programming"
+    },
+    {
+      "key": "CS11",
+      "official": "Computer Science 11",
+      "bank": "Computer Science 11",
+      "page": "mathematics/11/computer-science"
+    },
+    {
+      "key": "CS12",
+      "official": "Computer Science 12",
+      "bank": "Computer Science 12",
+      "page": "mathematics/12/computer-science"
+    },
+    {
+      "key": "CSTU10",
+      "official": "Computer Studies 10",
+      "bank": "Computer Studies 10",
+      "page": "adst/10/computer-studies"
+    },
+    {
+      "key": "CUL10",
+      "official": "Culinary Arts 10",
+      "bank": "Culinary Arts 10",
+      "page": "adst/10/culinary-arts"
+    },
+    {
+      "key": "CUL11",
+      "official": "Culinary Arts 11",
+      "bank": "Culinary Arts 11",
+      "page": "adst/11/culinary-arts"
+    },
+    {
+      "key": "CUL12",
+      "official": "Culinary Arts 12",
+      "bank": "Culinary Arts 12",
+      "page": "adst/12/culinary-arts"
+    },
+    {
+      "key": "CW10",
+      "official": "Creative Writing 10",
+      "bank": "Creative Writing 10",
+      "page": "english-language-arts/10/creative-writing"
+    },
+    {
+      "key": "CW11",
+      "official": "Creative Writing 11",
+      "bank": "Creative Writing 11",
+      "page": "english-language-arts/11/creative-writing"
+    },
+    {
+      "key": "CW12",
+      "official": "Creative Writing 12",
+      "bank": "Creative Writing 12",
+      "page": "english-language-arts/12/creative-writing"
+    },
+    {
+      "key": "DANCE10",
+      "official": "Dance Foundations 10",
+      "bank": "Dance Foundations 10",
+      "page": "arts-education/10/dance-foundations"
+    },
+    {
+      "key": "DANCE11",
+      "official": "Dance Technique and Performance 11",
+      "bank": "Dance Technique and Performance 11",
+      "page": "arts-education/11/dance-technique-and-performance"
+    },
+    {
+      "key": "DANCE12",
+      "official": "Dance Technique and Performance 12",
+      "bank": "Dance Technique and Performance 12",
+      "page": "arts-education/12/dance-technique-and-performance"
+    },
+    {
+      "key": "DCHORE10",
+      "official": "Dance Choreography 10",
+      "bank": "Dance Choreography 10",
+      "page": "arts-education/10/dance-choreography"
+    },
+    {
+      "key": "DCHORE11",
+      "official": "Dance Choreography 11",
+      "bank": "Dance Choreography 11",
+      "page": "arts-education/11/dance-choreography"
+    },
+    {
+      "key": "DCHORE12",
+      "official": "Dance Choreography 12",
+      "bank": "Dance Choreography 12",
+      "page": "arts-education/12/dance-choreography"
+    },
+    {
+      "key": "DCOMM11",
+      "official": "Digital Communications 11",
+      "bank": "Digital Communications 11",
+      "page": "adst/11/digital-communications"
+    },
+    {
+      "key": "DCOMP10",
+      "official": "Dance Company 10",
+      "bank": "Dance Company 10",
+      "page": "arts-education/10/dance-company"
+    },
+    {
+      "key": "DCOMP11",
+      "official": "Dance Company 11",
+      "bank": "Dance Company 11",
+      "page": "arts-education/11/dance-company"
+    },
+    {
+      "key": "DCOMP12",
+      "official": "Dance Company 12",
+      "bank": "Dance Company 12",
+      "page": "arts-education/12/dance-company"
+    },
+    {
+      "key": "DCOND11",
+      "official": "Dance Conditioning 11",
+      "bank": "Dance Conditioning 11",
+      "page": "arts-education/11/dance-conditioning"
+    },
+    {
+      "key": "DCOND12",
+      "official": "Dance Conditioning 12",
+      "bank": "Dance Conditioning 12",
+      "page": "arts-education/12/dance-conditioning"
+    },
+    {
+      "key": "DFOUND11",
+      "official": "Dance Foundations 11",
+      "bank": "Dance Foundations 11",
+      "page": "arts-education/11/dance-foundations"
+    },
+    {
+      "key": "DFOUND12",
+      "official": "Dance Foundations 12",
+      "bank": "Dance Foundations 12",
+      "page": "arts-education/12/dance-foundations"
+    },
+    {
+      "key": "DMD12",
+      "official": "Digital Media Development 12",
+      "bank": "Digital Media Development 12",
+      "page": "adst/12/digital-media-development"
+    },
+    {
+      "key": "DRAFT10",
+      "official": "Drafting 10",
+      "bank": "Drafting 10",
+      "page": "adst/10/drafting"
+    },
+    {
+      "key": "DRAFT11",
+      "official": "Drafting 11",
+      "bank": "Drafting 11",
+      "page": "adst/11/drafting"
+    },
+    {
+      "key": "DRAFT12",
+      "official": "Drafting 12",
+      "bank": "Drafting 12",
+      "page": "adst/12/drafting"
+    },
+    {
+      "key": "DRAMA10",
+      "official": "Drama 10",
+      "bank": "Drama 10",
+      "page": "arts-education/10/drama"
+    },
+    {
+      "key": "DRAMA11",
+      "official": "Drama 11",
+      "bank": "Drama 11",
+      "page": "arts-education/11/drama"
+    },
+    {
+      "key": "DRAMA12",
+      "official": "Drama 12",
+      "bank": "Drama 12",
+      "page": "arts-education/12/drama"
+    },
+    {
+      "key": "DSD11",
+      "official": "Directing and Script Development 11",
+      "bank": "Directing and Script Development 11",
+      "page": "arts-education/11/directing-and-script-development"
+    },
+    {
+      "key": "DSD12",
+      "official": "Directing and Script Development 12",
+      "bank": "Directing and Script Development 12",
+      "page": "arts-education/12/directing-and-script-development"
+    },
+    {
+      "key": "DTEP10",
+      "official": "Dance Technique and Performance 10",
+      "bank": "Dance Technique and Performance 10",
+      "page": "arts-education/10/dance-technique-and-performance"
+    },
+    {
+      "key": "EARTH11",
+      "official": "Earth Sciences 11",
+      "bank": "Earth Sciences 11",
+      "page": "science/11/earth-sciences"
+    },
+    {
+      "key": "ECOM12",
+      "official": "E-Commerce 12",
+      "bank": "E-Commerce 12",
+      "page": "adst/12/e-commerce"
+    },
+    {
+      "key": "ECON12",
+      "official": "Economic Theory 12",
+      "bank": "Economic Theory 12",
+      "page": "social-studies/12/economic-theory"
+    },
+    {
+      "key": "EDT12",
+      "official": "Engine and Drivetrain 12",
+      "bank": "Engine and Drivetrain 12",
+      "page": "adst/12/engine-and-drivetrain"
+    },
+    {
+      "key": "EFP12",
+      "official": "English First Peoples 12",
+      "bank": "English First Peoples 12",
+      "page": "english-language-arts/12/english-first-peoples"
+    },
+    {
+      "key": "EFPLS10",
+      "official": "Literary Studies 10",
+      "bank": "EFP Literary Studies 10",
+      "page": "english-language-arts/10/efp-literary-studies"
+    },
+    {
+      "key": "EFPLSNM11",
+      "official": "EFP: Literary Studies + New Media 11",
+      "bank": "EFP Literary Studies and New Media 11",
+      "page": "english-language-arts/11/efp-literary-studies-and-new-media"
+    },
+    {
+      "key": "EFPLSSL11",
+      "official": "EFP: Literary Studies + Spoken Language 11",
+      "bank": "EFP Literary Studies and Spoken Language 11",
+      "page": "english-language-arts/11/efp-literary-studies-and-spoken-language"
+    },
+    {
+      "key": "EFPLSW11",
+      "official": "EFP: Literary Studies + Writing 11",
+      "bank": "EFP Literary Studies and Writing 11",
+      "page": "english-language-arts/11/efp-literary-studies-and-writing"
+    },
+    {
+      "key": "EFPNM10",
+      "official": "New Media 10",
+      "bank": "EFP New Media 10",
+      "page": "english-language-arts/10/efp-new-media"
+    },
+    {
+      "key": "EFPSL10",
+      "official": "Spoken Language 10",
+      "bank": "EFP Spoken Language 10",
+      "page": "english-language-arts/10/efp-spoken-language"
+    },
+    {
+      "key": "EFPW10",
+      "official": "Writing 10",
+      "bank": "EFP Writing 10",
+      "page": "english-language-arts/10/efp-writing"
+    },
+    {
+      "key": "ELA8",
+      "official": "English Language Arts 8",
+      "bank": "English Language Arts 8",
+      "page": "english-language-arts/8/core"
+    },
+    {
+      "key": "ELA9",
+      "official": "English Language Arts 9",
+      "bank": "English Language Arts 9",
+      "page": "english-language-arts/9/core"
+    },
+    {
+      "key": "ELEC11",
+      "official": "Electronics 11",
+      "bank": "Electronics 11",
+      "page": "adst/11/electronics"
+    },
+    {
+      "key": "ELEC12",
+      "official": "Electronics 12",
+      "bank": "Electronics 12",
+      "page": "adst/12/electronics"
+    },
+    {
+      "key": "ELROB10",
+      "official": "Electronics and Robotics 10",
+      "bank": "Electronics and Robotics 10",
+      "page": "adst/10/electronics-and-robotics"
+    },
+    {
+      "key": "ENG11",
+      "official": "Engineering 11",
+      "bank": "Engineering 11",
+      "page": "adst/11/engineering"
+    },
+    {
+      "key": "ENG12",
+      "official": "Engineering 12",
+      "bank": "Engineering 12",
+      "page": "adst/12/engineering"
+    },
+    {
+      "key": "ENT10",
+      "official": "Entrepreneurship and Marketing 10",
+      "bank": "Entrepreneurship and Marketing 10",
+      "page": "adst/10/entrepreneurship-and-marketing"
+    },
+    {
+      "key": "ENT12",
+      "official": "Entrepreneurship 12",
+      "bank": "Entrepreneurship 12",
+      "page": "adst/12/entrepreneurship"
+    },
+    {
+      "key": "ENVSCI11",
+      "official": "Environmental Science 11",
+      "bank": "Environmental Science 11",
+      "page": "science/11/environmental-science"
+    },
+    {
+      "key": "ENVSCI12",
+      "official": "Environmental Science 12",
+      "bank": "Environmental Science 12",
+      "page": "science/12/environmental-science"
+    },
+    {
+      "key": "ES12",
+      "official": "English Studies 12",
+      "bank": "English Studies 12",
+      "page": "english-language-arts/12/english-studies"
+    },
+    {
+      "key": "ESS11",
+      "official": "Explorations in Social Studies 11",
+      "bank": "Explorations in Social Studies 11",
+      "page": "social-studies/11/explorations-in-social-studies"
+    },
+    {
+      "key": "FACCT12",
+      "official": "Financial Accounting 12",
+      "bank": "Financial Accounting 12",
+      "page": "adst/12/financial-accounting"
+    },
+    {
+      "key": "FAS10",
+      "official": "Family and Society 10",
+      "bank": "Family and Society 10",
+      "page": "adst/10/family-and-society"
+    },
+    {
+      "key": "FASH12",
+      "official": "Fashion Industry 12",
+      "bank": "Fashion Industry 12",
+      "page": "adst/12/fashion-industry"
+    },
+    {
+      "key": "FC11",
+      "official": "Fitness and Conditioning 11",
+      "bank": "Fitness and Conditioning 11",
+      "page": "physical-health-education/11/fitness-and-conditioning"
+    },
+    {
+      "key": "FC12",
+      "official": "Fitness and Conditioning 12",
+      "bank": "Fitness and Conditioning 12",
+      "page": "physical-health-education/12/fitness-and-conditioning"
+    },
+    {
+      "key": "FOM11",
+      "official": "Foundations of Mathematics 11",
+      "bank": "Foundations of Mathematics 11",
+      "page": "mathematics/11/foundations-of-mathematics"
+    },
+    {
+      "key": "FOM12",
+      "official": "Foundations of Mathematics 12",
+      "bank": "Foundations of Mathematics 12",
+      "page": "mathematics/12/foundations-of-mathematics"
+    },
+    {
+      "key": "FPC10",
+      "official": "Foundations of Mathematics and Pre-calculus 10",
+      "bank": "Foundations of Mathematics and Pre-calculus 10",
+      "page": "mathematics/10/foundations-of-mathematics-and-pre-calculus"
+    },
+    {
+      "key": "FS10",
+      "official": "Food Studies 10",
+      "bank": "Food Studies 10",
+      "page": "adst/10/food-studies"
+    },
+    {
+      "key": "FS11",
+      "official": "Food Studies 11",
+      "bank": "Food Studies 11",
+      "page": "adst/11/food-studies"
+    },
+    {
+      "key": "FS12",
+      "official": "Food Studies 12",
+      "bank": "Food Studies 12",
+      "page": "adst/12/food-studies"
+    },
+    {
+      "key": "FTVT11",
+      "official": "Film & Television 11",
+      "bank": "Film and Television 11",
+      "page": "arts-education/11/film-and-television"
+    },
+    {
+      "key": "FTVT12",
+      "official": "Film & Television 12",
+      "bank": "Film and Television 12",
+      "page": "arts-education/12/film-and-television"
+    },
+    {
+      "key": "FURNCAB12",
+      "official": "Furniture and Cabinetry 12",
+      "bank": "Furniture and Cabinetry 12",
+      "page": "adst/12/furniture-and-cabinetry"
+    },
+    {
+      "key": "GARTS11",
+      "official": "Graphic Arts 11",
+      "bank": "Graphic Arts 11",
+      "page": "arts-education/11/graphic-arts"
+    },
+    {
+      "key": "GARTS12",
+      "official": "Graphic Arts 12",
+      "bank": "Graphic Arts 12",
+      "page": "arts-education/12/graphic-arts"
+    },
+    {
+      "key": "GEN12",
+      "official": "Genocide Studies 12",
+      "bank": "Genocide Studies 12",
+      "page": "social-studies/12/genocide-studies"
+    },
+    {
+      "key": "GEO12",
+      "official": "Geology 12",
+      "bank": "Geology 12",
+      "page": "science/12/geology"
+    },
+    {
+      "key": "GPROD11",
+      "official": "Graphic Production 11",
+      "bank": "Graphic Production 11",
+      "page": "adst/11/graphic-production"
+    },
+    {
+      "key": "GPROD12",
+      "official": "Graphic Production 12",
+      "bank": "Graphic Production 12",
+      "page": "adst/12/graphic-production"
+    },
+    {
+      "key": "HGEO12",
+      "official": "Human Geography 12",
+      "bank": "Human Geography 12",
+      "page": "social-studies/12/human-geography"
+    },
+    {
+      "key": "HIST12",
+      "official": "20th Century World History 12",
+      "bank": "20th Century World History 12",
+      "page": "social-studies/12/20th-century-world-history"
+    },
+    {
+      "key": "HLE12",
+      "official": "Housing and Living Environments 12",
+      "bank": "Housing and Living Environments 12",
+      "page": "adst/12/housing-and-living-environments"
+    },
+    {
+      "key": "HOM11",
+      "official": "History of Mathematics 11",
+      "bank": "History of Mathematics 11",
+      "page": "mathematics/11/history-of-mathematics"
+    },
+    {
+      "key": "ICD12",
+      "official": "Industrial Coding and Design 12",
+      "bank": "Industrial Coding and Design 12",
+      "page": "adst/12/industrial-coding-and-design"
+    },
+    {
+      "key": "IFR11",
+      "official": "Interpersonal and Family Relationships 11",
+      "bank": "Interpersonal and Family Relationships 11",
+      "page": "adst/11/interpersonal-and-family-relationships"
+    },
+    {
+      "key": "INSTMUS10",
+      "official": "Instrumental Music 10",
+      "bank": "Instrumental Music 10",
+      "page": "arts-education/10/instrumental-music"
+    },
+    {
+      "key": "INSTMUS11",
+      "official": "Instrumental Music 11",
+      "bank": "Instrumental Music 11",
+      "page": "arts-education/11/instrumental-music"
+    },
+    {
+      "key": "INSTMUS12",
+      "official": "Instrumental Music 12",
+      "bank": "Instrumental Music 12",
+      "page": "arts-education/12/instrumental-music"
+    },
+    {
+      "key": "LAW12",
+      "official": "Law Studies 12",
+      "bank": "Law Studies 12",
+      "page": "social-studies/12/law-studies"
+    },
+    {
+      "key": "LS10",
+      "official": "Literary Studies 10",
+      "bank": "Literary Studies 10",
+      "page": "english-language-arts/10/literary-studies"
+    },
+    {
+      "key": "LS11",
+      "official": "Literary Studies 11",
+      "bank": "Literary Studies 11",
+      "page": "english-language-arts/11/literary-studies"
+    },
+    {
+      "key": "LS11SCI",
+      "official": "Life Sciences 11",
+      "bank": "Life Sciences 11",
+      "page": "science/11/life-sciences"
+    },
+    {
+      "key": "LS12",
+      "official": "Literary Studies 12",
+      "bank": "Literary Studies 12",
+      "page": "english-language-arts/12/literary-studies"
+    },
+    {
+      "key": "MACHW12",
+      "official": "Machining and Welding 12",
+      "bank": "Machining and Welding 12",
+      "page": "adst/12/machining-and-welding"
+    },
+    {
+      "key": "MATH8",
+      "official": "Mathematics 8",
+      "bank": "Mathematics 8",
+      "page": "mathematics/8/core"
+    },
+    {
+      "key": "MATH9",
+      "official": "Mathematics 9",
+      "bank": "Mathematics 9",
+      "page": "mathematics/9/core"
+    },
+    {
+      "key": "MDES10",
+      "official": "Media Design 10",
+      "bank": "Media Design 10",
+      "page": "adst/10/media-design"
+    },
+    {
+      "key": "MDES11",
+      "official": "Media Design 11",
+      "bank": "Media Design 11",
+      "page": "adst/11/media-design"
+    },
+    {
+      "key": "MDES12",
+      "official": "Media Design 12",
+      "bank": "Media Design 12",
+      "page": "adst/12/media-design"
+    },
+    {
+      "key": "MECH12",
+      "official": "Mechatronics 12",
+      "bank": "Mechatronics 12",
+      "page": "adst/12/mechatronics"
+    },
+    {
+      "key": "MEDA11",
+      "official": "Media Arts 11",
+      "bank": "Media Arts 11",
+      "page": "arts-education/11/media-arts"
+    },
+    {
+      "key": "MEDA12",
+      "official": "Media Arts 12",
+      "bank": "Media Arts 12",
+      "page": "arts-education/12/media-arts"
+    },
+    {
+      "key": "MEDIA10",
+      "official": "Media Arts 10",
+      "bank": "Media Arts 10",
+      "page": "arts-education/10/media-arts"
+    },
+    {
+      "key": "METAL10",
+      "official": "Metalwork 10",
+      "bank": "Metalwork 10",
+      "page": "adst/10/metalwork"
+    },
+    {
+      "key": "METAL11",
+      "official": "Metalwork 11",
+      "bank": "Metalwork 11",
+      "page": "adst/11/metalwork"
+    },
+    {
+      "key": "METAL12",
+      "official": "Metalwork 12",
+      "bank": "Metalwork 12",
+      "page": "adst/12/metalwork"
+    },
+    {
+      "key": "MKTG11",
+      "official": "Marketing and Promotion 11",
+      "bank": "Marketing and Promotion 11",
+      "page": "adst/11/marketing-and-promotion"
+    },
+    {
+      "key": "MTHEATRE10",
+      "official": "Musical Theatre 10",
+      "bank": "Musical Theatre 10",
+      "page": "arts-education/10/musical-theatre"
+    },
+    {
+      "key": "MTHEATRE11",
+      "official": "Musical Theatre 11",
+      "bank": "Musical Theatre 11",
+      "page": "arts-education/11/musical-theatre"
+    },
+    {
+      "key": "MTHEATRE12",
+      "official": "Musical Theatre 12",
+      "bank": "Musical Theatre 12",
+      "page": "arts-education/12/musical-theatre"
+    },
+    {
+      "key": "NM10",
+      "official": "New Media 10",
+      "bank": "New Media 10",
+      "page": "english-language-arts/10/new-media"
+    },
+    {
+      "key": "NMED11",
+      "official": "New Media 11",
+      "bank": "New Media 11",
+      "page": "english-language-arts/11/new-media"
+    },
+    {
+      "key": "NMED12",
+      "official": "New Media 12",
+      "bank": "New Media 12",
+      "page": "english-language-arts/12/new-media"
+    },
+    {
+      "key": "ODED11",
+      "official": "Outdoor Education 11",
+      "bank": "Outdoor Education 11",
+      "page": "physical-health-education/11/outdoor-education"
+    },
+    {
+      "key": "ODED12",
+      "official": "Outdoor Education 12",
+      "bank": "Outdoor Education 12",
+      "page": "physical-health-education/12/outdoor-education"
+    },
+    {
+      "key": "PC11",
+      "official": "Pre-calculus 11",
+      "bank": "Pre-calculus 11",
+      "page": "mathematics/11/pre-calculus"
+    },
+    {
+      "key": "PC12",
+      "official": "Pre-calculus 12",
+      "bank": "Pre-calculus 12",
+      "page": "mathematics/12/pre-calculus"
+    },
+    {
+      "key": "PGEO12",
+      "official": "Physical Geography 12",
+      "bank": "Physical Geography 12",
+      "page": "social-studies/12/physical-geography"
+    },
+    {
+      "key": "PHE10",
+      "official": "Physical and Health Education 10",
+      "bank": "Physical and Health Education 10",
+      "page": "physical-health-education/10/core"
+    },
+    {
+      "key": "PHE8",
+      "official": "Physical and Health Education 8",
+      "bank": "Physical and Health Education 8",
+      "page": "physical-health-education/8/core"
+    },
+    {
+      "key": "PHE9",
+      "official": "Physical and Health Education 9",
+      "bank": "Physical and Health Education 9",
+      "page": "physical-health-education/9/core"
+    },
+    {
+      "key": "PHIL12",
+      "official": "Philosophy 12",
+      "bank": "Philosophy 12",
+      "page": "social-studies/12/philosophy"
+    },
+    {
+      "key": "PHOTO10",
+      "official": "Photography 10",
+      "bank": "Photography 10",
+      "page": "arts-education/10/photography"
+    },
+    {
+      "key": "PHOTO11",
+      "official": "Photography 11",
+      "bank": "Photography 11",
+      "page": "arts-education/11/photography"
+    },
+    {
+      "key": "PHOTO12",
+      "official": "Photography 12",
+      "bank": "Photography 12",
+      "page": "arts-education/12/photography"
+    },
+    {
+      "key": "PHYS11",
+      "official": "Physics 11",
+      "bank": "Physics 11",
+      "page": "science/11/physics"
+    },
+    {
+      "key": "PHYS12",
+      "official": "Physics 12",
+      "bank": "Physics 12",
+      "page": "science/12/physics"
+    },
+    {
+      "key": "POL12",
+      "official": "Political Studies 12",
+      "bank": "Political Studies 12",
+      "page": "social-studies/12/political-studies"
+    },
+    {
+      "key": "PWRTECH10",
+      "official": "Power Technology 10",
+      "bank": "Power Technology 10",
+      "page": "adst/10/power-technology"
+    },
+    {
+      "key": "REL12",
+      "official": "Comparative World Religions 12",
+      "bank": "Comparative World Religions 12",
+      "page": "social-studies/12/comparative-world-religions"
+    },
+    {
+      "key": "ROB11",
+      "official": "Robotics 11",
+      "bank": "Robotics 11",
+      "page": "adst/11/robotics"
+    },
+    {
+      "key": "ROB12",
+      "official": "Robotics 12",
+      "bank": "Robotics 12",
+      "page": "adst/12/robotics"
+    },
+    {
+      "key": "ROV12",
+      "official": "Remotely Operated Vehicles and Drones 12",
+      "bank": "Remotely Operated Vehicles and Drones 12",
+      "page": "adst/12/rovs-and-drones"
+    },
+    {
+      "key": "SA2D10",
+      "official": "Studio Arts 2D 10",
+      "bank": "Studio Arts 2D 10",
+      "page": "arts-education/10/studio-arts-2D"
+    },
+    {
+      "key": "SA2D11",
+      "official": "Studio Arts 2D 11",
+      "bank": "Studio Arts 2D 11",
+      "page": "arts-education/11/studio-arts-2D"
+    },
+    {
+      "key": "SA2D12",
+      "official": "Studio Arts 2D 12",
+      "bank": "Studio Arts 2D 12",
+      "page": "arts-education/12/studio-arts-2D"
+    },
+    {
+      "key": "SA3D10",
+      "official": "Studio Arts 3D 10",
+      "bank": "Studio Arts 3D 10",
+      "page": "arts-education/10/studio-arts-3D"
+    },
+    {
+      "key": "SA3D11",
+      "official": "Studio Arts 3D 11",
+      "bank": "Studio Arts 3D 11",
+      "page": "arts-education/11/studio-arts-3D"
+    },
+    {
+      "key": "SA3D12",
+      "official": "Studio Arts 3D 12",
+      "bank": "Studio Arts 3D 12",
+      "page": "arts-education/12/studio-arts-3D"
+    },
+    {
+      "key": "SCI10",
+      "official": "Science 10",
+      "bank": "Science 10",
+      "page": "science/10/core"
+    },
+    {
+      "key": "SCI8",
+      "official": "Science 8",
+      "bank": "Science 8",
+      "page": "science/8/core"
+    },
+    {
+      "key": "SCI9",
+      "official": "Science 9",
+      "bank": "Science 9",
+      "page": "science/9/core"
+    },
+    {
+      "key": "SFC11",
+      "official": "Science for Citizens 11",
+      "bank": "Science for Citizens 11",
+      "page": "science/11/science-for-citizens"
+    },
+    {
+      "key": "SJ12",
+      "official": "Social Justice 12",
+      "bank": "Social Justice 12",
+      "page": "social-studies/12/social-justice"
+    },
+    {
+      "key": "SL10",
+      "official": "Spoken Language 10",
+      "bank": "Spoken Language 10",
+      "page": "english-language-arts/10/spoken-language"
+    },
+    {
+      "key": "SPKN11",
+      "official": "Spoken Language 11",
+      "bank": "Spoken Language 11",
+      "page": "english-language-arts/11/spoken-language"
+    },
+    {
+      "key": "SPKN12",
+      "official": "Spoken Language 12",
+      "bank": "Spoken Language 12",
+      "page": "english-language-arts/12/spoken-language"
+    },
+    {
+      "key": "SS10",
+      "official": "Social Studies 10",
+      "bank": "Social Studies 10",
+      "page": "social-studies/10/core"
+    },
+    {
+      "key": "SS8",
+      "official": "Social Studies 8",
+      "bank": "Social Studies 8",
+      "page": "social-studies/8/core"
+    },
+    {
+      "key": "SS9",
+      "official": "Social Studies 9",
+      "bank": "Social Studies 9",
+      "page": "social-studies/9/core"
+    },
+    {
+      "key": "SSF12",
+      "official": "Specialized Studies in Food 12",
+      "bank": "Specialized Studies in Food 12",
+      "page": "adst/12/specialized-studies-in-food"
+    },
+    {
+      "key": "STAT12",
+      "official": "Statistics 12",
+      "bank": "Statistics 12",
+      "page": "mathematics/12/statistics"
+    },
+    {
+      "key": "TECHEX10",
+      "official": "Technology Explorations 10",
+      "bank": "Technology Explorations 10",
+      "page": "adst/10/technology-explorations"
+    },
+    {
+      "key": "TEXT10",
+      "official": "Textiles 10",
+      "bank": "Textiles 10",
+      "page": "adst/10/textiles"
+    },
+    {
+      "key": "TEXT11",
+      "official": "Textiles 11",
+      "bank": "Textiles 11",
+      "page": "adst/11/textiles"
+    },
+    {
+      "key": "TEXT12",
+      "official": "Textiles 12",
+      "bank": "Textiles 12",
+      "page": "adst/12/textiles"
+    },
+    {
+      "key": "THCO10",
+      "official": "Theatre Company 10",
+      "bank": "Theatre Company 10",
+      "page": "arts-education/10/theatre-company"
+    },
+    {
+      "key": "THCO11",
+      "official": "Theatre Company 11",
+      "bank": "Theatre Company 11",
+      "page": "arts-education/11/theatre-company"
+    },
+    {
+      "key": "THCO12",
+      "official": "Theatre Company 12",
+      "bank": "Theatre Company 12",
+      "page": "arts-education/12/theatre-company"
+    },
+    {
+      "key": "THPROD10",
+      "official": "Theatre Production 10",
+      "bank": "Theatre Production 10",
+      "page": "arts-education/10/theatre-production"
+    },
+    {
+      "key": "THPROD11",
+      "official": "Theatre Production 11",
+      "bank": "Theatre Production 11",
+      "page": "arts-education/11/theatre-production"
+    },
+    {
+      "key": "THPROD12",
+      "official": "Theatre Production 12",
+      "bank": "Theatre Production 12",
+      "page": "arts-education/12/theatre-production"
+    },
+    {
+      "key": "TOUR11",
+      "official": "Tourism 11",
+      "bank": "Tourism 11",
+      "page": "adst/11/tourism"
+    },
+    {
+      "key": "TOUR12",
+      "official": "Tourism 12",
+      "bank": "Tourism 12",
+      "page": "adst/12/tourism"
+    },
+    {
+      "key": "URB12",
+      "official": "Urban Studies 12",
+      "bank": "Urban Studies 12",
+      "page": "social-studies/12/urban-studies"
+    },
+    {
+      "key": "WDEV10",
+      "official": "Web Development 10",
+      "bank": "Web Development 10",
+      "page": "adst/10/web-development"
+    },
+    {
+      "key": "WOOD10",
+      "official": "Woodwork 10",
+      "bank": "Woodwork 10",
+      "page": "adst/10/woodwork"
+    },
+    {
+      "key": "WOOD11",
+      "official": "Woodwork 11",
+      "bank": "Woodwork 11",
+      "page": "adst/11/woodwork"
+    },
+    {
+      "key": "WOOD12",
+      "official": "Woodwork 12",
+      "bank": "Woodwork 12",
+      "page": "adst/12/woodwork"
+    },
+    {
+      "key": "WPM10",
+      "official": "Workplace Mathematics 10",
+      "bank": "Workplace Mathematics 10",
+      "page": "mathematics/10/workplace-mathematics"
+    },
+    {
+      "key": "WPM11",
+      "official": "Workplace Mathematics 11",
+      "bank": "Workplace Mathematics 11",
+      "page": "mathematics/11/workplace-mathematics"
+    }
+  ],
+  "bank_only_to_drop": [
+    {
+      "key": "BCFP11",
+      "bank": "BC First Peoples 11",
+      "grade": 11
+    },
+    {
+      "key": "BIO12",
+      "bank": "Biology 12",
+      "grade": 12
+    },
+    {
+      "key": "CLE11",
+      "bank": "Career-Life Education (Grade 11 context)",
+      "grade": 11
+    },
+    {
+      "key": "ELA10",
+      "bank": "English Language Arts 10",
+      "grade": 10
+    },
+    {
+      "key": "HUM8",
+      "bank": "Humanities 8",
+      "grade": 8
+    },
+    {
+      "key": "INDS11",
+      "bank": "Indigenous Studies 11",
+      "grade": 11
+    },
+    {
+      "key": "PHE11",
+      "bank": "Physical and Health Education 11",
+      "grade": 11
+    },
+    {
+      "key": "PHE12",
+      "bank": "Physical and Health Education 12",
+      "grade": 12
+    },
+    {
+      "key": "PHYG11",
+      "bank": "Physical Geography 11",
+      "grade": 11
+    },
+    {
+      "key": "WPM12",
+      "bank": "Workplace Mathematics 12",
+      "grade": 12
+    }
+  ],
+  "official_new": [
+    {
+      "key": "CISYS12",
+      "official": "Computer Information Systems 12",
+      "page": "adst/12/computer-information-systems"
+    },
+    {
+      "key": "DANCE9",
+      "official": "Dance 9",
+      "page": "arts-education/9/core#Dance"
+    },
+    {
+      "key": "DRAMA9",
+      "official": "Drama 9",
+      "page": "arts-education/9/core#Drama"
+    },
+    {
+      "key": "ECONBUS12",
+      "official": "Economics 12",
+      "page": "adst/12/economics"
+    },
+    {
+      "key": "FHC11",
+      "official": "Francophone History and Culture 11",
+      "page": "social-studies/11/francophone-history"
+    },
+    {
+      "key": "GEOM12",
+      "official": "Geometry 12",
+      "page": "mathematics/12/geometry"
+    },
+    {
+      "key": "MUSIC9",
+      "official": "Music 9",
+      "page": "arts-education/9/core#Music"
+    },
+    {
+      "key": "SPSCI12",
+      "official": "Specialized Science 12",
+      "page": "science/12/specialized-science"
+    },
+    {
+      "key": "VISART9",
+      "official": "Visual Arts 9",
+      "page": "arts-education/9/core#Visual Arts"
+    },
+    {
+      "key": "WEX12A",
+      "official": "Work Experience 12A",
+      "page": "additional-offerings/12A/work-experience"
+    },
+    {
+      "key": "WEX12B",
+      "official": "Work Experience 12B",
+      "page": "additional-offerings/12B/work-experience"
+    },
+    {
+      "key": "YWT11",
+      "official": "Youth Work in Trades 11",
+      "page": "additional-offerings/11/youth-work-in-trades"
+    },
+    {
+      "key": "YWT12",
+      "official": "Youth Work in Trades 12",
+      "page": "additional-offerings/12/youth-work-in-trades"
+    }
+  ]
+}
