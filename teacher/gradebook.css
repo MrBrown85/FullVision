@@ -435,6 +435,7 @@
   background: rgba(0, 122, 255, 0.06);
 }
 .gb-score-val {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1531,6 +1532,33 @@ th.gb-group-alt {
 }
 .gb-status-exc {
   background: var(--accent-purple);
+}
+
+/* Late: the score stays and a small L follows it (the printed sheet's mark),
+   in the Late colour the Assignments page uses. On a level tile it sits on
+   the tile's corner so the tile keeps its size. */
+.gb-late {
+  display: inline-block;
+  min-width: 13px;
+  height: 13px;
+  margin-left: 2px;
+  padding: 0 2px;
+  border-radius: 4px;
+  background: var(--score-2);
+  color: #fff;
+  font-family: var(--font-base);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  vertical-align: 2px;
+}
+.gb-score-val .gb-late {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  margin: 0;
+  box-shadow: 0 0 0 1.5px var(--surface);
 }
 
 /* Warning indicator for out-of-range scores */

@@ -142,6 +142,36 @@ test.describe('Gradebook — Spreadsheet View', () => {
     expect((await statuses())['stu-002:assess-001']).toBeUndefined();
   });
 
+  test('a Late score keeps its score and shows an L in both views', async ({ page }) => {
+    await seedStudents(page);
+    await seedAssessments(page);
+    await seedScores(page, { 'stu-002': { 'assess-001': { QAP: 2 } } });
+    await gotoApp(page, '/gradebook');
+    await page.locator('[data-action="setView"][data-mode="scores"]').click();
+
+    const cell = page.locator('.gb-scores-cell[data-sid="stu-002"][data-aid="assess-001"]');
+    const statuses = () =>
+      page.evaluate(cid => JSON.parse(localStorage.getItem('gb-statuses-' + cid) || '{}'), TEST_COURSE.id);
+
+    await cell.click({ button: 'right' });
+    await page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Mark Late' }).click();
+    expect((await statuses())['stu-002:assess-001']).toBe('LATE');
+    await expect(cell.locator('.gb-late')).toHaveText('L');
+    await expect(cell).toContainText('2.0');
+    await expect(cell).toHaveAttribute('aria-label', /, Late$/);
+
+    await page.locator('[data-action="setView"][data-mode="detailed"]').click();
+    await expect(page.locator('#gb-data td.gb-score[data-sid="stu-002"][data-aid="assess-001"] .gb-late')).toHaveCount(
+      1,
+    );
+
+    await page.locator('[data-action="setView"][data-mode="scores"]').click();
+    await cell.click({ button: 'right' });
+    await page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Undo Late' }).click();
+    expect((await statuses())['stu-002:assess-001']).toBeUndefined();
+    await expect(cell.locator('.gb-late')).toHaveCount(0);
+  });
+
   test('the Gradebook tab opens on Scores, even after Competencies was used', async ({ page }) => {
     await seedStudents(page);
     await page.addInitScript(() => localStorage.setItem('gb_viewMode', 'detailed'));

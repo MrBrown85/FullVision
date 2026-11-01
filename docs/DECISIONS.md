@@ -347,3 +347,4 @@ Context: Colin asked for a class grading spreadsheet that prints like MasterGrad
 Context: Colin's UX sweep of the gradebook for new and experienced teachers; plan in `~/fullvision-gradebook-sweep-plan.md`.
 
 1. **A click never changes a score.** A click on any Competencies-view cell opens the grader, as the Scores view and rubric cells already did; the click-to-step (3, 4, blank, 1, 2) is gone. The cell stays selected when the grader closes, and keyboard entry (1–4, + and −, 0 or Delete, C and I, digits on points) works on it as before. The grader steps through the students shown, in their order, in both views.
+2. **Late shows in the gradebook.** A Late cell keeps its score and adds a small L after it (the printed sheet's mark), in the Late colour the Assignments page uses; on a Competencies level tile it sits on the tile's corner so the tile keeps its size. Screen readers hear "…, Late". The cell menu has Mark Late and Undo Late (Late is always allowed).
