@@ -7793,6 +7793,11 @@ function getRubricChecks(cid) {
   _cache.rubricChecks[cid] = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
   return _cache.rubricChecks[cid];
 }
+/* Replace every tick in a class at once, cache and localStorage only.
+   Demo Mode's seed uses it; nothing is sent to the server. */
+function saveRubricChecks(cid, checks) {
+  _saveCourseField('rubricChecks', cid, checks && typeof checks === 'object' && !Array.isArray(checks) ? checks : {});
+}
 /* The ids of the checkboxes ticked for one student on one assessment. */
 function getRubricCheckIds(cid, sid, aid) {
   var list = getRubricChecks(cid)[sid + ':' + aid];

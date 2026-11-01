@@ -55,7 +55,9 @@ const DESKTOP = [
     hash: '/assignments',
     ready: '#ac-sci8a1',
     open: async page => {
-      await page.locator('#ac-sci8a1 .assess-header').click();
+      // The title, not the header's centre: on an Advanced Rubric the
+      // Checklists control pushes the view toggle under the midpoint.
+      await page.locator('#ac-sci8a1 .assess-title').click();
       const row = page.locator('#ac-sci8a1 .rsg-criterion-row').first();
       await expect(row).toBeVisible();
       // A chosen + or − shows the pressed state.

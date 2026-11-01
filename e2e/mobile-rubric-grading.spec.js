@@ -5,10 +5,11 @@ import { test, expect } from '@playwright/test';
    criterion, saved under each of its competencies, as on the desktop.
    Tags | Rubric switches back to competency rows. An Advanced Rubric's
    criterion has a Checks button that opens its checkboxes; ticking every
-   box of a level writes that level. Runs in Demo Mode on Science 8, whose
-   Chemical Reactions Lab uses the Lab Investigation Rubric. */
+   box of a level writes that level. Runs in Demo Mode on Science 8: the
+   Science Fair Proposal uses the Experimental Design Rubric (Standard), the
+   Chemical Reactions Lab the Lab Investigation Rubric (Advanced). */
 
-async function openLab(page, makeAdvanced) {
+async function openLab(page, makeAdvanced, title = 'Chemical Reactions Lab') {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
@@ -30,7 +31,10 @@ async function openLab(page, makeAdvanced) {
     });
   }
   await page.locator('.m-tab-item[data-tab="grade"]').click();
-  await page.locator('text=Chemical Reactions Lab').first().click();
+  await page
+    .locator('text=' + title)
+    .first()
+    .click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
 }
 
@@ -38,11 +42,11 @@ const firstCard = page => page.locator('.m-swiper-card').first();
 
 test.describe('Phone grading by rubric criterion', () => {
   test('a rubric assessment opens by criterion; Tags switches to competencies', async ({ page }) => {
-    await openLab(page, false);
+    await openLab(page, false, 'Science Fair Proposal');
     const card = firstCard(page);
     await expect(page.getByRole('button', { name: 'Rubric', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await expect(card.locator('.m-crit-group')).toHaveCount(3);
-    await expect(card.locator('.m-crit-name').first()).toHaveText('Scientific Inquiry');
+    await expect(card.locator('.m-crit-name').first()).toHaveText('Variable Identification');
     await expect(card.locator('.m-checks-btn')).toHaveCount(0);
 
     // A level saves under every competency of the criterion.
@@ -52,7 +56,7 @@ test.describe('Phone grading by rubric criterion', () => {
     await expect(card.locator('.m-crit-group').first().locator('.m-score-btn.m-score-active')).toHaveText(target);
     const saved = await page.evaluate(() => {
       const cid = Object.keys(COURSES)[0];
-      const a = getAssessments(cid).find(x => x.title === 'Chemical Reactions Lab');
+      const a = getAssessments(cid).find(x => x.title === 'Science Fair Proposal');
       const crit = getRubricById(cid, a.rubricId).criteria[0];
       const sid = document.querySelector('.m-swiper-card').dataset.sid;
       return rubricCriterionScoreKeys(crit).map(
