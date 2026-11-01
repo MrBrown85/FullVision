@@ -269,6 +269,7 @@ Context: the Competencies view, the printed grade sheet and the CSV export each 
 3. **A criterion column averages every competency it feeds** (Colin, 2026-10-22). In Rubrics by Criterion, each student's value is the mean of their scores on the criterion's competencies, so each student counts once.
 4. **The NS mark says how it counts.** Its tooltip reads "counts as 0" on points work; on proficiency work, "not counted, no evidence yet" in a Proficiency class and "0 in the course %, not counted in proficiency" in a class with a course %.
 5. **The CSV export prints what the Scores view shows** (`assessmentCellValue`: points as points, levels on the proficiency scale, NS and EXC as such) and ends with a Class Average row under each assessment.
+6. **Level averages follow the same rule** (2026-11-01). A group grade's level (a category, module or type on the student page, or one assignment's pill) leaves Missing proficiency work out instead of counting it as 0, so a 3 and a Missing read 3.0, not 1.5. The % beside it still counts the Missing work as 0 (D7). Missing points work stays a 0 level, as its column counts it.
 
 ## Buttons and breadcrumbs (2026-10-19)
 

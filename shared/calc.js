@@ -448,12 +448,16 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
 }
 
 /* The mean of a student's overall levels on a group of assessments, each
-   counted its Factor times. { mean, count }, or null when none is scored. */
+   counted its Factor times. { mean, count }, or null when none is scored.
+   Missing proficiency work is no evidence here, as in competency
+   proficiency and Class Averages (the BC scale has no level 0); it still
+   counts 0 in the %. Missing points work is a 0 level, as its column is. */
 function _factoredMeanLevel(cid, studentId, assessments) {
   var sum = 0;
   var factors = 0;
   var count = 0;
   (assessments || []).forEach(function (assessment) {
+    if (!isPointsScored(assessment) && getAssignmentStatus(cid, studentId, assessment.id) === 'NS') return;
     var value = getAssessmentOverallScore(cid, studentId, assessment.id);
     if (value == null) return;
     var factor = getAssessmentWeight(assessment);
