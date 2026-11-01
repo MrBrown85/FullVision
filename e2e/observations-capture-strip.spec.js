@@ -2,9 +2,9 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, seedAssessments, gotoApp, TEST_COURSE } from './helpers.js';
 
 /* One capture strip on every surface (docs/DECISIONS.md, "Observations
-   (2026-10-18)"). A comment captured from the Assignments popover is a full
-   observation: it shows on the Observations page with its type, tags and
-   assessment. */
+   (2026-10-18)"). A comment captured from the Assignments popover (the
+   one-student grader's Comment button) is a full observation: it shows on
+   the Observations page with its type, tags and assessment. */
 
 async function storedObs(page) {
   return page.evaluate(cid => {
@@ -25,7 +25,8 @@ test.describe('Observation capture strip', () => {
     page,
   }) => {
     await gotoApp(page, '/assignments?open=assess-001');
-    await page.locator('.comment-btn[data-sid="stu-001"]').first().click();
+    await page.locator('#gb-roster-list .student-row[data-sid="stu-001"]').click();
+    await page.locator('.grader-inline .grader-add-comment[data-sid="stu-001"]').first().click();
 
     const pop = page.locator('#comment-popover-overlay .comment-popover');
     await expect(pop).toBeVisible();
@@ -44,7 +45,7 @@ test.describe('Observation capture strip', () => {
 
     await expect(pop.locator('.comment-entry-text')).toHaveText('Explained the method to her group');
     await expect(pop.locator('.comment-entry .obs-pill-type')).toHaveText('Strength');
-    await expect(page.locator('.comment-btn[data-sid="stu-001"] .comment-count').first()).toHaveText('1');
+    await expect(page.locator('.grader-add-comment[data-sid="stu-001"] .comment-count').first()).toHaveText('1');
 
     const saved = await storedObs(page);
     expect(saved).toHaveLength(1);

@@ -52,10 +52,10 @@ test('Fill row and fill column show the new levels at once', async ({ page }) =>
     .locator('[data-action="toggleScoreMenu"]');
   await menu.click();
   await menu.locator('[data-action="fillScoresAndClose"][data-score="2"]').click();
-  await expect(rows.nth(1).locator('.rsg-level.active')).toHaveText('Developing');
+  await expect(rows.nth(1).locator('.rsg-level.active .rsg-level-name')).toHaveText('Developing');
 
   await page.locator(`.rsg-header-level.hl4[data-aid="${AID}"]`).click();
   await page.locator('#confirm-ok-btn').click();
-  await expect(rows.first().locator('.rsg-level.active')).toHaveText('Extending');
-  await expect(rows.last().locator('.rsg-level.active')).toHaveText('Extending');
+  await expect(rows.first().locator('.rsg-level.active .rsg-level-name')).toHaveText('Extending');
+  await expect(rows.last().locator('.rsg-level.active .rsg-level-name')).toHaveText('Extending');
 });

@@ -3451,10 +3451,12 @@ window.PageAssignments = (function () {
           '<button type="button" class="rsg-mod' +
           (level > 0 ? ' l' + level : '') +
           (allowed && mod === m ? ' active' : '') +
-          '" data-action="setScoreMod" data-mod="' +
+          '" data-action="setScoreMod" data-stop-prop="true" tabindex="-1" data-mod="' +
           m +
           '" aria-label="' +
           (m > 0 ? 'Plus' : 'Minus') +
+          '" aria-pressed="' +
+          (allowed && mod === m) +
           '" title="' +
           (m > 0 ? 'Plus (+)' : 'Minus (\u2212)') +
           '"' +
@@ -3464,14 +3466,37 @@ window.PageAssignments = (function () {
           '</button>'
         );
       })
-      .join('');
+      .join('<span class="rsg-mod-sep" aria-hidden="true"></span>');
+  }
+
+  /* A level button's contents. The chosen level carries its − | + inside
+     it, as an Advanced rubric's chosen tile does; a click on the level
+     around them still clears it. */
+  function _levelInnerHtml(l, modLevel, mod) {
+    if (!modLevel || l !== modLevel) return PROF_LABELS[l];
+    var m = normalizeScoreMod(l, mod);
+    return (
+      '<span class="rsg-level-name">' +
+      PROF_LABELS[l] +
+      (m ? ' ' + scoreModSuffix(m) : '') +
+      '</span><span class="rsg-mods" role="group" aria-label="Fine-tune ' +
+      PROF_LABELS[l] +
+      '">' +
+      scoreModButtonsHtml(l, m) +
+      '</span>'
+    );
   }
 
   function syncModRow(row) {
     if (!row) return;
     var st = rowScoreState(row);
-    var box = row.querySelector('.rsg-mods');
-    if (box) box.innerHTML = scoreModButtonsHtml(st.level, st.mod);
+    var modLevel = st.mixed ? 0 : st.level;
+    row.querySelectorAll('.rsg-level').forEach(function (el) {
+      var l = Number(el.dataset.level);
+      var on = modLevel > 0 && l === modLevel && el.classList.contains('active');
+      el.innerHTML = _levelInnerHtml(l, on ? modLevel : 0, st.mod);
+      el.classList.toggle('has-mods', on);
+    });
   }
 
   function syncModRows(selector) {
@@ -3745,17 +3770,18 @@ window.PageAssignments = (function () {
      (levelOrderFor). The `lN` / `hlN` classes and data-level stay on the
      level itself, so the 1–4 keys and the fill actions mean the same level
      wherever the button sits. */
-  function _levelButtonsHtml(cid, activeClass, attrs) {
+  function _levelButtonsHtml(cid, activeClass, attrs, modLevel, mod) {
     return levelOrderFor(cid)
       .map(function (l) {
         return (
           '<div class="rsg-level l' +
           l +
           activeClass(l) +
+          (modLevel && l === modLevel ? ' has-mods' : '') +
           '" ' +
           attrs(l) +
           ' role="button" tabindex="0">' +
-          PROF_LABELS[l] +
+          _levelInnerHtml(l, modLevel, mod) +
           '</div>'
         );
       })
@@ -3832,9 +3858,8 @@ window.PageAssignments = (function () {
     );
   }
   /* A student's row in the whole-class grid: the name, Late | Excused |
-     Missing, Comment, and the row's fill menu. */
+     Missing, and the row's fill menu. */
   function _rsgStudentHeadHtml(cid, aid, st, status, fillAction) {
-    var count = _assignmentCommentCount(cid, st.id, aid);
     return (
       '<div class="rsg-student-head">' +
       '<span class="rsg-student-name">' +
@@ -3843,15 +3868,6 @@ window.PageAssignments = (function () {
       '<div class="grader-status rsg-status" role="group" aria-label="Status" data-stop-prop="true">' +
       _graderStatusButtons(aid, st.id, status, ['LATE', 'EXC', 'NS']) +
       '</div>' +
-      '<button type="button" class="comment-btn rsg-comment-btn" data-action="openCommentPopover" data-cid="' +
-      cid +
-      '" data-sid="' +
-      st.id +
-      '" data-aid="' +
-      aid +
-      '" data-stop-prop="true" title="Comments">Comment' +
-      (count > 0 ? ' <span class="comment-count">' + count + '</span>' : '') +
-      '</button>' +
       '<div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Set this student\'s levels" aria-label="Set this student\'s levels">' +
       _ROW_FILL_ICON +
       '<div class="col-fill-menu" data-stop-prop="true">' +
@@ -3866,6 +3882,41 @@ window.PageAssignments = (function () {
       '</div></div></div>' +
       '</div>'
     );
+  }
+  /* The student's overall comment under their criteria (score.comment; it
+     prints on the rubric handout). One line until clicked, then three; it
+     saves as the teacher types and when they leave it, level or not. */
+  function _rsgOverallCommentHtml(cid, aid, st) {
+    var first = displayNameFirst(st);
+    return (
+      '<div class="rsg-overall"><textarea class="rsg-overall-comment" rows="1" placeholder="Add an overall comment' +
+      (first ? ' for ' + esc(first) : '') +
+      '" aria-label="Overall comment, ' +
+      esc(displayNameWithLast(st)) +
+      '" data-action-blur="rsgOverallComment" data-action-input="rsgOverallComment" data-aid="' +
+      aid +
+      '" data-sid="' +
+      st.id +
+      '">' +
+      esc(getScoreComment(cid, st.id, aid)) +
+      '</textarea></div>'
+    );
+  }
+  var _overallCommentTimers = {};
+  function _saveOverallComment(el) {
+    var key = el.dataset.sid + ':' + el.dataset.aid;
+    clearTimeout(_overallCommentTimers[key]);
+    delete _overallCommentTimers[key];
+    var text = el.value.trim();
+    if (text === getScoreComment(activeCourse, el.dataset.sid, el.dataset.aid)) return;
+    saveScoreComment(activeCourse, el.dataset.sid, el.dataset.aid, text);
+  }
+  function _queueOverallComment(el) {
+    var key = el.dataset.sid + ':' + el.dataset.aid;
+    clearTimeout(_overallCommentTimers[key]);
+    _overallCommentTimers[key] = setTimeout(function () {
+      _saveOverallComment(el);
+    }, 800);
   }
   var _ROW_FILL_ICON =
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
@@ -3952,10 +4003,7 @@ window.PageAssignments = (function () {
           '"><svg class="rsg-tag-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 9.5V2.5a1 1 0 0 1 1-1h7l5 5v3"/><path d="M14.5 9.5l-5 5-4-4 5-5"/><circle cx="5" cy="5" r="1" fill="currentColor" stroke="none"/></svg>' +
           '<span class="rsg-criterion-name">' +
           esc(tag.label) +
-          '</span></div>' +
-          '<div class="rsg-crit-tools"><div class="rsg-mods">' +
-          scoreModButtonsHtml(state.mixed ? 0 : score, mod) +
-          '</div></div></div>' +
+          '</span></div></div>' +
           '<div class="rsg-levels">' +
           _levelButtonsHtml(
             cid,
@@ -3975,10 +4023,12 @@ window.PageAssignments = (function () {
                 '"'
               );
             },
+            state.mixed ? 0 : score,
+            mod,
           ) +
           '</div></div>';
       });
-      html += '</div></div>';
+      html += '</div>' + _rsgOverallCommentHtml(cid, a.id, st) + '</div>';
     });
     html += '</div>';
     return html;
@@ -4226,7 +4276,7 @@ window.PageAssignments = (function () {
       criteria.forEach(function (crit) {
         html += _rubricCriterionRowHtml(cid, a.id, st.id, crit, studentScores, advanced, single);
       });
-      html += '</div></div>';
+      html += '</div>' + _rsgOverallCommentHtml(cid, a.id, st) + '</div>';
     });
     html += '</div>';
 
@@ -4294,15 +4344,11 @@ window.PageAssignments = (function () {
       '"><span class="rsg-criterion-name">' +
       esc(crit.name) +
       '</span></div>' +
-      '<div class="rsg-crit-tools">' +
-      '<div class="rsg-mods">' +
-      scoreModButtonsHtml(modLevel, critMod) +
-      // Its own cell: .rsg-mods is redrawn on every score change.
-      '</div>' +
-      (advanced ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, aid, sid, crit) + '</div>' : '') +
-      // A single-point criterion's comment is its Work On field.
-      (single ? '' : '<div class="rsg-comment-cell">' + criterionCommentButtonHtml(aid, sid, crit) + '</div>') +
-      '</div>' +
+      (advanced
+        ? '<div class="rsg-crit-tools"><div class="rsg-checks-cell">' +
+          _checksButtonHtml(cid, aid, sid, crit) +
+          '</div></div>'
+        : '') +
       (advice
         ? '<div class="rsg-checklist-advice' +
           (advice.suggested ? ' l' + advice.suggested : '') +
@@ -4333,8 +4379,12 @@ window.PageAssignments = (function () {
             '"'
           );
         },
+        modLevel,
+        critMod,
       ) +
       '</div>' +
+      // A single-point criterion's comment is its Work On field.
+      (single ? '' : '<div class="rsg-comment-cell">' + criterionCommentButtonHtml(aid, sid, crit) + '</div>') +
       (open ? _checklistPanelHtml(cid, aid, sid, crit, displayScore) : '') +
       (single ? _rsgSinglePointNotesHtml(cid, aid, sid, crit) : '') +
       '</div></div>'
@@ -5671,7 +5721,8 @@ window.PageAssignments = (function () {
 
   /* ── Criterion comment ──────────────────────────────────── */
   // One short note per rubric criterion, printed under its row on the rubric
-  // handout. The grid shows only an icon so scoring stays compact.
+  // handout. Its labelled button sits at the end of the criterion's levels,
+  // solid once the criterion has a comment.
   function criterionCommentButtonHtml(aid, sid, crit) {
     var note = getRubricCriterionComment(activeCourse, sid, aid, crit);
     return (
@@ -5685,7 +5736,7 @@ window.PageAssignments = (function () {
       crit.id +
       '" data-stop-prop="true" aria-label="Comment on this criterion" aria-keyshortcuts="C" title="' +
       (note ? esc(note) : 'Comment on this criterion (C)') +
-      '"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg></button>'
+      '"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>Comment</button>'
     );
   }
   function openCriterionComment(aid, sid, critId) {
@@ -6534,6 +6585,10 @@ window.PageAssignments = (function () {
     }
     // T-UI-09 · live weight mutation (mark dirty, no re-render — weight shows up
     // in the input itself, so the input's own value stays in sync).
+    if (el.dataset.actionInput === 'rsgOverallComment') {
+      _queueOverallComment(el);
+      return;
+    }
     if (el.dataset.actionInput === 'critWeightLive') {
       updateCritWeight(parseInt(el.dataset.critIdx, 10), el.value);
       return;
@@ -6612,6 +6667,10 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionBlur === 'dibelsField') {
       if (el.isConnected) _commitDibelsField(el);
+      return;
+    }
+    if (el.dataset.actionBlur === 'rsgOverallComment') {
+      _saveOverallComment(el);
       return;
     }
     if (el.dataset.actionBlur === 'rsgWorkOn' || el.dataset.actionBlur === 'rsgBeyond') {

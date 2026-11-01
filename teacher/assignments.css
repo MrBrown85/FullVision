@@ -3049,34 +3049,6 @@
 .rsg-status .grader-status-sep {
   margin: 6px 0;
 }
-.rsg-student-head .rsg-comment-btn {
-  height: 26px;
-  padding: 0 9px;
-  border: none;
-  border-radius: 13px;
-  background: rgba(0, 122, 255, 0.1);
-  color: var(--link);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.rsg-student-head .rsg-comment-btn::before {
-  content: '';
-  width: 12px;
-  height: 12px;
-  background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-}
-.rsg-student-head .rsg-comment-btn .comment-count {
-  background: var(--link);
-  color: var(--surface);
-  font-weight: 700;
-}
 .rsg-student-head .score-row-action {
   margin-left: auto;
 }
@@ -3093,8 +3065,46 @@
   color: var(--text);
 }
 
-/* Criteria: name, and under it − | + and the comment button (and the
-   checklist count on Advanced rubrics); the level control to the right. */
+/* The overall comment under a student's criteria: one line, three once
+   clicked. Plain field edges, blue when focused. */
+.rsg-overall {
+  padding-left: 20px;
+}
+.rsg-overall-comment {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 36px;
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid #aeaeb2;
+  border-radius: 9px;
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--text-base);
+  line-height: 1.4;
+  color: var(--text);
+  resize: none;
+  overflow: hidden;
+  outline: none;
+}
+.rsg-overall-comment::placeholder {
+  color: var(--text-2);
+}
+.rsg-overall-comment:focus {
+  height: calc(3 * 1.4em + 16px);
+  overflow-y: auto;
+  border-color: var(--active);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.25);
+}
+@media (prefers-color-scheme: dark) {
+  .rsg-overall-comment {
+    border-color: var(--border);
+  }
+}
+
+/* Criteria: name (and under it the checklist count on Advanced rubrics);
+   the level control to the right, then the comment button. */
 .rsg-criteria {
   display: flex;
   flex-direction: column;
@@ -3480,55 +3490,76 @@
   font-size: var(--text-sm);
   font-weight: 700;
 }
-/* + / − beside the levels */
-/* − | + under the criterion name, a stepper like the grader's. */
+/* − | + inside the chosen level, a stepper like the Advanced rubric's
+   chosen tile: white signs straight on the level colour (no lighter track,
+   which would leave white text on a paler fill), the picked sign solid
+   white. */
+.rsg-levels {
+  container-type: inline-size;
+}
+.rsg-level.has-mods {
+  position: relative;
+  padding: 0 64px;
+}
+.rsg-level-name {
+  white-space: nowrap;
+}
 .rsg-mods {
+  position: absolute;
+  top: 50%;
+  right: 3px;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  padding: 2px;
-  border-radius: 9px;
-  background: rgba(118, 118, 128, 0.12);
+  padding: 1px;
+  border-radius: 6px;
 }
 .rsg-mod {
-  width: 28px;
-  height: 26px;
+  width: 26px;
+  height: 24px;
   border: none;
-  border-radius: 7px;
+  border-radius: 5px;
   background: transparent;
   font-family: inherit;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1;
-  color: var(--text);
+  color: #fff;
   cursor: pointer;
 }
-.rsg-mod + .rsg-mod {
-  box-shadow: -1px 0 0 0 rgba(60, 60, 67, 0.25);
+.rsg-mod-sep {
+  width: 1px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.5);
 }
 .rsg-mod:hover:not(:disabled):not(.active) {
-  background: rgba(118, 118, 128, 0.16);
+  background: rgba(255, 255, 255, 0.18);
 }
-/* The chosen sign takes the row's level colour, solid with white. */
 .rsg-mod.active {
-  color: #fff;
+  background: #fff;
   font-weight: 700;
-  box-shadow: none;
 }
 .rsg-mod.active.l4 {
-  background: var(--score-4);
+  color: var(--score-4);
 }
 .rsg-mod.active.l3 {
-  background: var(--score-3);
+  color: var(--score-3);
 }
 .rsg-mod.active.l2 {
-  background: var(--score-2);
+  color: var(--score-2);
 }
 .rsg-mod.active.l1 {
-  background: var(--score-1);
+  color: var(--score-1);
 }
 .rsg-mod:disabled {
-  color: var(--text-3);
-  opacity: 0.45;
+  opacity: 0.35;
   cursor: default;
+}
+/* Narrow levels: the name moves left to make room for − | +. */
+@container (max-width: 600px) {
+  .rsg-level.has-mods {
+    justify-content: flex-start;
+    padding: 0 62px 0 8px;
+  }
 }
 
 /* Student assignment status toggles (excused / not submitted) */
@@ -4156,23 +4187,28 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The criterion comment: a speech bubble after −/+, always visible, filled
-   when the criterion has a comment. C opens it on the focused row. */
+/* The criterion comment: a labelled blue pill at the end of the levels,
+   solid blue once the criterion has a comment. C opens it on the focused
+   row. */
 .rsg-comment-cell {
   display: flex;
+  margin-top: 4px;
 }
 .rsg-crit-comment {
-  width: 28px;
-  height: 26px;
-  padding: 0;
+  height: 32px;
+  padding: 0 14px 0 12px;
   border: none;
-  border-radius: 7px;
-  background: rgba(118, 118, 128, 0.12);
-  color: var(--text);
+  border-radius: 16px;
+  background: rgba(0, 122, 255, 0.12);
+  color: #0058d0;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
 }
 .rsg-crit-comment svg {
   width: 15px;
@@ -4180,14 +4216,24 @@
 }
 .rsg-crit-comment:hover,
 .rsg-crit-comment:focus-visible {
-  background: rgba(118, 118, 128, 0.2);
+  background: rgba(0, 122, 255, 0.2);
 }
 .rsg-crit-comment.has-comment {
-  color: var(--link);
+  background: #0062d6;
+  color: #fff;
+}
+.rsg-crit-comment.has-comment:hover,
+.rsg-crit-comment.has-comment:focus-visible {
+  background: #0058c0;
 }
 .rsg-crit-comment.has-comment svg {
   fill: currentColor;
-  fill-opacity: 0.18;
+  fill-opacity: 0.35;
+}
+@media (prefers-color-scheme: dark) {
+  .rsg-crit-comment {
+    color: #64a8ff;
+  }
 }
 /* Criterion comment box: one comment per rubric criterion, printed on the
    handout. Header names the student, criterion, assessment and chosen level. */
@@ -4510,10 +4556,21 @@
   box-shadow: inset 0 0 0 1px rgba(0, 122, 255, 0.22);
 }
 .rsg-criterion-main {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 10px;
+  row-gap: 6px;
   min-width: 0;
+}
+.rsg-criterion-main:not(:has(> .rsg-comment-cell)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.rsg-criterion-main > * {
+  grid-column: 1;
+}
+.rsg-criterion-main > .rsg-comment-cell {
+  grid-column: 2;
+  grid-row: 1;
 }
 .rsg-checklist-advice {
   display: flex;
