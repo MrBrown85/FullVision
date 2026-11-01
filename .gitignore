@@ -32,3 +32,4 @@ playwright-report/
 
 # Playwright CLI scratch (per-run session dumps)
 .playwright-cli/
+schema-snapshot.live.sql
