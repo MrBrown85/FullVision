@@ -35,19 +35,20 @@
   visibility: hidden;
   font-weight: 600;
 }
-/* The term picker is as wide as the term shown, not its longest option. */
+/* The term picker is as wide as the term shown, not its longest option,
+   and shows the whole term. */
 .gb-toolbar .term-select {
   field-sizing: content;
-  max-width: 240px;
+  max-width: none;
   height: var(--control-h);
 }
 /* Narrower windows keep one row: Export and Print Grades show their icons
-   (both keep their names for screen readers and on hover), Search and a
-   long term's name narrow. */
+   (both keep their names for screen readers and on hover) and Search
+   narrows. Only below 1240px is a long term's name cut. */
 .gb-toolbar .gb-tb-icon {
   display: none;
 }
-@media (max-width: 1180px) {
+@media (max-width: 1300px) {
   .gb-toolbar .gb-tb-text {
     display: none;
   }
@@ -58,6 +59,8 @@
   .gb-toolbar .gb-search-input:focus {
     width: 100px;
   }
+}
+@media (max-width: 1239px) {
   .gb-toolbar .term-select {
     max-width: 120px;
   }
