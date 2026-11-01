@@ -7578,7 +7578,11 @@ window.PageAssignments = (function () {
 
   /* The best-piece sentence this note makes, as the comment would read it
      (teacher/comment-bank.js), the title's quotes turned single inside the
-     preview's own. */
+     preview's own. A note that does not start with a past-tense verb
+     (CommentLint.startsPastTense) is saved but not used: the sentence
+     shows its no-note form and the hint turns orange to say why. */
+  var _REPORT_NOTE_HINT =
+    'Start with what the student did, like \u201Clinked \u2026\u201D or \u201Cshowed \u2026\u201D.';
   function _reportNotePreview(input) {
     var cid = activeCourse;
     var preview = input.parentNode.querySelector('.grader-report-note-preview');
@@ -7594,10 +7598,17 @@ window.PageAssignments = (function () {
     )
       .replace(/\u201C/g, '\u2018')
       .replace(/\u201D/g, '\u2019');
-    preview.textContent =
-      'When this is the student\u2019s best piece, the comment reads: \u201C' +
-      sentence +
-      '\u201D Start with what the student did, like \u201Clinked \u2026\u201D or \u201Cshowed \u2026\u201D.';
+    var typed = String(input.value || '').trim();
+    var off = !!typed && !(window.CommentLint && CommentLint.startsPastTense(typed));
+    preview.textContent = '';
+    var reads = document.createElement('span');
+    reads.textContent = 'When this is the student\u2019s best piece, the comment reads: \u201C' + sentence + '\u201D ';
+    var hint = document.createElement('span');
+    hint.className = 'grader-report-note-hint';
+    hint.textContent = _REPORT_NOTE_HINT;
+    preview.appendChild(reads);
+    preview.appendChild(hint);
+    preview.classList.toggle('warn', off);
   }
 
   function _saveReportNote(input) {

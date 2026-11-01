@@ -4985,6 +4985,11 @@
   line-height: 1.4;
   color: var(--text-2);
 }
+/* The hint, in orange while the note does not start with a past-tense verb. */
+.grader-report-note-preview.warn .grader-report-note-hint {
+  color: var(--score-2-text);
+  font-weight: 600;
+}
 @media (max-width: 560px) {
   .grader-report-note {
     grid-template-columns: minmax(0, 1fr);

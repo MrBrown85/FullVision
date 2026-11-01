@@ -653,7 +653,7 @@ describe('Suggested for Your Bank', () => {
   it('is wired into approval: suggestions are noted on Approve and Next and offered after the last one', () => {
     const src = readFileSync('teacher/report-questionnaire.js', 'utf-8');
     const approve = src.slice(src.indexOf('function tqApproveNext'), src.indexOf('function _noteForBank'));
-    expect(approve).toMatch(/_noteForBank\(st, true\);[\s\S]*tqNextStudent\(\);\s*_offerBank\(true\);/);
+    expect(approve).toMatch(/_noteForBank\(st, true\);[\s\S]*_nextUnapproved\(\);[\s\S]*_offerBank\(true\);/);
     expect(src).toMatch(/PersonalBank\.load\(\);/);
   });
 });

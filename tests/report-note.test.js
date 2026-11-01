@@ -224,10 +224,115 @@ describe('the best-piece sentence', () => {
     expect(S({ title: 'Map Quiz', note: 'Labelled every river.', name: 'Ava', pronouns: they })).toBe(
       'Ava’s best piece was “Map Quiz”, where Ava labelled every river.',
     );
-    expect(S({ title: 'Map Quiz', note: 'DNA model built to scale', name: 'Ava', pronouns: they })).toBe(
-      'Ava’s best piece was “Map Quiz”, where Ava DNA model built to scale.',
+    expect(S({ title: 'Map Quiz', note: 'Built a DNA model to scale', name: 'Ava', pronouns: they })).toBe(
+      'Ava’s best piece was “Map Quiz”, where Ava built a DNA model to scale.',
     );
   });
+
+  it('leaves out a note that does not start with a past-tense verb, so the sentence takes its no-note form', () => {
+    expect(S({ title: 'Graphs Lab', note: 'clear graphs and a careful method', name: 'Ava', pronouns: they })).toBe(
+      'Ava’s best piece was “Graphs Lab.”',
+    );
+    expect(S({ title: 'Map Quiz', note: 'DNA model built to scale', name: 'Ava', pronouns: they })).toBe(
+      'Ava’s best piece was “Map Quiz.”',
+    );
+    expect(CommentBank.reportNoteText('Clear graphs and a careful method.')).toBe('');
+    expect(CommentBank.reportNoteText('Showed clear graphs and a careful method.')).toBe(
+      'showed clear graphs and a careful method',
+    );
+  });
+});
+
+describe('the past-tense check (teacher/comment-lint.js, shared by the grader card and the engine)', () => {
+  const ok = CommentLint.startsPastTense;
+  it('passes a first word ending in -ed, or an irregular past form, whatever its case', () => {
+    expect(ok('linked Animal Farm to false equality')).toBe(true);
+    expect(ok('Labelled every river.')).toBe(true);
+    expect(ok('  wrote from a soldier’s view')).toBe(true);
+    expect(ok('Built a DNA model to scale')).toBe(true);
+    expect(ok('understood the source')).toBe(true);
+    ['drew', 'chose', 'read', 'put', 'set', 'used', 'began', 'brought', 'ran', 'won', 'went'].forEach(w =>
+      expect(ok(w + ' it well')).toBe(true),
+    );
+    expect(CommentLint.PAST_FORMS).toContain('showed');
+    expect(new Set(CommentLint.PAST_FORMS).size).toBe(CommentLint.PAST_FORMS.length);
+  });
+  it('fails a note that starts with anything else, and an empty one', () => {
+    expect(ok('clear graphs and a careful method')).toBe(false);
+    expect(ok('DNA model built to scale')).toBe(false);
+    expect(ok('links two sources')).toBe(false);
+    expect(ok('writes with care')).toBe(false);
+    expect(ok('a careful method')).toBe(false);
+    expect(ok('')).toBe(false);
+    expect(ok('   ')).toBe(false);
+    expect(ok(null)).toBe(false);
+  });
+});
+
+describe('the engine uses the note only when it passes the check', () => {
+  const f = (note, pronouns) => ({
+    name: 'Gabriel',
+    pronouns: ReportBlocks.getPronouns({ pronouns: pronouns || '' }),
+    pronounsOnFile: !!pronouns,
+    comps: [],
+    work: [
+      { id: 'a1', title: '4.2 Map Quiz', d: '2026-10-01', v: 3, note: 'labelled every river' },
+      { id: 'a2', title: '4.3 What Does the Poster Show?', d: '2026-10-20', v: 4, note: note },
+    ],
+    record: { total: 0, handed: 0, late: 0, missing: 0 },
+    obs: [],
+    voice: {},
+    confidence: [],
+    habits: {},
+    levelText: () => 'Extending',
+  });
+  it('drafts the no-note form for a note that is not a past-tense phrase, and never prints the note', () => {
+    const ctx = CommentBank.context(f('clear graphs and a careful method', 'he/him'), {});
+    expect(ctx.bestPiece).toBe('His best piece was “What Does the Poster Show?”');
+    expect(ctx._bestNote).toBe(false);
+    for (let seed = 1; seed < 12; seed++) {
+      const text = CommentBank.draft(ctx, { seed }).text;
+      expect(text).not.toContain('clear graphs');
+      expect(text).not.toContain(', where he');
+    }
+  });
+  it('verify() reads the note the same way: a draft with the note stands only while the note passes', () => {
+    const good = f('showed clear graphs and a careful method', 'he/him');
+    const d = CommentBank.draft(CommentBank.context(good, {}), { seed: 3 });
+    expect(d.text).toContain(', where he showed clear graphs and a careful method.');
+    expect(CommentBank.verify(d, good, {}).replaced).toEqual([]);
+    const bad = f('clear graphs and a careful method', 'he/him');
+    const r = CommentBank.verify(d, bad, {});
+    expect(r.replaced.map(x => x.sentenceId)).toContain('n36');
+    expect(r.text).not.toContain('clear graphs');
+    // The same note, now a past-tense phrase, verifies as drafted.
+    expect(CommentBank.verify(CommentBank.draft(CommentBank.context(bad, {}), { seed: 3 }), bad, {}).replaced).toEqual(
+      [],
+    );
+  });
+});
+
+describe('the grader card’s hint', () => {
+  const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
+  const css = readFileSync(resolve(root, 'teacher/assignments.css'), 'utf-8');
+  it('turns orange when the note does not start with a past-tense verb, saving the note anyway', () => {
+    const preview = src.slice(src.indexOf('function _reportNotePreview('), src.indexOf('function _saveReportNote('));
+    expect(preview).toContain('CommentLint.startsPastTense(typed)');
+    expect(preview).toContain("preview.classList.toggle('warn', off)");
+    expect(preview).toContain("hint.className = 'grader-report-note-hint'");
+    expect(css).toContain('.grader-report-note-preview.warn .grader-report-note-hint');
+    expect(css).toMatch(
+      /\.grader-report-note-preview\.warn \.grader-report-note-hint \{\n  color: var\(--score-2-text\);/,
+    );
+    const save = src.slice(src.indexOf('function _saveReportNote('), src.indexOf('function _graderGrade('));
+    expect(save).toContain('saveScoreReportNote(cid, sid, aid, input.value)');
+    expect(save).not.toContain('startsPastTense');
+  });
+});
+
+describe('the best-piece sentence, without a title', () => {
+  const they = ReportBlocks.getPronouns({ pronouns: 'they/them' });
+  const S = o => CommentBank.bestPieceSentence(o);
 
   it('drops the lesson number, not a number that is the title', () => {
     expect(CommentBank.workTitle('4.3 What Does the Poster Show?')).toBe('What Does the Poster Show?');

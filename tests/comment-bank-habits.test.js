@@ -249,6 +249,22 @@ describe('redrawHabits: a rating changed after Generate', () => {
     expect(back.habits).toMatchObject({ before: d.habits.after, after: '' });
     expect(back.text).toBe(prev.text);
   });
+
+  it('with steps ATTENDANCE_STEPS draws only the attendance sentence again: added once entered, out once cleared', () => {
+    const att = (prev, absent, late) =>
+      CommentBank.redrawHabits(CommentBank.context(facts({ habits: all(4), absent, late }), {}), prev, {
+        steps: CommentBank.ATTENDANCE_STEPS,
+      });
+    const prev = draftFor(all(4));
+    expect(prev.sentences.some(x => x.step === 'attendance')).toBe(false);
+    const d = att(prev, 3, 1);
+    expect(d.habits).toMatchObject({ before: '', after: 'He has missed three classes and been late once this term.' });
+    expect(d.sentences.filter(x => x.step !== 'attendance').map(x => x.text)).toEqual(prev.sentences.map(x => x.text));
+    expect(d.text).toContain(d.habits.after);
+    const back = att(d, null, null);
+    expect(back.habits).toMatchObject({ before: d.habits.after, after: '' });
+    expect(back.text).toBe(prev.text);
+  });
 });
 
 describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
@@ -355,5 +371,68 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
     expect(box.value).not.toContain(sentence);
     expect(box.value).toMatch(/^Gabriel worked hard\./);
     expect(box.value).toMatch(/work habits are excellent/);
+  });
+
+  /* The Sentences card follows the comment without another Generate: a
+     rating adds or changes the Habits row, attendance adds and removes
+     the Attendance row (the States mockup's "Attendance entered"). */
+  describe('the Sentences card follows', () => {
+    let drawn, els;
+    const label = (html, name) => new RegExp('qn-req-label">' + name + '<').test(html);
+    beforeEach(() => {
+      drawn = [];
+      els = {
+        'tq-sentences': {
+          set outerHTML(v) {
+            drawn.push(v);
+          },
+        },
+        'tq-att-absences': { value: '', classList: { toggle() {} } },
+        'tq-att-lates': { value: '', classList: { toggle() {} } },
+        'tq-att-note': { innerHTML: '' },
+      };
+      globalThis.document.getElementById = id => (id === 'tq-narrative' ? box : els[id] || null);
+    });
+
+    it('a rating adds the Habits row, and changes it, without Generate', () => {
+      upsertTermRating(CID, GABRIEL.id, TERM, { habits: {} });
+      RQ.tqGenerate();
+      expect(box.value).not.toMatch(/work habits/);
+      drawn = [];
+      KEYS.forEach(k => RQ.tqRate(k, 4));
+      expect(box.value).toMatch(/work habits are excellent\./);
+      expect(drawn.length).toBeGreaterThan(0);
+      const card = drawn[drawn.length - 1];
+      expect(label(card, 'Habits')).toBe(true);
+      expect(card).toContain('work habits are excellent.');
+      RQ.tqRate('devices', 1);
+      expect(box.value).toMatch(/using devices well\./);
+      expect(drawn[drawn.length - 1]).toContain('using devices well.');
+      expect(label(drawn[drawn.length - 1], 'Habits')).toBe(true);
+      expect(saved()).toBe(box.value);
+    });
+
+    it('attendance entered adds the Attendance row and its sentence; cleared, both go', () => {
+      RQ.tqGenerate();
+      expect(box.value).not.toMatch(/has missed/);
+      els['tq-att-absences'].value = '3';
+      els['tq-att-lates'].value = '1';
+      RQ.tqSetAttendance(GABRIEL.id);
+      expect(els['tq-att-note'].innerHTML).toBe('Added to the comment.');
+      expect(box.value).toMatch(/He has missed three classes and been late once this term\./);
+      let card = drawn[drawn.length - 1];
+      expect(label(card, 'Attendance')).toBe(true);
+      expect(card).toContain('He has missed three classes and been late once this term.');
+      expect(card).toContain('From Attendance above · new');
+      expect(saved()).toBe(box.value);
+      els['tq-att-absences'].value = '';
+      els['tq-att-lates'].value = '';
+      RQ.tqSetAttendance(GABRIEL.id);
+      expect(box.value).not.toMatch(/has missed/);
+      card = drawn[drawn.length - 1];
+      expect(label(card, 'Attendance')).toBe(false);
+      expect(card).not.toContain('From Attendance above');
+      expect(saved()).toBe(box.value);
+    });
   });
 });
