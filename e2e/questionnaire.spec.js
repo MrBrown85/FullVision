@@ -1536,3 +1536,50 @@ test('the character limit: 100 to 5000 or empty; a stray letter never clears it;
   expect(await page.evaluate(() => CommentBank.classSettings('sci8').charLimit)).toBe(5000);
   await expect(page.locator('#tq-limit-text')).toHaveText(' · limit 5000');
 });
+
+test('the character limit with the keyboard: Escape cancels; Return, Tab and a click outside save', async ({
+  page,
+}) => {
+  await open(page);
+  const saved = () => page.evaluate(() => CommentBank.classSettings('sci8').charLimit);
+  const input = page.locator('#tq-limit-input');
+  const btn = page.locator('#tq-count-btn');
+  const openBox = async () => {
+    await btn.click();
+    await expect(input).toBeFocused();
+  };
+  const typeIn = async v => {
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type(v);
+  };
+  // Return saves.
+  await openBox();
+  await typeIn('350');
+  await page.keyboard.press('Enter');
+  await expect(input).toHaveCount(0);
+  expect(await saved()).toBe(350);
+  await expect(page.locator('#tq-limit-text')).toHaveText(/ · limit 350| · remove or shorten a sentence/);
+  // Escape cancels: the blur as the box closes saves nothing.
+  await openBox();
+  await typeIn('600');
+  await page.keyboard.press('Escape');
+  await expect(input).toHaveCount(0);
+  await expect(btn).toBeFocused();
+  expect(await saved()).toBe(350);
+  await expect(page.locator('#tq-limit-text')).not.toContainText('600');
+  await expect(page.locator('#tq-count')).not.toContainText('600');
+  await openBox();
+  await expect(input).toHaveValue('350');
+  // Tab out of the box saves.
+  await typeIn('450');
+  await page.keyboard.press('Tab');
+  await expect.poll(saved).toBe(450);
+  // The box stays open after Tab; a click outside saves and closes it.
+  await expect(input).toHaveCount(1);
+  await input.focus();
+  await typeIn('500');
+  await page.locator('.qn-name').click();
+  await expect(input).toHaveCount(0);
+  expect(await saved()).toBe(500);
+  await expect(page.locator('#tq-limit-text')).toHaveText(/ · limit 500| · remove or shorten a sentence/);
+});

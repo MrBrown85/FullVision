@@ -241,7 +241,15 @@ window.ReportQuestionnaire = (function () {
     ' to ' +
     CommentBank.LIMIT_MAX +
     ', or leave it empty for no limit.';
+  var _limitCancelled = false;
   function _setLimit(value) {
+    // The limit as saved, unchanged (one saved by older code below 100
+    // too): kept as is. Only a new entry is held to 100 to 5000.
+    if (String(value == null ? '' : value).trim() === String(_limit() || '')) {
+      _limitMsg(false);
+      _syncCount();
+      return true;
+    }
     var p = CommentBank.parseLimit(value);
     _limitMsg(!p.ok);
     if (!p.ok) return false;
@@ -6391,6 +6399,7 @@ window.ReportQuestionnaire = (function () {
     switch (what) {
       case 'limitMenu':
         _limitOpen = !_limitOpen;
+        _limitCancelled = false;
         _supportMenu = false;
         _langMenu = false;
         _redrawLines(_limitOpen ? 'tq-limit-input' : 'tq-count-btn');
@@ -6530,6 +6539,8 @@ window.ReportQuestionnaire = (function () {
   function tqLineChange(el) {
     if (!el || !el.dataset) return;
     if (el.dataset.tqLimit) {
+      // The box closing on Escape blurs it: that change is not a save.
+      if (_limitCancelled) return;
       _setLimit(el.value);
       return;
     }
@@ -6662,8 +6673,10 @@ window.ReportQuestionnaire = (function () {
       );
       return true;
     }
-    // Escape in the limit cancels: the limit stays as saved.
+    // Escape in the limit cancels: the limit stays as saved, and the blur
+    // as the box closes saves nothing (_limitCancelled).
     var limit = _limitOpen;
+    if (limit) _limitCancelled = true;
     var menu = _supportMenu || _langMenu;
     var langWas = _langMenu;
     var was = _lineEdit;

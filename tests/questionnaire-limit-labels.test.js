@@ -5,8 +5,10 @@
  *    drops the family line, then attendance, then the strengths, then the
  *    habits sentence, nothing else; when even that cannot fit, the draft is
  *    kept as is and the count says why.
- * 7. The limit box takes a whole number from 100 to 5000 or nothing; any
- *    other entry says so and never clears the limit; Escape cancels.
+ * 7. A new entry in the limit box is a whole number from 100 to 5000 or
+ *    nothing; any other says so and never clears the limit; Escape
+ *    cancels, its blur saving nothing. A limit older code saved below 100
+ *    is honoured as is.
  * 8. The habits source lines and the ⓘ sheet say when a rating came from
  *    the record rather than the teacher.
  * 9. The ⓘ sheet keeps Tab and Shift-Tab inside it.
@@ -297,16 +299,37 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
       );
     });
 
-    it('a saved limit outside 100 to 5000 is no limit, and gates nothing', () => {
+    it('a limit older code saved below 100 is honoured and shown as is; 0, negatives and text are none', () => {
       const st = byName('Tyler');
-      ['50', 0, -10, 'abc', 6000].forEach(v => {
+      [0, -10, 'abc', ''].forEach(v => {
         setLimit(v);
         expect(CommentBank.classSettings(cid).charLimit, String(v)).toBeNull();
       });
       setLimit(50);
+      expect(CommentBank.classSettings(cid).charLimit).toBe(50);
       upsertTermRating(cid, st.id, term(), { narrative: 'x'.repeat(70) });
       open(st);
-      expect(RQ.approveBlockers(st)).not.toContain('limit');
+      box.value = 'x'.repeat(70);
+      expect(RQ.approveBlockers(st)).toContain('limit');
+      RQ.tqLine('limitMenu');
+      expect(RQ.renderTermQuestionnaire(cid)).toContain('title="Leave it empty for no limit." value="50"');
+      // Left as it was, Return keeps it; a new entry under 100 is refused.
+      const input = el('tq-limit-input', { dataset: { tqLimit: '1' }, value: '50' });
+      const msg = el('tq-limit-msg', { hidden: true });
+      els['tq-limit-input'] = input;
+      els['tq-limit-msg'] = msg;
+      RQ.handleKey({ key: 'Enter', target: input, preventDefault() {} });
+      expect(RQ.linesOpen()).toBe(false);
+      expect(settings().charLimit).toBe(50);
+      RQ.tqLine('limitMenu');
+      els['tq-limit-input'] = input;
+      els['tq-limit-msg'] = msg;
+      input.value = '60';
+      RQ.handleKey({ key: 'Enter', target: input, preventDefault() {} });
+      expect(RQ.linesOpen()).toBe(true);
+      expect(msg.hidden).toBe(false);
+      expect(settings().charLimit).toBe(50);
+      RQ.closeLines();
       setLimit(null);
     });
 
@@ -364,6 +387,9 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
       els['tq-limit-input'] = input;
       input.value = '900';
       RQ.handleKey({ key: 'Escape', target: input, preventDefault() {} });
+      expect(settings().charLimit).toBe(350);
+      // The blur as the box closes fires change: it saves nothing.
+      RQ.tqLineChange(input);
       expect(settings().charLimit).toBe(350);
       expect(RQ.linesOpen()).toBe(false);
       // Opened again, the box shows the saved limit.
@@ -492,7 +518,7 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
   });
 
   describe('10. one character is singular', () => {
-    it('counts “1 character”, and a stored limit of 1 is no limit, never “of 1 characters”', () => {
+    it('counts “1 character”, and a stored limit of 1 says “of 1 character”', () => {
       const st = byName('Tyler');
       upsertTermRating(cid, st.id, term(), { narrative: 'x' });
       setLimit(null);
@@ -500,9 +526,11 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
       setLimit(1);
       upsertTermRating(cid, st.id, term(), { narrative: 'x'.repeat(29) });
       const html = open(st);
+      box.value = 'x'.repeat(29);
       expect(html).not.toContain('1 characters');
-      expect(html).toContain('<span class="qn-count-text" id="tq-count">29 characters</span>');
+      expect(html).toContain('<span class="qn-count-text" id="tq-count">29 of 1 character</span>');
       RQ.syncApprove();
+      expect(btn.title).toContain('Shorten the comment to 1 character first.');
       expect(btn.title).not.toContain('1 characters');
       setLimit(null);
     });

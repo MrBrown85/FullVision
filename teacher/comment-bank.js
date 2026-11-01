@@ -1334,19 +1334,19 @@ window.CommentBank = (function () {
     var n = Number(t);
     return n >= LIMIT_MIN && n <= LIMIT_MAX ? { ok: true, limit: n } : { ok: false };
   }
-  /* A saved limit, only when valid (parseLimit); anything else is none. */
+  /* A saved limit: a whole number above 0, as older code saved it (one
+     below 100 is honoured as is; only a new entry is held to parseLimit).
+     Anything else is none. */
   function _savedLimit(v) {
-    if (v == null) return null;
-    var p = parseLimit(v);
-    return p.ok ? p.limit : null;
+    var n = Math.floor(Number(v));
+    return v != null && v !== '' && n > 0 ? n : null;
   }
 
   /* A class's comment settings, kept in its report settings (report_config,
      under blocks_config.commentSettings): the support lines it ticked and
      wrote, each student's own pick per report ({ termId: { sid: line id or
      'none' } }), the closing sentence and the character limit (null: no
-     limit, or a saved value parseLimit does not take). The late-work line
-     is the class's Late Work Policy. */
+     limit). The late-work line is the class's Late Work Policy. */
   function classSettings(cid) {
     var rc = (typeof getReportConfig === 'function' && getReportConfig(cid)) || {};
     var cs = (rc && rc.commentSettings) || {};
