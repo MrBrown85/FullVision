@@ -1009,8 +1009,25 @@ th.gb-group-alt {
 }
 .gb-header-resize-handle:hover,
 .gb-header-resize-handle:active {
-  background: var(--active);
-  opacity: 0.3;
+  background: rgba(0, 122, 255, 0.3);
+}
+/* A grab bar shows the header's edge can be dragged, while the pointer is
+   over the header. */
+.gb-header-resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: var(--text-3);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+#gb-colheads:hover .gb-header-resize-handle::after {
+  opacity: 1;
 }
 
 /* Score-only columns: white fill to match data cell background below */

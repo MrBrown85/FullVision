@@ -780,7 +780,34 @@ window.PageGradebook = (function () {
   }
 
   /* ── Header row height resize (Scores view) ─────────────── */
-  var _headerHeight = parseInt(localStorage.getItem('gb_headerHeight') || '200', 10);
+  /* The slanted header's height: the one the teacher dragged to, kept on
+     this device, or else just tall enough for the longest title, up to
+     170px (a longer title ends in an ellipsis and shows whole on hover). */
+  var _savedHeaderHeight = 0;
+  try {
+    _savedHeaderHeight = parseInt(localStorage.getItem('gb_headerHeight') || '0', 10) || 0;
+  } catch (e) {
+    /* storage blocked: fit the titles */
+  }
+  var _headerHeight = _savedHeaderHeight || 170;
+
+  var _measureCtx = null;
+  function _fittedHeaderHeight() {
+    var widest = 0;
+    if (!_measureCtx) _measureCtx = document.createElement('canvas').getContext('2d');
+    // Each title's own width in its font (the box it sits in is cut to the
+    // header, so the page can't tell how long the words are).
+    document
+      .querySelectorAll('#gb-colheads .gb-scores-assess-name, #gb-colheads .gb-scores-assess-meta')
+      .forEach(function (el) {
+        var cs = getComputedStyle(el);
+        _measureCtx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+        widest = Math.max(widest, _measureCtx.measureText(el.textContent).width);
+      });
+    // A title runs at 45°: its length is the height × √2 less the 40px the
+    // label starts in (gradebook.css), plus a little air.
+    return Math.max(100, Math.min(170, Math.ceil((widest + 48) / Math.SQRT2)));
+  }
 
   function initHeaderResize() {
     var colheads = document.getElementById('gb-colheads');
@@ -808,11 +835,17 @@ window.PageGradebook = (function () {
         document.removeEventListener('mouseup', onUp);
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
-        localStorage.setItem('gb_headerHeight', _headerHeight);
+        _savedHeaderHeight = _headerHeight;
+        try {
+          localStorage.setItem('gb_headerHeight', _headerHeight);
+        } catch (e) {
+          /* storage blocked: the height holds until the page reloads */
+        }
       }
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
     });
+    if (!_savedHeaderHeight) _headerHeight = _fittedHeaderHeight();
     applyHeaderHeight();
   }
 
