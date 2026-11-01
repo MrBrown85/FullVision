@@ -308,11 +308,13 @@ describe('the engine uses the note only when it passes the check', () => {
   it('verify() reads the note the same way: a draft with the note stands only while the note passes', () => {
     const good = f('showed clear graphs and a careful method', 'he/him');
     const d = CommentBank.draft(CommentBank.context(good, {}), { seed: 3 });
-    expect(d.text).toContain(', where he showed clear graphs and a careful method.');
+    // In one of the best-piece frames with a note (bank expansion, Nov 1).
+    expect(d.text).toContain('he showed clear graphs and a careful method');
+    const bestId = d.sentences.find(x => x.step === 'example').id;
     expect(CommentBank.verify(d, good, {}).replaced).toEqual([]);
     const bad = f('clear graphs and a careful method', 'he/him');
     const r = CommentBank.verify(d, bad, {});
-    expect(r.replaced.map(x => x.sentenceId)).toContain('n36');
+    expect(r.replaced.map(x => x.sentenceId)).toContain(bestId);
     expect(r.text).not.toContain('clear graphs');
     // The same note, now a past-tense phrase, verifies as drafted.
     expect(CommentBank.verify(CommentBank.draft(CommentBank.context(bad, {}), { seed: 3 }), bad, {}).replaced).toEqual(
@@ -396,22 +398,25 @@ describe('the comment engine', () => {
     // No grade sentence here (no marks), so the best piece leads and
     // names him.
     for (let seed = 1; seed < 20; seed++) {
-      expect(CommentBank.draft(ctx, { seed }).text).toContain(
-        'Gabriel’s best piece was “What Does the Poster Show?”, where he linked the poster to the Act.',
-      );
+      const d = CommentBank.draft(ctx, { seed });
+      const best = d.sentences.find(x => x.step === 'example');
+      expect(d.sentences[0], 'seed ' + seed).toBe(best);
+      expect(best.text, 'seed ' + seed).toContain('Gabriel');
+      expect(best.text, 'seed ' + seed).toContain('“What Does the Poster Show?”');
+      expect(best.text, 'seed ' + seed).toContain('linked the poster to the Act');
     }
   });
 
   it('verifies the sentence against the facts, and replaces it once the note changes', () => {
     const facts = f(work('linked the poster to the Act'), 'he/him');
     const d = CommentBank.draft(CommentBank.context(facts, {}), { seed: 3 });
-    const at = d.ids.indexOf('n36');
+    const at = d.sentences.findIndex(x => x.step === 'example');
     expect(at).toBeGreaterThanOrEqual(0);
     expect(d.provenance[at].factKeys).toContain('work:a2');
     expect(CommentBank.verify(d, facts, {}).replaced).toEqual([]);
     const edited = f(work('showed each step'), 'he/him');
     const r = CommentBank.verify(d, edited, {});
-    expect(r.replaced.map(x => x.sentenceId)).toContain('n36');
+    expect(r.replaced.map(x => x.sentenceId)).toContain(d.ids[at]);
   });
 
   it('reads the note from the data layer in facts()', () => {

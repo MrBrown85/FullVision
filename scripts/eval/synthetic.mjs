@@ -379,7 +379,8 @@ export function syntheticClass(kind, opts) {
       // In a class that reports a letter, one English language learner
       // and one student with an IEP, each assessed on their goals.
       designations: Number(k.grade) >= 10 ? (i === 6 ? ['ELL'] : i === 11 ? ['Q'] : []) : [],
-      enrolled_at: '2026-09-03',
+      // One student joined the class five weeks in (the newcomer story).
+      enrolled_at: i === 17 ? '2026-10-13' : '2026-09-03',
     };
   });
   const tagIds = k.sections.map((_, i) => id(4000 + i));
@@ -439,11 +440,15 @@ export function syntheticClass(kind, opts) {
     if (best && si % 3 === 0) best[6] = NOTES[si % NOTES.length];
     const habits = habitsFor(HABIT_SETS[si % HABIT_SETS.length], r);
     const goals = st.designations.indexOf('ELL') >= 0 ? 'language_goals' : st.designations.length ? 'iep_goals' : '';
-    if (Object.keys(habits).length || goals) {
+    // In a class that reports a letter, the first student with few marks
+    // (the 'thin' profile) is one the teacher chose IE for, so the IE
+    // comment's marks problem and plan are drafted.
+    const basis = goals || (Number(k.grade) >= 10 && si === PROFILES.indexOf('thin') ? 'ie' : '');
+    if (Object.keys(habits).length || basis) {
       ratings.push(
         Object.assign(
           { enrollment_id: st.enrollment_id, term: 1, habits, narrative_html: '' },
-          goals ? { reporting_basis: goals } : {},
+          basis ? { reporting_basis: basis } : {},
         ),
       );
     }

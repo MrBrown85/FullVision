@@ -38,7 +38,10 @@ describe('the drafts Generate writes', () => {
     const all = runAccuracy({ classData: syntheticClass() })
       .students.map(s => s.generated.text)
       .join(' ');
-    expect(all).toMatch(/is earning an? [ABC]/);
+    // The grade sentence in any of its frames: the letter and the Letter
+    // Grades Order word (bank expansion, Nov 1).
+    expect(all).toMatch(/\ban? [ABC][+-]?\b/);
+    expect(all).toMatch(/excellent|very good|good|satisfactory|minimally acceptable/);
     expect(all).toMatch(/“[^”]+”/);
     // The best piece prints without its mark (plan part 2), and no other
     // sentence prints a mark per piece, so no % appears in a draft.

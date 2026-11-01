@@ -323,6 +323,7 @@ window.CommentLint = (function () {
     'original',
     'sophisticated',
     'advanced',
+    'high',
     'rich',
     'vivid',
     'powerful',
@@ -381,8 +382,15 @@ window.CommentLint = (function () {
       .replace(/\{\w+\}/g, 'X')
       .replace(/\[([^|\]]*)\|[^\]]*\]/g, '$1');
   }
+  // Compounds whose word is no judgement: "high school" is a place, not a
+  // mark ("high" alone is evaluative).
+  var COMPOUNDS = [[/\bhigh school\b/gi, 'highschool']];
   function words(text) {
-    return plain(text)
+    var t = plain(text);
+    COMPOUNDS.forEach(function (c) {
+      t = t.replace(c[0], c[1]);
+    });
+    return t
       .toLowerCase()
       .replace(/[‘’]s\b/g, '')
       .split(/[^a-z’-]+/)
