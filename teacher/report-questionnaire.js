@@ -866,6 +866,7 @@ window.ReportQuestionnaire = (function () {
     };
   }
 
+  // html-safe: name, initials, pronouns, designations, ids and grade esc()'d; avatar colour from a fixed palette
   function _headerHtml(cid, student, f) {
     var sid = student.id;
     var first = student.firstName || displayNameFirst(student);
@@ -909,6 +910,7 @@ window.ReportQuestionnaire = (function () {
     }).length;
   }
 
+  // html-safe: habit names, hints and scale labels esc()'d; keys and values are fixed
   function _habitsHtml(cid, f) {
     var stored = (getStudentTermRating(cid, f.sid, getTermId()) || {}).habits || {};
     var head = CommentBank.SCALE.map(function (label) {
@@ -1073,6 +1075,7 @@ window.ReportQuestionnaire = (function () {
     return out;
   }
 
+  // html-safe: competency names, titles, notes, marks and missing work esc()'d; tags are fixed words
   function _glanceHtml(cid, student, f) {
     var best = bestPiece(f.work);
     // The best piece's mark as the comment prints it: in a Letter class,
@@ -1153,6 +1156,7 @@ window.ReportQuestionnaire = (function () {
     return rows;
   }
 
+  // html-safe: student answers, goal, labels and name esc()'d, in attributes too
   function _voiceHtml(cid, student, f, comment) {
     var first = student.firstName || displayNameFirst(student);
     var rows = voiceRows(f)
@@ -1211,6 +1215,7 @@ window.ReportQuestionnaire = (function () {
   /* The line at the right of the card (the States mockup): "Added to the
      comment." once a total is entered, the note until then, and a warning
      when a total is lower than the last report's (totals are to date). */
+  // html-safe: counts are whole numbers (_attendanceCount); the report label is esc()'d
   function _attendanceNoteHtml(att) {
     var lower = ['absences', 'lates'].find(function (f) {
       var prev = att['prev' + f[0].toUpperCase() + f.slice(1)];
@@ -1227,6 +1232,7 @@ window.ReportQuestionnaire = (function () {
     return entered ? 'Added to the comment.' : 'Optional. Left out until entered.';
   }
 
+  // html-safe: totals are whole numbers or empty (_attendanceCount); note from _attendanceNoteHtml
   function _attendanceHtml(cid, student) {
     var sid = student.id;
     var att = getTermAttendance(cid, sid, getTermId());
@@ -1274,6 +1280,7 @@ window.ReportQuestionnaire = (function () {
     bad(late, l);
     if (a === null || l === null) {
       var warnNote = document.getElementById('tq-att-note');
+      // html-safe: ATTENDANCE_BAD is a fixed sentence
       if (warnNote) warnNote.innerHTML = `<span class="qn-att-warn">${ATTENDANCE_BAD}</span>`;
       return;
     }
@@ -1392,6 +1399,7 @@ window.ReportQuestionnaire = (function () {
   }
 
   var INFO_ID = 'tq-info-overlay';
+  // html-safe: course, report and block labels esc()'d; sources and who chips are fixed text
   function _infoHtml(cid) {
     var form = _form(cid);
     var on = ReportSheets.onForm(form);
@@ -1572,6 +1580,7 @@ window.ReportQuestionnaire = (function () {
         <p class="qn-both-text">${parts.join(' ')}</p>
       </div>`;
   }
+  // html-safe: both comments, names and grades esc()'d per sentence
   function _bothHtml(cid, student, text, w) {
     var mine = {};
     var theirs = {};
@@ -1757,6 +1766,7 @@ window.ReportQuestionnaire = (function () {
   var COPY_ICON =
     '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="7.5" height="7.5" rx="1.5"></rect><path d="M8.5 4 V2.5 A1 1 0 0 0 7.5 1.5 H2.5 A1 1 0 0 0 1.5 2.5 V7.5 A1 1 0 0 0 2.5 8.5 H4"></path></svg>';
 
+  // html-safe: comment text, earlier comments, labels, ids and every sub-card (stale, basis, warn, count, marks) esc()'d
   function _commentHtml(cid, student) {
     var sid = student.id;
     var termId = getTermId();
@@ -4549,6 +4559,7 @@ window.ReportQuestionnaire = (function () {
      teacher changed; Reset Order once the teacher moved one; Browse
      Sentences… opens the bank. Before Generate has written anything, an IE
      or goals comment's Required rows and the class's rows (plan PR 8). */
+  // html-safe: every row, sentence, source, label, class line and teacher-typed text esc()'d; row and gap indexes are numbers
   function _sentencesHtml(cid, student, f) {
     var path = CommentBank.reportPath(f);
     var key = _rowKey(student);
@@ -5166,6 +5177,7 @@ window.ReportQuestionnaire = (function () {
 
   /* The rows for a part. Support lists the lines ticked for the class and
      Closing the class's sentence, as their rows on the card use them. */
+  // html-safe: sentences, class lines, case labels, ids and names esc()'d; counts are numbers
   function _browseRowsHtml(cid, student, f, ctx) {
     var b = _browse;
     var first = _first(student);
@@ -5312,6 +5324,7 @@ window.ReportQuestionnaire = (function () {
     return `<span class="qn-browse-fitwrap"><button type="button" class="qn-browse-fits" id="tq-browse-fits" data-action="tqSentences" data-do="fitsMenu" aria-haspopup="listbox" aria-expanded="${b.menu}" title="Show only sentences that fit ${esc(first)}, or every sentence for this part.">${b.fits ? 'Fits ' + esc(first) : 'Every sentence'} <span class="qn-browse-n" id="tq-browse-n">${count}</span>${CHEVRONS}</button>${menu}</span>`;
   }
 
+  // html-safe: first name, search text and part labels esc()'d; rows from _browseRowsHtml
   function _browseHtml(cid, student, f) {
     var b = _browse;
     var first = _first(student);
@@ -6867,6 +6880,7 @@ window.ReportQuestionnaire = (function () {
     if (_browse) _closeBrowse(true);
   }
 
+  // html-safe: student id is our own; every card it joins is checked and escaped
   function renderTermQuestionnaire(cid) {
     var students = getTqStudents();
     if (students.length === 0) return '<div class="empty-state"><div class="empty-state-title">No students</div></div>';

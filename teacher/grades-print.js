@@ -805,6 +805,7 @@
     );
   }
 
+  // html-safe: school, teacher, class, titles, categories, names, numbers and cell text esc()'d; sizes and counts are numbers; size and paper are validated keys
   function renderPage(model, page, index, total) {
     var opts = model.opts;
     var size = SIZES[opts.size];
@@ -1036,6 +1037,7 @@
     return html;
   }
 
+  // html-safe: joins renderPage, which is escaped
   function renderPages(model) {
     return model.pages
       .map(function (p, i) {
@@ -1084,6 +1086,7 @@
   function stage(cid, opts) {
     var model = buildModel(cid, opts);
     var root = _root();
+    // html-safe: renderPages here is escaped; marked at the sink because rubric-print.js has its own renderPages
     root.innerHTML = renderPages(model);
     root.setAttribute('lang', 'en');
     root.dataset.paper = model.opts.paper;
@@ -1351,6 +1354,7 @@
   }
 
   /* The right pane: Content, Students and Page. */
+  // html-safe: labels, menu values, dates and assessment titles esc()'d; keys are fixed option names
   function _settingsHtml(cid, opts) {
     var menus = _menus(cid, opts);
     var period = periodFor(cid, opts);
@@ -1395,6 +1399,7 @@
      class average row and the final grade column when they print, and
      marks in the cells unless the scores are blank. Widths follow the
      page's own, in inches. */
+  // html-safe: numbers and fixed markup only
   function _thumbHtml(model) {
     var opts = model.opts;
     var page = model.pages[0];
@@ -1476,6 +1481,7 @@
     return { pages: first, detail: who + what + c + (c === 1 ? ' column' : ' columns') };
   }
 
+  // html-safe: _thumbHtml plus the page lines, esc()'d
   function _previewHtml(model) {
     var lines = previewLines(model);
     return (
@@ -1488,6 +1494,7 @@
     );
   }
 
+  // html-safe: course name esc()'d; settings from _settingsHtml
   function _dialogHtml(cid, opts) {
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
     return (
@@ -1648,6 +1655,7 @@
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'gp-title');
+    // html-safe: this file's _dialogHtml is escaped; marked at the sink because rubric-print.js has its own _dialogHtml
     overlay.innerHTML = _dialogHtml(cid, _state.opts);
     overlay.addEventListener('click', function (e) {
       var t = e.target;
