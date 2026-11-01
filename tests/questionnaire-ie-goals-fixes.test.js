@@ -16,8 +16,10 @@
  * 6. On the IE path with work that has no mark yet, Completes Work is never
  *    filled from the record: only the teacher's ratings print, and verify()
  *    rejects a "completes work on time" claim the record gave.
- * 11. The calendar note matches the rule ("on or before"), and the arrow
- *    keys in the open calendar never move to another student.
+ * 11. The calendar note names the last day that can be picked, the school
+ *    year's ("on or before June 30") in every term; the calendar and
+ *    Approve use that one range; the arrow keys in the open calendar never
+ *    move to another student.
  */
 import './setup.js';
 import { readFileSync } from 'node:fs';
@@ -160,6 +162,7 @@ describe('2. The Language Goals row once the comment has sentences', () => {
     expect(html).toContain('No language goal lines chosen for this class. The comment leaves this sentence out.');
     const lang = html.indexOf('id="tq-row-languageGoals"');
     expect(lang).toBeLessThan(html.indexOf('id="tq-row-closing"'));
+    expect(lang).toBeLessThan(html.indexOf('id="tq-row-support"'));
     expect(lang).toBeGreaterThan(html.indexOf('<span class="qn-req-label">Statement</span>'));
 
     // With a line ticked and picked, the row shows it.
@@ -169,6 +172,34 @@ describe('2. The Language Goals row once the comment has sentences', () => {
     // Never on the grade path.
     rate({ reportingBasis: 'grade' });
     expect(open()).not.toContain('id="tq-row-languageGoals"');
+  });
+
+  it('sits before the Next Step row, never between it and its family line', () => {
+    seed();
+    // Maya, with all eight tasks marked, gets a Next Step sentence.
+    _cache.students[CID].find(x => x.id === MAYA.id).designations = ['ELL'];
+    const maya = () => getStudents(CID).find(x => x.id === MAYA.id);
+    const mayaFacts = () => CommentBank.facts(CID, maya(), TERM);
+    const draftMaya = () => CommentBank.draft(CommentBank.context(mayaFacts(), {}), { seed: 1, quiet: true });
+    upsertTermRating(CID, MAYA.id, TERM, { reportingBasis: 'language_goals' });
+    const d = draftMaya();
+    expect(d.sentences.map(x => x.step)).toContain('nextStep');
+    upsertTermRating(CID, MAYA.id, TERM, { narrative: d.text });
+    let html = open(MAYA.id);
+    const next = () => html.indexOf('<span class="qn-req-label">Next Step</span>');
+    expect(next()).toBeGreaterThan(0);
+    expect(html.indexOf('id="tq-row-languageGoals"')).toBeGreaterThan(0);
+    expect(html.indexOf('id="tq-row-languageGoals"')).toBeLessThan(next());
+    // With a line picked, Generate puts it just before the Next Step sentence.
+    save({ languageGoalsChosen: ['lg-reads-aloud'], languageGoalsFor: { [TERM]: { [MAYA.id]: 'lg-reads-aloud' } } });
+    const g = draftMaya();
+    const steps = g.sentences.map(x => x.step);
+    expect(steps.indexOf('languageGoals')).toBe(steps.indexOf('nextStep') - 1);
+    if (steps.includes('home')) expect(steps.indexOf('home')).toBe(steps.indexOf('nextStep') + 1);
+    upsertTermRating(CID, MAYA.id, TERM, { narrative: g.text });
+    html = open(MAYA.id);
+    expect(html.indexOf('id="tq-row-languageGoals"')).toBeGreaterThan(0);
+    expect(html.indexOf('id="tq-row-languageGoals"')).toBeLessThan(next());
   });
 });
 
@@ -355,23 +386,43 @@ describe('6. Completes Work on a thin IE comment', () => {
 });
 
 describe('11. The calendar', () => {
-  it('says "on or before" the term’s last day, which can be picked', () => {
+  it('names the school year’s last day in every term, and the calendar and Approve use that range', () => {
     seed();
     rate({ reportingBasis: 'ie' });
     open();
     const was = globalThis.getActiveTerm;
-    globalThis.getActiveTerm = () => ({ label: 'Term 2', endsOn: '2027-06-30' });
     try {
-      RQ.tqOpenDeadline();
-      for (let m = 0; m < 7; m++) RQ.tqDeadlineMonth(1);
-      const html = RQ.renderTermQuestionnaire(CID);
-      expect(html).toContain('Term 2 ends June 30. Pick a date on or before June 30.');
-      expect(html).not.toContain('Pick a date before then.');
-      expect(html).toMatch(/data-date="2027-06-30" aria-label="June 30">/);
+      [
+        { label: 'Term 1', endsOn: '2027-01-26' },
+        { label: 'Term 2', endsOn: '2027-06-30' },
+      ].forEach(term => {
+        globalThis.getActiveTerm = () => term;
+        RQ.tqOpenDeadline();
+        let html = RQ.renderTermQuestionnaire(CID);
+        expect(html, term.label).toContain('<span class="qn-cal-note">Pick a date on or before June 30.</span>');
+        expect(html).not.toContain('Pick a date before then.');
+        expect(html).not.toContain('January 26.');
+        // Today is the first day that can be picked.
+        expect(html).toMatch(/data-date="2026-11-01" aria-label="November 1">/);
+        for (let m = 0; m < 7; m++) RQ.tqDeadlineMonth(1);
+        html = RQ.renderTermQuestionnaire(CID);
+        // June 30 can be picked, July 1 is past the range.
+        expect(html).toMatch(/data-date="2027-06-30" aria-label="June 30">/);
+        expect(html).toContain('data-dir="1" aria-label="Next month" title="Next month" disabled');
+        RQ.tqCloseDeadline();
+      });
     } finally {
       globalThis.getActiveTerm = was;
-      RQ.tqCloseDeadline();
     }
+    // Approve follows the same range: June 30 stands, July 1 does not;
+    // today stands, yesterday does not.
+    expect(CommentBank.deadlineOk(CID, '2027-06-30')).toBe(true);
+    expect(CommentBank.deadlineOk(CID, '2027-07-01')).toBe(false);
+    expect(CommentBank.deadlineOk(CID, '2026-11-01')).toBe(true);
+    expect(CommentBank.deadlineOk(CID, '2026-10-31')).toBe(false);
+    rate({ ieDeadline: '2027-06-30' });
+    RQ.tqSetCheck('ie', true);
+    expect(RQ.approveBlockers(student())).not.toContain('deadlineRange');
   });
 
   it('keeps the arrow keys: no other student, and an IE waiting for its date stays', () => {

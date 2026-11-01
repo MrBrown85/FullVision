@@ -3814,6 +3814,10 @@ window.CommentBank = (function () {
     { key: 'overall', part: 'now', groups: ['Overall'] },
     // The best piece (plan part 2): the one sentence of Examples From Work.
     { key: 'example', part: 'now', groups: ['Examples From Work'] },
+    // The Language Goals line (plan PR 3b): a template the teacher picked,
+    // filled for the student; empty off the language-goals path. Before the
+    // Next Step sentence, never between it and its family line (#632).
+    { key: 'languageGoals', part: 'go', line: 'languageGoalLine', template: true },
     // One skill from the table when there is one (`prefer`); never a
     // sentence that names a bare competency label (`never`).
     {
@@ -3826,9 +3830,6 @@ window.CommentBank = (function () {
     // The teacher's support line for this student, one thing the family can
     // do at home, and the class's closing sentence (plan PR 8). Teacher
     // lines (`line`) are used exactly as typed and are left out when empty.
-    // The Language Goals line (plan PR 3b): a template the teacher picked,
-    // filled for the student; empty off the language-goals path.
-    { key: 'languageGoals', part: 'go', line: 'languageGoalLine', template: true },
     { key: 'support', part: 'how', line: 'supportLine' },
     { key: 'home', part: 'how', groups: ['For the Family'] },
     { key: 'closer', part: 'how', line: 'closingLine' },
@@ -4229,7 +4230,9 @@ window.CommentBank = (function () {
       var go = at(['nextStep']);
       var close = seq.indexOf('closer');
       put('support', home >= 0 ? home : go >= 0 ? go + 1 : close >= 0 ? close : seq.length);
-      put('languageGoals', seq.indexOf('support'));
+      // The language goal line goes before the Next Step sentence, never
+      // between it and the family line that follows it (#632).
+      put('languageGoals', go >= 0 ? seq.indexOf('nextStep') : seq.indexOf('support'));
     } else {
       var meet = seq.indexOf('ieMeeting');
       put('support', meet >= 0 ? meet : seq.indexOf('closer') >= 0 ? seq.indexOf('closer') : seq.length);

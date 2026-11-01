@@ -195,8 +195,9 @@ describe('the draft is the plan’s eight parts only', () => {
     'lateWork',
     'overall',
     'example',
-    'nextStep',
+    // Before the Next Step: never between it and its family line (#632).
     'languageGoals',
+    'nextStep',
     'support',
     'home',
     'closer',

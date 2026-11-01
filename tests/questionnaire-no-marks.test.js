@@ -129,5 +129,49 @@ describe('Generate with no marks or one mark (Demo Mode, Science 8, Report 2)', 
     const steps = draftFor(byName('Ethan'), 1).sentences.map(x => x.step);
     expect(steps).toContain('nextStep');
     expect(steps).toContain('home');
+
+    // On the language-goals path the goal line never sits between the Next
+    // Step sentence and its family line: it comes before the Next Step.
+    const ethan = byName('Ethan');
+    const was = { designations: ethan.designations, rating: getStudentTermRating(cid, ethan.id, 'term-2') };
+    // Goals replace a letter grade: a Letter class.
+    const mode = COURSES[cid].gradingSystem;
+    COURSES[cid].gradingSystem = 'letter';
+    clearProfCache();
+    const roster = getStudents(cid).map(x => (x.id === ethan.id ? Object.assign({}, x, { designations: ['ELL'] }) : x));
+    saveStudents(cid, roster);
+    upsertTermRating(cid, ethan.id, 'term-2', { reportingBasis: 'language_goals' });
+    const cfg = getReportConfig(cid) || {};
+    saveReportConfig(
+      cid,
+      Object.assign({}, cfg, {
+        commentSettings: Object.assign({}, cfg.commentSettings || {}, {
+          languageGoalsChosen: ['lg-discussions'],
+          languageGoalsFor: { 'term-2': { [ethan.id]: 'lg-discussions' } },
+        }),
+      }),
+    );
+    try {
+      for (let seed = 1; seed <= 6; seed++) {
+        const goal = draftFor(byName('Ethan'), seed).sentences.map(x => x.step);
+        expect(goal, 'seed ' + seed).toContain('languageGoals');
+        if (!goal.includes('home')) continue;
+        expect(goal.indexOf('home'), 'seed ' + seed).toBeGreaterThan(goal.indexOf('nextStep'));
+        const at = goal.indexOf('languageGoals');
+        expect(at < goal.indexOf('nextStep') || at > goal.indexOf('home'), 'seed ' + seed + ': ' + goal.join(' ')).toBe(
+          true,
+        );
+        expect(at, 'seed ' + seed).toBe(goal.indexOf('nextStep') - 1);
+      }
+    } finally {
+      saveStudents(
+        cid,
+        getStudents(cid).map(x => (x.id === ethan.id ? Object.assign({}, x, { designations: was.designations }) : x)),
+      );
+      upsertTermRating(cid, ethan.id, 'term-2', { reportingBasis: (was.rating || {}).reportingBasis || 'grade' });
+      saveReportConfig(cid, cfg);
+      COURSES[cid].gradingSystem = mode;
+      clearProfCache();
+    }
   });
 });

@@ -2284,11 +2284,9 @@ window.ReportQuestionnaire = (function () {
     }
     var prevOk = _cal.month > range.min.slice(0, 7);
     var nextOk = _cal.month < range.max.slice(0, 7);
-    var term = typeof getActiveTerm === 'function' ? getActiveTerm(_activeCourse) : null;
-    var note =
-      term && term.endsOn && term.endsOn >= range.min
-        ? `<span class="qn-cal-note">${esc(term.label || 'This term')} ends ${esc(_longDay(term.endsOn))}. Pick a date on or before ${esc(_longDay(term.endsOn))}.</span>`
-        : '';
+    // The note names the last day that can be picked: the school year's
+    // last day, in every term (the plan: limited to the school year).
+    var note = `<span class="qn-cal-note">Pick a date on or before ${esc(_longDay(range.max))}.</span>`;
     return `<div class="qn-cal" role="dialog" aria-label="Pick a deadline" id="tq-cal" tabindex="-1">
       <div class="qn-cal-top"><span class="qn-cal-title">${esc(title)}</span>
         <span class="qn-cal-nav"><button type="button" data-action="tqDeadlineMonth" data-dir="-1" aria-label="Previous month" title="Previous month"${prevOk ? '' : ' disabled'}>‹</button><button type="button" data-action="tqDeadlineMonth" data-dir="1" aria-label="Next month" title="Next month"${nextOk ? '' : ' disabled'}>›</button></span></div>
@@ -4440,7 +4438,8 @@ window.ReportQuestionnaire = (function () {
     extra.forEach(function (step) {
       var si = _stepAt(step);
       // Closing last; on the IE path Support before Meeting; else before
-      // the first row of a later step, or last.
+      // the first row of a later step (Language Goals before the Next Step
+      // row, never between it and its family line), or last.
       var pos =
         step === 'closer'
           ? -1
