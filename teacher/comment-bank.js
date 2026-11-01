@@ -5654,12 +5654,46 @@ window.CommentBank = (function () {
     },
   };
 
+  /* Where a sentence came from (provenance) as it was filled with the
+     values read back from its text (valuesIn): a skill chosen among
+     several valid ones (the even skill, one of a tie at the top, the
+     highest-marked skill) is put as named when it is still one of them,
+     so its sources are the competency it names, not the one the class's
+     rotation would choose now. */
+  function provenanceAs(s, ctx, values) {
+    var vals = Object.assign({}, values || {});
+    var when = (s && s.when) || {};
+    Object.keys(when).forEach(function (k) {
+      vals['when.' + k] = when[k];
+    });
+    var pv = provenance(s, ctxFor(s, _asNamed({ values: vals }, ctx)));
+    pv.values = Object.assign({}, pv.values, values || {});
+    return pv;
+  }
+
   /* The even skill a sentence named ({evenSkill}) is a choice among the
      student's even skills (evenSkills), not a fact: the context holds the
      one it would choose now, so for the check the context is put as the
      sentence was filled, when the skill named is still one of them. The
      claim (CLAIMS.evenResults) checks the competency behind it. */
   function _asNamed(pv, ctx) {
+    // One of a tie at the top (`when.topSkill`, topSkillOf) is a choice in
+    // the same way: the context as named while that skill is still in the
+    // tie (CLAIMS.strength checks the competency behind it).
+    var vals = (pv && pv.values) || {};
+    var topNamed = vals['when.topSkill'] || vals.topSkill || '';
+    if (topNamed && ctx && ctx._f && topNamed !== ctx._topSkill && !strengthSkills(ctx._f).length) {
+      var tx = topTieSkills(ctx._f).find(function (e) {
+        return e.key === topNamed;
+      });
+      if (tx)
+        ctx = Object.assign({}, ctx, {
+          topSkill: tx.key,
+          _topSkill: tx.key,
+          _facts: Object.assign({}, ctx._facts, { topSkill: ['comp:' + tx.comp.id] }),
+          _compNames: Object.assign({}, ctx._compNames, { topSkill: [tx.comp.name] }),
+        });
+    }
     var hiNamed = (pv && pv.values && pv.values.highestSkill) || '';
     if (hiNamed && ctx && hiNamed !== ctx.highestSkill) {
       var hx = (ctx._highestSkills || []).find(function (e) {
@@ -6160,6 +6194,7 @@ window.CommentBank = (function () {
     pattern: pattern,
     usedBy: usedBy,
     valuesIn: valuesIn,
+    provenanceAs: provenanceAs,
     parts: parts,
     fitCount: fitCount,
     familyOf: familyOf,

@@ -2838,7 +2838,8 @@ window.ReportQuestionnaire = (function () {
         used[b.id] = true;
         var br = rowFromSentence(b, ctx);
         br.text = br.drafted = t;
-        br.prov = Object.assign({}, br.prov, { values: Object.assign({}, br.prov.values, read) });
+        // A skill chosen among several valid ones is checked as named.
+        br.prov = CommentBank.provenanceAs(b, ctx, read);
         // Its realiser tokens hold today's values: the text as written.
         delete br.raw.toks;
         return br;

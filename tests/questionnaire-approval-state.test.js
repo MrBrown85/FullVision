@@ -372,3 +372,129 @@ describe('4. IE with no deadline waits for the date', () => {
     expect(noor().reportingBasis || 'grade').toBe('grade');
   });
 });
+
+describe('1b. a skill chosen among several valid ones is never a false flag', () => {
+  // Twelve students with even results on three skills (each on four
+  // pieces): the skill an even-results sentence names rotates through the
+  // class (least named first), so it is a choice, not a fact.
+  const KIDS = Array.from({ length: 12 }, (_, i) => ({
+    id: 'stu-even-' + i,
+    firstName: ['Ana', 'Ben', 'Cal', 'Dev', 'Eli', 'Fay', 'Gus', 'Hal', 'Ivy', 'Jon', 'Kit', 'Lou'][i],
+    lastName: 'Even' + String.fromCharCode(65 + i),
+    pronouns: i % 2 ? 'he/him' : 'she/her',
+  }));
+  let LEVELS = [3, 3, 3];
+  let SECS = secs;
+  function seedEven() {
+    btn = { disabled: false, title: '' };
+    ready = { textContent: '' };
+    CID = 'course-approval-state-' + ++classes;
+    COURSES[CID] = { id: CID, name: 'History 12', gradingSystem: 'letter', gradeLevel: '12' };
+    _cache.students[CID] = KIDS.map(k => Object.assign({}, k));
+    _cache.learningMaps[CID] = {
+      sections: SECS.map((n, i) => ({ id: 'sec' + i, name: n, shortName: n, tags: [{ id: 't' + i, label: n }] })),
+    };
+    _cache.categories[CID] = [];
+    _cache.assessments[CID] = Array.from({ length: 4 * SECS.length }, (_, i) => ({
+      id: 'a' + i,
+      title: 'Task ' + (i + 1),
+      scoreMode: 'proficiency',
+      tagIds: ['t' + (i % SECS.length)],
+      type: 'summative',
+      date: '2026-10-' + String((i % 28) + 1).padStart(2, '0'),
+    }));
+    _cache.scores[CID] = {};
+    KIDS.forEach(k => {
+      _cache.scores[CID][k.id] = _cache.assessments[CID].map(a => ({
+        assessmentId: a.id,
+        tagId: a.tagIds[0],
+        score: LEVELS[Number(a.tagIds[0].slice(1))],
+        date: a.date,
+      }));
+    });
+    _cache.statuses[CID] = {};
+    _cache.overrides[CID] = {};
+    _cache.courseConfigs[CID] = {};
+    _cache.observations[CID] = {};
+    _cache.reflections[CID] = {};
+    _cache.termRatings[CID] = {};
+    _cache.reportConfig[CID] = null;
+    clearProfCache();
+  }
+  /* Each student's comment drafted in turn and saved, as Generate does;
+     then the page reloads: the class's comments come back with no session
+     tally of the skills named (the same class under a new id here). */
+  function draftClass() {
+    KIDS.forEach((k, n) => {
+      const f = CommentBank.facts(CID, k, TERM);
+      const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 7 + n });
+      upsertTermRating(CID, k.id, TERM, { narrative: d.text });
+    });
+    const was = CID;
+    seedEven();
+    KIDS.forEach(k =>
+      upsertTermRating(CID, k.id, TERM, { narrative: getStudentTermRating(was, k.id, TERM).narrative }),
+    );
+  }
+  const evenNamed = () =>
+    KIDS.filter(k => {
+      const f = CommentBank.facts(CID, k, TERM);
+      const ctx = CommentBank.context(f, {});
+      return RQ.recoverRows(rating(k.id).narrative, ctx, null).some(
+        r => r.prov && r.prov.values && r.prov.values.evenSkill,
+      );
+    });
+  /* The checks after a reload: every comment's rows recovered from its
+     saved text and checked against today's facts. */
+  const flagged = () =>
+    KIDS.filter(k => {
+      open(k.id);
+      return RQ.claimChanges(k).length > 0;
+    }).map(k => k.id);
+
+  beforeEach(() => {
+    LEVELS = [3, 3, 3];
+    SECS = secs;
+    seedEven();
+  });
+
+  it('drafted, nothing changed, checked again after a reload: no flags', () => {
+    draftClass();
+    // The rotation named different skills, so the check sees choices.
+    expect(evenNamed().length).toBeGreaterThan(3);
+
+    expect(flagged()).toEqual([]);
+  });
+
+  it('a tie at the top (one of the tie named, by rotation): no flags after a reload', () => {
+    // Three skills tied at Extending, one well below (the next step).
+    LEVELS = [4, 4, 4, 2];
+    SECS = secs.concat('Continuity and Change');
+    seedEven();
+    draftClass();
+    const tieNamed = KIDS.filter(k => {
+      const ctx = CommentBank.context(CommentBank.facts(CID, k, TERM), {});
+      return RQ.recoverRows(rating(k.id).narrative, ctx, null).some(r => r.prov && r.prov.values['when.topSkill']);
+    });
+    expect(tieNamed.length).toBeGreaterThan(3);
+
+    expect(flagged()).toEqual([]);
+  });
+
+  it('a competency lowered so the named skill is no longer even: that comment flags', () => {
+    draftClass();
+    const k = evenNamed()[0];
+    const f = CommentBank.facts(CID, k, TERM);
+    const ctx = CommentBank.context(f, {});
+    const row = RQ.recoverRows(rating(k.id).narrative, ctx, null).find(r => r.prov && r.prov.values.evenSkill);
+    const named = (ctx._evenSkills || []).find(x => x.skill === row.prov.values.evenSkill);
+    expect(named).toBeTruthy();
+    // Every piece of that competency marked down a whole step.
+    _cache.scores[CID][k.id].forEach(e => {
+      if (_cache.assessments[CID].find(a => a.id === e.assessmentId).tagIds[0] === 't' + secs.indexOf(named.comp.name))
+        e.score = 1;
+    });
+    clearProfCache();
+    expect(flagged()).toEqual([k.id]);
+  });
+});
