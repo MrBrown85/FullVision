@@ -57,6 +57,27 @@ jobs:
           fi
           node scripts/check-db-drift.mjs
 
+      # Fails when docs/schema.generated.sql no longer matches the live
+      # database; the live snapshot is uploaded so it can be committed.
+      - name: Check the schema snapshot matches the live database
+        id: schema-snapshot
+        env:
+          DATABASE_URL: ${{ secrets.FV_SCHEMA_READER_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::Schema snapshot check skipped: the FV_SCHEMA_READER_URL secret is not set."
+            exit 0
+          fi
+          node scripts/schema-snapshot.mjs
+
+      - name: Upload the live schema snapshot
+        if: failure() && steps.schema-snapshot.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-snapshot
+          path: schema-snapshot.live.sql
+          retention-days: 7
+
       - name: Collect changed files for format check
         id: changed-files
         shell: bash
