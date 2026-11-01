@@ -5927,7 +5927,7 @@
 }
 .grsp-legend {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr) 250px;
+  grid-template-columns: 232px minmax(0, 1fr) 232px;
   column-gap: 10px;
   padding: 2px 14px 0;
 }
@@ -5944,9 +5944,9 @@
 }
 .grdt-crit.grsp-crit {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr) 250px;
+  grid-template-columns: 232px minmax(0, 1fr) 232px;
   gap: 10px;
-  align-items: start;
+  align-items: stretch;
 }
 .grsp-note {
   padding: 12px;
@@ -5963,6 +5963,16 @@
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
+}
+/* Work On and Went Beyond run the card's full height, their fields filling
+   the panel rather than sitting in it as one-line boxes. */
+.grsp-note .grdt-note,
+.grsp-note .grdt-note:focus,
+.grsp-note .grdt-note.has-text {
+  flex: 1;
+  height: auto;
+  min-height: 72px;
+  resize: none;
 }
 .grsp-standard {
   padding: 6px 10px;

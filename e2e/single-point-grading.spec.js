@@ -67,6 +67,12 @@ test('the grade editor shows Work On | the standard | Went Beyond', async ({ pag
   await card.locator('.grdl-level[data-level="3"]').click();
   await expect(card.locator('.grdl-level.is-on')).toHaveText('Proficient');
 
+  // Work On and Went Beyond run the card's height, not one-line boxes.
+  const [note, crit] = await page.evaluate(() => {
+    var c = document.querySelector('#grader-overlay .grsp-crit[data-critid="crit-hyp"]');
+    return [c.querySelector('.grsp-note.is-work').getBoundingClientRect().height, c.getBoundingClientRect().height];
+  });
+  expect(note).toBeGreaterThan(crit - 40);
   await card.locator('.grsp-note.is-work .grdt-note').fill('Name the variable.');
   await card.locator('.grsp-note.is-beyond .grdt-note').fill('Predicted a range.');
   await page.locator('#grader-overlay .grader-student').click();
