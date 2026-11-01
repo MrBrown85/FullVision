@@ -3282,7 +3282,7 @@ window.CommentBank = (function () {
     });
     // A Habit Ratings frame is matched on the same ratings as the summary
     // sentence, so its habit condition makes it no more specific: the two
-    // share a tier, and the summary stays the default (habitCellFits).
+    // share a tier and rotate, least used first (habitCellFits).
     if (s.habit && s.part === 'habits') n--;
     return n;
   }
@@ -3290,9 +3290,10 @@ window.CommentBank = (function () {
   /* Whether a Habit Ratings frame (bank hl001-hl120: one habit at one
      rating, `habit` and `level`) may fill the habits step: only when exactly
      one habit is rated Sometimes or Rarely and the frame is that habit's,
-     so the draft names it specifically. The summary sentence is the default
-     everywhere else; Other Wording and Browse Sentences offer every frame
-     whose rating matches (fits()). */
+     so the draft names it specifically; the frame shares the summary's tier
+     (specificity) and rotates with its frames, least used first. The
+     summary sentence is the only pick everywhere else; Other Wording and
+     Browse Sentences offer every frame whose rating matches (fits()). */
   function habitCellFits(s, ctx) {
     return !!s.habit && !!ctx._habitAlone && ctx._habitAlone === s.habit;
   }
@@ -3541,12 +3542,8 @@ window.CommentBank = (function () {
           // Exhaust before repeat: a sentence no classmate has comes before
           // any a classmate has, the least used next.
           used: usage[s.id] || 0,
-          // At equal use, the habits summary before a Habit Ratings frame
-          // (the summary is the default; a frame is drafted once every
-          // summary frame is in a classmate's comment), then wording
-          // written for this kind of class, then a sentence that does not
-          // start like the one before it.
-          cell: s.habit && step.key === 'habits' ? 1 : 0,
+          // At equal use, wording written for this kind of class first, then
+          // a sentence that does not start like the one before it.
           general: s.subjects ? 0 : 1,
           repeats: repeatsLast(t, last) ? 1 : 0,
           // A step that says a fact (the grade, the work not handed in)
@@ -3574,14 +3571,7 @@ window.CommentBank = (function () {
           .filter(fresh);
       if (!scored.length) return;
       scored.sort(function (a, b) {
-        return (
-          a.long - b.long ||
-          a.used - b.used ||
-          a.cell - b.cell ||
-          a.general - b.general ||
-          a.repeats - b.repeats ||
-          a.r - b.r
-        );
+        return a.long - b.long || a.used - b.used || a.general - b.general || a.repeats - b.repeats || a.r - b.r;
       });
       var pick = scored[0];
       taken[pick.s.id] = true;

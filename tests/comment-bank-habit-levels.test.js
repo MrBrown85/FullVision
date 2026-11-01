@@ -6,9 +6,9 @@
  *
  * - A cell has at least four frames that differ in structure.
  * - A frame fits only at its rating, and verify() fails it at any other.
- * - Generate keeps the summary sentence as the default; a cell frame is
- *   drafted only when exactly one habit is rated below Usually, once the
- *   summary frames are in classmates' comments, and it names that habit.
+ * - Generate drafts a cell frame only when exactly one habit is rated below
+ *   Usually: that habit's frames share the summary's tier and rotate with
+ *   it, least used first, and every one names that habit.
  * - Other Wording on a cell row offers only that cell's frames; on the
  *   summary row, cell frames whose rating matches are eligible.
  * - A rating change still redraws the habits sentence (#586).
@@ -169,10 +169,22 @@ describe('the Habit Ratings cells', () => {
 describe('Generate and the Habit Ratings frames', () => {
   const drafted = (habits, comments, seed) =>
     habitsRow(CommentBank.draft(ctxFor(habits), { seed: seed || 1, comments: comments || [] }));
+  /* The habits sentence of n classmates with the same ratings, drafted in
+     turn with each draft a classmate's comment (exhaust before repeat). */
+  const overClass = (habits, n) => {
+    const comments = [];
+    const rows = [];
+    for (let i = 1; i <= n; i++) {
+      const d = CommentBank.draft(ctxFor(habits, { sid: 'cell-s' + i }), { seed: i, comments: comments.slice() });
+      comments.push({ sid: 'cell-s' + i, text: d.text });
+      rows.push(habitsRow(d));
+    }
+    return rows;
+  };
 
-  it('keeps the summary sentence as the default pick for every rating', () => {
+  it('keeps the summary sentence as the only pick at Usually and Consistently', () => {
     KEYS.forEach(habit =>
-      LEVELS.forEach(level => {
+      [3, 4].forEach(level => {
         for (let seed = 1; seed <= 4; seed++) {
           const row = drafted({ ...all(4), [habit]: level }, [], seed);
           expect(row, habit + ' ' + level).toBeTruthy();
@@ -182,25 +194,29 @@ describe('Generate and the Habit Ratings frames', () => {
     );
   });
 
-  it('drafts a cell frame only for the one habit rated below Usually, once every summary frame is used, and reaches each frame', () => {
+  it('with one habit below Usually, that habit’s cell frames share the summary’s tier and rotate with it from the first student', () => {
     KEYS.forEach(habit =>
       [1, 2].forEach(level => {
         const habits = { ...all(4), [habit]: level };
         const ctx = ctxFor(habits);
-        const comments = summariesUsed(ctx);
-        expect(comments.length).toBeGreaterThanOrEqual(4);
-        const want = cell(habit, level).map(s => s.id);
-        const got = new Set();
-        for (let seed = 1; seed <= 12 && got.size < want.length; seed++) {
-          const row = drafted(habits, comments, seed);
-          expect(row.id, habit + ' ' + level + ' seed ' + seed).toMatch(/^hl/);
-          const s = COMMENT_BANK.sentences.find(x => x.id === row.id);
-          expect(s.habit, row.id).toBe(habit);
-          expect(s.level, row.id).toBe(level);
-          got.add(row.id);
-          comments.push(row.text);
-        }
-        expect([...got].sort(), habit + ' ' + level).toEqual(want.slice().sort());
+        const pool = summaries()
+          .filter(s => CommentBank.fits(s, ctx))
+          .map(s => s.id)
+          .concat(cell(habit, level).map(s => s.id));
+        const rows = overClass(habits, pool.length);
+        const ids = rows.map(r => r.id);
+        // Exhaust before repeat over both sets: every frame once before any twice.
+        expect(ids.slice().sort(), habit + ' ' + level).toEqual(pool.slice().sort());
+        // A cell frame comes before the summary frames alone could run out.
+        expect(
+          ids.slice(0, pool.length - cell(habit, level).length).some(id => /^hl/.test(id)),
+          habit + ' ' + level,
+        ).toBe(true);
+        rows.forEach(r => {
+          const s = COMMENT_BANK.sentences.find(x => x.id === r.id);
+          if (s.habit) expect([s.habit, s.level], r.id).toEqual([habit, level]);
+          expect(r.text, r.id).not.toMatch(/[{}[\]]/);
+        });
       }),
     );
   });

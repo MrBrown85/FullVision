@@ -631,11 +631,11 @@ var COMMENT_BANK = {
     // student does: Consistently and Usually describe the habit; Sometimes
     // says what has begun and the next step; Rarely names the next step as
     // one thing to do, never a deficit. Plain wording that fits every kind
-    // of class (no handing in). Generate keeps the summary sentence
-    // (hs01-hs10) as its default; a cell frame is drafted only when exactly
-    // one habit is rated below Usually and the summary frames are all in
-    // classmates' comments. Other Wording and Browse Sentences offer them
-    // whenever the rating matches.
+    // of class (no handing in). Generate drafts a cell frame only when exactly
+    // one habit is rated below Usually: that habit's frames share the summary
+    // sentence's tier (hs05-hs07, hs28-hs33) and rotate with it, least used
+    // first. Other Wording and Browse Sentences offer them whenever the
+    // rating matches.
     {
       id: 'hl001',
       part: 'habits',

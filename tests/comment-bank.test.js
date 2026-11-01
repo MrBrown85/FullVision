@@ -660,7 +660,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), { habits: rated });
     const d = CommentBank.draft(ctx, { seed: 1 });
     expect(d.sentences.filter(x => x.step === 'habits').map(x => x.text)).toEqual([
-      expect.stringMatching(/taking part in class/i),
+      // Takes Part is the one habit rated below Usually: the summary frame
+      // or a Habit Ratings frame for it names it.
+      expect.stringMatching(/tak(e|es|ing) part|discussion|question/i),
     ]);
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
     // The Demo class has no closing sentence or support lines set, so the
