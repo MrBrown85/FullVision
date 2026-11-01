@@ -21,34 +21,45 @@ async function go(page, student) {
 }
 const saved = (page, sid) => page.evaluate(s => getStudentTermRating('sci8', s, 'term-2') || {}, sid);
 
-/* Liam's Generate draft, approved; then his best piece this term,
-   “Plate Tectonics Presentation”, is marked down in the gradebook. */
+/* Liam's Generate draft names his best piece this term; returns its title. */
+async function generateLiam(page) {
+  await page.locator('#tq-generate').click();
+  await expect(page.locator('#tq-narrative')).toHaveValue(/best piece was “/);
+  return (await page.locator('#tq-narrative').inputValue()).match(/best piece was “(.+?)[.?!]?”/)[1];
+}
+
+/* That piece marked down in the gradebook: a level of 1, or 1 point. */
+async function markDown(page, title) {
+  await page.evaluate(t => {
+    const a = getAssessments('sci8').find(x => x.title === t);
+    getScores('sci8')
+      .st4.filter(e => e.assessmentId === a.id)
+      .forEach(e => upsertScore('sci8', 'st4', e.assessmentId, e.tagId, 1, e.date, e.type, e.note, e.mod));
+  }, title);
+}
+
+/* Liam's Generate draft, approved; then his best piece is marked down. */
 async function approveLiamThenMarkDown(page) {
   await open(page, 'st4');
   await page.evaluate(() => upsertTermRating('sci8', 'st4', 'term-2', { narrative: '' }));
   await go(page, 'st5');
   await go(page, 'st4');
-  await page.locator('#tq-generate').click();
-  await expect(page.locator('#tq-narrative')).toHaveValue(/Plate Tectonics Presentation/);
+  const best = await generateLiam(page);
   for (const cb of await page.locator('[data-tq-check]').all()) await cb.check();
   await page.locator('#tq-approve-next').click();
   await expect.poll(async () => (await saved(page, 'st4')).approvedAt).toBeTruthy();
-  await page.evaluate(() => {
-    const a = getAssessments('sci8').find(x => x.title === 'Plate Tectonics Presentation');
-    getScores('sci8')
-      .st4.filter(e => e.assessmentId === a.id)
-      .forEach(e => upsertScore('sci8', 'st4', e.assessmentId, e.tagId, 1, e.date, e.type, e.note, e.mod));
-  });
+  await markDown(page, best);
+  return best;
 }
 
 test('a mark changed after approval: the notice and the orange dot', async ({ page }) => {
-  await approveLiamThenMarkDown(page);
+  const best = await approveLiamThenMarkDown(page);
   await go(page, 'st5');
   await go(page, 'st4');
   const board = page.locator('#tq-stale');
   await expect(board).toBeVisible();
-  await expect(board.locator('.qn-stale-note')).toContainText('“Plate Tectonics Presentation” was marked after');
-  await expect(board.locator('.qn-stale-was').first()).toHaveText('His best piece was “Plate Tectonics Presentation.”');
+  await expect(board.locator('.qn-stale-note')).toContainText('“' + best + '” was marked after');
+  await expect(board.locator('.qn-stale-was').first()).toHaveText('His best piece was “' + best + '.”');
   await expect(board.locator('.qn-stale-keep').first()).toHaveText('Keep as Approved');
   await expect(page.locator('#gb-sidebar .student-row[data-sid="st4"] .student-row-mark.flag')).toHaveText('●');
   await expect(page.locator('#tq-approve-next')).toBeDisabled();
@@ -62,21 +73,15 @@ test('a mark changed before approval: the row shows it and Approve and Next wait
   await page.evaluate(() => upsertTermRating('sci8', 'st4', 'term-2', { narrative: '' }));
   await go(page, 'st5');
   await go(page, 'st4');
-  await page.locator('#tq-generate').click();
-  await expect(page.locator('#tq-narrative')).toHaveValue(/Plate Tectonics Presentation/);
+  const best = await generateLiam(page);
   for (const cb of await page.locator('[data-tq-check]').all()) await cb.check();
   // Marked down in another tab of the gradebook, then Approve and Next.
-  await page.evaluate(() => {
-    const a = getAssessments('sci8').find(x => x.title === 'Plate Tectonics Presentation');
-    getScores('sci8')
-      .st4.filter(e => e.assessmentId === a.id)
-      .forEach(e => upsertScore('sci8', 'st4', e.assessmentId, e.tagId, 1, e.date, e.type, e.note, e.mod));
-  });
+  await markDown(page, best);
   await page.locator('#tq-approve-next').click();
   expect((await saved(page, 'st4')).approvedAt).toBeFalsy();
   await expect(page.locator('.qn').first()).toHaveAttribute('data-sid', 'st4');
   const claim = page.locator('#tq-sentences .qn-claim').first();
-  await expect(claim.locator('.qn-stale-was')).toHaveText('His best piece was “Plate Tectonics Presentation.”');
+  await expect(claim.locator('.qn-stale-was')).toHaveText('His best piece was “' + best + '.”');
   await expect(claim.locator('.qn-stale-label').first()).toHaveText('Written');
   await expect(claim.locator('.qn-stale-keep')).toHaveText('Keep as Written');
   await expect(page.locator('#tq-approve-next')).toBeDisabled();
@@ -92,7 +97,7 @@ test('a mark changed before approval: the row shows it and Approve and Next wait
   await expect(page.locator('#tq-approve-next')).toBeEnabled();
   await page.locator('#tq-approve-next').click();
   await expect.poll(async () => (await saved(page, 'st4')).approvedAt).toBeTruthy();
-  expect((await saved(page, 'st4')).narrative).not.toContain('His best piece was “Plate Tectonics Presentation.”');
+  expect((await saved(page, 'st4')).narrative).not.toContain('His best piece was “' + best + '.”');
 });
 
 test('Write Your Own on one student does not follow to the next', async ({ page }) => {
