@@ -106,7 +106,9 @@ test('a click anywhere on a chosen rubric level clears it', async ({ page }) => 
   await expect(chosen).toContainText('Proficient');
   // − | + fine-tunes without clearing.
   await chosen.locator('[data-mod="1"]').click();
-  await expect(dialog.locator('.grdt-chosen-label')).toHaveText(/Proficient \+/);
+  // The + shows on its own button; the label stays the level's name (mockup).
+  await expect(chosen.locator('[data-mod="1"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(dialog.locator('.grdt-chosen-label')).toHaveText('Proficient');
   await slowClick(page, dialog.locator('.grdt-tile.is-chosen .grdt-words'));
   await expect(dialog.locator('.grdt-tile.is-chosen')).toHaveCount(0);
   await expect(dialog.locator('.grader-grade')).toHaveText('Not Graded');

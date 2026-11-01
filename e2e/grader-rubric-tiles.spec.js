@@ -63,7 +63,9 @@ test('rubric tiles score, fine-tune and take feedback', async ({ page }) => {
   await hyp.locator('.grdt-tile[data-level="3"]').click();
   await expect(hyp.locator('.grdt-tile.is-chosen')).toContainText('Proficient');
   await hyp.locator('.grdt-stepper [data-mod="1"]').click();
-  await expect(hyp.locator('.grdt-chosen-label')).toHaveText(/Proficient \+/);
+  // The + shows on its own button; the label stays the level's name (mockup).
+  await expect(hyp.locator('.grdt-stepper [data-mod="1"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(hyp.locator('.grdt-chosen-label')).toHaveText('Proficient');
 
   await hyp.focus();
   await page.keyboard.press('4');

@@ -617,7 +617,6 @@ window.PageAssignments = (function () {
               '</span>'
             : '<span class="grdt-words">' + esc(words) + '</span>';
           if (state.level === lv) {
-            var modLabel = state.mod > 0 ? ' +' : state.mod < 0 ? ' −' : '';
             var canUp = normalizeScoreMod(lv, 1) === 1;
             var canDown = normalizeScoreMod(lv, -1) === -1;
             // A click anywhere on the tile clears it, except on − | +.
@@ -636,7 +635,6 @@ window.PageAssignments = (function () {
               lv +
               '" aria-pressed="true" title="Click to clear">' +
               PROF_LABELS[lv] +
-              modLabel +
               '</button>' +
               '<span class="grdt-stepper" role="group" aria-label="Fine-tune ' +
               PROF_LABELS[lv] +
