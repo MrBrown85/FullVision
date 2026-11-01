@@ -1382,7 +1382,12 @@ th.gb-group-alt {
   color: var(--text);
   transition: background 0.08s;
 }
-.gb-ctx-item:hover {
+.gb-ctx-menu:focus {
+  outline: none;
+}
+.gb-ctx-item:hover,
+.gb-ctx-item:focus {
+  outline: none;
   background: var(--active);
   color: #fff;
 }
@@ -1395,7 +1400,8 @@ th.gb-group-alt {
 .gb-ctx-danger {
   color: var(--priority);
 }
-.gb-ctx-danger:hover {
+.gb-ctx-danger:hover,
+.gb-ctx-danger:focus {
   background: var(--priority);
   color: #fff;
 }

@@ -2110,12 +2110,76 @@ window.PageGradebook = (function () {
     menu.style.top = y + 'px';
   }
 
-  function _dismissContextMenu() {
+  /* A cell or column menu: arrow keys move through its items, Return or
+     Space picks one, Escape closes it and gives focus back. The click that
+     closes it does nothing else, so it can't open the grader under it. */
+  var _menuReturnFocus = null;
+  function _wireMenu(menu, invoker) {
+    menu.setAttribute('role', 'menu');
+    menu.tabIndex = -1;
+    menu.querySelectorAll('.gb-ctx-item').forEach(function (item) {
+      item.setAttribute('role', 'menuitem');
+      item.tabIndex = -1;
+    });
+    menu.querySelectorAll('.gb-ctx-divider').forEach(function (d) {
+      d.setAttribute('role', 'separator');
+    });
+    _menuReturnFocus = invoker && invoker.hasAttribute('tabindex') ? invoker : document.activeElement;
+    menu.addEventListener('keydown', _menuKeydown);
+    document.addEventListener('click', _menuClickAway, true);
+    menu.focus({ preventScroll: true });
+  }
+
+  function _menuClickAway(e) {
+    var menu = document.querySelector('.gb-ctx-menu');
+    if (menu && menu.contains(e.target)) return;
+    if (menu) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    _dismissContextMenu();
+  }
+
+  function _menuKeydown(e) {
+    var menu = e.currentTarget;
+    var items = Array.prototype.filter.call(menu.querySelectorAll('.gb-ctx-item'), function (it) {
+      return !it.classList.contains('is-disabled');
+    });
+    var at = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Home' || e.key === 'End') {
+      if (!items.length) return;
+      var next =
+        e.key === 'Home'
+          ? 0
+          : e.key === 'End'
+            ? items.length - 1
+            : e.key === 'ArrowDown'
+              ? (at + 1) % items.length
+              : at <= 0
+                ? items.length - 1
+                : at - 1;
+      items[next].focus();
+    } else if ((e.key === 'Enter' || e.key === ' ') && at >= 0) {
+      items[at].click();
+    } else if (e.key === 'Escape') {
+      _dismissContextMenu(true);
+    } else if (e.key === 'Tab') {
+      _dismissContextMenu(true);
+    } else return;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function _dismissContextMenu(restoreFocus) {
+    document.removeEventListener('click', _menuClickAway, true);
     var existing = document.querySelector('.gb-ctx-menu');
     if (existing) existing.remove();
     document.querySelectorAll('.gb-col-menu').forEach(function (el) {
       el.classList.remove('gb-col-menu');
     });
+    var back = _menuReturnFocus;
+    _menuReturnFocus = null;
+    if (restoreFocus === true && back && back.isConnected && back.focus) back.focus({ preventScroll: true });
   }
 
   function showScoreContextMenu(e, cell) {
@@ -2148,6 +2212,7 @@ window.PageGradebook = (function () {
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item" data-ctx="addObservation">Add observation</div>';
     _placeContextMenu(menu, e.clientX, e.clientY);
+    _wireMenu(menu, cell);
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-ctx]');
       if (!item || item.classList.contains('is-disabled')) return;
@@ -2182,9 +2247,6 @@ window.PageGradebook = (function () {
       }
       _dismissContextMenu();
     });
-    setTimeout(function () {
-      document.addEventListener('click', _dismissContextMenu, { once: true });
-    }, 0);
   }
 
   /* The shared capture strip in a dialog, with this cell's student and
@@ -2252,6 +2314,7 @@ window.PageGradebook = (function () {
       cell.classList.add('gb-col-menu');
     });
     _placeContextMenu(menu, e.clientX, e.clientY);
+    _wireMenu(menu, header);
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-ctx]');
       if (!item) return;
@@ -2316,9 +2379,6 @@ window.PageGradebook = (function () {
       }
       _dismissContextMenu();
     });
-    setTimeout(function () {
-      document.addEventListener('click', _dismissContextMenu, { once: true });
-    }, 0);
   }
 
   /* Delete Assignment hides the column and offers Undo (the toast's button or
