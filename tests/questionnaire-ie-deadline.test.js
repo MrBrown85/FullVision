@@ -16,7 +16,15 @@
  *   comment is never changed.
  */
 import './setup.js';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// The deadlines below fall in this school year: today is pinned to
+// November 1, 2026 (a saved deadline that has passed counts as none).
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-01T19:00:00Z'));
+});
+afterAll(() => vi.useRealTimers());
 
 const RQ = ReportQuestionnaire;
 // A class of its own per seed: the screen keeps each comment's rows in memory.

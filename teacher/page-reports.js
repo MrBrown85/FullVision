@@ -2030,8 +2030,8 @@ window.PageReports = (function () {
       RQ.tqSetAttendance(el.dataset.sid);
       return;
     }
-    // A support line ticked, or the character limit typed.
-    if (el.dataset.tqSupport || el.dataset.tqLimit) {
+    // A support or language goal line ticked, or the character limit typed.
+    if (el.dataset.tqSupport || el.dataset.tqLang || el.dataset.tqLimit) {
       RQ.tqLineChange(el);
       return;
     }

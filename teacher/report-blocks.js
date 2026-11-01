@@ -359,9 +359,13 @@ window.ReportBlocks = (function () {
     const isHtml = /<\/?(p|div|br|ul|ol|li|b|i|u|strong|em|span)\b[^>]*>/i.test(narrative);
     // A comment saved before Nov 2 may say [date] in its Deadline sentence:
     // it never prints. The sentence is left out until a deadline is picked,
-    // then says the date. An approved comment is printed as approved.
-    if (!isHtml && !(rating && rating.approvedAt) && typeof CommentBank !== 'undefined' && CommentBank.withDeadline)
-      narrative = CommentBank.withDeadline(narrative, rating && rating.ieDeadline);
+    // then says the date; a saved date that has passed or falls after the
+    // school year counts as none. An approved comment is printed as approved.
+    if (!isHtml && !(rating && rating.approvedAt) && typeof CommentBank !== 'undefined' && CommentBank.withDeadline) {
+      const iso = rating && rating.ieDeadline;
+      const ok = !iso || !CommentBank.deadlineOk || CommentBank.deadlineOk(cid, iso);
+      narrative = CommentBank.withDeadline(narrative, iso, ok);
+    }
     const content = isHtml
       ? sanitizeNarrativeHtml(narrative.trim())
       : narrative

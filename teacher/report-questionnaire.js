@@ -1951,11 +1951,13 @@ window.ReportQuestionnaire = (function () {
     var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
     if (_iePending && basis !== 'ie') _cancelIePending();
     if ((rating.reportingBasis || 'grade') === basis) return;
-    if (basis === 'ie' && !rating.ieDeadline) {
+    // A saved date that has passed or falls after the school year counts
+    // as none.
+    if (basis === 'ie' && !CommentBank.deadlineOk(_activeCourse, rating.ieDeadline, _today())) {
       _iePending = _rowKey(st);
       _cal = { month: _deadlineRange().min.slice(0, 7) };
       rerender();
-      _focusSel('#tq-cal .qn-cal-day:not([disabled])');
+      _focusAny(['#tq-cal .qn-cal-day:not([disabled])', '#tq-cal']);
       return;
     }
     var text = plainComment(rating.narrative || '').trim();
@@ -2157,7 +2159,8 @@ window.ReportQuestionnaire = (function () {
     if (!st) return [];
     var f = _facts(st);
     var out = [];
-    if (CommentBank.reportPath(f) === 'ie' && !f.grade.ieDeadline) out.push('deadline');
+    if (CommentBank.reportPath(f) === 'ie' && !_pickedDeadline(f))
+      out.push(_staleDeadline(f) ? 'deadlineRange' : 'deadline');
     if (claimChanges(st).length || _approvedChanged(st)) out.push('claims');
     _checksFor(f, _rowsFor(st, f)).forEach(function (id) {
       if (!_checked[_checkKey(st.id, id)]) out.push(id);
@@ -2185,7 +2188,7 @@ window.ReportQuestionnaire = (function () {
     if (!btn) return;
     var date = blocked.indexOf('deadline') >= 0;
     var ticks = blocked.filter(function (b) {
-      return b !== 'deadline' && b !== 'limit' && b !== 'long' && b !== 'claims';
+      return b !== 'deadline' && b !== 'deadlineRange' && b !== 'limit' && b !== 'long' && b !== 'claims';
     });
     var ie = st && CommentBank.reportPath(_facts(st)) === 'ie';
     var tail =
@@ -2198,6 +2201,7 @@ window.ReportQuestionnaire = (function () {
               ? ' Tick “I checked this” first.'
               : ' Tick “I checked this” on the highlighted sentence' + (ticks.length > 1 ? 's' : '') + ' first.'
             : '';
+    if (blocked.indexOf('deadlineRange') >= 0) tail = ' ' + _rangeLine() + tail;
     if (_claimsBlocked) tail += ' ' + CLAIMS_LINE[_claimsBlocked];
     if (blocked.indexOf('limit') >= 0)
       tail += ' Shorten the comment to ' + _plural(_limit(), 'character', 'characters') + ' first.';
@@ -2220,23 +2224,7 @@ window.ReportQuestionnaire = (function () {
      term's start to its last term's end; with no terms, September 1 to June
      30 of the school year today falls in. { start, end } as YYYY-MM-DD. */
   function schoolYear(cid, today) {
-    var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
-    var starts = terms
-      .map(function (t) {
-        return t.starts_on;
-      })
-      .filter(Boolean)
-      .sort();
-    var ends = terms
-      .map(function (t) {
-        return t.ends_on;
-      })
-      .filter(Boolean)
-      .sort();
-    if (starts.length && ends.length) return { start: starts[0], end: ends[ends.length - 1] };
-    var y = Number(String(today).slice(0, 4));
-    var fall = Number(String(today).slice(5, 7)) >= 8;
-    return { start: (fall ? y : y - 1) + '-09-01', end: (fall ? y + 1 : y) + '-06-30' };
+    return CommentBank.schoolYear(cid, today);
   }
 
   function _today() {
@@ -2259,9 +2247,22 @@ window.ReportQuestionnaire = (function () {
   /* The days a deadline can fall on: from today (or the year's start) to
      the end of the school year. */
   function _deadlineRange() {
-    var today = _today();
-    var yr = schoolYear(_activeCourse, today);
-    return { min: today > yr.start ? today : yr.start, max: yr.end };
+    return CommentBank.deadlineRange(_activeCourse, _today());
+  }
+  /* The deadline picked for the student, '' while none is picked or the
+     saved one cannot stand (passed, or after the school year). */
+  function _pickedDeadline(f) {
+    var g = (f && f.grade) || {};
+    return g.ieDeadline && g.ieDeadlineOk !== false ? g.ieDeadline : '';
+  }
+  /* A saved deadline that has passed or falls after the school year. */
+  function _staleDeadline(f) {
+    var g = (f && f.grade) || {};
+    return !!g.ieDeadline && g.ieDeadlineOk === false;
+  }
+  /* The plain reason Approve and Next waits on such a date. */
+  function _rangeLine() {
+    return 'Pick a deadline from today to ' + _longDay(_deadlineRange().max) + '.';
   }
 
   function _calendarHtml(picked) {
@@ -2286,9 +2287,9 @@ window.ReportQuestionnaire = (function () {
     var term = typeof getActiveTerm === 'function' ? getActiveTerm(_activeCourse) : null;
     var note =
       term && term.endsOn && term.endsOn >= range.min
-        ? `<span class="qn-cal-note">${esc(term.label || 'This term')} ends ${esc(_longDay(term.endsOn))}. Pick a date before then.</span>`
+        ? `<span class="qn-cal-note">${esc(term.label || 'This term')} ends ${esc(_longDay(term.endsOn))}. Pick a date on or before ${esc(_longDay(term.endsOn))}.</span>`
         : '';
-    return `<div class="qn-cal" role="dialog" aria-label="Pick a deadline" id="tq-cal">
+    return `<div class="qn-cal" role="dialog" aria-label="Pick a deadline" id="tq-cal" tabindex="-1">
       <div class="qn-cal-top"><span class="qn-cal-title">${esc(title)}</span>
         <span class="qn-cal-nav"><button type="button" data-action="tqDeadlineMonth" data-dir="-1" aria-label="Previous month" title="Previous month"${prevOk ? '' : ' disabled'}>‹</button><button type="button" data-action="tqDeadlineMonth" data-dir="1" aria-label="Next month" title="Next month"${nextOk ? '' : ' disabled'}>›</button></span></div>
       <div class="qn-cal-week" aria-hidden="true"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
@@ -2300,13 +2301,19 @@ window.ReportQuestionnaire = (function () {
   function tqOpenDeadline() {
     var st = _current();
     if (!st) return;
-    var picked = _facts(st).grade.ieDeadline;
+    // A saved date that has passed or falls after the school year is not
+    // picked: the calendar opens on today's month, with its days to pick.
+    var picked = _pickedDeadline(_facts(st));
     var range = _deadlineRange();
     var start = picked || range.min;
     _cal = { month: start.slice(0, 7) };
     _syncRequired();
+    // The focus stays in the calendar: the picked day, else the first that
+    // can be picked, else the calendar itself.
     var on =
-      document.querySelector('#tq-cal .qn-cal-day.on') || document.querySelector('#tq-cal .qn-cal-day:not([disabled])');
+      document.querySelector('#tq-cal .qn-cal-day.on') ||
+      document.querySelector('#tq-cal .qn-cal-day:not([disabled])') ||
+      document.getElementById('tq-cal');
     if (on) on.focus();
   }
   function tqCloseDeadline() {
@@ -2514,7 +2521,9 @@ window.ReportQuestionnaire = (function () {
      (approval always waited for a picked date). */
   function _shownText(rating) {
     var text = plainComment((rating && rating.narrative) || '');
-    return rating && !rating.approvedAt ? CommentBank.withDeadline(text, rating.ieDeadline) : text;
+    if (!rating || rating.approvedAt) return text;
+    var ok = !rating.ieDeadline || CommentBank.deadlineOk(_activeCourse, rating.ieDeadline, _today());
+    return CommentBank.withDeadline(text, rating.ieDeadline, ok);
   }
 
   /* ── The Required sentences ──────────────────────────────── */
@@ -2556,7 +2565,11 @@ window.ReportQuestionnaire = (function () {
           ? 'From the work with no mark yet'
           : 'Your gradebook';
     if (key === 'ieDeadline')
-      return g.ieDeadline ? 'The date you picked' : 'Approve and Next stays off until you pick a date.';
+      return _pickedDeadline(f)
+        ? 'The date you picked'
+        : _staleDeadline(f)
+          ? _rangeLine()
+          : 'Approve and Next stays off until you pick a date.';
     return 'Gives the student and family a chance to talk with you';
   }
 
@@ -2566,7 +2579,7 @@ window.ReportQuestionnaire = (function () {
      draft's rows (the Sentences card); without them it stands alone. */
   function _requiredRowHtml(cid, student, f, p, path, i, handle) {
     var checks = _checksFor(f);
-    var picked = (f.grade && f.grade.ieDeadline) || '';
+    var picked = _pickedDeadline(f);
     var check = p.key === 'ieProblem' && checks.length ? checks[0] : '';
     var date = p.key === 'ieDeadline';
     var flag = (check && !_isChecked(student.id, check)) || (date && !picked);
@@ -3863,6 +3876,7 @@ window.ReportQuestionnaire = (function () {
     return CommentBank.effectiveHabits(
       (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits,
       f.record,
+      f,
     );
   }
   /* The habits the teacher rated for the student this report (Not Seen
@@ -4359,10 +4373,27 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
+  /* The IE comment's parts in its order (the IEPath mockup): where a
+     Required row the comment has no sentence for goes. */
+  var IE_ORDER = [
+    'grade',
+    'ieProblem',
+    'habits',
+    'strongHabits',
+    'attendance',
+    'iePlan',
+    'ieDeadline',
+    'support',
+    'ieMeeting',
+    'closer',
+  ];
+
   /* The rows in order (as units), with a class row (Not Handed In,
-     Support, Closing) the comment has no sentence for where its step would
-     fall; on the IE path the Support row sits before Meeting (the IEPath
-     mockup). */
+     Support, Language Goals, Closing) the comment has no sentence for where
+     its step would fall; on the IE path the Support row sits before Meeting
+     (the IEPath mockup), and each Required row the comment has no sentence
+     for (a comment written without Generate) stays, with its "I checked
+     this", where its sentence would go. */
   function _rowListHtml(cid, student, f, rows, path) {
     var ctx = _bankContext(cid, student, f);
     var claims = claimChanges(student);
@@ -4389,8 +4420,21 @@ window.ReportQuestionnaire = (function () {
         i: -1,
       });
     }
+    if (ie)
+      ['grade', 'ieProblem', 'iePlan', 'ieMeeting'].forEach(function (step) {
+        if (has[step]) return;
+        var si = IE_ORDER.indexOf(step);
+        var next = items.findIndex(function (it) {
+          return IE_ORDER.indexOf(it.unit[0].step) > si;
+        });
+        items.splice(next < 0 ? items.length : next, 0, {
+          unit: [{ step: step, placeholder: true, text: '' }],
+          i: -1,
+        });
+      });
     var extra = [];
     if (!ie && f.notHandedIn && f.notHandedIn.count > 0 && !has.notHandedIn) extra.push('notHandedIn');
+    if (path === 'language_goals' && !has.languageGoals) extra.push('languageGoals');
     if (!has.support) extra.push('support');
     if (!has.closer) extra.push('closer');
     extra.forEach(function (step) {
@@ -6100,6 +6144,7 @@ window.ReportQuestionnaire = (function () {
     var habits = CommentBank.effectiveHabits(
       (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits,
       f.record,
+      f,
     );
     var lines = CommentBank.supportChecklist(cid, f.family);
     var on = lines.filter(function (l) {
@@ -6149,6 +6194,7 @@ window.ReportQuestionnaire = (function () {
     var habits = CommentBank.effectiveHabits(
       (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits,
       f.record,
+      f,
     );
     var any = ((f.classLines && f.classLines.support) || []).length > 0;
     var choice = CommentBank.supportChoice(f, habits);
@@ -6859,6 +6905,12 @@ window.ReportQuestionnaire = (function () {
       return;
     }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    // Arrow keys in the open calendar stay there: they never move to
+    // another student (which would drop an IE waiting for its date).
+    if (_cal && t && t.closest && t.closest('#tq-cal')) {
+      if (e.stopPropagation) e.stopPropagation();
+      return;
+    }
     if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
     if (t && (t.closest('input, textarea, select, [contenteditable="true"]') || t.closest('#gb-sidebar'))) return;
     e.preventDefault();

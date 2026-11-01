@@ -1477,15 +1477,27 @@ window.CommentBank = (function () {
     return 3;
   }
 
+  /* Whether the record can say anything about Completes Work: not on the
+     IE path while the student has work with no mark yet, since that work
+     is part of the IE problem and the record cannot tell whether it came
+     in on time. */
+  function _unmarkedIe(f) {
+    if (!f || reportPath(f) !== 'ie') return false;
+    var m = (f.grade && f.grade.marked) || {};
+    return m.all > 0 && (m.mine || 0) < m.all;
+  }
+
   /* The habits a sentence is matched against: the teacher's, with Completes
-     Work from the record while the teacher has not picked it. */
-  function effectiveHabits(stored, rec) {
+     Work from the record while the teacher has not picked it (never on the
+     IE path while work has no mark yet: only the teacher's ratings there).
+     `f`: the facts, when known. */
+  function effectiveHabits(stored, rec, f) {
     var out = {};
     HABITS.forEach(function (h) {
       var v = stored && Number(stored[h.key]);
       if (v >= 1 && v <= NOT_SEEN) out[h.key] = v;
     });
-    if (!('completes' in out)) {
+    if (!('completes' in out) && !_unmarkedIe(f)) {
       var auto = completesFromRecord(rec);
       if (auto) out.completes = auto;
     }
@@ -1950,6 +1962,9 @@ window.CommentBank = (function () {
         pieces: pieces,
         basis: typeof reportingBasis === 'function' ? reportingBasis(cid, sid, termId) : 'grade',
         ieDeadline: String(rating.ieDeadline || '').slice(0, 10),
+        // false once the saved date has passed or falls after the school
+        // year: the comment then says no deadline until a new one is picked.
+        ieDeadlineOk: !rating.ieDeadline || deadlineOk(cid, rating.ieDeadline),
         ieAllowed: ieAllowed(cid),
         marked: marked,
         ell: des.indexOf('ELL') >= 0,
@@ -2195,18 +2210,85 @@ window.CommentBank = (function () {
     return isNaN(date) ? '' : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
   }
 
+  /* The school year a deadline is picked in: the class's first reporting
+     term's start to its last term's end; with no terms, September 1 to June
+     30 of the school year today falls in. { start, end } as YYYY-MM-DD. */
+  function schoolYear(cid, today) {
+    var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+    var starts = terms
+      .map(function (t) {
+        return t.starts_on;
+      })
+      .filter(Boolean)
+      .sort();
+    var ends = terms
+      .map(function (t) {
+        return t.ends_on;
+      })
+      .filter(Boolean)
+      .sort();
+    if (starts.length && ends.length) return { start: starts[0], end: ends[ends.length - 1] };
+    var y = Number(String(today).slice(0, 4));
+    var fall = Number(String(today).slice(5, 7)) >= 8;
+    return { start: (fall ? y : y - 1) + '-09-01', end: (fall ? y + 1 : y) + '-06-30' };
+  }
+  function _todayFor(cid) {
+    return typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
+  }
+  /* The days a deadline can fall on: from today (or the year's start) to
+     the end of the school year. { min, max } as YYYY-MM-DD. */
+  function deadlineRange(cid, today) {
+    today = today || _todayFor(cid);
+    var yr = schoolYear(cid, today);
+    return { min: today > yr.start ? today : yr.start, max: yr.end };
+  }
+  /* Whether a saved deadline can stand: a real date from today to the last
+     school day. One that has passed, or falls after the school year, is
+     treated as not picked: no Deadline sentence, Approve and Next off. */
+  function deadlineOk(cid, iso, today) {
+    var d = String(iso || '').slice(0, 10);
+    if (!deadlineText(d)) return false;
+    var r = deadlineRange(cid, today);
+    return d >= r.min && d <= r.max;
+  }
+  /* The deadline the comment says, '' until a date is picked that can
+     stand (deadlineOk, through the facts). */
+  function _deadlineOf(f) {
+    var g = (f && f.grade) || {};
+    return g.ieDeadlineOk === false ? '' : deadlineText(g.ieDeadline);
+  }
+
   /* The placeholder a Deadline sentence said before a date was picked,
      in comments saved before Nov 2. */
   var DATE_PLACEHOLDER = '[date]';
 
+  /* Whether a sentence holds the date as a whole: "December 1" is not in
+     "December 18". */
+  function _holdsDate(text, date) {
+    if (!date) return false;
+    var at = String(text || '').indexOf(date);
+    while (at >= 0) {
+      if (!/[0-9]/.test(text.charAt(at + date.length))) return true;
+      at = text.indexOf(date, at + 1);
+    }
+    return false;
+  }
+
   /* A comment with the old [date] placeholder dealt with: each sentence
      that holds it is taken out while no deadline is picked (`iso` empty),
      else the placeholder says the date. Everything else stays as written.
-     A comment without the placeholder comes back unchanged. */
-  function withDeadline(text, iso) {
+     A comment without the placeholder comes back unchanged. With `ok`
+     false the saved date cannot stand (deadlineOk): it counts as not
+     picked, and the Deadline sentence that says it (the date and "IE") is
+     taken out too until a new date is picked. */
+  function withDeadline(text, iso, ok) {
     var t = String(text == null ? '' : text);
-    if (t.indexOf(DATE_PLACEHOLDER) < 0) return t;
-    var date = deadlineText(iso);
+    var stale = ok === false ? deadlineText(iso) : '';
+    var staleIn = function (piece) {
+      return !!stale && _holdsDate(piece, stale) && /\bIE\b/.test(piece);
+    };
+    if (t.indexOf(DATE_PLACEHOLDER) < 0 && !staleIn(t)) return t;
+    var date = ok === false ? '' : deadlineText(iso);
     if (date) return t.split(DATE_PLACEHOLDER).join(date);
     // The comment's sentences with the space after each, ended by . ! ? or
     // … (and a closing quote) where the next sentence starts.
@@ -2215,7 +2297,7 @@ window.CommentBank = (function () {
     var from = 0;
     var m;
     var keep = function (piece) {
-      if (piece.indexOf(DATE_PLACEHOLDER) < 0) out += piece;
+      if (piece.indexOf(DATE_PLACEHOLDER) < 0 && !staleIn(piece)) out += piece;
     };
     while ((m = re.exec(t))) {
       if (!m[0]) {
@@ -2770,7 +2852,7 @@ window.CommentBank = (function () {
   function context(f, picks) {
     picks = picks || {};
     var p = f.pronouns;
-    var habits = effectiveHabits(picks.habits || f.habits, f.record);
+    var habits = effectiveHabits(picks.habits || f.habits, f.record, f);
     var withLevels = f.comps.filter(function (c) {
       return c.start > 0 && c.now > 0;
     });
@@ -3051,6 +3133,8 @@ window.CommentBank = (function () {
       _picks: picks,
       _p: p,
       _habits: habits,
+      // The teacher's own ratings, without Completes Work from the record.
+      _rated: effectiveHabits(picks.habits || f.habits, null),
       _standing: f.standing || '',
       _family: f.family || '',
       _grade: gr ? gr.kind : '',
@@ -3114,7 +3198,7 @@ window.CommentBank = (function () {
       missingWork: _missingCount(f) > 0 ? notHandedInSentence(f.notHandedIn) : '',
       markedMine: ieProblemOf(f) === 'marks' ? numberIn(f.grade.marked.mine) : '',
       markedClass: /^(marks|noMarks)$/.test(ieProblemOf(f)) ? numberIn(f.grade.marked.all) : '',
-      ieDeadline: reportPath(f) === 'ie' ? deadlineText(f.grade.ieDeadline) : '',
+      ieDeadline: reportPath(f) === 'ie' ? _deadlineOf(f) : '',
       // One or two skills in plain words from the table, as the next step
       // is: "{He} can {strengths}." Never a bare competency label.
       strengths: strengthsText(f),
@@ -3986,7 +4070,7 @@ window.CommentBank = (function () {
     var pieces = g.pieces || [];
     var work = f.work || [];
     var rec = f.record || {};
-    var habits = effectiveHabits((picks && picks.habits) || f.habits, rec);
+    var habits = effectiveHabits((picks && picks.habits) || f.habits, rec, f);
     var letterMode = g.mode === 'letter' || g.mode === 'both';
     var level = Number(f.overall) || 0;
     // Strong in one skill (the "strongest" gate) and a full proficiency
@@ -5617,6 +5701,16 @@ window.CommentBank = (function () {
         checks.push(!sum.excellent && named('habitStrengths', [CONSISTENTLY], sum.strong.slice(0, 3)));
       if (_has(pv, 'strongHabits'))
         checks.push(!sum.excellent && named('strongHabits', [CONSISTENTLY], sum.strong.slice(0, 3)));
+      // On the IE path, never "completes work on time" from the record
+      // beside work not handed in or with no mark yet: the comment's own
+      // problem says otherwise. Only the teacher's rating says it there.
+      if (
+        reportPath(f) === 'ie' &&
+        !(ctx._rated || {}).completes &&
+        _completesClaim(pv, eff) &&
+        (_missingCount(f) > 0 || _unmarkedIe(f))
+      )
+        return false;
       return checks.length > 0 && checks.every(Boolean);
     },
     lateWork: function (pv, f) {
@@ -5821,6 +5915,21 @@ window.CommentBank = (function () {
      left out when the part has none. Returns the draft's shape { text, ids,
      sentences, provenance } plus `replaced`: [{ sentenceId, failed, by }],
      `by` the stand-in's id or null. opts: { bank }. */
+  /* Whether a sentence says the student completes work on time: matched
+     on Completes Work at Consistently, naming it among the strong habits,
+     or calling every habit excellent with it among them. Only on the IE
+     path (claim checks). */
+  function _completesClaim(pv, eff) {
+    var v = (pv && pv.values) || {};
+    if (!pv || !v) return false;
+    if (Number(v['when.completes']) === CONSISTENTLY) return true;
+    var names = function (slot) {
+      return _has(pv, slot) && _ids(pv, slot, 'habit').indexOf('completes') >= 0;
+    };
+    if (names('habitStrengths') || names('strongHabits')) return true;
+    return _has(pv, 'habitsExcellent') && (eff || {}).completes === CONSISTENTLY;
+  }
+
   function verify(d, f, picks, opts) {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
@@ -5837,7 +5946,7 @@ window.CommentBank = (function () {
     var sentences = [];
     var out = [];
     var replaced = [];
-    var dated = !!deadlineText(f && f.grade && f.grade.ieDeadline);
+    var dated = !!_deadlineOf(f);
     prov.forEach(function (pv, i) {
       var said = String((d.sentences[i] && d.sentences[i].text) || '');
       // A sentence that still says [date] (a comment from before Nov 2):
@@ -6301,6 +6410,9 @@ window.CommentBank = (function () {
     ieSource: ieSource,
     ieProblemOf: ieProblemOf,
     deadlineText: deadlineText,
+    schoolYear: schoolYear,
+    deadlineRange: deadlineRange,
+    deadlineOk: deadlineOk,
     withDeadline: withDeadline,
     numberWords: numberWords,
     notHandedInSentence: notHandedInSentence,
