@@ -20,9 +20,13 @@ function day(n) {
 /* Points { d, v }, `gap` days apart. */
 const pts = (vs, gap = 7) => vs.map((v, i) => ({ id: 'w' + i, d: day(i * gap), v, title: 'Task ' + i }));
 /* A competency at `level` with n scores (or the scores given). */
+// Competency labels the science skill table knows (CommentBank.SKILLS), so
+// the strengths and next step print as skills; 'Skill c' has no skill.
+const NAMES = { a: 'Evaluating', b: 'Questioning and Predicting' };
+const skillA = CommentBank.SKILLS.science.find(r => r.key === 'evaluating').skill;
 const comp = (id, level, n = 3, scores) => ({
   id,
-  name: 'Skill ' + id,
+  name: NAMES[id] || 'Skill ' + id,
   scores: scores || pts(Array.from({ length: n }, () => level)),
   start: level,
   now: level,
@@ -60,8 +64,19 @@ function facts(over) {
   );
 }
 const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
-const one = (id, ctx) => {
-  const s = byId(id);
+// The bank has no growth sentence any more (not a plan part); one by hand
+// keeps the "improved" gate under test.
+const rose = {
+  id: 'x-rose',
+  part: 'now',
+  group: 'Overall',
+  text: 'This term {he} [has|have] grown most in {rise}.',
+  needs: ['rise'],
+  claims: ['improved'],
+};
+const one = (s, ctx) => {
+  if (typeof s === 'string') s = byId(s);
+  const id = s.id;
   const text = CommentBank.fill(s, ctx);
   return { text, ids: [id], sentences: [{ id, part: s.part, text }], provenance: [CommentBank.provenance(s, ctx)] };
 };
@@ -145,24 +160,22 @@ describe('below a gate, the claiming sentence is not eligible', () => {
   };
 
   it('selection skips a strength claim below the gate, even when its slot has a value', () => {
-    const f = facts(selfB);
-    const ctx = CommentBank.context(f, {});
-    expect(ctx.selfStrong).toBe('Skill b');
-    expect(CommentBank.fits(byId('n146'), ctx)).toBe(false);
+    const f = facts({ comps: [comp('a', 3.4), comp('b', 3), comp('c', 2.5)] });
+    const ctx = Object.assign(CommentBank.context(f, {}), { strengths: 'evaluate a method' });
+    expect(CommentBank.fits(byId('n15'), ctx)).toBe(false);
     // On a skill past the gate, the same sentence fits.
-    const f2 = facts({ ...selfB, comps: [comp('b', 3.5), comp('a', 3), comp('c', 2.5)] });
-    expect(CommentBank.fits(byId('n146'), CommentBank.context(f2, {}))).toBe(true);
+    expect(CommentBank.fits(byId('n15'), CommentBank.context(facts({}), {}))).toBe(true);
   });
 
-  it('gives no strengths slot below the gate', () => {
+  it('gives no strengths slot below the gate, and the skill from the table above it', () => {
     expect(CommentBank.context(facts({ comps: [comp('a', 3.4), comp('b', 3)] }), {}).strengths).toBe('');
     expect(CommentBank.context(facts({ comps: [comp('a', 3.5, 2), comp('b', 3)] }), {}).strengths).toBe('');
-    expect(CommentBank.context(facts({}), {}).strengths).toBe('Skill a');
+    expect(CommentBank.context(facts({}), {}).strengths).toBe(skillA);
   });
 
   it('gives no rise below the "improved" gate', () => {
     const rising = scores => facts({ comps: [comp('a', 3, 0, pts(scores, 10)), comp('b', 3)] });
-    expect(CommentBank.context(rising([2, 2.5, 3, 3]), {}).rise).toBe('Skill a');
+    expect(CommentBank.context(rising([2, 2.5, 3, 3]), {}).rise).toBe('Evaluating');
     expect(CommentBank.context(rising([1, 3, 3, 3.2]), {}).rise).toBe('');
     expect(CommentBank.context(rising([2, 2.5, 3]), {}).rise).toBe('');
   });
@@ -197,11 +210,12 @@ describe('below a gate, the claiming sentence is not eligible', () => {
 
   it('verify() fails an improved sentence once the gain rests on one low early score', () => {
     const f = facts({ comps: [comp('a', 3, 0, pts([2, 2.5, 3, 3], 10)), comp('b', 3)] });
-    const d = one('n20', CommentBank.context(f, {}));
-    expect(d.text).toContain('Skill a');
-    expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
+    const d = one(rose, CommentBank.context(f, {}));
+    const bank = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([rose]) };
+    expect(d.text).toContain('Evaluating');
+    expect(CommentBank.verify(d, f, {}, { bank }).replaced).toEqual([]);
     const lowStart = facts({ comps: [comp('a', 3, 0, pts([1, 3, 3, 3.2], 10)), comp('b', 3)] });
-    expect(CommentBank.verify(d, lowStart, {}).replaced[0].failed).toContain('improved');
+    expect(CommentBank.verify(d, lowStart, {}, { bank }).replaced[0].failed).toContain('improved');
     expect(CommentBank.CLAIMS.improved(d.provenance[0], lowStart)).toBe(false);
   });
 });

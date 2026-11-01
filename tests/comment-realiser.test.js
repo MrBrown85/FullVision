@@ -239,10 +239,10 @@ describe('lists and length', () => {
   it('drafts a sentence over 20 words only when nothing shorter fits', () => {
     const long = '{He} ' + Array.from({ length: 22 }, () => 'worked').join(' ') + '.';
     const bank = {
-      parts: [{ id: 'now', title: 'Now' }],
+      parts: [{ id: 'how', title: 'How' }],
       sentences: [
-        { id: 'long', part: 'now', group: 'Openings', text: long, claims: [] },
-        { id: 'short', part: 'now', group: 'Openings', text: '{He} [has|have] had a steady term.', claims: [] },
+        { id: 'long', part: 'how', group: 'For the Family', text: long, claims: [] },
+        { id: 'short', part: 'how', group: 'For the Family', text: '{He} [has|have] had a steady term.', claims: [] },
       ],
     };
     for (let seed = 1; seed <= 6; seed++) {

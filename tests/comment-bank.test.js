@@ -71,10 +71,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 177 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(177);
+  it('has 128 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(128);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(177);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(128);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -97,17 +97,26 @@ describe('the bank', () => {
     );
   });
 
-  it('covers every picture with an opening, and has no Looking Ahead or Work to Revisit group', () => {
+  it('holds only the plan’s parts: no openings, growth, student’s words, even results, revisits or looking ahead', () => {
     const at = (key, lvl) => COMMENT_BANK.sentences.filter(s => s.when && s.when[key] === lvl);
-    ['strong', 'steady', 'challenge', 'early'].forEach(pic => {
-      expect(at('picture', pic).filter(s => s.group === 'Openings').length, pic).toBeGreaterThanOrEqual(3);
-    });
-    // The Looking Ahead sentences (claims about the future) and Work to
-    // Revisit (which sent families back to a worksheet) are gone; the
-    // example step keeps only the plan's best-piece sentence.
-    COMMENT_BANK.sentences.forEach(s => expect(['Looking Ahead', 'Work to Revisit'], s.id).not.toContain(s.group));
+    const gone = ['Openings', 'Growth This Term', "In the Student's Words", 'Looking Ahead', 'Work to Revisit'];
+    COMMENT_BANK.sentences.forEach(s => expect(gone, s.id).not.toContain(s.group));
     expect(COMMENT_BANK.sentences.filter(s => s.group === 'Examples From Work').map(s => s.id)).toEqual(['n36']);
-    expect(COMMENT_BANK.sentences.some(s => /\{(assignment2|level2|strongWorks|weakWorks)\}/.test(s.text))).toBe(false);
+    expect(
+      COMMENT_BANK.sentences.some(s =>
+        /\{(assignment2|level2|strongWorks|weakWorks|even|rise|fall|fellCount|selfGood|selfHard|selfStrong|selfLow|goal|plan|picture)\}/.test(
+          s.text,
+        ),
+      ),
+    ).toBe(false);
+    COMMENT_BANK.sentences.forEach(s =>
+      expect((s.needs || []).concat(Object.keys(s.when || {})), s.id).not.toContain('even'),
+    );
+    expect(at('picture', 'steady')).toEqual([]);
+    // Every strengths sentence prints the skill after "can", never "in {strengths}".
+    COMMENT_BANK.sentences
+      .filter(s => /\{strengths?\}/.test(s.text))
+      .forEach(s => expect(s.text, s.id).toMatch(/\bcan \{strengths?\}/));
     ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w =>
       expect(at('standing', w).length, w).toBeGreaterThanOrEqual(3),
     );
@@ -153,6 +162,7 @@ describe('the bank', () => {
       evidence: 'grade',
       even: 'even',
       strengths: 'strength',
+      strength: 'strength',
       growthAreas: 'growthArea',
       focusLow: 'growthArea',
       rise: 'improved',
@@ -272,9 +282,14 @@ describe('fill', () => {
 
 describe('fill takes values as written', () => {
   it('never reads a slot or a verb choice inside a value', () => {
-    const n50 = COMMENT_BANK.sentences.find(s => s.id === 'n50');
+    const quoted = {
+      id: 'x-quote',
+      part: 'now',
+      group: 'Overall',
+      text: 'In {his} own words, {he} [is|are] good at this: {selfGood}',
+    };
     const ctx = { ...fullContext(P.she), selfGood: '“I like [math|science] and {name} games.”' };
-    expect(CommentBank.fill(n50, ctx)).toBe(
+    expect(CommentBank.fill(quoted, ctx)).toBe(
       'In her own words, she is good at this: “I like [math|science] and {name} games.”',
     );
   });
@@ -354,8 +369,9 @@ describe('fits', () => {
     expect(CommentBank.fits(both, ctx)).toBe(true);
     const notSeen = fullContext(P.she, { completes: 5 });
     expect([sometimes, rarely].some(x => CommentBank.fits(x, notSeen))).toBe(false);
-    expect(CommentBank.fits(byId('n04'), ctx)).toBe(true); // picture steady
-    expect(CommentBank.fits(byId('n01'), ctx)).toBe(false); // picture strong
+    const steady = { ...at({ picture: 'steady' }, 'x4'), claims: ['picture'] };
+    expect(CommentBank.fits(steady, ctx)).toBe(true);
+    expect(CommentBank.fits(steady, { ...ctx, picture: 'strong' })).toBe(false);
   });
 });
 
@@ -487,18 +503,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 36 sentences (1, 18, 12, 5)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 18 sentences (1, 5, 8, 4)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 18, 12, 5]);
-    expect(CommentBank.fitCount(ctx)).toBe(36);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 8, 4]);
+    expect(CommentBank.fitCount(ctx)).toBe(18);
   });
 
-  it('offers Jasper 30 (1, 16, 9, 4), by the name he goes by', () => {
+  it('offers Jasper 18 (1, 5, 8, 4), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 16, 9, 4]);
-    expect(CommentBank.fitCount(ctx)).toBe(30);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 8, 4]);
+    expect(CommentBank.fitCount(ctx)).toBe(18);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -586,8 +602,11 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     ]);
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
     // The Demo class has no closing sentence or support lines set, so the
-    // comment leaves those out (plan PR 8).
-    expect(sentences.length).toBeGreaterThanOrEqual(7);
+    // comment leaves those out (plan PR 8): the grade, the best piece, the
+    // habits, the next step and the family sentence, under six and
+    // flagged so, never padded.
+    expect(sentences.length).toBe(5);
+    expect(d.short).toBe(true);
     expect(d.text).not.toMatch(/[{}[\]]/);
     expect(d.text).toMatch(/^Cece /);
     // The course is named wherever the story opens with it.
@@ -613,7 +632,8 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   it('the same seed gives the same draft; a new seed a different one; classmates get different openings', () => {
     const ctx = ctxFor('Cece');
     expect(CommentBank.draft(ctx, { seed: 7 }).text).toBe(CommentBank.draft(ctx, { seed: 7 }).text);
-    expect(CommentBank.draft(ctx, { seed: 7 }).text).not.toBe(CommentBank.draft(ctx, { seed: 8 }).text);
+    const texts = new Set([1, 2, 3, 4, 5, 6, 7, 8].map(seed => CommentBank.draft(ctx, { seed }).text));
+    expect(texts.size).toBeGreaterThanOrEqual(2);
     // The grade sentence leads both; the family sentence, which has 18 to
     // choose from, differs once a classmate has it (the best piece has one
     // sentence, so it is the same for both).
@@ -684,10 +704,26 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(ctx.rise).toBe('');
     const mateo = getStudents(cid).find(s => s.firstName === 'Mateo');
     const mctx = CommentBank.context(CommentBank.facts(cid, mateo, 'term-2'), {});
-    expect(CommentBank.provenance(byId('n20'), mctx).factKeys).toEqual(['comp:SC']);
+    const rose = {
+      id: 'x-rose',
+      part: 'now',
+      group: 'Overall',
+      text: 'This term {he} [has|have] grown most in {rise}.',
+      needs: ['rise'],
+      claims: ['improved'],
+    };
+    expect(CommentBank.provenance(rose, mctx).factKeys).toEqual(['comp:SC']);
     // Only Completes Work is rated (from the record): the IE strengths name it.
     expect(CommentBank.provenance(byId('hs11'), ctx).factKeys).toEqual(['habit:completes']);
-    expect(CommentBank.provenance(byId('n04'), ctx).values['when.picture']).toBe('steady');
+    const steady = {
+      id: 'x-steady',
+      part: 'now',
+      group: 'Overall',
+      text: 'A steady term.',
+      when: { picture: 'steady' },
+      claims: ['picture'],
+    };
+    expect(CommentBank.provenance(steady, ctx).values['when.picture']).toBe('steady');
   });
 
   /* One sentence as a draft, to verify against changed facts. */

@@ -188,9 +188,9 @@ describe('the angle shapes the draft', () => {
     });
   });
 
-  it('leads with the story: growth for a climb, the best piece for a strong term', () => {
+  it('leads with the story: the best piece for a climb and for a strong term (no growth sentence: not a plan part)', () => {
     const climb = CommentBank.angle(FIXTURES.climb, {});
-    expect(climb.lead).toBe('growth');
+    expect(climb.lead).toBe('example');
     expect(CommentBank.angle(FIXTURES.strength, {}).lead).toBe('example');
     expect(CommentBank.angle(FIXTURES.hidden, {}).lead).toBe('example');
     expect(CommentBank.angle(FIXTURES.ie, {}).lead).toBe('ieProblem');
@@ -233,7 +233,9 @@ describe('the Generate Comment button (Demo Mode, Science 8)', () => {
       seen.add(d.text);
       box = d.text;
     }
-    expect(seen.size).toBeGreaterThanOrEqual(5);
+    // Demo Mode has no class lines and no habits rated, so a version
+    // differs only in the family sentence, of which two fit Science.
+    expect(seen.size).toBeGreaterThanOrEqual(2);
   });
 
   it('tries the next seeds when a press would give the text already on screen', () => {

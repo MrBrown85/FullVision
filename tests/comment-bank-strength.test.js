@@ -26,12 +26,12 @@ describe('stepPool', () => {
       home('h2', { when: { picture: 'steady' } }),
       home('h3', { when: { picture: 'steady' } }),
       home('h4', { when: { picture: 'climb' } }),
-      { id: 'o1', part: 'now', group: 'Openings', text: 'An opening.' },
+      { id: 'o1', part: 'now', group: 'Examples From Work', text: 'An example.' },
     ]);
     const ids = ctx => CommentBank.stepPool('home', ctx, bank).map(s => s.id);
     expect(ids({ picture: 'steady' })).toEqual(['h2', 'h3']);
     expect(ids({ picture: 'none' })).toEqual(['h1']);
-    expect(CommentBank.stepPool('opening', { picture: 'steady' }, bank).map(s => s.id)).toEqual(['o1']);
+    expect(CommentBank.stepPool('example', { picture: 'steady' }, bank).map(s => s.id)).toEqual(['o1']);
     // A class line has no bank sentences.
     expect(CommentBank.stepPool('closer', {}, bank)).toEqual([]);
   });

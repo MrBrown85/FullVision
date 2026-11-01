@@ -26,7 +26,9 @@ const PARTS = [
 const handCtx = over =>
   Object.assign({ _p: THEY, _habits: { completes: 4 }, _family: '', picture: 'steady', name: 'Noor' }, over || {});
 
-const opening = (id, text, when, claims) => ({ id, part: 'now', group: 'Openings', text, when, claims });
+// Hand-made family sentences (the home step): the one step a hand context
+// runs that chooses among several bank sentences.
+const opening = (id, text, when, claims) => ({ id, part: 'how', group: 'For the Family', text, when, claims });
 
 describe('most specific wins', () => {
   const bank = {
@@ -399,19 +401,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     if (n - 1 >= 5) expect(flagged[0].shared).toBe(n - 1);
   });
 
-  it('never repeats an opening in the class until every opening that fits is used', () => {
+  it('never repeats a family sentence in the class until every one that fits is used', () => {
     const students = getStudents(cid);
     const comments = [];
-    const byPicture = {};
+    const seen = [];
     students.forEach(st => {
       const f = CommentBank.facts(cid, st, 'term-2');
       const ctx = CommentBank.context(f, {});
       const d = CommentBank.draft(ctx, { seed: CommentBank.seedFor(st.id), comments });
       comments.push({ sid: st.id, text: d.text });
-      const op = d.sentences.find(x => x.step === 'opening');
+      const op = d.sentences.find(x => x.step === 'home');
       if (!op) return;
-      const fit = COMMENT_BANK.sentences.filter(s => s.group === 'Openings' && CommentBank.fits(s, ctx));
-      const seen = (byPicture[ctx.picture] = byPicture[ctx.picture] || []);
+      const fit = COMMENT_BANK.sentences.filter(s => s.group === 'For the Family' && CommentBank.fits(s, ctx));
       if (seen.indexOf(op.id) >= 0)
         expect(
           fit.every(s => seen.indexOf(s.id) >= 0),

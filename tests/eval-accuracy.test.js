@@ -40,7 +40,9 @@ describe('the drafts Generate writes', () => {
       .join(' ');
     expect(all).toMatch(/is earning an? [ABC]/);
     expect(all).toMatch(/“[^”]+”/);
-    expect(all).toMatch(/\d+%/);
+    // The best piece prints without its mark (plan part 2), and no other
+    // sentence prints a mark per piece, so no % appears in a draft.
+    expect(all).not.toMatch(/\d+%/);
     expect(all).toMatch(/not handed in/);
   });
 
