@@ -32,16 +32,6 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Regenerate the lockfile (temporary)
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-
-      - name: Upload the lockfile (temporary)
-        uses: actions/upload-artifact@v4
-        with:
-          name: package-lock
-          path: package-lock.json
-          retention-days: 3
-
       - name: Install dependencies
         run: npm ci
 
