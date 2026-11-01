@@ -1910,12 +1910,18 @@ window.PageStudent = (function () {
       return (x.date || '').localeCompare(y.date || '');
     });
     var cols = 'grid-template-columns:minmax(150px,1.2fr) repeat(' + list.length + ',minmax(72px,1fr)) 110px 90px';
-    var mean = function (vs) {
-      return vs.length
-        ? vs.reduce(function (s, v) {
-            return s + v;
-          }, 0) / vs.length
-        : null;
+    // A criterion's average over the scored assessments, each counted its
+    // Factor times, as every level average is (DECISIONS "Assessment Factor").
+    var factors = list.map(getAssessmentWeight);
+    var mean = function (vals) {
+      var sum = 0;
+      var total = 0;
+      vals.forEach(function (v, i) {
+        if (v == null) return;
+        sum += factors[i] * v;
+        total += factors[i];
+      });
+      return total > 0 ? sum / total : null;
     };
     var chip = function (v) {
       if (v == null) return '<span class="stu-rt-none">\u2014</span>';
@@ -1944,9 +1950,6 @@ window.PageStudent = (function () {
       var vals = list.map(function (a) {
         return rubricCriterionLevel(cid, studentId, a, crit);
       });
-      var scored = vals.filter(function (v) {
-        return v != null;
-      });
       var points = [];
       vals.forEach(function (v, i) {
         var t = _dayNum(list[i].date);
@@ -1966,9 +1969,7 @@ window.PageStudent = (function () {
       });
       html += '<span role="cell" class="stu-rt-center">' + _startNowHtml(cid, points) + '</span>';
       html +=
-        '<span role="cell" class="stu-rt-avg"><strong>' +
-        esc(formatLevel(cid, mean(scored))) +
-        '</strong></span></div>';
+        '<span role="cell" class="stu-rt-avg"><strong>' + esc(formatLevel(cid, mean(vals))) + '</strong></span></div>';
     });
     html += '</div></div>';
     return html;

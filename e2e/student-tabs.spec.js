@@ -240,3 +240,46 @@ test('the header shows one line of facts and copies the student number', async (
   await expect(header.locator('[data-action="copy-student-field"]')).toHaveText('Copied!');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('STU-201');
 });
+
+test("a shared rubric's criterion Average counts each assessment's Factor", async ({ page }) => {
+  const sid = await openCece(page);
+  // The rubric shared by the most of Cece's assessments, its first criterion
+  // scored on at least two of them; the newest of those counts 4 times.
+  const expected = await page.evaluate(sid => {
+    const cid = getActiveCourse();
+    const byRubric = {};
+    getAssessments(cid)
+      .filter(a => a.rubricId)
+      .forEach(a => (byRubric[a.rubricId] = (byRubric[a.rubricId] || []).concat(a)));
+    for (const [rid, list] of Object.entries(byRubric)) {
+      const crit = getRubricById(cid, rid).criteria[0];
+      const scored = list.filter(a => rubricCriterionLevel(cid, sid, a, crit) != null);
+      if (scored.length < 2) continue;
+      const newest = scored
+        .slice()
+        .sort((x, y) => (x.date || '').localeCompare(y.date || ''))
+        .pop();
+      saveAssessments(
+        cid,
+        getAssessments(cid).map(a => (a.id === newest.id ? { ...a, weight: 4 } : a)),
+      );
+      let sum = 0;
+      let total = 0;
+      scored.forEach(a => {
+        const f = a.id === newest.id ? 4 : getAssessmentWeight(a);
+        sum += f * rubricCriterionLevel(cid, sid, a, crit);
+        total += f;
+      });
+      return { rubric: getRubricById(cid, rid).name, crit: crit.name, avg: formatLevel(cid, sum / total) };
+    }
+    return null;
+  }, sid);
+  expect(expected).not.toBeNull();
+  await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid);
+  await page.locator('#stu-tab-breakdown').click();
+  await page.locator('[data-action="stuTypeView"][data-view="strengths"]').click();
+  const chip = page.locator('.stu-rt-picker .stu-chip', { hasText: expected.rubric });
+  if (await chip.count()) await chip.first().click();
+  const row = page.locator('.stu-rt-row:not(.stu-rt-head)', { hasText: expected.crit }).first();
+  await expect(row.locator('.stu-rt-avg')).toHaveText(expected.avg);
+});
