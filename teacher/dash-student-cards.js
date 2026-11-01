@@ -119,9 +119,16 @@ window.DashStudentCards = (function () {
           return getAssignmentStatus(cid, st.id, a.id) === 'NS';
         }).length;
 
-        var allSc = (allScores[st.id] || []).filter(function (sc) {
-          return sc.score > 0;
-        });
+        // Every piece of competency evidence as calc.js counts it: points
+        // work as its level (18/20 is 4, not 18), Excused and 0% category
+        // work left out, inside the term in view.
+        var allSc = getAllTags(cid)
+          .reduce(function (list, t) {
+            return list.concat(getCountedTagScores(cid, st.id, t.id));
+          }, [])
+          .filter(function (sc) {
+            return sc.score > 0;
+          });
         var trend = 'flat';
         if (allSc.length >= 4) {
           allSc.sort(function (a, b) {

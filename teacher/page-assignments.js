@@ -3019,8 +3019,14 @@ window.PageAssignments = (function () {
     var max = parseFloat(grid.dataset.max) || 100;
     var vals = [];
     var left = 0;
+    // Missing counts as 0 in the Average, as in the course % and the
+    // gradebook's Class Average (classColumnAverage); Excused is left out.
+    var missing = 0;
     rows.forEach(function (r) {
-      if (r.classList.contains('has-status')) return;
+      if (r.classList.contains('has-status')) {
+        if (r.querySelector('[data-status="NS"][aria-pressed="true"]')) missing++;
+        return;
+      }
       var inp = r.querySelector('.gb-pts-input');
       var v = inp ? parsePointsInput(inp.value, max) : null;
       if (v == null) left++;
@@ -3039,7 +3045,7 @@ window.PageAssignments = (function () {
         sorted.length % 2
           ? sorted[(sorted.length - 1) / 2]
           : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
-      html += '<span>Average <b>' + Math.round(((sum / vals.length) * 100) / max) + '%</b></span>';
+      html += '<span>Average <b>' + Math.round(((sum / (vals.length + missing)) * 100) / max) + '%</b></span>';
       if (stats)
         stats.innerHTML =
           '<span class="ldg-name">Class</span><span>Median <b>' +

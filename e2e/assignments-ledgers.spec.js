@@ -55,6 +55,18 @@ test('the points ledger takes a score and a status', async ({ page }) => {
   await expect(row.locator('.grader-status-btn[data-status="LATE"]')).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('the points ledger Average counts Missing as 0, like the Class Average', async ({ page }) => {
+  const card = await open(page, [assessment('a-avg', 'Unit Quiz', { scoreMode: 'points', maxPoints: 10 })], 'a-avg');
+  const alice = card.locator('.ldg-row[data-status-student="stu-001"]');
+  await alice.locator('.ldg-pts-input').fill('7');
+  await alice.locator('.ldg-pts-input').press('Tab');
+  await expect(card.locator('.ldg-tally')).toContainText('Average 70%');
+  // Bob is Missing: 7 + 0 over 2 students, 35%; he isn't counted as Marked.
+  await card.locator('.ldg-row[data-status-student="stu-002"] .grader-status-btn[data-status="NS"]').click();
+  await expect(card.locator('.ldg-tally')).toContainText('Average 35%');
+  await expect(card.locator('.ldg-tally')).toContainText('1 Marked');
+});
+
 test('the Complete / Incomplete ledger marks and clears', async ({ page }) => {
   const card = await open(page, [assessment('a-cmp', 'Exit Slip', { scoreMode: 'complete' })], 'a-cmp');
   const row = card.locator('.ldg-row[data-status-student="stu-001"]');
