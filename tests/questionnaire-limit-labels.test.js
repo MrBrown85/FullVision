@@ -2,9 +2,9 @@
  * Live bug hunt 2 (Nov 1 2026), Term Questionnaire, items 4 and 7–10:
  *
  * 4. Generate kept to the class's character limit: over it, the draft
- *    drops the family line, then attendance, then the strengths, and so on
- *    (never the grade, the IE Required sentences, a sentence the teacher
- *    kept or typed); when even that cannot fit, the draft is kept as is.
+ *    drops the family line, then attendance, then the strengths, then the
+ *    habits sentence, nothing else; when even that cannot fit, the draft is
+ *    kept as is and the count says why.
  * 7. The limit box takes a whole number from 100 to 5000 or nothing; any
  *    other entry says so and never clears the limit; Escape cancels.
  * 8. The habits source lines and the ⓘ sheet say when a rating came from
@@ -143,7 +143,7 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
   });
 
   describe('4. Generate keeps to the character limit', () => {
-    const DROP = ['home', 'attendance', 'overall', 'habits', 'strongHabits', 'nextStep', 'example'];
+    const DROP = ['home', 'attendance', 'overall', 'habits', 'strongHabits'];
     // The steps a fitted draft left out, in the drop order: the family line
     // goes before attendance, attendance before the strengths, and so on.
     const expectDropOrder = (whole, fitted) => {
@@ -177,6 +177,31 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
       });
       // The live run: 9 of 10 drafts were over 350 before.
       expect(dropped).toBeGreaterThan(10);
+    });
+
+    it('never drops the next step, the best piece, Not Handed In or the first sentence; past that the draft is kept', () => {
+      const KEEP = ['grade', 'nextStep', 'example', 'notHandedIn', 'lateWork', 'support', 'closer'];
+      getStudents(cid).forEach(st => {
+        const whole = draftOf(st);
+        const steps = whole.sentences.map(x => x.step);
+        // Only the four droppable steps out: what is left is the floor.
+        const floor = whole.sentences.filter((x, i) => i === 0 || DROP.indexOf(x.step) < 0);
+        const min = floor.map(x => x.text).join(' ').length;
+        [min - 1, 200].forEach(limit => {
+          const d = draftOf(st, { charLimit: limit });
+          const left = d.sentences.map(x => x.step);
+          KEEP.filter(k => steps.indexOf(k) >= 0).forEach(k => expect(left, st.firstName + ' ' + k).toContain(k));
+          expect(left[0]).toBe(steps[0]);
+          if (d.text.length > limit) {
+            expect(d.overLimit).toBe(true);
+            expect(d.text).toBe(whole.text);
+          }
+        });
+        // Just under the floor: nothing more can go, so the whole draft stays.
+        const under = draftOf(st, { charLimit: min - 1 });
+        expect(under.overLimit, st.firstName).toBe(true);
+        expect(under.text).toBe(whole.text);
+      });
     });
 
     it('drops the family line first, then the strengths', () => {

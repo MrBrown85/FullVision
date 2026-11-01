@@ -4729,14 +4729,15 @@ window.CommentBank = (function () {
 
   /* A composed draft realised and verified, then fitted to the character
      limit (plan: drafts stay within the class's limit): over it, the draft
-     drops whole sentences in LIMIT_DROP order, the last of a step first,
-     until it fits. Never the grade sentence (no step in LIMIT_DROP), the IE
-     path's Required sentences, a sentence the teacher kept, the class's own
-     lines or the comment's first sentence (it names the student, and leads
-     a Proficiency class's comment, which has no grade sentence). When
+     drops whole sentences in LIMIT_DROP order until it fits: the family
+     line, then attendance, then the strengths, then the habits sentence.
+     Nothing else: never the next step, the best piece, the grade sentence,
+     Not Handed In, the IE path's Required sentences, a sentence the teacher
+     kept, the class's own lines or the comment's first sentence (it names
+     the student, and leads a Proficiency class's comment). When
      even that cannot fit, the whole draft is kept and `overLimit` is set;
      the count on screen says why. `limit` null: no limit. */
-  var LIMIT_DROP = ['home', 'attendance', 'overall', 'habits', 'strongHabits', 'nextStep', 'example'];
+  var LIMIT_DROP = ['home', 'attendance', 'overall', 'habits', 'strongHabits'];
   function _fitted(c, f, ctx, bank, limit) {
     var finish = function (x) {
       var d = _realised(x);
