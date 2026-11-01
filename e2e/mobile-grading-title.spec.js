@@ -1,7 +1,8 @@
 /**
  * The phone's grading screen always shows what is being graded: the
  * assessment's title in the bar with "N of 27" under it, with no scrolling.
- * Bars over a large title still fade their title in on scroll. Demo Mode.
+ * The Grade list's bar shows its title at rest; the student page's bar
+ * fades its title in on scroll. Demo Mode.
  */
 import { test, expect } from '@playwright/test';
 
@@ -14,8 +15,8 @@ test('the grading bar shows the title and the student count, and follows a thumb
   await page.waitForURL(/teacher-mobile\//);
   await page.locator('.m-tab-item[data-tab="grade"]').click();
 
-  // The Grade list has a large title, so its bar title waits for a scroll.
-  await expect(page.locator('#m-nav-bar-grade-picker .m-nav-bar-title-inline')).toHaveCSS('opacity', '0');
+  // The Grade list has no large title: its bar title shows at rest.
+  await expect(page.locator('#m-nav-bar-grade-picker .m-nav-bar-title-inline')).toHaveCSS('opacity', '1');
 
   await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
   await page.locator('#m-grade-list .m-cell', { hasText: 'Science Fair Proposal' }).click();

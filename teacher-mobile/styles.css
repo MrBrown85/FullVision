@@ -292,8 +292,13 @@ body.fv-switching-course::after {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.m-nav-bar-scrolled .m-nav-bar-title-inline {
+.m-nav-bar-scrolled .m-nav-bar-title-inline,
+.m-nav-bar-compact .m-nav-bar-title-inline {
   opacity: 1;
+}
+/* Under a compact bar the content starts a little way down. */
+.m-nav-bar-compact + .m-screen-content {
+  padding-top: 12px;
 }
 /* The grading screen has no large title and never scrolls its bar, so its
    title (the assessment and "N of 27") always shows. */

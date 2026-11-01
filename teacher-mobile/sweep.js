@@ -418,9 +418,8 @@ window.MSweep = (function () {
     var done = _done();
     return (
       '<div class="m-screen" id="m-screen-obs-sweep">' +
-      MC.navBar({ id: 'obs-sweep', title: 'Sweep', backLabel: 'Observations' }) +
+      MC.navBar({ id: 'obs-sweep', title: 'Sweep', backLabel: 'Observations', compact: true }) +
       '<div class="m-screen-content" id="m-sweep-content">' +
-      MC.largeTitleHTML('Sweep') +
       '<div class="m-sweep-head">' +
       '<div class="m-sweep-count" id="m-sweep-count" aria-live="polite">' +
       _countText(done) +

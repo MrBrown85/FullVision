@@ -104,7 +104,16 @@ window.MObserve = (function () {
 
   /* ── Observation Feed Screen ────────────────────────────────── */
   function renderFeed(cid) {
-    var nav = MC.navBar({ id: 'obs-feed', title: 'Observations' });
+    var nav = MC.navBar({
+      id: 'obs-feed',
+      title: 'Observations',
+      compact: true,
+      rightHTML:
+        '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
+        '<button class="m-nav-bar-action" data-action="m-settings" title="Settings">' +
+        MC.ICONS.settings +
+        '</button>',
+    });
 
     // Build filter pills
     var students = getStudents(cid);
@@ -156,7 +165,6 @@ window.MObserve = (function () {
       '<div class="m-screen" id="m-screen-obs-feed">' +
       nav +
       '<div class="m-screen-content" id="m-obs-feed-content">' +
-      MC.largeTitleHTML('Observations') +
       '<div class="m-sweep-start-wrap"><button class="m-sweep-start" data-action="m-sweep-start">Start a sweep</button></div>' +
       quickBar +
       filters +

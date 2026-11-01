@@ -120,7 +120,16 @@ window.MGrade = (function () {
 
   /* ── Assessment Picker Screen ───────────────────────────────── */
   function renderPicker(cid) {
-    var nav = MC.navBar({ id: 'grade-picker', title: 'Grade' });
+    var nav = MC.navBar({
+      id: 'grade-picker',
+      title: 'Grade',
+      compact: true,
+      rightHTML:
+        '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
+        '<button class="m-nav-bar-action" data-action="m-settings" title="Settings">' +
+        MC.ICONS.settings +
+        '</button>',
+    });
 
     var assessments = getAssessments(cid);
     var students = getStudents(cid);
@@ -220,7 +229,6 @@ window.MGrade = (function () {
       '<div class="m-screen" id="m-screen-grade-picker">' +
       nav +
       '<div class="m-screen-content">' +
-      MC.largeTitleHTML('Grade') +
       segmented +
       cells +
       '</div></div>'
