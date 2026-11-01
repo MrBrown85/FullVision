@@ -311,8 +311,8 @@
       if (action === 'm-auth-tab') {
         var tab = target.getAttribute('data-tab');
         var isSignIn = tab === 'signin';
-        document.getElementById('m-form-signin').style.display = isSignIn ? '' : 'none';
-        document.getElementById('m-form-signup').style.display = isSignIn ? 'none' : '';
+        document.getElementById('m-form-signin').hidden = !isSignIn;
+        document.getElementById('m-form-signup').hidden = isSignIn;
         document.querySelectorAll('.m-auth-tabs .m-seg-btn').forEach(function (btn) {
           var active = btn.getAttribute('data-tab') === tab;
           btn.classList.toggle('m-seg-active', active);

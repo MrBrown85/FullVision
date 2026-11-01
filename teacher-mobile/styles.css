@@ -2329,6 +2329,9 @@ body.fv-switching-course::after {
   flex-direction: column;
   gap: 6px;
 }
+.m-auth-form[hidden] {
+  display: none;
+}
 .m-auth-label {
   font-size: 13px;
   font-weight: 600;
