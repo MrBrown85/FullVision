@@ -475,11 +475,18 @@
     rgba(255, 255, 255, 0.32) 6px
   );
 }
-.gb-score.gb-focus {
+.gb-score.gb-focus,
+#gb-data .gb-scores-cell.gb-focus {
   outline: 2px solid var(--active);
   outline-offset: -1px;
   z-index: 1;
   position: relative;
+}
+/* The selected cell draws its own ring; a focused cell without the
+   selection (just after Escape) draws none. */
+.gb-score:focus:not(.gb-focus),
+.gb-scores-cell:focus:not(.gb-focus) {
+  outline: none;
 }
 .gb-unscored {
   color: var(--text-3) !important;
