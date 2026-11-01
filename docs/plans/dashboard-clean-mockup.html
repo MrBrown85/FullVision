@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Mockup</title>
+<style>
+:root {
+  --score-1: #d32f2f; --score-2: #c07a00; --score-3: #2e7d32; --score-4: #1565c0;
+  --score-1-bg: #fee2e2; --score-1-text: #991b1b;
+  --score-2-bg: #fef3c7; --score-2-text: #92400e;
+  --score-3-bg: #bbf7d0; --score-3-text: #166534;
+  --score-4-bg: #dbeafe; --score-4-text: #1e40af;
+  --obs-note: #f2c200; --obs-note-edge: #a88600;
+  --font-base: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
+  --mono: 'SF Mono', ui-monospace, Menlo, monospace;
+  --bg: #f5f5f7; --surface: #fff; --surface-2: #e5e5ea; --border: #d1d1d6;
+  --text: #1d1d1f; --text-2: #636366; --text-3: #58585d;
+  --active: #007aff; --active-light: rgba(0,122,255,.08); --link: #0066cc;
+  --late: #ff9500; --accent-purple: #7b1fa2;
+  --divider-subtle: rgba(0,0,0,.06); --divider-medium: rgba(0,0,0,.09); --divider-strong: rgba(0,0,0,.12);
+  --seg-track: rgba(118,118,128,.12); --seg-thumb: #fff;
+  --overlay-hover: rgba(0,0,0,.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --control-h: 32px; --chip-h: 24px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: #dcdce0; font-family: var(--font-base); font-size: 14px; color: var(--text); -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; }
+a { color: var(--link); text-decoration: none; cursor: pointer; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ── App frame ─────────────────────────────────────────── */
+.frame { width: 1440px; margin: 24px auto; background: var(--bg); border-radius: 12px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.18); }
+.topbar { height: 56px; background: var(--surface); border-bottom: .5px solid var(--divider-medium); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 16px; }
+.nav { display: flex; background: var(--seg-track); border-radius: 9px; padding: 2px; }
+.nav span { padding: 6px 16px; border-radius: 7px; font-size: 15px; color: var(--text-2); }
+.nav span.on { background: var(--seg-thumb); color: var(--text); font-weight: 600; box-shadow: var(--shadow-sm); }
+.topright { justify-self: end; display: flex; align-items: center; gap: 16px; }
+.sync { width: 8px; height: 8px; border-radius: 50%; background: var(--score-3); }
+.acct { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); }
+.sideicon { width: 18px; height: 14px; border: 1.5px solid var(--text-2); border-radius: 3px; }
+
+.app { display: grid; grid-template-columns: 260px minmax(0, 1fr); min-height: 1600px; }
+.side { background: var(--surface); border-right: .5px solid var(--divider-medium); padding: 12px; }
+.picker, .sidesearch { height: var(--control-h); border: 1px solid var(--border); border-radius: 8px; display: flex; align-items: center; padding: 0 10px; font-size: 14px; margin-bottom: 8px; background: var(--surface); }
+.picker { font-weight: 600; justify-content: space-between; }
+.sidesearch { color: var(--text-2); margin-bottom: 12px; }
+.roster { margin: 0 -12px; border-top: .5px solid var(--divider-medium); padding-top: 4px; }
+.rrow { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; }
+.rrow:hover { background: var(--overlay-hover); }
+.av { width: 28px; height: 28px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; flex: none; }
+.rname { flex: 1; font-size: 14px; }
+.rbadge { font-family: var(--mono); font-size: 12px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+
+/* ── Page ──────────────────────────────────────────────── */
+.toolbar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--surface); border-bottom: .5px solid var(--divider-medium); }
+.btn { height: var(--control-h); padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--bg); }
+.select { justify-content: space-between; min-width: 170px; }
+.select::after { content: ''; width: 7px; height: 7px; border-right: 1.5px solid var(--text-2); border-bottom: 1.5px solid var(--text-2); transform: rotate(45deg) translateY(-2px); margin-left: 12px; }
+.search { height: var(--control-h); flex: 0 1 260px; border-radius: 8px; background: var(--seg-track); display: flex; align-items: center; padding: 0 10px; color: var(--text-2); }
+.chip { height: var(--chip-h); padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); font-size: 13px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+.chip:hover { background: var(--bg); }
+.chip.on { background: var(--active-light); border-color: var(--active); color: var(--link); }
+.spacer { flex: 1; }
+.count { color: var(--text-2); font-size: 14px; }
+
+.content { padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--surface); border-radius: 12px; box-shadow: var(--shadow-sm); }
+.card-h { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; min-height: 52px; }
+.title { font-size: 16px; font-weight: 600; }
+.sub { color: var(--text-2); font-size: 13px; }
+.seg { display: inline-flex; background: var(--seg-track); border-radius: 8px; padding: 2px; height: var(--control-h); }
+.seg button { border: 0; background: none; padding: 0 12px; border-radius: 6px; font-size: 13px; color: var(--text-2); cursor: pointer; white-space: nowrap; }
+.seg button.on { background: var(--seg-thumb); color: var(--text); font-weight: 600; box-shadow: var(--shadow-sm); }
+.seg button .n { font-family: var(--mono); font-size: 12px; margin-left: 4px; color: var(--text-3); font-weight: 400; }
+.tool { height: var(--control-h); padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; cursor: pointer; }
+.tool[aria-pressed="true"] { background: var(--active-light); border-color: var(--active); color: var(--link); }
+
+/* ── Summary strip ─────────────────────────────────────── */
+.summary { display: grid; grid-template-columns: 1.25fr .85fr 1.9fr; }
+.bdays { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 8px; }
+.bdays div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bdays b { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bdays span { font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.stat { padding: 14px 18px 16px; border-left: .5px solid var(--divider-medium); cursor: pointer; border-radius: 0; }
+.stat:first-child { border-left: 0; }
+.stat:hover { background: var(--overlay-hover); }
+.stat:first-child:hover { border-radius: 12px 0 0 12px; }
+.stat:last-child:hover { border-radius: 0 12px 12px 0; }
+.stat-l { font-size: 13px; color: var(--text-2); }
+.stat-v { font-size: 28px; font-weight: 600; letter-spacing: -.01em; margin-top: 2px; display: flex; align-items: baseline; gap: 8px; }
+.stat-v .word { font-size: 15px; font-weight: 600; }
+.stat-s { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+.mixbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; margin-top: 10px; background: transparent; }
+.mixbar i { display: block; height: 100%; }
+.mixkey { display: flex; gap: 12px; margin-top: 6px; font-size: 12px; color: var(--text-2); }
+.mixkey b { font-family: var(--mono); font-weight: 600; color: var(--text); margin-right: 3px; }
+
+/* ── Row 2 ─────────────────────────────────────────────── */
+.row2 { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; }
+.col { display: flex; flex-direction: column; gap: 12px; }
+
+/* Needs Attention */
+.na { display: flex; flex-direction: column; }
+.na .card-h { flex-wrap: wrap; row-gap: 8px; }
+.rule { font-size: 13px; color: var(--text-2); }
+.na-filter { padding: 0 16px 10px; display: flex; align-items: center; gap: 10px; }
+.na-list { flex: 1 1 auto; height: 0; min-height: 0; overflow: auto; border-top: .5px solid var(--divider-medium); }
+.na-row { position: relative; display: grid; grid-template-columns: 18px 136px 112px 1fr; align-items: center; gap: 10px; min-height: 44px; padding: 6px 16px; border-bottom: .5px solid var(--divider-subtle); }
+.na-row:hover { background: var(--overlay-hover); }
+.na-rank { font-family: var(--mono); font-size: 12px; color: var(--text-3); text-align: right; }
+.na-name { font-weight: 600; color: var(--text); }
+.na-name:hover { color: var(--link); }
+.facts { font-size: 13px; color: var(--text-2); line-height: 1.45; }
+.facts .sep { color: var(--border); margin: 0 6px; }
+.facts .f { white-space: nowrap; }
+.facts b { color: var(--text); font-weight: 600; font-family: var(--mono); font-size: 12px; }
+.facts .late b, .facts .late { color: #a35a00; }
+.facts .gl { font-size: 12px; margin-right: 2px; }
+.fact { height: var(--chip-h); display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border-radius: 4px; background: var(--bg); font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.fact b { color: var(--text); font-weight: 600; }
+.fact .gl { font-size: 12px; }
+.fact.late b { color: #a35a00; }
+.na-act { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); display: flex; gap: 6px; padding-left: 28px; background: linear-gradient(90deg, transparent, #f5f5f5 24px); opacity: 0; transition: opacity .12s; }
+.na-row:hover .na-act, .na-row:focus-within .na-act { opacity: 1; }
+.mini { height: 26px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 12px; cursor: pointer; white-space: nowrap; }
+.na-empty { padding: 28px 16px; color: var(--text-2); }
+.compchip { display: none; }
+.compchip.show { display: inline-flex; }
+
+/* Grade badge (follows the class's grading setting) */
+.gb { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border-radius: 4px; font-size: 13px; font-weight: 600; justify-self: start; white-space: nowrap; }
+.gb .num { font-size: 13px; }
+.l1 { background: var(--score-1-bg); color: var(--score-1-text); }
+.l2 { background: var(--score-2-bg); color: var(--score-2-text); }
+.l3 { background: var(--score-3-bg); color: var(--score-3-text); }
+.l4 { background: var(--score-4-bg); color: var(--score-4-text); }
+
+/* Competencies */
+.legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 16px 8px; font-size: 12px; color: var(--text-2); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.comp { display: grid; grid-template-columns: 112px minmax(0, 1fr) 34px 78px; gap: 12px; align-items: center; padding: 0 16px; height: 40px; border-top: .5px solid var(--divider-subtle); }
+.comp:hover { background: var(--overlay-hover); }
+.comp.sel { background: var(--active-light); }
+.comp-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.comp .mixbar { margin-top: 0; }
+.comp-avg { font-family: var(--mono); font-size: 14px; font-weight: 600; text-align: right; }
+.below { justify-self: end; border: 0; background: none; padding: 4px 6px; border-radius: 4px; font-size: 13px; color: var(--link); cursor: pointer; white-space: nowrap; }
+.below:hover { background: var(--active-light); }
+.below .num { font-weight: 600; }
+.card-f { padding: 10px 16px 14px; border-top: .5px solid var(--divider-subtle); font-size: 13px; color: var(--text-2); display: flex; justify-content: space-between; }
+
+.cc { padding: 0 16px 6px; }
+.cc-row { display: flex; align-items: center; gap: 8px; height: 32px; border-top: .5px solid var(--divider-subtle); font-size: 14px; }
+.cc-row .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.cc-row .nm2 { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-row .num { font-size: 13px; color: var(--text-2); }
+.cc-row.off { color: var(--text-3); }
+.cc-row.off .dot { background: none !important; border: 1.5px solid var(--border); }
+.bday { padding: 10px 16px 14px; border-top: .5px solid var(--divider-medium); font-size: 13px; color: var(--text-2); display: flex; gap: 10px; flex-wrap: wrap; }
+.bday span { white-space: nowrap; }
+.bday b { color: var(--text); font-weight: 600; }
+
+/* ── Observations ──────────────────────────────────────── */
+.ob-key { display: flex; flex-wrap: wrap; gap: 14px; padding: 0 16px 10px; font-size: 12px; color: var(--text-2); align-items: center; }
+.ob-key span { display: inline-flex; align-items: center; gap: 5px; }
+.mk { display: inline-block; width: 6px; height: 12px; border-radius: 2px; }
+.t-s { background: var(--score-3); } .t-g { background: var(--score-4); } .t-c { background: var(--score-2); }
+.t-n { background: var(--obs-note); box-shadow: inset 0 0 0 1px var(--obs-note-edge); }
+.t-x { background: none; box-shadow: inset 0 0 0 1.5px var(--text-3); }
+.diamond { color: var(--accent-purple); font-size: 11px; }
+.ob-body { padding: 4px 16px 16px; border-top: .5px solid var(--divider-subtle); }
+.ob-blocks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; }
+.ob-blocks.comp-view { grid-template-columns: repeat(2, 1fr); }
+.ob-row { display: grid; grid-template-columns: 16px 12px 86px 34px repeat(8, 1fr) 30px; align-items: center; gap: 3px; height: 26px; transition: opacity .15s; }
+.comp-view .ob-row { grid-template-columns: 18px 14px 96px repeat(6, 1fr) 6px; gap: 4px; }
+.ob-row.head { height: 30px; align-items: end; padding-bottom: 4px; font-size: 12px; color: var(--text-2); }
+.ob-row.head .wk { text-align: center; line-height: 1.15; }
+.ob-row.head .wk small { display: block; font-size: 12px; color: var(--text-3); min-height: 14px; }
+.ob-add { opacity: 0; border: 0; background: none; color: var(--link); font-size: 16px; padding: 0; cursor: pointer; line-height: 1; }
+.ob-row:hover .ob-add { opacity: 1; }
+.ob-row:not(.head):hover { background: var(--overlay-hover); border-radius: 4px; }
+.ob-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.ob-name.overdue { color: #a35a00; font-weight: 600; }
+.ob-tot { font-family: var(--mono); font-size: 12px; color: var(--text-3); text-align: right; padding-right: 3px; }
+.cell { height: 18px; border-radius: 4px; background: var(--bg); display: flex; align-items: center; justify-content: center; gap: 2px; }
+.cell.has { cursor: pointer; }
+.cell.has:hover { box-shadow: inset 0 0 0 1px var(--border); }
+.cell .mk { height: 10px; }
+.days { font-family: var(--mono); font-size: 12px; color: #a35a00; font-weight: 600; text-align: right; }
+.lv { height: 20px; border-radius: 4px; font-family: var(--mono); font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 3px; }
+.dim .ob-row:not(.head):not(.hl) { opacity: .28; }
+.cv-h { text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Students ──────────────────────────────────────────── */
+.st-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 0 16px 16px; }
+.sc { border: .5px solid var(--divider-strong); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.sc:hover { box-shadow: var(--shadow-sm); }
+.sc-top { display: flex; align-items: center; gap: 10px; }
+.sc-name { color: var(--text); font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.sc-strip i { height: 6px; border-radius: 2px; display: block; }
+.sc-foot { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-2); }
+.sc-foot .late { color: #a35a00; font-weight: 600; }
+.st-grid { padding: 0 16px 16px; }
+table.sg { width: 100%; border-collapse: collapse; font-size: 14px; }
+.sg th { font-size: 13px; color: var(--text-2); font-weight: 500; text-align: center; padding: 6px 4px; border-bottom: .5px solid var(--divider-medium); }
+.sg th:first-child, .sg td:first-child { text-align: left; }
+.sg td { text-align: center; padding: 4px; border-bottom: .5px solid var(--divider-subtle); height: 36px; }
+.sg td .lv { width: 64px; margin: 0 auto; }
+.sg tfoot td { font-weight: 600; font-family: var(--mono); font-size: 13px; }
+.names-hidden .nm { filter: blur(5px); }
+
+/* ── Notes under the mockup ────────────────────────────── */
+.notes { width: 1440px; margin: 0 auto 48px; background: var(--surface); border-radius: 12px; padding: 24px 28px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+.notes h2 { font-size: 18px; margin: 0 0 4px; }
+.notes p { margin: 0 0 14px; color: var(--text-2); }
+.notes table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.notes th { text-align: left; font-size: 13px; color: var(--text-2); font-weight: 500; padding: 6px 10px; border-bottom: 1px solid var(--divider-strong); }
+.notes td { padding: 8px 10px; border-bottom: .5px solid var(--divider-medium); vertical-align: top; }
+.notes td:first-child { font-weight: 600; width: 260px; }
+</style>
+</head>
+<body>
+
+<div class="frame" id="frame">
+  <div class="topbar">
+    <div><div class="sideicon"></div></div>
+    <div class="nav"><span class="on">Dashboard</span><span>Assignments</span><span>Observations</span><span>Gradebook</span><span>Reports</span></div>
+    <div class="topright"><span class="sync" title="Saved"></span><span class="acct"></span></div>
+  </div>
+
+  <div class="app">
+    <aside class="side">
+      <div class="picker">Block A · Science 8 <span style="color:var(--text-2)">⌄</span></div>
+      <div class="sidesearch">Search…</div>
+      <div class="roster" id="roster"></div>
+    </aside>
+
+    <main>
+      <div class="toolbar">
+        <button class="btn">Class Management</button>
+        <button class="btn select">All Time</button>
+        <div class="search">⌕&nbsp; Search Students…</div>
+        <button class="btn select" style="min-width:150px">Last Name A→Z</button>
+        <button class="chip">⚑ Flagged</button>
+        <div class="spacer"></div>
+        <span class="count">27 Students</span>
+      </div>
+
+      <div class="content" id="content">
+
+        <!-- 1. Class at a glance -->
+        <section class="card summary" aria-label="Class at a Glance">
+          <div class="stat">
+            <div class="stat-l">Class Average</div>
+            <div class="stat-v"><span class="num">2.9</span><span class="word" style="color:var(--score-3-text)">Proficient</span></div>
+            <div class="mixbar" style="height:8px">
+              <i style="flex:5;background:var(--score-2)"></i><i style="flex:19;background:var(--score-3)"></i><i style="flex:3;background:var(--score-4)"></i>
+            </div>
+            <div class="mixkey"><span><b>5</b>Developing</span><span><b>19</b>Proficient</span><span><b>3</b>Extending</span></div>
+          </div>
+          <div class="stat">
+            <div class="stat-l">Missing and Late</div>
+            <div class="stat-v num">0</div>
+            <div class="stat-s">Nothing is missing or late.</div>
+          </div>
+          <div class="stat">
+            <div class="stat-l">Upcoming Birthdays</div>
+            <div class="bdays">
+              <div><b class="nm">Mei Wong</b><span>Thu, Oct 29 · in 4 days</span></div>
+              <div><b class="nm">Leo Martineau</b><span>Tue, Nov 3 · in 9 days</span></div>
+              <div><b class="nm">Priya Kaur</b><span>Mon, Nov 9 · in 15 days</span></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. Needs Attention + Competencies -->
+        <div class="row2">
+          <section class="card na" aria-labelledby="na-title">
+            <div class="card-h">
+              <span class="title" id="na-title">Needs Attention</span>
+              <span class="sub" id="na-count">13 students</span>
+              <div class="spacer"></div>
+              <span class="rule">Below Proficient · At Least 3 Scores</span>
+              <a style="font-size:13px">Change Rule</a>
+            </div>
+            <div class="na-filter">
+              <div class="seg" id="na-seg">
+                <button class="on" data-f="all">All<span class="n">13</span></button>
+                <button data-f="below">Below Proficient<span class="n">12</span></button>
+                <button data-f="notobs">Not Observed 3+ Weeks<span class="n">3</span></button>
+                <button data-f="nostr">No Strength<span class="n">6</span></button>
+                <button data-f="missing">Missing<span class="n">0</span></button>
+              </div>
+              <button class="chip on compchip" id="compchip">Processing <span aria-hidden="true">×</span></button>
+            </div>
+            <div class="na-list" id="na-list"></div>
+          </section>
+
+          <div class="col">
+            <section class="card" aria-labelledby="cc-title">
+              <div class="card-h">
+                <span class="title" id="cc-title">Curricular Competencies</span>
+                <div class="spacer"></div>
+                <a style="font-size:14px">View Gradebook →</a>
+              </div>
+              <div class="legend">
+                <span><i class="sw" style="background:var(--score-1)"></i>Emerging</span>
+                <span><i class="sw" style="background:var(--score-2)"></i>Developing</span>
+                <span><i class="sw" style="background:var(--score-3)"></i>Proficient</span>
+                <span><i class="sw" style="background:var(--score-4)"></i>Extending</span>
+              </div>
+              <div id="comps"></div>
+            </section>
+
+            <section class="card" aria-labelledby="core-title">
+              <div class="card-h" style="padding-bottom:4px">
+                <span class="title" id="core-title">Core Competencies</span>
+                <span class="sub">Assessments Tagged</span>
+              </div>
+              <div class="cc" id="core"></div>
+            </section>
+          </div>
+        </div>
+
+        <!-- 3. Observations -->
+        <section class="card" aria-labelledby="ob-title" id="obcard">
+          <div class="card-h">
+            <span class="title" id="ob-title">Observations</span>
+            <span class="sub" id="ob-window">Last 8 Weeks</span>
+            <span style="width:8px"></span>
+            <button class="chip" data-flag="notobs"><span class="num">3</span> Not Observed in 3+ Weeks</button>
+            <button class="chip" data-flag="nostr"><span class="diamond">◇</span><span class="num">6</span> With No Strength Recorded</button>
+            <div class="spacer"></div>
+            <div class="seg" id="ob-seg"><button class="on" data-v="week">By Week</button><button data-v="comp">By Competency</button></div>
+            <button class="tool" id="hide-names" aria-pressed="false">Hide Names</button>
+            <a style="font-size:14px;margin-left:4px">Record →</a>
+          </div>
+          <div class="ob-key" id="ob-key"></div>
+          <div class="ob-body"><div class="ob-blocks" id="ob-blocks"></div></div>
+        </section>
+
+        <!-- 4. Students -->
+        <section class="card" aria-labelledby="st-title" id="stcard">
+          <div class="card-h">
+            <span class="title" id="st-title">Students</span>
+            <div class="spacer"></div>
+            <div class="seg" id="st-seg"><button class="on" data-v="cards">Cards</button><button data-v="grid">Grid</button></div>
+          </div>
+          <div id="students"></div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<section class="notes">
+  <h2>Where Each Piece Went</h2>
+  <p>Nothing is removed. The top bar keeps only what a teacher acts on or wants at a glance: the class average, anything missing or late, and upcoming birthdays. Below it: who to act on, the competency picture, observation coverage, then every student. “Observed Recently” is dropped from the top; the Observations card’s “3 Not Observed in 3+ Weeks” already says it.</p>
+  <table>
+    <thead><tr><th>On the Current Dashboard</th><th>In This Mockup</th></tr></thead>
+    <tbody>
+      <tr><td>Class Distribution bar (3 / 19 / 5)</td><td>Class Average in the top bar: one thin bar with the counts written under it.</td></tr>
+      <tr><td>Class Avg, Standards Covered, Assessments tiles; 6 of 6 Standards Assessed dots</td><td>Class Avg is the top bar’s first cell. Assessments and standards covered moved to one line at the foot of Curricular Competencies (“37 assessments · 6 of 6 competencies assessed”).</td></tr>
+      <tr><td>Missing and Late (three boxes)</td><td>One cell in the top bar. At zero it says so in one line; the Not Submitted / Late / Past Due split shows only when there is something to count. Missing is also a filter in Needs Attention.</td></tr>
+      <tr><td>Who Needs Help (names repeated under each competency, plus the “4 or more” line)</td><td>Needs Attention: one row per student, worst first, with the reasons as facts. Same rule and Change Rule. Each competency’s “N Below” opens that competency’s list (try Processing).</td></tr>
+      <tr><td>Observations flags (not observed 3+ weeks, no strength)</td><td>Kept on the Observations card, and also folded into Needs Attention as reasons and filters.</td></tr>
+      <tr><td>Curricular Competencies bars with numbers inside, colour-coded names</td><td>Thin bars, one legend, plain names, average and a “Below” count per row.</td></tr>
+      <tr><td>Observations grid (By Week / By Competency, Hide Names, Record, +, overdue days, diamond)</td><td>Full width so the 27 students fit in three short columns; quieter cells, one key line.</td></tr>
+      <tr><td>Core Competencies, Next Steps, Upcoming Birthdays</td><td>Core Competencies as a list with counts. Upcoming Birthdays is the top bar’s last cell, with full names and how many days away. Next Steps items show as class rows at the top of Needs Attention when there are any (none in this class).</td></tr>
+      <tr><td>Students (Cards / Grid)</td><td>Same toggle. Cards are smaller: grade, a six-segment competency strip, last observed.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<script>
+(function () {
+  var WEEKS = [['Aug', 31], ['Sep', 7], ['', 14], ['', 21], ['', 28], ['Oct', 5], ['', 12], ['', 19]];
+  var COMPS = [
+    { s: 'Questioning', n: 'Questioning and Predicting', mix: [0, 5, 19, 3], avg: '2.9' },
+    { s: 'Planning', n: 'Planning and Conducting', mix: [0, 5, 19, 3], avg: '2.9' },
+    { s: 'Processing', n: 'Processing and Analyzing Data and Information', mix: [1, 11, 11, 4], avg: '2.7' },
+    { s: 'Evaluating', n: 'Evaluating', mix: [0, 5, 19, 3], avg: '2.9' },
+    { s: 'Applying', n: 'Applying and Innovating', mix: [0, 5, 19, 3], avg: '2.9' },
+    { s: 'Communicating', n: 'Communicating', mix: [0, 5, 15, 7], avg: '3.1' },
+  ];
+  var LV = ['', 'Emerging', 'Developing', 'Proficient', 'Extending'];
+  var GL = ['', '○', '◐', '●', '◆'];
+  var COLORS = ['#2e7d32', '#6a1b9a', '#00695c', '#c62828', '#1565c0', '#ad1457', '#4e342e', '#283593', '#00838f', '#ef6c00'];
+
+  // name, overall, [Q,P,Proc,E,A,Comm], observations [week, type], overdue days
+  var S = [
+    ['Cece Adeyemi', 3.0, [3, 3, 3, 3, 3, 3], [[3, 's'], [7, 'n']]],
+    ['Noor Al-Rashid', 3.6, [4, 3, 4, 3, 4, 4], [[2, 's'], [5, 'n'], [6, 's']]],
+    ['Hannah Berg', 3.1, [3, 3, 3, 3, 3, 3], [[3, 's'], [6, 's']]],
+    ['Sam Blackwood', 2.8, [3, 3, 2, 3, 3, 3], [[4, 'g'], [6, 'n']]],
+    ['Liam Chen', 3.0, [3, 3, 3, 3, 3, 3], [[5, 's']]],
+    ['Mateo Cruz', 3.1, [3, 3, 3, 3, 3, 4], [[1, 's'], [7, 's']]],
+    ['Ethan Dubois', 2.0, [2, 2, 2, 2, 2, 1.7], [[2, 'g'], [7, 'g'], [7, 'c']]],
+    ['Caleb Firth', 2.8, [3, 3, 2, 3, 3, 3], [[2, 's'], [7, 'g']]],
+    ['Jasper Gill', 2.8, [3, 3, 2, 3, 3, 3], [[4, 's']], 21],
+    ['Fatima Hassan', 3.0, [3, 3, 3, 3, 3, 3], [[5, 's']]],
+    ['Tessa Ironside', 3.3, [3, 3, 4, 3, 3, 4], [[0, 's'], [4, 's'], [7, 's']]],
+    ['Anisa Jama', 3.2, [3, 3, 3, 3, 3, 4], [[0, 's'], [4, 's'], [7, 's']]],
+    ['Priya Kaur', 3.7, [4, 4, 4, 4, 4, 4], [[0, 's'], [6, 's']]],
+    ['Jordan Kim', 3.0, [3, 3, 3, 3, 3, 3], [[3, 's'], [7, 'g']]],
+    ['Ines Larsen', 2.9, [3, 3, 2, 3, 3, 4], [[0, 's'], [4, 's'], [7, 's']]],
+    ['Marcus Lee', 2.2, [2, 2, 2, 2, 2, 3], [[3, 'g'], [6, 'g']]],
+    ['Leo Martineau', 2.8, [3, 3, 2, 3, 3, 3], [[3, 'g'], [6, 'g']]],
+    ['Amara Osei', 3.6, [4, 4, 3, 4, 3, 4], [[4, 's']], 23],
+    ['Sofia Park', 3.0, [3, 3, 3, 3, 3, 3], [[2, 's'], [7, 's']]],
+    ['Tyler Reid', 2.2, [2, 2, 2, 2, 2, 2.3], [[4, 'g']], 23],
+    ['Aiden Singh', 2.1, [2, 2, 2, 2, 2, 2], [[3, 's'], [5, 's']]],
+    ['Olivia Tran', 2.8, [3, 3, 2, 3, 3, 3], [[1, 's'], [7, 's']]],
+    ['Darius Taylor', 2.6, [3, 3, 2, 3, 3, 2], [[3, 's'], [7, 'g']]],
+    ['Raj Verma', 1.9, [2, 2, 1, 2, 2, 2], [[1, 'g'], [5, 'g']]],
+    ['Maya Wilson', 3.0, [3, 3, 3, 3, 3, 3], [[1, 's'], [5, 's']]],
+    ['Mei Wong', 3.2, [3, 3, 3, 3, 3, 4], [[4, 's'], [7, 's']]],
+    ['Liv Zhang', 3.0, [3, 3, 3, 3, 3, 3], [[5, 's']]],
+  ].map(function (r, i) {
+    var parts = r[0].split(' ');
+    var types = r[3].map(function (o) { return o[1]; });
+    var last = Math.max.apply(null, r[3].map(function (o) { return o[0]; }));
+    return {
+      i: i, name: r[0], short: parts[0] + ' ' + parts[1][0] + '.',
+      init: parts[0][0] + parts[1][0], color: COLORS[i % COLORS.length],
+      ov: r[1], lvl: r[1] >= 3.5 ? 4 : r[1] >= 2.5 ? 3 : r[1] >= 1.5 ? 2 : 1,
+      comp: r[2], obs: r[3], overdue: r[4] || 0,
+      noStr: types.indexOf('s') < 0,
+      ago: r[4] || (7 - last) * 7 + 6,
+    };
+  });
+  S.forEach(function (s) {
+    s.below = [];
+    s.comp.forEach(function (v, k) { if (v < 3) s.below.push(k); });
+  });
+  var lvOf = function (v) { return v >= 3.5 ? 4 : v >= 2.5 ? 3 : v >= 1.5 ? 2 : 1; };
+  var fmt = function (v) { return v.toFixed(1); }; // stands in for formatLevel()
+  var BADGE = ['', 'EMG', 'DEV', 'PRF', 'EXT'];
+
+  // Sidebar roster
+  document.getElementById('roster').innerHTML = S.slice(0, 18).map(function (s) {
+    return '<div class="rrow"><span class="av" style="background:' + s.color + '">' + s.init + '</span>' +
+      '<span class="rname nm">' + s.name + '</span><span class="rbadge l' + s.lvl + '">' + BADGE[s.lvl] + '</span></div>';
+  }).join('');
+
+  function gb(v) {
+    var l = lvOf(v);
+    return '<span class="gb l' + l + '"><span class="num">' + fmt(v) + '</span>' + LV[l] + '</span>';
+  }
+  function gbShort(v) {
+    var l = lvOf(v);
+    return '<span class="gb l' + l + '" title="' + LV[l] + '"><span aria-hidden="true">' + GL[l] + '</span><span class="num">' + fmt(v) + '</span></span>';
+  }
+  function mixbar(m) {
+    return '<div class="mixbar">' + m.map(function (n, k) {
+      return n ? '<i style="flex:' + n + ';background:var(--score-' + (k + 1) + ')" title="' + n + ' ' + LV[k + 1] + '"></i>' : '';
+    }).join('') + '</div>';
+  }
+
+  // Curricular Competencies
+  var compSel = null;
+  function renderComps() {
+    document.getElementById('comps').innerHTML = COMPS.map(function (c, k) {
+      var below = c.mix[0] + c.mix[1];
+      return '<div class="comp' + (compSel === k ? ' sel' : '') + '"><a class="comp-n" title="' + c.n + '">' + c.s + '</a>' +
+        mixbar(c.mix) + '<span class="comp-avg">' + c.avg + '</span>' +
+        '<button class="below" data-k="' + k + '"><span class="num">' + below + '</span> Below</button></div>';
+    }).join('') +
+      '<div class="card-f"><span>37 assessments · 6 of 6 competencies assessed</span><span>Next Steps: none</span></div>';
+  }
+  document.getElementById('comps').addEventListener('click', function (e) {
+    var b = e.target.closest('.below');
+    if (!b) return;
+    var k = +b.dataset.k;
+    compSel = compSel === k ? null : k;
+    if (compSel !== null) { naFilter = 'below'; setSeg('na-seg', 'below'); }
+    renderComps(); renderNA();
+  });
+
+  // Core competencies
+  var CORE = [['Communicating', '#1565c0', 4], ['Collaborating', '#2e7d32', 3], ['Creative Thinking', '#ef6c00', 2],
+    ['Critical and Reflective Thinking', '#6a1b9a', 5], ['Personal Awareness and Responsibility', '#00838f', 0],
+    ['Positive Personal and Cultural Identity', '#ad1457', 0], ['Social Awareness and Responsibility', '#4e342e', 1]];
+  document.getElementById('core').innerHTML = CORE.map(function (c) {
+    return '<div class="cc-row' + (c[2] ? '' : ' off') + '" title="' + c[0] + '"><span class="dot" style="background:' + c[1] + '"></span>' +
+      '<span class="nm2">' + c[0] + '</span><span class="num">' + (c[2] || '—') + '</span></div>';
+  }).join('');
+
+  // Needs Attention
+  var naFilter = 'all';
+  function reasons(s) {
+    var f = [];
+    var lvTxt = function (k) {
+      var v = s.comp[k], l = lvOf(v);
+      return '<span class="gl" style="color:var(--score-' + l + ')">' + GL[l] + '</span>' + COMPS[k].s + ' <b>' + fmt(v) + '</b>';
+    };
+    if (compSel !== null) f.push(lvTxt(compSel));
+    else if (s.below.length === 1) f.push(lvTxt(s.below[0]));
+    else if (s.below.length) {
+      var low = s.below.reduce(function (a, k) { return s.comp[k] < s.comp[a] ? k : a; }, s.below[0]);
+      f.push('Below Proficient on <b>' + s.below.length + '</b> of 6');
+      f.push('Lowest ' + lvTxt(low));
+    }
+    if (s.overdue) f.push('<span class="late">Not observed in <b>' + s.overdue + '</b> days</span>');
+    if (s.noStr) f.push('<span class="diamond">◇</span> No strength recorded');
+    return f.map(function (x) { return '<span class="f">' + x + '</span>'; }).join('<span class="sep">·</span> ');
+  }
+  function score(s) { return s.below.length * 2 + (s.overdue ? 3 : 0) + (s.noStr ? 2 : 0) + (3 - s.ov); }
+  function renderNA() {
+    var list = S.filter(function (s) {
+      if (compSel !== null) return s.comp[compSel] < 3;
+      if (naFilter === 'below') return s.below.length > 0;
+      if (naFilter === 'notobs') return s.overdue > 0;
+      if (naFilter === 'nostr') return s.noStr;
+      if (naFilter === 'missing') return false;
+      return s.below.length || s.overdue || s.noStr;
+    }).sort(function (a, b) {
+      if (compSel !== null) return a.comp[compSel] - b.comp[compSel] || a.name.localeCompare(b.name);
+      return score(b) - score(a);
+    });
+    var chip = document.getElementById('compchip');
+    chip.classList.toggle('show', compSel !== null);
+    if (compSel !== null) chip.firstChild.nodeValue = COMPS[compSel].s + ' ';
+    document.getElementById('na-count').textContent = list.length + ' student' + (list.length === 1 ? '' : 's');
+    document.getElementById('na-list').innerHTML = list.length ? list.map(function (s, n) {
+      return '<div class="na-row"><span class="na-rank">' + (n + 1) + '</span>' +
+        '<a class="na-name nm">' + s.name + '</a>' + gb(s.ov) +
+        '<div class="facts">' + reasons(s) + '</div>' +
+        '<div class="na-act"><button class="mini">+ Observation</button><button class="mini">Gradebook →</button></div></div>';
+    }).join('') : '<div class="na-empty">Nothing is missing or late.</div>';
+  }
+  document.getElementById('compchip').addEventListener('click', function () { compSel = null; renderComps(); renderNA(); });
+
+  function setSeg(id, v) {
+    document.querySelectorAll('#' + id + ' button').forEach(function (b) {
+      b.classList.toggle('on', (b.dataset.f || b.dataset.v) === v);
+    });
+  }
+  document.getElementById('na-seg').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    naFilter = b.dataset.f; compSel = null; setSeg('na-seg', naFilter); renderComps(); renderNA();
+  });
+
+  // Observations
+  var obView = 'week', obFlag = null;
+  function obKey() {
+    var k = document.getElementById('ob-key');
+    if (obView === 'week') {
+      k.innerHTML = '<span>Each square is a week; each mark is one observation.</span>' +
+        '<span><i class="mk t-s"></i>Strength</span><span><i class="mk t-g"></i>Growth</span><span><i class="mk t-c"></i>Concern</span>' +
+        '<span><i class="mk t-n"></i>Note</span><span><i class="mk t-x"></i>No Type</span><span><span class="diamond">◇</span>No Strength Recorded</span>';
+    } else {
+      k.innerHTML = '<span>Each cell is the student’s proficiency on that competency, all time.</span>' +
+        [1, 2, 3, 4].map(function (l) { return '<span><i class="sw l' + l + '" style="border:1px solid var(--score-' + l + ')"></i>' + LV[l] + '</span>'; }).join('');
+    }
+  }
+  function renderObs() {
+    obKey();
+    var cols = obView === 'week' ? 3 : 2;
+    var per = Math.ceil(S.length / cols);
+    var wrap = document.getElementById('ob-blocks');
+    wrap.className = 'ob-blocks' + (obView === 'comp' ? ' comp-view' : '');
+    var h = '';
+    for (var c = 0; c < cols; c++) {
+      h += '<div>';
+      if (obView === 'week') {
+        h += '<div class="ob-row head"><span></span><span></span><span></span><span class="ob-tot">Total</span>' +
+          WEEKS.map(function (w) { return '<span class="wk"><small>' + w[0] + '</small>' + w[1] + '</span>'; }).join('') + '<span></span></div>';
+      } else {
+        h += '<div class="ob-row head"><span></span><span></span><span></span>' +
+          COMPS.map(function (cp) { return '<span class="cv-h" title="' + cp.n + '">' + cp.s + '</span>'; }).join('') + '<span></span></div>';
+      }
+      S.slice(c * per, (c + 1) * per).forEach(function (s) {
+        var hl = obFlag === 'notobs' ? s.overdue : obFlag === 'nostr' ? s.noStr : false;
+        h += '<div class="ob-row' + (hl ? ' hl' : '') + '"><button class="ob-add" title="Add an observation">+</button>' +
+          '<span class="diamond">' + (s.noStr ? '◇' : '') + '</span>' +
+          '<a class="ob-name nm' + (s.overdue && obView === 'week' ? ' overdue' : '') + '">' + s.short + '</a>';
+        if (obView === 'week') {
+          h += '<span class="ob-tot">' + s.obs.length + '</span>';
+          for (var w = 0; w < 8; w++) {
+            var marks = s.obs.filter(function (o) { return o[0] === w; });
+            h += '<span class="cell' + (marks.length ? ' has' : '') + '">' +
+              marks.map(function (o) { return '<i class="mk t-' + o[1] + '"></i>'; }).join('') + '</span>';
+          }
+          h += '<span class="days">' + (s.overdue ? s.overdue + 'd' : '') + '</span>';
+        } else {
+          s.comp.forEach(function (v) {
+            var l = lvOf(v);
+            h += '<span class="lv l' + l + '">' + fmt(v) + '</span>';
+          });
+          h += '<span></span>';
+        }
+        h += '</div>';
+      });
+      h += '</div>';
+    }
+    wrap.innerHTML = h;
+    wrap.parentNode.classList.toggle('dim', !!obFlag);
+    document.getElementById('ob-window').textContent = obView === 'week' ? 'Last 8 Weeks' : 'All Time';
+  }
+  document.getElementById('ob-seg').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    obView = b.dataset.v; setSeg('ob-seg', obView); renderObs();
+  });
+  document.querySelectorAll('[data-flag]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      obFlag = obFlag === b.dataset.flag ? null : b.dataset.flag;
+      document.querySelectorAll('[data-flag]').forEach(function (x) { x.classList.toggle('on', x.dataset.flag === obFlag); });
+      renderObs();
+    });
+  });
+  document.getElementById('hide-names').addEventListener('click', function () {
+    var on = this.getAttribute('aria-pressed') !== 'true';
+    this.setAttribute('aria-pressed', on);
+    document.getElementById('frame').classList.toggle('names-hidden', on);
+  });
+
+  // Students
+  var stView = 'cards';
+  function renderStudents() {
+    var el = document.getElementById('students');
+    if (stView === 'cards') {
+      el.className = 'st-cards';
+      el.innerHTML = S.map(function (s) {
+        return '<div class="sc"><div class="sc-top"><span class="av" style="background:' + s.color + '">' + s.init + '</span>' +
+          '<a class="sc-name nm">' + s.name + '</a>' + gbShort(s.ov) + '</div>' +
+          '<div class="sc-strip">' + s.comp.map(function (v, k) {
+            return '<i style="background:var(--score-' + lvOf(v) + ')" title="' + COMPS[k].s + ': ' + fmt(v) + ' ' + LV[lvOf(v)] + '"></i>';
+          }).join('') + '</div>' +
+          '<div class="sc-foot"><span' + (s.overdue ? ' class="late"' : '') + '>Observed ' + s.ago + ' days ago</span><span>' + s.obs.length + (s.obs.length === 1 ? ' observation' : ' observations') + '</span></div></div>';
+      }).join('');
+    } else {
+      el.className = 'st-grid';
+      var avg = COMPS.map(function (c) { return c.avg; });
+      el.innerHTML = '<table class="sg"><thead><tr><th>Student</th><th>Overall</th>' +
+        COMPS.map(function (c) { return '<th title="' + c.n + '">' + c.s + '</th>'; }).join('') + '<th>Last Observed</th></tr></thead><tbody>' +
+        S.map(function (s) {
+          return '<tr><td><a class="nm" style="color:var(--text);font-weight:500">' + s.name + '</a></td><td>' + gb(s.ov) + '</td>' +
+            s.comp.map(function (v) { var l = lvOf(v); return '<td><span class="lv l' + l + '">' + GL[l] + ' ' + fmt(v) + '</span></td>'; }).join('') +
+            '<td class="num" style="font-size:13px;color:' + (s.overdue ? '#a35a00' : 'var(--text-2)') + '">' + s.ago + 'd</td></tr>';
+        }).join('') +
+        '</tbody><tfoot><tr><td style="font-family:var(--font-base)">Class Avg</td><td>2.9</td>' + avg.map(function (a) { return '<td>' + a + '</td>'; }).join('') + '<td></td></tr></tfoot></table>';
+    }
+  }
+  document.getElementById('st-seg').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    stView = b.dataset.v; setSeg('st-seg', stView); renderStudents();
+  });
+
+  renderComps(); renderNA(); renderObs(); renderStudents();
+})();
+</script>
+</body>
+</html>
