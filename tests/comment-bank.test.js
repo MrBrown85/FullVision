@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 732 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(732);
+  it('has 729 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(729);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(732);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(729);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -558,18 +558,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
 
   // The habits part: Completes Work from the record is the one strong
   // habit, so the four Strong Habits frames (hs11, hs13-hs15) fit.
-  it('knows the Demo class is Science from its name, and offers Cece 56 sentences (4, 16, 11, 25)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 55 sentences (4, 15, 11, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([4, 16, 11, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(56);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([4, 15, 11, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(55);
   });
 
-  it('offers Jasper 56 (4, 16, 11, 25), by the name he goes by', () => {
+  it('offers Jasper 55 (4, 15, 11, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([4, 16, 11, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(56);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([4, 15, 11, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(55);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
