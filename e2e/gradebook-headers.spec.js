@@ -70,7 +70,7 @@ test.describe('Gradebook column headers', () => {
     await expect(tip).toHaveText(LONG_TITLE);
   });
 
-  test('Newest first puts the latest assessment first and is remembered after reload', async ({ page }) => {
+  test('Newest First is on at first, turns off, and is remembered after reload', async ({ page }) => {
     await openGradebook(page);
     const firstDate = () =>
       page.evaluate(() => {
@@ -84,18 +84,24 @@ test.describe('Gradebook column headers', () => {
         .sort(),
     );
     const toggle = page.getByRole('button', { name: 'Newest First' });
-    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    expect(await firstDate()).toBe(dates[0]);
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(await firstDate()).toBe(dates[dates.length - 1]);
 
     await toggle.click();
-    await expect(page.getByRole('button', { name: 'Newest First' })).toHaveAttribute('aria-pressed', 'true');
-    expect(await firstDate()).toBe(dates[dates.length - 1]);
+    await expect(page.getByRole('button', { name: 'Newest First' })).toHaveAttribute('aria-pressed', 'false');
+    expect(await firstDate()).toBe(dates[0]);
 
-    // The gradebook always opens on Scores (#305); Newest first is what is remembered.
+    // The gradebook always opens on Scores (#305), which follows the same switch.
     await page.reload();
+    await expect(page.getByRole('button', { name: 'Newest First' })).toHaveAttribute('aria-pressed', 'false');
+    const firstScoresDate = await page.evaluate(() => {
+      const id = document.querySelector('.gb-grid-colhead').dataset.aid;
+      return getAssessments('sci8').find(x => x.id === id).date;
+    });
+    expect(firstScoresDate).toBe(dates[0]);
     await page.locator('[data-action="setView"][data-mode="detailed"]').click();
     await expect(page.locator('.gb-grid-assess-group').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Newest First' })).toHaveAttribute('aria-pressed', 'true');
-    expect(await firstDate()).toBe(dates[dates.length - 1]);
+    await expect(page.getByRole('button', { name: 'Newest First' })).toHaveAttribute('aria-pressed', 'false');
+    expect(await firstDate()).toBe(dates[0]);
   });
 });
