@@ -98,7 +98,7 @@ test.describe('Scoring an Advanced Rubric', () => {
     await panel.getByLabel('Goggles on').check();
     await expect(safety.locator('.rsg-level.active')).toHaveCount(0);
     await panel.getByLabel('Cleans the station').check();
-    await expect(safety.locator('.rsg-level.active')).toHaveText('Proficient');
+    await expect(safety.locator('.rsg-level.active .rsg-level-name')).toHaveText('Proficient');
     await expect(row(page, 'stu-001', 'crit-safe').locator('.rsg-checklist-head')).toHaveText('Suggested: Proficient');
     await expect(panel.locator('.rsg-checklist-col.is-chosen')).toHaveAttribute('data-level', '3');
     await expect(safety.locator('.rsg-checks-btn')).toHaveText('2/4');
@@ -115,7 +115,7 @@ test.describe('Scoring an Advanced Rubric', () => {
     const panel = page.locator('.rsg-checklist[data-sid="stu-001"][data-critid="crit-safe"]');
     await panel.getByLabel('Goggles on').check();
     await panel.getByLabel('Cleans the station').check();
-    await expect(safety.locator('.rsg-level.active')).toHaveText('Developing');
+    await expect(safety.locator('.rsg-level.active .rsg-level-name')).toHaveText('Developing');
     await expect(row(page, 'stu-001', 'crit-safe').locator('.rsg-checklist-hint')).toContainText(
       'You picked Developing',
     );

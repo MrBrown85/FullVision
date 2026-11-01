@@ -61,6 +61,9 @@ const DESKTOP = [
       // A chosen + or − shows the pressed state.
       await row.locator('.rsg-mod:not(:disabled)').first().click();
       await expect(row.locator('.rsg-mod.active')).toHaveCount(1);
+      // − | + sit inside the level: move off it so the hover's descriptor
+      // bar isn't part of this page's check.
+      await page.mouse.move(0, 0);
     },
   },
   { name: 'gradebook', hash: '/gradebook', ready: '.gb-grid' },

@@ -47,15 +47,24 @@ test('the whole-class rubric grid scores, fine-tunes and sets a status', async (
   const alice = card.locator('.rsg-student[data-status-student="stu-001"]');
   await expect(alice.locator('.rsg-student-name')).toContainText('Alice');
   await expect(alice.locator('.rsg-status .grader-status-btn')).toHaveText(['Late', 'Excused', 'Missing']);
-  await expect(alice.locator('.rsg-comment-btn')).toContainText('Comment');
+  // The overall comment is a field under the criteria, not a button.
+  await expect(alice.locator('.rsg-student-head .comment-btn')).toHaveCount(0);
+  await expect(alice.locator('.rsg-overall-comment')).toHaveAttribute(
+    'placeholder',
+    'Add an overall comment for Alice',
+  );
 
+  // − | + sit inside the chosen level; the comment button ends the row.
   const hyp = alice.locator('.rsg-criterion-row[data-criterion="crit-hyp"]');
-  await expect(hyp.locator('.rsg-criterion-side .rsg-mods .rsg-mod')).toHaveCount(2);
-  await expect(hyp.locator('.rsg-criterion-side .rsg-crit-comment')).toBeVisible();
+  await expect(hyp.locator('.rsg-mod')).toHaveCount(0);
+  await expect(hyp.locator('.rsg-criterion-main .rsg-crit-comment')).toHaveText('Comment');
   await hyp.locator('.rsg-level.l3').click();
-  await expect(hyp.locator('.rsg-level.active')).toHaveText('Proficient');
+  await expect(hyp.locator('.rsg-level.active .rsg-level-name')).toHaveText('Proficient');
+  await expect(hyp.locator('.rsg-level.active .rsg-mod')).toHaveCount(2);
   await hyp.locator('.rsg-mod[data-mod="1"]').click();
   await expect(hyp.locator('.rsg-mod.active')).toHaveCount(1);
+  await expect(hyp.locator('.rsg-level.active .rsg-level-name')).toHaveText('Proficient +');
+  await expect(hyp.locator('.rsg-level.l3')).toHaveClass(/active/);
 
   // Scored work can't be Missing or Excused; Late still applies.
   await expect(alice.locator('.grader-status-btn[data-status="EXC"]')).toBeDisabled();

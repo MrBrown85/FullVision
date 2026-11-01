@@ -63,7 +63,7 @@ test('the Competencies view scores a competency through its criteria', async ({ 
 
   const qap = alice.locator('.rsg-criterion-row[data-tag="QAP"]');
   await qap.locator('.rsg-level.l3').click();
-  await expect(qap.locator('.rsg-level.active')).toHaveText('Proficient');
+  await expect(qap.locator('.rsg-level.active .rsg-level-name')).toHaveText('Proficient');
   expect(await aliceScores(page)).toEqual({ 'crit-q1': 3, 'crit-q2': 3 });
 
   // Criteria that disagree show the lowest, striped, with no + | −.
@@ -71,7 +71,7 @@ test('the Competencies view scores a competency through its criteria', async ({ 
   await alice.locator('.rsg-criterion-row[data-criterion="crit-q2"] .rsg-level.l2').click();
   await view.filter({ hasText: 'Competencies' }).click();
   await expect(qap.locator('.rsg-level.active.mixed')).toHaveText('Developing');
-  await expect(qap.locator('.rsg-mod:disabled')).toHaveCount(2);
+  await expect(qap.locator('.rsg-mod')).toHaveCount(0);
 
   // Clicking the mixed level sets every criterion to it.
   await qap.locator('.rsg-level.l2').click();
@@ -80,7 +80,9 @@ test('the Competencies view scores a competency through its criteria', async ({ 
 
   // A criterion that feeds two competencies shows on both rows at once.
   await alice.locator('.rsg-criterion-row[data-tag="PI"] .rsg-level.l4').click();
-  await expect(alice.locator('.rsg-criterion-row[data-tag="IP"] .rsg-level.active')).toHaveText('Extending');
+  await expect(alice.locator('.rsg-criterion-row[data-tag="IP"] .rsg-level.active .rsg-level-name')).toHaveText(
+    'Extending',
+  );
 
   // A criterion with no competency is scored on its own.
   await alice.locator('.rsg-criterion-row[data-tag="crit-neat"] .rsg-level.l4').click();

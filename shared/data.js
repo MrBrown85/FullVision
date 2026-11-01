@@ -3324,6 +3324,17 @@ function _rubricCriterionById(cid, assessment, criterionId) {
   );
 }
 
+/* The key an unscored entry carrying only the overall comment (or Note for
+   the Report) sits under. Rubric work keys entries by criterion, and an
+   entry under a competency there is moved onto its criteria
+   (_migrateRubricScoreKeys), so it takes the first criterion. */
+function _noteOnlyScoreKey(cid, assessment) {
+  var rubric = _rubricForAssessment(cid, assessment);
+  var first = rubric && (rubric.criteria || [])[0];
+  if (first && first.id) return first.id;
+  return scoreTagIds(assessment)[0] || '';
+}
+
 // A server rubric_score row is kept under its criterion's own id.
 function _rubricCriterionTagIds(cid, assessment, criterionId) {
   return [criterionId];
@@ -3431,12 +3442,14 @@ async function _hydrateAssessmentDetails(cid) {
           });
         });
         // Rubric work's level lives in its rubric_scores, never under a tag.
+        // A comment saved before any level (value null) keeps its entry too.
         if (
           cell.score &&
-          cell.score.value != null &&
+          (cell.score.value != null ||
+            (comment && !isPointsScored(merged) && tagScores.length === 0 && rubricScores.length === 0)) &&
           ((tagScores.length === 0 && rubricScores.length === 0) || isPointsScored(merged))
         ) {
-          var fallbackTag = scoreTagIds(merged)[0];
+          var fallbackTag = cell.score.value == null ? _noteOnlyScoreKey(cid, merged) : scoreTagIds(merged)[0];
           _pushHydratedScore(
             scores,
             sid,
@@ -3684,14 +3697,18 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
         scores[sid].some(function (entry) {
           return entry.assessmentId === aid;
         });
-      if (cell.score && cell.score.value != null && !hasAssessmentEntry) {
+      // A comment or Note for the Report saved before any level is a score
+      // row with no value: it still needs an entry to carry it. Not on
+      // points or Complete/Incomplete work, where an entry's 0 is a score.
+      var noteOnly = (comment || reportNote) && !isPointsScored(assessment);
+      if (cell.score && (cell.score.value != null || noteOnly) && !hasAssessmentEntry) {
         _pushHydratedScore(
           scores,
           sid,
           _scoreEntryFromCanonical(
             cid,
             assessment,
-            scoreTagIds(assessment)[0],
+            cell.score.value == null ? _noteOnlyScoreKey(cid, assessment) : scoreTagIds(assessment)[0],
             cell.score.value,
             comment,
             isPointsScored(assessment) ? 0 : cell.score.modifier,
@@ -4910,7 +4927,9 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
     if (nextMod) existing.mod = nextMod;
     else delete existing.mod;
     if (date) existing.date = date;
-    if (note !== undefined) existing.note = note;
+    // Callers pass '' for "no comment given"; picking a level keeps the
+    // overall comment (saveScoreComment is how it changes or clears).
+    if (note) existing.note = note;
   } else {
     var entry = {
       id: sid + ':' + aid + ':' + tid,
@@ -5255,15 +5274,37 @@ function getScoreComment(cid, sid, aid) {
   return entry ? String(entry.note) : '';
 }
 
-/* Change (or clear, with '') an overall comment the work already has a
-   score entry for. With no entry there is nothing to write it on. */
+/* Change (or clear, with '') an overall comment. Proficiency work with no
+   level yet gets an unscored entry to carry it, under the key the loader
+   gives a score row with no levels (_noteOnlyScoreKey); the server's save_score_comment makes
+   the score row (value null) when there is none. Points and
+   Complete/Incomplete work still need a score first: there an entry's 0
+   is a score. */
 function saveScoreComment(cid, sid, aid, text) {
   var note = (text == null ? '' : String(text)).trim();
   var scores = getScores(cid);
   var entries = (scores[sid] || []).filter(function (e) {
     return e && e.assessmentId === aid;
   });
-  if (!entries.length) return false;
+  if (!entries.length) {
+    if (!note) return true;
+    var assessment = _assessmentById(cid, aid);
+    if (!assessment || isPointsScored(assessment)) return false;
+    var key = _noteOnlyScoreKey(cid, assessment);
+    var entry = {
+      id: sid + ':' + aid + ':' + key,
+      assessmentId: aid,
+      tagId: key,
+      score: 0,
+      date: assessment.date || courseToday(cid),
+      type: assessment.type || 'summative',
+      note: '',
+      created: new Date().toISOString(),
+    };
+    if (!scores[sid]) scores[sid] = [];
+    scores[sid].push(entry);
+    entries = [entry];
+  }
   if (getScoreComment(cid, sid, aid) === note) return true;
   entries.forEach(function (e) {
     e.note = note;
