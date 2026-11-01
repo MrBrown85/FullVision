@@ -50,6 +50,7 @@ window.MCardStack = (function () {
       el.className = 'm-card-stack-item';
       el.setAttribute('data-depth', String(depth));
       el.setAttribute('data-idx', String(idx));
+      // html-safe: the one caller (tab-students.js) passes renderCard = MCardWidgets.assembleCard, checked to escape its text.
       el.innerHTML = _renderCard(_cards[idx], idx);
       return el;
     }
@@ -72,6 +73,7 @@ window.MCardStack = (function () {
       var behindEl = _els[1];
       if (!behindEl) return;
       var behindIdx = dir === 'right' ? _mod(_idx - 1) : _mod(_idx + 1);
+      // html-safe: renderCard is MCardWidgets.assembleCard (see _buildCard).
       behindEl.innerHTML = _renderCard(_cards[behindIdx], behindIdx);
       behindEl.setAttribute('data-idx', String(behindIdx));
     }
@@ -205,6 +207,7 @@ window.MCardStack = (function () {
       if (_els[1]) {
         var nextIdx = _mod(_idx + 1);
         if (_els[1].getAttribute('data-idx') !== String(nextIdx)) {
+          // html-safe: renderCard is MCardWidgets.assembleCard (see _buildCard).
           _els[1].innerHTML = _renderCard(_cards[nextIdx], nextIdx);
           _els[1].setAttribute('data-idx', String(nextIdx));
         }

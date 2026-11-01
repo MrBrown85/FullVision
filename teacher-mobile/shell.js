@@ -503,6 +503,7 @@
     var stack = document.getElementById('m-nav-stack');
     var below = stack.querySelector('.m-screen:last-child');
     var tmp = document.createElement('div');
+    // html-safe: html is MStudents.renderDetail, MGrade.renderSwiper or MSweep.render, each checked to escape its text.
     tmp.innerHTML = html;
     var screen = tmp.firstElementChild;
     screen.classList.remove('m-screen-hidden');
@@ -537,6 +538,7 @@
       html = MGrade.renderPicker(_cid);
     }
 
+    // html-safe: html is MStudents.renderList, MObserve.renderFeed or MGrade.renderPicker, each checked to escape its text.
     stack.innerHTML = html;
     _navStacks[tab].push(tab);
 
@@ -569,6 +571,7 @@
 
     // Insert new screen
     var tmp = document.createElement('div');
+    // html-safe: every caller passes MGrade.renderSwiper, MStudents.renderDetail or MSweep.render, each checked to escape its text.
     tmp.innerHTML = html;
     var newScreen = tmp.firstElementChild;
     if (restore) newScreen.setAttribute('data-restore', JSON.stringify(restore));
