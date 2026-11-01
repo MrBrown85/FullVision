@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
 
 // Points and Complete / Incomplete ledgers: one row per student with the
-// score or mark, Late | Excused | Missing, and a Comment pill.
+// score or mark, Late | Excused | Missing, and the Overall Comment field.
 function assessment(id, title, extra) {
   return Object.assign(
     {
@@ -40,7 +40,10 @@ test('the points ledger takes a score and a status', async ({ page }) => {
   const card = await open(page, [assessment('a-pts', 'Unit Quiz', { scoreMode: 'points', maxPoints: 10 })], 'a-pts');
   const row = card.locator('.ldg-row[data-status-student="stu-001"]');
   await expect(row.locator('.ldg-status .grader-status-btn')).toHaveText(['Late', 'Excused', 'Missing']);
-  await expect(row.locator('.ldg-note')).toContainText('Comment');
+  await expect(row.locator('.ldg-overall .rsg-overall-comment')).toHaveAttribute(
+    'placeholder',
+    'Add an overall comment for Alice',
+  );
 
   const input = row.locator('.ldg-pts-input');
   await input.fill('7');
@@ -58,6 +61,10 @@ test('the Complete / Incomplete ledger marks and clears', async ({ page }) => {
   const complete = row.locator('.cmp-complete');
   await complete.click();
   await expect(row.locator('.cmp-complete')).toHaveClass(/active/);
+  // Typing in the row's Overall Comment is not a c / i answer.
+  await row.locator('.ldg-overall .rsg-overall-comment').pressSequentially('ci');
+  await expect(row.locator('.cmp-complete')).toHaveClass(/active/);
+  await expect(row.locator('.cmp-incomplete')).not.toHaveClass(/active/);
   await expect(card.locator('.ldg-tally')).toContainText('1 Complete');
   await row.locator('.cmp-complete').click();
   await expect(row.locator('.cmp-btn.active')).toHaveCount(0);

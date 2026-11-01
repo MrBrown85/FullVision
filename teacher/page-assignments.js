@@ -523,9 +523,14 @@ window.PageAssignments = (function () {
   function _graderHtml(cid, a, tagObjs, students, scores, oneStudent) {
     var one = oneStudent && students.length === 1 ? students[0] : null;
     if (isDibelsScored(a)) return one ? _dibelsCardHtml(cid, a, one) : _dibelsGridHtml(cid, a, students);
-    if (isCompletionScored(a)) return one ? _completeCardHtml(cid, a, one) : renderCompletionGrid(cid, a, students);
+    if (isCompletionScored(a))
+      return one
+        ? _completeCardHtml(cid, a, one) + _graderOverallCommentHtml(cid, a, one)
+        : renderCompletionGrid(cid, a, students);
     if (a.scoreMode === 'points')
-      return one ? _pointsCardHtml(cid, a, one) : renderPointsGrid(cid, a, students, scores);
+      return one
+        ? _pointsCardHtml(cid, a, one) + _graderOverallCommentHtml(cid, a, one)
+        : renderPointsGrid(cid, a, students, scores);
     if (a.rubricId && getRubricById(cid, a.rubricId)) {
       var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
       var rubric = getRubricById(cid, a.rubricId);
@@ -2877,8 +2882,6 @@ window.PageAssignments = (function () {
     ['EXC', 'Excused', 'active-excused'],
     ['NS', 'Missing', 'active-ns'],
   ];
-  var LEDGER_COMMENT_ICON =
-    '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" stroke-linejoin="round"/></svg>';
 
   // Late | Excused | Missing as one segmented control, like the grader's.
   function ledgerStatusHtml(aid, sid, current) {
@@ -2908,24 +2911,13 @@ window.PageAssignments = (function () {
     );
   }
 
-  function ledgerCommentInner(count) {
-    return LEDGER_COMMENT_ICON + 'Comment' + (count > 0 ? '<span class="ldg-note-count">' + count + '</span>' : '');
-  }
-
-  function ledgerCommentHtml(cid, aid, sid) {
-    var count = _assignmentCommentCount(cid, sid, aid);
+  /* The row's Overall Comment: the grid's field, in the row after the
+     status (rsgOverallComment saves it). */
+  function ledgerOverallCommentHtml(cid, aid, st) {
     return (
-      '<div class="ldg-comment"><button type="button" class="ldg-note' +
-      (count > 0 ? ' has' : '') +
-      '" tabindex="-1" data-action="openCommentPopover" data-cid="' +
-      cid +
-      '" data-sid="' +
-      sid +
-      '" data-aid="' +
-      aid +
-      '" data-stop-prop="true" title="Comments">' +
-      ledgerCommentInner(count) +
-      '</button></div>'
+      '<div class="ldg-overall">' +
+      _overallCommentFieldHtml(cid, aid, st, 'rsg-overall-comment ldg-overall-comment') +
+      '</div>'
     );
   }
 
@@ -3029,7 +3021,7 @@ window.PageAssignments = (function () {
       '<button type="button" class="ldg-action cmp-fill-all" data-action="confirmFillCompletion" data-aid="' +
       a.id +
       '">Set Unmarked to Complete</button></div></div>' +
-      '<div class="ldg-head"><span>Student</span><span>Mark</span><span>Status</span><span class="ldg-head-end">Comment</span></div>';
+      '<div class="ldg-head"><span>Student</span><span>Mark</span><span>Status</span><span>Overall Comment</span></div>';
     students.forEach(function (st) {
       var stStatus = statuses[st.id + ':' + a.id] || null;
       html +=
@@ -3038,7 +3030,7 @@ window.PageAssignments = (function () {
         completionButtonsHtml(a.id, st.id, getCompletionMark(cid, st.id, a.id)) +
         '</div>' +
         ledgerStatusHtml(a.id, st.id, stStatus) +
-        ledgerCommentHtml(cid, a.id, st.id) +
+        ledgerOverallCommentHtml(cid, a.id, st) +
         '</div>';
     });
     html += '</div>';
@@ -3163,7 +3155,7 @@ window.PageAssignments = (function () {
         '</span>' +
         '</div>' +
         ledgerStatusHtml(a.id, st.id, stStatus) +
-        ledgerCommentHtml(cid, a.id, st.id) +
+        ledgerOverallCommentHtml(cid, a.id, st) +
         '</div>';
     });
     html += '<div class="ldg-stats"></div>' + '</div>';
@@ -3889,11 +3881,12 @@ window.PageAssignments = (function () {
      comment on the work; it prints on the rubric handout). One line until
      clicked, three while it holds text; it saves as the teacher types and
      when they leave it, level or not. */
-  function _rsgOverallCommentHtml(cid, aid, st) {
+  function _overallCommentFieldHtml(cid, aid, st, cls) {
     var first = displayNameFirst(st);
     var text = getScoreComment(cid, st.id, aid);
     return (
-      '<div class="rsg-overall"><textarea class="rsg-overall-comment' +
+      '<textarea class="' +
+      cls +
       (text ? ' has-text' : '') +
       '" rows="1" placeholder="Add an overall comment' +
       (first ? ' for ' + esc(first) : '') +
@@ -3905,8 +3898,11 @@ window.PageAssignments = (function () {
       st.id +
       '">' +
       esc(text) +
-      '</textarea></div>'
+      '</textarea>'
     );
+  }
+  function _rsgOverallCommentHtml(cid, aid, st) {
+    return '<div class="rsg-overall">' + _overallCommentFieldHtml(cid, aid, st, 'rsg-overall-comment') + '</div>';
   }
   /* The one-student views' Overall Comment: a row under the tiles, cards
      or single-point rows, the same field and saving as the grid's. */
@@ -5746,11 +5742,6 @@ window.PageAssignments = (function () {
       if (btn.dataset.sid === sid && btn.dataset.aid === aid)
         btn.innerHTML = count > 0 ? 'Comment <span class="comment-count">' + count + '</span>' : 'Comment';
     });
-    document.querySelectorAll('.ldg-note').forEach(function (btn) {
-      if (btn.dataset.sid !== sid || btn.dataset.aid !== aid) return;
-      btn.innerHTML = ledgerCommentInner(count);
-      btn.classList.toggle('has', count > 0);
-    });
   }
 
   /* ── Criterion comment ──────────────────────────────────── */
@@ -6845,7 +6836,8 @@ window.PageAssignments = (function () {
       return;
     }
     var ldgRow = document.activeElement.closest && document.activeElement.closest('.ldg-row.ldg-cmp');
-    if (ldgRow && handleLedgerKey(e, ldgRow)) return;
+    // Typing in the row's Overall Comment is not a c / i answer.
+    if (ldgRow && document.activeElement.tagName !== 'TEXTAREA' && handleLedgerKey(e, ldgRow)) return;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
       // Criterion comment: Enter saves, Cmd/Ctrl+Enter saves and moves on,
       // Shift+Enter is a new line.
