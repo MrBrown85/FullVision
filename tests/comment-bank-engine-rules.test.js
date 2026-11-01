@@ -211,9 +211,12 @@ describe('the draft is the plan’s eight parts only', () => {
       'support',
       'closer',
     ]);
-    expect(d.text).toMatch(
-      /^Tomas is earning a B this term, which is very good work\. His best piece was “What Does the Poster Show\?”, where he linked the poster to the Act\./,
-    );
+    // The grade sentence, then the best piece with its note (in one of the
+    // best-piece frames, bank expansion Nov 1).
+    expect(d.text).toMatch(/^Tomas is earning a B this term, which is very good work\. /);
+    expect(d.sentences[1].step).toBe('example');
+    expect(d.sentences[1].text).toContain('“What Does the Poster Show?”');
+    expect(d.sentences[1].text).toContain('linked the poster to the Act.');
     expect(d.text).toContain('completing work on time and taking part in class.');
     expect(d.text).not.toContain('missed three classes');
     // One of the two-title Not Handed In frames (m01, m07-m11), both titles
@@ -356,8 +359,8 @@ describe('six to nine sentences', () => {
     expect(d.short).toBe(true);
     expect(d.sentences.length).toBeLessThan(6);
     expect(stepsOf(d)).toEqual(['grade', 'example', 'home']);
-    expect(d.text).toBe(
-      'Ines is Proficient on the BC proficiency scale this term. Their best piece was “Energy Lab.” At home, you can ask them to explain how one thing in the kitchen works.',
+    expect(d.text).toMatch(
+      /^Ines is Proficient on the BC proficiency scale this term\. [^.]*“Energy Lab\.” At home, you can ask them to explain how one thing in the kitchen works\.$/,
     );
     // Nothing was added to reach six: no habits sentence with no habit
     // rated, no strengths below the gate, no next step on two pieces.

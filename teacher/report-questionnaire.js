@@ -2132,7 +2132,15 @@ window.ReportQuestionnaire = (function () {
      “{title}”, where {he} {note}."): the only one labelled Best Piece and
      tinted, on the card and in the comment (the LayoutE mockup). */
   function _isBestRow(row) {
-    return !!row && row.step === 'example' && row.id === 'n36';
+    if (!row || row.step !== 'example') return false;
+    // The plan's best-piece sentence (n36) and the frames around the same
+    // title and note (bank expansion, Nov 1): any sentence claiming it.
+    var s =
+      row.s ||
+      COMMENT_BANK.sentences.find(function (x) {
+        return x.id === row.id;
+      });
+    return !!s && (s.claims || []).indexOf('bestPiece') >= 0;
   }
   /* A row's label: its part, or on the IE path Problem, Plan, Deadline and
      Meeting, and Statement for the goals sentence. In the example step

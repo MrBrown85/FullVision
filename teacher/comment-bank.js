@@ -1017,6 +1017,12 @@ window.CommentBank = (function () {
     return t;
   }
 
+  /* The note as the {bestNote} slot: reportNoteText, without a closing ! ?
+     or …, since the frame ends the sentence itself. */
+  function noteSlot(note) {
+    return reportNoteText(note).replace(/[!?…\s]+$/, '');
+  }
+
   /* "{His} best piece was “{title}”, where {he} {note}." With no note:
      "{His} best piece was “{title}.”" A title's own ? or ! stays inside the
      quotes; the period ends inside the closing quote, any comma after it.
@@ -2007,7 +2013,20 @@ window.CommentBank = (function () {
     var lines = f.classLines || {};
     var gr = gradeOf(f);
     var gslots = gradeSlots(gr);
+    // The story's facts (angleFacts) as slots a sentence can need without
+    // printing them (bank expansion, Nov 1): the marks climbed over the
+    // term, strong in one skill and a full proficiency lower in another,
+    // strong submitted work behind work labelled Missing, and joined the
+    // class late. Each is 'yes' or '', so the sentences bound to a story
+    // are offered only while it holds, and verify() re-reads them.
+    var af = angleFacts(f, picks);
+    var hiddenNow = af.missing >= 2 && af.missing * 5 >= af.total && af.strongWork;
     var factsOf = {
+      climb: ['grade.pieces'],
+      split: keys('comp', f.comps),
+      hidden: ['notHandedIn', 'work'],
+      newcomer: ['enrolled'],
+      bestNote: keys('work', [top]),
       gradeLetter: ['grade.letter'],
       gradeStanding: ['grade.letter'],
       gradeNext: ['grade.pct', 'grade.pieces'],
@@ -2171,6 +2190,13 @@ window.CommentBank = (function () {
       fellCount: fell.length > 1 ? NUM[fell.length] || String(fell.length) : '',
       assignment: top ? top.title : '',
       level: top ? workMark(f, top) : '',
+      // The teacher's Note for the Report on the best piece, as a slot
+      // after "where {he}": the best-piece frames with a note need it.
+      bestNote: top ? noteSlot(top.note) : '',
+      climb: af.climb ? 'yes' : '',
+      split: af.split ? 'yes' : '',
+      hidden: hiddenNow ? 'yes' : '',
+      newcomer: af.joinedLate ? 'yes' : '',
       // The whole best-piece sentence, with the teacher's note when there is one.
       bestPiece: top
         ? bestPieceSentence({ title: top.title, note: top.note, name: f.name, pronouns: p, onFile: f.pronounsOnFile })
@@ -2281,10 +2307,19 @@ window.CommentBank = (function () {
   function fits(s, ctx) {
     return _fitsSlots(s, ctx) && passesGates(s, ctx);
   }
-  function _fitsSlots(s, ctx) {
+  /* opts.story === false: the story slots (STORY_SLOTS) are not required.
+     verify() reads a sentence that way: a story is a condition for
+     offering it, and what the sentence asserts about the story is a claim
+     (improved, split, newcomer), so an approved sentence is not flagged
+     when the story changes but its words still hold. */
+  function _fitsSlots(s, ctx, opts) {
     if (!forFamily(s, ctx._family || '')) return false;
     var needs = s.needs || [];
-    for (var i = 0; i < needs.length; i++) if (!ctx[needs[i]]) return false;
+    var story = !(opts && opts.story === false);
+    for (var i = 0; i < needs.length; i++) {
+      if (!story && STORY_SLOTS.indexOf(needs[i]) >= 0) continue;
+      if (!ctx[needs[i]]) return false;
+    }
     if (!_fitsMine(s, ctx)) return false;
     var when = s.when || {};
     return Object.keys(when).every(function (k) {
@@ -3017,11 +3052,21 @@ window.CommentBank = (function () {
 
   /* How specific a sentence is for this student: the `when` conditions it
      meets (fits() needs every one met), plus one for the sentence that
-     carries the teacher's Note for the Report on the best piece. Each step
-     keeps only the sentences at its top score. */
+     carries the teacher's Note for the Report on the best piece, and one
+     for each story slot it needs that holds (climb, split, hidden,
+     newcomer), so a sentence written for the student's story comes before
+     a general one. Each step keeps only the sentences at its top score. */
+  var STORY_SLOTS = ['climb', 'split', 'hidden', 'newcomer'];
+  // The stories whose sentences come first: not split, which most classes
+  // hold for many students, so its frames mix with the steady ones.
+  var STORY_LEADS = ['climb', 'hidden', 'newcomer'];
   function specificity(s, ctx) {
+    var needs = s.needs || [];
     var n = Object.keys(s.when || {}).length;
-    if (ctx._bestNote && (s.needs || []).indexOf('bestPiece') >= 0) n++;
+    if (ctx._bestNote && (needs.indexOf('bestPiece') >= 0 || needs.indexOf('bestNote') >= 0)) n++;
+    STORY_LEADS.forEach(function (k) {
+      if (needs.indexOf(k) >= 0 && ctx[k]) n++;
+    });
     return n;
   }
 
@@ -3031,6 +3076,20 @@ window.CommentBank = (function () {
   function _stepFits(s, step, ctx) {
     if (s.part !== step.part || !fits(s, ctx)) return false;
     if (step.groups && step.groups.indexOf(s.group) < 0) return false;
+    // A fact the draft states once (SAYS): the grade sentence says the
+    // grade, the Not Handed In sentence the missing work, so a sentence
+    // of another step that claims either cannot fill its step (_compose
+    // leaves it out); the pool a step draws from (stepPool, bankStrength)
+    // says the same.
+    var says = {};
+    if (ctx._grade) says.grade = true;
+    if (ctx.missingWork && ctx._path !== 'ie') says.notHandedIn = true;
+    if (
+      (s.claims || []).some(function (c) {
+        return c !== step.says && SAYS[c] && says[c];
+      })
+    )
+      return false;
     if (step.prefer && ctx[step.prefer] && (s.needs || []).indexOf(step.prefer) < 0) return false;
     if (
       step.never &&
@@ -3972,13 +4031,29 @@ window.CommentBank = (function () {
     },
     // A competency that rose: past the "improved" gate (improvedComp).
     improved: function (pv, f) {
+      var checks = [];
       var ids = _ids(pv, 'rise', 'comp');
-      return (
-        ids.length > 0 &&
-        ids.every(function (id) {
-          return improvedComp(_byId(f.comps, id));
-        })
-      );
+      if (ids.length)
+        checks.push(
+          ids.every(function (id) {
+            return improvedComp(_byId(f.comps, id));
+          }),
+        );
+      // The marks climbed over the term (the climb story): the scored
+      // pieces' % past the "improved" gate (climbed).
+      if (_has(pv, 'climb')) checks.push(climbed((f.grade && f.grade.pieces) || []));
+      return checks.length > 0 && checks.every(Boolean);
+    },
+    // Joined the class two weeks or more after it began, this term (the
+    // newcomer story, angleFacts).
+    newcomer: function (pv, f) {
+      return _has(pv, 'newcomer') && angleFacts(f, {}).joinedLate;
+    },
+    // Strong in one skill (past the "strongest" gate) and a full
+    // proficiency lower in another on three or more pieces (the split
+    // story, angleFacts).
+    split: function (pv, f) {
+      return _has(pv, 'split') && angleFacts(f, {}).split;
     },
     slipped: function (pv, f) {
       var checks = [];
@@ -4020,6 +4095,11 @@ window.CommentBank = (function () {
         checks.push(!!w && w.title === pv.values[slot] && tenths(w.v) === top);
         if (w && slot === 'assignment' && _has(pv, 'level')) checks.push(pv.values.level === workMark(f, w));
       });
+      // The Note for the Report as a slot: the top piece's note, as written.
+      if (_has(pv, 'bestNote')) {
+        var bn = _byId(f.work, _ids(pv, 'bestNote', 'work')[0]);
+        checks.push(!!bn && tenths(bn.v) === top && !!pv.values.bestNote && pv.values.bestNote === noteSlot(bn.note));
+      }
       if (_has(pv, 'strongWorks'))
         checks.push(
           _atTop(
@@ -4237,9 +4317,9 @@ window.CommentBank = (function () {
     var own = Object.prototype.hasOwnProperty;
     var out = [];
     var stale =
-      !_fitsSlots(s, ctx) ||
+      !_fitsSlots(s, ctx, { story: false }) ||
       Object.keys(pv.values || {}).some(function (k) {
-        if (/^when\./.test(k)) return false;
+        if (/^when\./.test(k) || STORY_SLOTS.indexOf(k) >= 0) return false;
         var now = own.call(ctx, k) && ctx[k] != null ? String(ctx[k]) : '';
         return now !== pv.values[k];
       });

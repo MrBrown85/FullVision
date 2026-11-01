@@ -21,6 +21,24 @@ const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
 const words = t => t.trim().split(/\s+/).length;
 const IE_IDS = ['gr06', 'ie01', 'ie02', 'ie03', 'ie04', 'ie05', 'ie06', 'ie07', 'ie08', 'ie09', 'ie10'];
 const claimsGrade = id => ((byId(id) || {}).claims || []).indexOf('grade') >= 0;
+/* The Required parts of a draft as [group, ieProblem]: the IE grade
+   sentence and the IE Problem, Plan, Deadline and Meeting groups, in the
+   draft's order. Each group has several frames (bank expansion, Nov 1), so
+   a test checks the group and the problem it names, not the id. */
+const IE_GROUPS = ['Grade', 'IE Problem', 'IE Plan', 'IE Deadline', 'IE Meeting'];
+const required = d =>
+  d.ids
+    .map(byId)
+    .filter(s => s && (s.id === 'gr06' || IE_GROUPS.indexOf(s.group) > 0))
+    .map(s => [s.group, (s.when || {}).ieProblem || '']);
+const requiredFor = problem => [
+  ['Grade', ''],
+  ['IE Problem', problem],
+  ['IE Plan', problem],
+  ['IE Deadline', ''],
+  ['IE Meeting', ''],
+];
+const stepText = (d, step) => (d.sentences.find(x => x.step === step) || {}).text || '';
 
 const CID = 'course-ie-goals';
 const TERM = 'term-1';
@@ -189,11 +207,11 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     expect(CommentBank.ieProblemOf(f)).toBe('marks');
     for (let n = 1; n <= 6; n++) {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed: n });
-      const req = d.ids.filter(id => IE_IDS.indexOf(id) >= 0);
-      expect(req, 'seed ' + n).toEqual(['gr06', 'ie02', 'ie05', 'ie07', 'ie08']);
+      expect(required(d), 'seed ' + n).toEqual(requiredFor('marks'));
       expect(d.ids[0]).toBe('gr06');
       expect(d.ids.slice(1).filter(claimsGrade)).toEqual([]);
-      expect(d.text).toContain('She has a mark on three of the eight assignments marked so far this term.');
+      // The problem states both counts, in whichever of its frames.
+      expect(stepText(d, 'ieProblem'), 'seed ' + n).toMatch(/\bthree\b.*\beight\b|\beight\b.*\bthree\b/);
       expect(d.text).toContain('The deadline to replace this IE with a grade is [date].');
       expect(d.text).not.toMatch(/earning a/);
       expect(d.replaced).toEqual([]);
@@ -206,14 +224,9 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     const f = factsNow();
     expect(CommentBank.ieProblemOf(f)).toBe('noMarks');
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(d.text).toContain('She has no marks yet on the eight assignments marked so far this term.');
-    expect(d.ids.filter(id => IE_IDS.concat(['ie09', 'ie10']).indexOf(id) >= 0)).toEqual([
-      'gr06',
-      'ie09',
-      'ie10',
-      'ie07',
-      'ie08',
-    ]);
+    expect(stepText(d, 'ieProblem')).toMatch(/\beight\b/);
+    expect(stepText(d, 'ieProblem')).toMatch(/\bno marks?\b|\bnone has a mark\b|\bnot yet have a mark\b/);
+    expect(required(d)).toEqual(requiredFor('noMarks'));
     expect(d.replaced).toEqual([]);
   });
 
@@ -238,7 +251,8 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     expect(CommentBank.ieProblemOf(f)).toBe('missing');
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
     expect(d.text).toContain('Three assignments are not handed in, including three Current Events assignments.');
-    expect(d.text).toContain('To earn a grade, she needs to submit the missing work.');
+    expect(stepText(d, 'iePlan')).toMatch(/\bsubmit(ting)? the missing work\b/);
+    expect(required(d)).toEqual(requiredFor('missing'));
     expect(d.replaced).toEqual([]);
   });
 
@@ -269,7 +283,8 @@ describe('Automatic IE: under 50% before the course ends', () => {
     expect(ReportQuestionnaire.basisChoices(f).ie).toBe(false);
     expect(CommentBank.ieProblemOf(f)).toBe('low');
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(d.ids.filter(id => IE_IDS.indexOf(id) >= 0)).toEqual(['gr06', 'ie03', 'ie06', 'ie07', 'ie08']);
+    expect(required(d)).toEqual(requiredFor('low'));
+    expect(stepText(d, 'ieProblem')).toContain('below 50%');
     expect(d.replaced).toEqual([]);
   });
 
