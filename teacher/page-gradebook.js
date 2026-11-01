@@ -442,9 +442,9 @@ window.PageGradebook = (function () {
     if (empty) {
       html += empty;
     } else if (viewMode === 'scores') {
-      html += renderScoresTable(cid, students, assessments, sections, isLetter, scores);
+      html += renderScoresTable(cid, students, assessments, sections, isLetter, scores) + _keyHtml();
     } else {
-      html += renderDetailedTable(cid, students, assessments, sections, isLetter, scores);
+      html += renderDetailedTable(cid, students, assessments, sections, isLetter, scores) + _keyHtml();
     }
 
     // A redraw (a saved score, a sort, a filter) leaves the table where it
@@ -463,6 +463,27 @@ window.PageGradebook = (function () {
     initGridHoverSync();
     initHeaderResize();
     initColHoverTooltip();
+  }
+
+  /* One line under the grid: what the colours and marks mean. */
+  function _keyHtml() {
+    var html = '<div class="gb-key" aria-label="Key">';
+    [1, 2, 3, 4].forEach(function (n) {
+      html +=
+        '<span class="gb-key-item"><span class="gb-key-swatch" style="background:var(--score-' +
+        n +
+        ')"></span>' +
+        PROF_LABELS[n] +
+        '</span>';
+    });
+    html +=
+      '<span class="gb-key-gap"></span>' +
+      '<span class="gb-key-item"><span class="gb-status gb-status-ns">M</span>Missing</span>' +
+      '<span class="gb-key-item"><span class="gb-status gb-status-exc">EXC</span>Excused</span>' +
+      '<span class="gb-key-item"><span class="gb-late">L</span>Late</span>' +
+      '<span class="gb-key-item"><span class="gb-key-dash">\u2014</span>No Score</span>' +
+      '</div>';
+    return html;
   }
 
   /* What the page says when there is nothing to show, and the one step that
@@ -871,6 +892,7 @@ window.PageGradebook = (function () {
             tagCode: key && key.tag ? _tagShortCode(key.tag) || key.label : key ? key.label : '?',
             sectionColor: sec ? sec.color : 'var(--text-3)',
             tagText: key ? key.text || key.label : 'No longer in the learning map',
+            groupName: sec ? sec.name || sec.shortName || '' : '',
           });
         });
       }
@@ -987,7 +1009,13 @@ window.PageGradebook = (function () {
         col.sectionColor +
         ';color:' +
         col.sectionColor +
-        '" title="' +
+        '" data-tip-code="' +
+        esc(col.isCriterionCol ? '' : col.tagCode) +
+        '" data-tip-text="' +
+        esc(col.tagText || col.tagCode) +
+        '" data-tip-group="' +
+        esc(col.groupName || '') +
+        '" aria-label="' +
         esc(col.tagText || col.tagCode) +
         '">' +
         esc(col.tagCode) +
@@ -1222,9 +1250,9 @@ window.PageGradebook = (function () {
 
     // Q1: Corner (top-left, fixed)
     html +=
-      '<div class="gb-grid-corner"><button type="button" class="gb-grid-corner-inner gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
+      '<div class="gb-grid-corner"><div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
       sortArrow('name') +
-      '</button></div>';
+      '</button><span class="gb-grid-corner-label">Overall</span></div></div>';
 
     // Q2: Column headers (top-right, scrolls horizontally)
     html += '<div class="gb-grid-colheads" id="gb-colheads"><div class="gb-grid-colheads-inner">';
@@ -1233,7 +1261,8 @@ window.PageGradebook = (function () {
       var categoryName = _getCategoryName(cid, categoryId);
       var typeClass = _getAssessmentAccentClass(a, 'gb-scores');
       var isScoreOnly = isPointsScored(a);
-      var maxPts = isScoreOnly ? ' / ' + (a.maxPoints || 100) : '';
+      var shortDate = formatShortDate(a.date);
+      var maxPts = isScoreOnly ? (shortDate ? ' \u00b7 ' : '') + 'Out of ' + (a.maxPoints || 100) : '';
       var tagSecs = (a.tagIds || [])
         .map(function (tid) {
           return getSectionForTag(cid, tid);
@@ -1260,7 +1289,7 @@ window.PageGradebook = (function () {
         esc(a.title) +
         '</span>' +
         '<span class="gb-scores-assess-meta">' +
-        formatShortDate(a.date) +
+        shortDate +
         maxPts +
         '</span>' +
         '</div>' +
@@ -1394,7 +1423,9 @@ window.PageGradebook = (function () {
                 ? 'Complete'
                 : 'Incomplete'
               : val > 0
-                ? cell.text
+                ? cell.kind === 'points'
+                  ? cell.text + ' out of ' + (a.maxPoints || 100)
+                  : cell.text + (levelWord(cid, cell.level) ? ', ' + levelWord(cid, cell.level) : '')
                 : 'no score') +
           (cell.late && !statusMark ? ', Late' : '') +
           '" data-action="editScoreCell" data-aid="' +
@@ -2970,7 +3001,36 @@ window.PageGradebook = (function () {
       return;
     }
     var assessGroup = e.target.closest('.gb-grid-assess-group');
-    if (assessGroup) _showAssessTitleTip(assessGroup);
+    if (assessGroup) {
+      _showAssessTitleTip(assessGroup);
+      return;
+    }
+    var codeHead = e.target.closest('.gb-grid-tag-header');
+    if (codeHead && codeHead !== _tipSource) _showCodeTip(codeHead);
+  }
+
+  /* A competency code's header: at once, the code, its wording and its group
+     (a criterion column: its whole name). */
+  function _showCodeTip(head) {
+    var gbTip = document.getElementById('gb-tooltip');
+    if (!gbTip || !head.dataset.tipText) return;
+    var code = head.dataset.tipCode;
+    var group = head.dataset.tipGroup;
+    gbTip.className = 'dark';
+    gbTip.innerHTML =
+      '<div class="gb-code-tip">' +
+      (code ? '<strong>' + esc(code) + '</strong> ' : '') +
+      esc(head.dataset.tipText) +
+      (group ? '<div class="gb-code-tip-group">' + esc(group) + '</div>' : '') +
+      '</div>';
+    gbTip.style.display = 'block';
+    _tipSource = head;
+    var rect = head.getBoundingClientRect();
+    var left = rect.left + rect.width / 2 - gbTip.offsetWidth / 2;
+    if (left < 8) left = 8;
+    if (left + gbTip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - gbTip.offsetWidth - 8;
+    gbTip.style.left = left + 'px';
+    gbTip.style.top = rect.bottom + 6 + 'px';
   }
 
   /* Beside the name, or below it when there's no room to the right. */
