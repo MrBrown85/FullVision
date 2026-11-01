@@ -97,11 +97,9 @@ describe('the tie at the top (topTieOf)', () => {
     expect(ids(CommentBank.topTieOf([c('a', 3.6), c('b', 3.4), c('c', 3.3), c('d', 2.8)]))).toEqual(['a', 'b', 'c']);
   });
 
-  it('fails under half a step over the rest, with a tied competency on two pieces, or with no rest', () => {
+  it('fails under half a step over the rest, or with no rest', () => {
     // 3.3 over 2.9 is not half a step.
     expect(CommentBank.topTieOf([c('a', 3.6), c('b', 3.4), c('c', 3.3), c('d', 2.9)])).toEqual([]);
-    // A tied competency on two pieces.
-    expect(CommentBank.topTieOf([c('a', 3.6), c('b', 3.4, 2), c('c', 3.3), c('d', 2.6)])).toEqual([]);
     // Every competency within half a step: the even case, not a tie.
     expect(CommentBank.topTieOf([c('a', 3.6), c('b', 3.4), c('c', 3.3)])).toEqual([]);
     expect(CommentBank.topTieOf([c('a', 3.4), c('b', 3.2)])).toEqual([]);
@@ -110,6 +108,44 @@ describe('the tie at the top (topTieOf)', () => {
     // Two at the top half a step over the third pass the strongest gate instead.
     expect(ids(CommentBank.strongestOf([c('a', 3.6), c('b', 3.5), c('c', 2.8)]))).toEqual(['a', 'b']);
     expect(CommentBank.topTieOf([c('a', 3.6), c('b', 3.5), c('c', 2.8)])).toEqual([]);
+  });
+
+  it('leaves a competency on fewer than 3 pieces out of the tie: not named, not a blocker, not the rest', () => {
+    // In the band on two pieces: the other two tie, half a step over the rest.
+    expect(ids(CommentBank.topTieOf([c('a', 3.6), c('b', 3.4, 2), c('c', 3.3), c('d', 2.6)]))).toEqual(['a', 'c']);
+    // The lead is the tie's own: 3.4 over 2.9 is half a step even though
+    // the thin one (3.2) is not.
+    expect(ids(CommentBank.topTieOf([c('a', 3.6), c('b', 3.2, 2), c('c', 3.4), c('d', 2.9)]))).toEqual(['a', 'c']);
+    // And the tie's own lead still has to be half a step: 3.3 over 2.9 is not.
+    expect(CommentBank.topTieOf([c('a', 3.6), c('b', 3.4, 2), c('c', 3.3), c('d', 2.9)])).toEqual([]);
+    // Two or more on 3+ pieces must tie: one judged in the band is not a tie.
+    expect(CommentBank.topTieOf([c('a', 3.6), c('b', 3.4, 2), c('c', 3.3, 1), c('d', 2.6)])).toEqual([]);
+    // Thin and alone at the top: no strongest, and the band below it has
+    // one judged competency, so no tie either.
+    expect(CommentBank.strongestOf([c('a', 4, 2), c('b', 3.5), c('c', 3.0), c('d', 3.0, 1)])).toEqual([]);
+    expect(CommentBank.topTieOf([c('a', 4, 2), c('b', 3.5), c('c', 3.0), c('d', 3.0, 1)])).toEqual([]);
+    // Below the band, a thin competency is still the rest the lead is measured over.
+    expect(CommentBank.topTieOf([c('a', 3.6), c('b', 3.4), c('c', 3.3), c('d', 2.9, 1)])).toEqual([]);
+    expect(ids(CommentBank.topTieOf([c('a', 3.6), c('b', 3.4), c('c', 3.3), c('d', 2.8, 1)]))).toEqual(['a', 'b', 'c']);
+    // The strongest and even gates are as they were: a thin competency
+    // in the band still blocks the strongest, and still counts for even.
+    expect(CommentBank.strongestOf([c('a', 3.6, 2), c('b', 3.0), c('c', 2.8)])).toEqual([]);
+    expect(ids(CommentBank.strongestOf([c('a', 3.6), c('b', 3.0, 2), c('c', 2.8)]))).toEqual(['a']);
+    expect(ids(CommentBank.evenComps([c('a', 3.2), c('b', 3.1, 2), c('c', 3.0)], 3.1))).toEqual(['a', 'b', 'c']);
+    expect(CommentBank.evenComps([c('a', 3.2), c('b', 3.1, 2), c('c', 2.7)], 3.1)).toEqual([]);
+    // The skill named is one of the judged tie, and verify() holds it.
+    const f = facts([
+      comp('a', 'Evidence', 3.6),
+      comp('b', 'Significance', 3.4, 2),
+      comp('c', 'Cause and Consequence', 3.3),
+      comp('d', 'Inquiry', 2.6),
+    ]);
+    expect(CommentBank.topTieSkills(f).map(x => x.key)).toEqual(['evidence', 'cause']);
+    const ctx = CommentBank.context(f, {});
+    expect(['evidence', 'cause']).toContain(ctx._topSkill);
+    const s = topFrames.find(x => x.subjects[0] === 'socials' && x.when.topSkill === ctx._topSkill);
+    const text = CommentBank.fill(s, ctx, { first: true });
+    expect(verified(s, text, CommentBank.provenance(s, ctx), f, 'overall').replaced).toEqual([]);
   });
 
   it('yields to the strongest gate, and ignores a competency with no level', () => {
@@ -290,5 +326,36 @@ describe('the per-skill frames under a tie', () => {
 
   it('the At a Glance tag still means strongest: none under a tie', () => {
     expect(RQ.skillTags(tieComps())).toEqual({ d: 'Next step' });
+  });
+
+  it('when every frame of the top tier runs past 20 words, the next tier is tried before nothing', () => {
+    // A newcomer whose strongest skill has a twelve-word wording: both
+    // newcomer frames (n442, n443) run past 20 words with it, so the
+    // per-skill frames one tier down fill the strengths step.
+    const f = facts([comp('a', 'Relationships and Consent', 4), comp('b', 'Fitness', 3), comp('c', 'Safety', 3)], {
+      cid: 'c-tier-down',
+      family: 'pe',
+      course: 'PHE 8',
+      enrolled: '2026-09-20',
+      classStart: '2026-09-01',
+      termStart: '2026-09-01',
+    });
+    const ctx = CommentBank.context(f, {});
+    expect(ctx._strongSkill).toBe('relationships');
+    const story = COMMENT_BANK.sentences.filter(s => s.story === 'newcomer' && s.group === 'Overall' && !s.subjects);
+    expect(story.map(s => s.id).sort()).toEqual(['n442', 'n443']);
+    story.forEach(s => {
+      expect(CommentBank.fits(s, ctx), s.id).toBe(true);
+      expect(CommentRealiser.tooLong(CommentBank.fill(s, ctx)), s.id).toBe(true);
+    });
+    const d = CommentBank.draft(ctx, { seed: 3 });
+    expect(d.angle).toBe('newcomer');
+    const row = d.sentences.find(x => x.step === 'overall');
+    expect(row).toBeTruthy();
+    expect(
+      topFrames.filter(s => s.subjects[0] === 'pe' && s.when.topSkill === 'relationships').map(s => s.id),
+    ).toContain(row.id);
+    expect(CommentRealiser.tooLong(row.text)).toBe(false);
+    expect(d.replaced).toEqual([]);
   });
 });
