@@ -412,8 +412,9 @@ window.MSweep = (function () {
     );
   }
 
-  function render(cid) {
-    _open(cid);
+  // `opts.keep` draws the sweep in progress again instead of starting over.
+  function render(cid, opts) {
+    if (!(opts && opts.keep && _s && _s.cid === cid)) _open(cid);
     var done = _done();
     return (
       '<div class="m-screen" id="m-screen-obs-sweep">' +

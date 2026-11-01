@@ -1415,10 +1415,11 @@ window.MGrade = (function () {
     );
   }
 
-  function jumpToStudent(idx) {
+  // `instant` lands on the student with no scroll animation.
+  function jumpToStudent(idx, instant) {
     var swiper = document.getElementById('m-swiper');
     if (!swiper) return;
-    swiper.scrollTo({ left: idx * swiper.clientWidth, behavior: 'smooth' });
+    swiper.scrollTo({ left: idx * swiper.clientWidth, behavior: instant ? 'auto' : 'smooth' });
     _currentIdx = idx;
     _updateCurrentThumb(idx);
     _updateSubtitle(idx, document.querySelectorAll('#m-thumb-strip .m-thumb').length);
@@ -1559,5 +1560,8 @@ window.MGrade = (function () {
     undoLastScore: undoLastScore,
     setupSwiper: setupSwiper,
     jumpToStudent: jumpToStudent,
+    getCurrentIndex: function () {
+      return _currentIdx;
+    },
   };
 })();
