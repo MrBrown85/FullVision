@@ -353,16 +353,28 @@ describe('the card drawn for a Demo Mode student', () => {
     localStorage.clear();
   });
 
+  it('labels only the best-piece sentence Best Piece; a Voice quote is Voice, another example Example', () => {
+    expect(RQ.rowLabel({ step: 'example', id: 'n36' }, null)).toBe('Best Piece');
+    expect(RQ.rowLabel({ step: 'example', id: 'n31', s: { group: 'Examples From Work' } }, null)).toBe('Example');
+    expect(RQ.rowLabel({ step: 'example', id: 'n50', s: { group: "In the Student's Words" } }, null)).toBe('Voice');
+    expect(RQ.rowLabel({ step: 'grade', id: 'gr01' }, null)).toBe('Grade');
+  });
+
   it('a saved draft: one row per sentence with its part, source, handle and Other Wording; Browse Sentences…', () => {
     const students = RQ.getTqStudents();
     const st = students.find(s => s.firstName === 'Noor');
     RQ.tqStudentIndex = students.indexOf(st);
     // The page reads the report picker's term; with no picker, the first.
     const termId = ReportBlocks.getTermId();
+    // A Note for the Report on the best piece, so the draft carries the
+    // best-piece sentence (plan PR 7).
+    const best = RQ.bestPiece(CommentBank.facts(cid, st, termId).work);
+    saveScoreReportNote(cid, st.id, best.id, 'labelled every part of the circuit');
     const f = CommentBank.facts(cid, st, termId);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: CommentBank.seedFor(st.id) });
     upsertTermRating(cid, st.id, termId, { narrative: d.text });
     const html = RQ.renderTermQuestionnaire(cid);
+    saveScoreReportNote(cid, st.id, best.id, '');
     const card = html.slice(html.indexOf('id="tq-sentences"'));
     expect(card).toContain('Reword, edit or drag to reorder. The comment above follows.');
     expect(card).toContain('Browse Sentences…');
@@ -371,6 +383,9 @@ describe('the card drawn for a Demo Mode student', () => {
     expect((card.match(/data-do="wording"/g) || []).length).toBe(d.sentences.length);
     expect(card).toContain('<span class="qn-req-label">Grade</span>');
     expect(card).toContain('<span class="qn-req-label">Best Piece</span>');
+    // The best-piece row alone is tinted and names the note.
+    expect((card.match(/qn-srow best/g) || []).length).toBe(1);
+    expect(card).toContain('· your note for the report');
     expect(card).toContain('<span class="qn-req-label">Next Step</span>');
     expect(card).toContain('Drag to move this sentence. ⌥↑ and ⌥↓ move it too.');
     // The class rows the comment has no sentence for are there too (plan PR 8).
