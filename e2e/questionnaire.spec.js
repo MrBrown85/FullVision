@@ -712,6 +712,12 @@ test.describe('the Sentences card', () => {
   }) => {
     await open(page);
     await page.locator('#tq-generate').click();
+    // Cece's habits: five Consistently, Uses Feedback Sometimes, so the
+    // Habits part has her own cases.
+    for (const k of ['completes', 'ready', 'others', 'part', 'devices']) {
+      await page.locator(`[data-action="tqRate"][data-habit="${k}"][data-value="4"]`).click();
+    }
+    await page.locator('[data-action="tqRate"][data-habit="feedback"][data-value="2"]').click();
     await page.locator('#tq-browse-btn').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
     await expect(sheet).toBeVisible();
@@ -730,21 +736,59 @@ test.describe('the Sentences card', () => {
     await expect(sheet.locator('.qn-browse-hint')).toHaveText(
       'The list scrolls. Drag the bottom edge to show more at once.',
     );
-    // Grade: the one in use, In Use, and the count.
+    // Grade: the one in use, In Use, and the count. The sentences sit
+    // under headings that name the case; Cece's own case is first, marked
+    // with her name and open.
     await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Fits Cece \d+ of \d+/);
     await expect(sheet.locator('.qn-browse-row.on .qn-browse-inuse')).toHaveText('In Use');
     await expect(sheet.locator('.qn-browse-row.on .qn-browse-meta')).toHaveText(/^In use/);
-    // Next Step: Use puts a sentence in the comment and the row says In Use.
+    const heads = sheet.locator('.qn-browse-head');
+    await expect(heads.first().locator('.qn-browse-head-label')).toHaveText('Extending to Emerging');
+    await expect(heads.first().locator('.qn-chip-own')).toHaveText('Cece');
+    await expect(heads.first()).toHaveAttribute('aria-expanded', 'true');
+    // Habits: every habit at every rating is its own case; Cece's rated
+    // cells come first and open, the rest closed; a closed case opens on a
+    // click and a sentence can be used from inside it.
+    await sheet.locator('[role="tab"]', { hasText: 'Habits' }).click();
+    await sheet.locator('#tq-browse-fits').click();
+    await sheet.locator('#tq-fits-menu [data-fits="0"]').click();
+    await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Every sentence \d+/);
+    const labels = await heads.locator('.qn-browse-head-label').allTextContents();
+    // The cells (one per habit and rating, "Uses Feedback · Sometimes") come
+    // before the summary; a bank without a cell's sentences leaves that
+    // heading out, and the fixed order is checked in the unit tests.
+    const cells = labels.filter(l => / · (Consistently|Usually|Sometimes|Rarely)$/.test(l));
+    const summary = labels.findIndex(l => /^Summary/.test(l));
+    expect(summary).toBeGreaterThanOrEqual(cells.length);
+    const ownHeads = sheet.locator('.qn-browse-group.own .qn-browse-head');
+    expect(await ownHeads.count()).toBeGreaterThan(0);
+    for (const h of await ownHeads.all()) await expect(h).toHaveAttribute('aria-expanded', 'true');
+    const closed = sheet.locator('.qn-browse-group:not(.own)').first();
+    await expect(closed.locator('.qn-browse-head')).toHaveAttribute('aria-expanded', 'false');
+    await expect(closed.locator('.qn-browse-row').first()).toBeHidden();
+    await closed.locator('.qn-browse-head').click();
+    await expect(closed.locator('.qn-browse-head')).toHaveAttribute('aria-expanded', 'true');
+    await expect(closed.locator('.qn-browse-row').first()).toBeVisible();
+    await expect(closed.locator('.qn-browse-head')).toBeFocused();
+    // Next Step: Use from inside a group puts a sentence in the comment and the row says In Use.
     await sheet.locator('[role="tab"]', { hasText: 'Next Step' }).click();
+    await sheet.locator('#tq-browse-fits').click();
+    await sheet.locator('#tq-fits-menu [data-fits="1"]').click();
+    await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Fits Cece \d+ of \d+/);
     const rowsList = sheet.locator('.qn-browse-row');
     const fitCount = Number((await sheet.locator('#tq-browse-n').textContent()).split(' of ')[0]);
     await expect(rowsList).toHaveCount(fitCount);
-    const use = rowsList.filter({ has: page.locator('.qn-browse-use:not([disabled])') }).first();
+    const ownGroup = sheet.locator('.qn-browse-group.own').first();
+    await expect(ownGroup.locator('.qn-browse-head-label')).toHaveText(/^Science/);
+    const use = ownGroup
+      .locator('.qn-browse-row')
+      .filter({ has: page.locator('.qn-browse-use:not([disabled])') })
+      .first();
     const text = await use.locator('.qn-browse-sentence').textContent();
     await use.locator('.qn-browse-use').click();
     await expect(sheet.locator('.qn-browse-row.on .qn-browse-sentence').filter({ hasText: text })).toHaveCount(1);
     await expect(page.locator('#tq-narrative')).toHaveValue(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-    // Every sentence: more rows, the ones that do not fit with Use off.
+    // Every sentence: more rows and more cases, the ones that do not fit with Use off.
     await sheet.locator('#tq-browse-fits').click();
     await expect(sheet.locator('#tq-fits-menu [role="option"]')).toHaveText([
       /Fits Cece\d+$/,
@@ -753,8 +797,17 @@ test.describe('the Sentences card', () => {
     await sheet.locator('#tq-fits-menu [data-fits="0"]').click();
     await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Every sentence \d+/);
     expect(await rowsList.count()).toBeGreaterThan(fitCount);
-    await expect(sheet.locator('.qn-browse-use[disabled]').first()).toBeVisible();
-    // Search narrows the list.
+    await expect(heads.locator('.qn-browse-head-label', { hasText: /^Social Studies · Evidence$/ })).toHaveCount(1);
+    expect(await sheet.locator('.qn-browse-use[disabled]').count()).toBeGreaterThan(0);
+    // Search filters across the groups and opens the ones with a match.
+    await sheet.locator('#tq-browse-search').fill('At home');
+    const matched = sheet.locator('.qn-browse-group');
+    expect(await matched.count()).toBeGreaterThan(1);
+    for (const g of await matched.all()) {
+      await expect(g.locator('.qn-browse-head')).toHaveAttribute('aria-expanded', 'true');
+      await expect(g.locator('.qn-browse-head-label')).toHaveText(/For the Family$/);
+    }
+    for (const r of await sheet.locator('.qn-browse-sentence').all()) await expect(r).toHaveText(/at home/i);
     await sheet.locator('#tq-browse-search').fill('zzzz');
     await expect(sheet.locator('.qn-browse-empty')).toHaveText('No sentences match “zzzz”.');
     await sheet.locator('#tq-browse-search').fill('');
