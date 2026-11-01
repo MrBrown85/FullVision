@@ -25,8 +25,12 @@ describe('thinLine', () => {
 });
 
 describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
-  let cid, saved, hadDoc, oldDoc;
+  let cid, saved, hadDoc, oldDoc, fullBank;
   beforeAll(() => {
+    // The bank as it was before Nov 1 (the first 18 family sentences), so
+    // the family part is thin for the class: four sentences for Science.
+    fullBank = COMMENT_BANK.sentences;
+    COMMENT_BANK.sentences = fullBank.filter(s => s.group !== 'For the Family' || Number(s.id.slice(1)) <= 18);
     saved = window.isDemoMode;
     window.isDemoMode = () => true;
     localStorage.clear();
@@ -40,6 +44,7 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
     RQ.configure({ activeCourse: cid, renderReports: () => {} });
   });
   afterAll(() => {
+    COMMENT_BANK.sentences = fullBank;
     if (hadDoc) globalThis.document = oldDoc;
     else delete globalThis.document;
     setActiveTerm(cid, null);

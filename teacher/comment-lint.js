@@ -32,9 +32,11 @@ window.CommentLint = (function () {
     ['check', 'in'],
     ['check', 'on'],
     ['check', 'out'],
+    ['coach', 'through'],
     ['come', 'along'],
     ['come', 'in'],
     ['come', 'into'],
+    ['come', 'out'],
     ['come', 'together'],
     ['come', 'up'],
     ['end', 'up'],
@@ -51,6 +53,7 @@ window.CommentLint = (function () {
     ['get', 'by'],
     ['get', 'going'],
     ['get', 'in'],
+    ['get', 'lost'],
     ['get', 'on'],
     ['get', 'started'],
     ['get', 'through'],
@@ -97,6 +100,7 @@ window.CommentLint = (function () {
     ['work', 'on'],
     ['work', 'out'],
     ['work', 'through'],
+    ['write', 'down'],
     ['write', 'up'],
   ];
   var IRREGULAR = {
@@ -185,6 +189,9 @@ window.CommentLint = (function () {
     /\balong the way\b/i,
     /\bmore of a challenge\b/i,
     /\bturn\b.*\baround\b/i,
+    // "tell a reliable site from one that is not" (tell apart).
+    /\btell\b[^.]{0,30}\bfrom (one|another|each other)\b/i,
+    /\bha(ve|ving|s|d) a hard time\b/i,
   ];
 
   // Praise of the person, not the work.

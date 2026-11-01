@@ -54,16 +54,19 @@ describe('bankStrength in Demo Mode (Science 8, Report 2)', () => {
     localStorage.clear();
   });
 
-  it('finds the four family sentences every student draws from', () => {
+  it('finds the family sentences for each student’s next step, five or more a student', () => {
     const r = CommentBank.bankStrength('sci8', { termId: 'term-2' });
     const n = getStudents('sci8').length;
     expect(n).toBeGreaterThanOrEqual(12);
-    expect(r.parts.find(p => p.step === 'home')).toMatchObject({
-      sentences: 4,
-      students: n,
-      thin: true,
-      worst: { sentences: 4, students: n },
-    });
+    const home = r.parts.find(p => p.step === 'home');
+    expect(home.students).toBe(n);
+    // Each student's pool is the sentences for the next step's skill (five
+    // or more), or the general ones; no skill has 15 students, so none is
+    // thin.
+    getStudents('sci8').forEach(st =>
+      expect(r.byStudent[String(st.id)].home.sentences, st.firstName).toBeGreaterThanOrEqual(5),
+    );
+    expect(home.thin).toBe(false);
     // The one next-step sentence is by design, so it is never a thin part.
     expect(r.parts.map(p => p.step)).not.toContain('nextStep');
   });

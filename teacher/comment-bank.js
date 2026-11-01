@@ -579,6 +579,208 @@ window.CommentBank = (function () {
       text: 'In class, I will talk about goals and plans each month.',
       fits: ['planning', 'self', 'exploring'],
     },
+    // Grown 2026-11-01: more lines in the plan's "In class, I will…" shape,
+    // for any class and for each kind. Each is used exactly as written once
+    // ticked, so every one passes the lint (tests/comment-bank-lint.test.js).
+    {
+      id: 'sl-help',
+      text: 'In class, I will ask the student each week what help is needed.',
+      fits: ['feedback', 'part', 'completes'],
+    },
+    {
+      id: 'sl-week-plan',
+      text: 'In class, I will plan the coming week with the student at its start.',
+      fits: ['completes', 'ready'],
+    },
+    {
+      id: 'sl-start',
+      text: 'In class, I will help the student begin each task in the first five minutes.',
+      fits: ['ready'],
+    },
+    {
+      id: 'sl-feedback-talk',
+      text: 'In class, I will talk with the student about feedback before the next piece.',
+      fits: ['feedback', 'revising', 'testing', 'reflecting'],
+    },
+    {
+      id: 'sl-one-question',
+      text: 'In class, I will ask the student one question in each discussion.',
+      fits: ['part', 'speaking'],
+    },
+    {
+      id: 'sl-group-role',
+      text: 'In class, I will give the student a clear role in each group task.',
+      fits: ['others', 'leading'],
+    },
+    {
+      id: 'sl-phones',
+      text: 'In class, I will ask for phones to be away at the start of each lesson.',
+      fits: ['devices'],
+    },
+    {
+      id: 'sl-missing-plan',
+      text: 'In class, I will make a plan with the student for each piece labelled Missing.',
+      fits: ['completes'],
+    },
+    {
+      id: 'sl-finish-time',
+      text: 'In class, I will give time each week to finish work that is in progress.',
+      fits: ['completes'],
+    },
+    {
+      id: 'sl-example',
+      text: 'In class, I will show an example of finished work before each assignment.',
+      fits: ['ready', 'completes'],
+    },
+    {
+      id: 'sl-monthly-goal',
+      text: 'In class, I will set one goal with the student each month and review it together.',
+      fits: ['feedback', 'completes', 'ready'],
+    },
+    {
+      id: 'sl-paragraph-feedback',
+      families: ['socials'],
+      text: 'In class, I will give feedback on one paragraph each week before the final copy.',
+      fits: ['cause', 'continuity', 'ethical', 'significance'],
+    },
+    {
+      id: 'sl-name-source',
+      families: ['socials'],
+      text: 'In class, I will ask the student to name the source behind each claim.',
+      fits: ['evidence', 'inquiry'],
+    },
+    {
+      id: 'sl-two-sources',
+      families: ['socials'],
+      text: 'In class, I will give two sources for each question and ask how they differ.',
+      fits: ['perspective', 'evidence'],
+    },
+    {
+      id: 'sl-read-draft',
+      families: ['ela'],
+      text: 'In class, I will read one paragraph of the draft with the student each week.',
+      fits: ['writing', 'revising', 'conventions'],
+    },
+    {
+      id: 'sl-text-question',
+      families: ['ela'],
+      text: 'In class, I will ask the student one question about what the class read in each discussion.',
+      fits: ['reading', 'thinking', 'speaking'],
+    },
+    {
+      id: 'sl-source-list',
+      families: ['ela'],
+      text: 'In class, I will give a short list of sources to start each research task.',
+      fits: ['information'],
+    },
+    {
+      id: 'sl-predict',
+      families: ['science'],
+      text: 'In class, I will ask the student to predict the result before each experiment.',
+      fits: ['questioning', 'planning'],
+    },
+    {
+      id: 'sl-graph-feedback',
+      families: ['science'],
+      text: 'In class, I will give feedback on each graph before the write-up is marked.',
+      fits: ['processing', 'communicating'],
+    },
+    {
+      id: 'sl-everyday',
+      families: ['science'],
+      text: 'In class, I will ask the student to explain one everyday example of each idea.',
+      fits: ['applying', 'evaluating'],
+    },
+    {
+      id: 'sl-worked-example',
+      families: ['math'],
+      text: 'In class, I will give a worked example to keep for each type of problem.',
+      fits: ['solving', 'communicating'],
+    },
+    {
+      id: 'sl-explain-aloud',
+      families: ['math'],
+      text: 'In class, I will ask the student to explain one solution aloud each week.',
+      fits: ['reasoning', 'communicating'],
+    },
+    {
+      id: 'sl-practice-set',
+      families: ['math'],
+      text: 'In class, I will give a short set of practice problems with answers for each unit.',
+      fits: ['solving', 'connecting'],
+    },
+    {
+      id: 'sl-choice-note',
+      families: ['arts'],
+      text: 'In class, I will ask the student to write a short note about one choice in each piece.',
+      fits: ['reflecting', 'communicating'],
+    },
+    {
+      id: 'sl-two-ideas',
+      families: ['arts'],
+      text: 'In class, I will give time to try two ideas before the student chooses one.',
+      fits: ['creating', 'connecting'],
+    },
+    {
+      id: 'sl-technique',
+      families: ['arts'],
+      text: 'In class, I will give one technique to practise each week and check it with the student.',
+      fits: ['technique'],
+    },
+    {
+      id: 'sl-fitness-goal',
+      families: ['pe'],
+      text: 'In class, I will set a fitness goal with the student and check it each month.',
+      fits: ['fitness', 'wellbeing'],
+    },
+    {
+      id: 'sl-warm-up',
+      families: ['pe'],
+      text: 'In class, I will give the student a turn leading one warm-up each unit.',
+      fits: ['leading', 'part'],
+    },
+    {
+      id: 'sl-safety',
+      families: ['pe'],
+      text: 'In class, I will review the safety rules with the student before each new activity.',
+      fits: ['safety'],
+    },
+    {
+      id: 'sl-test-record',
+      families: ['adst'],
+      text: 'In class, I will ask the student to test each project and record what changed.',
+      fits: ['testing', 'making', 'sharing'],
+    },
+    {
+      id: 'sl-sketch-check',
+      families: ['adst'],
+      text: 'In class, I will check the sketch and measurements before any cutting or building starts.',
+      fits: ['designing', 'tools'],
+    },
+    {
+      id: 'sl-tool-safe',
+      families: ['adst'],
+      text: 'In class, I will ask the student to show one tool being used safely each week.',
+      fits: ['tools', 'making'],
+    },
+    {
+      id: 'sl-goal-step',
+      families: ['career'],
+      text: 'In class, I will ask the student to write one step toward a goal each week.',
+      fits: ['planning', 'self'],
+    },
+    {
+      id: 'sl-research-time',
+      families: ['career'],
+      text: 'In class, I will give time each week to research one career.',
+      fits: ['exploring'],
+    },
+    {
+      id: 'sl-reflect',
+      families: ['career'],
+      text: 'In class, I will ask the student to reflect on one experience each month.',
+      fits: ['connecting', 'self'],
+    },
   ];
 
   /* The support lines on offer for a kind of class, in order. */
@@ -3791,6 +3993,12 @@ window.CommentBank = (function () {
     nextStep: function (pv, f) {
       // The next step as a skill: the competency nextStepOf() picks, said
       // with the table's skill for it.
+      // A sentence bound to one skill without naming it (a For the Family
+      // sentence, `when.nextSkill`): that skill is the next step's.
+      if (_has(pv, 'when.nextSkill') && !_has(pv, 'nextSkill')) {
+        var ns = nextSkillOf(f);
+        return !!ns && ns.key === pv.values['when.nextSkill'];
+      }
       if (_has(pv, 'nextSkill')) {
         var n = nextSkillOf(f);
         if (!n || _ids(pv, 'nextSkill', 'comp')[0] !== String(n.comp.id) || pv.values.nextSkill !== n.skill)

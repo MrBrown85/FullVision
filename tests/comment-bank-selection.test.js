@@ -401,7 +401,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     if (n - 1 >= 5) expect(flagged[0].shared).toBe(n - 1);
   });
 
-  it('never repeats a family sentence in the class until every one that fits is used', () => {
+  it('never repeats a family sentence in the class until every one in the student’s tier is used', () => {
     const students = getStudents(cid);
     const comments = [];
     const seen = [];
@@ -412,7 +412,8 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       comments.push({ sid: st.id, text: d.text });
       const op = d.sentences.find(x => x.step === 'home');
       if (!op) return;
-      const fit = COMMENT_BANK.sentences.filter(s => s.group === 'For the Family' && CommentBank.fits(s, ctx));
+      // The tier: the sentences for the next step's skill, or the general ones.
+      const fit = CommentBank.stepPool('home', ctx);
       if (seen.indexOf(op.id) >= 0)
         expect(
           fit.every(s => seen.indexOf(s.id) >= 0),

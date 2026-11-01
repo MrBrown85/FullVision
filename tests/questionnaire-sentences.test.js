@@ -330,7 +330,11 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const example = rows.find(r => r.step === 'example');
     expect(src(example)).toMatch(/ · (Emerging|Developing|Proficient|Extending)/);
     const home = rows.find(r => r.step === 'home');
-    expect(src(home)).toBe('A general sentence. It states no fact about Cece.');
+    // A family sentence for the next step's skill names that competency; a
+    // general one states no fact.
+    const homeS = COMMENT_BANK.sentences.find(s => s.id === home.id);
+    if (homeS && homeS.when) expect(src(home)).toMatch(/ · (Emerging|Developing|Proficient|Extending)$/);
+    else expect(src(home)).toBe('A general sentence. It states no fact about Cece.');
     // Cece has no competency past the "strongest" gate, so no strengths
     // row; one by hand names the competency behind it.
     expect(rows.some(r => r.step === 'overall')).toBe(false);
