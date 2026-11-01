@@ -1556,7 +1556,8 @@ window.ReportQuestionnaire = (function () {
     var st = _current();
     var el = _box();
     var wrap = document.getElementById('tq-warn-wrap');
-    if (!st || !el || !wrap || String(el.dataset.sid) !== String(st.id)) return;
+    // A late timer (the student or page changed in the 300 ms) does nothing.
+    if (!st || !el || !el.dataset || !wrap || String(el.dataset.sid) !== String(st.id)) return;
     wrap.innerHTML = _warnHtml(_activeCourse, st, el.value);
   }
 
