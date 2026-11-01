@@ -110,17 +110,21 @@ describe('the habits sentence in a draft', () => {
     for (let seed = 1; seed <= 6; seed++) {
       const hs = habitsSentence(facts({ habits: all(4) }), {}, seed);
       expect(hs).toHaveLength(1);
-      expect(hs[0].text).toMatch(/^His work habits are excellent( this term)?\.$/);
+      // One of the excellent frames (hs01, hs02, hs16-hs21): the plan's
+      // "work habits are excellent", or every habit rated Consistently.
+      expect(hs[0].text).toMatch(/work habits are excellent|rated Consistently/);
+      expect(hs[0].text).not.toMatch(/Usually|to build/);
     }
-    // No pronouns on file: they/them (Colin, Nov 1).
+    // No pronouns on file: they/them (Colin, Nov 1), in whichever frame.
     const named = habitsSentence(facts({ habits: all(4), pronounsOnFile: false, pronouns: THEY }));
-    expect(named[0].text).toMatch(/^Their work habits are excellent/);
+    expect(named[0].text).toMatch(/\b(their|they)\b/i);
+    expect(named[0].text).not.toMatch(/Gabriel/);
   });
 
   it('one weak habit: names only that one', () => {
     for (let seed = 1; seed <= 6; seed++) {
       const [s] = habitsSentence(facts({ habits: { ...all(4), feedback: 2 } }), {}, seed);
-      expect(s.text).toMatch(/using feedback\.$/);
+      expect(s.text).toMatch(/using feedback/i);
       expect(s.text).not.toMatch(/ and /);
       expect(s.text).not.toMatch(/class time|others|taking part|devices|completing/);
     }
@@ -128,12 +132,12 @@ describe('the habits sentence in a draft', () => {
 
   it('two weak habits: names both in one sentence', () => {
     const [s] = habitsSentence(facts({ habits: { ...all(3), ready: 2, devices: 1 } }));
-    expect(s.text).toMatch(/using devices well and using class time well\.$/);
+    expect(s.text).toMatch(/using devices well and using class time well/i);
   });
 
   it('three weak habits: names the two lowest', () => {
     const [s] = habitsSentence(facts({ habits: { ...all(4), completes: 2, part: 1, devices: 2 } }));
-    expect(s.text).toMatch(/taking part in class and completing work on time\.$/);
+    expect(s.text).toMatch(/taking part in class and completing work on time/i);
     expect(s.text).not.toMatch(/devices/);
   });
 
@@ -141,7 +145,7 @@ describe('the habits sentence in a draft', () => {
     const [s] = habitsSentence(facts({ habits: { ...all(4), devices: 5 } }));
     expect(s.text).toMatch(/work habits are excellent/);
     const [t] = habitsSentence(facts({ habits: { ...all(5), others: 1 } }));
-    expect(t.text).toMatch(/working well with others\.$/);
+    expect(t.text).toMatch(/working well with others/i);
   });
 
   it('nothing rated: no habits sentence', () => {
@@ -193,7 +197,9 @@ describe('the habits sentence in a draft', () => {
     expect(CommentBank.reportPath(f)).toBe('ie');
     const hs = habitsSentence(f);
     expect(hs.map(x => x.step)).toEqual(['strongHabits']);
-    expect(hs[0].text).toBe('He comes to class ready, works well with others and takes part.');
+    // hs11 whole, or one of the frames around the same phrase (hs13-hs15).
+    expect(hs[0].text).toMatch(/\bhe comes to class ready, works well with others and takes part\.$/i);
+    expect(hs[0].text).not.toMatch(/Consistently|excellent/);
   });
 });
 
@@ -231,8 +237,8 @@ describe('redrawHabits: a rating changed after Generate', () => {
   it('writes only the habits sentence again', () => {
     const prev = draftFor({ ...all(4), feedback: 2 });
     const d = redraw(prev, { ...all(4), devices: 1 });
-    expect(d.habits.before).toMatch(/using feedback/);
-    expect(d.habits.after).toMatch(/using devices well/);
+    expect(d.habits.before).toMatch(/using feedback/i);
+    expect(d.habits.after).toMatch(/using devices well/i);
     expect(others(d)).toEqual(others(prev));
     expect(d.sentences.map(x => x.step)).toEqual(prev.sentences.map(x => x.step));
     expect(d.text).toBe(prev.text.replace(d.habits.before, d.habits.after));
@@ -243,7 +249,7 @@ describe('redrawHabits: a rating changed after Generate', () => {
     expect(prev.sentences.some(x => x.step === 'habits')).toBe(false);
     const d = redraw(prev, all(4));
     expect(d.habits).toMatchObject({ before: '' });
-    expect(d.habits.after).toMatch(/excellent/);
+    expect(d.habits.after).toMatch(/work habits are excellent|rated Consistently/);
     expect(others(d)).toEqual(others(prev));
     const back = redraw(d, {});
     expect(back.habits).toMatchObject({ before: d.habits.after, after: '' });
@@ -258,7 +264,11 @@ describe('redrawHabits: a rating changed after Generate', () => {
     const prev = draftFor(all(4));
     expect(prev.sentences.some(x => x.step === 'attendance')).toBe(false);
     const d = att(prev, 3, 1);
-    expect(d.habits).toMatchObject({ before: '', after: 'He has missed three classes and been late once this term.' });
+    // One of the both-count attendance frames (h60, h73-h78): the exact
+    // counts, both said.
+    expect(d.habits.before).toBe('');
+    expect(d.habits.after).toMatch(/three classes/);
+    expect(d.habits.after).toMatch(/\bonce\b/);
     expect(d.sentences.filter(x => x.step !== 'attendance').map(x => x.text)).toEqual(prev.sentences.map(x => x.text));
     expect(d.text).toContain(d.habits.after);
     const back = att(d, null, null);
@@ -345,9 +355,9 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
     expect(ReportBlocks.getTermId()).toBe(TERM);
     RQ.tqGenerate();
     const first = box.value;
-    expect(first).toMatch(/using feedback\./);
+    expect(first).toMatch(/using feedback/i);
     RQ.tqRate('devices', 1);
-    expect(box.value).toMatch(/using devices well and using feedback\./);
+    expect(box.value).toMatch(/using devices well and using feedback/i);
     const strip = t => t.replace(/[^.]*work habits?[^.]*\./i, '');
     expect(strip(box.value)).toBe(strip(first));
     expect(saved()).toBe(box.value);
@@ -355,7 +365,7 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
 
   it('an edited habits sentence survives a rating change', () => {
     RQ.tqGenerate();
-    const habit = box.value.match(/[^.]*using feedback\./)[0].trim();
+    const habit = box.value.match(/[^.]*using feedback[^.]*\./i)[0].trim();
     box.value = box.value.replace(habit, 'He is learning to act on feedback.');
     RQ.tqNarrativeInput();
     const edited = box.value;
@@ -364,13 +374,13 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
     // Another sentence edited, the habits sentence untouched: only it changes.
     RQ.tqGenerate();
     const again = box.value;
-    const sentence = again.match(/[^.]*using feedback\./)[0].trim();
+    const sentence = again.match(/[^.]*using feedback[^.]*\./i)[0].trim();
     box.value = again.replace(/^[^.]*\./, 'Gabriel worked hard.');
     RQ.tqRate('devices', 4);
     RQ.tqRate('feedback', 4);
     expect(box.value).not.toContain(sentence);
     expect(box.value).toMatch(/^Gabriel worked hard\./);
-    expect(box.value).toMatch(/work habits are excellent/);
+    expect(box.value).toMatch(/work habits are excellent|rated Consistently/);
   });
 
   /* The Sentences card follows the comment without another Generate: a
@@ -400,14 +410,15 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
       expect(box.value).not.toMatch(/work habits/);
       drawn = [];
       KEYS.forEach(k => RQ.tqRate(k, 4));
-      expect(box.value).toMatch(/work habits are excellent\./);
+      const excellent = /work habits are excellent|rated Consistently/;
+      expect(box.value).toMatch(excellent);
       expect(drawn.length).toBeGreaterThan(0);
       const card = drawn[drawn.length - 1];
       expect(label(card, 'Habits')).toBe(true);
-      expect(card).toContain('work habits are excellent.');
+      expect(card).toMatch(excellent);
       RQ.tqRate('devices', 1);
-      expect(box.value).toMatch(/using devices well\./);
-      expect(drawn[drawn.length - 1]).toContain('using devices well.');
+      expect(box.value).toMatch(/using devices well/i);
+      expect(drawn[drawn.length - 1]).toMatch(/using devices well/i);
       expect(label(drawn[drawn.length - 1], 'Habits')).toBe(true);
       expect(saved()).toBe(box.value);
     });
@@ -419,10 +430,13 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
       els['tq-att-lates'].value = '1';
       RQ.tqSetAttendance(GABRIEL.id);
       expect(els['tq-att-note'].innerHTML).toBe('Added to the comment.');
-      expect(box.value).toMatch(/He has missed three classes and been late once this term\./);
+      // One of the both-count attendance frames, the exact counts said.
+      const att = box.value.match(/[^.]*three classes[^.]*\./);
+      expect(att).not.toBeNull();
+      expect(att[0]).toMatch(/\bonce\b/);
       let card = drawn[drawn.length - 1];
       expect(label(card, 'Attendance')).toBe(true);
-      expect(card).toContain('He has missed three classes and been late once this term.');
+      expect(card).toContain(att[0].trim());
       expect(card).toContain('From Attendance above · new');
       expect(saved()).toBe(box.value);
       els['tq-att-absences'].value = '';

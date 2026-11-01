@@ -184,6 +184,13 @@ export function loadClass(classData, report) {
   const hasTerm = (g.getReportingTerms(cid) || []).some(t => Number(t.ordinal) === _report);
   g.setActiveTerm(cid, hasTerm ? _report : null);
   const termId = g.ReportBlocks.getTermId();
+  // A synthetic class's attendance (eval_term_attendance: [{ enrollment_id,
+  // term, absences, lates }]), entered as the Reports page's attendance
+  // card enters it; a real class bundle has none.
+  (bundle.eval_term_attendance || []).forEach(a => {
+    if (a && a.enrollment_id && a.term)
+      g.saveTermAttendance(cid, a.enrollment_id, 'term-' + a.term, a.absences, a.lates);
+  });
   const students = g.sortStudents(g.getStudents(cid) || [], 'lastName');
   return { cid, termId, students };
 }

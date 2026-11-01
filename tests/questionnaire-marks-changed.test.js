@@ -102,7 +102,12 @@ const facts = (termId = TERM) => CommentBank.facts(CID, PRI, termId);
 function drafted() {
   const f = facts();
   const ctx = CommentBank.context(f, {});
-  const d = CommentBank.draft(ctx, { seed: 5 });
+  // The first seed from 5 whose draft uses the plan's own Not Handed In
+  // sentence (m01) rather than one of its frames (m02-m21), so the record's
+  // values can be checked by wording (NH_BEFORE, NH_AFTER).
+  let seed = 5;
+  while (!CommentBank.draft(ctx, { seed }).ids.includes('m01')) seed++;
+  const d = CommentBank.draft(ctx, { seed });
   return { f, ctx, d, rows: RQ.rowsFromDraft(d) };
 }
 function open(sid) {

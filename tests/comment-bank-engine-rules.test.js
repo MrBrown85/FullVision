@@ -216,8 +216,11 @@ describe('the draft is the plan’s eight parts only', () => {
     );
     expect(d.text).toContain('completing work on time and taking part in class.');
     expect(d.text).not.toContain('missed three classes');
-    expect(d.text).toContain(
-      'Two assignments are not handed in: “Current Events: Week 4” and “Current Events: Week 5.” Late work is accepted until December 4.',
+    // One of the two-title Not Handed In frames (m01, m07-m11), both titles
+    // quoted, with the class's late-work line right after it.
+    expect(d.text).toContain('not handed in');
+    expect(d.text).toMatch(
+      /“Current Events: Week 4” and “Current Events: Week 5\.?”[^.]*\.? Late work is accepted until December 4\./,
     );
     // The next step is one of the frames for Significance, then the
     // support line.

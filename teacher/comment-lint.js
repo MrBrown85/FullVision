@@ -391,11 +391,19 @@ window.CommentLint = (function () {
 
   /* What the lint finds in one template or sentence: [] when it passes,
      else one line per finding ("phrasal verb: keep up"). */
+  // The plan's own Not Handed In wording (Sentence grammar: "One assignment
+  // is not handed in"), a participle the bank's frames repeat; "hand in"
+  // as a verb ("needs to hand in the work") stays banned.
+  var PLAN_PHRASES = [/\bnot handed in\b/gi];
+
   function findings(text) {
     var out = [];
     var p = plain(text);
+    var pp = PLAN_PHRASES.reduce(function (t, re) {
+      return t.replace(re, 'not-handed-in');
+    }, p);
     PHRASAL_RES.forEach(function (x) {
-      if (x.re.test(p)) out.push('phrasal verb: ' + x.name);
+      if (x.re.test(pp)) out.push('phrasal verb: ' + x.name);
     });
     IDIOMS.forEach(function (re) {
       if (re.test(p)) out.push('idiom: ' + re);
