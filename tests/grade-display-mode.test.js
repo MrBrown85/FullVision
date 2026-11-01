@@ -57,6 +57,17 @@ describe('grades shown by grading setting', () => {
     expect(formatLevel(CID, 0)).toBe('—');
   });
 
+  it("names a student's or competency's level, or gives its % in a Letter class", () => {
+    setting('proficiency');
+    expect(levelText(CID, 2.8)).toBe('Proficient');
+    setting('both');
+    expect(levelText(CID, 2.8)).toBe('Proficient');
+    setting('letter');
+    expect(levelText(CID, 2.8)).toBe('70%');
+    expect(levelText(CID, 0)).toBe('');
+    expect(levelText(CID, 0, 'No Evidence')).toBe('No Evidence');
+  });
+
   it("shows a student's overall grade as the class grades", () => {
     setting('proficiency');
     expect(studentGradeSummary(CID, 's1')).toEqual({ text: '2.8', level: 3 });

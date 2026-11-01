@@ -2048,6 +2048,15 @@ function levelWord(cid, value) {
   return PROF_LABELS[Math.round(value)] || '';
 }
 
+/* A student's or competency's level (an average) as the class describes it
+   on its own: the proficiency word, or the level's % in a Letter class,
+   which doesn't use proficiency words. `empty` (default '') with no level.
+   One assessment's score keeps its level name (scoreLevelText). */
+function levelText(cid, value, empty) {
+  if (!(value > 0)) return empty === undefined ? '' : empty;
+  return levelWord(cid, value) || formatLevel(cid, value);
+}
+
 /* ── What a report prints for the grade ──────────────────────────
    Per student and report, the teacher can report something other than the
    letter (term_rating.reporting_basis; Generate plan PR 3, approved by

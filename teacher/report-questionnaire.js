@@ -4664,8 +4664,15 @@ window.ReportQuestionnaire = (function () {
   var LEVEL_WORDS = { 4: 'Consistently', 3: 'Usually', 2: 'Sometimes', 1: 'Rarely' };
   // The letter grades by standing (the Letter Grades Order), and the next
   // letter up for the "close to" frames; A has none.
-  var LETTERS = ['A', 'B', 'C+', 'C', 'C-'];
-  var NEXT_LETTER = { B: 'A', 'C+': 'B', C: 'C+', 'C-': 'C' };
+  var LETTERS = BC_LETTER_BANDS.filter(function (b) {
+    return b.min > 0;
+  }).map(function (b) {
+    return b.label;
+  });
+  var NEXT_LETTER = {};
+  LETTERS.forEach(function (l, i) {
+    if (i > 0) NEXT_LETTER[l] = LETTERS[i - 1];
+  });
   var PROFICIENCY_WORDS = ['Extending', 'Proficient', 'Developing', 'Emerging'];
   // The stories a strengths sentence can be written for (CommentBank.ANGLES
   // ids); any other story reads as steady.

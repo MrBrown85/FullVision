@@ -575,7 +575,7 @@ function renderStudentHeader(cid, sid, opts) {
   const letterOnly = courseGradeMode(cid) === 'letter';
   if (!letterOnly) {
     html += `<div class="overall-card" style="--grade-c:${profColor}">
-    <span class="overall-val">${overall > 0 ? overall.toFixed(1) : '\u2014'}</span>
+    <span class="overall-val">${levelFigure(overall)}</span>
     <span class="overall-word">${PROF_LABELS[overallRounded] || 'No Evidence'}</span>
   </div>`;
   }
@@ -1035,12 +1035,6 @@ function profBadge(score, size) {
 function profBar(value, max, color) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return `<div class="prof-bar"><div class="prof-bar-fill" style="width:${pct}%;background:${color || 'var(--active)'}"></div></div>`;
-}
-
-// Proficiency label badge (shows word instead of number)
-function profLabelBadge(score) {
-  const s = Math.round(score);
-  return `<span class="prof-label prof-${s}">${s > 0 ? PROF_LABELS[s] : '\u2014'}</span>`;
 }
 
 /* The roster keeps its scroll position when the sidebar is drawn again.
@@ -1521,7 +1515,6 @@ window.UI = {
   filterRoster,
   profBadge,
   profBar,
-  profLabelBadge,
   refreshSidebar,
   toggleSidebar,
   applySidebarState,
