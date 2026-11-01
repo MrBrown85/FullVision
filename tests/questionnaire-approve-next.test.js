@@ -176,3 +176,64 @@ describe('Approve and Next', () => {
     expect(onLast).toBe(1);
   });
 });
+
+describe('⌘ Return on an earlier report’s tab (live run: it approved and moved on)', () => {
+  let hadDoc, oldDoc, oldBank;
+  const current = () => RQ.getTqStudents()[RQ.tqStudentIndex];
+  const press = () => {
+    let stopped = false;
+    RQ.handleKey({
+      key: 'Enter',
+      metaKey: true,
+      target: { id: 'tq-generate', dataset: {}, closest: () => null },
+      preventDefault: () => (stopped = true),
+    });
+    return stopped;
+  };
+  beforeAll(() => {
+    hadDoc = 'document' in globalThis;
+    oldDoc = globalThis.document;
+    oldBank = window.PersonalBank;
+  });
+  afterAll(() => {
+    if (hadDoc) globalThis.document = oldDoc;
+    else delete globalThis.document;
+    window.PersonalBank = oldBank;
+  });
+  beforeEach(() => {
+    localStorage.clear();
+    seed();
+    window.PersonalBank = undefined;
+    // Report 2, with Report 1's comment as the earlier tab.
+    STUDENTS.forEach(s => upsertTermRating(CID, s.id, 'term-2', { narrative: TEXT }));
+    const period = { value: 'Report 2', selectedIndex: 0, options: [{ value: 'Report 2', text: 'Report 2' }] };
+    globalThis.document = {
+      getElementById: id => (id === 'report-period' ? period : null),
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      body: { classList: { add() {}, remove() {} } },
+    };
+    RQ.configure({ activeCourse: CID, renderReports: () => {}, onLastStudent: () => {} });
+    RQ.tqStudentIndex = 0;
+  });
+  afterEach(() => {
+    delete COURSES[CID];
+    clearProfCache();
+  });
+
+  it('does nothing while the Term 1 tab is open', () => {
+    expect(ReportBlocks.getTermId()).toBe('term-2');
+    RQ.tqCommentTab('term-1');
+    expect(press()).toBe(true);
+    expect(current().id).toBe('stu-hopper');
+    expect(getStudentTermRating(CID, 'stu-hopper', 'term-2').approvedAt).toBeFalsy();
+    expect(getStudentTermRating(CID, 'stu-hopper', 'term-1').approvedAt).toBeFalsy();
+  });
+
+  it('still approves and moves on from This Report', () => {
+    RQ.tqCommentTab('this');
+    press();
+    expect(getStudentTermRating(CID, 'stu-hopper', 'term-2').approvedAt).toBeTruthy();
+    expect(current().id).toBe('stu-lovelace');
+  });
+});

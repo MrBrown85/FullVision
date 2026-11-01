@@ -56,6 +56,44 @@ describe('sentencesOf', () => {
     ]);
     expect(RQ.sentencesOf('')).toEqual([]);
   });
+  it('never ends a sentence after a title, e.g., i.e. or an initial (live run: “He also helped Ms.” / “Lee clean up.”)', () => {
+    expect(
+      RQ.sentencesOf('Liam asked great questions in the lab. He also helped Ms. Lee clean up. He is kind!'),
+    ).toEqual(['Liam asked great questions in the lab.', 'He also helped Ms. Lee clean up.', 'He is kind!']);
+    const one = [
+      'She thanked Mr. Singh, Mrs. Ortiz and Dr. Patel for their help.',
+      'They walked along St. George Street to the park.',
+      'She read tall tales, e.g. Paul Bunyan, all term.',
+      'He chose one planet, i.e. Mars, for the project.',
+      'She read a book by J. K. Rowling for the report.',
+      'J. K. Rowling was her author for the report.',
+      'She brought pencils, rulers, etc. to every lab.',
+    ];
+    one.forEach(s => expect(RQ.sentencesOf(s + ' Next, she can revise.')).toEqual([s, 'Next, she can revise.']));
+  });
+  it('keeps a quoted title ending in ? or ! in its sentence, and never splits inside a quotation', () => {
+    expect(
+      RQ.sentencesOf('Her best piece was “Why Do Leaves Fall?” and it showed her thinking. Next, she can revise.'),
+    ).toEqual(['Her best piece was “Why Do Leaves Fall?” and it showed her thinking.', 'Next, she can revise.']);
+    expect(RQ.sentencesOf('Her best piece was “Why? A Study of Rain” this term. She explained it well.')).toEqual([
+      'Her best piece was “Why? A Study of Rain” this term.',
+      'She explained it well.',
+    ]);
+    expect(RQ.sentencesOf('He wrote "Stop! Look Both Ways" for the poster. It was clear.')).toEqual([
+      'He wrote "Stop! Look Both Ways" for the poster.',
+      'It was clear.',
+    ]);
+    // A title that ends the sentence still ends it, and a grade letter does too.
+    expect(RQ.sentencesOf('Her best piece was “What Does the Poster Show?” Next, she can revise.')).toEqual([
+      'Her best piece was “What Does the Poster Show?”',
+      'Next, she can revise.',
+    ]);
+    expect(RQ.sentencesOf('Ava is earning a B. Her work habits are good. She is close to an A.')).toEqual([
+      'Ava is earning a B.',
+      'Her work habits are good.',
+      'She is close to an A.',
+    ]);
+  });
 });
 
 const row = (id, step, text, extra = {}) =>
@@ -371,6 +409,39 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(RQ.gapPart(rows, ctx, { seed: 3 })).toBe('habits');
     const every = RQ.PARTS.map(p => ({ id: 'x:' + p.id, step: p.steps[0], text: 'X.' }));
     expect(RQ.gapPart(every, ctx, { seed: 3 })).toBe('grade');
+  });
+
+  it('a typed sentence with Ms., e.g. or an initial stays one row through reorder and regenerate', () => {
+    const { d, ctx } = draftFor(cece());
+    const rows = RQ.rowsFromDraft(d);
+    const mine = ' Cece also helped Ms. Lee clean up. She read J. K. Rowling, e.g. the first book, at home.';
+    const typed = RQ.alignRows(rows, RQ.composeRows(rows) + mine);
+    expect(typed.filter(RQ.isTyped).map(r => r.text)).toEqual([
+      'Cece also helped Ms. Lee clean up.',
+      'She read J. K. Rowling, e.g. the first book, at home.',
+    ]);
+    // Moved to the top: still one row each, and the box reads back the same rows.
+    const at = typed.findIndex(RQ.isTyped);
+    const moved = RQ.dropRow(typed, at, 0, true);
+    const text = RQ.composeRows(moved);
+    expect(text.startsWith('Cece also helped Ms. Lee clean up.')).toBe(true);
+    const back = RQ.alignRows(moved, text);
+    expect(back.map(r => r.id)).toEqual(moved.map(r => r.id));
+    expect(back.some(r => r.edited && !RQ.isTyped(r))).toBe(false);
+    // Generate again: the typed rows come back whole, at their place.
+    const again = CommentBank.draft(ctx, { seed: CommentBank.seedFor(cece().id) + 1 });
+    const next = RQ.keepTyped(back, RQ.rowsFromDraft(again, back));
+    expect(next.filter(RQ.isTyped).map(r => r.text)).toEqual([
+      'Cece also helped Ms. Lee clean up.',
+      'She read J. K. Rowling, e.g. the first book, at home.',
+    ]);
+    const after = RQ.composeRows(next);
+    expect(RQ.alignRows(next, after).map(r => r.id)).toEqual(next.map(r => r.id));
+    expect(
+      RQ.recoverRows(after, ctx)
+        .filter(r => r.step === null)
+        .map(r => r.text),
+    ).toEqual(['Cece also helped Ms. Lee clean up.', 'She read J. K. Rowling, e.g. the first book, at home.']);
   });
 
   it('composeRows: the comment follows the rows, and the name moves to whichever sentence comes first', () => {

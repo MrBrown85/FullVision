@@ -5,7 +5,7 @@
  * report card prints both, and the comment can say it in a sentence.
  */
 import './setup.js';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const CID = 'term-attendance';
 const MAX = { id: 'stu-max', firstName: 'Max', lastName: 'Lind', pronouns: 'he/him' };
@@ -75,5 +75,87 @@ describe('term attendance', () => {
     expect(year).toContain('Times Late</span> <b>5</b>');
     expect(year).toContain('Year to date');
     expect(ReportBlocks.renderBlockAttendance(CID, MAX, ctx, { late: false })).not.toContain('Times Late');
+  });
+
+  it('keeps only whole numbers from 0 to 200: no rounding, no huge numbers', () => {
+    saveTermAttendance(CID, MAX.id, 'term-2', 2.7, '1.2');
+    expect(getTermAttendance(CID, MAX.id, 'term-2')).toMatchObject({ absences: null, lates: null });
+    saveTermAttendance(CID, MAX.id, 'term-2', 99999999, '1e+21');
+    expect(getTermAttendance(CID, MAX.id, 'term-2')).toMatchObject({ absences: null, lates: null });
+    saveTermAttendance(CID, MAX.id, 'term-2', '200', 0);
+    expect(getTermAttendance(CID, MAX.id, 'term-2')).toMatchObject({ absences: 200, lates: 0 });
+    saveTermAttendance(CID, MAX.id, 'term-2', 201, '7');
+    expect(getTermAttendance(CID, MAX.id, 'term-2')).toMatchObject({ absences: null, lates: 7 });
+  });
+});
+
+describe('the Attendance card’s boxes (live run: 99999999 and 1e+21 printed, 2.7 became “two”)', () => {
+  const RQ = ReportQuestionnaire;
+  let hadDoc, oldDoc, els;
+  const input = (value, badInput) => {
+    const cls = new Set();
+    const attrs = {};
+    return {
+      value,
+      validity: { badInput: !!badInput },
+      classList: { toggle: (c, on) => (on ? cls.add(c) : cls.delete(c)), contains: c => cls.has(c) },
+      setAttribute: (k, v) => (attrs[k] = v),
+      removeAttribute: k => delete attrs[k],
+      attrs,
+    };
+  };
+  beforeEach(() => {
+    localStorage.clear();
+    delete _cache.termRatings[CID];
+    hadDoc = 'document' in globalThis;
+    oldDoc = globalThis.document;
+    els = { 'tq-att-absences': input(''), 'tq-att-lates': input(''), 'tq-att-note': { innerHTML: '' } };
+    globalThis.document = {
+      getElementById: id => els[id] || null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    };
+    // No student on screen: the card saves and redraws its note only.
+    RQ.configure({ activeCourse: CID, renderReports: () => {} });
+    RQ.tqStudentIndex = 0;
+  });
+  afterEach(() => {
+    if (hadDoc) globalThis.document = oldDoc;
+    else delete globalThis.document;
+  });
+  const enter = (a, l) => {
+    els['tq-att-absences'].value = a;
+    els['tq-att-lates'].value = l;
+    RQ.tqSetAttendance(MAX.id);
+    return getTermAttendance(CID, MAX.id, ReportBlocks.getTermId());
+  };
+
+  it('reads a box as a whole number from 0 to 200, or not at all', () => {
+    expect(RQ.attendanceValue(input('3'))).toBe(3);
+    expect(RQ.attendanceValue(input(' 0 '))).toBe(0);
+    expect(RQ.attendanceValue(input('200'))).toBe(200);
+    expect(RQ.attendanceValue(input(''))).toBe('');
+    ['2.7', '-4', '201', '99999999', '1e+21', 'abc'].forEach(v => expect(RQ.attendanceValue(input(v))).toBeNull());
+    expect(RQ.attendanceValue(input('', true))).toBeNull();
+  });
+
+  it('saves nothing from a box that holds anything else, and says so plainly', () => {
+    expect(enter('3', '1')).toMatchObject({ absences: 3, lates: 1 });
+    expect(els['tq-att-note'].innerHTML).toBe('Added to the comment.');
+    for (const [a, l] of [
+      ['99999999', '1e+21'],
+      ['2.7', '1.2'],
+      ['-4', '-1'],
+      ['5', '201'],
+    ]) {
+      expect(enter(a, l)).toMatchObject({ absences: 3, lates: 1 });
+      expect(els['tq-att-note'].innerHTML).toContain('Enter a whole number from 0 to 200.');
+    }
+    expect(els['tq-att-absences'].classList.contains('bad')).toBe(false);
+    expect(els['tq-att-lates'].classList.contains('bad')).toBe(true);
+    expect(els['tq-att-lates'].attrs['aria-invalid']).toBe('true');
+    expect(enter('4', '2')).toMatchObject({ absences: 4, lates: 2 });
+    expect(els['tq-att-lates'].classList.contains('bad')).toBe(false);
+    expect(els['tq-att-note'].innerHTML).toBe('Added to the comment.');
   });
 });

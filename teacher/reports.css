@@ -4568,6 +4568,9 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--text-2);
   line-height: 1.35;
 }
+.qn-nodraft {
+  margin-bottom: 8px;
+}
 .qn-earlier {
   border: 1px solid var(--border-2);
   border-radius: var(--radius-sm);
@@ -4609,7 +4612,8 @@ body.qn-roster #gb-sidebar .student-row-note {
   background: var(--surface);
   color: var(--text);
 }
-.qn-att-input.warn {
+.qn-att-input.warn,
+.qn-att-input.bad {
   border-color: var(--score-2);
 }
 .qn-att-note {
@@ -5294,6 +5298,12 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--text-2);
 }
 /* A thin part of the bank, under the row's source line (plan PR 13). */
+.qn-pron-note {
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--score-2-text);
+}
 .qn-req-thin {
   font-size: 12px;
   line-height: 1.4;

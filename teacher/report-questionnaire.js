@@ -1141,20 +1141,49 @@ window.ReportQuestionnaire = (function () {
     };
     return `<div class="qn-card qn-att">
       <span class="qn-att-title">Attendance</span>
-      <label class="qn-att-field">Classes Absent<input type="number" min="0" step="1" inputmode="numeric" class="qn-att-input${warn('absences', 'prevAbsences')}" id="tq-att-absences" data-tq-att="absences" data-sid="${sid}" aria-label="Classes Absent" title="Classes absent so far this year, as a total to date. Optional." value="${att.absences == null ? '' : att.absences}"></label>
-      <label class="qn-att-field">Times Late<input type="number" min="0" step="1" inputmode="numeric" class="qn-att-input${warn('lates', 'prevLates')}" id="tq-att-lates" data-tq-att="lates" data-sid="${sid}" aria-label="Times Late" title="Times late so far this year, as a total to date. Optional." value="${att.lates == null ? '' : att.lates}"></label>
+      <label class="qn-att-field">Classes Absent<input type="number" min="0" max="200" step="1" inputmode="numeric" class="qn-att-input${warn('absences', 'prevAbsences')}" id="tq-att-absences" data-tq-att="absences" data-sid="${sid}" aria-label="Classes Absent" title="Classes absent so far this year, as a total to date. Optional." value="${att.absences == null ? '' : att.absences}"></label>
+      <label class="qn-att-field">Times Late<input type="number" min="0" max="200" step="1" inputmode="numeric" class="qn-att-input${warn('lates', 'prevLates')}" id="tq-att-lates" data-tq-att="lates" data-sid="${sid}" aria-label="Times Late" title="Times late so far this year, as a total to date. Optional." value="${att.lates == null ? '' : att.lates}"></label>
       <span class="qn-att-note" id="tq-att-note" aria-live="polite">${_attendanceNoteHtml(att)}</span>
     </div>`;
   }
 
+  /* A box's total: a whole number from 0 to 200, '' for an empty box, or
+     null for anything else (a decimal, a negative, 1e+21), which is never
+     rounded, saved or printed. */
+  var ATTENDANCE_MAX = 200;
+  var ATTENDANCE_BAD = 'Enter a whole number from 0 to 200.';
+  function attendanceValue(input) {
+    if (input && input.validity && input.validity.badInput) return null;
+    var v = String((input && input.value) == null ? '' : input.value).trim();
+    if (v === '') return '';
+    if (!/^\d+$/.test(v)) return null;
+    var n = Number(v);
+    return n <= ATTENDANCE_MAX ? n : null;
+  }
+
   /* A box changed: save both totals and redraw only the note, so the
-     cursor stays where the teacher put it. */
+     cursor stays where the teacher put it. A box that does not hold a
+     whole number from 0 to 200 saves nothing and says so. */
   function tqSetAttendance(sid) {
     var abs = document.getElementById('tq-att-absences');
     var late = document.getElementById('tq-att-lates');
     if (!abs || !late) return;
     var termId = getTermId();
-    saveTermAttendance(_activeCourse, sid, termId, abs.value, late.value);
+    var a = attendanceValue(abs);
+    var l = attendanceValue(late);
+    var bad = function (el, v) {
+      if (el.classList) el.classList.toggle('bad', v === null);
+      if (v === null && el.setAttribute) el.setAttribute('aria-invalid', 'true');
+      else if (el.removeAttribute) el.removeAttribute('aria-invalid');
+    };
+    bad(abs, a);
+    bad(late, l);
+    if (a === null || l === null) {
+      var warnNote = document.getElementById('tq-att-note');
+      if (warnNote) warnNote.innerHTML = `<span class="qn-att-warn">${ATTENDANCE_BAD}</span>`;
+      return;
+    }
+    saveTermAttendance(_activeCourse, sid, termId, a, l);
     var att = getTermAttendance(_activeCourse, sid, termId);
     var note = document.getElementById('tq-att-note');
     if (note) note.innerHTML = _attendanceNoteHtml(att);
@@ -1488,6 +1517,15 @@ window.ReportQuestionnaire = (function () {
     var termId = getTermId();
     var key = _rowKey(st);
     var f = _facts(st, true);
+    // No marked work this term: nothing to draft from, so nothing is
+    // drafted and the card says so.
+    if (noMarkedWork(f)) {
+      _noDraft[key] = true;
+      var line = document.getElementById('tq-nodraft');
+      if (line) line.hidden = false;
+      else rerender();
+      return;
+    }
     var n = (_generated[st.id] || 0) + 1;
     _generated[st.id] = n;
     // Sentences the teacher edited stay, as written, and so does the order
@@ -1539,6 +1577,23 @@ window.ReportQuestionnaire = (function () {
     _writeRows(st);
   }
 
+  /* Whether the student has no marked work this term (a mark on none of
+     the class's marked work), so Generate has nothing true to draft from.
+     The IE comment, which is about the missing marks, still drafts. */
+  var _noDraft = {}; // key: Generate was pressed with no marked work
+  function noMarkedWork(f) {
+    var g = (f && f.grade) || {};
+    if (g.basis === 'ie') return false;
+    return !(g.marked && g.marked.mine > 0);
+  }
+  function _noDraftHtml(student, f) {
+    if (!noMarkedWork(f)) return '';
+    var shown = !!_noDraft[_rowKey(student)];
+    return `<div class="qn-hint qn-nodraft" id="tq-nodraft" role="status"${shown ? '' : ' hidden'}>No marked work for ${esc(
+      _first(student),
+    )} this term yet, so there is nothing to draft from. You can write the comment yourself.</div>`;
+  }
+
   /* Earlier reports with a comment, newest first, as tabs beside This Report. */
   function _earlierReports(cid, sid, termId) {
     var n = Number(String(termId).replace(/\D/g, ''));
@@ -1583,7 +1638,7 @@ window.ReportQuestionnaire = (function () {
       : '';
     var body;
     if (thisTab) {
-      body = `${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" title="The student’s report comment. Type here, or change a sentence in the Sentences card below." data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea></div>
+      body = `${_noDraftHtml(student, _facts(student))}${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" title="The student’s report comment. Type here, or change a sentence in the Sentences card below." data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea></div>
         <div class="qn-comment-foot" id="tq-comment-foot"${text.trim() ? '' : ' hidden'}>
           ${_countHtml(cid, text)}
           <button type="button" class="qn-sel-add" id="tq-sel-add" hidden data-action="tqSentences" data-do="ownFromBox" title="Adds the selected sentence to your bank, for other students it fits.">Add to My Bank</button>
@@ -2478,22 +2533,11 @@ window.ReportQuestionnaire = (function () {
     return p ? p.label : '';
   }
 
-  /* A comment's sentences: split after . ! ? or … (and a closing quote)
-     where the next sentence starts. No lookbehind (Safari before 16.4). */
+  /* A comment's sentences, as the realiser splits them: after . ! ? or …
+     (and a closing quote) where the next sentence starts, never after a
+     title such as Ms., e.g. or an initial, or inside a quotation. */
   function sentencesOf(text) {
-    var t = String(text || '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    var out = [];
-    var re = /[.!?…]+["”]?\s+(?=["“]?[A-Z0-9])/g;
-    var from = 0;
-    var m;
-    while ((m = re.exec(t))) {
-      out.push(t.slice(from, m.index + m[0].length).trim());
-      from = m.index + m[0].length;
-    }
-    if (from < t.length) out.push(t.slice(from).trim());
-    return out.filter(Boolean);
+    return CommentRealiser.sentences(text);
   }
 
   function _bankById(id) {
@@ -2545,6 +2589,7 @@ window.ReportQuestionnaire = (function () {
         row.drafted = was ? was.drafted : null;
         if (was) {
           row.id = was.id;
+          if (was.pronounWords) row.pronounWords = was.pronounWords;
           row.raw = was.raw || x;
           row.prov = was.prov;
           row.s = was.s;
@@ -2926,6 +2971,59 @@ window.ReportQuestionnaire = (function () {
     if (!text) return [];
     _rows[key] = recoverRows(text, _bankContext(_activeCourse, student, f), rating.draftMeta);
     return _rows[key];
+  }
+
+  /* ── Pronouns changed (Edit Student) ────────────────────── */
+
+  /* The pronouns each student's rows were last drawn with, per row key.
+     When they change, every bank sentence the teacher has not edited is
+     filled again with the new ones at once (the realiser); a sentence the
+     teacher typed or edited is left as written and, when it still holds
+     an old pronoun, its row says "Pronouns changed". The comment saved
+     this way is a new text, so an approved one needs approving again
+     (upsertTermRating clears the approval, as Use the New Sentence does). */
+  var _pronounsSeen = {};
+  function _pronounWords(p) {
+    return p ? [p.subj, p.obj, p.poss, p.refl].filter(Boolean) : [];
+  }
+  function _holdsWord(text, words) {
+    var t = String(text || '');
+    return (words || []).some(function (w) {
+      return new RegExp('(^|[^A-Za-z])' + w + '($|[^A-Za-z])', 'i').test(t);
+    });
+  }
+  function pronounsChanged(rows, ctx, was, now) {
+    var keep = _pronounWords(now);
+    var gone = _pronounWords(was).filter(function (w, i, all) {
+      return keep.indexOf(w) < 0 && all.indexOf(w) === i;
+    });
+    var who = _whoOf(ctx);
+    return rows.map(function (r) {
+      if (!r.edited && r.raw && r.raw.toks)
+        return Object.assign({}, r, { raw: Object.assign({}, r.raw, { who: who }) });
+      if (r.edited && !r.classLine && gone.length && _holdsWord(r.text, gone))
+        return Object.assign({}, r, { pronounWords: gone });
+      return r;
+    });
+  }
+  /* Whether a row's note shows: it still holds an old pronoun. */
+  function pronounNote(row) {
+    return !!row && !!row.pronounWords && _holdsWord(row.text, row.pronounWords);
+  }
+  function _syncPronouns(cid, student, f) {
+    var key = _rowKey(student);
+    var now = (f && f.pronouns) || null;
+    var was = _pronounsSeen[key];
+    _pronounsSeen[key] = now;
+    var rows = _rows[key];
+    if (!was || !rows || !rows.length || JSON.stringify(was) === JSON.stringify(now)) return;
+    var next = pronounsChanged(rows, _bankContext(cid, student, f), was, now);
+    _rows[key] = next;
+    var text = composeRows(next);
+    var termId = getTermId();
+    var saved = plainComment((getStudentTermRating(cid, student.id, termId) || {}).narrative || '');
+    if (text !== saved.replace(/\s+$/, '')) upsertTermRating(cid, student.id, termId, { narrative: text });
+    _syncLast(key, next, text);
   }
 
   /* The comment from the rows, in their order, through the realiser (plan
@@ -3600,7 +3698,11 @@ window.ReportQuestionnaire = (function () {
     var source = _unitSource(unit, cid, student, f, ctx) + (added ? ' · added just now' : '');
     return `<div class="qn-req-row qn-srow${tint}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
       ${handle}<div class="qn-req-part"><span class="qn-req-label">${esc(rowLabel(row, path))}</span></div>
-      <div class="qn-req-body"><span class="qn-req-text">${esc(text)}</span><span class="qn-req-source">${esc(source)}</span>${thin}${ownBox}</div>
+      <div class="qn-req-body"><span class="qn-req-text">${esc(text)}</span><span class="qn-req-source">${esc(source)}</span>${
+        unit.some(pronounNote)
+          ? '<span class="qn-pron-note" title="The student’s pronouns changed after you wrote this sentence. Check its pronouns.">Pronouns changed</span>'
+          : ''
+      }${thin}${ownBox}</div>
       ${act}
       ${low ? _checkHtml(student.id, 'low') : ''}
       ${open ? (typed ? _optionsMenuHtml(i) : _wordingMenuHtml(cid, student, ctx, rows, i)) : ''}
@@ -6173,6 +6275,8 @@ window.ReportQuestionnaire = (function () {
     var student = students[tqStudentIndex];
     _enterScreen(cid, student);
     var f = _facts(student, true);
+    // The pronouns may have changed (Edit Student) since the rows were drawn.
+    _syncPronouns(cid, student, f);
     // Marks may have changed since the page was last drawn.
     _strength = null;
     _staleCache = {};
@@ -6272,7 +6376,8 @@ window.ReportQuestionnaire = (function () {
     }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      tqApproveNext();
+      // An earlier report's tab is read only: ⌘ Return does nothing there.
+      if (_commentTab === 'this') tqApproveNext();
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
@@ -6307,6 +6412,8 @@ window.ReportQuestionnaire = (function () {
     tqCloseInfo: tqCloseInfo,
     tqEditStudent: tqEditStudent,
     tqSetAttendance: tqSetAttendance,
+    noMarkedWork: noMarkedWork,
+    attendanceValue: attendanceValue,
     tqAddReportNote: tqAddReportNote,
     tqSelectStudent: tqSelectStudent,
     tqSetBasis: tqSetBasis,
@@ -6354,6 +6461,8 @@ window.ReportQuestionnaire = (function () {
     gapPart: _gapPart,
     recoverRows: recoverRows,
     composeRows: composeRows,
+    pronounsChanged: pronounsChanged,
+    pronounNote: pronounNote,
     units: _units,
     moveRow: moveRow,
     dropRow: dropRow,

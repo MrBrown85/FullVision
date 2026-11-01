@@ -347,8 +347,63 @@ window.CommentRealiser = (function () {
     };
   }
 
+  /* ── Sentences ─────────────────────────────────────────────────────── */
+
+  /* A comment's sentences: split after . ! ? or … (and a closing quote)
+     where the next sentence starts, never after a title (Ms. Mr. Mrs. Dr.
+     St.), e.g. or i.e., an initial (J. K. Rowling), or inside a quotation
+     (“Why? A Study of Rain”). A ? or ! that closes a quotation followed by
+     a lower-case word stays in the sentence. etc. ends a sentence only
+     before a capital. No lookbehind (Safari before 16.4). */
+  var TITLE_WORD = /^(?:mr|ms|mrs|dr|st)$/i;
+  var INSIDE_WORD = /^(?:e\.g|i\.e)$/i;
+  var INITIAL = /^[A-Z]$/;
+  function _lastWord(s) {
+    return (String(s).match(/(\S+)$/) || ['', ''])[1].replace(/^[(“"‘']+/, '');
+  }
+  function _count(s, ch) {
+    return String(s).split(ch).length - 1;
+  }
+  function _inQuote(before, after) {
+    if (_count(before, '“') > _count(before, '”') && after.indexOf('”') >= 0) return true;
+    return _count(before, '"') % 2 === 1 && after.indexOf('"') >= 0;
+  }
+  function _endsHere(sentence, mark, rest) {
+    if (_inQuote(sentence + mark, rest)) return false;
+    if (mark !== '.') return true;
+    var word = _lastWord(sentence);
+    if (TITLE_WORD.test(word) || INSIDE_WORD.test(word)) return false;
+    if (!INITIAL.test(word)) return true;
+    // A single capital: an initial when the sentence starts with it, when
+    // another initial or a title is next to it; a grade ("a B.") is not.
+    var words = String(sentence).trim().split(' ');
+    var prev = words.length > 1 ? words[words.length - 2].replace(/^[(“"‘']+/, '') : '';
+    if (/^an?$/i.test(prev)) return true;
+    if (words.length === 1) return false;
+    if (/^[A-Z]\.$/.test(prev) || TITLE_WORD.test(prev.replace(/\.$/, ''))) return false;
+    return !/^[A-Z]\.(?:\s|$)/.test(rest);
+  }
+  function sentences(text) {
+    var t = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    var out = [];
+    var re = /([.!?…]+["”]?)\s+(?=["“]?[A-Z0-9])/g;
+    var from = 0;
+    var m;
+    while ((m = re.exec(t))) {
+      var end = m.index + m[0].length;
+      if (!_endsHere(t.slice(from, m.index), m[1], t.slice(end))) continue;
+      out.push(t.slice(from, end).trim());
+      from = end;
+    }
+    if (from < t.length) out.push(t.slice(from).trim());
+    return out.filter(Boolean);
+  }
+
   return {
     MAX_WORDS: MAX_WORDS,
+    sentences: sentences,
     TITLE_SLOTS: TITLE_SLOTS,
     numberWords: numberWords,
     numberIn: numberIn,

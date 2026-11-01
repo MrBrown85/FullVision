@@ -1150,8 +1150,14 @@ describe('wording by kind of class', () => {
       const d = CommentBank.draft(ctx, { seed: 5 });
       expect(CommentBank.verify(d, f, {}).replaced, tag).toEqual([]);
       // No closing sentence or support lines are set for these classes, and
-      // one piece per competency is too little evidence for a next step.
-      expect(d.ids.length, tag).toBeGreaterThanOrEqual(4);
+      // one piece per competency is too little evidence for a next step (so
+      // no family line either, which belongs to it).
+      expect(d.ids.length, tag).toBeGreaterThanOrEqual(3);
+      if (!d.sentences.some(x => x.step === 'nextStep'))
+        expect(
+          d.sentences.map(x => x.step),
+          tag,
+        ).not.toContain('home');
       expect(d.text, tag).not.toMatch(/[{}[\]]/);
       if (fam === 'pe' || fam === 'arts') expect(d.text, tag).not.toMatch(/hands? in|handing in/i);
       if (fam === 'pe' || fam === 'career')
