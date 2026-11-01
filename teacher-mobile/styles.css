@@ -182,11 +182,21 @@ body.fv-switching-course::after {
   transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
+/* A tab switch fades the new tab in. */
+.m-screen.m-tab-enter {
+  opacity: 0;
+}
+.m-screen.m-tab-enter-active {
+  opacity: 1;
+  transition: opacity 0.18s ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .m-screen.m-push-enter-active,
   .m-screen.m-push-exit-active,
   .m-screen.m-pop-enter-active,
-  .m-screen.m-pop-exit-active {
+  .m-screen.m-pop-exit-active,
+  .m-screen.m-tab-enter-active {
     transition: none;
   }
   .m-screen,

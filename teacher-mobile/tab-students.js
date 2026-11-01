@@ -145,6 +145,14 @@ window.MStudents = (function () {
     }
   }
 
+  function getCardIndex() {
+    return _stackInstance ? _stackInstance.getCurrentIndex() : 0;
+  }
+
+  function goToCard(idx) {
+    if (_stackInstance) _stackInstance.goTo(idx);
+  }
+
   function destroyCardStack() {
     if (_stackInstance) {
       _stackInstance.destroy();
@@ -228,6 +236,8 @@ window.MStudents = (function () {
     filterList: filterList,
     initCardStack: initCardStack,
     destroyCardStack: destroyCardStack,
+    getCardIndex: getCardIndex,
+    goToCard: goToCard,
     renderAllStudents: renderAllStudents,
     showAllStudents: showAllStudents,
     jumpToStudent: jumpToStudent,

@@ -8,6 +8,8 @@
   var APP_VERSION = '1.0';
   var _activeTab = 'students';
   var _navStacks = { students: [], observe: [], grade: [] };
+  // Where each tab was left: scroll, card, and the screens open on it.
+  var _tabState = { students: null, observe: null, grade: null };
   var _cid = null;
   var _searchTimer = null;
   // The student whose page opened the current grading screen (Grade button).
@@ -86,7 +88,7 @@
           MSweep.refresh();
           return;
         }
-        _renderTab(_activeTab);
+        _rerenderActiveTab();
       });
     }
   }
@@ -350,6 +352,7 @@
   /* ── Tab switching ──────────────────────────────────────────── */
   function _switchTab(tab) {
     if (tab === _activeTab) return;
+    _tabState[_activeTab] = _captureTabState();
     _activeTab = tab;
     _gradeReturnSid = null;
 
@@ -363,6 +366,93 @@
     });
 
     _renderTab(tab);
+    _restoreTabState(_tabState[tab]);
+    _tabState[tab] = null;
+
+    // The tab fades in rather than cutting.
+    var root = document.querySelector('#m-nav-stack .m-screen');
+    if (root) {
+      root.classList.add('m-tab-enter');
+      requestAnimationFrame(function () {
+        root.classList.add('m-tab-enter-active');
+        root.classList.remove('m-tab-enter');
+        setTimeout(function () {
+          root.classList.remove('m-tab-enter-active');
+        }, 220);
+      });
+    }
+  }
+
+  // The active tab, drawn again from the data, in the same place.
+  function _rerenderActiveTab() {
+    var state = _captureTabState();
+    _renderTab(_activeTab);
+    _restoreTabState(state);
+  }
+
+  /* ── Tab state: each tab stays where it was left ──────────── */
+  function _captureTabState() {
+    var stack = document.getElementById('m-nav-stack');
+    var screens = stack ? stack.querySelectorAll('.m-screen') : [];
+    if (!screens.length) return null;
+    var content = screens[0].querySelector('.m-screen-content');
+    var state = {
+      scrollTop: content ? content.scrollTop : 0,
+      cardIndex: _activeTab === 'students' && MStudents.getCardIndex ? MStudents.getCardIndex() : 0,
+      gradeReturnSid: _gradeReturnSid,
+      pushed: [],
+    };
+    for (var i = 1; i < screens.length; i++) {
+      var raw = screens[i].getAttribute('data-restore');
+      if (!raw) continue;
+      var c = screens[i].querySelector('.m-screen-content');
+      state.pushed.push({
+        desc: JSON.parse(raw),
+        scrollTop: c ? c.scrollTop : 0,
+        gradeIndex: MGrade.getCurrentIndex ? MGrade.getCurrentIndex() : 0,
+      });
+    }
+    return state;
+  }
+
+  function _restoreTabState(state) {
+    if (!state) return;
+    var stack = document.getElementById('m-nav-stack');
+    var root = stack.querySelector('.m-screen');
+    if (!root) return;
+    if (state.cardIndex && MStudents.goToCard) MStudents.goToCard(state.cardIndex);
+    var content = root.querySelector('.m-screen-content');
+    if (content) content.scrollTop = state.scrollTop;
+    state.pushed.forEach(_restorePushed);
+    _gradeReturnSid = state.gradeReturnSid;
+  }
+
+  // A screen that was open on this tab, put back without the slide.
+  function _restorePushed(p) {
+    var desc = p.desc;
+    var html;
+    if (desc.kind === 'detail') html = MStudents.renderDetail(_cid, desc.sid);
+    else if (desc.kind === 'swiper') html = MGrade.renderSwiper(_cid, desc.aid);
+    else if (desc.kind === 'sweep') html = MSweep.render(_cid, { keep: true });
+    if (!html) return;
+    var stack = document.getElementById('m-nav-stack');
+    var below = stack.querySelector('.m-screen:last-child');
+    var tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    var screen = tmp.firstElementChild;
+    screen.classList.remove('m-screen-hidden');
+    screen.setAttribute('data-restore', JSON.stringify(desc));
+    stack.appendChild(screen);
+    if (below) below.style.display = 'none';
+    _navStacks[_activeTab].push('detail');
+    var navBar = screen.querySelector('.m-nav-bar');
+    if (navBar) MC.setupScrollTitle(screen, navBar.id);
+    if (desc.kind === 'swiper') {
+      MGrade.setupSwiper(_cid, desc.aid);
+      MGrade.jumpToStudent(p.gradeIndex, true);
+    }
+    var content = screen.querySelector('.m-screen-content');
+    if (content) content.scrollTop = p.scrollTop;
   }
 
   function _renderTab(tab) {
@@ -411,7 +501,8 @@
   }
 
   /* ── Push/pop screens ───────────────────────────────────────── */
-  function _pushScreen(html) {
+  // `restore` says how to draw the screen again when its tab is reopened.
+  function _pushScreen(html, restore) {
     var stack = document.getElementById('m-nav-stack');
     var current = stack.querySelector('.m-screen:last-child');
 
@@ -419,6 +510,7 @@
     var tmp = document.createElement('div');
     tmp.innerHTML = html;
     var newScreen = tmp.firstElementChild;
+    if (restore) newScreen.setAttribute('data-restore', JSON.stringify(restore));
     newScreen.classList.add('m-push-enter');
     stack.appendChild(newScreen);
 
@@ -483,6 +575,7 @@
     tmp.innerHTML = MStudents.renderDetail(_cid, sid);
     var screen = tmp.firstElementChild;
     screen.classList.remove('m-screen-hidden');
+    screen.setAttribute('data-restore', JSON.stringify({ kind: 'detail', sid: sid }));
     stack.appendChild(screen);
     if (list) list.style.display = 'none';
     _navStacks[_activeTab].push('detail');
@@ -521,7 +614,7 @@
         _switchTab('grade');
         if (!newest) return;
         _gradeReturnSid = gradeSid;
-        _pushScreen(MGrade.renderSwiper(_cid, newest.id));
+        _pushScreen(MGrade.renderSwiper(_cid, newest.id), { kind: 'swiper', aid: newest.id });
         var gradeIdx = sortStudents(getStudents(_cid).slice(), 'alpha').findIndex(function (st) {
           return st.id === gradeSid;
         });
@@ -675,7 +768,7 @@
       if (action === 'm-student-detail') {
         var sid = target.getAttribute('data-sid');
         var html = MStudents.renderDetail(_cid, sid);
-        _pushScreen(html);
+        _pushScreen(html, { kind: 'detail', sid: sid });
         return;
       }
 
@@ -701,7 +794,7 @@
       }
 
       if (action === 'm-sweep-start') {
-        _pushScreen(MSweep.render(_cid));
+        _pushScreen(MSweep.render(_cid), { kind: 'sweep' });
         return;
       }
 
@@ -871,7 +964,7 @@
       if (action === 'm-grade-assess') {
         var aid = target.closest('[data-aid]').getAttribute('data-aid');
         var swiperHTML = MGrade.renderSwiper(_cid, aid);
-        _pushScreen(swiperHTML);
+        _pushScreen(swiperHTML, { kind: 'swiper', aid: aid });
         setTimeout(function () {
           MGrade.setupSwiper(_cid, aid);
         }, 400);
