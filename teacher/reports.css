@@ -3812,6 +3812,7 @@ textarea.studio-text {
   --qn-best-bg: #e8f1fe;
   --qn-ring: #c07a00;
   --qn-copied-bg: #f0faf2;
+  --qn-att-bg: #f5f9ff;
 }
 @media (prefers-color-scheme: dark) {
   .qn,
@@ -3821,6 +3822,7 @@ textarea.studio-text {
     --qn-best-bg: var(--active-light);
     --qn-ring: var(--score-2-text);
     --qn-copied-bg: var(--score-3-bg);
+    --qn-att-bg: var(--surface-2);
   }
 }
 
@@ -4379,7 +4381,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--link);
+  color: inherit;
   cursor: pointer;
 }
 .qn-warn-link:focus-visible {
@@ -5549,6 +5551,10 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-srow.best {
   background: var(--qn-best-bg);
+}
+/* The attendance sentence, newly added (the States mockup). */
+.qn-srow.attendance {
+  background: var(--qn-att-bg);
 }
 .qn-srow.dragging {
   opacity: 0.35;

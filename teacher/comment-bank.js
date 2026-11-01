@@ -2657,7 +2657,8 @@ window.CommentBank = (function () {
      Not Handed In sentence and the late-work line after the habits, the
      support line before the home sentence (else after the next step), and
      the closing sentence last. The IE story states its own problem and
-     plan, so it takes only the closing sentence. */
+     plan, so it takes no late-work line; its support line comes before
+     the meeting sentence (the IEPath mockup). */
   var HABIT_KEYS = ['habits', 'strongHabits', 'attendance'];
   function _withClassSteps(order, ie) {
     var seq = (order || []).slice();
@@ -2677,6 +2678,9 @@ window.CommentBank = (function () {
       var go = at(['nextStep']);
       var close = seq.indexOf('closer');
       put('support', home >= 0 ? home : go >= 0 ? go + 1 : close >= 0 ? close : seq.length);
+    } else {
+      var meet = seq.indexOf('ieMeeting');
+      put('support', meet >= 0 ? meet : seq.indexOf('closer') >= 0 ? seq.indexOf('closer') : seq.length);
     }
     if (seq.indexOf('closer') < 0) seq.push('closer');
     return seq;
