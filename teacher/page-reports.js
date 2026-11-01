@@ -2032,6 +2032,11 @@ window.PageReports = (function () {
       RQ.tqLineChange(el);
       return;
     }
+    // "Belongs under" for a sentence of the teacher's own.
+    if (el.dataset.tqOwn) {
+      RQ.tqSentences('ownBind', el);
+      return;
+    }
     // "I checked this" on a highlighted row of the Sentences card.
     if (el.dataset.tqCheck) {
       RQ.tqSetCheck(el.dataset.tqCheck, !!el.checked);
@@ -2054,6 +2059,7 @@ window.PageReports = (function () {
   function _handleNarrativeInput(e) {
     if (e.target && e.target.id === 'tq-narrative') RQ.tqNarrativeInput();
     else if (e.target && e.target.id === 'tq-browse-search') RQ.tqSentences('search', e.target);
+    else if (e.target && e.target.id === 'tq-own-input') RQ.tqSentences('ownInput', e.target);
   }
 
   /* ⌘ Return and the arrow keys on the questionnaire. */

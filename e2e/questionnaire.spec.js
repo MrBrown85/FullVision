@@ -970,3 +970,179 @@ test('Approve and Next on the last student goes round to the next unapproved one
   await expect(page.locator('.report-seg-btn[data-tab="questionnaire"]')).toHaveClass(/active/);
   await expect(page.locator('#gb-sidebar .student-row[data-sid="st2"] .student-row-mark')).toHaveText('✓');
 });
+
+/* A sentence of the teacher's own (Colin, Nov 1): "+ Write Your Own" in
+   Browse Sentences and in Other Wording, "+ Add to My Bank" at the top of
+   the sheet, Add to My Bank on a typed sentence, Yours with ×. */
+test('Write Your Own: saved from Browse Sentences, shown as Yours, used, and still there after a reload', async ({
+  page,
+}) => {
+  await open(page);
+  await page.locator('#tq-generate').click();
+  await page.locator('#tq-browse-btn').click();
+  const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+  await sheet.locator('[role="tab"]', { hasText: 'Habits' }).click();
+  // Under a case heading: "+ Write Your Own", bound to that case (no picker).
+  const inCase = sheet.locator('.qn-browse-group-rows:not([hidden]) .qn-browse-add').first();
+  await expect(inCase).toHaveText('+ Write Your Own');
+  await inCase.click();
+  const box = sheet.locator('#tq-own');
+  await expect(box.locator('#tq-own-input')).toBeFocused();
+  await expect(box.locator('#tq-own-part')).toHaveCount(0);
+  await box.locator('.qn-line-cancel').click();
+  await expect(box).toHaveCount(0);
+  // At the top: "+ Add to My Bank" with Belongs Under.
+  await expect(sheet.locator('.qn-browse-add-top')).toHaveText('+ Add to My Bank');
+  await sheet.locator('.qn-browse-add-top').click();
+  await expect(box.locator('#tq-own-input')).toBeFocused();
+  await expect(box.locator('.qn-own-hint')).toHaveText(
+    'Write it for this student; FullVision turns the name and pronouns into slots.',
+  );
+  await expect(box.locator('#tq-own-part')).toHaveValue('habits');
+  await expect(box.locator('#tq-own-case')).toHaveValue('');
+  await expect(box.locator('#tq-own-save')).toBeDisabled();
+  await box.locator('#tq-own-input').fill('Cece brings her notebook and starts the warm-up to keep up her pace.');
+  await expect(box.locator('.qn-own-saved')).toHaveText(
+    'Saved as: [Name] brings [his/her/their] notebook and starts the warm-up to keep up [his/her/their] pace.',
+  );
+  await expect(box.locator('.qn-own-why')).toHaveText(['“keep up” is a phrase families may not know; try “continue”.']);
+  await expect(box.locator('#tq-own-save')).toBeEnabled();
+  await box.locator('#tq-own-input').fill('Cece brings her notebook and starts the warm-up without a reminder.');
+  await expect(box.locator('.qn-own-why')).toHaveCount(0);
+  await box.locator('#tq-own-save').click();
+  const mine = sheet.locator('.qn-browse-row', { has: page.locator('.qn-chip-yours') });
+  await expect(mine).toHaveCount(1);
+  await expect(mine.locator('.qn-chip-yours')).toHaveText('Yours · Any Case');
+  await expect(mine.locator('.qn-browse-sentence')).toHaveText(
+    'She brings her notebook and starts the warm-up without a reminder.',
+  );
+  await expect(mine.locator('.qn-browse-del')).toBeVisible();
+  await expect(mine.locator('.qn-browse-use')).toBeFocused();
+  await mine.locator('.qn-browse-use').click();
+  await expect(mine.locator('.qn-browse-inuse')).toHaveText('In Use');
+  await expect(page.locator('#tq-narrative')).toHaveValue(
+    /She brings her notebook and starts the warm-up without a reminder\./,
+  );
+  await sheet.locator('.qn-browse-done').click();
+  await page.reload();
+  await page.locator('#tq-narrative').waitFor();
+  await expect(page.locator('#tq-narrative')).toHaveValue(/She brings her notebook/);
+  await page.locator('#tq-browse-btn').click();
+  await sheet.locator('[role="tab"]', { hasText: 'Habits' }).click();
+  await expect(sheet.locator('.qn-chip-yours')).toHaveText(['Yours · Any Case']);
+  // × removes it, Undo brings it back.
+  await sheet.locator('.qn-browse-del').click();
+  await expect(sheet.locator('.qn-chip-yours')).toHaveCount(0);
+  await expect(page.locator('#undo-toast')).toContainText('Removed from your bank.');
+  await page.locator('#undo-toast .undo-toast-btn').click();
+  await expect(sheet.locator('.qn-chip-yours')).toHaveText(['Yours · Any Case']);
+});
+
+test('Write Your Own from Other Wording goes into the row; Add to My Bank on a typed sentence takes a part', async ({
+  page,
+}) => {
+  await open(page);
+  await page.locator('#tq-generate').click();
+  const rows = p => p.locator('#tq-sentences .qn-srow');
+  const row = rows(page).nth(1);
+  await row.locator('[data-do="wording"]').click();
+  const menu = page.locator('#tq-wording-menu');
+  await expect(menu.locator('[role="menuitem"]').last()).toHaveText('+ Write Your Own');
+  await menu.locator('[data-do="ownOpen"]').click();
+  const box = page.locator('#tq-sentences #tq-own');
+  await expect(box.locator('#tq-own-input')).toBeFocused();
+  await expect(box.locator('#tq-own-part')).toHaveCount(0);
+  await box.locator('#tq-own-input').fill('Cece used feedback on Biodiversity Field Journal to improve her draft.');
+  await expect(box.locator('.qn-own-saved')).toHaveText(
+    'Saved as: [Name] used feedback on [best piece] to improve [his/her/their] draft.',
+  );
+  await box.locator('#tq-own-input').press('Enter');
+  await expect(box).toHaveCount(0);
+  await expect(rows(page).nth(1).locator('.qn-req-text')).toHaveText(
+    'She used feedback on “Biodiversity Field Journal” to improve her draft.',
+  );
+  await expect(page.locator('#tq-narrative')).toHaveValue(
+    /She used feedback on “Biodiversity Field Journal” to improve her draft\./,
+  );
+  // A sentence typed into the box: Add to My Bank on its row, with Belongs Under.
+  await toEnd(page);
+  await page.keyboard.type(' Cece asks a question when a step is unclear.');
+  const typed = rows(page).filter({ hasText: 'Cece asks a question' });
+  await expect(typed.locator('.qn-own-add')).toHaveText('Add to My Bank');
+  await typed.locator('.qn-own-add').click();
+  await expect(box.locator('#tq-own-input')).toHaveValue('Cece asks a question when a step is unclear.');
+  await expect(box.locator('#tq-own-part option')).toHaveText([
+    'Best Piece',
+    'Strengths',
+    'Habits',
+    'Not Handed In',
+    'Next Step',
+  ]);
+  await box.locator('#tq-own-part').selectOption('habits');
+  await expect(box.locator('#tq-own-case option').first()).toHaveText('Any Case');
+  await box.locator('#tq-own-save').click();
+  await expect(box).toHaveCount(0);
+  expect(
+    await page.evaluate(() => PersonalBank.list().map(t => [t.text, t.condition.step, !!t.condition.general])),
+  ).toEqual([
+    ['{He} [asks|ask] a question when a step is unclear.', 'habits', true],
+    ['{He} used feedback on {assignment} to improve {his} draft.', 'example', false],
+  ]);
+});
+
+test('Add to My Bank from the comment box: the pill shows only on a typed sentence and opens the box under its row; × purges after the toast', async ({
+  page,
+}) => {
+  await open(page);
+  await page.locator('#tq-generate').click();
+  const box = page.locator('#tq-narrative');
+  const pill = page.locator('#tq-sel-add');
+  // A bank sentence selected: no pill.
+  await box.evaluate(el => {
+    el.focus();
+    el.setSelectionRange(0, 12);
+    el.dispatchEvent(new Event('select', { bubbles: true }));
+  });
+  await expect(pill).toBeHidden();
+  // A typed sentence selected: the pill, in the foot, clear of the text.
+  await toEnd(page);
+  await page.keyboard.type(' Cece asks a question when a step is unclear.');
+  await expect(page.locator('#tq-sentences .qn-srow', { hasText: 'Cece asks a question' })).toHaveCount(1);
+  await box.evaluate(el => {
+    const i = el.value.indexOf('Cece asks');
+    el.focus();
+    el.setSelectionRange(i, i + 9);
+    el.dispatchEvent(new Event('select', { bubbles: true }));
+  });
+  await expect(pill).toBeVisible();
+  await expect(pill).toHaveText('Add to My Bank');
+  const foot = await page.locator('#tq-comment-foot').boundingBox();
+  const text = await box.boundingBox();
+  expect(foot.y).toBeGreaterThanOrEqual(text.y + text.height - 1);
+  await pill.click();
+  const own = page.locator('#tq-sentences .qn-srow', { hasText: 'Cece asks a question' }).locator('#tq-own');
+  await expect(own.locator('#tq-own-input')).toHaveValue('Cece asks a question when a step is unclear.');
+  await expect(own.locator('#tq-own-input')).toBeFocused();
+  await own.locator('#tq-own-part').selectOption('strengths');
+  await own.locator('#tq-own-save').click();
+  await expect(own).toHaveCount(0);
+  expect(await page.evaluate(() => PersonalBank.list().length)).toBe(1);
+  // × then no Undo: when the toast closes (its timer calls dismissUndoToast;
+  // called here so the test does not wait on a timer) the sentence is purged.
+  await page.locator('#tq-browse-btn').click();
+  const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+  await sheet.locator('[role="tab"]', { hasText: 'Strengths' }).click();
+  await expect(sheet.locator('.qn-chip-yours')).toHaveText(['Yours · Any Case']);
+  await sheet.locator('.qn-browse-del').click();
+  await expect(page.locator('#undo-toast')).toBeVisible();
+  expect(await page.evaluate(() => PersonalBank.list().length)).toBe(0);
+  await page.evaluate(() => dismissUndoToast());
+  await expect(page.locator('#undo-toast')).toHaveCount(0);
+  expect(await page.evaluate(() => PersonalBank.list().length)).toBe(0);
+  await page.reload();
+  await page.locator('#tq-narrative').waitFor();
+  expect(await page.evaluate(() => PersonalBank.list().length)).toBe(0);
+  await page.locator('#tq-browse-btn').click();
+  await sheet.locator('[role="tab"]', { hasText: 'Strengths' }).click();
+  await expect(sheet.locator('.qn-chip-yours')).toHaveCount(0);
+});

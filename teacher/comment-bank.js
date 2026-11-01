@@ -3551,11 +3551,18 @@ window.CommentBank = (function () {
         return !exclude[s.id];
       });
       // The teacher's own sentences (plan PR 10) rank above the shared bank
-      // whenever their condition holds: they fit, so they go first.
+      // whenever their condition holds: they fit, so they go first. One
+      // bound to a part with no case (`general`, Colin Nov 1) is picked
+      // only when nothing more specific fits: no personal sentence with a
+      // case, and no shared sentence with a `when` it meets.
       var mine = cands.filter(function (s) {
         return s.mine && !exclude[s.id];
       });
-      if (mine.length) tier = mine;
+      var specific = mine.filter(function (s) {
+        return !s.general;
+      });
+      if (specific.length) tier = _topTier(specific, ctx);
+      else if (mine.length && (!tier.length || specificity(tier[0], ctx) === 0)) tier = mine;
       // Every sentence of the top tier is excluded: a sentence that asserts
       // nothing stands in, never a vaguer claim.
       if (!tier.length) tier = _standIns(step, ctx, bank, taken, exclude);

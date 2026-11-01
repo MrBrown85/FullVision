@@ -657,3 +657,153 @@ describe('Suggested for Your Bank', () => {
     expect(src).toMatch(/PersonalBank\.load\(\);/);
   });
 });
+
+/* A sentence the teacher writes for the bank (Colin, Nov 1: "Can teachers
+   just write their own and add to a bank easily?"): one line for the
+   student on screen, slotted like a suggestion, bound to a row's case or
+   a part (and a case picked), the lint as advice only, the save blocked
+   only by a classmate's name or a health or designation word. */
+describe('a sentence of the teacher’s own', () => {
+  const setup = over => {
+    const f = facts(over);
+    const ctx = CommentBank.context(f, {});
+    return { f, ctx };
+  };
+  const composeFor = (text, bind, over) => {
+    const { f, ctx } = setup(over);
+    return PB.compose(text, bind, ctx, f, GABRIEL, { others: OTHERS });
+  };
+  const bestPieceRow = ctx => rowFor('example', '', 'n36', ctx);
+
+  it('slots the name, pronouns and an unquoted title, and previews in plain words', () => {
+    const out = composeFor('Gabriel used feedback on 4.2 The Poster to improve his draft.', { step: 'example' });
+    expect(out.blocked).toBe('');
+    expect(out.template.text).toBe('{He} used feedback on {assignment} to improve {his} draft.');
+    expect(out.preview).toBe('[Name] used feedback on [best piece] to improve [his/her/their] draft.');
+    expect(out.template.slots).toEqual(['He', 'assignment', 'his']);
+    expect(out.template.condition.own).toBe(true);
+    expect(out.advice).toEqual([]);
+    expect(PB.plainWords('{He} [brings|bring] {his} notebook to {course}.')).toBe(
+      '[Name] brings [his/her/their] notebook to [class name].',
+    );
+    expect(PB.plainWords('In {course}, {he} [is|are] ready.')).toBe('In [class name], [he/she/they] is ready.');
+  });
+
+  it('gives the lint, the word count, a date and a one-day marker as advice in plain words, and still saves', () => {
+    const out = composeFor('Gabriel needs to keep up his bright work.', { step: 'overall' });
+    expect(out.blocked).toBe('');
+    expect(out.template).toBeTruthy();
+    expect(out.advice).toEqual([
+      '“keep up” is a phrase families may not know; try “continue”.',
+      '“bright” praises the person; say what the work or the habit showed instead.',
+    ]);
+    expect(composeFor('Gabriel reads.', { step: 'overall' }).advice).toEqual([
+      'This is 2 words; a bank sentence needs six or more.',
+    ]);
+    expect(
+      composeFor(
+        'Gabriel reads every page of every chapter of every unit of the course twice before each and every quiz in class.',
+        { step: 'overall' },
+      ).advice[0],
+    ).toMatch(/^This is 2\d words; a report sentence has 20 or fewer\.$/);
+    expect(composeFor('Gabriel led the group discussion on Tuesday with care.', { step: 'overall' }).advice).toEqual([
+      'This is about one day; a bank sentence is used every term.',
+    ]);
+    expect(composeFor('The map project can still be handed in until December 4.', { step: 'overall' }).advice).toEqual(
+      expect.arrayContaining(['A date fits one report only; a bank sentence is used every term.']),
+    );
+    expect(
+      composeFor('Gabriel finished the Treaty unit with care and time to spare.', { step: 'overall' }).advice,
+    ).toEqual(['“Treaty” is a name FullVision cannot turn into a slot, so every student’s comment would say it.']);
+    // Advice only: the template is kept and installed, the lint notwithstanding.
+    const e = PB.keep(out.template);
+    const s = COMMENT_BANK.sentences.find(x => x.id === 'mine:' + e.id);
+    expect(s).toBeTruthy();
+    expect(s.mine).toBe(true);
+  });
+
+  it('blocks only a classmate’s name and a health or designation word', () => {
+    expect(composeFor('Gabriel and Amelia wrote the report together this term.', { step: 'overall' }).blocked).toBe(
+      '“Amelia” is a classmate’s name; a bank sentence cannot name another student.',
+    );
+    const out = composeFor('Gabriel worked on his IEP goals in every lab this term.', { step: 'overall' });
+    expect(out.blocked).toMatch(/is a health or designation word; a bank sentence cannot hold one\.$/);
+    expect(out.template).toBeTruthy();
+  });
+
+  it('binds to a row’s case, or to a part with a case, or to a part alone as general', () => {
+    const { ctx } = setup();
+    const row = composeFor('Gabriel used feedback on 4.2 The Poster to improve his draft.', { row: bestPieceRow(ctx) });
+    expect(row.template.condition).toMatchObject({ step: 'example', part: 'now', group: 'Examples From Work' });
+    expect(row.template.condition.general).toBeUndefined();
+    expect(row.template.condition.needs).toEqual(expect.arrayContaining(['assignment']));
+    const cased = composeFor('Gabriel asks a question when a step is unclear.', {
+      step: 'habits',
+      needs: ['habitToBuild'],
+      group: 'Work Habits',
+    });
+    expect(cased.template.condition).toMatchObject({ step: 'habits', needs: ['habitToBuild'], claims: [] });
+    expect(cased.template.condition.general).toBeUndefined();
+    expect(cased.offered).toBe('Offered when one habit is rated Sometimes or Rarely, in Socials classes');
+    const general = composeFor('Gabriel asks a question when a step is unclear.', { step: 'habits' });
+    expect(general.template.condition).toMatchObject({ step: 'habits', general: true, when: {}, claims: [] });
+    expect(general.offered).toBe('Offered in Socials classes');
+    const e = PB.keep(general.template);
+    expect(COMMENT_BANK.sentences.find(x => x.id === 'mine:' + e.id).general).toBe(true);
+  });
+
+  it('Generate picks a general sentence only when nothing more specific fits; a cased one ranks first', () => {
+    // A hand-made bank for the family step (as comment-bank-selection does):
+    // a shared sentence with a `when`, a shared no-claim sentence, the
+    // teacher's own general sentence and the teacher's own cased one.
+    const home = (id, text, when, extra) =>
+      Object.assign({ id, part: 'how', group: 'For the Family', text, when, claims: [] }, extra || {});
+    const parts = [{ id: 'how', title: 'How They Will Get There' }];
+    const ctx = { _p: THEY, _habits: {}, _family: '', picture: 'steady', name: 'Noor' };
+    const shared = home('s1', 'At home, you could ask what a steady week of work looked like.', { picture: 'steady' });
+    const plain = home('s0', 'At home, you could ask what the class worked on this week.', undefined);
+    const general = home('mine:g', 'At home, you could ask which idea from class came up at dinner.', undefined, {
+      mine: true,
+      general: true,
+    });
+    const cased = home(
+      'mine:c',
+      'At home, you could ask what made this a steady term.',
+      { picture: 'steady' },
+      {
+        mine: true,
+      },
+    );
+    const pick = sentences =>
+      CommentBank.draft(ctx, { bank: { parts, sentences }, seed: 2 }).sentences.find(x => x.step === 'home').id;
+    // A shared sentence with a `when` it meets beats the general one.
+    expect(pick([shared, plain, general])).toBe('s1');
+    // Nothing more specific: the general one goes first, above the shared no-claim sentence.
+    expect(pick([plain, general])).toBe('mine:g');
+    // A cased sentence of the teacher's own ranks above everything, as before.
+    expect(pick([shared, plain, general, cased])).toBe('mine:c');
+  });
+
+  it('forget takes a sentence out with its entry for Undo; restore puts it back; purge tells the server', () => {
+    const calls = [];
+    window.v2 = Object.assign({}, REAL_V2, {
+      saveCommentTemplate: () => Promise.resolve({ data: null, error: null }),
+      deleteCommentTemplate: id => {
+        calls.push(id);
+        return Promise.resolve({ data: null, error: null });
+      },
+    });
+    const e = PB.keep(composeFor('Gabriel asks a question when a step is unclear.', { step: 'habits' }).template);
+    const gone = PB.forget('mine:' + e.id);
+    expect(gone.id).toBe(e.id);
+    expect(COMMENT_BANK.sentences.some(s => s.mine)).toBe(false);
+    expect(PB.restore(gone)).toBe(true);
+    expect(COMMENT_BANK.sentences.some(s => s.id === 'mine:' + e.id)).toBe(true);
+    PB.forget('mine:' + e.id);
+    PB.purge(gone);
+    expect(calls).toEqual([]); // a local id never reaches the server
+    const srv = Object.assign({}, gone, { id: '11111111-2222-4333-8444-555555555555' });
+    PB.purge(srv);
+    expect(calls).toEqual(['11111111-2222-4333-8444-555555555555']);
+  });
+});
