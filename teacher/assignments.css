@@ -4723,7 +4723,6 @@
 .grader-counts-as:empty {
   display: none;
 }
-.grader-print,
 .grader-done {
   height: 30px;
   padding: 0 14px;
@@ -4735,6 +4734,32 @@
   font-size: var(--text-sm);
   font-weight: 600;
   cursor: pointer;
+}
+/* Print is tinted, as the mockup draws it, so Done is the dialog's one
+   solid blue button. */
+.grader-print {
+  height: 30px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(0, 122, 255, 0.1);
+  color: #0062cc;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.grader-print:hover {
+  background: rgba(0, 122, 255, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  .grader-print {
+    background: rgba(10, 132, 255, 0.2);
+    color: var(--active);
+  }
 }
 .grader-scroll {
   flex: 1;
