@@ -12,6 +12,7 @@ const PRECACHE_URLS = [
   '/login.css',
   '/login-auth.js',
   '/manifest.json',
+  '/favicon.svg',
   '/vendor/supabase.min.js',
   '/curriculum_by_course.json',
   // Shared modules

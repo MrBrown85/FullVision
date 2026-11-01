@@ -10,6 +10,18 @@
     <title>FullVision — Gradebook and Report Cards for BC Teachers</title>
     <meta name="theme-color" content="#0071e3" />
     <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://fullvision.ca/" />
+    <meta property="og:title" content="FullVision — Gradebook and Report Cards for BC Teachers" />
+    <meta
+      property="og:description"
+      content="Score on the Provincial Proficiency Scale, record observations, hear from students, and write Learning Updates from the evidence."
+    />
+    <meta property="og:image" content="https://fullvision.ca/assets/splash/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <script src="shared/sentry-init.js"></script>
     <style>
       body {
@@ -271,7 +283,7 @@
         .h2 {
           font-size: 30px !important;
         }
-        .navcta-plain {
+        .navcta-demo {
           display: none;
         }
         .phone {
@@ -307,9 +319,24 @@
         border-bottom: 2px solid #0071e3;
         transform: rotate(-45deg);
       }
+      .skip {
+        position: absolute;
+        left: 16px;
+        top: -48px;
+        padding: 10px 14px;
+        background: #ffffff;
+        color: #1d1d1f;
+        border-radius: 10px;
+        box-shadow: 0 0 0 2px #0071e3;
+        z-index: 10;
+      }
+      .skip:focus {
+        top: 12px;
+      }
     </style>
   </head>
   <body>
+    <a class="skip" href="#top">Skip to Content</a>
     <div class="fv" style="background: #f5f5f7; min-height: 100vh">
       <header style="background: #ffffff; border-bottom: 1px solid #e5e5ea">
         <div
@@ -342,7 +369,7 @@
               >Sign In</a
             >
             <a
-              class="btn btn-solid"
+              class="btn btn-solid navcta-demo"
               href="/login.html?demo=1"
               data-link="demo"
               style="min-height: 44px; padding: 0 18px; font-size: 15px; background: #0071e3"
@@ -387,12 +414,12 @@
               <img
                 class="collage-back"
                 src="/assets/splash/growth.jpg"
-                alt="A student page: Cece's Processing and Analyzing Data competency rising from 3.0 to 3.2, where it shows across labs, written work, projects and quizzes, and each piece of evidence."
+                alt="A competency rising from 3.0 to 3.2, with the work behind it."
               />
               <img
                 class="collage-front"
                 src="/assets/splash/phone-report.jpg"
-                alt="Cece's progress report on her phone: Proficient overall, each skill as an I-can statement, and her teacher's comment."
+                alt="A student's progress report on her phone."
               />
             </div>
           </div>
@@ -495,7 +522,7 @@
               class="shot"
               loading="lazy"
               src="/assets/splash/advanced-rubric.jpg"
-              alt="The full FullVision Assignments page scoring the Chemical Reactions Lab on an Advanced Rubric: for Cece Adeyemi, each criterion shows Proficient plus, with ticked checkboxes under Emerging, Developing and Proficient, a Suggested: Proficient note, and Comment buttons."
+              alt="Scoring a lab on an Advanced Rubric, with checklists under each level."
             />
           </div>
         </section>
@@ -521,7 +548,7 @@
                 class="shot"
                 loading="lazy"
                 src="/assets/splash/gradebook.jpg"
-                alt="The Science 8 gradebook: students down the side, assessments across the top, each score shaded by proficiency."
+                alt="The gradebook grid, each score shaded by proficiency."
               />
             </div>
           </div>
@@ -546,7 +573,7 @@
                 class="shot"
                 loading="lazy"
                 src="/assets/splash/comment.jpg"
-                alt="The Teacher Comment box with Generate Comment, and below it the comment's sentences, each one editable and marked Edited."
+                alt="A report comment and the editable sentences it was built from."
               />
             </div>
 
@@ -578,7 +605,7 @@
                 class="shot"
                 loading="lazy"
                 src="/assets/splash/custom-report.jpg"
-                alt="The Custom report builder: a list of blocks on the left, Cece Adeyemi's report page in the middle with proficiency, teacher comment, next steps and her self-assessment and goal, and block settings on the right."
+                alt="The Custom report builder with a student's report card."
               />
             </div>
 
@@ -599,7 +626,7 @@
                 class="shot"
                 loading="lazy"
                 src="/assets/splash/quick-report.jpg"
-                alt="Quick Report options on the left and a printable grade sheet for Cece Adeyemi listing each assignment, category weights and her term grade."
+                alt="A printable grade sheet for one student."
               />
             </div>
 
@@ -621,7 +648,7 @@
                 class="shot"
                 loading="lazy"
                 src="/assets/splash/print-rubrics.jpg"
-                alt="The Print Rubrics window: Completed Rubrics or Blank Rubric, the assessment, which students, one, two or four rubrics per page, and a preview of Cece's graded rubric."
+                alt="The Print Rubrics window with a preview of a graded rubric."
               />
             </div>
           </div>
@@ -653,14 +680,14 @@
                 class="shot"
                 loading="lazy"
                 src="/assets/splash/learner-profile.jpg"
-                alt="Cece Adeyemi's Learner Profile: how to say her name, languages spoken at home, how she learns best, her About Me answers and her Science 8 goal."
+                alt="A student's Learner Profile in her own words."
               />
               <div class="phone-wrap" style="width: 100%; justify-self: center">
                 <img
                   class="phone"
                   loading="lazy"
                   src="/assets/splash/student-phone.jpg"
-                  alt="The student phone page: Hi Cece, with a November Reflection and Goal Check-In of 8 questions and a Yes, Start button."
+                  alt="The student phone page inviting Cece to start a reflection."
                 />
               </div>
             </div>
@@ -686,7 +713,7 @@
               class="shot"
               loading="lazy"
               src="/assets/splash/observations.jpg"
-              alt="The Observations page: a box for a new note above Note, Growth and Strength entries for students, each with context and tags."
+              alt="The Observations page with Strength, Growth and Note entries."
             />
           </div>
         </section>
@@ -714,7 +741,7 @@
               class="shot"
               loading="lazy"
               src="/assets/splash/needs-attention.jpg"
-              alt="The Needs Attention list beside proficiency bars for each curricular competency and a count of assessments tagged to each Core Competency."
+              alt="The Needs Attention list and proficiency by competency."
             />
           </div>
         </section>
@@ -737,7 +764,7 @@
               class="shot"
               loading="lazy"
               src="/assets/splash/student-page.jpg"
-              alt="A student page for Noor Al-Rashid showing proficiency in each competency with a bar for every score and the latest evidence."
+              alt="A student page with every score for each competency."
             />
           </div>
         </section>
@@ -762,7 +789,7 @@
                   class="phone"
                   loading="lazy"
                   src="/assets/splash/phone-app.jpg"
-                  alt="The FullVision phone app showing Cece's card: 3.1 Proficient, a bar for each competency, a private note, and Observe and View Profile buttons."
+                  alt="The phone app showing one student's card."
                 />
               </div>
             </div>
@@ -862,7 +889,7 @@
               >
                 <span style="font-size: 16px; font-weight: 700">Hosted in Canada</span
                 ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
-                  >Data lives in a Canadian data centre.</span
+                  >Data lives in a Canadian data centre, as BC's FOIPPA expects for student records.</span
                 >
               </div>
               <div
@@ -950,6 +977,9 @@
           <span style="font-size: 14px; color: #636366">© 2026 FullVision · Made in British Columbia</span>
           <nav aria-label="Footer" style="display: flex; gap: 24px; flex-wrap: wrap">
             <a href="/privacy.html" style="font-size: 14px; text-decoration: none; color: #48484d">Privacy Policy</a>
+            <a href="mailto:colin.brown04@gmail.com" style="font-size: 14px; text-decoration: none; color: #48484d"
+              >Contact</a
+            >
             <a href="/login.html" data-link="signin" style="font-size: 14px; text-decoration: none; color: #48484d"
               >Sign In</a
             >
