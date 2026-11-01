@@ -348,6 +348,19 @@ window.PageReports = (function () {
     _applyReportTerm();
 
     if (activeTab === 'questionnaire') {
+      // The sentence bank loads the first time Reports needs it.
+      if (typeof COMMENT_BANK === 'undefined') {
+        output.innerHTML =
+          '<div class="empty-state"><div class="empty-state-text">Loading the sentence bank…</div></div>';
+        CommentBank.loadBank().then(function (ok) {
+          if (activeTab !== 'questionnaire') return;
+          if (ok) renderReports();
+          else
+            output.innerHTML =
+              '<div class="empty-state"><div class="empty-state-text">The sentence bank didn’t load. Check your connection, then open Reports again.</div></div>';
+        });
+        return;
+      }
       output.innerHTML = renderTermQuestionnaire(cid);
       _syncLongFormAuthContext();
       RQ.afterRender();
