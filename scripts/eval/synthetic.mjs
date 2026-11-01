@@ -263,6 +263,9 @@ const PROFILES = [
   'climb',
   'missing',
 ];
+/* Attendance entered at Report 1 as [absences, lates], cycled through the
+   roster; null for a student with none entered. */
+const ATTENDANCE_SETS = [null, [3, 0], null, [0, 2], [4, 1], null, [1, 0], null, [0, 1], [12, 3], null, [2, 2]];
 const HABIT_SETS = [
   'excellent',
   'good',
@@ -407,6 +410,7 @@ export function syntheticClass(kind, opts) {
   const scoreRows = [];
   const tagRows = [];
   const ratings = [];
+  const attendance = [];
   students.forEach((st, si) => {
     const profile = PROFILES[si % PROFILES.length];
     let best = null;
@@ -443,6 +447,12 @@ export function syntheticClass(kind, opts) {
         ),
       );
     }
+    // Attendance entered for about half the roster, cycling through
+    // absences only, lates only and both (the rest have none entered), so
+    // the attendance frames are exercised (loadClass applies it as the
+    // Reports page's attendance card does).
+    const att = ATTENDANCE_SETS[si % ATTENDANCE_SETS.length];
+    if (att) attendance.push({ enrollment_id: st.enrollment_id, term: 1, absences: att[0], lates: att[1] });
   });
   const course = {
     id: id(1),
@@ -493,6 +503,7 @@ export function syntheticClass(kind, opts) {
     observations: { observations: [], total: 0 },
     profiles: [],
     term_ratings: ratings,
+    eval_term_attendance: attendance,
     report_config: k.lines
       ? {
           blocks_config: {

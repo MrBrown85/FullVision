@@ -957,6 +957,21 @@ window.CommentBank = (function () {
     var toks = strengthsTokens(f, ks);
     return toks ? R.render(toks, _whoOfFacts(f), { named: true }) : '';
   }
+  /* The same strong habits as a verb phrase after the student, for the
+     Strong Habits frames (bank hs13-hs16): "{He} {strongHabits}." gives
+     "He comes to class ready, takes part and works well with others." The
+     tokens hold both verb forms, agreeing with the mention before them;
+     the string is the form for this student's pronouns. */
+  function strongHabitsTokens(f, ks) {
+    var toks = strengthsTokens(f, ks);
+    return toks ? [toks[2]] : null;
+  }
+  function strongHabitsPhrase(f, ks) {
+    var toks = strongHabitsTokens(f, ks);
+    if (!toks) return '';
+    var p = f.pronouns || { subj: 'they' };
+    return toks[0].verb[f.pronounsOnFile && p.subj === 'they' ? 1 : 0];
+  }
   /* Who a comment is about, for the realiser: { name, p, onFile }. */
   function _whoOfFacts(f) {
     return { name: f.name, p: f.pronouns, onFile: !!f.pronounsOnFile };
@@ -1064,6 +1079,23 @@ window.CommentBank = (function () {
       ' assignments are not handed in' +
       (group ? ', including ' + numberIn(group.count) + ' ' + group.name + ' assignments.' : '.')
     );
+  }
+  /* The same facts as slots, for the Not Handed In frames (bank m02-m21):
+     title (one, quoted) when exactly one is labelled Missing; titles
+     ("“A” and “B”") when exactly two; many ('yes') when three or more with
+     no group; group ("six Current Events assignments") when there is one.
+     Each is '' otherwise, so a frame fits only the case its wording
+     states. The count is the missingCount slot. */
+  function missingSlots(nh) {
+    var n = (nh && nh.count) || 0;
+    var titles = (nh && nh.titles) || [];
+    var group = nh && nh.groups && nh.groups[0];
+    return {
+      title: n === 1 && titles[0] ? _quotedMid(titles[0]) : '',
+      titles: n === 2 && titles[0] && titles[1] ? _quotedMid(titles[0]) + ' and ' + _quotedMid(titles[1]) : '',
+      many: n >= 3 && !group ? 'yes' : '',
+      group: n >= 3 && group ? numberIn(group.count) + ' ' + group.name + ' assignments' : '',
+    };
   }
 
   /* The name and pronouns a sentence about this student uses. */
@@ -2021,7 +2053,19 @@ window.CommentBank = (function () {
       habitToBuild: habitKeys(hsum.build),
       habitsToBuild: habitKeys(hsum.build),
       habitStrengths: habitKeys(strongThree),
+      strongHabits: habitKeys(strongThree),
       attendance: ['attendance.absent', 'attendance.late'],
+      // The attendance frames (bank h61-h78): the classes missed, the times
+      // late, and whether only one of the two is entered.
+      absentClasses: ['attendance.absent'],
+      lateTimes: ['attendance.late'],
+      absentOnly: ['attendance.absent', 'attendance.late'],
+      lateOnly: ['attendance.absent', 'attendance.late'],
+      // The Not Handed In frames (bank m02-m21).
+      missingTitle: ['notHandedIn'],
+      missingTitles: ['notHandedIn'],
+      missingMany: ['notHandedIn'],
+      missingGroup: ['notHandedIn'],
       // The counts and the proficiency word a teacher's own sentence can
       // hold as slots (plan PR 10, teacher/comment-personal.js).
       missingCount: ['notHandedIn'],
@@ -2054,6 +2098,8 @@ window.CommentBank = (function () {
     };
     var missingN = _missingCount(f);
     var absentN = Math.floor(Number(f.absent)) || 0;
+    var att = attendanceSlots(f.absent, f.late);
+    var ms = missingN > 0 ? missingSlots(f.notHandedIn) : { title: '', titles: '', many: '', group: '' };
 
     return {
       // The facts and picks this context was built from, so draft() can
@@ -2082,6 +2128,7 @@ window.CommentBank = (function () {
       _toks: {
         bestPiece: top ? bestPieceTokens({ title: top.title, note: top.note }) : null,
         habitStrengths: hsum.excellent ? null : strengthsTokens(f, strongThree),
+        strongHabits: hsum.excellent ? null : strongHabitsTokens(f, strongThree),
       },
       name: f.name,
       course: f.course,
@@ -2162,9 +2209,22 @@ window.CommentBank = (function () {
       habitToBuild: buildWords.length === 1 ? buildWords[0] : '',
       habitsToBuild: buildWords.length === 2 ? list(buildWords) : '',
       habitStrengths: hsum.excellent ? '' : strengthsSentence(f, strongThree),
+      strongHabits: hsum.excellent ? '' : strongHabitsPhrase(f, strongThree),
       // "missed three classes and been late once", either half left out
       // when its field is empty or zero (plan, Sentence grammar).
       attendance: attendanceText(f.absent, f.late),
+      // The same counts as slots: "three classes", "once"; absentOnly and
+      // lateOnly ('yes') when the other count is empty or zero.
+      absentClasses: att.absentClasses,
+      lateTimes: att.lateTimes,
+      absentOnly: att.absentOnly,
+      lateOnly: att.lateOnly,
+      // The work not handed in as slots: the one title, the two titles,
+      // the count of three or more with no group, and the group.
+      missingTitle: ms.title,
+      missingTitles: ms.titles,
+      missingMany: ms.many,
+      missingGroup: ms.group,
       // How many pieces are labelled Missing, and classes missed, as numbers
       // (the realiser spells them by place), and the overall proficiency
       // word: slots for a teacher's own sentences (plan PR 10).
@@ -2184,6 +2244,20 @@ window.CommentBank = (function () {
     if (a > 0) bits.push('missed ' + numberIn(a) + (a === 1 ? ' class' : ' classes'));
     if (l > 0) bits.push('been late ' + R.times(l));
     return bits.join(' and ');
+  }
+  /* The same counts as slots for the attendance frames (bank h61-h78):
+     absentClasses "three classes" ("one class"), lateTimes "once" /
+     "twice" / "three times", each '' at zero or empty; absentOnly and
+     lateOnly 'yes' when the other count is zero or empty. */
+  function attendanceSlots(absent, late) {
+    var a = Math.floor(Number(absent)) || 0;
+    var l = Math.floor(Number(late)) || 0;
+    return {
+      absentClasses: a > 0 ? numberIn(a) + (a === 1 ? ' class' : ' classes') : '',
+      lateTimes: l > 0 ? R.times(l) : '',
+      absentOnly: a > 0 && !l ? 'yes' : '',
+      lateOnly: l > 0 && !a ? 'yes' : '',
+    };
   }
 
   /* ── Offering and filling ──────────────────────────────────────────── */
@@ -3169,9 +3243,12 @@ window.CommentBank = (function () {
           // a sentence that does not start like the one before it.
           general: s.subjects ? 0 : 1,
           repeats: repeatsLast(t, last) ? 1 : 0,
-          // The grade step has one sentence that fits and draws no random
-          // number, so the rest of the draft's mix is as it was.
-          r: step.says ? 0 : rand(),
+          // A step that says a fact (the grade, the work not handed in)
+          // draws no random number, so the rest of the draft's mix is as it
+          // was; its frames are mixed by a hash of the seed and the id
+          // instead, so a tie never falls to the bank's order (2026-11-01:
+          // the Not Handed In frames m02-m21 were otherwise never picked).
+          r: step.says ? seedFor(seed + ':' + s.id) : rand(),
         };
       };
       // A quotation already in the draft is out: now that every title is
@@ -4047,6 +4124,8 @@ window.CommentBank = (function () {
       if (_has(pv, 'habitsToBuild')) checks.push(sum.build.length === 2 && named('habitsToBuild', [1, 2], sum.build));
       if (_has(pv, 'habitStrengths'))
         checks.push(!sum.excellent && named('habitStrengths', [CONSISTENTLY], sum.strong.slice(0, 3)));
+      if (_has(pv, 'strongHabits'))
+        checks.push(!sum.excellent && named('strongHabits', [CONSISTENTLY], sum.strong.slice(0, 3)));
       return checks.length > 0 && checks.every(Boolean);
     },
     lateWork: function (pv, f) {
@@ -4055,6 +4134,11 @@ window.CommentBank = (function () {
     notHandedIn: function (pv, f) {
       if (_has(pv, 'missingWork') && pv.values.missingWork !== notHandedInSentence(f.notHandedIn)) return false;
       if (_has(pv, 'missingCount') && pv.values.missingCount !== String(_missingCount(f))) return false;
+      // The Not Handed In frames: each slot as the facts give it now, and
+      // present (a frame for one title is false once there are two).
+      var ms = missingSlots(f.notHandedIn);
+      var slots = { missingTitle: 'title', missingTitles: 'titles', missingMany: 'many', missingGroup: 'group' };
+      for (var k in slots) if (_has(pv, k) && (!ms[slots[k]] || pv.values[k] !== ms[slots[k]])) return false;
       return _missingCount(f) > 0;
     },
     // Marks on fewer of the class's marked work: the counts as said.
@@ -4096,6 +4180,12 @@ window.CommentBank = (function () {
         var a = Math.floor(Number(f.absent)) || 0;
         checks.push(a > 0 && pv.values.absentCount === String(a));
       }
+      // The attendance frames: each slot as the counts give it now, and
+      // present (an absences-only frame is false once a late is entered).
+      var att = attendanceSlots(f.absent, f.late);
+      ['absentClasses', 'lateTimes', 'absentOnly', 'lateOnly'].forEach(function (k) {
+        if (_has(pv, k)) checks.push(!!att[k] && pv.values[k] === att[k]);
+      });
       return checks.length > 0 && checks.every(Boolean);
     },
     // The student's own words and self-assessment.
@@ -4625,6 +4715,9 @@ window.CommentBank = (function () {
     deadlineText: deadlineText,
     numberWords: numberWords,
     notHandedInSentence: notHandedInSentence,
+    missingSlots: missingSlots,
+    attendanceSlots: attendanceSlots,
+    strongHabitsPhrase: strongHabitsPhrase,
     requiredParts: requiredParts,
     pictureOf: pictureOf,
     seedFor: seedFor,

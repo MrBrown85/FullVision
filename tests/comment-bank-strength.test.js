@@ -152,7 +152,7 @@ describe('bankStrength on a synthetic History 12 class', () => {
     r = CommentBank.bankStrength(cid, { termId });
   });
 
-  it('flags the habits part: the two "excellent" sentences fit every student rated all Consistently, six or more', () => {
+  it('the habits part is not thin: the seven "excellent" frames fit every student rated all Consistently, six or more', () => {
     const excellent = getStudents(cid).filter(st => {
       const f = CommentBank.facts(cid, st, termId);
       const rating = getStudentTermRating(cid, st.id, termId) || {};
@@ -161,9 +161,9 @@ describe('bankStrength on a synthetic History 12 class', () => {
     });
     expect(excellent.length).toBeGreaterThanOrEqual(6);
     excellent.forEach(st =>
-      expect(r.byStudent[st.id].habits).toEqual({ sentences: 2, students: excellent.length, thin: true }),
+      expect(r.byStudent[st.id].habits).toEqual({ sentences: 7, students: excellent.length, thin: false }),
     );
-    expect(r.parts.find(p => p.step === 'habits').thin).toBe(true);
+    expect(r.parts.find(p => p.step === 'habits').thin).toBe(false);
   });
 
   it('counts an IE comment for no part', () => {

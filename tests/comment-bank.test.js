@@ -66,15 +66,24 @@ function fullContext(p, habits) {
     absent: '4',
     attendance: 'missed four classes and been late twice',
     late: '2',
+    absentClasses: 'four classes',
+    lateTimes: 'twice',
+    absentOnly: 'yes',
+    lateOnly: 'yes',
+    strongHabits: 'comes to class ready',
+    missingTitle: '“Energy Lab”',
+    missingTitles: '“Energy Lab” and “Poster”',
+    missingMany: 'yes',
+    missingGroup: 'six Current Events assignments',
     bestPiece: 'Her best piece was “Energy Lab”, where she measured every trial.',
   };
 }
 
 describe('the bank', () => {
-  it('has 572 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(572);
+  it('has 633 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(633);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(572);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(633);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -90,8 +99,15 @@ describe('the bank', () => {
       );
     });
     // The habits sentences name a habit only through habitWords, which says
-    // Completes Work in PE and Arts their own way.
-    COMMENT_BANK.sentences.filter(s => s.part === 'habits').forEach(s => expect(s.text, s.id).not.toMatch(/hand/i));
+    // Completes Work in PE and Arts their own way. The Not Handed In frames
+    // repeat the plan's own "not handed in" (Sentence grammar), as the
+    // engine-built m01 prints it for every kind of class.
+    COMMENT_BANK.sentences
+      .filter(s => s.part === 'habits' && s.group !== 'Not Handed In')
+      .forEach(s => expect(s.text, s.id).not.toMatch(/hand/i));
+    COMMENT_BANK.sentences
+      .filter(s => s.group === 'Not Handed In')
+      .forEach(s => expect(s.text.replace(/not handed in/g, ''), s.id).not.toMatch(/hand/i));
     ['g104', 'g105'].forEach(id =>
       expect(COMMENT_BANK.sentences.find(s => s.id === id).except).toEqual(['pe', 'career']),
     );
@@ -185,9 +201,19 @@ describe('the bank', () => {
       habitToBuild: 'habits',
       habitsToBuild: 'habits',
       habitStrengths: 'habits',
+      strongHabits: 'habits',
       absent: 'attendance',
       attendance: 'attendance',
       late: 'attendance',
+      absentClasses: 'attendance',
+      lateTimes: 'attendance',
+      absentOnly: 'attendance',
+      lateOnly: 'attendance',
+      missingTitle: 'notHandedIn',
+      missingTitles: 'notHandedIn',
+      missingMany: 'notHandedIn',
+      missingGroup: 'notHandedIn',
+      missingCount: 'notHandedIn',
       selfGood: 'studentWords',
       selfHard: 'studentWords',
       selfStrong: 'studentWords',
@@ -515,18 +541,20 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 42 sentences (1, 5, 11, 25)', () => {
+  // The habits part: Completes Work from the record is the one strong
+  // habit, so the four Strong Habits frames (hs11, hs13-hs15) fit.
+  it('knows the Demo class is Science from its name, and offers Cece 45 sentences (4, 5, 11, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 11, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(42);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([4, 5, 11, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(45);
   });
 
-  it('offers Jasper 42 (1, 5, 11, 25), by the name he goes by', () => {
+  it('offers Jasper 45 (4, 5, 11, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 11, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(42);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([4, 5, 11, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(45);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -597,10 +625,16 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
-    expect(habits.fit).toBe(1 + 1);
-    // One attendance sentence (plan, Sentence grammar), both halves said.
+    expect(habits.fit).toBe(4 + 7);
+    // The attendance frames for both counts (plan, Sentence grammar: both
+    // halves said, the exact counts): h60 and the six both-count frames.
     const att = habits.rows.filter(r => r.group === 'Attendance');
-    expect(att.map(r => r.text)).toEqual(['She has missed four classes and been late twice this term.']);
+    expect(att).toHaveLength(7);
+    expect(att.map(r => r.text)).toContain('She has missed four classes and been late twice this term.');
+    att.forEach(r => {
+      expect(r.text).toMatch(/four classes/);
+      expect(r.text).toMatch(/twice/);
+    });
     saveTermAttendance(cid, st.id, 'term-2', null, null);
   });
 

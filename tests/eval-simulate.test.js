@@ -89,7 +89,10 @@ describe('simulate', () => {
       c.nearIdentical.forEach(pairs => pairs.forEach(p => expect(p.shared).toBeGreaterThanOrEqual(5)));
       c.thin.forEach(t => expect(t.students).toBeGreaterThanOrEqual(3 * t.sentences));
     });
-    expect(r.classes[2].thin.map(t => t.step)).toContain('habits');
+    // The habits part is no longer thin: seven "excellent" frames serve the
+    // students rated all Consistently (2026-11-01).
+    r.classes.forEach(c => expect(c.thin.map(t => t.step)).not.toContain('habits'));
+    expect(r.classes.some(c => c.thin.length > 0)).toBe(true);
   });
 
   it('prints a plain report', () => {
@@ -97,7 +100,7 @@ describe('simulate', () => {
     expect(text).toMatch(/^Simulation: 5 classes/);
     expect(text).toMatch(/Never picked: \d+ of \d+\./);
     expect(text).toMatch(/Over-picked \(in 4 or more comments of one class\): \d+\./);
-    expect(text).toMatch(/thin: habits, 2 sentences fit \d+ students/);
+    expect(text).toMatch(/thin: \w+, \d+ sentences fit \d+ students/);
   });
 });
 
