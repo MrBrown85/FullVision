@@ -55,7 +55,13 @@ window.ReportBlocks = (function () {
      subject/object[/possessive] (ze/zir/zir). "prefer not to say", "not
      set", empty, or anything else means no pronouns on file, and the
      student reads as they/them/their with plural verbs (Colin, Nov 1,
-     #596). onFile says whether a set parsed. */
+     #596). onFile says whether a set parsed.
+     A set of two subject pronouns ("she/they", "he/they", "they/she")
+     reads as the full set of the first: she/her/her, he/him/his or
+     they/them/their. Only a subject/object set ("she/her", "ze/zir/zir")
+     gives its second word as the object. */
+  const KNOWN_SUBJ = { she: 'her', he: 'him', they: 'them' };
+  const SUBJECT_WORDS = ['she', 'he', 'they', 'ze', 'zie', 'xe', 'ey', 'fae', 've', 'it'];
   function getPronouns(student) {
     const raw = String((student && student.pronouns) || '')
       .trim()
@@ -63,8 +69,9 @@ window.ReportBlocks = (function () {
     const parts = raw ? raw.split('/').map(x => x.trim()) : [];
     const word = x => /^[a-z]{2,}$/.test(x || '');
     const ok = parts.length >= 2 && parts.length <= 3 && parts.every(word) && parts[0] !== parts[1];
+    const twoSubjects = ok && KNOWN_SUBJ[parts[0]] && SUBJECT_WORDS.indexOf(parts[1]) >= 0;
     const subj = ok ? parts[0] : 'they';
-    const obj = ok ? parts[1] : 'them';
+    const obj = twoSubjects ? KNOWN_SUBJ[subj] : ok ? parts[1] : 'them';
     let poss, refl, verb;
     if (subj === 'she') {
       poss = 'her';

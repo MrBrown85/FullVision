@@ -128,6 +128,45 @@ describe('the filters', () => {
     expect(out.template).toBeTruthy();
   });
 
+  /* A classmate whose name is one letter ("J", "O") was never checked, so a
+     kept template could name them. A one-letter name matches only as a
+     whole word with its capital, so "a" and "I" in an ordinary sentence
+     never block. */
+  describe('a classmate with a one-letter name', () => {
+    const CLASS = ['Amelia', 'Tavares', 'J', 'O', 'Owen'];
+    const sug = (text, others = CLASS) => {
+      const f = facts();
+      const ctx = CommentBank.context(f, {});
+      return PB.suggest(text, rowFor('overall', text, 'n11', ctx), ctx, f, GABRIEL, { others });
+    };
+    const comp = text => {
+      const f = facts();
+      return PB.compose(text, { step: 'overall' }, CommentBank.context(f, {}), f, GABRIEL, { others: CLASS });
+    };
+    it('leaves out a sentence that names them', () => {
+      expect(sug('Gabriel worked with J on every lab report this term.').reason).toBe('another student: J');
+      expect(sug('Gabriel and O built the trench model as a pair.').reason).toBe('another student: O');
+      expect(sug('Gabriel read J’s notes before each quiz this term.').reason).toBe('another student: J');
+      expect(comp('Gabriel worked with J on every lab report this term.').blocked).toBe(
+        '“J” is a classmate’s name; a bank sentence cannot name another student.',
+      );
+    });
+    it('does not block "a", "I", a lowercase letter or a longer name that starts with the letter', () => {
+      const ok = [
+        'Gabriel wrote a clear essay and I was glad to see his revisions.',
+        'Gabriel can explain part j of the unit guide in his own words.',
+        'Gabriel asked Jin and O’Brien careful questions in every discussion.',
+        'Gabriel explains how causes connect in each unit of the course.',
+      ];
+      ok.forEach(t => expect(sug(t).reason || '', t).not.toMatch(/another student/));
+      ok.forEach(t => expect(comp(t).blocked, t).not.toMatch(/classmate/));
+    });
+    it('a lowercase one-letter entry is not a classmate’s name', () => {
+      const text = 'Gabriel wrote a clear essay and I was glad to see his revisions.';
+      expect(sug(text, ['a', 'i']).reason || '').not.toMatch(/another student/);
+    });
+  });
+
   it('leaves out a date', () => {
     expect(reason('The map project can still be handed in until December 4.')).toBe('a date');
     expect(reason('Gabriel finished the first unit by 10/21 with time to spare.')).toBe('a date');

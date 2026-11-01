@@ -215,13 +215,25 @@ window.PersonalBank = (function () {
     });
   }
 
-  /* The first of a set of names the text holds as a whole word, as written. */
+  /* The first of a set of names the text holds as a whole word, as written
+     (with its capital). A one-letter name ("J", "O") counts only as a
+     capital letter standing alone: "J" and "J’s" match, "O’Brien" does not,
+     and a lowercase letter on the list is not a name, so "a" and "I" in an
+     ordinary sentence never match one. */
   function _nameIn(text, names) {
     for (var i = 0; i < names.length; i++) {
       var n = String(names[i] || '').trim();
-      if (n.length < 2) continue;
-      var re = new RegExp('(^|[^A-Za-zÀ-ɏ])' + _reEsc(n) + '(?![A-Za-zÀ-ɏ])');
-      if (re.test(text)) return n;
+      if (!n) continue;
+      var before = '(^|[^A-Za-zÀ-ɏ])';
+      var after = '(?![A-Za-zÀ-ɏ])';
+      if (n.length === 1) {
+        if (!/^[A-ZÀ-Þ]$/.test(n)) continue;
+        // Not part of a longer name: no letter joined by a hyphen or an
+        // apostrophe on either side, except a possessive 's.
+        before = "(^|[^A-Za-zÀ-ɏ'’-])";
+        after += "(?![-'’](?!s(?![A-Za-zÀ-ɏ]))[A-Za-zÀ-ɏ])";
+      }
+      if (new RegExp(before + _reEsc(n) + after).test(text)) return n;
     }
     return '';
   }

@@ -212,8 +212,37 @@
     keys.forEach(function (k) {
       if (k !== 'p_idempotency_key' && /^p_(.+_)?ids?$/.test(k)) ids.push(k + '=' + JSON.stringify(payload[k]));
     });
+    // A term rating is one row per enrollment and term.
+    if (endpoint === 'save_term_rating') ids.push('p_term=' + JSON.stringify(payload.p_term));
+    // A new personal-bank template has no id yet (p_id null): it is the
+    // template with this text, not every new template.
+    if (endpoint === 'save_comment_template' && payload.p_id == null) {
+      ids.push('p_text=' + JSON.stringify(payload.p_text));
+    }
     if (!ids.length) return null;
     return endpoint + '|' + ids.join('&');
+  }
+
+  /* The fields a write sets on its target, for writes that send only the
+     fields that changed (save_term_rating's p_payload); null when a write
+     sets the whole record. */
+  function _fields(entry) {
+    if (!entry || entry.endpoint !== 'save_term_rating') return null;
+    var p = entry.payload && entry.payload.p_payload;
+    return p && typeof p === 'object' ? Object.keys(p) : [];
+  }
+
+  /* Whether a newer write makes an older one out of date: same target, and
+     it sets every field the older one set. A term-rating habits save does
+     not replace a failed narrative, approval or IE save on the same row. */
+  function _supersedes(newer, older) {
+    var target = _target(newer.endpoint, newer.payload);
+    if (!target || _target(older.endpoint, older.payload) !== target) return false;
+    var mine = _fields(newer);
+    if (!mine) return true;
+    return _fields(older).every(function (k) {
+      return mine.indexOf(k) >= 0;
+    });
   }
 
   function _sameSet(a, b) {
@@ -792,7 +821,7 @@
       q.last_flush_at = new Date().toISOString();
       _writeQueue(q);
       _counts.succeeded++;
-      _dropDeadFor(_target(entry.endpoint, entry.payload));
+      _dropDeadFor(entry);
       // Listeners see the result before the push() caller does, so a re-key
       // driven from here is finished by the time the caller's .then runs.
       _notify('flush:success', {
@@ -840,9 +869,8 @@
 
     // One failed write per target: a newer failure replaces an older one.
     // The last try after a reload is dropped instead.
-    var target = _target(entry.endpoint, entry.payload);
     var dead = _readDead().filter(function (e) {
-      return !target || _target(e.endpoint, e.payload) !== target;
+      return !_supersedes(entry, e);
     });
     if (entry.last_try) _reportDropped(entry);
     else dead.push(entry);
@@ -879,13 +907,13 @@
     _writeQueue(q);
   }
 
-  /* A write to this target landed, so older failed writes to it are out of
-     date: retrying one would put back the value it replaced. */
-  function _dropDeadFor(target) {
-    if (!target) return;
+  /* A write to this target landed, so older failed writes it replaces are
+     out of date: retrying one would put back the value it replaced. */
+  function _dropDeadFor(entry) {
+    if (!_target(entry.endpoint, entry.payload)) return;
     var dead = _readDead();
     var keep = dead.filter(function (e) {
-      return _target(e.endpoint, e.payload) !== target;
+      return !_supersedes(entry, e);
     });
     if (keep.length === dead.length) return;
     _writeDead(keep);
@@ -1176,7 +1204,7 @@
       var drop = !target || entry.last_try || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
       if (!drop) {
         drop = q.entries.some(function (e) {
-          return _target(e.endpoint, e.payload) === target;
+          return _supersedes(e, entry);
         });
       }
       if (drop) {
