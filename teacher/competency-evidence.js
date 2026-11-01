@@ -118,6 +118,7 @@ window.CompetencyEvidence = (function () {
     return word || formatLevel(cid, level);
   }
 
+  // html-safe: titles and criterion names are escaped; ids, levels, dates and PROF_COLORS are ours.
   function scoreRowHtml(cid, sid, sc, assessMap) {
     var assess = assessMap[sc.assessmentId];
     var sColor = PROF_COLORS[sc.level || sc.score] || PROF_COLORS[0];
@@ -193,6 +194,7 @@ window.CompetencyEvidence = (function () {
     );
   }
 
+  // html-safe: rows from scoreRowHtml and obsRowHtml, which escape every title, note and label.
   function listHtml(cid, sid, ev, assessMap) {
     if (!ev.rows.length) return '<li class="ced-empty">No evidence yet</li>';
     return ev.rows
@@ -277,6 +279,7 @@ window.CompetencyEvidence = (function () {
       var tagId = d.getAttribute('data-tagid');
       var ev = evidenceFor(_cid, _sid, tagId);
       var list = d.querySelector('.ced-list');
+      // html-safe: this file's listHtml escapes every title, note and label.
       if (list) list.innerHTML = listHtml(_cid, _sid, ev, assessMap);
       var row = rowFor(d);
       var count = row && row.querySelector('.dash-tag-evidence');

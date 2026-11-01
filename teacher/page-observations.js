@@ -202,6 +202,7 @@ window.PageObservations = (function () {
     // Feed
     h += '<div class="obs-feed" id="obs-feed">' + renderFeedHtml(filtered) + '</div>';
 
+    // html-safe: the search text is escaped; renderFilterRow's chips and popovers escape every name and label; counts are numbers.
     document.getElementById('main').innerHTML = h;
     if (_capture) _capture.mount(document.getElementById('obs-capture-host'));
     wireSearch();
@@ -242,6 +243,7 @@ window.PageObservations = (function () {
     return h;
   }
 
+  // html-safe: tag keys and labels are escaped; dot colours come from obsTagColor; ids and actions are fixed.
   function renderTagPopover(id, selectedArr, toggleFn) {
     var items = ObsCapture.tagMenuItems(activeCourse);
     var h =
@@ -605,6 +607,7 @@ window.PageObservations = (function () {
     return Card.html(ob, ctx || feedContext());
   }
 
+  // html-safe: day labels go through ObsCard.dayHeaderHtml's esc; ObsCard.html escapes names, text, tags and titles.
   function renderFeedHtml(filtered) {
     if (filtered.length === 0) {
       var n = visibleObs(getAllQuickObs(activeCourse)).length;
@@ -867,6 +870,7 @@ window.PageObservations = (function () {
     deleteOb(sid, obId);
   }
 
+  // html-safe: tag labels and keys are escaped; colours come from obsTagColor.
   function _renderFocusTagsHtml() {
     var h = '';
     _focusDraft.dims.forEach(function (t) {
@@ -890,6 +894,7 @@ window.PageObservations = (function () {
     return h;
   }
 
+  // html-safe: tags from _renderFocusTagsHtml; ObsCard.contextMenuHtml uses fixed OBS_CONTEXTS keys and escaped labels.
   function _focusRowHtml() {
     return (
       '<span class="obs-row-label">Tags</span>' +
@@ -933,6 +938,7 @@ window.PageObservations = (function () {
     );
   }
 
+  // html-safe: the name, with-text, notice and note text are escaped; the type band uses fixed OBS_SENTIMENTS keys.
   function _renderFocusCardHtml(ob) {
     var p = Card.parts(ob, Card.context(activeCourse, { hidden: _pendingDeletes }));
     return (

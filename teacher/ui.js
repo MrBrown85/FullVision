@@ -6,6 +6,7 @@ function sanitizeHtml(raw) {
   // Parsed into a <template>, whose content is inert: an <img onerror> in
   // it doesn't load or fire while it is cleaned, as it could in a <div>.
   var holder = document.createElement('template');
+  // html-safe: parsed into an inert <template> only to be cleaned; never shown as is.
   holder.innerHTML = raw;
   var root = holder.content || holder;
   (function walk(node) {
@@ -52,6 +53,7 @@ let _sessionExpiredRetries = {};
 let _sessionExpiredCopyDraft = null;
 let _sessionExpiredModalOpen = false;
 
+// html-safe: TB_PAGES, OFFLINE_BANNER_COPY and the icons are fixed; the only caller (router.js) passes no rightHTML.
 function renderDock(activePage, rightHTML) {
   _ensureSyncStatusUI();
   const ap = activePage === 'student' ? 'dashboard' : activePage;
@@ -397,6 +399,7 @@ function getUpcomingBirthdays(cid) {
    picks the reporting term the class is viewed in. The choice is kept per
    class on this device (setSelectedTermOrdinal) and every grade on these
    pages follows it through calc.js. Hidden when the class has no terms. */
+// html-safe: cid and term labels/dates are escaped; ordinals are numbers.
 function renderTermPicker(cid) {
   var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
   if (!terms.length) return '';
@@ -481,6 +484,7 @@ function segSelect(btn) {
    keep "Dashboard" lit in the top nav and show where they are at the left
    of their toolbar: "Dashboard › Mei Wong". The first part links back.
    parentAction is a data-action for screens that close in place. */
+// html-safe: every argument goes through esc.
 function renderBreadcrumb(parentLabel, parentHref, currentLabel, parentAction) {
   return (
     '<nav class="tb-breadcrumb" aria-label="Breadcrumb"><ol>' +
@@ -671,6 +675,7 @@ function _rosterShowShort(cid, mode) {
   return mode === 'percent' ? '%' : _rosterShowLabel(cid, mode);
 }
 
+// html-safe: names and initials go through esc; ids, the avatar colour and the flag mark are ours.
 function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
   const flags = getFlags(cid);
   let html = '';
@@ -685,7 +690,7 @@ function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
       ? `type="button" data-action="sidebarStudentClick"`
       : `role="link" tabindex="0" data-href="${href}"`;
     html += `<${tag} class="student-row${s.id === selectedStudentId ? ' selected' : ''}" ${clickAttr} data-sid="${s.id}">
-      <span class="student-avatar" style="background:${avatarBg}">${initials(s)}</span>
+      <span class="student-avatar" style="background:${avatarBg}">${esc(initials(s))}</span>
       <span class="student-info">
         <span class="student-row-name">${flagged ? '<span style="color:var(--priority);margin-right:3px">\u2691</span>' : ''}${esc(fullName(s))}</span>
       </span>
@@ -695,6 +700,7 @@ function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
   return html;
 }
 
+// html-safe: every option and label comes from the fixed ROSTER_SORTS / ROSTER_SHOWS lists.
 function _rosterMenuHtml(options, mode, key) {
   return options
     .map(
@@ -711,6 +717,7 @@ function _rosterShowMenuHtml(cid, mode) {
 }
 
 let _sidebarCid = null;
+// html-safe: course names are escaped; labels come from the fixed roster lists; rows come from _sidebarRowsHtml.
 function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
   _sidebarClickFnName = onStudentClick || null;
   const cid = activeCourse;
@@ -849,6 +856,7 @@ document.addEventListener(
 /* The grade beside each name, as the class is set to grade
    (studentRosterBadges): proficiency code (EXT, PRF, DEV, EMG, IC), letter
    and %, or both. */
+// html-safe: colours come from PROF_COLORS / PROF_TINT; title and text go through esc.
 function _sidebarGradeBadge(part) {
   // IC has no level colour; the level-0 grey (#bbb) is too faint to read as text.
   var color = part.level ? PROF_COLORS[part.level] || PROF_COLORS[0] : 'var(--text-2)';
@@ -935,6 +943,7 @@ function applySidebarAnnotations() {
       extra.id = 'gb-sidebar-extra';
       top.appendChild(extra);
     }
+    // html-safe: the only annotator (report-questionnaire.js syncRoster) returns fixed buttons with counts.
     extra.innerHTML = a.top();
   } else if (extra) {
     extra.remove();
@@ -953,6 +962,7 @@ function applySidebarAnnotations() {
       sub.remove();
     }
     const cell = row.querySelector('.student-row-grades');
+    // html-safe: the only annotator (report-questionnaire.js syncRoster) returns fixed tick/flag spans.
     if (cell && a) cell.innerHTML = n.mark || '';
     row.classList.toggle('roster-hidden', !!n.hidden);
   });
@@ -1260,7 +1270,7 @@ function showConfirm(title, message, okLabel, okStyle, onConfirm) {
     <div class="confirm-message">${esc(message)}</div>
     <div class="confirm-actions">
       <button class="confirm-cancel" id="confirm-cancel-btn">Cancel</button>
-      <button class="confirm-ok ${okStyle || 'primary'}" id="confirm-ok-btn">${esc(okLabel || 'OK')}</button>
+      <button class="confirm-ok ${esc(okStyle || 'primary')}" id="confirm-ok-btn">${esc(okLabel || 'OK')}</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
