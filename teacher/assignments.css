@@ -3168,6 +3168,7 @@
 }
 .rsg-level {
   flex: 1;
+  min-width: 0;
   height: 32px;
   border-radius: 7px;
   display: flex;
@@ -3503,31 +3504,32 @@
   font-weight: 700;
 }
 /* − | + inside the chosen level, a stepper like the Advanced rubric's
-   chosen tile: white signs straight on the level colour (no lighter track,
-   which would leave white text on a paler fill), the picked sign solid
-   white. */
+   chosen tile. The level keeps the same width as the others, its name at
+   the left and the signs at the right, white straight on the level colour
+   (no lighter track, which would leave white text on a paler fill), the
+   picked sign solid white. */
 .rsg-levels {
   container-type: inline-size;
 }
 .rsg-level.has-mods {
-  position: relative;
-  padding: 0 64px;
+  padding: 0;
+  justify-content: space-between;
+  gap: 6px;
 }
 .rsg-level-name {
+  margin-left: 10px;
   white-space: nowrap;
 }
 .rsg-mods {
-  position: absolute;
-  top: 50%;
-  right: 3px;
-  transform: translateY(-50%);
+  flex-shrink: 0;
+  margin-right: 3px;
   display: flex;
   align-items: center;
   padding: 1px;
   border-radius: 6px;
 }
 .rsg-mod {
-  width: 26px;
+  width: 28px;
   height: 24px;
   border: none;
   border-radius: 5px;
@@ -3566,11 +3568,20 @@
   opacity: 0.35;
   cursor: default;
 }
-/* Narrow levels: the name moves left to make room for − | +. */
-@container (max-width: 600px) {
+/* Narrow levels: − | + move under the name, as a narrow tile's do. */
+@container (max-width: 720px) {
   .rsg-level.has-mods {
-    justify-content: flex-start;
-    padding: 0 62px 0 8px;
+    flex-direction: column;
+    justify-content: center;
+    height: auto;
+    min-height: 32px;
+    gap: 2px;
+  }
+  .rsg-level.has-mods .rsg-level-name {
+    margin: 4px 0 0;
+  }
+  .rsg-level.has-mods .rsg-mods {
+    margin: 0 0 4px;
   }
 }
 
@@ -5210,37 +5221,29 @@
   text-align: left;
   cursor: pointer;
 }
-.grdt-tile.is-chosen.l4 .grdt-chosen-label svg {
-  color: var(--score-4);
-}
-.grdt-tile.is-chosen.l3 .grdt-chosen-label svg {
-  color: var(--score-3);
-}
-.grdt-tile.is-chosen.l2 .grdt-chosen-label svg {
-  color: var(--score-2);
-}
-.grdt-tile.is-chosen.l1 .grdt-chosen-label svg {
-  color: var(--score-1);
-}
+/* The signs sit straight on the level colour, as the grids' do (no
+   lighter track behind them). */
 .grdt-stepper {
   margin-left: auto;
   display: flex;
   align-items: center;
-  padding: 2px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.2);
+  padding: 1px;
+  border-radius: 6px;
 }
 .grdt-stepper button {
   width: 28px;
   height: 24px;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   background: transparent;
   color: #fff;
   font: inherit;
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
+}
+.grdt-stepper button:hover:not(:disabled):not(.is-on) {
+  background: rgba(255, 255, 255, 0.18);
 }
 .grdt-stepper button.is-on {
   background: #fff;
@@ -5264,8 +5267,8 @@
 }
 .grdt-stepper-sep {
   width: 1px;
-  height: 14px;
-  background: rgba(255, 255, 255, 0.45);
+  height: 12px;
+  background: rgba(255, 255, 255, 0.5);
 }
 .grdt-note-row {
   display: grid;
