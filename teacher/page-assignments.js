@@ -4473,11 +4473,13 @@ window.PageAssignments = (function () {
         var tag = getTagById(activeCourse, tid);
         var sec = getSectionForTag(activeCourse, tid);
         var color = cssColor(sec ? sec.color : 'var(--text-3)');
+        // The section colour as text goes through tintText(), as every
+        // small coloured label does, so it reads on the bar (4.5:1).
         return (
           '<span class="rsg-descriptor-tag" style="border-color:' +
           color +
           ';color:' +
-          color +
+          tintText(color) +
           '">' +
           esc(_rubricTagName(tag, sec)) +
           '</span>'
