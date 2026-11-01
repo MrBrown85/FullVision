@@ -60,5 +60,6 @@ test('rubric competency cells are read-only, open the grader and mark disagreein
 
   await page.keyboard.press('Enter');
   await expect(page.locator('#grader-overlay .grader-dialog')).toBeVisible();
-  await expect(page.locator('#grader-overlay .grdt-crit')).toHaveCount(2);
+  // The two criteria; the Overall Comment row under them is a card too.
+  await expect(page.locator('#grader-overlay .grdt-crit[data-critid]')).toHaveCount(2);
 });
