@@ -179,7 +179,7 @@ describe('the filters', () => {
     // Nearly f03: "At home, you can ask {him} what a news story means …".
     const nearBank = item('At home, you could ask him what one news story means for the people in it.');
     const fresh = item('At home, you could ask him which map in his notes he would redraw and why.');
-    const twin = item('At home, you could ask him which map in his notes he would draw again and why.');
+    const twin = item('At home, you could ask him which map in his notes he would draw once more and why.');
     expect(nearBank.template && fresh.template && twin.template).toBeTruthy();
     PB.noteApproved('c1', 'term-1', 's1', 'Gabriel Wong', [nearBank, fresh, twin]);
     let r = PB.review('c1', 'term-1', ['s1']);
@@ -262,12 +262,12 @@ describe('the student’s details as slots', () => {
 
   it('slots a count and binds it to one or more, so the noun and verb agree', () => {
     const f = facts({ notHandedIn: { count: 1, titles: ['Map Quiz'], groups: [] } });
-    const out = suggestFor('One assignment is still missing, and Gabriel can bring it to class soon.', {
+    const out = suggestFor('One assignment is missing, and Gabriel can bring it to class soon.', {
       f,
       step: 'notHandedIn',
       base: null,
     });
-    expect(out.template.text).toBe('{missingCount} assignment is still missing, and {he} can bring it to class soon.');
+    expect(out.template.text).toBe('{missingCount} assignment is missing, and {he} can bring it to class soon.');
     expect(out.chips[0]).toEqual({ from: 'One assignment', to: 'how many' });
     expect(out.template.condition.counts).toEqual({ missingCount: 'one' });
     expect(out.offered).toBe('Offered when one assignment is not handed in, in Socials classes');
@@ -384,7 +384,7 @@ describe('kept sentences in Generate', () => {
   it('holds a count to one or more', () => {
     const f = facts({ notHandedIn: { count: 1, titles: ['Map Quiz'], groups: [] } });
     const ctx = CommentBank.context(f, {});
-    const t = 'One assignment is still missing, and Gabriel can bring it to class soon.';
+    const t = 'One assignment is missing, and Gabriel can bring it to class soon.';
     PB.keep(PB.suggest(t, rowFor('notHandedIn', t, null, ctx), ctx, f, GABRIEL, {}).template);
     const mine = COMMENT_BANK.sentences.find(s => s.mine);
     const one = CommentBank.context(ameliaFacts({ notHandedIn: { count: 1, titles: ['Essay'], groups: [] } }), {});
@@ -394,7 +394,7 @@ describe('kept sentences in Generate', () => {
     );
     expect(CommentBank.fits(mine, one)).toBe(true);
     expect(CommentBank.fill(mine, one, { first: true })).toBe(
-      'One assignment is still missing, and Amelia can bring it to class soon.',
+      'One assignment is missing, and Amelia can bring it to class soon.',
     );
     expect(CommentBank.fits(mine, three)).toBe(false);
   });
@@ -402,7 +402,7 @@ describe('kept sentences in Generate', () => {
   it('fails verify() when a slot it was filled with is no longer true', () => {
     const f = facts({ notHandedIn: { count: 1, titles: ['Map Quiz'], groups: [] } });
     const ctx = CommentBank.context(f, {});
-    const t = 'One assignment is still missing, and Gabriel can bring it to class soon.';
+    const t = 'One assignment is missing, and Gabriel can bring it to class soon.';
     PB.keep(PB.suggest(t, rowFor('notHandedIn', t, null, ctx), ctx, f, GABRIEL, {}).template);
     const mine = COMMENT_BANK.sentences.find(s => s.mine);
     const pv = CommentBank.provenance(mine, ctx);

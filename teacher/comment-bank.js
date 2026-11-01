@@ -786,7 +786,7 @@ window.CommentBank = (function () {
     // select, rewritten as what the teacher will do in class.
     {
       id: 'sl-ghs-ask',
-      text: 'In class, I will ask the student each week whether anything needs explaining again.',
+      text: 'In class, I will ask the student each week whether any part of the lesson is unclear.',
       fits: ['feedback', 'part'],
       src: 'GHS 36, 420, 446',
     },
@@ -841,7 +841,7 @@ window.CommentBank = (function () {
     {
       id: 'sl-ghs-rehearse',
       families: ['arts'],
-      text: 'In class, I will give rehearsal time for the hard parts of a piece.',
+      text: 'In class, I will give time to practise the hardest part of a piece.',
       fits: ['technique', 'creating'],
       src: 'GHS 238, 475',
     },
@@ -867,7 +867,7 @@ window.CommentBank = (function () {
     },
     {
       id: 'lg-speaks',
-      text: '{He} [speaks|speak] English with growing clarity; the next step is practising the sounds of new words aloud.',
+      text: '{He} can say new words in English after hearing them; the next step is using them in a sentence.',
       src: 'GHS 302',
     },
     {
@@ -877,7 +877,7 @@ window.CommentBank = (function () {
     },
     {
       id: 'lg-one-step',
-      text: '{He} can follow spoken instructions in English one step at a time; the next step is a longer set.',
+      text: '{He} can follow spoken instructions in English one step at a time; the next step is two steps given together.',
       src: 'GHS 308',
     },
     {
@@ -897,12 +897,12 @@ window.CommentBank = (function () {
     },
     {
       id: 'lg-extra-time',
-      text: '{He} can complete assignments in English with extra time; the next step is finishing one in the time given.',
+      text: '{He} can complete assignments in English; the next step is finishing one in the time given.',
       src: 'GHS 314',
     },
     {
       id: 'lg-with-support',
-      text: '{He} can complete assignments in English with support in class; the next step is completing one without help.',
+      text: '{He} can complete assignments in English after asking one question; the next step is completing one without asking.',
       src: 'GHS 312',
     },
     {
@@ -912,27 +912,27 @@ window.CommentBank = (function () {
     },
     {
       id: 'lg-takes-part',
-      text: '{He} [takes|take] part in class in English when speaking; the next step is taking part in writing as well.',
+      text: '{He} [takes|take] part in class by speaking in English; the next step is taking part in writing as well.',
       src: 'GHS 307',
     },
     {
       id: 'lg-translation',
-      text: '{He} can follow instructions in English with a translation beside them; the next step is following them in English alone.',
+      text: '{He} can follow instructions in English when written as well as spoken; the next step is spoken instructions alone.',
       src: 'GHS 317',
     },
     {
       id: 'lg-reading',
-      text: '{He} can read short texts in English; the next step is reading a little in English each day.',
+      text: '{He} can read short texts in English; the next step is a longer text with a question about it.',
       src: 'GHS 319, 321',
     },
     {
       id: 'lg-listening',
-      text: '{He} can follow English in class when it is spoken slowly; the next step is English shows or music.',
+      text: '{He} can follow English spoken slowly in class; the next step is following it at the usual pace.',
       src: 'GHS 320',
     },
     {
       id: 'lg-outside',
-      text: '{He} can speak, read and write in English in class; the next step is using English outside class as well.',
+      text: '{He} can speak, read and write in English in class; the next step is using English with others between lessons.',
       src: 'GHS 306',
     },
   ];
