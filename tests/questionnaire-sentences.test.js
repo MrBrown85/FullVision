@@ -25,6 +25,7 @@ describe('partOf and rowLabel', () => {
     expect(RQ.rowLabel({ step: 'grade' }, 'ie')).toBe('Grade');
     expect(RQ.rowLabel({ step: 'grade' }, 'language_goals')).toBe('Statement');
     expect(RQ.rowLabel({ step: 'ieDeadline' }, 'ie')).toBe('Deadline');
+    expect(RQ.rowLabel({ step: 'attendance' }, null)).toBe('Attendance');
     expect(RQ.rowLabel({ step: null }, null)).toBe('');
   });
   it('lists the eight parts of Browse Sentences in the mockup’s order', () => {
@@ -135,6 +136,19 @@ describe('moveRow, dropRow and resetOrder', () => {
     row('h', 'habits', 'H.'),
     row('c', 'closer', 'C.'),
   ];
+  it('shows the next-step sentences as one row, with the support row after them', () => {
+    const next = [
+      row('g', 'grade', 'G.'),
+      row('n', 'nextStep', 'N.'),
+      row('s', 'support', 'S.'),
+      row('h', 'home', 'H.'),
+      row('c', 'closer', 'C.'),
+    ];
+    expect(RQ.units(next).map(u => u.map(r => r.id))).toEqual([['g'], ['n', 'h'], ['s'], ['c']]);
+    // Moved as one; the support row keeps its place after them.
+    expect(RQ.moveRow(next, 1, -1).map(r => r.id)).toEqual(['n', 'h', 'g', 's', 'c']);
+    expect(RQ.units(rows).map(u => u.map(r => r.id))).toEqual([['a'], ['m', 'l'], ['h'], ['c']]);
+  });
   it('moves a row one place, the Not Handed In sentence and its late line as one', () => {
     expect(RQ.moveRow(rows, 3, -1).map(r => r.id)).toEqual(['a', 'h', 'm', 'l', 'c']);
     expect(RQ.moveRow(rows, 1, 1).map(r => r.id)).toEqual(['a', 'h', 'm', 'l', 'c']);
@@ -379,8 +393,12 @@ describe('the card drawn for a Demo Mode student', () => {
     expect(card).toContain('Reword, edit or drag to reorder. The comment above follows.');
     expect(card).toContain('Browse Sentences…');
     expect(card).not.toContain('Reset Order');
-    expect((card.match(/class="qn-srow-handle" draggable="true"/g) || []).length).toBe(d.sentences.length);
-    expect((card.match(/data-do="wording"/g) || []).length).toBe(d.sentences.length);
+    // One row per unit: the next-step sentences share a row.
+    const units = RQ.units(RQ.rowsFromDraft(d)).length;
+    expect(units).toBeLessThan(d.sentences.length);
+    expect((card.match(/class="qn-srow-handle" draggable="true"/g) || []).length).toBe(units);
+    expect((card.match(/data-do="wording"/g) || []).length).toBe(units);
+    expect((card.match(/<span class="qn-req-label">Next Step<\/span>/g) || []).length).toBe(1);
     expect(card).toContain('<span class="qn-req-label">Grade</span>');
     expect(card).toContain('<span class="qn-req-label">Best Piece</span>');
     // The best-piece row alone is tinted and names the note.

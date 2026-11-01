@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-/* Attendance on the Term Questionnaire (Colin, 2026-10-24): the teacher
-   copies the totals to date from MyEd at each report; the questionnaire
-   shows the change since the last report and warns when a total goes
-   down. Generate Comment uses the totals once entered. */
+/* Attendance on the Term Questionnaire: the teacher types the totals to
+   date at each report; the card says "Added to the comment." once a total
+   is entered (the States mockup) and warns when a total goes down.
+   Generate Comment uses the totals once entered. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function openQuestionnaire(page) {
@@ -29,12 +29,12 @@ test('totals to date give this term without any math', async ({ page }) => {
   await openQuestionnaire(page);
   await pickReport(page, 1);
   await enter(page, 4, 3);
-  await expect(page.locator('#tq-att-note')).toContainText('No earlier report has attendance');
+  await expect(page.locator('#tq-att-note')).toHaveText('Added to the comment.');
 
   await pickReport(page, 2);
-  await expect(page.locator('#tq-att-note')).toContainText('report had 4 absent, 3 late');
+  await expect(page.locator('#tq-att-note')).toHaveText('Optional. Left out until entered.');
   await enter(page, 10, 5);
-  await expect(page.locator('#tq-att-note')).toContainText('6 absent, 2 late');
+  await expect(page.locator('#tq-att-note')).toHaveText('Added to the comment.');
 
   // Back to Report 2 after a reload: the totals stay.
   await page.reload();
@@ -57,4 +57,10 @@ test('Generate Comment uses the attendance totals once they are entered', async 
   await page.locator('#tq-generate').click();
   // One attendance sentence (plan, Sentence grammar): numbers in words.
   await expect(page.locator('#tq-narrative')).toHaveValue(/missed four classes and been late twice this term\./);
+  // Its row: Attendance, tinted, "From Attendance above · new" (the States mockup).
+  const row = page.locator('#tq-sentences .qn-srow', { has: page.locator('.qn-req-label:text-is("Attendance")') });
+  await expect(row).toHaveCount(1);
+  await expect(row).toHaveClass(/\battendance\b/);
+  await expect(row.locator('.qn-req-text')).toHaveText(/missed four classes and been late twice this term\./);
+  await expect(row.locator('.qn-req-source')).toHaveText('From Attendance above · new');
 });

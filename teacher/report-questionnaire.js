@@ -1066,10 +1066,9 @@ window.ReportQuestionnaire = (function () {
     return opt ? opt.text : n ? 'Report ' + n[1] : '';
   }
 
-  /* The line at the right of the card: the change since the last report
-     with its totals, a warning when a total is lower than that report's
-     (totals are to date), or the mockup's note until something is
-     entered. */
+  /* The line at the right of the card (the States mockup): "Added to the
+     comment." once a total is entered, the note until then, and a warning
+     when a total is lower than the last report's (totals are to date). */
   function _attendanceNoteHtml(att) {
     var lower = ['absences', 'lates'].find(function (f) {
       var prev = att['prev' + f[0].toUpperCase() + f.slice(1)];
@@ -1082,27 +1081,8 @@ window.ReportQuestionnaire = (function () {
         _reportLabel(att[lower + 'PrevTerm']),
       )} report. Enter the total to date.</span>`;
     }
-    var prevTerm = att.absencesPrevTerm || att.latesPrevTerm;
     var entered = att.absences != null || att.lates != null;
-    if (!prevTerm) {
-      return entered
-        ? 'No earlier report has attendance, so these are this term’s totals too.'
-        : 'Optional. Left out until entered.';
-    }
-    var was = [
-      att.prevAbsences != null ? att.prevAbsences + ' absent' : '',
-      att.prevLates != null ? att.prevLates + ' late' : '',
-    ]
-      .filter(Boolean)
-      .join(', ');
-    if (!entered) return `The ${esc(_reportLabel(prevTerm))} report had ${was}.`;
-    var since = [
-      att.absencesThisTerm != null ? att.absencesThisTerm + ' absent' : '',
-      att.latesThisTerm != null ? att.latesThisTerm + ' late' : '',
-    ]
-      .filter(Boolean)
-      .join(', ');
-    return `Since the ${esc(_reportLabel(prevTerm))} report (${was}): <strong>${since}</strong>`;
+    return entered ? 'Added to the comment.' : 'Optional. Left out until entered.';
   }
 
   function _attendanceHtml(cid, student) {
@@ -1531,13 +1511,17 @@ window.ReportQuestionnaire = (function () {
           )
           .map(function (t) {
             var pressed = _commentTab === t[0];
-            return `<button type="button" class="seg-btn${pressed ? ' active' : ''}" data-action="tqCommentTab" data-tab="${esc(t[0])}" aria-pressed="${pressed}">${esc(t[1])}</button>`;
+            var tip =
+              t[0] === 'this'
+                ? 'The comment for this report.'
+                : 'The comment that went home in ' + t[1] + '. Read only.';
+            return `<button type="button" class="seg-btn${pressed ? ' active' : ''}" data-action="tqCommentTab" data-tab="${esc(t[0])}" aria-pressed="${pressed}" title="${esc(tip)}">${esc(t[1])}</button>`;
           })
           .join('')}</div>`
       : '';
     var body;
     if (thisTab) {
-      body = `${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea></div>
+      body = `${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" title="The student’s report comment. Type here, or change a sentence in the Sentences card below." data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea></div>
         <div class="qn-comment-foot" id="tq-comment-foot"${text.trim() ? '' : ' hidden'}>
           ${_countHtml(cid, text)}
           <button type="button" class="qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${COPY_ICON}<span class="qn-copy-label">Copy</span></button>
@@ -2068,13 +2052,15 @@ window.ReportQuestionnaire = (function () {
   }
 
   /* The Required parts of an IE or goals comment as rows, before Generate
-     has written the comment. Nothing on the grade path. */
+     has written the comment; on the IE path the Support row follows the
+     Deadline (the IEPath mockup). Nothing on the grade path. */
   function _requiredRows(cid, student, f) {
     var path = CommentBank.reportPath(f);
     if (!path) return '';
     return CommentBank.requiredParts(_bankContext(cid, student, f))
       .map(function (p) {
-        return _requiredRowHtml(cid, student, f, p, path);
+        var html = _requiredRowHtml(cid, student, f, p, path);
+        return p.key === 'ieDeadline' ? html + _supportRowHtml(cid, student, f) : html;
       })
       .join('');
   }
@@ -2126,8 +2112,9 @@ window.ReportQuestionnaire = (function () {
   /* A row's label: its part, or on the IE path Problem, Plan, Deadline and
      Meeting, and Statement for the goals sentence. In the example step
      only the best-piece sentence is Best Piece; a Student Voice quote is
-     Voice and any other example Example. A sentence of the teacher's own
-     that fits no part has none. */
+     Voice and any other example Example. The attendance sentence is
+     Attendance (the States mockup). A sentence of the teacher's own that
+     fits no part has none. */
   function rowLabel(row, path) {
     if (!row.step) return '';
     if (_isRequired(row.step, path)) {
@@ -2137,6 +2124,7 @@ window.ReportQuestionnaire = (function () {
     if (row.step === 'example' && !_isBestRow(row)) {
       return row.s && row.s.group === "In the Student's Words" ? 'Voice' : 'Example';
     }
+    if (row.step === 'attendance') return 'Attendance';
     var p = partOf(row.step);
     return p ? p.label : '';
   }
@@ -2585,12 +2573,33 @@ window.ReportQuestionnaire = (function () {
   /* ── Moving rows ─────────────────────────────────────────── */
 
   /* The rows as the card shows them: the Not Handed In sentence and the
-     late-work line after it are one row. */
+     late-work line after it are one row, and the next-step sentences (the
+     next step, the student's own words, the family's part) are one Next
+     Step row; a support row among them is shown after that row, never
+     between its sentences (the LayoutE and InContext mockups). */
+  var NEXT_KEYS = ['nextStep', 'goWords', 'home'];
+  function _isNext(row) {
+    return !!row && NEXT_KEYS.indexOf(row.step) >= 0;
+  }
   function _units(rows) {
     var out = [];
     for (var i = 0; i < rows.length; i++) {
       var u = [rows[i]];
-      if (rows[i].step === 'notHandedIn' && rows[i + 1] && rows[i + 1].step === 'lateWork') u.push(rows[++i]);
+      if (rows[i].step === 'notHandedIn' && rows[i + 1] && rows[i + 1].step === 'lateWork') {
+        u.push(rows[++i]);
+      } else if (_isNext(rows[i])) {
+        var held = [];
+        while (rows[i + 1] && (_isNext(rows[i + 1]) || (rows[i + 1].step === 'support' && _isNext(rows[i + 2])))) {
+          i++;
+          if (rows[i].step === 'support') held.push([rows[i]]);
+          else u.push(rows[i]);
+        }
+        out.push(u);
+        held.forEach(function (h) {
+          out.push(h);
+        });
+        continue;
+      }
       out.push(u);
     }
     return out;
@@ -2937,12 +2946,27 @@ window.ReportQuestionnaire = (function () {
     return '';
   }
 
+  /* One source line for a row of several sentences: each sentence's
+     source once, the "general sentence" note only when no sentence states
+     a fact. */
+  function _unitSource(unit, cid, student, f, ctx) {
+    var out = [];
+    var general = '';
+    unit.forEach(function (r) {
+      var src = rowSource(r, cid, student, f, ctx);
+      if (/^A general sentence\./.test(src)) general = src;
+      else if (out.indexOf(src) < 0) out.push(src);
+    });
+    return out.join(' · ') || general;
+  }
+
   /* Where a row's fact came from, in plain words: the grade and its
      distance from the next band, the piece and its mark, the ratings, the
      weakest skill. An edited sentence says so instead. */
   function rowSource(row, cid, student, f, ctx) {
     var first = _first(student);
     if (row.edited) return 'Edited by you · kept when you regenerate';
+    if (row.step === 'attendance') return 'From Attendance above · new';
     if (row.step === 'grade') return _gradeSource(cid, f);
     if (row.step === 'habits' || row.step === 'strongHabits') return _habitsSource(cid, student, f);
     var keys = ((row.prov && row.prov.factKeys) || []).slice();
@@ -2978,7 +3002,6 @@ window.ReportQuestionnaire = (function () {
       var top = bestPiece(f.work);
       if (top && String(top.note || '').trim()) bits.push('your note for the report');
     }
-    if (row.step === 'attendance' && bits.length) bits.push('entered by you');
     return bits.join(' · ') || 'A general sentence. It states no fact about ' + first + '.';
   }
 
@@ -3040,9 +3063,11 @@ window.ReportQuestionnaire = (function () {
     return i != null && i >= 0 ? ' data-row="' + i + '"' : '';
   }
 
-  /* One row of the card. i: its index among the rows (none for a class
-     row the comment has no sentence for yet). */
-  function _rowHtml(cid, student, f, ctx, rows, row, i, path) {
+  /* One row of the card. unit: its rows (_units), the first leading; i:
+     the first's index among the rows (none for a class row the comment has
+     no sentence for yet). */
+  function _rowHtml(cid, student, f, ctx, rows, unit, i, path) {
+    var row = unit[0];
     var fixed = i < 0 || _isRequired(row.step, path);
     var handle = fixed ? SPACER : HANDLE;
     if (row.step === 'notHandedIn') return _missingRowHtml(cid, f, handle, i);
@@ -3060,22 +3085,38 @@ window.ReportQuestionnaire = (function () {
       );
     var open = !!_wording && _wording.index === i;
     var low = row.step === 'grade' && _checksFor(f, rows).indexOf('low') >= 0;
-    var act = row.edited
+    var edited = unit.some(function (r) {
+      return r.edited;
+    });
+    var act = edited
       ? '<span class="qn-edited" title="You changed this sentence. Generate Comment keeps it.">Edited</span>'
       : row.step && row.s
         ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Shows other ways to say this sentence. Pick one to use it.">Other Wording ▾</button>`
         : '';
-    return `<div class="qn-req-row qn-srow${_isBestRow(row) ? ' best' : ''}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
+    var tint = _isBestRow(row) ? ' best' : row.step === 'attendance' ? ' attendance' : '';
+    var text = unit
+      .map(function (r) {
+        return r.text;
+      })
+      .join(' ');
+    var thin = unit
+      .map(function (r) {
+        return _thinHtml(cid, student, r, i);
+      })
+      .join('');
+    return `<div class="qn-req-row qn-srow${tint}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
       ${handle}<div class="qn-req-part"><span class="qn-req-label">${esc(rowLabel(row, path))}</span></div>
-      <div class="qn-req-body"><span class="qn-req-text">${esc(row.text)}</span><span class="qn-req-source">${esc(rowSource(row, cid, student, f, ctx))}</span>${_thinHtml(cid, student, row, i)}</div>
+      <div class="qn-req-body"><span class="qn-req-text">${esc(text)}</span><span class="qn-req-source">${esc(_unitSource(unit, cid, student, f, ctx))}</span>${thin}</div>
       ${act}
       ${low ? _checkHtml(student.id, 'low') : ''}
       ${open ? _wordingMenuHtml(cid, student, ctx, rows, i) : ''}
     </div>`;
   }
 
-  /* The rows in order, with a class row (Not Handed In, Support, Closing)
-     the comment has no sentence for where its step would fall. */
+  /* The rows in order (as units), with a class row (Not Handed In,
+     Support, Closing) the comment has no sentence for where its step would
+     fall; on the IE path the Support row sits before Meeting (the IEPath
+     mockup). */
   function _rowListHtml(cid, student, f, rows, path) {
     var ctx = _bankContext(cid, student, f);
     var ie = path === 'ie';
@@ -3083,25 +3124,30 @@ window.ReportQuestionnaire = (function () {
     rows.forEach(function (r) {
       has[r.step] = true;
     });
-    var items = rows.map(function (r, i) {
-      return { row: r, i: i };
+    var items = _units(rows).map(function (u) {
+      return { unit: u, i: rows.indexOf(u[0]) };
     });
     var extra = [];
     if (!ie && f.notHandedIn && f.notHandedIn.count > 0 && !has.notHandedIn) extra.push('notHandedIn');
-    if (!ie && !has.support) extra.push('support');
+    if (!has.support) extra.push('support');
     if (!has.closer) extra.push('closer');
     extra.forEach(function (step) {
       var si = _stepAt(step);
-      // Before the first row of a later step; else last.
-      var pos = items.findIndex(function (it) {
-        return !!it.row.step && _stepAt(it.row.step) > si;
-      });
-      items.splice(pos < 0 ? items.length : pos, 0, { row: { step: step, placeholder: true }, i: -1 });
+      // Closing last; on the IE path Support before Meeting; else before
+      // the first row of a later step, or last.
+      var pos =
+        step === 'closer'
+          ? -1
+          : items.findIndex(function (it) {
+              var lead = it.unit[0].step;
+              if (ie && step === 'support') return lead === 'ieMeeting';
+              return !!lead && _stepAt(lead) > si;
+            });
+      items.splice(pos < 0 ? items.length : pos, 0, { unit: [{ step: step, placeholder: true }], i: -1 });
     });
     return items
       .map(function (it) {
-        if (it.row.step === 'lateWork') return '';
-        return _rowHtml(cid, student, f, ctx, rows, it.row, it.i, path);
+        return _rowHtml(cid, student, f, ctx, rows, it.unit, it.i, path);
       })
       .join('');
   }
@@ -3736,8 +3782,9 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
-  /* The rows for the class's lines, in the comment's order. An IE comment
-     states its own problem and plan, so it has only the closing row. */
+  /* The rows for the class's lines, in the comment's order. On the IE
+     path the Support row is drawn among the Required rows (_requiredRows),
+     so only the closing row is added here. */
   function _classRowsHtml(cid, student, f) {
     var ie = CommentBank.reportPath(f) === 'ie';
     var rows = '';
@@ -4217,6 +4264,7 @@ window.ReportQuestionnaire = (function () {
     alignRows: alignRows,
     recoverRows: recoverRows,
     composeRows: composeRows,
+    units: _units,
     moveRow: moveRow,
     dropRow: dropRow,
     resetOrder: resetOrder,

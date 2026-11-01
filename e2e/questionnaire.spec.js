@@ -462,6 +462,14 @@ test.describe('checks and approval', () => {
     await expect(page.locator('#tq-warn')).toContainText(
       /[A-Z][a-z]+ of these sentences are also in Cece Adeyemi’s comment\. Press Generate Comment for another version, or change a sentence\./,
     );
+    // Show Both takes the warning's amber (the States mockup).
+    const colours = await page
+      .locator('#tq-warn')
+      .evaluate(w => [
+        getComputedStyle(w).color,
+        getComputedStyle(w.querySelector('[data-action="tqShowBoth"]')).color,
+      ]);
+    expect(colours[1]).toBe(colours[0]);
     await page.locator('[data-action="tqShowBoth"]').click();
     const both = page.locator('#tq-both-overlay');
     await expect(both.locator('#tq-both-title')).toHaveText('Both Comments');
@@ -472,6 +480,29 @@ test.describe('checks and approval', () => {
     await expect(both).toHaveCount(0);
     await expect(page.locator('[data-action="tqShowBoth"]')).toBeFocused();
   });
+});
+
+test('the report tabs, the picker, This Report and the comment box explain themselves on hover', async ({ page }) => {
+  await open(page);
+  await expect(page.locator('.report-seg-btn[data-tab="questionnaire"]')).toHaveAttribute(
+    'title',
+    'Write and approve each student’s report comment.',
+  );
+  await expect(page.locator('.report-seg-btn[data-tab="progress"]')).toHaveAttribute(
+    'title',
+    'Build and print the class’s report cards.',
+  );
+  await expect(page.locator('#report-period')).toHaveAttribute('title', /^The report you are working on\./);
+  await expect(page.locator('#tq-narrative')).toHaveAttribute('title', /^The student’s report comment\./);
+  // An earlier report's comment has its own tab, read only.
+  await expect(page.locator('.qn-comment-tabs .seg-btn[data-tab="this"]')).toHaveAttribute(
+    'title',
+    'The comment for this report.',
+  );
+  await expect(page.locator('.qn-comment-tabs .seg-btn:not([data-tab="this"])').first()).toHaveAttribute(
+    'title',
+    /^The comment that went home in .+\. Read only\.$/,
+  );
 });
 
 test('no overflow at 1440 × 900', async ({ page }) => {
@@ -543,14 +574,26 @@ test.describe('the Sentences card', () => {
     const n = await page.evaluate(
       () => ReportQuestionnaire.sentencesOf(document.getElementById('tq-narrative').value).length,
     );
-    await expect(rows(page)).toHaveCount(n);
+    // Every sentence is in exactly one row; the next-step sentences share
+    // one Next Step row, with one source line (the LayoutE mockup).
+    const perRow = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('#tq-sentences .qn-srow .qn-req-text')).map(
+        el => ReportQuestionnaire.sentencesOf(el.textContent).length,
+      ),
+    );
+    expect(perRow.reduce((a, b) => a + b, 0)).toBe(n);
+    expect(perRow.some(k => k > 1)).toBe(true);
+    await expect(rowByLabel(page, 'Next Step')).toHaveCount(1);
+    await expect(rowByLabel(page, 'Next Step').locator('.qn-req-source')).toHaveCount(1);
+    const rowCount = perRow.length;
+    await expect(rows(page)).toHaveCount(rowCount);
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
     await expect(rows(page).first().locator('.qn-req-source')).toContainText('from this term’s scores');
     await expect(rows(page).first().locator('[data-do="wording"]')).toHaveText('Other Wording ▾');
     await expect(page.locator('#tq-sentences .qn-sub')).toHaveText(
       'Reword, edit or drag to reorder. The comment above follows.',
     );
-    await expect(page.locator('#tq-sentences .qn-srow-handle[draggable="true"]')).toHaveCount(n);
+    await expect(page.locator('#tq-sentences .qn-srow-handle[draggable="true"]')).toHaveCount(rowCount);
     await expect(page.locator('[data-do="reset"]')).toHaveCount(0);
     // The best piece's row, moved first, names Cece; the grade sentence now
     // uses her pronoun.
@@ -591,8 +634,12 @@ test.describe('the Sentences card', () => {
     page,
   }) => {
     await open(page);
+    // Six habits rated, so the comment has a habits sentence with alternatives.
+    for (const key of await page.evaluate(() => CommentBank.HABITS.map(h => h.key))) {
+      await page.locator(`[data-action="tqRate"][data-habit="${key}"][data-value="4"]`).click();
+    }
     await page.locator('#tq-generate').click();
-    const home = page.locator('#tq-sentences .qn-srow', { hasText: 'At home, you can ask' });
+    const home = rowByLabel(page, 'Habits');
     await home.locator('[data-do="wording"]').click();
     const menu = page.locator('#tq-wording-menu');
     await expect(menu).toBeVisible();
@@ -606,7 +653,7 @@ test.describe('the Sentences card', () => {
     await expect(items.nth(1).locator('.qn-menu-meta')).toHaveText(
       /^(Not used yet in this class|Used for \d+ classmates?)$/,
     );
-    await expect(menu.locator('.qn-menu-all')).toHaveText(/^All \d+ next step sentences…$/);
+    await expect(menu.locator('.qn-menu-all')).toHaveText(/^All \d+ habits sentences…$/);
     const alt = await items.nth(1).locator('.qn-menu-text').textContent();
     await items.nth(1).click();
     await expect(menu).toHaveCount(0);
@@ -617,7 +664,7 @@ test.describe('the Sentences card', () => {
     await menu.locator('.qn-menu-all').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
     await expect(sheet).toBeVisible();
-    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Next Step');
+    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Habits');
     await expect(sheet.locator('.qn-browse-row.on .qn-browse-sentence', { hasText: alt })).toHaveCount(1);
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);

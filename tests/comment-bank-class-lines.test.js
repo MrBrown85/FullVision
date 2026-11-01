@@ -217,11 +217,14 @@ describe('the draft', () => {
     expect(CommentBank.supportChoice(f, { completes: 2 })).toMatchObject({ line: { id: 'b' }, fit: 'completes' });
   });
 
-  it('keeps the closing sentence last on the IE path, with no support or late-work line', () => {
+  it('keeps the closing sentence last on the IE path, the support line before the meeting, no late-work line', () => {
+    // The ticked line fits the student (Completes Work rated Sometimes), as
+    // the IEPath mockup's "missing work" line fits a student with work out.
     const f = facts({
       grade: { mode: 'letter', letter: 'IE', pct: 40, basis: 'ie', pieces: [], marked: { mine: 2, all: 8 } },
+      habits: { completes: 2 },
       classLines: {
-        support: [line('a', 'In class, I will give a short checklist for each assignment.')],
+        support: [line('a', 'In class, I will give a short checklist for each assignment.', ['completes'])],
         pick: null,
         closing: 'Extra help is at lunch on Tuesdays in [Room].',
         late: 'Late work is accepted until December 4.',
@@ -230,7 +233,11 @@ describe('the draft', () => {
     const d = draftOf(f);
     const steps = d.sentences.map(s => s.step);
     expect(steps[steps.length - 1]).toBe('closer');
-    expect(steps).not.toContain('support');
+    // The IEPath mockup: the support line sits after the deadline, before
+    // the meeting sentence.
+    expect(stepText(d, 'support')).toBe('In class, I will give a short checklist for each assignment.');
+    expect(steps.indexOf('ieDeadline')).toBeLessThan(steps.indexOf('support'));
+    expect(steps.indexOf('support')).toBeLessThan(steps.indexOf('ieMeeting'));
     expect(steps).not.toContain('lateWork');
   });
 });
