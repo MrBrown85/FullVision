@@ -206,6 +206,40 @@ export const KINDS = {
     ],
     points: [],
   },
+  foods10: {
+    name: 'Foods 10',
+    grade: '10',
+    system: 'letter',
+    size: 24,
+    sections: ['Designing', 'Making', 'Testing', 'Sharing'],
+    titles: [
+      'Knife Skills Check',
+      'Lab: Muffins',
+      'Recipe Plan: Soup',
+      'Lab: Soup',
+      'Food Safety Quiz',
+      'Lab: Stir-Fry',
+      'Menu Project Plan',
+      'Menu Project Presentation',
+    ],
+    points: [4],
+  },
+  career10: {
+    name: 'Career Life Education 10',
+    grade: '10',
+    system: 'proficiency',
+    size: 26,
+    sections: ['Self-Awareness', 'Exploring Careers', 'Planning', 'Connections'],
+    titles: [
+      'Strengths Inventory',
+      'Career Interview Reflection',
+      'Job Posting Analysis',
+      'Volunteer Reflection',
+      'Goal Setting Worksheet',
+      'Career Research Report',
+    ],
+    points: [],
+  },
 };
 
 /* The student mixes, cycled through the roster. Each picks marks per

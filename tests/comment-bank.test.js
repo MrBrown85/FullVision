@@ -71,10 +71,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 128 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(128);
+  it('has 299 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(299);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(128);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(299);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -211,7 +211,9 @@ describe('the bank', () => {
                 ? 'ie'
                 : k === 'ieProblem'
                   ? { missing: 'notHandedIn', marks: 'marks', noMarks: 'marks', low: 'lowMarks' }[s.when[k]]
-                  : 'habits',
+                  : k === 'nextSkill'
+                    ? 'nextStep'
+                    : 'habits',
         ),
       );
       if (!s.claims.length) {
@@ -243,7 +245,16 @@ describe('the bank', () => {
           ]).toContain(v);
         else if (k === 'path') expect(v).toBe('ie');
         else if (k === 'ieProblem') expect(['missing', 'marks', 'noMarks', 'low']).toContain(v);
-        else {
+        else if (k === 'nextSkill') {
+          // A frame for one skill: the key is in the table for its one
+          // kind of class, and it needs the slot verify() checks.
+          expect(s.subjects, s.id).toHaveLength(1);
+          expect(
+            (CommentBank.SKILLS[s.subjects[0]] || []).map(r => r.key),
+            s.id,
+          ).toContain(v);
+          expect(s.needs, s.id).toContain('nextSkill');
+        } else {
           expect(keys, s.id).toContain(k);
           expect(v).toBeGreaterThanOrEqual(1);
           expect(v).toBeLessThanOrEqual(4);
@@ -503,18 +514,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 18 sentences (1, 5, 8, 4)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 21 sentences (1, 5, 11, 4)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 8, 4]);
-    expect(CommentBank.fitCount(ctx)).toBe(18);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 11, 4]);
+    expect(CommentBank.fitCount(ctx)).toBe(21);
   });
 
-  it('offers Jasper 18 (1, 5, 8, 4), by the name he goes by', () => {
+  it('offers Jasper 21 (1, 5, 11, 4), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 8, 4]);
-    expect(CommentBank.fitCount(ctx)).toBe(18);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 11, 4]);
+    expect(CommentBank.fitCount(ctx)).toBe(21);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });

@@ -4,13 +4,15 @@ import { describe, it, expect, beforeEach } from 'vitest';
 describe('Card Widget Editor', () => {
   beforeEach(() => {
     localStorage.clear();
-    Object.keys(_cache).forEach(function(k) { delete _cache[k]; });
+    Object.keys(_cache).forEach(function (k) {
+      delete _cache[k];
+    });
   });
 
   it('builds editor HTML with all widgets listed', () => {
     var html = MCardWidgetEditor.buildEditorHTML();
     expect(html).toContain('Customize Card');
-    WIDGET_REGISTRY.forEach(function(w) {
+    WIDGET_REGISTRY.forEach(function (w) {
       expect(html).toContain(w.label);
     });
   });
@@ -52,6 +54,14 @@ describe('Card Widget Editor', () => {
     saveCardWidgetConfig({ order: ['hero'], disabled: [] });
     MCardWidgetEditor.resetToDefaults();
     var config = getCardWidgetConfig();
-    expect(config.order).toEqual(['hero', 'sectionBars', 'completion', 'growth', 'obsSnippet', 'dispositions', 'actions']);
+    expect(config.order).toEqual([
+      'hero',
+      'sectionBars',
+      'completion',
+      'growth',
+      'obsSnippet',
+      'dispositions',
+      'actions',
+    ]);
   });
 });

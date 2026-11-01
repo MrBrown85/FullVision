@@ -10,16 +10,22 @@ describe('migrateLearningMap', () => {
       subjects: [{ id: 'SCI8', name: 'Science 8' }],
       sections: [
         {
-          id: 'SCI8_questioning', subject: 'SCI8', name: 'Questioning and Predicting',
-          shortName: 'Questioning', color: '#0891b2',
-          tags: [{ id: 'QAP', label: 'Question and Predict', text: '' }]
+          id: 'SCI8_questioning',
+          subject: 'SCI8',
+          name: 'Questioning and Predicting',
+          shortName: 'Questioning',
+          color: '#0891b2',
+          tags: [{ id: 'QAP', label: 'Question and Predict', text: '' }],
         },
         {
-          id: 'SCI8_evaluating', subject: 'SCI8', name: 'Evaluating',
-          shortName: 'Evaluating', color: '#dc2626',
-          tags: [{ id: 'EM', label: 'Evaluate Methods', text: '' }]
-        }
-      ]
+          id: 'SCI8_evaluating',
+          subject: 'SCI8',
+          name: 'Evaluating',
+          shortName: 'Evaluating',
+          color: '#dc2626',
+          tags: [{ id: 'EM', label: 'Evaluate Methods', text: '' }],
+        },
+      ],
     };
 
     const result = migrateLearningMap(oldMap);
@@ -39,8 +45,8 @@ describe('migrateLearningMap', () => {
     expect(result.sections[1].tags[0]._legacySectionId).toBe('SCI8_evaluating');
     // sectionToTagMap is stored
     expect(result._sectionToTagMap).toEqual({
-      'SCI8_questioning': 'QAP',
-      'SCI8_evaluating': 'EM'
+      SCI8_questioning: 'QAP',
+      SCI8_evaluating: 'EM',
     });
   });
 
@@ -49,9 +55,14 @@ describe('migrateLearningMap', () => {
       _flatVersion: 2,
       subjects: [{ id: 'SCI8', name: 'Science 8' }],
       sections: [
-        { id: 'QAP', subject: 'SCI8', name: 'Questioning', color: '#0891b2',
-          tags: [{ id: 'QAP', label: 'Question and Predict', color: '#0891b2' }] }
-      ]
+        {
+          id: 'QAP',
+          subject: 'SCI8',
+          name: 'Questioning',
+          color: '#0891b2',
+          tags: [{ id: 'QAP', label: 'Question and Predict', color: '#0891b2' }],
+        },
+      ],
     };
 
     const result = migrateLearningMap(alreadyFlat);
@@ -69,8 +80,8 @@ describe('migrateLearningMap', () => {
     const map = {
       sections: [
         { id: 'empty', name: 'Empty Section', tags: [] },
-        { id: 'sec2', name: 'Has Tag', color: '#ff0000', tags: [{ id: 'T1', label: 'Tag 1' }] }
-      ]
+        { id: 'sec2', name: 'Has Tag', color: '#ff0000', tags: [{ id: 'T1', label: 'Tag 1' }] },
+      ],
     };
     const result = migrateLearningMap(map);
     expect(result.sections[0].id).toBe('empty'); // unchanged — no tag to adopt
@@ -81,8 +92,8 @@ describe('migrateLearningMap', () => {
     const map = {
       sections: [
         { id: 'OLD_SEC', tags: [{ id: 'QAP', label: 'Q&P' }] },
-        { id: 'OLD_SEC2', tags: [{ id: 'PI', label: 'Plan' }] }
-      ]
+        { id: 'OLD_SEC2', tags: [{ id: 'PI', label: 'Plan' }] },
+      ],
     };
     migrateLearningMap(map);
     // Tag IDs never change
@@ -94,20 +105,20 @@ describe('migrateLearningMap', () => {
 describe('migrateOverridesForFlatMap', () => {
   beforeEach(() => {
     _cache.overrides[CID] = {
-      'stu1': {
-        'SCI8_questioning': { level: 3, reason: 'Good progress' },
-        'SCI8_evaluating': { level: 2, reason: 'Needs work' }
+      stu1: {
+        SCI8_questioning: { level: 3, reason: 'Good progress' },
+        SCI8_evaluating: { level: 2, reason: 'Needs work' },
       },
-      'stu2': {
-        'SCI8_questioning': { level: 4, reason: 'Excellent' }
-      }
+      stu2: {
+        SCI8_questioning: { level: 4, reason: 'Excellent' },
+      },
     };
   });
 
   it('re-keys overrides from old section IDs to tag IDs', () => {
     const sectionToTag = {
-      'SCI8_questioning': 'QAP',
-      'SCI8_evaluating': 'EM'
+      SCI8_questioning: 'QAP',
+      SCI8_evaluating: 'EM',
     };
 
     migrateOverridesForFlatMap(CID, sectionToTag);
@@ -127,9 +138,9 @@ describe('migrateOverridesForFlatMap', () => {
 
   it('does nothing when overrides already use tag IDs', () => {
     _cache.overrides[CID] = {
-      'stu1': { 'QAP': { level: 3, reason: 'test' } }
+      stu1: { QAP: { level: 3, reason: 'test' } },
     };
-    const sectionToTag = { 'SCI8_questioning': 'QAP' };
+    const sectionToTag = { SCI8_questioning: 'QAP' };
     migrateOverridesForFlatMap(CID, sectionToTag);
     expect(_cache.overrides[CID]['stu1']['QAP']).toEqual({ level: 3, reason: 'test' });
   });
@@ -138,9 +149,9 @@ describe('migrateOverridesForFlatMap', () => {
 describe('migrateGoalsForFlatMap', () => {
   it('re-keys goals from old section IDs to tag IDs', () => {
     _cache.goals[CID] = {
-      'stu1': { 'SCI8_questioning': 'Improve questioning skills' }
+      stu1: { SCI8_questioning: 'Improve questioning skills' },
     };
-    migrateGoalsForFlatMap(CID, { 'SCI8_questioning': 'QAP' });
+    migrateGoalsForFlatMap(CID, { SCI8_questioning: 'QAP' });
     expect(_cache.goals[CID]['stu1']['QAP']).toBe('Improve questioning skills');
     expect(_cache.goals[CID]['stu1']['SCI8_questioning']).toBeUndefined();
   });
@@ -149,9 +160,9 @@ describe('migrateGoalsForFlatMap', () => {
 describe('migrateReflectionsForFlatMap', () => {
   it('re-keys reflections from old section IDs to tag IDs', () => {
     _cache.reflections[CID] = {
-      'stu1': { 'SCI8_evaluating': { confidence: 3, text: 'Getting better', date: '2025-01-01' } }
+      stu1: { SCI8_evaluating: { confidence: 3, text: 'Getting better', date: '2025-01-01' } },
     };
-    migrateReflectionsForFlatMap(CID, { 'SCI8_evaluating': 'EM' });
+    migrateReflectionsForFlatMap(CID, { SCI8_evaluating: 'EM' });
     expect(_cache.reflections[CID]['stu1']['EM'].confidence).toBe(3);
     expect(_cache.reflections[CID]['stu1']['SCI8_evaluating']).toBeUndefined();
   });

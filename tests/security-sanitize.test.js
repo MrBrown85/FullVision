@@ -10,8 +10,8 @@ const origCreateElement = globalThis.document.createElement;
 const origCreateTextNode = globalThis.document.createTextNode;
 
 beforeAll(() => {
-  globalThis.document.createElement = (tag) => realDoc.createElement(tag);
-  globalThis.document.createTextNode = (text) => realDoc.createTextNode(text);
+  globalThis.document.createElement = tag => realDoc.createElement(tag);
+  globalThis.document.createTextNode = text => realDoc.createTextNode(text);
 });
 
 afterAll(() => {
