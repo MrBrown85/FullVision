@@ -6904,19 +6904,6 @@ function _patchLearningMapEntityId(map, kind, oldId, newId) {
   return changed;
 }
 
-function _patchObjectKeys(obj, idMap) {
-  if (!obj || !idMap) return false;
-  var changed = false;
-  Object.keys(idMap).forEach(function (oldId) {
-    var newId = idMap[oldId];
-    if (!newId || obj[oldId] === undefined) return;
-    if (obj[newId] === undefined) obj[newId] = obj[oldId];
-    delete obj[oldId];
-    changed = true;
-  });
-  return changed;
-}
-
 /* A competency's I Can statements as a clean list: trimmed, no blanks. */
 function _iCanStatementsOf(tag) {
   var list = (tag && (tag.i_can_statements || tag.iCanStatements)) || [];
@@ -11162,17 +11149,6 @@ window.v2.getLearningMap = function (courseId) {
   return _rpcOrNoop('get_learning_map', { p_course_id: courseId });
 };
 
-window.v2.getClassDashboard = function (courseId) {
-  return _rpcOrNoop('get_class_dashboard', { p_course_id: courseId });
-};
-
-window.v2.getTermRating = function (enrollmentId, term) {
-  return _rpcOrNoop('get_term_rating', {
-    p_enrollment_id: enrollmentId,
-    p_term: Number(term),
-  });
-};
-
 window.v2.getObservations = function (courseId, opts) {
   opts = opts || {};
   return _rpcOrNoop('get_observations', {
@@ -11185,12 +11161,6 @@ window.v2.getObservations = function (courseId, opts) {
 
 window.v2.getAssessmentDetail = function (assessmentId) {
   return _rpcOrNoop('get_assessment_detail', { p_assessment_id: assessmentId });
-};
-
-window.v2.getReport = function (enrollmentId, term) {
-  var params = { p_enrollment_id: enrollmentId };
-  if (term != null) params.p_term = Number(term);
-  return _rpcOrNoop('get_report', params);
 };
 
 /* ── Withdrawn students (docs/DECISIONS.md: "Students are removed by
@@ -11503,26 +11473,6 @@ function dropHeldStudentDeletes() {
 
 /* ── v2 write RPCs from Phase 5.5 ─────────────────────────────────────── */
 
-/* §15.4 — post-import reconciliation: merge a duplicate "ghost" student
-   into a canonical record. Same-course enrollments merge (designations
-   unioned, withdrawn_at cleared if either was active); cross-course
-   enrollments move. Ghost student is deleted. Returns
-   { enrollments_moved, enrollments_merged, deleted_student }. */
-window.v2.relinkStudent = function (ghostStudentId, canonicalStudentId) {
-  return _rpcOrNoop('relink_student', {
-    p_ghost_student_id: ghostStudentId,
-    p_canonical_student_id: canonicalStudentId,
-  });
-};
-
-/* §16.2 — self-service "Clear all my data" from Settings. Removes every
-   course + student owned by the teacher; Teacher row + TeacherPreference
-   are kept (active_course_id reset to null). Returns
-   { courses, students } counts. */
-window.v2.clearData = function () {
-  return _rpcOrNoop('clear_data', {});
-};
-
 window.v2.saveTermRating = function (enrollmentId, term, payload) {
   payload = payload || {};
   var wire = {};
@@ -11598,12 +11548,6 @@ window.createCustomTag = function (cid, label) {
 };
 
 window.v2 = window.v2 || {};
-window.v2.deleteCustomTag = function (id) {
-  return _rpcOrNoop('delete_custom_tag', { p_id: id });
-};
-window.v2.deleteCustomTagByLabel = function (cid, label) {
-  return _rpcOrNoop('delete_custom_tag_by_label', { p_course_id: cid, p_label: label });
-};
 
 function getQuickObsByDim(cid, sid, dim) {
   return getStudentQuickObs(cid, sid).filter(o => (o.dims || []).includes(dim));

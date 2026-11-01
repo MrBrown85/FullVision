@@ -7939,25 +7939,6 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
-  // Legacy aliases
-  function cmAddSec() {
-    cmAddStd();
-  }
-  function cmUpdateSecName(secId, val) {
-    cmUpdateStdName(secId, val);
-  }
-  function cmUpdateSecSubject(secId, subId) {
-    cmUpdateStdSubject(secId, subId);
-  }
-  function cmUpdateSecColor(secId, color) {
-    cmUpdateStdColor(secId, color);
-  }
-  function cmDeleteSec(secId) {
-    cmDeleteStd(secId);
-  }
-  function cmToggleSec(headerEl) {
-    headerEl.closest('.cm-sec-group').classList.toggle('open');
-  }
   function cmAddTag(secId) {
     /* no-op in flat mode */
   }
@@ -8117,12 +8098,6 @@ window.DashClassManager = (function () {
       cmAddSubject: function () {
         cmAddSubject();
       },
-      cmToggleSec: function () {
-        cmToggleSec(el);
-      },
-      cmDeleteSec: function () {
-        cmDeleteSec(el.dataset.secid);
-      },
       cmDeleteStd: function () {
         cmDeleteStd(el.dataset.secid);
       },
@@ -8131,9 +8106,6 @@ window.DashClassManager = (function () {
       },
       cmAddTag: function () {
         cmAddTag(el.dataset.secid);
-      },
-      cmAddSec: function () {
-        cmAddSec();
       },
       cmAddStd: function () {
         cmAddStd();
@@ -8395,14 +8367,6 @@ window.DashClassManager = (function () {
       cmUpdateStdGroup(el.dataset.secid, el.value);
       return true;
     }
-    if (el.dataset.actionChange === 'cmSecSubject') {
-      cmUpdateSecSubject(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmSecColor') {
-      cmUpdateSecColor(el.dataset.secid, el.value);
-      return true;
-    }
     if (el.dataset.actionChange === 'cmImportMap') {
       cmImportMap(el.dataset.col, el.value);
       return true;
@@ -8526,10 +8490,6 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionBlur === 'cmIcanEdit') {
       cmIcanEdit(el.dataset.secid, Number(el.dataset.idx), el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmSecName') {
-      cmUpdateSecName(el.dataset.secid, el.value);
       return true;
     }
     if (el.dataset.actionBlur === 'cmTagLabel') {
