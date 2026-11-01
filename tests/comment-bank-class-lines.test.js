@@ -9,7 +9,8 @@
  * - The closing sentence and the late-work line are used exactly as typed;
  *   the late-work line follows the missing-work sentence only for students
  *   with work labelled Missing.
- * - One "For the Family" sentence per kind of class.
+ * - "For the Family" sentences: five per next-step skill (`when.nextSkill`),
+ *   plus general ones per kind of class and for any class.
  * - The class settings live in report_config (blocks_config.commentSettings)
  *   and the late-work line is course.late_work_policy.
  */
@@ -253,18 +254,71 @@ describe('the draft', () => {
 
 describe('For the Family sentences', () => {
   const fam = COMMENT_BANK.sentences.filter(s => s.group === 'For the Family');
-  it('has at least two for every kind of class and two for any class', () => {
-    ['socials', 'science', 'math', 'ela', 'arts', 'pe', 'adst', 'career'].forEach(k =>
-      expect(fam.filter(s => (s.subjects || []).indexOf(k) >= 0).length, k).toBeGreaterThanOrEqual(2),
+  const general = fam.filter(s => !s.when);
+  const KINDS = ['socials', 'science', 'math', 'ela', 'arts', 'pe', 'adst', 'career'];
+  it('has at least six general ones for every kind of class and ten for any class', () => {
+    KINDS.forEach(k =>
+      expect(general.filter(s => (s.subjects || []).indexOf(k) >= 0).length, k).toBeGreaterThanOrEqual(6),
     );
-    expect(fam.filter(s => !s.subjects).length).toBeGreaterThanOrEqual(2);
+    expect(general.filter(s => !s.subjects).length).toBeGreaterThanOrEqual(10);
   });
-  it('are plain: one sentence each, 20 words or fewer, claiming nothing about the student', () => {
+  it('has at least three for every skill the next step can name, tagged to that kind of class', () => {
+    KINDS.forEach(k =>
+      CommentBank.SKILLS[k].forEach(r =>
+        expect(
+          fam.filter(s => s.when && s.when.nextSkill === r.key && (s.subjects || []).indexOf(k) >= 0).length,
+          k + '.' + r.key,
+        ).toBeGreaterThanOrEqual(3),
+      ),
+    );
+  });
+  it('are plain: one sentence each, 20 words or fewer, an invitation, claiming only the next step they help with', () => {
     fam.forEach(s => {
-      expect(s.text, s.id).toMatch(/^At home, you can /);
       expect(words(s.text), s.id).toBeLessThanOrEqual(20);
-      expect(s.claims, s.id).toEqual([]);
+      expect(s.text, s.id).not.toMatch(/\b(make sure|remind|supervis|monitor|homework|classmates?|peers?)\b/i);
+      expect(s.text, s.id).not.toMatch(/\b(still|again|only|finally|unfortunately)\b|!|\bat least\b/i);
+      if (s.when) {
+        expect(Object.keys(s.when), s.id).toEqual(['nextSkill']);
+        expect(s.claims, s.id).toEqual(['nextStep']);
+      } else expect(s.claims, s.id).toEqual([]);
     });
+  });
+  it('offers the sentences for the next step’s skill first, and the general ones without one', () => {
+    // Noor's lowest competency with 3+ pieces is Significance.
+    const f = facts();
+    const ctx = CommentBank.context(f, {});
+    expect(ctx._nextSkill).toBe('significance');
+    const pool = CommentBank.stepPool('home', ctx);
+    expect(pool.length).toBeGreaterThanOrEqual(3);
+    pool.forEach(s => expect(s.when, s.id).toEqual({ nextSkill: 'significance' }));
+    const d = draftOf(f);
+    const home = d.sentences.find(s => s.step === 'home');
+    expect(home.text).toMatch(/event|history/);
+    // The same facts with no table skill for the next step: a general one.
+    const g = facts({ comps: [comp('c1', 'Evidence', 3.5), comp('c2', 'Perspective', 3), comp('c3', 'Maps', 2.5)] });
+    const gctx = CommentBank.context(g, {});
+    expect(gctx._nextSkill).toBe('');
+    CommentBank.stepPool('home', gctx).forEach(s => expect(s.when, s.id).toBeUndefined());
+  });
+  it('verify() replaces a skill-bound sentence once the next step is another skill', () => {
+    const f = facts();
+    const d = draftOf(f);
+    const home = d.sentences.find(s => s.step === 'home');
+    expect(COMMENT_BANK.sentences.find(s => s.id === home.id).when).toEqual({ nextSkill: 'significance' });
+    expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
+    // Perspective drops below Significance: the next step is Perspective now.
+    const f2 = facts({
+      comps: [comp('c1', 'Evidence', 3.5), comp('c2', 'Perspective', 2), comp('c3', 'Significance', 2.5)],
+    });
+    const v = CommentBank.verify(d, f2, {});
+    const r = v.replaced.find(x => x.sentenceId === home.id);
+    expect(r).toBeTruthy();
+    expect(r.failed).toContain('nextStep');
+    // The stand-in asserts nothing (plan PR 5): a general For the Family sentence.
+    const by = COMMENT_BANK.sentences.find(s => s.id === r.by);
+    expect(by.group).toBe('For the Family');
+    expect(by.when).toBeUndefined();
+    expect(by.claims).toEqual([]);
   });
   it('the mockup’s Socials sentence is one of them', () => {
     expect(fam.map(s => s.text)).toContain('At home, you can ask {him} what a news story means for the people in it.');

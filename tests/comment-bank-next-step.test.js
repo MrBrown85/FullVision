@@ -69,7 +69,8 @@ const verified = (s, text, pv, f) =>
     {},
   );
 
-const frames = COMMENT_BANK.sentences.filter(s => s.when && s.when.nextSkill);
+// The Next Step frames (the For the Family sentences share `when.nextSkill`).
+const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Next Step' && s.when && s.when.nextSkill);
 const forSkill = (family, key) => frames.filter(s => s.subjects[0] === family && s.when.nextSkill === key);
 
 describe('the Next Step frames per skill', () => {
