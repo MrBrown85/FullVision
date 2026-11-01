@@ -469,7 +469,7 @@ var COMMENT_BANK = {
       id: 'hs35',
       part: 'habits',
       group: 'Work Habits',
-      text: 'There are two work habits for {him} to build: {habitsToBuild}.',
+      text: '{He} [has|have] two work habits to build: {habitsToBuild}.',
       needs: ['habitsToBuild'],
       claims: ['habits'],
       src: 'new',
