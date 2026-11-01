@@ -146,7 +146,9 @@ describe('even results (evenComps)', () => {
     expect(verified(s, text, CommentBank.provenance(s, ectx), f, 'overall').replaced.length).toBe(1);
   });
 
-  const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Overall' && s.when && s.when.evenWord);
+  // The untagged frames, which carry the skill ({evenSkill}); the languages
+  // family has its own, without it (tested with the languages frames).
+  const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Overall' && s.when && s.when.evenWord && !s.subjects);
   // Twelve "can" frames for Extending and Proficient (six print the word);
   // seven for Developing and Emerging, whose "is learning to" and "is
   // beginning to" leave fewer words to spend (three print the word).
@@ -233,16 +235,20 @@ describe('even results (evenComps)', () => {
 describe('the strengths frames per skill', () => {
   // The frames that assert the strongest (`when.strongSkill`) and the ones
   // that claim a strength, which also fit a tie at the top (`when.topSkill`,
-  // tests/comment-bank-top-tie.test.js).
+  // tests/comment-bank-top-tie.test.js). The languages hidden and newcomer
+  // frames are bound to a skill too, but need their story as well (tested
+  // in tests/comment-bank-languages-frames.test.js).
   const keyOf = s => (s.when && (s.when.strongSkill || s.when.topSkill)) || '';
-  const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Overall' && keyOf(s));
+  const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Overall' && keyOf(s) && !s.story);
   const forSkill = (family, key) => frames.filter(s => s.subjects[0] === family && keyOf(s) === key);
   /* The table row's competency strongest (four, on three pieces), one other
      a full step lower. */
   const strongFacts = (family, row) => facts(family, [comp('a', row.name, 4), comp('b', 'Other Area', 2.5)]);
 
-  // The skills with strengths frames: the table's original 43 rows. The 43
-  // rows lane H added (#611) have none yet; a later lane writes them.
+  // Every skill in the table has frames: the original 43 rows (lane G) and
+  // the 43 rows lane H added (#611), written in round three (lane I). The
+  // story frames for one skill (needs hidden or newcomer as well) are the
+  // languages family's own and are tested below.
   const covered = [];
   Object.entries(CommentBank.SKILLS).forEach(([family, rows]) =>
     rows.forEach(row => {
@@ -250,9 +256,11 @@ describe('the strengths frames per skill', () => {
     }),
   );
 
-  it('give the table’s original 43 skills at least three frames each, bound to the skill and its kind of class', () => {
-    expect(covered.length).toBe(43);
-    expect(frames.length).toBe(129);
+  it('give every skill in the table at least three frames, bound to the skill and its kind of class', () => {
+    // 129 from lane G (43 of them tie-safe), 129 for lane H's skills and 86
+    // more tie-safe ones for the original skills (round three, lane I).
+    expect(covered.length).toBe(86);
+    expect(frames.length).toBe(344);
     covered.forEach(([family, row]) => {
       {
         const mine = forSkill(family, row.key);

@@ -82,6 +82,18 @@ const one = (s, ctx) => {
 };
 const ids = xs => xs.map(c => c.id);
 
+/* A strengths sentence in the shape of the generic frames the bank no
+   longer carries (n15, cut in round three: the per-skill frames cover every
+   skill); verify() reads it from a bank that holds it. */
+const N15 = {
+  id: 'n15',
+  part: 'now',
+  group: 'Overall',
+  text: '{His} strongest work shows {he} can {strengths}.',
+  needs: ['strengths'],
+  claims: ['strength'],
+};
+const withN15 = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([N15]) };
 describe('the "strongest" gate', () => {
   it('passes at 3 scored pieces and half a step over the next competency', () => {
     expect(ids(CommentBank.strongestOf([comp('a', 3.5), comp('b', 3)]))).toEqual(['a']);
@@ -162,9 +174,9 @@ describe('below a gate, the claiming sentence is not eligible', () => {
   it('selection skips a strength claim below the gate, even when its slot has a value', () => {
     const f = facts({ comps: [comp('a', 3.4), comp('b', 3), comp('c', 2.5)] });
     const ctx = Object.assign(CommentBank.context(f, {}), { strengths: 'evaluate a method' });
-    expect(CommentBank.fits(byId('n15'), ctx)).toBe(false);
+    expect(CommentBank.fits(N15, ctx)).toBe(false);
     // On a skill past the gate, the same sentence fits.
-    expect(CommentBank.fits(byId('n15'), CommentBank.context(facts({}), {}))).toBe(true);
+    expect(CommentBank.fits(N15, CommentBank.context(facts({}), {}))).toBe(true);
   });
 
   it('gives no strengths slot below the gate, and the skill from the table above it', () => {
@@ -198,14 +210,14 @@ describe('below a gate, the claiming sentence is not eligible', () => {
 
   it('verify() fails a strength sentence once the facts fall below the gate', () => {
     const f = facts({});
-    const d = one('n15', CommentBank.context(f, {}));
-    expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
+    const d = one(N15, CommentBank.context(f, {}));
+    expect(CommentBank.verify(d, f, {}, { bank: withN15 }).replaced).toEqual([]);
     // Two pieces in the top skill now.
     const thin = facts({ comps: [comp('a', 3.5, 2), comp('b', 3), comp('c', 2.5)] });
-    expect(CommentBank.verify(d, thin, {}).replaced[0].failed).toContain('strength');
+    expect(CommentBank.verify(d, thin, {}, { bank: withN15 }).replaced[0].failed).toContain('strength');
     // Under half a step clear.
     const close = facts({ comps: [comp('a', 3.4), comp('b', 3), comp('c', 2.8)] });
-    expect(CommentBank.verify(d, close, {}).replaced[0].failed).toContain('strength');
+    expect(CommentBank.verify(d, close, {}, { bank: withN15 }).replaced[0].failed).toContain('strength');
   });
 
   it('verify() fails an improved sentence once the gain rests on one low early score', () => {

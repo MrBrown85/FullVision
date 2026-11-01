@@ -91,13 +91,27 @@ const PRONOUNS = ['she/her', 'he/him', 'they/them', '', 'he/him', 'she/her'];
    closing sentence and support lines set (the others have none, as a
    class with nothing set). */
 export const KINDS = {
+  // History 12 and English 10 carry their kind's whole skill table as
+  // sections (round three, Nov 1: Ethical Judgment, Cause and Consequence
+  // and Inquiry; Revising, Exchanging Ideas and Accessing Information were
+  // no student's next step or strength before), tagged four to an
+  // assessment like the kinds below so each section keeps enough pieces.
   history12: {
     lines: true,
     name: 'History 12',
     grade: '12',
     system: 'letter',
     size: 30,
-    sections: ['Significance', 'Evidence', 'Continuity and Change', 'Perspective'],
+    tagsPer: 4,
+    sections: [
+      'Significance',
+      'Evidence',
+      'Continuity and Change',
+      'Perspective',
+      'Ethical Judgment',
+      'Cause and Consequence',
+      'Inquiry',
+    ],
     titles: [
       '1.1 Causes of the Great War',
       'Current Events: Week 1',
@@ -118,7 +132,16 @@ export const KINDS = {
     grade: '10',
     system: 'both',
     size: 28,
-    sections: ['Comprehend and Connect', 'Thinking Critically', 'Create and Communicate', 'Conventions'],
+    tagsPer: 4,
+    sections: [
+      'Comprehend and Connect',
+      'Thinking Critically',
+      'Create and Communicate',
+      'Conventions',
+      'Revising',
+      'Exchanging Ideas',
+      'Accessing Information',
+    ],
     titles: [
       'Short Story Response: The Lottery',
       'Vocabulary Check 1',
@@ -460,6 +483,10 @@ const PROFILES = [
 /* Attendance entered at Report 1 as [absences, lates], cycled through the
    roster; null for a student with none entered. */
 const ATTENDANCE_SETS = [null, [3, 0], null, [0, 2], [4, 1], null, [1, 0], null, [0, 1], [12, 3], null, [2, 2]];
+/* buildOne: one habit alone at Sometimes; buildRarely: one alone at Rarely
+   (round three, Nov 1: the Rarely cells of the Habit Ratings frames were
+   never offered before, since Rarely came only with a second habit at
+   Sometimes); buildTwo: two habits, one of them Rarely or Sometimes. */
 const HABIT_SETS = [
   'excellent',
   'good',
@@ -471,10 +498,10 @@ const HABIT_SETS = [
   'buildOne',
   'excellent',
   'none',
-  'good',
+  'buildRarely',
   'excellent',
   'buildTwo',
-  'good',
+  'buildRarely',
   'buildOne',
   'buildTwo',
 ];
@@ -526,6 +553,11 @@ function levelFor(profile, at, comp, r) {
       return r() < 0.75 ? null : clamp(3 + wobble);
     case 'failing':
       return r() < 0.5 ? 'NS' : 1;
+    // No mark on anything (round three, Nov 1): in a class that reports a
+    // letter, the teacher chose IE, so the IE comment's no-marks problem
+    // and plan frames are drafted.
+    case 'noMarks':
+      return null;
     default:
       return 3;
   }
@@ -538,6 +570,7 @@ function habitsFor(set, r) {
     out[k] = set === 'excellent' ? 4 : r() < 0.5 ? 3 : 4;
   });
   if (set === 'buildOne') out[HABIT_KEYS[Math.floor(r() * 6)]] = 2;
+  if (set === 'buildRarely') out[HABIT_KEYS[Math.floor(r() * 6)]] = 1;
   if (set === 'buildTwo') {
     const a = Math.floor(r() * 6);
     out[HABIT_KEYS[a]] = 2;
@@ -612,8 +645,10 @@ export function syntheticClass(kind, opts) {
   // skill is some student's next step and its frames are exercised.
   const FULL = ['strong', 'steady', 'climb', 'struggling'];
   let fullSeen = 0;
+  // Roster position 21 (si 20) has no marks at all, in every kind.
+  const NO_MARKS = 20;
   students.forEach((st, si) => {
-    const profile = PROFILES[si % PROFILES.length];
+    const profile = si === NO_MARKS ? 'noMarks' : PROFILES[si % PROFILES.length];
     const focus = k.tagsPer && FULL.indexOf(profile) >= 0 ? fullSeen++ % tagIds.length : -1;
     let best = null;
     assessments.forEach((a, ai) => {
@@ -650,7 +685,7 @@ export function syntheticClass(kind, opts) {
     // In a class that reports a letter, the first student with few marks
     // (the 'thin' profile) is one the teacher chose IE for, so the IE
     // comment's marks problem and plan are drafted.
-    const basis = goals || (Number(k.grade) >= 10 && si === PROFILES.indexOf('thin') ? 'ie' : '');
+    const basis = goals || (Number(k.grade) >= 10 && (si === PROFILES.indexOf('thin') || si === NO_MARKS) ? 'ie' : '');
     if (Object.keys(habits).length || basis) {
       ratings.push(
         Object.assign(
@@ -721,7 +756,7 @@ export function syntheticClass(kind, opts) {
           blocks_config: {
             commentSettings: {
               supportChosen: ['sl-missing', 'sl-revise', 'sl-checklist'],
-              closing: 'It has been a pleasure to teach this class this term.',
+              closing: 'Thank you for reading this report, and please contact me with any questions.',
             },
           },
         }
