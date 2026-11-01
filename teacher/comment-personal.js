@@ -563,6 +563,18 @@ window.PersonalBank = (function () {
           return lead + mark({ slot: k, text: '{' + k + '}' });
         });
       });
+    // The strongest competencies by their labels, as {strengths} too.
+    Object.keys(e.labels || {}).forEach(function (k) {
+      e.labels[k].forEach(function (val) {
+        val = String(val || '').trim();
+        if (val.length < 2) return;
+        var re = new RegExp('(^|[^A-Za-zÀ-ɏ])' + _reEsc(val) + '(?![A-Za-zÀ-ɏ])', 'g');
+        s = s.replace(re, function (m, lead) {
+          chip(val, SLOT_LABEL[k]);
+          return lead + mark({ slot: k, text: '{' + k + '}' });
+        });
+      });
+    });
     // Counts: "One assignment", "three classes".
     Object.keys(COUNT_NOUNS).forEach(function (k) {
       var n = Math.floor(Number(v[k])) || 0;
@@ -781,7 +793,17 @@ window.PersonalBank = (function () {
     TITLE_SLOTS.concat(COMP_SLOTS, ['course', 'standingWord', 'missingCount', 'absentCount']).forEach(function (k) {
       if (ctx && ctx[k]) values[k] = ctx[k];
     });
-    return { names: names, p: p, values: values };
+    // {strengths} fills with the strongest competencies' skills (the plan's
+    // part 3), but the teacher may have named the competency itself; its
+    // label is slotted the same way, from the facts behind the slot.
+    var labels = { strengths: [] };
+    ((ctx && ctx._facts && ctx._facts.strengths) || []).forEach(function (key) {
+      var c = ((f && f.comps) || []).find(function (x) {
+        return 'comp:' + x.id === key;
+      });
+      if (c && c.name) labels.strengths.push(String(c.name));
+    });
+    return { names: names, p: p, values: values, labels: labels };
   }
 
   /* One sentence of an approved comment, checked and made a template.
