@@ -23,13 +23,13 @@ window.PageGradebook = (function () {
     localStorage.setItem('gb_rubricColumns_' + activeCourse, mode === 'criteria' ? 'criteria' : 'competencies');
     render();
   }
-  /* "Newest first" puts the Competencies view's latest assessments on the
-     left. Remembered on this device; the Scores view is always newest first. */
-  var _newestFirst = false;
+  /* Newest First puts the latest assessments on the left, in both views.
+     On unless the teacher turned it off; remembered on this device. */
+  var _newestFirst = true;
   try {
-    _newestFirst = localStorage.getItem('gb_newestFirst') === '1';
+    _newestFirst = localStorage.getItem('gb_newestFirst') !== '0';
   } catch (e) {
-    /* storage blocked: oldest first */
+    /* storage blocked: newest first */
   }
   function toggleNewestFirst() {
     _newestFirst = !_newestFirst;
@@ -223,7 +223,7 @@ window.PageGradebook = (function () {
       .sort(function (a, b) {
         return (a.date || '').localeCompare(b.date || '');
       });
-    if (viewMode === 'detailed' && _newestFirst) allAssessments.reverse();
+    if (_newestFirst) allAssessments.reverse();
     var undatedCount = term ? undatedAssessmentCount(cid) : 0;
     var sections = getSections(cid);
     var course = COURSES[cid];
@@ -620,6 +620,16 @@ window.PageGradebook = (function () {
     else if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) col = Math.min(col + 1, cols - 1);
     else col = Math.max(col - 1, 0);
     if (rows[row][col]) _selectCell(rows[row][col]);
+  }
+
+  function _newestFirstButton() {
+    return (
+      '<button class="tb-toggle-btn gb-newest-first' +
+      (_newestFirst ? ' active' : '') +
+      '" data-action="toggleNewestFirst" aria-pressed="' +
+      _newestFirst +
+      '" title="Put the latest assessments on the left">Newest First</button>'
+    );
   }
 
   /* One line under the grid: what the colours and marks mean. */
@@ -1074,11 +1084,7 @@ window.PageGradebook = (function () {
     // Q1: Corner (Student + Overall labels)
     html +=
       '<div class="gb-grid-corner gb-grid-corner-comp">' +
-      '<button class="tb-toggle-btn gb-newest-first' +
-      (_newestFirst ? ' active' : '') +
-      '" data-action="toggleNewestFirst" aria-pressed="' +
-      _newestFirst +
-      '" title="Put the latest assessments on the left">Newest First</button>' +
+      _newestFirstButton() +
       '<div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
       sortArrow('name') +
       '</button><span class="gb-grid-corner-label">Overall</span></div>' +
@@ -1395,10 +1401,8 @@ window.PageGradebook = (function () {
     var cw = getCategoryWeights(cid);
     var rowH = '';
 
-    // Assignments sorted newest-first (left)
-    var sortedAssess = assessments.slice().sort(function (a, b) {
-      return (b.date || '').localeCompare(a.date || '');
-    });
+    // In the order the Newest First switch gives (render).
+    var sortedAssess = assessments.slice();
 
     var html = '';
     var rowPx = 40;
@@ -1408,7 +1412,9 @@ window.PageGradebook = (function () {
 
     // Q1: Corner (top-left, fixed)
     html +=
-      '<div class="gb-grid-corner"><div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
+      '<div class="gb-grid-corner gb-grid-corner-comp">' +
+      _newestFirstButton() +
+      '<div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
       sortArrow('name') +
       '</button><span class="gb-grid-corner-label">Overall</span></div></div>';
 
