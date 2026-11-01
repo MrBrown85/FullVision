@@ -2381,7 +2381,13 @@ window.CommentBank = (function () {
      competencies, highest first (report order on a tie); [] otherwise. A
      student whose every competency is within half a step is the even
      case (evenComps), not this one. One of the tied skills is named as a
-     strength, "among the highest", never "strongest" (topSkillOf). */
+     strength, "among the highest", never "strongest" (topSkillOf).
+     A competency in the band on fewer than 3 pieces is left out of the tie
+     and is not a blocker (Nov 1, strengths coverage): with 7+ competencies
+     tagged four to an assessment, one thin competency near the top
+     otherwise stopped every tie. It is not the rest either: the tie's
+     lead is measured over the first competency below the band, whatever
+     its piece count (as the "strongest" gate measures). */
   function topTieOf(comps) {
     if (strongestOf(comps).length) return [];
     var xs = (comps || [])
@@ -2392,17 +2398,17 @@ window.CommentBank = (function () {
         return b.level - a.level;
       });
     if (xs.length < 3) return [];
-    var tie = xs.filter(function (c) {
+    var band = xs.filter(function (c) {
       return !_atLeast(xs[0].level - c.level, STRONGEST_GAP);
     });
     var rest = xs.filter(function (c) {
-      return tie.indexOf(c) < 0;
+      return band.indexOf(c) < 0;
     });
-    if (tie.length < 2 || !rest.length) return [];
-    var enough = tie.every(function (c) {
+    var tie = band.filter(function (c) {
       return (c.scores || []).length >= STRONGEST_PIECES;
     });
-    if (!enough || !_atLeast(tie[tie.length - 1].level - rest[0].level, STRONGEST_GAP)) return [];
+    if (tie.length < 2 || !rest.length) return [];
+    if (!_atLeast(tie[tie.length - 1].level - rest[0].level, STRONGEST_GAP)) return [];
     return tie;
   }
 
@@ -2427,8 +2433,10 @@ window.CommentBank = (function () {
     return out;
   }
 
-  /* The skills named as a tied strength in each class this session, per
-     student: { cid: { sid: skill key } }. Kept in memory only, as _told. */
+  /* The skills named as a strength that was a choice, not a fact (one of a
+     tie at the top, or one of a student's even results) in each class this
+     session, per student: { cid: { sid: skill key } }. Kept in memory only,
+     as _told. */
   var _topTold = {};
   function _topUsesFor(cid, sid) {
     var mine = (cid != null && _topTold[cid]) || {};
@@ -2499,14 +2507,18 @@ window.CommentBank = (function () {
   /* The even competencies as skills from the table (one per skill key),
      [{ comp, key, skill }]; the frames print the first ({evenSkill}). The
      next step's competency (nextStepOf) is left out, so the strengths
-     sentence and the next step never name one skill. The shortest wording
-     comes first (highest competency first on a tie): every even competency
-     is within half a step of the others, so any is a fair example, and the
-     shortest keeps the realised sentence within 20 words (ctxFor's rule) for
-     more students. */
+     sentence and the next step never name one skill. Every even competency
+     is within half a step of the others, so any is a fair example: as for
+     a tie (topSkillOf), the skill named for the fewest classmates this
+     session comes first, then the shortest wording (which keeps the
+     realised sentence within 20 words for more students), then the
+     highest competency. Before Nov 1 the shortest always came first, so a
+     class printed one clause for most of its even students. A frame too
+     long with the first skill takes the next that fits (ctxFor). */
   function evenSkills(f) {
     var out = [];
     var next = nextStepOf(f.comps);
+    var uses = _topUsesFor(f.cid, f.sid);
     evenComps(f.comps, f.overall).forEach(function (c) {
       // Only a competency judged on 3+ pieces is named as what the
       // student can do.
@@ -2522,10 +2534,17 @@ window.CommentBank = (function () {
       out.push({ comp: c, key: sk.key, skill: sk.skill });
     });
     return out
-      .sort(function (x, y) {
-        return R.wordCount(x.skill) - R.wordCount(y.skill);
+      .map(function (x, i) {
+        return { x: x, i: i };
       })
-      .slice(0, 2);
+      .sort(function (a, b) {
+        return (
+          (uses[a.x.key] || 0) - (uses[b.x.key] || 0) || R.wordCount(a.x.skill) - R.wordCount(b.x.skill) || a.i - b.i
+        );
+      })
+      .map(function (p) {
+        return p.x;
+      });
   }
   /* "{evenSkill}": the first even skill alone, '' with none. */
   function evenSkillText(f) {
@@ -2905,6 +2924,10 @@ window.CommentBank = (function () {
       // (`when.evenWord`), in every grading style: a condition only, so a
       // Letter class binds the verb to it without printing it.
       _evenWord: evenNow.length && f.overall > 0 ? word(f.overall) : '',
+      // The even skills in the order they are offered (evenSkills): the
+      // first fills {evenSkill}; a frame too long with it takes the next
+      // that fits (ctxFor).
+      _evenSkills: evenSk,
       _options: options,
       _focus: focus || null,
       _facts: factsOf,
@@ -3166,10 +3189,35 @@ window.CommentBank = (function () {
      and the provenance records that value. A sentence still over 20 words
      with one skill is not offered (_compose) and fails verify(). */
   function ctxFor(s, ctx) {
-    if (!s || !ctx || !/\{strengths\}/.test(String(s.text || ''))) return ctx;
+    if (!s || !ctx) return ctx;
+    var text = String(s.text || '');
+    if (/\{evenSkill\}/.test(text)) return _evenCtxFor(s, ctx);
+    if (!/\{strengths\}/.test(text)) return ctx;
     if (!ctx.strengths || !ctx.strength || ctx.strengths === ctx.strength) return ctx;
     if (!R.tooLong(R.render(_tokensRaw(s, ctx), whoOf(ctx), { named: true }))) return ctx;
     return Object.assign({}, ctx, { strengths: ctx.strength });
+  }
+  /* The same for "{evenSkill}": a frame that runs past 20 words with the
+     first even skill (evenSkills, the least named in the class) holds the
+     next even skill that keeps it within 20, with the facts and
+     competency name behind the slot moved with it, so the provenance and
+     verify() read the competency actually named. */
+  function _evenCtxFor(s, ctx) {
+    var xs = ctx._evenSkills || [];
+    if (!ctx.evenSkill || xs.length < 2) return ctx;
+    var long = function (c) {
+      return R.tooLong(R.render(_tokensRaw(s, c), whoOf(c), { named: true }));
+    };
+    if (!long(ctx)) return ctx;
+    for (var i = 1; i < xs.length; i++) {
+      var alt = Object.assign({}, ctx, {
+        evenSkill: xs[i].skill,
+        _facts: Object.assign({}, ctx._facts, { evenSkill: ['comp:' + xs[i].comp.id] }),
+        _compNames: Object.assign({}, ctx._compNames, { evenSkill: [xs[i].comp.name] }),
+      });
+      if (!long(alt)) return alt;
+    }
+    return ctx;
   }
   /* Who a context is about: { name, p, onFile }. A context built by hand
      with pronouns counts them as on file. */
@@ -4204,12 +4252,25 @@ window.CommentBank = (function () {
       };
       // A quotation already in the draft is out: now that every title is
       // quoted (the realiser), the same piece is never named twice. So is
-      // a sentence over 20 words as realised. When the whole tier is out,
+      // a sentence over 20 words as realised. When the whole top tier is
+      // out this way, the next tier down is tried (Nov 1: the newcomer and
+      // even-results frames ran long for some students, and the per-skill
+      // frames that fit them were never reached); when every tier is out,
       // a sentence that asserts nothing stands in, as for an excluded tier.
       var fresh = function (x) {
         return !x.dup && !x.long;
       };
       var scored = tier.map(score).filter(fresh);
+      var lower = cands.filter(function (s) {
+        return !exclude[s.id] && !s.mine && tier.indexOf(s) < 0;
+      });
+      while (!scored.length && lower.length) {
+        var next = _topTier(lower, ctx);
+        scored = next.map(score).filter(fresh);
+        lower = lower.filter(function (s) {
+          return next.indexOf(s) < 0;
+        });
+      }
       if (!scored.length)
         scored = _standIns(step, ctx, bank, taken, exclude)
           .filter(function (s) {
@@ -4335,15 +4396,28 @@ window.CommentBank = (function () {
       _told[cid] = _told[cid] || {};
       _told[cid][sid] = story.id;
     }
-    // The skill a tied strength named (`when.topSkill`), for classmates'
-    // picks (topSkillOf): the least-named skill of their tie comes first.
+    // The skill a tied strength named (`when.topSkill`), or the even skill
+    // named ({evenSkill}), for classmates' picks (topSkillOf, evenSkills):
+    // the least-named skill of their tie or even results comes first.
     if (tally) {
       var top = d.provenance.find(function (pv) {
         return !!(pv.values || {})['when.topSkill'];
       });
-      if (top) {
+      var named = top ? top.values['when.topSkill'] : '';
+      if (!named) {
+        var ev = d.provenance.find(function (pv) {
+          return !!(pv.values || {}).evenSkill;
+        });
+        var evSk =
+          ev &&
+          (ctx._evenSkills || []).find(function (x) {
+            return x.skill === ev.values.evenSkill;
+          });
+        named = evSk ? evSk.key : '';
+      }
+      if (named) {
         _topTold[cid] = _topTold[cid] || {};
-        _topTold[cid][String(sid)] = top.values['when.topSkill'];
+        _topTold[cid][String(sid)] = named;
       } else if (_topTold[cid]) delete _topTold[cid][String(sid)];
     }
     // This draft's bank sentences, for classmates' usage (classUsage()).
@@ -4976,7 +5050,19 @@ window.CommentBank = (function () {
       var checks = [];
       if (_has(pv, 'evenResults'))
         checks.push(_ids(pv, 'evenResults', 'comp').length === ids.length && among('evenResults'));
-      if (_has(pv, 'evenSkill')) checks.push(among('evenSkill') && !!v.evenSkill && v.evenSkill === evenSkillText(f));
+      // The skill named is a choice (evenSkills), not a fact: any even
+      // competency on 3+ pieces, in the table's wording for it, holds.
+      if (_has(pv, 'evenSkill')) {
+        var ec = _byId(f.comps, _ids(pv, 'evenSkill', 'comp')[0]);
+        var esk = ec ? skillOf(f.family, ec.name) : null;
+        checks.push(
+          among('evenSkill') &&
+            !!esk &&
+            (ec.scores || []).length >= STRONGEST_PIECES &&
+            !!v.evenSkill &&
+            v.evenSkill === esk.skill,
+        );
+      }
       var now = f.overall > 0 ? word(f.overall) : '';
       if (_has(pv, 'when.evenWord')) checks.push(!!now && v['when.evenWord'] === now);
       if (_has(pv, 'evenWord')) checks.push(!!now && !!f.standing && f.standing === now && v.evenWord === now);
@@ -5291,6 +5377,25 @@ window.CommentBank = (function () {
     },
   };
 
+  /* The even skill a sentence named ({evenSkill}) is a choice among the
+     student's even skills (evenSkills), not a fact: the context holds the
+     one it would choose now, so for the check the context is put as the
+     sentence was filled, when the skill named is still one of them. The
+     claim (CLAIMS.evenResults) checks the competency behind it. */
+  function _asNamed(pv, ctx) {
+    var named = (pv && pv.values && pv.values.evenSkill) || '';
+    if (!named || !ctx || named === ctx.evenSkill) return ctx;
+    var x = (ctx._evenSkills || []).find(function (e) {
+      return e.skill === named;
+    });
+    if (!x) return ctx;
+    return Object.assign({}, ctx, {
+      evenSkill: x.skill,
+      _facts: Object.assign({}, ctx._facts, { evenSkill: ['comp:' + x.comp.id] }),
+      _compNames: Object.assign({}, ctx._compNames, { evenSkill: [x.comp.name] }),
+    });
+  }
+
   /* The claims that fail for one sentence, 'slots' when a value it was
      filled with is no longer what the facts give or it no longer fits, and
      'length' when the sentence as realised runs past 20 words (the
@@ -5298,7 +5403,7 @@ window.CommentBank = (function () {
   function _failed(s, pv, f, ctx) {
     var own = Object.prototype.hasOwnProperty;
     var out = [];
-    ctx = ctxFor(s, ctx);
+    ctx = ctxFor(s, _asNamed(pv, ctx));
     if (R.tooLong(fill(s, ctx))) out.push('length');
     var stale =
       !_fitsSlots(s, ctx, { story: false }) ||
