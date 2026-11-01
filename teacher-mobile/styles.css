@@ -281,6 +281,13 @@ body.fv-switching-course::after {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Sync light, as on the desktop top bar. The dot's colours come from
+   teacher/styles.css; data.js sets its state. */
+.m-sync {
+  display: flex;
+  align-items: center;
+}
+
 /* Large title area */
 .m-title-large {
   padding: 0 16px 8px;

@@ -92,6 +92,7 @@ window.MStudentsList = (function () {
       title: 'Students',
       rightHTML:
         toggleHTML +
+        '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
         '<button class="m-nav-bar-action" data-action="m-sort" title="Sort">' +
         MC.ICONS.sort +
         '</button>' +
@@ -100,8 +101,11 @@ window.MStudentsList = (function () {
         '</button>',
     });
 
+    // Search is for List view; Cards view hides it (see _syncViewVisibility).
     var search =
-      '<div class="m-search-wrap"><input class="m-search-input" type="search" placeholder="Search students..." data-action="m-student-search" autocomplete="off"></div>';
+      '<div class="m-search-wrap" id="m-student-search-wrap"' +
+      (viewMode === 'cards' ? ' style="display:none"' : '') +
+      '><input class="m-search-input" type="search" placeholder="Search students..." data-action="m-student-search" autocomplete="off"></div>';
     var allStatuses = getAssignmentStatuses(cid);
     var allAssessments = getAssessments(cid);
 
