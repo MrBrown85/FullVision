@@ -2284,7 +2284,7 @@ window.PageAssignments = (function () {
         html += _afTagRow(sec, selTags);
       });
     }
-    html += '</div></div>';
+    html += '</div>' + _untaggedNote(cid, selTags.length > 0) + '</div>';
 
     // Core Competencies
     var selCC = assess ? assess.coreCompetencyIds || [] : [];
@@ -2469,6 +2469,22 @@ window.PageAssignments = (function () {
     return factor > 0 ? factor : 1;
   }
 
+  /* A proficiency score only counts through a competency: an assessment with
+     none ticked never moves a student's proficiency, so the form says so.
+     Letter classes count it in the course %, so they get no note. */
+  function _untaggedNote(cid, hasTags) {
+    if (courseGradeMode(cid) === 'letter' || getSections(cid).length === 0) return '';
+    return (
+      '<p class="af-untagged-note" id="af-untagged-note" role="status"' +
+      (hasTags ? ' hidden' : '') +
+      '>No competency is ticked, so scores on this assessment won\u2019t count toward any student\u2019s proficiency.</p>'
+    );
+  }
+  function _refreshUntaggedNote() {
+    var note = document.getElementById('af-untagged-note');
+    if (note) note.hidden = !!document.querySelector('.af-tag-cb:checked');
+  }
+
   /* ── Assessment CRUD ────────────────────────────────────── */
   function showNewForm() {
     _resetCollabState();
@@ -2507,6 +2523,7 @@ window.PageAssignments = (function () {
     updateSectionBadge(secId);
   }
   function updateSectionBadge(secId) {
+    _refreshUntaggedNote();
     var cbs = document.querySelectorAll('.af-tag-cb[data-section="' + secId + '"]');
     var count = Array.from(cbs).filter(function (cb) {
       return cb.checked;
