@@ -1321,6 +1321,27 @@ window.CommentBank = (function () {
     });
   }
 
+  /* The character limit as typed in its box: { ok: true, limit } for a
+     whole number from LIMIT_MIN to LIMIT_MAX (limit null when the box is
+     empty: no limit), else { ok: false }. A stray letter, 0, a negative or
+     a decimal is never read as "no limit". */
+  var LIMIT_MIN = 100;
+  var LIMIT_MAX = 5000;
+  function parseLimit(value) {
+    var t = String(value == null ? '' : value).trim();
+    if (t === '') return { ok: true, limit: null };
+    if (!/^\d+$/.test(t)) return { ok: false };
+    var n = Number(t);
+    return n >= LIMIT_MIN && n <= LIMIT_MAX ? { ok: true, limit: n } : { ok: false };
+  }
+  /* A saved limit: a whole number above 0, as older code saved it (one
+     below 100 is honoured as is; only a new entry is held to parseLimit).
+     Anything else is none. */
+  function _savedLimit(v) {
+    var n = Math.floor(Number(v));
+    return v != null && v !== '' && n > 0 ? n : null;
+  }
+
   /* A class's comment settings, kept in its report settings (report_config,
      under blocks_config.commentSettings): the support lines it ticked and
      wrote, each student's own pick per report ({ termId: { sid: line id or
@@ -1329,7 +1350,6 @@ window.CommentBank = (function () {
   function classSettings(cid) {
     var rc = (typeof getReportConfig === 'function' && getReportConfig(cid)) || {};
     var cs = (rc && rc.commentSettings) || {};
-    var limit = Math.floor(Number(cs.charLimit));
     return {
       supportChosen: Array.isArray(cs.supportChosen) ? cs.supportChosen.map(String) : [],
       supportOwn: Array.isArray(cs.supportOwn)
@@ -1348,7 +1368,7 @@ window.CommentBank = (function () {
         : [],
       languageGoalsFor: cs.languageGoalsFor && typeof cs.languageGoalsFor === 'object' ? cs.languageGoalsFor : {},
       closing: String(cs.closing || '').trim(),
-      charLimit: limit > 0 ? limit : null,
+      charLimit: _savedLimit(cs.charLimit),
     };
   }
 
@@ -4597,11 +4617,14 @@ window.CommentBank = (function () {
      angleUses: { angle id: n } in the class (else this session's drafts in
      the class); exclude: sentence ids never to use (last term's approved
      sentences, from that report's draft_meta: approvedIds()); bank;
-     quiet: a draft for a check, not counted in the class's usage }.
+     quiet: a draft for a check, not counted in the class's usage;
+     charLimit: the class's character limit, the draft fitted to it
+     (_fitted); reserve: characters the screen adds to the draft, counted
+     against the limit }.
 
      Returns { text, ids, sentences, provenance, replaced, angle, seed,
-     short }: each sentence { id, part, step, text, kept? } in order, where
-     each came from (provenance()), what verify() replaced, the story told
+     short, overLimit? }: each sentence { id, part, step, text, kept? } in
+     order, where each came from (provenance()), what verify() replaced, the story told
      (never shown), the seed used, and whether fewer than six sentences
      were true for this student. A context built by hand, without facts, gets
      the steps in DRAFT_STEPS order and no verify. */
@@ -4635,15 +4658,16 @@ window.CommentBank = (function () {
       exclude[id] = true;
     });
     var base = Number(opts.seed) || 1;
+    // The class's character limit (classSettings), less what the screen
+    // adds to the draft (the teacher's typed sentences): `reserve`.
+    var limit = Number(opts.charLimit) > 0 ? Number(opts.charLimit) - (Number(opts.reserve) || 0) : null;
     var d;
     var seed = base;
     for (var k = 0; k < RETRIES; k++) {
       seed = base + k * 7919;
       // Selection, then the realiser (each sentence filled for its place),
       // then verify.
-      d = _realised(_compose(ctx, bank, seq, kept, seed, usage, exclude));
-      if (f) d = verify(d, f, ctx._picks, { bank: bank });
-      else d.replaced = [];
+      d = _fitted(_compose(ctx, bank, seq, kept, seed, usage, exclude), f, ctx, bank, limit);
       if (!previous || d.text !== previous) break;
     }
     if (story && tally) {
@@ -4701,6 +4725,41 @@ window.CommentBank = (function () {
     d.seed = seed;
     d.short = d.sentences.length < MIN_SENTENCES;
     return d;
+  }
+
+  /* A composed draft realised and verified, then fitted to the character
+     limit (plan: drafts stay within the class's limit): over it, the draft
+     drops whole sentences in LIMIT_DROP order until it fits: the family
+     line, then attendance, then the strengths, then the habits sentence.
+     Nothing else: never the next step, the best piece, the grade sentence,
+     Not Handed In, the IE path's Required sentences, a sentence the teacher
+     kept, the class's own lines or the comment's first sentence (it names
+     the student, and leads a Proficiency class's comment). When
+     even that cannot fit, the whole draft is kept and `overLimit` is set;
+     the count on screen says why. `limit` null: no limit. */
+  var LIMIT_DROP = ['home', 'attendance', 'overall', 'habits', 'strongHabits'];
+  function _fitted(c, f, ctx, bank, limit) {
+    var finish = function (x) {
+      var d = _realised(x);
+      if (f) d = verify(d, f, ctx._picks, { bank: bank });
+      else d.replaced = [];
+      return d;
+    };
+    var whole = finish(c);
+    if (!limit || whole.text.length <= limit) return whole;
+    var cur = { sentences: c.sentences.slice(), provenance: c.provenance.slice() };
+    for (var k = 0; k < LIMIT_DROP.length; k++) {
+      for (var i = cur.sentences.length - 1; i >= 1; i--) {
+        var x = cur.sentences[i];
+        if (x.step !== LIMIT_DROP[k] || x.kept || x.classLine) continue;
+        cur.sentences.splice(i, 1);
+        cur.provenance.splice(i, 1);
+        var d = finish(cur);
+        if (d.text.length <= limit) return d;
+      }
+    }
+    whole.overLimit = true;
+    return whole;
   }
 
   /* A rating changed on the Work Habits grid: the draft `prev` (as draft()
@@ -6296,6 +6355,9 @@ window.CommentBank = (function () {
     fitName: fitName,
     classSettings: classSettings,
     classLines: classLines,
+    parseLimit: parseLimit,
+    LIMIT_MIN: LIMIT_MIN,
+    LIMIT_MAX: LIMIT_MAX,
     passesGates: passesGates,
     angleFacts: angleFacts,
     stepOf: stepOf,

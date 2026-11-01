@@ -4316,6 +4316,13 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 12px;
   color: var(--text-2);
 }
+.qn-limit-msg {
+  font-size: 12px;
+  color: var(--danger);
+}
+.qn-limit-msg[hidden] {
+  display: none;
+}
 .qn-copy {
   border: 1px solid var(--border);
   background: var(--surface);
