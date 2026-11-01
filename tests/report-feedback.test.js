@@ -107,7 +107,7 @@ function seed() {
   saveScores(CID, {
     [SID]: [
       entry('score-only', '', 8),
-      entry('points', '', 16),
+      entry('points', '', 16, { note: 'Check question 3.\nShow the units.' }),
       entry('done', '', 1, { note: 'Neat and on time.' }),
       entry('not-done', '', 0),
       entry('rubric', TAG_1, 3, { mod: 1, critNote: 'Ask a sharper question.' }),
@@ -117,6 +117,7 @@ function seed() {
       entry('tags', TAG_2, 0, { critNote: 'Plan before you start.' }),
       entry('single', CRIT_SP, 3, { critNote: 'Slow down.', critBeyond: 'Used a prop.' }),
       entry('advanced', CRIT_ADV, 3),
+      entry('excused', TAG_1, 0, { note: 'Joined the next trip instead.' }),
     ],
   });
   saveAssignmentStatuses(CID, { [SID + ':rubric']: 'LATE', [SID + ':missing']: 'NS', [SID + ':excused']: 'EXC' });
@@ -216,7 +217,7 @@ describe('forStudent: which assessments get a card', () => {
 });
 
 describe('forStudent: what a card carries', () => {
-  it('points work: the score, out of, percent and the comments with their dates', () => {
+  it('points work: the score, out of, percent and the Overall Comment, a line per paragraph', () => {
     const item = byId(F.forStudent(CID, ST)).points;
     expect(item).toMatchObject({
       title: 'Energy Quiz',
@@ -231,8 +232,8 @@ describe('forStudent: what a card carries', () => {
       rubric: null,
     });
     expect(item.feedback).toEqual([
-      { text: 'Check question 3.', date: 'Oct 2', dateIso: '2026-10-02' },
-      { text: 'Show the units.', date: 'Oct 4', dateIso: '2026-10-04' },
+      { text: 'Check question 3.', date: '', dateIso: '' },
+      { text: 'Show the units.', date: '', dateIso: '' },
     ]);
     expect(item.grade.text).toBeTruthy();
     expect(item.grade.text).toBe(item.grade.word);
@@ -445,14 +446,15 @@ describe('observations', () => {
     expect(ids).toEqual(['ob-old', 'ob-early', 'ob-str', 'ob-gr', 'ob-late']);
   });
 
-  it('leaves a private assignment comment off the assessment card', () => {
+  it('linked observations never print as the feedback on the work', () => {
     const all = getQuickObs(CID);
     const priv = comment('o-priv', 'points', 'Parents meeting about this.', '2026-10-09');
     priv.sentiment = 'concern';
-    saveQuickObs(CID, { [SID]: all[SID].concat([priv]) });
-    const texts = RubricPrint.feedbackItems(CID, SID, 'points').map(f => f.text);
-    expect(texts).toContain('Show the units.');
-    expect(texts).not.toContain('Parents meeting about this.');
+    saveQuickObs(CID, { [SID]: all[SID].concat([comment('o-log', 'points', 'From the log.', '2026-10-09'), priv]) });
+    expect(RubricPrint.feedbackItems(CID, SID, 'points').map(f => f.text)).toEqual([
+      'Check question 3.',
+      'Show the units.',
+    ]);
   });
 
   it('prints the Overall Comment alone once the work has one, a line per paragraph', () => {
@@ -468,11 +470,11 @@ describe('observations', () => {
     expect(byId(F.forStudent(CID, ST)).points.feedback.map(f => f.text)).toEqual(['Great effort.', 'Show the units.']);
   });
 
-  it('falls back to the linked observations only while the Overall Comment is empty', () => {
-    expect(RubricPrint.feedbackItems(CID, SID, 'points').map(f => f.text)).toEqual([
-      'Check question 3.',
-      'Show the units.',
-    ]);
+  it('prints nothing for work with no Overall Comment, whatever observations it has', () => {
+    const scores = getScores(CID);
+    scores[SID] = scores[SID].map(e => (e.assessmentId === 'points' ? Object.assign({}, e, { note: '' }) : e));
+    saveScores(CID, scores);
+    expect(RubricPrint.feedbackItems(CID, SID, 'points')).toEqual([]);
   });
 
   it('keeps to the report’s term', () => {
