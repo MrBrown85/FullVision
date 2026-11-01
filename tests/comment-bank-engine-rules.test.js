@@ -382,11 +382,12 @@ describe('six to nine sentences', () => {
     const d = draftOf(thin);
     expect(d.short).toBe(true);
     expect(d.sentences.length).toBeLessThan(6);
-    expect(stepsOf(d)).toEqual(['grade', 'example', 'home']);
+    // The family line belongs to the Next Step sentence, so with no next
+    // step it is left out too (live run, Nov 1 2026).
+    expect(stepsOf(d)).toEqual(['grade', 'example']);
     expect(d.sentences[0].text).toContain('Ines');
     expect(d.sentences[0].text).toContain('Proficient');
     expect(d.sentences[1].text).toContain('“Energy Lab');
-    expect(d.sentences[2].step).toBe('home');
     // Nothing was added to reach six: no habits sentence with no habit
     // rated, no strengths below the gate, no next step on two pieces.
     expect(CommentBank.verify(d, thin, {}).text).toBe(d.text);

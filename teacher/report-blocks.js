@@ -2112,6 +2112,7 @@ window.ReportBlocks = (function () {
     reportContext: reportContext,
     levelDots: levelDots,
     getPronouns: getPronouns,
+    PRONOUN_SETS: PRONOUN_SETS,
     OBS_DESCRIPTORS: OBS_DESCRIPTORS,
     renderBlockHeader: renderBlockHeader,
     renderBlockAcademicSummary: renderBlockAcademicSummary,

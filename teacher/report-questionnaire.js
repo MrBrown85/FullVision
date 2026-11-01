@@ -433,9 +433,12 @@ window.ReportQuestionnaire = (function () {
      Clicking it puts the cursor in the box (it is the box's label). */
   function _emptyHtml(cid, student, text) {
     var habits = (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || {};
+    // Under the no-marks line (Generate pressed with no marked work), no
+    // hint to press Generate.
+    var noDraft = !!_noDraft[_rowKey(student)] && noMarkedWork(_facts(student));
     return `<label class="qn-empty" id="tq-empty" for="tq-narrative"${String(text || '').trim() ? ' hidden' : ''}>
           <span class="qn-empty-title">No comment yet</span>
-          <span class="qn-empty-hint">Rate the six work habits, then press Generate Comment. You can also type here.</span>
+          <span class="qn-empty-hint"${noDraft ? ' hidden' : ''}>Rate the six work habits, then press Generate Comment. You can also type here.</span>
           <span class="qn-empty-chip" id="tq-empty-rated">${_ratedCount(habits)} of 6 habits rated</span>
         </label>`;
   }
@@ -463,10 +466,21 @@ window.ReportQuestionnaire = (function () {
     termId = termId || getTermId();
     var r = getStudentTermRating(cid, student.id, termId) || {};
     var meta = r.draftMeta;
-    if (!meta || !Array.isArray(meta.sentences) || !meta.sentences.length) return null;
+    if (!meta) return null;
+    var marks = Array.isArray(meta.sentences) && meta.sentences.length > 0;
+    // The pronouns changed since the approval (draft_meta.pronouns).
+    var pron = !!r.approvedAt && !!meta.pronouns && !_samePronouns(meta.pronouns, ReportBlocks.getPronouns(student));
+    if (!marks && !pron) return null;
     var text = plainComment(r.narrative || '');
     var key = cid + '|' + student.id + '|' + termId;
-    var sig = JSON.stringify(meta) + '\u0000' + text;
+    var sig =
+      JSON.stringify(meta) +
+      '\u0000' +
+      text +
+      '\u0000' +
+      (r.approvedAt || '') +
+      '\u0000' +
+      String(student.pronouns || '');
     var hit = _staleCache[key];
     if (hit && hit.sig === sig) return hit.v;
     var cur = _current();
@@ -474,7 +488,28 @@ window.ReportQuestionnaire = (function () {
       cid === _activeCourse && termId === getTermId() && cur && cur.id === student.id
         ? _facts(student)
         : CommentBank.facts(cid, student, termId);
-    var v = CommentBank.staleness(meta, f, _picksFor(cid, student, f, termId), { text: text });
+    var v = marks ? CommentBank.staleness(meta, f, _picksFor(cid, student, f, termId), { text: text }) : null;
+    var p = pron ? pronounChanges(cid, student, r, f) : [];
+    if (p.length) {
+      // A sentence shows once: as a pronoun change when that is all that
+      // changed in it, else as out of date for its marks.
+      var only = function (c) {
+        return p.some(function (x) {
+          return x.before === c.before && x.after === c.after;
+        });
+      };
+      var marksNow = ((v && v.changes) || []).filter(function (c) {
+        return !(c.kind === 'marks' && only(c));
+      });
+      var seen = marksNow.map(function (c) {
+        return c.before;
+      });
+      p = p.filter(function (c) {
+        return !c.keptAsApproved && seen.indexOf(c.before) < 0;
+      });
+      v = v ? Object.assign({}, v, { changes: marksNow.concat(p) }) : { changes: p, pieces: [] };
+      if (!v.changes.length) v = null;
+    }
     _staleCache[key] = { sig: sig, v: v };
     return v;
   }
@@ -576,6 +611,10 @@ window.ReportQuestionnaire = (function () {
       );
       out.push(_cap(names) + ' changed after ' + day + ', so ' + _sentenceCount(cls.length) + ' your class settings.');
     }
+    var pron = stale.changes.filter(function (c) {
+      return c.kind === 'pronouns';
+    }).length;
+    if (pron) out.push('The pronouns changed after ' + day + ', so ' + _sentenceCount(pron) + ' them.');
     out.push('Approved text is never changed for you.');
     return out.join(' ');
   }
@@ -626,34 +665,53 @@ window.ReportQuestionnaire = (function () {
     var stale = staleFor(_activeCourse, st, termId);
     var c = stale && stale.changes[Number(i)];
     if (!c) return;
-    if (what === 'keep') {
+    if (what === 'keep' && c.kind === 'pronouns') {
+      var kept = (Array.isArray(r.draftMeta.pronoun_kept) ? r.draftMeta.pronoun_kept : []).concat(c.before);
+      upsertTermRating(_activeCourse, st.id, termId, {
+        draftMeta: Object.assign({}, r.draftMeta, { pronoun_kept: kept }),
+      });
+    } else if (what === 'keep') {
       upsertTermRating(_activeCourse, st.id, termId, {
         draftMeta: CommentBank.keepApproved(r.draftMeta, c, stale, _facts(st, true)),
       });
     } else if (what === 'use') {
       var text = plainComment(r.narrative || '');
-      var next = _swapSentence(text, c.before, c.after);
-      if (next === text) return;
       var key = _rowKey(st);
       var f = _facts(st, true);
       var rows = _rowsFor(st, f).slice();
-      var at = rows.findIndex(function (x) {
-        return x.text === c.before;
-      });
-      if (at >= 0) {
-        var step = rows[at].step || (r.draftMeta.sentences[c.i] || {}).step || null;
-        if (!c.after) rows.splice(at, 1);
-        else if (c.kind === 'class') rows[at] = _classRow(step, c.after);
+      // The approval goes with the first new sentence, so a pronoun change
+      // puts in every sentence the pronouns changed (as for a comment not
+      // yet approved); one kept as approved stays.
+      var todo =
+        c.kind === 'pronouns'
+          ? stale.changes.filter(function (x) {
+              return x.kind === 'pronouns';
+            })
+          : [c];
+      var next = text;
+      todo.forEach(function (x) {
+        var swapped = _swapSentence(next, x.before, x.after);
+        if (swapped === next) return;
+        next = swapped;
+        var at = rows.findIndex(function (y) {
+          return y.text === x.before;
+        });
+        if (at < 0) {
+          rows = alignRows(rows, next);
+          return;
+        }
+        var step = rows[at].step || (r.draftMeta.sentences[x.i] || {}).step || null;
+        if (!x.after) rows.splice(at, 1);
+        else if (x.kind === 'class') rows[at] = _classRow(step, x.after);
         else {
-          var s = c.id ? _bankById(c.id) : null;
+          var s = x.id ? _bankById(x.id) : null;
           var row = s ? rowFromSentence(s, _bankContext(_activeCourse, st, f), step, at === 0) : null;
           rows[at] = row || Object.assign({}, rows[at], { edited: false });
-          rows[at].text = rows[at].drafted = c.after;
+          rows[at].text = rows[at].drafted = x.after;
         }
-        _rows[key] = rows;
-      } else {
-        _rows[key] = alignRows(rows, next);
-      }
+      });
+      if (next === text) return;
+      _rows[key] = rows;
       upsertTermRating(_activeCourse, st.id, termId, { narrative: next });
       _syncLast(key, _rows[key], next);
     } else return;
@@ -1141,20 +1199,49 @@ window.ReportQuestionnaire = (function () {
     };
     return `<div class="qn-card qn-att">
       <span class="qn-att-title">Attendance</span>
-      <label class="qn-att-field">Classes Absent<input type="number" min="0" step="1" inputmode="numeric" class="qn-att-input${warn('absences', 'prevAbsences')}" id="tq-att-absences" data-tq-att="absences" data-sid="${sid}" aria-label="Classes Absent" title="Classes absent so far this year, as a total to date. Optional." value="${att.absences == null ? '' : att.absences}"></label>
-      <label class="qn-att-field">Times Late<input type="number" min="0" step="1" inputmode="numeric" class="qn-att-input${warn('lates', 'prevLates')}" id="tq-att-lates" data-tq-att="lates" data-sid="${sid}" aria-label="Times Late" title="Times late so far this year, as a total to date. Optional." value="${att.lates == null ? '' : att.lates}"></label>
+      <label class="qn-att-field">Classes Absent<input type="number" min="0" max="200" step="1" inputmode="numeric" class="qn-att-input${warn('absences', 'prevAbsences')}" id="tq-att-absences" data-tq-att="absences" data-sid="${sid}" aria-label="Classes Absent" title="Classes absent so far this year, as a total to date. Optional." value="${att.absences == null ? '' : att.absences}"></label>
+      <label class="qn-att-field">Times Late<input type="number" min="0" max="200" step="1" inputmode="numeric" class="qn-att-input${warn('lates', 'prevLates')}" id="tq-att-lates" data-tq-att="lates" data-sid="${sid}" aria-label="Times Late" title="Times late so far this year, as a total to date. Optional." value="${att.lates == null ? '' : att.lates}"></label>
       <span class="qn-att-note" id="tq-att-note" aria-live="polite">${_attendanceNoteHtml(att)}</span>
     </div>`;
   }
 
+  /* A box's total: a whole number from 0 to 200, '' for an empty box, or
+     null for anything else (a decimal, a negative, 1e+21), which is never
+     rounded, saved or printed. */
+  var ATTENDANCE_MAX = 200;
+  var ATTENDANCE_BAD = 'Enter a whole number from 0 to 200.';
+  function attendanceValue(input) {
+    if (input && input.validity && input.validity.badInput) return null;
+    var v = String((input && input.value) == null ? '' : input.value).trim();
+    if (v === '') return '';
+    if (!/^\d+$/.test(v)) return null;
+    var n = Number(v);
+    return n <= ATTENDANCE_MAX ? n : null;
+  }
+
   /* A box changed: save both totals and redraw only the note, so the
-     cursor stays where the teacher put it. */
+     cursor stays where the teacher put it. A box that does not hold a
+     whole number from 0 to 200 saves nothing and says so. */
   function tqSetAttendance(sid) {
     var abs = document.getElementById('tq-att-absences');
     var late = document.getElementById('tq-att-lates');
     if (!abs || !late) return;
     var termId = getTermId();
-    saveTermAttendance(_activeCourse, sid, termId, abs.value, late.value);
+    var a = attendanceValue(abs);
+    var l = attendanceValue(late);
+    var bad = function (el, v) {
+      if (el.classList) el.classList.toggle('bad', v === null);
+      if (v === null && el.setAttribute) el.setAttribute('aria-invalid', 'true');
+      else if (el.removeAttribute) el.removeAttribute('aria-invalid');
+    };
+    bad(abs, a);
+    bad(late, l);
+    if (a === null || l === null) {
+      var warnNote = document.getElementById('tq-att-note');
+      if (warnNote) warnNote.innerHTML = `<span class="qn-att-warn">${ATTENDANCE_BAD}</span>`;
+      return;
+    }
+    saveTermAttendance(_activeCourse, sid, termId, a, l);
     var att = getTermAttendance(_activeCourse, sid, termId);
     var note = document.getElementById('tq-att-note');
     if (note) note.innerHTML = _attendanceNoteHtml(att);
@@ -1488,6 +1575,17 @@ window.ReportQuestionnaire = (function () {
     var termId = getTermId();
     var key = _rowKey(st);
     var f = _facts(st, true);
+    // No marked work this term: nothing to draft from, so nothing is
+    // drafted and the card says so.
+    if (noMarkedWork(f)) {
+      _noDraft[key] = true;
+      var line = document.getElementById('tq-nodraft');
+      var hint = document.querySelector('#tq-empty .qn-empty-hint');
+      if (line) line.hidden = false;
+      if (hint) hint.hidden = true;
+      if (!line) rerender();
+      return;
+    }
     var n = (_generated[st.id] || 0) + 1;
     _generated[st.id] = n;
     // Sentences the teacher edited stay, as written, and so does the order
@@ -1539,6 +1637,23 @@ window.ReportQuestionnaire = (function () {
     _writeRows(st);
   }
 
+  /* Whether the student has no marked work this term (a mark on none of
+     the class's marked work), so Generate has nothing true to draft from.
+     The IE comment, which is about the missing marks, still drafts. */
+  var _noDraft = {}; // key: Generate was pressed with no marked work
+  function noMarkedWork(f) {
+    var g = (f && f.grade) || {};
+    if (g.basis === 'ie') return false;
+    return !(g.marked && g.marked.mine > 0);
+  }
+  function _noDraftHtml(student, f) {
+    if (!noMarkedWork(f)) return '';
+    var shown = !!_noDraft[_rowKey(student)];
+    return `<div class="qn-hint qn-nodraft" id="tq-nodraft" role="status"${shown ? '' : ' hidden'}>No marked work for ${esc(
+      _first(student),
+    )} this term yet, so there is nothing to draft from. You can write the comment yourself.</div>`;
+  }
+
   /* Earlier reports with a comment, newest first, as tabs beside This Report. */
   function _earlierReports(cid, sid, termId) {
     var n = Number(String(termId).replace(/\D/g, ''));
@@ -1583,7 +1698,7 @@ window.ReportQuestionnaire = (function () {
       : '';
     var body;
     if (thisTab) {
-      body = `${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" title="The student’s report comment. Type here, or change a sentence in the Sentences card below." data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea></div>
+      body = `${_noDraftHtml(student, _facts(student))}${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" title="The student’s report comment. Type here, or change a sentence in the Sentences card below." data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea></div>
         <div class="qn-comment-foot" id="tq-comment-foot"${text.trim() ? '' : ' hidden'}>
           ${_countHtml(cid, text)}
           <button type="button" class="qn-sel-add" id="tq-sel-add" hidden data-action="tqSentences" data-do="ownFromBox" title="Adds the selected sentence to your bank, for other students it fits.">Add to My Bank</button>
@@ -1608,6 +1723,7 @@ window.ReportQuestionnaire = (function () {
           ${thisTab ? '<button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="Writes the comment from the gradebook, your ratings and Student Voice. Press again for another version. Sentences you typed or edited and your order stay.">Generate Comment</button>' : ''}
         </div>
         ${stale ? _staleHtml(cid, student, rating, stale) : ''}
+        ${thisTab ? _pronounNoticeHtml(rating, _facts(student)) : ''}
         ${thisTab ? _basisHtml(cid, student, _facts(student)) : ''}
         ${thisTab ? '<div id="tq-warn-wrap">' + _warnHtml(cid, student, text) + '</div>' : ''}
         ${body}
@@ -1890,7 +2006,7 @@ window.ReportQuestionnaire = (function () {
     return (
       !!stale &&
       stale.changes.some(function (c) {
-        return c.kind === 'marks';
+        return c.kind === 'marks' || c.kind === 'pronouns';
       })
     );
   }
@@ -2478,22 +2594,11 @@ window.ReportQuestionnaire = (function () {
     return p ? p.label : '';
   }
 
-  /* A comment's sentences: split after . ! ? or … (and a closing quote)
-     where the next sentence starts. No lookbehind (Safari before 16.4). */
+  /* A comment's sentences, as the realiser splits them: after . ! ? or …
+     (and a closing quote) where the next sentence starts, never after a
+     title such as Ms., e.g. or an initial, or inside a quotation. */
   function sentencesOf(text) {
-    var t = String(text || '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    var out = [];
-    var re = /[.!?…]+["”]?\s+(?=["“]?[A-Z0-9])/g;
-    var from = 0;
-    var m;
-    while ((m = re.exec(t))) {
-      out.push(t.slice(from, m.index + m[0].length).trim());
-      from = m.index + m[0].length;
-    }
-    if (from < t.length) out.push(t.slice(from).trim());
-    return out.filter(Boolean);
+    return CommentRealiser.sentences(text);
   }
 
   function _bankById(id) {
@@ -2924,8 +3029,310 @@ window.ReportQuestionnaire = (function () {
     var rating = getStudentTermRating(_activeCourse, student.id, getTermId()) || {};
     var text = _shownText(rating).trim();
     if (!text) return [];
-    _rows[key] = recoverRows(text, _bankContext(_activeCourse, student, f), rating.draftMeta);
-    return _rows[key];
+    var ctx = _bankContext(_activeCourse, student, f);
+    // The pronouns may have changed since the comment was written, with
+    // the questionnaire closed (Class Management, the Student Dashboard).
+    var was = writtenWith(rating, f, text, student);
+    _pronounsSeen[key] = (f && f.pronouns) || null;
+    if (!was || rating.approvedAt) {
+      // An approved comment is never changed for the teacher: its sentences
+      // that read with the old pronouns show on the card (staleFor) with
+      // Keep as Approved or Use the New Sentence.
+      if (was) _recordPronouns(student, was);
+      _rows[key] = recoverRows(text, ctx, rating.draftMeta);
+      return _rows[key];
+    }
+    return _applyPronouns(student, f, was, recoverRows(text, _pronounContext(student, f, was), rating.draftMeta));
+  }
+
+  /* ── Pronouns changed (Edit Student) ────────────────────── */
+
+  /* The pronouns each student's rows were last drawn with, per row key.
+     When they change, every bank sentence the teacher has not edited is
+     filled again with the new ones at once (the realiser); a sentence the
+     teacher typed or edited is left as written and, when it still holds
+     an old pronoun, its row says "Pronouns changed". An approved comment
+     is never changed for the teacher: its sentences show on the card as
+     the marks-changed pattern does (staleFor, pronounChanges), and Use the
+     New Sentence clears the approval. */
+  var _pronounsSeen = {};
+  function _pronounWords(p) {
+    return p ? [p.subj, p.obj, p.poss, p.refl].filter(Boolean) : [];
+  }
+  function _holdsWord(text, words) {
+    var t = String(text || '');
+    return (words || []).some(function (w) {
+      return new RegExp('(^|[^A-Za-z])' + w + '($|[^A-Za-z])', 'i').test(t);
+    });
+  }
+  /* The rows with every bank sentence the teacher has not edited filled
+     for the pronouns now; the rest as written. ctxWas: the context the
+     rows were read with. A sentence is filled again from the values it
+     was written with (CommentBank.valuesIn), so only its pronouns change;
+     one too short to read back keeps its tokens, filled again from today's
+     facts only when they still give the same sentence (a slot filled whole
+     with the pronouns, like the best piece). */
+  function _writtenToks(r, whoWas) {
+    if (!r.s) return null;
+    var v = CommentBank.valuesIn(r.s, r.text);
+    if (!v) return null;
+    var toks = CommentRealiser.tokens(r.s.text, function (k) {
+      var x = v[k] == null ? '' : String(v[k]);
+      // A title is read with its quotes; the realiser puts them back.
+      return CommentRealiser.TITLE_SLOTS[k] ? x.replace(/^[“"]/, '').replace(/[”"]$/, '') : x;
+    });
+    var back = function (named) {
+      return CommentRealiser.render(toks, whoWas, { named: named }) === r.text;
+    };
+    return back(true) || back(false) ? toks : null;
+  }
+  function pronounsChanged(rows, ctx, ctxWas) {
+    var who = _whoOf(ctx);
+    var whoWas = ctxWas ? _whoOf(ctxWas) : null;
+    return rows.map(function (r) {
+      if (r.edited || r.kept || r.classLine) return r;
+      var toks = whoWas ? _writtenToks(r, whoWas) : null;
+      if (!toks && r.raw && r.raw.toks) {
+        toks = r.raw.toks;
+        if (ctxWas && r.s && JSON.stringify(CommentBank.sentenceTokens(r.s, ctxWas)) === JSON.stringify(toks))
+          toks = CommentBank.sentenceTokens(r.s, ctx);
+      }
+      if (!toks) return r;
+      var raw = r.raw || { id: r.id, part: r.s ? r.s.part : null, step: r.step, text: r.text };
+      return Object.assign({}, r, { raw: Object.assign({}, raw, { who: who, toks: toks }) });
+    });
+  }
+
+  /* The pronouns as a comment's record keeps them (draft_meta.pronouns). */
+  function pronounSet(p) {
+    if (!p) return null;
+    var out = {};
+    ['subj', 'obj', 'poss', 'refl', 'verb', 'capSubj'].forEach(function (k) {
+      if (p[k] != null) out[k] = p[k];
+    });
+    return out;
+  }
+  function _samePronouns(a, b) {
+    return JSON.stringify(pronounSet(a)) === JSON.stringify(pronounSet(b));
+  }
+  /* A context for the student with other pronouns. */
+  function _pronounContext(student, f, p) {
+    var g = Object.assign({}, f, { pronouns: Object.assign({}, p, { onFile: true }), pronounsOnFile: true });
+    return CommentBank.context(g, _picksFor(_activeCourse, student, f));
+  }
+  /* The bank sentences, not edited, that a comment's text holds word for
+     word when read with a context's pronouns (a row read with other values
+     has no realiser tokens). */
+  function _bankRowCount(text, ctx) {
+    return recoverRows(text, ctx, null).filter(function (r) {
+      return !!r.s && !r.edited && !!r.raw && !!r.raw.toks;
+    }).length;
+  }
+  var PRONOUN_SETS = ['he/him', 'she/her', 'they/them'];
+  /* The pronouns a saved comment was written with, when they are not the
+     student's now; null when they are the same. The set kept with the
+     approval (draft_meta.pronouns) while the comment is still the approved
+     text; else the set its bank sentences read with, when that finds more
+     of them than the pronouns on file do (a comment written before the set
+     was kept, or changed since). */
+  function writtenWith(rating, f, text, student) {
+    var now = f && f.pronouns;
+    if (!now) return null;
+    var meta = (rating && rating.draftMeta) || null;
+    var stored = meta && meta.pronouns;
+    var approvedText =
+      meta && Array.isArray(meta.sentences)
+        ? meta.sentences
+            .map(function (x) {
+              return x && x.text;
+            })
+            .join(' ')
+        : null;
+    var plain = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (stored && stored.subj && approvedText === plain) return _samePronouns(stored, now) ? null : stored;
+    var nowWords = _pronounWords(now);
+    var cands = PRONOUN_SETS.map(function (s) {
+      return ReportBlocks.getPronouns({ pronouns: s });
+    });
+    if (stored && stored.subj) cands.unshift(stored);
+    var best = null;
+    var bestN = -1;
+    var cur = null;
+    cands.forEach(function (p) {
+      if (_samePronouns(p, now) || (best && _samePronouns(p, best))) return;
+      var extra = _pronounWords(p).filter(function (w) {
+        return nowWords.indexOf(w) < 0;
+      });
+      if (!_holdsWord(plain, extra)) return;
+      if (cur == null) cur = _bankRowCount(plain, _bankContext(_activeCourse, student, f));
+      var n = _bankRowCount(plain, _pronounContext(student, f, p));
+      if (n > cur && n > bestN) {
+        best = p;
+        bestN = n;
+      }
+    });
+    return best;
+  }
+
+  function _syncPronouns(cid, student, f) {
+    var key = _rowKey(student);
+    var now = (f && f.pronouns) || null;
+    if (!_rows[key]) {
+      // First drawn since the page loaded: the saved comment is compared
+      // with the pronouns on file as its rows are recovered (_rowsFor).
+      _rowsFor(student, f);
+      return;
+    }
+    var was = _pronounsSeen[key];
+    _pronounsSeen[key] = now;
+    var rows = _rows[key];
+    if (!was || !rows || !rows.length || JSON.stringify(was) === JSON.stringify(now)) return;
+    if ((getStudentTermRating(cid, student.id, getTermId()) || {}).approvedAt) _recordPronouns(student, was);
+    else _applyPronouns(student, f, was, rows);
+  }
+
+  /* The record told which pronouns the comment was written with, when it
+     does not say yet (draft_meta.pronouns); a comment with no record gets
+     one that holds only them. */
+  function _pronounRecord(meta, was, now) {
+    var kept = meta && meta.pronouns;
+    if (kept && kept.subj && !_samePronouns(kept, now)) return null;
+    var out = Object.assign({}, meta || { v: 1, sentences: [] }, { pronouns: pronounSet(was) });
+    delete out.pronoun_ok;
+    delete out.pronoun_kept;
+    return out;
+  }
+  function _recordPronouns(student, was) {
+    var termId = getTermId();
+    var rating = getStudentTermRating(_activeCourse, student.id, termId) || {};
+    var meta = _pronounRecord(rating.draftMeta || null, was, ReportBlocks.getPronouns(student));
+    if (meta) upsertTermRating(_activeCourse, student.id, termId, { draftMeta: meta });
+  }
+
+  /* An approved comment's sentences that read with the pronouns it was
+     written with (draft_meta.pronouns), as changes for the card (the
+     marks-changed pattern): { kind: 'pronouns', i, id, before, after,
+     keptAsApproved }. Only bank sentences the teacher did not edit; one
+     kept as approved (draft_meta.pronoun_kept) is marked so staleFor leaves
+     it off the card. [] when the pronouns are the same. */
+  function pronounChanges(cid, student, rating, f) {
+    var meta = (rating && rating.draftMeta) || null;
+    var was = meta && meta.pronouns;
+    if (!rating || !rating.approvedAt || !was || !was.subj || !f || _samePronouns(was, f.pronouns)) return [];
+    var text = plainComment(rating.narrative || '').trim();
+    if (!text) return [];
+    var keep = Array.isArray(meta.pronoun_kept) ? meta.pronoun_kept : [];
+    var ctxWas = _pronounContext(student, f, was);
+    var old = recoverRows(text, ctxWas, meta);
+    var before = old.map(function (r) {
+      return r.text;
+    });
+    var next = pronounsChanged(old, CommentBank.context(f, _picksFor(cid, student, f)), ctxWas);
+    composeRows(next);
+    var out = [];
+    next.forEach(function (r, i) {
+      if (r.edited || r.kept || r.text === before[i]) return;
+      out.push({
+        kind: 'pronouns',
+        // Kept as approved (draft_meta.pronoun_kept): not shown again.
+        keptAsApproved: keep.indexOf(before[i]) >= 0,
+        id: r.s ? r.id : null,
+        i: (meta.sentences || []).findIndex(function (x) {
+          return x && x.text === before[i];
+        }),
+        before: before[i],
+        after: r.text,
+      });
+    });
+    return out;
+  }
+
+  /* Rows read with the pronouns `was` filled again with the student's
+     pronouns now, the comment saved from them, and the record told which
+     pronouns the comment was written with (draft_meta.pronouns), so the
+     typed and edited sentences are checked against them on every load
+     until the comment is approved again. A new text clears an approval
+     (upsertTermRating), as Use the New Sentence does. */
+  function _applyPronouns(student, f, was, rows) {
+    var key = _rowKey(student);
+    var termId = getTermId();
+    var next = pronounsChanged(rows, _bankContext(_activeCourse, student, f), _pronounContext(student, f, was));
+    _rows[key] = next;
+    var text = composeRows(next);
+    var rating = getStudentTermRating(_activeCourse, student.id, termId) || {};
+    var data = {};
+    if (text !== plainComment(rating.narrative || '').replace(/\s+$/, '')) data.narrative = text;
+    var meta = _pronounRecord(rating.draftMeta || null, was, f.pronouns);
+    if (meta) data.draftMeta = meta;
+    if (Object.keys(data).length) upsertTermRating(_activeCourse, student.id, termId, data);
+    _syncLast(key, next, text);
+    return next;
+  }
+
+  /* The old pronoun words a typed or edited sentence is checked for: the
+     words of the pronouns the comment was written with (draft_meta) that
+     the student's pronouns now do not use, and the sentences the teacher
+     kept as they are (Dismiss). Read on every load. */
+  function pronounCheck(rating, f) {
+    var meta = (rating && rating.draftMeta) || null;
+    var was = meta && meta.pronouns;
+    var now = f && f.pronouns;
+    if (!was || !was.subj || !now || _samePronouns(was, now)) return { gone: [], ok: [] };
+    return {
+      gone: pronounWordsNotIn(now, was),
+      ok: Array.isArray(meta.pronoun_ok) ? meta.pronoun_ok : [],
+    };
+  }
+  /* Every pronoun word (he, she, they and the other sets ReportBlocks
+     knows) that the pronouns `now` do not use, so a sentence written for
+     any earlier set is caught, not only the last one. "it" and "its" are
+     left out unless the comment was written with them: they are in most
+     sentences about a thing. */
+  function pronounWordsNotIn(now, was) {
+    var sets = (window.ReportBlocks && ReportBlocks.PRONOUN_SETS) || {};
+    var keep = _pronounWords(now).concat(sets[now && now.subj] || []);
+    var all = [];
+    Object.keys(sets).forEach(function (subj) {
+      if (subj === 'it' && !(was && was.subj === 'it')) return;
+      [subj].concat(sets[subj]).forEach(function (w) {
+        if (all.indexOf(w) < 0) all.push(w);
+      });
+    });
+    _pronounWords(was).forEach(function (w) {
+      if (all.indexOf(w) < 0) all.push(w);
+    });
+    return all.filter(function (w) {
+      return keep.indexOf(w) < 0;
+    });
+  }
+  function _pronounCheckFor(student, f) {
+    return pronounCheck(getStudentTermRating(_activeCourse, student.id, getTermId()) || {}, f);
+  }
+  /* Whether a row says "Pronouns changed": a sentence the teacher typed or
+     edited that still holds an old pronoun word and was not kept as it is. */
+  function pronounNote(row, check) {
+    if (!row || !row.edited || row.classLine || row.placeholder || !check || !check.gone.length) return false;
+    return check.ok.indexOf(row.text) < 0 && _holdsWord(row.text, check.gone);
+  }
+  /* The line in the comment card once the change took the approval away. */
+  function _pronounNoticeHtml(rating, f) {
+    var meta = (rating && rating.draftMeta) || null;
+    if (!meta || !meta.approved_at || rating.approvedAt || !pronounCheck(rating, f).gone.length) return '';
+    return '<div class="qn-hint qn-pron-notice" id="tq-pron-notice" role="status">Pronouns changed since this comment was approved. Check the marked sentences, then approve again.</div>';
+  }
+  /* Dismiss on a row's note: the sentence stays as written, unmarked. */
+  function _pronounOk(st, unit) {
+    var termId = getTermId();
+    var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
+    var meta = rating.draftMeta;
+    if (!meta) return;
+    var ok = (Array.isArray(meta.pronoun_ok) ? meta.pronoun_ok : []).slice();
+    unit.forEach(function (r) {
+      if (ok.indexOf(r.text) < 0) ok.push(r.text);
+    });
+    upsertTermRating(_activeCourse, st.id, termId, { draftMeta: Object.assign({}, meta, { pronoun_ok: ok }) });
   }
 
   /* The comment from the rows, in their order, through the realiser (plan
@@ -3598,9 +4005,16 @@ window.ReportQuestionnaire = (function () {
       })
       .join('');
     var source = _unitSource(unit, cid, student, f, ctx) + (added ? ' · added just now' : '');
+    var pron = _pronounCheckFor(student, f);
     return `<div class="qn-req-row qn-srow${tint}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
       ${handle}<div class="qn-req-part"><span class="qn-req-label">${esc(rowLabel(row, path))}</span></div>
-      <div class="qn-req-body"><span class="qn-req-text">${esc(text)}</span><span class="qn-req-source">${esc(source)}</span>${thin}${ownBox}</div>
+      <div class="qn-req-body"><span class="qn-req-text">${esc(text)}</span><span class="qn-req-source">${esc(source)}</span>${
+        unit.some(function (r) {
+          return pronounNote(r, pron);
+        })
+          ? `<span class="qn-pron-note" title="The student’s pronouns changed after you wrote this sentence. Check its pronouns.">Pronouns changed · <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="pronounOk" data-row="${i}" title="Keeps this sentence as written and takes this note away.">Dismiss</button></span>`
+          : ''
+      }${thin}${ownBox}</div>
       ${act}
       ${low ? _checkHtml(student.id, 'low') : ''}
       ${open ? (typed ? _optionsMenuHtml(i) : _wordingMenuHtml(cid, student, ctx, rows, i)) : ''}
@@ -4831,6 +5245,16 @@ window.ReportQuestionnaire = (function () {
     var key = _rowKey(st);
     var i = Number(ds.row);
     switch (what) {
+      case 'pronounOk': {
+        tqSaveCurrentIfNeeded();
+        var unitAt = _units(_rows[key] || []).find(function (u) {
+          return u[0] === (_rows[key] || [])[i];
+        });
+        if (!unitAt) return;
+        _pronounOk(st, unitAt);
+        _syncRequired();
+        return;
+      }
       case 'wording':
       case 'options': {
         var open = !!_wording && _wording.index === i;
@@ -6173,6 +6597,8 @@ window.ReportQuestionnaire = (function () {
     var student = students[tqStudentIndex];
     _enterScreen(cid, student);
     var f = _facts(student, true);
+    // The pronouns may have changed (Edit Student) since the rows were drawn.
+    _syncPronouns(cid, student, f);
     // Marks may have changed since the page was last drawn.
     _strength = null;
     _staleCache = {};
@@ -6272,7 +6698,8 @@ window.ReportQuestionnaire = (function () {
     }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      tqApproveNext();
+      // An earlier report's tab is read only: ⌘ Return does nothing there.
+      if (_commentTab === 'this') tqApproveNext();
       return;
     }
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
@@ -6307,6 +6734,8 @@ window.ReportQuestionnaire = (function () {
     tqCloseInfo: tqCloseInfo,
     tqEditStudent: tqEditStudent,
     tqSetAttendance: tqSetAttendance,
+    noMarkedWork: noMarkedWork,
+    attendanceValue: attendanceValue,
     tqAddReportNote: tqAddReportNote,
     tqSelectStudent: tqSelectStudent,
     tqSetBasis: tqSetBasis,
@@ -6354,6 +6783,13 @@ window.ReportQuestionnaire = (function () {
     gapPart: _gapPart,
     recoverRows: recoverRows,
     composeRows: composeRows,
+    pronounsChanged: pronounsChanged,
+    pronounSet: pronounSet,
+    writtenWith: writtenWith,
+    pronounNote: pronounNote,
+    pronounCheck: pronounCheck,
+    pronounWordsNotIn: pronounWordsNotIn,
+    pronounChanges: pronounChanges,
     units: _units,
     moveRow: moveRow,
     dropRow: dropRow,

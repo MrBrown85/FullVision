@@ -11806,8 +11806,10 @@ function upsertTermRating(cid, sid, termId, data) {
    has them, so no teacher subtracts (Colin, 2026-10-24). */
 function _attendanceCount(v) {
   if (v === '' || v == null) return null;
-  var n = Math.floor(Number(v));
-  return isFinite(n) && n >= 0 ? n : null;
+  // A whole number from 0 to 200 only: a decimal is never rounded, and a
+  // number no class could have (99999999, 1e+21) is never kept or printed.
+  var n = typeof v === 'number' ? v : /^\s*\d+\s*$/.test(String(v)) ? Number(v) : NaN;
+  return Number.isInteger(n) && n >= 0 && n <= 200 ? n : null;
 }
 
 /* Saves one report's totals to date; null (or '') clears a number. */

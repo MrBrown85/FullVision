@@ -4543,6 +4543,18 @@ window.CommentBank = (function () {
       prov.push(provenance(pick.s, ctx));
       got[key] = true;
     });
+    // The family sentence belongs to the Next Step sentence: without one
+    // (no marks to draw a next step from) it is left out, never a lone
+    // line. One the teacher kept stays. (A context built by hand, without
+    // facts, runs its steps as given.)
+    if (ctx._f && !got.nextStep) {
+      for (var h = sentences.length - 1; h >= 0; h--) {
+        if (sentences[h].step !== 'home' || sentences[h].kept) continue;
+        sentences.splice(h, 1);
+        prov.splice(h, 1);
+        out.splice(h, 1);
+      }
+    }
     // Never more than nine sentences (plan: six to nine): the family
     // sentence goes first, then attendance (the plan's optional last part),
     // then the strengths. A sentence the teacher kept and the class's
@@ -4976,22 +4988,10 @@ window.CommentBank = (function () {
 
   /* ── Near-identical comments ───────────────────────────────────────── */
 
-  /* A comment's sentences: split after . ! ? or … (and a closing quote)
-     where the next sentence starts. No lookbehind (Safari before 16.4). */
+  /* A comment's sentences, as the realiser splits them (a title such as
+     Ms., e.g. or an initial never ends one). */
   function _sentencesOf(text) {
-    var t = String(text || '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    var out = [];
-    var re = /[.!?…]+["”]?\s+(?=["“]?[A-Z0-9])/g;
-    var from = 0;
-    var m;
-    while ((m = re.exec(t))) {
-      out.push(t.slice(from, m.index + m[0].length).trim());
-      from = m.index + m[0].length;
-    }
-    if (from < t.length) out.push(t.slice(from).trim());
-    return out.filter(Boolean);
+    return R.sentences(text);
   }
 
   /* A sentence's runs of four words, as a set: lower case, punctuation
@@ -5969,6 +5969,15 @@ window.CommentBank = (function () {
       marks: marksOf(f),
       approved_at: opts.approvedAt || null,
     };
+    // The pronouns the comment was written with, so a later change to the
+    // student's pronouns is found when the comment is next opened.
+    var p = f && f.pronouns;
+    if (p && p.subj) {
+      out.pronouns = {};
+      ['subj', 'obj', 'poss', 'refl', 'verb', 'capSubj'].forEach(function (k) {
+        if (p[k] != null) out.pronouns[k] = p[k];
+      });
+    }
     var prev = opts.prev || {};
     var seen = {};
     Object.keys(prev.class_seen || {}).forEach(function (k) {
