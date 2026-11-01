@@ -171,7 +171,6 @@
       });
       await Promise.race([retryActiveCourseLoad(), timeout]);
       if (courseLoadFailed(getActiveCourse())) throw new Error('could not reach the server');
-      MC.showToast('Synced just now');
     } catch (e) {
       console.warn('Pull-to-refresh error:', e);
       var msg = e.message === 'timeout' ? 'Sync timed out' : 'Refresh failed — ' + (e.message || 'unknown error');
@@ -407,6 +406,8 @@
     if (tab === 'students' && MStudents.initCardStack) {
       MStudents.initCardStack(_cid);
     }
+    // The sync light is drawn fresh with each render; show the current state.
+    if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
   }
 
   /* ── Push/pop screens ───────────────────────────────────────── */

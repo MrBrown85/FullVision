@@ -27,6 +27,8 @@ window.MStudents = (function () {
   function _syncViewVisibility(showCards) {
     var container = document.getElementById('m-student-card-stack');
     var list = document.getElementById('m-student-list');
+    var search = document.getElementById('m-student-search-wrap');
+    if (search) search.style.display = _viewMode === 'cards' ? 'none' : '';
     if (container) {
       container.style.display = showCards ? '' : 'none';
       // Cards view sizes the stack to the screen (see .m-cards-mode).
@@ -161,6 +163,10 @@ window.MStudents = (function () {
       destroyCardStack();
       _syncViewVisibility(false);
     } else {
+      // Cards view has no search, so a leftover search is cleared.
+      var input = document.querySelector('[data-action="m-student-search"]');
+      if (input) input.value = '';
+      _showNoMatch('');
       _syncViewVisibility(true);
       initCardStack(_activeCid);
     }
