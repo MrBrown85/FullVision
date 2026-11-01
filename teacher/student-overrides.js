@@ -19,7 +19,6 @@ window.StudentOverrides = (function () {
     }
     var override = getSectionOverride(activeCourse, studentId, secId);
     var rawProf = getSectionProficiencyRaw(activeCourse, studentId, secId);
-    var rawRounded = Math.round(rawProf);
     setSelectedLevel(override ? override.level : 0);
 
     var html =
@@ -30,9 +29,7 @@ window.StudentOverrides = (function () {
       '">&times;</button>' +
       '</div>' +
       '<div class="override-calculated">Calculated: <strong>' +
-      (rawProf > 0 ? rawProf.toFixed(1) : '—') +
-      ' ' +
-      (rawProf > 0 ? PROF_LABELS[rawRounded] : '') +
+      esc([formatLevel(activeCourse, rawProf), levelWord(activeCourse, rawProf)].filter(Boolean).join(' ')) +
       '</strong></div>' +
       '<div class="override-levels">' +
       // In the class's Rubric Levels order.

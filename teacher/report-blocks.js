@@ -275,7 +275,7 @@ window.ReportBlocks = (function () {
     const _rptGrouped = getGroupedSections(cid);
     const _renderChip = (name, prof, color) => {
       const sr = Math.round(prof);
-      const slabel = prof > 0 ? PROF_LABELS[sr] : 'No Evidence';
+      const slabel = prof > 0 ? esc(levelText(cid, prof)) : 'No Evidence';
       const scolor = PROF_COLORS[sr] || PROF_COLORS[0];
       return `<div class="report-section-chip">
       <div class="report-section-chip-name" style="color:${cssColor(color)}">${esc(name)}</div>
@@ -510,21 +510,21 @@ window.ReportBlocks = (function () {
       <div class="report-outcome-section-header" style="display:flex;align-items:center;justify-content:space-between">
         <span>${esc(sec.shortName || sec.name)}</span>`;
       if (secProf > 0) {
-        html += `<span data-prof="${sr}" style="font-size:0.68rem;font-weight:600;color:${PROF_COLORS[sr]}">${PROF_LABELS[sr]}</span>`;
+        html += `<span data-prof="${sr}" style="font-size:0.68rem;font-weight:600;color:${PROF_COLORS[sr]}">${esc(levelText(cid, secProf))}</span>`;
       }
       html += `</div>`;
       if (secOverride) {
         // The level the scores give now, worked out here rather than taken
         // from the server.
         const calculated = getSectionProficiencyRaw(cid, student.id, sec.id);
-        html += `<div style="font-size:0.62rem;color:var(--text-3);font-style:italic;margin:2px 0 6px;padding-left:2px">Teacher override (calculated: ${esc(formatLevel(cid, calculated))} ${PROF_LABELS[Math.round(calculated)] || ''}): ${esc(secOverride.reason)}</div>`;
+        html += `<div style="font-size:0.62rem;color:var(--text-3);font-style:italic;margin:2px 0 6px;padding-left:2px">Teacher override (calculated: ${esc([formatLevel(cid, calculated), levelWord(cid, calculated)].filter(Boolean).join(' '))}): ${esc(secOverride.reason)}</div>`;
       }
       sec.tags.forEach(tag => {
         const prof = getTagProficiency(cid, student.id, tag.id);
         const r = Math.round(prof);
         const color = PROF_COLORS[r] || PROF_COLORS[0];
         const tint = PROF_TINT[r] || PROF_TINT[0];
-        const label = prof > 0 ? PROF_LABELS[r] : 'Not yet assessed';
+        const label = prof > 0 ? esc(levelText(cid, prof)) : 'Not yet assessed';
         const barPct = levelBarPercent(cid, prof);
         // Gather per-tag assessment evidence. getTagScores turns points into
         // a level (18/20 is Extending, not level 18) and leaves out excused work.
@@ -1219,7 +1219,7 @@ window.ReportBlocks = (function () {
     sections.forEach((sec, si) => {
       const secProf = getSectionProficiency(cid, student.id, sec.id);
       const sr = Math.round(secProf);
-      const secLabel = secProf > 0 ? PROF_LABELS[sr] : 'No Evidence';
+      const secLabel = secProf > 0 ? esc(levelText(cid, secProf)) : 'No Evidence';
 
       // Tag-level breakdown
       const tagData = sec.tags.map(tag => {
@@ -1755,7 +1755,7 @@ window.ReportBlocks = (function () {
         const r = Math.round(avg);
         const pct = levelBarPercent(cid, avg);
         const color = avg > 0 ? PROF_COLORS[r] || 'var(--text-3)' : 'var(--border)';
-        const profLabel = d.count === 0 ? 'Not yet assessed' : avg > 0 ? PROF_LABELS[r] : 'Not yet assessed';
+        const profLabel = d.count === 0 ? 'Not yet assessed' : avg > 0 ? esc(levelText(cid, avg)) : 'Not yet assessed';
         const labelColor = avg > 0 ? color : 'var(--text-3)';
         html += `<div style="margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:2px">

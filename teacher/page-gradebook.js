@@ -1728,7 +1728,7 @@ window.PageGradebook = (function () {
     var r = grade ? grade.level : Math.round(val);
     var color = PROF_COLORS[r] || PROF_COLORS[0];
     var label = levelWord(cid, val);
-    var num = grade ? grade.text || '—' : val > 0 ? val.toFixed(1) : '—';
+    var num = grade ? grade.text || '—' : levelFigure(val);
     var tint = PROF_TINT[r] || '';
     var bg = tint ? 'background:linear-gradient(' + tint + ',' + tint + '),var(--bg)' : '';
     return (
@@ -1820,7 +1820,7 @@ window.PageGradebook = (function () {
         '</span><span class="gb-tip-val" style="color:' +
         (r ? PROF_COLORS[r] : 'var(--text-3)') +
         '">' +
-        PROF_LABELS[r] +
+        esc(r ? levelText(cid, sp) : PROF_LABELS[0]) +
         (r && n ? ' <span class="gb-tip-count">(' + n + ')</span>' : '') +
         '</span></div>';
     });

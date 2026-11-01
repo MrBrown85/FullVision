@@ -430,7 +430,10 @@ describe('the report and the gradebook read the reporting basis (calc.js)', () =
     let html = ReportBlocks.renderBlockAcademicSummary(CID, student(), { termId: TERM });
     expect(html).toContain('>IE<');
     expect(html).toContain('Insufficient Evidence');
-    expect(html).not.toContain('75%');
+    // The overall grade prints IE, not the course %. Competencies still
+    // print their own % in a Letter class (Colin, 2026-11-01).
+    const overall = html.slice(html.indexOf('report-overall-main'), html.indexOf('report-overall-sections'));
+    expect(overall).not.toContain('75%');
     rate({ reportingBasis: 'iep_goals' });
     html = ReportBlocks.renderBlockAcademicSummary(CID, student(), { termId: TERM });
     expect(html).toContain('No Letter Grade');
