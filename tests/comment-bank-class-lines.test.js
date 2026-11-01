@@ -179,16 +179,33 @@ describe('the draft', () => {
   });
 
   it('uses the student’s own pick, or leaves the sentence out for that student only', () => {
+    // Line a fits Noor's next step (Significance); line b fits nothing of hers.
     const support = [
-      line('a', 'In class, I will give a short checklist for each assignment.'),
-      line('b', 'In class, I will check in about missing work each week.'),
+      line('a', 'In class, I will give feedback on source work each week.', ['significance']),
+      line('b', 'In class, I will check in about missing work each week.', ['completes']),
     ];
     const base = { support, pick: null, closing: '', late: '' };
     expect(stepText(draftOf(facts({ classLines: base })), 'support')).toBe(support[0].text);
     expect(stepText(draftOf(facts({ classLines: { ...base, pick: 'b' } })), 'support')).toBe(support[1].text);
     expect(stepText(draftOf(facts({ classLines: { ...base, pick: 'none' } })), 'support')).toBeUndefined();
-    // A pick no longer ticked falls back to the class's lines.
+    // A pick no longer ticked falls back to the class's line that fits.
     expect(stepText(draftOf(facts({ classLines: { ...base, pick: 'gone' } })), 'support')).toBe(support[0].text);
+  });
+
+  it('leaves the support sentence out when no ticked line fits the student, never the first ticked line', () => {
+    const support = [
+      line('a', 'In class, I will give a short checklist for each assignment.', ['ready']),
+      line('b', 'In class, I will check in about missing work each week.', ['completes']),
+    ];
+    const f = facts({ classLines: { support, pick: null, closing: '', late: '' } });
+    expect(CommentBank.supportChoice(f, {})).toBeNull();
+    expect(stepText(draftOf(f), 'support')).toBeUndefined();
+    expect(CommentBank.context(f, {}).supportLine).toBe('');
+    // A line with no `fits` at all fits no one.
+    const bare = facts({
+      classLines: { support: [line('c', 'In class, I will say hello.')], pick: null, closing: '', late: '' },
+    });
+    expect(CommentBank.supportChoice(bare, {})).toBeNull();
   });
 
   it('picks a line that fits a habit rated Sometimes or Rarely when none fits the next step', () => {

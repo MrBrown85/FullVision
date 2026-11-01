@@ -1525,6 +1525,32 @@ window.CommentBank = (function () {
     return sk ? { comp: c, key: sk.key, name: sk.name, skill: sk.skill } : null;
   }
 
+  /* The strengths (plan, target comment part 3): the competencies past the
+     "strongest" gate (strongestOf), each as its skill in plain words from
+     the table, [{ comp, key, skill }]. A competency the table has no skill
+     for is left out; the comment never prints a bare competency label. */
+  function strengthSkills(f) {
+    return strongestOf(f.comps)
+      .map(function (c) {
+        var sk = skillOf(f.family, c.name);
+        return sk ? { comp: c, key: sk.key, skill: sk.skill } : null;
+      })
+      .filter(Boolean);
+  }
+  /* The strengths as the sentences print them: "{strengths}" = one or two
+     skills ("A and B"), "{strength}" = the first alone. '' with none. */
+  function strengthsText(f) {
+    return list(
+      strengthSkills(f).map(function (x) {
+        return x.skill;
+      }),
+    );
+  }
+  function strengthText(f) {
+    var xs = strengthSkills(f);
+    return xs.length ? xs[0].skill : '';
+  }
+
   /* What a support line fits for this student: the next step's skill when
      the line names it, else a habit rated Sometimes or Rarely that it
      names; null when neither. */
@@ -1555,9 +1581,9 @@ window.CommentBank = (function () {
   }
 
   /* The support line in this student's comment: their own pick for this
-     report, else the class's ticked line that fits them (supportFit), else
-     the first ticked line. null when none is ticked or the teacher left the
-     sentence out for this student. { line, fit, mine }. */
+     report, else the class's ticked line that fits them (supportFit). null
+     when none is ticked, none fits, or the teacher left the sentence out
+     for this student. { line, fit, mine }. */
   function supportChoice(f, habits) {
     var cl = (f && f.classLines) || {};
     var lines = cl.support || [];
@@ -1580,8 +1606,10 @@ window.CommentBank = (function () {
     var bySkill = fitted.find(function (x) {
       return next && x.fit === next.key;
     });
-    var pick = bySkill || fitted[0] || { line: lines[0], fit: null };
-    return { line: pick.line, fit: pick.fit, mine: false };
+    // No ticked line fits this student: the sentence is left out (the
+    // Support row shows "Choose…"), never the first ticked line.
+    var pick = bySkill || fitted[0] || null;
+    return pick ? { line: pick.line, fit: pick.fit, mine: false } : null;
   }
 
   /* The claims a gate decides, and whether a sentence passes them for this
@@ -1650,6 +1678,8 @@ window.CommentBank = (function () {
       })
       .slice(0, 2);
     var strongest = strongestOf(f.comps);
+    // The strengths as skills (plan part 3), never the bare labels.
+    var strongSkills = strengthSkills(f);
     var fallen = drops.length
       ? drops.slice().sort(function (a, b) {
           return tenths(a.start) - tenths(a.now) - (tenths(b.start) - tenths(b.now));
@@ -1747,7 +1777,13 @@ window.CommentBank = (function () {
       standing: ['overall'],
       letterStanding: ['letter'],
       evidence: ['overall', 'work'],
-      strengths: keys('comp', strongest),
+      strengths: keys(
+        'comp',
+        strongSkills.map(function (x) {
+          return x.comp;
+        }),
+      ),
+      strength: keys('comp', [strongSkills[0] && strongSkills[0].comp]),
       growthAreas: keys('comp', lowest),
       even: keys('comp', withLevels),
       rise: keys('comp', [rises[0]]),
@@ -1853,11 +1889,10 @@ window.CommentBank = (function () {
       markedMine: ieProblemOf(f) === 'marks' ? numberIn(f.grade.marked.mine) : '',
       markedClass: /^(marks|noMarks)$/.test(ieProblemOf(f)) ? numberIn(f.grade.marked.all) : '',
       ieDeadline: reportPath(f) === 'ie' ? deadlineText(f.grade.ieDeadline) : '',
-      strengths: list(
-        strongest.map(function (c) {
-          return c.name;
-        }),
-      ),
+      // One or two skills in plain words from the table, as the next step
+      // is: "{He} can {strengths}." Never a bare competency label.
+      strengths: strengthsText(f),
+      strength: strengthText(f),
       growthAreas: list(
         lowest.map(function (c) {
           return c.name;
@@ -2235,27 +2270,27 @@ window.CommentBank = (function () {
     return h || 1;
   }
 
-  /* The draft's steps: the grade sentence (gradeOf; none for IE, F or no
-     marks), an opening, the habits (one summary sentence, then attendance
-     when entered), where the student is now (overall, one example, growth),
-     the next step (and the student's own goal), and how they will get
-     there (home or class, then a closer). Each step takes at most one
-     sentence. A step that `says` a fact (the grade) keeps every later
-     sentence claiming it out. The angle (angle()) sets which steps run and
-     in what order; this is the order with no story to tell. */
+  /* The draft's steps, the plan's eight parts and nothing else: the grade
+     sentence (gradeOf; none for IE, F or no marks), the habits (one summary
+     sentence, then attendance when entered, then the work not handed in
+     and the late-work line), the best piece, the strengths (overall), the
+     next step with the support line and one thing the family can do, and
+     the closing sentence. Each step takes at most one sentence. A step that
+     `says` a fact (the grade) keeps every later sentence claiming it out.
+     The angle (angle()) sets which steps run and in what order; this is
+     the order with no story to tell. */
   var DRAFT_STEPS = [
     { key: 'grade', part: 'now', groups: ['Grade'], says: 'grade' },
-    { key: 'opening', part: 'now', groups: ['Openings'] },
     { key: 'habits', part: 'habits', groups: ['Work Habits'] },
     { key: 'attendance', part: 'habits', groups: ['Attendance'] },
     // The work labelled Missing, then the class's late-work line after it
     // (plan PR 8): only for a student with work not handed in.
     { key: 'notHandedIn', part: 'habits', groups: ['Not Handed In'], says: 'notHandedIn' },
     { key: 'lateWork', part: 'habits', line: 'lateLine', after: 'notHandedIn' },
+    // The strengths (plan part 3): one or two skills from the table.
     { key: 'overall', part: 'now', groups: ['Overall'] },
     // The best piece (plan part 2): the one sentence of Examples From Work.
     { key: 'example', part: 'now', groups: ['Examples From Work'] },
-    { key: 'growth', part: 'now', groups: ['Growth This Term'] },
     // One skill from the table when there is one (`prefer`); never a
     // sentence that names a bare competency label (`never`).
     {
@@ -2265,7 +2300,6 @@ window.CommentBank = (function () {
       prefer: 'nextSkill',
       never: ['focus', 'focusLow', 'growthAreas', 'rise', 'fall'],
     },
-    { key: 'goWords', part: 'go', groups: ["In the Student's Words"] },
     // The teacher's support line for this student, one thing the family can
     // do at home, and the class's closing sentence (plan PR 8). Teacher
     // lines (`line`) are used exactly as typed and are left out when empty.
@@ -2285,14 +2319,7 @@ window.CommentBank = (function () {
   var SAYS = { grade: true, notHandedIn: true };
 
   /* Facts a draft states once, by topic. */
-  var NO_REPEAT = {
-    rise: 'rise',
-    fall: 'fall',
-    fellCount: 'fell',
-    nextStep: 'nextStep',
-    goal: 'goal',
-    plan: 'plan',
-  };
+  var NO_REPEAT = { nextStep: 'nextStep' };
 
   /* The data slots a sentence names, in its own order: every {slot} but the
      pronouns, then any it needs without printing ("even"). */
@@ -2387,7 +2414,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.scored < THIN;
       },
-      order: ['opening', 'habits', 'attendance', 'example', 'nextStep', 'home', 'closer'],
+      order: ['habits', 'attendance', 'example', 'nextStep', 'home', 'closer'],
     },
     {
       // Joined the class two weeks or more after it began, during this
@@ -2397,7 +2424,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.joinedLate;
       },
-      order: ['opening', 'habits', 'attendance', 'example', 'overall', 'nextStep', 'home', 'closer'],
+      order: ['habits', 'attendance', 'example', 'overall', 'nextStep', 'home', 'closer'],
     },
     {
       // Strong handed-in work behind a grade pulled down by work labelled
@@ -2411,23 +2438,23 @@ window.CommentBank = (function () {
     },
     {
       // The marks climbed over the term, past the "improved" gate
-      // (climbed()): the growth leads.
+      // (climbed()): the best piece leads, then the strengths.
       id: 'climb',
       tier: 4,
       when: function (a) {
         return a.climb;
       },
-      order: ['growth', 'example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
+      order: ['example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
     },
     {
       // The marks slid over the term, by the same trend (slid()): the best
-      // piece first, then the slide.
+      // piece first, then the habits before the strengths.
       id: 'slide',
       tier: 4,
       when: function (a) {
         return a.slide;
       },
-      order: ['example', 'growth', 'overall', 'habits', 'attendance', 'nextStep', 'goWords', 'home', 'closer'],
+      order: ['example', 'habits', 'attendance', 'overall', 'nextStep', 'home', 'closer'],
     },
     {
       // Strong in one skill (past the "strongest" gate), weak in another a
@@ -2438,7 +2465,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.split;
       },
-      order: ['overall', 'example', 'habits', 'attendance', 'nextStep', 'goWords', 'home', 'closer'],
+      order: ['overall', 'example', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
     },
     {
       // Good marks, with two or more habits rated Sometimes or Rarely: the
@@ -2458,7 +2485,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.high && !a.missing && !a.slide;
       },
-      order: ['example', 'overall', 'habits', 'attendance', 'nextStep', 'goWords', 'home', 'closer'],
+      order: ['example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
     },
     {
       // A C or C- (or below Proficient): what is working leads.
@@ -2467,7 +2494,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.low;
       },
-      order: ['example', 'habits', 'attendance', 'overall', 'nextStep', 'goWords', 'home', 'closer'],
+      order: ['example', 'habits', 'attendance', 'overall', 'nextStep', 'home', 'closer'],
     },
     {
       // No story stands out: the steps in their usual order.
@@ -2644,10 +2671,10 @@ window.CommentBank = (function () {
     };
     if (!ie) {
       var h = at(HABIT_KEYS);
-      put('notHandedIn', h >= 0 ? h + 1 : Math.max(0, at(['nextStep', 'goWords', 'home', 'closer'])));
+      put('notHandedIn', h >= 0 ? h + 1 : Math.max(0, at(['nextStep', 'home', 'closer'])));
       put('lateWork', seq.indexOf('notHandedIn') + 1);
       var home = seq.indexOf('home');
-      var go = at(['nextStep', 'goWords']);
+      var go = at(['nextStep']);
       var close = seq.indexOf('closer');
       put('support', home >= 0 ? home : go >= 0 ? go + 1 : close >= 0 ? close : seq.length);
     }
@@ -2822,9 +2849,11 @@ window.CommentBank = (function () {
       });
       if (byKey[k].says) said[byKey[k].says] = true;
     });
-    // The Not Handed In sentence states the work not handed in, so no
-    // earlier habit sentence says it as well.
+    // The Not Handed In sentence states the work not handed in, and the
+    // grade sentence the grade, so no other sentence says either, wherever
+    // the teacher's order puts them.
     if (seq.indexOf('notHandedIn') >= 0 && ctx.missingWork) said.notHandedIn = true;
+    if (seq.indexOf('grade') >= 0 && ctx._grade) said.grade = true;
     seq.forEach(function (key) {
       var step = byKey[key];
       // A class line: the teacher's text, as typed (plan PR 8).
@@ -2964,6 +2993,19 @@ window.CommentBank = (function () {
       prov.push(provenance(pick.s, ctx));
       got[key] = true;
     });
+    // Never more than nine sentences (plan: six to nine): the family
+    // sentence goes first, then attendance (the plan's optional last part),
+    // then the strengths. A sentence the teacher kept and the class's
+    // lines stay.
+    DROP_FIRST.forEach(function (key) {
+      if (sentences.length <= MAX_SENTENCES) return;
+      for (var i = sentences.length - 1; i >= 0 && sentences.length > MAX_SENTENCES; i--) {
+        if (sentences[i].step !== key || sentences[i].kept || sentences[i].classLine) continue;
+        sentences.splice(i, 1);
+        prov.splice(i, 1);
+        out.splice(i, 1);
+      }
+    });
     return {
       text: out.join(' '),
       ids: sentences.map(function (x) {
@@ -2995,12 +3037,20 @@ window.CommentBank = (function () {
      sentences, from that report's draft_meta: approvedIds()); bank;
      quiet: a draft for a check, not counted in the class's usage }.
 
-     Returns { text, ids, sentences, provenance, replaced, angle, seed }:
-     each sentence { id, part, step, text, kept? } in order, where each came
-     from (provenance()), what verify() replaced, the story told (never
-     shown) and the seed used. A context built by hand, without facts, gets
+     Returns { text, ids, sentences, provenance, replaced, angle, seed,
+     short }: each sentence { id, part, step, text, kept? } in order, where
+     each came from (provenance()), what verify() replaced, the story told
+     (never shown), the seed used, and whether fewer than six sentences
+     were true for this student. A context built by hand, without facts, gets
      the steps in DRAFT_STEPS order and no verify. */
   var RETRIES = 8;
+  /* Six to nine sentences (plan): a draft is never longer than nine
+     (_compose drops the family sentence, then attendance, then the
+     strengths); one with fewer than six says only what is true and carries
+     `short: true` for the screen to show. Nothing is ever padded. */
+  var MAX_SENTENCES = 9;
+  var MIN_SENTENCES = 6;
+  var DROP_FIRST = ['home', 'attendance', 'overall'];
   function draft(ctx, opts) {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
@@ -3051,6 +3101,7 @@ window.CommentBank = (function () {
     }
     d.angle = story ? story.id : null;
     d.seed = seed;
+    d.short = d.sentences.length < MIN_SENTENCES;
     return d;
   }
 
@@ -3570,16 +3621,29 @@ window.CommentBank = (function () {
     // The strongest competencies, or the one the student feels strongest in
     // when the sentence says the work agrees: each past the "strongest"
     // gate (strongestOf).
+    // A strengths slot must also be the skill wording from the table for
+    // those competencies (strengthsText), never a bare competency label.
     strength: function (pv, f) {
-      var ids = _ids(pv, 'strengths', 'comp').concat(_ids(pv, 'selfStrong', 'confidence'));
+      var v = pv.values || {};
+      var ids = _ids(pv, 'strengths', 'comp')
+        .concat(_ids(pv, 'strength', 'comp'))
+        .concat(_ids(pv, 'selfStrong', 'confidence'));
       var gated = strongestOf(f.comps).map(function (c) {
         return String(c.id);
       });
+      var labels = (f.comps || []).map(function (c) {
+        return String(c.name || '');
+      });
+      var wording = function (k, want) {
+        return !_has(pv, k) || (!!v[k] && v[k] === want && labels.indexOf(v[k]) < 0);
+      };
       return (
         ids.length > 0 &&
         ids.every(function (id) {
           return gated.indexOf(String(id)) >= 0;
-        })
+        }) &&
+        wording('strengths', strengthsText(f)) &&
+        wording('strength', strengthText(f))
       );
     },
     // Competencies to build: each below the highest now.
@@ -4341,6 +4405,10 @@ window.CommentBank = (function () {
     trendOf: trendOf,
     improvedGate: improvedGate,
     improvedComp: improvedComp,
+    strengthSkills: strengthSkills,
+    strengthsText: strengthsText,
+    MAX_SENTENCES: MAX_SENTENCES,
+    MIN_SENTENCES: MIN_SENTENCES,
     climbed: climbed,
     slid: slid,
     strongestOf: strongestOf,

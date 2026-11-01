@@ -279,9 +279,11 @@ describe('the comment engine', () => {
 
   it('puts the best-piece sentence with the note in the draft', () => {
     const ctx = CommentBank.context(f(work('linked the poster to the Act'), 'he/him'), {});
+    // No grade sentence here (no marks), so the best piece leads and
+    // names him.
     for (let seed = 1; seed < 20; seed++) {
       expect(CommentBank.draft(ctx, { seed }).text).toContain(
-        'His best piece was “What Does the Poster Show?”, where he linked the poster to the Act.',
+        'Gabriel’s best piece was “What Does the Poster Show?”, where he linked the poster to the Act.',
       );
     }
   });

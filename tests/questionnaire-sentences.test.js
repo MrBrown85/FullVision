@@ -317,8 +317,13 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(src(example)).toMatch(/ · (Emerging|Developing|Proficient|Extending)/);
     const home = rows.find(r => r.step === 'home');
     expect(src(home)).toBe('A general sentence. It states no fact about Cece.');
-    const overall = rows.find(r => r.step === 'overall');
-    expect(src(overall)).toBe('All six competencies at Proficient');
+    // Cece has no competency past the "strongest" gate, so no strengths
+    // row; one by hand names the competency behind it.
+    expect(rows.some(r => r.step === 'overall')).toBe(false);
+    const c = f.comps[0];
+    expect(src({ step: 'overall', edited: false, prov: { factKeys: ['comp:' + c.id] } })).toBe(
+      c.name + ' · ' + f.levelText(c.level),
+    );
     expect(src(Object.assign({}, rows[0], { edited: true }))).toBe('Edited by you · kept when you regenerate');
     expect(src({ step: null, edited: false, prov: null })).toBe('A general sentence. It states no fact about Cece.');
   });
