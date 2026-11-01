@@ -5103,6 +5103,29 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 12px;
   color: var(--text-2);
 }
+/* A thin part of the bank, under the row's source line (plan PR 13). */
+.qn-req-thin {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--score-2-text);
+}
+.qn-thin-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+}
+.qn-thin-link:hover {
+  text-decoration: underline;
+}
+.qn-thin-link:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 .qn-req-ctrl {
   flex: none;
   display: flex;

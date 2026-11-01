@@ -251,11 +251,10 @@ describe('class warnings', () => {
   it('names the classmate whose comment shares five or more sentences, with Show Both', () => {
     seed();
     upsertTermRating(CID, GAB.id, TERM, { narrative: SIX });
-    // Five of Ava's six sentences are Gabriel's with the names swapped.
+    // Five of Ava's six sentences are Gabriel's with the names swapped; the
+    // grade sentence, which every student gets, never counts (plan PR 13).
     upsertTermRating(CID, AVA.id, TERM, {
-      narrative: SIX.replace(/Gabriel/g, 'Ava')
-        .replace(/\bHis\b/g, 'Her')
-        .replace('Extra help is at lunch on Tuesdays in [Room].', 'See you in January.'),
+      narrative: SIX.replace(/Gabriel/g, 'Ava').replace(/\bHis\b/g, 'Her'),
     });
     const html = open();
     expect(html).toContain(
