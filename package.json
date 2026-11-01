@@ -17,10 +17,13 @@
     "test:e2e:real:headed": "npx playwright test --config=playwright.real.config.js --headed",
     "format": "prettier --write '**/*.{js,css,html,json,md}'",
     "format:check": "prettier --check '**/*.{js,css,html,json,md}'",
-    "format:staged": "bash scripts/format-staged.sh"
+    "format:staged": "bash scripts/format-staged.sh",
+    "audit:html": "node scripts/audit-innerhtml.mjs --check"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
+    "acorn": "^8.16.0",
+    "acorn-walk": "^8.3.5",
     "linkedom": "^0.18.12",
     "prettier": "^3.2.0",
     "vitest": "^1.6.0"
