@@ -167,17 +167,18 @@ describe('failed writes from the new operations keep their own target', () => {
       expect(failed.map(p => p.p_payload.ie_deadline)).toEqual(['2026-11-27']);
     });
 
-    it('a newer narrative that lands takes the narrative out of a failed save, so it never replays last', async () => {
-      const dead = await run(
-        [
-          ['save_term_rating', rating(1, { narrative_html: 'Old.', approved: true })],
-          ['save_term_rating', rating(1, { narrative_html: 'New.' })],
-        ],
-        (n, p) => (p.p_payload.narrative_html === 'Old.' ? REJECT : OK),
-      );
-      expect(dead.map(p => p.p_payload)).toEqual([{ approved: true }]);
-
-      // The next load sends what is left once more: the approval only.
+    const APPROVE_OLD = { narrative_html: 'Old.', approved: true, draft_meta: { facts_hash: 'X' } };
+    const failedEntry = (id, wire) => ({
+      id: id,
+      owner: TEACHER,
+      key: 'enrollment:' + ENR,
+      endpoint: 'save_term_rating',
+      payload: rating(1, wire),
+      attempts: 1,
+      last_error: 'rejected',
+    });
+    /* A page load that sends everything and records each p_payload. */
+    async function reloadAndSend() {
       const sent = [];
       const Q = loadPage();
       Q.configure({
@@ -188,19 +189,58 @@ describe('failed writes from the new operations keep their own target', () => {
       });
       setOnline(true);
       await Q.flush();
-      expect(sent).toEqual([{ approved: true }]);
+      await Q.flush();
+      return sent;
+    }
+
+    it('a newer narrative that lands drops the old narrative and its approval from a failed save', async () => {
+      const sent = [];
+      const dead = await run(
+        [
+          ['save_term_rating', rating(1, APPROVE_OLD)],
+          ['save_term_rating', rating(1, { narrative_html: 'New.' })],
+        ],
+        (n, p) => {
+          if (p.p_payload.narrative_html === 'Old.') return REJECT;
+          sent.push(p.p_payload);
+          return OK;
+        },
+      );
+      expect(sent).toEqual([{ narrative_html: 'New.' }]);
+      expect(dead).toEqual([]);
+      expect(await reloadAndSend()).toEqual([]);
     });
 
-    it('a newer narrative still queued at the next load goes first, and the failed save loses its narrative', async () => {
-      const failed = (id, wire) => ({
-        id: id,
-        owner: TEACHER,
-        key: 'enrollment:' + ENR,
-        endpoint: 'save_term_rating',
-        payload: rating(1, wire),
-        attempts: 1,
-        last_error: 'rejected',
-      });
+    it('a failed save keeps what the newer narrative does not set', async () => {
+      const dead = await run(
+        [
+          ['save_term_rating', rating(1, Object.assign({ habits: { ready: 3 } }, APPROVE_OLD))],
+          ['save_term_rating', rating(1, { narrative_html: 'New.' })],
+        ],
+        (n, p) => (p.p_payload.narrative_html === 'Old.' ? REJECT : OK),
+      );
+      expect(dead.map(p => p.p_payload)).toEqual([{ habits: { ready: 3 } }]);
+    });
+
+    it('a newer narrative that carries its own approval wins', async () => {
+      const approveNew = { narrative_html: 'New.', approved: true, draft_meta: { facts_hash: 'Y' } };
+      const sent = [];
+      const dead = await run(
+        [
+          ['save_term_rating', rating(1, APPROVE_OLD)],
+          ['save_term_rating', rating(1, approveNew)],
+        ],
+        (n, p) => {
+          if (p.p_payload.narrative_html === 'Old.') return REJECT;
+          sent.push(p.p_payload);
+          return OK;
+        },
+      );
+      expect(sent).toEqual([approveNew]);
+      expect(dead).toEqual([]);
+    });
+
+    it('a newer narrative still queued at the next load is sent, and the old approval is not', async () => {
       localStorage.setItem(
         'fv-sync-queue-v1',
         JSON.stringify({
@@ -216,23 +256,40 @@ describe('failed writes from the new operations keep their own target', () => {
           ],
         }),
       );
-      localStorage.setItem(
-        'fv-sync-dead-letter-v1',
-        JSON.stringify([failed('d1', { narrative_html: 'Old.', approved: true })]),
-      );
+      localStorage.setItem('fv-sync-dead-letter-v1', JSON.stringify([failedEntry('d1', APPROVE_OLD)]));
+      const sent = await reloadAndSend();
+      expect(sent).toEqual([{ narrative_html: 'New.' }]);
+      expect(JSON.stringify(sent)).not.toMatch(/Old\.|approved|draft_meta/);
+    });
+
+    it('an approval still queued loses its approval when a newer narrative is queued behind it', async () => {
       const sent = [];
-      const Q = loadPage();
-      Q.configure({
-        send: (n, p) => {
+      await run(
+        [
+          ['save_term_rating', rating(1, APPROVE_OLD)],
+          ['save_term_rating', rating(1, { narrative_html: 'New.' })],
+        ],
+        (n, p) => {
           sent.push(p.p_payload);
           return OK;
         },
-      });
-      setOnline(true);
-      await Q.flush();
-      await Q.flush();
-      expect(sent).toEqual([{ narrative_html: 'New.' }, { approved: true }]);
-      expect(JSON.stringify(sent)).not.toContain('Old.');
+      );
+      expect(sent).toEqual([{ narrative_html: 'Old.' }, { narrative_html: 'New.' }]);
+    });
+
+    it('an approval alone still queued goes as an empty save', async () => {
+      const sent = [];
+      await run(
+        [
+          ['save_term_rating', rating(1, { approved: true, draft_meta: { facts_hash: 'X' } })],
+          ['save_term_rating', rating(1, { narrative_html: 'New.' })],
+        ],
+        (n, p) => {
+          sent.push(p.p_payload);
+          return OK;
+        },
+      );
+      expect(sent).toEqual([{}, { narrative_html: 'New.' }]);
     });
 
     it('on the next load a failed save is retried unless a queued save sets the same fields', () => {

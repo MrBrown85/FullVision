@@ -242,19 +242,59 @@
   function _without(newer, older) {
     var target = _target(newer.endpoint, newer.payload);
     if (!target || _target(older.endpoint, older.payload) !== target) return older;
-    var mine = _fields(newer);
+    var mine = _replacedFields(newer);
     if (!mine) return null;
-    var theirs = _fields(older);
+    return _withoutKeys(older, mine);
+  }
+
+  /* An approval and its draft_meta belong to the narrative they were made
+     with: a newer narrative replaces them too, unless it carries its own. */
+  var NARRATIVE_BOUND = ['approved', 'draft_meta'];
+  function _replacedFields(newer) {
+    var mine = _fields(newer);
+    if (!mine || mine.indexOf('narrative_html') < 0) return mine;
+    return mine.concat(
+      NARRATIVE_BOUND.filter(function (k) {
+        return mine.indexOf(k) < 0;
+      }),
+    );
+  }
+
+  /* A term-rating write without these fields: itself when it sets none of
+     them, null when nothing is left, else a copy. */
+  function _withoutKeys(entry, keys) {
+    var theirs = _fields(entry);
     var left = theirs.filter(function (k) {
-      return mine.indexOf(k) < 0;
+      return keys.indexOf(k) < 0;
     });
     if (!left.length) return null;
-    if (left.length === theirs.length) return older;
+    if (left.length === theirs.length) return entry;
     var wire = {};
     left.forEach(function (k) {
-      wire[k] = older.payload.p_payload[k];
+      wire[k] = entry.payload.p_payload[k];
     });
-    return Object.assign({}, older, { payload: Object.assign({}, older.payload, { p_payload: wire }) });
+    return Object.assign({}, entry, { payload: Object.assign({}, entry.payload, { p_payload: wire }) });
+  }
+
+  /* A new narrative queued for a term rating takes the approval out of the
+     older saves still waiting to go for that row, so the approval made with
+     the old narrative never lands on the new one. A save left with no field
+     still goes, as an empty one, so whoever waits on it hears back. */
+  function _unapproveQueued(entries, entry) {
+    var mine = _fields(entry);
+    if (!mine || mine.indexOf('narrative_html') < 0) return;
+    var target = _target(entry.endpoint, entry.payload);
+    var drop = NARRATIVE_BOUND.filter(function (k) {
+      return mine.indexOf(k) < 0;
+    });
+    if (!target || !drop.length) return;
+    entries.forEach(function (e, i) {
+      if (_isInFlight(e) || _target(e.endpoint, e.payload) !== target) return;
+      var left = _withoutKeys(e, drop);
+      if (left === e) return;
+      if (!left) left = Object.assign({}, e, { payload: Object.assign({}, e.payload, { p_payload: {} }) });
+      entries[i] = left;
+    });
   }
 
   /* The failed writes with what a newer write replaces taken out. */
@@ -705,6 +745,7 @@
       // idempotency key can't carry a new value.
       q.entries[at] = entry;
     } else {
+      _unapproveQueued(q.entries, entry);
       q.entries.push(entry);
     }
     try {
