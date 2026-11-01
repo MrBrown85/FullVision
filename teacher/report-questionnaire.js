@@ -1546,9 +1546,10 @@ window.ReportQuestionnaire = (function () {
       : '';
     var body;
     if (thisTab) {
-      body = `${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" title="The student’s report comment. Type here, or change a sentence in the Sentences card below." data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea><button type="button" class="qn-sel-add" id="tq-sel-add" hidden data-action="tqSentences" data-do="ownFromBox" title="Adds the selected sentence to your bank, for other students it fits.">Add to My Bank</button></div>
+      body = `${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" title="The student’s report comment. Type here, or change a sentence in the Sentences card below." data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea></div>
         <div class="qn-comment-foot" id="tq-comment-foot"${text.trim() ? '' : ' hidden'}>
           ${_countHtml(cid, text)}
+          <button type="button" class="qn-sel-add" id="tq-sel-add" hidden data-action="tqSentences" data-do="ownFromBox" title="Adds the selected sentence to your bank, for other students it fits.">Add to My Bank</button>
           <button type="button" class="qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${COPY_ICON}<span class="qn-copy-label">Copy</span></button>
         </div>`;
     } else {
@@ -3793,11 +3794,11 @@ window.ReportQuestionnaire = (function () {
       return !q || t.toLowerCase().indexOf(q) >= 0;
     };
     // yours: null, or { id, general } for a sentence of the teacher's own:
-    // the Yours chip ("Yours · Any case" when it is bound to no case) and
+    // the Yours chip ("Yours · Any Case" when it is bound to no case) and
     // a × that removes it from their bank, with Undo.
     var row = function (text, meta, ctrl, on, yours) {
       var chip = yours
-        ? `<span class="qn-chip-yours" title="${yours.general ? 'A sentence of your own for this part, with no case: Generate uses it when nothing more specific fits.' : 'A sentence of your own.'}">${yours.general ? 'Yours · Any case' : 'Yours'}</span>`
+        ? `<span class="qn-chip-yours" title="${yours.general ? 'A sentence of your own for this part, with no case: Generate uses it when nothing more specific fits.' : 'A sentence of your own.'}">${yours.general ? 'Yours · Any Case' : 'Yours'}</span>`
         : '';
       var del = yours
         ? `<button type="button" class="qn-browse-del" data-action="tqSentences" data-do="ownDelete" data-sentence="${esc(yours.id)}" aria-label="Delete this sentence from your bank" title="Removes this sentence from your bank. Undo for a few seconds.">×</button>`
@@ -4202,8 +4203,8 @@ window.ReportQuestionnaire = (function () {
      row); "+ Add to My Bank" at the top of Browse Sentences; and "Add to
      My Bank" on a sentence the teacher typed or changed (its row on the
      Sentences card, or the sentence selected in the comment box). A
-     sentence with no row's case takes a "Belongs under" picker: the part,
-     and a case or Any case. The box shows the slotted result in plain
+     sentence with no row's case takes a "Belongs Under" picker: the part,
+     and a case or Any Case. The box shows the slotted result in plain
      words ("Saved as: …") and the lint's advice in orange; only a health
      or designation word or a classmate's name stops the save. */
   var _own = null; // { where: 'browse' | 'top' | 'row', mode: 'write' | 'add', index, text, part, caseId, caseKey }
@@ -4384,7 +4385,7 @@ window.ReportQuestionnaire = (function () {
           return `<option value="${esc(x.key)}"${x.key === o.caseKey ? ' selected' : ''}>${esc(x.label)}</option>`;
         })
         .join('');
-      picker = `<div class="qn-own-under"><span class="qn-own-label">Belongs under</span><select class="qn-own-select" id="tq-own-part" data-tq-own="part" aria-label="The part of the comment this sentence belongs under" title="The part of the comment this sentence belongs under.">${parts}</select><select class="qn-own-select" id="tq-own-case" data-tq-own="case" aria-label="The case this sentence is for" title="When Generate may use it: a case that is true for ${esc(first)} now, or any case."><option value=""${o.caseKey ? '' : ' selected'}>Any case</option>${cases}</select></div>`;
+      picker = `<div class="qn-own-under"><span class="qn-own-label">Belongs Under</span><select class="qn-own-select" id="tq-own-part" data-tq-own="part" aria-label="The part of the comment this sentence belongs under" title="The part of the comment this sentence belongs under.">${parts}</select><select class="qn-own-select" id="tq-own-case" data-tq-own="case" aria-label="The case this sentence is for" title="When Generate may use it: a case that is true for ${esc(first)} now, or any case."><option value=""${o.caseKey ? '' : ' selected'}>Any Case</option>${cases}</select></div>`;
     }
     var ok = !!c && !!c.template && !c.blocked;
     return `<div class="qn-own" id="tq-own" role="group" aria-label="A sentence of your own">
@@ -4541,8 +4542,9 @@ window.ReportQuestionnaire = (function () {
     else commit();
   }
 
-  /* "Add to My Bank" over the comment box while a sentence the teacher
-     typed or changed is selected: the row the selection sits in, or -1. */
+  /* "Add to My Bank" in the comment's foot while a sentence the teacher
+     typed or changed is selected in the box: the row the selection sits
+     in, or -1. */
   function _selRow(st) {
     var el = _box();
     if (!el || el.selectionStart == null || el.selectionStart === el.selectionEnd) return -1;
