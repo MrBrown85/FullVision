@@ -70,6 +70,7 @@ window.StudentOverrides = (function () {
       secId +
       '">Save Override</button>' +
       '</div>';
+    // html-safe: the reason and calculated level are escaped; secId is our section id; levels and labels are fixed.
     panel.innerHTML = html;
     panel.style.display = '';
   }

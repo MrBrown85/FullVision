@@ -485,6 +485,7 @@ window.PageDashboard = (function () {
     }
 
     /* -- Toolbar (rendered to separate mount) -- */
+    // html-safe: DashOverview.renderDashToolbar escapes class names; renderTermPicker is checked; the rest is a count.
     document.getElementById('page-toolbar-mount').innerHTML = Overview.renderDashToolbar({
       activeCourse: activeCourse,
       students: students,
@@ -550,6 +551,7 @@ window.PageDashboard = (function () {
       '</div>';
 
     _hidePop();
+    // html-safe: checked builders in dash-overview, dash-insights, dash-student-cards and dash-observations escape every name, title and label; colours are fixed score variables.
     document.getElementById('main').innerHTML = html;
     _afterObsRender(null, 0);
     _placeMixPop();
@@ -598,6 +600,7 @@ window.PageDashboard = (function () {
     if (!card) return;
     _hidePop();
     var st = _obsState();
+    // html-safe: DashObservations.renderCard escapes names, labels and notes; types and flags are fixed keys.
     card.innerHTML = DashObservations.renderCard(activeCourse, getStudents(activeCourse), st);
     obsHighlight = st.highlight;
     _afterObsRender(focusKey, (depth || 0) + 1);

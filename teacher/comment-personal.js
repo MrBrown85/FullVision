@@ -1504,6 +1504,7 @@ window.PersonalBank = (function () {
     return n + ' ' + (n === 1 ? one : many);
   }
 
+  // html-safe: sentence, student name, chips, offer line and key all esc()'d
   function _cardHtml(it) {
     var chips = (it.chips || [])
       .map(function (c) {
@@ -1523,6 +1524,7 @@ window.PersonalBank = (function () {
     </div>`;
   }
 
+  // html-safe: course, counts, tally and left-out sentences esc()'d or numbers; cards from _cardHtml
   function _sheetHtml() {
     var b = _sheet;
     var r = review(b.cid, b.termId, b.order);

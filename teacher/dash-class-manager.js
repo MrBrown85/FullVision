@@ -380,13 +380,14 @@ window.DashClassManager = (function () {
     return out;
   }
 
+  // html-safe: codes and tip text go through esc, colours through cssColor; levels are fixed numbers.
   function _cmHelpGradebook(cid, sec, tag, siblings, withTip) {
     var color = sec.color || 'var(--active)';
     var cols = [tag].concat(siblings).slice(0, 4);
     var levels = [3, 2, 4, 3];
     var head = cols
       .map(function (t, i) {
-        var c = (i === 0 ? sec.color : null) || color;
+        var c = cssColor((i === 0 ? sec.color : null) || color);
         return (
           '<div class="gb-grid-tag-header cm-help-col' +
           (i === 0 ? ' cm-help-hl' : '') +
@@ -430,6 +431,7 @@ window.DashClassManager = (function () {
     return PROF_LABELS[n] || '';
   }
 
+  // html-safe: competency names and level words go through esc; levels and dots are fixed.
   function _cmHelpReportTable(cid, sec, tag, siblings) {
     var rows = [tag].concat(siblings).slice(0, 3);
     return (
@@ -459,6 +461,7 @@ window.DashClassManager = (function () {
     );
   }
 
+  // html-safe: the competency label, level word and I Can statements go through esc.
   function _cmHelpNextSteps(cid, sec, tag) {
     var icans = tag.i_can_statements || [];
     if (!icans.length) {
@@ -528,6 +531,7 @@ window.DashClassManager = (function () {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'cm-help-title');
+    // html-safe: tab names are escaped; the rest is fixed markup and tab indexes.
     overlay.innerHTML =
       '<div class="cm-help-card">' +
       '<div class="cm-help-head">' +
@@ -568,6 +572,7 @@ window.DashClassManager = (function () {
         t.tabIndex = j === i ? 0 : -1;
       });
       panel.setAttribute('aria-labelledby', 'cm-help-tab-' + i);
+      // html-safe: pictures come from the checked _cmHelp* builders; name and text are escaped.
       panel.innerHTML =
         '<div class="cm-help-picture" aria-hidden="true">' +
         parts[i].picture +
@@ -2621,6 +2626,7 @@ window.DashClassManager = (function () {
   /* ── Block picker ──────────────────────────────────────────────
      None, A–E, X, or "Other" text. Used in Details, the new-class wizard
      and Duplicate Class. */
+  // html-safe: ids are fixed by the callers, blocks come from COURSE_BLOCK_CHOICES, an Other value is escaped.
   function blockPickerHtml(id, value) {
     var v = normalizeCourseBlock(value);
     var isChoice = v === '' || COURSE_BLOCK_CHOICES.indexOf(v) >= 0;
@@ -2779,6 +2785,7 @@ window.DashClassManager = (function () {
     return ((words[0] || '?').charAt(0) + (words[1] ? words[1].charAt(0) : '')).toUpperCase();
   }
 
+  // html-safe: badge and name are escaped; meta is built by renderCmSidebar from esc(label) and counts.
   function _cmClassItemHtml(cid, meta, extraClass) {
     var c = COURSES[cid];
     var sel = cid === cmSelectedCourse && cmMode === 'edit' ? ' selected' : '';
@@ -2810,6 +2817,7 @@ window.DashClassManager = (function () {
     return n + ' Student' + (n !== 1 ? 's' : '');
   }
 
+  // html-safe: counts and fixed markup; block labels are escaped; rows come from _cmClassItemHtml.
   function renderCmSidebar(courseIds) {
     var html =
       '<aside class="cm-sidebar" aria-label="Classes">' +
@@ -5453,6 +5461,7 @@ window.DashClassManager = (function () {
     return !!_cmTermRows(cid).dirty && !_cmTermError(cid);
   }
 
+  // html-safe: the error text is escaped; term numbers are Number()s from normalizeTermOrdinals.
   function _cmTermFooterHtml(cid) {
     var err = _cmTermError(cid);
     if (err) return '<span class="cm-cat-sum cm-cat-sum-over">' + esc(err) + '</span>';
@@ -6333,6 +6342,7 @@ window.DashClassManager = (function () {
         c +
         '"></div>';
     });
+    // html-safe: CM_COLORS are fixed; target and id are our own data attributes ('section'/'subject' and ids).
     palette.innerHTML = html;
     palette.classList.add('open');
   }

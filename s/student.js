@@ -387,7 +387,7 @@ var StudentPage = (function () {
   function textArea(id, value, rows, attrs) {
     return (
       '<textarea class="sp-text" id="' +
-      id +
+      esc(id) +
       '" rows="' +
       (rows || 2) +
       '"' +
@@ -610,7 +610,7 @@ var StudentPage = (function () {
         if (k && CORE[k]) {
           html +=
             '<div class="sp-core-name" id="' +
-            gid +
+            esc(gid) +
             '">' +
             esc(CORE[k].name) +
             '</div><div class="sp-core-line">' +
@@ -630,7 +630,7 @@ var StudentPage = (function () {
               '" data-act="step" data-q="' +
               q.id +
               '" data-core="' +
-              key +
+              esc(key) +
               '" data-value="' +
               (i + 1) +
               '">' +
@@ -640,13 +640,13 @@ var StudentPage = (function () {
           }).join('') +
           '</div>' +
           '<label class="sp-sub-label" for="' +
-          gid +
+          esc(gid) +
           '-why">Why? One sentence.</label>' +
           textArea(
             gid + '-why',
             why,
             2,
-            ' data-q="' + q.id + '" data-kind="why" data-core="' + key + '" maxlength="1000"',
+            ' data-q="' + q.id + '" data-kind="why" data-core="' + esc(key) + '" maxlength="1000"',
           ) +
           '</div>';
       });
@@ -1184,6 +1184,7 @@ var StudentPage = (function () {
 
   function paint(focusSel) {
     if (!root) return;
+    // html-safe: this file's render (the name is shared): every screen escapes server and typed text with esc; q.id is a question uuid; PhoneReportView.html escapes the report.
     root.innerHTML = render(S);
     root.querySelectorAll('textarea.sp-text').forEach(grow);
     var f = focusSel ? root.querySelector(focusSel) : null;

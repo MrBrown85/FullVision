@@ -805,6 +805,7 @@
     );
   }
 
+  // html-safe: school, teacher, class, titles, categories, names, numbers and cell text esc()'d; sizes and counts are numbers; size and paper are validated keys
   function renderPage(model, page, index, total) {
     var opts = model.opts;
     var size = SIZES[opts.size];
@@ -1036,6 +1037,7 @@
     return html;
   }
 
+  // html-safe: joins renderPage, which is escaped
   function renderPages(model) {
     return model.pages
       .map(function (p, i) {
@@ -1056,57 +1058,28 @@
     return root;
   }
 
-  /* The page rule: the paper by name and portrait ("legal portrait"), so a
-     browser that matches a named size to the printer's paper picks Legal
-     rather than shrinking the page onto Letter, and offers no landscape
-     choice. reports.css sets its own margins and :left/:right margins for
-     duplex reports; the grade sheet has the same narrow margin all round. */
-  function _pageStyle(paperKey) {
-    var paper = PAPER[paperKey] || PAPER.letter;
-    var size = paper.key + ' portrait';
-    var margin = MARGIN + 'in';
-    return (
-      '@page { size: ' +
-      size +
-      '; margin: ' +
-      margin +
-      '; }\n@page :left { margin: ' +
-      margin +
-      '; }\n@page :right { margin: ' +
-      margin +
-      '; }\n@page :first { margin: ' +
-      margin +
-      '; }'
-    );
-  }
-
   /* Renders the sheet into the print root, off screen, and returns the model. */
   function stage(cid, opts) {
     var model = buildModel(cid, opts);
     var root = _root();
+    // html-safe: renderPages here is escaped; marked at the sink because rubric-print.js has its own renderPages
     root.innerHTML = renderPages(model);
     root.setAttribute('lang', 'en');
     root.dataset.paper = model.opts.paper;
     return model;
   }
 
-  /* The page rule goes last in the document every time, so a page rule the
-     Reports page left behind (its paper, its margins) cannot win. */
+  /* The paper by name and portrait ("legal portrait"), so a browser that
+     matches a named size to the printer's paper picks Legal rather than
+     shrinking the page onto Letter, and offers no landscape choice; the
+     same narrow margin all round (ui.js setPrintMode). */
   function activatePrintMode(paperKey) {
-    var style = document.getElementById(STYLE_ID);
-    if (!style) {
-      style = document.createElement('style');
-      style.id = STYLE_ID;
-    }
-    style.textContent = _pageStyle(paperKey);
-    document.head.appendChild(style);
-    document.body.classList.add('grades-print-active');
+    var paper = PAPER[paperKey] || PAPER.letter;
+    setPrintMode(STYLE_ID, 'grades-print-active', paper.key + ' portrait', MARGIN + 'in');
   }
 
   function deactivatePrintMode() {
-    document.body.classList.remove('grades-print-active');
-    var style = document.getElementById(STYLE_ID);
-    if (style) style.remove();
+    clearPrintMode(STYLE_ID, 'grades-print-active');
     var root = document.getElementById(ROOT_ID);
     if (root) root.innerHTML = '';
   }
@@ -1115,18 +1088,7 @@
     var model = stage(cid, opts);
     if (!model.pages.length) return model;
     activatePrintMode(model.opts.paper);
-    var finished = false;
-    function done() {
-      if (finished) return;
-      finished = true;
-      window.removeEventListener('afterprint', done);
-      deactivatePrintMode();
-    }
-    window.addEventListener('afterprint', done);
-    window.print();
-    // Chrome returns from print() when its dialog closes; a browser that
-    // returns at once fires afterprint later.
-    setTimeout(done, 0);
+    printThen(deactivatePrintMode);
     return model;
   }
 
@@ -1351,6 +1313,7 @@
   }
 
   /* The right pane: Content, Students and Page. */
+  // html-safe: labels, menu values, dates and assessment titles esc()'d; keys are fixed option names
   function _settingsHtml(cid, opts) {
     var menus = _menus(cid, opts);
     var period = periodFor(cid, opts);
@@ -1395,6 +1358,7 @@
      class average row and the final grade column when they print, and
      marks in the cells unless the scores are blank. Widths follow the
      page's own, in inches. */
+  // html-safe: numbers and fixed markup only
   function _thumbHtml(model) {
     var opts = model.opts;
     var page = model.pages[0];
@@ -1476,6 +1440,7 @@
     return { pages: first, detail: who + what + c + (c === 1 ? ' column' : ' columns') };
   }
 
+  // html-safe: _thumbHtml plus the page lines, esc()'d
   function _previewHtml(model) {
     var lines = previewLines(model);
     return (
@@ -1488,6 +1453,7 @@
     );
   }
 
+  // html-safe: course name esc()'d; settings from _settingsHtml
   function _dialogHtml(cid, opts) {
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
     return (
@@ -1648,6 +1614,7 @@
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'gp-title');
+    // html-safe: this file's _dialogHtml is escaped; marked at the sink because rubric-print.js has its own _dialogHtml
     overlay.innerHTML = _dialogHtml(cid, _state.opts);
     overlay.addEventListener('click', function (e) {
       var t = e.target;

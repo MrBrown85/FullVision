@@ -1406,6 +1406,7 @@ window.ReportSheets = (function () {
   }
 
   function _measureAll(stage, htmls) {
+    // html-safe: htmls are _probe's ReportBlocks.renderCommentBox('A') samples
     stage.innerHTML = htmls
       .map(function (h) {
         return '<div class="sheet-item">' + h + '</div>';
@@ -1432,6 +1433,7 @@ window.ReportSheets = (function () {
   /* Each cell rendered for the student and measured at its own width, as
      it will sit on the page: { px, rows?, chrome? } on each entry. */
   function _measureCells(stage, cells) {
+    // html-safe: block ids are BLOCKS keys (_cleanCell); widths are numbers; c.html is _cellHtml, a ReportBlocks.renderReportBlock render
     stage.innerHTML = cells
       .map(function (c) {
         return (
@@ -1469,6 +1471,7 @@ window.ReportSheets = (function () {
   /* The block with only rows [start, end) of its first table body. */
   function _partHtml(html, start, end, continued) {
     var tpl = document.createElement('div');
+    // html-safe: html is one cell from _cellHtml (ReportBlocks.renderReportBlock), parsed in a detached div
     tpl.innerHTML = html;
     var table = tpl.querySelector('table');
     var body = table && table.tBodies[0];
@@ -1785,6 +1788,7 @@ window.ReportSheets = (function () {
       })
       .join('');
     stage.remove();
+    // html-safe: the students' layoutStudent renders (here or GradeReport.layoutStudent): ids and names esc()'d, cells from ReportBlocks.renderReportBlock
     preview.innerHTML = html;
     preview.classList.add('report-sheets-on');
     _applyZoom(preview, paper);
@@ -1904,6 +1908,7 @@ window.ReportSheets = (function () {
       var probe = _probe(stage);
       var r = layoutStudent(cid, student, ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
       var tpl = document.createElement('div');
+      // html-safe: r.html is this file's layoutStudent render, parsed in a detached div
       tpl.innerHTML = r.html;
       var sides = Array.prototype.map.call(tpl.querySelectorAll('.sheet-zoom'), function (z) {
         var sheet = z.querySelector('.report-sheet');

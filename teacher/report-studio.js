@@ -17,6 +17,7 @@ window.ReportStudio = (function () {
   /* The two panes. The canvas holds the fit line, the print settings
      (opts.settingsHtml), the view switch and the preview the sheet engine
      fills. */
+  // html-safe: fixed markup; opts.settingsHtml is page-reports _printSettingsHtml, which is literal buttons
   function layoutHtml(opts) {
     opts = opts || {};
     var all = opts.view === 'all';
@@ -134,6 +135,7 @@ window.ReportStudio = (function () {
     root.style.setProperty('--tpl-scale', scale.toFixed(4));
   }
 
+  // html-safe: template and block names, groups and reasons esc()'d; ids are BLOCKS keys or esc()'d; th.html is ReportSheets.thumbs, the sheet engine's own render of ReportBlocks blocks
   function paletteHtml(form, tab, templates, sizes, fit, thumbs) {
     var sheets = S();
     var on = sheets.onForm(form);
@@ -231,6 +233,7 @@ window.ReportStudio = (function () {
      Everyone, which leads with them). */
   /* text.over: what the link says when a report does not fit (the Grade
      Report says so in its own words). */
+  // html-safe: only counts and fixed words; text.over/feedbackOver are page-reports constants
   function fitLineHtml(summary, form, text) {
     if (!summary || !summary.perStudent) return '';
     var ids = Object.keys(summary.perStudent);
@@ -675,6 +678,7 @@ window.ReportStudio = (function () {
 
   /* A block from the palette, at its real size for the previewed student,
      shown while the pointer rests on it. */
+  // html-safe: label and name esc()'d; html is page-reports _blockHtml, a ReportBlocks.renderReportBlock render
   function peekHtml(label, who, html) {
     return (
       '<div class="studio-peek no-print" role="presentation">' +
@@ -805,6 +809,7 @@ window.ReportStudio = (function () {
       var own = drag.fromPage
         ? root.querySelector('.studio-pages:not(.studio-all) .sheet-cell[data-block="' + drag.id + '"]')
         : null;
+      // html-safe: widths and scale are numbers; own.innerHTML is the rendered cell already in the page; api.html is page-reports _blockHtml (ReportBlocks.renderReportBlock)
       ghost.innerHTML =
         '<div class="report-sheet studio-ghost-sheet" style="width:' +
         wPx +

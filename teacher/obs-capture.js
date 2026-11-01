@@ -427,6 +427,7 @@ window.ObsCapture = (function () {
     root.setAttribute('data-obsc', String(++_uid));
     var _destroyed = false;
 
+    // html-safe: p is a fixed id prefix from the callers ('', 'note-', 'ced-', 'asg-', 'dlg-'); the placeholder is escaped.
     root.innerHTML =
       '<div class="obsc-row obsc-who" data-part="who"></div>' +
       '<div class="obsc-slot" data-slot="who"></div>' +
@@ -548,6 +549,7 @@ window.ObsCapture = (function () {
     }
 
     /* One row: + Starter | Tags | Context, + Link, then Save as Starter and Add. */
+    // html-safe: labels are escaped before chip/removable; colours and context keys come from fixed lists; ids use the fixed prefix.
     function renderLinks() {
       var h = chip('menu', '+ Starter', {
         value: 'starters',
@@ -790,6 +792,7 @@ window.ObsCapture = (function () {
       return '<div class="obsc-menu-note">A starter fills the type, context and tags you haven’t set.</div>';
     }
 
+    // html-safe: name is a MENU_ROW key; item/section/search/starterItem escape every label and value.
     function menuHtml(name) {
       var h = '';
       var id = '';
@@ -947,6 +950,7 @@ window.ObsCapture = (function () {
         var html = '';
         if (slot === 'input') html = suggestHtml();
         else if (state.menu && MENU_ROW[state.menu] === slot) html = menuHtml(state.menu);
+        // html-safe: html is suggestHtml() or menuHtml(), both escaping every label; dot colours come from obsTagColor.
         el.innerHTML = html;
       });
       if (state.menu && state.menu !== 'context') {
@@ -1064,6 +1068,7 @@ window.ObsCapture = (function () {
       overlay.setAttribute('role', 'dialog');
       overlay.setAttribute('aria-modal', 'true');
       overlay.setAttribute('aria-labelledby', p + 'save-starter-title');
+      // html-safe: text, names and labels are escaped; sentiment keys and colours come from fixed lists; p is a fixed prefix.
       overlay.innerHTML =
         '<div class="confirm-card obsc-save-card">' +
         '<div class="confirm-title" id="' +

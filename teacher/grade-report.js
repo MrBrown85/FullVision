@@ -355,6 +355,7 @@ window.GradeReport = (function () {
   }
 
   function _measure(stage, html) {
+    // html-safe: html is the letterhead (ReportBlocks.renderBlockHeader), _tailHtml or _tableHtml, all escaped
     stage.innerHTML = '<div class="sheet-item">' + html + '</div>';
     return stage.firstChild.offsetHeight;
   }
@@ -533,6 +534,7 @@ window.GradeReport = (function () {
   }
 
   /* One piece of an extra card; part > 0 is a later piece. */
+  // html-safe: ReportFeedback.observationsCardHtml / termCommentCardHtml escape every field
   function _extraHtml(x, p) {
     var rows = p ? x.rows.slice(p.from, p.to) : x.rows;
     var opts = { continued: !!(p && p.part > 0) };
@@ -570,6 +572,7 @@ window.GradeReport = (function () {
     return stage.getBoundingClientRect().width / stage.offsetWidth || 1;
   }
   function _measureCards(stage, htmls) {
+    // html-safe: htmls are ReportFeedback card HTML (report-feedback-cards.js escapes every field)
     stage.innerHTML = '<div class="fb-col" style="width:' + FB_COL_W + 'px">' + htmls.join('') + '</div>';
     var k = _scale(stage);
     return Array.prototype.map.call(stage.firstChild.children, function (el) {
@@ -657,6 +660,7 @@ window.GradeReport = (function () {
      and foot. */
   function _rubricParts(stage, item, number, h, size) {
     var cont = _pieceItem(item, { from: 0, to: 1, part: 1, last: false });
+    // html-safe: two ReportFeedback.cardHtml cards (report-feedback-cards.js escapes every field); size is a number
     stage.innerHTML =
       '<div class="fb-col" style="width:' +
       FB_COL_W +
@@ -698,6 +702,7 @@ window.GradeReport = (function () {
      "(continued)" piece. */
   function _extraParts(stage, x, h) {
     var cont = _extraHtml(x, { from: 0, to: 1, part: 1 });
+    // html-safe: both cards from _extraHtml, which is escaped
     stage.innerHTML = '<div class="fb-col" style="width:' + FB_COL_W + 'px">' + _extraHtml(x) + cont + '</div>';
     var k = _scale(stage);
     var sel = x.kind === 'observations' ? '.fb-obs' : '.fb-para';
