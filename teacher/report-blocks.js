@@ -521,7 +521,7 @@ window.ReportBlocks = (function () {
         const color = PROF_COLORS[r] || PROF_COLORS[0];
         const tint = PROF_TINT[r] || PROF_TINT[0];
         const label = prof > 0 ? PROF_LABELS[r] : 'Not yet assessed';
-        const barPct = prof > 0 ? (prof / 4) * 100 : 0;
+        const barPct = levelBarPercent(cid, prof);
         // Gather per-tag assessment evidence. getTagScores turns points into
         // a level (18/20 is Extending, not level 18) and leaves out excused work.
         const tagScores = getTagScores(cid, student.id, tag.id).filter(s => s.score > 0);
@@ -1749,7 +1749,7 @@ window.ReportBlocks = (function () {
         const avg = d.scored > 0 ? d.totalScore / d.scored : 0;
         if (!(avg > 0) && options.noEvidence === 'hide') return;
         const r = Math.round(avg);
-        const pct = avg > 0 ? (avg / 4) * 100 : 0;
+        const pct = levelBarPercent(cid, avg);
         const color = avg > 0 ? PROF_COLORS[r] || 'var(--text-3)' : 'var(--border)';
         const profLabel = d.count === 0 ? 'Not yet assessed' : avg > 0 ? PROF_LABELS[r] : 'Not yet assessed';
         const labelColor = avg > 0 ? color : 'var(--text-3)';
