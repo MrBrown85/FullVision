@@ -21,8 +21,9 @@
      Letter class the letter and %, a Both class both. calc.js works out
      every part (assessmentCellValue, levelWord, assessmentGroupGrade).
    - status: 'Late', 'Missing', 'Excused' or ''.
-   - feedback: the assignment comments, oldest first, then the score's
-     comment ([{ text, date, dateIso }]; RubricPrint.feedbackItems).
+   - feedback: the Overall Comment, a line per paragraph (or, until the
+     Nov 2026 migration has run, the observations linked to the work when
+     it has none) ([{ text, date, dateIso }]; RubricPrint.feedbackItems).
    - rubric: { name, style, levelOrder, rows } on rubric, tags and general
      work, read from RubricPrint.sheetData so the cards match Print Rubrics.
 
