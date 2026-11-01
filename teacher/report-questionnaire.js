@@ -245,9 +245,12 @@ window.ReportQuestionnaire = (function () {
       if (!btn) return;
       var label = btn.querySelector('.qn-copy-label');
       if (!label) return;
+      // A green "✓ Copied" pill for a moment (the States mockup).
       label.textContent = 'Copied';
+      btn.classList.add('copied');
       setTimeout(function () {
         label.textContent = 'Copy';
+        btn.classList.remove('copied');
       }, 1600);
     });
   }
@@ -349,8 +352,48 @@ window.ReportQuestionnaire = (function () {
     _fitBox();
     _syncEmpty();
     _syncCount();
+    _syncMarks();
     _syncQuotedSoon();
     _syncWarnSoon();
+  }
+
+  /* ── In-text marks (the LayoutE mockup) ──────────────────── */
+
+  /* The best-piece sentence tinted and the missing-work sentence ringed
+     inside the comment: a layer behind the box carrying the same text,
+     invisible except for the marks, so typing, undo and the count are the
+     box's own. */
+  function _marksHtml(rows, text) {
+    var t = String(text || '');
+    var spans = [];
+    (rows || []).forEach(function (r) {
+      var kind = _isBestRow(r) ? 'best' : r.step === 'notHandedIn' || r.step === 'ieProblem' ? 'missing' : '';
+      var s = String(r.text || '').trim();
+      if (!kind || !s) return;
+      var at = t.indexOf(s);
+      if (at < 0) return;
+      spans.push({ at: at, end: at + s.length, kind: kind });
+    });
+    spans.sort(function (a, b) {
+      return a.at - b.at;
+    });
+    var out = '';
+    var from = 0;
+    spans.forEach(function (sp) {
+      if (sp.at < from) return;
+      out += esc(t.slice(from, sp.at)) + `<span class="qn-mark ${sp.kind}">${esc(t.slice(sp.at, sp.end))}</span>`;
+      from = sp.end;
+    });
+    out += esc(t.slice(from));
+    // A trailing line break needs a character after it to take height.
+    return out + '​';
+  }
+  function _syncMarks() {
+    var st = _current();
+    var el = _box();
+    var layer = document.getElementById('tq-marks');
+    if (!st || !el || !layer || String(el.dataset.sid) !== String(st.id)) return;
+    layer.innerHTML = _marksHtml(_rows[_rowKey(st)] || [], el.value);
   }
 
   /* The Ready count and the roster. */
@@ -373,6 +416,9 @@ window.ReportQuestionnaire = (function () {
   function _syncEmpty() {
     var el = _box();
     var box = document.getElementById('tq-empty');
+    // No count or Copy under "No comment yet" (the States mockup).
+    var foot = document.getElementById('tq-comment-foot');
+    if (el && foot) foot.hidden = !el.value.trim();
     if (el && box) box.hidden = !!el.value.trim();
   }
 
@@ -822,10 +868,13 @@ window.ReportQuestionnaire = (function () {
 
   /* ── At a Glance ─────────────────────────────────────────── */
 
-  /* Under the best piece, when it has no Note for the Report: Add one
-     opens the grader on that piece for this student. */
+  /* Under the best piece: its Note for the Report, or when it has none
+     Add one, which opens the grader on that piece for this student. */
   function _reportNoteNudge(best) {
-    if (!best || !best.id || String(best.note || '').trim()) return '';
+    if (!best || !best.id) return '';
+    var note = String(best.note || '').trim();
+    // With a note: "Note for the report: “…”" (the LayoutE mockup).
+    if (note) return `<span class="qn-muted qn-note-line">Note for the report: “${esc(note)}”</span>`;
     return `<span class="qn-muted qn-note-nudge">No note for the report yet · <button type="button" class="qn-card-link qn-note-add" data-action="tqAddReportNote" data-aid="${esc(best.id)}" title="Opens the grader on this piece. Write one line about what the student did, for the comment.">Add one</button></span>`;
   }
 
@@ -1102,7 +1151,7 @@ window.ReportQuestionnaire = (function () {
   var SCREEN_SOURCES = [
     ['Grade', 'Your gradebook: this term’s marks, with your category weights.', 'FullVision'],
     ['Work Habits', 'Your six ratings, Rarely to Consistently.', 'You'],
-    ['Best Piece', 'The highest-marked assignment this term.', 'FullVision'],
+    ['Best Piece', 'The highest-marked assignment this term, and your note for the report on it.', 'FullVision'],
     ['Not Handed In', 'Assignments labelled Missing.', 'FullVision'],
     ['Skills', 'This term’s competency scores.', 'FullVision'],
     ['Goal and Voice', 'Answers to About Me and the goal check-in, sent from the student’s phone.', 'Student'],
@@ -1488,8 +1537,8 @@ window.ReportQuestionnaire = (function () {
       : '';
     var body;
     if (thisTab) {
-      body = `${_emptyHtml(cid, student, text)}<textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea>
-        <div class="qn-comment-foot">
+      body = `${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea></div>
+        <div class="qn-comment-foot" id="tq-comment-foot"${text.trim() ? '' : ' hidden'}>
           ${_countHtml(cid, text)}
           <button type="button" class="qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${COPY_ICON}<span class="qn-copy-label">Copy</span></button>
         </div>`;
@@ -2068,14 +2117,25 @@ window.ReportQuestionnaire = (function () {
     if (!path) return false;
     return step === 'grade' || (path === 'ie' && !!IE_LABELS[step]);
   }
+  /* The row of the plan's best-piece sentence (n36: "{His} best piece was
+     “{title}”, where {he} {note}."): the only one labelled Best Piece and
+     tinted, on the card and in the comment (the LayoutE mockup). */
+  function _isBestRow(row) {
+    return !!row && row.step === 'example' && row.id === 'n36';
+  }
   /* A row's label: its part, or on the IE path Problem, Plan, Deadline and
-     Meeting, and Statement for the goals sentence. A sentence of the
-     teacher's own that fits no part has none. */
+     Meeting, and Statement for the goals sentence. In the example step
+     only the best-piece sentence is Best Piece; a Student Voice quote is
+     Voice and any other example Example. A sentence of the teacher's own
+     that fits no part has none. */
   function rowLabel(row, path) {
     if (!row.step) return '';
     if (_isRequired(row.step, path)) {
       if (row.step === 'grade') return path === 'ie' ? 'Grade' : 'Statement';
       return IE_LABELS[row.step];
+    }
+    if (row.step === 'example' && !_isBestRow(row)) {
+      return row.s && row.s.group === "In the Student's Words" ? 'Voice' : 'Example';
     }
     var p = partOf(row.step);
     return p ? p.label : '';
@@ -2518,6 +2578,7 @@ window.ReportQuestionnaire = (function () {
     if (mark(next) === mark(rows)) return;
     _rows[key] = next;
     _syncLast(key, next, el.value);
+    _syncMarks();
     _syncRequired();
   }
 
@@ -2913,7 +2974,7 @@ window.ReportQuestionnaire = (function () {
       else w = _factWords(k, cid, student, f, ctx);
       if (w && bits.indexOf(w) < 0) bits.push(w);
     });
-    if (row.step === 'example') {
+    if (_isBestRow(row)) {
       var top = bestPiece(f.work);
       if (top && String(top.note || '').trim()) bits.push('your note for the report');
     }
@@ -3004,7 +3065,7 @@ window.ReportQuestionnaire = (function () {
       : row.step && row.s
         ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Shows other ways to say this sentence. Pick one to use it.">Other Wording ▾</button>`
         : '';
-    return `<div class="qn-req-row qn-srow${row.step === 'example' ? ' best' : ''}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
+    return `<div class="qn-req-row qn-srow${_isBestRow(row) ? ' best' : ''}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
       ${handle}<div class="qn-req-part"><span class="qn-req-label">${esc(rowLabel(row, path))}</span></div>
       <div class="qn-req-body"><span class="qn-req-text">${esc(row.text)}</span><span class="qn-req-source">${esc(rowSource(row, cid, student, f, ctx))}</span>${_thinHtml(cid, student, row, i)}</div>
       ${act}

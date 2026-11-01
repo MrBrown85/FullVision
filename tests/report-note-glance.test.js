@@ -50,12 +50,14 @@ describe('At a Glance: the note for the report', () => {
     expect(html).toContain('>Add one</button>');
   });
 
-  it('says nothing once the best piece has a note', () => {
+  it('shows the note under the best piece once it has one', () => {
     const st = cece();
     const best = RQ.bestPiece(CommentBank.facts(cid, st, 'term-2').work);
     saveScoreReportNote(cid, st.id, best.id, 'kept a field journal with dated sketches');
     try {
-      expect(show(st)).not.toContain('No note for the report yet');
+      const html = show(st);
+      expect(html).not.toContain('No note for the report yet');
+      expect(html).toContain('Note for the report: “kept a field journal with dated sketches”');
     } finally {
       saveScoreReportNote(cid, st.id, best.id, '');
     }

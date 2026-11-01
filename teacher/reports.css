@@ -3810,6 +3810,8 @@ textarea.studio-text {
   --qn-hairline: #f0f0f3;
   --qn-dim: var(--text-3);
   --qn-best-bg: #e8f1fe;
+  --qn-ring: #c07a00;
+  --qn-copied-bg: #f0faf2;
 }
 @media (prefers-color-scheme: dark) {
   .qn,
@@ -3817,6 +3819,8 @@ textarea.studio-text {
     --qn-hairline: var(--surface-2);
     --qn-dim: var(--text-2);
     --qn-best-bg: var(--active-light);
+    --qn-ring: var(--score-2-text);
+    --qn-copied-bg: var(--score-3-bg);
   }
 }
 
@@ -4168,6 +4172,9 @@ body.qn-roster #gb-sidebar .student-row-note {
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
+.qn-text-wrap {
+  position: relative;
+}
 .qn-text {
   display: block;
   width: 100%;
@@ -4185,9 +4192,36 @@ body.qn-roster #gb-sidebar .student-row-note {
   min-height: 1.7em;
   outline: none;
   border-radius: 4px;
+  position: relative;
 }
 .qn-text:focus-visible {
   box-shadow: 0 0 0 2px var(--score-4-bg);
+}
+/* The marks behind the box: the same text, wrapped the same way, with
+   only the best-piece tint and the missing-work ring showing. */
+.qn-marks {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: 0;
+  font: inherit;
+  font-size: 15.5px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  color: transparent;
+  pointer-events: none;
+  border-radius: 4px;
+}
+.qn-mark {
+  border-radius: 4px;
+}
+.qn-mark.best {
+  background: var(--qn-best-bg);
+  box-shadow: 0 0 0 2px var(--qn-best-bg);
+}
+.qn-mark.missing {
+  box-shadow: 0 0 0 2px var(--qn-ring);
 }
 .qn-comment-foot {
   display: flex;
@@ -4195,6 +4229,9 @@ body.qn-roster #gb-sidebar .student-row-note {
   gap: 8px;
   font-size: 12.5px;
   color: var(--text-2);
+}
+.qn-comment-foot[hidden] {
+  display: none;
 }
 /* The count opens the class's character limit (plan PR 8). */
 .qn-count-wrap {
@@ -4273,6 +4310,20 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-copy:hover {
   background: var(--overlay-hover);
+}
+/* "✓ Copied" for a moment after Copy (the States mockup). */
+.qn-copy.copied,
+.qn-copy.copied:hover {
+  color: var(--score-3-text);
+  border-color: var(--score-3-bg);
+  background: var(--qn-copied-bg);
+  font-weight: 600;
+}
+.qn-copy.copied svg {
+  display: none;
+}
+.qn-copy.copied .qn-copy-label::before {
+  content: '✓ ';
 }
 /* Before Generate: "No comment yet" over the empty box (the States mockup). */
 .qn-empty {
@@ -5095,7 +5146,8 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 
 /* At a Glance: "No note for the report yet · Add one" under the best piece. */
-.qn-note-nudge {
+.qn-note-nudge,
+.qn-note-line {
   font-size: 12px;
 }
 .qn-note-add {

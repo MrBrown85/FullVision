@@ -210,6 +210,7 @@ test('Copy puts the comment on the clipboard and says Copied', async ({ page, co
   const text = await page.locator('#tq-narrative').inputValue();
   await page.locator('#tq-copy-btn').click();
   await expect(page.locator('#tq-copy-btn .qn-copy-label')).toHaveText('Copied');
+  await expect(page.locator('#tq-copy-btn')).toHaveClass(/copied/);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(text);
 });
 
@@ -330,6 +331,9 @@ test('the circled question mark opens Where This Information Comes From', async 
     'Attendance',
     'Teacher Comment',
   ]);
+  await expect(cards.nth(0).locator('.qn-info-row').nth(2)).toContainText(
+    'The highest-marked assignment this term, and your note for the report on it.',
+  );
   const blocks = await page.evaluate(() =>
     ReportSheets.onForm(ReportSheets.formFor(getReportConfig('sci8') || {})).map(id => ReportSheets.BLOCKS[id].label),
   );
@@ -358,6 +362,8 @@ test.describe('checks and approval', () => {
       'Rate the six work habits, then press Generate Comment. You can also type here.',
     );
     await expect(page.locator('#tq-empty-rated')).toHaveText('0 of 6 habits rated');
+    // No count or Copy under it.
+    await expect(page.locator('#tq-comment-foot')).toBeHidden();
     await page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]').click();
     await expect(page.locator('#tq-empty-rated')).toHaveText('1 of 6 habits rated');
     // Clicking it puts the cursor in the box; typing hides it.
@@ -365,6 +371,7 @@ test.describe('checks and approval', () => {
     await expect(page.locator('#tq-narrative')).toBeFocused();
     await page.keyboard.type('Cece had a good term.');
     await expect(page.locator('#tq-empty')).toBeHidden();
+    await expect(page.locator('#tq-comment-foot')).toBeVisible();
     await expect(page.locator('#tq-approve-next')).toBeEnabled();
   });
 
@@ -391,6 +398,8 @@ test.describe('checks and approval', () => {
     const row = page.locator('#tq-row-missing');
     await expect(row).toHaveClass(/flag/);
     await expect(row.locator('.qn-req-text')).toContainText(title);
+    // The missing-work sentence is ringed inside the comment (the LayoutE mockup).
+    await expect(page.locator('#tq-marks .qn-mark.missing')).toContainText(title);
     await expect(row.locator('.qn-req-source').last()).toHaveText(
       '1 of 22 · check that it is really missing before you approve',
     );
@@ -509,6 +518,25 @@ test.describe('the Sentences card', () => {
     page,
   }) => {
     await open(page);
+    // A Note for the Report on Cece's best piece, so Generate uses the
+    // best-piece sentence (plan PR 7) and At a Glance shows the note.
+    await page.evaluate(() => {
+      const best = ReportQuestionnaire.bestPiece(
+        CommentBank.facts(
+          'sci8',
+          getStudents('sci8').find(s => s.id === 'st1'),
+          'term-2',
+        ).work,
+      );
+      saveScoreReportNote('sci8', 'st1', best.id, 'kept a field journal with dated sketches');
+    });
+    await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st2');
+    await page.locator('#tq-narrative').waitFor();
+    await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st1');
+    await page.locator('#tq-narrative').waitFor();
+    await expect(page.locator('.qn-glance .qn-note-line')).toHaveText(
+      'Note for the report: “kept a field journal with dated sketches”',
+    );
     await page.locator('#tq-generate').click();
     const box = page.locator('#tq-narrative');
     const draft = await box.inputValue();
@@ -528,6 +556,15 @@ test.describe('the Sentences card', () => {
     // uses her pronoun.
     const best = rowByLabel(page, 'Best Piece');
     const bestText = await best.locator('.qn-req-text').textContent();
+    // Only the best-piece sentence is labelled Best Piece and tinted, on
+    // the card and inside the comment; its source names the note.
+    await expect(best).toHaveCount(1);
+    await expect(best).toHaveClass(/\bbest\b/);
+    await expect(page.locator('#tq-sentences .qn-srow.best')).toHaveCount(1);
+    expect(bestText).toContain('where she kept a field journal with dated sketches');
+    await expect(best.locator('.qn-req-source')).toContainText('· your note for the report');
+    await expect(page.locator('#tq-marks .qn-mark.best')).toHaveText(bestText);
+    await expect(page.locator('#tq-marks .qn-mark')).toHaveCount(1);
     await best.locator('.qn-srow-handle').focus();
     await page.keyboard.press('Alt+ArrowUp');
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Best Piece');
