@@ -2969,7 +2969,22 @@ window.ReportQuestionnaire = (function () {
     var rating = getStudentTermRating(_activeCourse, student.id, getTermId()) || {};
     var text = _shownText(rating).trim();
     if (!text) return [];
-    _rows[key] = recoverRows(text, _bankContext(_activeCourse, student, f), rating.draftMeta);
+    var ctx = _bankContext(_activeCourse, student, f);
+    // The pronouns may have changed since the comment was written, with
+    // the questionnaire closed (Class Management, the Student Dashboard).
+    var was = writtenWith(rating, f, text, student);
+    _pronounsSeen[key] = (f && f.pronouns) || null;
+    if (!was) {
+      _rows[key] = recoverRows(text, ctx, rating.draftMeta);
+      return _rows[key];
+    }
+    var old = recoverRows(text, _pronounContext(student, f, was), rating.draftMeta);
+    _rows[key] = pronounsChanged(old, ctx, was, f.pronouns);
+    var next = composeRows(_rows[key]);
+    var saved = plainComment(rating.narrative || '').replace(/\s+$/, '');
+    // A new text clears an approval (upsertTermRating), as Use the New
+    // Sentence does, so the teacher approves again.
+    if (next !== saved) upsertTermRating(_activeCourse, student.id, getTermId(), { narrative: next });
     return _rows[key];
   }
 
@@ -3010,9 +3025,87 @@ window.ReportQuestionnaire = (function () {
   function pronounNote(row) {
     return !!row && !!row.pronounWords && _holdsWord(row.text, row.pronounWords);
   }
+  /* The pronouns as a comment's record keeps them (draft_meta.pronouns). */
+  function pronounSet(p) {
+    if (!p) return null;
+    var out = {};
+    ['subj', 'obj', 'poss', 'refl', 'verb', 'capSubj'].forEach(function (k) {
+      if (p[k] != null) out[k] = p[k];
+    });
+    return out;
+  }
+  function _samePronouns(a, b) {
+    return JSON.stringify(pronounSet(a)) === JSON.stringify(pronounSet(b));
+  }
+  /* A context for the student with other pronouns. */
+  function _pronounContext(student, f, p) {
+    var g = Object.assign({}, f, { pronouns: Object.assign({}, p, { onFile: true }), pronounsOnFile: true });
+    return CommentBank.context(g, _picksFor(_activeCourse, student, f));
+  }
+  /* The bank sentences, not edited, that a comment's text holds when read
+     with a context's pronouns. */
+  function _bankRowCount(text, ctx) {
+    return recoverRows(text, ctx, null).filter(function (r) {
+      return !!r.s && !r.edited;
+    }).length;
+  }
+  var PRONOUN_SETS = ['he/him', 'she/her', 'they/them'];
+  /* The pronouns a saved comment was written with, when they are not the
+     student's now; null when they are the same. The set kept with the
+     approval (draft_meta.pronouns) while the comment is still the approved
+     text; else the set its bank sentences read with, when that finds more
+     of them than the pronouns on file do (a comment written before the set
+     was kept, or changed since). */
+  function writtenWith(rating, f, text, student) {
+    var now = f && f.pronouns;
+    if (!now) return null;
+    var meta = (rating && rating.draftMeta) || null;
+    var stored = meta && meta.pronouns;
+    var approvedText =
+      meta && Array.isArray(meta.sentences)
+        ? meta.sentences
+            .map(function (x) {
+              return x && x.text;
+            })
+            .join(' ')
+        : null;
+    var plain = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (stored && stored.subj && approvedText === plain) return _samePronouns(stored, now) ? null : stored;
+    var nowWords = _pronounWords(now);
+    var cands = PRONOUN_SETS.map(function (s) {
+      return ReportBlocks.getPronouns({ pronouns: s });
+    });
+    if (stored && stored.subj) cands.unshift(stored);
+    var best = null;
+    var bestN = -1;
+    var cur = null;
+    cands.forEach(function (p) {
+      if (_samePronouns(p, now) || (best && _samePronouns(p, best))) return;
+      var extra = _pronounWords(p).filter(function (w) {
+        return nowWords.indexOf(w) < 0;
+      });
+      if (!_holdsWord(plain, extra)) return;
+      if (cur == null) cur = _bankRowCount(plain, _bankContext(_activeCourse, student, f));
+      var n = _bankRowCount(plain, _pronounContext(student, f, p));
+      if (n > cur && n > bestN) {
+        best = p;
+        bestN = n;
+      }
+    });
+    return best;
+  }
+
   function _syncPronouns(cid, student, f) {
     var key = _rowKey(student);
     var now = (f && f.pronouns) || null;
+    if (!_rows[key]) {
+      // First drawn since the page loaded: the saved comment is compared
+      // with the pronouns on file as its rows are recovered (_rowsFor).
+      _rowsFor(student, f);
+      return;
+    }
     var was = _pronounsSeen[key];
     _pronounsSeen[key] = now;
     var rows = _rows[key];
@@ -6462,6 +6555,8 @@ window.ReportQuestionnaire = (function () {
     recoverRows: recoverRows,
     composeRows: composeRows,
     pronounsChanged: pronounsChanged,
+    pronounSet: pronounSet,
+    writtenWith: writtenWith,
     pronounNote: pronounNote,
     units: _units,
     moveRow: moveRow,

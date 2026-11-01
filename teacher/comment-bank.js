@@ -5969,6 +5969,15 @@ window.CommentBank = (function () {
       marks: marksOf(f),
       approved_at: opts.approvedAt || null,
     };
+    // The pronouns the comment was written with, so a later change to the
+    // student's pronouns is found when the comment is next opened.
+    var p = f && f.pronouns;
+    if (p && p.subj) {
+      out.pronouns = {};
+      ['subj', 'obj', 'poss', 'refl', 'verb', 'capSubj'].forEach(function (k) {
+        if (p[k] != null) out.pronouns[k] = p[k];
+      });
+    }
     var prev = opts.prev || {};
     var seen = {};
     Object.keys(prev.class_seen || {}).forEach(function (k) {

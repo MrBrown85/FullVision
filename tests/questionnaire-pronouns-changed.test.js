@@ -11,7 +11,15 @@ import { readFileSync } from 'fs';
 import { runInThisContext } from 'vm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-const RQ = ReportQuestionnaire;
+let RQ = ReportQuestionnaire;
+/* The page loaded again: the questionnaire with nothing in memory. */
+const reload = () => {
+  runInThisContext(readFileSync('teacher/report-questionnaire.js', 'utf-8'), {
+    filename: 'teacher/report-questionnaire.js',
+  });
+  RQ = window.ReportQuestionnaire;
+  RQ.configure({ activeCourse: 'sci8', renderReports: () => {} });
+};
 const HE = /\b(he|him|his|himself)\b/i;
 
 describe('pronouns changed after the comment was written (Demo Mode, Science 8, Report 2)', () => {
@@ -107,6 +115,81 @@ describe('pronouns changed after the comment was written (Demo Mode, Science 8, 
       expect(html).toContain('>Pronouns changed</span>');
       // Drawn again with the same pronouns, nothing more changes.
       RQ.renderTermQuestionnaire(cid);
+      expect(comment()).toBe(text);
+    } finally {
+      st.pronouns = 'he/him';
+    }
+  });
+
+  /* An approved comment for Ethan as written with the pronouns on file:
+     the draft and a typed sentence, with its record (draft_meta). */
+  const approvedFor = (st, mine) => {
+    const f = CommentBank.facts(cid, st, 'term-2');
+    const d = CommentBank.draft(CommentBank.context(f, {}), { seed: CommentBank.seedFor(st.id) + 3 });
+    const rows = RQ.rowsFromDraft(d).concat(mine ? [RQ.typedRow(mine, 9)] : []);
+    const text = RQ.composeRows(rows);
+    const at = '2026-11-01T10:00:00.000Z';
+    const draftMeta = CommentBank.draftMeta(rows, f, { approvedAt: at });
+    upsertTermRating(cid, st.id, 'term-2', { narrative: text, approvedAt: at, draftMeta });
+    return { text, draftMeta };
+  };
+  const open = st => {
+    RQ.tqStudentIndex = RQ.getTqStudents().findIndex(s => s.id === st.id);
+    return RQ.renderTermQuestionnaire(cid);
+  };
+
+  it('keeps the pronouns with the approval (draft_meta.pronouns)', () => {
+    const { draftMeta } = approvedFor(ethan());
+    expect(draftMeta.pronouns).toMatchObject({ subj: 'he', obj: 'him', poss: 'his', refl: 'himself' });
+  });
+
+  it('changed with the questionnaire closed, then a reload: the approved comment follows, is noted, and needs approving again', () => {
+    const st = ethan();
+    const mine = 'He helped clean up after the lab.';
+    const { text: before } = approvedFor(st, mine);
+    reload();
+    // Class Management or the Student Dashboard changes the pronouns.
+    st.pronouns = 'she/her';
+    try {
+      reload();
+      const html = open(st);
+      const text = comment();
+      expect(text).not.toBe(before);
+      expect(text.endsWith(' ' + mine)).toBe(true);
+      const drafted = text.slice(0, -mine.length);
+      expect(HE.test(drafted)).toBe(false);
+      expect(/\b(she|her|herself)\b/i.test(drafted)).toBe(true);
+      expect(getStudentTermRating(cid, st.id, 'term-2').approvedAt).toBeFalsy();
+      expect((html.match(/class="qn-pron-note"/g) || []).length).toBe(1);
+      // Re-rendered rows are bank rows, not Edited.
+      expect((html.match(/>Edited</g) || []).length).toBe(0);
+      // Opened again after another reload, nothing more changes.
+      reload();
+      open(st);
+      expect(comment()).toBe(text);
+    } finally {
+      st.pronouns = 'he/him';
+    }
+  });
+
+  it('a comment with no record (not approved) is read with the pronouns its sentences use', () => {
+    const st = ethan();
+    const f = CommentBank.facts(cid, st, 'term-2');
+    const d = CommentBank.draft(CommentBank.context(f, {}), { seed: CommentBank.seedFor(st.id) + 5 });
+    upsertTermRating(cid, st.id, 'term-2', { narrative: d.text, approvedAt: null, draftMeta: null });
+    // Same pronouns: nothing changes.
+    reload();
+    open(st);
+    expect(comment()).toBe(d.text);
+    st.pronouns = 'they/them';
+    try {
+      reload();
+      open(st);
+      const text = comment();
+      expect(HE.test(text)).toBe(false);
+      expect(/\b(they|them|their|themselves)\b/i.test(text)).toBe(true);
+      reload();
+      open(st);
       expect(comment()).toBe(text);
     } finally {
       st.pronouns = 'he/him';
