@@ -1553,28 +1553,41 @@ function getGroupProficiency(cid, studentId, groupId) {
  * @returns {number} Overall proficiency (0-4), or 0 if no evidence
  */
 function getOverallProficiency(cid, studentId) {
-  const grouped = getGroupedSections(cid);
-  const hasGroups = grouped.groups.some(g => g.sections.length > 0);
-  if (!hasGroups) {
-    // No groups — original behavior: average all sections
-    const sections = getSections(cid);
-    const profs = sections.map(s => getSectionProficiency(cid, studentId, s.id)).filter(p => p > 0);
-    if (profs.length === 0) return 0;
-    return profs.reduce((a, b) => a + b, 0) / profs.length;
-  }
-  // Group-aware: one value per group + one per ungrouped section
-  const values = [];
-  grouped.groups.forEach(gi => {
-    if (gi.sections.length === 0) return;
-    const gp = getGroupProficiency(cid, studentId, gi.group.id);
-    if (gp > 0) values.push(gp);
+  return rollUpSectionLevels(cid, function (sec) {
+    return getSectionProficiency(cid, studentId, sec.id);
   });
-  grouped.ungrouped.forEach(sec => {
-    const sp = getSectionProficiency(cid, studentId, sec.id);
-    if (sp > 0) values.push(sp);
+}
+
+/* An overall level from a level per competency, rolled up as
+   getOverallProficiency does: with no groups, the mean of the competencies;
+   with groups, one mean per group plus each ungrouped competency, then the
+   mean of those. `levelOf(section)` is 0 for a competency with no level,
+   which is left out. A report's "then" column rolls up the same way as its
+   "now". */
+function rollUpSectionLevels(cid, levelOf) {
+  var mean = function (list) {
+    var v = list.filter(function (p) {
+      return p > 0;
+    });
+    return v.length
+      ? v.reduce(function (a, b) {
+          return a + b;
+        }, 0) / v.length
+      : 0;
+  };
+  var grouped = getGroupedSections(cid);
+  var hasGroups = grouped.groups.some(function (g) {
+    return g.sections.length > 0;
   });
-  if (values.length === 0) return 0;
-  return values.reduce((a, b) => a + b, 0) / values.length;
+  if (!hasGroups) return mean(getSections(cid).map(levelOf));
+  var values = [];
+  grouped.groups.forEach(function (gi) {
+    if (gi.sections.length) values.push(mean(gi.sections.map(levelOf)));
+  });
+  grouped.ungrouped.forEach(function (sec) {
+    values.push(levelOf(sec));
+  });
+  return mean(values);
 }
 
 /** Convert an average proficiency to a letter grade and percentage for PHIL12.
