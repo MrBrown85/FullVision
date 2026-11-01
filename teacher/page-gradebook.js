@@ -434,7 +434,7 @@ window.PageGradebook = (function () {
     }
 
     if (activeFilterCount > 0) {
-      html += '<button class="gb-filter-clear" data-action="clearAllFilters">Clear all</button>';
+      html += '<button class="gb-filter-clear" data-action="clearAllFilters">Clear All</button>';
     }
     html += '</div>';
 
@@ -922,7 +922,7 @@ window.PageGradebook = (function () {
       (_newestFirst ? ' active' : '') +
       '" data-action="toggleNewestFirst" aria-pressed="' +
       _newestFirst +
-      '" title="Put the latest assessments on the left">Newest first</button>' +
+      '" title="Put the latest assessments on the left">Newest First</button>' +
       '<div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
       sortArrow('name') +
       '</button><span class="gb-grid-corner-label">Overall</span></div>' +
@@ -2262,14 +2262,14 @@ window.PageGradebook = (function () {
     var menu = document.createElement('div');
     menu.className = 'gb-ctx-menu';
     menu.innerHTML =
-      '<div class="gb-ctx-item" data-ctx="editCell">Edit score</div>' +
-      '<div class="gb-ctx-item" data-ctx="clearCell">Clear score</div>' +
+      '<div class="gb-ctx-item" data-ctx="editCell">Edit Score</div>' +
+      '<div class="gb-ctx-item" data-ctx="clearCell">Clear Score</div>' +
       '<div class="gb-ctx-divider"></div>' +
-      statusItem('markMissing', 'NS', status === 'NS' ? 'Undo missing' : 'Mark missing') +
-      statusItem('excuseCell', 'EXC', status === 'EXC' ? 'Undo excuse' : 'Excuse') +
+      statusItem('markMissing', 'NS', status === 'NS' ? 'Undo Missing' : 'Mark Missing') +
+      statusItem('excuseCell', 'EXC', status === 'EXC' ? 'Undo Excuse' : 'Excuse') +
       statusItem('lateCell', 'LATE', status === 'LATE' ? 'Undo Late' : 'Mark Late') +
       '<div class="gb-ctx-divider"></div>' +
-      '<div class="gb-ctx-item" data-ctx="addObservation">Add observation</div>';
+      '<div class="gb-ctx-item" data-ctx="addObservation">Add Observation</div>';
     _placeContextMenu(menu, e.clientX, e.clientY);
     _wireMenu(menu, cell);
     menu.addEventListener('click', function (ev) {
@@ -2321,7 +2321,7 @@ window.PageGradebook = (function () {
     if (!student || !assess) return;
     ObsCapture.openDialog({
       cid: cid,
-      title: 'Add observation',
+      title: 'Add Observation',
       subtitle: displayName(student) + ' \u00b7 ' + (assess.title || 'Assessment'),
       students: [sid],
       lockStudents: true,

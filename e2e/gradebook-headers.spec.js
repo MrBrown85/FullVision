@@ -83,19 +83,19 @@ test.describe('Gradebook column headers', () => {
         .map(a => a.date || '')
         .sort(),
     );
-    const toggle = page.getByRole('button', { name: 'Newest first' });
+    const toggle = page.getByRole('button', { name: 'Newest First' });
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
     expect(await firstDate()).toBe(dates[0]);
 
     await toggle.click();
-    await expect(page.getByRole('button', { name: 'Newest first' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Newest First' })).toHaveAttribute('aria-pressed', 'true');
     expect(await firstDate()).toBe(dates[dates.length - 1]);
 
     // The gradebook always opens on Scores (#305); Newest first is what is remembered.
     await page.reload();
     await page.locator('[data-action="setView"][data-mode="detailed"]').click();
     await expect(page.locator('.gb-grid-assess-group').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Newest first' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: 'Newest First' })).toHaveAttribute('aria-pressed', 'true');
     expect(await firstDate()).toBe(dates[dates.length - 1]);
   });
 });
