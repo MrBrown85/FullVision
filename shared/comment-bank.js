@@ -3943,7 +3943,7 @@ var COMMENT_BANK = {
       id: 'n523',
       part: 'now',
       group: 'Overall',
-      text: 'Close in every skill, {his} marks show {he} can {evenSkill}.',
+      text: 'Marks are close in every skill, and {he} can {evenSkill}.',
       needs: ['evenSkill'],
       when: { evenWord: 'Proficient' },
       claims: ['evenResults'],
