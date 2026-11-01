@@ -397,7 +397,7 @@ window.PageGradebook = (function () {
 
     html +=
       (sortedCategories.length > 0 ? '<div class="gb-filter-strip-divider"></div>' : '') +
-      '<span class="gb-filter-strip-label">Outcomes</span><div class="gb-filter-strip-group">';
+      '<span class="gb-filter-strip-label">Competencies</span><div class="gb-filter-strip-group">';
     sections.forEach(function (sec) {
       var isActive = filterSections.includes(sec.id);
       html +=
@@ -1506,7 +1506,7 @@ window.PageGradebook = (function () {
         tip +=
           '<div class="gb-tip-note">' +
           ns +
-          (ns === 1 ? ' assignment missing (counts as 0)' : ' assignments missing (count as 0)') +
+          (ns === 1 ? ' assessment missing (counts as 0)' : ' assessments missing (count as 0)') +
           '</div>';
     }
     // Categories make up the course grade, so they sit under it, each graded
@@ -1567,7 +1567,7 @@ window.PageGradebook = (function () {
       tip +=
         '<div class="gb-tip-note">From ' +
         handedIn +
-        (handedIn === 1 ? ' assignment' : ' assignments') +
+        (handedIn === 1 ? ' assessment' : ' assessments') +
         ' handed in</div>';
     tip += rows;
     tip +=
@@ -2355,8 +2355,8 @@ window.PageGradebook = (function () {
       return a.id === aid;
     });
     menu.innerHTML =
-      '<div class="gb-ctx-item" data-ctx="scoreMode">Score This Assignment</div>' +
-      '<div class="gb-ctx-item" data-ctx="editAssess">Edit Assignment Details</div>' +
+      '<div class="gb-ctx-item" data-ctx="scoreMode">Grade This Assessment</div>' +
+      '<div class="gb-ctx-item" data-ctx="editAssess">Edit Assessment Details</div>' +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item" data-ctx="markUngradedNS">Count Missing as Zero</div>' +
       '<div class="gb-ctx-item" data-ctx="markUngradedEXC">Count Missing as Excused</div>' +
@@ -2364,7 +2364,7 @@ window.PageGradebook = (function () {
         ? '<div class="gb-ctx-item" data-ctx="undoBulkStatus">Undo Count Missing</div>'
         : '') +
       '<div class="gb-ctx-divider"></div>' +
-      '<div class="gb-ctx-item gb-ctx-danger" data-ctx="deleteAssess">Delete Assignment</div>';
+      '<div class="gb-ctx-item gb-ctx-danger" data-ctx="deleteAssess">Delete Assessment</div>';
     // The column stays highlighted while its menu is open, so it is clear
     // which assignment the menu acts on.
     header.classList.add('gb-col-menu');
@@ -2424,10 +2424,10 @@ window.PageGradebook = (function () {
         // destructive actions in the gradebook.
         // The dialog names the assignment so a click on the wrong column is
         // caught before anything happens.
-        var title = assess && assess.title ? assess.title : 'this assignment';
+        var title = assess && assess.title ? assess.title : 'this assessment';
         showConfirm(
           'Delete “' + title + '”?',
-          'All scores, statuses, and observations linked to this assignment will be removed. You can undo this for a few seconds.',
+          'All scores, statuses, and observations linked to this assessment will be removed. You can undo this for a few seconds.',
           'Delete',
           'danger',
           function () {
