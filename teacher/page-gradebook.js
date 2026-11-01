@@ -1478,7 +1478,9 @@ window.PageGradebook = (function () {
       var typeClass = _getAssessmentAccentClass(a, 'gb-scores');
       var isScoreOnly = isPointsScored(a);
       var shortDate = formatShortDate(a.date);
-      var maxPts = isScoreOnly ? (shortDate ? ' \u00b7 ' : '') + 'Out of ' + (a.maxPoints || 100) : '';
+      // Points work says what it's out of; Complete/Incomplete has no total.
+      var maxPts =
+        isScoreOnly && !isCompletionScored(a) ? (shortDate ? ' \u00b7 ' : '') + 'Out of ' + (a.maxPoints || 100) : '';
       var tagSecs = (a.tagIds || [])
         .map(function (tid) {
           return getSectionForTag(cid, tid);
