@@ -2720,9 +2720,11 @@ window.PageAssignments = (function () {
     var after = structuredClone(assessments[idx]);
     var srcCid = activeCourse;
     saveAssessments(activeCourse, assessments);
+    var carried = _carryOverallToCompetencies(activeCourse, before, after);
     openAssessIds.add(aid);
     hideNewForm();
     render();
+    if (carried) refreshSidebarGrades();
     if (window.AssessmentCopy && (before.copyGroup || copyTargets.length)) {
       // One dialog at a time: the edit offer first, then any new copies.
       Promise.resolve(before.copyGroup ? AssessmentCopy.offerLinkedEdit(srcCid, before, after) : null)
@@ -2731,6 +2733,37 @@ window.PageAssignments = (function () {
         })
         .then(render);
     }
+  }
+
+  /* Work scored with one Overall level before any competency was ticked:
+     once competencies are ticked that Overall no longer counts (calc.js
+     drops a leftover overall), so each student's level is copied onto every
+     competency the work is now scored on, unless one already has a score.
+     The Overall entry stays, so unticking them all brings it back. Rubric,
+     points, Complete/Incomplete and DIBELS work score their own way. */
+  function _carryOverallToCompetencies(cid, before, after) {
+    if (after.rubricId || isPointsScored(after) || after.scoreMode === 'dibels') return 0;
+    if (!isUnlinkedTag(scoreTagIds(before, cid)[0])) return 0;
+    var tagIds = scoreTagIds(after, cid);
+    if (!tagIds.length || isUnlinkedTag(tagIds[0])) return 0;
+    var copied = 0;
+    var scores = getScores(cid);
+    Object.keys(scores).forEach(function (sid) {
+      var entries = scores[sid] || [];
+      var overall = entries.find(function (e) {
+        return e.assessmentId === after.id && isUnlinkedTag(e.tagId) && Number(e.score) > 0;
+      });
+      if (!overall) return;
+      tagIds.forEach(function (tid) {
+        var scored = entries.some(function (e) {
+          return e.assessmentId === after.id && e.tagId === tid;
+        });
+        if (scored) return;
+        upsertScore(cid, sid, after.id, tid, overall.score, overall.date, overall.type, '', overall.mod);
+        copied++;
+      });
+    });
+    return copied;
   }
 
   function dupeAssess(aid) {
