@@ -466,10 +466,21 @@ window.ReportQuestionnaire = (function () {
     termId = termId || getTermId();
     var r = getStudentTermRating(cid, student.id, termId) || {};
     var meta = r.draftMeta;
-    if (!meta || !Array.isArray(meta.sentences) || !meta.sentences.length) return null;
+    if (!meta) return null;
+    var marks = Array.isArray(meta.sentences) && meta.sentences.length > 0;
+    // The pronouns changed since the approval (draft_meta.pronouns).
+    var pron = !!r.approvedAt && !!meta.pronouns && !_samePronouns(meta.pronouns, ReportBlocks.getPronouns(student));
+    if (!marks && !pron) return null;
     var text = plainComment(r.narrative || '');
     var key = cid + '|' + student.id + '|' + termId;
-    var sig = JSON.stringify(meta) + '\u0000' + text;
+    var sig =
+      JSON.stringify(meta) +
+      '\u0000' +
+      text +
+      '\u0000' +
+      (r.approvedAt || '') +
+      '\u0000' +
+      String(student.pronouns || '');
     var hit = _staleCache[key];
     if (hit && hit.sig === sig) return hit.v;
     var cur = _current();
@@ -477,7 +488,28 @@ window.ReportQuestionnaire = (function () {
       cid === _activeCourse && termId === getTermId() && cur && cur.id === student.id
         ? _facts(student)
         : CommentBank.facts(cid, student, termId);
-    var v = CommentBank.staleness(meta, f, _picksFor(cid, student, f, termId), { text: text });
+    var v = marks ? CommentBank.staleness(meta, f, _picksFor(cid, student, f, termId), { text: text }) : null;
+    var p = pron ? pronounChanges(cid, student, r, f) : [];
+    if (p.length) {
+      // A sentence shows once: as a pronoun change when that is all that
+      // changed in it, else as out of date for its marks.
+      var only = function (c) {
+        return p.some(function (x) {
+          return x.before === c.before && x.after === c.after;
+        });
+      };
+      var marksNow = ((v && v.changes) || []).filter(function (c) {
+        return !(c.kind === 'marks' && only(c));
+      });
+      var seen = marksNow.map(function (c) {
+        return c.before;
+      });
+      p = p.filter(function (c) {
+        return !c.keptAsApproved && seen.indexOf(c.before) < 0;
+      });
+      v = v ? Object.assign({}, v, { changes: marksNow.concat(p) }) : { changes: p, pieces: [] };
+      if (!v.changes.length) v = null;
+    }
     _staleCache[key] = { sig: sig, v: v };
     return v;
   }
@@ -579,6 +611,10 @@ window.ReportQuestionnaire = (function () {
       );
       out.push(_cap(names) + ' changed after ' + day + ', so ' + _sentenceCount(cls.length) + ' your class settings.');
     }
+    var pron = stale.changes.filter(function (c) {
+      return c.kind === 'pronouns';
+    }).length;
+    if (pron) out.push('The pronouns changed after ' + day + ', so ' + _sentenceCount(pron) + ' them.');
     out.push('Approved text is never changed for you.');
     return out.join(' ');
   }
@@ -629,34 +665,53 @@ window.ReportQuestionnaire = (function () {
     var stale = staleFor(_activeCourse, st, termId);
     var c = stale && stale.changes[Number(i)];
     if (!c) return;
-    if (what === 'keep') {
+    if (what === 'keep' && c.kind === 'pronouns') {
+      var kept = (Array.isArray(r.draftMeta.pronoun_kept) ? r.draftMeta.pronoun_kept : []).concat(c.before);
+      upsertTermRating(_activeCourse, st.id, termId, {
+        draftMeta: Object.assign({}, r.draftMeta, { pronoun_kept: kept }),
+      });
+    } else if (what === 'keep') {
       upsertTermRating(_activeCourse, st.id, termId, {
         draftMeta: CommentBank.keepApproved(r.draftMeta, c, stale, _facts(st, true)),
       });
     } else if (what === 'use') {
       var text = plainComment(r.narrative || '');
-      var next = _swapSentence(text, c.before, c.after);
-      if (next === text) return;
       var key = _rowKey(st);
       var f = _facts(st, true);
       var rows = _rowsFor(st, f).slice();
-      var at = rows.findIndex(function (x) {
-        return x.text === c.before;
-      });
-      if (at >= 0) {
-        var step = rows[at].step || (r.draftMeta.sentences[c.i] || {}).step || null;
-        if (!c.after) rows.splice(at, 1);
-        else if (c.kind === 'class') rows[at] = _classRow(step, c.after);
+      // The approval goes with the first new sentence, so a pronoun change
+      // puts in every sentence the pronouns changed (as for a comment not
+      // yet approved); one kept as approved stays.
+      var todo =
+        c.kind === 'pronouns'
+          ? stale.changes.filter(function (x) {
+              return x.kind === 'pronouns';
+            })
+          : [c];
+      var next = text;
+      todo.forEach(function (x) {
+        var swapped = _swapSentence(next, x.before, x.after);
+        if (swapped === next) return;
+        next = swapped;
+        var at = rows.findIndex(function (y) {
+          return y.text === x.before;
+        });
+        if (at < 0) {
+          rows = alignRows(rows, next);
+          return;
+        }
+        var step = rows[at].step || (r.draftMeta.sentences[x.i] || {}).step || null;
+        if (!x.after) rows.splice(at, 1);
+        else if (x.kind === 'class') rows[at] = _classRow(step, x.after);
         else {
-          var s = c.id ? _bankById(c.id) : null;
+          var s = x.id ? _bankById(x.id) : null;
           var row = s ? rowFromSentence(s, _bankContext(_activeCourse, st, f), step, at === 0) : null;
           rows[at] = row || Object.assign({}, rows[at], { edited: false });
-          rows[at].text = rows[at].drafted = c.after;
+          rows[at].text = rows[at].drafted = x.after;
         }
-        _rows[key] = rows;
-      } else {
-        _rows[key] = alignRows(rows, next);
-      }
+      });
+      if (next === text) return;
+      _rows[key] = rows;
       upsertTermRating(_activeCourse, st.id, termId, { narrative: next });
       _syncLast(key, _rows[key], next);
     } else return;
@@ -1951,7 +2006,7 @@ window.ReportQuestionnaire = (function () {
     return (
       !!stale &&
       stale.changes.some(function (c) {
-        return c.kind === 'marks';
+        return c.kind === 'marks' || c.kind === 'pronouns';
       })
     );
   }
@@ -2979,7 +3034,11 @@ window.ReportQuestionnaire = (function () {
     // the questionnaire closed (Class Management, the Student Dashboard).
     var was = writtenWith(rating, f, text, student);
     _pronounsSeen[key] = (f && f.pronouns) || null;
-    if (!was) {
+    if (!was || rating.approvedAt) {
+      // An approved comment is never changed for the teacher: its sentences
+      // that read with the old pronouns show on the card (staleFor) with
+      // Keep as Approved or Use the New Sentence.
+      if (was) _recordPronouns(student, was);
       _rows[key] = recoverRows(text, ctx, rating.draftMeta);
       return _rows[key];
     }
@@ -2992,9 +3051,10 @@ window.ReportQuestionnaire = (function () {
      When they change, every bank sentence the teacher has not edited is
      filled again with the new ones at once (the realiser); a sentence the
      teacher typed or edited is left as written and, when it still holds
-     an old pronoun, its row says "Pronouns changed". The comment saved
-     this way is a new text, so an approved one needs approving again
-     (upsertTermRating clears the approval, as Use the New Sentence does). */
+     an old pronoun, its row says "Pronouns changed". An approved comment
+     is never changed for the teacher: its sentences show on the card as
+     the marks-changed pattern does (staleFor, pronounChanges), and Use the
+     New Sentence clears the approval. */
   var _pronounsSeen = {};
   function _pronounWords(p) {
     return p ? [p.subj, p.obj, p.poss, p.refl].filter(Boolean) : [];
@@ -3006,15 +3066,43 @@ window.ReportQuestionnaire = (function () {
     });
   }
   /* The rows with every bank sentence the teacher has not edited filled
-     for the pronouns now; the rest as written. */
-  function pronounsChanged(rows, ctx) {
+     for the pronouns now; the rest as written. ctxWas: the context the
+     rows were read with. A sentence is filled again from the values it
+     was written with (CommentBank.valuesIn), so only its pronouns change;
+     one too short to read back keeps its tokens, filled again from today's
+     facts only when they still give the same sentence (a slot filled whole
+     with the pronouns, like the best piece). */
+  function _writtenToks(r, whoWas) {
+    if (!r.s) return null;
+    var v = CommentBank.valuesIn(r.s, r.text);
+    if (!v) return null;
+    var toks = CommentRealiser.tokens(r.s.text, function (k) {
+      var x = v[k] == null ? '' : String(v[k]);
+      // A title is read with its quotes; the realiser puts them back.
+      return CommentRealiser.TITLE_SLOTS[k] ? x.replace(/^[“"]/, '').replace(/[”"]$/, '') : x;
+    });
+    var back = function (named) {
+      return CommentRealiser.render(toks, whoWas, { named: named }) === r.text;
+    };
+    return back(true) || back(false) ? toks : null;
+  }
+  function pronounsChanged(rows, ctx, ctxWas) {
     var who = _whoOf(ctx);
+    var whoWas = ctxWas ? _whoOf(ctxWas) : null;
     return rows.map(function (r) {
-      if (!r.edited && r.raw && r.raw.toks)
-        return Object.assign({}, r, { raw: Object.assign({}, r.raw, { who: who }) });
-      return r;
+      if (r.edited || r.kept || r.classLine) return r;
+      var toks = whoWas ? _writtenToks(r, whoWas) : null;
+      if (!toks && r.raw && r.raw.toks) {
+        toks = r.raw.toks;
+        if (ctxWas && r.s && JSON.stringify(CommentBank.sentenceTokens(r.s, ctxWas)) === JSON.stringify(toks))
+          toks = CommentBank.sentenceTokens(r.s, ctx);
+      }
+      if (!toks) return r;
+      var raw = r.raw || { id: r.id, part: r.s ? r.s.part : null, step: r.step, text: r.text };
+      return Object.assign({}, r, { raw: Object.assign({}, raw, { who: who, toks: toks }) });
     });
   }
+
   /* The pronouns as a comment's record keeps them (draft_meta.pronouns). */
   function pronounSet(p) {
     if (!p) return null;
@@ -3032,11 +3120,12 @@ window.ReportQuestionnaire = (function () {
     var g = Object.assign({}, f, { pronouns: Object.assign({}, p, { onFile: true }), pronounsOnFile: true });
     return CommentBank.context(g, _picksFor(_activeCourse, student, f));
   }
-  /* The bank sentences, not edited, that a comment's text holds when read
-     with a context's pronouns. */
+  /* The bank sentences, not edited, that a comment's text holds word for
+     word when read with a context's pronouns (a row read with other values
+     has no realiser tokens). */
   function _bankRowCount(text, ctx) {
     return recoverRows(text, ctx, null).filter(function (r) {
-      return !!r.s && !r.edited;
+      return !!r.s && !r.edited && !!r.raw && !!r.raw.toks;
     }).length;
   }
   var PRONOUN_SETS = ['he/him', 'she/her', 'they/them'];
@@ -3100,7 +3189,64 @@ window.ReportQuestionnaire = (function () {
     _pronounsSeen[key] = now;
     var rows = _rows[key];
     if (!was || !rows || !rows.length || JSON.stringify(was) === JSON.stringify(now)) return;
-    _applyPronouns(student, f, was, rows);
+    if ((getStudentTermRating(cid, student.id, getTermId()) || {}).approvedAt) _recordPronouns(student, was);
+    else _applyPronouns(student, f, was, rows);
+  }
+
+  /* The record told which pronouns the comment was written with, when it
+     does not say yet (draft_meta.pronouns); a comment with no record gets
+     one that holds only them. */
+  function _pronounRecord(meta, was, now) {
+    var kept = meta && meta.pronouns;
+    if (kept && kept.subj && !_samePronouns(kept, now)) return null;
+    var out = Object.assign({}, meta || { v: 1, sentences: [] }, { pronouns: pronounSet(was) });
+    delete out.pronoun_ok;
+    delete out.pronoun_kept;
+    return out;
+  }
+  function _recordPronouns(student, was) {
+    var termId = getTermId();
+    var rating = getStudentTermRating(_activeCourse, student.id, termId) || {};
+    var meta = _pronounRecord(rating.draftMeta || null, was, ReportBlocks.getPronouns(student));
+    if (meta) upsertTermRating(_activeCourse, student.id, termId, { draftMeta: meta });
+  }
+
+  /* An approved comment's sentences that read with the pronouns it was
+     written with (draft_meta.pronouns), as changes for the card (the
+     marks-changed pattern): { kind: 'pronouns', i, id, before, after,
+     keptAsApproved }. Only bank sentences the teacher did not edit; one
+     kept as approved (draft_meta.pronoun_kept) is marked so staleFor leaves
+     it off the card. [] when the pronouns are the same. */
+  function pronounChanges(cid, student, rating, f) {
+    var meta = (rating && rating.draftMeta) || null;
+    var was = meta && meta.pronouns;
+    if (!rating || !rating.approvedAt || !was || !was.subj || !f || _samePronouns(was, f.pronouns)) return [];
+    var text = plainComment(rating.narrative || '').trim();
+    if (!text) return [];
+    var keep = Array.isArray(meta.pronoun_kept) ? meta.pronoun_kept : [];
+    var ctxWas = _pronounContext(student, f, was);
+    var old = recoverRows(text, ctxWas, meta);
+    var before = old.map(function (r) {
+      return r.text;
+    });
+    var next = pronounsChanged(old, CommentBank.context(f, _picksFor(cid, student, f)), ctxWas);
+    composeRows(next);
+    var out = [];
+    next.forEach(function (r, i) {
+      if (r.edited || r.kept || r.text === before[i]) return;
+      out.push({
+        kind: 'pronouns',
+        // Kept as approved (draft_meta.pronoun_kept): not shown again.
+        keptAsApproved: keep.indexOf(before[i]) >= 0,
+        id: r.s ? r.id : null,
+        i: (meta.sentences || []).findIndex(function (x) {
+          return x && x.text === before[i];
+        }),
+        before: before[i],
+        after: r.text,
+      });
+    });
+    return out;
   }
 
   /* Rows read with the pronouns `was` filled again with the student's
@@ -3112,18 +3258,14 @@ window.ReportQuestionnaire = (function () {
   function _applyPronouns(student, f, was, rows) {
     var key = _rowKey(student);
     var termId = getTermId();
-    var next = pronounsChanged(rows, _bankContext(_activeCourse, student, f), was, f.pronouns);
+    var next = pronounsChanged(rows, _bankContext(_activeCourse, student, f), _pronounContext(student, f, was));
     _rows[key] = next;
     var text = composeRows(next);
     var rating = getStudentTermRating(_activeCourse, student.id, termId) || {};
     var data = {};
     if (text !== plainComment(rating.narrative || '').replace(/\s+$/, '')) data.narrative = text;
-    var meta = rating.draftMeta || null;
-    var kept = meta && meta.pronouns;
-    if (!kept || !kept.subj || _samePronouns(kept, f.pronouns)) {
-      data.draftMeta = Object.assign({}, meta || { v: 1, sentences: [] }, { pronouns: pronounSet(was) });
-      delete data.draftMeta.pronoun_ok;
-    }
+    var meta = _pronounRecord(rating.draftMeta || null, was, f.pronouns);
+    if (meta) data.draftMeta = meta;
     if (Object.keys(data).length) upsertTermRating(_activeCourse, student.id, termId, data);
     _syncLast(key, next, text);
     return next;
@@ -3138,13 +3280,32 @@ window.ReportQuestionnaire = (function () {
     var was = meta && meta.pronouns;
     var now = f && f.pronouns;
     if (!was || !was.subj || !now || _samePronouns(was, now)) return { gone: [], ok: [] };
-    var keep = _pronounWords(now);
     return {
-      gone: _pronounWords(was).filter(function (w, i, all) {
-        return keep.indexOf(w) < 0 && all.indexOf(w) === i;
-      }),
+      gone: pronounWordsNotIn(now, was),
       ok: Array.isArray(meta.pronoun_ok) ? meta.pronoun_ok : [],
     };
+  }
+  /* Every pronoun word (he, she, they and the other sets ReportBlocks
+     knows) that the pronouns `now` do not use, so a sentence written for
+     any earlier set is caught, not only the last one. "it" and "its" are
+     left out unless the comment was written with them: they are in most
+     sentences about a thing. */
+  function pronounWordsNotIn(now, was) {
+    var sets = (window.ReportBlocks && ReportBlocks.PRONOUN_SETS) || {};
+    var keep = _pronounWords(now).concat(sets[now && now.subj] || []);
+    var all = [];
+    Object.keys(sets).forEach(function (subj) {
+      if (subj === 'it' && !(was && was.subj === 'it')) return;
+      [subj].concat(sets[subj]).forEach(function (w) {
+        if (all.indexOf(w) < 0) all.push(w);
+      });
+    });
+    _pronounWords(was).forEach(function (w) {
+      if (all.indexOf(w) < 0) all.push(w);
+    });
+    return all.filter(function (w) {
+      return keep.indexOf(w) < 0;
+    });
   }
   function _pronounCheckFor(student, f) {
     return pronounCheck(getStudentTermRating(_activeCourse, student.id, getTermId()) || {}, f);
@@ -3851,7 +4012,7 @@ window.ReportQuestionnaire = (function () {
         unit.some(function (r) {
           return pronounNote(r, pron);
         })
-          ? `<span class="qn-pron-note" title="The student’s pronouns changed after you wrote this sentence. Check its pronouns.">Pronouns changed <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="pronounOk" data-row="${i}" title="Keeps this sentence as written and takes this note away.">Dismiss</button></span>`
+          ? `<span class="qn-pron-note" title="The student’s pronouns changed after you wrote this sentence. Check its pronouns.">Pronouns changed · <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="pronounOk" data-row="${i}" title="Keeps this sentence as written and takes this note away.">Dismiss</button></span>`
           : ''
       }${thin}${ownBox}</div>
       ${act}
@@ -6627,6 +6788,8 @@ window.ReportQuestionnaire = (function () {
     writtenWith: writtenWith,
     pronounNote: pronounNote,
     pronounCheck: pronounCheck,
+    pronounWordsNotIn: pronounWordsNotIn,
+    pronounChanges: pronounChanges,
     units: _units,
     moveRow: moveRow,
     dropRow: dropRow,
