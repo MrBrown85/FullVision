@@ -2069,7 +2069,7 @@ window.PageGradebook = (function () {
         key,
         level,
         assess ? assess.date : courseToday(cid),
-        assess ? assess.type : 'summative',
+        scoreTypeFor(assess),
         entry.note || '',
         next,
       );
@@ -2140,7 +2140,7 @@ window.PageGradebook = (function () {
         setPointsScore(cid, sid, aid, raw);
       } else {
         var tidVal = td.dataset.tid;
-        upsertScore(cid, sid, aid, tidVal, raw || 0, assess.date || courseToday(cid), assess.type || 'summative');
+        upsertScore(cid, sid, aid, tidVal, raw || 0, assess.date || courseToday(cid), scoreTypeFor(assess));
       }
       _redrawCompetencyCell(td);
     }
@@ -2925,7 +2925,7 @@ window.PageGradebook = (function () {
         setPointsScore(cid, sid, aid, val);
       } else {
         tagIds.forEach(function (tid) {
-          upsertScore(cid, sid, aid, tid, val, assess.date || courseToday(cid), assess.type || 'summative', '');
+          upsertScore(cid, sid, aid, tid, val, assess.date || courseToday(cid), scoreTypeFor(assess), '');
         });
       }
     }
@@ -3199,7 +3199,7 @@ window.PageGradebook = (function () {
             key,
             val,
             assess ? assess.date : courseToday(activeCourse),
-            assess ? assess.type : 'summative',
+            scoreTypeFor(assess),
             '',
           );
         });
@@ -3235,7 +3235,7 @@ window.PageGradebook = (function () {
               key,
               0,
               assess ? assess.date : courseToday(activeCourse),
-              assess ? assess.type : 'summative',
+              scoreTypeFor(assess),
               '',
             );
           });

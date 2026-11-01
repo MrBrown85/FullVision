@@ -3277,7 +3277,7 @@ function _scoreEntryFromCanonical(
     // is a score); on proficiency work 0 is unscored.
     score: value == null || value === '' ? (isPointsScored(assessment) ? null : 0) : Number(value),
     date: assessment.date || assessment.assigned_at || courseToday(cid),
-    type: assessment.type || 'summative',
+    type: scoreTypeFor(assessment),
     note: comment || '',
     created: assessment.date || assessment.assigned_at || '',
   };
@@ -4914,6 +4914,17 @@ function _termRatingsRowsToBlob(rows) {
 /* Efficient single-score write — upserts one row to scores table + updates cache */
 /* `mod` is the level's + or − (1 or −1). Leaving it out means none, so
    picking a level clears a + or − it had before. */
+/* The type a new score is saved with. It follows the assessment the way
+   calc.js buckets a score (getTagProficiency): work in a category counts
+   as summative; otherwise the assessment's own type, formative when it has
+   none. Desktop and phone both save through this, so a score saved on one
+   reads the same on the other and after a reload. */
+function scoreTypeFor(assessment) {
+  if (!assessment) return 'summative';
+  if (getAssessmentCategoryId(assessment)) return 'summative';
+  return assessment.type || 'formative';
+}
+
 function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
   var nextMod = normalizeScoreMod(scoreVal, mod);
   // Update cache blob
@@ -5161,7 +5172,7 @@ function _saveRubricCriterionNote(cid, sid, aid, criterionId, text, field) {
         tagId: tid,
         score: 0,
         date: (assessment && assessment.date) || courseToday(cid),
-        type: (assessment && assessment.type) || 'summative',
+        type: scoreTypeFor(assessment),
         note: '',
         created: new Date().toISOString(),
       };
@@ -5233,7 +5244,7 @@ function saveTagComment(cid, sid, aid, tagId, text) {
       tagId: tagId,
       score: 0,
       date: (assessment && assessment.date) || courseToday(cid),
-      type: (assessment && assessment.type) || 'summative',
+      type: scoreTypeFor(assessment),
       note: '',
       created: new Date().toISOString(),
     };
@@ -5298,7 +5309,7 @@ function saveScoreComment(cid, sid, aid, text) {
       tagId: key,
       score: isPointsScored(assessment) ? null : 0,
       date: assessment.date || courseToday(cid),
-      type: assessment.type || 'summative',
+      type: scoreTypeFor(assessment),
       note: '',
       created: new Date().toISOString(),
     };
@@ -7347,7 +7358,7 @@ function applyAssignmentStatus(cid, sid, aid, status) {
   });
   if (status !== 'NS' || !assess || isPointsScored(assess)) return false;
   scoreTagIds(assess, cid).forEach(function (tagId) {
-    upsertScore(cid, sid, aid, tagId, 0, assess.date || '', assess.type || 'summative', '');
+    upsertScore(cid, sid, aid, tagId, 0, assess.date || '', scoreTypeFor(assess), '');
   });
   return true;
 }
@@ -9251,7 +9262,7 @@ function setPointsScore(cid, sid, aid, rawScore) {
         tagId: tid,
         score: rawScore,
         date: assess.date || courseToday(cid),
-        type: assess.type || 'summative',
+        type: scoreTypeFor(assess),
         note: '',
         created: new Date().toISOString(),
       });
