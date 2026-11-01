@@ -168,27 +168,6 @@
   color: #fff;
 }
 /* Score grid */
-.score-grid {
-  margin: 10px 0;
-}
-.score-grid-header {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  padding: 0 0 6px;
-  border-bottom: 2px solid var(--border);
-  margin-bottom: 4px;
-}
-.score-grid-header-name {
-  width: 140px;
-  flex-shrink: 0;
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  padding: 4px 0;
-  display: flex;
-  align-items: flex-end;
-}
 .score-col-header {
   flex: 1;
   min-width: 90px;
