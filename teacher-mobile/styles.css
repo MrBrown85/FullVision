@@ -2446,19 +2446,30 @@ body.fv-switching-course::after {
   justify-content: center;
   height: 0;
   overflow: hidden;
-  transition: height 0.2s;
   background: var(--bg);
 }
-.m-pull-indicator.active {
-  height: 40px;
+.m-pull-indicator.m-pull-settle {
+  transition: height 0.25s ease-out;
 }
+/* The spinner grows and turns with the pull; past the threshold it spins. */
 .m-pull-spinner {
   width: 20px;
   height: 20px;
   border: 2px solid var(--border);
   border-top-color: var(--active);
   border-radius: 50%;
+  opacity: var(--m-pull, 0);
+  transform: scale(calc(0.6 + 0.4 * var(--m-pull, 0))) rotate(calc(180deg * var(--m-pull, 0)));
+}
+.m-pull-indicator.m-pull-ready .m-pull-spinner {
   animation: m-spin 0.6s linear infinite;
+}
+.m-screen-content.m-pulling {
+  transition: none;
+  overflow-y: hidden;
+}
+.m-screen-content.m-pull-settle {
+  transition: transform 0.25s ease-out;
 }
 @keyframes m-spin {
   to {
