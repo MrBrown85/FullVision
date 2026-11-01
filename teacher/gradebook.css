@@ -841,22 +841,19 @@ th.gb-group-alt {
 
 /* ── 4-quadrant grid layout (like a spreadsheet app) ────── */
 /* Inner radius for quadrant corners: 1px inset from the grid border */
-/* Earthy palette scoped to the grid and its key */
+/* Earthy palette scoped to the grid and its key. Emerging keeps the app's
+   red (styles.css), so it reads the same on every page (Colin, 2026-11-01). */
 .gb-grid,
 .gb-key {
-  --score-1: #c2584a;
   --score-2: #b8893a;
   --score-3: #548c5a;
   --score-4: #3e7d91;
-  --score-1-bg: #f6e2de;
-  --score-1-text: #8a3d33;
   --score-2-bg: #f3ecda;
   --score-2-text: #7a5a1e;
   --score-3-bg: #dde9de;
   --score-3-text: #365c3a;
   --score-4-bg: #daeaee;
   --score-4-text: #2a5868;
-  --score-1-dark: #a84a3e;
   --score-2-dark: #9e7530;
   --score-3-dark: #467a4c;
   --score-4-dark: #306d80;
@@ -864,19 +861,15 @@ th.gb-group-alt {
 @media (prefers-color-scheme: dark) {
   .gb-grid,
   .gb-key {
-    --score-1: #e07060;
     --score-2: #dda854;
     --score-3: #6bae70;
     --score-4: #5aa0ae;
-    --score-1-bg: rgba(224, 112, 96, 0.2);
-    --score-1-text: #e8887a;
     --score-2-bg: rgba(221, 168, 84, 0.2);
     --score-2-text: #e5bc72;
     --score-3-bg: rgba(107, 174, 112, 0.2);
     --score-3-text: #82c487;
     --score-4-bg: rgba(90, 160, 174, 0.2);
     --score-4-text: #78b8c6;
-    --score-1-dark: #e07060;
     --score-2-dark: #dda854;
     --score-3-dark: #6bae70;
     --score-4-dark: #5aa0ae;

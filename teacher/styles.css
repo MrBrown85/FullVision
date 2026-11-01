@@ -214,7 +214,6 @@ textarea:focus {
 .tb-toggle-btn:focus-visible,
 .student-row:focus-visible,
 .dash-card:focus-visible,
-.hm-row:focus-visible,
 .tag-select-item:focus-visible,
 .assess-header:focus-visible,
 .rsg-level:focus-visible {
@@ -1360,183 +1359,10 @@ body.offline-active #app-dock {
 }
 
 /* ── Heatmap ────────────────────────────────────────────────── */
-.hm-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0 4px;
-  table-layout: fixed;
-}
-.hm-table colgroup col:first-child {
-  width: 200px;
-}
-.hm-row {
-  background: var(--surface);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition:
-    box-shadow var(--duration-fast),
-    background var(--duration-fast);
-  box-shadow: none;
-}
-.hm-row:hover {
-  box-shadow: var(--shadow-sm);
-  background: rgba(0, 122, 255, 0.02);
-}
-.hm-name-cell {
-  padding: 4px 10px;
-  border-radius: var(--radius) 0 0 var(--radius);
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  background: inherit;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.hm-flag-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: var(--text-xl);
-  padding: 4px 6px;
-  line-height: 1;
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-  transition: background var(--duration-micro);
-}
-.hm-flag-btn:hover {
-  background: var(--divider-subtle);
-}
-.hm-name-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-  color: inherit;
-  min-width: 0;
-}
-.hm-student-name {
-  font-size: var(--text-xl);
-  font-weight: 600;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.hm-section-cell {
-  text-align: center;
-  padding: 4px 6px;
-  position: relative;
-}
-.hm-section-val {
-  font-family: var(--font-base);
-  font-size: var(--text-3xl);
-  font-weight: 600;
-  line-height: 1;
-}
-.hm-section-label {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  margin-top: 1px;
-}
-.hm-section-trend {
-  font-size: var(--text-sm);
-  position: absolute;
-  top: 2px;
-  right: 4px;
-}
-.hm-overall-cell {
-  text-align: center;
-  padding: 4px 8px;
-  border-right: 2px solid var(--border);
-}
-.hm-overall-val {
-  font-family: var(--font-base);
-  font-size: var(--text-4xl);
-  font-weight: 700;
-  line-height: 1;
-}
-.hm-overall-label {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-2);
-  margin-top: 1px;
-  font-weight: 600;
-}
-.hm-header-cell {
-  text-align: center;
-  padding: 8px 4px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 700;
-}
-.hm-header-cell:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 3;
-  background: var(--bg);
-}
-.hm-low-evidence {
-  border: 1px dashed var(--border-2);
-}
-.hm-section-cell:last-child {
-  border-radius: 0 var(--radius) var(--radius) 0;
-}
 
 /* ── Heatmap row actions (edit/delete) ─────────────────────── */
-.hm-row-actions {
-  opacity: 0;
-  transition: opacity var(--duration-micro);
-  display: inline-flex;
-  gap: 2px;
-  margin-left: 6px;
-}
-.hm-row:hover .hm-row-actions {
-  opacity: 1;
-}
-.hm-row-actions button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: var(--text-sm);
-  padding: 2px 4px;
-  border-radius: var(--radius-xs);
-  color: var(--text-3);
-}
-.hm-row-actions button:hover {
-  background: var(--divider-subtle);
-  color: var(--text);
-}
-.hm-row-actions button:last-child:hover {
-  color: var(--danger);
-  background: rgba(198, 40, 40, 0.08);
-}
 
 /* ── Focus areas callout ───────────────────────────────────── */
-.focus-callout {
-  background: var(--priority-light);
-  border: 1px solid rgba(198, 40, 40, 0.2);
-  border-left: 4px solid var(--priority);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  margin-bottom: 16px;
-}
-.focus-callout-title {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  color: var(--priority);
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-.focus-callout-item {
-  font-size: var(--text-md);
-  color: var(--text);
-  padding: 3px 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
 /* ── Stats dashboard ───────────────────────────────────────── */
 .stats-row {
@@ -1911,37 +1737,6 @@ body.offline-active #app-dock {
 }
 
 /* ── Evidence list ──────────────────────────────────────────── */
-.evidence-accordion {
-  border-bottom: 1px solid var(--border);
-}
-.evidence-accordion-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  cursor: pointer;
-  font-size: var(--text-md);
-  font-weight: 500;
-}
-.evidence-accordion-header:hover {
-  color: var(--link);
-}
-.evidence-accordion-body {
-  display: none;
-  padding: 0 0 10px 8px;
-}
-.evidence-accordion.open .evidence-accordion-body {
-  display: block;
-}
-.evidence-accordion-chevron {
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  transition: transform var(--duration-micro);
-  width: 12px;
-}
-.evidence-accordion.open .evidence-accordion-chevron {
-  transform: rotate(90deg);
-}
 
 /* ── Teacher notes ──────────────────────────────────────────── */
 .note-add textarea {
@@ -2204,11 +1999,6 @@ body.offline-active #app-dock {
 }
 
 /* ── Points grid on assignments page ────────────────────── */
-.pts-grid .score-grid-header {
-  display: grid;
-  grid-template-columns: 1fr 120px 50px 32px;
-  align-items: end;
-}
 .pts-grid .score-row {
   display: grid;
   grid-template-columns: 1fr 120px 50px 32px;
@@ -2544,8 +2334,7 @@ body.offline-active #app-dock {
 
 /* ── Assessment title links ─────────────────────────────────── */
 .gb-assess-group a:hover,
-.tag-assess-title:hover,
-.evidence-accordion-header a:hover {
+.tag-assess-title:hover {
   text-decoration: underline;
   color: var(--link) !important;
 }
@@ -2562,224 +2351,8 @@ body.offline-active #app-dock {
 }
 
 /* ── Learning Outcomes Editor ──────────────────────────────── */
-.lo-section-row {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  margin-bottom: 8px;
-  overflow: hidden;
-}
-.lo-section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  cursor: pointer;
-  border-left: 4px solid var(--border);
-  transition: background 0.1s;
-}
-.lo-section-header:hover {
-  background: var(--overlay-hover);
-}
-.lo-section-chevron {
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  transition: transform var(--duration-micro);
-  width: 14px;
-  flex-shrink: 0;
-  text-align: center;
-}
-.lo-section-row.open .lo-section-chevron {
-  transform: rotate(90deg);
-}
-.lo-section-name-input {
-  flex: 1;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 600;
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  padding: 2px 5px;
-  background: transparent;
-  outline: none;
-  color: var(--text);
-}
-.lo-section-name-input:hover {
-  border-color: var(--border);
-}
-.lo-section-name-input:focus {
-  border-color: var(--active);
-  background: var(--surface);
-}
-.lo-section-count {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  flex-shrink: 0;
-}
-.lo-section-delete {
-  width: 22px;
-  height: 22px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: var(--text-3);
-  font-size: var(--text-sm);
-  border-radius: var(--radius-xs);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.lo-section-delete:hover {
-  color: var(--priority);
-  background: var(--priority-light);
-}
-.lo-section-body {
-  display: none;
-  border-top: 1px solid var(--border);
-}
-.lo-section-row.open .lo-section-body {
-  display: block;
-}
-.lo-tag-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px 6px 18px;
-  border-bottom: 1px solid var(--overlay-hover);
-  font-size: var(--text-base);
-}
-.lo-tag-row:last-child {
-  border-bottom: none;
-}
-.lo-tag-id {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  width: 36px;
-  flex-shrink: 0;
-  text-transform: uppercase;
-  color: var(--text-2);
-}
-.lo-tag-label-input {
-  flex: 1;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  padding: 2px 5px;
-  background: transparent;
-  outline: none;
-  color: var(--text);
-}
-.lo-tag-label-input:hover {
-  border-color: var(--border);
-}
-.lo-tag-label-input:focus {
-  border-color: var(--active);
-  background: var(--surface);
-}
-.lo-tag-delete {
-  width: 20px;
-  height: 20px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: var(--text-3);
-  font-size: var(--text-sm);
-  border-radius: var(--radius-xs);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.lo-tag-delete:hover {
-  color: var(--priority);
-}
-.lo-tag-text-input {
-  flex-basis: 100%;
-  margin-top: 2px;
-  margin-left: 42px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  line-height: 1.4;
-  color: var(--text-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  padding: 3px 6px;
-  background: var(--overlay-hover);
-  outline: none;
-  resize: none;
-  min-height: 28px;
-  box-sizing: border-box;
-  width: calc(100% - 42px);
-}
-.lo-tag-text-input:hover {
-  border-color: var(--border);
-}
-.lo-tag-text-input:focus {
-  border-color: var(--active);
-  background: var(--surface);
-}
-.lo-add-btn {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  background: none;
-  border: 1px dashed var(--border-2);
-  border-radius: var(--radius-sm);
-  padding: 5px 12px;
-  cursor: pointer;
-  color: var(--text-3);
-  transition: all 0.1s;
-  margin: 6px 10px;
-}
-.lo-add-btn:hover {
-  border-color: var(--active);
-  color: var(--link);
-}
-.lo-reset-btn {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  background: none;
-  border: 1px solid var(--border-2);
-  border-radius: var(--radius-sm);
-  padding: 5px 12px;
-  cursor: pointer;
-  color: var(--text-3);
-  transition: all 0.1s;
-  margin-top: 8px;
-}
-.lo-reset-btn:hover {
-  border-color: var(--priority);
-  color: var(--priority);
-}
 
 /* ── Section color picker (inline in Add Section button) ─── */
-.lo-add-btn.lo-picking-color {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 6px 14px;
-  border-style: solid;
-  border-color: var(--border);
-  cursor: default;
-}
-.lo-color-swatch {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  transition: all var(--duration-micro);
-  flex-shrink: 0;
-  padding: 0;
-}
-.lo-color-swatch:hover {
-  transform: scale(1.25);
-  border-color: rgba(255, 255, 255, 0.6);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
-}
 
 /* ── Empty States ──────────────────────────────────────────── */
 .empty-state {
@@ -3045,17 +2618,6 @@ body.offline-active #app-dock {
 }
 
 /* ── Heatmap row "View" affordance ─────────────────────────── */
-.hm-row-view {
-  opacity: 0;
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--link);
-  transition: opacity var(--duration-micro);
-  white-space: nowrap;
-}
-.hm-row:hover .hm-row-view {
-  opacity: 1;
-}
 
 /* ── Print ──────────────────────────────────────────────────── */
 @media print {
@@ -3148,24 +2710,8 @@ body.offline-active #app-dock {
   }
 
   /* Heatmap: make horizontally scrollable */
-  .hm-table {
-    font-size: var(--text-base);
-  }
-  .hm-name-cell {
-    min-width: 140px;
-  }
-  .hm-section-val {
-    font-size: var(--text-2xl);
-  }
-  .hm-overall-val {
-    font-size: var(--text-3xl);
-  }
 
   /* Score grid: horizontally scrollable with sticky names */
-  .score-grid {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
   .score-name {
     position: sticky;
     left: 0;
@@ -3217,24 +2763,6 @@ body.offline-active #app-dock {
 @media (max-width: 480px) {
   .page-main {
     padding: 8px 6px;
-  }
-
-  .hm-table {
-    font-size: var(--text-sm);
-  }
-  .hm-avatar {
-    width: 24px;
-    height: 24px;
-    font-size: var(--text-2xs);
-  }
-  .hm-student-name {
-    font-size: var(--text-base);
-  }
-  .hm-section-val {
-    font-size: var(--text-xl);
-  }
-  .hm-overall-val {
-    font-size: var(--text-2xl);
   }
 
   .student-name-xl {
