@@ -3105,6 +3105,7 @@ window.ReportQuestionnaire = (function () {
     var handle = fixed ? SPACER : HANDLE;
     if (row.step === 'notHandedIn') return _missingRowHtml(cid, f, handle, i);
     if (row.step === 'support') return _supportRowHtml(cid, student, f, handle, i);
+    if (row.step === 'languageGoals') return _langRowHtml(cid, student, f, handle, i);
     if (row.step === 'closer') return _closingRowHtml(cid, handle, i);
     if (_isRequired(row.step, path))
       return _requiredRowHtml(
@@ -3559,6 +3560,7 @@ window.ReportQuestionnaire = (function () {
         var open = !!_wording && _wording.index === i;
         _wording = open ? null : { index: i };
         _supportMenu = false;
+        _langMenu = false;
         _limitOpen = false;
         _syncRequired();
         if (!open) _focusSel('#tq-wording-menu .qn-menu-item.on');
@@ -3639,6 +3641,7 @@ window.ReportQuestionnaire = (function () {
      Management edits it). Teacher text is used exactly as typed. */
   var _lineEdit = null; // 'closing', 'late' or 'own' while its box is open
   var _supportMenu = false;
+  var _langMenu = false; // the Language Goals row's menu
 
   function _courseName(cid) {
     return (typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name) || 'this class';
@@ -3787,6 +3790,80 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
+  /* The Language Goals row (plan PR 3b): only for a student assessed on
+     language goals. FullVision has no language-proficiency facts, so the
+     teacher ticks the lines used in the class and picks one for each
+     student here; until one is picked the comment leaves the sentence
+     out. Each line is a template, shown filled for the student. */
+  function _langMenuHtml(cid, student, f, choice) {
+    var course = _courseName(cid);
+    var first = _first(student);
+    var ctx = _bankContext(cid, student, f);
+    var filled = function (text) {
+      return CommentBank.fill({ text: text }, ctx);
+    };
+    var lines = CommentBank.languageGoalsChecklist(cid);
+    var on = lines.filter(function (l) {
+      return l.on;
+    });
+    var item = function (id, text, meta, checked, tip) {
+      return `<button type="button" role="menuitemradio" aria-checked="${checked}" class="qn-menu-item${checked ? ' on' : ''}" data-action="tqLine" data-do="pickLang" data-line="${esc(id)}" title="${esc(tip)}"><span class="qn-menu-mark" aria-hidden="true">${checked ? '✓' : ''}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(text)}</span>${meta ? `<span class="qn-menu-meta">${esc(meta)}</span>` : ''}</span></button>`;
+    };
+    var use = on
+      .map(function (l) {
+        var inUse = !!choice && choice.line.id === l.id;
+        return item(l.id, filled(l.text), inUse ? 'In use' : '', inUse, 'Use this line in ' + first + '’s comment.');
+      })
+      .join('');
+    var useHtml = on.length
+      ? `<span class="qn-menu-head">Use for ${esc(first)}</span>${use}${item('none', 'Leave this sentence out', 'For ' + first + ' only', !choice, 'Leaves the language goal out of ' + first + '’s comment.')}<div class="qn-menu-sep" role="separator"></div>`
+      : '';
+    var checks = lines
+      .map(function (l) {
+        return `<label class="qn-menu-check" title="${esc(l.on ? 'Untick to stop using this line in ' + course + '.' : 'Tick if you use this line in ' + course + '.')}"><input type="checkbox" data-tq-lang="${esc(l.id)}"${l.on ? ' checked' : ''}>${esc(filled(l.text))}</label>`;
+      })
+      .join('');
+    var own =
+      _lineEdit === 'ownLang'
+        ? `<div class="qn-line-edit qn-menu-own">
+            <input type="text" class="qn-line-input" id="tq-line-own-lang" data-tq-line-input="ownLang" aria-label="Your own language goal line for ${esc(course)}" title="Say what the student can do in English and one next step. Write {He} and {his} where the pronouns go.">
+            <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqLine" data-do="cancel" title="Closes without adding a line.">Cancel</button><button type="button" class="qn-line-save" data-action="tqLine" data-do="saveOwnLang" title="Adds this line to ${esc(course)}’s list and ticks it.">Save for Class</button></div>
+          </div>`
+        : `<button type="button" class="qn-menu-add" data-action="tqLine" data-do="writeOwnLang" title="Write a language goal line of your own for ${esc(course)}.">+ Write Your Own</button>`;
+    return `<div class="qn-menu" role="menu" aria-label="Language goal lines for ${esc(course)}" id="tq-lang-menu">
+      ${useHtml}
+      <span class="qn-menu-head">Lines you use in ${esc(course)}</span>
+      ${checks}
+      ${own}
+    </div>`;
+  }
+
+  function _langRowHtml(cid, student, f, handle, i) {
+    var course = _courseName(cid);
+    var first = _first(student);
+    var any = ((f.classLines && f.classLines.languageGoals) || []).length > 0;
+    var choice = CommentBank.languageGoalChoice(f);
+    var menu = _langMenu ? _langMenuHtml(cid, student, f, choice) : '';
+    var open = ` aria-haspopup="menu" aria-expanded="${_langMenu}"`;
+    handle = handle || '';
+    if (!any)
+      return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-languageGoals"${_rowAttr(i)}>
+        ${handle}<div class="qn-req-part"><span class="qn-req-label">Language Goals</span></div>
+        <span class="qn-line-empty">No language goal lines chosen for this class. The comment leaves this sentence out.</span>
+        <button type="button" class="qn-line-choose" data-action="tqLine" data-do="langMenu"${open} title="Tick the language goal lines you use in ${esc(course)}.">Choose…</button>
+        ${menu}
+      </div>`;
+    var body = choice
+      ? `<span class="qn-req-text">${esc(CommentBank.fill({ text: choice.line.text }, _bankContext(cid, student, f)))}</span><span class="qn-req-source">One of your language goal lines for ${esc(course)}</span>`
+      : `<span class="qn-req-text qn-line-off">No language goal picked for ${esc(first)}. The comment leaves this sentence out.</span><span class="qn-req-source">For ${esc(first)} only</span>`;
+    return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-languageGoals"${_rowAttr(i)}>
+      ${handle}<div class="qn-req-part"><span class="qn-req-label">Language Goals</span></div>
+      <div class="qn-req-body">${body}</div>
+      <button type="button" class="qn-line-menu${_langMenu ? ' on' : ''}" data-action="tqLine" data-do="langMenu"${open} title="Pick the language goal for ${esc(first)}, or tick the lines you use in ${esc(course)}.">Language Goal ▾</button>
+      ${menu}
+    </div>`;
+  }
+
   function _closingRowHtml(cid, handle, i) {
     var course = _courseName(cid);
     var closing = CommentBank.classSettings(cid).closing;
@@ -3822,6 +3899,7 @@ window.ReportQuestionnaire = (function () {
     var ie = CommentBank.reportPath(f) === 'ie';
     var rows = '';
     if (!ie && f.notHandedIn && f.notHandedIn.count > 0) rows += _missingRowHtml(cid, f);
+    if (CommentBank.reportPath(f) === 'language_goals') rows += _langRowHtml(cid, student, f);
     if (!ie) rows += _supportRowHtml(cid, student, f);
     return rows + _closingRowHtml(cid);
   }
@@ -3937,10 +4015,12 @@ window.ReportQuestionnaire = (function () {
       case 'limitMenu':
         _limitOpen = !_limitOpen;
         _supportMenu = false;
+        _langMenu = false;
         _redrawLines(_limitOpen ? 'tq-limit-input' : 'tq-count-btn');
         return;
       case 'supportMenu':
         _supportMenu = !_supportMenu;
+        _langMenu = false;
         _limitOpen = false;
         if (_lineEdit === 'own') _lineEdit = null;
         _redrawLines(_supportMenu ? null : 'tq-row-support');
@@ -3961,6 +4041,44 @@ window.ReportQuestionnaire = (function () {
         _lineEdit = 'own';
         _redrawLines('tq-line-own');
         return;
+      case 'langMenu':
+        _langMenu = !_langMenu;
+        _supportMenu = false;
+        _limitOpen = false;
+        if (_lineEdit === 'ownLang') _lineEdit = null;
+        _redrawLines(_langMenu ? null : 'tq-row-languageGoals');
+        _focusSel('#tq-lang-menu .qn-menu-item.on, #tq-lang-menu .qn-menu-item, #tq-lang-menu input');
+        return;
+      case 'pickLang': {
+        var goalPicks = Object.assign({}, cs.languageGoalsFor);
+        goalPicks[termId] = Object.assign({}, goalPicks[termId] || {});
+        var lineId = el && el.dataset.line ? String(el.dataset.line) : null;
+        goalPicks[termId][st.id] = lineId === 'none' ? null : lineId;
+        _saveSettings({ languageGoalsFor: goalPicks });
+        _langMenu = false;
+        _afterLine(before, 'languageGoalLine', false);
+        _redrawLines(null);
+        _focusSel('#tq-row-languageGoals .qn-line-menu');
+        return;
+      }
+      case 'writeOwnLang':
+        _lineEdit = 'ownLang';
+        _redrawLines('tq-line-own-lang');
+        return;
+      case 'saveOwnLang': {
+        var langText = _lineValue('own-lang');
+        if (!langText) return;
+        var langId = 'own-' + Date.now().toString(36);
+        _saveSettings({
+          languageGoalsOwn: cs.languageGoalsOwn.concat([{ id: langId, text: langText }]),
+          languageGoalsChosen: cs.languageGoalsChosen.concat([langId]),
+        });
+        _lineEdit = null;
+        _afterLine(before, 'languageGoalLine', false);
+        _redrawLines(null);
+        _focusSel('#tq-lang-menu .qn-menu-add');
+        return;
+      }
       case 'saveOwn': {
         var text = _lineValue('own');
         if (!text) return;
@@ -3978,6 +4096,7 @@ window.ReportQuestionnaire = (function () {
       case 'editClosing':
         _lineEdit = 'closing';
         _supportMenu = false;
+        _langMenu = false;
         _redrawLines('tq-line-closing');
         return;
       case 'saveClosing':
@@ -3990,6 +4109,7 @@ window.ReportQuestionnaire = (function () {
       case 'editLate':
         _lineEdit = 'late';
         _supportMenu = false;
+        _langMenu = false;
         _redrawLines('tq-line-late');
         return;
       case 'saveLate': {
@@ -4007,7 +4127,13 @@ window.ReportQuestionnaire = (function () {
         _lineEdit = null;
         _redrawLines(null);
         _focusSel(
-          was === 'own' ? '#tq-support-menu .qn-menu-add' : was === 'closing' ? '#tq-row-closing button' : null,
+          was === 'own'
+            ? '#tq-support-menu .qn-menu-add'
+            : was === 'ownLang'
+              ? '#tq-lang-menu .qn-menu-add'
+              : was === 'closing'
+                ? '#tq-row-closing button'
+                : null,
         );
         return;
       }
@@ -4028,6 +4154,22 @@ window.ReportQuestionnaire = (function () {
     if (!el || !el.dataset) return;
     if (el.dataset.tqLimit) {
       _setLimit(el.value);
+      return;
+    }
+    var langId = el.dataset.tqLang;
+    if (langId) {
+      var stu = _current();
+      if (!stu) return;
+      tqSaveCurrentIfNeeded();
+      var was = _bankContext(_activeCourse, stu, _facts(stu, true));
+      var langChosen = CommentBank.classSettings(_activeCourse).languageGoalsChosen.filter(function (x) {
+        return x !== langId;
+      });
+      if (el.checked) langChosen.push(langId);
+      _saveSettings({ languageGoalsChosen: langChosen });
+      _afterLine(was, 'languageGoalLine', false);
+      _redrawLines(null);
+      _focusSel('#tq-lang-menu [data-tq-lang="' + langId + '"]');
       return;
     }
     var id = el.dataset.tqSupport;
@@ -4056,7 +4198,7 @@ window.ReportQuestionnaire = (function () {
 
   /* Whether a popover or a line's box is open. */
   function linesOpen() {
-    return _supportMenu || _limitOpen || !!_lineEdit || !!_wording || !!(_browse && _browse.menu);
+    return _supportMenu || _langMenu || _limitOpen || !!_lineEdit || !!_wording || !!(_browse && _browse.menu);
   }
   /* A click outside an open menu or the limit closes it; a box being
      edited stays until Cancel, Save for Class or Escape. */
@@ -4066,6 +4208,11 @@ window.ReportQuestionnaire = (function () {
     if (_supportMenu && !target.closest('#tq-support-menu, #tq-row-support [data-do="supportMenu"]')) {
       _supportMenu = false;
       if (_lineEdit === 'own') _lineEdit = null;
+      redraw = true;
+    }
+    if (_langMenu && !target.closest('#tq-lang-menu, #tq-row-languageGoals [data-do="langMenu"]')) {
+      _langMenu = false;
+      if (_lineEdit === 'ownLang') _lineEdit = null;
       redraw = true;
     }
     if (_limitOpen && !target.closest('#tq-limit, #tq-count-btn')) {
@@ -4100,13 +4247,15 @@ window.ReportQuestionnaire = (function () {
       return true;
     }
     var limit = _limitOpen;
-    var menu = _supportMenu;
+    var menu = _supportMenu || _langMenu;
+    var langWas = _langMenu;
     if (limit) {
       var input = document.getElementById('tq-limit-input');
       if (input) _setLimit(input.value);
     }
     var was = _lineEdit;
     _supportMenu = false;
+    _langMenu = false;
     _limitOpen = false;
     _lineEdit = null;
     _redrawLines(null);
@@ -4114,7 +4263,9 @@ window.ReportQuestionnaire = (function () {
       limit
         ? '#tq-count-btn'
         : menu
-          ? '#tq-row-support [data-do="supportMenu"]'
+          ? langWas
+            ? '#tq-row-languageGoals [data-do="langMenu"]'
+            : '#tq-row-support [data-do="supportMenu"]'
           : was === 'closing'
             ? '#tq-row-closing button'
             : was === 'late'
