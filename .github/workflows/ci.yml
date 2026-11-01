@@ -33,6 +33,11 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      # Fails on a new innerHTML site the audit can't prove safe (not in
+      # docs/xss-baseline.json). See scripts/audit-innerhtml.mjs.
+      - name: Check innerHTML sites
+        run: npm run audit:html
+
       # Fails when the client calls an RPC the live database doesn't have, or
       # a file in migrations/ was never applied. Skipped until the read-only
       # role's connection string is saved as a secret (see
