@@ -16,8 +16,8 @@ test('gradebook search keeps the focus and the text as typed', async ({ page }) 
 
   await expect(search).toHaveValue('Alice ');
   await expect(search).toBeFocused();
-  await expect(page.locator('.gb-grid-rowhead')).toHaveCount(1);
-  await expect(page.locator('.gb-grid-rowhead')).toContainText('Alice');
+  await expect(page.locator('.gb-grid-rowhead:not(.gb-grid-rowhead-stats)')).toHaveCount(1);
+  await expect(page.locator('.gb-grid-rowhead:not(.gb-grid-rowhead-stats)')).toContainText('Alice');
 
   // The caret stays where it was: delete the first letter, then put it back.
   for (let i = 0; i < 5; i++) await page.keyboard.press('ArrowLeft');
