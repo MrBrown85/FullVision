@@ -1769,6 +1769,10 @@ window.PageReports = (function () {
       tqSentences: function () {
         RQ.tqSentences(el.dataset.do, el);
       },
+      // Marks changed after approval: Keep as Approved or Use the New Sentence.
+      tqStale: function () {
+        RQ.tqStale(el.dataset.do, el.dataset.i);
+      },
       toggleStudentPicker: function () {
         toggleStudentPicker(e);
       },

@@ -4307,8 +4307,9 @@ function _fillOverrideCalculated(cid) {
    fields win; the nine "dims" the old questionnaire rated were never stored
    on the server, so this device keeps its own (read by old reports only).
    The six habits and the approval are on the server since Oct 28 2026; the
-   reporting basis and the IE deadline since Oct 31 2026 (a server without
-   those columns sends neither, and this device's copy is kept). A
+   reporting basis and the IE deadline since Oct 31 2026, and what an
+   approved comment was built from (draft_meta) after it (a server without
+   those columns sends none, and this device's copy is kept). A
    rating this device has and the server doesn't was written while saves
    never reached the server (term ids read as NaN until Oct 2026): it is sent
    now, once. */
@@ -4332,6 +4333,12 @@ function _applyBundleTermRatings(cid, rows) {
       reportingBasis: 'reporting_basis' in r ? r.reporting_basis || 'grade' : prev.reportingBasis || 'grade',
       ieDeadline:
         'ie_deadline' in r ? (r.ie_deadline ? String(r.ie_deadline).slice(0, 10) : null) : prev.ieDeadline || null,
+      draftMeta:
+        'draft_meta' in r
+          ? r.draft_meta && typeof r.draft_meta === 'object'
+            ? r.draft_meta
+            : null
+          : prev.draftMeta || null,
       workHabits: r.work_habits_rating || 0,
       participation: r.participation_rating || 0,
       socialTraits: r.social_traits || [],
@@ -11450,6 +11457,11 @@ window.v2.saveTermRating = function (enrollmentId, term, payload) {
   // ignores both keys.
   if ('reportingBasis' in payload) wire.reporting_basis = payload.reportingBasis || 'grade';
   if ('ieDeadline' in payload) wire.ie_deadline = payload.ieDeadline || null;
+  // What an approved comment was built from (20261031_term_rating_draft_meta),
+  // for the marks-changed check. A server without the column ignores it.
+  if ('draftMeta' in payload) {
+    wire.draft_meta = payload.draftMeta && typeof payload.draftMeta === 'object' ? payload.draftMeta : null;
+  }
   if (Array.isArray(payload.dimensions)) {
     wire.dimensions = payload.dimensions.map(function (d) {
       return { section_id: d.sectionId, rating: Number(d.rating) };
@@ -11922,6 +11934,7 @@ var _TERM_RATING_WIRE = {
   approvedAt: 'approved',
   reportingBasis: 'reportingBasis',
   ieDeadline: 'ieDeadline',
+  draftMeta: 'draftMeta',
 };
 function _termRatingPatch(data) {
   var payload = {};

@@ -2923,8 +2923,8 @@ window.CommentBank = (function () {
      in its step; order: step keys or sentence ids in the teacher's order;
      angleUses: { angle id: n } in the class (else this session's drafts in
      the class); exclude: sentence ids never to use (last term's approved
-     sentences, once draft_meta stores them; the screen passes none yet);
-     bank }.
+     sentences, from that report's draft_meta: approvedIds()); bank;
+     quiet: a draft for a check, not counted in the class's usage }.
 
      Returns { text, ids, sentences, provenance, replaced, angle, seed }:
      each sentence { id, part, step, text, kept? } in order, where each came
@@ -2938,7 +2938,8 @@ window.CommentBank = (function () {
     var f = ctx._f || null;
     var cid = f && f.cid;
     var sid = f && f.sid;
-    var tally = cid != null && sid != null;
+    // quiet: a draft for a check (staleness()), not counted in the class.
+    var tally = cid != null && sid != null && !opts.quiet;
     var story = f ? angle(f, ctx._picks, { uses: opts.angleUses || (tally ? _usesFor(cid, sid) : {}) }) : null;
     var kept = _kept(opts.kept, bank);
     var seq = _sequence(
@@ -3846,6 +3847,344 @@ window.CommentBank = (function () {
     return _realised({ sentences: sentences, provenance: out, replaced: replaced });
   }
 
+  /* ── Marks changed after approval (plan PR 12) ─────────────────────── */
+
+  /* With each approval the screen keeps what the comment was built from
+     (term_rating.draft_meta): each sentence's id, part, step, text and
+     whether the teacher edited it, the slot values it was filled with, the
+     class sentences it used (closing, support, late work) as they were,
+     and a hash of the gradebook facts. On a later visit staleness()
+     compares that record with today's facts and class settings. Approved
+     text is never rewritten here: it only says what changed and what is
+     true now, and the teacher decides. */
+  var CLASS_SENTENCE_STEPS = { closing: 'closer', support: 'support', late_work: 'lateWork' };
+  var STEP_CLASS_SENTENCE = { closer: 'closing', support: 'support', lateWork: 'late_work' };
+
+  /* JSON with every object's keys in order, so the same facts always give
+     the same text. */
+  function _stable(v) {
+    if (Array.isArray(v)) return '[' + v.map(_stable).join(',') + ']';
+    if (v && typeof v === 'object') {
+      return (
+        '{' +
+        Object.keys(v)
+          .sort()
+          .filter(function (k) {
+            return v[k] !== undefined && typeof v[k] !== 'function';
+          })
+          .map(function (k) {
+            return JSON.stringify(k) + ':' + _stable(v[k]);
+          })
+          .join(',') +
+        '}'
+      );
+    }
+    return JSON.stringify(v === undefined ? null : v);
+  }
+
+  /* Each piece's mark this term, by piece: 'work:<id>' { t: title, m: its
+     level and % }, and 'missing:<title>' for work labelled Missing. What
+     names the pieces that changed ("“Lab 3” was marked …"). */
+  function marksOf(f) {
+    var out = {};
+    var titles = {};
+    ((typeof getAssessments === 'function' && f && getAssessments(f.cid)) || []).forEach(function (a) {
+      titles[a.id] = a.title || '';
+    });
+    ((f && f.work) || []).forEach(function (w) {
+      out['work:' + w.id] = { t: w.title || '', m: [w.v, w.pct == null ? '' : w.pct].join('|') };
+    });
+    ((f && f.grade && f.grade.pieces) || []).forEach(function (p) {
+      var k = 'work:' + p.id;
+      if (out[k]) out[k].m += '|' + p.pct;
+      else out[k] = { t: titles[p.id] || '', m: '|' + p.pct };
+    });
+    ((f && f.notHandedIn && f.notHandedIn.titles) || []).forEach(function (t) {
+      out['missing:' + t] = { t: t, m: 'NS' };
+    });
+    return out;
+  }
+
+  /* A hash of the gradebook facts a comment is built from: every piece's
+     mark, the Notes for the Report, the levels per competency, the record
+     of work handed in, the course grade and the attendance. The student's
+     answers, the habit ratings and the class settings are not in it. */
+  function factsHash(f) {
+    if (!f) return '';
+    var g = f.grade || {};
+    var text = _stable({
+      marks: marksOf(f),
+      notes: (f.work || []).map(function (w) {
+        return [w.id, w.note || ''];
+      }),
+      comps: (f.comps || []).map(function (c) {
+        return [c.id, c.start, c.now, c.level];
+      }),
+      record: f.record || null,
+      overall: f.overall || 0,
+      letter: f.letter || '',
+      grade: [g.mode, g.letter, g.pct, g.basis, g.ieDeadline || '', g.marked || null],
+      attendance: [f.absent == null ? null : f.absent, f.late == null ? null : f.late],
+    });
+    return 'h' + seedFor(text).toString(16) + '.' + seedFor(text.split('').reverse().join('')).toString(16);
+  }
+
+  function _clone(v) {
+    return v == null ? v : JSON.parse(JSON.stringify(v));
+  }
+
+  /* The record kept with an approval, from the rows on screen (the
+     Sentences card's: { id, step, text, edited, classLine, raw, prov,
+     kept }). A row the teacher chose Keep as Approved on stays kept, and a
+     class sentence they kept after an edit stays seen while the comment
+     still uses it (opts.prev, the record before). opts: { approvedAt, prev,
+     bank }. */
+  function draftMeta(rows, f, opts) {
+    opts = opts || {};
+    var bank = opts.bank || COMMENT_BANK;
+    var inBank = {};
+    bank.sentences.forEach(function (s) {
+      inBank[s.id] = true;
+    });
+    var sentences = [];
+    var slots = {};
+    var used = {};
+    var keptBefore = {};
+    ((opts.prev && opts.prev.sentences) || []).forEach(function (x) {
+      if (x && x.kept) keptBefore[x.id + '\u0000' + x.text] = true;
+    });
+    (rows || []).forEach(function (r) {
+      if (!r || !String(r.text || '').trim()) return;
+      var x = {
+        id: String(r.id),
+        part: (r.raw && r.raw.part) || (r.prov && r.prov.part) || null,
+        step: r.step || null,
+        text: String(r.text),
+        edited: !!r.edited,
+      };
+      if (!r.edited && (r.kept || keptBefore[x.id + '\u0000' + x.text])) x.kept = true;
+      if (r.classLine) {
+        x.class_line = true;
+        var k = STEP_CLASS_SENTENCE[r.step];
+        if (k && !r.edited) used[k] = String(r.text);
+      } else if (!r.edited && r.prov && inBank[r.id]) {
+        x.values = _clone(r.prov.values || {});
+        x.sources = _clone(r.prov.sources || {});
+        Object.keys(x.values).forEach(function (k) {
+          if (!/^when\./.test(k)) slots[k] = x.values[k];
+        });
+      }
+      sentences.push(x);
+    });
+    var out = {
+      v: 1,
+      sentences: sentences,
+      slots: slots,
+      class_sentences: used,
+      facts_hash: factsHash(f),
+      marks: marksOf(f),
+      approved_at: opts.approvedAt || null,
+    };
+    var prev = opts.prev || {};
+    var seen = {};
+    Object.keys(prev.class_seen || {}).forEach(function (k) {
+      if (used[k] != null && (prev.class_sentences || {})[k] === used[k]) seen[k] = prev.class_seen[k];
+    });
+    if (Object.keys(seen).length) out.class_seen = seen;
+    return out;
+  }
+
+  /* The approved sentence ids a draft for the next report leaves out
+     (draft()'s exclude): the bank sentences in the record, as approved,
+     not the teacher's own. */
+  function approvedIds(meta) {
+    return ((meta && meta.sentences) || [])
+      .filter(function (x) {
+        return x && x.id && !x.edited && !x.class_line && !/^(text|class):/.test(String(x.id));
+      })
+      .map(function (x) {
+        return String(x.id);
+      });
+  }
+
+  /* The pieces whose mark changed between two marksOf() records, by title,
+     each once, in the order they come. */
+  function changedPieces(was, now) {
+    var out = [];
+    was = was || {};
+    now = now || {};
+    Object.keys(was)
+      .concat(Object.keys(now))
+      .forEach(function (k) {
+        var a = was[k];
+        var b = now[k];
+        if (a && b && a.m === b.m) return;
+        var t = String((b && b.t) || (a && a.t) || '').trim();
+        if (t && out.indexOf(t) < 0) out.push(t);
+      });
+    return out;
+  }
+
+  /* The sentence that is true now in place of sentence i of an approved
+     comment (list: its record's sentences): the same bank sentence filled
+     with today's values when it still holds; else the sentence a draft
+     gives that step today, every other sentence kept as approved; else
+     none ({ text: '' }, the step no longer applies). Filled for its place
+     (the realiser). Returns { text, id }. */
+  function _nowTrue(list, i, s, f, ctx, bank) {
+    var x = list[i];
+    if (s && fits(s, ctx) && !_failed(s, provenance(s, ctx), f, ctx).length) {
+      var xs = list.map(function (y, j) {
+        return j === i
+          ? { id: s.id, part: s.part, step: x.step, text: fill(s, ctx), toks: sentenceTokens(s, ctx), who: whoOf(ctx) }
+          : { id: y.id, text: y.text };
+      });
+      return { text: R.realise(xs).sentences[i].text, id: s.id };
+    }
+    if (!x.step) return { text: '', id: null };
+    var kept = {};
+    var order = [];
+    list.forEach(function (y, j) {
+      if (!y.step) return;
+      order.push(y.step);
+      if (j !== i) kept[y.step] = y.text;
+    });
+    var d = draft(ctx, { seed: seedFor(String(f.sid)), kept: kept, order: order, bank: bank, quiet: true });
+    var hit = d.sentences.find(function (y) {
+      return y.step === x.step && !y.kept;
+    });
+    return hit ? { text: hit.text, id: hit.id } : { text: '', id: null };
+  }
+
+  /* What no longer holds in an approved comment, from its record (meta),
+     today's facts (f) and the picks it was drafted with ({ habits, focus }).
+     A sentence is flagged when the facts hash differs and a value it
+     claims changed (verify() fails it), or when it is a class sentence
+     that has been edited since. Sentences the teacher edited, kept as
+     approved, or wrote are never flagged.
+
+     Returns null when nothing changed, else { changes: [{ i, kind:
+     'marks'|'class', key (class: closing, support, late_work), before:
+     the approved sentence, after: the sentence that is true now ('' when
+     no sentence fits now) }], pieces: titles whose mark changed, hasGrade,
+     gradeChanged, hash }. opts: { text: the saved comment (a change whose
+     sentence is no longer in it is dropped), bank }. */
+  function staleness(meta, f, picks, opts) {
+    opts = opts || {};
+    if (!meta || !f || !Array.isArray(meta.sentences) || !meta.sentences.length) return null;
+    var bank = opts.bank || COMMENT_BANK;
+    var list = meta.sentences;
+    var ctx = context(f, picks);
+    var changes = [];
+
+    // A class sentence the comment used, edited since (or seen and kept).
+    var seen = meta.class_seen || {};
+    var cls = meta.class_sentences || {};
+    Object.keys(cls).forEach(function (k) {
+      var step = CLASS_SENTENCE_STEPS[k];
+      var def =
+        step &&
+        DRAFT_STEPS.find(function (x) {
+          return x.key === step;
+        });
+      if (!def) return;
+      var was = String(seen[k] != null ? seen[k] : cls[k]).trim();
+      var now = String(ctx[def.line] || '').trim();
+      if (now === was) return;
+      var i = list.findIndex(function (x) {
+        return x && x.class_line && x.step === step && !x.edited;
+      });
+      if (i < 0 || String(list[i].text).trim() === now) return;
+      changes.push({ i: i, kind: 'class', key: k, before: list[i].text, after: now });
+    });
+
+    // Marks: only when the facts are not what they were.
+    var hash = factsHash(f);
+    if (meta.facts_hash && meta.facts_hash !== hash) {
+      var byId = {};
+      bank.sentences.forEach(function (s) {
+        byId[s.id] = s;
+      });
+      var at = {};
+      var d = { sentences: [], provenance: [] };
+      list.forEach(function (x, i) {
+        var s = byId[x.id];
+        var check = !!s && !x.edited && !x.kept && !x.class_line && !!x.values;
+        if (check && !(x.id in at)) at[x.id] = i;
+        d.sentences.push({ id: x.id, part: x.part, step: x.step, text: x.text });
+        d.provenance.push(
+          check
+            ? {
+                sentenceId: x.id,
+                part: s.part,
+                claims: (s.claims || []).slice(),
+                factKeys: [],
+                values: x.values,
+                sources: x.sources || {},
+              }
+            : { sentenceId: x.id, kept: true },
+        );
+      });
+      var v = verify(d, f, picks, { bank: bank });
+      (v.replaced || []).forEach(function (r) {
+        var i = at[r.sentenceId];
+        if (i == null) return;
+        var now = _nowTrue(list, i, byId[r.sentenceId], f, ctx, bank);
+        if (now.text === list[i].text) return;
+        changes.push({ i: i, kind: 'marks', before: list[i].text, after: now.text, id: now.id });
+      });
+    }
+
+    if (opts.text != null) {
+      var text = String(opts.text);
+      changes = changes.filter(function (c) {
+        return text.indexOf(c.before) >= 0;
+      });
+    }
+    if (!changes.length) return null;
+    changes.sort(function (a, b) {
+      return a.i - b.i;
+    });
+    var marks = changes.some(function (c) {
+      return c.kind === 'marks';
+    });
+    return {
+      changes: changes,
+      pieces: marks ? changedPieces(meta.marks, marksOf(f)) : [],
+      hasGrade: list.some(function (x) {
+        return x && x.step === 'grade';
+      }),
+      gradeChanged: changes.some(function (c) {
+        return c.kind === 'marks' && list[c.i].step === 'grade';
+      }),
+      hash: hash,
+    };
+  }
+
+  /* The record after Keep as Approved on one change: a marks change keeps
+     that sentence as approved (never checked again); a class change notes
+     the class sentence as seen, so only a later edit flags it again. Once
+     no marks change is left, the facts as they are now become the record's
+     facts. stale: staleness()'s result the change came from. */
+  function keepApproved(meta, change, stale, f) {
+    var out = _clone(meta) || {};
+    if (!change) return out;
+    if (change.kind === 'class') {
+      out.class_seen = Object.assign({}, out.class_seen || {});
+      out.class_seen[change.key] = change.after;
+      return out;
+    }
+    if (out.sentences && out.sentences[change.i]) out.sentences[change.i].kept = true;
+    var left = ((stale && stale.changes) || []).some(function (c) {
+      return c.kind === 'marks' && c.i !== change.i;
+    });
+    if (!left && f) {
+      out.facts_hash = factsHash(f);
+      out.marks = marksOf(f);
+    }
+    return out;
+  }
+
   return {
     SCALE: SCALE,
     HABITS: HABITS,
@@ -3879,6 +4218,13 @@ window.CommentBank = (function () {
     stepPool: stepPool,
     provenance: provenance,
     verify: verify,
+    factsHash: factsHash,
+    marksOf: marksOf,
+    draftMeta: draftMeta,
+    approvedIds: approvedIds,
+    changedPieces: changedPieces,
+    staleness: staleness,
+    keepApproved: keepApproved,
     CLAIMS: CLAIMS,
     STANDING: STANDING,
     aOrAn: aOrAn,
