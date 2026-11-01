@@ -30,6 +30,58 @@ function sanitizeHtml(raw) {
   return out.innerHTML;
 }
 
+/* ── Printing one sheet (grade sheets, rubrics, QR slips) ──── */
+/* The page rule for a sheet that prints on its own: the paper ("letter
+   portrait", "legal portrait") and one margin on every page, :left, :right
+   and :first included, so reports.css's duplex margins can't apply. */
+function printPageCss(size, margin) {
+  return (
+    '@page { size: ' +
+    size +
+    '; margin: ' +
+    margin +
+    '; }\n@page :left { margin: ' +
+    margin +
+    '; }\n@page :right { margin: ' +
+    margin +
+    '; }\n@page :first { margin: ' +
+    margin +
+    '; }'
+  );
+}
+
+/* Turns a sheet's print mode on: its page rule, last in <head> every time
+   so a page rule another screen left behind can't win, and the body class
+   that shows only the sheet. */
+function setPrintMode(styleId, bodyClass, size, margin) {
+  var style = document.getElementById(styleId) || document.createElement('style');
+  style.id = styleId;
+  style.textContent = printPageCss(size, margin);
+  document.head.appendChild(style);
+  document.body.classList.add(bodyClass);
+}
+
+function clearPrintMode(styleId, bodyClass) {
+  document.body.classList.remove(bodyClass);
+  var style = document.getElementById(styleId);
+  if (style) style.remove();
+}
+
+/* window.print(), then `cleanup` once. Chrome returns from print() when its
+   dialog closes; a browser that returns at once fires afterprint later. */
+function printThen(cleanup) {
+  var finished = false;
+  function done() {
+    if (finished) return;
+    finished = true;
+    window.removeEventListener('afterprint', done);
+    cleanup();
+  }
+  window.addEventListener('afterprint', done);
+  window.print();
+  setTimeout(done, 0);
+}
+
 /* ── Course-switch input lock (P7.3) ───────────────────────── */
 /* While a class loads, the previous class is still on screen. setPageLock
    (shared/data.js) makes the page inert, which blocks the keyboard as well

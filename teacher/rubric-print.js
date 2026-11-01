@@ -787,60 +787,25 @@
     return out;
   }
 
-  function _pageStyle(layoutKey) {
-    var layout = LAYOUTS[layoutKey] || LAYOUTS.full;
-    var size = 'letter ' + layout.orientation;
-    var margin = layout.margin + 'in';
-    // reports.css sets :left/:right margins for duplex reports; sheets are
-    // cut apart, so every page gets the same margin.
-    return (
-      '@page { size: ' +
-      size +
-      '; margin: ' +
-      margin +
-      '; }\n@page :left { margin: ' +
-      margin +
-      '; }\n@page :right { margin: ' +
-      margin +
-      '; }'
-    );
-  }
-
+  // Sheets are cut apart, so every page gets the same margin (ui.js setPrintMode).
   function _activatePrintMode(layoutKey) {
-    var style = document.getElementById(STYLE_ID);
-    if (!style) {
-      style = document.createElement('style');
-      style.id = STYLE_ID;
-      document.head.appendChild(style);
-    }
-    style.textContent = _pageStyle(layoutKey);
-    document.body.classList.add('rubric-print-active');
+    var layout = LAYOUTS[layoutKey] || LAYOUTS.full;
+    setPrintMode(STYLE_ID, 'rubric-print-active', 'letter ' + layout.orientation, layout.margin + 'in');
   }
 
   function _deactivatePrintMode() {
-    document.body.classList.remove('rubric-print-active');
-    var style = document.getElementById(STYLE_ID);
-    if (style) style.remove();
+    clearPrintMode(STYLE_ID, 'rubric-print-active');
   }
 
   function print(cid, aid, opts) {
     var out = stage(cid, aid, opts);
     if (!out.sheets) return out;
     _activatePrintMode(opts.layout);
-    var finished = false;
-    function done() {
-      if (finished) return;
-      finished = true;
-      window.removeEventListener('afterprint', done);
+    printThen(function () {
       _deactivatePrintMode();
       var root = document.getElementById(ROOT_ID);
       if (root) root.innerHTML = '';
-    }
-    window.addEventListener('afterprint', done);
-    window.print();
-    // Chrome returns from print() when the dialog closes; browsers that
-    // return at once fire afterprint later.
-    setTimeout(done, 0);
+    });
     return out;
   }
 
