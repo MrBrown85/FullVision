@@ -2,8 +2,8 @@
  * Bank strength and the near-identical audit's set-aside sentences (plan
  * PR 13). bankStrength() says, for each part a draft picks among bank
  * sentences for, how many sentences fit how many students, and flags a part
- * where more students draw only from its sentences than there are
- * sentences. nearIdentical() never counts a sentence every student must get
+ * where three or more students per sentence draw only from its sentences,
+ * so some sentence must serve three or more of them. nearIdentical() never counts a sentence every student must get
  * (the grade sentence, the class's closing, support and late-work lines) as
  * shared. Synthetic classes only (tests/eval-fixture.js,
  * scripts/eval/synthetic.mjs).
@@ -74,16 +74,24 @@ describe('bankStrength on a small class', () => {
   const part = (r, step) => r.parts.find(p => p.step === step);
   const sidOf = first => getStudents(cid).find(s => s.firstName === first).id;
 
-  it('flags a part with fewer sentences than the students who draw only from them', () => {
-    const r = CommentBank.bankStrength(cid, { termId, bank: bankOf([home('h1'), home('h2')]) });
+  it('flags a part whose sentences must each serve three or more of the students who draw only from them', () => {
+    expect(CommentBank.THIN_PER_SENTENCE).toBe(3);
+    const r = CommentBank.bankStrength(cid, { termId, bank: bankOf([home('h1')]) });
     expect(r.students).toBe(STUDENTS.length);
     expect(part(r, 'home')).toMatchObject({
-      sentences: 2,
+      sentences: 1,
       students: 5,
       thin: true,
-      worst: { sentences: 2, students: 5 },
+      worst: { sentences: 1, students: 5 },
     });
-    Object.values(r.byStudent).forEach(s => expect(s.home).toEqual({ sentences: 2, students: 5, thin: true }));
+    Object.values(r.byStudent).forEach(s => expect(s.home).toEqual({ sentences: 1, students: 5, thin: true }));
+  });
+
+  it('does not flag a part where a sentence repeats but none must serve three students', () => {
+    // Five students over two sentences: one repeats, none serves three.
+    const r = CommentBank.bankStrength(cid, { termId, bank: bankOf([home('h1'), home('h2')]) });
+    expect(part(r, 'home')).toMatchObject({ sentences: 2, students: 5, thin: false, worst: null });
+    Object.values(r.byStudent).forEach(s => expect(s.home).toEqual({ sentences: 2, students: 5, thin: false }));
   });
 
   it('does not flag a part with a sentence for every student', () => {
@@ -93,14 +101,19 @@ describe('bankStrength on a small class', () => {
   });
 
   it('counts with a student only the classmates whose sentences are all among theirs', () => {
-    // Mateo and Owen have work labelled Missing, so the third sentence fits
-    // only them: their three sentences fit all five students, the other
-    // three students have only the first two.
-    const bank = bankOf([home('h1'), home('h2'), home('h3', { needs: ['missingWork'] })]);
+    // Mateo and Owen have work labelled Missing, so the second sentence fits
+    // only them: their two sentences fit all five students, the other three
+    // students have only the first, which must serve all three of them.
+    const bank = bankOf([home('h1'), home('h2', { needs: ['missingWork'] })]);
     const r = CommentBank.bankStrength(cid, { termId, bank });
-    expect(r.byStudent[sidOf('Mateo')].home).toEqual({ sentences: 3, students: 5, thin: true });
-    expect(r.byStudent[sidOf('Noor')].home).toEqual({ sentences: 2, students: 3, thin: true });
-    expect(part(r, 'home')).toMatchObject({ sentences: 3, students: 5, worst: { sentences: 3, students: 5 } });
+    expect(r.byStudent[sidOf('Mateo')].home).toEqual({ sentences: 2, students: 5, thin: false });
+    expect(r.byStudent[sidOf('Noor')].home).toEqual({ sentences: 1, students: 3, thin: true });
+    expect(part(r, 'home')).toMatchObject({
+      sentences: 2,
+      students: 5,
+      thin: true,
+      worst: { sentences: 1, students: 3 },
+    });
   });
 
   it('leaves out the parts whose wording is fixed: grade, attendance, not handed in, class lines, the IE parts', () => {
@@ -112,7 +125,7 @@ describe('bankStrength on a small class', () => {
     expect(steps).toEqual(expect.arrayContaining(['habits', 'overall', 'example', 'nextStep', 'home']));
     r.parts.forEach(p => {
       expect(p.students).toBeLessThanOrEqual(STUDENTS.length);
-      if (p.thin) expect(p.worst.students).toBeGreaterThan(p.worst.sentences);
+      if (p.thin) expect(p.worst.students).toBeGreaterThanOrEqual(3 * p.worst.sentences);
     });
   });
 });
@@ -124,14 +137,14 @@ describe('bankStrength on a synthetic History 12 class', () => {
     r = CommentBank.bankStrength(cid, { termId });
   });
 
-  it('flags the habits part: the two "excellent" sentences fit every student rated all Consistently', () => {
+  it('flags the habits part: the two "excellent" sentences fit every student rated all Consistently, six or more', () => {
     const excellent = getStudents(cid).filter(st => {
       const f = CommentBank.facts(cid, st, termId);
       const rating = getStudentTermRating(cid, st.id, termId) || {};
       const ctx = CommentBank.context(f, { habits: rating.habits || {} });
       return CommentBank.reportPath(f) !== 'ie' && ctx.habitsExcellent;
     });
-    expect(excellent.length).toBeGreaterThan(2);
+    expect(excellent.length).toBeGreaterThanOrEqual(6);
     excellent.forEach(st =>
       expect(r.byStudent[st.id].habits).toEqual({ sentences: 2, students: excellent.length, thin: true }),
     );

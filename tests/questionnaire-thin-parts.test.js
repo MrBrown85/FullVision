@@ -1,7 +1,7 @@
 /**
  * Thin parts of the bank on the review screen (plan PR 13; the class
- * warnings mockup): a row whose part is thin for the student says so under
- * its source line, with "Write one of your own" opening Browse Sentences on
+ * warnings mockup): a row whose part is thin for the student (a sentence
+ * must serve three or more students) says so under its source line, with "Write one of your own" opening Browse Sentences on
  * that part. Demo Mode only.
  */
 import './setup.js';

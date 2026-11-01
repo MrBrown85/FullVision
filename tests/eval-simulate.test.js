@@ -86,7 +86,7 @@ describe('simulate', () => {
   it('lists the near-identical pairs and the thin parts per class', () => {
     r.classes.forEach(c => {
       c.nearIdentical.forEach(pairs => pairs.forEach(p => expect(p.shared).toBeGreaterThanOrEqual(5)));
-      c.thin.forEach(t => expect(t.students).toBeGreaterThan(t.sentences));
+      c.thin.forEach(t => expect(t.students).toBeGreaterThanOrEqual(3 * t.sentences));
     });
     expect(r.classes[2].thin.map(t => t.step)).toContain('habits');
   });
