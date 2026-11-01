@@ -4,8 +4,8 @@
  * One test per finding. Each test is written the way it should pass once the
  * finding is fixed, and is marked `it.fails` so it passes (the assertion
  * fails) while the bug is there. The fix PR for a group flips its tests from
- * `it.fails` to `it`. A test marked `it.skip` could not be made to fail for
- * the reason the finding gives; the comment above it says why.
+ * `it.fails` to `it`. A finding that turned out not to be a bug has a plain
+ * `it` that guards the behaviour; the comment above it says why.
  *
  * Nothing here changes shared/, teacher/ or teacher-mobile/.
  */
@@ -460,8 +460,8 @@ describe('write-path audit: data layer', () => {
     expect(getSaveProblem()).toMatch(/storage is full/);
   });
 
-  // Finding 6, report sketch. Passes today: the second save reads the live cache, so the create is never sent.
-  it.skip('does not resurrect an assessment deleted before its create resolved', async () => {
+  // Finding 6, report sketch. Not a bug: the second save reads the live cache, so the create is never sent. Kept as a guard.
+  it('does not resurrect an assessment deleted before its create resolved', async () => {
     seed('assessments', []);
     fake.hold();
     var a = getAssessments(CID);
@@ -1168,8 +1168,8 @@ describe('write-path audit: class load', () => {
     _REFRESH_QUIET_MS = originalQuiet;
   });
 
-  // Finding 13. Passes today: _v2GradebookToCache rebuilds scores and statuses from the get_gradebook cells first.
-  it.skip('drops a score and a status removed on another device', async () => {
+  // Finding 13. Not a bug: _v2GradebookToCache rebuilds scores and statuses from the get_gradebook cells first. Kept as a guard.
+  it('drops a score and a status removed on another device', async () => {
     var graded = {
       score: { value: 3, status: 'LATE', comment: '' },
       tag_scores: [{ tag_id: TAG_ID, value: 3 }],

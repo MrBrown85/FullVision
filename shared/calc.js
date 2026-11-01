@@ -1432,6 +1432,21 @@ function getCountedTagScores(cid, studentId, tagId) {
   });
 }
 
+/* Which side of the legacy summative / formative split a score falls on:
+   work in a category is 'categorized', work with none 'uncategorized'
+   (counted only when a competency has no categorized evidence). Read from
+   the assessment's category alone: the server loads uncategorized work as
+   formative, while work just made on this device was created summative, so
+   reading its type made a level change on reload. */
+function _assessmentScoreBucket(cid) {
+  var assessMap = _getAssessMap(cid);
+  return function (score) {
+    var assessment = assessMap.get(score.assessmentId);
+    if (!assessment) return score && score.type === 'formative' ? 'uncategorized' : 'categorized';
+    return assessment.categoryId || assessment.category_id ? 'categorized' : 'uncategorized';
+  };
+}
+
 /** Calculate proficiency for a single tag using the course's configured method and weights.
  * @param {string} cid - Course ID
  * @param {string} studentId - Student ID
@@ -1449,17 +1464,11 @@ function getTagProficiency(cid, studentId, tagId) {
   const scores = getCountedTagScores(cid, studentId, tagId);
   const cw = getCategoryWeights(cid);
   const aw = _getAW(cid);
-  var assessMap = _getAssessMap(cid);
   var result = calcProficiency(scores, method, dw, {
     categoryWeights: cw,
     assessmentWeights: aw,
     recentLimit: getRecentScoreLimit(cid),
-    getScoreBucket: function (score) {
-      var assessment = assessMap.get(score.assessmentId);
-      if (!assessment) return score && score.type === 'formative' ? 'uncategorized' : 'categorized';
-      if (assessment.categoryId || assessment.category_id) return 'categorized';
-      return assessment.type === 'formative' ? 'uncategorized' : 'categorized';
-    },
+    getScoreBucket: _assessmentScoreBucket(cid),
   });
   _tagProfCache[cacheKey] = result;
   return result;
@@ -1808,7 +1817,12 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   // Build opts for calcProficiency (matching getTagProficiency pattern)
   const cw = getCategoryWeights(cid);
   const aw = _getAW(cid);
-  const opts = { categoryWeights: cw, assessmentWeights: aw, recentLimit: getRecentScoreLimit(cid) };
+  const opts = {
+    categoryWeights: cw,
+    assessmentWeights: aw,
+    recentLimit: getRecentScoreLimit(cid),
+    getScoreBucket: _assessmentScoreBucket(cid),
+  };
 
   // Sort allScores once by date, then use a running pointer — O(n) instead of O(n²).
   // For each date, advance the pointer to include all scores up to that date,

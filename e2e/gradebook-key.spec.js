@@ -13,12 +13,13 @@ import {
 // on points work, a key under the grid, and a competency code's wording on
 // hover.
 const QUIZ = { ...TEST_ASSESSMENT, id: 'quiz-1', title: 'Quiz 1', scoreMode: 'points', maxPoints: 10 };
+const HOMEWORK = { ...TEST_ASSESSMENT, id: 'hw-1', title: 'Homework', scoreMode: 'complete', maxPoints: 1 };
 
 test.beforeEach(async ({ page }) => {
   await mockAuth(page);
   await seedCourse(page);
   await seedStudents(page);
-  await seedAssessments(page, [TEST_ASSESSMENT, QUIZ]);
+  await seedAssessments(page, [TEST_ASSESSMENT, QUIZ, HOMEWORK]);
   await seedScores(page, { 'stu-001': { 'assess-001': { QAP: 3 } } });
   await gotoApp(page, '/gradebook');
   await page.locator('[data-action="setView"][data-mode="scores"]').click();
@@ -27,6 +28,8 @@ test.beforeEach(async ({ page }) => {
 test('Scores: Overall heading, Out of on points work, and the key', async ({ page }) => {
   await expect(page.locator('.gb-grid-corner')).toContainText('Overall');
   await expect(page.locator('.gb-grid-colhead[data-aid="quiz-1"] .gb-scores-assess-meta')).toContainText('Out of 10');
+  // Complete/Incomplete work has no total.
+  await expect(page.locator('.gb-grid-colhead[data-aid="hw-1"] .gb-scores-assess-meta')).toHaveText('Mar 20, 2026');
   await expect(page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-001"]')).toHaveAttribute(
     'aria-label',
     /3\.0, Proficient$/,

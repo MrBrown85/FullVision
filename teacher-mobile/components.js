@@ -297,11 +297,17 @@ window.MComponents = (function () {
   }
 
   /* ── HTML escape ───────────────────────────────────────────── */
+  /* Safe in element content and in quoted attribute values. Reading
+     innerHTML back from textContent left " and ' as they were, which broke
+     the attributes this is used in (aria-label, data-val, data-search). */
   function _esc(str) {
     if (!str) return '';
-    var d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   /* ── Proficiency color (CSS var resolved) ──────────────────── */

@@ -6055,6 +6055,10 @@ function updateCourse(id, updates) {
   if (!COURSES[id]) return;
   Object.assign(COURSES[id], updates);
   _safeLSSet('gb-courses', JSON.stringify(COURSES));
+  // The grade level sets the course %'s rounding (whole for 10–12), and the
+  // method and grading style are read from the course too: no cached grade
+  // may outlive them.
+  if (typeof clearProfCache === 'function') clearProfCache();
 
   if (_useSupabase) {
     const sb = getSupabase();

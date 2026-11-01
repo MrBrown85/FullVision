@@ -1892,9 +1892,13 @@ window.ReportBlocks = (function () {
       setActiveTerm(cid, now.ordinal);
     }
     if (!before.some(v => v > 0)) return '';
+    // The arrow follows the figures beside it: the proficiency word in a
+    // Proficiency class, the % in a Letter or Both class (_levelHtml), so
+    // 70% to 78% is up even when both are Proficient.
+    const shown = v => (courseGradeMode(cid) === 'proficiency' ? Math.round(v) : Math.round(levelToPercent(cid, v)));
     const arrow = (a, b) => {
       if (!(a > 0) || !(b > 0)) return '';
-      const d = Math.round(b) - Math.round(a);
+      const d = shown(b) - shown(a);
       if (d > 0) return '<span class="report-growth-up" aria-label="Up">\u2191</span>';
       if (d < 0) return '<span class="report-growth-down" aria-label="Down">\u2193</span>';
       return '<span class="report-growth-same" aria-label="Same">\u2192</span>';
