@@ -10,16 +10,55 @@ const MOCK_MAP = {
   subjects: [{ id: 'SCI8', name: 'Science 8' }],
   sections: [
     {
-      id: 't1', name: 'Questioning', color: '#0891b2', subject: 'SCI8', shortName: 'Questioning',
-      tags: [{ id: 't1', label: 'Question and Predict', color: '#0891b2', subject: 'SCI8', name: 'Questioning', shortName: 'Questioning' }],
+      id: 't1',
+      name: 'Questioning',
+      color: '#0891b2',
+      subject: 'SCI8',
+      shortName: 'Questioning',
+      tags: [
+        {
+          id: 't1',
+          label: 'Question and Predict',
+          color: '#0891b2',
+          subject: 'SCI8',
+          name: 'Questioning',
+          shortName: 'Questioning',
+        },
+      ],
     },
     {
-      id: 't2', name: 'Planning', color: '#0891b2', subject: 'SCI8', shortName: 'Planning',
-      tags: [{ id: 't2', label: 'Plan Investigations', color: '#0891b2', subject: 'SCI8', name: 'Planning', shortName: 'Planning' }],
+      id: 't2',
+      name: 'Planning',
+      color: '#0891b2',
+      subject: 'SCI8',
+      shortName: 'Planning',
+      tags: [
+        {
+          id: 't2',
+          label: 'Plan Investigations',
+          color: '#0891b2',
+          subject: 'SCI8',
+          name: 'Planning',
+          shortName: 'Planning',
+        },
+      ],
     },
     {
-      id: 't3', name: 'Processing', color: '#0891b2', subject: 'SCI8', shortName: 'Processing',
-      tags: [{ id: 't3', label: 'Identify Patterns', color: '#0891b2', subject: 'SCI8', name: 'Processing', shortName: 'Processing' }],
+      id: 't3',
+      name: 'Processing',
+      color: '#0891b2',
+      subject: 'SCI8',
+      shortName: 'Processing',
+      tags: [
+        {
+          id: 't3',
+          label: 'Identify Patterns',
+          color: '#0891b2',
+          subject: 'SCI8',
+          name: 'Processing',
+          shortName: 'Processing',
+        },
+      ],
     },
   ],
 };

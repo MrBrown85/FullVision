@@ -530,12 +530,15 @@ window.PageAssignments = (function () {
       var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
       var rubric = getRubricById(cid, a.rubricId);
       if (showRubric && oneStudent && students.length === 1)
-        return rubricStyle(rubric) === 'single_point'
-          ? _singlePointHtml(cid, a, rubric, students[0])
-          : _rubricTilesHtml(cid, a, rubric, students[0], _isAdvancedRubric(rubric));
+        return (
+          (rubricStyle(rubric) === 'single_point'
+            ? _singlePointHtml(cid, a, rubric, students[0])
+            : _rubricTilesHtml(cid, a, rubric, students[0], _isAdvancedRubric(rubric))) +
+          _graderOverallCommentHtml(cid, a, students[0])
+        );
       if (showRubric) return renderRubricGradingView(cid, a, students, scores);
     }
-    if (one) return _levelCardsHtml(cid, a, tagObjs, one);
+    if (one) return _levelCardsHtml(cid, a, tagObjs, one) + _graderOverallCommentHtml(cid, a, one);
     return renderTagGrid(cid, a, tagObjs, students, scores);
   }
 
@@ -627,7 +630,6 @@ window.PageAssignments = (function () {
               '" data-level="' +
               lv +
               '" aria-pressed="true" title="Click to clear">' +
-              '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#fff"/><path d="M7.5 12.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
               PROF_LABELS[lv] +
               modLabel +
               '</button>' +
@@ -722,7 +724,7 @@ window.PageAssignments = (function () {
         '</div>' +
         '<div class="grdt-note-row"><label class="grdt-note-label" for="grdt-note-' +
         crit.id +
-        '">Feedback (Optional)</label>' +
+        '">Comment (Optional)</label>' +
         '<textarea id="grdt-note-' +
         crit.id +
         '" class="grdt-note' +
@@ -1362,7 +1364,7 @@ window.PageAssignments = (function () {
       '</div>'
     );
   }
-  // The competency's Feedback (Optional) box, one line until it has focus
+  // The competency's Comment (Optional) box, one line until it has focus
   // or text, as under a rubric criterion.
   function _tagNoteHtml(cid, aid, sid, tagId) {
     var note = getTagComment(cid, sid, aid, tagId);
@@ -1370,7 +1372,7 @@ window.PageAssignments = (function () {
     return (
       '<label class="grdt-note-label grdl-note-label" for="' +
       id +
-      '">Feedback (Optional)</label>' +
+      '">Comment (Optional)</label>' +
       '<textarea id="' +
       id +
       '" class="grdt-note' +
@@ -3883,13 +3885,17 @@ window.PageAssignments = (function () {
       '</div>'
     );
   }
-  /* The student's overall comment under their criteria (score.comment; it
-     prints on the rubric handout). One line until clicked, then three; it
-     saves as the teacher types and when they leave it, level or not. */
+  /* The student's Overall Comment under their criteria (score.comment, the
+     comment on the work; it prints on the rubric handout). One line until
+     clicked, three while it holds text; it saves as the teacher types and
+     when they leave it, level or not. */
   function _rsgOverallCommentHtml(cid, aid, st) {
     var first = displayNameFirst(st);
+    var text = getScoreComment(cid, st.id, aid);
     return (
-      '<div class="rsg-overall"><textarea class="rsg-overall-comment" rows="1" placeholder="Add an overall comment' +
+      '<div class="rsg-overall"><textarea class="rsg-overall-comment' +
+      (text ? ' has-text' : '') +
+      '" rows="1" placeholder="Add an overall comment' +
       (first ? ' for ' + esc(first) : '') +
       '" aria-label="Overall comment, ' +
       esc(displayNameWithLast(st)) +
@@ -3898,8 +3904,32 @@ window.PageAssignments = (function () {
       '" data-sid="' +
       st.id +
       '">' +
-      esc(getScoreComment(cid, st.id, aid)) +
+      esc(text) +
       '</textarea></div>'
+    );
+  }
+  /* The one-student views' Overall Comment: a row under the tiles, cards
+     or single-point rows, the same field and saving as the grid's. */
+  function _graderOverallCommentHtml(cid, a, st) {
+    var text = getScoreComment(cid, st.id, a.id);
+    return (
+      '<div class="grdt-tiles grdt-overall"><section class="grdt-crit" aria-label="Overall Comment">' +
+      '<div class="grdt-note-row"><label class="grdt-note-label" for="grdt-overall-' +
+      a.id +
+      '">Overall Comment</label>' +
+      '<textarea id="grdt-overall-' +
+      a.id +
+      '" class="grdt-note' +
+      (text ? ' has-text' : '') +
+      '" rows="1" placeholder="Add an overall comment for ' +
+      esc(displayNameFirst(st)) +
+      '" data-action-blur="rsgOverallComment" data-action-input="rsgOverallComment" data-aid="' +
+      a.id +
+      '" data-sid="' +
+      st.id +
+      '">' +
+      esc(text) +
+      '</textarea></div></section></div>'
     );
   }
   var _overallCommentTimers = {};
@@ -3908,10 +3938,12 @@ window.PageAssignments = (function () {
     clearTimeout(_overallCommentTimers[key]);
     delete _overallCommentTimers[key];
     var text = el.value.trim();
+    el.classList.toggle('has-text', !!text);
     if (text === getScoreComment(activeCourse, el.dataset.sid, el.dataset.aid)) return;
     saveScoreComment(activeCourse, el.dataset.sid, el.dataset.aid, text);
   }
   function _queueOverallComment(el) {
+    el.classList.toggle('has-text', !!el.value.trim());
     var key = el.dataset.sid + ':' + el.dataset.aid;
     clearTimeout(_overallCommentTimers[key]);
     _overallCommentTimers[key] = setTimeout(function () {
@@ -4441,11 +4473,13 @@ window.PageAssignments = (function () {
         var tag = getTagById(activeCourse, tid);
         var sec = getSectionForTag(activeCourse, tid);
         var color = cssColor(sec ? sec.color : 'var(--text-3)');
+        // The section colour as text goes through tintText(), as every
+        // small coloured label does, so it reads on the bar (4.5:1).
         return (
-          // The section colour on the border only: cyan or green text on the
-          // bar's grey is under 4.5:1.
           '<span class="rsg-descriptor-tag" style="border-color:' +
           color +
+          ';color:' +
+          tintText(color) +
           '">' +
           esc(_rubricTagName(tag, sec)) +
           '</span>'
@@ -5708,7 +5742,7 @@ window.PageAssignments = (function () {
   function updateCommentBadge(sid, aid) {
     var cid = activeCourse;
     var count = _assignmentCommentCount(cid, sid, aid);
-    document.querySelectorAll('.comment-btn, .grader-inline .grader-add-comment').forEach(function (btn) {
+    document.querySelectorAll('.comment-btn').forEach(function (btn) {
       if (btn.dataset.sid === sid && btn.dataset.aid === aid)
         btn.innerHTML = count > 0 ? 'Comment <span class="comment-count">' + count + '</span>' : 'Comment';
     });
@@ -7324,13 +7358,6 @@ window.PageAssignments = (function () {
         '<div class="grader-status" role="group" aria-label="Status"></div>' +
         '</div>' +
         '<div class="grader-body"></div>' +
-        '<section class="grader-feedback" aria-labelledby="grader-feedback-title">' +
-        '<div class="grader-feedback-head"><h2 id="grader-feedback-title">Overall Feedback</h2>' +
-        '<button type="button" class="grader-add-comment" data-action="openCommentPopover">' +
-        _GRADER_PLUS +
-        'Add Comment</button></div>' +
-        '<div class="grader-feedback-list"></div>' +
-        '</section>' +
         '<section class="grader-report-note" aria-labelledby="grader-report-note-title">' +
         '<div class="grader-report-note-head"><h2 id="grader-report-note-title">Note for the Report</h2>' +
         '<p>Optional. One line about what the student did, written about them, not to them.</p></div>' +
@@ -7352,10 +7379,6 @@ window.PageAssignments = (function () {
     dialog.querySelector('[data-grader="prev"]').disabled = !(i > 0);
     dialog.querySelector('[data-grader="next"]').disabled = !(i >= 0 && i < _grader.studentIds.length - 1);
     dialog.querySelector('.grader-toolbar-start').innerHTML = _graderPrintButton(cid, a);
-    var add = dialog.querySelector('.grader-add-comment');
-    add.dataset.cid = cid;
-    add.dataset.sid = st.id;
-    add.dataset.aid = a.id;
     dialog.querySelector('.grader-body').innerHTML =
       '<div class="assess-card open active" id="ac-' +
       a.id +
@@ -7369,8 +7392,6 @@ window.PageAssignments = (function () {
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>';
   var _GRADER_CHEVRON_RIGHT =
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>';
-  var _GRADER_PLUS =
-    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
   var _GRADER_PRINTER =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>';
 
@@ -7443,10 +7464,9 @@ window.PageAssignments = (function () {
 
   /* One student open on the Assignments page: the dialog's grader inside
      the card, under a row with the student's name, the Late | Excused |
-     Missing control, Comment, the arrow-key hint and the grade. */
+     Missing control, the arrow-key hint and the grade. */
   function _inlineGraderHtml(cid, a, tagObjs, st, scores) {
     var status = getAssignmentStatus(cid, st.id, a.id);
-    var count = _assignmentCommentCount(cid, st.id, a.id);
     var grade = _graderGrade(cid, a, st.id);
     return (
       '<div class="grader-inline' +
@@ -7459,15 +7479,6 @@ window.PageAssignments = (function () {
       '<div class="grader-status" role="group" aria-label="Status">' +
       _graderStatusButtons(a.id, st.id, status, isDibelsScored(a) ? ['EXC', 'NS'] : ['LATE', 'EXC', 'NS']) +
       '</div>' +
-      '<button type="button" class="grader-add-comment" data-action="openCommentPopover" data-cid="' +
-      cid +
-      '" data-sid="' +
-      st.id +
-      '" data-aid="' +
-      a.id +
-      '">Comment' +
-      (count ? ' <span class="comment-count">' + count + '</span>' : '') +
-      '</button>' +
       '<span class="grader-spacer"></span>' +
       '<span class="grader-hint">← → change student</span>' +
       (isDibelsScored(a)
@@ -7485,7 +7496,7 @@ window.PageAssignments = (function () {
   }
 
   /* The parts of the dialog that change with every click: the status
-     control, the comment list and the grade. */
+     control, the Note for the Report and the grade. */
   function _refreshGraderChrome() {
     if (!_grader) return;
     var cid = activeCourse;
@@ -7505,24 +7516,6 @@ window.PageAssignments = (function () {
       dialog.querySelector('.grader-status').innerHTML = statusHtml;
       _grader.statusHtml = statusHtml;
     }
-    var notes = getAssignmentObs(cid, sid, a.id)
-      .slice()
-      .sort(function (x, y) {
-        return (x.created || '') < (y.created || '') ? -1 : 1;
-      });
-    dialog.querySelector('.grader-feedback-list').innerHTML = notes.length
-      ? notes
-          .map(function (o) {
-            return (
-              '<p class="grader-note">' +
-              (o.date ? '<span class="grader-note-date">' + esc(formatDate(o.date)) + '</span>' : '') +
-              (isPrivateObservation(o) ? obsPrivateLabelHtml(o) + ' ' : '') +
-              esc(o.text || '') +
-              '</p>'
-            );
-          })
-          .join('')
-      : '<p class="grader-note grader-note-empty">No comments on this assignment yet.</p>';
     // Missing and Excused set the grading controls aside, as the grids do.
     dialog.querySelector('.grader-body').classList.toggle('is-locked', status === 'NS' || status === 'EXC');
     _refreshReportNote(dialog, cid, a, sid);

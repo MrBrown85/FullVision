@@ -63,9 +63,9 @@ const DESKTOP = [
       // A chosen + or − shows the pressed state.
       await row.locator('.rsg-mod:not(:disabled)').first().click();
       await expect(row.locator('.rsg-mod.active')).toHaveCount(1);
-      // − | + sit inside the level: move off it so the hover's descriptor
-      // bar isn't part of this page's check.
-      await page.mouse.move(0, 0);
+      // The pointer is on the level, so the descriptor bar and its
+      // competency tags are open and part of this page's check.
+      await expect(page.locator('#rsg-descriptor-bar .rsg-descriptor-tag').first()).toBeVisible();
     },
   },
   { name: 'gradebook', hash: '/gradebook', ready: '.gb-grid' },

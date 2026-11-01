@@ -232,32 +232,41 @@
       .filter(Boolean);
   }
 
-  /* The feedback printed at the bottom, one item per comment: the
-     assessment comments the teacher added from the grid's Comment button
-     (observations linked to the assessment), oldest first, each with its
-     day, then the score comment if there is one (score.comment; it has no
-     day of its own). [{ text, date: 'YYYY-MM-DD' or '' }]. */
+  /* The feedback printed at the bottom: the Overall Comment (score.comment,
+     the teacher's comment on the work; docs/DECISIONS.md "Assignment
+     feedback"), one item per paragraph, with no day of its own.
+     Until migrations/20261101_observations_to_overall_comment.sql has run,
+     work with no Overall Comment falls back to the observations linked to
+     it (what the Assignments Comment button wrote before Nov 2026), oldest
+     first, each with its day; private ones (Concern, Note) never print.
+     [{ text, date: 'YYYY-MM-DD' or '' }]. */
   function feedbackItems(cid, sid, aid, entries) {
+    var note = '';
+    (entries || getScores(cid)[sid] || []).forEach(function (e) {
+      if (e && e.assessmentId === aid && e.note && !note) note = String(e.note).trim();
+    });
+    if (note) {
+      return note
+        .split(/\n+/)
+        .map(function (line) {
+          return line.trim();
+        })
+        .filter(Boolean)
+        .map(function (line) {
+          return { text: line, date: '' };
+        });
+    }
     var items = [];
     if (typeof getAssignmentObs === 'function') {
       getAssignmentObs(cid, sid, aid)
         .slice()
         .reverse()
         .forEach(function (o) {
-          // Private (Concern, Note) comments never print.
           if (isPrivateObservation(o)) return;
           var text = o && o.text ? String(o.text).trim() : '';
           if (text) items.push({ text: text, date: String(o.date || o.created || '').slice(0, 10) });
         });
     }
-    var note = '';
-    (entries || getScores(cid)[sid] || []).forEach(function (e) {
-      if (e && e.assessmentId === aid && e.note && !note) note = String(e.note).trim();
-    });
-    var seen = items.some(function (i) {
-      return i.text === note;
-    });
-    if (note && !seen) items.push({ text: note, date: '' });
     return items;
   }
 

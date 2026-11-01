@@ -14,6 +14,9 @@ cp roster-template.csv _headers dist/
 # App directories
 cp -r teacher teacher-mobile shared vendor dist/
 
+# The splash page's screenshots (index.html)
+cp -r assets dist/
+
 # The student phone page (fullvision.ca/s/#CODE)
 cp -r s dist/
 

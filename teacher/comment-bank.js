@@ -380,7 +380,7 @@ window.CommentBank = (function () {
       {
         key: 'testing',
         name: 'Testing',
-        match: /test|evaluat|iterat|feedback|revision/i,
+        match: /test|prototyp|evaluat|iterat|feedback|revision/i,
         skill: 'test a prototype and use the results to improve it',
       },
       {
@@ -418,7 +418,7 @@ window.CommentBank = (function () {
       {
         key: 'connecting',
         name: 'Connections',
-        match: /interact|mentor|network|experience|workplace|reflect/i,
+        match: /connect|interact|mentor|network|experience|workplace|reflect/i,
         skill: 'reflect on a work or volunteer experience and what it taught',
       },
       {
@@ -736,8 +736,8 @@ window.CommentBank = (function () {
 
   /* The IE comment's habits sentence: the habits rated Consistently (keys,
      at most three, the grid's order) as one sentence, "He comes to class
-     ready, takes part and works well with others." The name in place of
-     the pronoun when none is on file. '' with none. As tokens for the
+     ready, takes part and works well with others." They/them when no
+     pronouns are on file. '' with none. As tokens for the
      realiser (strengthsTokens), the verb agreeing with whoever starts it. */
   function strengthsTokens(f, ks) {
     if (!ks || !ks.length) return null;
@@ -820,7 +820,7 @@ window.CommentBank = (function () {
     ];
   }
   /* The best-piece sentence where it usually sits, after the first: the
-     student's pronouns when on file, else the name again. o: { title, note,
+     student's pronouns, they/them when none are on file. o: { title, note,
      name, pronouns, onFile }. '' with no title. */
   function bestPieceSentence(o) {
     o = o || {};
@@ -1865,6 +1865,9 @@ window.CommentBank = (function () {
       _grade: gr ? gr.kind : '',
       _ieProblem: ieProblemOf(f),
       _path: reportPath(f),
+      // The next step's skill key (SKILLS), for the frames written for one
+      // skill (`when.nextSkill`); '' when there is no next step.
+      _nextSkill: next ? next.key : '',
       _options: options,
       _focus: focus || null,
       _facts: factsOf,
@@ -2008,6 +2011,7 @@ window.CommentBank = (function () {
       if (k === 'grade') return ctx._grade === when[k];
       if (k === 'path') return ctx._path === when[k];
       if (k === 'ieProblem') return ctx._ieProblem === when[k];
+      if (k === 'nextSkill') return !!ctx._nextSkill && ctx._nextSkill === when[k];
       return (ctx._habits || {})[k] === when[k];
     });
   }
@@ -2056,7 +2060,7 @@ window.CommentBank = (function () {
   }
 
   /* One sentence filled for the student where a sentence usually sits,
-     after the first: their pronouns when on file, else the name. A draft
+     after the first: their pronouns, they/them when none are on file. A draft
      puts each sentence in its place with realise(), which names the
      student in the first sentence that mentions them. opts.first: fill it
      as the comment's first sentence, naming the student. */
@@ -2364,6 +2368,8 @@ window.CommentBank = (function () {
     var when = s.when || {};
     Object.keys(when).forEach(function (k) {
       values['when.' + k] = when[k];
+      // A frame for one skill rests on the next step's competency.
+      if (k === 'nextSkill') return ((ctx._facts && ctx._facts.nextSkill) || []).forEach(add);
       add(
         k === 'picture'
           ? 'picture'
@@ -3787,7 +3793,10 @@ window.CommentBank = (function () {
       // with the table's skill for it.
       if (_has(pv, 'nextSkill')) {
         var n = nextSkillOf(f);
-        return !!n && _ids(pv, 'nextSkill', 'comp')[0] === String(n.comp.id) && pv.values.nextSkill === n.skill;
+        if (!n || _ids(pv, 'nextSkill', 'comp')[0] !== String(n.comp.id) || pv.values.nextSkill !== n.skill)
+          return false;
+        // A frame for one skill: the next step is still that skill.
+        return !_has(pv, 'when.nextSkill') || pv.values['when.nextSkill'] === n.key;
       }
       var compId = _ids(pv, 'focus', 'comp').concat(_ids(pv, 'nextStep', 'comp'))[0];
       var c = _byId(f.comps, compId);
@@ -3811,7 +3820,7 @@ window.CommentBank = (function () {
       var checks = [];
       Object.keys(pv.values).forEach(function (k) {
         var m = k.match(/^when\.(\w+)$/);
-        if (m && ['picture', 'standing', 'grade', 'ieProblem', 'path'].indexOf(m[1]) < 0)
+        if (m && ['picture', 'standing', 'grade', 'ieProblem', 'path', 'nextSkill'].indexOf(m[1]) < 0)
           checks.push(eff[m[1]] === pv.values[k]);
       });
       var named = function (slot, ok, want) {

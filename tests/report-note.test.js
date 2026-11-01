@@ -199,10 +199,19 @@ describe('the best-piece sentence', () => {
     );
   });
 
-  it('uses the name again when no pronouns are on file, with ’s, never they', () => {
+  it('uses they/them when no pronouns are on file, the same as they/them on file (Colin, Nov 1)', () => {
     expect(S({ title: 'Trench Letter', note: 'wrote from a soldier’s view', name: 'Chris', pronouns: they })).toBe(
-      'Chris’s best piece was “Trench Letter”, where Chris wrote from a soldier’s view.',
+      'Their best piece was “Trench Letter”, where they wrote from a soldier’s view.',
     );
+    // The grader's Note for the Report preview reads the same sentence.
+    expect(
+      S(
+        Object.assign(
+          { title: 'Trench Letter', note: 'wrote from a soldier’s view' },
+          CommentBank.studentRef({ firstName: 'Chris', pronouns: '' }),
+        ),
+      ),
+    ).toBe('Their best piece was “Trench Letter”, where they wrote from a soldier’s view.');
   });
 
   it('uses singular they when on file', () => {
@@ -213,28 +222,28 @@ describe('the best-piece sentence', () => {
 
   it('without a note ends inside the quotes, keeping a title’s own question mark', () => {
     expect(S({ title: '4.3 What Does the Poster Show?', name: 'Ava', pronouns: they })).toBe(
-      'Ava’s best piece was “What Does the Poster Show?”',
+      'Their best piece was “What Does the Poster Show?”',
     );
     expect(S({ title: 'Trench Letter', note: '   ', name: 'Ava', pronouns: they })).toBe(
-      'Ava’s best piece was “Trench Letter.”',
+      'Their best piece was “Trench Letter.”',
     );
   });
 
   it('starts the note lower case and ends it with one period', () => {
     expect(S({ title: 'Map Quiz', note: 'Labelled every river.', name: 'Ava', pronouns: they })).toBe(
-      'Ava’s best piece was “Map Quiz”, where Ava labelled every river.',
+      'Their best piece was “Map Quiz”, where they labelled every river.',
     );
     expect(S({ title: 'Map Quiz', note: 'Built a DNA model to scale', name: 'Ava', pronouns: they })).toBe(
-      'Ava’s best piece was “Map Quiz”, where Ava built a DNA model to scale.',
+      'Their best piece was “Map Quiz”, where they built a DNA model to scale.',
     );
   });
 
   it('leaves out a note that does not start with a past-tense verb, so the sentence takes its no-note form', () => {
     expect(S({ title: 'Graphs Lab', note: 'clear graphs and a careful method', name: 'Ava', pronouns: they })).toBe(
-      'Ava’s best piece was “Graphs Lab.”',
+      'Their best piece was “Graphs Lab.”',
     );
     expect(S({ title: 'Map Quiz', note: 'DNA model built to scale', name: 'Ava', pronouns: they })).toBe(
-      'Ava’s best piece was “Map Quiz.”',
+      'Their best piece was “Map Quiz.”',
     );
     expect(CommentBank.reportNoteText('Clear graphs and a careful method.')).toBe('');
     expect(CommentBank.reportNoteText('Showed clear graphs and a careful method.')).toBe(
@@ -417,8 +426,8 @@ describe('the grader card', () => {
   const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
   const css = readFileSync(resolve(root, 'teacher/assignments.css'), 'utf-8');
 
-  it('sits under Overall Feedback with the mockup’s wording', () => {
-    const at = src.indexOf('Overall Feedback</h2>');
+  it('sits under the grading with the mockup’s wording', () => {
+    const at = src.indexOf('<div class="grader-body"></div>');
     const card = src.indexOf('<section class="grader-report-note"');
     expect(at).toBeGreaterThan(0);
     expect(card).toBeGreaterThan(at);

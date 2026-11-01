@@ -12,8 +12,21 @@ const MOCK_MAP = {
   subjects: [{ id: 'SCI8', name: 'Science 8', color: '#0891b2' }],
   sections: [
     {
-      id: 't1', name: 'Questioning', color: '#0891b2', subject: 'SCI8', shortName: 'Questioning',
-      tags: [{ id: 't1', label: 'Question and Predict', color: '#0891b2', subject: 'SCI8', name: 'Questioning', shortName: 'Questioning' }],
+      id: 't1',
+      name: 'Questioning',
+      color: '#0891b2',
+      subject: 'SCI8',
+      shortName: 'Questioning',
+      tags: [
+        {
+          id: 't1',
+          label: 'Question and Predict',
+          color: '#0891b2',
+          subject: 'SCI8',
+          name: 'Questioning',
+          shortName: 'Questioning',
+        },
+      ],
     },
   ],
 };
@@ -78,9 +91,7 @@ describe('multiple groups coexist', () => {
 
 describe('group with sections array', () => {
   it('saves group containing section references correctly', () => {
-    const groups = [
-      { id: 'g1', name: 'Inquiry', sortOrder: 0, color: '#10b981', sectionIds: ['t1', 't2'] },
-    ];
+    const groups = [{ id: 'g1', name: 'Inquiry', sortOrder: 0, color: '#10b981', sectionIds: ['t1', 't2'] }];
     saveCompetencyGroups(CID, groups);
     const loaded = getCompetencyGroupById(CID, 'g1');
     expect(loaded.sectionIds).toEqual(['t1', 't2']);

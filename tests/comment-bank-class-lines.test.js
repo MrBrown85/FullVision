@@ -116,7 +116,16 @@ describe('nextStepOf', () => {
 describe('the draft', () => {
   it('says the next step as a skill, never a bare competency label', () => {
     const d = draftOf(facts());
-    expect(stepText(d, 'nextStep')).toBe('Next, they can explain why an event mattered and who it affected.');
+    // One of the frames written for Significance, filled for singular they.
+    const got = d.sentences.find(x => x.step === 'nextStep');
+    const forSkill = COMMENT_BANK.sentences
+      .filter(s => s.when && s.when.nextSkill === 'significance' && s.subjects[0] === 'socials')
+      .map(s => s.id);
+    expect(forSkill).toContain(got.id);
+    expect(got.text).toMatch(
+      /^(Next, they can|The next step for them is to|Their next step is to|[A-Z]\w+ing .* (is their next step|is what they can practise next))/,
+    );
+    expect(got.text).not.toContain('Significance');
     expect(d.replaced).toEqual([]);
     // No skill in the table: no next-step sentence that names a competency.
     const d2 = draftOf(facts({ comps: [comp('c1', 'Evidence', 3.5), comp('c3', 'Recognize Impacts', 2.5)] }));

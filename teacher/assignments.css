@@ -3065,8 +3065,8 @@
   color: var(--text);
 }
 
-/* The overall comment under a student's criteria: one line, three once
-   clicked. Plain field edges, blue when focused. */
+/* The Overall Comment under a student's criteria: one line, three once
+   clicked or while it holds text. Plain field edges, blue when focused. */
 .rsg-overall {
   padding-left: 20px;
 }
@@ -3094,6 +3094,10 @@
 }
 .rsg-overall-comment::placeholder {
   color: var(--text-2);
+}
+.rsg-overall-comment.has-text {
+  height: calc(3 * 1.4em + 16px);
+  overflow-y: auto;
 }
 /* It grows to three lines; scrolling comes on once it has, so a long
    comment shows no scrollbar while it opens. */
@@ -3168,6 +3172,7 @@
 }
 .rsg-level {
   flex: 1;
+  min-width: 0;
   height: 32px;
   border-radius: 7px;
   display: flex;
@@ -3503,31 +3508,32 @@
   font-weight: 700;
 }
 /* − | + inside the chosen level, a stepper like the Advanced rubric's
-   chosen tile: white signs straight on the level colour (no lighter track,
-   which would leave white text on a paler fill), the picked sign solid
-   white. */
+   chosen tile. The level keeps the same width as the others, its name at
+   the left and the signs at the right, white straight on the level colour
+   (no lighter track, which would leave white text on a paler fill), the
+   picked sign solid white. */
 .rsg-levels {
   container-type: inline-size;
 }
 .rsg-level.has-mods {
-  position: relative;
-  padding: 0 64px;
+  padding: 0;
+  justify-content: space-between;
+  gap: 6px;
 }
 .rsg-level-name {
+  margin-left: 10px;
   white-space: nowrap;
 }
 .rsg-mods {
-  position: absolute;
-  top: 50%;
-  right: 3px;
-  transform: translateY(-50%);
+  flex-shrink: 0;
+  margin-right: 3px;
   display: flex;
   align-items: center;
   padding: 1px;
   border-radius: 6px;
 }
 .rsg-mod {
-  width: 26px;
+  width: 28px;
   height: 24px;
   border: none;
   border-radius: 5px;
@@ -3566,11 +3572,20 @@
   opacity: 0.35;
   cursor: default;
 }
-/* Narrow levels: the name moves left to make room for − | +. */
-@container (max-width: 600px) {
+/* Narrow levels: − | + move under the name, as a narrow tile's do. */
+@container (max-width: 720px) {
   .rsg-level.has-mods {
-    justify-content: flex-start;
-    padding: 0 62px 0 8px;
+    flex-direction: column;
+    justify-content: center;
+    height: auto;
+    min-height: 32px;
+    gap: 2px;
+  }
+  .rsg-level.has-mods .rsg-level-name {
+    margin: 4px 0 0;
+  }
+  .rsg-level.has-mods .rsg-mods {
+    margin: 0 0 4px;
   }
 }
 
@@ -3896,7 +3911,6 @@
   flex-wrap: nowrap;
 }
 .rsg-descriptor-tag {
-  color: var(--text-2);
   font-family: var(--font-base);
   font-size: var(--text-2xs);
   font-weight: 500;
@@ -4739,24 +4753,6 @@
   display: none;
 }
 .grader-print,
-.grader-add-comment {
-  height: 30px;
-  padding: 0 12px;
-  border: none;
-  border-radius: 8px;
-  background: rgba(0, 122, 255, 0.1);
-  color: var(--link);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-.grader-add-comment {
-  border-radius: 15px;
-}
 .grader-done {
   height: 30px;
   padding: 0 14px;
@@ -4875,7 +4871,7 @@
   padding: 4px 14px;
 }
 /* The dialog grades one student: their name, status and Comment live in
-   its header and Overall Feedback, so the grids' own copies stand aside. */
+   its header and the Overall Comment, so the grids' own copies stand aside. */
 .grader-body .rsg-student {
   grid-template-columns: minmax(0, 1fr) 36px;
 }
@@ -4889,46 +4885,7 @@
 .grader-body .ldg-grid {
   --ldg-cols: minmax(0, 1fr);
 }
-.grader-feedback {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.grader-feedback-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 4px;
-}
-.grader-feedback-head h2 {
-  flex: 1;
-  margin: 0;
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--text);
-}
-.grader-feedback-list {
-  background: var(--surface);
-  border-radius: 16px;
-  padding: 6px 16px;
-  box-shadow: 0 0 0 0.5px var(--divider-medium);
-}
-.grader-note {
-  margin: 0;
-  padding: 10px 0;
-  font-size: var(--text-base);
-  line-height: 1.5;
-  color: var(--text);
-}
-.grader-note + .grader-note {
-  border-top: 1px solid var(--divider-subtle);
-}
-.grader-note-date {
-  display: block;
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-/* The Note for the Report card, under Overall Feedback. */
+/* The Note for the Report card, under the grading. */
 .grader-report-note {
   background: var(--surface);
   border-radius: 16px;
@@ -4967,14 +4924,22 @@
   gap: 6px;
   min-width: 0;
 }
+/* The same field edges as every comment field (.grdt-note), one line. */
 .grader-report-note-input {
-  font: inherit;
-  font-size: 15px;
-  padding: 9px 12px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--seg-track);
+  box-sizing: border-box;
+  height: 36px;
+  padding: 7px 12px;
+  border: 1px solid #aeaeb2;
+  border-radius: 9px;
+  background: var(--surface);
   color: var(--text);
+  font: inherit;
+  font-size: var(--text-base);
+  outline: none;
+}
+.grader-report-note-input:focus {
+  border-color: var(--active);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.25);
 }
 .grader-report-note-input:disabled {
   color: var(--text-2);
@@ -5211,37 +5176,29 @@
   text-align: left;
   cursor: pointer;
 }
-.grdt-tile.is-chosen.l4 .grdt-chosen-label svg {
-  color: var(--score-4);
-}
-.grdt-tile.is-chosen.l3 .grdt-chosen-label svg {
-  color: var(--score-3);
-}
-.grdt-tile.is-chosen.l2 .grdt-chosen-label svg {
-  color: var(--score-2);
-}
-.grdt-tile.is-chosen.l1 .grdt-chosen-label svg {
-  color: var(--score-1);
-}
+/* The signs sit straight on the level colour, as the grids' do (no
+   lighter track behind them). */
 .grdt-stepper {
   margin-left: auto;
   display: flex;
   align-items: center;
-  padding: 2px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.2);
+  padding: 1px;
+  border-radius: 6px;
 }
 .grdt-stepper button {
   width: 28px;
   height: 24px;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   background: transparent;
   color: #fff;
   font: inherit;
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
+}
+.grdt-stepper button:hover:not(:disabled):not(.is-on) {
+  background: rgba(255, 255, 255, 0.18);
 }
 .grdt-stepper button.is-on {
   background: #fff;
@@ -5265,8 +5222,8 @@
 }
 .grdt-stepper-sep {
   width: 1px;
-  height: 14px;
-  background: rgba(255, 255, 255, 0.45);
+  height: 12px;
+  background: rgba(255, 255, 255, 0.5);
 }
 .grdt-note-row {
   display: grid;
@@ -5287,34 +5244,47 @@
 .grdl-card .grdt-note {
   align-self: start;
 }
-/* One line until clicked; three while typing or once it holds text. */
+/* The same field as the grid's Overall Comment (.rsg-overall-comment):
+   one line until clicked; three while typing or once it holds text. */
 .grdt-note {
+  display: block;
   box-sizing: border-box;
   width: 100%;
   height: 36px;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 10px;
-  background: rgba(118, 118, 128, 0.12);
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid #aeaeb2;
+  border-radius: 9px;
+  background: var(--surface);
   color: var(--text);
   font: inherit;
   font-size: var(--text-base);
   line-height: 1.4;
   resize: none;
+  overflow: hidden;
   outline: none;
   transition:
-    height 150ms ease,
-    box-shadow 150ms ease;
+    height var(--duration-fast) var(--ease-out),
+    border-color var(--duration-micro) var(--ease-out),
+    box-shadow var(--duration-micro) var(--ease-out);
+}
+.grdt-note::placeholder {
+  color: var(--text-2);
 }
 .grdt-note:focus,
 .grdt-note.has-text {
-  height: 84px;
+  height: calc(3 * 1.4em + 16px);
+  overflow-y: auto;
 }
 .grdt-note:focus {
-  background: var(--surface);
-  box-shadow:
-    0 0 0 1px var(--active),
-    0 0 0 4px rgba(0, 122, 255, 0.25);
+  border-color: var(--active);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.25);
+}
+@media (prefers-color-scheme: dark) {
+  .grdt-note,
+  .grader-report-note-input {
+    border-color: var(--border);
+  }
 }
 /* The tiles sit straight on the dialog's grey, without the card behind
    the older grids. */
@@ -5690,14 +5660,6 @@
   padding: 0 10px;
   font-size: var(--text-xs);
 }
-.grader-inline .grader-add-comment {
-  height: 26px;
-  border-radius: 13px;
-  font-size: var(--text-xs);
-}
-.grader-inline .grader-add-comment .comment-count {
-  font-weight: 700;
-}
 .grader-inline .grader-hint {
   flex: none;
 }
@@ -5997,9 +5959,6 @@
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
-}
-.grsp-note .grdt-note {
-  background: var(--surface);
 }
 .grsp-standard {
   padding: 6px 10px;

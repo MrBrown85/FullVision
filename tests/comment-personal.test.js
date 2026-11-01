@@ -361,7 +361,7 @@ describe('kept sentences in Generate', () => {
   });
 
   it('holds a competency it was bound to: the next step is the same competency', () => {
-    keepFromGabriel('Next, he can say how two people saw the same event in different ways.', 'nextStep', 'g301');
+    keepFromGabriel('Next, he can say how two people saw the same event in different ways.', 'nextStep', 'g310');
     const mine = COMMENT_BANK.sentences.find(s => s.mine);
     expect(mine.comps).toEqual({ nextSkill: ['Perspective'] });
     const same = CommentBank.context(ameliaFacts(), {});

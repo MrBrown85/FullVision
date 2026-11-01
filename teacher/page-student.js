@@ -765,18 +765,16 @@ window.PageStudent = (function () {
     return html + '</div>';
   }
 
-  /* The teacher's own words on a piece of work: the comments left on it in
-     Assignments (observations linked to it), else the note on its score;
-     otherwise a way to add one. */
+  /* The teacher's own words on a piece of work: its Overall Comment (the
+     note on its score), else, until the Nov 2026 migration has run, the
+     first observation linked to it; otherwise a way to add one. */
   function _assessNoteHtml(ctx, a) {
-    var linked = typeof getAssignmentObs === 'function' ? getAssignmentObs(ctx.cid, studentId, a.id) : [];
-    var text = linked.length ? String(linked[0].text || '').split('\n')[0] : '';
-    if (!text) {
-      var withNote = ctx.allScores.find(function (s) {
-        return s.assessmentId === a.id && s.note;
-      });
-      text = withNote ? withNote.note : '';
-    }
+    var withNote = ctx.allScores.find(function (s) {
+      return s.assessmentId === a.id && s.note;
+    });
+    var text = withNote ? String(withNote.note).split('\n')[0] : '';
+    var linked = !text && typeof getAssignmentObs === 'function' ? getAssignmentObs(ctx.cid, studentId, a.id) : [];
+    if (!text && linked.length) text = String(linked[0].text || '').split('\n')[0];
     var href = '/assignments?course=' + ctx.cid + '&open=' + a.id + '&student=' + studentId;
     if (!text)
       return (

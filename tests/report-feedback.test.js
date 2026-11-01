@@ -455,6 +455,26 @@ describe('observations', () => {
     expect(texts).not.toContain('Parents meeting about this.');
   });
 
+  it('prints the Overall Comment alone once the work has one, a line per paragraph', () => {
+    const scores = getScores(CID);
+    scores[SID] = scores[SID].map(e =>
+      e.assessmentId === 'points' ? Object.assign({}, e, { note: 'Great effort.\nShow the units.' }) : e,
+    );
+    saveScores(CID, scores);
+    expect(RubricPrint.feedbackItems(CID, SID, 'points')).toEqual([
+      { text: 'Great effort.', date: '' },
+      { text: 'Show the units.', date: '' },
+    ]);
+    expect(byId(F.forStudent(CID, ST)).points.feedback.map(f => f.text)).toEqual(['Great effort.', 'Show the units.']);
+  });
+
+  it('falls back to the linked observations only while the Overall Comment is empty', () => {
+    expect(RubricPrint.feedbackItems(CID, SID, 'points').map(f => f.text)).toEqual([
+      'Check question 3.',
+      'Show the units.',
+    ]);
+  });
+
   it('keeps to the report’s term', () => {
     saveCourseConfig(CID, {
       reportingTerms: [
