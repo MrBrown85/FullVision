@@ -2894,7 +2894,8 @@ var COMMENT_BANK = {
       id: 'ie07',
       part: 'go',
       group: 'IE Deadline',
-      // {ieDeadline} is the date the teacher picked, or [date] until then.
+      // {ieDeadline} is the date the teacher picked; until one is picked no
+      // Deadline sentence is drafted (Nov 2).
       text: 'The deadline to replace this IE with a grade is {ieDeadline}.',
       needs: ['ieDeadline'],
       when: { path: 'ie' },
@@ -3139,10 +3140,12 @@ var COMMENT_BANK = {
       src: 'new',
     },
     // Grown 2026-11-01 (bank expansion, round two, lane G): more frames for
-    // the deadline. {ieDeadline} is the date the teacher picked, or [date]
-    // until then; the deadline picker (teacher/report-questionnaire.js
-    // tqPickDeadline) finds the deadline sentence by its step and replaces
-    // the date in it, whichever frame it is.
+    // the deadline. {ieDeadline} is the date the teacher picked; none is
+    // drafted until then (Nov 2). The deadline picker
+    // (teacher/report-questionnaire.js tqPickDeadline) puts the sentence in
+    // when a date is picked, finds it by its step and replaces the date in
+    // it when another is picked, whichever frame it is, and takes it out
+    // when the date is cleared.
     {
       id: 'ie36',
       part: 'go',

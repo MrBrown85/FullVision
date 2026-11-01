@@ -1758,6 +1758,9 @@ window.PageReports = (function () {
       tqPickDeadline: function () {
         RQ.tqPickDeadline(el.dataset.date);
       },
+      tqClearDeadline: function () {
+        RQ.tqClearDeadline();
+      },
       tqAddReportNote: function () {
         RQ.tqAddReportNote(el.dataset.aid);
       },

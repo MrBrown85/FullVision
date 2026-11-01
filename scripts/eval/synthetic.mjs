@@ -686,11 +686,18 @@ export function syntheticClass(kind, opts) {
     // (the 'thin' profile) is one the teacher chose IE for, so the IE
     // comment's marks problem and plan are drafted.
     const basis = goals || (Number(k.grade) >= 10 && (si === PROFILES.indexOf('thin') || si === NO_MARKS) ? 'ie' : '');
-    if (Object.keys(habits).length || basis) {
+    // A deadline picked for every other student of a class that reports a
+    // letter (Nov 2): about half the IE students (the teacher's choice, or
+    // under 50%) have one, so IE comments are drafted both with the
+    // Deadline sentence and, before a date is picked, without one. Off the
+    // IE path the date is not used.
+    const deadline = !goals && k.system !== 'proficiency' && si % 2 === 0 ? '2026-12-18' : '';
+    if (Object.keys(habits).length || basis || deadline) {
       ratings.push(
         Object.assign(
           { enrollment_id: st.enrollment_id, term: 1, habits, narrative_html: '' },
           basis ? { reporting_basis: basis } : {},
+          deadline ? { ie_deadline: deadline } : {},
         ),
       );
     }

@@ -88,7 +88,9 @@ describe('most specific wins', () => {
   it('fills the exclude list on the screen from last report’s approved record (PR 12)', () => {
     const src = readFileSync('teacher/report-questionnaire.js', 'utf-8');
     expect(src).not.toMatch(/exclude: \[\],/);
-    expect(src.match(/exclude: lastTermIds\(_activeCourse, st\.id, termId\),/g)).toHaveLength(3);
+    // Generate, the habits redraw, the redraft and the Deadline
+    // sentence put in when a date is picked (Nov 2).
+    expect(src.match(/exclude: lastTermIds\(_activeCourse, st\.id, termId\),/g)).toHaveLength(4);
   });
 });
 

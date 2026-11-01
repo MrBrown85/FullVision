@@ -2165,13 +2165,49 @@ window.CommentBank = (function () {
     if (f.grade.pct != null && Number(f.grade.pct) < 50) return 'low';
     return '';
   }
-  /* The deadline as the comment says it ("December 18"), or [date] until
-     the teacher picks one. */
+  /* The deadline as the comment says it ("December 18"), or '' until the
+     teacher picks one: no Deadline sentence is drafted until then (Colin,
+     Nov 2: "Withhold the deadline until a date is picked"). */
   function deadlineText(iso) {
     var d = String(iso || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return '[date]';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return '';
     var date = typeof parseLocalDate === 'function' ? parseLocalDate(d) : new Date(d + 'T00:00:00');
-    return isNaN(date) ? '[date]' : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    return isNaN(date) ? '' : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  }
+
+  /* The placeholder a Deadline sentence said before a date was picked,
+     in comments saved before Nov 2. */
+  var DATE_PLACEHOLDER = '[date]';
+
+  /* A comment with the old [date] placeholder dealt with: each sentence
+     that holds it is taken out while no deadline is picked (`iso` empty),
+     else the placeholder says the date. Everything else stays as written.
+     A comment without the placeholder comes back unchanged. */
+  function withDeadline(text, iso) {
+    var t = String(text == null ? '' : text);
+    if (t.indexOf(DATE_PLACEHOLDER) < 0) return t;
+    var date = deadlineText(iso);
+    if (date) return t.split(DATE_PLACEHOLDER).join(date);
+    // The comment's sentences with the space after each, ended by . ! ? or
+    // … (and a closing quote) where the next sentence starts.
+    var re = /[.!?…]+["”]?(\s+|$)/g;
+    var out = '';
+    var from = 0;
+    var m;
+    var keep = function (piece) {
+      if (piece.indexOf(DATE_PLACEHOLDER) < 0) out += piece;
+    };
+    while ((m = re.exec(t))) {
+      if (!m[0]) {
+        re.lastIndex++;
+        continue;
+      }
+      keep(t.slice(from, m.index + m[0].length));
+      from = m.index + m[0].length;
+    }
+    if (from < t.length) keep(t.slice(from));
+    // The sentence taken out was the last: no space left trailing.
+    return /\s$/.test(t) ? out : out.replace(/\s+$/, '');
   }
 
   /* What the grade sentence says, from the facts: { kind, letter,
@@ -2955,7 +2991,8 @@ window.CommentBank = (function () {
       gradeNext: gslots.gradeNext,
       gradeWord: gslots.gradeWord,
       // The IE path: the work not handed in as one sentence, the marks
-      // against the class's, and the deadline ([date] until it is picked).
+      // against the class's, and the deadline ('' until it is picked, so
+      // no Deadline frame fits and none is drafted).
       // The work not handed in as one sentence: the IE path's problem, and
       // the Not Handed In sentence on the others.
       missingWork: _missingCount(f) > 0 ? notHandedInSentence(f.notHandedIn) : '',
@@ -5312,13 +5349,11 @@ window.CommentBank = (function () {
     lowMarks: function (pv, f) {
       return !!f.grade && f.grade.pct != null && Number(f.grade.pct) < 50;
     },
-    // The IE's deadline as the teacher picked it ([date] until then).
+    // The IE's deadline as the teacher picked it: never a sentence without
+    // a real date ([date], or none picked).
     deadline: function (pv, f) {
-      return (
-        reportPath(f) === 'ie' &&
-        _has(pv, 'ieDeadline') &&
-        pv.values.ieDeadline === deadlineText(f.grade && f.grade.ieDeadline)
-      );
+      var want = deadlineText(f.grade && f.grade.ieDeadline);
+      return reportPath(f) === 'ie' && !!want && _has(pv, 'ieDeadline') && pv.values.ieDeadline === want;
     },
     // The absences and lates as said: "missed three classes and been late
     // once", from the teacher's attendance for the term.
@@ -5460,7 +5495,25 @@ window.CommentBank = (function () {
     var sentences = [];
     var out = [];
     var replaced = [];
+    var dated = !!deadlineText(f && f.grade && f.grade.ieDeadline);
     prov.forEach(function (pv, i) {
+      var said = String((d.sentences[i] && d.sentences[i].text) || '');
+      // A sentence that still says [date] (a comment from before Nov 2):
+      // the picked date in its place, else the sentence is left out.
+      if (said.indexOf(DATE_PLACEHOLDER) >= 0) {
+        if (!dated) {
+          replaced.push({ sentenceId: pv.sentenceId, failed: ['deadline'], by: null });
+          return;
+        }
+        var x0 = Object.assign({}, d.sentences[i], { text: withDeadline(said, f.grade.ieDeadline) });
+        // Its realiser tokens hold the placeholder: the text as written.
+        delete x0.toks;
+        sentences.push(x0);
+        var vals = Object.assign({}, pv.values);
+        if (_has(pv, 'ieDeadline')) vals.ieDeadline = deadlineText(f.grade.ieDeadline);
+        out.push(Object.assign({}, pv, { values: vals }));
+        return;
+      }
       // A sentence the teacher kept is theirs, as written, and so is a class
       // line (support, closing, late work): not checked.
       if (pv.kept || pv.classLine) {
@@ -5475,7 +5528,8 @@ window.CommentBank = (function () {
         out.push(pv);
         return;
       }
-      var stand = s ? _fallback(s, ctx, bank, used) : null;
+      // A deadline sentence with no date picked goes, with no stand-in.
+      var stand = s && !(failed.indexOf('deadline') >= 0 && !dated) ? _fallback(s, ctx, bank, used) : null;
       replaced.push({ sentenceId: pv.sentenceId, failed: failed, by: stand ? stand.id : null });
       if (!stand) return;
       used[stand.id] = true;
@@ -5892,6 +5946,7 @@ window.CommentBank = (function () {
     ieSource: ieSource,
     ieProblemOf: ieProblemOf,
     deadlineText: deadlineText,
+    withDeadline: withDeadline,
     numberWords: numberWords,
     notHandedInSentence: notHandedInSentence,
     missingSlots: missingSlots,

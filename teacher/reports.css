@@ -6019,6 +6019,20 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 11.5px;
   color: var(--text-2);
 }
+.qn-cal-clear {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  color: var(--active);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.qn-cal-clear:hover {
+  text-decoration: underline;
+}
 
 /* Approve and Next while an IE still needs its deadline or a tick. */
 #tq-approve-next:disabled {

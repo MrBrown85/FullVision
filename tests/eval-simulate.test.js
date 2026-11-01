@@ -11,6 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { formatReport, main, simulate } from '../scripts/eval/simulate.mjs';
 import { KINDS, syntheticClass } from '../scripts/eval/synthetic.mjs';
 import { loadClass, ROOT } from '../scripts/eval/app.mjs';
+import { draftStudents } from '../scripts/eval/generate.mjs';
 
 const dir = mkdtempSync(join(tmpdir(), 'fv-sim-'));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -36,6 +37,33 @@ describe('the synthetic classes', () => {
         a.gradebook.students.length,
       );
     });
+  });
+});
+
+describe('the IE students in the synthetic classes', () => {
+  it('half have a deadline, whose comment says it; the rest have no Deadline sentence and no [date]', () => {
+    let dated = 0;
+    let undated = 0;
+    Object.keys(KINDS).forEach(kind => {
+      const { cid, termId, students } = loadClass(syntheticClass(kind), 1);
+      draftStudents(cid, termId, students, 1).forEach(d => {
+        if (CommentBank.reportPath(d.facts) !== 'ie') return;
+        const who = kind + ' ' + d.facts.name;
+        expect(d.text, who).not.toContain('[date]');
+        const has = d.sentences.some(x => x.step === 'ieDeadline');
+        if (d.facts.grade.ieDeadline) {
+          dated++;
+          expect(has, who).toBe(true);
+          expect(d.text, who).toContain('December 18');
+        } else {
+          undated++;
+          expect(has, who).toBe(false);
+        }
+      });
+    });
+    expect(dated).toBeGreaterThan(0);
+    expect(undated).toBeGreaterThan(0);
+    expect(Math.abs(dated - undated)).toBeLessThanOrEqual(Object.keys(KINDS).length);
   });
 });
 

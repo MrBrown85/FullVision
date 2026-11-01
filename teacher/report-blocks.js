@@ -327,16 +327,19 @@ window.ReportBlocks = (function () {
     // ctx.narrativeOverride is the questionnaire's unsaved draft, so the
     // editor can say how the comment will sit on the form while it is typed.
     let narrative;
+    const rating = getStudentTermRating(cid, student.id, termId);
     if (ctx && ctx.narrativeOverride != null) narrative = ctx.narrativeOverride;
-    else {
-      const rating = getStudentTermRating(cid, student.id, termId);
-      narrative = rating && rating.narrative;
-    }
+    else narrative = rating && rating.narrative;
     if (!narrative || !String(narrative).trim()) return '';
     narrative = String(narrative);
     // A comment saved by the old editor is HTML until it is next edited; the
     // questionnaire saves plain text, a paragraph per line.
     const isHtml = /<\/?(p|div|br|ul|ol|li|b|i|u|strong|em|span)\b[^>]*>/i.test(narrative);
+    // A comment saved before Nov 2 may say [date] in its Deadline sentence:
+    // it never prints. The sentence is left out until a deadline is picked,
+    // then says the date.
+    if (!isHtml && typeof CommentBank !== 'undefined' && CommentBank.withDeadline)
+      narrative = CommentBank.withDeadline(narrative, rating && rating.ieDeadline);
     const content = isHtml
       ? sanitizeNarrativeHtml(narrative.trim())
       : narrative
