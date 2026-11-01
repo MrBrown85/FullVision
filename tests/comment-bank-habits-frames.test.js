@@ -234,11 +234,28 @@ describe('Work Habits frames', () => {
     Object.values(got).forEach(t => expect(t).not.toMatch(/excellent|to build/));
   });
 
-  it('one habit to build: hs05-hs07, hs28-hs33, named only through the summary slot', () => {
-    const got = expectReachable(hab({ ...all(4), feedback: 2 }), 'habits', ids(5, 7, 'hs').concat(ids(28, 33, 'hs')));
-    Object.values(got).forEach(t => {
-      expect(t).toMatch(/using feedback/i);
-      expect(t).not.toMatch(/ and |excellent|good/);
+  it('one habit to build: hs05-hs07, hs28-hs33, named only through the summary slot; then the Habit Ratings frames for that habit', () => {
+    // Once every summary frame is in a classmate's comment, the habits step
+    // draws the Habit Ratings frames for the one habit rated below Usually
+    // (hl091-hl095: Uses Feedback at Sometimes), which name it too.
+    const cells = COMMENT_BANK.sentences
+      .filter(s => s.group === 'Habit Ratings' && s.habit === 'feedback' && s.level === 2)
+      .map(s => s.id);
+    const got = expectReachable(
+      hab({ ...all(4), feedback: 2 }),
+      'habits',
+      ids(5, 7, 'hs').concat(ids(28, 33, 'hs'), cells),
+    );
+    Object.entries(got).forEach(([id, t]) => {
+      expect(t, id).not.toMatch(/excellent|good|class time|others|taking part|devices|completing/);
+      if (/^hs/.test(id)) {
+        expect(t, id).toMatch(/using feedback/i);
+        expect(t, id).not.toMatch(/ and /);
+      } else
+        expect(
+          COMMENT_BANK.sentences.find(s => s.id === id),
+          id,
+        ).toMatchObject({ habit: 'feedback', level: 2 });
     });
     expect(got.hs32).toBe('Using feedback is the work habit to build next.');
   });
@@ -384,7 +401,9 @@ describe('the frames and the lint', () => {
         .filter(s => s.part === 'habits' && CommentBank.fits(s, ctx))
         .forEach(s => {
           const start = CommentBank.fill(s, ctx).toLowerCase().split(/\s+/).slice(0, 3).join(' ');
-          const key = s.group + '|' + start;
+          // A Habit Ratings cell (one habit at one rating) is its own
+          // selection (Colin, Nov 1), so its frames are compared within it.
+          const key = s.group + '|' + (s.habit ? s.habit + s.level + '|' : '') + start;
           const other = seen[key];
           if (other && allowed.indexOf(other + '|' + s.id) < 0)
             expect.fail(s.id + ' opens like ' + other + ': ' + CommentBank.fill(s, ctx));

@@ -2348,6 +2348,9 @@ window.CommentBank = (function () {
       // about them, as tokens: the realiser names the student in the first
       // sentence that mentions them (plan PR 9).
       _who: _whoOfFacts(f),
+      // The one habit rated Sometimes or Rarely, when exactly one is: the
+      // habit a Habit Ratings frame may be drafted for (habitCellFits).
+      _habitAlone: hsum.build.length === 1 ? hsum.build[0] : '',
       _toks: {
         bestPiece: top ? bestPieceTokens({ title: top.title, note: top.note }) : null,
         habitStrengths: hsum.excellent ? null : strengthsTokens(f, strongThree),
@@ -2812,7 +2815,9 @@ window.CommentBank = (function () {
      the order with no story to tell. */
   var DRAFT_STEPS = [
     { key: 'grade', part: 'now', groups: ['Grade'], says: 'grade' },
-    { key: 'habits', part: 'habits', groups: ['Work Habits'] },
+    // The summary sentence, or (habitCellFits) a Habit Ratings frame for
+    // the one habit rated below Usually.
+    { key: 'habits', part: 'habits', groups: ['Work Habits', 'Habit Ratings'] },
     { key: 'attendance', part: 'habits', groups: ['Attendance'] },
     // The work labelled Missing, then the class's late-work line after it
     // (plan PR 8): only for a student with work not handed in.
@@ -3275,7 +3280,21 @@ window.CommentBank = (function () {
     STORY_LEADS.forEach(function (k) {
       if (needs.indexOf(k) >= 0 && ctx[k]) n++;
     });
+    // A Habit Ratings frame is matched on the same ratings as the summary
+    // sentence, so its habit condition makes it no more specific: the two
+    // share a tier, and the summary stays the default (habitCellFits).
+    if (s.habit && s.part === 'habits') n--;
     return n;
+  }
+
+  /* Whether a Habit Ratings frame (bank hl001-hl120: one habit at one
+     rating, `habit` and `level`) may fill the habits step: only when exactly
+     one habit is rated Sometimes or Rarely and the frame is that habit's,
+     so the draft names it specifically. The summary sentence is the default
+     everywhere else; Other Wording and Browse Sentences offer every frame
+     whose rating matches (fits()). */
+  function habitCellFits(s, ctx) {
+    return !!s.habit && !!ctx._habitAlone && ctx._habitAlone === s.habit;
   }
 
   /* Whether a sentence can fill a step for this student, before the rest of
@@ -3298,6 +3317,7 @@ window.CommentBank = (function () {
       })
     )
       return false;
+    if (step.key === 'habits' && s.habit && !habitCellFits(s, ctx)) return false;
     if (step.prefer && ctx[step.prefer] && (s.needs || []).indexOf(step.prefer) < 0) return false;
     if (
       step.never &&
@@ -3521,8 +3541,12 @@ window.CommentBank = (function () {
           // Exhaust before repeat: a sentence no classmate has comes before
           // any a classmate has, the least used next.
           used: usage[s.id] || 0,
-          // At equal use, wording written for this kind of class first, then
-          // a sentence that does not start like the one before it.
+          // At equal use, the habits summary before a Habit Ratings frame
+          // (the summary is the default; a frame is drafted once every
+          // summary frame is in a classmate's comment), then wording
+          // written for this kind of class, then a sentence that does not
+          // start like the one before it.
+          cell: s.habit && step.key === 'habits' ? 1 : 0,
           general: s.subjects ? 0 : 1,
           repeats: repeatsLast(t, last) ? 1 : 0,
           // A step that says a fact (the grade, the work not handed in)
@@ -3550,7 +3574,14 @@ window.CommentBank = (function () {
           .filter(fresh);
       if (!scored.length) return;
       scored.sort(function (a, b) {
-        return a.long - b.long || a.used - b.used || a.general - b.general || a.repeats - b.repeats || a.r - b.r;
+        return (
+          a.long - b.long ||
+          a.used - b.used ||
+          a.cell - b.cell ||
+          a.general - b.general ||
+          a.repeats - b.repeats ||
+          a.r - b.r
+        );
       });
       var pick = scored[0];
       taken[pick.s.id] = true;
@@ -4971,6 +5002,7 @@ window.CommentBank = (function () {
     completesFromRecord: completesFromRecord,
     effectiveHabits: effectiveHabits,
     habitSummary: habitSummary,
+    habitCellFits: habitCellFits,
     habitWords: habitWords,
     facts: facts,
     notHandedIn: notHandedIn,
