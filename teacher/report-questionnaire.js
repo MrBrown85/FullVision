@@ -381,7 +381,13 @@ window.ReportQuestionnaire = (function () {
     var t = String(text || '');
     var spans = [];
     (rows || []).forEach(function (r) {
-      var kind = _isBestRow(r) ? 'best' : r.step === 'notHandedIn' || r.step === 'ieProblem' ? 'missing' : '';
+      var kind = _justAdded(r)
+        ? 'added'
+        : _isBestRow(r)
+          ? 'best'
+          : r.step === 'notHandedIn' || r.step === 'ieProblem'
+            ? 'missing'
+            : '';
       var s = String(r.text || '').trim();
       if (!kind || !s) return;
       var at = t.indexOf(s);
@@ -1470,6 +1476,10 @@ window.ReportQuestionnaire = (function () {
     // fresh start is Remove From Comment or clearing the box; ⌘ Z brings
     // the previous text back either way.
     var wrote = !!_lastDraft[key];
+    // The rows follow the box first, so a sentence just deleted (⌘A,
+    // Delete, Generate at once) never comes back.
+    clearTimeout(_alignTimer);
+    _alignNow();
     var rows = _rowsFor(st, f);
     var kept = {};
     rows.forEach(function (r) {
@@ -2722,6 +2732,7 @@ window.ReportQuestionnaire = (function () {
       tqNarrativeDirty = true;
       tqSaveNarrative();
       _syncNote();
+      _syncMarks();
     } else {
       upsertTermRating(_activeCourse, st.id, getTermId(), { narrative: text });
     }
@@ -3310,7 +3321,7 @@ window.ReportQuestionnaire = (function () {
           ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Shows other ways to say this sentence. Pick one to use it.">Other Wording ▾</button>`
           : addBank;
     var ownBox = _own && _own.where === 'row' && _own.index === i ? _ownBoxHtml(student) : '';
-    var added = _justAdded(student, row);
+    var added = _justAdded(row);
     var tint = added ? ' added' : _isBestRow(row) ? ' best' : row.step === 'attendance' ? ' attendance' : '';
     var text = unit
       .map(function (r) {
@@ -3337,12 +3348,27 @@ window.ReportQuestionnaire = (function () {
   /* The row put in just now, tinted for a few seconds with "added just
      now" on its source line. */
   var ADDED_FOR = 5000;
-  var _added = null; // { key, id, at }
-  function _justAdded(student, row) {
-    return !!_added && _added.key === _rowKey(student) && _added.id === row.id && Date.now() - _added.at < ADDED_FOR;
+  var _added = null; // { row, at }
+  var _addedTimer = null;
+  function _justAdded(row) {
+    return !!_added && _added.row === row && Date.now() - _added.at < ADDED_FOR;
   }
+  /* When the fade ends, the tint and "added just now" go from the row and
+     the comment's mark, in place (no redraw, so an open menu or box
+     stays). */
   function _markAdded(st, row) {
-    _added = { key: _rowKey(st), id: row.id, at: Date.now() };
+    _added = { row: row, at: Date.now() };
+    clearTimeout(_addedTimer);
+    _addedTimer = setTimeout(function () {
+      _added = null;
+      if (typeof document === 'undefined' || !document.querySelectorAll) return;
+      document.querySelectorAll('#tq-sentences .qn-srow.added').forEach(function (el) {
+        el.classList.remove('added');
+        var src = el.querySelector('.qn-req-source');
+        if (src) src.textContent = src.textContent.replace(/ · added just now$/, '');
+      });
+      _syncMarks();
+    }, ADDED_FOR);
   }
 
   /* The Options menu of a Your Sentence row. */
@@ -4284,7 +4310,13 @@ window.ReportQuestionnaire = (function () {
       var meta = r.inUse ? 'In use' + (n ? ' · used for ' + _plural(n, 'classmate', 'classmates') : '') : _usedMeta(n);
       var ctrl = r.inUse
         ? inUse
-        : `<button type="button" class="qn-browse-use" data-action="tqSentences" data-do="use" data-sentence="${esc(r.id)}"${r.fits ? '' : ' disabled'} title="${esc(r.fits ? 'Puts this sentence in ' + first + '’s comment.' : 'This sentence needs a fact FullVision does not have for ' + first + '.')}">Use</button>`;
+        : `<button type="button" class="qn-browse-use" data-action="tqSentences" data-do="use" data-sentence="${esc(r.id)}"${r.fits ? '' : ' disabled'} title="${esc(
+            !r.fits
+              ? 'This sentence needs a fact FullVision does not have for ' + first + '.'
+              : b.gap != null && _replacedBy(rows, _bankById(r.id) || {}) < 0
+                ? 'Puts this sentence in ' + first + '’s comment, at the place you chose.'
+                : 'Puts this sentence in ' + first + '’s comment.',
+          )}">Use</button>`;
       return row(r.text, meta, ctrl, r.inUse, r.mine ? { id: r.id, general: r.general } : null);
     };
     return list.groups
@@ -4469,18 +4501,54 @@ window.ReportQuestionnaire = (function () {
     out.splice(pos, 0, row);
     return out;
   }
+  /* The row a bank sentence picked at a gap replaces, or -1 to put it in
+     there: the row of the same step (one grade sentence, one next step, one
+     Not Handed In), or, for an advising sentence, the comment's advising
+     row (one next step a comment, the engine's rule). */
+  function _replacedBy(rows, s) {
+    var step = CommentBank.stepOf(s);
+    var at = rows.findIndex(function (r) {
+      return !!step && r.step === step;
+    });
+    if (at >= 0) return at;
+    if (!CommentBank.advises(s)) return -1;
+    return rows.findIndex(function (r) {
+      return !!r.s && CommentBank.advises(r.s);
+    });
+  }
+  /* The part Browse Sentences opens on from a gap: the first that can be
+     put in there, else the first the comment has no row for, else Grade. */
+  function _gapPart(rows, ctx, opts) {
+    var missing = insertChoices(rows, ctx, opts);
+    if (missing.length) return missing[0].part;
+    var p = PARTS.find(function (x) {
+      return !rows.some(function (r) {
+        return !!r.step && x.steps.indexOf(r.step) >= 0;
+      });
+    });
+    return p ? p.id : 'grade';
+  }
   function _useSentence(st, id) {
     var s = _bankById(id);
     var f = _facts(st);
     var ctx = _bankContext(_activeCourse, st, f);
     if (!s || !CommentBank.fits(s, ctx)) return;
     var key = _rowKey(st);
-    if (_browse && _browse.gap != null) {
+    var rows = _rowsFor(st, f);
+    var at = _browse && _browse.gap != null ? _replacedBy(rows, s) : -1;
+    if (_browse && _browse.gap != null && at < 0) {
       var row = rowFromSentence(s, ctx, CommentBank.stepOf(s));
-      _rows[key] = insertRow(_rowsFor(st, f), row, _browse.gap);
+      _rows[key] = insertRow(rows, row, _browse.gap);
       _markAdded(st, row);
       _browse.gap++;
-    } else _rows[key] = useSentence(_rowsFor(st, f), s, ctx);
+    } else if (at >= 0) {
+      // From a gap, a part the comment has once only (its step, or an
+      // advising sentence) takes the place of that row, never a second
+      // time; the gap stays for the next pick.
+      var next = rows.slice();
+      next[at] = rowFromSentence(s, ctx, rows[at].step, at === 0);
+      _rows[key] = next;
+    } else _rows[key] = useSentence(rows, s, ctx);
     _writeRows(st);
     _syncBrowse();
     _focusSel('#tq-browse-list .qn-browse-row.on');
@@ -4545,12 +4613,7 @@ window.ReportQuestionnaire = (function () {
       case 'browseAt': {
         var at = Number(ds.gap);
         var rowsNow = _rows[key] || [];
-        var missing = insertChoices(
-          rowsNow,
-          _bankContext(_activeCourse, st, _facts(st)),
-          _insertOpts(_activeCourse, st),
-        );
-        _openBrowse(missing.length ? missing[0].part : 'grade', at);
+        _openBrowse(_gapPart(rowsNow, _bankContext(_activeCourse, st, _facts(st)), _insertOpts(_activeCourse, st)), at);
         return;
       }
       case 'pick':
@@ -5972,6 +6035,8 @@ window.ReportQuestionnaire = (function () {
     keepTyped: keepTyped,
     insertRow: insertRow,
     insertChoices: insertChoices,
+    replacedBy: _replacedBy,
+    gapPart: _gapPart,
     recoverRows: recoverRows,
     composeRows: composeRows,
     units: _units,

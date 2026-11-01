@@ -368,17 +368,27 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
   });
 
   it('an edited habits sentence survives a rating change', () => {
+    // The habits sentence as a whole sentence (a quoted title's period
+    // would cut a regex short).
+    const habitsOf = text => RQ.sentencesOf(text).find(x => /feedback/i.test(x));
     RQ.tqGenerate();
-    const habit = box.value.match(/[^.]*feedback[^.]*\./i)[0].trim();
+    const habit = habitsOf(box.value);
     box.value = box.value.replace(habit, 'He is learning to act on feedback.');
     RQ.tqNarrativeInput();
     const edited = box.value;
     RQ.tqRate('devices', 1);
     expect(box.value).toBe(edited);
-    // Another sentence edited, the habits sentence untouched: only it changes.
+    // Generate again keeps the edited sentence (the rows follow the box
+    // before it runs).
+    RQ.tqGenerate();
+    expect(box.value).toContain('He is learning to act on feedback.');
+    // Put back as Generate wrote it, it is no longer the teacher's; another
+    // sentence edited, the habits sentence untouched: only it changes.
+    box.value = box.value.replace('He is learning to act on feedback.', habit);
+    RQ.tqNarrativeInput();
     RQ.tqGenerate();
     const again = box.value;
-    const sentence = again.match(/[^.]*feedback[^.]*\./i)[0].trim();
+    const sentence = habitsOf(again);
     box.value = again.replace(/^[^.]*\./, 'Gabriel worked hard.');
     RQ.tqRate('devices', 4);
     RQ.tqRate('feedback', 4);

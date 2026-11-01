@@ -4227,6 +4227,23 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-mark.missing {
   box-shadow: 0 0 0 2px var(--qn-ring);
 }
+/* The sentence put in just now, tinted like its row and fading with it. */
+.qn-mark.added {
+  background: var(--qn-new-bg);
+  box-shadow: 0 0 0 2px var(--qn-new-bg);
+  animation: qn-added-mark 5s ease-in forwards;
+}
+@keyframes qn-added-mark {
+  0%,
+  60% {
+    background-color: var(--qn-new-bg);
+    box-shadow: 0 0 0 2px var(--qn-new-bg);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
 .qn-comment-foot {
   display: flex;
   align-items: center;
@@ -5361,6 +5378,12 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-line-cancel:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 2px;
+}
+/* A menu item with the keyboard focus takes the hover fill too. */
+.qn-menu-item:focus-visible,
+.qn-menu-add:focus-visible {
+  background: var(--overlay-hover);
+  outline-offset: -2px;
 }
 .qn-line-choose {
   flex: none;

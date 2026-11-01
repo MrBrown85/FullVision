@@ -893,6 +893,10 @@ test.describe('the Sentences card', () => {
     await expect(added.locator('.qn-req-label')).toHaveText('Strengths');
     await expect(added).toHaveClass(/\badded\b/);
     await expect(added.locator('.qn-req-source')).toHaveText(/ · added just now$/);
+    // The sentence is tinted in the comment too, like the best piece.
+    await expect(page.locator('#tq-marks .qn-mark.added')).toHaveText(
+      await added.locator('.qn-req-text').textContent(),
+    );
     await expect(rows(page)).toHaveCount(n + 1);
     const text = await box.inputValue();
     const sentences = ReportQuestionnaireSentences(text);
@@ -911,6 +915,78 @@ test.describe('the Sentences card', () => {
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     await expect(gaps.nth(1).locator('.qn-gap-add')).toBeFocused();
+    // When the fade ends the tint, the mark and "added just now" go, in place.
+    await expect(added).not.toHaveClass(/\badded\b/, { timeout: 7000 });
+    await expect(added.locator('.qn-req-source')).not.toHaveText(/added just now/);
+    await expect(page.locator('#tq-marks .qn-mark.added')).toHaveCount(0);
+  });
+
+  test('Browse Sentences… from a gap: opens on a part that can go in; Use replaces a part the comment has once only; ⌘A Delete then Generate at once', async ({
+    page,
+  }) => {
+    await open(page);
+    await clearComment(page);
+    await page.locator('#tq-generate').click();
+    const box = page.locator('#tq-narrative');
+    const gaps = page.locator('#tq-sentences .qn-gap');
+    const n = await rows(page).count();
+    const gradeWas = await rows(page).first().locator('.qn-req-text').textContent();
+    // Every drafted part is in: Browse opens on Habits (nothing rated, so no
+    // habits sentence fits), not on a part already there.
+    await gaps.last().locator('.qn-gap-add').click();
+    await page.locator('#tq-add-menu [data-do="browseAt"]').click();
+    const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Habits');
+    // A second grade sentence is never put in: Use on Grade replaces the
+    // grade row, the row count unchanged, the first row still Grade.
+    await sheet.locator('[role="tab"]', { hasText: 'Grade' }).click();
+    const use = sheet.locator('.qn-browse-use:enabled').first();
+    await expect(use).toHaveAttribute('title', 'Puts this sentence in Cece’s comment.');
+    await use.click();
+    await expect(rows(page)).toHaveCount(n);
+    await expect(rowByLabel(page, 'Grade')).toHaveCount(1);
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    expect(await rows(page).first().locator('.qn-req-text').textContent()).not.toBe(gradeWas);
+    await expect(rowByLabel(page, 'Next Step')).toHaveCount(1);
+    // A Strengths sentence from the same sheet, with the strengths row gone,
+    // goes in at the gap: its Use says so.
+    await page.keyboard.press('Escape');
+    const gone = await rowByLabel(page, 'Strengths').locator('.qn-req-text').textContent();
+    await box.evaluate((el, t) => {
+      el.value = el.value.replace(' ' + t, '').replace(t, '');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, gone);
+    await expect(rowByLabel(page, 'Strengths')).toHaveCount(0);
+    await gaps.last().locator('.qn-gap-add').click();
+    await page.locator('#tq-add-menu [data-do="browseAt"]').click();
+    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Strengths');
+    await expect(sheet.locator('.qn-browse-use:enabled').first()).toHaveAttribute(
+      'title',
+      'Puts this sentence in Cece’s comment, at the place you chose.',
+    );
+    await sheet.locator('.qn-browse-use:enabled').first().click();
+    await expect(rows(page).last().locator('.qn-req-label')).toHaveText('Strengths');
+    await expect(rows(page)).toHaveCount(n);
+    await page.keyboard.press('Escape');
+    // The keyboard focus on a menu item is filled like a hover.
+    await gaps.last().locator('.qn-gap-add').click();
+    const item = page.locator('#tq-add-menu [role="menuitem"]').first();
+    await expect(item).toBeFocused();
+    expect(await item.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+    expect(await item.evaluate(el => getComputedStyle(el).outlineStyle)).toBe('solid');
+    await page.keyboard.press('Escape');
+    // A typed sentence, then ⌘A, Delete and Generate at once: nothing
+    // deleted comes back.
+    await toEnd(page);
+    await page.keyboard.type(' Cece explained her lab results clearly to the class.');
+    await expect(rowByLabel(page, 'Your Sentence')).toHaveCount(1);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Backspace');
+    await page.locator('#tq-generate').click();
+    await expect(rowByLabel(page, 'Your Sentence')).toHaveCount(0);
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    expect(await box.inputValue()).not.toContain('explained her lab results');
+    await expect(rowByLabel(page, 'Strengths')).toHaveCount(1);
   });
 
   test('Write Your Own… at a gap puts a typed row there; Browse Sentences… from a gap inserts with Use; the keyboard path', async ({
@@ -955,7 +1031,8 @@ test.describe('the Sentences card', () => {
     expect(ReportQuestionnaireSentences(await box.inputValue())[2]).toBe(
       'Cece explained her lab results clearly to the class.',
     );
-    // Browse Sentences… from the last gap: Use puts the sentence in there.
+    // Browse Sentences… from the last gap: a part the comment has once
+    // only (Strengths) is replaced in its row, never put in twice.
     const n = await rows(page).count();
     await gaps.last().locator('.qn-gap-add').click();
     await menu.locator('[data-do="browseAt"]').click();
@@ -965,10 +1042,9 @@ test.describe('the Sentences card', () => {
     const use = sheet.locator('.qn-browse-use:enabled').first();
     const pick = await use.locator('..').locator('.qn-browse-sentence').textContent();
     await use.click();
-    await expect(rows(page)).toHaveCount(n + 1);
-    await expect(rows(page).last().locator('.qn-req-label')).toHaveText('Strengths');
-    await expect(rows(page).last()).toHaveClass(/\badded\b/);
-    expect((await rows(page).last().locator('.qn-req-text').textContent()).slice(4)).toBe(pick.slice(4));
+    await expect(rows(page)).toHaveCount(n);
+    await expect(rowByLabel(page, 'Strengths')).toHaveCount(1);
+    expect((await rowByLabel(page, 'Strengths').locator('.qn-req-text').textContent()).slice(4)).toBe(pick.slice(4));
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
     await expect(gaps.last().locator('.qn-gap-add')).toBeFocused();
