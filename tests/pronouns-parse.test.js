@@ -68,7 +68,7 @@ describe('getPronouns', () => {
     expect(P('xe/xem')).toEqual({
       subj: 'xe',
       obj: 'xem',
-      poss: 'xem',
+      poss: 'xyr',
       refl: 'xemself',
       verb: 's',
       capSubj: 'Xe',
@@ -119,14 +119,14 @@ describe('a rendered comment (Demo Mode, Science 8, Report 2)', () => {
     window.isDemoMode = saved;
     localStorage.clear();
   });
-  const textFor = (first, pronouns) => {
+  const textFor = (first, pronouns, seed) => {
     const st = Object.assign(
       {},
       getStudents(cid).find(s => s.firstName === first),
       { pronouns },
     );
     const f = CommentBank.facts(cid, st, 'term-2');
-    return CommentBank.draft(CommentBank.context(f, {}), { seed: 3 }).text;
+    return CommentBank.draft(CommentBank.context(f, {}), { seed: seed == null ? 3 : seed }).text;
   };
   it('never prints "prefer not to say"; the student is they/their after the first sentence', () => {
     const text = textFor('Cece', 'prefer not to say');
@@ -136,9 +136,111 @@ describe('a rendered comment (Demo Mode, Science 8, Report 2)', () => {
     expect(text).toBe(textFor('Cece', ''));
     expect(text).toBe(textFor('Cece', 'they/them'));
   });
+  it('a set of two subject pronouns reads as the first set in every draft', () => {
+    [1, 2, 3, 4, 5, 6, 7, 8].forEach(seed => {
+      expect(textFor('Cece', 'she/they', seed)).toBe(textFor('Cece', 'she/her', seed));
+      expect(textFor('Cece', 'he/they', seed)).toBe(textFor('Cece', 'he/him', seed));
+      expect(textFor('Cece', 'they/she', seed)).toBe(textFor('Cece', 'they/them', seed));
+      expect(textFor('Cece', 'they/he', seed)).toBe(textFor('Cece', 'they/them', seed));
+      expect(textFor('Cece', 'he/his', seed)).toBe(textFor('Cece', 'he/him', seed));
+      expect(textFor('Cece', 'she/hers', seed)).toBe(textFor('Cece', 'she/her', seed));
+      expect(textFor('Cece', 'xe/they', seed)).toBe(textFor('Cece', 'xe/xem/xyr', seed));
+      expect(textFor('Cece', 'she/they', seed)).not.toMatch(/\b(they|them|their)\b/);
+    });
+  });
   it('he/him and she/her are unchanged', () => {
     expect(textFor('Cece', 'she/her')).toMatch(/\b(she|her)\b/i);
     expect(textFor('Cece', 'she/her')).not.toMatch(/\b(they|their)\b/);
     expect(textFor('Cece', 'he/him')).toMatch(/\b(he|his|him)\b/i);
+  });
+});
+
+/* A set of two subject pronouns ("she/they", "he/they", "they/she") reads as
+   the full set of the first. Before this, the second word became the object:
+   "Thank you for helping they settle in". */
+describe('a set of two subject pronouns', () => {
+  const SHE = P('she/her');
+  const HE = P('he/him');
+  const THEM = P('they/them');
+  it('uses the full set of the first pronoun', () => {
+    expect(P('she/they')).toEqual(SHE);
+    expect(P('he/they')).toEqual(HE);
+    expect(P('they/she')).toEqual(THEM);
+    expect(P('they/he')).toEqual(THEM);
+    expect(P(' She/They ')).toEqual(SHE);
+    expect(P('she/they/them')).toEqual(SHE);
+  });
+  it('a neopronoun first uses its own set', () => {
+    const set = (subj, obj, poss, refl) => ({
+      subj,
+      obj,
+      poss,
+      refl,
+      verb: 's',
+      capSubj: subj[0].toUpperCase() + subj.slice(1),
+      onFile: true,
+    });
+    expect(P('xe/they')).toEqual(set('xe', 'xem', 'xyr', 'xemself'));
+    expect(P('ze/they')).toEqual(set('ze', 'zir', 'zir', 'zirself'));
+    expect(P('fae/they')).toEqual(set('fae', 'faer', 'faer', 'faerself'));
+    expect(P('xe/xem/xyr')).toEqual(set('xe', 'xem', 'xyr', 'xemself'));
+    // An unknown subject with only another subject: they as object and possessive.
+    expect(P('co/they')).toEqual(set('co', 'them', 'their', 'themself'));
+    expect(P('co/she')).toEqual(set('co', 'them', 'their', 'themself'));
+    // A set the roster spells out is still used as written.
+    expect(P('ze/hir/hir')).toEqual(set('ze', 'hir', 'hir', 'hirself'));
+    expect(P('co/cos')).toEqual(set('co', 'cos', 'cos', 'cosself'));
+  });
+  it('an object or possessive form reads as the full set of its subject', () => {
+    expect(P('he/his')).toEqual(HE);
+    expect(P('he/him/his')).toEqual(HE);
+    expect(P('she/hers')).toEqual(SHE);
+    expect(P('she/her/hers')).toEqual(SHE);
+    expect(P('they/theirs')).toEqual(THEM);
+    expect(P('they/them/theirs')).toEqual(THEM);
+    expect(P('it/its')).toEqual({
+      subj: 'it',
+      obj: 'it',
+      poss: 'its',
+      refl: 'itself',
+      verb: 's',
+      capSubj: 'It',
+      onFile: true,
+    });
+  });
+  it('keeps a subject/object set as written', () => {
+    expect(P('she/her').obj).toBe('her');
+    expect(P('ze/zir/zir')).toMatchObject({ subj: 'ze', obj: 'zir', poss: 'zir' });
+    expect(P('they/them').obj).toBe('them');
+  });
+  it('renders the object and possessive of the first set', () => {
+    const R = CommentRealiser;
+    const line = p =>
+      R.render(
+        R.tokens('Thank you for helping {him} settle in; {he} [has|have] grown in {his} writing.'),
+        {
+          name: 'Sam',
+          p,
+        },
+        { named: true },
+      );
+    expect(line(P('she/they'))).toBe('Thank you for helping her settle in; she has grown in her writing.');
+    expect(line(P('he/they'))).toBe('Thank you for helping him settle in; he has grown in his writing.');
+    expect(line(P('they/she'))).toBe('Thank you for helping them settle in; they have grown in their writing.');
+    expect(line(P('they/he'))).toBe('Thank you for helping them settle in; they have grown in their writing.');
+    expect(line(P('xe/they'))).toBe('Thank you for helping xem settle in; xe has grown in xyr writing.');
+    expect(line(P('he/his'))).toBe('Thank you for helping him settle in; he has grown in his writing.');
+    expect(line(P('she/hers'))).toBe('Thank you for helping her settle in; she has grown in her writing.');
+  });
+  it('the grader note preview reads the first set', () => {
+    const S = o => CommentBank.bestPieceSentence(o);
+    const note = { title: 'Trench Letter', note: 'wrote from a soldier’s view' };
+    const ref = pronouns => Object.assign({}, note, CommentBank.studentRef({ firstName: 'Chris', pronouns }));
+    expect(S(ref('she/they'))).toBe('Her best piece was “Trench Letter”, where she wrote from a soldier’s view.');
+    expect(S(ref('he/they'))).toBe('His best piece was “Trench Letter”, where he wrote from a soldier’s view.');
+    expect(S(ref('they/she'))).toBe('Their best piece was “Trench Letter”, where they wrote from a soldier’s view.');
+    expect(S(ref('they/he'))).toBe('Their best piece was “Trench Letter”, where they wrote from a soldier’s view.');
+    expect(S(ref('ze/they'))).toBe('Zir best piece was “Trench Letter”, where ze wrote from a soldier’s view.');
+    expect(S(ref('he/his'))).toBe('His best piece was “Trench Letter”, where he wrote from a soldier’s view.');
   });
 });

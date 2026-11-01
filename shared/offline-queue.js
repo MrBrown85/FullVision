@@ -212,8 +212,98 @@
     keys.forEach(function (k) {
       if (k !== 'p_idempotency_key' && /^p_(.+_)?ids?$/.test(k)) ids.push(k + '=' + JSON.stringify(payload[k]));
     });
+    // A term rating is one row per enrollment and term.
+    if (endpoint === 'save_term_rating') ids.push('p_term=' + JSON.stringify(payload.p_term));
+    // A new personal-bank template has no id yet (p_id null): it is the
+    // template with this text, not every new template.
+    if (endpoint === 'save_comment_template' && payload.p_id == null) {
+      ids.push('p_text=' + JSON.stringify(payload.p_text));
+    }
     if (!ids.length) return null;
     return endpoint + '|' + ids.join('&');
+  }
+
+  /* The fields a write sets on its target, for writes that send only the
+     fields that changed (save_term_rating's p_payload); null when a write
+     sets the whole record. */
+  function _fields(entry) {
+    if (!entry || entry.endpoint !== 'save_term_rating') return null;
+    var p = entry.payload && entry.payload.p_payload;
+    return p && typeof p === 'object' ? Object.keys(p) : [];
+  }
+
+  /* What is left of an older failed write once a newer write to the same
+     target is queued or lands: the older one itself when the targets differ,
+     null when the newer one sets everything it set, else a copy without the
+     fields the newer one sets. A term-rating habits save leaves a failed
+     narrative, approval or IE save alone, and a newer narrative takes the
+     narrative out of a failed one, so the older value is never applied
+     after the newer one. */
+  function _without(newer, older) {
+    var target = _target(newer.endpoint, newer.payload);
+    if (!target || _target(older.endpoint, older.payload) !== target) return older;
+    var mine = _replacedFields(newer);
+    if (!mine) return null;
+    return _withoutKeys(older, mine);
+  }
+
+  /* An approval and its draft_meta belong to the narrative they were made
+     with: a newer narrative replaces them too, unless it carries its own. */
+  var NARRATIVE_BOUND = ['approved', 'draft_meta'];
+  function _replacedFields(newer) {
+    var mine = _fields(newer);
+    if (!mine || mine.indexOf('narrative_html') < 0) return mine;
+    return mine.concat(
+      NARRATIVE_BOUND.filter(function (k) {
+        return mine.indexOf(k) < 0;
+      }),
+    );
+  }
+
+  /* A term-rating write without these fields: itself when it sets none of
+     them, null when nothing is left, else a copy. */
+  function _withoutKeys(entry, keys) {
+    var theirs = _fields(entry);
+    var left = theirs.filter(function (k) {
+      return keys.indexOf(k) < 0;
+    });
+    if (!left.length) return null;
+    if (left.length === theirs.length) return entry;
+    var wire = {};
+    left.forEach(function (k) {
+      wire[k] = entry.payload.p_payload[k];
+    });
+    return Object.assign({}, entry, { payload: Object.assign({}, entry.payload, { p_payload: wire }) });
+  }
+
+  /* A new narrative queued for a term rating takes the approval out of the
+     older saves still waiting to go for that row, so the approval made with
+     the old narrative never lands on the new one. A save left with no field
+     still goes, as an empty one, so whoever waits on it hears back. */
+  function _unapproveQueued(entries, entry) {
+    var mine = _fields(entry);
+    if (!mine || mine.indexOf('narrative_html') < 0) return;
+    var target = _target(entry.endpoint, entry.payload);
+    var drop = NARRATIVE_BOUND.filter(function (k) {
+      return mine.indexOf(k) < 0;
+    });
+    if (!target || !drop.length) return;
+    entries.forEach(function (e, i) {
+      if (_isInFlight(e) || _target(e.endpoint, e.payload) !== target) return;
+      var left = _withoutKeys(e, drop);
+      if (left === e) return;
+      if (!left) left = Object.assign({}, e, { payload: Object.assign({}, e.payload, { p_payload: {} }) });
+      entries[i] = left;
+    });
+  }
+
+  /* The failed writes with what a newer write replaces taken out. */
+  function _pruneDead(dead, newer) {
+    return dead
+      .map(function (e) {
+        return _without(newer, e);
+      })
+      .filter(Boolean);
   }
 
   function _sameSet(a, b) {
@@ -655,6 +745,7 @@
       // idempotency key can't carry a new value.
       q.entries[at] = entry;
     } else {
+      _unapproveQueued(q.entries, entry);
       q.entries.push(entry);
     }
     try {
@@ -792,7 +883,7 @@
       q.last_flush_at = new Date().toISOString();
       _writeQueue(q);
       _counts.succeeded++;
-      _dropDeadFor(_target(entry.endpoint, entry.payload));
+      _dropDeadFor(entry);
       // Listeners see the result before the push() caller does, so a re-key
       // driven from here is finished by the time the caller's .then runs.
       _notify('flush:success', {
@@ -840,10 +931,7 @@
 
     // One failed write per target: a newer failure replaces an older one.
     // The last try after a reload is dropped instead.
-    var target = _target(entry.endpoint, entry.payload);
-    var dead = _readDead().filter(function (e) {
-      return !target || _target(e.endpoint, e.payload) !== target;
-    });
+    var dead = _pruneDead(_readDead(), entry);
     if (entry.last_try) _reportDropped(entry);
     else dead.push(entry);
     _writeDead(dead);
@@ -879,18 +967,24 @@
     _writeQueue(q);
   }
 
-  /* A write to this target landed, so older failed writes to it are out of
-     date: retrying one would put back the value it replaced. */
-  function _dropDeadFor(target) {
-    if (!target) return;
+  /* A write to this target landed, so what it sets in older failed writes
+     is out of date: retrying that would put back the value it replaced. */
+  function _dropDeadFor(entry) {
+    if (!_target(entry.endpoint, entry.payload)) return;
     var dead = _readDead();
-    var keep = dead.filter(function (e) {
-      return _target(e.endpoint, e.payload) !== target;
-    });
-    if (keep.length === dead.length) return;
+    var keep = _pruneDead(dead, entry);
+    var changed =
+      keep.length !== dead.length ||
+      keep.some(function (e, i) {
+        return e !== dead[i];
+      });
+    if (!changed) return;
     _writeDead(keep);
+    var kept = keep.map(function (e) {
+      return e.id;
+    });
     dead.forEach(function (e) {
-      if (keep.indexOf(e) < 0) _notify('dead-letter:dismiss', { id: e.id, superseded: true });
+      if (kept.indexOf(e.id) < 0) _notify('dead-letter:dismiss', { id: e.id, superseded: true });
     });
   }
 
@@ -1156,16 +1250,18 @@
   }
 
   /* Once per page load: send the signed-in teacher's failed writes once
-     more, at the end of the queue. A write to a record that a newer queued
-     write also sets is out of date, and one that adds a row or waited on a
-     create that failed has nothing to retry against; those are dropped and
-     reported. Another teacher's stay for _discardForeign. */
+     more, at the end of the queue, without what a newer queued write also
+     sets. One left with nothing to set is out of date, and one that adds a
+     row or waited on a create that failed has nothing to retry against;
+     those are dropped and reported. Another teacher's stay for
+     _discardForeign. */
   function _retryDeadOnLoad() {
     var owner = currentOwner();
     if (!owner) return;
     var dead = _readDead();
     if (!dead.length) return;
     var q = _readQueue();
+    var queued = q.entries.slice();
     var keep = [];
     dead.forEach(function (entry) {
       if (_isForeign(entry, owner)) {
@@ -1174,15 +1270,17 @@
       }
       var target = _target(entry.endpoint, entry.payload);
       var drop = !target || entry.last_try || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
-      if (!drop) {
-        drop = q.entries.some(function (e) {
-          return _target(e.endpoint, e.payload) === target;
-        });
+      // What a queued write sets is newer: only the rest is retried.
+      var rest = entry;
+      for (var i = 0; !drop && i < queued.length; i++) {
+        rest = _without(queued[i], rest);
+        drop = !rest;
       }
       if (drop) {
         _reportDropped(entry);
         return;
       }
+      entry = rest;
       entry.attempts = 0;
       entry.last_try = true;
       delete entry.next_at;
