@@ -1171,9 +1171,9 @@ window.PageDashboard = (function () {
       Router.navigate('/observations/starters');
       return;
     }
-    // The Term Questionnaire's "Questionnaires ›" link: Class Management
-    // open on its Questionnaires tab.
-    else if (params && params.manage === 'questionnaires') openClassManager('questionnaires');
+    // A "manage" link (the Term Questionnaire's "Questionnaires ›", the
+    // gradebook's Add Students): Class Management open on that tab.
+    else if (params && params.manage) openClassManager(params.manage);
 
     // Ensure page starts at top
     requestAnimationFrame(function () {

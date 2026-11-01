@@ -1363,6 +1363,31 @@ th.gb-group-alt {
   padding: 4px 4px;
 }
 
+/* Nothing to show: one white card, a plain sentence and the one step
+   that changes it. */
+.gb-empty {
+  max-width: 440px;
+  margin: 12px auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+  text-align: center;
+}
+.gb-empty-text {
+  margin: 0;
+  font-family: var(--font-base);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
 /* Context menus */
 .gb-ctx-menu {
   position: fixed;

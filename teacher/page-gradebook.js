@@ -438,17 +438,9 @@ window.PageGradebook = (function () {
     html += '</div>';
 
     // ── Table ──
-    if (assessments.length === 0) {
-      var secLabel = filterSections.length > 0 ? ' in the selected sections' : '';
-      html +=
-        '<div style="text-align:center;padding:60px 20px;color:var(--text-3)">' +
-        '<div style="font-family:var(--font-base);font-size:0.95rem;margin-bottom:4px">No assignments found' +
-        secLabel +
-        '.</div>' +
-        '<div style="font-family:var(--font-base);font-size:0.875rem">Try adjusting your filters or <a role="link" tabindex="0" data-href="/assignments?course=' +
-        cid +
-        '" style="color:var(--link)">create a new assessment</a>.</div>' +
-        '</div>';
+    var empty = _emptyState(cid, everyAssessment, allAssessments, assessments, students);
+    if (empty) {
+      html += empty;
     } else if (viewMode === 'scores') {
       html += renderScoresTable(cid, students, assessments, sections, isLetter, scores);
     } else {
@@ -471,6 +463,41 @@ window.PageGradebook = (function () {
     initGridHoverSync();
     initHeaderResize();
     initColHoverTooltip();
+  }
+
+  /* What the page says when there is nothing to show, and the one step that
+     changes it: no students, no assessments, a term or filters that leave
+     none, or a search that finds no one. */
+  function _emptyState(cid, everyAssessment, termAssessments, shownAssessments, shownStudents) {
+    var hasStudents = getStudents(cid).length > 0;
+    var addStudents =
+      '<a class="tb-action-btn tb-action-secondary" role="link" tabindex="0" data-href="/dashboard?course=' +
+      cid +
+      '&manage=students">Add Students</a>';
+    var text, action;
+    if (!hasStudents && !everyAssessment.length) {
+      text = 'This class has no students or assessments yet.';
+      action = addStudents;
+    } else if (!hasStudents) {
+      text = 'No students in this class yet.';
+      action = addStudents;
+    } else if (!everyAssessment.length) {
+      text = 'No assessments in this class yet. Add one with + New Assessment.';
+    } else if (!termAssessments.length) {
+      text = 'No assessments in this term.';
+      action = '<button class="tb-action-btn tb-action-secondary" data-action="showAllTime">Show All Time</button>';
+    } else if (!shownAssessments.length) {
+      text = 'No assessments match these filters.';
+      action = '<button class="tb-action-btn tb-action-secondary" data-action="clearAllFilters">Clear Filters</button>';
+    } else if (!shownStudents.length && searchQuery) {
+      text = 'No students match \u201c' + esc(searchText.trim()) + '\u201d.';
+      action = '<button class="tb-action-btn tb-action-secondary" data-action="clearSearch">Clear Search</button>';
+    } else if (!shownStudents.length) {
+      text = 'None of these students are in this class.';
+      action =
+        '<button class="tb-action-btn tb-action-secondary" data-action="clearStudentFilter">Show All Students</button>';
+    } else return '';
+    return '<div class="gb-empty"><p class="gb-empty-text">' + text + '</p>' + (action || '') + '</div>';
   }
 
   /* ── 4-quadrant grid: row hover sync between Q3 and Q4 ───── */
@@ -3064,6 +3091,15 @@ window.PageGradebook = (function () {
       },
       clearAllFilters: function () {
         clearAllFilters();
+      },
+      clearSearch: function () {
+        searchQuery = '';
+        searchText = '';
+        render();
+      },
+      showAllTime: function () {
+        if (typeof setSelectedTermOrdinal === 'function') setSelectedTermOrdinal(activeCourse, null);
+        render();
       },
       toggleSort: function () {
         toggleSort(el.dataset.sortkey);
