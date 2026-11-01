@@ -57,6 +57,9 @@ test('one student is graded with the grader inside the card', async ({ page }) =
   const grader = card.locator('.grader-inline');
   await expect(grader.locator('.grader-inline-name')).toHaveText(/Alice/);
   await expect(grader.locator('.grader-status .grader-status-btn')).toHaveText(['Late', 'Excused', 'Missing']);
+  // One feedback box, the Overall Comment field; no Comment button.
+  await expect(grader.locator('.grader-add-comment')).toHaveCount(0);
+  await expect(grader.locator('.grdt-overall .grdt-note')).toBeVisible();
   await expect(page.locator('#rsg-descriptor-bar')).toBeHidden();
 
   const hyp = grader.locator('.grdt-crit[data-critid="crit-hyp"]');

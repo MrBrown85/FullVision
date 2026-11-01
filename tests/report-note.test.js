@@ -417,8 +417,8 @@ describe('the grader card', () => {
   const src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf-8');
   const css = readFileSync(resolve(root, 'teacher/assignments.css'), 'utf-8');
 
-  it('sits under Overall Feedback with the mockup’s wording', () => {
-    const at = src.indexOf('Overall Feedback</h2>');
+  it('sits under the grading with the mockup’s wording', () => {
+    const at = src.indexOf('<div class="grader-body"></div>');
     const card = src.indexOf('<section class="grader-report-note"');
     expect(at).toBeGreaterThan(0);
     expect(card).toBeGreaterThan(at);

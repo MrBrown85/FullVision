@@ -69,8 +69,16 @@ test('rubric tiles score, fine-tune and take feedback', async ({ page }) => {
   await page.keyboard.press('4');
   await expect(hyp.locator('.grdt-chosen-label')).toHaveText(/Extending/);
 
+  await expect(hyp.locator('.grdt-note-label')).toHaveText('Comment (Optional)');
   await hyp.locator('.grdt-note').fill('Clear question.');
   await dialog.locator('.grader-student').click();
+  // The Overall Comment is a field under the tiles; the observations list is gone.
+  await expect(dialog.locator('.grader-feedback')).toHaveCount(0);
+  await dialog.locator('.grdt-overall .grdt-note').fill('Strong lab.');
+  await dialog.locator('.grader-student').click();
+  await expect
+    .poll(() => page.evaluate(({ cid }) => getScoreComment(cid, 'stu-001', 'assess-gt'), { cid: TEST_COURSE.id }))
+    .toBe('Strong lab.');
   const note = await page.evaluate(
     ({ cid }) => {
       const a = getAssessments(cid).find(x => x.id === 'assess-gt');
