@@ -45,7 +45,7 @@ function letterFacts(letter, pct, pieces, mode) {
 /* One sentence as a draft, filled from ctx, to verify against facts. */
 function one(id, ctx) {
   const s = byId(id);
-  const text = CommentBank.fill(s, ctx);
+  const text = CommentBank.fill(s, ctx, { first: true });
   return {
     text,
     ids: [id],
@@ -58,10 +58,10 @@ const words = t => t.trim().split(/\s+/).length;
 describe('the grade sentences in the bank', () => {
   it('are worded per the plan, claim the grade, and stay within 20 words', () => {
     const ctx = CommentBank.context(letterFacts('B', 84.5), {});
-    expect(CommentBank.fill(byId('gr01'), { ...ctx, gradeNext: '' })).toBe(
+    expect(CommentBank.fill(byId('gr01'), { ...ctx, gradeNext: '' }, { first: true })).toBe(
       'Noor is earning a B this term, which is very good work.',
     );
-    expect(CommentBank.fill(byId('gr02'), ctx)).toBe(
+    expect(CommentBank.fill(byId('gr02'), ctx, { first: true })).toBe(
       'Noor is earning a B this term, which is very good work and close to an A.',
     );
     GRADE_IDS.forEach(id => {
@@ -171,7 +171,9 @@ describe('gradeOf', () => {
     const f = { ...letterFacts(null, null, [], 'proficiency'), overall: 3.1, standing: 'Proficient' };
     expect(CommentBank.gradeOf(f)).toEqual({ kind: 'proficiency', word: 'Proficient' });
     const ctx = CommentBank.context(f, {});
-    expect(CommentBank.fill(byId('gr05'), ctx)).toBe('Noor is Proficient on the BC proficiency scale this term.');
+    expect(CommentBank.fill(byId('gr05'), ctx, { first: true })).toBe(
+      'Noor is Proficient on the BC proficiency scale this term.',
+    );
     expect(GRADE_IDS.filter(id => CommentBank.fits(byId(id), ctx))).toEqual(['gr05']);
   });
 });

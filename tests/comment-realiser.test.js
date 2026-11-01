@@ -49,18 +49,64 @@ describe('name and pronouns', () => {
     expect(moved.text).toBe(texts(moved).join(' '));
   });
 
-  it('uses the name for every mention when no pronouns are on file, never they', () => {
+  it('uses they/them/their with plural verbs when no pronouns are on file (Colin, Nov 1)', () => {
     const chris = { name: 'Chris', p: THEY, onFile: false };
-    const r = R.realise([
+    const draftChris = [
       sentence('a', '{He} [is|are] earning a B this term, which is very good work.', chris),
       sentence('b', '{His} work habits are excellent.', chris),
       sentence('c', 'At home, you can ask {him} what {he} [is|are] reading.', chris),
-    ]);
-    expect(texts(r)).toEqual([
+    ];
+    // The same output as they/them on file: the name once, then they.
+    const expected = [
       'Chris is earning a B this term, which is very good work.',
-      'Chris’s work habits are excellent.',
-      'At home, you can ask Chris what Chris is reading.',
+      'Their work habits are excellent.',
+      'At home, you can ask them what they are reading.',
+    ];
+    expect(texts(R.realise(draftChris))).toEqual(expected);
+    const onFile = draftChris.map(x => ({ ...x, who: { name: 'Chris', p: THEY, onFile: true } }));
+    expect(texts(R.realise(onFile))).toEqual(expected);
+    // No pronouns given at all: still they.
+    const none = draftChris.map(x => ({ ...x, who: { name: 'Chris' } }));
+    expect(texts(R.realise(none))).toEqual(expected);
+    // Reorder still moves the name to the first sentence.
+    expect(texts(R.realise(draftChris, ['c', 'a', 'b']))).toEqual([
+      'At home, you can ask Chris what they are reading.',
+      'They are earning a B this term, which is very good work.',
+      'Their work habits are excellent.',
     ]);
+  });
+
+  it('fills every slot and verb form with they/them/their when no pronouns are on file', () => {
+    const who = { name: 'Chris', p: THEY, onFile: false };
+    const fill = t => R.render(R.tokens(t), who, { named: true });
+    expect(fill('{He} [sees|see] {himself} in {his} work.')).toBe('They see themselves in their work.');
+    expect(fill('I ask {him} about {his} plan, and {he} [reads|read] daily.')).toBe(
+      'I ask them about their plan, and they read daily.',
+    );
+    expect(fill('{His} plan: {he} [reads|read].')).toBe('Their plan: they read.');
+    expect(R.render(R.tokens('{He} [comes|come] to class ready and [takes|take] part.'), who, { named: true })).toBe(
+      'They come to class ready and take part.',
+    );
+    // The first sentence carries the name with singular verbs; the capitalised slots stay capital.
+    expect(R.render(R.tokens('{He} [comes|come] to class ready and [takes|take] part.'), who, { named: false })).toBe(
+      'Chris comes to class ready and takes part.',
+    );
+    expect(R.render(R.tokens('{His} plan: {he} [reads|read] daily.'), who, { named: false })).toBe(
+      'Chris’s plan: they read daily.',
+    );
+  });
+
+  it('keeps he/him and she/her on file unchanged', () => {
+    const t = '{He} [sees|see] {himself} in {his} work, so I ask {him} about {his} plan.';
+    expect(R.render(R.tokens(t), { name: 'Jack', p: HE, onFile: true }, { named: true })).toBe(
+      'He sees himself in his work, so I ask him about his plan.',
+    );
+    expect(R.render(R.tokens(t), { name: 'Ava', p: SHE, onFile: true }, { named: true })).toBe(
+      'She sees herself in her work, so I ask her about her plan.',
+    );
+    expect(R.render(R.tokens(t), { name: 'Jack', p: HE, onFile: true }, { named: false })).toBe(
+      'Jack sees himself in his work, so I ask him about his plan.',
+    );
   });
 
   it('makes the possessive ’s whatever the name ends in', () => {
@@ -77,13 +123,16 @@ describe('name and pronouns', () => {
     expect(R.render(R.tokens(t), ava, { named: true })).toBe('She comes to class ready and takes part.');
   });
 
-  it('uses the reflexive on file after the name, and they only when they/them is on file', () => {
+  it('uses the reflexive after the name, themselves with no pronouns on file', () => {
     const t = '{He} [sees|see] {himself} as strongest in Evidence.';
     expect(R.render(R.tokens(t), { name: 'Sam', p: THEY, onFile: true }, { named: false })).toBe(
       'Sam sees themselves as strongest in Evidence.',
     );
+    expect(R.render(R.tokens(t), { name: 'Ava', p: THEY, onFile: false }, { named: false })).toBe(
+      'Ava sees themselves as strongest in Evidence.',
+    );
     const r = R.render(R.tokens('{His} plan: {he} [reads|read] daily.'), { name: 'Ava', p: THEY, onFile: false });
-    expect(r).toBe('Ava’s plan: Ava reads daily.');
+    expect(r).toBe('Their plan: they read daily.');
   });
 
   it('uses teacher text exactly as typed, and counts it as naming the student when it holds the name', () => {

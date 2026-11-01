@@ -112,9 +112,9 @@ describe('the habits sentence in a draft', () => {
       expect(hs).toHaveLength(1);
       expect(hs[0].text).toMatch(/^His work habits are excellent( this term)?\.$/);
     }
-    // No pronouns on file: the name again.
+    // No pronouns on file: they/them (Colin, Nov 1).
     const named = habitsSentence(facts({ habits: all(4), pronounsOnFile: false, pronouns: THEY }));
-    expect(named[0].text).toMatch(/^Gabriel’s work habits are excellent/);
+    expect(named[0].text).toMatch(/^Their work habits are excellent/);
   });
 
   it('one weak habit: names only that one', () => {
