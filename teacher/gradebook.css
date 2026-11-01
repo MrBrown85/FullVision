@@ -1407,6 +1407,17 @@ th.gb-group-alt {
   font-weight: 600;
   font-size: var(--text-sm);
 }
+/* A Both class's level: the proficiency over its percent, one column wide. */
+.gb-cell-both {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.1;
+}
+.gb-cell-both small {
+  font-size: 10.5px;
+  font-weight: 600;
+}
 /* The cell being edited (click, Tab, Enter or score mode): the app's active
    tint on the cell, and the theme's focus ring on the editor itself. The
    hover rectangle stays off while the editor is open so the ring is the
