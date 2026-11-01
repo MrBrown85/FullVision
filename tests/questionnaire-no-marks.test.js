@@ -94,7 +94,11 @@ describe('Generate with no marks or one mark (Demo Mode, Science 8, Report 2)', 
     RQ.tqGenerate();
     expect(box.value).toBe('');
     expect((getStudentTermRating(cid, st.id, 'term-2') || {}).narrative || '').toBe('');
-    expect(RQ.renderTermQuestionnaire(cid)).toContain(`id="tq-nodraft" role="status">${line}</div>`);
+    const after = RQ.renderTermQuestionnaire(cid);
+    expect(after).toContain(`id="tq-nodraft" role="status">${line}</div>`);
+    // Under the line, no hint to rate habits and press Generate.
+    expect(after).toContain('<span class="qn-empty-hint" hidden>');
+    expect(before).toContain('<span class="qn-empty-hint">Rate the six work habits');
     expect(RQ.approveBlockers(st)).toEqual(blockers);
   });
 

@@ -4568,8 +4568,12 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--text-2);
   line-height: 1.35;
 }
-.qn-nodraft {
+.qn-nodraft,
+.qn-pron-notice {
   margin-bottom: 8px;
+}
+.qn-pron-notice {
+  color: var(--score-2-text);
 }
 .qn-earlier {
   border: 1px solid var(--border-2);

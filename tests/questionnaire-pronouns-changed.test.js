@@ -67,21 +67,26 @@ describe('pronouns changed after the comment was written (Demo Mode, Science 8, 
     st.pronouns = 'she/her';
     try {
       const f2 = CommentBank.facts(cid, st, 'term-2');
-      const next = RQ.pronounsChanged(before, CommentBank.context(f2, {}), was, f2.pronouns);
+      const next = RQ.pronounsChanged(before, CommentBank.context(f2, {}));
+      const check = RQ.pronounCheck({ draftMeta: { pronouns: RQ.pronounSet(was) } }, f2);
+      const noted = r => RQ.pronounNote(r, check);
       const text = RQ.composeRows(next);
       const bank = next.filter(r => !r.edited).map(r => r.text);
       expect(bank.some(t => /\b(she|her|herself)\b/i.test(t))).toBe(true);
       expect(bank.some(t => HE.test(t))).toBe(false);
       expect(text).toContain('He helped clean up after the lab.');
       expect(text).toContain('Ethan finished his poster early.');
-      expect(next.filter(RQ.pronounNote).map(r => r.text)).toEqual([
+      expect(next.filter(noted).map(r => r.text)).toEqual([
         'Ethan finished his poster early.',
         'He helped clean up after the lab.',
       ]);
       // Once the teacher fixes the sentence, the note goes.
-      expect(RQ.pronounNote(Object.assign({}, next.find(RQ.pronounNote), { text: 'Ethan finished early.' }))).toBe(
-        false,
-      );
+      expect(RQ.pronounNote(Object.assign({}, next.find(noted), { text: 'Ethan finished early.' }), check)).toBe(false);
+      // Dismissed: kept as written, unmarked.
+      const ok = Object.assign({}, check, { ok: ['He helped clean up after the lab.'] });
+      expect(next.filter(r => RQ.pronounNote(r, ok)).map(r => r.text)).toEqual(['Ethan finished his poster early.']);
+      // The same pronouns as written: nothing to check.
+      expect(RQ.pronounCheck({ draftMeta: { pronouns: RQ.pronounSet(f2.pronouns) } }, f2).gone).toEqual([]);
     } finally {
       st.pronouns = 'he/him';
     }
@@ -112,7 +117,8 @@ describe('pronouns changed after the comment was written (Demo Mode, Science 8, 
       const at = html.indexOf('class="qn-pron-note"');
       const rowStart = html.lastIndexOf('<div class="qn-req-row', at);
       expect(html.slice(rowStart, at)).toContain(mine);
-      expect(html).toContain('>Pronouns changed</span>');
+      expect(html).toContain('>Pronouns changed <button');
+      expect(html).toContain('data-do="pronounOk"');
       // Drawn again with the same pronouns, nothing more changes.
       RQ.renderTermQuestionnaire(cid);
       expect(comment()).toBe(text);
@@ -191,6 +197,68 @@ describe('pronouns changed after the comment was written (Demo Mode, Science 8, 
       reload();
       open(st);
       expect(comment()).toBe(text);
+    } finally {
+      st.pronouns = 'he/him';
+    }
+  });
+
+  it('the note stays on every load until the sentence is fixed, dismissed or the comment approved again; the card says why', () => {
+    const st = ethan();
+    const mine = 'Ethan finished his poster early.';
+    approvedFor(st, mine);
+    reload();
+    st.pronouns = 'she/her';
+    const notice = 'Pronouns changed since this comment was approved. Check the marked sentences, then approve again.';
+    const notes = html => (html.match(/class="qn-pron-note"/g) || []).length;
+    try {
+      // Reloaded three times: the note and the line stay.
+      for (let n = 0; n < 3; n++) {
+        reload();
+        const html = open(st);
+        expect(notes(html), 'load ' + n).toBe(1);
+        expect(html).toContain(notice);
+        expect(comment().endsWith(' ' + mine)).toBe(true);
+        expect(getStudentTermRating(cid, st.id, 'term-2').approvedAt).toBeFalsy();
+      }
+      // Dismiss: gone, and still gone after a reload.
+      const html = open(st);
+      const row = Number(html.match(/data-do="pronounOk" data-row="(\d+)"/)[1]);
+      RQ.tqSentences('pronounOk', { dataset: { row: String(row) } });
+      reload();
+      expect(notes(open(st))).toBe(0);
+      expect(comment().endsWith(' ' + mine)).toBe(true);
+    } finally {
+      st.pronouns = 'he/him';
+    }
+  });
+
+  it('fixing the sentence takes the note away; approving again takes the line away', () => {
+    const st = ethan();
+    const mine = 'Ethan finished his poster early.';
+    approvedFor(st, mine);
+    reload();
+    st.pronouns = 'she/her';
+    try {
+      reload();
+      expect(open(st)).toContain('class="qn-pron-note"');
+      const fixed = comment().replace(mine, 'Ethan finished her poster early.');
+      upsertTermRating(cid, st.id, 'term-2', { narrative: fixed });
+      reload();
+      let html = open(st);
+      expect(html).not.toContain('class="qn-pron-note"');
+      expect(html).toContain('qn-pron-notice');
+      // Approved again: the record now holds the new pronouns.
+      const f = CommentBank.facts(cid, st, 'term-2');
+      const at = '2026-11-02T10:00:00.000Z';
+      const rows = RQ.recoverRows(fixed, CommentBank.context(f, {}));
+      upsertTermRating(cid, st.id, 'term-2', {
+        approvedAt: at,
+        draftMeta: CommentBank.draftMeta(rows, f, { approvedAt: at }),
+      });
+      reload();
+      html = open(st);
+      expect(html).not.toContain('qn-pron-notice');
+      expect(getStudentTermRating(cid, st.id, 'term-2').draftMeta.pronouns.subj).toBe('she');
     } finally {
       st.pronouns = 'he/him';
     }
