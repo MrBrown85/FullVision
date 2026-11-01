@@ -422,11 +422,15 @@ window.CommentLint = (function () {
   }
 
   /* Whether a template gives the student a next step in so many words
-     ("next step", "to do next"). A bank sentence that does must declare it
-     (claims nextStep, or advises: true): tests/comment-bank-lint.test.js
-     fails an undeclared one, and the draft holds one such sentence
-     (CommentBank.advises). */
-  var ADVICE_RE = /\bnext step\b|\bto do next\b/i;
+     ("next step", "to do next"), or names a thing to do the way the Habit
+     Ratings frames at Sometimes and Rarely do ("one thing to do", "the
+     thing to do", "the aim this term", "the change to make", "the place to
+     start", "can start with", "the first thing for {him} to do"). A bank
+     sentence that does must declare it (claims nextStep, or advises:
+     true): tests/comment-bank-lint.test.js fails an undeclared one, and
+     the draft holds one such sentence (CommentBank.advises). */
+  var ADVICE_RE =
+    /\bnext step\b|\bto do next\b|\b(one|the) thing to do\b|\bthe aim this term\b|\bthe change to make\b|\bthe place to start\b|\bcan start with\b|\bthe first thing for \w+ to do\b/i;
   function advisesText(text) {
     return ADVICE_RE.test(plain(text));
   }

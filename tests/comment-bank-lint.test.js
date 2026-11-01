@@ -130,7 +130,15 @@ describe('the vocabulary lint', () => {
     expect(undeclared).toEqual([]);
     expect(CommentLint.advisesText('{His} next step is to read each comment.')).toBe(true);
     expect(CommentLint.advisesText('One thing to do next is to ask.')).toBe(true);
-    expect(CommentLint.advisesText('One thing to do is to ask.')).toBe(false);
+    // The Habit Ratings phrasings at Sometimes and Rarely name a thing to do.
+    expect(CommentLint.advisesText('One thing to do is to ask.')).toBe(true);
+    expect(CommentLint.advisesText('A start without a reminder is the thing to do.')).toBe(true);
+    expect(CommentLint.advisesText('The aim this term is a plan for each task.')).toBe(true);
+    expect(CommentLint.advisesText('For {him}, the change to make is to use class time.')).toBe(true);
+    expect(CommentLint.advisesText('The place to start is one answer in each discussion.')).toBe(true);
+    expect(CommentLint.advisesText('{He} can start with a short plan for each task.')).toBe(true);
+    expect(CommentLint.advisesText('In class, the first thing for {him} to do is start the task.')).toBe(true);
+    expect(CommentLint.advisesText('{He} [revises|revise] each piece after feedback.')).toBe(false);
     expect(CommentLint.findings('When a piece comes back with comments, {he} [revises|revise] it.')).toContain(
       'phrasal verb: come back',
     );
