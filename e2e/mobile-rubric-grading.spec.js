@@ -31,7 +31,10 @@ async function openLab(page, makeAdvanced, title = 'Chemical Reactions Lab') {
     });
   }
   await page.locator('.m-tab-item[data-tab="grade"]').click();
-  await page.locator('text=' + title).first().click();
+  await page
+    .locator('text=' + title)
+    .first()
+    .click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
 }
 
