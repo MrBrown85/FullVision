@@ -108,8 +108,11 @@ window.MComponents = (function () {
     if (!sheet) return;
     var startY = 0,
       dy = 0,
-      dragging = false;
+      dragging = false,
+      startT = 0;
     var DISMISS_THRESHOLD = 80;
+    var FLICK = 0.5; // px/ms
+    var backdrop = document.getElementById('m-sheet-backdrop');
 
     sheet.addEventListener(
       'touchstart',
@@ -119,6 +122,7 @@ window.MComponents = (function () {
         var isHandle = e.target.closest('.m-sheet-handle');
         if (!isHandle && content && content.scrollTop > 0) return;
         startY = e.touches[0].clientY;
+        startT = Date.now();
         dy = 0;
         dragging = false;
       },
@@ -133,10 +137,16 @@ window.MComponents = (function () {
         if (!dragging && dy > 10) {
           dragging = true;
           sheet.style.transition = 'none';
+          if (backdrop) backdrop.style.transition = 'none';
         }
-        if (dragging && dy > 0) {
+        if (!dragging) return;
+        e.preventDefault();
+        if (dy > 0) {
           sheet.style.transform = 'translateY(' + dy + 'px)';
-          e.preventDefault();
+          if (backdrop) backdrop.style.opacity = String(Math.max(0, 1 - dy / sheet.offsetHeight));
+        } else {
+          // Pulling up gives a little, then holds.
+          sheet.style.transform = 'translateY(' + dy * 0.15 + 'px)';
         }
       },
       { passive: false },
@@ -150,7 +160,13 @@ window.MComponents = (function () {
           return;
         }
         sheet.style.transition = '';
-        if (dy > DISMISS_THRESHOLD) {
+        if (backdrop) {
+          backdrop.style.transition = '';
+          backdrop.style.opacity = '';
+        }
+        var velocity = dy / Math.max(Date.now() - startT, 1);
+        if (dy > DISMISS_THRESHOLD || (dy > 20 && velocity > FLICK)) {
+          sheet.style.transform = '';
           dismissSheet();
         } else {
           sheet.style.transform = 'translateY(0)';

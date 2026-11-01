@@ -112,7 +112,8 @@ window.MCardStack = (function () {
       var dy = touch.clientY - _startY;
 
       if (!_isDragging) {
-        if (Math.abs(dx) > DEAD_ZONE && Math.abs(dx) > Math.abs(dy)) {
+        // Clearly sideways, so reading down a card never starts a swipe.
+        if (Math.abs(dx) > DEAD_ZONE && Math.abs(dx) > Math.abs(dy) * 1.5) {
           _isDragging = true;
           var active = _els[0];
           if (active) active.classList.add('m-card-dragging');

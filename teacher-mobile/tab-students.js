@@ -74,53 +74,6 @@ window.MStudents = (function () {
         /* no-op, browsing only */
       },
     });
-
-    _initLongPress(container, cid);
-  }
-
-  // Long-press listeners — attached once per container element
-  var _longPressContainer = null;
-  var _longPressTimer = null;
-
-  function _initLongPress(container, cid) {
-    if (_longPressContainer === container) return;
-    _longPressContainer = container;
-
-    container.addEventListener(
-      'touchstart',
-      function (e) {
-        if (e.target.closest('button') || e.target.closest('[data-action]')) return;
-        _longPressTimer = setTimeout(function () {
-          _longPressTimer = null;
-          MCardWidgetEditor.show(function onUpdate() {
-            initCardStack(cid);
-          });
-        }, 500);
-      },
-      { passive: true },
-    );
-
-    container.addEventListener(
-      'touchmove',
-      function () {
-        if (_longPressTimer) {
-          clearTimeout(_longPressTimer);
-          _longPressTimer = null;
-        }
-      },
-      { passive: true },
-    );
-
-    container.addEventListener(
-      'touchend',
-      function () {
-        if (_longPressTimer) {
-          clearTimeout(_longPressTimer);
-          _longPressTimer = null;
-        }
-      },
-      { passive: true },
-    );
   }
 
   /* ── All Students sheet: the list, with search ─────────────── */
@@ -185,7 +138,6 @@ window.MStudents = (function () {
       '<div style="padding:8px 0 16px">' +
         '<div style="font-size:17px;font-weight:600;text-align:center;margin-bottom:16px">Sort Students</div>' +
         opts +
-        '<button class="m-btn-ghost" data-action="m-dismiss-sheet" style="margin-top:8px">Cancel</button>' +
         '</div>',
     );
   }

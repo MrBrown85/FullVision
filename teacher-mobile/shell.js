@@ -826,10 +826,8 @@
         var gradeIdx = sortStudents(getStudents(_cid).slice(), 'alpha').findIndex(function (st) {
           return st.id === gradeSid;
         });
-        setTimeout(function () {
-          MGrade.setupSwiper(_cid, newest.id);
-          if (gradeIdx > 0) MGrade.jumpToStudent(gradeIdx);
-        }, 400);
+        MGrade.setupSwiper(_cid, newest.id);
+        if (gradeIdx > 0) MGrade.jumpToStudent(gradeIdx, true);
         return;
       }
 
@@ -883,7 +881,6 @@
             '<button class="m-btn-primary" style="background:var(--surface);color:var(--text);border:1px solid var(--border)" data-action="m-switch-desktop">Switch to Desktop</button>' +
             '<button class="m-btn-primary" style="background:none;color:var(--score-1);border:none;margin-top:4px" data-action="m-sign-out">Sign Out</button>' +
             versionBlock +
-            '<button class="m-btn-ghost" style="margin-top:4px" data-action="m-dismiss-sheet">Cancel</button>' +
             '</div>',
         );
         // Wire course select change
