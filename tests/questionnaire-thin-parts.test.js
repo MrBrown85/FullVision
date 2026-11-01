@@ -55,7 +55,7 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
     const termId = ReportBlocks.getTermId();
     const f = CommentBank.facts(cid, st, termId);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: CommentBank.seedFor(st.id) });
-    upsertTermRating(cid, st.id, termId, { narrative: edit ? edit(d.text) : d.text });
+    upsertTermRating(cid, st.id, termId, { narrative: edit ? edit(d.text, d) : d.text });
     const html = RQ.renderTermQuestionnaire(cid);
     return { html: html.slice(html.indexOf('id="tq-sentences"')), d, students, st, termId };
   }
@@ -94,8 +94,12 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
 
   it('shows none on a sentence the teacher edited', () => {
     // Another student: the card keeps a student's rows once drawn.
-    const { html } = card('Hannah', t => t.replace(/Next, (\w+) can /, 'Next, $1 should try to '));
-    const at = html.search(/Next, \w+ should try to/);
+    // The next-step sentence, whichever frame it is, edited by hand.
+    const { html } = card('Hannah', (t, d) => {
+      const next = d.sentences.find(x => x.step === 'nextStep');
+      return t.replace(next.text, 'Hannah should try to do this next.');
+    });
+    const at = html.indexOf('Hannah should try to do this next.');
     expect(at).toBeGreaterThan(0);
     const end = html.indexOf('<div class="qn-req-row', at);
     expect(html.slice(at, end < 0 ? undefined : end)).not.toContain('qn-req-thin');

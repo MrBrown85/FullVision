@@ -219,9 +219,15 @@ describe('the draft is the plan’s eight parts only', () => {
     expect(d.text).toContain(
       'Two assignments are not handed in: “Current Events: Week 4” and “Current Events: Week 5.” Late work is accepted until December 4.',
     );
-    expect(d.text).toContain(
-      'Next, he can explain why an event mattered and who it affected. In class, I will give feedback on source work each week.',
-    );
+    // The next step is one of the frames for Significance, then the
+    // support line.
+    const next = d.sentences.find(x => x.step === 'nextStep');
+    const forSkill = COMMENT_BANK.sentences
+      .filter(s => s.id === 'g301' || (s.when && s.when.nextSkill === 'significance' && s.subjects[0] === 'socials'))
+      .map(s => s.id);
+    expect(forSkill).toContain(next.id);
+    expect(next.text).not.toContain('Significance');
+    expect(d.text).toContain(next.text + ' In class, I will give feedback on source work each week.');
     expect(d.text).toMatch(/Extra help is at lunch on Tuesdays in \[Room\]\.$/);
     expect(d.text).not.toMatch(
       /There is a lot to recognize|steady term|grown most|slipped|even across|own goal|revisit/,

@@ -380,7 +380,7 @@ window.CommentBank = (function () {
       {
         key: 'testing',
         name: 'Testing',
-        match: /test|evaluat|iterat|feedback|revision/i,
+        match: /test|prototyp|evaluat|iterat|feedback|revision/i,
         skill: 'test a prototype and use the results to improve it',
       },
       {
@@ -418,7 +418,7 @@ window.CommentBank = (function () {
       {
         key: 'connecting',
         name: 'Connections',
-        match: /interact|mentor|network|experience|workplace|reflect/i,
+        match: /connect|interact|mentor|network|experience|workplace|reflect/i,
         skill: 'reflect on a work or volunteer experience and what it taught',
       },
       {
@@ -1865,6 +1865,9 @@ window.CommentBank = (function () {
       _grade: gr ? gr.kind : '',
       _ieProblem: ieProblemOf(f),
       _path: reportPath(f),
+      // The next step's skill key (SKILLS), for the frames written for one
+      // skill (`when.nextSkill`); '' when there is no next step.
+      _nextSkill: next ? next.key : '',
       _options: options,
       _focus: focus || null,
       _facts: factsOf,
@@ -2008,6 +2011,7 @@ window.CommentBank = (function () {
       if (k === 'grade') return ctx._grade === when[k];
       if (k === 'path') return ctx._path === when[k];
       if (k === 'ieProblem') return ctx._ieProblem === when[k];
+      if (k === 'nextSkill') return !!ctx._nextSkill && ctx._nextSkill === when[k];
       return (ctx._habits || {})[k] === when[k];
     });
   }
@@ -2364,6 +2368,8 @@ window.CommentBank = (function () {
     var when = s.when || {};
     Object.keys(when).forEach(function (k) {
       values['when.' + k] = when[k];
+      // A frame for one skill rests on the next step's competency.
+      if (k === 'nextSkill') return ((ctx._facts && ctx._facts.nextSkill) || []).forEach(add);
       add(
         k === 'picture'
           ? 'picture'
@@ -2732,7 +2738,13 @@ window.CommentBank = (function () {
      carries the teacher's Note for the Report on the best piece. Each step
      keeps only the sentences at its top score. */
   function specificity(s, ctx) {
-    var n = Object.keys(s.when || {}).length;
+    // `when.nextSkill` binds a frame to one skill but makes it no more
+    // specific than the plan's "Next, {he} can {nextSkill}." (g301), so
+    // every frame for the skill shares one tier and the class draws from
+    // all of them.
+    var n = Object.keys(s.when || {}).filter(function (k) {
+      return k !== 'nextSkill';
+    }).length;
     if (ctx._bestNote && (s.needs || []).indexOf('bestPiece') >= 0) n++;
     return n;
   }
@@ -3787,7 +3799,10 @@ window.CommentBank = (function () {
       // with the table's skill for it.
       if (_has(pv, 'nextSkill')) {
         var n = nextSkillOf(f);
-        return !!n && _ids(pv, 'nextSkill', 'comp')[0] === String(n.comp.id) && pv.values.nextSkill === n.skill;
+        if (!n || _ids(pv, 'nextSkill', 'comp')[0] !== String(n.comp.id) || pv.values.nextSkill !== n.skill)
+          return false;
+        // A frame for one skill: the next step is still that skill.
+        return !_has(pv, 'when.nextSkill') || pv.values['when.nextSkill'] === n.key;
       }
       var compId = _ids(pv, 'focus', 'comp').concat(_ids(pv, 'nextStep', 'comp'))[0];
       var c = _byId(f.comps, compId);
@@ -3811,7 +3826,7 @@ window.CommentBank = (function () {
       var checks = [];
       Object.keys(pv.values).forEach(function (k) {
         var m = k.match(/^when\.(\w+)$/);
-        if (m && ['picture', 'standing', 'grade', 'ieProblem', 'path'].indexOf(m[1]) < 0)
+        if (m && ['picture', 'standing', 'grade', 'ieProblem', 'path', 'nextSkill'].indexOf(m[1]) < 0)
           checks.push(eff[m[1]] === pv.values[k]);
       });
       var named = function (slot, ok, want) {
