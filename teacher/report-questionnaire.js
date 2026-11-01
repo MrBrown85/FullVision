@@ -3555,6 +3555,11 @@ window.ReportQuestionnaire = (function () {
       PROFICIENCY_WORDS.forEach(function (w) {
         add('even:' + w, 'Even Results · ' + w);
       });
+      // The student's own highest-marked skill (CommentBank.highestSkills),
+      // by the competency's proficiency word (bank n1001-n1027).
+      PROFICIENCY_WORDS.forEach(function (w) {
+        add('high:' + w, 'Highest Marks · ' + w);
+      });
       PROFICIENCY_WORDS.forEach(function (w) {
         add('st:' + w, w);
       });
@@ -3650,6 +3655,7 @@ window.ReportQuestionnaire = (function () {
         return [sf ? 'skill:' + sf + ':' + skillKey : 'other'];
       }
       if (when.evenWord) return ['even:' + when.evenWord];
+      if (when.highestWord) return ['high:' + when.highestWord];
       if (fam) return ['fam:' + fam + (when.standing ? ':' + when.standing : '')];
       return [when.standing ? 'st:' + when.standing : 'steady'];
     }
@@ -3757,9 +3763,11 @@ window.ReportQuestionnaire = (function () {
         /* a context built by hand: the steady story */
       }
       // The strength's skill (the strongest, else one of a tie at the top),
-      // else even results, come before the story.
+      // else even results, else the highest-marked skill, come before the
+      // story.
       if (fam && ctx._topSkill) out.push('skill:' + fam + ':' + ctx._topSkill);
       if (ctx._evenWord) out.push('even:' + ctx._evenWord);
+      if (ctx._highestWord) out.push('high:' + ctx._highestWord);
       out.push(story);
       if (fam && f.standing) out.push('fam:' + fam + ':' + f.standing);
       if (fam) out.push('fam:' + fam);

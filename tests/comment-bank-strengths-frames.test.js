@@ -138,7 +138,16 @@ describe('even results (evenComps)', () => {
     const ctx = CommentBank.context(f, {});
     expect(ctx.evenResults).toBe('');
     expect(ctx._evenWord).toBe('');
-    expect(CommentBank.stepPool('overall', ctx)).toEqual([]);
+    // The highest-marked skill holds instead (Nov 2): Evidence, at
+    // Proficient; with a competency on one piece above it, no frame that
+    // says "highest" is offered.
+    const pool = CommentBank.stepPool('overall', ctx);
+    expect(pool.filter(x => x.when && x.when.evenWord)).toEqual([]);
+    expect(pool.length).toBeGreaterThan(0);
+    pool.forEach(x => {
+      expect(x.when.highestWord, x.id).toBe('Proficient');
+      expect(x.needs, x.id).not.toContain('highestTop');
+    });
     const even = evenFacts('Proficient');
     const ectx = CommentBank.context(even, {});
     const s = frames.find(x => x.when.evenWord === 'Proficient');
@@ -185,27 +194,27 @@ describe('even results (evenComps)', () => {
   });
 
   it('a frame too long with the first even skill takes the next that fits, and verify() reads that competency', () => {
-    // Evaluating's wording is thirteen words, so every even frame runs past
-    // 20 with it; Questioning's is eight.
-    const f = facts('science', [
-      comp('a', 'Evaluating', 3.1),
-      comp('b', 'Questioning and Predicting', 3.0),
-      comp('c', 'Planning and Conducting', 2.9),
+    // Estimating's wording is twelve words, so the first Proficient even
+    // frame (nine of its own) runs past 20 with it; Connecting's is eight.
+    const f = facts('math', [
+      comp('a', 'Estimating', 3.1),
+      comp('b', 'Connecting and Reflecting', 3.0),
+      comp('c', 'Reasoning and Modelling', 2.9),
     ]);
     const ctx = CommentBank.context(f, {});
-    expect(ctx._evenSkills.map(x => x.key)).toEqual(['questioning', 'evaluating']);
-    // As if classmates had been given Questioning: Evaluating comes first.
+    expect(ctx._evenSkills.map(x => x.key)).toEqual(['connecting', 'estimating']);
+    // As if classmates had been given Connecting: Estimating comes first.
     const first = Object.assign({}, ctx, {
-      evenSkill: skillWords('science', 'evaluating'),
+      evenSkill: skillWords('math', 'estimating'),
       _evenSkills: ctx._evenSkills.slice().reverse(),
       _facts: Object.assign({}, ctx._facts, { evenSkill: ['comp:a'] }),
     });
     const s = frames.find(x => x.when.evenWord === 'Proficient');
     const text = CommentBank.fill(s, first);
     expect(CommentRealiser.tooLong(text)).toBe(false);
-    expect(text).toContain(skillWords('science', 'questioning'));
+    expect(text).toContain(skillWords('math', 'connecting'));
     const pv = CommentBank.provenance(s, first);
-    expect(pv.values.evenSkill).toBe(skillWords('science', 'questioning'));
+    expect(pv.values.evenSkill).toBe(skillWords('math', 'connecting'));
     expect(pv.sources.evenSkill).toEqual(['comp:b']);
     expect(pv.factKeys).toContain('comp:b');
     expect(verified(s, text, pv, f, 'overall').replaced).toEqual([]);

@@ -183,7 +183,7 @@ window.CommentBank = (function () {
         key: 'ethical',
         name: 'Ethical Judgment',
         match: /ethical|judg/i,
-        skill: 'make a fair judgment about a past event, using what people knew at the time',
+        skill: 'judge a past event fairly, by what people knew then',
       },
       {
         key: 'significance',
@@ -227,7 +227,7 @@ window.CommentBank = (function () {
         key: 'evaluating',
         name: 'Evaluating',
         match: /evaluat/i,
-        skill: 'judge how reliable the results are and how the method could be improved',
+        skill: 'judge how reliable results are and how to improve the method',
       },
       {
         key: 'questioning',
@@ -298,13 +298,13 @@ window.CommentBank = (function () {
         key: 'patterns',
         name: 'Sequences and Rules',
         match: /sequence|puzzle|conjecture|generali[sz]|\brules?\b/i,
-        skill: 'find the rule behind a pattern and use it to predict the next case',
+        skill: 'find the rule in a pattern and predict the next case',
       },
       {
         key: 'graphs',
         name: 'Graphs and Tables',
         match: /\bgraph|table|diagram|chart|plot/i,
-        skill: 'show the numbers in a graph or table and say what the shape means',
+        skill: 'show numbers in a graph or table and explain its shape',
       },
       {
         key: 'notation',
@@ -316,7 +316,7 @@ window.CommentBank = (function () {
         key: 'wordProblems',
         name: 'Real-World Applications',
         match: /word problem|real.?world|real.?life|applied|applications? (to|of|in)|everyday|situation/i,
-        skill: 'change a word problem into an equation and explain what the answer means',
+        skill: 'write a word problem as an equation and explain the answer',
       },
       {
         key: 'procedures',
@@ -408,7 +408,7 @@ window.CommentBank = (function () {
         name: 'Planning a Piece',
         match:
           /plan(ning)? (a|the|each) (piece|work|composition|project)|sketch\b|thumbnail|storyboard|outline|brainstorm/i,
-        skill: 'plan a piece with a sketch or an outline before starting the final version',
+        skill: 'plan a piece with a sketch or outline before the final version',
       },
       {
         key: 'revising',
@@ -426,25 +426,25 @@ window.CommentBank = (function () {
         key: 'performing',
         name: 'Ensemble and Stage',
         match: /\bstage|ensemble(?! heritage)|\bchoir|\bband\b|\bacting|repertoire|instrument/i,
-        skill: 'rehearse a part until the whole piece can be performed without a stop',
+        skill: 'rehearse a part until the whole piece runs without stopping',
       },
       {
         key: 'notation',
         name: 'Reading Notation',
         match: /notation|sight-?read|read(ing)? music|music theory|\bscore\b|\bscales?\b(?= and| on)/i,
-        skill: 'read a line of music or a rhythm and play or clap it in time',
+        skill: 'read written music and play or clap it in time',
       },
       {
         key: 'camera',
         name: 'Camera and Light',
         match: /camera|lens|exposure|shutter|framing|\bfocus|\bshot\b/i,
-        skill: 'control the light and the framing before taking a photo or a shot',
+        skill: 'control the light and framing before each photo or shot',
       },
       {
         key: 'documenting',
         name: 'Process Journal',
         match: /portfolio|artist statement|journal|sketchbook|process record/i,
-        skill: 'keep a record of each stage of a piece, with a note on what changed',
+        skill: 'record each stage of a piece and note what changed',
       },
     ],
     pe: [
@@ -487,13 +487,13 @@ window.CommentBank = (function () {
         key: 'strategy',
         name: 'Game Strategy',
         match: /game strateg|tactic|game sense|offen[cs]|defen[cs]|game plan/i,
-        skill: 'read the play in a game and move to open space before the pass',
+        skill: 'read the play and move to open space before the pass',
       },
       {
         key: 'nutrition',
         name: 'Eating and Hydration',
         match: /\beating|\bdiet|hydrat|sleep|food choice/i,
-        skill: 'plan a day of food and water that gives the body what an active day needs',
+        skill: 'plan the food and water an active day needs',
       },
       {
         key: 'relationships',
@@ -505,19 +505,19 @@ window.CommentBank = (function () {
         key: 'substances',
         name: 'Substance Use',
         match: /substance|\bdrug|alcohol|vap(e|ing)|tobacco|addict|cannabis/i,
-        skill: 'explain the risks of a substance and practise a way to say no',
+        skill: 'explain a substance’s risks and practise a way to say no',
       },
       {
         key: 'pacing',
         name: 'Endurance and Pacing',
         match: /endur|pacing|\bpace\b|aerobic|stamina|\brun(ning)?\b/i,
-        skill: 'hold a steady pace for a whole run rather than starting fast and fading',
+        skill: 'hold an even pace for the whole run',
       },
       {
         key: 'stress',
         name: 'Managing Stress',
         match: /stress|anxiety|coping|emotion|resilien|mindful|self-?regulat/i,
-        skill: 'name one way to lower stress and use it before a test or a game',
+        skill: 'use one way to lower stress before a test or game',
       },
     ],
     adst: [
@@ -537,7 +537,7 @@ window.CommentBank = (function () {
         key: 'tools',
         name: 'Tools and Technologies',
         match: /tool|technolog|software|cad\b|digital|program|code|equipment/i,
-        skill: 'choose the right tool or program for each step of a project',
+        skill: 'choose the right tool or program for each project step',
       },
       {
         key: 'designing',
@@ -590,27 +590,27 @@ window.CommentBank = (function () {
         key: 'coding',
         name: 'Coding',
         match: /\bcod(e|ing)\b|programm|algorithm|debug|script|robot|microcontroller|javascript|html|css/i,
-        skill: 'test a program in small parts and fix one error at a time',
+        skill: 'test a program in small parts and fix each error',
       },
       {
         key: 'media',
         name: 'Media and Graphics',
         match: /(?<!social )media|video|animat|graphic|typograph|page layout|\bweb|multimedia|podcast|audio|brand/i,
-        skill: 'plan a media piece for one audience and edit it until the message is clear',
+        skill: 'plan and edit a media piece with one audience in mind',
       },
       {
         key: 'business',
         name: 'Business',
         match:
           /business|market|entrepreneur|account|financ(?!.*(family|consumer))|budget|customer|sales|e-?commerce|enterprise|\bcost/i,
-        skill: 'explain who a product is for and how its price covers its costs',
+        skill: 'explain who a product is for and what its price covers',
       },
       {
         key: 'materials',
         name: 'Material Selection',
         match:
           /material (science|selection|propert)|select(ing)? [\w ]*materials|fibre|fiber|\bstock\b|ingredient|lumber/i,
-        skill: 'choose the right material for a job and say why it suits the job',
+        skill: 'choose the right material for a job and say why',
       },
       {
         key: 'collaborating',
@@ -656,13 +656,13 @@ window.CommentBank = (function () {
         key: 'interview',
         name: 'Résumés and Interviews',
         match: /r[ée]sum|interview|cover letter|job search|job application|hiring|employab|portfolio/i,
-        skill: 'show in a résumé or an interview how past experience fits a job posting',
+        skill: 'show in a résumé or interview how past experience fits a job',
       },
       {
         key: 'budgeting',
         name: 'Budgeting',
         match: /budget|financ|money|\bcost|income|saving|spending/i,
-        skill: 'make a simple budget and say what each spending choice leaves for the others',
+        skill: 'make a simple budget and explain each spending choice',
       },
       {
         key: 'postSecondary',
@@ -684,7 +684,7 @@ window.CommentBank = (function () {
         key: 'listening',
         name: 'Listening',
         match: /listen|audio|speech|\bsign(ing|ed)\b|viewing|comprehen/i,
-        skill: 'find the main idea in a short spoken or signed message in the language',
+        skill: 'find the main idea in a short spoken or signed message',
       },
       {
         key: 'speaking',
@@ -696,37 +696,37 @@ window.CommentBank = (function () {
         key: 'reading',
         name: 'Reading',
         match: /\bread|written text|\bprint/i,
-        skill: 'read a short text in the language and say what it is about',
+        skill: 'say what a short text in the language is about',
       },
       {
         key: 'writing',
         name: 'Writing',
         match: /writ|compos|paragraph|sentence/i,
-        skill: 'write a short paragraph in the language with the words in the right order',
+        skill: 'write a short paragraph in the language in the right word order',
       },
       {
         key: 'vocabulary',
         name: 'Vocabulary',
         match: /vocab|\bwords?\b|lexic/i,
-        skill: 'use the new words from each unit in sentences, not just in a list',
+        skill: 'use the new words from each unit in full sentences',
       },
       {
         key: 'grammar',
         name: 'Grammar',
         match: /grammar|\bverb|tense|structure|accura|conjugat|agreement/i,
-        skill: 'use the verb form or marker the language needs for who is acting and when',
+        skill: 'use the verb form or marker for who is acting and when',
       },
       {
         key: 'culture',
         name: 'Culture',
         match: /cultur|communit|tradition|awareness|identity|perspective|\bsocial/i,
-        skill: 'describe one custom from a community that uses the language and what it shows',
+        skill: 'describe a custom of a community that uses the language',
       },
       {
         key: 'communicating',
         name: 'Communicating',
         match: /communicat|interact|exchange|express|respond|engag/i,
-        skill: 'say what is meant in the language, with another word or a gesture when one is missing',
+        skill: 'use another word or a gesture to be understood in the language',
       },
       {
         key: 'understanding',
@@ -2588,6 +2588,84 @@ window.CommentBank = (function () {
     return xs.length ? xs[0].skill : '';
   }
 
+  /* The student's own highest-marked skill (strengths for a staircase,
+     Nov 2): no other route holds (strongest, a tie at the top, even
+     results), and two or more competencies are judged on 3+ scored pieces
+     (one skill is not a pattern). The competencies at the highest
+     proficiency among the judged ones, as it prints (tenths), the next
+     step's left out; report order. [] otherwise. A fact about the student's
+     own work, never a ranking against anyone else and never "strongest"
+     (the frames say what the work shows in that skill at its proficiency
+     word, `when.highestWord`). */
+  function highestOf(comps, overall) {
+    if (strongestOf(comps).length || topTieOf(comps).length || evenComps(comps, overall).length) return [];
+    var judged = (comps || []).filter(function (c) {
+      return c.level > 0 && (c.scores || []).length >= STRONGEST_PIECES;
+    });
+    if (judged.length < 2) return [];
+    var next = nextStepOf(comps);
+    var pool = judged.filter(function (c) {
+      return c !== next;
+    });
+    if (!pool.length) return [];
+    var top = Math.max.apply(
+      null,
+      pool.map(function (c) {
+        return tenths(c.level);
+      }),
+    );
+    return pool.filter(function (c) {
+      return tenths(c.level) === top;
+    });
+  }
+  /* The highest-marked competencies (highestOf) as skills from the table,
+     one per skill key and never the next step's skill, [{ comp, key, skill,
+     word }], word the competency's own proficiency word. As for a tie
+     (topSkillOf), the skill named for the fewest classmates this session
+     comes first, then the shortest wording, then report order. A frame too
+     long with the first skill takes the next with the same word (ctxFor). */
+  function highestSkills(f) {
+    var next = nextSkillOf(f);
+    var uses = _topUsesFor(f.cid, f.sid);
+    var out = [];
+    highestOf(f.comps, f.overall).forEach(function (c) {
+      var sk = skillOf(f.family, c.name);
+      if (
+        !sk ||
+        (next && next.key === sk.key) ||
+        out.some(function (x) {
+          return x.key === sk.key;
+        })
+      )
+        return;
+      out.push({ comp: c, key: sk.key, skill: sk.skill, word: word(c.level) });
+    });
+    return out
+      .map(function (x, i) {
+        return { x: x, i: i };
+      })
+      .sort(function (a, b) {
+        return (
+          (uses[a.x.key] || 0) - (uses[b.x.key] || 0) || R.wordCount(a.x.skill) - R.wordCount(b.x.skill) || a.i - b.i
+        );
+      })
+      .map(function (p) {
+        return p.x;
+      });
+  }
+  /* Whether the highest-marked skill is at the top of every competency
+     with a level, whatever its piece count: the frames that say "where
+     {his} marks are highest" need it (`highestTop`), so a competency
+     marked once or twice above it never makes them untrue. */
+  function highestIsTop(f, x) {
+    return (
+      !!x &&
+      !(f.comps || []).some(function (c) {
+        return c.level > 0 && tenths(c.level) > tenths(x.comp.level);
+      })
+    );
+  }
+
   /* What a support line fits for this student: the next step's skill when
      the line names it, else a habit rated Sometimes or Rarely that it
      names; null when neither. */
@@ -2724,6 +2802,13 @@ window.CommentBank = (function () {
     // The strength as one skill (topSkillOf): the strongest, else one of a
     // tie at the top (topTieOf), for the frames under `when.topSkill`.
     var topSk = topSkillOf(f);
+    // The student's own highest-marked skill (highestSkills), when no
+    // other route names a strength, for the frames under `when.highestWord`.
+    var hiSk = highestSkills(f);
+    var hiTop = highestIsTop(f, hiSk[0]);
+    var levelled = f.comps.filter(function (c) {
+      return c.level > 0;
+    });
     var fallen = drops.length
       ? drops.slice().sort(function (a, b) {
           return tenths(a.start) - tenths(a.now) - (tenths(b.start) - tenths(b.now));
@@ -2853,6 +2938,10 @@ window.CommentBank = (function () {
       evenResults: keys('comp', evenNow),
       evenSkill: keys('comp', [evenSk[0] && evenSk[0].comp]),
       evenWord: ['overall'].concat(keys('comp', evenNow)),
+      // The highest-marked skill (highestSkills): the competency named;
+      // "highest" over every competency with a level rests on them all.
+      highestSkill: keys('comp', [hiSk[0] && hiSk[0].comp]),
+      highestTop: keys('comp', levelled),
       growthAreas: keys('comp', lowest),
       even: keys('comp', withLevels),
       rise: keys('comp', [rises[0]]),
@@ -2914,6 +3003,7 @@ window.CommentBank = (function () {
       strongSkill: names([strongSkills[0] && strongSkills[0].comp]),
       topSkill: names([topSk && topSk.comp]),
       evenSkill: names([evenSk[0] && evenSk[0].comp]),
+      highestSkill: names([hiSk[0] && hiSk[0].comp]),
       growthAreas: names(lowest),
       rise: names([rises[0]]),
       fall: names([fallen]),
@@ -2964,6 +3054,12 @@ window.CommentBank = (function () {
       // first fills {evenSkill}; a frame too long with it takes the next
       // that fits (ctxFor).
       _evenSkills: evenSk,
+      // The highest-marked skill's key and its own proficiency word
+      // (`when.highestSkill`, `when.highestWord`), and the candidates in
+      // the order they are offered (highestSkills; ctxFor).
+      _highestSkill: hiSk[0] ? hiSk[0].key : '',
+      _highestWord: hiSk[0] ? hiSk[0].word : '',
+      _highestSkills: hiSk,
       _options: options,
       _focus: focus || null,
       _facts: factsOf,
@@ -3013,6 +3109,11 @@ window.CommentBank = (function () {
       evenResults: evenNow.length ? 'yes' : '',
       evenSkill: evenSkillText(f),
       evenWord: evenNow.length ? f.standing || '' : '',
+      // The highest-marked skill in the table's words, and 'yes' when no
+      // competency with a level sits above it (the frames that say
+      // "where {his} marks are highest" need it).
+      highestSkill: hiSk[0] ? hiSk[0].skill : '',
+      highestTop: hiTop ? 'yes' : '',
       growthAreas: list(
         lowest.map(function (c) {
           return c.name;
@@ -3175,6 +3276,8 @@ window.CommentBank = (function () {
       if (k === 'strongSkill') return !!ctx._strongSkill && ctx._strongSkill === when[k];
       if (k === 'topSkill') return !!ctx._topSkill && ctx._topSkill === when[k];
       if (k === 'evenWord') return !!ctx._evenWord && ctx._evenWord === when[k];
+      if (k === 'highestSkill') return !!ctx._highestSkill && ctx._highestSkill === when[k];
+      if (k === 'highestWord') return !!ctx._highestWord && ctx._highestWord === when[k];
       return (ctx._habits || {})[k] === when[k];
     });
   }
@@ -3229,6 +3332,7 @@ window.CommentBank = (function () {
     if (!s || !ctx) return ctx;
     var text = String(s.text || '');
     if (/\{evenSkill\}/.test(text)) return _evenCtxFor(s, ctx);
+    if (/\{highestSkill\}/.test(text)) return _highestCtxFor(s, ctx);
     if (!/\{strengths\}/.test(text)) return ctx;
     if (!ctx.strengths || !ctx.strength || ctx.strengths === ctx.strength) return ctx;
     if (!R.tooLong(R.render(_tokensRaw(s, ctx), whoOf(ctx), { named: true }))) return ctx;
@@ -3255,6 +3359,34 @@ window.CommentBank = (function () {
       if (!long(alt)) return alt;
     }
     return ctx;
+  }
+  /* The same for "{highestSkill}": a frame that runs past 20 words with
+     the first highest-marked skill (highestSkills) holds the next one with
+     the same proficiency word that keeps it within 20, its facts, key and
+     word moved with it. */
+  function _highestCtxFor(s, ctx) {
+    var xs = ctx._highestSkills || [];
+    if (!ctx.highestSkill || xs.length < 2) return ctx;
+    var long = function (c) {
+      return R.tooLong(R.render(_tokensRaw(s, c), whoOf(c), { named: true }));
+    };
+    if (!long(ctx)) return ctx;
+    for (var i = 1; i < xs.length; i++) {
+      if (xs[i].word !== ctx._highestWord) continue;
+      var alt = _withHighest(ctx, xs[i]);
+      if (!long(alt)) return alt;
+    }
+    return ctx;
+  }
+  /* A context with another of the highest-marked skills in the slot. */
+  function _withHighest(ctx, x) {
+    return Object.assign({}, ctx, {
+      highestSkill: x.skill,
+      _highestSkill: x.key,
+      _highestWord: x.word,
+      _facts: Object.assign({}, ctx._facts, { highestSkill: ['comp:' + x.comp.id] }),
+      _compNames: Object.assign({}, ctx._compNames, { highestSkill: [x.comp.name] }),
+    });
   }
   /* Who a context is about: { name, p, onFile }. A context built by hand
      with pronouns counts them as on file. */
@@ -3600,6 +3732,8 @@ window.CommentBank = (function () {
       if (k === 'strongSkill') return ((ctx._facts && ctx._facts.strongSkill) || []).forEach(add);
       if (k === 'topSkill') return ((ctx._facts && ctx._facts.topSkill) || []).forEach(add);
       if (k === 'evenWord') return ((ctx._facts && ctx._facts.evenWord) || []).forEach(add);
+      if (k === 'highestSkill' || k === 'highestWord')
+        return ((ctx._facts && ctx._facts.highestSkill) || []).forEach(add);
       add(
         k === 'picture'
           ? 'picture'
@@ -4452,6 +4586,18 @@ window.CommentBank = (function () {
           });
         named = evSk ? evSk.key : '';
       }
+      // The highest-marked skill named ({highestSkill}), on the same tally.
+      if (!named) {
+        var hi = d.provenance.find(function (pv) {
+          return !!(pv.values || {}).highestSkill;
+        });
+        var hiSk =
+          hi &&
+          (ctx._highestSkills || []).find(function (x) {
+            return x.skill === hi.values.highestSkill;
+          });
+        named = hiSk ? hiSk.key : '';
+      }
       if (named) {
         _topTold[cid] = _topTold[cid] || {};
         _topTold[cid][String(sid)] = named;
@@ -5045,6 +5191,29 @@ window.CommentBank = (function () {
         )
           return false;
       } else if (tops.length) return false;
+      // A frame for the student's own highest-marked skill (highestSkills):
+      // no other route holds, the competency behind it is at the highest
+      // proficiency among the judged ones and not the next step, the skill
+      // is the table's wording for it, the proficiency word bound is its
+      // own, and "highest" over every competency still holds where the
+      // frame needs it (highestTop). Which of a tie was named is a choice,
+      // not a fact.
+      var highs = _ids(pv, 'highestSkill', 'comp');
+      if (highs.length || _has(pv, 'when.highestSkill') || _has(pv, 'when.highestWord')) {
+        var hx = highs.length
+          ? highestSkills(f).find(function (x) {
+              return String(x.comp.id) === highs[0];
+            })
+          : null;
+        if (
+          !hx ||
+          (_has(pv, 'highestSkill') && v.highestSkill !== hx.skill) ||
+          (_has(pv, 'when.highestSkill') && v['when.highestSkill'] !== hx.key) ||
+          (_has(pv, 'when.highestWord') && v['when.highestWord'] !== hx.word) ||
+          (_has(pv, 'highestTop') && !highestIsTop(f, hx))
+        )
+          return false;
+      }
       var labels = (f.comps || []).map(function (c) {
         return String(c.name || '');
       });
@@ -5052,7 +5221,7 @@ window.CommentBank = (function () {
         return !_has(pv, k) || (!!v[k] && wants.indexOf(v[k]) >= 0 && labels.indexOf(v[k]) < 0);
       };
       return (
-        ids.length + tops.length > 0 &&
+        ids.length + tops.length + highs.length > 0 &&
         ids.every(function (id) {
           return gated.indexOf(String(id)) >= 0;
         }) &&
@@ -5293,6 +5462,8 @@ window.CommentBank = (function () {
             'strongSkill',
             'topSkill',
             'evenWord',
+            'highestSkill',
+            'highestWord',
           ].indexOf(m[1]) < 0
         )
           checks.push(eff[m[1]] === pv.values[k]);
@@ -5418,6 +5589,13 @@ window.CommentBank = (function () {
      sentence was filled, when the skill named is still one of them. The
      claim (CLAIMS.evenResults) checks the competency behind it. */
   function _asNamed(pv, ctx) {
+    var hiNamed = (pv && pv.values && pv.values.highestSkill) || '';
+    if (hiNamed && ctx && hiNamed !== ctx.highestSkill) {
+      var hx = (ctx._highestSkills || []).find(function (e) {
+        return e.skill === hiNamed;
+      });
+      if (hx) ctx = _withHighest(ctx, hx);
+    }
     var named = (pv && pv.values && pv.values.evenSkill) || '';
     if (!named || !ctx || named === ctx.evenSkill) return ctx;
     var x = (ctx._evenSkills || []).find(function (e) {
@@ -5975,6 +6153,8 @@ window.CommentBank = (function () {
     evenComps: evenComps,
     evenSkills: evenSkills,
     evenSkillText: evenSkillText,
+    highestOf: highestOf,
+    highestSkills: highestSkills,
     MAX_SENTENCES: MAX_SENTENCES,
     MIN_SENTENCES: MIN_SENTENCES,
     climbed: climbed,
