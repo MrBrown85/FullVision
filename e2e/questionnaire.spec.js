@@ -446,9 +446,10 @@ test.describe('checks and approval', () => {
 
   test('a near-identical comment shows the class warning with Show Both', async ({ page }) => {
     await open(page);
-    // Six habits rated and attendance entered, so Cece's draft has five
-    // sentences beyond the grade sentence (which never counts as shared):
-    // best piece, habits, attendance, next step, family.
+    // Six habits rated and attendance entered, so Cece's draft has at least
+    // five sentences beyond the grade sentence (which never counts as
+    // shared). Noor's comment is then a copy of its first six sentences,
+    // so the two share exactly five whatever the bank drafts.
     for (const key of await page.evaluate(() => CommentBank.HABITS.map(h => h.key))) {
       await page.locator(`[data-action="tqRate"][data-habit="${key}"][data-value="4"]`).click();
     }
@@ -465,7 +466,7 @@ test.describe('checks and approval', () => {
     await page.evaluate(
       t => {
         const el = document.getElementById('tq-narrative');
-        el.value = t;
+        el.value = ReportQuestionnaire.sentencesOf(t).slice(0, 6).join(' ');
         ReportQuestionnaire.tqNarrativeInput();
       },
       cece.replace(/Cece/g, 'Noor'),
