@@ -725,6 +725,25 @@ window.PageGradebook = (function () {
         if (dataRows[i]) dataRows[i].classList.remove('gb-row-hover');
       });
     });
+
+    // Hover a Q4 cell → highlight its column too, header and all, so a
+    // score reads against both its student and its assignment.
+    data.addEventListener('mouseover', function (e) {
+      var td = e.target.closest ? e.target.closest('td') : null;
+      var idx = td && data.contains(td) ? td.cellIndex : -1;
+      if (idx === _hoveredColIdx) return;
+      hideColTooltip();
+      if (idx < 0) return;
+      _hoveredColIdx = idx;
+      showColTooltip(_colHeadAt(idx), idx);
+    });
+    data.addEventListener('mouseleave', hideColTooltip);
+  }
+
+  /* A column's header: the slanted heading (Scores) or the competency code
+     under its assessment (Competencies). */
+  function _colHeadAt(idx) {
+    return document.querySelectorAll('#gb-colheads .gb-grid-colhead, #gb-colheads .gb-grid-tag-header')[idx] || null;
   }
 
   /* ── 4-quadrant grid scroll sync ─────────────────────────── */
@@ -927,10 +946,10 @@ window.PageGradebook = (function () {
   }
 
   function showColTooltip(colEl, colIdx) {
-    // Highlight the skewed column header and its score cells; no card, so
+    // Highlight the column header and its score cells; no card, so
     // nothing covers the scores below.
-    colEl.classList.add('gb-col-hover');
-    var table = document.querySelector('.gb-scores-table');
+    if (colEl) colEl.classList.add('gb-col-hover');
+    var table = document.querySelector('#gb-data table');
     if (table) {
       table.querySelectorAll('tbody tr').forEach(function (row) {
         var cell = row.children[colIdx];

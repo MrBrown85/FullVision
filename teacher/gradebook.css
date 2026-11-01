@@ -1787,6 +1787,10 @@ th.gb-group-alt {
 .gb-scores-cell.gb-col-menu {
   background: var(--active-light) !important;
 }
+.gb-table tbody tr:not(.gb-stats-row) td.gb-score.gb-col-hover,
+.gb-grid-tag-header.gb-col-hover {
+  background-color: var(--active-light) !important;
+}
 
 /* A row whose grade is IE or No Letter Grade (a reporting basis for the
    term in view): the name stays whole at every column width and the grade
