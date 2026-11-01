@@ -1463,17 +1463,14 @@ window.ReportQuestionnaire = (function () {
     var n = (_generated[st.id] || 0) + 1;
     _generated[st.id] = n;
     // Sentences the teacher edited stay, as written, and so does the order
-    // they set (plan PR 11b); a sentence they typed stays at its place in
-    // the order (keepTyped, the InsertRows mockup), also in a comment
-    // Generate wrote on an earlier visit. A comment with no bank sentence
-    // at all (written by hand) is replaced whole, as before.
+    // they set (plan PR 11b); every sentence they typed stays as a Your
+    // Sentence row at its place in the order (keepTyped, the InsertRows
+    // mockup), in a comment Generate wrote on an earlier visit and in one
+    // typed entirely by hand, with the bank's parts filled in around it. A
+    // fresh start is Remove From Comment or clearing the box; ⌘ Z brings
+    // the previous text back either way.
     var wrote = !!_lastDraft[key];
     var rows = _rowsFor(st, f);
-    var replace =
-      !wrote &&
-      !rows.some(function (r) {
-        return !!r.step;
-      });
     var kept = {};
     rows.forEach(function (r) {
       if (r.edited && r.step && !kept[r.step]) kept[r.step] = r.text;
@@ -1498,7 +1495,7 @@ window.ReportQuestionnaire = (function () {
     if (!d.text) return;
     _lastDraft[key] = d;
     _lastSeed[key] = d.seed;
-    _adoptDraft(key, d, replace);
+    _adoptDraft(key, d);
     if (!_ordered[key])
       _original[key] = d.sentences
         .map(function (x) {
@@ -2368,7 +2365,8 @@ window.ReportQuestionnaire = (function () {
   /* The teacher's typed sentences (old rows with no step) put back among
      the new rows at their place in the order: after the row they followed,
      found by its text or its step; else before the row that followed them;
-     else where they were. */
+     else where they were, after the grade sentence when Generate put it
+     first (the grade leads unless the teacher moved it). */
   function keepTyped(old, rows) {
     var out = rows.slice();
     var find = function (r) {
@@ -2385,18 +2383,17 @@ window.ReportQuestionnaire = (function () {
         var next = -1;
         for (var k = i + 1; k < old.length && next < 0; k++) next = find(old[k]);
         at = next >= 0 ? next : Math.min(i, out.length);
+        if (next < 0 && at === 0 && out[0] && out[0].step === 'grade') at = 1;
       }
       out.splice(at, 0, r);
     });
     return out;
   }
   /* A draft adopted as the rows: the teacher's typed sentences go back at
-     their place (keepTyped), unless `replace`: Generate over a comment with
-     no bank sentence starts afresh. */
-  function _adoptDraft(key, d, replace) {
+     their place (keepTyped). */
+  function _adoptDraft(key, d) {
     var old = _rows[key] || [];
-    var rows = rowsFromDraft(d, old);
-    if (!replace) rows = keepTyped(old, rows);
+    var rows = keepTyped(old, rowsFromDraft(d, old));
     _rows[key] = rows;
     return rows;
   }

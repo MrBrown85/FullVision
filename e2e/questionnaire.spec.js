@@ -35,6 +35,17 @@ function ReportQuestionnaireSentences(text) {
   return out.filter(Boolean);
 }
 
+/* The seeded comment cleared, for a draft with no typed sentences kept in
+   it (a typed sentence stays through Generate; a fresh start is clearing
+   the box). */
+async function clearComment(page) {
+  await page.locator('#tq-narrative').evaluate(el => {
+    el.value = '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(page.locator('#tq-sentences .qn-srow')).toHaveCount(0);
+}
+
 /* The cursor at the end of the comment (End only reaches the end of a
    wrapped line). */
 async function toEnd(page) {
@@ -597,6 +608,7 @@ test.describe('the Sentences card', () => {
     await expect(page.locator('.qn-glance .qn-note-line')).toHaveText(
       'Note for the report: “kept a field journal with dated sketches”',
     );
+    await clearComment(page);
     await page.locator('#tq-generate').click();
     const box = page.locator('#tq-narrative');
     const draft = await box.inputValue();
@@ -738,8 +750,25 @@ test.describe('the Sentences card', () => {
     page,
   }) => {
     await open(page);
+    const seeded = ReportQuestionnaireSentences(await page.locator('#tq-narrative').inputValue());
+    expect(seeded.length).toBe(2);
     await page.locator('#tq-generate').click();
     const box = page.locator('#tq-narrative');
+    // The hand-written comment is not replaced: its sentences are Your
+    // Sentence rows after the grade sentence, in their order, with the
+    // bank's parts around them.
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    await expect(rows(page).nth(1).locator('.qn-req-text')).toHaveText(seeded[0]);
+    await expect(rows(page).nth(2).locator('.qn-req-text')).toHaveText(seeded[1]);
+    await expect(rows(page).nth(1).locator('.qn-req-label')).toHaveText('Your Sentence');
+    expect(await rows(page).count()).toBeGreaterThan(3);
+    // ⌘Z brings the hand-written comment back.
+    await box.focus();
+    await page.keyboard.press('ControlOrMeta+z');
+    expect(ReportQuestionnaireSentences(await box.inputValue())).toEqual(seeded);
+    await expect(rows(page)).toHaveCount(2);
+    await page.locator('#tq-generate').click();
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
     // Typed after the first sentence.
     const first = await rows(page).first().locator('.qn-req-text').textContent();
     await box.evaluate((el, t) => {
@@ -762,7 +791,9 @@ test.describe('the Sentences card', () => {
     expect(ReportQuestionnaireSentences(text)[1]).toBe('Cece explained her lab results clearly to the class.');
     expect(text.split('explained her lab results').length).toBe(2);
     // Kept too for a comment Generate did not write this visit: after a
-    // reload the rows are recovered from the saved comment.
+    // reload the rows are recovered from the saved comment. (Cece's seeded
+    // comment, typed by hand, is kept the same way: its two sentences follow
+    // the grade sentence, in their order, with the bank's parts around.)
     await page.reload();
     await page.locator('#tq-narrative').waitFor();
     await expect(rows(page).nth(1).locator('.qn-req-label')).toHaveText('Your Sentence');
@@ -1272,6 +1303,7 @@ test('Write Your Own from Other Wording goes into the row; Add to My Bank on a t
   page,
 }) => {
   await open(page);
+  await clearComment(page);
   await page.locator('#tq-generate').click();
   const rows = p => p.locator('#tq-sentences .qn-srow');
   const row = rows(page).nth(1);

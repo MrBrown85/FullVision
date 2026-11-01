@@ -153,8 +153,14 @@ describe('typed rows: keepTyped and insertRow (the InsertRows mockup)', () => {
     expect(RQ.keepTyped([a, h, mine], [a, h]).map(r => r.id)).toEqual(['a', 'h', 'text:1']);
     const two = RQ.typedRow('She also helps others.', 2);
     expect(RQ.keepTyped([a, mine, two, h], [a, h2]).map(r => r.id)).toEqual(['a', 'text:1', 'text:2', 'h2']);
-    // Nothing in common: at the index it had.
+    // Nothing in common: at the index it had, after a grade sentence Generate
+    // put first; a sentence the teacher put before the grade stays there.
     expect(RQ.keepTyped([a, mine], [h2, c]).map(r => r.id)).toEqual(['h2', 'text:1', 'c']);
+    expect(RQ.keepTyped([mine, two], [a, h]).map(r => r.id)).toEqual(['a', 'text:1', 'text:2', 'h']);
+    expect(RQ.keepTyped([mine, a], [a, h]).map(r => r.id)).toEqual(['text:1', 'a', 'h']);
+    // A comment typed entirely by hand: every sentence kept, in order, the
+    // bank's parts around them.
+    expect(RQ.keepTyped([mine, two], [a, b, h]).map(r => r.id)).toEqual(['a', 'text:1', 'text:2', 'b', 'h']);
     // Already there (a kept sentence): not twice.
     expect(RQ.keepTyped([a, mine], [a, mine]).map(r => r.id)).toEqual(['a', 'text:1']);
   });
