@@ -165,7 +165,10 @@ function _getSectionById(cid, sectionId) {
 function pointsToProf(rawScore, maxPoints, scale) {
   if (!maxPoints || maxPoints <= 0) return 0;
   const pct = (rawScore / maxPoints) * 100;
-  const boundaries = (scale && scale.boundaries) || DEFAULT_GRADING_SCALE.boundaries;
+  // Highest start first, however the table was saved.
+  const boundaries = ((scale && scale.boundaries) || DEFAULT_GRADING_SCALE.boundaries)
+    .slice()
+    .sort((a, b) => b.min - a.min);
   for (let i = 0; i < boundaries.length; i++) {
     if (pct >= boundaries[i].min) return boundaries[i].proficiency;
   }
@@ -206,12 +209,17 @@ function courseShowsLetterGrades(course) {
   return !!course && (course.gradingSystem === 'letter' || course.gradingSystem === 'both');
 }
 
-function _normalizeAssessmentEntryValue(assessment, rawScore) {
+/* A score entry's value on the 0–4 scale. Points and Complete/Incomplete
+   work read as the level the class's Points to Proficiency table gives
+   (72% is Developing on the default table), the same level its competency
+   and its gradebook cell show; a proficiency level is itself. */
+function _normalizeAssessmentEntryValue(cid, assessment, rawScore) {
   if (rawScore == null || rawScore === '') return null;
   var num = Number(rawScore);
   if (!isFinite(num)) return null;
-  if (isPointsScored(assessment) && assessment.maxPoints > 0) {
-    return Math.max(0, Math.min(4, (num / assessment.maxPoints) * 4));
+  if (isPointsScored(assessment)) {
+    var max = isCompletionScored(assessment) ? COMPLETE_MAX_POINTS : Number(assessment.maxPoints) || 0;
+    if (max > 0) return pointsToProf(Math.max(0, num), max, getGradingScale(cid));
   }
   return num;
 }
@@ -428,7 +436,7 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
     .map(function (entry) {
       // A proficiency level counts with its + or − (3+ = 3.33).
       var raw = isPointsScored(assessment) ? entry.score : entry.score > 0 ? scoreModValue(entry) : entry.score;
-      return _normalizeAssessmentEntryValue(assessment, raw);
+      return _normalizeAssessmentEntryValue(cid, assessment, raw);
     })
     .filter(function (value) {
       return value != null;

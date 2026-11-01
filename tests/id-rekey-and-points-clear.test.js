@@ -171,7 +171,8 @@ describe('cleared points scores', () => {
     _cache.scores[CID] = { [ENR_Y]: [{ assessmentId: AID, tagId: TAG1, score: 0, date: '2026-10-13' }] };
     clearProfCache();
     expect(getTagScores(CID, ENR_Y, TAG1)[0].score).toBe(1);
-    expect(getAssessmentOverallScore(CID, ENR_Y, AID)).toBe(0);
+    // 0% is the bottom of Points to Proficiency, Emerging, as its competency reads it.
+    expect(getAssessmentOverallScore(CID, ENR_Y, AID)).toBe(1);
   });
 
   it('counts a cleared points cell as no evidence', () => {
@@ -184,7 +185,7 @@ describe('cleared points scores', () => {
   it('still counts Incomplete', () => {
     _cache.scores[CID] = { [ENR_Y]: [{ assessmentId: 'cmp', tagId: TAG1, score: 0, date: '2026-10-13' }] };
     clearProfCache();
-    expect(getAssessmentOverallScore(CID, ENR_Y, 'cmp')).toBe(0);
+    expect(getAssessmentOverallScore(CID, ENR_Y, 'cmp')).toBe(1);
     expect(getTagScores(CID, ENR_Y, TAG1)[0].score).toBeGreaterThan(0);
   });
 });

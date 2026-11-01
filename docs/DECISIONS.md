@@ -67,6 +67,14 @@ Supersedes D3. Easton Su (History 12) was Proficient-ish everywhere and sat at 6
 - **Changing Counts As with a term already ended asks first:** it changes that term's % too, and there is no snapshot of issued reports.
 - `qToPercentage` (the old 55 / 68 / 82 table, reached only by `calcLetterGrade`) is gone; `calcLetterGrade` reads Counts As.
 
+## Points work's level (2026-11-01)
+
+A 72% test showed 2.9 (Proficient's colour) on the student page, while its competency and its gradebook cell said Developing from the class's Points to Proficiency table. Colin: the table decides.
+
+- **A points or Complete/Incomplete assessment's level is the level its % reaches on the class's Points to Proficiency table**, everywhere a level is shown: group grades and single-assignment grades on the student page, level averages, report blocks, the printed sheet's level reading. Before, it was a straight share of 4 (72% = 2.88).
+- **The % doesn't change.** Points work still counts its points in the course %.
+- A points 0 and Incomplete are Emerging, the table's bottom, as their competency already read them. Missing points work stays a 0 level.
+
 ## New class defaults (2026-10-25)
 
 - **Grades 8–9:** Proficiency, Rubric Levels Emerging First, Mean.
