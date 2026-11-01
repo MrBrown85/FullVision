@@ -320,6 +320,120 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(RQ.browseList('grade', ctx, { fits: true }).rows[0].text).toContain('Cece');
   });
 
+  it('browseCase: every bank sentence lands under a named case, read from its fields or derived from when and needs', () => {
+    const labels = {};
+    RQ.PARTS.forEach(p => RQ.browseCases(p.id).forEach(c => (labels[p.id + '|' + c.id] = c.label)));
+    const other = [];
+    COMMENT_BANK.sentences.forEach(s => {
+      const p = RQ.partOf(CommentBank.stepOf(s));
+      if (!p) return;
+      const c = RQ.browseCase(p.id, s);
+      expect(labels[p.id + '|' + c], s.id).toBeTruthy();
+      if (c === 'other') other.push(s.id);
+    });
+    expect(other).toEqual([]);
+    // Headings: Title Case, no codes, no pronouns.
+    Object.values(labels).forEach(l => {
+      expect(l).toMatch(/^[A-Z]/);
+      expect(l).not.toMatch(/\b(he|she|they|his|her|their|him|them)\b/i);
+    });
+    // Grade: the kind of grade sentence; an explicit standing wins.
+    expect(RQ.browseCase('grade', { when: { grade: 'letter' } })).toBe('letter');
+    expect(RQ.browseCase('grade', { when: { grade: 'cminus' } })).toBe('w:minimally-acceptable');
+    expect(RQ.browseCase('grade', { when: { grade: 'letter' }, standing: 'very good' })).toBe('w:very-good');
+    expect(RQ.browseCase('grade', { when: { grade: 'letter' }, standing: 'A' })).toBe('w:excellent');
+    expect(RQ.browseCase('grade', { when: { grade: 'proficiency' }, standing: 'Proficient' })).toBe('p:Proficient');
+    expect(RQ.browseCase('grade', { when: { grade: 'ie' } })).toBe('ie');
+    // Best piece: with a note or without.
+    expect(RQ.browseCase('bestPiece', { needs: ['assignment', 'bestNote'] })).toBe('note');
+    expect(RQ.browseCase('bestPiece', { needs: ['assignment'] })).toBe('noNote');
+    expect(RQ.browseCase('bestPiece', { needs: ['bestPiece'] })).toBe('any');
+    // Strengths: the story, else the family and standing, else the standing, else steady.
+    expect(RQ.browseCase('strengths', { needs: ['climb', 'strengths'] })).toBe('climb');
+    expect(RQ.browseCase('strengths', { story: 'hidden', needs: ['strengths'] })).toBe('hidden');
+    expect(RQ.browseCase('strengths', { story: 'building', needs: ['strengths'] })).toBe('steady');
+    expect(RQ.browseCase('strengths', { when: { standing: 'Extending' }, subjects: ['socials'] })).toBe(
+      'fam:socials:Extending',
+    );
+    expect(RQ.browseCase('strengths', { when: { standing: 'Emerging' } })).toBe('st:Emerging');
+    expect(RQ.browseCase('strengths', { needs: ['strengths'] })).toBe('steady');
+    // Habits: a habit at a rating from the fields or from `when`; the summary, strong habits and attendance by needs.
+    expect(RQ.browseCase('habits', { habit: 'feedback', level: 2 })).toBe('cell:feedback:2');
+    expect(RQ.browseCase('habits', { habit: 'feedback', level: 'Sometimes' })).toBe('cell:feedback:2');
+    expect(RQ.browseCase('habits', { when: { devices: 1 } })).toBe('cell:devices:1');
+    expect(RQ.browseCase('habits', { needs: ['habitsExcellent'] })).toBe('sum:excellent');
+    expect(RQ.browseCase('habits', { needs: ['habitsToBuild'] })).toBe('sum:two');
+    expect(RQ.browseCase('habits', { group: 'Strong Habits', needs: ['habitsExcellent'] })).toBe('strong');
+    expect(RQ.browseCase('habits', { group: 'Attendance', needs: ['attendance'] })).toBe('att:any');
+    expect(RQ.browseCase('habits', { group: 'Attendance', needs: ['absentClasses', 'absentOnly'] })).toBe('att:absent');
+    expect(RQ.browseCase('habits', { group: 'Attendance', needs: ['lateTimes', 'lateOnly'] })).toBe('att:late');
+    expect(RQ.browseCase('habits', { group: 'Attendance', needs: ['absentClasses', 'lateTimes'] })).toBe('att:both');
+    expect(
+      RQ.browseCases('habits')
+        .slice(0, 2)
+        .map(c => c.label),
+    ).toEqual(['Completes Work · Consistently', 'Completes Work · Usually']);
+    expect(RQ.browseCases('habits').filter(c => /^cell:/.test(c.id)).length).toBe(24);
+    // Not handed in: one title, two, a count, a count and a group, any number.
+    expect(RQ.browseCase('notHandedIn', { needs: ['missingTitle'] })).toBe('one');
+    expect(RQ.browseCase('notHandedIn', { needs: ['missingTitles'] })).toBe('two');
+    expect(RQ.browseCase('notHandedIn', { needs: ['missingCount', 'missingMany'] })).toBe('count');
+    expect(RQ.browseCase('notHandedIn', { needs: ['missingCount', 'missingGroup'] })).toBe('group');
+    expect(RQ.browseCase('notHandedIn', { needs: ['missingWork'] })).toBe('any');
+    // Next step: the skill under its kind of class; family lines under theirs.
+    expect(RQ.browseCase('nextStep', { when: { nextSkill: 'evidence' }, subjects: ['socials'] })).toBe(
+      'skill:socials:evidence',
+    );
+    expect(RQ.browseCase('nextStep', { skill: 'evaluating' })).toBe('skill:science:evaluating');
+    expect(RQ.browseCase('nextStep', { needs: ['focus', 'nextStep'] })).toBe('any');
+    expect(RQ.browseCase('nextStep', { when: { feedback: 2 }, subjects: ['math'] })).toBe('fam:math');
+    expect(RQ.browseCase('nextStep', { group: 'For the Family', subjects: ['ela'] })).toBe('home:ela');
+    expect(
+      RQ.browseCase('nextStep', { group: 'For the Family', subjects: ['socials'], when: { nextSkill: 'evidence' } }),
+    ).toBe('home:socials:evidence');
+    expect(RQ.browseCases('nextStep').find(c => c.id === 'home:socials:evidence').label).toBe(
+      'Social Studies · Evidence · For the Family',
+    );
+    expect(RQ.browseCase('nextStep', { group: 'For the Family' })).toBe('home:any');
+    expect(RQ.browseCases('nextStep').find(c => c.id === 'skill:socials:evidence').label).toBe(
+      'Social Studies · Evidence',
+    );
+  });
+
+  it('browseOwn and groups: the student’s own cases first, then the fixed order, empty cases left out', () => {
+    const { f, ctx } = draftFor(cece());
+    const grade = RQ.browseOwn('grade', ctx);
+    expect(grade[0]).toBe('p:' + f.standing);
+    expect(grade[1]).toBe('proficiency');
+    const habits = RQ.browseOwn('habits', ctx);
+    const rated = Object.keys(ctx._habits).filter(k => ctx._habits[k] >= 1 && ctx._habits[k] <= 4);
+    expect(habits.slice(0, rated.length).every(id => /^cell:/.test(id))).toBe(true);
+    expect(habits.some(id => /^sum:/.test(id))).toBe(true);
+    expect(RQ.browseOwn('strengths', ctx)).toContain('fam:' + ctx._family);
+    expect(RQ.browseOwn('nextStep', ctx)).toContain('home:' + ctx._family);
+    expect(RQ.browseOwn('bestPiece', ctx)[1]).toBe('any');
+    const list = RQ.browseList('habits', ctx, { fits: false });
+    expect(list.groups.length).toBeGreaterThan(1);
+    expect(list.groups.every(g => g.rows.length > 0)).toBe(true);
+    expect(list.groups.reduce((n, g) => n + g.rows.length, 0)).toBe(list.rows.length);
+    const ownFirst = list.groups.findIndex(g => !g.own);
+    expect(list.groups.slice(0, ownFirst).every(g => g.own)).toBe(true);
+    expect(list.groups.slice(ownFirst).some(g => g.own)).toBe(false);
+    const cases = RQ.browseCases('habits').map(c => c.id);
+    const rest = list.groups.slice(ownFirst).map(g => cases.indexOf(g.id));
+    expect(rest).toEqual(rest.slice().sort((a, b) => a - b));
+    // Within a group, least used first.
+    const usage = {};
+    list.groups[0].rows.forEach((r, i) => (usage[r.id] = list.groups[0].rows.length - i));
+    const again = RQ.browseList('habits', ctx, { fits: false, usage });
+    const g0 = again.groups.find(g => g.id === list.groups[0].id);
+    expect(g0.rows.map(r => usage[r.id])).toEqual(g0.rows.map(r => usage[r.id]).sort((a, b) => a - b));
+    // A search keeps only the groups with a match.
+    const q = RQ.browseList('grade', ctx, { fits: false, q: 'proficiency scale' });
+    expect(q.rows.length).toBeGreaterThan(0);
+    expect(q.groups.every(g => g.rows.every(r => /proficiency scale/i.test(r.text)))).toBe(true);
+  });
+
   it('rowSource: the grade from the scores, the ratings behind the habits, the piece behind the example, Edited', () => {
     const st = cece();
     const { d, f, ctx } = draftFor(st);

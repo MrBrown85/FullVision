@@ -5769,6 +5769,63 @@ body.qn-roster #gb-sidebar .student-row-note {
   overflow-y: auto;
   padding-bottom: 32px;
 }
+/* The cases: a heading per case that opens and closes its sentences; the
+   student's own case is marked with the first name. */
+.qn-browse-group + .qn-browse-group {
+  border-top: 1px solid var(--surface-2);
+}
+.qn-browse-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 14px;
+  border: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.qn-browse-head svg {
+  flex: none;
+  color: var(--text-2);
+  transition: transform 0.12s;
+}
+.qn-browse-head[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+.qn-browse-head:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.qn-browse-head-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qn-browse-head-n {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text-2);
+}
+.qn-chip-own {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--active);
+  color: #fff;
+}
+.qn-browse-group-rows[hidden] {
+  display: none;
+}
 .qn-browse-row {
   display: flex;
   align-items: center;

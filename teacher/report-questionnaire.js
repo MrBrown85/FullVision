@@ -3276,13 +3276,337 @@ window.ReportQuestionnaire = (function () {
     return CommentBank.fill(Object.assign({}, s, { text: text }), ctx, first);
   }
 
+  /* ── Browse Sentences: the cases ─────────────────────────── */
+
+  /* Within a part the sentences sit under headings that name the case
+     each one is for, in a fixed order, the student's own case first
+     (Colin, Nov 1: "the teacher must be able to select the appropriate
+     comments if they don't see something reflective of the student"). A
+     sentence's case is read from its taxonomy fields where the bank has
+     them (standing, story, skill, habit, level, subjects) and derived from
+     `when` and `needs` otherwise, so the grouping works on today's bank.
+     Headings are plain words in Title Case: no competency codes, no
+     pronouns. */
+  var FAMILY_ORDER = ['socials', 'science', 'math', 'ela', 'arts', 'pe', 'adst', 'career'];
+  var FAMILY_NAMES = {
+    socials: 'Social Studies',
+    science: 'Science',
+    math: 'Mathematics',
+    ela: 'English Language Arts',
+    arts: 'Arts Education',
+    pe: 'Physical and Health Education',
+    adst: 'Applied Design, Skills and Technologies',
+    career: 'Career Education',
+  };
+  var LEVEL_WORDS = { 4: 'Consistently', 3: 'Usually', 2: 'Sometimes', 1: 'Rarely' };
+  var STANDING_WORDS = ['excellent', 'very good', 'good', 'satisfactory', 'minimally acceptable'];
+  var PROFICIENCY_WORDS = ['Extending', 'Proficient', 'Developing', 'Emerging'];
+  // The stories a strengths sentence can be written for (CommentBank.ANGLES
+  // ids); any other story reads as steady.
+  var STORIES = [
+    ['steady', 'Steady'],
+    ['climb', 'Marks Climbed'],
+    ['slide', 'Marks Slid'],
+    ['split', 'Strong in One Skill'],
+    ['hidden', 'Hidden by Missing Work'],
+    ['newcomer', 'New to the Class'],
+  ];
+  var SUMMARY_CASES = [
+    ['sum:excellent', 'Summary · Excellent'],
+    ['sum:good', 'Summary · Good'],
+    ['sum:one', 'Summary · One Habit to Build'],
+    ['sum:two', 'Summary · Two Habits to Build'],
+    ['sum:any', 'Summary'],
+  ];
+  var ATTENDANCE_CASES = [
+    ['att:absent', 'Absences Only'],
+    ['att:late', 'Lates Only'],
+    ['att:both', 'Absences and Lates'],
+    ['att:any', 'Absences or Lates'],
+  ];
+
+  function _titleCase(w) {
+    return String(w || '').replace(/\b[a-z]/g, function (c) {
+      return c.toUpperCase();
+    });
+  }
+  /* A grade case from a standing: a letter (A to C-), a Letter Grades
+     Order word or a proficiency word; '' when it is none of them. */
+  function _standingCase(w) {
+    var s = String(w || '').trim();
+    if (CommentBank.STANDING[s]) s = CommentBank.STANDING[s];
+    var low = s.toLowerCase();
+    if (STANDING_WORDS.indexOf(low) >= 0) return 'w:' + low.replace(/\s+/g, '-');
+    var pw = PROFICIENCY_WORDS.find(function (x) {
+      return x.toLowerCase() === low;
+    });
+    return pw ? 'p:' + pw : '';
+  }
+  /* A habit rating as the stored scale, 1 Rarely to 4 Consistently, from a
+     number or its word; 0 when it is neither. */
+  function _levelNum(v) {
+    var n = Number(v);
+    if (n >= 1 && n <= 4) return n;
+    var w = String(v || '').toLowerCase();
+    var k = Object.keys(LEVEL_WORDS).find(function (x) {
+      return LEVEL_WORDS[x].toLowerCase() === w;
+    });
+    return k ? Number(k) : 0;
+  }
+  function _storyCase(id) {
+    return STORIES.some(function (x) {
+      return x[0] === id;
+    })
+      ? id
+      : 'steady';
+  }
+  function _familyOfSkill(key) {
+    return (
+      FAMILY_ORDER.find(function (fam) {
+        return (CommentBank.SKILLS[fam] || []).some(function (r) {
+          return r.key === key;
+        });
+      }) || ''
+    );
+  }
+
+  /* The cases of a part, in their fixed order: [{ id, label }]. Support and
+     Closing list the class's own lines and have no bank cases. */
+  function browseCases(part) {
+    var out = [];
+    var add = function (id, label) {
+      out.push({ id: id, label: label });
+    };
+    if (part === 'grade') {
+      STANDING_WORDS.slice(0, 4).forEach(function (w) {
+        add(_standingCase(w), _titleCase(w));
+      });
+      add('letter', 'Excellent to Satisfactory');
+      add('letterClose', 'Close to the Next Letter');
+      add('w:minimally-acceptable', 'Minimally Acceptable');
+      add('cminusClose', 'Minimally Acceptable, Close to a C');
+      PROFICIENCY_WORDS.forEach(function (w) {
+        add('p:' + w, w);
+      });
+      add('proficiency', 'Extending to Emerging');
+      add('ie', 'Not Enough Evidence');
+      add('languageGoals', 'Language Goals');
+      add('iepGoals', 'IEP Goals');
+    } else if (part === 'bestPiece') {
+      add('note', 'With a Note');
+      add('noNote', 'Without a Note');
+      add('any', 'With or Without a Note');
+    } else if (part === 'strengths') {
+      STORIES.forEach(function (x) {
+        add(x[0], x[1]);
+      });
+      PROFICIENCY_WORDS.forEach(function (w) {
+        add('st:' + w, w);
+      });
+      FAMILY_ORDER.forEach(function (fam) {
+        add('fam:' + fam, FAMILY_NAMES[fam]);
+        PROFICIENCY_WORDS.forEach(function (w) {
+          add('fam:' + fam + ':' + w, FAMILY_NAMES[fam] + ' · ' + w);
+        });
+      });
+    } else if (part === 'habits') {
+      // Every habit at every rating is its own case (Colin, Nov 1: "each
+      // rating of each habit needs its own selection"), then the summary
+      // sentences, the IE comment's strong habits, and attendance.
+      CommentBank.HABITS.forEach(function (h) {
+        [4, 3, 2, 1].forEach(function (l) {
+          add('cell:' + h.key + ':' + l, h.name + ' · ' + LEVEL_WORDS[l]);
+        });
+      });
+      SUMMARY_CASES.forEach(function (x) {
+        add(x[0], x[1]);
+      });
+      add('strong', 'Strong Habits');
+      ATTENDANCE_CASES.forEach(function (x) {
+        add(x[0], x[1]);
+      });
+    } else if (part === 'notHandedIn') {
+      add('one', 'One Title');
+      add('two', 'Two Titles');
+      add('count', 'A Count');
+      add('group', 'A Count and a Group');
+      add('any', 'Any Number');
+    } else if (part === 'nextStep') {
+      FAMILY_ORDER.forEach(function (fam) {
+        (CommentBank.SKILLS[fam] || []).forEach(function (r) {
+          add('skill:' + fam + ':' + r.key, FAMILY_NAMES[fam] + ' · ' + r.name);
+        });
+        add('fam:' + fam, FAMILY_NAMES[fam]);
+        (CommentBank.SKILLS[fam] || []).forEach(function (r) {
+          add('home:' + fam + ':' + r.key, FAMILY_NAMES[fam] + ' · ' + r.name + ' · For the Family');
+        });
+        add('home:' + fam, FAMILY_NAMES[fam] + ' · For the Family');
+      });
+      add('any', 'Any Class');
+      add('home:any', 'Any Class · For the Family');
+    }
+    add('other', 'Other');
+    return out;
+  }
+
+  /* The case a bank sentence is for, within a part. */
+  function browseCase(part, s) {
+    var when = s.when || {};
+    var needs = s.needs || [];
+    var has = function (k) {
+      return needs.indexOf(k) >= 0;
+    };
+    var fam = s.subjects && s.subjects.length === 1 ? s.subjects[0] : '';
+    var step = CommentBank.stepOf(s);
+    if (part === 'grade') {
+      if (s.standing) return _standingCase(s.standing) || 'other';
+      var g = when.grade;
+      if (g === 'cminus') return 'w:minimally-acceptable';
+      return /^(letter|letterClose|cminusClose|proficiency|ie|languageGoals|iepGoals)$/.test(g || '') ? g : 'other';
+    }
+    if (part === 'bestPiece') return has('bestNote') ? 'note' : has('assignment') ? 'noNote' : 'any';
+    if (part === 'strengths') {
+      if (s.story) return _storyCase(s.story);
+      var story = ['climb', 'slide', 'split', 'hidden', 'newcomer'].find(has);
+      if (story) return story;
+      if (has('new')) return 'newcomer';
+      if (fam) return 'fam:' + fam + (when.standing ? ':' + when.standing : '');
+      return when.standing ? 'st:' + when.standing : 'steady';
+    }
+    if (part === 'habits') {
+      var habit = s.habit || '';
+      var level = _levelNum(s.level);
+      if (!habit) {
+        var keys = Object.keys(when).filter(function (k) {
+          return CommentBank.HABITS.some(function (h) {
+            return h.key === k;
+          });
+        });
+        if (keys.length === 1) {
+          habit = keys[0];
+          level = _levelNum(when[habit]);
+        }
+      }
+      if (habit && level) return 'cell:' + habit + ':' + level;
+      if (step === 'attendance' || s.group === 'Attendance') {
+        if (has('absentOnly')) return 'att:absent';
+        if (has('lateOnly')) return 'att:late';
+        if (has('absentClasses') && has('lateTimes')) return 'att:both';
+        if (has('absentClasses')) return 'att:absent';
+        if (has('lateTimes')) return 'att:late';
+        return 'att:any';
+      }
+      if (step === 'strongHabits' || s.group === 'Strong Habits' || has('habitStrengths') || has('strongHabits'))
+        return 'strong';
+      if (has('habitsExcellent')) return 'sum:excellent';
+      if (has('habitsGood')) return 'sum:good';
+      if (has('habitToBuild')) return 'sum:one';
+      if (has('habitsToBuild')) return 'sum:two';
+      return 'sum:any';
+    }
+    if (part === 'notHandedIn') {
+      if (has('missingTitle')) return 'one';
+      if (has('missingTitles')) return 'two';
+      if (has('missingGroup')) return 'group';
+      if (has('missingMany') || has('missingCount')) return 'count';
+      return 'any';
+    }
+    if (part === 'nextStep') {
+      var key = s.skill || when.nextSkill || '';
+      if (step === 'home' || s.group === 'For the Family') {
+        var hf = fam || (key && _familyOfSkill(key)) || '';
+        return 'home:' + (hf || 'any') + (key && hf ? ':' + key : '');
+      }
+      if (key) {
+        var sf = fam || _familyOfSkill(key);
+        return sf ? 'skill:' + sf + ':' + key : 'other';
+      }
+      return fam ? 'fam:' + fam : 'any';
+    }
+    return 'other';
+  }
+
+  /* The student's own cases in a part, the most specific first, from the
+     facts the context was built on: the grade sentence's kind and standing,
+     whether the best piece has a note, the term's story, standing and kind
+     of class, each habit's rating, the attendance entered, how much work is
+     not handed in, and the next step's skill. */
+  function browseOwn(part, ctx) {
+    var f = ctx._f || {};
+    var out = [];
+    var fam = ctx._family || '';
+    if (part === 'grade') {
+      var gr = CommentBank.gradeOf(f) || {};
+      var k = gr.kind || '';
+      if (k === 'letter' || k === 'letterClose') out.push(_standingCase(gr.standing), k);
+      else if (k === 'cminus') out.push('w:minimally-acceptable');
+      else if (k === 'cminusClose') out.push('cminusClose', 'w:minimally-acceptable');
+      else if (k === 'proficiency') out.push('p:' + gr.word, 'proficiency');
+      else if (k) out.push(k);
+    } else if (part === 'bestPiece') {
+      out.push(ctx._bestNote ? 'note' : 'noNote', 'any');
+    } else if (part === 'strengths') {
+      var story = 'steady';
+      try {
+        story = _storyCase(CommentBank.angle(f, ctx._picks || {}).id);
+      } catch (e) {
+        /* a context built by hand: the steady story */
+      }
+      out.push(story);
+      if (fam && f.standing) out.push('fam:' + fam + ':' + f.standing);
+      if (fam) out.push('fam:' + fam);
+      if (f.standing) out.push('st:' + f.standing);
+    } else if (part === 'habits') {
+      var h = ctx._habits || {};
+      CommentBank.HABITS.forEach(function (x) {
+        var v = Number(h[x.key]);
+        if (v >= 1 && v <= 4) out.push('cell:' + x.key + ':' + v);
+      });
+      if (ctx.habitsExcellent) out.push('sum:excellent');
+      else if (ctx.habitsGood) out.push('sum:good');
+      else if (ctx.habitToBuild) out.push('sum:one');
+      else if (ctx.habitsToBuild) out.push('sum:two');
+      out.push('sum:any');
+      if (ctx._path === 'ie') out.push('strong');
+      var absent = Number(f.absent) > 0;
+      var late = Number(f.late) > 0;
+      if (absent && late) out.push('att:both');
+      else if (absent) out.push('att:absent');
+      else if (late) out.push('att:late');
+      if (absent || late) out.push('att:any');
+    } else if (part === 'notHandedIn') {
+      var nh = f.notHandedIn || {};
+      var n = Number(nh.count) || 0;
+      if (n === 1) out.push('one');
+      else if (n === 2) out.push('two');
+      else if (n > 2) {
+        if ((nh.groups || []).length) out.push('group');
+        out.push('count');
+      }
+      if (n > 0) out.push('any');
+    } else if (part === 'nextStep') {
+      if (fam && ctx._nextSkill) out.push('skill:' + fam + ':' + ctx._nextSkill);
+      if (fam) out.push('fam:' + fam);
+      if (fam && ctx._nextSkill) out.push('home:' + fam + ':' + ctx._nextSkill);
+      if (fam) out.push('home:' + fam);
+      else out.push('any', 'home:any');
+    }
+    return out.filter(function (id, i, xs) {
+      return !!id && xs.indexOf(id) === i;
+    });
+  }
+
   /* The bank's sentences for a part, the least used in the class first:
-     [{ id, text, fits, used, mine, inUse }], with how many fit and how
-     many there are. opts: { fits: only those that fit, q: a search, usage,
-     inUse: { id: true }, bank }. */
+     [{ id, text, fits, used, mine, inUse, case }], with how many fit and
+     how many there are, and the same rows under their cases (groups: [{
+     id, label, own, rows }], the student's own cases first, then the
+     fixed order, empty cases left out). opts: { fits: only those that fit,
+     q: a search, usage, inUse: { id: true }, bank, own: the student's own
+     case ids (browseOwn by default) }. */
   function browseList(part, ctx, opts) {
     opts = opts || {};
     var p = typeof part === 'string' ? PARTS.find(x => x.id === part) : part;
+    var pid = p ? p.id : '';
     var bank = opts.bank || COMMENT_BANK;
     var usage = opts.usage || {};
     var inUse = opts.inUse || {};
@@ -3295,8 +3619,15 @@ window.ReportQuestionnaire = (function () {
     var fit = all.filter(function (s) {
       return CommentBank.fits(s, ctx);
     });
+    var cases = browseCases(pid);
+    var known = function (id) {
+      return cases.some(function (c) {
+        return c.id === id;
+      });
+    };
     var rows = (opts.fits ? fit : all)
       .map(function (s, i) {
+        var c = browseCase(pid, s);
         return {
           id: s.id,
           text: _preview(s, ctx),
@@ -3304,6 +3635,7 @@ window.ReportQuestionnaire = (function () {
           used: usage[s.id] || 0,
           mine: !!s.mine,
           inUse: !!inUse[s.id],
+          case: known(c) ? c : 'other',
           at: i,
         };
       })
@@ -3313,7 +3645,65 @@ window.ReportQuestionnaire = (function () {
       .sort(function (a, b) {
         return a.used - b.used || a.at - b.at;
       });
-    return { rows: rows, fit: fit.length, total: all.length };
+    var own = (opts.own || browseOwn(pid, ctx)).filter(known);
+    var ordered = own
+      .map(function (id) {
+        return cases.find(function (c) {
+          return c.id === id;
+        });
+      })
+      .concat(
+        cases.filter(function (c) {
+          return own.indexOf(c.id) < 0;
+        }),
+      );
+    var groups = ordered
+      .map(function (c) {
+        return {
+          id: c.id,
+          label: c.label,
+          own: own.indexOf(c.id) >= 0,
+          rows: rows.filter(function (r) {
+            return r.case === c.id;
+          }),
+        };
+      })
+      .filter(function (g) {
+        return g.rows.length > 0;
+      });
+    return { rows: rows, fit: fit.length, total: all.length, groups: groups, own: own };
+  }
+
+  /* Whether a case's group is open: the student's own cases open when a
+     part is first shown, the rest closed; while a search is typed every
+     group with a match opens, until it is closed by hand. */
+  function _groupKey(part, id) {
+    return part + '|' + id;
+  }
+  function _groupOpen(part, id) {
+    var b = _browse;
+    var k = _groupKey(part, id);
+    if (b.q.trim()) return b.openQ[k] !== false;
+    return !!b.open[k];
+  }
+  function _initGroups(part, own) {
+    var b = _browse;
+    if (b.init[part]) return;
+    b.init[part] = true;
+    own.forEach(function (id) {
+      b.open[_groupKey(part, id)] = true;
+    });
+  }
+  var CHEVRON =
+    '<svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 1.5 L6 5 L2 8.5"></path></svg>';
+  /* A case's heading and its rows: the heading opens and closes the
+     group; the student's own case is marked with the first name. */
+  function _groupHtml(part, id, label, own, first, rowsHtml, n) {
+    var isOpen = _groupOpen(part, id);
+    var chip = own
+      ? `<span class="qn-chip-own" title="${esc(first)}’s own case, from what FullVision has on file.">${esc(first)}</span>`
+      : '';
+    return `<div class="qn-browse-group${own ? ' own' : ''}" data-case="${esc(id)}"><button type="button" class="qn-browse-head" aria-expanded="${isOpen}" data-action="tqSentences" data-do="group" data-case="${esc(id)}" title="${isOpen ? 'Hides' : 'Shows'} the sentences for this case.">${CHEVRON}<span class="qn-browse-head-label">${esc(label)}</span>${chip}<span class="qn-browse-head-n">${n}</span></button><div class="qn-browse-group-rows"${isOpen ? '' : ' hidden'}>${rowsHtml}</div></div>`;
   }
 
   /* The rows for a part. Support lists the lines ticked for the class and
@@ -3333,19 +3723,25 @@ window.ReportQuestionnaire = (function () {
     var none = function (text) {
       return `<div class="qn-browse-empty">${esc(text)}</div>`;
     };
+    var group = function (id, label, own, rowsHtml, n) {
+      return _groupHtml(b.part, id, label, own, first, rowsHtml, n);
+    };
     if (b.part === 'support') {
+      // The class's ticked lines, then the rest of the checklist, which a
+      // teacher ticks under Support Line on the Sentences card before use.
       var habits = _habitsOf(cid, student, f);
       var choice = CommentBank.supportChoice(f, habits);
-      var lines = CommentBank.supportChecklist(cid, f.family).filter(function (l) {
+      var all = CommentBank.supportChecklist(cid, f.family);
+      var lines = all.filter(function (l) {
         return l.on && match(l.text);
       });
-      if (!lines.length)
-        return none(
-          q
-            ? 'No support lines match “' + b.q.trim() + '”.'
-            : 'No support lines are ticked for ' + course + '. Tick some under Support Line on the Sentences card.',
-        );
-      return lines
+      var rest = all.filter(function (l) {
+        return !l.on && match(l.text);
+      });
+      if (!lines.length && !rest.length)
+        return none(q ? 'No support lines match “' + b.q.trim() + '”.' : 'No support lines for ' + course + '.');
+      _initGroups(b.part, ['class']);
+      var ticked = lines
         .map(function (l) {
           var on = !!choice && choice.line.id === l.id && !(f.classLines && f.classLines.pick === 'none');
           return row(
@@ -3359,12 +3755,28 @@ window.ReportQuestionnaire = (function () {
           );
         })
         .join('');
+      var unticked = rest
+        .map(function (l) {
+          return row(
+            l.text,
+            'Not ticked for ' + course,
+            `<button type="button" class="qn-browse-use" disabled title="Tick this line under Support Line on the Sentences card to use it.">Use</button>`,
+            false,
+            false,
+          );
+        })
+        .join('');
+      return (
+        (lines.length ? group('class', course, true, ticked, lines.length) : '') +
+        (rest.length ? group('checklist', 'Checklist', false, unticked, rest.length) : '')
+      );
     }
     if (b.part === 'closing') {
       var closing = CommentBank.classSettings(cid).closing;
       if (!closing) return none('No closing sentence for ' + course + '. Add one in its row on the Sentences card.');
       if (!match(closing)) return none('No sentences match “' + b.q.trim() + '”.');
-      return row(closing, 'From your class settings', inUse, true, false);
+      _initGroups(b.part, ['class']);
+      return group('class', course, true, row(closing, 'From your class settings', inUse, true, false), 1);
     }
     var rows = _rowsFor(student, f);
     var used = {};
@@ -3372,6 +3784,7 @@ window.ReportQuestionnaire = (function () {
       used[r.id] = true;
     });
     var list = browseList(b.part, ctx, { fits: b.fits, q: b.q, usage: _usage(cid, student), inUse: used });
+    _initGroups(b.part, list.own);
     if (!list.rows.length)
       return none(
         q
@@ -3380,16 +3793,17 @@ window.ReportQuestionnaire = (function () {
             ? 'No sentences here fit ' + first + '. Choose every sentence to see them all.'
             : 'No sentences for this part.',
       );
-    return list.rows
-      .map(function (r) {
-        var n = r.used;
-        var meta = r.inUse
-          ? 'In use' + (n ? ' · used for ' + _plural(n, 'classmate', 'classmates') : '')
-          : _usedMeta(n);
-        var ctrl = r.inUse
-          ? inUse
-          : `<button type="button" class="qn-browse-use" data-action="tqSentences" data-do="use" data-sentence="${esc(r.id)}"${r.fits ? '' : ' disabled'} title="${esc(r.fits ? 'Puts this sentence in ' + first + '’s comment.' : 'This sentence needs a fact FullVision does not have for ' + first + '.')}">Use</button>`;
-        return row(r.text, meta, ctrl, r.inUse, r.mine);
+    var rowHtml = function (r) {
+      var n = r.used;
+      var meta = r.inUse ? 'In use' + (n ? ' · used for ' + _plural(n, 'classmate', 'classmates') : '') : _usedMeta(n);
+      var ctrl = r.inUse
+        ? inUse
+        : `<button type="button" class="qn-browse-use" data-action="tqSentences" data-do="use" data-sentence="${esc(r.id)}"${r.fits ? '' : ' disabled'} title="${esc(r.fits ? 'Puts this sentence in ' + first + '’s comment.' : 'This sentence needs a fact FullVision does not have for ' + first + '.')}">Use</button>`;
+      return row(r.text, meta, ctrl, r.inUse, r.mine);
+    };
+    return list.groups
+      .map(function (g) {
+        return group(g.id, g.label, g.own, g.rows.map(rowHtml).join(''), g.rows.length);
       })
       .join('');
   }
@@ -3452,7 +3866,9 @@ window.ReportQuestionnaire = (function () {
     tqSaveCurrentIfNeeded();
     _closeBrowse(true);
     _wording = null;
-    _browse = { part: part || 'grade', fits: true, q: '', menu: false };
+    // open: the groups opened by hand per part and case; openQ: the same
+    // while a search is typed; init: the parts whose own cases were opened.
+    _browse = { part: part || 'grade', fits: true, q: '', menu: false, open: {}, openQ: {}, init: {} };
     var overlay = document.createElement('div');
     overlay.id = BROWSE_ID;
     overlay.className = 'confirm-overlay qn-info-overlay qn-browse-overlay';
@@ -3613,8 +4029,18 @@ window.ReportQuestionnaire = (function () {
       case 'search':
         if (!_browse) return;
         _browse.q = String(el.value || '');
+        _browse.openQ = {};
         _syncBrowseList();
         return;
+      case 'group': {
+        if (!_browse) return;
+        var gid = String(ds.case || '');
+        var map = _browse.q.trim() ? _browse.openQ : _browse.open;
+        map[_groupKey(_browse.part, gid)] = !_groupOpen(_browse.part, gid);
+        _syncBrowseList();
+        _focusSel('#tq-browse-list .qn-browse-head[data-case="' + gid + '"]');
+        return;
+      }
       case 'use':
         tqSaveCurrentIfNeeded();
         _useSentence(st, ds.sentence);
@@ -4455,6 +4881,9 @@ window.ReportQuestionnaire = (function () {
     alternatives: alternatives,
     useSentence: useSentence,
     browseList: browseList,
+    browseCases: browseCases,
+    browseCase: browseCase,
+    browseOwn: browseOwn,
     rowSource: rowSource,
     thinLine: thinLine,
     sheetHeight: sheetHeight,
