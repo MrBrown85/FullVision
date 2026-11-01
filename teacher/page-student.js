@@ -248,6 +248,7 @@ window.PageStudent = (function () {
     };
     var badEmail = 'Enter an email address, or leave it blank.';
 
+    // html-safe: student fields and descriptions are escaped; labels, codes and SUPPORT_FLAGS / BC_DESIGNATIONS keys are fixed.
     overlay.innerHTML =
       '<div class="edit-modal es-modal">' +
       '<div class="es-head"><h2 class="edit-modal-title" id="edit-modal-heading">Edit Student</h2>' +

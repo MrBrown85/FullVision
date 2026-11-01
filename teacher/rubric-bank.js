@@ -937,6 +937,7 @@ window.RubricBank = (function () {
     );
   }
 
+  // html-safe: fixed markup; search text through esc; listHtml and paneHtml escape every class, rubric, criterion and assessment name
   function _overlayHtml() {
     return (
       '<div class="rb-card" role="dialog" aria-modal="true" aria-labelledby="rb-heading">' +
@@ -971,6 +972,7 @@ window.RubricBank = (function () {
 
   function _renderList() {
     var el = document.getElementById('rb-list');
+    // html-safe: RubricBank's own listHtml; class and rubric names and row meta through esc, counts are numbers
     if (el) el.innerHTML = listHtml();
   }
 

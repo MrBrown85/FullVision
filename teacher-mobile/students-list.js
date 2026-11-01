@@ -56,7 +56,7 @@ window.MStudentsList = (function () {
         '<div class="m-cell-avatar" style="background:' +
         color +
         '">' +
-        initials +
+        MC.esc(initials) +
         missingDot +
         '</div>' +
         '<div class="m-cell-body">' +

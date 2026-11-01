@@ -257,6 +257,7 @@ window.MSweep = (function () {
     return n + ' of ' + _s.ids.length + ' observed today';
   }
 
+  // html-safe: ids, labels and names go through MC.esc; state and TICK are constants.
   function _gridHtml(done) {
     var students = _students(_s.cid);
     var byId = {};
@@ -289,6 +290,7 @@ window.MSweep = (function () {
       .join('');
   }
 
+  // html-safe: fixed keys and labels.
   function _orderHtml() {
     return [
       { key: 'roster', label: 'Roster order' },
@@ -311,6 +313,7 @@ window.MSweep = (function () {
       .join('');
   }
 
+  // html-safe: names, starter keys and text go through MC.esc; TYPES are constants; typePill and tagChips are checked; counts are numbers.
   function _panelHtml(done) {
     if (_s.finished) {
       var allDone = _s.ids.every(function (id) {

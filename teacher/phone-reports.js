@@ -419,6 +419,7 @@ var PhoneReports = (function () {
     );
   }
 
+  // html-safe: report label, dates, student names and message all esc()'d; the rest is fixed markup
   function _sendHtml(cid, ctx) {
     var label = ctx.termLabel || 'this report';
     var noBirthday = _students(cid).filter(function (s) {
@@ -453,6 +454,7 @@ var PhoneReports = (function () {
     );
   }
 
+  // html-safe: student name, days and reply line esc()'d; ids esc()'d or encodeURIComponent'd; dot colours are fixed tokens
   function _row(cid, report, st, sRow, i) {
     var opened = sRow && sRow.opened_at;
     var replied = sRow && sRow.replied_at;
@@ -497,6 +499,7 @@ var PhoneReports = (function () {
     );
   }
 
+  // html-safe: title, dates, message and labels esc()'d; counts are numbers; rows come from _row
   function _reportHtml(cid, report) {
     var rows = {};
     (report.students || []).forEach(function (s) {
@@ -586,6 +589,7 @@ var PhoneReports = (function () {
     );
   }
 
+  // html-safe: fixed wrapper around _reportHtml or _sendHtml, both escaped
   function panelHtml(cid, ctx) {
     if (!loaded(cid)) {
       load(cid, _rerender);
@@ -606,6 +610,7 @@ var PhoneReports = (function () {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', 'Report as the student sees it');
+    // html-safe: first name esc()'d; PhoneReportView.html (shared/phone-report-view.js) escapes every field of the copy
     overlay.innerHTML =
       '<div class="pp-phone"><div class="pp-phone-bar"><span>As ' +
       esc(row.data.first || 'the student') +

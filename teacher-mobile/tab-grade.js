@@ -547,7 +547,7 @@ window.MGrade = (function () {
         '" data-action="m-grade-jump" data-idx="' +
         idx +
         '">' +
-        initials +
+        MC.esc(initials) +
         '</div>';
     });
     thumbs += '</div>';
@@ -570,6 +570,7 @@ window.MGrade = (function () {
     );
   }
 
+  // html-safe: names, labels and criterion text go through MC.esc; colours through cssColor or avatarColor's constants; ids, levels and points are ours or numbers; _criterionGroupHtml, _completionBtnsHtml, _modBtnsHtml and pointsPctHtml are checked.
   function _renderStudentCard(cid, st, assessment, allScores, allStatuses) {
     var color = MC.avatarColor(st.id);
     var initials = MC.avatarInitials(st);
@@ -596,7 +597,7 @@ window.MGrade = (function () {
       '<div class="m-grade-avatar" style="background:' +
       color +
       '">' +
-      initials +
+      MC.esc(initials) +
       '</div>' +
       '<div><div class="m-grade-student-name">' +
       MC.esc(name) +
@@ -650,7 +651,7 @@ window.MGrade = (function () {
         // under every competency it assesses.
         ptsTagLines +=
           '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' +
-          tagColor +
+          cssColor(tagColor) +
           '"></span>' +
           MC.esc(tagLabel) +
           '</div>';
@@ -684,7 +685,7 @@ window.MGrade = (function () {
         tagGroups +=
           '<div class="m-score-group">' +
           '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' +
-          tagColor +
+          cssColor(tagColor) +
           '"></span>' +
           MC.esc(tagLabel) +
           '</div>' +
@@ -1121,6 +1122,7 @@ window.MGrade = (function () {
   }
 
   /* ── + / − on a level ──────────────────────────────────────── */
+  // html-safe: fixed markup; m is -1 or 1 and scoreModSuffix returns '+' or '\u2212'.
   function _modBtnsHtml(level, mod) {
     return [-1, 1]
       .map(function (m) {
@@ -1460,6 +1462,7 @@ window.MGrade = (function () {
   }
 
   /* ── Complete / Incomplete ──────────────────────────────── */
+  // html-safe: fixed markup; m is 'complete' or 'incomplete'.
   function _completionBtnsHtml(mark) {
     return (
       '<div class="m-cmp-btns">' +

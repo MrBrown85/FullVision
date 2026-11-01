@@ -766,6 +766,7 @@
   function stage(cid, aid, opts) {
     var root = _root();
     var out = renderPages(cid, aid, opts);
+    // html-safe: out.html is built by renderPages and renderSheet; student, course, rubric, criterion and assessment text and comments through esc; layouts and levels are constants
     root.innerHTML = out.html;
     root.dataset.layout = opts.layout;
     root.setAttribute('lang', 'en');
@@ -1259,9 +1260,10 @@
     // doesn't play again.
     var card = overlay.querySelector('.rubric-print-card');
     var next = document.createElement('div');
+    // html-safe: this file's _dialogHtml escapes rubric, assessment and student names; options are constants. The two copies below re-serialise that parsed markup
     next.innerHTML = _dialogHtml();
     if (card && next.firstChild) card.innerHTML = next.firstChild.innerHTML;
-    else overlay.innerHTML = next.innerHTML;
+    else overlay.innerHTML = next.innerHTML; // html-safe: re-serialised markup from _dialogHtml above
     _refreshStatus();
     var el = focusSelector && overlay.querySelector(focusSelector);
     if (el && el.focus) el.focus();
@@ -1327,6 +1329,7 @@
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'rp-title');
+    // html-safe: this file's _dialogHtml escapes rubric, assessment and student names; options are constants
     overlay.innerHTML = _dialogHtml();
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) {

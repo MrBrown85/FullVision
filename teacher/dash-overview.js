@@ -395,7 +395,7 @@ window.DashOverview = (function () {
       html +=
         '<div class="bday-row">' +
         '<div class="bday-avatar">' +
-        initials(b.student) +
+        esc(initials(b.student)) +
         '</div>' +
         '<div class="bday-info">' +
         '<div class="bday-name">' +

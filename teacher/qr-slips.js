@@ -72,6 +72,7 @@ var QrSlips = (function () {
       });
   }
 
+  // html-safe: name, class, title, dates, URL, code, password and note all esc()'d; svg is vendor qrcode's own rect markup
   function _slipHtml(slip, q, className, svg) {
     var dates = _dates(q);
     return (
@@ -111,6 +112,7 @@ var QrSlips = (function () {
   }
 
   /* The slips as letter pages of eight. */
+  // html-safe: fixed page wrappers around _slipHtml, which escapes every value
   function buildPages(slips, q, className, draw) {
     var make = draw || qrSvg;
     var pages = [];

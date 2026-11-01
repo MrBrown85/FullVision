@@ -639,6 +639,7 @@ window.RubricLibrary = (function () {
           targets.other.forEach(function (c) {
             parts.push(row(c, planCopy(srcCid, rubric, c.id)));
           });
+          // html-safe: parts come from row(), which escapes class ids, names and summary lines
           list.innerHTML = parts.join('');
           list.addEventListener('change', function () {
             updateOk(root);

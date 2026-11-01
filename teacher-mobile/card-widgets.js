@@ -76,7 +76,7 @@ window.MCardWidgets = (function () {
       '<div class="m-scard-avatar" style="background:' +
       color +
       '">' +
-      initials +
+      MC.esc(initials) +
       '</div>' +
       '<div class="m-scard-info">' +
       '<div class="m-scard-name">' +
@@ -111,7 +111,7 @@ window.MCardWidgets = (function () {
       '<div class="m-scard-avatar-min" style="background:' +
       color +
       '">' +
-      initials +
+      MC.esc(initials) +
       '</div>' +
       '<div class="m-scard-name-min">' +
       MC.esc(name) +
@@ -132,7 +132,7 @@ window.MCardWidgets = (function () {
       secBars +=
         '<div class="m-scard-sec-row">' +
         '<div class="m-scard-sec-dot" style="background:' +
-        (sec.color || '#888') +
+        cssColor(sec.color || '#888') +
         '"></div>' +
         '<div class="m-scard-sec-name">' +
         MC.esc(sec.shortName || sec.name) +
@@ -351,7 +351,7 @@ window.MCardWidgets = (function () {
     } else if (topCtx && topCtx !== 'unknown') {
       text += ' \u00b7 strongest in ' + contextLabel;
     }
-    return '<div class="m-wdg-obs-summary">' + text + '</div>';
+    return '<div class="m-wdg-obs-summary">' + MC.esc(text) + '</div>';
   };
 
   /* ── reflection ──────────────────────────────────────────────── */
@@ -554,6 +554,7 @@ window.MCardWidgets = (function () {
   };
 
   /* ── assembleCard ────────────────────────────────────────────── */
+  // html-safe: every widget renderer escapes its text with MC.esc and passes colours through cssColor or constants.
   function assembleCard(st, cid, data) {
     var config = data.widgetConfig;
     var order = config.order;

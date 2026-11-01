@@ -359,6 +359,7 @@ window.PageReports = (function () {
     // Progress Reports › Sent to Phones: this period's report on the
     // students' phones (teacher/phone-reports.js).
     if (phonesView && typeof PhoneReports !== 'undefined') {
+      // html-safe: PhoneReports.panelHtml (phone-reports.js) escapes every value; marked here because student-evidence.js has its own panelHtml
       output.innerHTML = PhoneReports.panelHtml(cid, ReportBlocks.reportContext());
       return;
     }
@@ -556,6 +557,7 @@ window.PageReports = (function () {
       if (!info) return;
       if (cell.dataset.gradesHtml === undefined) cell.dataset.gradesHtml = cell.innerHTML;
       if (info.sheets <= 1 && !info.noComment) {
+        // html-safe: the cell's own earlier innerHTML, saved in its dataset just above
         cell.innerHTML = cell.dataset.gradesHtml;
         return;
       }
@@ -575,6 +577,7 @@ window.PageReports = (function () {
     if (!_sidebarAnnotated) return;
     document.querySelectorAll('#gb-sidebar .student-row-grades').forEach(function (cell) {
       if (cell.dataset.gradesHtml !== undefined) {
+        // html-safe: the cell's own earlier innerHTML, saved by _annotateSidebar
         cell.innerHTML = cell.dataset.gradesHtml;
         delete cell.dataset.gradesHtml;
       }
@@ -673,6 +676,7 @@ window.PageReports = (function () {
         });
         shown = one ? [one] : rec.students.slice(0, 1);
       }
+      // html-safe: an issued copy's HTML, saved at Issue from the sheet engine's own render (ReportSheets/GradeReport layoutStudent over ReportBlocks)
       preview.innerHTML = shown
         .map(function (st) {
           return st.html;
@@ -739,6 +743,7 @@ window.PageReports = (function () {
     return { ids: ids, sheets: sheets, hashes: hashes, last: last, changed: changed, ctx: ctx, summary: s };
   }
 
+  // html-safe: term, course, form name, issue label and student names esc()'d; counts are numbers; the rest is fixed markup
   function _printDialogHtml(c) {
     var course = COURSES[activeCourse] || {};
     var n = c.ids.length;
@@ -1090,6 +1095,7 @@ window.PageReports = (function () {
   }
   /* Paper, and for Build Your Own Sides and Ink, over the canvas beside
      One Student and Everyone. */
+  // html-safe: literal labels, ids and option values only
   function _printSettingsHtml() {
     var seg = function (label, id, action, key, options, current) {
       return (
@@ -1161,6 +1167,7 @@ window.PageReports = (function () {
     }
     return html + '<span class="tb-divider" aria-hidden="true">\u2502</span>';
   }
+  // html-safe: literal labels and modes only
   function _modeSwitchHtml() {
     var grade = _isGrade();
     var btn = function (mode, label, on) {
@@ -1183,6 +1190,7 @@ window.PageReports = (function () {
       '</div>'
     );
   }
+  // html-safe: literal labels, keys and values only
   function _gradePanelHtml() {
     var o = _gradeOpts();
     var check = function (key, label, off) {
@@ -1688,6 +1696,7 @@ window.PageReports = (function () {
   function tqSelectStudent(sid) {
     RQ.tqSelectStudent(sid);
   }
+  // html-safe: returns ReportQuestionnaire.renderTermQuestionnaire, which is checked
   function renderTermQuestionnaire(cid) {
     return RQ.renderTermQuestionnaire(cid);
   }
@@ -2185,6 +2194,7 @@ window.PageReports = (function () {
     initSidebarToggle();
 
     // Render the toolbar + output container into main
+    // html-safe: TOOLBAR_HTML is a literal string at the foot of this file
     document.getElementById('main').innerHTML = TOOLBAR_HTML;
 
     reportPaper = _loadPaper(activeCourse);

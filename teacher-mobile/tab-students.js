@@ -34,6 +34,7 @@ window.MStudents = (function () {
   }
 
   /* ── Rich Student Card (for card stack) ───────────────────── */
+  // html-safe: MCardWidgets.assembleCard escapes every name and text and passes colours through cssColor.
   function _renderStudentCard(st, cid, data) {
     return MCardWidgets.assembleCard(st, cid, data);
   }
@@ -143,6 +144,7 @@ window.MStudents = (function () {
   }
 
   /* ── Student Detail Screen ──────────────────────────────────── */
+  // html-safe: MStudentDetail.renderDetail escapes every name and text and passes colours through cssColor.
   function renderDetail(cid, sid) {
     return DetailUI.renderDetail({
       cid: cid,

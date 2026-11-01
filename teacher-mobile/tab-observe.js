@@ -55,6 +55,7 @@ window.MObserve = (function () {
      card opens the edit sheet; the name filters the feed to that student.
      opts: showStudent (default true), when ('time' | 'date'),
            editable (default true: tap opens the sheet, swipe deletes). */
+  // html-safe: every text value goes through MC.esc; ids, OBS_SENTIMENTS labels and obsTagColor's constant colours are ours; obsPrivateLabelHtml and linkPillsHtml escape their own text.
   function cardHtml(cid, ob, ctx, opts) {
     opts = opts || {};
     var p = ObsCard.parts(ob, ctx);
@@ -74,7 +75,7 @@ window.MObserve = (function () {
       '<div class="m-obs-card"' +
       (editable ? ' data-action="m-obs-edit"' : '') +
       ' data-sentiment="' +
-      (ob.sentiment || '') +
+      MC.esc(ob.sentiment) +
       '"' +
       ids +
       '><div class="m-obs-main"><div class="m-obs-header">' +
@@ -145,7 +146,7 @@ window.MObserve = (function () {
         '<div class="m-quick-dot" style="background:' +
         color +
         '">' +
-        inits +
+        MC.esc(inits) +
         '</div>' +
         '<span class="m-quick-name">' +
         firstName +
@@ -178,6 +179,7 @@ window.MObserve = (function () {
     );
   }
 
+  // html-safe: fixed markup, the escaped day label, and cardHtml (checked above).
   function _renderObsCards(cid, allObs, filter) {
     var filtered = allObs.filter(function (ob) {
       return !_pendingDeletes[ob.id];
@@ -284,6 +286,7 @@ window.MObserve = (function () {
     );
   }
 
+  // html-safe: _rowHtml escapes the value; id, kind and key are our constants.
   function _contextRowHtml() {
     var c = _selectedContext && OBS_CONTEXTS[_selectedContext];
     return _rowHtml('m-obs-ctx-row', 'context', 'Context', c ? c.label : '');
@@ -343,6 +346,7 @@ window.MObserve = (function () {
     };
     Object.keys(map).forEach(function (id) {
       var el = document.getElementById(id);
+      // html-safe: map holds _contextRowHtml, _studentRowHtml and _linkRowsHtml, all _rowHtml rows that escape their value.
       if (el) el.outerHTML = map[id]();
     });
     var title = document.querySelector('#m-obs-edit .m-edit-form .m-edit-title');
@@ -362,6 +366,7 @@ window.MObserve = (function () {
     return typeof resolveTag === 'function' ? resolveTag(t).label : OBS_LABELS[t] || t;
   }
 
+  // html-safe: tag keys and labels go through MC.esc; obsTagColor returns only constant colours.
   function _tagChipsHtml() {
     return (
       _selectedDims
@@ -524,6 +529,7 @@ window.MObserve = (function () {
     if (!form || !pick) return;
     var cid = getActiveCourse();
     pick.setAttribute('data-kind', kind);
+    // html-safe: PICKER_TITLE is a constant map; _pickerRowsHtml's rows (_pickRow) escape every value and label; dots are obsTagColor constants.
     pick.innerHTML =
       '<div class="m-edit-top">' +
       '<button type="button" class="m-edit-cancel" data-action="m-obs-picker-back">\u2039 Back</button>' +
@@ -715,6 +721,7 @@ window.MObserve = (function () {
     if (!_selectedStudents.length) {
       picker.innerHTML = '<span class="m-student-picker-placeholder">Select student...</span>';
     } else {
+      // html-safe: names go through MC.esc; sid is a student id.
       picker.innerHTML = _selectedStudents
         .map(function (sid) {
           var st = students.find(function (s) {
@@ -864,6 +871,7 @@ window.MObserve = (function () {
     var form = document.querySelector('#m-obs-edit .m-edit-form');
     if (!pickEl || !form) return;
     var students = getStudents(cid);
+    // html-safe: names go through MC.esc; sid is a student id.
     pickEl.innerHTML =
       '<div class="m-edit-top"><span class="m-edit-top-sp"></span><div class="m-edit-title">Concern Added</div>' +
       '<button type="button" class="m-edit-save" data-action="m-obs-flag-done">Done</button></div>' +

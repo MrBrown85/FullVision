@@ -308,6 +308,7 @@ window.StudentEvidence = (function () {
     );
   }
 
+  // html-safe: TABS keys and labels are fixed (labels escaped); counts are numbers.
   function tabsHtml(counts) {
     return TABS.map(function (t) {
       var on = t.key === _tab;
@@ -338,6 +339,7 @@ window.StudentEvidence = (function () {
     concerns: 'No concerns recorded.',
   };
 
+  // html-safe: the query and group labels are escaped; cards come from ObsCard.html, which escapes names, text and tags.
   function listHtml(list) {
     if (!list.length) {
       var msg = _query.trim() ? 'Nothing here matches “' + esc(_query.trim()) + '”.' : esc(EMPTY[_tab] || EMPTY.all);
@@ -475,6 +477,7 @@ window.StudentEvidence = (function () {
     var list = _root.querySelector('#ev-list');
     if (list) {
       list.setAttribute('aria-labelledby', 'ev-tab-' + _tab);
+      // html-safe: this file's listHtml escapes the query and labels; cards come from ObsCard.html.
       list.innerHTML = listHtml(tabFilter(all, _tab));
     }
   }

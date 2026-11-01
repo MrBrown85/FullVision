@@ -397,7 +397,7 @@ window.PageGradebook = (function () {
         '" data-action="toggleSectionFilter" data-secid="' +
         sec.id +
         '"><span class="chip-dot" style="background:' +
-        sec.color +
+        cssColor(sec.color) +
         '"></span>' +
         esc(sec.shortName || sec.name) +
         '</button>';
@@ -415,7 +415,7 @@ window.PageGradebook = (function () {
           '" data-action="toggleModuleFilter" data-moduleid="' +
           u.id +
           '"><span class="chip-dot" style="background:' +
-          u.color +
+          cssColor(u.color) +
           '"></span>' +
           esc(u.name) +
           '</button>';
@@ -447,6 +447,7 @@ window.PageGradebook = (function () {
     _scrollKey = scrollKey;
 
     var refocus = _cellKey(document.activeElement);
+    // html-safe: names, titles and category/section/module names are escaped; colours go through cssColor; grades come from calc.js.
     document.getElementById('main').innerHTML = html;
     applyStickyLeft();
     initScrollShadows();
@@ -1046,7 +1047,7 @@ window.PageGradebook = (function () {
           tagIds: c.keys,
           isCriterionCol: true,
           tagCode: name,
-          sectionColor: sec ? sec.color : 'var(--text-3)',
+          sectionColor: cssColor(sec ? sec.color : 'var(--text-3)'),
           tagText: codes.length
             ? name + ' \u00b7 ' + codes.join(', ')
             : name + ': counts toward the overall grade only',
@@ -1080,6 +1081,7 @@ window.PageGradebook = (function () {
     return out;
   }
 
+  // html-safe: titles, names, codes and tips are escaped; colours go through cssColor; ids, levels and grades are ours or calc.js's.
   function renderDetailedTable(cid, students, assessments, sections, isLetter, scores) {
     var cols = [];
     var groups = [];
@@ -1111,7 +1113,7 @@ window.PageGradebook = (function () {
           tagId: '__pts__',
           isPointsCol: true,
           tagCode: isCompletionScored(a) ? '\u2713/\u2717' : '/' + (a.maxPoints || 100),
-          sectionColor: sec ? sec.color : 'var(--text-3)',
+          sectionColor: cssColor(sec ? sec.color : 'var(--text-3)'),
           tagText: a.title,
         });
       } else {
@@ -1128,7 +1130,7 @@ window.PageGradebook = (function () {
             // A competency's short code, never its server id; a criterion's
             // name; '?' for one no longer in the learning map.
             tagCode: key && key.tag ? _tagShortCode(key.tag) || key.label : key ? key.label : '?',
-            sectionColor: sec ? sec.color : 'var(--text-3)',
+            sectionColor: cssColor(sec ? sec.color : 'var(--text-3)'),
             tagText: key ? key.text || key.label : 'No longer in the learning map',
             groupName: sec ? sec.name || sec.shortName || '' : '',
           });
@@ -1175,12 +1177,12 @@ window.PageGradebook = (function () {
           return getSectionForTag(cid, tid);
         })
         .filter(Boolean);
-      var stripeColor = tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)';
+      var stripeColor = cssColor(tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)');
       var badges = '';
       if (isCompletionScored(a)) badges += '<span class="gb-assess-badge">\u2713/\u2717</span>';
       else if (a.scoreMode === 'points')
         badges += '<span class="gb-assess-badge">/ ' + (a.maxPoints || 100) + '</span>';
-      if (getAssessmentWeight(a) !== 1) badges += '<span class="gb-assess-badge">' + a.weight + 'x</span>';
+      if (getAssessmentWeight(a) !== 1) badges += '<span class="gb-assess-badge">' + esc(a.weight) + 'x</span>';
       var _catId = _getAssessmentCategoryId(a);
       var _catIdx = _catId
         ? (getCategories(cid) || []).findIndex(function (c) {
@@ -1467,6 +1469,7 @@ window.PageGradebook = (function () {
   /* ══════════════════════════════════════════════════════════
      SCORES VIEW — Apple Numbers-inspired spreadsheet
      ══════════════════════════════════════════════════════════ */
+  // html-safe: titles, names and designations are escaped; colours go through cssColor; cell text comes from calc.js.
   function renderScoresTable(cid, students, assessments, sections, isLetter, scores) {
     var sortedStudents = applySorting(cid, students, sections, isLetter);
     var cw = getCategoryWeights(cid);
@@ -1505,7 +1508,7 @@ window.PageGradebook = (function () {
           return getSectionForTag(cid, tid);
         })
         .filter(Boolean);
-      var stripeColor = tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)';
+      var stripeColor = cssColor(tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)');
       var fillColor = isScoreOnly ? 'var(--surface)' : stripeColor;
       var stripeBottom = isScoreOnly ? 'var(--border)' : stripeColor;
       html +=
@@ -2205,6 +2208,7 @@ window.PageGradebook = (function () {
 
     var pop = document.createElement('div');
     pop.className = 'gb-add-popover';
+    // html-safe: category and section names are escaped, colours go through cssColor; ids and today's date are ours.
     pop.innerHTML =
       '<div class="gb-add-popover-title">New Assignment</div>' +
       '<div class="gb-add-field"><label>Title</label><input type="text" id="gb-new-title" placeholder="e.g. Chapter 3 Quiz" autofocus></div>' +
@@ -2239,7 +2243,7 @@ window.PageGradebook = (function () {
             (sec.tags[0] ? sec.tags[0].id : sec.id) +
             '" checked>' +
             '<span style="color:' +
-            sec.color +
+            cssColor(sec.color) +
             '">' +
             esc(sec.shortName || sec.name) +
             '</span></label>'
@@ -2548,6 +2552,7 @@ window.PageGradebook = (function () {
     }
     var menu = document.createElement('div');
     menu.className = 'gb-ctx-menu';
+    // html-safe: statusItem gets only fixed actions and labels.
     menu.innerHTML =
       '<div class="gb-ctx-item" data-ctx="editCell">Edit Score</div>' +
       '<div class="gb-ctx-item" data-ctx="clearCell">Clear Score</div>' +
@@ -3324,6 +3329,7 @@ window.PageGradebook = (function () {
     var tipHtml = name.dataset.sid ? _nameTipHtml[name.dataset.sid] : null;
     if (!gbTip || !tipHtml) return;
     gbTip.className = '';
+    // html-safe: tipHtml is built by _setNameTip, which escapes category and section names and grade text.
     gbTip.innerHTML = tipHtml;
     gbTip.style.display = 'block';
     _tipSource = name;

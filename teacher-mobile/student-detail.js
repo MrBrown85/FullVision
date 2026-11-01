@@ -120,7 +120,7 @@ window.MStudentDetail = (function () {
       '">' +
       '<div class="m-section-header">' +
       '<div class="m-section-dot" style="background:' +
-      (sec.color || '#888') +
+      cssColor(sec.color || '#888') +
       '"></div>' +
       '<div class="m-section-name">' +
       MC.esc(sec.shortName || sec.name) +
@@ -257,6 +257,7 @@ window.MStudentDetail = (function () {
     }
   }
 
+  // html-safe: names, titles, goals, reflections and observation text go through MC.esc; colours through cssColor or constants; grades come from calc.js; MObserve.cardHtml and obsPrivateLabelHtml are checked.
   function renderDetail(opts) {
     var cid = opts.cid;
     var sid = opts.sid;
@@ -283,7 +284,7 @@ window.MStudentDetail = (function () {
       '<div class="m-hero-avatar" style="background:' +
       color +
       '">' +
-      initials +
+      MC.esc(initials) +
       '</div>' +
       '<div class="m-hero-name">' +
       MC.esc(name) +
@@ -319,7 +320,7 @@ window.MStudentDetail = (function () {
         focusHTML +=
           '<div class="m-focus-row">' +
           '<span class="m-section-dot" style="background:' +
-          secColor +
+          cssColor(secColor) +
           '"></span>' +
           '<span class="m-focus-name">' +
           MC.esc(label) +
