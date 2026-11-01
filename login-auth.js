@@ -335,3 +335,6 @@ async function handleForgot() {
 /* ── Form submit listeners ── */
 document.getElementById('form-signin').addEventListener('submit', handleSignIn);
 document.getElementById('form-signup').addEventListener('submit', handleSignUp);
+
+// The splash page's Create an Account link opens the Sign Up tab.
+if (window.location.hash === '#signup') switchTab('signup');
