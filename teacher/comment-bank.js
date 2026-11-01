@@ -589,12 +589,12 @@ window.CommentBank = (function () {
     },
     {
       id: 'sl-week-plan',
-      text: 'In class, I will plan the week with the student at the start of each week.',
+      text: 'In class, I will plan the coming week with the student at its start.',
       fits: ['completes', 'ready'],
     },
     {
       id: 'sl-start',
-      text: 'In class, I will check that the student has started each task in the first five minutes.',
+      text: 'In class, I will help the student begin each task in the first five minutes.',
       fits: ['ready'],
     },
     {
