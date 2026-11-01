@@ -752,6 +752,15 @@ window.PageGradebook = (function () {
       rowheads.scrollTop = data.scrollTop;
     };
     data.addEventListener('scroll', fn, { passive: true });
+    // A name that takes the focus (Tab, or ← from a score) scrolls the
+    // names' column into view; the scores follow so the rows stay in line.
+    rowheads.addEventListener(
+      'scroll',
+      function () {
+        if (Math.abs(rowheads.scrollTop - data.scrollTop) > 1) data.scrollTop = rowheads.scrollTop;
+      },
+      { passive: true },
+    );
     _gridScrollHandler = { el: data, fn: fn };
   }
 
