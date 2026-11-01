@@ -446,8 +446,19 @@ test.describe('checks and approval', () => {
 
   test('a near-identical comment shows the class warning with Show Both', async ({ page }) => {
     await open(page);
+    // Six habits rated and attendance entered, so Cece's draft has five
+    // sentences beyond the grade sentence (which never counts as shared):
+    // best piece, habits, attendance, next step, family.
+    for (const key of await page.evaluate(() => CommentBank.HABITS.map(h => h.key))) {
+      await page.locator(`[data-action="tqRate"][data-habit="${key}"][data-value="4"]`).click();
+    }
+    await page.locator('#tq-att-absences').fill('3');
+    await page.locator('#tq-att-absences').press('Tab');
+    await page.locator('#tq-att-lates').fill('1');
+    await page.locator('#tq-att-lates').press('Tab');
     await page.locator('#tq-generate').click();
     const cece = await page.locator('#tq-narrative').inputValue();
+    expect(await page.evaluate(t => ReportQuestionnaire.sentencesOf(t).length, cece)).toBeGreaterThanOrEqual(6);
     await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st2');
     await page.locator('#tq-narrative').waitFor();
     await expect(page.locator('#tq-warn')).toHaveCount(0);
@@ -460,7 +471,7 @@ test.describe('checks and approval', () => {
       cece.replace(/Cece/g, 'Noor'),
     );
     await expect(page.locator('#tq-warn')).toContainText(
-      /[A-Z][a-z]+ of these sentences are also in Cece Adeyemi’s comment\. Press Generate Comment for another version, or change a sentence\./,
+      /Five of these sentences are also in Cece Adeyemi’s comment\. Press Generate Comment for another version, or change a sentence\./,
     );
     // Show Both takes the warning's amber (the States mockup).
     const colours = await page
