@@ -8087,9 +8087,9 @@ var COMMENT_BANK = {
     // step's. Each frame says what the work shows in that skill at the
     // competency's own proficiency word (`when.highestWord`: can; is
     // learning to; is beginning to), never "strongest", "best" or "most",
-    // and never against anyone else. A frame that says "highest" or
-    // "furthest along" also needs `highestTop` (no competency with a level,
-    // on any number of pieces, sits above it). No subject words: the skill
+    // and never against anyone else. A frame that says "where {his} marks
+    // are highest" also needs `highestTop` (no competency with a level, on
+    // any number of pieces, sits above it). No subject words: the skill
     // comes from the slot, so every kind of class shares them.
     {
       id: 'n1001',
@@ -8202,16 +8202,6 @@ var COMMENT_BANK = {
       src: 'new',
     },
     {
-      id: 'n1012',
-      part: 'now',
-      group: 'Overall',
-      text: '{His} work this term is evidence that {he} can {highestSkill}.',
-      needs: ['highestSkill'],
-      when: { highestWord: 'Extending' },
-      claims: ['strength'],
-      src: 'new',
-    },
-    {
       id: 'n1013',
       part: 'now',
       group: 'Overall',
@@ -8255,7 +8245,7 @@ var COMMENT_BANK = {
       id: 'n1017',
       part: 'now',
       group: 'Overall',
-      text: 'This term, {he} [is|are] learning to {highestSkill}.',
+      text: 'Learning to {highestSkill} is part of {his} work this term.',
       needs: ['highestSkill'],
       when: { highestWord: 'Developing' },
       claims: ['strength'],
@@ -8265,7 +8255,7 @@ var COMMENT_BANK = {
       id: 'n1018',
       part: 'now',
       group: 'Overall',
-      text: 'In {his} work, {he} [is|are] learning to {highestSkill}.',
+      text: '{His} work this term shows {him} learning to {highestSkill}.',
       needs: ['highestSkill'],
       when: { highestWord: 'Developing' },
       claims: ['strength'],
@@ -8285,7 +8275,7 @@ var COMMENT_BANK = {
       id: 'n1020',
       part: 'now',
       group: 'Overall',
-      text: '{His} work is furthest along as {he} [begins|begin] to {highestSkill}.',
+      text: '{His} marks are highest as {he} [begins|begin] to {highestSkill}.',
       needs: ['highestSkill', 'highestTop'],
       when: { highestWord: 'Emerging' },
       claims: ['strength'],
@@ -8295,7 +8285,7 @@ var COMMENT_BANK = {
       id: 'n1021',
       part: 'now',
       group: 'Overall',
-      text: '{He} [is|are] beginning to {highestSkill}, where {his} work is furthest along.',
+      text: '{He} [is|are] beginning to {highestSkill}, where {his} marks are highest.',
       needs: ['highestSkill', 'highestTop'],
       when: { highestWord: 'Emerging' },
       claims: ['strength'],
@@ -8305,7 +8295,7 @@ var COMMENT_BANK = {
       id: 'n1022',
       part: 'now',
       group: 'Overall',
-      text: 'Beginning to {highestSkill} is where {his} work is furthest along.',
+      text: 'Beginning to {highestSkill} is where {his} marks are highest.',
       needs: ['highestSkill', 'highestTop'],
       when: { highestWord: 'Emerging' },
       claims: ['strength'],
@@ -8317,16 +8307,6 @@ var COMMENT_BANK = {
       group: 'Overall',
       text: 'So far this term, {he} [has|have] begun to {highestSkill}.',
       needs: ['highestSkill'],
-      when: { highestWord: 'Emerging' },
-      claims: ['strength'],
-      src: 'new',
-    },
-    {
-      id: 'n1024',
-      part: 'now',
-      group: 'Overall',
-      text: '{His} work is furthest along here: {he} [is|are] beginning to {highestSkill}.',
-      needs: ['highestSkill', 'highestTop'],
       when: { highestWord: 'Emerging' },
       claims: ['strength'],
       src: 'new',

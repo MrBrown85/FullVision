@@ -183,7 +183,7 @@ window.CommentBank = (function () {
         key: 'ethical',
         name: 'Ethical Judgment',
         match: /ethical|judg/i,
-        skill: 'make a fair judgment about a past event, using what people knew at the time',
+        skill: 'judge a past event fairly, by what people knew then',
       },
       {
         key: 'significance',
@@ -227,7 +227,7 @@ window.CommentBank = (function () {
         key: 'evaluating',
         name: 'Evaluating',
         match: /evaluat/i,
-        skill: 'judge how reliable the results are and how the method could be improved',
+        skill: 'judge how reliable results are and how to improve the method',
       },
       {
         key: 'questioning',
@@ -298,13 +298,13 @@ window.CommentBank = (function () {
         key: 'patterns',
         name: 'Sequences and Rules',
         match: /sequence|puzzle|conjecture|generali[sz]|\brules?\b/i,
-        skill: 'find the rule behind a pattern and use it to predict the next case',
+        skill: 'find the rule in a pattern and use it to predict',
       },
       {
         key: 'graphs',
         name: 'Graphs and Tables',
         match: /\bgraph|table|diagram|chart|plot/i,
-        skill: 'show the numbers in a graph or table and say what the shape means',
+        skill: 'show numbers in a graph or table and explain its shape',
       },
       {
         key: 'notation',
@@ -316,7 +316,7 @@ window.CommentBank = (function () {
         key: 'wordProblems',
         name: 'Real-World Applications',
         match: /word problem|real.?world|real.?life|applied|applications? (to|of|in)|everyday|situation/i,
-        skill: 'change a word problem into an equation and explain what the answer means',
+        skill: 'write a word problem as an equation and explain the answer',
       },
       {
         key: 'procedures',
@@ -408,7 +408,7 @@ window.CommentBank = (function () {
         name: 'Planning a Piece',
         match:
           /plan(ning)? (a|the|each) (piece|work|composition|project)|sketch\b|thumbnail|storyboard|outline|brainstorm/i,
-        skill: 'plan a piece with a sketch or an outline before starting the final version',
+        skill: 'plan a piece with a sketch or outline before the final version',
       },
       {
         key: 'revising',
@@ -426,25 +426,25 @@ window.CommentBank = (function () {
         key: 'performing',
         name: 'Ensemble and Stage',
         match: /\bstage|ensemble(?! heritage)|\bchoir|\bband\b|\bacting|repertoire|instrument/i,
-        skill: 'rehearse a part until the whole piece can be performed without a stop',
+        skill: 'rehearse a part until the whole piece plays without stopping',
       },
       {
         key: 'notation',
         name: 'Reading Notation',
         match: /notation|sight-?read|read(ing)? music|music theory|\bscore\b|\bscales?\b(?= and| on)/i,
-        skill: 'read a line of music or a rhythm and play or clap it in time',
+        skill: 'read written music and play or clap it in time',
       },
       {
         key: 'camera',
         name: 'Camera and Light',
         match: /camera|lens|exposure|shutter|framing|\bfocus|\bshot\b/i,
-        skill: 'control the light and the framing before taking a photo or a shot',
+        skill: 'control the light and framing before taking a photo',
       },
       {
         key: 'documenting',
         name: 'Process Journal',
         match: /portfolio|artist statement|journal|sketchbook|process record/i,
-        skill: 'keep a record of each stage of a piece, with a note on what changed',
+        skill: 'record each stage of a piece and note what changed',
       },
     ],
     pe: [
@@ -487,13 +487,13 @@ window.CommentBank = (function () {
         key: 'strategy',
         name: 'Game Strategy',
         match: /game strateg|tactic|game sense|offen[cs]|defen[cs]|game plan/i,
-        skill: 'read the play in a game and move to open space before the pass',
+        skill: 'read the play and move to open space before the pass',
       },
       {
         key: 'nutrition',
         name: 'Eating and Hydration',
         match: /\beating|\bdiet|hydrat|sleep|food choice/i,
-        skill: 'plan a day of food and water that gives the body what an active day needs',
+        skill: 'plan a day of food and water for an active day',
       },
       {
         key: 'relationships',
@@ -505,19 +505,19 @@ window.CommentBank = (function () {
         key: 'substances',
         name: 'Substance Use',
         match: /substance|\bdrug|alcohol|vap(e|ing)|tobacco|addict|cannabis/i,
-        skill: 'explain the risks of a substance and practise a way to say no',
+        skill: 'explain a substance’s risks and practise a way to say no',
       },
       {
         key: 'pacing',
         name: 'Endurance and Pacing',
         match: /endur|pacing|\bpace\b|aerobic|stamina|\brun(ning)?\b/i,
-        skill: 'hold a steady pace for a whole run rather than starting fast and fading',
+        skill: 'hold an even pace for the whole run',
       },
       {
         key: 'stress',
         name: 'Managing Stress',
         match: /stress|anxiety|coping|emotion|resilien|mindful|self-?regulat/i,
-        skill: 'name one way to lower stress and use it before a test or a game',
+        skill: 'use one way to lower stress before a test or game',
       },
     ],
     adst: [
@@ -537,7 +537,7 @@ window.CommentBank = (function () {
         key: 'tools',
         name: 'Tools and Technologies',
         match: /tool|technolog|software|cad\b|digital|program|code|equipment/i,
-        skill: 'choose the right tool or program for each step of a project',
+        skill: 'choose the right tool or program for each project step',
       },
       {
         key: 'designing',
@@ -590,27 +590,27 @@ window.CommentBank = (function () {
         key: 'coding',
         name: 'Coding',
         match: /\bcod(e|ing)\b|programm|algorithm|debug|script|robot|microcontroller|javascript|html|css/i,
-        skill: 'test a program in small parts and fix one error at a time',
+        skill: 'test a program in small parts and fix each error',
       },
       {
         key: 'media',
         name: 'Media and Graphics',
         match: /(?<!social )media|video|animat|graphic|typograph|page layout|\bweb|multimedia|podcast|audio|brand/i,
-        skill: 'plan a media piece for one audience and edit it until the message is clear',
+        skill: 'plan and edit a media piece with one audience in mind',
       },
       {
         key: 'business',
         name: 'Business',
         match:
           /business|market|entrepreneur|account|financ(?!.*(family|consumer))|budget|customer|sales|e-?commerce|enterprise|\bcost/i,
-        skill: 'explain who a product is for and how its price covers its costs',
+        skill: 'explain who a product is for and what its price covers',
       },
       {
         key: 'materials',
         name: 'Material Selection',
         match:
           /material (science|selection|propert)|select(ing)? [\w ]*materials|fibre|fiber|\bstock\b|ingredient|lumber/i,
-        skill: 'choose the right material for a job and say why it suits the job',
+        skill: 'choose the right material for a job and say why',
       },
       {
         key: 'collaborating',
@@ -656,13 +656,13 @@ window.CommentBank = (function () {
         key: 'interview',
         name: 'Résumés and Interviews',
         match: /r[ée]sum|interview|cover letter|job search|job application|hiring|employab|portfolio/i,
-        skill: 'show in a résumé or an interview how past experience fits a job posting',
+        skill: 'show in a résumé or interview how past experience fits a job',
       },
       {
         key: 'budgeting',
         name: 'Budgeting',
         match: /budget|financ|money|\bcost|income|saving|spending/i,
-        skill: 'make a simple budget and say what each spending choice leaves for the others',
+        skill: 'make a simple budget and explain each spending choice',
       },
       {
         key: 'postSecondary',
@@ -684,7 +684,7 @@ window.CommentBank = (function () {
         key: 'listening',
         name: 'Listening',
         match: /listen|audio|speech|\bsign(ing|ed)\b|viewing|comprehen/i,
-        skill: 'find the main idea in a short spoken or signed message in the language',
+        skill: 'find the main idea in a short spoken or signed message',
       },
       {
         key: 'speaking',
@@ -696,37 +696,37 @@ window.CommentBank = (function () {
         key: 'reading',
         name: 'Reading',
         match: /\bread|written text|\bprint/i,
-        skill: 'read a short text in the language and say what it is about',
+        skill: 'say what a short text in the language is about',
       },
       {
         key: 'writing',
         name: 'Writing',
         match: /writ|compos|paragraph|sentence/i,
-        skill: 'write a short paragraph in the language with the words in the right order',
+        skill: 'write a short paragraph in the language in the right word order',
       },
       {
         key: 'vocabulary',
         name: 'Vocabulary',
         match: /vocab|\bwords?\b|lexic/i,
-        skill: 'use the new words from each unit in sentences, not just in a list',
+        skill: 'use the new words from each unit in full sentences',
       },
       {
         key: 'grammar',
         name: 'Grammar',
         match: /grammar|\bverb|tense|structure|accura|conjugat|agreement/i,
-        skill: 'use the verb form or marker the language needs for who is acting and when',
+        skill: 'use the right verb form for who is acting and when',
       },
       {
         key: 'culture',
         name: 'Culture',
         match: /cultur|communit|tradition|awareness|identity|perspective|\bsocial/i,
-        skill: 'describe one custom from a community that uses the language and what it shows',
+        skill: 'describe a custom of a community that uses the language',
       },
       {
         key: 'communicating',
         name: 'Communicating',
         match: /communicat|interact|exchange|express|respond|engag/i,
-        skill: 'say what is meant in the language, with another word or a gesture when one is missing',
+        skill: 'use gestures and other words to be understood in the language',
       },
       {
         key: 'understanding',
@@ -2654,9 +2654,9 @@ window.CommentBank = (function () {
       });
   }
   /* Whether the highest-marked skill is at the top of every competency
-     with a level, whatever its piece count: the frames that say "highest"
-     or "furthest along" need it (`highestTop`), so a competency marked once
-     or twice above it never makes them untrue. */
+     with a level, whatever its piece count: the frames that say "where
+     {his} marks are highest" need it (`highestTop`), so a competency
+     marked once or twice above it never makes them untrue. */
   function highestIsTop(f, x) {
     return (
       !!x &&
@@ -3111,7 +3111,7 @@ window.CommentBank = (function () {
       evenWord: evenNow.length ? f.standing || '' : '',
       // The highest-marked skill in the table's words, and 'yes' when no
       // competency with a level sits above it (the frames that say
-      // "highest" or "furthest along" need it).
+      // "where {his} marks are highest" need it).
       highestSkill: hiSk[0] ? hiSk[0].skill : '',
       highestTop: hiTop ? 'yes' : '',
       growthAreas: list(

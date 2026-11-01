@@ -9,7 +9,8 @@
  *   shortest wording.
  * - The frames (`when.highestWord`) say what the work shows at the
  *   competency's own proficiency word; the ones that say "highest" or
- *   "furthest along" need `highestTop` (no competency with a level above).
+ *   "where {his} marks are highest" need `highestTop` (no competency with
+ *   a level above).
  * - verify() checks the competency is still one of the highest-marked ones
  *   and not the next step, in the table's wording, at its own word.
  * - Browse Sentences: "Highest Marks · {word}" under Strengths.
@@ -255,13 +256,13 @@ describe('the highest-marked skill frames', () => {
         expect(s.needs[0], s.id).toBe('highestSkill');
         // A frame that ranks within the student's own work needs nothing
         // with a level above; none ranks against anyone else.
-        const ranks = /\bhighest\b|\bfurthest\b/.test(s.text);
+        const ranks = /\bhighest\b/.test(s.text);
         expect(s.needs.indexOf('highestTop') >= 0, s.id).toBe(ranks);
         expect(s.text, s.id).not.toMatch(/\b(strongest|best|most|top|strength)\b/i);
         expect(CommentLint.findings(s.text), s.id).toEqual([]);
       });
     });
-    expect(frames.length).toBe(27);
+    expect(frames.length).toBe(25);
   });
 
   it('binds the verb to the competency’s own word: can, learning to, beginning to', () => {
@@ -295,19 +296,16 @@ describe('the highest-marked skill frames', () => {
               });
               if (!CommentRealiser.tooLong(CommentBank.fill(s, ctx))) fit++;
             });
-          // Every skill fits a frame at every word, but the longest wording
-          // (seventeen words) at Developing and Emerging, whose shortest
-          // frames ("is learning to", "is beginning to") have four.
-          const short = w === 'Developing' || w === 'Emerging';
-          if (CommentRealiser.wordCount(r.skill) <= 16 || !short)
-            expect(fit, fam + ':' + r.key + ':' + w).toBeGreaterThan(0);
-          else expect(fit, fam + ':' + r.key + ':' + w).toBe(0);
+          // Every skill fits a frame at every word: no wording in the table
+          // runs past twelve words (Nov 2).
+          expect(CommentRealiser.wordCount(r.skill), fam + ':' + r.key).toBeLessThanOrEqual(12);
+          expect(fit, fam + ':' + r.key + ':' + w).toBeGreaterThan(0);
         });
       });
     });
   });
 
-  it('prints the Emerging frames as where the work is furthest along, never a deficit', () => {
+  it('prints the Emerging frames as a start, where the marks are highest, never a deficit', () => {
     // 1.4, 1.4, 1.2, 1.0: all Emerging, the overall Developing from other
     // work, so not even results.
     const comps = [
@@ -329,7 +327,7 @@ describe('the highest-marked skill frames', () => {
       expect(t, s.id).not.toMatch(/\b(not yet|struggl|difficult|weak|low|behind)\b/i);
       expect(verified(s, t, CommentBank.provenance(s, ctx), f).replaced, s.id).toEqual([]);
     });
-    expect(pool.filter(s => /furthest along/.test(s.text)).length).toBeGreaterThanOrEqual(4);
+    expect(pool.filter(s => /marks are highest/.test(s.text)).length).toBe(3);
     const d = CommentBank.draft(ctx, { seed: 2 });
     const row = d.sentences.find(x => x.step === 'overall');
     expect(isHigh(row.id)).toBe(true);
@@ -337,29 +335,36 @@ describe('the highest-marked skill frames', () => {
   });
 
   it('takes the next equal top when the first runs past 20 words', () => {
-    // Ethical's wording is fifteen words; Inquiry's ten.
+    // Developing in a Languages class: Writing's wording is twelve words,
+    // Reading's ten; "is learning to …, where {his} marks are highest" has
+    // nine of its own.
     const comps = [
-      comp('a', 'Ethical Judgment', 3.0),
-      comp('b', 'Inquiry', 3.0),
-      comp('c', 'Significance', 2.8),
-      comp('d', 'Continuity and Change', 2.6),
-      comp('e', 'Cause and Consequence', 2.5),
-      comp('f', 'Perspective', 1.0),
+      comp('a', 'Writing', 2.0),
+      comp('b', 'Reading', 2.0),
+      comp('c', 'Vocabulary', 1.8),
+      comp('d', 'Culture', 1.7),
+      comp('e', 'Grammar', 1.5),
+      comp('f', 'Speaking', 1.0),
     ];
-    const f = facts(comps);
+    const f = facts(comps, { family: 'languages', course: 'Core French 10', overall: 1.8, standing: 'Developing' });
+    expect(CommentBank.topTieOf(comps)).toEqual([]);
     const ctx = CommentBank.context(f, {});
-    expect(ctx._highestSkills.map(x => x.key)).toEqual(['inquiry', 'ethical']);
+    expect(ctx._highestSkills.map(x => x.key)).toEqual(['reading', 'writing']);
     const first = Object.assign({}, ctx, {
-      highestSkill: skillWords('socials', 'ethical'),
-      _highestSkill: 'ethical',
+      highestSkill: skillWords('languages', 'writing'),
+      _highestSkill: 'writing',
       _highestSkills: ctx._highestSkills.slice().reverse(),
       _facts: Object.assign({}, ctx._facts, { highestSkill: ['comp:a'] }),
     });
-    const s = frames.find(x => x.when.highestWord === 'Proficient' && x.text.indexOf('as {his} marks show') >= 0);
-    expect(CommentRealiser.tooLong(CommentBank.fill(s, ctx))).toBe(false);
+    const s = frames.find(
+      x => x.when.highestWord === 'Developing' && /^\{He\} \[is\|are\] learning to .*, where/.test(x.text),
+    );
+    expect(
+      CommentRealiser.tooLong(CommentBank.fill(s, Object.assign({}, ctx, { highestSkill: first.highestSkill }))),
+    ).toBe(true);
     const text = CommentBank.fill(s, first);
     expect(CommentRealiser.tooLong(text)).toBe(false);
-    expect(text).toContain(skillWords('socials', 'inquiry'));
+    expect(text).toContain(skillWords('languages', 'reading'));
     const pv = CommentBank.provenance(s, first);
     expect(pv.sources.highestSkill).toEqual(['comp:b']);
     expect(verified(s, text, pv, f).replaced).toEqual([]);
