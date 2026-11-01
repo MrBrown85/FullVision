@@ -219,6 +219,7 @@ create table student (
   student_number text,
   email          text,
   date_of_birth  date,
+  slip_password  text,                     -- four digits on a questionnaire slip, for a student with no birthday or number
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
 );

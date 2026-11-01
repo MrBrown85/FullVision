@@ -43,15 +43,28 @@ def expect_error(name, fn, code=None):
     finally:
         back()
 def key(): return str(uuid.uuid4())
-def open_(code, ip='ip-1'):
+def open_raw(code, ip='ip-1'):
     as_role('service_role'); return c.run('select student_submit.open(:c, :i)', c=code, i=ip)[0][0]
+# Since 20261101_questionnaire_identity_check.sql a slip opens to "who are
+# you?"; these tests are about what comes after, so open_ also passes the
+# check (ENR1's student by birthday, ENR2's by student number).
+def open_(code, ip='ip-1'):
+    r = open_raw(code, ip)
+    if not (r.get('ok') and r.get('kind') == 'questionnaire' and r.get('check')):
+        return r
+    as_role('service_role')
+    v = c.run("select student_submit.verify(:t, '2012-05-15', 'S-1002', null, :i)", t=r['token'], i=ip)[0][0]
+    if not v.get('ok'):
+        return v
+    return dict(r, **{k: v[k] for k in ('parts', 'context')})
 def submit(token, answers, ip='ip-1'):
     as_role('service_role'); return c.run('select student_submit.submit(:t, :a::jsonb, :i)', t=token, a=json.dumps(answers), i=ip)[0][0]
 def one(sql, **kw):
     as_owner(); return c.run(sql, **kw)[0][0]
 
 as_owner()
-c.run("update student set preferred_name = 'CeCe' where id = :s", s=STU1)
+c.run("update student set preferred_name = 'CeCe', date_of_birth = '2012-05-15' where id = :s", s=STU1)
+c.run("update student set student_number = 'S-1002' where id = (select student_id from enrollment where id = :e)", e=ENR2)
 today = one("select (now() at time zone 'America/Vancouver')::date::text")
 
 # ── A reflection with its Goal Check-In, and codes ─────────────────────

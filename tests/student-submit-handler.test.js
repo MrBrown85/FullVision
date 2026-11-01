@@ -25,6 +25,12 @@ function setup(overrides) {
               ? { ok: true, token: 'a'.repeat(64), student: { first_name: 'Cece' } }
               : { ok: false, error: 'not_found' };
           },
+          async verify(token, who, hash) {
+            calls.push({ route: 'verify', token, who, hash });
+            return who.studentNumber === '0123456' || who.password === '4821'
+              ? { ok: true, parts: [] }
+              : { ok: false, error: 'wrong_identity', tries_left: 4 };
+          },
           async check(token, birthday, hash) {
             calls.push({ route: 'check', token, birthday, hash });
             return birthday === '2012-05-15'
@@ -75,6 +81,39 @@ describe('student-submit handler', () => {
     const res = await handle(post({ route: 'submit', token: 'a'.repeat(64), answers }));
     expect(await res.json()).toEqual({ ok: true, submitted_at: '2026-11-04T10:00:00Z' });
     expect(calls[0]).toMatchObject({ route: 'submit', token: 'a'.repeat(64), answers });
+  });
+
+  it('verifies a questionnaire slip by birthday, student number or password, and never logs them', async () => {
+    const { handle, calls, logs } = setup();
+    const token = 'b'.repeat(64);
+    let res = await handle(post({ route: 'verify', token, student_number: '0123456' }));
+    expect(await res.json()).toEqual({ ok: true, parts: [] });
+    expect(calls[0].who).toEqual({ birthday: null, studentNumber: '0123456', password: null });
+    res = await handle(post({ route: 'verify', token, password: '4821' }));
+    expect((await res.json()).ok).toBe(true);
+    res = await handle(post({ route: 'verify', token, birthday: '2012-05-16' }));
+    expect(await res.json()).toEqual({ ok: false, error: 'wrong_identity', tries_left: 4 });
+    expect(calls[2].who).toEqual({ birthday: '2012-05-16', studentNumber: null, password: null });
+    const logged = JSON.stringify(logs);
+    for (const secret of ['0123456', '4821', '2012-05-16', token]) expect(logged).not.toContain(secret);
+    expect(logs.map(l => l.outcome)).toEqual(['ok', 'ok', 'wrong_identity']);
+  });
+
+  it('refuses a verify with nothing to check, or a field of the wrong shape', async () => {
+    const { handle, calls } = setup();
+    const token = 'b'.repeat(64);
+    for (const body of [
+      { route: 'verify', token },
+      { route: 'verify', token, birthday: '', student_number: '', password: '' },
+      { route: 'verify', token, birthday: '15/05/2012' },
+      { route: 'verify', token, student_number: 'x'.repeat(33) },
+      { route: 'verify', token, password: 1234 },
+      { route: 'verify', student_number: '0123456' },
+    ]) {
+      const res = await handle(post(body));
+      expect(res.status, JSON.stringify(body)).toBe(400);
+    }
+    expect(calls).toEqual([]);
   });
 
   it('checks a birthday for a phone report, and never logs it', async () => {

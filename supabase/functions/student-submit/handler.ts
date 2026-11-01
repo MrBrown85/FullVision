@@ -1,7 +1,9 @@
 // The student-submit request handler (docs/STUDENT-VOICE-PLAN.md, PR 6).
 //
-// A student's phone posts here; nothing else does. Three routes:
+// A student's phone posts here; nothing else does. Four routes:
 //   {route: 'open', code}             -> student_submit.open
+//   {route: 'verify', token, birthday | student_number | password}
+//                                     -> student_submit.verify (questionnaires)
 //   {route: 'check', token, birthday} -> student_submit.check (phone reports)
 //   {route: 'submit', token, answers} -> student_submit.submit
 // The SQL functions (migrations/20261025_student_submit.sql) hold every
@@ -14,9 +16,13 @@
 
 export type Db = {
   open: (code: string, ipHash: string) => Promise<Record<string, unknown>>;
+  verify: (token: string, who: Identity, ipHash: string) => Promise<Record<string, unknown>>;
   check: (token: string, birthday: string, ipHash: string) => Promise<Record<string, unknown>>;
   submit: (token: string, answers: unknown, ipHash: string) => Promise<Record<string, unknown>>;
 };
+
+// What the student typed to show the slip is theirs; any one may match.
+export type Identity = { birthday: string | null; studentNumber: string | null; password: string | null };
 
 export type Options = {
   db: Db;
@@ -80,6 +86,22 @@ export async function ipHash(req: Request, key: string): Promise<string> {
   return Array.from(sig, b => b.toString(16).padStart(2, '0')).join('');
 }
 
+/* The verify body's identity fields: each a short string or absent, and at
+   least one given. Null when the shape is wrong. */
+export function identity(body: Record<string, unknown>): Identity | null {
+  const field = (v: unknown, max: number): string | null | undefined => {
+    if (v == null || v === '') return null;
+    return typeof v === 'string' && v.length <= max ? v : undefined;
+  };
+  const birthday = field(body.birthday, 10);
+  const studentNumber = field(body.student_number, 32);
+  const password = field(body.password, 16);
+  if (birthday === undefined || studentNumber === undefined || password === undefined) return null;
+  if (birthday !== null && !/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return null;
+  if (birthday === null && studentNumber === null && password === null) return null;
+  return { birthday, studentNumber, password };
+}
+
 export function makeHandler(opts: Options) {
   const log = opts.log || (entry => console.log(JSON.stringify(entry)));
 
@@ -120,6 +142,12 @@ export function makeHandler(opts: Options) {
           return reply(400, { ok: false, error: 'bad_request' }, origin);
         }
         result = await opts.db.open(body.code, hash);
+      } else if (route === 'verify') {
+        const who = identity(body);
+        if (typeof body.token !== 'string' || body.token.length > 128 || !who) {
+          return reply(400, { ok: false, error: 'bad_request' }, origin);
+        }
+        result = await opts.db.verify(body.token, who, hash);
       } else if (route === 'check') {
         if (
           typeof body.token !== 'string' ||
@@ -144,7 +172,8 @@ export function makeHandler(opts: Options) {
       return reply(500, { ok: false, error: 'server' }, origin);
     }
 
-    // Route, outcome and time. Never the code, token, birthday, answers or name.
+    // Route, outcome and time. Never the code, token, birthday, student
+    // number, password, answers or name.
     log({
       route,
       outcome: result && result.ok ? 'ok' : (result && result.error) || 'unknown',
