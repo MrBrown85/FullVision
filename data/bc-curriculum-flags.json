@@ -1,0 +1,542 @@
+[
+  {
+    "course": "ADST8",
+    "severity": "info",
+    "kind": "note left out of Content",
+    "detail": "The curriculum is designed to be offered in modules or courses of various lengths. Schools are required to provide students with the equivalent of a full-year “course” in Applied Design, Skills, and Technologies. This “course” can be made up of one or more modules. Schools may choose from among the modules listed below or develop new modules that use the Curricular Competencies of Applied Design, Skills, and Technologies 8 with locally developed content. Locally developed modules can be offered in addition to, or instead of, the modules in the provincial curriculum."
+  },
+  {
+    "course": "ADST9",
+    "severity": "info",
+    "kind": "note left out of Content",
+    "detail": "The curriculum is designed to be offered in modules or courses of various lengths. There are more Content learning standards for Grade 9, as schools often offer these as full courses. Schools are required to provide students with the equivalent of a full-year “course” in Applied Design, Skills, and Technologies. This “course” can be made up of one or more of the modules listed below. Schools may choose from among the modules provided in the provincial curriculum or develop new modules that use the Curricular Competencies of Applied Design, Skills, and Technologies 9 with locally developed content. Locally developed modules can be offered in addition to, or instead of, the modules in the provincial curriculum."
+  },
+  {
+    "course": "ARTS9",
+    "severity": "review",
+    "kind": "split from a file that holds several curricula for this grade",
+    "detail": "arts-education/9/core — General"
+  },
+  {
+    "course": "DANCE9",
+    "severity": "review",
+    "kind": "split from a file that holds several curricula for this grade",
+    "detail": "arts-education/9/core — Dance"
+  },
+  {
+    "course": "DRAMA9",
+    "severity": "review",
+    "kind": "split from a file that holds several curricula for this grade",
+    "detail": "arts-education/9/core — Drama"
+  },
+  {
+    "course": "MUSIC9",
+    "severity": "review",
+    "kind": "split from a file that holds several curricula for this grade",
+    "detail": "arts-education/9/core — Music"
+  },
+  {
+    "course": "VISART9",
+    "severity": "review",
+    "kind": "split from a file that holds several curricula for this grade",
+    "detail": "arts-education/9/core — Visual Arts"
+  },
+  {
+    "course": "INSTMUS10",
+    "severity": "info",
+    "kind": "note left out of Content",
+    "detail": "Note: Students are only expected to know techniques related to their instrument(s) of choice."
+  },
+  {
+    "course": "INSTMUS11",
+    "severity": "info",
+    "kind": "note left out of Content",
+    "detail": "Note: Students are only expected to know techniques related to their instrument(s) of choice."
+  },
+  {
+    "course": "INSTMUS12",
+    "severity": "info",
+    "kind": "note left out of Content",
+    "detail": "Note: Students are only expected to know techniques related to their instrument(s) of choice."
+  },
+  {
+    "course": "MTHEATRE12",
+    "severity": "review",
+    "kind": "competency starts lower case (kept as printed)",
+    "detail": "interpret and respond to musical theatre productions using discipline-specific vocabulary"
+  },
+  {
+    "course": "CAREE8",
+    "severity": "info",
+    "kind": "the Ministry file prints one section for several grades",
+    "detail": "Grades 8–9"
+  },
+  {
+    "course": "CAREE9",
+    "severity": "info",
+    "kind": "the Ministry file prints one section for several grades",
+    "detail": "Grades 8–9"
+  },
+  {
+    "course": "ELA9",
+    "severity": "review",
+    "kind": "bullet-styled line read as a heading (same file uses it as a heading)",
+    "detail": "Create and communicate (writing, speaking, representing)"
+  },
+  {
+    "course": "COMP10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "CW10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and text genres"
+  },
+  {
+    "course": "EFPLS10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "EFPLS10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Common themes in First Peoples texts"
+  },
+  {
+    "course": "EFPLS10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Reconciliation in Canada"
+  },
+  {
+    "course": "EFPNM10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "EFPNM10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Common themes in First Peoples texts"
+  },
+  {
+    "course": "EFPNM10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Reconciliation in Canada"
+  },
+  {
+    "course": "EFPSL10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "EFPSL10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Common themes in First Peoples texts"
+  },
+  {
+    "course": "EFPSL10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Reconciliation in Canada"
+  },
+  {
+    "course": "EFPW10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "EFPW10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Common themes in First Peoples texts"
+  },
+  {
+    "course": "EFPW10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Reconciliation in Canada"
+  },
+  {
+    "course": "LS10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "NM10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "SL10",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and text genres, including creative spoken forms"
+  },
+  {
+    "course": "COMP11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and text genres"
+  },
+  {
+    "course": "CW11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "EFPLSNM11",
+    "severity": "info",
+    "kind": "table outside Big Ideas / Learning Standards",
+    "detail": "social advocacy (Social Studies) | digital support for First Nations language revitalization and reclamation (Languages) | online publishing process and industry (Applied Design, Skills, Technologies)"
+  },
+  {
+    "course": "EFPLSNM11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "A wide variety of BC, Canadian, and global First Peoples texts"
+  },
+  {
+    "course": "EFPLSNM11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "A wide variety of text forms and genres"
+  },
+  {
+    "course": "EFPLSNM11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Common themes in First Peoples texts"
+  },
+  {
+    "course": "EFPLSNM11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Reconciliation in Canada"
+  },
+  {
+    "course": "EFPLSSL11",
+    "severity": "info",
+    "kind": "table outside Big Ideas / Learning Standards",
+    "detail": "self-assessment presentations (all subjects) | First Peoples oral tradition informing land use (Social Studies) | First Nations language revitalization and reclamation (Languages) | oral performance ("
+  },
+  {
+    "course": "EFPLSSL11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "A wide variety of BC, Canadian, and global First Peoples texts"
+  },
+  {
+    "course": "EFPLSSL11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "A wide variety of text forms and genres"
+  },
+  {
+    "course": "EFPLSSL11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Common themes in First Peoples texts"
+  },
+  {
+    "course": "EFPLSSL11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Reconciliation in Canada"
+  },
+  {
+    "course": "EFPLSW11",
+    "severity": "info",
+    "kind": "table outside Big Ideas / Learning Standards",
+    "detail": "documenting land use (Social Studies) | engaging in First Nations language revitalization projects (Languages) | dialogue using various languages, dialects, colloquialisms (Languages) | publishing pro"
+  },
+  {
+    "course": "EFPLSW11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "A wide variety of BC, Canadian, and global First Peoples texts"
+  },
+  {
+    "course": "EFPLSW11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "A wide variety of text forms and genres"
+  },
+  {
+    "course": "EFPLSW11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Common themes in First Peoples texts"
+  },
+  {
+    "course": "EFPLSW11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Reconciliation in Canada"
+  },
+  {
+    "course": "LS11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "NMED11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "SPKN11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres including creative spoken forms"
+  },
+  {
+    "course": "COMP12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and text genres"
+  },
+  {
+    "course": "CW12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "EFP12",
+    "severity": "info",
+    "kind": "table outside Big Ideas / Learning Standards",
+    "detail": "Social Justice 12 | Law 12 | BC First Peoples 12 | Contemporary Indigenous Studies 12 | Environmental Science 11 | Political Studies 11 | Comparative Cultures 11 | Drama 11 or 12 | Theatre 11 or 12 | "
+  },
+  {
+    "course": "EFP12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "A wide variety of BC, Canadian, and global First Peoples texts"
+  },
+  {
+    "course": "EFP12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "A wide variety of text forms and genres"
+  },
+  {
+    "course": "EFP12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Common themes in First Peoples literature"
+  },
+  {
+    "course": "EFP12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Reconciliation in Canada"
+  },
+  {
+    "course": "ES12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "ES12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Reconciliation in Canada"
+  },
+  {
+    "course": "LS12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "LS12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Appropriation and reclamation of voice"
+  },
+  {
+    "course": "LS12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "The evolution of language"
+  },
+  {
+    "course": "NMED12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "SPKN12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Text forms and genres"
+  },
+  {
+    "course": "SPKN12",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "Creative spoken genres"
+  },
+  {
+    "course": "PHE8",
+    "severity": "info",
+    "kind": "heading has no heading style",
+    "detail": "Physical literacy"
+  },
+  {
+    "course": "PHE8",
+    "severity": "info",
+    "kind": "heading has no heading style",
+    "detail": "Healthy and active living"
+  },
+  {
+    "course": "PHE8",
+    "severity": "info",
+    "kind": "heading has no heading style",
+    "detail": "Social and community health"
+  },
+  {
+    "course": "PHE8",
+    "severity": "info",
+    "kind": "heading has no heading style",
+    "detail": "Mental well-being"
+  },
+  {
+    "course": "PHE9",
+    "severity": "info",
+    "kind": "heading has no heading style",
+    "detail": "Physical literacy"
+  },
+  {
+    "course": "PHE9",
+    "severity": "info",
+    "kind": "heading has no heading style",
+    "detail": "Healthy and active living"
+  },
+  {
+    "course": "PHE9",
+    "severity": "info",
+    "kind": "heading has no heading style",
+    "detail": "Social and community health"
+  },
+  {
+    "course": "PHE9",
+    "severity": "info",
+    "kind": "heading has no heading style",
+    "detail": "Mental well-being"
+  },
+  {
+    "course": "PHE10",
+    "severity": "info",
+    "kind": "note left out of Content",
+    "detail": "Note: Some of the learning standards in the PHE curriculum address topics that some students and their parents or guardians may feel more comfortable addressing at home. Detailed information about opting for alternative delivery can be found on the Ministry policy website."
+  },
+  {
+    "course": "ENVSCI11",
+    "severity": "info",
+    "kind": "content heading with no items under it",
+    "detail": "restoration practices"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "worked Example pages left out",
+    "detail": "2 page(s)"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "note under a Big Idea left out",
+    "detail": "(adapted from Environmental Science 11)"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "note under a Big Idea left out",
+    "detail": "(adapted from Environmental Science 12)"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "note under a Big Idea left out",
+    "detail": "(adapted from Life Sciences 11)"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "note under a Big Idea left out",
+    "detail": "(adapted from Anatomy and Physiology 12)"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "note under a Big Idea left out",
+    "detail": "(adapted from Chemistry 11)"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "note under a Big Idea left out",
+    "detail": "(adapted from Chemistry 12)"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "note under a Big Idea left out",
+    "detail": "(adapted from Physics 11)"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "note under a Big Idea left out",
+    "detail": "(adapted from Physics 12)"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "note under a Big Idea left out",
+    "detail": "(adapted from Earth Sciences 11)"
+  },
+  {
+    "course": "SPSCI12",
+    "severity": "info",
+    "kind": "note under a Big Idea left out",
+    "detail": "(adapted from Geology 12)"
+  },
+  {
+    "course": "ESS11",
+    "severity": "info",
+    "kind": "worked Example pages left out",
+    "detail": "3 page(s)"
+  },
+  {
+    "course": "PHIL12",
+    "severity": "info",
+    "kind": "one-table layout with Elaborations columns (elaborations left out)",
+    "detail": ""
+  },
+  {
+    "course": "PHIL12",
+    "severity": "review",
+    "kind": "footer date not unique",
+    "detail": "none"
+  }
+]
