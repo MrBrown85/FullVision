@@ -234,40 +234,23 @@
 
   /* The feedback printed at the bottom: the Overall Comment (score.comment,
      the teacher's comment on the work; docs/DECISIONS.md "Assignment
-     feedback"), one item per paragraph, with no day of its own.
-     Until migrations/20261101_observations_to_overall_comment.sql has run,
-     work with no Overall Comment falls back to the observations linked to
-     it (what the Assignments Comment button wrote before Nov 2026), oldest
-     first, each with its day; private ones (Concern, Note) never print.
-     [{ text, date: 'YYYY-MM-DD' or '' }]. */
+     feedback"), one item per paragraph, with no day of its own. Observations
+     linked to the work are a separate record and never print here.
+     [{ text, date: '' }]. */
   function feedbackItems(cid, sid, aid, entries) {
     var note = '';
     (entries || getScores(cid)[sid] || []).forEach(function (e) {
       if (e && e.assessmentId === aid && e.note && !note) note = String(e.note).trim();
     });
-    if (note) {
-      return note
-        .split(/\n+/)
-        .map(function (line) {
-          return line.trim();
-        })
-        .filter(Boolean)
-        .map(function (line) {
-          return { text: line, date: '' };
-        });
-    }
-    var items = [];
-    if (typeof getAssignmentObs === 'function') {
-      getAssignmentObs(cid, sid, aid)
-        .slice()
-        .reverse()
-        .forEach(function (o) {
-          if (isPrivateObservation(o)) return;
-          var text = o && o.text ? String(o.text).trim() : '';
-          if (text) items.push({ text: text, date: String(o.date || o.created || '').slice(0, 10) });
-        });
-    }
-    return items;
+    return note
+      .split(/\n+/)
+      .map(function (line) {
+        return line.trim();
+      })
+      .filter(Boolean)
+      .map(function (line) {
+        return { text: line, date: '' };
+      });
   }
 
   function _feedbackText(cid, sid, aid, entries) {

@@ -766,15 +766,12 @@ window.PageStudent = (function () {
   }
 
   /* The teacher's own words on a piece of work: its Overall Comment (the
-     note on its score), else, until the Nov 2026 migration has run, the
-     first observation linked to it; otherwise a way to add one. */
+     note on its score); otherwise a way to add one. */
   function _assessNoteHtml(ctx, a) {
     var withNote = ctx.allScores.find(function (s) {
       return s.assessmentId === a.id && s.note;
     });
     var text = withNote ? String(withNote.note).split('\n')[0] : '';
-    var linked = !text && typeof getAssignmentObs === 'function' ? getAssignmentObs(ctx.cid, studentId, a.id) : [];
-    if (!text && linked.length) text = String(linked[0].text || '').split('\n')[0];
     var href = '/assignments?course=' + ctx.cid + '&open=' + a.id + '&student=' + studentId;
     if (!text)
       return (
@@ -782,13 +779,7 @@ window.PageStudent = (function () {
         href +
         '" title="Open in Assignments">+ Note</a>'
       );
-    return (
-      '<span class="stu-note">' +
-      (linked.length && isPrivateObservation(linked[0]) ? obsPrivateLabelHtml(linked[0]) + ' ' : '') +
-      esc(text) +
-      (linked.length > 1 ? ' <span class="stu-sub-inline">+' + (linked.length - 1) + ' more</span>' : '') +
-      '</span>'
-    );
+    return '<span class="stu-note">' + esc(text) + '</span>';
   }
 
   function _compsTabHtml(ctx) {
