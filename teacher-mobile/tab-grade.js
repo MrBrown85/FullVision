@@ -135,9 +135,11 @@ window.MGrade = (function () {
     var students = getStudents(cid);
     var allScores = getScores(cid);
 
-    // Load persisted filters for this course.
+    // Load persisted filters for this course. Cells that don't match are
+    // drawn hidden, so the list never flashes unfiltered.
     _filters = _loadFilters(cid);
     _segmentMode = 'recent';
+    var ctx = _filterCtx(cid);
 
     // Sort by date, newest first
     var sorted = assessments.slice().sort(function (a, b) {
@@ -190,7 +192,9 @@ window.MGrade = (function () {
         cells +=
           '<div class="m-cell" data-action="m-grade-assess" data-aid="' +
           a.id +
-          '">' +
+          '"' +
+          (_matchesAllFilters(a, ctx) ? '' : ' style="display:none"') +
+          '>' +
           '<div class="m-cell-body">' +
           '<div class="m-cell-title">' +
           '<span class="m-type-badge ' +
@@ -294,16 +298,11 @@ window.MGrade = (function () {
   }
 
   /* ── Filter assessment list ─────────────────────────────────── */
-  function filterAssessments(cid, mode) {
-    if (mode) _segmentMode = mode;
-
-    var assessments = getAssessments(cid);
-    var students = getStudents(cid);
-    var allScores = getScores(cid);
+  function _filterCtx(cid) {
     var now = new Date();
-    var ctx = {
-      students: students,
-      allScores: allScores,
+    return {
+      students: getStudents(cid),
+      allScores: getScores(cid),
       recentCutoff: new Date(now.getTime() - 30 * 86400000),
       dateCutoffs: {
         week: new Date(now.getTime() - 7 * 86400000),
@@ -311,6 +310,13 @@ window.MGrade = (function () {
       },
       term: _termForValue(cid, _filters.dateRange),
     };
+  }
+
+  function filterAssessments(cid, mode) {
+    if (mode) _segmentMode = mode;
+
+    var assessments = getAssessments(cid);
+    var ctx = _filterCtx(cid);
 
     // Update segmented control active state
     document.querySelectorAll('.m-seg-btn[data-action="m-grade-seg"]').forEach(function (btn) {
