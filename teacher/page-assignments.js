@@ -1961,8 +1961,8 @@ window.PageAssignments = (function () {
     var sections = getSections(cid);
     var isEdit = !!assess;
     var title = assess ? assess.title : '';
-    var dateAssigned = assess ? assess.dateAssigned || assess.date || '' : new Date().toISOString().slice(0, 10);
-    var dateDue = assess ? assess.date || '' : new Date().toISOString().slice(0, 10);
+    var dateAssigned = assess ? assess.dateAssigned || assess.date || '' : courseToday(cid);
+    var dateDue = assess ? assess.date || '' : courseToday(cid);
     var dueDate = assess ? assess.dueDate || '' : '';
     var categoryId = _getAssessmentCategoryId(assess);
     var selTags = assess ? assess.tagIds || [] : [];
@@ -2035,8 +2035,9 @@ window.PageAssignments = (function () {
         : '') +
       '</div>';
 
-    // Dates
-    var today = new Date().toISOString().slice(0, 10);
+    // Dates. Today is the class's calendar day: toISOString() is UTC, which
+    // is already tomorrow after 4 pm in BC.
+    var today = courseToday(cid);
     var defaultDue =
       dueDate ||
       (function () {
@@ -2544,8 +2545,7 @@ window.PageAssignments = (function () {
       }
       return;
     }
-    var dateAssigned =
-      (document.getElementById('af-date-assigned') || {}).value || new Date().toISOString().slice(0, 10);
+    var dateAssigned = (document.getElementById('af-date-assigned') || {}).value || courseToday(activeCourse);
     var date = dateAssigned;
     var description = (document.getElementById('af-desc') ? document.getElementById('af-desc').value : '').trim();
     var tagIds = Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
@@ -2655,8 +2655,7 @@ window.PageAssignments = (function () {
       }
       return;
     }
-    var dateAssigned =
-      (document.getElementById('af-date-assigned') || {}).value || new Date().toISOString().slice(0, 10);
+    var dateAssigned = (document.getElementById('af-date-assigned') || {}).value || courseToday(activeCourse);
     var date = dateAssigned;
     var description = (document.getElementById('af-desc') ? document.getElementById('af-desc').value : '').trim();
     var tagIds = Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {

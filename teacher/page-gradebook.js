@@ -1902,7 +1902,7 @@ window.PageGradebook = (function () {
     var cid = activeCourse;
     var sections = getSections(cid);
     var categories = _getSortedCategories(cid);
-    var today = new Date().toISOString().slice(0, 10);
+    var today = courseToday(cid);
 
     var pop = document.createElement('div');
     pop.className = 'gb-add-popover';
@@ -1994,7 +1994,7 @@ window.PageGradebook = (function () {
       }
       return;
     }
-    var date = (document.getElementById('gb-new-date') || {}).value || new Date().toISOString().slice(0, 10);
+    var date = (document.getElementById('gb-new-date') || {}).value || courseToday(activeCourse);
     var categoryId = (document.getElementById('gb-new-category') || {}).value || '';
     var scoreMode = (document.getElementById('gb-new-scoremode') || {}).value || 'proficiency';
     var maxPoints = parseInt((document.getElementById('gb-new-maxpts') || {}).value, 10) || 100;
