@@ -3264,16 +3264,19 @@ window.ReportQuestionnaire = (function () {
 
   /* A sentence's text for the student (named in a grade sentence, which
      comes first), missing facts shown as …, so a sentence that does not
-     fit still reads. */
-  function _preview(s, ctx) {
+     fit still reads. `over` fills slots for a case the student is not in
+     (the letter and standing word of another grade): the sentence then
+     reads as it would print for that case. */
+  function _preview(s, ctx, over) {
     var first = { first: CommentBank.stepOf(s) === 'grade' };
-    if (CommentBank.fits(s, ctx)) return CommentBank.fill(s, ctx, first);
+    if (!over && CommentBank.fits(s, ctx)) return CommentBank.fill(s, ctx, first);
+    var c = over ? Object.assign({}, ctx, over) : ctx;
     var own = Object.prototype.hasOwnProperty;
     var text = String(s.text).replace(/\{(\w+)\}/g, function (m, k) {
-      if (/^(He|he|him|His|his|himself|name)$/.test(k) || (own.call(ctx, k) && ctx[k])) return m;
+      if (/^(He|he|him|His|his|himself|name)$/.test(k) || (own.call(c, k) && c[k])) return m;
       return '…';
     });
-    return CommentBank.fill(Object.assign({}, s, { text: text }), ctx, first);
+    return CommentBank.fill(Object.assign({}, s, { text: text }), c, first);
   }
 
   /* ── Browse Sentences: the cases ─────────────────────────── */
@@ -3284,7 +3287,9 @@ window.ReportQuestionnaire = (function () {
      comments if they don't see something reflective of the student"). A
      sentence's case is read from its taxonomy fields where the bank has
      them (standing, story, skill, habit, level, subjects) and derived from
-     `when` and `needs` otherwise, so the grouping works on today's bank.
+     `when` and `needs` otherwise, so the grouping works on today's bank. A
+     frame that serves several cases (a grade sentence with the letter as
+     a slot) is listed under every case it serves, previewed for that case.
      Headings are plain words in Title Case: no competency codes, no
      pronouns. */
   var FAMILY_ORDER = ['socials', 'science', 'math', 'ela', 'arts', 'pe', 'adst', 'career'];
@@ -3299,7 +3304,10 @@ window.ReportQuestionnaire = (function () {
     career: 'Career Education',
   };
   var LEVEL_WORDS = { 4: 'Consistently', 3: 'Usually', 2: 'Sometimes', 1: 'Rarely' };
-  var STANDING_WORDS = ['excellent', 'very good', 'good', 'satisfactory', 'minimally acceptable'];
+  // The letter grades by standing (the Letter Grades Order), and the next
+  // letter up for the "close to" frames; A has none.
+  var LETTERS = ['A', 'B', 'C+', 'C', 'C-'];
+  var NEXT_LETTER = { B: 'A', 'C+': 'B', C: 'C+', 'C-': 'C' };
   var PROFICIENCY_WORDS = ['Extending', 'Proficient', 'Developing', 'Emerging'];
   // The stories a strengths sentence can be written for (CommentBank.ANGLES
   // ids); any other story reads as steady.
@@ -3322,8 +3330,8 @@ window.ReportQuestionnaire = (function () {
     ['att:absent', 'Absences Only'],
     ['att:late', 'Lates Only'],
     ['att:both', 'Absences and Lates'],
-    ['att:any', 'Absences or Lates'],
   ];
+  var MISSING_CASES = ['one', 'two', 'count', 'group'];
 
   function _titleCase(w) {
     return String(w || '').replace(/\b[a-z]/g, function (c) {
@@ -3336,7 +3344,10 @@ window.ReportQuestionnaire = (function () {
     var s = String(w || '').trim();
     if (CommentBank.STANDING[s]) s = CommentBank.STANDING[s];
     var low = s.toLowerCase();
-    if (STANDING_WORDS.indexOf(low) >= 0) return 'w:' + low.replace(/\s+/g, '-');
+    var letter = LETTERS.find(function (l) {
+      return CommentBank.STANDING[l] === low;
+    });
+    if (letter) return 'w:' + letter;
     var pw = PROFICIENCY_WORDS.find(function (x) {
       return x.toLowerCase() === low;
     });
@@ -3378,24 +3389,18 @@ window.ReportQuestionnaire = (function () {
       out.push({ id: id, label: label });
     };
     if (part === 'grade') {
-      STANDING_WORDS.slice(0, 4).forEach(function (w) {
-        add(_standingCase(w), _titleCase(w));
+      LETTERS.forEach(function (l) {
+        add('w:' + l, _titleCase(CommentBank.STANDING[l]));
       });
-      add('letter', 'Excellent to Satisfactory');
-      add('letterClose', 'Close to the Next Letter');
-      add('w:minimally-acceptable', 'Minimally Acceptable');
-      add('cminusClose', 'Minimally Acceptable, Close to a C');
       PROFICIENCY_WORDS.forEach(function (w) {
         add('p:' + w, w);
       });
-      add('proficiency', 'Extending to Emerging');
       add('ie', 'Not Enough Evidence');
       add('languageGoals', 'Language Goals');
       add('iepGoals', 'IEP Goals');
     } else if (part === 'bestPiece') {
       add('note', 'With a Note');
       add('noNote', 'Without a Note');
-      add('any', 'With or Without a Note');
     } else if (part === 'strengths') {
       STORIES.forEach(function (x) {
         add(x[0], x[1]);
@@ -3430,7 +3435,6 @@ window.ReportQuestionnaire = (function () {
       add('two', 'Two Titles');
       add('count', 'A Count');
       add('group', 'A Count and a Group');
-      add('any', 'Any Number');
     } else if (part === 'nextStep') {
       FAMILY_ORDER.forEach(function (fam) {
         (CommentBank.SKILLS[fam] || []).forEach(function (r) {
@@ -3449,7 +3453,8 @@ window.ReportQuestionnaire = (function () {
     return out;
   }
 
-  /* The case a bank sentence is for, within a part. */
+  /* The cases a bank sentence is for, within a part: one, or every case a
+     frame with a slot can serve. */
   function browseCase(part, s) {
     var when = s.when || {};
     var needs = s.needs || [];
@@ -3459,19 +3464,31 @@ window.ReportQuestionnaire = (function () {
     var fam = s.subjects && s.subjects.length === 1 ? s.subjects[0] : '';
     var step = CommentBank.stepOf(s);
     if (part === 'grade') {
-      if (s.standing) return _standingCase(s.standing) || 'other';
+      if (s.standing) return [_standingCase(s.standing) || 'other'];
       var g = when.grade;
-      if (g === 'cminus') return 'w:minimally-acceptable';
-      return /^(letter|letterClose|cminusClose|proficiency|ie|languageGoals|iepGoals)$/.test(g || '') ? g : 'other';
+      if (g === 'letter')
+        return LETTERS.slice(0, 4).map(function (l) {
+          return 'w:' + l;
+        });
+      if (g === 'letterClose')
+        return LETTERS.slice(1, 4).map(function (l) {
+          return 'w:' + l;
+        });
+      if (g === 'cminus' || g === 'cminusClose') return ['w:C-'];
+      if (g === 'proficiency')
+        return PROFICIENCY_WORDS.map(function (w) {
+          return 'p:' + w;
+        });
+      return /^(ie|languageGoals|iepGoals)$/.test(g || '') ? [g] : ['other'];
     }
-    if (part === 'bestPiece') return has('bestNote') ? 'note' : has('assignment') ? 'noNote' : 'any';
+    if (part === 'bestPiece') return has('bestNote') ? ['note'] : has('assignment') ? ['noNote'] : ['note', 'noNote'];
     if (part === 'strengths') {
-      if (s.story) return _storyCase(s.story);
+      if (s.story) return [_storyCase(s.story)];
       var story = ['climb', 'slide', 'split', 'hidden', 'newcomer'].find(has);
-      if (story) return story;
-      if (has('new')) return 'newcomer';
-      if (fam) return 'fam:' + fam + (when.standing ? ':' + when.standing : '');
-      return when.standing ? 'st:' + when.standing : 'steady';
+      if (story) return [story];
+      if (has('new')) return ['newcomer'];
+      if (fam) return ['fam:' + fam + (when.standing ? ':' + when.standing : '')];
+      return [when.standing ? 'st:' + when.standing : 'steady'];
     }
     if (part === 'habits') {
       var habit = s.habit || '';
@@ -3487,43 +3504,69 @@ window.ReportQuestionnaire = (function () {
           level = _levelNum(when[habit]);
         }
       }
-      if (habit && level) return 'cell:' + habit + ':' + level;
+      if (habit && level) return ['cell:' + habit + ':' + level];
       if (step === 'attendance' || s.group === 'Attendance') {
-        if (has('absentOnly')) return 'att:absent';
-        if (has('lateOnly')) return 'att:late';
-        if (has('absentClasses') && has('lateTimes')) return 'att:both';
-        if (has('absentClasses')) return 'att:absent';
-        if (has('lateTimes')) return 'att:late';
-        return 'att:any';
+        if (has('absentOnly')) return ['att:absent'];
+        if (has('lateOnly')) return ['att:late'];
+        if (has('absentClasses') && has('lateTimes')) return ['att:both'];
+        if (has('absentClasses')) return ['att:absent'];
+        if (has('lateTimes')) return ['att:late'];
+        return ATTENDANCE_CASES.map(function (x) {
+          return x[0];
+        });
       }
       if (step === 'strongHabits' || s.group === 'Strong Habits' || has('habitStrengths') || has('strongHabits'))
-        return 'strong';
-      if (has('habitsExcellent')) return 'sum:excellent';
-      if (has('habitsGood')) return 'sum:good';
-      if (has('habitToBuild')) return 'sum:one';
-      if (has('habitsToBuild')) return 'sum:two';
-      return 'sum:any';
+        return ['strong'];
+      if (has('habitsExcellent')) return ['sum:excellent'];
+      if (has('habitsGood')) return ['sum:good'];
+      if (has('habitToBuild')) return ['sum:one'];
+      if (has('habitsToBuild')) return ['sum:two'];
+      return ['sum:any'];
     }
     if (part === 'notHandedIn') {
-      if (has('missingTitle')) return 'one';
-      if (has('missingTitles')) return 'two';
-      if (has('missingGroup')) return 'group';
-      if (has('missingMany') || has('missingCount')) return 'count';
-      return 'any';
+      if (has('missingTitle')) return ['one'];
+      if (has('missingTitles')) return ['two'];
+      if (has('missingGroup')) return ['group'];
+      if (has('missingMany') || has('missingCount')) return ['count'];
+      return MISSING_CASES.slice();
     }
     if (part === 'nextStep') {
       var key = s.skill || when.nextSkill || '';
       if (step === 'home' || s.group === 'For the Family') {
         var hf = fam || (key && _familyOfSkill(key)) || '';
-        return 'home:' + (hf || 'any') + (key && hf ? ':' + key : '');
+        return ['home:' + (hf || 'any') + (key && hf ? ':' + key : '')];
       }
       if (key) {
         var sf = fam || _familyOfSkill(key);
-        return sf ? 'skill:' + sf + ':' + key : 'other';
+        return [sf ? 'skill:' + sf + ':' + key : 'other'];
       }
-      return fam ? 'fam:' + fam : 'any';
+      return [fam ? 'fam:' + fam : 'any'];
     }
-    return 'other';
+    return ['other'];
+  }
+
+  /* The slot values that preview a frame for a case the student is not
+     in: another letter's grade words, or a slot left blank (shown as …)
+     for attendance or missing work the student does not have. null when
+     the preview needs no change. */
+  function _caseFill(part, id, s) {
+    if (part === 'grade') {
+      var m = /^w:(.+)$/.exec(id);
+      if (m && LETTERS.indexOf(m[1]) >= 0) {
+        var next = NEXT_LETTER[m[1]];
+        return {
+          gradeLetter: CommentBank.aOrAn(m[1]),
+          gradeStanding: CommentBank.STANDING[m[1]],
+          gradeNext: next ? CommentBank.aOrAn(next) : '',
+        };
+      }
+      var p = /^p:(.+)$/.exec(id);
+      return p ? { gradeWord: p[1] } : null;
+    }
+    var needs = s.needs || [];
+    if (part === 'habits' && /^att:/.test(id) && needs.indexOf('attendance') >= 0) return { attendance: '' };
+    if (part === 'notHandedIn' && needs.indexOf('missingWork') >= 0) return { missingWork: '' };
+    return null;
   }
 
   /* The student's own cases in a part, the most specific first, from the
@@ -3538,13 +3581,11 @@ window.ReportQuestionnaire = (function () {
     if (part === 'grade') {
       var gr = CommentBank.gradeOf(f) || {};
       var k = gr.kind || '';
-      if (k === 'letter' || k === 'letterClose') out.push(_standingCase(gr.standing), k);
-      else if (k === 'cminus') out.push('w:minimally-acceptable');
-      else if (k === 'cminusClose') out.push('cminusClose', 'w:minimally-acceptable');
-      else if (k === 'proficiency') out.push('p:' + gr.word, 'proficiency');
+      if (gr.letter) out.push('w:' + gr.letter);
+      else if (k === 'proficiency') out.push('p:' + gr.word);
       else if (k) out.push(k);
     } else if (part === 'bestPiece') {
-      out.push(ctx._bestNote ? 'note' : 'noNote', 'any');
+      out.push(ctx._bestNote ? 'note' : 'noNote');
     } else if (part === 'strengths') {
       var story = 'steady';
       try {
@@ -3573,7 +3614,6 @@ window.ReportQuestionnaire = (function () {
       if (absent && late) out.push('att:both');
       else if (absent) out.push('att:absent');
       else if (late) out.push('att:late');
-      if (absent || late) out.push('att:any');
     } else if (part === 'notHandedIn') {
       var nh = f.notHandedIn || {};
       var n = Number(nh.count) || 0;
@@ -3583,7 +3623,6 @@ window.ReportQuestionnaire = (function () {
         if ((nh.groups || []).length) out.push('group');
         out.push('count');
       }
-      if (n > 0) out.push('any');
     } else if (part === 'nextStep') {
       if (fam && ctx._nextSkill) out.push('skill:' + fam + ':' + ctx._nextSkill);
       if (fam) out.push('fam:' + fam);
@@ -3597,12 +3636,16 @@ window.ReportQuestionnaire = (function () {
   }
 
   /* The bank's sentences for a part, the least used in the class first:
-     [{ id, text, fits, used, mine, inUse, case }], with how many fit and
-     how many there are, and the same rows under their cases (groups: [{
-     id, label, own, rows }], the student's own cases first, then the
-     fixed order, empty cases left out). opts: { fits: only those that fit,
-     q: a search, usage, inUse: { id: true }, bank, own: the student's own
-     case ids (browseOwn by default) }. */
+     [{ id, text, fits, used, mine, inUse, case }], one row per sentence and
+     case (a frame that serves several cases has a row under each,
+     previewed for that case; it fits only under the student's own), with
+     how many sentences fit and how many there are, and the rows under
+     their cases (groups: [{ id, label, own, rows }], the student's own
+     cases first, then the fixed order; empty cases left out, except the
+     habit cells, which stay so a teacher sees which have no sentences
+     yet). opts: { fits: only those that fit, q: a search, usage, inUse: {
+     id: true }, bank, own: the student's own case ids (browseOwn by
+     default) }. */
   function browseList(part, ctx, opts) {
     opts = opts || {};
     var p = typeof part === 'string' ? PARTS.find(x => x.id === part) : part;
@@ -3625,27 +3668,38 @@ window.ReportQuestionnaire = (function () {
         return c.id === id;
       });
     };
-    var rows = (opts.fits ? fit : all)
-      .map(function (s, i) {
-        var c = browseCase(pid, s);
-        return {
+    var own = (opts.own || browseOwn(pid, ctx)).filter(known);
+    var rows = [];
+    all.forEach(function (s, i) {
+      var ids = browseCase(pid, s).map(function (c) {
+        return known(c) ? c : 'other';
+      });
+      var fitsStudent = CommentBank.fits(s, ctx);
+      ids.forEach(function (c) {
+        // A frame under a case that is not the student's: previewed for
+        // that case, and not one that fits.
+        var elsewhere = ids.length > 1 && own.indexOf(c) < 0;
+        var fits = fitsStudent && !elsewhere;
+        if (opts.fits && !fits) return;
+        rows.push({
           id: s.id,
-          text: _preview(s, ctx),
-          fits: CommentBank.fits(s, ctx),
+          text: _preview(s, ctx, elsewhere ? _caseFill(pid, c, s) : null),
+          fits: fits,
           used: usage[s.id] || 0,
           mine: !!s.mine,
-          inUse: !!inUse[s.id],
-          case: known(c) ? c : 'other',
+          inUse: !!inUse[s.id] && !elsewhere,
+          case: c,
           at: i,
-        };
-      })
+        });
+      });
+    });
+    rows = rows
       .filter(function (r) {
         return !q || r.text.toLowerCase().indexOf(q) >= 0;
       })
       .sort(function (a, b) {
         return a.used - b.used || a.at - b.at;
       });
-    var own = (opts.own || browseOwn(pid, ctx)).filter(known);
     var ordered = own
       .map(function (id) {
         return cases.find(function (c) {
@@ -3669,7 +3723,10 @@ window.ReportQuestionnaire = (function () {
         };
       })
       .filter(function (g) {
-        return g.rows.length > 0;
+        if (g.rows.length) return true;
+        // The habit cells stay, every one with Every sentence and the
+        // student's rated ones with Fits, so an empty cell is seen.
+        return pid === 'habits' && /^cell:/.test(g.id) && !q && (!opts.fits || g.own);
       });
     return { rows: rows, fit: fit.length, total: all.length, groups: groups, own: own };
   }
@@ -3697,13 +3754,15 @@ window.ReportQuestionnaire = (function () {
   var CHEVRON =
     '<svg width="8" height="10" viewBox="0 0 8 10" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><path d="M2 1.5 L6 5 L2 8.5"></path></svg>';
   /* A case's heading and its rows: the heading opens and closes the
-     group; the student's own case is marked with the first name. */
+     group; the student's own case is marked with the first name. A case
+     with no sentences yet says so. */
   function _groupHtml(part, id, label, own, first, rowsHtml, n) {
     var isOpen = _groupOpen(part, id);
     var chip = own
       ? `<span class="qn-chip-own" title="${esc(first)}’s own case, from what FullVision has on file.">${esc(first)}</span>`
       : '';
-    return `<div class="qn-browse-group${own ? ' own' : ''}" data-case="${esc(id)}"><button type="button" class="qn-browse-head" aria-expanded="${isOpen}" data-action="tqSentences" data-do="group" data-case="${esc(id)}" title="${isOpen ? 'Hides' : 'Shows'} the sentences for this case.">${CHEVRON}<span class="qn-browse-head-label">${esc(label)}</span>${chip}<span class="qn-browse-head-n">${n}</span></button><div class="qn-browse-group-rows"${isOpen ? '' : ' hidden'}>${rowsHtml}</div></div>`;
+    var body = n ? rowsHtml : '<div class="qn-browse-none">No sentences yet.</div>';
+    return `<div class="qn-browse-group${own ? ' own' : ''}" data-case="${esc(id)}"><button type="button" class="qn-browse-head" aria-expanded="${isOpen}" data-action="tqSentences" data-do="group" data-case="${esc(id)}" title="${isOpen ? 'Hides' : 'Shows'} the sentences for this case.">${CHEVRON}<span class="qn-browse-head-label">${esc(label)}</span>${chip}<span class="qn-browse-head-n">${n}</span></button><div class="qn-browse-group-rows"${isOpen ? '' : ' hidden'}>${body}</div></div>`;
   }
 
   /* The rows for a part. Support lists the lines ticked for the class and
@@ -3727,19 +3786,19 @@ window.ReportQuestionnaire = (function () {
       return _groupHtml(b.part, id, label, own, first, rowsHtml, n);
     };
     if (b.part === 'support') {
-      // The class's ticked lines, then the rest of the checklist, which a
-      // teacher ticks under Support Line on the Sentences card before use.
+      // The class's ticked lines, under the class's name; the checklist is
+      // managed from the Support Line menu on the Sentences card.
       var habits = _habitsOf(cid, student, f);
       var choice = CommentBank.supportChoice(f, habits);
-      var all = CommentBank.supportChecklist(cid, f.family);
-      var lines = all.filter(function (l) {
+      var lines = CommentBank.supportChecklist(cid, f.family).filter(function (l) {
         return l.on && match(l.text);
       });
-      var rest = all.filter(function (l) {
-        return !l.on && match(l.text);
-      });
-      if (!lines.length && !rest.length)
-        return none(q ? 'No support lines match “' + b.q.trim() + '”.' : 'No support lines for ' + course + '.');
+      if (!lines.length)
+        return none(
+          q
+            ? 'No support lines match “' + b.q.trim() + '”.'
+            : 'No support lines are ticked for ' + course + '. Tick some under Support Line on the Sentences card.',
+        );
       _initGroups(b.part, ['class']);
       var ticked = lines
         .map(function (l) {
@@ -3755,21 +3814,7 @@ window.ReportQuestionnaire = (function () {
           );
         })
         .join('');
-      var unticked = rest
-        .map(function (l) {
-          return row(
-            l.text,
-            'Not ticked for ' + course,
-            `<button type="button" class="qn-browse-use" disabled title="Tick this line under Support Line on the Sentences card to use it.">Use</button>`,
-            false,
-            false,
-          );
-        })
-        .join('');
-      return (
-        (lines.length ? group('class', course, true, ticked, lines.length) : '') +
-        (rest.length ? group('checklist', 'Checklist', false, unticked, rest.length) : '')
-      );
+      return group('class', course, true, ticked, lines.length);
     }
     if (b.part === 'closing') {
       var closing = CommentBank.classSettings(cid).closing;
@@ -3820,6 +3865,19 @@ window.ReportQuestionnaire = (function () {
       return x.id === b.part;
     });
     var list = browseList(p, ctx, {});
+    // Support and Closing hold the class's own lines, all of which fit.
+    if (b.part === 'support' || b.part === 'closing') {
+      var f = ctx._f || {};
+      var n =
+        b.part === 'support'
+          ? CommentBank.supportChecklist(_activeCourse, f.family).filter(function (l) {
+              return l.on;
+            }).length
+          : CommentBank.classSettings(_activeCourse).closing
+            ? 1
+            : 0;
+      list = { fit: n, total: n };
+    }
     var count = b.fits ? list.fit + ' of ' + list.total : String(list.total);
     var opt = function (fits, label, n) {
       var on = b.fits === fits;
