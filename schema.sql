@@ -719,6 +719,20 @@ create table phone_report_student (
 -- check (num_nonnulls(questionnaire_id, report_issue_id, phone_report_id) >= 1).
 -- student_submit.session gains checked_at timestamptz, check_fails integer.
 
+-- A teacher's own comment sentences (20261031_comment_template). Kept from
+-- "Suggested for Your Bank" after a class's comments are approved; no student
+-- column. RLS: teacher_id = auth.uid(). Unique per teacher by lower(btrim(text)).
+create table comment_template (
+  id          uuid        primary key default gen_random_uuid(),
+  teacher_id  uuid        not null references teacher(id) on delete cascade,
+  text        text        not null,                                   -- the template with slot markers, 1..400 chars
+  slots       jsonb       not null default '[]',                      -- array of the slot names the text uses
+  condition   jsonb       not null default '{}',                      -- object: the facts that were true when kept
+  uses        integer     not null default 0,                         -- approved comments that used it, >= 0
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
 -- ─── Extensions + cron ──────────────────────────────────────────────────────
 -- pg_cron enabled (migration fullvision_v2_enable_pg_cron).
 -- Job `fv_retention_cleanup_daily` runs at 03:17 UTC calling fv_retention_cleanup().
@@ -876,6 +890,12 @@ create table phone_report_student (
 --                   p_language text, p_consent_at timestamptz, p_consent_source text, p_id uuid, p_idempotency_key uuid)
 --   delete_guardian(p_id uuid, p_idempotency_key uuid)
 --   list_course_guardians(p_course_id uuid)
+--
+-- Comment templates (20261031):
+--   save_comment_template(p_text text, p_slots jsonb, p_condition jsonb, p_id uuid, p_uses integer,
+--                         p_idempotency_key uuid)   -- no p_id: same text updates that row; null p_uses keeps the count
+--   list_comment_templates()                        -- the teacher's rows, most used first
+--   delete_comment_template(p_id uuid, p_idempotency_key uuid)
 --
 -- Student questionnaires:
 --   list_questionnaire_templates()

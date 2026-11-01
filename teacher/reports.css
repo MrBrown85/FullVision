@@ -5906,3 +5906,103 @@ body.qn-roster #gb-sidebar .student-row-note {
   cursor: default;
   filter: none;
 }
+
+/* Suggested for Your Bank (plan PR 10): the teacher's own sentences after a
+   class's last comment is approved. */
+.qn-bank {
+  --qn-bank-chip: #e3eefc;
+  width: min(900px, 100%);
+  margin: 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  color: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+  .qn-bank {
+    --qn-bank-chip: var(--active-light);
+  }
+}
+.qn-bank-head,
+.qn-bank-card,
+.qn-bank-out,
+.qn-bank-foot {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+}
+.qn-bank-head {
+  gap: 4px;
+}
+.qn-bank-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.qn-bank-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+.qn-bank-dim {
+  color: var(--text-2);
+}
+.qn-bank-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qn-bank-card {
+  gap: 10px;
+}
+.qn-bank-from {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.qn-bank-sentence {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.qn-bank-chips,
+.qn-bank-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.qn-bank-chip {
+  padding: 3px 8px;
+  background: var(--qn-bank-chip);
+  border-radius: 6px;
+}
+.qn-bank-gap {
+  flex: 1;
+}
+.qn-bank-out {
+  padding: 12px 16px;
+  gap: 4px;
+  color: var(--text-2);
+}
+.qn-bank-out-title {
+  font-weight: 600;
+  color: var(--text);
+}
+.qn-bank-foot {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+}
+.qn-bank .qn-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}

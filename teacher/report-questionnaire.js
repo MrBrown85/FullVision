@@ -264,6 +264,10 @@ window.ReportQuestionnaire = (function () {
       return;
     }
     var termId = getTermId();
+    // The rows follow the box first, so the bank's suggestions read the
+    // comment as approved (plan PR 10).
+    clearTimeout(_alignTimer);
+    _alignNow();
     var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
     var data = { approvedAt: new Date().toISOString() };
     if (el && el.value.replace(/\s+$/, '') !== plainComment(rating.narrative || '').replace(/\s+$/, '')) {
@@ -278,8 +282,54 @@ window.ReportQuestionnaire = (function () {
     clearTimeout(_saveTimer);
     upsertTermRating(_activeCourse, st.id, termId, data);
     tqNarrativeDirty = false;
+    _noteForBank(st, true);
     _syncStatus();
     tqNextStudent();
+    _offerBank(true);
+  }
+
+  /* ── The personal bank (plan PR 10, teacher/comment-personal.js) ── */
+
+  /* An approved comment's sentences that the teacher wrote or changed, as
+     suggestions for their bank, read with the facts that were true now. */
+  function _noteForBank(st, current) {
+    if (!window.PersonalBank) return;
+    var termId = getTermId();
+    var f = current ? _facts(st) : CommentBank.facts(_activeCourse, st, termId);
+    var others = [];
+    getStudents(_activeCourse).forEach(function (s) {
+      if (s.id === st.id) return;
+      _namesOf(s).forEach(function (n) {
+        if (others.indexOf(n) < 0) others.push(n);
+      });
+    });
+    var items = PersonalBank.fromRows(_rowsFor(st, f), _bankContext(_activeCourse, st, f), f, st, {
+      others: others,
+    });
+    PersonalBank.noteApproved(_activeCourse, termId, st.id, displayNameWithLast(st), items);
+  }
+
+  /* "Suggested for Your Bank", once the class's last comment is approved
+     (after), or again after Later. Comments approved before this visit
+     are read from their saved text. */
+  function _offerBank(after) {
+    if (!window.PersonalBank) return;
+    var termId = getTermId();
+    var students = getTqStudents();
+    if (!students.length || !students.every(s => _approved(s.id))) return;
+    if (!PersonalBank.shouldOffer(_activeCourse, termId, after)) return;
+    students.forEach(function (s) {
+      if (!PersonalBank.hasNote(_activeCourse, termId, s.id)) _noteForBank(s, false);
+    });
+    PersonalBank.open({
+      cid: _activeCourse,
+      termId: termId,
+      order: students.map(function (s) {
+        return s.id;
+      }),
+      course: _courseName(_activeCourse),
+      total: students.length,
+    });
   }
 
   function _approved(sid) {
@@ -3978,6 +4028,12 @@ window.ReportQuestionnaire = (function () {
     _fitBox();
     syncApprove();
     _wireDrag();
+    // The teacher's own sentences in the bank (plan PR 10), and the
+    // suggestions again after Later.
+    if (window.PersonalBank) {
+      PersonalBank.load();
+      _offerBank(false);
+    }
   }
 
   /* ⌘ Return approves and moves on; ⌘⇧C copies; ↑ ↓ change the student
@@ -3987,6 +4043,11 @@ window.ReportQuestionnaire = (function () {
     // The grader opened from At a Glance keeps its own keys.
     if (window.PageAssignments && PageAssignments.graderOpen && PageAssignments.graderOpen()) return;
     var t = e.target;
+    // "Suggested for Your Bank" keeps the keys while it is open.
+    if (window.PersonalBank && PersonalBank.isOpen()) {
+      if (e.key === 'Escape') PersonalBank.close('later');
+      return;
+    }
     if (e.key === 'Escape') {
       if (document.getElementById(BOTH_ID)) tqCloseBoth();
       else if (document.getElementById(INFO_ID)) tqCloseInfo();

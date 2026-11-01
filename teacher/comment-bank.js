@@ -1778,7 +1778,38 @@ window.CommentBank = (function () {
       habitsToBuild: habitKeys(hsum.build),
       habitStrengths: habitKeys(strongThree),
       attendance: ['attendance.absent', 'attendance.late'],
+      // The counts and the proficiency word a teacher's own sentence can
+      // hold as slots (plan PR 10, teacher/comment-personal.js).
+      missingCount: ['notHandedIn'],
+      absentCount: ['attendance.absent'],
+      standingWord: ['overall'],
     };
+    // The competency names behind each competency slot, for a teacher's own
+    // sentence bound to one ("Offered when Evidence is a strength").
+    var names = function (xs) {
+      return xs.filter(Boolean).map(function (c) {
+        return c.name;
+      });
+    };
+    var compNames = {
+      strengths: names(strongest),
+      growthAreas: names(lowest),
+      rise: names([rises[0]]),
+      fall: names([fallen]),
+      focus: names([focus]),
+      focusLow: names(
+        focus &&
+          lowest.some(function (c) {
+            return c.id === focus.id;
+          })
+          ? [focus]
+          : [],
+      ),
+      nextStep: names([focus]),
+      nextSkill: names([next && next.comp]),
+    };
+    var missingN = _missingCount(f);
+    var absentN = Math.floor(Number(f.absent)) || 0;
 
     return {
       // The facts and picks this context was built from, so draft() can
@@ -1795,6 +1826,7 @@ window.CommentBank = (function () {
       _options: options,
       _focus: focus || null,
       _facts: factsOf,
+      _compNames: compNames,
       _bestNote: !!(top && reportNoteText(top.note)),
       // Who the comment is about, and the slots built as whole sentences
       // about them, as tokens: the realiser names the student in the first
@@ -1887,6 +1919,12 @@ window.CommentBank = (function () {
       // "missed three classes and been late once", either half left out
       // when its field is empty or zero (plan, Sentence grammar).
       attendance: attendanceText(f.absent, f.late),
+      // How many pieces are labelled Missing, and classes missed, as numbers
+      // (the realiser spells them by place), and the overall proficiency
+      // word: slots for a teacher's own sentences (plan PR 10).
+      missingCount: missingN > 0 ? String(missingN) : '',
+      absentCount: absentN > 0 ? String(absentN) : '',
+      standingWord: f.standing || '',
     };
   }
 
@@ -1921,6 +1959,7 @@ window.CommentBank = (function () {
     if (!forFamily(s, ctx._family || '')) return false;
     var needs = s.needs || [];
     for (var i = 0; i < needs.length; i++) if (!ctx[needs[i]]) return false;
+    if (!_fitsMine(s, ctx)) return false;
     var when = s.when || {};
     return Object.keys(when).every(function (k) {
       if (k === 'picture') return ctx.picture === when[k];
@@ -1929,6 +1968,29 @@ window.CommentBank = (function () {
       if (k === 'path') return ctx._path === when[k];
       if (k === 'ieProblem') return ctx._ieProblem === when[k];
       return (ctx._habits || {})[k] === when[k];
+    });
+  }
+
+  /* A teacher's own sentence (plan PR 10) holds only where it was written:
+     `comps` names the competencies it was about, per slot (any one of them
+     there now, as in "Offered when Evidence is a strength"), and `counts`
+     whether a count was one or more, so "One assignment is" never reads
+     "Three assignment is". Shared bank sentences have neither. */
+  function _fitsMine(s, ctx) {
+    var comps = s.comps || {};
+    var ok = Object.keys(comps).every(function (k) {
+      var have = ((ctx._compNames || {})[k] || []).map(function (n) {
+        return String(n).toLowerCase();
+      });
+      return (comps[k] || []).some(function (n) {
+        return have.indexOf(String(n).toLowerCase()) >= 0;
+      });
+    });
+    if (!ok) return false;
+    var counts = s.counts || {};
+    return Object.keys(counts).every(function (k) {
+      var n = Number(ctx[k]) || 0;
+      return counts[k] === 'one' ? n === 1 : n > 1;
     });
   }
 
@@ -2826,6 +2888,12 @@ window.CommentBank = (function () {
       var tier = _topTier(cands, ctx).filter(function (s) {
         return !exclude[s.id];
       });
+      // The teacher's own sentences (plan PR 10) rank above the shared bank
+      // whenever their condition holds: they fit, so they go first.
+      var mine = cands.filter(function (s) {
+        return s.mine && !exclude[s.id];
+      });
+      if (mine.length) tier = mine;
       // Every sentence of the top tier is excluded: a sentence that asserts
       // nothing stands in, never a vaguer claim.
       if (!tier.length) tier = _standIns(step, ctx, bank, taken, exclude);
@@ -3470,6 +3538,8 @@ window.CommentBank = (function () {
       if (_has(pv, 'standing')) checks.push(!!now && f.standing === now && v.standing === _article(now) + ' level');
       if (_has(pv, 'when.standing')) checks.push(!!now && f.standing === now && v['when.standing'] === now);
       if (_has(pv, 'evidence')) checks.push(!!v.evidence && v.evidence === evidenceOf(f));
+      // The proficiency word alone, in a teacher's own sentence (plan PR 10).
+      if (_has(pv, 'standingWord')) checks.push(!!now && f.standing === now && v.standingWord === now);
       // The grade sentence: the kind it was written for (the letter, C-,
       // close to the next letter, the proficiency word) and each grade
       // slot, against gradeOf on the facts.
@@ -3683,6 +3753,7 @@ window.CommentBank = (function () {
     },
     notHandedIn: function (pv, f) {
       if (_has(pv, 'missingWork') && pv.values.missingWork !== notHandedInSentence(f.notHandedIn)) return false;
+      if (_has(pv, 'missingCount') && pv.values.missingCount !== String(_missingCount(f))) return false;
       return _missingCount(f) > 0;
     },
     // Marks on fewer of the class's marked work: the counts as said.
@@ -3714,8 +3785,17 @@ window.CommentBank = (function () {
     // The absences and lates as said: "missed three classes and been late
     // once", from the teacher's attendance for the term.
     attendance: function (pv, f) {
-      var want = attendanceText(f.absent, f.late);
-      return _has(pv, 'attendance') && !!want && pv.values.attendance === want;
+      var checks = [];
+      if (_has(pv, 'attendance')) {
+        var want = attendanceText(f.absent, f.late);
+        checks.push(!!want && pv.values.attendance === want);
+      }
+      // A teacher's own sentence with the classes missed as a number.
+      if (_has(pv, 'absentCount')) {
+        var a = Math.floor(Number(f.absent)) || 0;
+        checks.push(a > 0 && pv.values.absentCount === String(a));
+      }
+      return checks.length > 0 && checks.every(Boolean);
     },
     // The student's own words and self-assessment.
     studentWords: function (pv, f) {

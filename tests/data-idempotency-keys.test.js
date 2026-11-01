@@ -58,7 +58,7 @@ describe('_stampIdempotencyKey', () => {
 
 describe('FV_IDEMPOTENT_RPCS', () => {
   it('names exactly the endpoints the server retrofitted', () => {
-    // Verified against pg_proc: these 39 are the public functions carrying a
+    // Verified against pg_proc: these 41 are the public functions carrying a
     // p_idempotency_key argument (the three student ones from
     // migrations/20261019_withdraw_students.sql, the six report-form ones
     // from migrations/20261020_report_template / _report_issue / _guardian,
@@ -66,7 +66,9 @@ describe('FV_IDEMPOTENT_RPCS', () => {
     // migrations/20261022_soft_remove_competency.sql, the four questionnaire
     // ones from migrations/20261025_questionnaires_tables_and_functions.sql,
     // the four phone-report ones from migrations/20261025_phone_reports.sql,
-    // save_score_report_note from migrations/20261031_score_report_note.sql).
+    // save_score_report_note from migrations/20261031_score_report_note.sql,
+    // and save_comment_template / delete_comment_template from
+    // migrations/20261031_comment_template.sql, live once it is applied).
     // Keep in lockstep with the database.
     expect(Object.keys(FV_IDEMPOTENT_RPCS).sort()).toEqual([
       'close_phone_report',
@@ -77,6 +79,7 @@ describe('FV_IDEMPOTENT_RPCS', () => {
       'create_phone_report',
       'create_report_issue',
       'create_student_and_enroll',
+      'delete_comment_template',
       'delete_guardian',
       'delete_questionnaire',
       'delete_report_issue',
@@ -92,6 +95,7 @@ describe('FV_IDEMPOTENT_RPCS', () => {
       'reenrol_student',
       'remove_section',
       'restore_section',
+      'save_comment_template',
       'save_report_template',
       'save_score_report_note',
       'set_questionnaire_on',
