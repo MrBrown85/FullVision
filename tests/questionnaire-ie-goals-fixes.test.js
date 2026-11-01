@@ -113,8 +113,10 @@ beforeAll(() => {
     body: { classList: { add() {}, remove() {} } },
   };
 });
-afterAll(() => {
+afterAll(async () => {
   vi.useRealTimers();
+  // Generate's timers (the class warning) run before the page goes.
+  await new Promise(r => setTimeout(r, 400));
   if (hadDoc) globalThis.document = oldDoc;
   else delete globalThis.document;
 });

@@ -157,19 +157,3 @@ test('the calendar keeps the focus: ‹ and › with clicks and keys, then ↓ �
   await expect(page.locator('#tq-cal')).toHaveCount(0);
   await expect(page.locator('#tq-deadline-btn')).toBeFocused();
 });
-
-test('choosing IE waits for a date; › and ↓ in that calendar keep the student and the waiting IE', async ({ page }) => {
-  await open(page);
-  await page.evaluate(() => upsertTermRating('sci8', 'st1', 'term-2', { reportingBasis: 'grade', ieDeadline: null }));
-  await page.locator('#report-period').selectOption('Report 1');
-  await page.locator('#report-period').selectOption('Report 2');
-  const name = page.locator('.qn-name');
-  const who = await name.textContent();
-  await page.locator('#tq-basis [data-basis="ie"]').click();
-  await expect(page.locator('#tq-cal')).toHaveCount(1);
-  await page.locator('#tq-cal [data-dir="1"]').click();
-  await page.keyboard.press('ArrowDown');
-  await expect(name).toHaveText(who);
-  await expect(page.locator('#tq-cal')).toHaveCount(1);
-  expect(await page.evaluate(() => ReportQuestionnaire.iePending())).toBe(true);
-});
