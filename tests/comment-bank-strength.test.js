@@ -54,15 +54,18 @@ describe('bankStrength in Demo Mode (Science 8, Report 2)', () => {
     localStorage.clear();
   });
 
-  it('finds the one next-step sentence every student draws from', () => {
+  it('finds the four family sentences every student draws from', () => {
     const r = CommentBank.bankStrength('sci8', { termId: 'term-2' });
     const n = getStudents('sci8').length;
-    expect(r.parts.find(p => p.step === 'nextStep')).toMatchObject({
-      sentences: 1,
+    expect(n).toBeGreaterThanOrEqual(12);
+    expect(r.parts.find(p => p.step === 'home')).toMatchObject({
+      sentences: 4,
       students: n,
       thin: true,
-      worst: { sentences: 1, students: n },
+      worst: { sentences: 4, students: n },
     });
+    // The one next-step sentence is by design, so it is never a thin part.
+    expect(r.parts.map(p => p.step)).not.toContain('nextStep');
   });
 });
 
@@ -116,13 +119,22 @@ describe('bankStrength on a small class', () => {
     });
   });
 
-  it('leaves out the parts whose wording is fixed: grade, attendance, not handed in, class lines, the IE parts', () => {
+  it('leaves out the parts whose wording is fixed: grade, attendance, not handed in, best piece, next step, class lines, the IE parts', () => {
     const r = CommentBank.bankStrength(cid, { termId });
     const steps = r.parts.map(p => p.step);
-    ['grade', 'attendance', 'notHandedIn', 'lateWork', 'support', 'closer', 'ieProblem', 'iePlan'].forEach(k =>
-      expect(steps).not.toContain(k),
-    );
-    expect(steps).toEqual(expect.arrayContaining(['habits', 'overall', 'example', 'nextStep', 'home']));
+    [
+      'grade',
+      'attendance',
+      'notHandedIn',
+      'example',
+      'nextStep',
+      'lateWork',
+      'support',
+      'closer',
+      'ieProblem',
+      'iePlan',
+    ].forEach(k => expect(steps).not.toContain(k));
+    expect(steps).toEqual(expect.arrayContaining(['habits', 'overall', 'home']));
     r.parts.forEach(p => {
       expect(p.students).toBeLessThanOrEqual(STUDENTS.length);
       if (p.thin) expect(p.worst.students).toBeGreaterThanOrEqual(3 * p.worst.sentences);

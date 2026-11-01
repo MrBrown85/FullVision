@@ -61,11 +61,14 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
   }
 
   it('shows the thin line under the row of a thin part, linking to Browse Sentences on that part', () => {
+    // The family sentence: four fit the whole class. The card shows it in
+    // the Next Step row with the next-step sentence, so the row is that one.
     const { html, d, students } = card('Noor');
+    expect(d.sentences.some(x => x.step === 'home')).toBe(true);
     const i = d.sentences.findIndex(x => x.step === 'nextStep');
     expect(i).toBeGreaterThanOrEqual(0);
     const line =
-      '<span class="qn-req-thin">Only 1 next step sentence fits ' +
+      '<span class="qn-req-thin">Only 4 next step sentences fit ' +
       students.length +
       ' students, so some will repeat. <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="all" data-row="' +
       i +
@@ -77,11 +80,13 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
     expect(row).toContain('class="qn-req-source"');
   });
 
-  it('shows it only for the parts that are thin for the student, never the grade sentence', () => {
+  it('shows it only for the parts that are thin for the student, never the grade, best piece or next step sentence', () => {
     const { html, d, st, termId, students } = card('Noor');
     const strength = CommentBank.bankStrength(cid, { termId, students });
     const thin = d.sentences.filter(x => (strength.byStudent[st.id][x.step] || {}).thin);
     expect(thin.length).toBeGreaterThan(0);
+    expect(thin.map(x => x.step)).not.toContain('example');
+    expect(thin.map(x => x.step)).not.toContain('nextStep');
     expect((html.match(/class="qn-req-thin"/g) || []).length).toBe(thin.length);
     const at = html.indexOf('<span class="qn-req-label">Grade</span>');
     expect(html.slice(at, html.indexOf('<div class="qn-req-row', at))).not.toContain('qn-req-thin');

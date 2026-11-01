@@ -77,10 +77,11 @@ describe('simulate', () => {
     expect(r.overPicked.length).toBeGreaterThan(0);
     r.overPicked.forEach(o => {
       expect(o.comments).toBeGreaterThanOrEqual(r.overAt);
-      expect(['grade', 'attendance', 'notHandedIn']).not.toContain(o.step);
+      expect(['grade', 'attendance', 'notHandedIn', 'example', 'nextStep']).not.toContain(o.step);
     });
-    // The one next-step sentence is in every Demo comment.
-    expect(r.overPicked.find(o => o.id === 'g301' && /Demo/.test(o.class))).toBeTruthy();
+    // The one next-step sentence is in every Demo comment, but the next
+    // step has one template by design, so it is never listed.
+    expect(r.overPicked.find(o => o.id === 'g301')).toBeUndefined();
   });
 
   it('lists the near-identical pairs and the thin parts per class', () => {

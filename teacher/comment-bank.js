@@ -3251,9 +3251,11 @@ window.CommentBank = (function () {
   /* Steps whose wording does not come from choosing among bank sentences
      are left out: the grade sentence, the attendance sentence and the work
      not handed in each have one wording per fact (the sentence grammar),
-     class lines are the teacher's own text, and the IE path's Required
-     parts are set. */
-  var FIXED_STEPS = { grade: true, attendance: true, notHandedIn: true };
+     the best piece and the next step each have one template by design (the
+     best-piece forms, the skill-table sentence), class lines are the
+     teacher's own text, and the IE path's Required parts are set. What is
+     left is what a teacher can widen with sentences of their own. */
+  var FIXED_STEPS = { grade: true, attendance: true, notHandedIn: true, example: true, nextStep: true };
   function _strengthSteps() {
     return DRAFT_STEPS.filter(function (s) {
       return !!s.groups && !s.line && !s.ie && !s.says && !FIXED_STEPS[s.key];
