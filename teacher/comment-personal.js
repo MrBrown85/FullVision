@@ -327,7 +327,9 @@ window.PersonalBank = (function () {
   };
   var TITLE_SLOTS = ['assignment', 'assignment2', 'seeWork', 'aboutWork'];
   var COMP_SLOTS = ['strengths', 'growthAreas', 'focusLow', 'rise', 'fall', 'focus', 'nextSkill'];
-  var PROFICIENCY = ['Emerging', 'Developing', 'Proficient', 'Extending'];
+  var PROFICIENCY = [1, 2, 3, 4].map(function (l) {
+    return PROF_LABELS[l];
+  });
   var NUMBER_WORDS = [
     'zero',
     'one',

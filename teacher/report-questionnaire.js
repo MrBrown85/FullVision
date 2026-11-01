@@ -4666,7 +4666,9 @@ window.ReportQuestionnaire = (function () {
   // letter up for the "close to" frames; A has none.
   var LETTERS = ['A', 'B', 'C+', 'C', 'C-'];
   var NEXT_LETTER = { B: 'A', 'C+': 'B', C: 'C+', 'C-': 'C' };
-  var PROFICIENCY_WORDS = ['Extending', 'Proficient', 'Developing', 'Emerging'];
+  var PROFICIENCY_WORDS = [4, 3, 2, 1].map(function (l) {
+    return PROF_LABELS[l];
+  });
   // The stories a strengths sentence can be written for (CommentBank.ANGLES
   // ids); any other story reads as steady.
   var STORIES = [
