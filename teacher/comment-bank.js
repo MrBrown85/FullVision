@@ -781,6 +781,160 @@ window.CommentBank = (function () {
       text: 'In class, I will ask the student to reflect on one experience each month.',
       fits: ['connecting', 'self'],
     },
+    // Adapted 2026-11-01 from the school's comment bank (`src` "GHS <code>";
+    // docs/comment-bank-school-codes.md): the codes no gradebook fact can
+    // select, rewritten as what the teacher will do in class.
+    {
+      id: 'sl-ghs-ask',
+      text: 'In class, I will ask the student each week whether anything needs explaining again.',
+      fits: ['feedback', 'part'],
+      src: 'GHS 36, 420, 446',
+    },
+    {
+      id: 'sl-ghs-clear',
+      text: 'In class, I will ask the student during work periods whether the task is clear.',
+      fits: ['ready', 'feedback'],
+      src: 'GHS Humanities',
+    },
+    {
+      id: 'sl-ghs-detail',
+      families: ['socials', 'ela'],
+      text: 'In class, I will check the level of detail in the student’s work during each work period.',
+      fits: ['evidence', 'significance', 'writing', 'thinking', 'reading'],
+      src: 'GHS Humanities',
+    },
+    {
+      id: 'sl-ghs-draft',
+      families: ['socials', 'ela'],
+      text: 'In class, I will look at the student’s draft during work periods before the final copy is due.',
+      fits: ['revising', 'writing', 'conventions', 'evidence', 'cause', 'continuity'],
+      src: 'GHS Humanities',
+    },
+    {
+      id: 'sl-ghs-aloud',
+      families: ['socials', 'ela'],
+      text: 'In class, I will ask the student to explain an idea aloud before writing it.',
+      fits: ['writing', 'thinking', 'reading', 'evidence', 'significance', 'perspective'],
+      src: 'GHS Humanities',
+    },
+    {
+      id: 'sl-ghs-full-sentences',
+      families: ['science'],
+      text: 'In class, I will ask for full-sentence answers and mark where more detail is needed.',
+      fits: ['communicating', 'evaluating'],
+      src: 'GHS 527',
+    },
+    {
+      id: 'sl-ghs-process',
+      families: ['math'],
+      text: 'In class, I will ask the student to show the process for one problem each day.',
+      fits: ['communicating', 'reasoning'],
+      src: 'GHS 611',
+    },
+    {
+      id: 'sl-ghs-demo',
+      families: ['adst', 'arts', 'science'],
+      text: 'In class, I will repeat each demonstration for the student before the practical work starts.',
+      fits: ['making', 'tools', 'technique', 'planning'],
+      src: 'GHS 184, 188, 401',
+    },
+    {
+      id: 'sl-ghs-rehearse',
+      families: ['arts'],
+      text: 'In class, I will give rehearsal time for the hard parts of a piece.',
+      fits: ['technique', 'creating'],
+      src: 'GHS 238, 475',
+    },
+  ];
+
+  /* ── Language Goals (plan PR 3b; the school's ELL lines) ────────────── */
+
+  /* Lines for a student assessed on language goals (reporting_basis
+     'language_goals'): FullVision has no language-proficiency facts, so
+     no rule selects one. The teacher ticks the lines used in a class and
+     picks one per student from the Language Goals row; the comment leaves
+     the sentence out until one is picked. Each says what the student can
+     do in English and one next step, never the designation (the fixed
+     Statement says that). Templates: {He} and both verb forms, filled by
+     the realiser like a bank sentence. Adapted 2026-11-01 from the
+     school's ELL comment sheet (`src` "GHS <code>";
+     docs/comment-bank-school-codes.md). */
+  var LANGUAGE_GOAL_LINES = [
+    {
+      id: 'lg-discussions',
+      text: '{He} can follow class discussions in English and join small-group talk; the next step is one idea in whole-class talk.',
+      src: 'GHS 303, 304',
+    },
+    {
+      id: 'lg-speaks',
+      text: '{He} [speaks|speak] English with growing clarity; the next step is practising the sounds of new words aloud.',
+      src: 'GHS 302',
+    },
+    {
+      id: 'lg-instructions',
+      text: '{He} can follow spoken instructions in English; the next step is asking for a repeat when one step is unclear.',
+      src: 'GHS 309',
+    },
+    {
+      id: 'lg-one-step',
+      text: '{He} can follow spoken instructions in English one step at a time; the next step is a longer set.',
+      src: 'GHS 308',
+    },
+    {
+      id: 'lg-vocabulary',
+      text: '{He} can use new words from class in {his} writing; the next step is reviewing the new words each week.',
+      src: 'GHS 310',
+    },
+    {
+      id: 'lg-reads-aloud',
+      text: '{He} can read a text aloud in English; the next step is answering a question about what it says.',
+      src: 'GHS 311',
+    },
+    {
+      id: 'lg-in-time',
+      text: '{He} can complete assignments in English in the time given; the next step is adding more detail to {his} answers.',
+      src: 'GHS 313',
+    },
+    {
+      id: 'lg-extra-time',
+      text: '{He} can complete assignments in English with extra time; the next step is finishing one in the time given.',
+      src: 'GHS 314',
+    },
+    {
+      id: 'lg-with-support',
+      text: '{He} can complete assignments in English with support in class; the next step is completing one without help.',
+      src: 'GHS 312',
+    },
+    {
+      id: 'lg-writing',
+      text: '{His} writing in English has grown this term; the next step is a paragraph with one clear main idea.',
+      src: 'GHS 315',
+    },
+    {
+      id: 'lg-takes-part',
+      text: '{He} [takes|take] part in class in English when speaking; the next step is taking part in writing as well.',
+      src: 'GHS 307',
+    },
+    {
+      id: 'lg-translation',
+      text: '{He} can follow instructions in English with a translation beside them; the next step is following them in English alone.',
+      src: 'GHS 317',
+    },
+    {
+      id: 'lg-reading',
+      text: '{He} can read short texts in English; the next step is reading a little in English each day.',
+      src: 'GHS 319, 321',
+    },
+    {
+      id: 'lg-listening',
+      text: '{He} can follow English in class when it is spoken slowly; the next step is English shows or music.',
+      src: 'GHS 320',
+    },
+    {
+      id: 'lg-outside',
+      text: '{He} can speak, read and write in English in class; the next step is using English outside class as well.',
+      src: 'GHS 306',
+    },
   ];
 
   /* The support lines on offer for a kind of class, in order. */
@@ -807,6 +961,15 @@ window.CommentBank = (function () {
           })
         : [],
       supportFor: cs.supportFor && typeof cs.supportFor === 'object' ? cs.supportFor : {},
+      // The Language Goals list (LANGUAGE_GOAL_LINES): the lines ticked for
+      // the class, the teacher's own, and each student's pick per report.
+      languageGoalsChosen: Array.isArray(cs.languageGoalsChosen) ? cs.languageGoalsChosen.map(String) : [],
+      languageGoalsOwn: Array.isArray(cs.languageGoalsOwn)
+        ? cs.languageGoalsOwn.filter(function (l) {
+            return l && l.id && String(l.text || '').trim();
+          })
+        : [],
+      languageGoalsFor: cs.languageGoalsFor && typeof cs.languageGoalsFor === 'object' ? cs.languageGoalsFor : {},
       closing: String(cs.closing || '').trim(),
       charLimit: limit > 0 ? limit : null,
     };
@@ -830,24 +993,61 @@ window.CommentBank = (function () {
       );
   }
 
+  /* The class's Language Goals checklist: the built-in lines, then the
+     teacher's own, each { id, text, own, on }. */
+  function languageGoalsChecklist(cid) {
+    var cs = classSettings(cid);
+    var on = function (id) {
+      return cs.languageGoalsChosen.indexOf(String(id)) >= 0;
+    };
+    return LANGUAGE_GOAL_LINES.map(function (l) {
+      return { id: l.id, text: l.text, own: false, on: on(l.id) };
+    }).concat(
+      cs.languageGoalsOwn.map(function (l) {
+        return { id: String(l.id), text: String(l.text).trim(), own: true, on: on(l.id) };
+      }),
+    );
+  }
+
   /* What the comment needs of the class's lines for one student this
      report: { support: the ticked lines, pick: this student's own pick
-     (a line id, 'none' to leave the sentence out, or null), closing, late,
-     charLimit }. Teacher text is used exactly as typed. */
+     (a line id, 'none' to leave the sentence out, or null), languageGoals:
+     the ticked Language Goals lines, goalPick: this student's pick among
+     them (a line id or null), closing, late, charLimit }. Teacher text is
+     used exactly as typed. */
   function classLines(cid, sid, termId, family) {
     var cs = classSettings(cid);
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
     var picks = (termId && cs.supportFor[termId]) || {};
     var pick = picks[sid] != null ? String(picks[sid]) : null;
+    var goalPicks = (termId && cs.languageGoalsFor[termId]) || {};
+    var goalPick = goalPicks[sid] != null ? String(goalPicks[sid]) : null;
     return {
       support: supportChecklist(cid, family).filter(function (l) {
         return l.on;
       }),
       pick: pick,
+      languageGoals: languageGoalsChecklist(cid).filter(function (l) {
+        return l.on;
+      }),
+      goalPick: goalPick,
       closing: cs.closing,
       late: String(course.lateWorkPolicy || '').trim(),
       charLimit: cs.charLimit,
     };
+  }
+
+  /* The Language Goals line in this student's comment: their own pick for
+     this report among the class's ticked lines, else null (no rule picks
+     one; the row asks the teacher to). Only on the language-goals path.
+     { line, mine: true }. */
+  function languageGoalChoice(f) {
+    var cl = (f && f.classLines) || {};
+    if (reportPath(f) !== 'language_goals' || !cl.goalPick) return null;
+    var line = (cl.languageGoals || []).find(function (l) {
+      return l.id === cl.goalPick;
+    });
+    return line ? { line: line, mine: true } : null;
   }
 
   var PER_GROUP = 2;
@@ -2010,6 +2210,7 @@ window.CommentBank = (function () {
     // The next step as a skill, and the class's lines (plan PR 8).
     var next = nextSkillOf(f);
     var support = supportChoice(f, habits);
+    var goal = languageGoalChoice(f);
     var lines = f.classLines || {};
     var gr = gradeOf(f);
     var gslots = gradeSlots(gr);
@@ -2229,6 +2430,9 @@ window.CommentBank = (function () {
       // The teacher's own text, exactly as typed: the support line for this
       // student, the class's closing sentence and its late-work line.
       supportLine: support ? support.line.text : '',
+      // The Language Goals line the teacher picked for this student (a
+      // template, filled like a bank sentence), on that path only.
+      languageGoalLine: goal ? goal.line.text : '',
       closingLine: lines.closing || '',
       lateLine: lines.late || '',
       seeWork: seeWork,
@@ -2630,6 +2834,9 @@ window.CommentBank = (function () {
     // The teacher's support line for this student, one thing the family can
     // do at home, and the class's closing sentence (plan PR 8). Teacher
     // lines (`line`) are used exactly as typed and are left out when empty.
+    // The Language Goals line (plan PR 3b): a template the teacher picked,
+    // filled for the student; empty off the language-goals path.
+    { key: 'languageGoals', part: 'go', line: 'languageGoalLine', template: true },
     { key: 'support', part: 'how', line: 'supportLine' },
     { key: 'home', part: 'how', groups: ['For the Family'] },
     { key: 'closer', part: 'how', line: 'closingLine' },
@@ -3007,6 +3214,7 @@ window.CommentBank = (function () {
       var go = at(['nextStep']);
       var close = seq.indexOf('closer');
       put('support', home >= 0 ? home : go >= 0 ? go + 1 : close >= 0 ? close : seq.length);
+      put('languageGoals', seq.indexOf('support'));
     } else {
       var meet = seq.indexOf('ieMeeting');
       put('support', meet >= 0 ? meet : seq.indexOf('closer') >= 0 ? seq.indexOf('closer') : seq.length);
@@ -3220,8 +3428,17 @@ window.CommentBank = (function () {
         var lid = 'class:' + key;
         var values = {};
         values[step.line] = lt;
-        out.push(lt);
-        sentences.push({ id: lid, part: step.part, step: key, text: lt, classLine: true });
+        // A template line (the Language Goals list) is filled for the
+        // student and realised with the others; typed text is as typed.
+        var ls = { id: lid, text: lt };
+        var lfilled = step.template ? fill(ls, ctx) : lt;
+        out.push(lfilled);
+        var lsent = { id: lid, part: step.part, step: key, text: lfilled, classLine: true };
+        if (step.template) {
+          lsent.toks = sentenceTokens(ls, ctx);
+          lsent.who = whoOf(ctx);
+        }
+        sentences.push(lsent);
         prov.push({
           sentenceId: lid,
           part: step.part,
@@ -3816,6 +4033,9 @@ window.CommentBank = (function () {
       var cs = classSettings(cid);
       texts.push(cs.closing);
       supportChecklist(cid, familyOf(cid)).forEach(function (l) {
+        texts.push(l.text);
+      });
+      languageGoalsChecklist(cid).forEach(function (l) {
         texts.push(l.text);
       });
       var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
@@ -4836,6 +5056,9 @@ window.CommentBank = (function () {
     SKILLS: SKILLS,
     SUPPORT_LINES: SUPPORT_LINES,
     supportLinesFor: supportLinesFor,
+    LANGUAGE_GOAL_LINES: LANGUAGE_GOAL_LINES,
+    languageGoalsChecklist: languageGoalsChecklist,
+    languageGoalChoice: languageGoalChoice,
     supportChecklist: supportChecklist,
     supportChoice: supportChoice,
     supportFit: supportFit,

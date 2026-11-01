@@ -48,6 +48,8 @@ function texts() {
     rows.forEach(r => out.push({ id: 'skill ' + fam + '.' + r.key, text: 'Next, {he} can ' + r.skill + '.' })),
   );
   CommentBank.SUPPORT_LINES.forEach(l => out.push({ id: 'support ' + l.id, text: l.text, support: true }));
+  // The Language Goals lines are templates filled like bank sentences.
+  CommentBank.LANGUAGE_GOAL_LINES.forEach(l => out.push({ id: 'language goal ' + l.id, text: l.text }));
   ['build', 'does', 'do'].forEach(form =>
     ['', 'pe', 'arts'].forEach(fam =>
       CommentBank.HABITS.forEach(h =>
@@ -74,6 +76,7 @@ describe('the vocabulary lint', () => {
     expect(all.filter(t => t.bank).length).toBe(COMMENT_BANK.sentences.length);
     expect(all.some(t => t.id.startsWith('skill '))).toBe(true);
     expect(all.some(t => t.id.startsWith('support '))).toBe(true);
+    expect(all.some(t => t.id.startsWith('language goal '))).toBe(true);
     expect(all.some(t => t.id.startsWith('habit '))).toBe(true);
   });
 

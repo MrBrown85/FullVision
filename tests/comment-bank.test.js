@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 729 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(729);
+  it('has 784 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(784);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(729);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(784);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -566,10 +566,10 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(CommentBank.fitCount(ctx)).toBe(55);
   });
 
-  it('offers Jasper 55 (4, 15, 11, 25), by the name he goes by', () => {
+  it('offers Jasper 56 (4, 15, 12, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([4, 15, 11, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(55);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([4, 15, 12, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(56);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });

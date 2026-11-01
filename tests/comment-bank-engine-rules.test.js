@@ -176,6 +176,7 @@ describe('the draft is the plan’s eight parts only', () => {
     'overall',
     'example',
     'nextStep',
+    'languageGoals',
     'support',
     'home',
     'closer',

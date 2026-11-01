@@ -407,6 +407,9 @@ describe('the class settings (report_config) and the review screen', () => {
       supportChosen: [],
       supportOwn: [],
       supportFor: {},
+      languageGoalsChosen: [],
+      languageGoalsOwn: [],
+      languageGoalsFor: {},
       closing: '',
       charLimit: null,
     });
