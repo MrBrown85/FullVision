@@ -149,30 +149,13 @@ var QrSlips = (function () {
       document.body.appendChild(root);
     }
     root.innerHTML = buildPages(slips, q, _className(cid));
-    var style = document.getElementById(STYLE_ID);
-    if (!style) {
-      style = document.createElement('style');
-      style.id = STYLE_ID;
-      document.head.appendChild(style);
-    }
-    // Every page the same margin; the slips are cut apart.
-    style.textContent =
-      '@page { size: letter portrait; margin: 0.25in; }\n@page :left { margin: 0.25in; }\n@page :right { margin: 0.25in; }';
-    document.body.classList.add('qr-slips-active');
-    var finished = false;
-    function done() {
-      if (finished) return;
-      finished = true;
-      window.removeEventListener('afterprint', done);
-      document.body.classList.remove('qr-slips-active');
-      var s = document.getElementById(STYLE_ID);
-      if (s) s.remove();
+    // Every page the same margin; the slips are cut apart (ui.js setPrintMode).
+    setPrintMode(STYLE_ID, 'qr-slips-active', 'letter portrait', '0.25in');
+    printThen(function () {
+      clearPrintMode(STYLE_ID, 'qr-slips-active');
       var r = document.getElementById(ROOT_ID);
       if (r) r.innerHTML = '';
-    }
-    window.addEventListener('afterprint', done);
-    window.print();
-    setTimeout(done, 0);
+    });
     return slips.length;
   }
 

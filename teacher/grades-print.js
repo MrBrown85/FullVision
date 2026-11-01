@@ -1058,30 +1058,6 @@
     return root;
   }
 
-  /* The page rule: the paper by name and portrait ("legal portrait"), so a
-     browser that matches a named size to the printer's paper picks Legal
-     rather than shrinking the page onto Letter, and offers no landscape
-     choice. reports.css sets its own margins and :left/:right margins for
-     duplex reports; the grade sheet has the same narrow margin all round. */
-  function _pageStyle(paperKey) {
-    var paper = PAPER[paperKey] || PAPER.letter;
-    var size = paper.key + ' portrait';
-    var margin = MARGIN + 'in';
-    return (
-      '@page { size: ' +
-      size +
-      '; margin: ' +
-      margin +
-      '; }\n@page :left { margin: ' +
-      margin +
-      '; }\n@page :right { margin: ' +
-      margin +
-      '; }\n@page :first { margin: ' +
-      margin +
-      '; }'
-    );
-  }
-
   /* Renders the sheet into the print root, off screen, and returns the model. */
   function stage(cid, opts) {
     var model = buildModel(cid, opts);
@@ -1093,23 +1069,17 @@
     return model;
   }
 
-  /* The page rule goes last in the document every time, so a page rule the
-     Reports page left behind (its paper, its margins) cannot win. */
+  /* The paper by name and portrait ("legal portrait"), so a browser that
+     matches a named size to the printer's paper picks Legal rather than
+     shrinking the page onto Letter, and offers no landscape choice; the
+     same narrow margin all round (ui.js setPrintMode). */
   function activatePrintMode(paperKey) {
-    var style = document.getElementById(STYLE_ID);
-    if (!style) {
-      style = document.createElement('style');
-      style.id = STYLE_ID;
-    }
-    style.textContent = _pageStyle(paperKey);
-    document.head.appendChild(style);
-    document.body.classList.add('grades-print-active');
+    var paper = PAPER[paperKey] || PAPER.letter;
+    setPrintMode(STYLE_ID, 'grades-print-active', paper.key + ' portrait', MARGIN + 'in');
   }
 
   function deactivatePrintMode() {
-    document.body.classList.remove('grades-print-active');
-    var style = document.getElementById(STYLE_ID);
-    if (style) style.remove();
+    clearPrintMode(STYLE_ID, 'grades-print-active');
     var root = document.getElementById(ROOT_ID);
     if (root) root.innerHTML = '';
   }
@@ -1118,18 +1088,7 @@
     var model = stage(cid, opts);
     if (!model.pages.length) return model;
     activatePrintMode(model.opts.paper);
-    var finished = false;
-    function done() {
-      if (finished) return;
-      finished = true;
-      window.removeEventListener('afterprint', done);
-      deactivatePrintMode();
-    }
-    window.addEventListener('afterprint', done);
-    window.print();
-    // Chrome returns from print() when its dialog closes; a browser that
-    // returns at once fires afterprint later.
-    setTimeout(done, 0);
+    printThen(deactivatePrintMode);
     return model;
   }
 
