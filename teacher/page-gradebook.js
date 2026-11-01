@@ -1016,7 +1016,9 @@ window.PageGradebook = (function () {
           return a.id === col.assessmentId;
         });
         // Not submitted and Excused replace the score.
-        var statusMark = scoreStatusMarker(getAssignmentStatus(cid, s.id, col.assessmentId), cid, assess);
+        var cellStatus = getAssignmentStatus(cid, s.id, col.assessmentId);
+        var statusMark = scoreStatusMarker(cellStatus, cid, assess);
+        var lateMark = cellStatus === 'LATE' ? lateMarkHtml() : '';
         if (col.isPointsCol && isCompletionScored(assess)) {
           var mark = getCompletionMark(cid, s.id, col.assessmentId);
           html +=
@@ -1032,7 +1034,7 @@ window.PageGradebook = (function () {
             '" data-action="editScoreCell" data-kb="1" title="' +
             (mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '') +
             '">' +
-            (statusMark || completionCellHtml(mark)) +
+            (statusMark || completionCellHtml(mark) + (mark ? lateMark : '')) +
             '</td>';
         } else if (col.isPointsCol) {
           var max = assess.maxPoints || 100;
@@ -1045,7 +1047,9 @@ window.PageGradebook = (function () {
                 formatPoints(score) +
                 '<span class="gb-pts-max">/' +
                 max +
-                '</span></span><span class="gb-pts-pct">' +
+                '</span>' +
+                lateMark +
+                '</span><span class="gb-pts-pct">' +
                 pct +
                 '%</span></div>'
               : '<span class="gb-pts-empty">\u00B7</span>';
@@ -1083,7 +1087,7 @@ window.PageGradebook = (function () {
           var content = statusMark
             ? statusMark
             : score > 0
-              ? formatScoreLevel(score, entry.mod)
+              ? formatScoreLevel(score, entry.mod) + lateMark
               : assigned
                 ? '<span class="gb-unscored">\u00B7</span>'
                 : '\u2014';
@@ -1323,11 +1327,11 @@ window.PageGradebook = (function () {
           display = statusMark;
         } else if (cmpMark) {
           cellStyle = cmpMark === 'complete' ? 'color:var(--score-3)' : 'color:var(--score-1)';
-          display = cell.text;
+          display = cell.text + (cell.late ? lateMarkHtml() : '');
         } else if (cell.kind === 'points' || cell.kind === 'level') {
           var r = cell.level;
           cellStyle = 'background:' + PROF_TINT[r] + ';color:' + PROF_COLORS[r];
-          display = cell.text;
+          display = cell.text + (cell.late ? lateMarkHtml() : '');
           // Warning for out-of-range: above 4 on proficiency work, above the
           // extra-credit cap (twice the maximum) on points work.
           if (cell.outOfRange) cellClass = ' gb-scores-warning';
@@ -1363,8 +1367,9 @@ window.PageGradebook = (function () {
                 ? 'Complete'
                 : 'Incomplete'
               : val > 0
-                ? display.replace(/<[^>]*>/g, '')
+                ? cell.text
                 : 'no score') +
+          (cell.late && !statusMark ? ', Late' : '') +
           '" data-action="editScoreCell" data-aid="' +
           a.id +
           '" data-sid="' +
@@ -1615,6 +1620,11 @@ window.PageGradebook = (function () {
       text +
       '</span></td>'
     );
+  }
+
+  /* Late keeps the score and adds an L after it, as the printed sheet does. */
+  function lateMarkHtml() {
+    return '<span class="gb-late" title="Late">L</span>';
   }
 
   function completionCellHtml(mark) {
@@ -2134,6 +2144,7 @@ window.PageGradebook = (function () {
       '<div class="gb-ctx-divider"></div>' +
       statusItem('markMissing', 'NS', status === 'NS' ? 'Undo missing' : 'Mark missing') +
       statusItem('excuseCell', 'EXC', status === 'EXC' ? 'Undo excuse' : 'Excuse') +
+      statusItem('lateCell', 'LATE', status === 'LATE' ? 'Undo Late' : 'Mark Late') +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item" data-ctx="addObservation">Add observation</div>';
     _placeContextMenu(menu, e.clientX, e.clientY);
@@ -2161,10 +2172,10 @@ window.PageGradebook = (function () {
           render();
           window.clearScore(sid, aid);
         }
-      } else if (action === 'markMissing' || action === 'excuseCell') {
-        // Same path as the Assignments page's NS / EXC buttons; picking the
-        // cell's current status again takes it off.
-        var next = action === 'markMissing' ? 'NS' : 'EXC';
+      } else if (action === 'markMissing' || action === 'excuseCell' || action === 'lateCell') {
+        // Same path as the Assignments page's NS / EXC / Late buttons; picking
+        // the cell's current status again takes it off.
+        var next = action === 'markMissing' ? 'NS' : action === 'excuseCell' ? 'EXC' : 'LATE';
         applyAssignmentStatus(activeCourse, sid, aid, status === next ? null : next);
         clearProfCache();
         render();
