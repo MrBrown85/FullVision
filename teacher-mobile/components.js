@@ -202,6 +202,7 @@ window.MComponents = (function () {
     opts = opts || {};
     var el = document.getElementById('m-toast');
     var undoBtn = opts.onUndo ? '<button class="m-toast-undo" data-action="m-toast-undo">Undo</button>' : '';
+    clearTimeout(_toastOutTimer);
     el.innerHTML = '<div class="m-toast-item"><span>' + _esc(message) + '</span>' + undoBtn + '</div>';
     _placeToast(el);
     if (opts.onUndo) {
@@ -224,10 +225,17 @@ window.MComponents = (function () {
     el.style.bottom = fab ? window.innerHeight - fab.getBoundingClientRect().top + 12 + 'px' : '';
   }
 
+  var _toastOutTimer = null;
   function hideToast() {
     clearTimeout(_toastTimer);
     var el = document.getElementById('m-toast');
-    el.innerHTML = '';
+    var item = el.querySelector('.m-toast-item');
+    if (!item) return;
+    item.classList.add('m-toast-out');
+    clearTimeout(_toastOutTimer);
+    _toastOutTimer = setTimeout(function () {
+      if (item.parentNode) item.parentNode.removeChild(item);
+    }, 200);
   }
 
   /* ── Scroll → large title collapse ─────────────────────────── */

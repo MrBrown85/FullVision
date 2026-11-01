@@ -69,7 +69,12 @@ body.fv-switching-course::after {
 }
 
 /* ── Tab Bar (iOS style) ───────────────────────────────────── */
+/* The bar lies over the content, which scrolls under its blur. */
 #m-tab-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-around;
@@ -81,6 +86,10 @@ body.fv-switching-course::after {
   border-top: 0.5px solid var(--divider-medium);
   flex-shrink: 0;
   z-index: var(--z-fab);
+}
+.m-screen-content,
+.m-swiper-card {
+  padding-bottom: calc(49px + env(safe-area-inset-bottom, 0px));
 }
 
 .m-tab-item {
@@ -100,6 +109,27 @@ body.fv-switching-course::after {
 }
 .m-tab-item.m-tab-active {
   color: var(--link);
+}
+/* Pressed: icon and text controls dim, pills and chips darken. */
+.m-tab-item:active,
+.m-nav-bar-action:active,
+.m-nav-bar-back:active,
+.m-card-all:active,
+.m-wdg-editor-done:active,
+.m-edit-cancel:active,
+.m-edit-save:active {
+  opacity: 0.5;
+}
+.m-thumb:active {
+  transform: scale(0.92);
+}
+.m-thumb.m-thumb-current:active {
+  transform: scale(1.1);
+}
+.m-seg-btn:active:not(.m-seg-active),
+.m-filter-pill:active:not(.m-filter-active),
+.m-sweep-type:active:not(.m-selected) {
+  background: var(--overlay-pressed);
 }
 .m-tab-icon {
   width: 25px;
@@ -226,6 +256,20 @@ body.fv-switching-course::after {
   .m-screen.m-swipe-settle,
   .m-screen::after {
     transition: none;
+  }
+  .m-card-stack-item,
+  .m-card-stack-item.m-card-spring,
+  .m-card-stack-item.m-card-exit-left,
+  .m-card-stack-item.m-card-exit-right,
+  .m-toast-item,
+  .m-fab,
+  .m-thumb,
+  .m-pull-indicator,
+  .m-screen-content.m-pull-settle,
+  .m-sheet-backdrop,
+  .m-loading-overlay {
+    transition: none !important;
+    animation: none !important;
   }
   .m-screen,
   .m-sheet,
@@ -2095,9 +2139,11 @@ body.fv-switching-course::after {
   right: 0;
   z-index: var(--z-toast);
 }
+/* Above the tab bar, which the content now runs under. */
+#m-toast,
 .m-toast {
   position: fixed;
-  bottom: calc(60px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(61px + env(safe-area-inset-bottom, 0px));
   left: 16px;
   right: 16px;
   z-index: var(--z-toast);
@@ -2135,6 +2181,15 @@ body.fv-switching-course::after {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+.m-toast-item.m-toast-out {
+  animation: m-toast-out 0.2s ease-in forwards;
+}
+@keyframes m-toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(12px);
   }
 }
 
@@ -2419,6 +2474,11 @@ body.fv-switching-course::after {
   justify-content: center;
   background: var(--bg);
   z-index: var(--z-loading);
+  transition: opacity 0.25s ease-out;
+}
+.m-loading-overlay.m-loading-fade {
+  opacity: 0;
+  pointer-events: none;
 }
 .m-loading-spinner {
   width: 32px;

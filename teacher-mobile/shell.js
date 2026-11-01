@@ -246,7 +246,11 @@
   /* ── Auth screen ──────────────────────────────────────────── */
   function _hideLoader() {
     var el = document.getElementById('m-loading');
-    if (el) el.style.display = 'none';
+    if (!el || el.style.display === 'none') return;
+    el.classList.add('m-loading-fade');
+    setTimeout(function () {
+      el.style.display = 'none';
+    }, 250);
   }
 
   function _showAuth() {
@@ -540,11 +544,7 @@
     // renderPicker loads _filters from LocalStorage into module state, but
     // the returned HTML renders every cell visible; filterAssessments walks
     // the DOM and hides cells that don't match.
-    if (tab === 'grade') {
-      setTimeout(function () {
-        MGrade.filterAssessments(_cid);
-      }, 0);
-    }
+    if (tab === 'grade') MGrade.filterAssessments(_cid);
 
     // Setup scroll → large title collapse
     var screen = stack.querySelector('.m-screen');
