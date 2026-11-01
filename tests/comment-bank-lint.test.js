@@ -100,6 +100,9 @@ describe('the vocabulary lint', () => {
     expect(f('{He} [is|are] talented.')).toContain('person praise: talented');
     expect(f('{He} [is|are] at the top of the class.').some(x => x.startsWith('comparison'))).toBe(true);
     expect(f('{His} work is stronger than others.').some(x => x.startsWith('comparison'))).toBe(true);
+    expect(f('{He} [has|have] finally handed the work in.')).toContain('shame word: finally');
+    expect(f('Ask {him} to explain it again.')).toContain('shame word: again');
+    expect(f('At least the labs are done.')).toContain('shame word: at least');
     expect(f('{He} [writes|write] insightful essays.')).toContain('evaluative word: insightful');
     expect(f('{He} will finish the unit with the class.').some(x => x.startsWith('future claim'))).toBe(true);
     expect(f('{His} marks should climb by the end of the term.').some(x => x.startsWith('future claim'))).toBe(true);

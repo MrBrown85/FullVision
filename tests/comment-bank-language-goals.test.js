@@ -170,7 +170,7 @@ describe('the line in the comment', () => {
     const d = draftOf(factsOf(SAM.id));
     const got = d.sentences.find(x => x.step === 'languageGoals');
     expect(got.text).toBe(
-      'They speak English with growing clarity; the next step is practising the sounds of new words aloud.',
+      'They can say new words in English after hearing them; the next step is using them in a sentence.',
     );
   });
 

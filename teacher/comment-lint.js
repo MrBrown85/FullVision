@@ -233,6 +233,13 @@ window.CommentLint = (function () {
     'standout',
   ];
 
+  // Words a student reads as shame (the acceptability checklist): one
+  // appearing anywhere in a sentence about them.
+  var SHAME = ['finally', 'still', 'again', 'only', 'at least', 'unfortunately'];
+  var SHAME_RES = SHAME.map(function (w) {
+    return { name: w, re: new RegExp('\\b' + w.replace(' ', '\\s+') + '\\b', 'i') };
+  });
+
   // Comparisons with classmates.
   var COMPARISONS = [
     /\btop of (the|his|her|their) class\b/i,
@@ -423,6 +430,9 @@ window.CommentLint = (function () {
     COMPARISONS.forEach(function (re) {
       if (re.test(p)) out.push('comparison: ' + re);
     });
+    SHAME_RES.forEach(function (x) {
+      if (x.re.test(p)) out.push('shame word: ' + x.name);
+    });
     ws.forEach(function (w) {
       if (EVALUATIVE.indexOf(w) >= 0 && !CONTROLLED[w]) out.push('evaluative word: ' + w);
     });
@@ -492,6 +502,7 @@ window.CommentLint = (function () {
     IDIOMS: IDIOMS,
     PRAISE: PRAISE,
     COMPARISONS: COMPARISONS,
+    SHAME: SHAME,
     EVALUATIVE: EVALUATIVE,
     CONTROLLED: CONTROLLED,
     plain: plain,
