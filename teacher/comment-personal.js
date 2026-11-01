@@ -216,26 +216,68 @@ window.PersonalBank = (function () {
   }
 
   /* The first of a set of names the text holds as a whole word, as written
-     (with its capital). A one-letter name ("J", "O") counts only as a
-     capital letter standing alone: "J" and "J’s" match, "O’Brien" does not,
-     and a lowercase letter on the list is not a name, so "a" and "I" in an
-     ordinary sentence never match one. */
+     (with its capital). One-letter entries are left to _initialIn: from a
+     flat list there is no telling a first name "J" from a last initial. */
   function _nameIn(text, names) {
     for (var i = 0; i < names.length; i++) {
       var n = String(names[i] || '').trim();
-      if (!n) continue;
-      var before = '(^|[^A-Za-zÀ-ɏ])';
-      var after = '(?![A-Za-zÀ-ɏ])';
-      if (n.length === 1) {
-        if (!/^[A-ZÀ-Þ]$/.test(n)) continue;
-        // Not part of a longer name: no letter joined by a hyphen or an
-        // apostrophe on either side, except a possessive 's.
-        before = "(^|[^A-Za-zÀ-ɏ'’-])";
-        after += "(?![-'’](?!s(?![A-Za-zÀ-ɏ]))[A-Za-zÀ-ɏ])";
-      }
-      if (new RegExp(before + _reEsc(n) + after).test(text)) return n;
+      if (n.length < 2) continue;
+      var re = new RegExp('(^|[^A-Za-zÀ-ɏ])' + _reEsc(n) + '(?![A-Za-zÀ-ɏ])');
+      if (re.test(text)) return n;
     }
     return '';
+  }
+
+  /* A classmate with a one-letter name, from the class roster (the class's
+     real names, never the flat list): a one-letter first or preferred name
+     as a capital standing alone ("J", "J’s"; not "O’Brien"), or a one-letter
+     last name written as an initial with a period after their first name
+     ("Sam B."). A last initial alone never counts, so "Part B", "an A" and a
+     sentence that starts with "A" are not blocked. own: the student's own
+     names. */
+  function _initialIn(text, classmates, own) {
+    var letter = function (n) {
+      return n.length === 1 && /^[A-ZÀ-Þ]$/.test(n) && own.indexOf(n) < 0;
+    };
+    var alone = "(?![A-Za-zÀ-ɏ])(?![-'’](?!s(?![A-Za-zÀ-ɏ]))[A-Za-zÀ-ɏ])";
+    for (var i = 0; i < classmates.length; i++) {
+      var s = classmates[i] || {};
+      var firsts = [s.preferred, s.preferredName, s.firstName]
+        .map(function (n) {
+          return String(n || '').trim();
+        })
+        .filter(Boolean);
+      var last = String(s.lastName || '').trim();
+      for (var k = 0; k < firsts.length; k++) {
+        var n = firsts[k];
+        if (letter(n) && new RegExp("(^|[^A-Za-zÀ-ɏ'’-])" + _reEsc(n) + alone).test(text)) return n;
+        if (n.length > 1 && letter(last)) {
+          var re = new RegExp('(^|[^A-Za-zÀ-ɏ])' + _reEsc(n) + '\\s+' + _reEsc(last) + '\\.');
+          if (re.test(text)) return n + ' ' + last + '.';
+        }
+      }
+    }
+    return '';
+  }
+
+  /* The student's classmates on the roster: opts.classmates, else the
+     class's students other than this one. */
+  function _classmates(f, student, opts) {
+    if (Array.isArray(opts.classmates)) return opts.classmates;
+    var cid = f && f.cid;
+    if (!cid || typeof getStudents !== 'function') return [];
+    var sid = student && student.id;
+    return (getStudents(cid) || []).filter(function (s) {
+      return s && s.id !== sid;
+    });
+  }
+
+  /* The classmate a sentence names, or ''. */
+  function _classmateIn(text, own, f, student, opts) {
+    var others = (opts.others || []).filter(function (n) {
+      return own.indexOf(n) < 0;
+    });
+    return _nameIn(text, others) || _initialIn(text, _classmates(f, student, opts), own);
   }
 
   /* ── The student's details as slots ────────────────────────────────── */
@@ -832,7 +874,7 @@ window.PersonalBank = (function () {
 
   /* One sentence of an approved comment, checked and made a template.
      row: its row on the Sentences card ({ step, s: the bank sentence it
-     replaced, prov }); opts: { others: classmates' names, family }.
+     replaced, prov }); opts: { others: classmates' names, classmates: roster rows (default: the class's), family }.
      Returns { text, template: { text, slots, condition }, chips, offered }
      or { text, reason }. */
   function suggest(text, row, ctx, f, student, opts) {
@@ -843,10 +885,7 @@ window.PersonalBank = (function () {
     var hit = _privateHit(text);
     if (hit) return Object.assign(out, { reason: 'private: ' + hit });
     var own = entities(ctx, f, student, text).names;
-    var others = (opts.others || []).filter(function (n) {
-      return own.indexOf(n) < 0;
-    });
-    var other = _nameIn(text, others);
+    var other = _classmateIn(text, own, f, student, opts);
     if (other) return Object.assign(out, { reason: 'another student: ' + other });
     if (_oneTime(text)) return Object.assign(out, { reason: 'about one day' });
     if (_date(text)) return Object.assign(out, { reason: 'a date' });
@@ -1017,7 +1056,7 @@ window.PersonalBank = (function () {
   }
 
   /* One sentence the teacher wrote, as a template with advice. bind: see
-     _condition. opts: { others: classmates' names, family }. Returns
+     _condition. opts: { others: classmates' names, classmates: roster rows (default: the class's), family }. Returns
      { text, template, chips, preview, offered, advice: [plain sentences],
        blocked: '' or why it cannot be saved }; no template for an empty
      line. */
@@ -1032,10 +1071,7 @@ window.PersonalBank = (function () {
     var hit = _privateHit(text);
     if (hit) out.blocked = _q(hit) + ' is a health or designation word; a bank sentence cannot hold one.';
     var e = entities(ctx, f, student, text);
-    var others = (opts.others || []).filter(function (n) {
-      return e.names.indexOf(n) < 0;
-    });
-    var other = _nameIn(text, others);
+    var other = _classmateIn(text, e.names, f, student, opts);
     if (!out.blocked && other)
       out.blocked = _q(other) + ' is a classmate’s name; a bank sentence cannot name another student.';
     var n = R.wordCount(text);

@@ -56,12 +56,26 @@ window.ReportBlocks = (function () {
      set", empty, or anything else means no pronouns on file, and the
      student reads as they/them/their with plural verbs (Colin, Nov 1,
      #596). onFile says whether a set parsed.
-     A set of two subject pronouns ("she/they", "he/they", "they/she")
-     reads as the full set of the first: she/her/her, he/him/his or
-     they/them/their. Only a subject/object set ("she/her", "ze/zir/zir")
-     gives its second word as the object. */
-  const KNOWN_SUBJ = { she: 'her', he: 'him', they: 'them' };
-  const SUBJECT_WORDS = ['she', 'he', 'they', 'ze', 'zie', 'xe', 'ey', 'fae', 've', 'it'];
+     A known subject (she, he, they, xe, ze, zie, ey, fae, ve, it) followed
+     by another subject ("she/they", "xe/they") or by forms of its own set
+     ("he/his", "she/hers", "they/theirs", "xe/xem") reads as its full set:
+     she/her/her, he/him/his, they/them/their, xe/xem/xyr, ze/zir/zir,
+     fae/faer/faer. An unknown subject followed by a subject ("co/they")
+     takes them/their. Anything else, such as "ze/hir/hir", is used as
+     written. */
+  // subject: [object, possessive, possessive pronoun, reflexive]
+  const PRONOUN_SETS = {
+    she: ['her', 'her', 'hers', 'herself'],
+    he: ['him', 'his', 'his', 'himself'],
+    they: ['them', 'their', 'theirs', 'themselves'],
+    xe: ['xem', 'xyr', 'xyrs', 'xemself'],
+    ze: ['zir', 'zir', 'zirs', 'zirself'],
+    zie: ['zir', 'zir', 'zirs', 'zirself'],
+    ey: ['em', 'eir', 'eirs', 'emself'],
+    fae: ['faer', 'faer', 'faers', 'faerself'],
+    ve: ['ver', 'vis', 'vis', 'verself'],
+    it: ['it', 'its', 'its', 'itself'],
+  };
   function getPronouns(student) {
     const raw = String((student && student.pronouns) || '')
       .trim()
@@ -69,27 +83,28 @@ window.ReportBlocks = (function () {
     const parts = raw ? raw.split('/').map(x => x.trim()) : [];
     const word = x => /^[a-z]{2,}$/.test(x || '');
     const ok = parts.length >= 2 && parts.length <= 3 && parts.every(word) && parts[0] !== parts[1];
-    const twoSubjects = ok && KNOWN_SUBJ[parts[0]] && SUBJECT_WORDS.indexOf(parts[1]) >= 0;
     const subj = ok ? parts[0] : 'they';
-    const obj = twoSubjects ? KNOWN_SUBJ[subj] : ok ? parts[1] : 'them';
-    let poss, refl, verb;
-    if (subj === 'she') {
-      poss = 'her';
-      refl = 'herself';
-      verb = 's';
-    } else if (subj === 'he') {
-      poss = 'his';
-      refl = 'himself';
-      verb = 's';
-    } else if (subj === 'they') {
+    const set = PRONOUN_SETS[subj];
+    const isSubject = x => Object.prototype.hasOwnProperty.call(PRONOUN_SETS, x);
+    const rest = ok ? parts.slice(1) : [];
+    let obj, poss, refl;
+    const ownForms = set && rest.every(x => set.indexOf(x) >= 0);
+    if (!ok || (set && (isSubject(rest[0]) || ownForms))) {
+      [obj, poss, , refl] = set;
+    } else if (!set && isSubject(rest[0])) {
+      obj = 'them';
       poss = 'their';
-      refl = 'themselves';
-      verb = '';
+      refl = 'themself';
+    } else if (subj === 'she' || subj === 'he' || subj === 'they') {
+      obj = parts[1];
+      poss = set[1];
+      refl = set[3];
     } else {
+      obj = parts[1];
       poss = parts[2] || obj;
       refl = obj + 'self';
-      verb = 's';
     }
+    const verb = subj === 'they' ? '' : 's';
     return { subj, obj, poss, refl, verb, capSubj: subj[0].toUpperCase() + subj.slice(1), onFile: ok };
   }
 

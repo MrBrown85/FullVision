@@ -232,17 +232,38 @@
     return p && typeof p === 'object' ? Object.keys(p) : [];
   }
 
-  /* Whether a newer write makes an older one out of date: same target, and
-     it sets every field the older one set. A term-rating habits save does
-     not replace a failed narrative, approval or IE save on the same row. */
-  function _supersedes(newer, older) {
+  /* What is left of an older failed write once a newer write to the same
+     target is queued or lands: the older one itself when the targets differ,
+     null when the newer one sets everything it set, else a copy without the
+     fields the newer one sets. A term-rating habits save leaves a failed
+     narrative, approval or IE save alone, and a newer narrative takes the
+     narrative out of a failed one, so the older value is never applied
+     after the newer one. */
+  function _without(newer, older) {
     var target = _target(newer.endpoint, newer.payload);
-    if (!target || _target(older.endpoint, older.payload) !== target) return false;
+    if (!target || _target(older.endpoint, older.payload) !== target) return older;
     var mine = _fields(newer);
-    if (!mine) return true;
-    return _fields(older).every(function (k) {
-      return mine.indexOf(k) >= 0;
+    if (!mine) return null;
+    var theirs = _fields(older);
+    var left = theirs.filter(function (k) {
+      return mine.indexOf(k) < 0;
     });
+    if (!left.length) return null;
+    if (left.length === theirs.length) return older;
+    var wire = {};
+    left.forEach(function (k) {
+      wire[k] = older.payload.p_payload[k];
+    });
+    return Object.assign({}, older, { payload: Object.assign({}, older.payload, { p_payload: wire }) });
+  }
+
+  /* The failed writes with what a newer write replaces taken out. */
+  function _pruneDead(dead, newer) {
+    return dead
+      .map(function (e) {
+        return _without(newer, e);
+      })
+      .filter(Boolean);
   }
 
   function _sameSet(a, b) {
@@ -869,9 +890,7 @@
 
     // One failed write per target: a newer failure replaces an older one.
     // The last try after a reload is dropped instead.
-    var dead = _readDead().filter(function (e) {
-      return !_supersedes(entry, e);
-    });
+    var dead = _pruneDead(_readDead(), entry);
     if (entry.last_try) _reportDropped(entry);
     else dead.push(entry);
     _writeDead(dead);
@@ -907,18 +926,24 @@
     _writeQueue(q);
   }
 
-  /* A write to this target landed, so older failed writes it replaces are
-     out of date: retrying one would put back the value it replaced. */
+  /* A write to this target landed, so what it sets in older failed writes
+     is out of date: retrying that would put back the value it replaced. */
   function _dropDeadFor(entry) {
     if (!_target(entry.endpoint, entry.payload)) return;
     var dead = _readDead();
-    var keep = dead.filter(function (e) {
-      return !_supersedes(entry, e);
-    });
-    if (keep.length === dead.length) return;
+    var keep = _pruneDead(dead, entry);
+    var changed =
+      keep.length !== dead.length ||
+      keep.some(function (e, i) {
+        return e !== dead[i];
+      });
+    if (!changed) return;
     _writeDead(keep);
+    var kept = keep.map(function (e) {
+      return e.id;
+    });
     dead.forEach(function (e) {
-      if (keep.indexOf(e) < 0) _notify('dead-letter:dismiss', { id: e.id, superseded: true });
+      if (kept.indexOf(e.id) < 0) _notify('dead-letter:dismiss', { id: e.id, superseded: true });
     });
   }
 
@@ -1184,16 +1209,18 @@
   }
 
   /* Once per page load: send the signed-in teacher's failed writes once
-     more, at the end of the queue. A write to a record that a newer queued
-     write also sets is out of date, and one that adds a row or waited on a
-     create that failed has nothing to retry against; those are dropped and
-     reported. Another teacher's stay for _discardForeign. */
+     more, at the end of the queue, without what a newer queued write also
+     sets. One left with nothing to set is out of date, and one that adds a
+     row or waited on a create that failed has nothing to retry against;
+     those are dropped and reported. Another teacher's stay for
+     _discardForeign. */
   function _retryDeadOnLoad() {
     var owner = currentOwner();
     if (!owner) return;
     var dead = _readDead();
     if (!dead.length) return;
     var q = _readQueue();
+    var queued = q.entries.slice();
     var keep = [];
     dead.forEach(function (entry) {
       if (_isForeign(entry, owner)) {
@@ -1202,15 +1229,17 @@
       }
       var target = _target(entry.endpoint, entry.payload);
       var drop = !target || entry.last_try || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
-      if (!drop) {
-        drop = q.entries.some(function (e) {
-          return _supersedes(e, entry);
-        });
+      // What a queued write sets is newer: only the rest is retried.
+      var rest = entry;
+      for (var i = 0; !drop && i < queued.length; i++) {
+        rest = _without(queued[i], rest);
+        drop = !rest;
       }
       if (drop) {
         _reportDropped(entry);
         return;
       }
+      entry = rest;
       entry.attempts = 0;
       entry.last_try = true;
       delete entry.next_at;

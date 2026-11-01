@@ -128,22 +128,41 @@ describe('the filters', () => {
     expect(out.template).toBeTruthy();
   });
 
-  /* A classmate whose name is one letter ("J", "O") was never checked, so a
-     kept template could name them. A one-letter name matches only as a
-     whole word with its capital, so "a" and "I" in an ordinary sentence
-     never block. */
+  /* A classmate whose first name is one letter ("J", "O") was never
+     checked, so a kept template could name them. One-letter names come from
+     the roster: a one-letter first name matches as a capital standing
+     alone, and a one-letter last name only as an initial after the first
+     name ("Sam B."), so "a", "I", "Part B", "an A" and a sentence-start
+     "A" never block. */
   describe('a classmate with a one-letter name', () => {
-    const CLASS = ['Amelia', 'Tavares', 'J', 'O', 'Owen'];
-    const sug = (text, others = CLASS) => {
+    const ROSTER = [
+      { id: 'j', firstName: 'J', lastName: 'Price' },
+      { id: 'o', firstName: 'O', lastName: 'Tavares' },
+      { id: 'sa', firstName: 'Sam', lastName: 'A' },
+      { id: 'lb', firstName: 'Leo', lastName: 'B' },
+    ];
+    // The flat list the Questionnaire passes: every roster name.
+    const FLAT = ['J', 'Price', 'O', 'Tavares', 'Sam', 'A', 'Leo', 'B'];
+    const sug = (text, opts = {}) => {
       const f = facts();
       const ctx = CommentBank.context(f, {});
-      return PB.suggest(text, rowFor('overall', text, 'n11', ctx), ctx, f, GABRIEL, { others });
+      return PB.suggest(
+        text,
+        rowFor('overall', text, 'n11', ctx),
+        ctx,
+        f,
+        GABRIEL,
+        Object.assign({ others: FLAT, classmates: ROSTER }, opts),
+      );
     };
     const comp = text => {
       const f = facts();
-      return PB.compose(text, { step: 'overall' }, CommentBank.context(f, {}), f, GABRIEL, { others: CLASS });
+      return PB.compose(text, { step: 'overall' }, CommentBank.context(f, {}), f, GABRIEL, {
+        others: FLAT,
+        classmates: ROSTER,
+      });
     };
-    it('leaves out a sentence that names them', () => {
+    it('leaves out a sentence that names a one-letter first name', () => {
       expect(sug('Gabriel worked with J on every lab report this term.').reason).toBe('another student: J');
       expect(sug('Gabriel and O built the trench model as a pair.').reason).toBe('another student: O');
       expect(sug('Gabriel read J’s notes before each quiz this term.').reason).toBe('another student: J');
@@ -151,19 +170,50 @@ describe('the filters', () => {
         '“J” is a classmate’s name; a bank sentence cannot name another student.',
       );
     });
-    it('does not block "a", "I", a lowercase letter or a longer name that starts with the letter', () => {
+    it('a one-letter last name counts only as an initial after the first name', () => {
+      const f = facts();
+      const ctx = CommentBank.context(f, {});
+      const bySam = { others: [], classmates: ROSTER };
+      expect(
+        PB.suggest(
+          'Gabriel and Sam A. compared sources every week.',
+          rowFor('overall', '', 'n11', ctx),
+          ctx,
+          f,
+          GABRIEL,
+          bySam,
+        ).reason,
+      ).toBe('another student: Sam A.');
+    });
+    it('does not block "a", "I", "Part B", "an A", a sentence-start "A" or a longer name', () => {
       const ok = [
         'Gabriel wrote a clear essay and I was glad to see his revisions.',
         'Gabriel can explain part j of the unit guide in his own words.',
+        'Gabriel finished Part B of the unit guide with careful answers.',
+        'Gabriel earned an A on the map test after steady review.',
+        'A careful reader, Gabriel checks every source he uses.',
         'Gabriel asked Jin and O’Brien careful questions in every discussion.',
-        'Gabriel explains how causes connect in each unit of the course.',
       ];
       ok.forEach(t => expect(sug(t).reason || '', t).not.toMatch(/another student/));
       ok.forEach(t => expect(comp(t).blocked, t).not.toMatch(/classmate/));
     });
-    it('a lowercase one-letter entry is not a classmate’s name', () => {
-      const text = 'Gabriel wrote a clear essay and I was glad to see his revisions.';
-      expect(sug(text, ['a', 'i']).reason || '').not.toMatch(/another student/);
+    it('a one-letter entry on the flat list alone is not a name', () => {
+      const text = 'A careful reader, Gabriel checks every source he uses each unit.';
+      expect(sug(text, { others: ['A', 'I', 'a'], classmates: [] }).reason || '').not.toMatch(/another student/);
+    });
+    it('reads the class roster when no classmates are passed', () => {
+      const cid = 'c-one-letter';
+      _cache.students[cid] = [Object.assign({}, GABRIEL), ...ROSTER];
+      const f = facts({ cid });
+      const ctx = CommentBank.context(f, {});
+      const text = 'Gabriel worked with J on every lab report this term.';
+      const out = PB.suggest(text, rowFor('overall', text, 'n11', ctx), ctx, f, GABRIEL, { others: FLAT });
+      expect(out.reason).toBe('another student: J');
+      const fine = 'Gabriel finished Part B of the unit guide with careful answers.';
+      expect(
+        PB.suggest(fine, rowFor('overall', fine, 'n11', ctx), ctx, f, GABRIEL, { others: FLAT }).reason || '',
+      ).not.toMatch(/another student/);
+      delete _cache.students[cid];
     });
   });
 
