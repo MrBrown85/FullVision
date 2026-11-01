@@ -4857,14 +4857,20 @@
   --ldg-cols: minmax(0, 1fr);
 }
 /* The Note for the Report card, under the grading. */
+/* The same card as the Overall Comment above it: the same lane (16px in),
+   12px under it (the card's 6px and 16px foot and the dialog's 14px gap
+   come back off), the same 200px label column. */
 .grader-report-note {
+  margin: -24px 16px 0;
   background: var(--surface);
   border-radius: 16px;
-  padding: 14px 16px;
+  padding: 14px;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 16px;
-  box-shadow: 0 0 0 0.5px var(--divider-medium);
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 8px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 0 0 0.5px var(--divider-medium);
 }
 .grader-report-note[hidden] {
   display: none;
@@ -4879,12 +4885,14 @@
 }
 .grader-report-note-head h2 {
   margin: 0;
-  font-size: var(--text-lg);
+  padding: 9px 2px 0;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
 }
 .grader-report-note-head p {
   margin: 0;
+  padding: 0 2px;
   font-size: var(--text-sm);
   line-height: 1.4;
   color: var(--text-2);
