@@ -86,9 +86,10 @@ const PRONOUNS = ['she/her', 'he/him', 'they/them', '', 'he/him', 'she/her'];
 /* The kinds of class. sections: competency names the class's kind has
    skills for; titles: its assignments in date order, some sharing the
    words before a colon, some with lesson numbers. points: the assignment
-   positions scored in points (out of 20). lines: the class has a closing
-   sentence and support lines set (the others have none, as a class with
-   nothing set). */
+   positions scored in points (out of 20). tagsPer: how many sections each
+   assessment is tagged to (2 when left out). lines: the class has a
+   closing sentence and support lines set (the others have none, as a
+   class with nothing set). */
 export const KINDS = {
   history12: {
     lines: true,
@@ -149,17 +150,30 @@ export const KINDS = {
     ],
     points: [],
   },
+  // The kinds below carry every competency their kind's skill table names
+  // (lane H, Nov 1), so each skill is some student's next step and its
+  // frames are exercised; with more sections, each assessment is tagged
+  // to four (tagsPer) so every section keeps four or more scored
+  // pieces, the next step's gate (four tags, so a section at the end of
+  // the cycle keeps four or more even where points work carries no tag).
   math11: {
     lines: true,
     name: 'Pre-Calculus 11',
     grade: '11',
     system: 'letter',
     size: 30,
+    tagsPer: 4,
     sections: [
       'Reasoning and Modelling',
       'Understanding and Solving',
       'Communicating and Representing',
       'Connecting and Reflecting',
+      'Estimating and Mental Math',
+      'Sequences and Rules',
+      'Graphs and Tables',
+      'Notation and Units',
+      'Real-World Applications',
+      'Procedures and Accuracy',
     ],
     titles: [
       'Quadratics Practice Set',
@@ -167,9 +181,17 @@ export const KINDS = {
       'Graphing Investigation',
       'Quiz 2: Radicals',
       'Problem of the Week: Fences',
+      'Estimation Challenge',
       'Problem of the Week: Bridges',
+      'Quiz 3: Rational Expressions',
+      'Pattern Rules Task',
       'Problem of the Week: Ramps',
       'Unit 2 Test',
+      'Trigonometry Practice Set',
+      'Quiz 4: Trigonometry',
+      'Word Problem Set',
+      'Quiz 5: Functions',
+      'Unit 3 Test',
     ],
     points: [1, 3, 7],
   },
@@ -177,14 +199,38 @@ export const KINDS = {
     name: 'Physical and Health Education 8',
     grade: '8',
     system: 'proficiency',
-    size: 24,
-    sections: ['Movement Skills', 'Fitness', 'Safety', 'Leadership'],
+    size: 30,
+    tagsPer: 4,
+    sections: [
+      'Movement Skills',
+      'Fitness',
+      'Safety',
+      'Leadership',
+      'Game Strategy',
+      'Eating and Hydration',
+      'Relationships and Consent',
+      'Substance Use',
+      'Endurance and Pacing',
+      'Outdoor Education',
+      'Managing Stress',
+      'Mental Well-being',
+    ],
     titles: [
       'Fitness Baseline',
       'Badminton Skills Check',
       'Healthy Choices Reflection',
       'Team Games Leadership',
+      'Pacing Run 1',
+      'Nutrition Label Task',
+      'Friendship and Respect Reflection',
+      'Substance Decisions Scenario',
+      'Orienteering Day Plan',
+      'Stress Toolkit',
       'Fitness Check-In',
+      'Pacing Run 2',
+      'Game Strategy Quiz',
+      'Healthy Eating Plan',
+      'Outdoor Skills Check',
       'Safety Plan',
     ],
     points: [],
@@ -194,15 +240,63 @@ export const KINDS = {
     grade: '11',
     system: 'both',
     size: 22,
-    sections: ['Explore and Create', 'Reason and Reflect', 'Communicate and Document', 'Technique'],
+    tagsPer: 4,
+    sections: [
+      'Explore and Create',
+      'Reason and Reflect',
+      'Communicate and Document',
+      'Technique',
+      'Planning a Piece',
+      'Using Feedback',
+      'Elements and Principles',
+      'Camera and Light',
+      'Process Journal',
+    ],
     titles: [
       'Sketchbook: Week 1',
       'Sketchbook: Week 2',
       'Value Study',
       'Sketchbook: Week 3',
+      'Composition Plan',
+      'Photo Series: Light',
       'Artist Statement',
       'Still Life Painting',
       'Critique Reflection',
+      'Sketchbook: Week 4',
+      'Revised Still Life',
+      'Portfolio Review',
+    ],
+    points: [],
+  },
+  music9: {
+    name: 'Concert Band 9',
+    grade: '9',
+    system: 'proficiency',
+    size: 24,
+    tagsPer: 4,
+    sections: [
+      'Ensemble and Stage',
+      'Reading Notation',
+      'Technique',
+      'Explore and Create',
+      'Reason and Reflect',
+      'Connect and Expand',
+      'Elements and Principles',
+      'Using Feedback',
+    ],
+    titles: [
+      'Playing Test: Scales',
+      'Rhythm Reading Check 1',
+      'Listening Journal: Week 1',
+      'Sectional Rehearsal Reflection',
+      'Playing Test: Chorale',
+      'Composition: Eight Bars',
+      'Rhythm Reading Check 2',
+      'Listening Journal: Week 2',
+      'Fall Concert Performance',
+      'Concert Reflection',
+      'Playing Test: March',
+      'Rhythm Reading Check 3',
     ],
     points: [],
   },
@@ -211,7 +305,17 @@ export const KINDS = {
     grade: '10',
     system: 'letter',
     size: 24,
-    sections: ['Designing', 'Making', 'Testing', 'Sharing'],
+    tagsPer: 4,
+    sections: [
+      'Safety',
+      'Recipes and Kitchen Skills',
+      'Material Selection',
+      'Teamwork',
+      'Designing',
+      'Making',
+      'Testing',
+      'Sharing',
+    ],
     titles: [
       'Knife Skills Check',
       'Lab: Muffins',
@@ -219,26 +323,116 @@ export const KINDS = {
       'Lab: Soup',
       'Food Safety Quiz',
       'Lab: Stir-Fry',
+      'Ingredient Choice Task',
+      'Lab: Pasta',
       'Menu Project Plan',
+      'Lab: Bread',
       'Menu Project Presentation',
+      'Group Meal Reflection',
     ],
     points: [4],
+  },
+  adst8: {
+    name: 'Applied Design, Skills and Technologies 8',
+    grade: '8',
+    system: 'proficiency',
+    size: 26,
+    tagsPer: 4,
+    sections: [
+      'Safety',
+      'Sewing and Textiles',
+      'Cutting and Joining',
+      'Drafting',
+      'Coding',
+      'Media and Graphics',
+      'Business',
+      'Tools and Technologies',
+      'Designing',
+    ],
+    titles: [
+      'Shop Safety Quiz',
+      'Drafting: Orthographic Views',
+      'Woodwork: Box Joint Project',
+      'Textiles: Drawstring Bag',
+      'Coding: Maze Game',
+      'Media: Poster Design',
+      'Business: Product Pitch',
+      'Drafting: Scale Drawing',
+      'Woodwork: Cutting Board',
+      'Textiles: Pencil Case',
+      'Coding: Scoreboard Program',
+      'Media: Short Video',
+      'Design Journal Check',
+      'Rotation Reflection',
+    ],
+    points: [],
   },
   career10: {
     name: 'Career Life Education 10',
     grade: '10',
     system: 'proficiency',
     size: 26,
-    sections: ['Self-Awareness', 'Exploring Careers', 'Planning', 'Connections'],
+    tagsPer: 4,
+    sections: [
+      'Self-Awareness',
+      'Exploring Careers',
+      'Planning',
+      'Connections',
+      'Examining Influences',
+      'Résumés and Interviews',
+      'Budgeting',
+      'Post-Secondary Options',
+    ],
     titles: [
       'Strengths Inventory',
       'Career Interview Reflection',
       'Job Posting Analysis',
+      'Influences Map',
       'Volunteer Reflection',
+      'Résumé Draft',
+      'Monthly Budget Task',
       'Goal Setting Worksheet',
+      'Mock Interview',
+      'Post-Secondary Comparison',
       'Career Research Report',
+      'Capstone Plan Check-In',
     ],
     points: [],
+  },
+  french10: {
+    name: 'Core French 10',
+    grade: '10',
+    system: 'both',
+    size: 26,
+    tagsPer: 4,
+    sections: [
+      'Listening',
+      'Speaking',
+      'Reading',
+      'Writing',
+      'Vocabulary',
+      'Grammar',
+      'Culture',
+      'Communicating',
+      'Understanding',
+    ],
+    titles: [
+      'Unit 1 Vocabulary Quiz',
+      'Dialogue: At the Café',
+      'Listening Check 1',
+      'Reading: Une journée à Montréal',
+      'Paragraph: Ma famille',
+      'Verb Quiz: Present Tense',
+      'Culture Project: Carnaval',
+      'Listening Check 2',
+      'Dialogue: Shopping',
+      'Reading: Le Petit Prince Extract',
+      'Unit 2 Vocabulary Quiz',
+      'Paragraph: Mes vacances',
+      'Oral Presentation: Ma ville',
+      'Unit 2 Test',
+    ],
+    points: [13],
   },
 };
 
@@ -405,15 +599,22 @@ export function syntheticClass(kind, opts) {
       date_assigned: date,
       due_date: date,
       display_order: i,
-      tag_ids: points ? [] : [tagIds[i % 4], tagIds[(i + 1) % 4]],
+      tag_ids: points ? [] : Array.from({ length: k.tagsPer || 2 }, (_, n) => tagIds[(i + n) % tagIds.length]),
     };
   });
   const scoreRows = [];
   const tagRows = [];
   const ratings = [];
   const attendance = [];
+  // The competency each student is weakest in, cycling through the
+  // sections over the students whose profile scores every piece (lane H,
+  // Nov 1), so in a kind with its whole skill table as sections every
+  // skill is some student's next step and its frames are exercised.
+  const FULL = ['strong', 'steady', 'climb', 'struggling'];
+  let fullSeen = 0;
   students.forEach((st, si) => {
     const profile = PROFILES[si % PROFILES.length];
+    const focus = k.tagsPer && FULL.indexOf(profile) >= 0 ? fullSeen++ % tagIds.length : -1;
     let best = null;
     assessments.forEach((a, ai) => {
       const at = assessments.length > 1 ? ai / (assessments.length - 1) : 0;
@@ -431,7 +632,13 @@ export function syntheticClass(kind, opts) {
       const row = [si, ai, v, null, '', 0, null];
       scoreRows.push(row);
       tags.forEach((t, n) => {
-        const tv = profile === 'split' ? levelFor('split', at, t, r) : n ? clamp(v + (r() < 0.3 ? -1 : 0)) : v;
+        // A focus student's other competencies keep the assessment's own
+        // level and the focus one sits two below it, so the weakest is
+        // decided (the level now reads the latest pieces, where a one
+        // level dip can tie), not left to the wobble.
+        let tv =
+          profile === 'split' ? levelFor('split', at, t, r) : n && focus < 0 ? clamp(v + (r() < 0.3 ? -1 : 0)) : v;
+        if (t === focus) tv = clamp(tv - 2);
         tagRows.push([si, ai, t, tv, 0]);
       });
       if (!best || v >= best[2]) best = row;

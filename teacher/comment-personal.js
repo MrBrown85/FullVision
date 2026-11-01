@@ -1076,6 +1076,7 @@ window.PersonalBank = (function () {
     arts: 'Arts',
     career: 'Career Education',
     ela: 'English',
+    languages: 'Languages',
     math: 'Math',
     pe: 'PE',
     science: 'Science',

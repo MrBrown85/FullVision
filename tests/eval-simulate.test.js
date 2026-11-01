@@ -21,7 +21,8 @@ describe('the synthetic classes', () => {
     expect(new Set(kinds.map(k => k.system))).toEqual(new Set(['letter', 'both', 'proficiency']));
     const families = Object.keys(KINDS).map(kind => CommentBank.familyOf(loadClass(syntheticClass(kind), 1).cid));
     expect(families).not.toContain('');
-    expect(new Set(families).size).toBe(kinds.length);
+    // Every kind of class the skill table knows has a synthetic class.
+    expect(new Set(families)).toEqual(new Set(Object.keys(CommentBank.SKILLS)));
     expect(kinds.some(k => Number(k.grade) <= 9)).toBe(true);
     expect(kinds.some(k => Number(k.grade) >= 10)).toBe(true);
   });

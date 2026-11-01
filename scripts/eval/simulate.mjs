@@ -21,7 +21,8 @@
  *   --presses  how many presses of Generate Comment per class (1 when left
  *              out): press 2 is the second version of every comment
  *   --kinds    the synthetic classes to run (all when left out): history12,
- *              english10, science9, math11, pe8, art11, foods10, career10
+ *              english10, science9, math11, pe8, art11, music9, foods10,
+ *              adst8, career10, french10
  *   --no-demo  leave out Demo Mode's class
  *   --out      a folder outside the FullVision folder for simulate.json */
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
