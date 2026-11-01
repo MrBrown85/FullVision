@@ -48,9 +48,9 @@ describe('Core Competencies block', () => {
   it('reads points work as its level, not its points', () => {
     seed({ assessments: [cc('a', { scoreMode: 'points', maxPoints: 20 })], scores: [sc('a', 18)] });
     const row = ctRow(ReportBlocks.renderBlockCoreCompetencies(CID, STUDENT));
-    // 18 of 20 is 3.6: Extending, a 90% bar
+    // 18 of 20 is 90%: Extending on Points to Proficiency, a full bar
     expect(row).toContain('Extending');
-    expect(row).toContain('width:90%');
+    expect(row).toContain('width:100%');
   });
 
   it('leaves Excused work out and counts each Factor', () => {

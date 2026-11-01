@@ -12,8 +12,8 @@ import { runAccuracy } from '../scripts/eval/accuracy.mjs';
 import { generateClass } from '../scripts/eval/generate.mjs';
 
 const PSA = 4; // "Primary Source Analysis"
-// Out of 20, per student in roster order: 95%, 75%, 55%, 85%, 45%.
-const POINTS = [19, 15, 11, 17, 9];
+// Out of 20, per student in roster order: 95%, 75%, 55%, 90%, 45%.
+const POINTS = [19, 15, 11, 18, 9];
 
 /* The fixture's Letter class with one piece scored out of 20 points, on
    the BC Letter Bands preset (Counts As 3+ = 86, 4- = 92), so a level's %
@@ -54,12 +54,12 @@ describe('points work in a Letter class', () => {
     const { cid, student, f } = owen();
     const a = getAssessments(cid).find(x => x.title === 'Primary Source Analysis');
     const w = f.work.find(x => x.id === a.id);
-    expect(assessmentCellValue(cid, student.id, a)).toMatchObject({ kind: 'points', value: 17 });
+    expect(assessmentCellValue(cid, student.id, a)).toMatchObject({ kind: 'points', value: 18 });
     expect(w.pct).toBeCloseTo(getAssessmentGroupPercentage(cid, student.id, [a]).pct, 9);
-    expect(w.pct).toBeCloseTo(85, 9);
-    // Its level (3.4) as a % on the class's Counts As would be 87%, the
-    // wrong number.
-    expect(f.levelText(w.v)).toBe('87%');
+    expect(w.pct).toBeCloseTo(90, 9);
+    // Its level (Extending on Points to Proficiency) as a % on the class's
+    // Counts As would be 100%, the wrong number.
+    expect(f.levelText(w.v)).toBe('100%');
     // Proficiency work has no % of its own here.
     expect(f.work.filter(x => x.id !== a.id).every(x => x.pct === null)).toBe(true);
   });
@@ -86,8 +86,8 @@ describe('points work in a Letter class', () => {
     const { f } = owen();
     const ctx = CommentBank.context(f, {});
     expect(ctx.assignment).toBe('Primary Source Analysis');
-    expect(ctx.level).toBe('85%');
-    expect(CommentBank.fill(marked, ctx)).toContain('reached 85%.');
+    expect(ctx.level).toBe('90%');
+    expect(CommentBank.fill(marked, ctx)).toContain('reached 90%.');
     expect(CommentBank.fill(byId('n36'), ctx)).toContain('“Primary Source Analysis');
   });
 
@@ -96,8 +96,8 @@ describe('points work in a Letter class', () => {
     const ctx = CommentBank.context(f, {});
     const d = marked1(ctx);
     expect(CommentBank.verify(d, f, {}, { bank }).replaced).toEqual([]);
-    const wrong = marked1({ ...ctx, level: '87%' });
-    expect(wrong.text).toContain('reached 87%.');
+    const wrong = marked1({ ...ctx, level: '100%' });
+    expect(wrong.text).toContain('reached 100%.');
     const v = CommentBank.verify(wrong, f, {}, { bank });
     expect(v.replaced[0]).toMatchObject({ sentenceId: 'x-mark' });
     expect(v.replaced[0].failed).toContain('bestPiece');
@@ -123,8 +123,8 @@ describe('the Term Questionnaire’s best piece (At a Glance)', () => {
       ReportQuestionnaire.tqStudentIndex = ReportQuestionnaire.getTqStudents().findIndex(s => s.id === st.id);
       const html = ReportQuestionnaire.renderTermQuestionnaire(run.cid);
       const best = html.match(/<div class="qn-fact qn-best">[\s\S]*?<\/div>\s*<\/div>/)[0];
-      expect(best).toContain('Primary Source Analysis · 85%');
-      expect(best).not.toContain('87%');
+      expect(best).toContain('Primary Source Analysis · 90%');
+      expect(best).not.toContain('100%');
     } finally {
       if (hadDoc) globalThis.document = oldDoc;
       else delete globalThis.document;
