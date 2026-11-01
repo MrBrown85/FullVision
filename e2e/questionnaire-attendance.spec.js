@@ -55,12 +55,16 @@ test('Generate Comment uses the attendance totals once they are entered', async 
   await expect(page.locator('#tq-att-note')).toHaveText('Optional. Left out until entered.');
   await enter(page, 4, 2);
   await page.locator('#tq-generate').click();
-  // One attendance sentence (plan, Sentence grammar): numbers in words.
-  await expect(page.locator('#tq-narrative')).toHaveValue(/missed four classes and been late twice this term\./);
+  // One attendance sentence (plan, Sentence grammar) with both counts in
+  // the plan's number forms ("four classes", "twice"); the frame rotates
+  // (h60, h74-h78), so the fact is checked, not one wording.
+  const attendance = /[^.]*\bfour classes\b[^.]*\btwice\b[^.]*\.|[^.]*\btwice\b[^.]*\bfour classes\b[^.]*\./;
+  await expect(page.locator('#tq-narrative')).toHaveValue(attendance);
   // Its row: Attendance, tinted, "From Attendance above · new" (the States mockup).
   const row = page.locator('#tq-sentences .qn-srow', { has: page.locator('.qn-req-label:text-is("Attendance")') });
   await expect(row).toHaveCount(1);
   await expect(row).toHaveClass(/\battendance\b/);
-  await expect(row.locator('.qn-req-text')).toHaveText(/missed four classes and been late twice this term\./);
+  await expect(row.locator('.qn-req-text')).toHaveText(attendance);
+  await expect(row.locator('.qn-req-text')).toHaveText(/^[^.]*\.$/);
   await expect(row.locator('.qn-req-source')).toHaveText('From Attendance above · new');
 });
