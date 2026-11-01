@@ -3225,11 +3225,18 @@ window.PageGradebook = (function () {
   }
 
   /* ── Tooltip ─────────────────────────────────────────────── */
+  var _nameTipTimer = null;
   function _handleMouseover(e) {
     if (_graderOpen()) return;
     var name = e.target.closest('.gb-grid-rowhead-name');
     if (name) {
-      _showNameTip(name);
+      // A short pause first, so moving across the names doesn't flash cards.
+      if (name !== _tipSource) {
+        clearTimeout(_nameTipTimer);
+        _nameTipTimer = setTimeout(function () {
+          if (name.isConnected && name.matches(':hover')) _showNameTip(name);
+        }, 400);
+      }
       return;
     }
     var assessGroup = e.target.closest('.gb-grid-assess-group');
@@ -3265,7 +3272,8 @@ window.PageGradebook = (function () {
     gbTip.style.top = rect.bottom + 6 + 'px';
   }
 
-  /* Beside the name, or below it when there's no room to the right. */
+  /* Under the student's row (over it near the bottom of the window), so the
+     row and its scores stay in view. */
   function _showNameTip(name) {
     var gbTip = document.getElementById('gb-tooltip');
     var tipHtml = name.dataset.sid ? _nameTipHtml[name.dataset.sid] : null;
@@ -3274,13 +3282,11 @@ window.PageGradebook = (function () {
     gbTip.innerHTML = tipHtml;
     gbTip.style.display = 'block';
     _tipSource = name;
-    var rect = name.getBoundingClientRect();
-    var left = rect.right + 8;
-    var top = rect.top + rect.height / 2 - gbTip.offsetHeight / 2;
-    if (left + gbTip.offsetWidth > window.innerWidth - 12) {
-      left = rect.left;
-      top = rect.bottom + 6;
-    }
+    var row = name.closest('.gb-grid-rowhead') || name;
+    var rect = row.getBoundingClientRect();
+    var left = rect.left + 8;
+    var top = rect.bottom + 4;
+    if (top + gbTip.offsetHeight > window.innerHeight - 8) top = rect.top - gbTip.offsetHeight - 4;
     if (top < 8) top = 8;
     if (top + gbTip.offsetHeight > window.innerHeight - 8) top = window.innerHeight - gbTip.offsetHeight - 8;
     gbTip.style.left = left + 'px';
@@ -3337,6 +3343,7 @@ window.PageGradebook = (function () {
   }
 
   function _handleMouseout(e) {
+    if (e.target.closest && e.target.closest('.gb-grid-rowhead-name')) clearTimeout(_nameTipTimer);
     if (_tipSource) {
       var related = e.relatedTarget;
       if (!related || !_tipSource.contains(related)) _hideTip();

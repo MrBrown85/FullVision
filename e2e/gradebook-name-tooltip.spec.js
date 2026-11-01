@@ -22,6 +22,12 @@ for (const view of ['scores', 'detailed']) {
     await expect(tip).toContainText('Course Grade');
     await expect(tip).toContainText('Proficient (3.0)');
     await expect(tip).toContainText('Evidence in');
+    // The card sits under (or over) the row, never on it.
+    const [row, card] = await page.evaluate(() => [
+      document.querySelector('.gb-grid-rowhead-name').closest('.gb-grid-rowhead').getBoundingClientRect().toJSON(),
+      document.getElementById('gb-tooltip').getBoundingClientRect().toJSON(),
+    ]);
+    expect(card.top >= row.bottom || card.bottom <= row.top).toBe(true);
   });
 }
 
