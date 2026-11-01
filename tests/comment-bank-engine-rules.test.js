@@ -156,11 +156,19 @@ describe('strengths are skills from the table, never a bare competency label', (
     expect(v.replaced[0].sentenceId).toBe('n15');
     expect(v.replaced[0].failed).toContain('strength');
     expect(v.text).not.toContain('Evidence');
-    // The gate still holds: the sentence fails once Evidence is not clear of Perspective.
+    // The gate still holds: the sentence fails once Evidence is no longer
+    // among the strongest. (With Evidence and Perspective both past the
+    // gate, the one-skill wording still holds: it is what {strengths}
+    // falls back to when two skills run past 20 words, ctxFor.)
     const close = tomas({
-      comps: [comp('c1', 'Evidence', 3.2), comp('c2', 'Perspective', 3), comp('c3', 'Significance', 2.5)],
+      comps: [comp('c1', 'Evidence', 3), comp('c2', 'Perspective', 3.6), comp('c3', 'Significance', 3)],
     });
     expect(CommentBank.verify(asDrafted, close, {}).replaced[0].failed).toContain('strength');
+    const both = tomas({
+      comps: [comp('c1', 'Evidence', 3.2), comp('c2', 'Perspective', 3), comp('c3', 'Significance', 2.5)],
+    });
+    expect(CommentBank.strengthSkills(both).map(x => x.key)).toEqual(['evidence', 'perspective']);
+    expect(CommentBank.verify(asDrafted, both, {}).replaced).toEqual([]);
     expect(CommentBank.CLAIMS.strength(asDrafted.provenance[0], f)).toBe(true);
     expect(CommentBank.CLAIMS.strength(wrong.provenance[0], f)).toBe(false);
   });

@@ -318,6 +318,8 @@ describe('the taxonomy fields', () => {
       else expect(s.story, s.id).toBeUndefined();
     });
     expect(COMMENT_BANK.sentences.filter(s => s.skill).length).toBeGreaterThan(300);
-    expect(COMMENT_BANK.sentences.filter(s => s.standing).length).toBeGreaterThan(40);
+    // No sentence conditions on the standing word: the grade sentence says
+    // it once, so the Overall sentences that did were cut (2026-11-01).
+    expect(COMMENT_BANK.sentences.filter(s => s.standing).length).toBe(0);
   });
 });

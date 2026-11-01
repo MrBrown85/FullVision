@@ -257,7 +257,7 @@ describe('Work Habits frames', () => {
           id,
         ).toMatchObject({ habit: 'feedback', level: 2 });
     });
-    expect(got.hs32).toBe('Using feedback is the work habit to build next.');
+    expect(got.hs32).toBe('Using feedback is the work habit to build.');
   });
 
   it('two habits to build: hs08-hs10, hs34-hs37, the lower first', () => {
