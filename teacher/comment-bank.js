@@ -315,7 +315,7 @@ window.CommentBank = (function () {
       {
         key: 'wordProblems',
         name: 'Real-World Applications',
-        match: /word problem|real.?world|real.?life|applied|application|everyday|situation/i,
+        match: /word problem|real.?world|real.?life|applied|applications? (to|of|in)|everyday|situation/i,
         skill: 'change a word problem into an equation and explain what the answer means',
       },
       {
@@ -425,7 +425,7 @@ window.CommentBank = (function () {
       {
         key: 'performing',
         name: 'Ensemble and Stage',
-        match: /\bstage|ensemble|\bchoir|\bband\b|\bacting|repertoire|instrument/i,
+        match: /\bstage|ensemble(?! heritage)|\bchoir|\bband\b|\bacting|repertoire|instrument/i,
         skill: 'rehearse a part until the whole piece can be performed without a stop',
       },
       {
@@ -570,7 +570,7 @@ window.CommentBank = (function () {
       {
         key: 'sewing',
         name: 'Sewing and Textiles',
-        match: /\bsew|textile|garment|stitch|fabric\b|pattern|fashion|cloth/i,
+        match: /\bsew|knit|textile|garment|stitch|fabric\b|pattern|fashion|cloth/i,
         skill: 'read a pattern and sew each seam in the order it gives',
       },
       {

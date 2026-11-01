@@ -97,7 +97,7 @@ describe('the skill table against curriculum_by_course.json', () => {
       ['math', 'Notation and Units', 'notation'],
       ['math', 'Algebraic Expressions', 'notation'],
       ['math', 'Real-World Applications', 'wordProblems'],
-      ['math', 'Ethics and Applications', 'wordProblems'],
+      ['math', 'Applications of Trigonometry', 'wordProblems'],
       ['math', 'Procedures and Accuracy', 'procedures'],
       ['math', 'Mental Calculation', 'procedures'],
       // Career
@@ -118,6 +118,7 @@ describe('the skill table against curriculum_by_course.json', () => {
       ['adst', 'Complete Garments', 'sewing'],
       ['adst', 'Creating Patterns', 'sewing'],
       ['adst', 'Textile Structures', 'sewing'],
+      ['adst', 'Knitting and Fiber Joining', 'sewing'],
       ['adst', 'Cutting and Shaping Metal', 'fabricating'],
       ['adst', 'Lathe Operation', 'fabricating'],
       ['adst', 'Use Woodworking', 'fabricating'],
@@ -213,6 +214,8 @@ describe('the skill table against curriculum_by_course.json', () => {
       ['pe', 'Describe and assess strategies for managing substance use', 'strategy'],
       ['pe', 'Creating Marketing Campaigns', 'nutrition'],
       ['math', 'Orthographic Projections', 'graphs'],
+      ['math', 'Ethics and Applications', 'wordProblems'],
+      ['arts', 'Ensemble Heritage', 'performing'],
       ['languages', 'Designing Robotic Systems and Solutions', 'listening'],
     ];
     NOT.forEach(([fam, label, key]) => expect(keyOf(fam, label), fam + ': ' + label).not.toBe(key));
