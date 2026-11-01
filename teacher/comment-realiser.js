@@ -4,12 +4,12 @@
    plan's rules:
 
    - Name and pronouns. The student is named in the first sentence that
-     mentions them; later sentences use their pronouns, or the name again
-     when none are on file (every mention: FullVision never assumes
-     pronouns). Possessive is always ’s ("Chris’s"). A
-     [singular|plural] verb agrees with the student mention before it, so
-     singular they takes plural verbs ("they come to class ready").
-     Moving a sentence first moves the name to it (realise()).
+     mentions them; later sentences use their pronouns, or they/them/their
+     when none are on file (Colin, Nov 1: "a student with no gender can be
+     a they"), exactly as for they/them on file. Possessive is always ’s
+     ("Chris’s"). A [singular|plural] verb agrees with the student mention
+     before it, so singular they takes plural verbs ("they come to class
+     ready"). Moving a sentence first moves the name to it (realise()).
    - a or an by sound ("an A", "a B", "an F", "an IE", "an Extending").
    - Assignment titles quoted, the lesson number dropped; a title's own
      question mark stays inside the quotes, a sentence-ending period goes
@@ -210,11 +210,11 @@ window.CommentRealiser = (function () {
   var THEY = { subj: 'they', obj: 'them', poss: 'their', refl: 'themselves' };
 
   /* Who a sentence is about: { name, p: pronouns { subj, obj, poss, refl
-     }, onFile }. With no pronouns on file every mention is the name:
-     "they" only when they/them is on file. */
+     } }. With no pronouns (none given, or none on file) the student is
+     they/them/their, the same as they/them on file. */
   function _who(who) {
     who = who || {};
-    return { name: String(who.name || ''), p: who.p || THEY, onFile: !!who.onFile };
+    return { name: String(who.name || ''), p: who.p || THEY };
   }
   function possessive(name) {
     return name + '’s';
@@ -244,11 +244,10 @@ window.CommentRealiser = (function () {
       }
       if (tok.name || tok.ref) {
         var role = tok.name ? 'subj' : tok.ref;
-        // The name: the first mention in the comment, an explicit {name},
-        // and, with no pronouns on file, every mention (FullVision never
-        // assumes pronouns: "Ava’s best piece was “X”, where Ava linked …").
-        // The bank writes no reflexive, so no "Ava sees Ava".
-        var useName = !!tok.name || !who.onFile || (role !== 'refl' && !state.named);
+        // The name: the first mention in the comment and an explicit
+        // {name}; every other mention is a pronoun. The bank writes no
+        // reflexive, so no "Ava sees Ava".
+        var useName = !!tok.name || (role !== 'refl' && !state.named);
         var w;
         if (useName && who.name) {
           w = role === 'poss' ? possessive(who.name) : who.name;
@@ -298,8 +297,8 @@ window.CommentRealiser = (function () {
   }
 
   /* A comment's sentences in order, each filled for its place: the student
-     named in the first sentence that mentions them, pronouns after (or the
-     name again with none on file). sentences: the draft's sentences, each
+     named in the first sentence that mentions them, pronouns after
+     (they/them with none on file). sentences: the draft's sentences, each
      { text, toks, who } as Generate gives them, or { text } for teacher
      text, used exactly as typed (one that holds the name counts as naming
      the student). order: the new order, as positions or sentence ids;

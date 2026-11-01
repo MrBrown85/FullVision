@@ -938,8 +938,8 @@ window.CommentBank = (function () {
 
   /* The IE comment's habits sentence: the habits rated Consistently (keys,
      at most three, the grid's order) as one sentence, "He comes to class
-     ready, takes part and works well with others." The name in place of
-     the pronoun when none is on file. '' with none. As tokens for the
+     ready, takes part and works well with others." They/them when no
+     pronouns are on file. '' with none. As tokens for the
      realiser (strengthsTokens), the verb agreeing with whoever starts it. */
   function strengthsTokens(f, ks) {
     if (!ks || !ks.length) return null;
@@ -1022,7 +1022,7 @@ window.CommentBank = (function () {
     ];
   }
   /* The best-piece sentence where it usually sits, after the first: the
-     student's pronouns when on file, else the name again. o: { title, note,
+     student's pronouns, they/them when none are on file. o: { title, note,
      name, pronouns, onFile }. '' with no title. */
   function bestPieceSentence(o) {
     o = o || {};
@@ -2262,7 +2262,7 @@ window.CommentBank = (function () {
   }
 
   /* One sentence filled for the student where a sentence usually sits,
-     after the first: their pronouns when on file, else the name. A draft
+     after the first: their pronouns, they/them when none are on file. A draft
      puts each sentence in its place with realise(), which names the
      student in the first sentence that mentions them. opts.first: fill it
      as the comment's first sentence, naming the student. */
