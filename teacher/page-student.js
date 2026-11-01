@@ -1127,8 +1127,10 @@ window.PageStudent = (function () {
         '<span class="stu-assess-cat">' +
         _assessmentCategoryBadge(cid, a) +
         '</span>' +
+        // Complete and Incomplete take the Proficient and Emerging colours,
+        // as the Assignments ledger does; the grey chip fails dark mode.
         '<span class="stu-assess-score"><span class="stu-level stu-level-' +
-        (cell.level > 0 ? cell.level : 0) +
+        (cell.kind === 'complete' ? (cell.mark === 'complete' ? 3 : 1) : cell.level > 0 ? cell.level : 0) +
         '">' +
         esc(_cellText(cell, a)) +
         '</span></span>' +

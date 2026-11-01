@@ -422,7 +422,7 @@ function seedIfNeeded() {
 
   function getSci8CategoryId(assessment) {
     if (!assessment) return null;
-    if (assessment.scoreMode === 'points' || assessment.evidenceType === 'quiz')
+    if (assessment.scoreMode === 'points' || assessment.scoreMode === 'complete' || assessment.evidenceType === 'quiz')
       return SCI8_CATEGORY_IDS['sci8-cat-checks'];
     if (assessment.evidenceType === 'lab' || assessment.evidenceType === 'observation')
       return SCI8_CATEGORY_IDS['sci8-cat-labs'];
@@ -445,7 +445,7 @@ function seedIfNeeded() {
      rubric gets one sign for the whole assessment: a competency can sit in
      two criteria, and its score is shared by both. */
   function seedScoreMod(sid, a, row, level) {
-    if (a.scoreMode === 'points') return 0;
+    if (a.scoreMode === 'points' || a.scoreMode === 'complete') return 0;
     var key = sid + '|' + a.id + '|' + row;
     var h = 0;
     for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
@@ -464,11 +464,15 @@ function seedIfNeeded() {
     studentIds.forEach((sid, idx) => {
       sc[sid] = [];
       assessments.forEach(a => {
-        const baseScore = scoreMap[a.id] ? scoreMap[a.id][idx] : 0;
+        let baseScore = scoreMap[a.id] ? scoreMap[a.id][idx] : 0;
         if (baseScore === 0) return; // blank — not yet assessed
+        // Complete/Incomplete work: 1 is Complete, -1 is Incomplete (a 0).
+        if (a.scoreMode === 'complete') baseScore = baseScore > 0 ? COMPLETE_MAX_POINTS : 0;
         // Rubric work is scored per criterion, under the criterion's id.
         const rubric = a.rubricId ? rubricById[a.rubricId] : null;
-        const keys = rubric ? rubric.criteria.map(c => c.id) : a.tagIds || [];
+        // Untagged work scores under the class-wide key, as scoreTagIds does.
+        const tagged = a.tagIds && a.tagIds.length ? a.tagIds : [UNLINKED_TAG_ID];
+        const keys = rubric ? rubric.criteria.map(c => c.id) : tagged;
         keys.forEach(tagId => {
           const mod = seedScoreMod(sid, a, a.rubricId ? 'rubric' : tagId, baseScore);
           sc[sid].push({
@@ -690,10 +694,14 @@ function seedIfNeeded() {
         title: 'Periodic Table Scavenger Hunt',
         date: '2025-11-07',
         type: 'formative',
-        tagIds: ['IP', 'EM'],
+        // Complete/Incomplete work carries no competency: a mark is 100% or
+        // 0%, which would read as Extending or nothing on a competency.
+        tagIds: [],
         evidenceType: 'quiz',
         notes: 'Interactive activity matching elements to everyday uses.',
         coreCompetencyIds: ['CRT'],
+        scoreMode: 'complete',
+        maxPoints: COMPLETE_MAX_POINTS,
         created: new Date('2025-11-07').toISOString(),
       },
       {
@@ -823,15 +831,15 @@ function seedIfNeeded() {
       },
       {
         id: 'sci8q4',
-        title: 'Lab Safety Quiz',
+        title: 'Lab Safety Contract',
         date: '2025-11-05',
         type: 'formative',
-        tagIds: ['PI'],
+        tagIds: [],
         evidenceType: 'quiz',
-        notes: '',
+        notes: 'Signed safety contract, returned with a family signature.',
         coreCompetencyIds: ['PAR'],
-        scoreMode: 'points',
-        maxPoints: 10,
+        scoreMode: 'complete',
+        maxPoints: COMPLETE_MAX_POINTS,
         created: new Date('2025-11-05').toISOString(),
       },
       {
@@ -1015,6 +1023,8 @@ function seedIfNeeded() {
       {
         id: 'rub_sci8_lab',
         name: 'Lab Investigation Rubric',
+        // An Advanced Rubric: a checklist inside each level (seedLabChecks).
+        style: 'advanced',
         criteria: [
           {
             id: 'crit_sci8_lab_inquiry',
@@ -1026,6 +1036,21 @@ function seedIfNeeded() {
               2: 'Follows a provided experimental procedure with some support in identifying variables.',
               1: 'Participates in experiments with significant teacher guidance; struggles to identify variables independently.',
             },
+            checks: [
+              { id: 'crit_sci8_lab_inquiry_1a', level: 1, label: 'Follows the steps with help', displayOrder: 0 },
+              { id: 'crit_sci8_lab_inquiry_2a', level: 2, label: 'Names the variable being tested', displayOrder: 0 },
+              {
+                id: 'crit_sci8_lab_inquiry_2b',
+                level: 2,
+                label: 'Follows the procedure on their own',
+                displayOrder: 1,
+              },
+              { id: 'crit_sci8_lab_inquiry_3a', level: 3, label: 'Writes a testable question', displayOrder: 0 },
+              { id: 'crit_sci8_lab_inquiry_3b', level: 3, label: 'Keeps other variables the same', displayOrder: 1 },
+              { id: 'crit_sci8_lab_inquiry_3c', level: 3, label: 'Follows the safety steps', displayOrder: 2 },
+              { id: 'crit_sci8_lab_inquiry_4a', level: 4, label: 'Tests more than one variable', displayOrder: 0 },
+              { id: 'crit_sci8_lab_inquiry_4b', level: 4, label: 'Explains why the design is fair', displayOrder: 1 },
+            ],
           },
           {
             id: 'crit_sci8_lab_data',
@@ -1037,6 +1062,16 @@ function seedIfNeeded() {
               2: 'Collects data with some inaccuracies; identifies obvious patterns but error analysis is incomplete.',
               1: 'Data collection is unreliable; struggles to identify patterns or sources of error without direct support.',
             },
+            checks: [
+              { id: 'crit_sci8_lab_data_1a', level: 1, label: 'Records some data', displayOrder: 0 },
+              { id: 'crit_sci8_lab_data_2a', level: 2, label: 'Records data in a table', displayOrder: 0 },
+              { id: 'crit_sci8_lab_data_2b', level: 2, label: 'Spots one pattern', displayOrder: 1 },
+              { id: 'crit_sci8_lab_data_3a', level: 3, label: 'Records accurate data with units', displayOrder: 0 },
+              { id: 'crit_sci8_lab_data_3b', level: 3, label: 'Describes the main pattern', displayOrder: 1 },
+              { id: 'crit_sci8_lab_data_3c', level: 3, label: 'Names a source of error', displayOrder: 2 },
+              { id: 'crit_sci8_lab_data_4a', level: 4, label: 'Explains a surprising result', displayOrder: 0 },
+              { id: 'crit_sci8_lab_data_4b', level: 4, label: 'Suggests how to reduce error', displayOrder: 1 },
+            ],
           },
           {
             id: 'crit_sci8_lab_comm',
@@ -1048,6 +1083,16 @@ function seedIfNeeded() {
               2: 'Presents basic findings with limited scientific vocabulary; connections to real-world applications are surface-level.',
               1: 'Struggles to present findings coherently; scientific vocabulary is absent or misused.',
             },
+            checks: [
+              { id: 'crit_sci8_lab_comm_1a', level: 1, label: 'Shares a result', displayOrder: 0 },
+              { id: 'crit_sci8_lab_comm_2a', level: 2, label: 'States the result in a sentence', displayOrder: 0 },
+              { id: 'crit_sci8_lab_comm_2b', level: 2, label: 'Uses some science words', displayOrder: 1 },
+              { id: 'crit_sci8_lab_comm_3a', level: 3, label: 'Explains the results clearly', displayOrder: 0 },
+              { id: 'crit_sci8_lab_comm_3b', level: 3, label: 'Uses science vocabulary correctly', displayOrder: 1 },
+              { id: 'crit_sci8_lab_comm_3c', level: 3, label: 'Connects to a real situation', displayOrder: 2 },
+              { id: 'crit_sci8_lab_comm_4a', level: 4, label: 'Explains with precision', displayOrder: 0 },
+              { id: 'crit_sci8_lab_comm_4b', level: 4, label: 'Makes a new real-world connection', displayOrder: 1 },
+            ],
           },
         ],
       },
@@ -1093,6 +1138,8 @@ function seedIfNeeded() {
       {
         id: 'rub_sci8_report',
         name: 'Scientific Report Rubric',
+        // A Single-Point Rubric: only the Proficient wording shows.
+        style: 'single_point',
         criteria: [
           {
             id: 'crit_sci8_report_hyp',
@@ -1468,7 +1515,8 @@ function seedIfNeeded() {
       sci8a10: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 3, 3, 2, 3, 3, 3],
       sci8a11: [3, 4, 2, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 2, 4, 3, 3, 2, 3],
       sci8a12: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 3, 4, 2, 3, 2, 3],
-      sci8a13: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 2, 3, 3, 4, 3, 3],
+      // Complete/Incomplete: 1 is Complete, -1 is Incomplete.
+      sci8a13: [1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 1, -1, 1, 1, -1, 1, 1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       sci8a14: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 2, 3, 4, 3, 3, 2, 3],
       sci8a15: [3, 4, 3, 3, 3, 2, 4, 3, 4, 3, 3, 2, 4, 3, 2, 3, 3, 2, 3, 3, 3, 2, 3, 3, 3, 3, 4],
       sci8a16: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 3, 4, 2, 3, 2, 3],
@@ -1480,7 +1528,7 @@ function seedIfNeeded() {
       sci8q1: [8, 10, 6, 8, 9, 5, 7, 9, 10, 8, 7, 5, 10, 8, 6, 5, 7, 4, 8, 7, 8, 6, 10, 7, 9, 5, 8],
       sci8q2: [12, 15, 10, 13, 12, 7, 11, 13, 15, 12, 11, 8, 14, 12, 9, 8, 11, 6, 12, 11, 13, 9, 14, 10, 13, 8, 12],
       sci8q3: [7, 10, 6, 8, 8, 5, 7, 8, 10, 7, 7, 5, 9, 7, 6, 5, 8, 4, 7, 7, 8, 6, 9, 7, 8, 5, 7],
-      sci8q4: [9, 10, 7, 9, 8, 6, 8, 9, 10, 8, 8, 6, 10, 8, 7, 6, 8, 5, 8, 8, 9, 7, 10, 8, 9, 6, 8],
+      sci8q4: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
       sci8q5: [8, 10, 7, 8, 8, 5, 7, 8, 10, 8, 7, 5, 10, 7, 6, 5, 7, 4, 8, 8, 7, 6, 10, 7, 8, 5, 8],
       sci8q6: [12, 15, 9, 12, 12, 7, 11, 12, 15, 11, 10, 7, 14, 11, 8, 7, 12, 6, 11, 12, 12, 9, 14, 10, 12, 7, 11],
       sci8q7: [7, 10, 6, 8, 7, 4, 7, 8, 10, 8, 7, 5, 9, 7, 5, 5, 7, 4, 7, 7, 8, 6, 9, 6, 8, 5, 7],
@@ -1794,6 +1842,64 @@ function seedIfNeeded() {
           'Proposing a study on the effect of music on plant growth. Hypothesis is testable and her materials list is thorough.';
       });
     saveScores('sci8', sci8ScoreNotes);
+
+    // Single-Point Rubric notes on the Biodiversity Field Journal: Areas for
+    // Growth (critNote) and Going Beyond (critBeyond), on the criterion row.
+    const sci8SpNotes = getScores('sci8');
+    [
+      ['st3', 'crit_sci8_report_results', 'critNote', 'Say what the tally shows before you explain why.'],
+      [
+        'st2',
+        'crit_sci8_report_hyp',
+        'critBeyond',
+        'Added a second site as a comparison and explained why it was a fair test.',
+      ],
+      [
+        'st6',
+        'crit_sci8_report_writing',
+        'critNote',
+        'Write each observation as a full sentence with the date and the place.',
+      ],
+      [
+        'st13',
+        'crit_sci8_report_results',
+        'critBeyond',
+        'Graphed species counts by day and pointed out the dip after the rainstorm.',
+      ],
+    ].forEach(([sid, critId, field, text]) => {
+      (sci8SpNotes[sid] || [])
+        .filter(e => e.assessmentId === 'sci8a18' && e.tagId === critId)
+        .forEach(e => {
+          e[field] = text;
+        });
+    });
+    saveScores('sci8', sci8SpNotes);
+
+    // Advanced Rubric ticks on every lab: each criterion gets every box up to
+    // the student's level. A + adds the first box of the next level; a −
+    // leaves the last box of the level empty, so the suggestion sits one
+    // level lower and the teacher's pick wins.
+    const labRubric = sci8Rubrics.find(r => r.id === 'rub_sci8_lab');
+    const labTicks = {};
+    sci8SeedAssessments
+      .filter(a => a.rubricId === 'rub_sci8_lab')
+      .forEach(a => {
+        STIDS.forEach((sid, idx) => {
+          const level = sci8ScoreMap[a.id] ? sci8ScoreMap[a.id][idx] : 0;
+          if (!level) return;
+          const mod = seedScoreMod(sid, a, 'rubric', level);
+          const ids = [];
+          labRubric.criteria.forEach(crit => {
+            const upTo = crit.checks.filter(c => c.level <= level);
+            if (mod < 0) upTo.pop();
+            upTo.forEach(c => ids.push(c.id));
+            const next = crit.checks.find(c => c.level === level + 1);
+            if (mod > 0 && next) ids.push(next.id);
+          });
+          labTicks[sid + ':' + a.id] = ids;
+        });
+      });
+    saveRubricChecks('sci8', labTicks);
 
     // Quick observations
     saveQuickObs(

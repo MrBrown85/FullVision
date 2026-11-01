@@ -4442,9 +4442,9 @@ window.PageAssignments = (function () {
         var sec = getSectionForTag(activeCourse, tid);
         var color = cssColor(sec ? sec.color : 'var(--text-3)');
         return (
+          // The section colour on the border only: cyan or green text on the
+          // bar's grey is under 4.5:1.
           '<span class="rsg-descriptor-tag" style="border-color:' +
-          color +
-          ';color:' +
           color +
           '">' +
           esc(_rubricTagName(tag, sec)) +
