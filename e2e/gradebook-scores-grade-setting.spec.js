@@ -30,3 +30,18 @@ test('a Both class shows the proficiency and the letter grade', async ({ page })
   expect(lines[0]).toBe('3.0');
   expect(lines[1]).toMatch(/%$/);
 });
+
+test('a Both class stacks each score so the columns stay under their titles', async ({ page }) => {
+  await page.evaluate(cid => {
+    COURSES[cid].gradingSystem = 'both';
+    clearProfCache();
+    PageGradebook.render();
+  }, TEST_COURSE.id);
+  const cell = page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-001"]');
+  await expect(cell.locator('.gb-cell-both')).toHaveText('3.075%');
+  const [head, td] = await page.evaluate(() => [
+    document.querySelector('.gb-grid-colhead').getBoundingClientRect().width,
+    document.querySelector('#gb-data td.gb-scores-cell').getBoundingClientRect().width,
+  ]);
+  expect(Math.abs(head - td)).toBeLessThan(1.5);
+});

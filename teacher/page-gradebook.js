@@ -1607,7 +1607,9 @@ window.PageGradebook = (function () {
         } else if (cell.kind === 'points' || cell.kind === 'level') {
           var r = cell.level;
           cellStyle = 'background:' + PROF_TINT[r] + ';color:' + PROF_COLORS[r];
-          display = cell.text + (cell.late ? lateMarkHtml() : '');
+          display =
+            (cell.kind === 'level' ? _levelCellHtml(cid, cell.value) : esc(cell.text)) +
+            (cell.late ? lateMarkHtml() : '');
           // Warning for out-of-range: above 4 on proficiency work, above the
           // extra-credit cap (twice the maximum) on points work.
           if (cell.outOfRange) cellClass = ' gb-scores-warning';
@@ -1677,7 +1679,7 @@ window.PageGradebook = (function () {
         '<td class="gb-scores-avg"><span class="gb-avg-val" style="color:' +
         (PROF_COLORS[level] || PROF_COLORS[0]) +
         '">' +
-        (isPointsScored(a) || isCompletionScored(a) ? _csvAverageText(a, stats) : formatLevel(cid, stats.avg)) +
+        (isPointsScored(a) || isCompletionScored(a) ? _csvAverageText(a, stats) : _levelCellHtml(cid, stats.avg)) +
         '</span></td>';
     });
     html += '</tr>';
@@ -1917,6 +1919,19 @@ window.PageGradebook = (function () {
       ' graded">' +
       text +
       '</span></td>'
+    );
+  }
+
+  /* A level in a Scores cell. A Both class shows the proficiency over its
+     percent, so "3.0 · 75%" fits the 48px column its title leans over. */
+  function _levelCellHtml(cid, value) {
+    if (courseGradeMode(cid) !== 'both') return esc(formatLevel(cid, value));
+    return (
+      '<span class="gb-cell-both"><span>' +
+      esc(formatLevelAs(cid, value, 'proficiency')) +
+      '</span><small>' +
+      esc(formatLevelAs(cid, value, 'percent')) +
+      '</small></span>'
     );
   }
 
