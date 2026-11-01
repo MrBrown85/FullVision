@@ -124,8 +124,9 @@ describe('the habits sentence in a draft', () => {
   it('one weak habit: names only that one', () => {
     for (let seed = 1; seed <= 6; seed++) {
       const [s] = habitsSentence(facts({ habits: { ...all(4), feedback: 2 } }), {}, seed);
-      expect(s.text).toMatch(/using feedback/i);
-      expect(s.text).not.toMatch(/ and /);
+      // The fact: Uses Feedback is the one habit named, in the summary frame
+      // or in a Habit Ratings frame for it (they share a tier).
+      expect(s.text).toMatch(/feedback/i);
       expect(s.text).not.toMatch(/class time|others|taking part|devices|completing/);
     }
   });
@@ -237,8 +238,10 @@ describe('redrawHabits: a rating changed after Generate', () => {
   it('writes only the habits sentence again', () => {
     const prev = draftFor({ ...all(4), feedback: 2 });
     const d = redraw(prev, { ...all(4), devices: 1 });
-    expect(d.habits.before).toMatch(/using feedback/i);
-    expect(d.habits.after).toMatch(/using devices well/i);
+    // The fact in each: the one habit below Usually, in whichever frame.
+    expect(d.habits.before).toMatch(/feedback/i);
+    expect(d.habits.after).toMatch(/device|phone|screen/i);
+    expect(d.habits.after).not.toMatch(/feedback/i);
     expect(others(d)).toEqual(others(prev));
     expect(d.sentences.map(x => x.step)).toEqual(prev.sentences.map(x => x.step));
     expect(d.text).toBe(prev.text.replace(d.habits.before, d.habits.after));
@@ -355,17 +358,18 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
     expect(ReportBlocks.getTermId()).toBe(TERM);
     RQ.tqGenerate();
     const first = box.value;
-    expect(first).toMatch(/using feedback/i);
+    expect(first).toMatch(/feedback/i);
     RQ.tqRate('devices', 1);
     expect(box.value).toMatch(/using devices well and using feedback/i);
-    const strip = t => t.replace(/[^.]*work habits?[^.]*\./i, '');
+    // Everything but the habits sentence (the one naming feedback) is as it was.
+    const strip = t => t.replace(/[^.]*feedback[^.]*\./i, '');
     expect(strip(box.value)).toBe(strip(first));
     expect(saved()).toBe(box.value);
   });
 
   it('an edited habits sentence survives a rating change', () => {
     RQ.tqGenerate();
-    const habit = box.value.match(/[^.]*using feedback[^.]*\./i)[0].trim();
+    const habit = box.value.match(/[^.]*feedback[^.]*\./i)[0].trim();
     box.value = box.value.replace(habit, 'He is learning to act on feedback.');
     RQ.tqNarrativeInput();
     const edited = box.value;
@@ -374,7 +378,7 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
     // Another sentence edited, the habits sentence untouched: only it changes.
     RQ.tqGenerate();
     const again = box.value;
-    const sentence = again.match(/[^.]*using feedback[^.]*\./i)[0].trim();
+    const sentence = again.match(/[^.]*feedback[^.]*\./i)[0].trim();
     box.value = again.replace(/^[^.]*\./, 'Gabriel worked hard.');
     RQ.tqRate('devices', 4);
     RQ.tqRate('feedback', 4);

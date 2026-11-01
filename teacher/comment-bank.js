@@ -2348,6 +2348,9 @@ window.CommentBank = (function () {
       // about them, as tokens: the realiser names the student in the first
       // sentence that mentions them (plan PR 9).
       _who: _whoOfFacts(f),
+      // The one habit rated Sometimes or Rarely, when exactly one is: the
+      // habit a Habit Ratings frame may be drafted for (habitCellFits).
+      _habitAlone: hsum.build.length === 1 ? hsum.build[0] : '',
       _toks: {
         bestPiece: top ? bestPieceTokens({ title: top.title, note: top.note }) : null,
         habitStrengths: hsum.excellent ? null : strengthsTokens(f, strongThree),
@@ -2812,7 +2815,9 @@ window.CommentBank = (function () {
      the order with no story to tell. */
   var DRAFT_STEPS = [
     { key: 'grade', part: 'now', groups: ['Grade'], says: 'grade' },
-    { key: 'habits', part: 'habits', groups: ['Work Habits'] },
+    // The summary sentence, or (habitCellFits) a Habit Ratings frame for
+    // the one habit rated below Usually.
+    { key: 'habits', part: 'habits', groups: ['Work Habits', 'Habit Ratings'] },
     { key: 'attendance', part: 'habits', groups: ['Attendance'] },
     // The work labelled Missing, then the class's late-work line after it
     // (plan PR 8): only for a student with work not handed in.
@@ -3275,7 +3280,22 @@ window.CommentBank = (function () {
     STORY_LEADS.forEach(function (k) {
       if (needs.indexOf(k) >= 0 && ctx[k]) n++;
     });
+    // A Habit Ratings frame is matched on the same ratings as the summary
+    // sentence, so its habit condition makes it no more specific: the two
+    // share a tier and rotate, least used first (habitCellFits).
+    if (s.habit && s.part === 'habits') n--;
     return n;
+  }
+
+  /* Whether a Habit Ratings frame (bank hl001-hl120: one habit at one
+     rating, `habit` and `level`) may fill the habits step: only when exactly
+     one habit is rated Sometimes or Rarely and the frame is that habit's,
+     so the draft names it specifically; the frame shares the summary's tier
+     (specificity) and rotates with its frames, least used first. The
+     summary sentence is the only pick everywhere else; Other Wording and
+     Browse Sentences offer every frame whose rating matches (fits()). */
+  function habitCellFits(s, ctx) {
+    return !!s.habit && !!ctx._habitAlone && ctx._habitAlone === s.habit;
   }
 
   /* Whether a sentence can fill a step for this student, before the rest of
@@ -3298,6 +3318,7 @@ window.CommentBank = (function () {
       })
     )
       return false;
+    if (step.key === 'habits' && s.habit && !habitCellFits(s, ctx)) return false;
     if (step.prefer && ctx[step.prefer] && (s.needs || []).indexOf(step.prefer) < 0) return false;
     if (
       step.never &&
@@ -4971,6 +4992,7 @@ window.CommentBank = (function () {
     completesFromRecord: completesFromRecord,
     effectiveHabits: effectiveHabits,
     habitSummary: habitSummary,
+    habitCellFits: habitCellFits,
     habitWords: habitWords,
     facts: facts,
     notHandedIn: notHandedIn,

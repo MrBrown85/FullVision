@@ -2802,7 +2802,10 @@ window.ReportQuestionnaire = (function () {
 
   /* Up to two other sentences that fit the same facts as a row's: the
      same step, fitting the student, claiming the same things, not in the
-     comment already, the least used in the class first. */
+     comment already, the least used in the class first. On a Habit Ratings
+     row (one habit at one rating, `habit` and `level`), only that cell's
+     other frames; on the summary row, the summary's frames and any cell
+     frame whose rating matches. */
   function alternatives(row, ctx, usage, taken, bank) {
     var step = row.step ? _stepDef(row.step) : null;
     if (!step || step.line || !row.s) return [];
@@ -2810,6 +2813,7 @@ window.ReportQuestionnaire = (function () {
       return (s.claims || []).slice().sort().join(',');
     };
     var same = claims(row.s);
+    var cell = row.s.habit ? { habit: row.s.habit, level: row.s.level } : null;
     var at = {};
     (bank || COMMENT_BANK).sentences.forEach(function (s, i) {
       at[s.id] = i;
@@ -2817,6 +2821,7 @@ window.ReportQuestionnaire = (function () {
     return (bank || COMMENT_BANK).sentences
       .filter(function (s) {
         if (s.id === row.id || s.part !== step.part || step.groups.indexOf(s.group) < 0) return false;
+        if (cell && (s.habit !== cell.habit || s.level !== cell.level)) return false;
         if (taken[s.id] || !CommentBank.fits(s, ctx) || claims(s) !== same) return false;
         if (step.prefer && ctx[step.prefer] && (s.needs || []).indexOf(step.prefer) < 0) return false;
         if (

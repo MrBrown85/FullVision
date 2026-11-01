@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 782 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(782);
+  it('has 902 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(902);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(782);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(902);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -557,19 +557,20 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   };
 
   // The habits part: Completes Work from the record is the one strong
-  // habit, so the four Strong Habits frames (hs11, hs13-hs15) fit.
-  it('knows the Demo class is Science from its name, and offers Cece 55 sentences (4, 15, 11, 25)', () => {
+  // habit, so the four Strong Habits frames (hs11, hs13-hs15) fit, and the
+  // five Habit Ratings frames for Completes Work at Consistently.
+  it('knows the Demo class is Science from its name, and offers Cece 60 sentences (9, 15, 11, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([4, 15, 11, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(55);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 15, 11, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(60);
   });
 
-  it('offers Jasper 56 (4, 15, 12, 25), by the name he goes by', () => {
+  it('offers Jasper 61 (9, 15, 12, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([4, 15, 12, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(56);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 15, 12, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(61);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -640,7 +641,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
-    expect(habits.fit).toBe(4 + 6);
+    expect(habits.fit).toBe(4 + 6 + 5);
     // The attendance frames for both counts (plan, Sentence grammar: both
     // halves said, the exact counts): h60 and the five both-count frames.
     const att = habits.rows.filter(r => r.group === 'Attendance');
@@ -659,7 +660,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), { habits: rated });
     const d = CommentBank.draft(ctx, { seed: 1 });
     expect(d.sentences.filter(x => x.step === 'habits').map(x => x.text)).toEqual([
-      expect.stringMatching(/taking part in class/i),
+      // Takes Part is the one habit rated below Usually: the summary frame
+      // or a Habit Ratings frame for it names it.
+      expect.stringMatching(/tak(e|es|ing) part|discussion|question/i),
     ]);
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
     // The Demo class has no closing sentence or support lines set, so the
