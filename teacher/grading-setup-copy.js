@@ -460,6 +460,7 @@ window.GradingSetupCopy = (function () {
   }
 
   /* ── Dialogs ───────────────────────────────────────────────── */
+  // html-safe: group keys and labels are constants; class names and summaries through esc
   function _groupsHtml(srcCid, only) {
     if (!srcCid) return '';
     var src = describeSource(srcCid);
@@ -491,6 +492,7 @@ window.GradingSetupCopy = (function () {
     return groups;
   }
 
+  // html-safe: class ids and names through esc; type and name are fixed strings from callers
   function _classRows(targets, type, name) {
     var row = function (c) {
       return (

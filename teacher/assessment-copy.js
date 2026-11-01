@@ -475,6 +475,7 @@ window.AssessmentCopy = (function () {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'copy-dialog-title');
+    // html-safe: title and labels through esc; opts.html comes from the dialog callers in assessment-copy, grading-setup-copy, rubric-library and page-assignments, which escape every name
     overlay.innerHTML =
       '<div class="confirm-card copy-dialog-card">' +
       '<div class="confirm-title" id="copy-dialog-title">' +

@@ -520,6 +520,7 @@ window.PageAssignments = (function () {
   /* The grading controls for one assessment, for the students given: the
      Complete/Incomplete grid, the points grid, the rubric or the
      competency grid, as the assessment is scored. */
+  // html-safe: every grading builder it calls escapes names, labels and comments; levels and points are numbers
   function _graderHtml(cid, a, tagObjs, students, scores, oneStudent) {
     var one = oneStudent && students.length === 1 ? students[0] : null;
     if (isDibelsScored(a)) return one ? _dibelsCardHtml(cid, a, one) : _dibelsGridHtml(cid, a, students);
@@ -850,6 +851,7 @@ window.PageAssignments = (function () {
   function _dibelsPeriodOf(a) {
     return _dibelsPeriods[a.id] || dibelsPeriodFor(courseToday(activeCourse));
   }
+  // html-safe: tone and label come from DIBELS_LEVELS for a computed level; text through esc
   function _dibelsChip(level, text) {
     if (!level) return '<span class="dbl-chip is-empty">—</span>';
     return (
@@ -918,6 +920,7 @@ window.PageAssignments = (function () {
       '.'
     );
   }
+  // html-safe: fixed labels and _dibelsChip for computed levels
   function _dibelsLevelPillsHtml(cid, a, sid) {
     var f = _dibelsFigures(cid, sid, a.id, _dibelsPeriodOf(a));
     return (
@@ -932,7 +935,7 @@ window.PageAssignments = (function () {
       '<input type="text" inputmode="numeric" class="dbl-input' +
       (big ? ' is-big' : '') +
       '" value="' +
-      (value == null ? '' : value) +
+      (value == null ? '' : esc(value)) +
       '" aria-label="' +
       esc(label) +
       '" data-action-blur="dibelsField" data-sid="' +
@@ -998,6 +1001,7 @@ window.PageAssignments = (function () {
       '</div></section></div>'
     );
   }
+  // html-safe: counts are numbers; row names, cut points and window names are constants; ids are ours
   function _dibelsCountsHtml(cid, a, students, period) {
     var counts = { orf: {}, maze: {} };
     var tested = 0;
@@ -1449,6 +1453,7 @@ window.PageAssignments = (function () {
     );
   }
 
+  // html-safe: titles, descriptions, category/rubric/module names through esc; colours through cssColor or fixed palettes; grading builders reviewed
   function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules) {
     var html =
       '<div class="settings-grid" style="display:grid;grid-template-columns:1fr;gap:20px;align-items:start;padding:12px 12px 20px">';
@@ -1560,7 +1565,7 @@ window.PageAssignments = (function () {
           })
           .join('') +
         (a.collaboration && a.collaboration !== 'individual'
-          ? '<span class="collab-badge">' + a.collaboration[0].toUpperCase() + a.collaboration.slice(1) + '</span>'
+          ? '<span class="collab-badge">' + esc(a.collaboration[0].toUpperCase() + a.collaboration.slice(1)) + '</span>'
           : '') +
         (window.AssessmentCopy ? AssessmentCopy.renderCardCopies(cid, a) : '') +
         '<span class="assess-date">' +
@@ -1703,7 +1708,7 @@ window.PageAssignments = (function () {
         '<div class="mod-folder' +
         (folderOpen ? ' open' : '') +
         '" style="--mod-color:' +
-        esc(u.color || '#6366f1') +
+        cssColor(u.color || '#6366f1') +
         '" data-module-id="' +
         u.id +
         '" draggable="true" data-module-drag="' +
@@ -1719,10 +1724,10 @@ window.PageAssignments = (function () {
         _MODULE_CHEVRON +
         '</span>' +
         '<span class="mod-folder-color" style="background:' +
-        (u.color || '#6366f1') +
+        cssColor(u.color || '#6366f1') +
         '" title="Change colour" data-action="openColorPicker" data-stop-prop="true">' +
         '<input type="color" value="' +
-        (u.color || '#6366f1') +
+        esc(u.color || '#6366f1') +
         '" data-action-change="moduleColor" data-moduleid="' +
         u.id +
         '">' +
@@ -1942,6 +1947,7 @@ window.PageAssignments = (function () {
 
     // Render toolbar
     var result = renderAssessToolbar(cid, assessments);
+    // html-safe: renderAssessToolbar escapes course names, category names, search text and student names
     document.getElementById('page-toolbar-mount').innerHTML = result.toolbarHtml;
 
     // Render assessment list
@@ -1999,7 +2005,7 @@ window.PageAssignments = (function () {
       '" data-section="' +
       sec.id +
       '" style="border-left:3px solid ' +
-      sec.color +
+      cssColor(sec.color) +
       ';padding-left:8px;margin-bottom:4px">' +
       '<input type="checkbox" value="' +
       tag.id +
@@ -2009,7 +2015,7 @@ window.PageAssignments = (function () {
       (checked ? ' checked' : '') +
       ' data-action-change="tagCheckbox">' +
       '<span class="af-tag-id" style="color:' +
-      sec.color +
+      cssColor(sec.color) +
       '">' +
       esc(tag.code || tag.shortName || '') +
       '</span>' +
@@ -2020,6 +2026,7 @@ window.PageAssignments = (function () {
     );
   }
 
+  // html-safe: titles, descriptions, names and dates through esc; colours through cssColor or constants; ids are ours
   function renderAssessForm(cid, assess) {
     var sections = getSections(cid);
     var isEdit = !!assess;
@@ -2125,13 +2132,13 @@ window.PageAssignments = (function () {
       '<div class="af-field" style="flex:1;max-width:200px">' +
       '<label class="af-label">Date Assigned</label>' +
       '<input class="af-input" id="af-date-assigned" type="date" value="' +
-      dateAssigned +
+      esc(dateAssigned) +
       '" data-action-change="autoSetDueDate">' +
       '</div>' +
       '<div class="af-field" style="flex:1;max-width:200px">' +
       '<label class="af-label">Due Date (optional)</label>' +
       '<input class="af-input" id="af-due" type="date" value="' +
-      defaultDue +
+      esc(defaultDue) +
       '">' +
       '</div>' +
       '</div>';
@@ -2223,7 +2230,7 @@ window.PageAssignments = (function () {
       '<div class="af-field">' +
       '<span class="af-label" id="af-scoremode-label">Scoring Mode</span>' +
       '<input type="hidden" id="af-scoremode" value="' +
-      scoreMode +
+      esc(scoreMode) +
       '">' +
       '<div class="af-mode-cards" role="radiogroup" aria-labelledby="af-scoremode-label">' +
       SCORE_MODE_CARDS.map(function (m) {
@@ -2262,7 +2269,7 @@ window.PageAssignments = (function () {
       '<label class="af-label" for="af-maxpoints">Max Points</label>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
       '<input class="af-input" id="af-maxpoints" type="number" min="1" max="9999" value="' +
-      maxPoints +
+      esc(maxPoints) +
       '" style="width:72px;text-align:center">' +
       '<div class="seg" id="af-maxpoints-picks" role="group" aria-label="Common maximums">' +
       [10, 25, 50, 100]
@@ -2328,7 +2335,7 @@ window.PageAssignments = (function () {
         html +=
           '<div style="margin-bottom:8px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
           '<span style="width:8px;height:8px;border-radius:50%;background:' +
-          g.color +
+          cssColor(g.color) +
           ';flex-shrink:0"></span>' +
           '<span style="font-size:var(--text-xs);font-weight:600;color:var(--text-2);">' +
           esc(g.name) +
@@ -2955,6 +2962,7 @@ window.PageAssignments = (function () {
   }
 
   /* ── Scoring Functions ──────────────────────────────────── */
+  // html-safe: marks and labels are constants; aid and sid are our ids
   function completionButtonsHtml(aid, sid, mark) {
     return (
       '<span class="ldg-seg" role="group" aria-label="Mark">' +
@@ -3069,6 +3077,7 @@ window.PageAssignments = (function () {
         else if (r.querySelector('.cmp-incomplete.active')) n.i++;
         else n.u++;
       });
+      // html-safe: the three counts are numbers
       tally.innerHTML =
         '<span><b>' +
         n.c +
@@ -3226,7 +3235,7 @@ window.PageAssignments = (function () {
   }
 
   function renderPointsGrid(cid, a, students, scores) {
-    var max = a.maxPoints || 100;
+    var max = Number(a.maxPoints) || 100;
     var statuses = getAssignmentStatuses(cid);
     var html =
       '<div class="ldg-grid pts-grid" data-aid="' +
@@ -3588,6 +3597,7 @@ window.PageAssignments = (function () {
   /* A level button's contents. The chosen level carries its − | + inside
      it, as an Advanced rubric's chosen tile does; a click on the level
      around them still clears it. */
+  // html-safe: level names and +/- buttons are constants for numeric levels
   function _levelInnerHtml(l, modLevel, mod) {
     if (!modLevel || l !== modLevel) return PROF_LABELS[l];
     var m = normalizeScoreMod(l, mod);
@@ -4442,6 +4452,7 @@ window.PageAssignments = (function () {
   /* One criterion for one student in the whole-class grid. On an Advanced
      rubric with its checklist open, the suggestion sits under the tools and
      a column of boxes under each level button, inside the row. */
+  // html-safe: criterion names, check labels and comments through esc; levels are numbers; ids are ours
   function _rubricCriterionRowHtml(cid, aid, sid, crit, studentScores, advanced, single) {
     var tagMods = [];
     var tagScores = rubricCriterionScoreKeys(crit).map(function (tid) {
@@ -4578,12 +4589,13 @@ window.PageAssignments = (function () {
     var levelNames = PROF_LABELS;
     var levelColors = { 4: 'var(--score-4)', 3: 'var(--score-3)', 2: 'var(--score-2)', 1: 'var(--score-1)' };
     var bar = _ensureDescriptorBar();
+    // html-safe: criterion name and level name through esc; colour from a fixed map
     bar.querySelector('.rsg-descriptor-label').innerHTML =
       esc(crit.name) +
       ' <span style="color:' +
       (levelColors[level] || 'var(--text-3)') +
       '">\u2014 ' +
-      (levelNames[level] || level) +
+      esc(levelNames[level] || level) +
       '</span>';
     var tagsHtml = (crit.tagIds || [])
       .map(function (tid) {
@@ -5152,7 +5164,7 @@ window.PageAssignments = (function () {
         '</span><label class="rubric-level-pts" title="Points for ' +
         L.name +
         '"><input class="rubric-level-value" type="number" step="0.5" min="0" value="' +
-        pts +
+        esc(pts) +
         '" data-crit="' +
         ci +
         '" data-level="' +
@@ -5671,6 +5683,7 @@ window.PageAssignments = (function () {
       '" data-stop-prop="true" title="Delete" aria-label="Delete overall comment">✕</button></div>'
     );
   }
+  // html-safe: comment text and pill labels through esc; dates are formatted Dates; ids are ours
   function _commentEntriesHtml(cid, sid, aid) {
     var obs = getAssignmentObs(cid, sid, aid);
     var overall = _overallCommentHtml(cid, sid, aid);
@@ -5686,7 +5699,7 @@ window.PageAssignments = (function () {
           var pills =
             (sent
               ? '<span class="obs-pill obs-pill-type" data-sentiment="' +
-                o.sentiment +
+                esc(o.sentiment) +
                 '">' +
                 esc(sent.label) +
                 '</span>'
@@ -5861,6 +5874,7 @@ window.PageAssignments = (function () {
     var count = _assignmentCommentCount(cid, sid, aid);
     document.querySelectorAll('.comment-btn').forEach(function (btn) {
       if (btn.dataset.sid === sid && btn.dataset.aid === aid)
+        // html-safe: count is a number
         btn.innerHTML = count > 0 ? 'Comment <span class="comment-count">' + count + '</span>' : 'Comment';
     });
   }
@@ -5951,6 +5965,7 @@ window.PageAssignments = (function () {
       };
       document.body.appendChild(overlay);
     }
+    // html-safe: student, criterion and assessment names and the note through esc; limits are numbers
     overlay.innerHTML =
       '<div class="comment-popover crit-comment-popover" role="dialog" aria-modal="true" aria-labelledby="crit-comment-title"><div class="comment-popover-header"><div class="crit-comment-heading"><div class="comment-popover-title" id="crit-comment-title">' +
       esc(name) +
@@ -7461,6 +7476,7 @@ window.PageAssignments = (function () {
     // save that redraws the controls (a points box on blur) doesn't swap out
     // the button being clicked.
     if (!dialog.firstChild)
+      // html-safe: fixed markup and icon constants; text is set with textContent below
       dialog.innerHTML =
         '<div class="grader-toolbar">' +
         '<div class="grader-toolbar-start"></div>' +
@@ -7502,6 +7518,7 @@ window.PageAssignments = (function () {
     dialog.querySelector('[data-grader="prev"]').disabled = !(i > 0);
     dialog.querySelector('[data-grader="next"]').disabled = !(i >= 0 && i < _grader.studentIds.length - 1);
     dialog.querySelector('.grader-toolbar-start').innerHTML = _graderPrintButton(cid, a);
+    // html-safe: a.id is our id; _graderHtml is reviewed
     dialog.querySelector('.grader-body').innerHTML =
       '<div class="assess-card open active" id="ac-' +
       a.id +
@@ -7521,6 +7538,7 @@ window.PageAssignments = (function () {
   /* Print Rubric on rubric work, Print on everything else but DIBELS: on
      competency-level work it prints the levels and feedback, on points and
      Complete/Incomplete work the score or mark and feedback. */
+  // html-safe: fixed labels and icon; a.id is our id
   function _graderPrintButton(cid, a) {
     if (isDibelsScored(a)) return '';
     var label = a.rubricId && getRubricById(cid, a.rubricId) ? 'Print Rubric' : 'Print';
@@ -7560,6 +7578,7 @@ window.PageAssignments = (function () {
     setTimeout(_syncStatusLocks, 0);
   }
   // The Missing | Excused | Late control's buttons, in the order given.
+  // html-safe: status keys and labels are constants; aid and sid are our ids
   function _graderStatusButtons(aid, sid, status, order) {
     return order
       .map(function (key) {
@@ -7636,6 +7655,7 @@ window.PageAssignments = (function () {
     // runs this, and new buttons under the mouse before it is released
     // lose the click.
     if (_grader.statusHtml !== statusHtml) {
+      // html-safe: statusHtml is built by _graderStatusButtons
       dialog.querySelector('.grader-status').innerHTML = statusHtml;
       _grader.statusHtml = statusHtml;
     }
