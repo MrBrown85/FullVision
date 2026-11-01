@@ -482,6 +482,7 @@ export async function mockAuth(page) {
         evidence_type: a.evidenceType || '',
         rubric_id: a.rubricId || null,
         module_id: a.moduleId || null,
+        core_competency_ids: a.coreCompetencyIds || [],
         collab_mode: null,
         collab_config: {
           pairs: a.pairs || [],
