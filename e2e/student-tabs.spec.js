@@ -180,7 +180,8 @@ test('Grade Breakdown shows each category with its share, and Group By groups th
   // Each section is its own card; the chart's points say what they are.
   await expect(page.locator('#stu-panel.stu-panel-cards > .stu-bd-section')).toHaveCount(4);
   await expect(page.locator('.stu-bar-key')).toContainText('Proficient');
-  await page.locator('.stu-chart-dot').first().click();
+  // The last point: points work at one level a few days apart can overlap, and the newest sits on top.
+  await page.locator('.stu-chart-dot').last().click();
   await expect(page.locator('.stu-chart-dot.show .stu-chart-tip')).toBeVisible();
   await expect(page.locator('.stu-rt-head').last()).toContainText('Start to Now');
   for (const view of ['growth', 'month', 'strengths']) {
