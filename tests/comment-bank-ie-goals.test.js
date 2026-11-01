@@ -31,13 +31,16 @@ const required = d =>
     .map(byId)
     .filter(s => s && (s.id === 'gr06' || IE_GROUPS.indexOf(s.group) > 0))
     .map(s => [s.group, (s.when || {}).ieProblem || '']);
-const requiredFor = problem => [
-  ['Grade', ''],
-  ['IE Problem', problem],
-  ['IE Plan', problem],
-  ['IE Deadline', ''],
-  ['IE Meeting', ''],
-];
+/* No Deadline sentence until a date is picked (Nov 2): `dated` false
+   leaves it out. */
+const requiredFor = (problem, dated = true) =>
+  [
+    ['Grade', ''],
+    ['IE Problem', problem],
+    ['IE Plan', problem],
+    ['IE Deadline', ''],
+    ['IE Meeting', ''],
+  ].filter(p => dated || p[0] !== 'IE Deadline');
 const stepText = (d, step) => (d.sentences.find(x => x.step === step) || {}).text || '';
 
 const CID = 'course-ie-goals';
@@ -198,7 +201,7 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     expect(CommentBank.ieOffered(factsNow())).toBe(true);
   });
 
-  it('chosen, writes the Required IE parts in order, with [date] until a deadline is picked', () => {
+  it('chosen, writes the Required IE parts in order, with no Deadline sentence until a deadline is picked', () => {
     seed();
     rate({ reportingBasis: 'ie' });
     const f = factsNow();
@@ -208,13 +211,14 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     expect(CommentBank.ieProblemOf(f)).toBe('marks');
     for (let n = 1; n <= 6; n++) {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed: n });
-      expect(required(d), 'seed ' + n).toEqual(requiredFor('marks'));
+      expect(required(d), 'seed ' + n).toEqual(requiredFor('marks', false));
       expect(d.ids[0]).toBe('gr06');
       expect(d.ids.slice(1).filter(claimsGrade)).toEqual([]);
       // The problem states both counts, in whichever of its frames.
       expect(stepText(d, 'ieProblem'), 'seed ' + n).toMatch(/\bthree\b.*\beight\b|\beight\b.*\bthree\b/);
-      // The deadline, in whichever of its frames, says [date] until one is picked.
-      expect(stepText(d, 'ieDeadline'), 'seed ' + n).toContain('[date]');
+      // No Deadline sentence, in any of its frames, until a date is picked.
+      expect(stepText(d, 'ieDeadline'), 'seed ' + n).toBe('');
+      expect(d.text, 'seed ' + n).not.toContain('[date]');
       expect(d.text).not.toMatch(/earning a/);
       expect(d.replaced).toEqual([]);
     }
@@ -228,7 +232,7 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
     expect(stepText(d, 'ieProblem')).toMatch(/\beight\b/);
     expect(stepText(d, 'ieProblem')).toMatch(/\bno marks?\b|\bnone has a mark\b|\bnot yet have a mark\b/);
-    expect(required(d)).toEqual(requiredFor('noMarks'));
+    expect(required(d)).toEqual(requiredFor('noMarks', false));
     expect(d.replaced).toEqual([]);
   });
 
@@ -285,7 +289,7 @@ describe('Automatic IE: under 50% before the course ends', () => {
     expect(ReportQuestionnaire.basisChoices(f).ie).toBe(false);
     expect(CommentBank.ieProblemOf(f)).toBe('low');
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(required(d)).toEqual(requiredFor('low'));
+    expect(required(d)).toEqual(requiredFor('low', false));
     expect(stepText(d, 'ieProblem')).toContain('below 50%');
     expect(d.replaced).toEqual([]);
   });

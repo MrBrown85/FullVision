@@ -1523,7 +1523,7 @@ window.ReportQuestionnaire = (function () {
     var sid = student.id;
     var termId = getTermId();
     var rating = getStudentTermRating(cid, sid, termId) || {};
-    var text = plainComment(rating.narrative || '');
+    var text = _shownText(rating);
     var earlier = _earlierReports(cid, sid, termId);
     if (_commentTab !== 'this' && earlier.indexOf(_commentTab) < 0) _commentTab = 'this';
     var thisTab = _commentTab === 'this';
@@ -1955,6 +1955,7 @@ window.ReportQuestionnaire = (function () {
      "December 18", or [date] until one is picked), as a whole: "December 1"
      is not in "December 18". */
   function _holdsDate(text, was) {
+    if (!was) return false;
     var at = String(text || '').indexOf(was);
     while (at >= 0) {
       if (!/[0-9]/.test(text.charAt(at + was.length))) return true;
@@ -1987,9 +1988,56 @@ window.ReportQuestionnaire = (function () {
     );
   }
 
-  /* A day picked: saved with the reporting basis for this report, and the
-     deadline sentence in the comment says the new date in place of [date]
-     (or the date picked before), whichever frame the sentence is. */
+  /* Where the Deadline sentence goes among the rows: after the Plan, else
+     before the Support, Meeting or Closing row, else last (the IEPath
+     mockup's order: Plan, Deadline, Support, Meeting). */
+  function deadlineAt(rows) {
+    var at = -1;
+    rows.forEach(function (r, i) {
+      if (r.step === 'iePlan') at = i + 1;
+    });
+    if (at >= 0) return at;
+    at = rows.findIndex(function (r) {
+      return r.step === 'support' || r.step === 'ieMeeting' || r.step === 'closer';
+    });
+    return at >= 0 ? at : rows.length;
+  }
+
+  /* The Deadline sentence's row once a date is picked: the frame a draft
+     would use for the student now (the class's usage counted, last term's
+     sentences left out), filled with the date. null when none fits. */
+  function _deadlineRow(st, f) {
+    var ctx = _bankContext(_activeCourse, st, f);
+    var termId = getTermId();
+    var key = _rowKey(st);
+    var d = CommentBank.draft(ctx, {
+      quiet: true,
+      seed: _lastSeed[key] || CommentBank.seedFor(st.id + '|' + termId) + 1,
+      comments: _classmateComments(_activeCourse, st.id, termId),
+      exclude: lastTermIds(_activeCourse, st.id, termId),
+    });
+    var x = (d.sentences || []).find(function (y) {
+      return y.step === 'ieDeadline';
+    });
+    var s = x ? _bankById(x.id) : CommentBank.stepPool(_stepDef('ieDeadline'), ctx, COMMENT_BANK)[0];
+    return s ? rowFromSentence(s, ctx, 'ieDeadline') : null;
+  }
+
+  /* The rows written as the comment and saved, without the box (the screen
+     redraws after). */
+  function _saveRows(st, rows) {
+    var key = _rowKey(st);
+    _rows[key] = rows;
+    var text = composeRows(rows);
+    upsertTermRating(_activeCourse, st.id, getTermId(), { narrative: text });
+    _syncLast(key, rows, text);
+  }
+
+  /* A day picked: saved with the reporting basis for this report. The
+     comment has no Deadline sentence until then: picking the first date
+     puts it in at its place (deadlineAt); a new date replaces the date in
+     that sentence only (the date picked before, as a whole), whichever
+     frame it is. */
   function tqPickDeadline(iso) {
     var st = _current();
     if (!st || !/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return;
@@ -2004,11 +2052,12 @@ window.ReportQuestionnaire = (function () {
       reportingBasis: rating.reportingBasis || 'grade',
       ieDeadline: iso,
     });
-    _facts(st, true);
-    var text = plainComment((getStudentTermRating(_activeCourse, st.id, termId) || {}).narrative || '');
-    var key = _activeCourse + '|' + st.id + '|' + termId;
+    var f = _facts(st, true);
+    var text = _shownText(getStudentTermRating(_activeCourse, st.id, termId));
+    var key = _rowKey(st);
     var last = _lastDraft[key];
-    var before = was !== now ? _deadlineSentence(text, was, last, _rowsFor(st, _facts(st))) : '';
+    var rows = text.trim() ? _rowsFor(st, f) : [];
+    var before = was ? _deadlineSentence(text, was, last, rows) : '';
     var after = before ? before.replace(was, now) : '';
     if (before && after !== before && text.indexOf(before) >= 0) {
       upsertTermRating(_activeCourse, st.id, termId, { narrative: text.replace(before, after) });
@@ -2028,11 +2077,42 @@ window.ReportQuestionnaire = (function () {
           if (r.raw) delete r.raw.toks;
         });
       }
+    } else if (
+      !before &&
+      rows.length &&
+      CommentBank.reportPath(f) === 'ie' &&
+      !rows.some(function (r) {
+        return r.step === 'ieDeadline';
+      })
+    ) {
+      // No Deadline sentence yet: it goes in at its place, with the date.
+      var row = _deadlineRow(st, f);
+      if (row) {
+        rows.splice(deadlineAt(rows), 0, row);
+        _saveRows(st, rows);
+      }
     }
+    // A comment shown without its old [date] sentence (_shownText) is saved
+    // as shown.
+    var now2 = getStudentTermRating(_activeCourse, st.id, termId) || {};
+    if (text.trim() && plainComment(now2.narrative || '').indexOf('[date]') >= 0 && !now2.approvedAt)
+      upsertTermRating(_activeCourse, st.id, termId, { narrative: _shownText(now2) });
     _cal = null;
     rerender();
     var b = document.getElementById('tq-deadline-btn');
     if (b) b.focus();
+  }
+
+  /* The comment as the screen shows it. One saved before Nov 2 may still
+     say [date] in its Deadline sentence: while it is not approved, the
+     sentence is left out while no deadline is picked, else it says the
+     date (CommentBank.withDeadline). Nothing is written on load; the
+     cleaned text is saved the next time the teacher edits, generates,
+     picks a date or approves. An approved comment is never changed
+     (approval always waited for a picked date). */
+  function _shownText(rating) {
+    var text = plainComment((rating && rating.narrative) || '');
+    return rating && !rating.approvedAt ? CommentBank.withDeadline(text, rating.ieDeadline) : text;
   }
 
   /* ── The Required sentences ──────────────────────────────── */
@@ -2103,7 +2183,7 @@ window.ReportQuestionnaire = (function () {
         : '';
     return `<div class="qn-req-row${flag ? ' flag' : ''}${path !== 'ie' ? ' statement' : ''}${date ? ' has-cal' : ''}"${_rowAttr(i)}>
           ${handle || ''}<div class="qn-req-part"><span class="qn-req-label">${esc(p.label)}</span><span class="qn-req-chip">Required</span></div>
-          <div class="qn-req-body"><span class="qn-req-text">${esc(p.text)}</span>${sourceHtml}</div>
+          <div class="qn-req-body">${p.text ? `<span class="qn-req-text">${esc(p.text)}</span>` : ''}${sourceHtml}</div>
           ${ctrl}
           ${date ? _calendarHtml(picked) : ''}
         </div>`;
@@ -2529,7 +2609,7 @@ window.ReportQuestionnaire = (function () {
     var key = _rowKey(student);
     if (_rows[key]) return _rows[key];
     var rating = getStudentTermRating(_activeCourse, student.id, getTermId()) || {};
-    var text = plainComment(rating.narrative || '').trim();
+    var text = _shownText(rating).trim();
     if (!text) return [];
     _rows[key] = recoverRows(text, _bankContext(_activeCourse, student, f), rating.draftMeta);
     return _rows[key];
@@ -3210,6 +3290,21 @@ window.ReportQuestionnaire = (function () {
     var items = _units(rows).map(function (u) {
       return { unit: u, i: rows.indexOf(u[0]) };
     });
+    // An IE comment has no Deadline sentence until a date is picked: its
+    // Required row stays, with Pick a Date, where the sentence will go.
+    if (ie && !has.ieDeadline) {
+      var at = deadlineAt(rows);
+      var pos =
+        at < rows.length
+          ? items.findIndex(function (it) {
+              return it.unit.indexOf(rows[at]) >= 0;
+            })
+          : -1;
+      items.splice(pos < 0 ? items.length : pos, 0, {
+        unit: [{ step: 'ieDeadline', placeholder: true, text: '' }],
+        i: -1,
+      });
+    }
     var extra = [];
     if (!ie && f.notHandedIn && f.notHandedIn.count > 0 && !has.notHandedIn) extra.push('notHandedIn');
     if (!has.support) extra.push('support');
@@ -5458,6 +5553,8 @@ window.ReportQuestionnaire = (function () {
     },
     tqDeadlineMonth: tqDeadlineMonth,
     tqPickDeadline: tqPickDeadline,
+    deadlineAt: deadlineAt,
+    shownText: _shownText,
     deadlineSentence: _deadlineSentence,
     tqLine: tqLine,
     tqLineChange: tqLineChange,

@@ -467,12 +467,12 @@ describe('the IE deadline frames', () => {
     });
   });
 
-  it('every frame fits on the IE path, says [date] until one is picked, then the date, and verifies', () => {
+  it('no frame fits until a date is picked; then each says the date and verifies', () => {
     const none = CommentBank.context(ieFacts(''), {});
     const picked = CommentBank.context(ieFacts('2026-12-18'), {});
+    expect(none.ieDeadline).toBe('');
     frames.forEach(s => {
-      expect(CommentBank.fits(s, none), s.id).toBe(true);
-      expect(CommentBank.fill(s, none, { first: true }), s.id).toContain('[date]');
+      expect(CommentBank.fits(s, none), s.id).toBe(false);
       const text = CommentBank.fill(s, picked, { first: true });
       expect(text, s.id).toContain('December 18');
       expect(
@@ -481,25 +481,50 @@ describe('the IE deadline frames', () => {
       expect(
         verified(s, text, CommentBank.provenance(s, picked), ieFacts('2027-01-08'), 'ieDeadline').replaced.length,
       ).toBe(1);
+      // With the date cleared, the sentence fails and nothing stands in.
+      const v = verified(s, text, CommentBank.provenance(s, picked), ieFacts(''), 'ieDeadline');
+      expect(v.replaced, s.id).toEqual([{ sentenceId: s.id, failed: expect.arrayContaining(['deadline']), by: null }]);
+      expect(v.sentences, s.id).toEqual([]);
     });
   });
-  it('the deadline picker finds the deadline sentence by its date, whichever frame it is, and replaces the date', () => {
-    const RQ = ReportQuestionnaire;
-    const none = CommentBank.context(ieFacts(''), {});
+
+  it('verify fails any deadline sentence without a real date: [date] goes, or says the date once one is picked', () => {
     const picked = CommentBank.context(ieFacts('2026-12-18'), {});
     frames.forEach(s => {
-      const before = CommentBank.fill(s, none, { first: true });
+      const legacy = CommentBank.fill(s, picked, { first: true }).replace('December 18', '[date]');
+      const pv = Object.assign(CommentBank.provenance(s, picked), { values: { ieDeadline: '[date]' } });
+      const none = verified(s, legacy, pv, ieFacts(''), 'ieDeadline');
+      expect(none.text, s.id).toBe('');
+      expect(none.replaced[0], s.id).toMatchObject({ sentenceId: s.id, failed: ['deadline'], by: null });
+      const dated = verified(s, legacy, pv, ieFacts('2026-12-18'), 'ieDeadline');
+      expect(dated.text, s.id).toBe(CommentBank.fill(s, picked, { first: true }));
+      expect(dated.text).not.toContain('[date]');
+      // A sentence the teacher kept that still says [date] is held to the same rule.
+      const kept = { sentenceId: 'kept:ieDeadline', part: 'go', claims: [], factKeys: [], values: {}, kept: true };
+      expect(verified(s, legacy, kept, ieFacts(''), 'ieDeadline').text).toBe('');
+      expect(verified(s, legacy, kept, ieFacts('2026-12-18'), 'ieDeadline').text).toContain('December 18');
+    });
+  });
+
+  it('the deadline picker finds the deadline sentence by its date, whichever frame it is, and replaces the date', () => {
+    const RQ = ReportQuestionnaire;
+    const picked = CommentBank.context(ieFacts('2026-12-18'), {});
+    const moved = CommentBank.context(ieFacts('2027-01-08'), {});
+    frames.forEach(s => {
+      const before = CommentBank.fill(s, picked, { first: true });
       const text = 'Noor’s mark this term is IE. ' + before + ' Please contact me so we can talk about this plan.';
       // From the draft's record of the step, else from the text.
       const last = { sentences: [{ step: 'ieDeadline', text: before }] };
-      expect(RQ.deadlineSentence(text, '[date]', last, null), s.id).toBe(before);
-      expect(RQ.deadlineSentence(text, '[date]', null, null), s.id).toBe(before);
-      expect(RQ.deadlineSentence(text, '[date]', null, [{ step: 'ieDeadline', text: before }]), s.id).toBe(before);
-      const after = before.replace('[date]', 'December 18');
-      expect(after, s.id).toBe(CommentBank.fill(s, picked, { first: true }));
+      expect(RQ.deadlineSentence(text, 'December 18', last, null), s.id).toBe(before);
+      expect(RQ.deadlineSentence(text, 'December 18', null, null), s.id).toBe(before);
+      expect(RQ.deadlineSentence(text, 'December 18', null, [{ step: 'ieDeadline', text: before }]), s.id).toBe(before);
+      const after = before.replace('December 18', 'January 8');
+      expect(after, s.id).toBe(CommentBank.fill(s, moved, { first: true }));
       const again = text.replace(before, after);
-      expect(RQ.deadlineSentence(again, 'December 18', null, null), s.id).toBe(after);
-      expect(RQ.deadlineSentence(again, '[date]', null, null), s.id).toBe('');
+      expect(RQ.deadlineSentence(again, 'January 8', null, null), s.id).toBe(after);
+      expect(RQ.deadlineSentence(again, 'December 18', null, null), s.id).toBe('');
+      // No date picked before: there is no sentence to find.
+      expect(RQ.deadlineSentence(text, '', null, null), s.id).toBe('');
     });
   });
 
