@@ -566,11 +566,10 @@ function _levelPoints(cid, value) {
    no reporting terms never ends, so it shows IE. With no class given, F. */
 function percentageToLetter(R, cid) {
   if (R == null) return null;
-  if (R >= 86) return 'A';
-  if (R >= 73) return 'B';
-  if (R >= 67) return 'C+';
-  if (R >= 60) return 'C';
-  if (R >= 50) return 'C-';
+  // Every band but the last (F, which turns on whether the course ended).
+  for (var i = 0; i < BC_LETTER_BANDS.length - 1; i++) {
+    if (R >= BC_LETTER_BANDS[i].min) return BC_LETTER_BANDS[i].label;
+  }
   return cid == null || courseHasEnded(cid) ? 'F' : 'IE';
 }
 
@@ -1876,7 +1875,10 @@ function courseGradeMode(cid) {
 }
 
 function _percentLevel(pct) {
-  return pct >= 86 ? 4 : pct >= 73 ? 3 : pct >= 60 ? 2 : 1;
+  for (var i = 0; i < BC_LETTER_BANDS.length; i++) {
+    if (pct >= BC_LETTER_BANDS[i].min) return BC_LETTER_BANDS[i].level;
+  }
+  return 1;
 }
 
 /* A level from 0 to 4 as the class shows it; `empty` (default "—") when
@@ -2295,22 +2297,13 @@ function classColumnAverageText(cid, assessment, res) {
    A Both class counts by level, the grade it shows first. Each band has the
    `level` its colour comes from and the `ids` of its students; students
    with nothing to show yet aren't counted. */
-var _LETTER_BANDS = [
-  { label: 'A', min: 86 },
-  { label: 'B', min: 73 },
-  { label: 'C+', min: 67 },
-  { label: 'C', min: 60 },
-  { label: 'C-', min: 50 },
-  { label: 'F', min: 0 }, // IE until the course ends (percentageToLetter)
-];
-
 /* The letter band above a course % (as shown): { letter, min }, the next
    letter up and the % it starts at (82.9 → A at 86). Null at A or with no
    %. Under 50 the next letter is C-. */
 function nextLetterBand(R) {
   if (R == null || isNaN(Number(R))) return null;
-  for (var i = _LETTER_BANDS.length - 1; i >= 0; i--) {
-    if (_LETTER_BANDS[i].min > Number(R)) return { letter: _LETTER_BANDS[i].label, min: _LETTER_BANDS[i].min };
+  for (var i = BC_LETTER_BANDS.length - 1; i >= 0; i--) {
+    if (BC_LETTER_BANDS[i].min > Number(R)) return { letter: BC_LETTER_BANDS[i].label, min: BC_LETTER_BANDS[i].min };
   }
   return null;
 }
@@ -2319,7 +2312,7 @@ function classGradeDistribution(cid, studentIds) {
   var bands;
   if (courseGradeMode(cid) === 'letter') {
     var under50 = percentageToLetter(0, cid);
-    bands = _LETTER_BANDS.map(function (b) {
+    bands = BC_LETTER_BANDS.map(function (b) {
       return { label: b.min === 0 ? under50 : b.label, level: _percentLevel(b.min), ids: [] };
     });
     (studentIds || []).forEach(function (sid) {
