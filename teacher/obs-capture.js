@@ -34,15 +34,6 @@ window.ObsCapture = (function () {
      inside the app does not lose it. */
   var _drafts = {};
 
-  function _esc(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
   function _focus(el) {
     if (el && typeof el.focus === 'function') el.focus();
   }
@@ -380,7 +371,7 @@ window.ObsCapture = (function () {
       '<span class="' +
       cls +
       ' obsc-pill-competency" title="Linked competency">' +
-      _esc(label) +
+      esc(label) +
       '</span>' +
       (lvl
         ? '<span class="' +
@@ -388,7 +379,7 @@ window.ObsCapture = (function () {
           ' obsc-pill-level" data-level="' +
           ob.level +
           '" title="Looks like this level. Evidence only, not a grade.">Looks ' +
-          _esc(lvl) +
+          esc(lvl) +
           '</span>'
         : '')
     );
@@ -443,7 +434,7 @@ window.ObsCapture = (function () {
       '<textarea class="obsc-input obs-note-box" id="' +
       p +
       'capture-input" rows="2" autocomplete="off" aria-label="Observation note" placeholder="' +
-      _esc(opts.placeholder || 'What did you notice?') +
+      esc(opts.placeholder || 'What did you notice?') +
       '"></textarea>' +
       '</div>' +
       '<div class="obsc-slot" data-slot="input"></div>' +
@@ -468,7 +459,7 @@ window.ObsCapture = (function () {
         '" data-obsc="' +
         action +
         '"' +
-        (o.value != null ? ' data-value="' + _esc(o.value) + '"' : '') +
+        (o.value != null ? ' data-value="' + esc(o.value) + '"' : '') +
         (o.id ? ' id="' + o.id + '"' : '') +
         (o.pressed != null ? ' aria-pressed="' + !!o.pressed + '"' : '') +
         (o.menu ? ' aria-haspopup="listbox" aria-expanded="' + (state.menu === o.menu) + '"' : '') +
@@ -495,9 +486,9 @@ window.ObsCapture = (function () {
           : '<button type="button" class="obsc-x" data-obsc="' +
             removeAction +
             '" data-value="' +
-            _esc(value) +
+            esc(value) +
             '" aria-label="Remove ' +
-            _esc(o.plain || '') +
+            esc(o.plain || '') +
             '">&times;</button>') +
         '</span>'
       );
@@ -511,7 +502,7 @@ window.ObsCapture = (function () {
             ? MComponents.avatarColor(s.id)
             : 'var(--text-3)';
       var ini = ((s.first || s.name || '?').charAt(0) + (s.last || '').charAt(0)).toUpperCase();
-      return '<i class="obsc-av" style="background:' + color + '" aria-hidden="true">' + _esc(ini) + '</i>';
+      return '<i class="obsc-av" style="background:' + color + '" aria-hidden="true">' + esc(ini) + '</i>';
     }
 
     /* The Student line, like an email's To line. */
@@ -524,11 +515,11 @@ window.ObsCapture = (function () {
       state.students.forEach(function (sid) {
         var s = byId[sid];
         if (!s) return;
-        h += removable(avatarHtml(s) + _esc(s.name), 'removeStudent', sid, {
+        h += removable(avatarHtml(s) + esc(s.name), 'removeStudent', sid, {
           cls: 'obsc-chip-student',
           locked: opts.lockStudents,
           plain: s.name,
-          attrs: ' data-sid="' + _esc(sid) + '"',
+          attrs: ' data-sid="' + esc(sid) + '"',
         });
       });
       if (!opts.lockStudents) {
@@ -544,7 +535,7 @@ window.ObsCapture = (function () {
       h += '<span class="obsc-sep" aria-hidden="true"></span><span class="obsc-group" role="group" aria-label="Type">';
       TYPE_KEYS.forEach(function (k) {
         var info = (typeof OBS_SENTIMENTS !== 'undefined' && OBS_SENTIMENTS[k]) || { label: k };
-        h += chip('type', _esc(info.label), {
+        h += chip('type', esc(info.label), {
           value: k,
           on: state.sentiment === k,
           pressed: state.sentiment === k,
@@ -567,7 +558,7 @@ window.ObsCapture = (function () {
       h += '<span class="obs-row-sep" aria-hidden="true"></span><span class="obs-row-label">Tags</span>';
       state.dims.forEach(function (k) {
         var label = tagLabel(k);
-        h += removable(_esc(label), 'removeTag', k, {
+        h += removable(esc(label), 'removeTag', k, {
           dot: typeof obsTagColor === 'function' ? obsTagColor(k) : '',
           plain: label,
           cls: 'obsc-chip-tag',
@@ -591,7 +582,7 @@ window.ObsCapture = (function () {
 
       if (state.assessmentId) {
         var title = _assessmentTitle(cid, state.assessmentId) || 'Assessment';
-        h += removable('Assessment: ' + _esc(title), 'clearAssessment', '', {
+        h += removable('Assessment: ' + esc(title), 'clearAssessment', '', {
           locked: opts.lockAssessment,
           trigger: opts.lockAssessment ? null : 'menuAssessment',
           plain: 'assessment ' + title,
@@ -600,13 +591,13 @@ window.ObsCapture = (function () {
       }
       if (state.competencyId) {
         var cl = competencyLabel(cid, state.competencyId) || 'Competency';
-        h += removable('Competency: ' + _esc(cl), 'clearCompetency', '', {
+        h += removable('Competency: ' + esc(cl), 'clearCompetency', '', {
           trigger: 'menuCompetency',
           plain: 'competency ' + cl,
           cls: 'obsc-chip-competency',
         });
         var lv = levelLabel(state.level);
-        h += chip('menu', lv ? 'Level: looks ' + _esc(lv) : 'Level', {
+        h += chip('menu', lv ? 'Level: looks ' + esc(lv) : 'Level', {
           value: 'level',
           menu: 'level',
           on: !!lv,
@@ -648,7 +639,7 @@ window.ObsCapture = (function () {
     }
 
     function renderFlag() {
-      if (state.error) return '<span class="obsc-error" role="alert">' + _esc(state.error) + '</span>';
+      if (state.error) return '<span class="obsc-error" role="alert">' + esc(state.error) + '</span>';
       if (!state.flagOffer.length) return '';
       var byId = {};
       studentList(cid).forEach(function (s) {
@@ -660,9 +651,9 @@ window.ObsCapture = (function () {
         if (!s) return;
         h +=
           '<button type="button" class="obsc-flag-btn" data-obsc="flag" data-value="' +
-          _esc(sid) +
+          esc(sid) +
           '">Flag ' +
-          _esc(s.first || s.name) +
+          esc(s.first || s.name) +
           '</button>';
       });
       h += '<button type="button" class="obsc-flag-dismiss" data-obsc="notNow">Not Now</button>';
@@ -709,30 +700,30 @@ window.ObsCapture = (function () {
         '" data-obsc="' +
         action +
         '" data-value="' +
-        _esc(value) +
+        esc(value) +
         '"' +
-        (o.search != null ? ' data-search="' + _esc(o.search) + '"' : '') +
+        (o.search != null ? ' data-search="' + esc(o.search) + '"' : '') +
         '>' +
         '<span class="obsc-check" aria-hidden="true">' +
         (o.on ? '✓' : '') +
         '</span>' +
         (o.dot ? '<span class="obsc-dot" style="background:' + o.dot + '"></span>' : '') +
         '<span class="obsc-item-label">' +
-        _esc(label) +
+        esc(label) +
         '</span>' +
-        (o.hint ? '<span class="obsc-item-hint">' + _esc(o.hint) + '</span>' : '') +
+        (o.hint ? '<span class="obsc-item-hint">' + esc(o.hint) + '</span>' : '') +
         '</div>'
       );
     }
     function section(label) {
-      return '<div class="obsc-menu-section" role="presentation" data-section>' + _esc(label) + '</div>';
+      return '<div class="obsc-menu-section" role="presentation" data-section>' + esc(label) + '</div>';
     }
     function search(placeholder) {
       return (
         '<input class="obsc-menu-search" type="text" autocomplete="off" data-obsc-search placeholder="' +
-        _esc(placeholder) +
+        esc(placeholder) +
         '" aria-label="' +
-        _esc(placeholder) +
+        esc(placeholder) +
         '">'
       );
     }
@@ -785,13 +776,13 @@ window.ObsCapture = (function () {
         '" ' +
         attrs +
         ' data-search="' +
-        _esc(t.text) +
+        esc(t.text) +
         '">' +
         ObsCard.typeBlockHtml(t.sentiment).replace('class="obs-type', 'class="obs-type obsc-item-hint') +
         '<span class="obsc-starter-text"><span class="obsc-item-label">' +
-        _esc(t.text) +
+        esc(t.text) +
         '</span>' +
-        (sets ? '<small class="obsc-starter-sets">' + _esc(sets) + '</small>' : '') +
+        (sets ? '<small class="obsc-starter-sets">' + esc(sets) + '</small>' : '') +
         '</span></div>'
       );
     }
@@ -809,7 +800,7 @@ window.ObsCapture = (function () {
         h += '<div class="obsc-menu-list">';
         if (!starters.length) h += '<div class="obsc-menu-empty">You have no sentence starters yet.</div>';
         starters.forEach(function (t) {
-          h += starterItem(t, 'data-obsc="pickStarter" data-value="' + _esc(t.id) + '"', false);
+          h += starterItem(t, 'data-obsc="pickStarter" data-value="' + esc(t.id) + '"', false);
         });
         h += starterFooterHtml();
         h += '</div>';
@@ -884,7 +875,7 @@ window.ObsCapture = (function () {
       var multi = name === 'students' || name === 'tags' ? ' aria-multiselectable="true"' : '';
       h = h.replace(
         '<div class="obsc-menu-list">',
-        '<div class="obsc-menu-list" role="listbox" aria-label="' + _esc(MENU_LABEL[name]) + '"' + multi + '>',
+        '<div class="obsc-menu-list" role="listbox" aria-label="' + esc(MENU_LABEL[name]) + '"' + multi + '>',
       );
       return '<div class="obsc-menu" data-menu="' + name + '"' + (id ? ' id="' + id + '"' : '') + '>' + h + '</div>';
     }
@@ -897,7 +888,7 @@ window.ObsCapture = (function () {
         if (sg.items.length && !sg.query) h += section('Most Used');
         if (!sg.items.length) {
           h += starterList(cid).length
-            ? '<div class="obsc-menu-empty">No starter matches “' + _esc(sg.query) + '”.</div>'
+            ? '<div class="obsc-menu-empty">No starter matches “' + esc(sg.query) + '”.</div>'
             : '<div class="obsc-menu-empty">You have no sentence starters yet.</div>';
         }
         sg.items.forEach(function (it, i) {
@@ -927,7 +918,7 @@ window.ObsCapture = (function () {
             '">' +
             (it.dot ? '<span class="obsc-dot" style="background:' + it.dot + '"></span>' : '') +
             '<span class="obsc-item-label">' +
-            _esc(it.label) +
+            esc(it.label) +
             '</span></div>';
         });
       }
@@ -1052,10 +1043,10 @@ window.ObsCapture = (function () {
       var info = sentiment && typeof OBS_SENTIMENTS !== 'undefined' && OBS_SENTIMENTS[sentiment];
       if (info)
         sets.push(
-          '<span class="obs-pill obs-pill-type" data-sentiment="' + sentiment + '">' + _esc(info.label) + '</span>',
+          '<span class="obs-pill obs-pill-type" data-sentiment="' + sentiment + '">' + esc(info.label) + '</span>',
         );
       var ctx = state.context && typeof OBS_CONTEXTS !== 'undefined' && OBS_CONTEXTS[state.context];
-      if (ctx) sets.push('<span class="obs-pill obs-pill-context">' + _esc(ctx.label) + '</span>');
+      if (ctx) sets.push('<span class="obs-pill obs-pill-context">' + esc(ctx.label) + '</span>');
       var dims = state.dims.concat(from.dims).filter(function (k, i, all) {
         return !/^tag:/.test(k) && all.indexOf(k) === i;
       });
@@ -1064,7 +1055,7 @@ window.ObsCapture = (function () {
           '<span class="obs-card-dim"><span class="dim-dot" style="background:' +
             (typeof obsTagColor === 'function' ? obsTagColor(k) : 'var(--text-3)') +
             '"></span>' +
-            _esc(tagLabel(k)) +
+            esc(tagLabel(k)) +
             '</span>',
         );
       });
@@ -1084,7 +1075,7 @@ window.ObsCapture = (function () {
         '<textarea class="obsc-save-text" id="' +
         p +
         'save-starter-text" rows="2">' +
-        _esc(text) +
+        esc(text) +
         '</textarea>' +
         '<div class="obsc-save-hint">Leave out student names so it works for anyone.</div>' +
         (sets.length
@@ -1093,7 +1084,7 @@ window.ObsCapture = (function () {
             '</div>'
           : '') +
         '<div class="obsc-save-note">Saves to My Sentence Starters for all your classes. Your observation' +
-        _esc(who) +
+        esc(who) +
         ' isn\u2019t added until you press Add.</div>' +
         '<div class="confirm-actions">' +
         '<button type="button" class="confirm-cancel" data-save-starter="cancel">Cancel</button>' +
@@ -1723,9 +1714,9 @@ window.ObsCapture = (function () {
     overlay.innerHTML =
       '<div class="obsc-dialog" role="dialog" aria-modal="true" aria-labelledby="obsc-dialog-title">' +
       '<div class="obsc-dialog-head"><div><div class="obsc-dialog-title" id="obsc-dialog-title">' +
-      _esc(opts.title || 'Add observation') +
+      esc(opts.title || 'Add observation') +
       '</div>' +
-      (opts.subtitle ? '<div class="obsc-dialog-sub">' + _esc(opts.subtitle) + '</div>' : '') +
+      (opts.subtitle ? '<div class="obsc-dialog-sub">' + esc(opts.subtitle) + '</div>' : '') +
       '</div><button type="button" class="obsc-dialog-close" aria-label="Close">✕</button></div>' +
       '<div class="obsc-dialog-body"></div></div>';
     var userOnAdd = opts.onAdd;

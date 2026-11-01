@@ -31,14 +31,6 @@ var LearnerProfile = (function () {
     Done: 'var(--score-4)',
   };
 
-  function _esc(s) {
-    return typeof esc === 'function'
-      ? esc(s)
-      : String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-        });
-  }
-
   function day(iso) {
     if (!iso) return '';
     var t = new Date(String(iso).length === 10 ? iso + 'T12:00:00' : iso);
@@ -61,13 +53,13 @@ var LearnerProfile = (function () {
     return String(s || '')
       .split(/(\s+|-)/)
       .map(function (part) {
-        return /^[A-Z]{2,}$/.test(part) ? '<strong>' + _esc(part) + '</strong>' : _esc(part);
+        return /^[A-Z]{2,}$/.test(part) ? '<strong>' + esc(part) + '</strong>' : esc(part);
       })
       .join('');
   }
 
   function bubble(s, lang) {
-    return '<blockquote class="qw-b"' + (lang ? ' lang="' + _esc(lang) + '"' : '') + '>' + _esc(s) + '</blockquote>';
+    return '<blockquote class="qw-b"' + (lang ? ' lang="' + esc(lang) + '"' : '') + '>' + esc(s) + '</blockquote>';
   }
 
   function noAnswer() {
@@ -81,7 +73,7 @@ var LearnerProfile = (function () {
       '<figure class="qw' +
       (opts && opts.cls ? ' ' + opts.cls : '') +
       '"><figcaption class="qw-q">' +
-      _esc(question) +
+      esc(question) +
       (extraHtml || '') +
       '</figcaption>' +
       (t ? bubble(t) : noAnswer()) +
@@ -94,7 +86,7 @@ var LearnerProfile = (function () {
   function src(who, first) {
     return who === 'you'
       ? '<span class="src src-you">Set by you</span>'
-      : '<span class="src src-them">From ' + _esc(first) + '</span>';
+      : '<span class="src src-them">From ' + esc(first) + '</span>';
   }
 
   /* ── ID card and private note ─────────────────────────────── */
@@ -123,37 +115,37 @@ var LearnerProfile = (function () {
         'Speaks at home</dt><dd>' +
         langs
           .map(function (l) {
-            return '<span class="stu-chip lp-static">' + _esc(l) + '</span>';
+            return '<span class="stu-chip lp-static">' + esc(l) + '</span>';
           })
           .join('') +
         '</dd></div>';
     }
     if (learns)
-      facts += '<div><dt>' + icon('people') + 'Learns best</dt><dd><strong>' + _esc(learns) + '</strong></dd></div>';
+      facts += '<div><dt>' + icon('people') + 'Learns best</dt><dd><strong>' + esc(learns) + '</strong></dd></div>';
     var refl = o.model.reflections[0];
     var html =
       '<div class="id-card"><div class="id-band"><span>' +
-      _esc(o.classLabel) +
+      esc(o.classLabel) +
       '</span>' +
-      (o.grade ? '<span>Grade ' + _esc(o.grade) + '</span>' : '') +
+      (o.grade ? '<span>Grade ' + esc(o.grade) + '</span>' : '') +
       '</div><div class="id-top"><div class="id-av" aria-hidden="true">' +
-      _esc(o.initials) +
+      esc(o.initials) +
       '</div>' +
       (say ? '<div class="id-say"><span>Say it</span> ' + sayHtml(say) + '</div>' : '') +
-      (o.pronouns ? '<span class="id-pron">' + _esc(o.pronouns) + '</span>' : '') +
+      (o.pronouns ? '<span class="id-pron">' + esc(o.pronouns) + '</span>' : '') +
       '</div>' +
       (facts ? '<dl class="id-facts">' + facts + '</dl>' : '') +
       '<nav class="id-jump" aria-label="On this page">' +
       '<a href="#lp-about" data-action="lpJump" data-target="lp-about">About Me <span>' +
-      _esc(a ? day(a.at) : 'Not yet') +
+      esc(a ? day(a.at) : 'Not yet') +
       '</span></a>' +
       '<a href="#lp-goals" data-action="lpJump" data-target="lp-goals">Goals <span>' +
-      _esc(o.goalCount + ' set') +
+      esc(o.goalCount + ' set') +
       '</span></a>' +
       '<a href="#lp-refl" data-action="lpJump" data-target="lp-refl">Reflections <span' +
       (o.newReply ? ' class="lp-new-text"' : '') +
       '>' +
-      _esc(refl ? (o.newReply ? 'New · ' : '') + day(refl.at) : 'Not yet') +
+      esc(refl ? (o.newReply ? 'New · ' : '') + day(refl.at) : 'Not yet') +
       '</span></a></nav></div>';
     var note = a && text(a.note && a.note.v);
     if (note) {
@@ -161,9 +153,9 @@ var LearnerProfile = (function () {
         '<div class="id-private"><div class="id-private-head">' +
         icon('lock') +
         'Private note to you</div><div class="id-private-text">' +
-        _esc(note) +
+        esc(note) +
         '</div><div class="id-private-foot"><span>Only you see this.</span><span>' +
-        _esc(day(a.at)) +
+        esc(day(a.at)) +
         '</span></div></div>';
     }
     return html;
@@ -175,7 +167,7 @@ var LearnerProfile = (function () {
     var a = o.model.about;
     var head =
       '<div class="qw-head"><h2 id="lp-about-h">About Me</h2>' +
-      (a ? '<span>' + _esc(day(a.at)) + '</span>' : '') +
+      (a ? '<span>' + esc(day(a.at)) + '</span>' : '') +
       '</div>';
     if (!a) {
       return (
@@ -183,7 +175,7 @@ var LearnerProfile = (function () {
         head +
         '<div class="lp-none">' +
         (o.aboutOn
-          ? _esc(o.first) + ' hasn’t answered About Me yet.'
+          ? esc(o.first) + ' hasn’t answered About Me yet.'
           : 'About Me isn’t turned on for this class. Turn it on in Class Management › Questionnaires.') +
         '</div></section>'
       );
@@ -202,7 +194,7 @@ var LearnerProfile = (function () {
       return !it.q.teacher_only;
     });
     if (rest.length) {
-      html += '<div class="qw-group"><h3>More About ' + _esc(o.first) + '</h3>';
+      html += '<div class="qw-group"><h3>More About ' + esc(o.first) + '</h3>';
       rest.forEach(function (it) {
         html += qa(it.q.prompt, it.v);
       });
@@ -239,18 +231,18 @@ var LearnerProfile = (function () {
     var kept = choice ? (/change/i.test(choice) ? ' · changed ' : ' · kept ') + day(r.at) : '';
     var html =
       '<div class="qw-group"><h3>' +
-      _esc(o.courseName + ' Goal') +
+      esc(o.courseName + ' Goal') +
       '</h3><div class="gl-card"><div class="gl-top"><span class="gl-meta">' +
       src('them', o.first) +
-      (a ? ' Set ' + _esc(day(a.at)) : '') +
-      _esc(kept) +
+      (a ? ' Set ' + esc(day(a.at)) : '') +
+      esc(kept) +
       (a && a.goal ? AGAIN : '') +
       '</span>' +
       (status
         ? '<span class="st"><span class="st-dot" style="background:' +
           (STATUS_COLORS[status] || 'var(--text-3)') +
           '"></span>' +
-          _esc(status) +
+          esc(status) +
           '</span>'
         : '') +
       '</div>';
@@ -258,14 +250,14 @@ var LearnerProfile = (function () {
     if (steps.length) {
       html +=
         '<figure class="qw gl-check"><figcaption class="qw-q">Next step <span class="gl-meta">' +
-        _esc(steps[0].from + ' · ' + day(steps[0].at)) +
+        esc(steps[0].from + ' · ' + day(steps[0].at)) +
         '</span></figcaption>' +
         bubble(steps[0].text) +
         '</figure>';
       if (steps[1]) {
         html +=
           '<div class="lp-hist">' +
-          _esc('Earlier next step · ' + day(steps[1].at) + ': “' + steps[1].text + '”') +
+          esc('Earlier next step · ' + day(steps[1].at) + ': “' + steps[1].text + '”') +
           '</div>';
       }
     }
@@ -278,11 +270,11 @@ var LearnerProfile = (function () {
     var pick = c.core && c.core.v ? text(c.core.v) : '';
     var html =
       '<div class="qw-group"><h3>Core Competency Goal</h3><div class="gl-card"><div class="gl-top"><div class="gl-title">' +
-      _esc(pick ? coreName(pick) : 'No competency chosen') +
+      esc(pick ? coreName(pick) : 'No competency chosen') +
       '</div><span class="gl-meta">' +
       src('them', o.first) +
       ' ' +
-      _esc(day(c.at)) +
+      esc(day(c.at)) +
       '</span></div>';
     if (c.coreGoal) html += qa(c.coreGoal.q.prompt, c.coreGoal.v);
     if (c.coreStep) html += qa(c.coreStep.q.prompt, c.coreStep.v, '', { cls: 'gl-check' });
@@ -301,7 +293,7 @@ var LearnerProfile = (function () {
   function steps(level, label) {
     return (
       '<div class="stu-core-steps" role="img" aria-label="' +
-      _esc(label) +
+      esc(label) +
       '">' +
       STEPS.map(function (s, i) {
         return '<span class="stu-core-step' + (level === i + 1 ? ' on' : '') + '">' + s + '</span>';
@@ -319,13 +311,13 @@ var LearnerProfile = (function () {
       if (q.kind === 'short_set') {
         var labels = (q.options && q.options.labels) || [];
         var vals = v && Array.isArray(v.json) ? v.json : [];
-        html += '<div class="qw-group"><h3>' + _esc(/shield/i.test(q.prompt) ? 'Personal Shield' : q.prompt) + '</h3>';
+        html += '<div class="qw-group"><h3>' + esc(/shield/i.test(q.prompt) ? 'Personal Shield' : q.prompt) + '</h3>';
         html += '<div class="sh-grid">';
         (labels.length ? labels : vals).forEach(function (lab, i) {
           var t = String(vals[i] || '').trim();
           html +=
             '<figure class="qw"><figcaption class="qw-q">' +
-            _esc(labels.length ? lab : 'Answer ' + (i + 1)) +
+            esc(labels.length ? lab : 'Answer ' + (i + 1)) +
             '</figcaption>' +
             (t ? bubble(t) : noAnswer()) +
             '</figure>';
@@ -342,9 +334,9 @@ var LearnerProfile = (function () {
           var w = k && why && typeof why === 'object' ? why[k] : typeof why === 'string' ? why : k ? '' : text(v);
           html +=
             '<div class="gl-card">' +
-            (k ? '<div class="gl-title">' + _esc(coreName(k)) + '</div>' : '') +
+            (k ? '<div class="gl-title">' + esc(coreName(k)) + '</div>' : '') +
             '<div class="qw-q qw-q-flush">' +
-            _esc(q.prompt) +
+            esc(q.prompt) +
             '</div>' +
             (lv
               ? steps(lv, first + ' chose ' + STEPS[lv - 1])
@@ -378,9 +370,9 @@ var LearnerProfile = (function () {
       '<div class="qw-group lp-reply' +
       (isNew ? ' lp-new' : '') +
       '"><h3>' +
-      _esc(e.title) +
+      esc(e.title) +
       ' <span class="gl-meta">' +
-      _esc(day(e.at) + ' · after reading the report on their phone') +
+      esc(day(e.at) + ' · after reading the report on their phone') +
       '</span>' +
       (isNew ? ' <span class="lp-new-tag">New</span>' : '') +
       '</h3><div class="qw-pair">';
@@ -398,11 +390,11 @@ var LearnerProfile = (function () {
       (list.length > 1
         ? '<span>Newest first</span>'
         : latest
-          ? '<span>' + _esc(day(latest.at) + (latest.theme ? ' · ' + latest.theme : '')) + '</span>'
+          ? '<span>' + esc(day(latest.at) + (latest.theme ? ' · ' + latest.theme : '')) + '</span>'
           : '') +
       '</div>';
     if (!list.length) {
-      return html + '<div class="lp-none">No reflections from ' + _esc(o.first) + ' yet.</div></section>';
+      return html + '<div class="lp-none">No reflections from ' + esc(o.first) + ' yet.</div></section>';
     }
     list.forEach(function (e) {
       if (e.kind === 'report_reply') {
@@ -412,9 +404,9 @@ var LearnerProfile = (function () {
       if (list.length > 1) {
         html +=
           '<div class="lp-older"><h3>' +
-          _esc(e.title) +
+          esc(e.title) +
           ' <span class="gl-meta">' +
-          _esc(day(e.at) + (e.theme ? ' · ' + e.theme : '')) +
+          esc(day(e.at) + (e.theme ? ' · ' + e.theme : '')) +
           '</span></h3></div>';
       }
       html += reflectionHtml(o, e, o.first);

@@ -17,6 +17,7 @@ const PRECACHE_URLS = [
   '/curriculum_by_course.json',
   // Shared modules
   '/shared/sentry-init.js',
+  '/shared/html.js',
   '/shared/link-nav.js',
   '/shared/supabase.js',
   '/shared/constants.js',

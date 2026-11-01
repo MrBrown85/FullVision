@@ -1060,10 +1060,10 @@ window.ReportBlocks = (function () {
      each level, with a few words of what it means. Two by two at Side by
      Side width. No dots. */
   const LEGEND_LEVELS = [
-    [1, 'Emerging', 'Initial understanding'],
-    [2, 'Developing', 'Partial understanding'],
-    [3, 'Proficient', 'Complete understanding'],
-    [4, 'Extending', 'Sophisticated understanding'],
+    [1, PROF_LABELS[1], 'Initial understanding'],
+    [2, PROF_LABELS[2], 'Partial understanding'],
+    [3, PROF_LABELS[3], 'Complete understanding'],
+    [4, PROF_LABELS[4], 'Sophisticated understanding'],
   ];
   function renderBlockLegend(options) {
     const half = options && options.size === 'half';

@@ -3397,6 +3397,41 @@ body.offline-active #app-dock {
   opacity: 0;
   pointer-events: none;
 }
+.app-loading-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.app-loading-logo {
+  width: 64px;
+  height: 64px;
+  overflow: visible;
+  animation: app-loading-hop 1.2s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+/* The four bars rise and settle one after another, like the logo growing. */
+.app-loading-bar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: app-loading-grow 1.2s ease-in-out infinite;
+}
+.app-loading-bar:nth-of-type(3) {
+  animation-delay: 0.12s;
+}
+.app-loading-bar:nth-of-type(4) {
+  animation-delay: 0.24s;
+}
+.app-loading-bar:nth-of-type(5) {
+  animation-delay: 0.36s;
+}
+.app-loading-shadow {
+  width: 44px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--overlay-pressed);
+  animation: app-loading-shadow 1.2s ease-in-out infinite;
+}
 .app-loading-title {
   font-family: var(--font-base);
   font-size: var(--text-2xl);
@@ -3404,28 +3439,54 @@ body.offline-active #app-dock {
   letter-spacing: -0.02em;
   color: var(--text);
 }
-.app-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border);
-  border-top-color: var(--active);
-  border-radius: 50%;
-  animation: app-loading-spin 0.8s linear infinite;
-}
 .app-loading-text {
+  min-height: 1.4em;
   font-family: var(--font-base);
   font-size: var(--text-sm);
   font-weight: 500;
   color: var(--text-3);
+  transition: opacity 0.2s ease;
 }
-@keyframes app-loading-spin {
-  to {
-    transform: rotate(360deg);
+.app-loading-text.is-swapping {
+  opacity: 0;
+}
+/* A small hop with a squash on landing. */
+@keyframes app-loading-hop {
+  0%,
+  100% {
+    transform: translateY(0) scale(1.06, 0.94);
+  }
+  15% {
+    transform: translateY(0) scale(1, 1);
+  }
+  50% {
+    transform: translateY(-14px) scale(0.97, 1.03);
+  }
+  85% {
+    transform: translateY(0) scale(1, 1);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .app-loading-spinner {
-    animation-duration: 2.4s;
+@keyframes app-loading-grow {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  40% {
+    transform: scaleY(0.45);
+  }
+  70% {
+    transform: scaleY(1.12);
+  }
+}
+@keyframes app-loading-shadow {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleX(0.6);
+    opacity: 0.5;
   }
 }
 @media print {

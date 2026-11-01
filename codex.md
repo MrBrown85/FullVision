@@ -2,7 +2,7 @@
 
 # FullVision Open Work
 
-This is the only active work list for the repo. All pending work, design
+When this was maintained, it was the only active work list for the repo. All pending work, design
 decisions, and deploy steps live here — no sibling docs (XSS, pilot, ops) to
 keep in sync. Implementation history still belongs in
 `docs/backend-design/HANDOFF.md`; everything else is here.

@@ -33,8 +33,9 @@ Core capabilities include:
 - `main` is the source-of-truth branch.
 - The Supabase-backed v2 read/write architecture is the live application model.
 - Desktop and mobile both run against the shared runtime under `shared/`.
-- The only active work list is [codex.md](codex.md).
-- Multi-session implementation continuity lives in [docs/backend-design/HANDOFF.md](docs/backend-design/HANDOFF.md).
+- The open-work list is [docs/ROADMAP.md](docs/ROADMAP.md); decisions and their reasons are in [docs/DECISIONS.md](docs/DECISIONS.md).
+- Rules for working in the repo are in [CLAUDE.md](CLAUDE.md).
+- [codex.md](codex.md) and [docs/backend-design/HANDOFF.md](docs/backend-design/HANDOFF.md) are history from the v2 rebuild and are no longer maintained.
 
 ## Architecture summary
 
@@ -153,7 +154,7 @@ Primary SQL mirrors:
 
 Primary backend-design references:
 
-- [docs/backend-design/HANDOFF.md](docs/backend-design/HANDOFF.md)
+- [docs/backend-design/HANDOFF.md](docs/backend-design/HANDOFF.md) (history)
 - [docs/backend-design/read-paths.md](docs/backend-design/read-paths.md)
 - [docs/backend-design/write-paths.md](docs/backend-design/write-paths.md)
 - [docs/backend-design/auth-lifecycle.md](docs/backend-design/auth-lifecycle.md)
@@ -173,7 +174,7 @@ FullVision/
 ├── netlify/                 edge-function support
 ├── dist/                    generated static output
 ├── schema.sql               top-level schema mirror
-├── codex.md                 only live work list
+├── codex.md                 v2 rebuild work list (history)
 └── README.md
 ```
 
@@ -182,9 +183,10 @@ FullVision/
 Use the docs in this order if you need to understand the current repository quickly:
 
 1. [README.md](README.md)
-2. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-3. [docs/backend-design/HANDOFF.md](docs/backend-design/HANDOFF.md)
-4. [codex.md](codex.md)
+2. [CLAUDE.md](CLAUDE.md)
+3. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+4. [docs/ROADMAP.md](docs/ROADMAP.md)
+5. [docs/DECISIONS.md](docs/DECISIONS.md)
 
 Additional references:
 
@@ -193,8 +195,8 @@ Additional references:
 ## Operational notes
 
 - Production availability can be affected by Netlify quota exhaustion.
-- Remaining open work includes a mix of user-blocked, deferred, and implementation items; see [codex.md](codex.md).
-- The runtime is teacher-facing today. Student and parent portals are deferred work, not part of the shipped application.
+- Open work is in [docs/ROADMAP.md](docs/ROADMAP.md).
+- Teachers sign in. Students have no accounts: they answer questionnaires and read phone reports on the student page (`s/`) with a code from their slip. There is no parent portal.
 
 ## License
 

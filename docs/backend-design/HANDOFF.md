@@ -1,3 +1,5 @@
+> **Superseded (2026-10-17).** The v2 rebuild this file coordinated is finished. Open work is in `docs/ROADMAP.md`, decisions in `docs/DECISIONS.md`, and repo rules in `CLAUDE.md`. Kept for history; not maintained. Don't follow the session prompt below.
+
 # FullVision v2 — Rebuild Handoff
 
 **Purpose:** single source of truth for multi-session, multi-context-window continuation of the v2 rebuild. Each Claude run reads this, does the next task, updates this file, stops. The user just re-runs the same prompt.

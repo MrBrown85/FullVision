@@ -17,6 +17,8 @@
 var PhoneReportView = (function () {
   'use strict';
 
+  // The student page (s/) loads this file without constants.js, so it keeps
+  // its own copy of PROF_LABELS's words.
   var WORDS = ['', 'Emerging', 'Developing', 'Proficient', 'Extending'];
   var MEANS = [
     '',
@@ -26,12 +28,6 @@ var PhoneReportView = (function () {
     'Extending means you understand the learning deeply and can take it further on your own.',
   ];
   var STEPS = ['Beginning', 'Growing', 'Confident', 'Leading'];
-
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
 
   function day(iso, withYear) {
     if (!iso) return '';

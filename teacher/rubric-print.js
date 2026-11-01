@@ -87,7 +87,7 @@
   };
   var LAYOUT_ORDER = ['full', 'half', 'quarter'];
   var LEVELS = [4, 3, 2, 1];
-  var LEVEL_NAMES = { 4: 'Extending', 3: 'Proficient', 2: 'Developing', 1: 'Emerging' };
+  var LEVEL_NAMES = PROF_LABELS;
   var LINE_ROWS = 36; // write-on lines: a full page's height at the line pitch
   // The BC proficiency scale's general descriptors.
   var GENERAL_LEVELS = {
@@ -122,13 +122,6 @@
   var _state = null;
 
   /* ── Data ───────────────────────────────────────────────── */
-
-  function _esc(s) {
-    if (typeof esc === 'function') return esc(s);
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
 
   function _courseName(cid) {
     var course = typeof COURSES !== 'undefined' && COURSES ? COURSES[cid] : null;
@@ -486,7 +479,7 @@
     var mark = '✓';
     if (row.mod > 0) mark += '+';
     else if (row.mod < 0) mark += '−';
-    return '<span class="rubric-mark" aria-label="' + _esc(LEVEL_NAMES[row.level] || '') + '">' + mark + '</span>';
+    return '<span class="rubric-mark" aria-label="' + esc(LEVEL_NAMES[row.level] || '') + '">' + mark + '</span>';
   }
 
   /* An Advanced Rubric's checkboxes for one level: an empty square, or a
@@ -509,7 +502,7 @@
             '">' +
             (isOn ? '✓' : '') +
             '</span><span>' +
-            _esc(check.label) +
+            esc(check.label) +
             '</span></div>'
           );
         })
@@ -546,7 +539,7 @@
         }));
     var html =
       '<table class="rubric-table is-single-point"><thead><tr><th class="rubric-crit-head">' +
-      _esc(data.rubric.name || 'Criteria') +
+      esc(data.rubric.name || 'Criteria') +
       '</th>' +
       (showWork ? '<th class="rubric-level-head rubric-sp-note-head">Work On</th>' : '') +
       '<th class="rubric-level-head rubric-sp-standard-head">Proficient Standard</th>' +
@@ -557,25 +550,25 @@
       var scored = row.level > 0;
       html +=
         '<tr class="rubric-row"><th class="rubric-crit" scope="row"><div class="rubric-crit-name">' +
-        _esc(c.name) +
+        esc(c.name) +
         '</div>';
       if (include.codes && row.codes.length)
-        html += '<div class="rubric-crit-codes">' + _esc(row.codes.join(' · ')) + '</div>';
+        html += '<div class="rubric-crit-codes">' + esc(row.codes.join(' · ')) + '</div>';
       html += '</th>';
-      if (showWork) html += '<td class="rubric-cell rubric-sp-note">' + _esc(row.comment || '') + '</td>';
+      if (showWork) html += '<td class="rubric-cell rubric-sp-note">' + esc(row.comment || '') + '</td>';
       html +=
         '<td class="rubric-cell rubric-sp-standard' +
         (scored ? ' is-scored l' + row.level + (row.mixed ? ' is-mixed' : '') : '') +
         '">' +
         (scored
           ? '<span class="rubric-sp-level">' +
-            _esc(LEVEL_NAMES[row.level] || '') +
+            esc(LEVEL_NAMES[row.level] || '') +
             (row.mod > 0 ? ' +' : row.mod < 0 ? ' −' : '') +
             '</span>'
           : '') +
-        _esc((c.levels && (c.levels[3] || c.levels['3'])) || '') +
+        esc((c.levels && (c.levels[3] || c.levels['3'])) || '') +
         '</td>';
-      if (showBeyond) html += '<td class="rubric-cell rubric-sp-note">' + _esc(row.beyond || '') + '</td>';
+      if (showBeyond) html += '<td class="rubric-cell rubric-sp-note">' + esc(row.beyond || '') + '</td>';
       html += '</tr>';
     });
     return html + '</tbody></table>';
@@ -589,21 +582,21 @@
     html += '<div class="rubric-head"><div class="rubric-head-main">';
     html += data.blank
       ? '<div class="rubric-student rubric-name-line"><span class="rubric-label">Name</span><span class="rubric-name-rule"></span></div>'
-      : '<div class="rubric-student">' + _esc(data.studentName) + '</div>';
+      : '<div class="rubric-student">' + esc(data.studentName) + '</div>';
     var meta = [data.courseName, data.assessment && data.assessment.title, data.date].filter(Boolean);
-    html += '<div class="rubric-meta">' + meta.map(_esc).join(' · ') + '</div>';
+    html += '<div class="rubric-meta">' + meta.map(esc).join(' · ') + '</div>';
     html += '</div>';
     if (include.overall && data.overall) {
       html +=
         '<div class="rubric-overall"><span class="rubric-label">' +
         (data.scoreOnly ? (isCompletionScored(data.assessment) ? 'Mark' : 'Score') : 'Overall') +
         '</span><span class="rubric-overall-value">' +
-        _esc(data.overall.text) +
+        esc(data.overall.text) +
         '</span>' +
-        (data.overall.word ? '<span class="rubric-overall-word">' + _esc(data.overall.word) + '</span>' : '') +
+        (data.overall.word ? '<span class="rubric-overall-word">' + esc(data.overall.word) + '</span>' : '') +
         '</div>';
     } else if (data.status && data.status !== 'Late') {
-      html += '<div class="rubric-overall"><span class="rubric-status">' + _esc(data.status) + '</span></div>';
+      html += '<div class="rubric-overall"><span class="rubric-status">' + esc(data.status) + '</span></div>';
     }
     html += '</div>';
 
@@ -614,7 +607,7 @@
     }
     html +=
       '<table class="rubric-table"><thead><tr><th class="rubric-crit-head">' +
-      _esc(data.rubric.name || 'Criteria') +
+      esc(data.rubric.name || 'Criteria') +
       '</th>';
     levels.forEach(function (lv) {
       html += '<th class="rubric-level-head l' + lv + '">' + LEVEL_NAMES[lv] + '</th>';
@@ -624,10 +617,10 @@
       var c = row.criterion;
       html +=
         '<tr class="rubric-row"><th class="rubric-crit" scope="row"><div class="rubric-crit-name">' +
-        _esc(c.name) +
+        esc(c.name) +
         '</div>';
       if (include.codes && row.codes.length)
-        html += '<div class="rubric-crit-codes">' + _esc(row.codes.join(' · ')) + '</div>';
+        html += '<div class="rubric-crit-codes">' + esc(row.codes.join(' · ')) + '</div>';
       html += '</th>';
       levels.forEach(function (lv) {
         var scored = row.level === lv;
@@ -636,7 +629,7 @@
           (scored ? ' is-scored l' + lv + (row.mixed ? ' is-mixed' : '') : '') +
           '">' +
           (scored ? _markHtml(row) : '') +
-          _esc((c.levels && c.levels[lv]) || '') +
+          esc((c.levels && c.levels[lv]) || '') +
           (include.checks ? _checksHtml(c, lv, data.ticked) : '') +
           '</td>';
       });
@@ -646,7 +639,7 @@
           '<tr class="rubric-comment-row"><td colspan="' +
           (levels.length + 1) +
           '"><span class="rubric-label">Comment</span>' +
-          _esc(row.comment) +
+          esc(row.comment) +
           '</td></tr>';
       }
     });
@@ -666,7 +659,7 @@
     return (
       '<div class="rubric-feedback is-lines rubric-reflect"><div class="rubric-label">Next Steps</div>' +
       '<div class="rubric-reflect-q">' +
-      _esc(NEXT_STEPS_PROMPT) +
+      esc(NEXT_STEPS_PROMPT) +
       '</div><div class="rubric-lines">' +
       new Array(LINE_ROWS + 1).join('<div class="rubric-line"></div>') +
       '</div></div>'
@@ -679,7 +672,7 @@
     // of the sheet for the teacher to write on by hand.
     return data.feedback
       ? '<div class="rubric-feedback"><div class="rubric-label">Feedback</div><div class="rubric-feedback-text">' +
-          _esc(data.feedback).replace(/\n/g, '<br>') +
+          esc(data.feedback).replace(/\n/g, '<br>') +
           '</div></div>'
       : '<div class="rubric-feedback is-lines"><div class="rubric-label">Feedback</div><div class="rubric-lines">' +
           // More lines than any sheet holds; the box shows the whole ones
@@ -902,8 +895,8 @@
       '"' +
       (checked ? ' checked' : '') +
       '><span>' +
-      _esc(label) +
-      (help ? ' <span class="rp-help">' + _esc(help) + '</span>' : '') +
+      esc(label) +
+      (help ? ' <span class="rp-help">' + esc(help) + '</span>' : '') +
       '</span></label>'
     );
   }
@@ -915,7 +908,7 @@
       '"' +
       (checked ? ' checked' : '') +
       '><span>' +
-      _esc(label) +
+      esc(label) +
       '</span></label>'
     );
   }
@@ -936,9 +929,9 @@
       '>' +
       (drawing || '') +
       '<span class="rp-tile-title">' +
-      _esc(title) +
+      esc(title) +
       '</span><span class="rp-tile-help">' +
-      _esc(help) +
+      esc(help) +
       '</span></label>'
     );
   }
@@ -981,9 +974,9 @@
     html += '<div class="confirm-title" id="rp-title">Print Rubrics</div>';
     html +=
       '<div class="confirm-message">' +
-      _esc(rubric ? rubric.name : '') +
+      esc(rubric ? rubric.name : '') +
       (rubric
-        ? ' · ' + _esc((rubric.criteria || []).length === 1 ? '1 Criterion' : rubric.criteria.length + ' Criteria')
+        ? ' · ' + esc((rubric.criteria || []).length === 1 ? '1 Criterion' : rubric.criteria.length + ' Criteria')
         : '') +
       '</div>';
     html += '<div class="rp-body"><div class="rp-groups">';
@@ -1008,12 +1001,12 @@
           .map(function (a) {
             return (
               '<option value="' +
-              _esc(a.id) +
+              esc(a.id) +
               '"' +
               (a.id === aid ? ' selected' : '') +
               '>' +
-              _esc(a.title || 'Untitled') +
-              (a.date ? ' · ' + _esc(formatDate(a.date)) : '') +
+              esc(a.title || 'Untitled') +
+              (a.date ? ' · ' + esc(formatDate(a.date)) : '') +
               '</option>'
             );
           })
@@ -1079,11 +1072,11 @@
     students.forEach(function (s) {
       html +=
         '<label class="rp-option rp-pick-option"><input type="checkbox" data-pick="' +
-        _esc(s.id) +
+        esc(s.id) +
         '"' +
         (opts.picked.indexOf(s.id) >= 0 ? ' checked' : '') +
         '><span>' +
-        _esc(displayName(s)) +
+        esc(displayName(s)) +
         (isStudentScored(cid, aid, s.id) ? '' : ' <span class="rp-help">not scored</span>') +
         '</span></label>';
     });
@@ -1122,9 +1115,9 @@
     html += '<div class="confirm-title" id="rp-title">Print Scores</div>';
     html +=
       '<div class="confirm-message">' +
-      _esc((assessment && assessment.title) || 'Untitled') +
+      esc((assessment && assessment.title) || 'Untitled') +
       ' · ' +
-      (complete ? 'Complete or Incomplete' : 'Out of ' + _esc(formatPoints(Number(assessment.maxPoints) || 0))) +
+      (complete ? 'Complete or Incomplete' : 'Out of ' + esc(formatPoints(Number(assessment.maxPoints) || 0))) +
       '</div>';
     html += '<div class="rp-body"><div class="rp-groups">';
     html += _studentsGroupHtml(cid, aid, opts, students);

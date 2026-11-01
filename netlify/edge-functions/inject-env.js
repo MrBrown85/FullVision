@@ -48,6 +48,9 @@ export default async function handler(request, context) {
     "worker-src 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
+    // No page uses <base>, <object> or <embed>; injected markup can't either.
+    "base-uri 'self'",
+    "object-src 'none'",
     `report-uri ${CSP_REPORT_URL}`,
     'report-to csp-endpoint',
   ].join('; ');

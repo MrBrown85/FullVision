@@ -1556,7 +1556,8 @@ window.ReportQuestionnaire = (function () {
     var st = _current();
     var el = _box();
     var wrap = document.getElementById('tq-warn-wrap');
-    if (!st || !el || !wrap || String(el.dataset.sid) !== String(st.id)) return;
+    // A late timer (the student or page changed in the 300 ms) does nothing.
+    if (!st || !el || !el.dataset || !wrap || String(el.dataset.sid) !== String(st.id)) return;
     wrap.innerHTML = _warnHtml(_activeCourse, st, el.value);
   }
 
@@ -4673,7 +4674,9 @@ window.ReportQuestionnaire = (function () {
   LETTERS.forEach(function (l, i) {
     if (i > 0) NEXT_LETTER[l] = LETTERS[i - 1];
   });
-  var PROFICIENCY_WORDS = ['Extending', 'Proficient', 'Developing', 'Emerging'];
+  var PROFICIENCY_WORDS = [4, 3, 2, 1].map(function (l) {
+    return PROF_LABELS[l];
+  });
   // The stories a strengths sentence can be written for (CommentBank.ANGLES
   // ids); any other story reads as steady.
   var STORIES = [
