@@ -1347,8 +1347,9 @@ function getTagScores(cid, studentId, tagId) {
   var result = filtered.map(s => {
     const assess = assessMap.get(s.assessmentId);
     if (isPointsScored(assess) && assess.maxPoints > 0) {
-      // A points 0 is a score: 0% is the lowest level, like Incomplete.
-      if (!isScoreEntered(assess, s)) return { ...s, rawPoints: s.score, score: 0 };
+      // A points 0 is a score (0% is the lowest level, like Incomplete); an
+      // entry with no score, which only carries a comment, is no score.
+      if (!isScoreEntered(assess, s)) return null;
       return { ...s, rawPoints: s.score, score: pointsToProf(s.score, assess.maxPoints, scale) };
     }
     // A + or − counts in every calculation (3+ = 3.33). `level` keeps the
@@ -1358,6 +1359,7 @@ function getTagScores(cid, studentId, tagId) {
     }
     return s;
   });
+  result = result.filter(Boolean);
   _tagScoresCache[cacheKey] = result;
   return result;
 }

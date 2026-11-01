@@ -3273,7 +3273,9 @@ function _scoreEntryFromCanonical(
     id: [assessment.id, tagId || 'overall'].join(':'),
     assessmentId: assessment.id,
     tagId: tagId || '',
-    score: value == null || value === '' ? 0 : Number(value),
+    // No value on points or Complete/Incomplete work is no score (a 0 there
+    // is a score); on proficiency work 0 is unscored.
+    score: value == null || value === '' ? (isPointsScored(assessment) ? null : 0) : Number(value),
     date: assessment.date || assessment.assigned_at || courseToday(cid),
     type: assessment.type || 'summative',
     note: comment || '',
@@ -3445,8 +3447,7 @@ async function _hydrateAssessmentDetails(cid) {
         // A comment saved before any level (value null) keeps its entry too.
         if (
           cell.score &&
-          (cell.score.value != null ||
-            (comment && !isPointsScored(merged) && tagScores.length === 0 && rubricScores.length === 0)) &&
+          (cell.score.value != null || (comment && tagScores.length === 0 && rubricScores.length === 0)) &&
           ((tagScores.length === 0 && rubricScores.length === 0) || isPointsScored(merged))
         ) {
           var fallbackTag = cell.score.value == null ? _noteOnlyScoreKey(cid, merged) : scoreTagIds(merged)[0];
@@ -3698,9 +3699,9 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
           return entry.assessmentId === aid;
         });
       // A comment or Note for the Report saved before any level is a score
-      // row with no value: it still needs an entry to carry it. Not on
-      // points or Complete/Incomplete work, where an entry's 0 is a score.
-      var noteOnly = (comment || reportNote) && !isPointsScored(assessment);
+      // row with no value: it still needs an entry to carry it (score null
+      // on points and Complete/Incomplete work, where a 0 is a score).
+      var noteOnly = !!(comment || reportNote);
       if (cell.score && (cell.score.value != null || noteOnly) && !hasAssessmentEntry) {
         _pushHydratedScore(
           scores,
@@ -5274,12 +5275,12 @@ function getScoreComment(cid, sid, aid) {
   return entry ? String(entry.note) : '';
 }
 
-/* Change (or clear, with '') an overall comment. Proficiency work with no
-   level yet gets an unscored entry to carry it, under the key the loader
-   gives a score row with no levels (_noteOnlyScoreKey); the server's save_score_comment makes
-   the score row (value null) when there is none. Points and
-   Complete/Incomplete work still need a score first: there an entry's 0
-   is a score. */
+/* Change (or clear, with '') an overall comment. Work with no level or
+   score yet gets an entry to carry it, under the key the loader gives a
+   score row with no levels (_noteOnlyScoreKey); the server's
+   save_score_comment makes the score row (value null) when there is none.
+   On points and Complete/Incomplete work the entry's score is null, since
+   a 0 there is a score. */
 function saveScoreComment(cid, sid, aid, text) {
   var note = (text == null ? '' : String(text)).trim();
   var scores = getScores(cid);
@@ -5289,13 +5290,13 @@ function saveScoreComment(cid, sid, aid, text) {
   if (!entries.length) {
     if (!note) return true;
     var assessment = _assessmentById(cid, aid);
-    if (!assessment || isPointsScored(assessment)) return false;
+    if (!assessment) return false;
     var key = _noteOnlyScoreKey(cid, assessment);
     var entry = {
       id: sid + ':' + aid + ':' + key,
       assessmentId: aid,
       tagId: key,
-      score: 0,
+      score: isPointsScored(assessment) ? null : 0,
       date: assessment.date || courseToday(cid),
       type: assessment.type || 'summative',
       note: '',

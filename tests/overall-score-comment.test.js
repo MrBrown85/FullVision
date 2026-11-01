@@ -140,10 +140,19 @@ describe('overall comment', () => {
     expect(commentCalls()).toHaveLength(0);
   });
 
-  it('still needs a score first on points work, where an entry of 0 is a score', () => {
-    expect(saveScoreComment(CID, SID2, POINTS_AID, 'Hello')).toBe(false);
-    expect((getScores(CID)[SID2] || []).filter(e => e.assessmentId === POINTS_AID)).toHaveLength(0);
-    expect(commentCalls()).toHaveLength(0);
+  it('saves a comment on points work with no score yet, on an entry with no score', () => {
+    saveScoreComment(CID, SID2, POINTS_AID, 'Hello');
+    var entries = getScores(CID)[SID2].filter(e => e.assessmentId === POINTS_AID);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ tagId: TAG_1, score: null, note: 'Hello' });
+    expect(getPointsScore(CID, SID2, POINTS_AID)).toBeNull();
+    expect(
+      isScoreEntered(
+        getAssessments(CID).find(a => a.id === POINTS_AID),
+        entries[0],
+      ),
+    ).toBe(false);
+    expect(commentCalls()).toHaveLength(1);
   });
 
   it('keeps the comment when a level is picked afterwards', () => {
@@ -194,11 +203,12 @@ describe('loading an overall comment saved before any level', () => {
     expect(out.scores[SID2][0]).toMatchObject({ tagId: TAG_1, score: 0, note: 'Hello' });
   });
 
-  it('adds no unscored entry on points work', () => {
+  it('keeps a comment-only score row on points work, with no score', () => {
     var out = _gradebookCellsToScoreCache(CID, assessments(), {
       [SID2]: { [POINTS_AID]: { score: { value: null, comment: 'Hello' }, tag_scores: [], rubric_scores: [] } },
     });
-    expect(out.scores[SID2]).toBeUndefined();
+    expect(out.scores[SID2]).toHaveLength(1);
+    expect(out.scores[SID2][0]).toMatchObject({ tagId: TAG_1, score: null, note: 'Hello' });
   });
 
   it('adds nothing for a score row with no level and no comment', () => {
