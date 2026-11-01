@@ -63,8 +63,10 @@ const DESKTOP = [
       // A chosen + or − shows the pressed state.
       await row.locator('.rsg-mod:not(:disabled)').first().click();
       await expect(row.locator('.rsg-mod.active')).toHaveCount(1);
-      // The pointer is on the level, so the descriptor bar and its
-      // competency tags are open and part of this page's check.
+      // Pointing at a level opens the descriptor bar and its competency tags,
+      // so they are part of this page's check. (Hovered on purpose: newer
+      // Playwright doesn't leave the pointer over the level after a click.)
+      await row.locator('.rsg-level[data-action="selectRubricScore"]').first().hover();
       await expect(page.locator('#rsg-descriptor-bar .rsg-descriptor-tag').first()).toBeVisible();
     },
   },
