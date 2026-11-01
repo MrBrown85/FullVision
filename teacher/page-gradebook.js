@@ -2104,9 +2104,9 @@ window.PageGradebook = (function () {
       var overall = getOverallProficiency(cid, s.id);
       var letterData = _getStudentLetterData(cid, s.id);
       row.push(overall > 0 ? overall.toFixed(2) : '');
-      row.push(
-        _getDisplayedFinalPercent(cid, s.id) != null ? _getDisplayedFinalPercent(cid, s.id).toFixed(1) + '%' : '',
-      );
+      // The % as the class shows it (whole or one decimal), as the Grade column has it.
+      var finalPct = _getDisplayedFinalPercent(cid, s.id);
+      row.push(finalPct != null ? formatCoursePercent(cid, finalPct) : '');
       if (isLetter) row.push(letterData.S ? letterData.S + ' (' + letterData.R + '%)' : '');
       // Assessment scores, as the Scores view shows them (calc.js)
       assessments.forEach(function (a) {

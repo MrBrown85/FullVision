@@ -73,7 +73,15 @@ test('the gradebook, the printed sheet and the CSV export show the same Class Av
     return out;
   }, TEST_COURSE.id);
 
-  // CSV export: the Class Average row under each assessment.
+  // CSV export: the Class Average row under each assessment. The class shows
+  // a whole %, so the Final % column must too.
+  const finalPct = await page.evaluate(cid => {
+    getCourseConfig(cid).roundPercent = true;
+    clearProfCache();
+    // 3+, 8/10 and Complete: 12.33 of 15 points
+    return formatCoursePercent(cid, getCourseLetterData(cid, 'stu-001').R);
+  }, TEST_COURSE.id);
+  expect(finalPct).toBe('82%');
   await page.locator('[data-action="setView"][data-mode="scores"]').click();
   const [download] = await Promise.all([
     page.waitForEvent('download'),
@@ -86,6 +94,7 @@ test('the gradebook, the printed sheet and the CSV export show the same Class Av
     .map(l => l.slice(1, -1).split('","'));
   const header = lines[0];
   const avgRow = lines[lines.length - 1];
+  expect(lines.find(l => /Alice/.test(l[0]))[header.indexOf('Final %')]).toBe(finalPct);
   expect(avgRow[0]).toBe('Class Average');
   const exported = {};
   [PROF, PTS, CMP].forEach(a => {
