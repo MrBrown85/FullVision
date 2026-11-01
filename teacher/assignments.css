@@ -2930,6 +2930,11 @@
 .af-counts-as:empty {
   display: none;
 }
+.af-untagged-note {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  margin: 6px 0 0;
+}
 
 /* Rubric badge on assessment cards */
 .rubric-badge {
