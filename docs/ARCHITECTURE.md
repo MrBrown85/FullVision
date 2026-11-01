@@ -27,7 +27,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
 
 - `login.html` and `login-auth.js` handle sign-in, sign-up, password reset, and Demo Mode entry.
 - Authenticated users are routed into the teacher experience.
-- The current production architecture is teacher-only; future student/parent portals are not part of the active runtime.
+- Teachers are the only accounts. Students answer questionnaires and read phone reports on the student page (`s/index.html`, `s/student.js`, `shared/phone-report-view.js`) with a code from their slip, through the `student-submit` Supabase edge function. There is no parent portal.
 
 ### Desktop SPA
 
@@ -39,7 +39,8 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
   - `page-student.js`
   - `page-gradebook.js`
   - `page-observations.js`
-  - `page-reports.js`: Reports, with two tabs. The Term Questionnaire is `report-questionnaire.js` (one student at a time: the student strip, What FullVision Has, the Comment Bank, the Teacher Comment and the BC Written Learning Update card); its Comment Bank is data in `shared/comment-bank.js` and a pure engine in `teacher/comment-bank.js` (`facts` reads one student's term from the data layer; `context`, `fits`, `fill`, `parts` decide what is offered; nothing writes a sentence). Progress Reports are `report-studio.js`, `report-sheets.js` (forms, layout and fit) and `report-blocks.js` (one renderer per printed block).
+  - `page-starters.js`: Observations › Starters (`/observations/starters`)
+  - `page-reports.js`: Reports, with two tabs. The Term Questionnaire is `report-questionnaire.js` (one student at a time: the student strip, What FullVision Has, the Comment Bank and the Teacher Comment); its Comment Bank is data in `shared/comment-bank.js` and a pure engine in `teacher/comment-bank.js` (`facts` reads one student's term from the data layer; `context`, `fits`, `fill`, `parts` decide what is offered). Generate assembles a draft from the bank's sentences; no model writes text (docs/DECISIONS.md). Progress Reports are `report-studio.js`, `report-sheets.js` (forms, layout and fit) and `report-blocks.js` (one renderer per printed block).
 - Shared desktop UI shell: `teacher/ui.js`
 
 The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`, `/gradebook`, `/observations`, `/observations/starters`, `/reports` and `/student?id=…`. Netlify serves `teacher/app.html` at each of them and `teacher/router.js` draws the page with `history.pushState`; the list is repeated in `netlify.toml`, `sw.js`, `serve.json` and the local servers, and `tests/app-routes.test.js` keeps them in step. Old `/teacher/app.html#/…` links are rewritten to the clean address at boot. Page modules render into shared mount points for the dock, sidebar, page toolbar, and main content area.
@@ -48,10 +49,12 @@ The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`
 
 - Entry point: `teacher-mobile/index.html`
 - Shell: `teacher-mobile/shell.js`
+- Shared pieces: `components.js` (`MComponents` / `MC`), `card-stack.js`, `card-widgets.js`, `card-widget-editor.js`
 - Main tab modules:
-  - `tab-students.js`
+  - `tab-students.js`, with `students-list.js` and `student-detail.js`
   - `tab-observe.js`
-  - `tab-grade.js`
+  - `tab-grade.js`, with `sweep.js`
+- It also loads `teacher/obs-capture.js` and `teacher/obs-card.js` from the desktop.
 
 The mobile experience reuses the same shared auth, data, queue, and calculation layers as desktop, but presents them through a separate shell and touch-first UI.
 
@@ -61,15 +64,23 @@ The mobile experience reuses the same shared auth, data, queue, and calculation 
 
 The app uses vanilla JavaScript with browser-global IIFE modules rather than a bundler-driven framework runtime.
 
-Shared runtime modules load before desktop or mobile page modules:
+Shared runtime modules load before desktop or mobile page modules, in this order on the desktop (`teacher/app.html`; `tests/docs-sync.test.js` checks it):
 
-1. Supabase SDK
-2. `shared/supabase.js`
-3. `shared/constants.js`
-4. `shared/data.js`
-5. `shared/offline-queue.js`
-6. `shared/auto-update.js`
-7. `shared/calc.js`
+1. `shared/sentry-init.js`
+2. `shared/html.js` (`esc`, the one escape helper)
+3. `shared/link-nav.js`
+4. Supabase SDK (`vendor/supabase.min.js`)
+5. `shared/supabase.js`
+6. `shared/constants.js`
+7. `shared/reporting-term-presets.js`
+8. `shared/data.js`
+9. `shared/offline-queue.js`
+10. `shared/auto-update.js`
+11. `shared/calc.js`
+12. `shared/rubric-draft.js`
+13. `shared/rubric-checks.js`
+
+The phone loads the same list without `link-nav.js`, `reporting-term-presets.js` and `rubric-draft.js`.
 
 Desktop or mobile modules then layer on top of that shared runtime.
 
@@ -143,7 +154,7 @@ Current signed-in flow:
 
 - `bootstrap_teacher(...)` ensures teacher bootstrap state exists
 - `list_teacher_courses()` provides course-level boot metadata
-- `get_gradebook(courseId)` hydrates the active course cache
+- `get_class_bundle(courseId)` hydrates the active course cache in one request (gradebook, learning map, rubrics, observations, term ratings, report config); `get_gradebook(courseId)` is the fallback when the bundle RPC isn't available
 - `get_student_profile(enrollmentId)` supports deeper student detail reads
 
 Legacy per-course fan-out reads are no longer the active architecture.
