@@ -79,9 +79,9 @@ describe('simulate', () => {
       expect(o.comments).toBeGreaterThanOrEqual(r.overAt);
       expect(['grade', 'attendance', 'notHandedIn', 'example', 'nextStep']).not.toContain(o.step);
     });
-    // The one next-step sentence is in every Demo comment, but the next
-    // step has one template by design, so it is never listed.
-    expect(r.overPicked.find(o => o.id === 'g301')).toBeUndefined();
+    // A next-step frame can be in many Demo comments, but the step is
+    // fixed by design, so it is never listed.
+    expect(r.overPicked.some(o => COMMENT_BANK.sentences.find(s => s.id === o.id).group === 'Next Step')).toBe(false);
   });
 
   it('lists the near-identical pairs and the thin parts per class', () => {

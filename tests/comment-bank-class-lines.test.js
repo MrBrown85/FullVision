@@ -116,11 +116,10 @@ describe('nextStepOf', () => {
 describe('the draft', () => {
   it('says the next step as a skill, never a bare competency label', () => {
     const d = draftOf(facts());
-    // One of the frames for Significance (the plan's g301 or a frame
-    // written for the skill), filled for singular they.
+    // One of the frames written for Significance, filled for singular they.
     const got = d.sentences.find(x => x.step === 'nextStep');
     const forSkill = COMMENT_BANK.sentences
-      .filter(s => s.id === 'g301' || (s.when && s.when.nextSkill === 'significance' && s.subjects[0] === 'socials'))
+      .filter(s => s.when && s.when.nextSkill === 'significance' && s.subjects[0] === 'socials')
       .map(s => s.id);
     expect(forSkill).toContain(got.id);
     expect(got.text).toMatch(

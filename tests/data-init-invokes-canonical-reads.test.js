@@ -52,7 +52,9 @@ describe('initData invokes the v2 get_gradebook RPC', () => {
 
     await initData(CID);
 
-    var names = client.calls.map(function (c) { return c.name; });
+    var names = client.calls.map(function (c) {
+      return c.name;
+    });
     expect(names).toContain('get_gradebook');
   });
 
@@ -62,7 +64,9 @@ describe('initData invokes the v2 get_gradebook RPC', () => {
 
     await initData(CID);
 
-    var call = client.calls.find(function (c) { return c.name === 'get_gradebook'; });
+    var call = client.calls.find(function (c) {
+      return c.name === 'get_gradebook';
+    });
     expect(call, 'get_gradebook should have been called').toBeDefined();
     expect(call.payload.p_course_id).toBe(CID);
   });

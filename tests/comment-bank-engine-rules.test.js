@@ -223,7 +223,7 @@ describe('the draft is the plan’s eight parts only', () => {
     // support line.
     const next = d.sentences.find(x => x.step === 'nextStep');
     const forSkill = COMMENT_BANK.sentences
-      .filter(s => s.id === 'g301' || (s.when && s.when.nextSkill === 'significance' && s.subjects[0] === 'socials'))
+      .filter(s => s.when && s.when.nextSkill === 'significance' && s.subjects[0] === 'socials')
       .map(s => s.id);
     expect(forSkill).toContain(next.id);
     expect(next.text).not.toContain('Significance');

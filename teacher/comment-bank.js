@@ -2738,13 +2738,7 @@ window.CommentBank = (function () {
      carries the teacher's Note for the Report on the best piece. Each step
      keeps only the sentences at its top score. */
   function specificity(s, ctx) {
-    // `when.nextSkill` binds a frame to one skill but makes it no more
-    // specific than the plan's "Next, {he} can {nextSkill}." (g301), so
-    // every frame for the skill shares one tier and the class draws from
-    // all of them.
-    var n = Object.keys(s.when || {}).filter(function (k) {
-      return k !== 'nextSkill';
-    }).length;
+    var n = Object.keys(s.when || {}).length;
     if (ctx._bestNote && (s.needs || []).indexOf('bestPiece') >= 0) n++;
     return n;
   }

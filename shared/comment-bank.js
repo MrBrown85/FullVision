@@ -1159,25 +1159,19 @@ var COMMENT_BANK = {
       claims: ['habits'],
       src: 'new',
     },
-    // Plan PR 8. The next step as one skill in plain words, from the
-    // competency-to-skill table (teacher/comment-bank.js SKILLS); never the
-    // bare competency label.
-    {
-      id: 'g301',
-      part: 'go',
-      group: 'Next Step',
-      text: 'Next, {he} can {nextSkill}.',
-      needs: ['nextSkill'],
-      claims: ['nextStep'],
-      src: 'new',
-    },
-    // Grown 2026-11-01 (lane C, Colin: "significantly more", "too little
-    // variation"): four frames for every skill in the competency-to-skill
-    // table (teacher/comment-bank.js SKILLS), bound to the skill by
-    // `when.nextSkill` (its key) and `subjects` (its kind of class), and to
-    // the fact by `needs: ['nextSkill']`, so verify() checks the same
-    // competency and skill as g301. Each restates the skill as one thing to
-    // do, never a fault; the frames differ in structure, not just a word.
+    // Plan PR 8, grown 2026-11-01 (lane C, Colin: "significantly more",
+    // "too little variation"). The next step as one skill in plain words
+    // from the competency-to-skill table (teacher/comment-bank.js SKILLS),
+    // never the bare competency label: four frames for every skill, bound
+    // to it by `when.nextSkill` (its key) and `subjects` (its kind of
+    // class), and to the fact by `needs: ['nextSkill']`, which verify()
+    // checks against the next step's competency. The first frame of each
+    // skill is the plan's "Next, {he} can …" form, which replaced the one
+    // template g301 (cut 2026-11-01: it rendered the same words as that
+    // frame, so two classmates could print one sentence under two ids).
+    // Each restates the skill as one thing to do, never a fault; the frames
+    // differ in structure, not just a word, and no sentence names the
+    // student twice (a student with no pronouns on file gets the name).
     {
       id: 'g302',
       part: 'go',
@@ -1193,7 +1187,7 @@ var COMMENT_BANK = {
       id: 'g303',
       part: 'go',
       group: 'Next Step',
-      text: 'The next step for {him} is to weigh a past decision fairly, in its own time.',
+      text: 'The next step for {him} is to judge a past decision by what people believed then.',
       needs: ['nextSkill'],
       when: { nextSkill: 'ethical' },
       subjects: ['socials'],
@@ -1281,7 +1275,7 @@ var COMMENT_BANK = {
       id: 'g311',
       part: 'go',
       group: 'Next Step',
-      text: 'The next step for {him} is to ask who created a source and what they wanted.',
+      text: 'The next step for {him} is to ask who created a source and what that person wanted.',
       needs: ['nextSkill'],
       when: { nextSkill: 'perspective' },
       subjects: ['socials'],
@@ -1457,7 +1451,7 @@ var COMMENT_BANK = {
       id: 'g327',
       part: 'go',
       group: 'Next Step',
-      text: 'The next step for {him} is to turn a topic into one question worth researching.',
+      text: 'The next step for {him} is to narrow a topic to one clear research question.',
       needs: ['nextSkill'],
       when: { nextSkill: 'inquiry' },
       subjects: ['socials'],
@@ -1468,7 +1462,7 @@ var COMMENT_BANK = {
       id: 'g328',
       part: 'go',
       group: 'Next Step',
-      text: 'Choosing sources that answer {his} own question is {his} next step.',
+      text: 'Choosing sources that answer the question asked is {his} next step.',
       needs: ['nextSkill'],
       when: { nextSkill: 'inquiry' },
       subjects: ['socials'],
@@ -1556,7 +1550,7 @@ var COMMENT_BANK = {
       id: 'g336',
       part: 'go',
       group: 'Next Step',
-      text: 'Turning curiosity into a testable question is {his} next step.',
+      text: 'Writing a question an experiment can test is {his} next step.',
       needs: ['nextSkill'],
       when: { nextSkill: 'questioning' },
       subjects: ['science'],
@@ -1919,7 +1913,7 @@ var COMMENT_BANK = {
       id: 'g369',
       part: 'go',
       group: 'Next Step',
-      text: '{His} next step is to plan a way into a problem before starting the arithmetic.',
+      text: '{His} next step is to choose a method before starting the calculation.',
       needs: ['nextSkill'],
       when: { nextSkill: 'solving' },
       subjects: ['math'],
@@ -2293,7 +2287,7 @@ var COMMENT_BANK = {
       id: 'g403',
       part: 'go',
       group: 'Next Step',
-      text: 'The next step for {him} is to sketch or test two ideas before settling on one.',
+      text: 'The next step for {him} is to sketch or test two ideas before choosing one.',
       needs: ['nextSkill'],
       when: { nextSkill: 'creating' },
       subjects: ['arts'],
@@ -2711,7 +2705,7 @@ var COMMENT_BANK = {
       id: 'g441',
       part: 'go',
       group: 'Next Step',
-      text: '{His} next step is to ask a user to try a prototype and note what they say.',
+      text: '{His} next step is to ask someone to try a prototype and record the comments.',
       needs: ['nextSkill'],
       when: { nextSkill: 'testing' },
       subjects: ['adst'],
@@ -2909,7 +2903,7 @@ var COMMENT_BANK = {
       id: 'g459',
       part: 'go',
       group: 'Next Step',
-      text: 'The next step for {him} is to explain how a strength fits a goal {he} [has|have] chosen.',
+      text: 'The next step for {him} is to explain how one strength fits a chosen goal.',
       needs: ['nextSkill'],
       when: { nextSkill: 'self' },
       subjects: ['career'],
@@ -2920,7 +2914,7 @@ var COMMENT_BANK = {
       id: 'g460',
       part: 'go',
       group: 'Next Step',
-      text: 'Describing what {he} [does|do] well and where it could lead is {his} next step.',
+      text: 'Describing one personal strength and where it could lead is {his} next step.',
       needs: ['nextSkill'],
       when: { nextSkill: 'self' },
       subjects: ['career'],
@@ -2975,7 +2969,7 @@ var COMMENT_BANK = {
       id: 'g465',
       part: 'go',
       group: 'Next Step',
-      text: '{His} next step is to connect an experience to a skill {he} [wants|want] to build.',
+      text: '{His} next step is to name the skill one experience outside class helped build.',
       needs: ['nextSkill'],
       when: { nextSkill: 'connecting' },
       subjects: ['career'],
@@ -3019,7 +3013,7 @@ var COMMENT_BANK = {
       id: 'g469',
       part: 'go',
       group: 'Next Step',
-      text: '{His} next step is to describe a typical day in one career {he} [is|are] curious about.',
+      text: '{His} next step is to describe a typical day in one career of interest.',
       needs: ['nextSkill'],
       when: { nextSkill: 'exploring' },
       subjects: ['career'],

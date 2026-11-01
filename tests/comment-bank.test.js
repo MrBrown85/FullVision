@@ -71,10 +71,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 300 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(300);
+  it('has 299 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(299);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(300);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(299);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -514,18 +514,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 22 sentences (1, 5, 12, 4)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 21 sentences (1, 5, 11, 4)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 12, 4]);
-    expect(CommentBank.fitCount(ctx)).toBe(22);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 11, 4]);
+    expect(CommentBank.fitCount(ctx)).toBe(21);
   });
 
-  it('offers Jasper 22 (1, 5, 12, 4), by the name he goes by', () => {
+  it('offers Jasper 21 (1, 5, 11, 4), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 12, 4]);
-    expect(CommentBank.fitCount(ctx)).toBe(22);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 5, 11, 4]);
+    expect(CommentBank.fitCount(ctx)).toBe(21);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });

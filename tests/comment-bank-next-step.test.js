@@ -2,9 +2,9 @@
  * The Next Step frames written for one skill (lane C, Nov 1): every skill in
  * the competency-to-skill table has at least three frames bound to it by
  * `when.nextSkill`, each reachable (it fits a student whose next step is
- * that skill), picked alongside the plan's g301 at one tier, verified
- * against the same competency, and never offered for another skill or
- * another kind of class.
+ * that skill), rendered differently from every other frame for the skill,
+ * verified against the same competency, never naming the student twice,
+ * and never offered for another skill or another kind of class.
  */
 import './setup.js';
 import { describe, expect, it } from 'vitest';
@@ -86,13 +86,20 @@ describe('the Next Step frames per skill', () => {
     );
   });
 
-  it('differ in structure within a skill: no two frames start with the same three words', () => {
+  it('differ in structure within a skill: no two frames start with the same three words, as rendered', () => {
     Object.entries(CommentBank.SKILLS).forEach(([family, rows]) =>
       rows.forEach(row => {
-        const starts = forSkill(family, row.key).map(s => s.text.split(/\s+/).slice(0, 3).join(' '));
-        expect(new Set(starts).size, family + '.' + row.key).toBe(starts.length);
+        const ctx = CommentBank.context(facts(family, row), {});
+        const texts = forSkill(family, row.key).map(s => CommentBank.fill(s, ctx));
+        const starts = texts.map(x => x.split(/\s+/).slice(0, 3).join(' '));
+        expect(new Set(starts).size, family + '.' + row.key + ': ' + starts.join(' | ')).toBe(starts.length);
+        expect(new Set(texts).size, family + '.' + row.key).toBe(texts.length);
       }),
     );
+  });
+
+  it('name the student at most once each: no sentence has two pronoun slots', () => {
+    frames.forEach(s => expect((s.text.match(/\{(He|he|him|His|his)\}/g) || []).length, s.id).toBeLessThanOrEqual(1));
   });
 
   it('state one thing to do, never a fault or a claim about the future', () => {
@@ -105,13 +112,16 @@ describe('the Next Step frames per skill', () => {
 
   Object.entries(CommentBank.SKILLS).forEach(([family, rows]) =>
     rows.forEach(row => {
-      it(`fit, fill and verify for ${family}.${row.key}, with g301 in the same pool`, () => {
+      it(`fit, fill and verify for ${family}.${row.key}: the pool is its own frames`, () => {
         const f = facts(family, row);
         const ctx = CommentBank.context(f, {});
         expect(CommentBank.nextSkillOf(f)).toMatchObject({ key: row.key, skill: row.skill });
         const pool = CommentBank.stepPool('nextStep', ctx).map(s => s.id);
-        forSkill(family, row.key).forEach(s => expect(pool, s.id).toContain(s.id));
-        expect(pool).toContain('g301');
+        expect(pool.sort()).toEqual(
+          forSkill(family, row.key)
+            .map(s => s.id)
+            .sort(),
+        );
         // Nothing written for another skill, and nothing of another kind of class.
         pool.forEach(id => {
           const s = COMMENT_BANK.sentences.find(x => x.id === id);
@@ -161,9 +171,7 @@ describe('the Next Step frames per skill', () => {
 
   it('are drawn in turn across a class: a skill’s frames are exhausted before one repeats', () => {
     const row = CommentBank.SKILLS.ela.find(r => r.key === 'writing');
-    const ids = forSkill('ela', 'writing')
-      .map(s => s.id)
-      .concat('g301');
+    const ids = forSkill('ela', 'writing').map(s => s.id);
     const comments = [];
     const seen = [];
     for (let i = 0; i < ids.length; i++) {
