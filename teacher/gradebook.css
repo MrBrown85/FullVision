@@ -771,8 +771,9 @@ th.gb-group-alt {
 
 /* ── 4-quadrant grid layout (like a spreadsheet app) ────── */
 /* Inner radius for quadrant corners: 1px inset from the grid border */
-/* Earthy palette scoped to competencies grid only */
-.gb-grid {
+/* Earthy palette scoped to the grid and its key */
+.gb-grid,
+.gb-key {
   --score-1: #c2584a;
   --score-2: #b8893a;
   --score-3: #548c5a;
@@ -791,7 +792,8 @@ th.gb-group-alt {
   --score-4-dark: #306d80;
 }
 @media (prefers-color-scheme: dark) {
-  .gb-grid {
+  .gb-grid,
+  .gb-key {
     --score-1: #e07060;
     --score-2: #dda854;
     --score-3: #6bae70;
@@ -1039,6 +1041,7 @@ th.gb-group-alt {
   display: flex;
   justify-content: space-between;
   gap: 16px;
+  width: 100%;
 }
 .gb-grid-corner-label {
   font-size: 12px;
@@ -1121,7 +1124,7 @@ th.gb-group-alt {
   width: 54px;
   text-align: center;
   padding: 4px 2px;
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-base);
   font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
@@ -1361,6 +1364,48 @@ th.gb-group-alt {
 /* Compact density toggle */
 .gb-scores-compact .gb-scores-cell {
   padding: 4px 4px;
+}
+
+/* The key under the grid: what the colours and marks mean. */
+.gb-key {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 10px 12px 0;
+  font-family: var(--font-base);
+  font-size: 12px;
+  color: var(--text);
+}
+.gb-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.gb-key-item .gb-late {
+  margin-left: 0;
+  vertical-align: 0;
+}
+.gb-key-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.gb-key-gap {
+  width: 6px;
+}
+.gb-key-dash {
+  color: var(--text-3);
+  font-weight: 700;
+}
+.gb-code-tip {
+  max-width: 280px;
+  line-height: 1.35;
+}
+.gb-code-tip-group {
+  margin-top: 2px;
+  opacity: 0.75;
 }
 
 /* Nothing to show: one white card, a plain sentence and the one step
