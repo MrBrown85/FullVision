@@ -3087,15 +3087,27 @@
   resize: none;
   overflow: hidden;
   outline: none;
+  transition:
+    height var(--duration-fast) var(--ease-out),
+    border-color var(--duration-micro) var(--ease-out),
+    box-shadow var(--duration-micro) var(--ease-out);
 }
 .rsg-overall-comment::placeholder {
   color: var(--text-2);
 }
+/* It grows to three lines; scrolling comes on once it has, so a long
+   comment shows no scrollbar while it opens. */
 .rsg-overall-comment:focus {
   height: calc(3 * 1.4em + 16px);
   overflow-y: auto;
   border-color: var(--active);
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.25);
+  transition:
+    height var(--duration-fast) var(--ease-out),
+    border-color var(--duration-micro) var(--ease-out),
+    box-shadow var(--duration-micro) var(--ease-out),
+    overflow 0s linear var(--duration-fast);
+  transition-behavior: allow-discrete;
 }
 @media (prefers-color-scheme: dark) {
   .rsg-overall-comment {
