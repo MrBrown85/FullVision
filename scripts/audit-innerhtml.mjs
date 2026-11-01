@@ -97,17 +97,44 @@ function collectFiles(root) {
   return out;
 }
 
+/* `html-safe: <reason>` in a comment marks HTML a person has checked:
+   - on the line(s) just above a function: everything it returns is
+     escaped or fixed markup, so a call to it is REVIEWED;
+   - on the line just above (or at the end of) a sink: the HTML it sets
+     was built by checked code (a stored string, a template constant).
+   The reason says what makes it safe. Every function that shares the name
+   must carry its own marker, since the index is by name. */
+const SAFE_MARK = /html-safe:\s*\S/;
+const SAFE_LINES = new Map(); // file → Set of line numbers a marker covers
+
 function parseFile(file) {
   const src = fs.readFileSync(file, 'utf8');
+  const comments = [];
+  const opts = sourceType => ({ ecmaVersion: 'latest', sourceType, locations: true, onComment: comments });
+  let result;
   try {
-    return { src, ast: parse(src, { ecmaVersion: 'latest', sourceType: 'script', locations: true }) };
+    result = { src, ast: parse(src, opts('script')) };
   } catch (_) {
+    comments.length = 0;
     try {
-      return { src, ast: parse(src, { ecmaVersion: 'latest', sourceType: 'module', locations: true }) };
+      result = { src, ast: parse(src, opts('module')) };
     } catch (e) {
       return { src, ast: null, parseError: e.message };
     }
   }
+  const lines = new Set();
+  for (const c of comments) {
+    if (!SAFE_MARK.test(c.value)) continue;
+    // The comment's own lines and the two below it.
+    for (let l = c.loc.start.line; l <= c.loc.end.line + 2; l++) lines.add(l);
+  }
+  SAFE_LINES.set(file, lines);
+  return result;
+}
+
+function isMarked(file, line) {
+  const lines = SAFE_LINES.get(file);
+  return !!(lines && lines.has(line));
 }
 
 function snippet(src, node, max = 180) {
@@ -125,7 +152,7 @@ function indexFunctions(file, ast, src) {
   function register(name, fnNode) {
     if (!name || !fnNode) return;
     const arr = FN_INDEX.get(name) || [];
-    arr.push({ file, fnNode, src, ast });
+    arr.push({ file, fnNode, src, ast, reviewed: isMarked(file, fnNode.loc.start.line) });
     FN_INDEX.set(name, arr);
   }
 
@@ -303,7 +330,11 @@ function classify(expr, ctx, depth = 0) {
         ctx.visitedHelpers.add(helperName);
         try {
           // classify each candidate's return, then merge (worst wins)
-          const parts = cands.map(c => classifyFnReturn(c.fnNode, { ...ctx, file: c.file, src: c.src }, depth + 1));
+          const parts = cands.map(c =>
+            c.reviewed
+              ? { kind: 'REVIEWED', via: helperName }
+              : classifyFnReturn(c.fnNode, { ...ctx, file: c.file, src: c.src }, depth + 1),
+          );
           const merged = mergeParts(parts, 'helper:' + helperName);
           if (merged.kind !== 'UNKNOWN') return merged;
           return { kind: 'UNKNOWN', note: 'helper:' + helperName + (merged.note ? '|' + merged.note : '') };
@@ -381,6 +412,7 @@ function mergeParts(parts, tag) {
     const unknowns = parts.filter(p => p.kind === 'UNKNOWN').slice(0, 3);
     return { kind: 'UNKNOWN', note: tag + ':' + unknowns.map(u => u.note || '?').join(',') };
   }
+  if (kinds.has('REVIEWED')) return { kind: 'REVIEWED', note: tag };
   if (kinds.has('SANITIZED')) return { kind: 'SANITIZED', note: tag };
   if (kinds.has('ESC_WRAPPED')) return { kind: 'ESC_WRAPPED', note: tag };
   if (kinds.has('TRUSTED_EXPR')) return { kind: 'TRUSTED_EXPR', note: tag };
@@ -402,7 +434,9 @@ function auditFile(file, ast, src) {
       if (p !== 'innerHTML' && p !== 'outerHTML') return;
       const fnNode = enclosingFunction(ancestors.slice(0, -1));
       const ctx = { file: rel, src, fnNode, sinkStart: node.end, visitedHelpers: new Set(), tracedIdents: new Set() };
-      const cls = classify(node.right, ctx);
+      const cls = isMarked(file, node.loc.start.line)
+        ? { kind: 'REVIEWED', note: 'marked at the sink' }
+        : classify(node.right, ctx);
       sites.push({
         file: rel,
         line: node.loc.start.line,
@@ -423,7 +457,9 @@ function auditFile(file, ast, src) {
       if (!htmlArg) return;
       const fnNode = enclosingFunction(ancestors.slice(0, -1));
       const ctx = { file: rel, src, fnNode, sinkStart: node.end, visitedHelpers: new Set(), tracedIdents: new Set() };
-      const cls = classify(htmlArg, ctx);
+      const cls = isMarked(file, node.loc.start.line)
+        ? { kind: 'REVIEWED', note: 'marked at the sink' }
+        : classify(htmlArg, ctx);
       sites.push({
         file: rel,
         line: node.loc.start.line,
