@@ -9,6 +9,7 @@ test('the page starts on the loading screen', async ({ page }) => {
   const html = await res.text();
   expect(html).toContain('id="app-loading"');
   expect(html).toContain('Loading your classes');
+  expect(html).toContain('id="app-loading-text"');
 });
 
 test('the loading screen goes once the dashboard is drawn', async ({ page }) => {
