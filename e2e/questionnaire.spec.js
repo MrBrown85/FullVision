@@ -18,6 +18,34 @@ async function open(page, student = 'st1') {
   await page.locator('#tq-narrative').waitFor();
 }
 
+/* A comment's sentences, as ReportQuestionnaire.sentencesOf splits them. */
+function ReportQuestionnaireSentences(text) {
+  const out = [];
+  const t = String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const re = /[.!?…]+["”]?\s+(?=["“]?[A-Z0-9])/g;
+  let from = 0;
+  let m;
+  while ((m = re.exec(t))) {
+    out.push(t.slice(from, m.index + m[0].length).trim());
+    from = m.index + m[0].length;
+  }
+  if (from < t.length) out.push(t.slice(from).trim());
+  return out.filter(Boolean);
+}
+
+/* The seeded comment cleared, for a draft with no typed sentences kept in
+   it (a typed sentence stays through Generate; a fresh start is clearing
+   the box). */
+async function clearComment(page) {
+  await page.locator('#tq-narrative').evaluate(el => {
+    el.value = '';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(page.locator('#tq-sentences .qn-srow')).toHaveCount(0);
+}
+
 /* The cursor at the end of the comment (End only reaches the end of a
    wrapped line). */
 async function toEnd(page) {
@@ -580,6 +608,7 @@ test.describe('the Sentences card', () => {
     await expect(page.locator('.qn-glance .qn-note-line')).toHaveText(
       'Note for the report: “kept a field journal with dated sketches”',
     );
+    await clearComment(page);
     await page.locator('#tq-generate').click();
     const box = page.locator('#tq-narrative');
     const draft = await box.inputValue();
@@ -705,13 +734,320 @@ test.describe('the Sentences card', () => {
     await page.locator('#tq-generate').click();
     await expect(page.locator('#tq-narrative')).toHaveValue(/^Cece had a steady term in Science 8\. /);
     await expect(first.locator('.qn-edited')).toHaveText('Edited');
-    // A sentence of the teacher's own, added at the end, gets a row with no part.
+    // A sentence of the teacher's own, added at the end, gets a Your
+    // Sentence row with Options (the InsertRows mockup).
     await toEnd(page);
     await page.keyboard.type(' She asks good questions.');
     const last = rows(page).last();
     await expect(last.locator('.qn-req-text')).toHaveText('She asks good questions.');
-    await expect(last.locator('.qn-req-label')).toHaveText('');
-    await expect(last.locator('.qn-edited')).toHaveText('Edited');
+    await expect(last.locator('.qn-req-label')).toHaveText('Your Sentence');
+    await expect(last.locator('.qn-req-source')).toHaveText('Typed by you · kept when you regenerate');
+    await expect(last.locator('[data-do="options"]')).toHaveText('Options ▾');
+    await expect(last.locator('.qn-edited')).toHaveCount(0);
+  });
+
+  test('a typed sentence: its row, kept at its place by Generate Comment, Options with Add to My Bank and Remove From Comment', async ({
+    page,
+  }) => {
+    await open(page);
+    const seeded = ReportQuestionnaireSentences(await page.locator('#tq-narrative').inputValue());
+    expect(seeded.length).toBe(2);
+    await page.locator('#tq-generate').click();
+    const box = page.locator('#tq-narrative');
+    // The hand-written comment is not replaced: its sentences are Your
+    // Sentence rows after the grade sentence, in their order, with the
+    // bank's parts around them.
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    await expect(rows(page).nth(1).locator('.qn-req-text')).toHaveText(seeded[0]);
+    await expect(rows(page).nth(2).locator('.qn-req-text')).toHaveText(seeded[1]);
+    await expect(rows(page).nth(1).locator('.qn-req-label')).toHaveText('Your Sentence');
+    expect(await rows(page).count()).toBeGreaterThan(3);
+    // ⌘Z brings the hand-written comment back.
+    await box.focus();
+    await page.keyboard.press('ControlOrMeta+z');
+    expect(ReportQuestionnaireSentences(await box.inputValue())).toEqual(seeded);
+    await expect(rows(page)).toHaveCount(2);
+    await page.locator('#tq-generate').click();
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    // Typed after the first sentence.
+    const first = await rows(page).first().locator('.qn-req-text').textContent();
+    await box.evaluate((el, t) => {
+      const i = el.value.indexOf(t) + t.length;
+      el.focus();
+      el.setSelectionRange(i, i);
+    }, first);
+    await page.keyboard.type(' Cece explained her lab results clearly to the class.');
+    const typed = rows(page).filter({ hasText: 'explained her lab results' });
+    await expect(typed).toHaveCount(1);
+    await expect(typed.locator('.qn-req-label')).toHaveText('Your Sentence');
+    await expect(typed.locator('.qn-req-source')).toHaveText('Typed by you · kept when you regenerate');
+    await expect(typed.locator('.qn-srow-handle[draggable="true"]')).toHaveCount(1);
+    await expect(rows(page).nth(1).locator('.qn-req-label')).toHaveText('Your Sentence');
+    // Generate again: still there, second, with the bank's parts around it.
+    await page.locator('#tq-generate').click();
+    await expect(rows(page).nth(1).locator('.qn-req-label')).toHaveText('Your Sentence');
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    const text = await box.inputValue();
+    expect(ReportQuestionnaireSentences(text)[1]).toBe('Cece explained her lab results clearly to the class.');
+    expect(text.split('explained her lab results').length).toBe(2);
+    // Kept too for a comment Generate did not write this visit: after a
+    // reload the rows are recovered from the saved comment. (Cece's seeded
+    // comment, typed by hand, is kept the same way: its two sentences follow
+    // the grade sentence, in their order, with the bank's parts around.)
+    await page.reload();
+    await page.locator('#tq-narrative').waitFor();
+    await expect(rows(page).nth(1).locator('.qn-req-label')).toHaveText('Your Sentence');
+    await page.locator('#tq-generate').click();
+    await expect(rows(page).nth(1).locator('.qn-req-label')).toHaveText('Your Sentence');
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    // Options: Add to My Bank (the own-sentence box under the row) and
+    // Remove From Comment; ⌘Z brings the sentence back.
+    await typed.locator('[data-do="options"]').click();
+    const menu = page.locator('#tq-options-menu');
+    await expect(menu.locator('.qn-menu-head')).toHaveText('Your Sentence');
+    await expect(menu.locator('[role="menuitem"] .qn-menu-text')).toHaveText(['Add to My Bank', 'Remove From Comment']);
+    await expect(menu.locator('[role="menuitem"]').first().locator('.qn-menu-meta')).toHaveText(
+      'For other students it fits',
+    );
+    await expect(menu.locator('[role="menuitem"]').first()).toBeFocused();
+    await menu.locator('[data-do="ownAdd"]').click();
+    const own = typed.locator('#tq-own');
+    await expect(own.locator('#tq-own-input')).toHaveValue('Cece explained her lab results clearly to the class.');
+    await page.keyboard.press('Escape');
+    await expect(own).toHaveCount(0);
+    await typed.locator('[data-do="options"]').click();
+    await menu.locator('[data-do="remove"]').click();
+    await expect(rows(page).filter({ hasText: 'explained her lab results' })).toHaveCount(0);
+    await expect(box).not.toHaveValue(/explained her lab results/);
+    await box.focus();
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect(box).toHaveValue(/explained her lab results/);
+    await expect(rows(page).filter({ hasText: 'explained her lab results' })).toHaveCount(1);
+  });
+
+  /* The rows' boxes, to check nothing moves. */
+  const boxes = page =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll('#tq-sentences .qn-req-row')).map(el => {
+        const r = el.getBoundingClientRect();
+        return [Math.round(r.top), Math.round(r.height)];
+      }),
+    );
+
+  test('the gap between rows: a line and + on hover with nothing moving; the + menu offers only the missing parts; one click puts the sentence there', async ({
+    page,
+  }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    const box = page.locator('#tq-narrative');
+    const strengths = rowByLabel(page, 'Strengths');
+    await expect(strengths).toHaveCount(1);
+    const gone = await strengths.locator('.qn-req-text').textContent();
+    // The strengths sentence deleted from the comment: its row goes.
+    await box.evaluate((el, t) => {
+      el.value = el.value.replace(' ' + t, '').replace(t, '');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, gone);
+    await expect(strengths).toHaveCount(0);
+    const n = await rows(page).count();
+    // A gap after every row of the comment, none before the first; hidden
+    // until hovered.
+    const gaps = page.locator('#tq-sentences .qn-gap');
+    await expect(gaps).toHaveCount(n);
+    await expect(gaps.first()).toHaveAttribute('data-gap', '1');
+    const plus = gaps.nth(1).locator('.qn-gap-add');
+    await expect(plus).toHaveCSS('opacity', '0');
+    const before = await boxes(page);
+    const g = await gaps.nth(1).boundingBox();
+    await page.mouse.move(g.x + g.width / 2, g.y);
+    await expect(plus).toHaveCSS('opacity', '1');
+    await expect(gaps.nth(1).locator('.qn-gap-line')).toHaveCSS('opacity', '1');
+    await expect(gaps.nth(1).locator('[role="tooltip"]')).toHaveText('Add a sentence here');
+    await expect(gaps.nth(1).locator('[role="tooltip"]')).toHaveCSS('opacity', '1');
+    expect(await boxes(page)).toEqual(before);
+    // The + at the line's left edge, on the hairline between the rows.
+    const p = await plus.boundingBox();
+    expect(Math.abs(p.y + p.height / 2 - g.y)).toBeLessThan(2);
+    expect(await boxes(page)).toEqual(before);
+    // The menu: Add Here, the Strengths part (the only one missing that
+    // fits), Write Your Own… and Browse Sentences…
+    await plus.click();
+    const menu = page.locator('#tq-add-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.locator('.qn-menu-head')).toHaveText('Add Here');
+    const items = menu.locator('.qn-add-item');
+    await expect(items).toHaveCount(1);
+    await expect(items.first().locator('.qn-add-part')).toHaveText('Strengths');
+    await expect(items.first().locator('.qn-menu-text')).not.toHaveText('');
+    await expect(items.first().locator('.qn-menu-meta')).not.toHaveText('');
+    await expect(items.first()).toBeFocused();
+    await expect(menu.locator('.qn-menu-add')).toHaveText(['Write Your Own…', 'Browse Sentences…']);
+    expect(await boxes(page)).toEqual(before);
+    const sentence = await items.first().locator('.qn-menu-text').textContent();
+    const countWas = await page.locator('#tq-count').textContent();
+    await items.first().click();
+    await expect(menu).toHaveCount(0);
+    // The row at that gap, tinted, "added just now"; the comment has the
+    // sentence at the same place; the count moved.
+    const added = rows(page).nth(2);
+    await expect(added.locator('.qn-req-label')).toHaveText('Strengths');
+    await expect(added).toHaveClass(/\badded\b/);
+    await expect(added.locator('.qn-req-source')).toHaveText(/ · added just now$/);
+    // The sentence is tinted in the comment too, like the best piece.
+    await expect(page.locator('#tq-marks .qn-mark.added')).toHaveText(
+      await added.locator('.qn-req-text').textContent(),
+    );
+    await expect(rows(page)).toHaveCount(n + 1);
+    const text = await box.inputValue();
+    const sentences = ReportQuestionnaireSentences(text);
+    expect(sentences[2]).toBe(await added.locator('.qn-req-text').textContent());
+    expect(sentences[2].replace(/^(She|Her)\b/, '')).toBe(sentence.replace(/^(She|Her|Cece’s|Cece)\b/, ''));
+    await expect(page.locator('#tq-count')).toHaveText(text.length + ' characters');
+    expect(await page.locator('#tq-count').textContent()).not.toBe(countWas);
+    expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').narrative)).toBe(text);
+    await expect(added.locator('.qn-line-menu')).toBeFocused();
+    // Now every part is in: the menu says so.
+    await gaps.nth(1).locator('.qn-gap-add').click();
+    await expect(menu.locator('.qn-add-item')).toHaveCount(0);
+    await expect(menu.locator('.qn-add-none')).toHaveText(
+      'Every part with a sentence that fits Cece is in the comment.',
+    );
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(gaps.nth(1).locator('.qn-gap-add')).toBeFocused();
+    // When the fade ends the tint, the mark and "added just now" go, in place.
+    await expect(added).not.toHaveClass(/\badded\b/, { timeout: 7000 });
+    await expect(added.locator('.qn-req-source')).not.toHaveText(/added just now/);
+    await expect(page.locator('#tq-marks .qn-mark.added')).toHaveCount(0);
+  });
+
+  test('Browse Sentences… from a gap: opens on a part that can go in; Use replaces a part the comment has once only; ⌘A Delete then Generate at once', async ({
+    page,
+  }) => {
+    await open(page);
+    await clearComment(page);
+    await page.locator('#tq-generate').click();
+    const box = page.locator('#tq-narrative');
+    const gaps = page.locator('#tq-sentences .qn-gap');
+    const n = await rows(page).count();
+    const gradeWas = await rows(page).first().locator('.qn-req-text').textContent();
+    // Every drafted part is in: Browse opens on Habits (nothing rated, so no
+    // habits sentence fits), not on a part already there.
+    await gaps.last().locator('.qn-gap-add').click();
+    await page.locator('#tq-add-menu [data-do="browseAt"]').click();
+    const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Habits');
+    // A second grade sentence is never put in: Use on Grade replaces the
+    // grade row, the row count unchanged, the first row still Grade.
+    await sheet.locator('[role="tab"]', { hasText: 'Grade' }).click();
+    const use = sheet.locator('.qn-browse-use:enabled').first();
+    await expect(use).toHaveAttribute('title', 'Puts this sentence in Cece’s comment.');
+    await use.click();
+    await expect(rows(page)).toHaveCount(n);
+    await expect(rowByLabel(page, 'Grade')).toHaveCount(1);
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    expect(await rows(page).first().locator('.qn-req-text').textContent()).not.toBe(gradeWas);
+    await expect(rowByLabel(page, 'Next Step')).toHaveCount(1);
+    // A Strengths sentence from the same sheet, with the strengths row gone,
+    // goes in at the gap: its Use says so.
+    await page.keyboard.press('Escape');
+    const gone = await rowByLabel(page, 'Strengths').locator('.qn-req-text').textContent();
+    await box.evaluate((el, t) => {
+      el.value = el.value.replace(' ' + t, '').replace(t, '');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, gone);
+    await expect(rowByLabel(page, 'Strengths')).toHaveCount(0);
+    await gaps.last().locator('.qn-gap-add').click();
+    await page.locator('#tq-add-menu [data-do="browseAt"]').click();
+    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Strengths');
+    await expect(sheet.locator('.qn-browse-use:enabled').first()).toHaveAttribute(
+      'title',
+      'Puts this sentence in Cece’s comment, at the place you chose.',
+    );
+    await sheet.locator('.qn-browse-use:enabled').first().click();
+    await expect(rows(page).last().locator('.qn-req-label')).toHaveText('Strengths');
+    await expect(rows(page)).toHaveCount(n);
+    await page.keyboard.press('Escape');
+    // The keyboard focus on a menu item is filled like a hover.
+    await gaps.last().locator('.qn-gap-add').click();
+    const item = page.locator('#tq-add-menu [role="menuitem"]').first();
+    await expect(item).toBeFocused();
+    expect(await item.evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+    expect(await item.evaluate(el => getComputedStyle(el).outlineStyle)).toBe('solid');
+    await page.keyboard.press('Escape');
+    // A typed sentence, then ⌘A, Delete and Generate at once: nothing
+    // deleted comes back.
+    await toEnd(page);
+    await page.keyboard.type(' Cece explained her lab results clearly to the class.');
+    await expect(rowByLabel(page, 'Your Sentence')).toHaveCount(1);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Backspace');
+    await page.locator('#tq-generate').click();
+    await expect(rowByLabel(page, 'Your Sentence')).toHaveCount(0);
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    expect(await box.inputValue()).not.toContain('explained her lab results');
+    await expect(rowByLabel(page, 'Strengths')).toHaveCount(1);
+  });
+
+  test('Write Your Own… at a gap puts a typed row there; Browse Sentences… from a gap inserts with Use; the keyboard path', async ({
+    page,
+  }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    const box = page.locator('#tq-narrative');
+    const gaps = page.locator('#tq-sentences .qn-gap');
+    // Keyboard: the + is focusable in order with the rows; Enter opens the
+    // menu; ⌥↓ on a row's handle still moves it.
+    await rows(page).first().locator('.qn-srow-handle').focus();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    await expect(gaps.first().locator('.qn-gap-add')).toBeFocused();
+    await expect(gaps.first().locator('.qn-gap-add')).toHaveCSS('opacity', '1');
+    await page.keyboard.press('Enter');
+    const menu = page.locator('#tq-add-menu');
+    await expect(menu).toBeVisible();
+    await menu.locator('[data-do="ownOpen"]').click();
+    const own = page.locator('#tq-sentences .qn-own-row #tq-own');
+    await expect(own.locator('#tq-own-input')).toBeFocused();
+    await expect(page.locator('#tq-sentences .qn-own-row .qn-req-label')).toHaveText('Your Sentence');
+    await expect(own.locator('#tq-own-save')).toHaveText('Add Here');
+    await expect(own.locator('#tq-own-save')).toBeDisabled();
+    await own.locator('#tq-own-input').fill('Cece explained her lab results clearly to the class');
+    await expect(own.locator('#tq-own-save')).toBeEnabled();
+    await own.locator('#tq-own-input').press('Enter');
+    await expect(own).toHaveCount(0);
+    const typed = rows(page).nth(1);
+    await expect(typed.locator('.qn-req-label')).toHaveText('Your Sentence');
+    await expect(typed.locator('.qn-req-text')).toHaveText('Cece explained her lab results clearly to the class.');
+    await expect(typed).toHaveClass(/\badded\b/);
+    await expect(typed.locator('[data-do="options"]')).toBeFocused();
+    expect(ReportQuestionnaireSentences(await box.inputValue())[1]).toBe(
+      'Cece explained her lab results clearly to the class.',
+    );
+    // ⌥↓ on its handle moves it down; the comment follows.
+    await typed.locator('.qn-srow-handle').focus();
+    await page.keyboard.press('Alt+ArrowDown');
+    await expect(rows(page).nth(2).locator('.qn-req-label')).toHaveText('Your Sentence');
+    expect(ReportQuestionnaireSentences(await box.inputValue())[2]).toBe(
+      'Cece explained her lab results clearly to the class.',
+    );
+    // Browse Sentences… from the last gap: a part the comment has once
+    // only (Strengths) is replaced in its row, never put in twice.
+    const n = await rows(page).count();
+    await gaps.last().locator('.qn-gap-add').click();
+    await menu.locator('[data-do="browseAt"]').click();
+    const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+    await expect(sheet).toBeVisible();
+    await sheet.locator('[role="tab"]', { hasText: 'Strengths' }).click();
+    const use = sheet.locator('.qn-browse-use:enabled').first();
+    const pick = await use.locator('..').locator('.qn-browse-sentence').textContent();
+    await use.click();
+    await expect(rows(page)).toHaveCount(n);
+    await expect(rowByLabel(page, 'Strengths')).toHaveCount(1);
+    expect((await rowByLabel(page, 'Strengths').locator('.qn-req-text').textContent()).slice(4)).toBe(pick.slice(4));
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await expect(gaps.last().locator('.qn-gap-add')).toBeFocused();
   });
 
   test('Browse Sentences: the parts, Fits, least used first, Use and In Use, search; the height is remembered', async ({
@@ -1043,6 +1379,7 @@ test('Write Your Own from Other Wording goes into the row; Add to My Bank on a t
   page,
 }) => {
   await open(page);
+  await clearComment(page);
   await page.locator('#tq-generate').click();
   const rows = p => p.locator('#tq-sentences .qn-srow');
   const row = rows(page).nth(1);
@@ -1069,8 +1406,8 @@ test('Write Your Own from Other Wording goes into the row; Add to My Bank on a t
   await toEnd(page);
   await page.keyboard.type(' Cece asks a question when a step is unclear.');
   const typed = rows(page).filter({ hasText: 'Cece asks a question' });
-  await expect(typed.locator('.qn-own-add')).toHaveText('Add to My Bank');
-  await typed.locator('.qn-own-add').click();
+  await typed.locator('[data-do="options"]').click();
+  await page.locator('#tq-options-menu [data-do="ownAdd"]').click();
   await expect(box.locator('#tq-own-input')).toHaveValue('Cece asks a question when a step is unclear.');
   await expect(box.locator('#tq-own-part option')).toHaveText([
     'Best Piece',

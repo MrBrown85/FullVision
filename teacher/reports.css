@@ -3813,6 +3813,7 @@ textarea.studio-text {
   --qn-ring: #c07a00;
   --qn-copied-bg: #f0faf2;
   --qn-att-bg: #f5f9ff;
+  --qn-new-bg: #e6f4ea;
 }
 @media (prefers-color-scheme: dark) {
   .qn,
@@ -3823,6 +3824,7 @@ textarea.studio-text {
     --qn-ring: var(--score-2-text);
     --qn-copied-bg: var(--score-3-bg);
     --qn-att-bg: var(--surface-2);
+    --qn-new-bg: var(--score-3-bg);
   }
 }
 
@@ -4224,6 +4226,23 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-mark.missing {
   box-shadow: 0 0 0 2px var(--qn-ring);
+}
+/* The sentence put in just now, tinted like its row and fading with it. */
+.qn-mark.added {
+  background: var(--qn-new-bg);
+  box-shadow: 0 0 0 2px var(--qn-new-bg);
+  animation: qn-added-mark 5s ease-in forwards;
+}
+@keyframes qn-added-mark {
+  0%,
+  60% {
+    background-color: var(--qn-new-bg);
+    box-shadow: 0 0 0 2px var(--qn-new-bg);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 2px transparent;
+  }
 }
 .qn-comment-foot {
   display: flex;
@@ -5210,7 +5229,8 @@ body.qn-roster #gb-sidebar .student-row-note {
   gap: 10px;
   padding: 10px 14px;
 }
-.qn-req-row + .qn-req-row {
+.qn-req-row + .qn-req-row,
+.qn-gap + .qn-req-row {
   border-top: 1px solid var(--surface-2);
 }
 .qn-req-row.flag {
@@ -5358,6 +5378,16 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-line-cancel:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 2px;
+}
+/* A focused menu item takes the hover fill, whether the menu was opened by
+   mouse or keyboard (board C); the focus ring stays keyboard-only. */
+.qn-menu-item:focus,
+.qn-menu-add:focus {
+  background: var(--overlay-hover);
+}
+.qn-menu-item:focus-visible,
+.qn-menu-add:focus-visible {
+  outline-offset: -2px;
 }
 .qn-line-choose {
   flex: none;
@@ -5564,6 +5594,131 @@ body.qn-roster #gb-sidebar .student-row-note {
   margin: 0 14px;
   border-radius: 2px;
   background: var(--active);
+}
+/* A row put in just now (the InsertRows mockup): a tint that fades. */
+.qn-srow.added {
+  background: var(--qn-new-bg);
+  animation: qn-added 5s ease-in forwards;
+}
+@keyframes qn-added {
+  0%,
+  60% {
+    background-color: var(--qn-new-bg);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+/* The gap after a row: nothing in the flow, so the rows never move. A
+   band 12px tall over the hairline takes the hover; the line, the + and
+   the tooltip show on hover, keyboard focus or while the menu is open. */
+.qn-gap {
+  position: relative;
+  height: 0;
+  z-index: 2;
+}
+/* The open menu above the next gap's hover band. */
+.qn-gap.open {
+  z-index: 3;
+}
+.qn-gap::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 12px;
+}
+.qn-gap-line {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: -1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--active);
+  opacity: 0;
+  pointer-events: none;
+}
+.qn-gap-add {
+  position: absolute;
+  left: 7px;
+  top: -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  border: 0;
+  background: var(--active);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 18px;
+  padding: 0;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  cursor: pointer;
+}
+.qn-gap-tip {
+  position: absolute;
+  left: 32px;
+  top: -13px;
+  background: #1d1d1f;
+  color: #fff;
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  pointer-events: none;
+}
+.qn-gap:hover .qn-gap-line,
+.qn-gap:focus-within .qn-gap-line,
+.qn-gap.open .qn-gap-line,
+.qn-gap:hover .qn-gap-add,
+.qn-gap:focus-within .qn-gap-add,
+.qn-gap.open .qn-gap-add,
+.qn-gap:hover .qn-gap-tip,
+.qn-gap:focus-within .qn-gap-tip {
+  opacity: 1;
+}
+.qn-gap.open .qn-gap-tip {
+  opacity: 0;
+}
+.qn-gap-add:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+/* The Add Here menu, from the + (the InsertRows mockup). */
+.qn-add-menu {
+  left: 30px;
+  right: auto;
+  top: 10px;
+}
+.qn-add-item {
+  gap: 10px;
+}
+.qn-add-part {
+  width: 72px;
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  padding-top: 2px;
+}
+.qn-add-none {
+  padding: 6px 10px;
+}
+/* The Options menu of a Your Sentence row. */
+.qn-options {
+  width: 270px;
+}
+/* The line for a sentence of the teacher's own at a gap, drawn as a row. */
+.qn-own-row .qn-own {
+  padding-top: 0;
 }
 .qn-edited {
   flex: none;

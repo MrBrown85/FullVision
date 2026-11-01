@@ -13,7 +13,9 @@ async function enterDemo(page) {
 }
 
 /* Labels of the visible buttons and links filled with the --active blue,
-   outside dialogs. Off-screen elements (the skip link) don't count. */
+   outside dialogs. Off-screen elements (the skip link) and ones drawn at
+   opacity 0 until hovered (the + between the Sentences card's rows) don't
+   count. */
 async function solidPrimaries(page) {
   return page.evaluate(() => {
     const probe = document.createElement('div');
@@ -27,7 +29,7 @@ async function solidPrimaries(page) {
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height || r.bottom <= 0 || r.right <= 0) return false;
         const cs = getComputedStyle(el);
-        return cs.visibility !== 'hidden' && cs.backgroundColor === blue;
+        return cs.visibility !== 'hidden' && cs.opacity !== '0' && cs.backgroundColor === blue;
       })
       .map(el => el.textContent.trim());
   });

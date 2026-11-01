@@ -26,7 +26,8 @@ describe('partOf and rowLabel', () => {
     expect(RQ.rowLabel({ step: 'grade' }, 'language_goals')).toBe('Statement');
     expect(RQ.rowLabel({ step: 'ieDeadline' }, 'ie')).toBe('Deadline');
     expect(RQ.rowLabel({ step: 'attendance' }, null)).toBe('Attendance');
-    expect(RQ.rowLabel({ step: null }, null)).toBe('');
+    expect(RQ.rowLabel({ step: null }, null)).toBe('Your Sentence');
+    expect(RQ.rowLabel({ step: null, placeholder: true }, null)).toBe('');
   });
   it('lists the eight parts of Browse Sentences in the mockup’s order', () => {
     expect(RQ.PARTS.map(p => p.label)).toEqual([
@@ -125,6 +126,61 @@ describe('alignRows', () => {
     ];
     const kept = RQ.alignRows(line, line.map(r => r.text).join(' '));
     expect(kept.map(r => r.edited)).toEqual([false, false]);
+  });
+});
+
+describe('typed rows: keepTyped and insertRow (the InsertRows mockup)', () => {
+  const a = row('a', 'grade', 'Ava is earning a B this term.');
+  const b = row('b', 'example', 'Her best piece was “Lab 3.”');
+  const h = row('h', 'habits', 'Her work habits are good.');
+  const c = row('c', 'home', 'At home, you can ask her about class.');
+  const mine = RQ.typedRow('Ava explained her results to the class.', 1);
+  it('isTyped: a row with no step that is not a class line or a placeholder', () => {
+    expect(RQ.isTyped(mine)).toBe(true);
+    expect(RQ.isTyped(a)).toBe(false);
+    expect(RQ.isTyped({ step: 'support', placeholder: true })).toBe(false);
+    expect(mine).toMatchObject({ id: 'text:1', step: null, edited: true, drafted: null, s: null });
+  });
+  it('keepTyped puts a typed sentence back after the row it followed, by text or step', () => {
+    const old = [a, b, mine, h, c];
+    const b2 = row('b2', 'example', 'Her best piece was “Lab 3”, where she measured carefully.');
+    const h2 = row('h2', 'habits', 'Her work habits are excellent.');
+    expect(RQ.keepTyped(old, [a, b2, h2, c]).map(r => r.id)).toEqual(['a', 'b2', 'text:1', 'h2', 'c']);
+    // The step it followed is gone: before the row that followed it.
+    expect(RQ.keepTyped(old, [a, h2, c]).map(r => r.id)).toEqual(['a', 'text:1', 'h2', 'c']);
+    // Typed first stays first; typed last stays last; two in a row stay together.
+    expect(RQ.keepTyped([mine, a, h], [a, h]).map(r => r.id)).toEqual(['text:1', 'a', 'h']);
+    expect(RQ.keepTyped([a, h, mine], [a, h]).map(r => r.id)).toEqual(['a', 'h', 'text:1']);
+    const two = RQ.typedRow('She also helps others.', 2);
+    expect(RQ.keepTyped([a, mine, two, h], [a, h2]).map(r => r.id)).toEqual(['a', 'text:1', 'text:2', 'h2']);
+    // Nothing in common: at the index it had, after a grade sentence Generate
+    // put first; a sentence the teacher put before the grade stays there.
+    expect(RQ.keepTyped([a, mine], [h2, c]).map(r => r.id)).toEqual(['h2', 'text:1', 'c']);
+    expect(RQ.keepTyped([mine, two], [a, h]).map(r => r.id)).toEqual(['a', 'text:1', 'text:2', 'h']);
+    expect(RQ.keepTyped([mine, a], [a, h]).map(r => r.id)).toEqual(['text:1', 'a', 'h']);
+    // A comment typed entirely by hand: every sentence kept, in order, the
+    // bank's parts around them.
+    expect(RQ.keepTyped([mine, two], [a, b, h]).map(r => r.id)).toEqual(['a', 'text:1', 'text:2', 'b', 'h']);
+    // Already there (a kept sentence): not twice.
+    expect(RQ.keepTyped([a, mine], [a, mine]).map(r => r.id)).toEqual(['a', 'text:1']);
+  });
+  it('insertRow puts a row at a gap, clamped to the ends', () => {
+    expect(RQ.insertRow([a, h], mine, 1).map(r => r.id)).toEqual(['a', 'text:1', 'h']);
+    expect(RQ.insertRow([a, h], mine, 0).map(r => r.id)).toEqual(['text:1', 'a', 'h']);
+    expect(RQ.insertRow([a, h], mine, 9).map(r => r.id)).toEqual(['a', 'h', 'text:1']);
+    expect(RQ.insertRow([], mine, 3).map(r => r.id)).toEqual(['text:1']);
+  });
+  it('alignRows gives a sentence typed into the comment a Your Sentence row', () => {
+    const out = RQ.alignRows(
+      [a, h],
+      'Ava is earning a B this term. She explained her results. Her work habits are good.',
+    );
+    expect(out.map(r => [r.step, RQ.isTyped(r)])).toEqual([
+      ['grade', false],
+      [null, true],
+      ['habits', false],
+    ]);
+    expect(RQ.rowLabel(out[1], null)).toBe('Your Sentence');
   });
 });
 
@@ -234,6 +290,87 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       [rows[0], edited],
     );
     expect(again[0]).toMatchObject({ id: rows[1].id, edited: true, drafted: rows[1].text, text: 'My own words.' });
+  });
+
+  it('Generate keeps a typed sentence at its place: rowsFromDraft, then keepTyped', () => {
+    const { d, ctx } = draftFor(cece());
+    const rows = RQ.rowsFromDraft(d);
+    const mine = RQ.typedRow('Cece explained her results to the class.', 7);
+    const withMine = RQ.insertRow(rows, mine, 2);
+    const again = CommentBank.draft(ctx, { seed: CommentBank.seedFor(cece().id) + 1 });
+    const next = RQ.keepTyped(withMine, RQ.rowsFromDraft(again, withMine));
+    expect(next.filter(RQ.isTyped).map(r => r.text)).toEqual(['Cece explained her results to the class.']);
+    expect(next.indexOf(mine)).toBe(2);
+    expect(RQ.composeRows(next)).toContain('explained her results to the class.');
+  });
+
+  it('insertChoices: only the parts missing from the comment, each with a sentence that fits; nothing Required', () => {
+    const { d, ctx } = draftFor(cece());
+    const rows = RQ.rowsFromDraft(d);
+    expect(rows.map(r => r.step)).toEqual(expect.arrayContaining(['grade', 'overall', 'example', 'nextStep']));
+    // Every part the draft could write is in it; the Demo class has no
+    // habit ratings, nothing Missing, no support lines and no closing
+    // sentence, so nothing is offered.
+    expect(RQ.insertChoices(rows, ctx, { seed: 3 })).toEqual([]);
+    // Without the strengths and best-piece rows, those two parts are
+    // offered, each with a bank sentence that fits Cece in a step of that
+    // part, filled with no slot left.
+    const fewer = rows.filter(r => r.step !== 'overall' && r.step !== 'example');
+    const choices = RQ.insertChoices(fewer, ctx, { seed: 3 });
+    expect(choices.map(c => c.part).sort()).toEqual(['bestPiece', 'strengths']);
+    choices.forEach(c => {
+      expect(RQ.partOf(c.step).id).toBe(c.part);
+      expect(c.label).toBe(RQ.PARTS.find(p => p.id === c.part).label);
+      expect(c.classLine).toBe(false);
+      expect(CommentBank.fits(c.s, ctx)).toBe(true);
+      expect(c.text).not.toMatch(/[{}[\]]/);
+      expect(fewer.map(r => r.id)).not.toContain(c.id);
+    });
+    // Put in at a gap, the row is the sentence filled for Cece.
+    const strengths = choices.find(c => c.part === 'strengths');
+    const put = RQ.insertRow(fewer, RQ.rowFromSentence(strengths.s, ctx, strengths.step), 1);
+    expect(put[1].step).toBe(strengths.step);
+    expect(RQ.composeRows(put)).toContain(put[1].text);
+    // A comment with only typed sentences: the grade is offered once, with
+    // the best piece, strengths and next step; never a second advising
+    // sentence.
+    const typedOnly = [RQ.typedRow('Cece explained her results.', 1)];
+    const fresh = RQ.insertChoices(typedOnly, ctx, { seed: 3 });
+    expect(fresh.filter(c => c.part === 'grade').length).toBe(1);
+    expect(fresh.map(c => c.part)).toEqual(expect.arrayContaining(['grade', 'bestPiece', 'strengths', 'nextStep']));
+    expect(new Set(fresh.map(c => c.part)).size).toBe(fresh.length);
+    expect(fresh.filter(c => !c.classLine && CommentBank.advises(c.s)).length).toBeLessThanOrEqual(1);
+    // With a next step in the comment, no second one is offered.
+    const withNext = typedOnly.concat(rows.filter(r => r.step === 'nextStep'));
+    expect(RQ.insertChoices(withNext, ctx, { seed: 3 }).map(c => c.part)).not.toContain('nextStep');
+    // On the IE path the grade is Required, so it is never offered.
+    expect(RQ.insertChoices(typedOnly, ctx, { seed: 3, path: 'ie' }).map(c => c.part)).not.toContain('grade');
+  });
+
+  it('replacedBy and gapPart: from a gap, a part the comment has once only replaces its row; Browse opens on a part that can go in', () => {
+    const { d, ctx } = draftFor(cece());
+    const rows = RQ.rowsFromDraft(d);
+    const grade = COMMENT_BANK.sentences.find(s => CommentBank.stepOf(s) === 'grade' && s.id !== rows[0].id);
+    expect(RQ.replacedBy(rows, grade)).toBe(0);
+    const next = rows.findIndex(r => r.step === 'nextStep');
+    const other = COMMENT_BANK.sentences.find(s => CommentBank.stepOf(s) === 'nextStep' && s.id !== rows[next].id);
+    expect(RQ.replacedBy(rows, other)).toBe(next);
+    // An advising sentence of another step replaces the comment's advising row.
+    const advising = COMMENT_BANK.sentences.find(s => s.advises === true && CommentBank.stepOf(s) !== 'nextStep');
+    expect(advising).toBeTruthy();
+    expect(RQ.replacedBy(rows, advising)).toBe(next);
+    // A part not in the comment goes in: -1.
+    const habit = COMMENT_BANK.sentences.find(s => CommentBank.stepOf(s) === 'habits' && !s.advises);
+    expect(RQ.replacedBy(rows, habit)).toBe(-1);
+    expect(RQ.replacedBy([], grade)).toBe(-1);
+    // Browse from a gap: the first part that can go in; with every drafted
+    // part in, the first part with no row (Habits for Cece: nothing rated);
+    // with every part in, Grade.
+    const fewer = rows.filter(r => r.step !== 'overall');
+    expect(RQ.gapPart(fewer, ctx, { seed: 3 })).toBe('strengths');
+    expect(RQ.gapPart(rows, ctx, { seed: 3 })).toBe('habits');
+    const every = RQ.PARTS.map(p => ({ id: 'x:' + p.id, step: p.steps[0], text: 'X.' }));
+    expect(RQ.gapPart(every, ctx, { seed: 3 })).toBe('grade');
   });
 
   it('composeRows: the comment follows the rows, and the name moves to whichever sentence comes first', () => {
@@ -551,7 +688,10 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       c.name + ' · ' + f.levelText(c.level),
     );
     expect(src(Object.assign({}, rows[0], { edited: true }))).toBe('Edited by you · kept when you regenerate');
-    expect(src({ step: null, edited: false, prov: null })).toBe('A general sentence. It states no fact about Cece.');
+    expect(src({ step: null, edited: false, prov: null })).toBe('Typed by you · kept when you regenerate');
+    expect(src({ step: null, classLine: true, edited: false, prov: null })).toBe(
+      'A general sentence. It states no fact about Cece.',
+    );
   });
 });
 
@@ -629,7 +769,7 @@ describe('the card drawn for a Demo Mode student', () => {
     expect(at('>Closing<')).toBeGreaterThan(at('>Support<'));
   });
 
-  it('a hand-written comment: every sentence a row of the teacher’s own, Edited, with no part', () => {
+  it('a hand-written comment: every sentence a Your Sentence row with Options, typed by you', () => {
     const students = RQ.getTqStudents();
     const st = students.find(s => s.firstName === 'Hannah');
     RQ.tqStudentIndex = students.indexOf(st);
@@ -638,8 +778,17 @@ describe('the card drawn for a Demo Mode student', () => {
     });
     const html = RQ.renderTermQuestionnaire(cid);
     const card = html.slice(html.indexOf('id="tq-sentences"'));
-    expect((card.match(/class="qn-edited"/g) || []).length).toBe(2);
-    expect(card).toContain('Edited by you · kept when you regenerate');
+    expect((card.match(/class="qn-edited"/g) || []).length).toBe(0);
+    expect((card.match(/<span class="qn-req-label">Your Sentence<\/span>/g) || []).length).toBe(2);
+    expect((card.match(/data-do="options"/g) || []).length).toBe(2);
+    expect(card).toContain('Typed by you · kept when you regenerate');
     expect(card).not.toContain('data-do="wording"');
+    // A gap after each row, with its + and tooltip; none before the first.
+    expect((card.match(/class="qn-gap" data-gap="\d+"/g) || []).length).toBe(2);
+    expect(card).toContain('data-gap="1"');
+    expect(card).toContain('data-gap="2"');
+    expect(card).not.toContain('data-gap="0"');
+    expect(card).toContain('aria-label="Add a sentence here"');
+    expect(card).toContain('<span class="qn-gap-tip" role="tooltip">Add a sentence here</span>');
   });
 });
