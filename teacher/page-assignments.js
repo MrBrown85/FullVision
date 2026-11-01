@@ -1558,8 +1558,10 @@ window.PageAssignments = (function () {
           : '') +
         (window.AssessmentCopy ? AssessmentCopy.renderCardCopies(cid, a) : '') +
         '<span class="assess-date">' +
-        (a.dateAssigned ? formatDate(a.dateAssigned) + ' \u2192 ' : '') +
-        formatDate(a.date) +
+        // Assigned \u2192 due. `date` is the assigned date (date_assigned on the
+        // server); the due date is its own field.
+        formatDate(a.dateAssigned || a.date) +
+        (a.dueDate ? ' \u2192 ' + formatDate(a.dueDate) : '') +
         '</span>' +
         (function () {
           // Students whose work is labelled Missing, whatever the due date.
