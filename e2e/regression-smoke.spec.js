@@ -48,7 +48,11 @@ test.describe('Regression smoke (P1.2)', () => {
     await page.locator('[data-action="setView"][data-mode="detailed"]').click();
     await expect(scoreCell).toBeVisible();
 
+    // A click opens the grader; the cell stays selected when it closes and
+    // the keyboard writes the score.
     await scoreCell.click();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('4');
     writtenValue = ((await scoreCell.locator('.gb-score-val').textContent()) || '').trim();
     expect(writtenValue).not.toBe('');
     expect(writtenValue).not.toBe('·');

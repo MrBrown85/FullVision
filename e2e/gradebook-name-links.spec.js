@@ -24,10 +24,11 @@ test('in Competencies, Tab and Enter on a name belong to the link, not the grid'
       var all = JSON.parse(localStorage.getItem('gb-scores-' + cid) || '{}');
       return (all['stu-001'] || []).map(e => e.score);
     }, TEST_COURSE.id);
-  // A score cell has the grid's keyboard focus first (clicking it also
-  // steps its score, so compare against the score after the click).
+  // A score cell has the grid's keyboard focus first (a click opens the
+  // grader; closing it leaves the cell selected).
   const cell = page.locator('#gb-data td.gb-score[data-sid="stu-001"][data-aid="assess-001"]');
   await cell.click();
+  await page.keyboard.press('Escape');
   await expect(cell).toHaveClass(/gb-focus/);
   const before = await storedScores();
 

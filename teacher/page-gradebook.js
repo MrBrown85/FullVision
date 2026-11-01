@@ -1029,7 +1029,7 @@ window.PageGradebook = (function () {
             col.assessmentId +
             '" data-pts="1" data-cmp="1" data-sid="' +
             s.id +
-            '" data-action="cycleScore" title="' +
+            '" data-action="editScoreCell" data-kb="1" title="' +
             (mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '') +
             '">' +
             (statusMark || completionCellHtml(mark)) +
@@ -1061,7 +1061,7 @@ window.PageGradebook = (function () {
             s.id +
             '" data-max="' +
             max +
-            '" data-action="cycleScore" title="' +
+            '" data-action="editScoreCell" data-kb="1" title="' +
             title +
             '">' +
             (statusMark || cellContent) +
@@ -1104,7 +1104,9 @@ window.PageGradebook = (function () {
             '" data-sid="' +
             s.id +
             '"' +
-            (rubricCol ? ' data-action="editScoreCell" title="' + rubricTitle + '"' : ' data-action="cycleScore"') +
+            (rubricCol
+              ? ' data-action="editScoreCell" title="' + rubricTitle + '"'
+              : ' data-action="editScoreCell" data-kb="1"') +
             '><span class="gb-score-val s' +
             score +
             (mixed ? ' gb-mixed' : '') +
@@ -1696,69 +1698,11 @@ window.PageGradebook = (function () {
     while (_undoStack.length > 50) _undoStack.shift();
   }
 
-  /* ── Score cycling ──────────────────────────────────────── */
-  var seq = [3, 4, 0, 1, 2];
   /* The score keys a Competencies-view cell writes: its one key, or every
      key of its rubric criterion (data-tids) in Criteria mode. */
   function _cellScoreKeys(td) {
     var tids = (td.dataset.tids || '').split(',').filter(Boolean);
     return tids.length ? tids : [td.dataset.tid];
-  }
-
-  function cycleScore(td) {
-    var cid = activeCourse;
-    var aid = td.dataset.aid;
-    var tid = td.dataset.tid;
-    var sid = td.dataset.sid;
-    var assess = getAssessments(cid).find(function (a) {
-      return a.id === aid;
-    });
-    if (isCompletionScored(assess)) {
-      setCellCompletion(td, nextCompletionMark(getCompletionMark(cid, sid, aid)));
-      return;
-    }
-    if (assess && assess.scoreMode === 'points') {
-      showPointsInput(td, assess);
-      return;
-    }
-    var scores = getScores(cid);
-    if (!scores[sid]) scores[sid] = [];
-    var entry = scores[sid].find(function (e) {
-      return e.assessmentId === aid && e.tagId === tid;
-    });
-    var current = entry ? entry.score : 0;
-    var next = seq[(seq.indexOf(current) + 1) % seq.length];
-    // A criterion cell (Rubric columns: Criteria) scores every competency
-    // the criterion feeds, as the rubric scorer does.
-    var tids = _cellScoreKeys(td);
-    _undoStack.push({
-      cid: cid,
-      sid: sid,
-      aid: aid,
-      tagIds: tids,
-      prevEntries: tids.map(function (key) {
-        var e = scores[sid].find(function (x) {
-          return x.assessmentId === aid && x.tagId === key;
-        });
-        return e ? structuredClone(e) : null;
-      }),
-    });
-    while (_undoStack.length > 50) _undoStack.shift();
-    // Use single-row upsert instead of full DELETE+INSERT bulk sync —
-    // the bulk pattern is non-transactional and can lose data if INSERT
-    // fails after DELETE succeeds.
-    tids.forEach(function (key) {
-      upsertScore(
-        cid,
-        sid,
-        aid,
-        key,
-        next,
-        assess ? assess.date : courseToday(cid),
-        assess ? assess.type : 'summative',
-      );
-    });
-    _redrawCompetencyCell(td);
   }
 
   // + / − on the focused cell's level; pressing the same key again clears it.
@@ -2483,17 +2427,31 @@ window.PageGradebook = (function () {
      levels, whichever the work uses. Previous/Next steps through the rows
      in the order shown; closing redraws the gradebook. While it is open the
      gradebook's own listeners stand aside (_graderOpen). */
-  function openGrader(sid, aid) {
+  /* The grader steps through the students shown, in their order. A
+     Competencies cell stays selected when it closes, so the keyboard carries
+     on from it. */
+  function openGrader(sid, aid, cell) {
     if (!window.PageAssignments || !sid || !aid) return;
-    var ids = Array.prototype.map.call(document.querySelectorAll('.gb-scores-row[data-sid]'), function (row) {
+    var ids = Array.prototype.map.call(document.querySelectorAll('#gb-data tr[data-sid]'), function (row) {
       return row.dataset.sid;
     });
+    var cellSel =
+      cell && cell.matches('td.gb-score')
+        ? '#gb-data td.gb-score[data-aid="' +
+          CSS.escape(aid) +
+          '"][data-sid="' +
+          CSS.escape(sid) +
+          '"]' +
+          (cell.dataset.tid ? '[data-tid="' + CSS.escape(cell.dataset.tid) + '"]' : '[data-pts="1"]')
+        : null;
     _hideTip();
     PageAssignments.openGrader(activeCourse, aid, sid, {
       studentIds: ids,
       onClose: function () {
         clearProfCache();
         render();
+        var back = cellSel && document.querySelector(cellSel);
+        if (back) back.classList.add('gb-focus');
       },
     });
   }
@@ -2797,7 +2755,7 @@ window.PageGradebook = (function () {
       focused.classList.remove('gb-focus');
       return;
     } else if (
-      focused.dataset.action !== 'cycleScore' &&
+      !focused.dataset.kb &&
       (['+', '=', '-', '_', 'Backspace', 'Delete'].includes(e.key) || /^[0-9]$/.test(e.key))
     ) {
       // A competency of rubric work is scored on the rubric: Enter or a
@@ -3039,11 +2997,8 @@ window.PageGradebook = (function () {
       toggleSort: function () {
         toggleSort(el.dataset.sortkey);
       },
-      cycleScore: function () {
-        cycleScore(el);
-      },
       editScoreCell: function () {
-        openGrader(el.dataset.sid, el.dataset.aid);
+        openGrader(el.dataset.sid, el.dataset.aid, el);
       },
       startScoreMode: function () {
         enterScoreMode(el.dataset.aid);
@@ -3068,7 +3023,7 @@ window.PageGradebook = (function () {
       },
     };
     if (handlers[action]) {
-      if (action !== 'stopPropOnly' && action !== 'cycleScore' && el.tagName !== 'SELECT') e.preventDefault();
+      if (action !== 'stopPropOnly' && el.tagName !== 'SELECT') e.preventDefault();
       handlers[action]();
     }
   }
