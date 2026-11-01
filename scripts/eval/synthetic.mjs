@@ -553,6 +553,11 @@ function levelFor(profile, at, comp, r) {
       return r() < 0.75 ? null : clamp(3 + wobble);
     case 'failing':
       return r() < 0.5 ? 'NS' : 1;
+    // No mark on anything (round three, Nov 1): in a class that reports a
+    // letter, the teacher chose IE, so the IE comment's no-marks problem
+    // and plan frames are drafted.
+    case 'noMarks':
+      return null;
     default:
       return 3;
   }
@@ -640,8 +645,10 @@ export function syntheticClass(kind, opts) {
   // skill is some student's next step and its frames are exercised.
   const FULL = ['strong', 'steady', 'climb', 'struggling'];
   let fullSeen = 0;
+  // Roster position 21 (si 20) has no marks at all, in every kind.
+  const NO_MARKS = 20;
   students.forEach((st, si) => {
-    const profile = PROFILES[si % PROFILES.length];
+    const profile = si === NO_MARKS ? 'noMarks' : PROFILES[si % PROFILES.length];
     const focus = k.tagsPer && FULL.indexOf(profile) >= 0 ? fullSeen++ % tagIds.length : -1;
     let best = null;
     assessments.forEach((a, ai) => {
@@ -678,7 +685,7 @@ export function syntheticClass(kind, opts) {
     // In a class that reports a letter, the first student with few marks
     // (the 'thin' profile) is one the teacher chose IE for, so the IE
     // comment's marks problem and plan are drafted.
-    const basis = goals || (Number(k.grade) >= 10 && si === PROFILES.indexOf('thin') ? 'ie' : '');
+    const basis = goals || (Number(k.grade) >= 10 && (si === PROFILES.indexOf('thin') || si === NO_MARKS) ? 'ie' : '');
     if (Object.keys(habits).length || basis) {
       ratings.push(
         Object.assign(

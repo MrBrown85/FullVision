@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1706 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1706);
+  it('has 1676 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(1676);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1706);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1676);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -823,8 +823,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   });
 
   /* One sentence as a draft, to verify against changed facts. */
-  const one = (id, ctx) => {
-    const s = byId(id);
+  const one = (idOrSentence, ctx) => {
+    const s = typeof idOrSentence === 'string' ? byId(idOrSentence) : idOrSentence;
+    const id = s.id;
     return {
       text: CommentBank.fill(s, ctx),
       ids: [id],
@@ -957,13 +958,27 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   });
 
   it('re-checks the letter grade against the facts', () => {
-    // Scientific Communication raised past the "strongest" gate, so n14 fits.
+    // Scientific Communication raised past the "strongest" gate, so a
+    // sentence that says the letter grade and a strength fits (the bank's
+    // n14, cut in round three, kept here as the test's own).
+    const N14 = {
+      id: 'n14',
+      part: 'now',
+      group: 'Overall',
+      text: '{He} [has|have] {letterStanding} overall, and {he} can {strengths}.',
+      needs: ['letterStanding', 'strengths'],
+      claims: ['grade', 'strength'],
+    };
+    const bank = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([N14]) };
     const base = cece();
     const comps = base.comps.map(c => (c.id === 'SC' ? { ...c, level: 3.9 } : c));
     const f = { ...base, comps, letter: 'a B (78%)' };
-    const d = one('n14', CommentBank.context(f, {}));
-    expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
-    expect(CommentBank.verify(d, { ...f, letter: 'a C+ (68%)' }, {}).replaced[0].failed).toEqual(['slots', 'grade']);
+    const d = one(N14, CommentBank.context(f, {}));
+    expect(CommentBank.verify(d, f, {}, { bank }).replaced).toEqual([]);
+    expect(CommentBank.verify(d, { ...f, letter: 'a C+ (68%)' }, {}, { bank }).replaced[0].failed).toEqual([
+      'slots',
+      'grade',
+    ]);
   });
 
   it('never passes a sentence with no fact behind it, or one with no claims field', () => {

@@ -65,7 +65,18 @@ function facts(over) {
 const GABRIEL = { id: 's1', firstName: 'Gabriel', lastName: 'Wong' };
 const AMELIA = { id: 's2', firstName: 'Amelia', lastName: 'Tavares' };
 const OTHERS = ['Amelia', 'Tavares', 'Jessie', 'Jin', 'Owen', 'Price'];
-const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
+/* The base sentence most rows replace: the bank's n11 (an Overall frame
+   saying the proficiency word and a strength), cut in round three, kept
+   here as the test's own, since PB.suggest reads it from the row alone. */
+const N11 = {
+  id: 'n11',
+  part: 'now',
+  group: 'Overall',
+  text: '{He} [is|are] working at {standing} overall, and {he} can {strengths}.',
+  needs: ['standing', 'strengths'],
+  claims: ['grade', 'strength'],
+};
+const byId = id => (id === 'n11' ? N11 : COMMENT_BANK.sentences.find(s => s.id === id));
 
 /* A row of the Sentences card the teacher changed: in a step, replacing a
    bank sentence (with its provenance) or none. */

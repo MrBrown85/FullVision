@@ -91,6 +91,18 @@ const stepsOf = d => d.sentences.map(s => s.step);
 const EVIDENCE = 'support each claim with evidence from a source';
 const PERSPECTIVE = 'judge a source by who created it and why';
 
+/* A strengths sentence in the shape of the generic frames the bank no
+   longer carries (n15, cut in round three: the per-skill frames cover every
+   skill); verify() reads it from a bank that holds it. */
+const N15 = {
+  id: 'n15',
+  part: 'now',
+  group: 'Overall',
+  text: '{His} strongest work shows {he} can {strengths}.',
+  needs: ['strengths'],
+  claims: ['strength'],
+};
+const withN15 = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([N15]) };
 describe('strengths are skills from the table, never a bare competency label', () => {
   it('fills {strengths} and {strength} from skillOf, as the next step is filled', () => {
     const ctx = CommentBank.context(tomas(), {});
@@ -136,14 +148,14 @@ describe('strengths are skills from the table, never a bare competency label', (
   it('verify() fails a strengths sentence filled with a bare label, or with the wrong skill', () => {
     const f = tomas();
     const ctx = CommentBank.context(f, {});
-    const n15 = COMMENT_BANK.sentences.find(s => s.id === 'n15');
+    const n15 = N15;
     const asDrafted = {
       text: CommentBank.fill(n15, ctx),
       ids: ['n15'],
       sentences: [{ id: 'n15', part: 'now', text: CommentBank.fill(n15, ctx) }],
       provenance: [CommentBank.provenance(n15, ctx)],
     };
-    expect(CommentBank.verify(asDrafted, f, {}).replaced).toEqual([]);
+    expect(CommentBank.verify(asDrafted, f, {}, { bank: withN15 }).replaced).toEqual([]);
     const bare = Object.assign(CommentBank.context(f, {}), { strengths: 'Evidence' });
     const wrong = {
       text: CommentBank.fill(n15, bare),
@@ -152,7 +164,7 @@ describe('strengths are skills from the table, never a bare competency label', (
       provenance: [CommentBank.provenance(n15, bare)],
     };
     expect(wrong.text).toContain('can Evidence');
-    const v = CommentBank.verify(wrong, f, {});
+    const v = CommentBank.verify(wrong, f, {}, { bank: withN15 });
     expect(v.replaced[0].sentenceId).toBe('n15');
     expect(v.replaced[0].failed).toContain('strength');
     expect(v.text).not.toContain('Evidence');
@@ -163,12 +175,12 @@ describe('strengths are skills from the table, never a bare competency label', (
     const close = tomas({
       comps: [comp('c1', 'Evidence', 3), comp('c2', 'Perspective', 3.6), comp('c3', 'Significance', 3)],
     });
-    expect(CommentBank.verify(asDrafted, close, {}).replaced[0].failed).toContain('strength');
+    expect(CommentBank.verify(asDrafted, close, {}, { bank: withN15 }).replaced[0].failed).toContain('strength');
     const both = tomas({
       comps: [comp('c1', 'Evidence', 3.2), comp('c2', 'Perspective', 3), comp('c3', 'Significance', 2.5)],
     });
     expect(CommentBank.strengthSkills(both).map(x => x.key)).toEqual(['evidence', 'perspective']);
-    expect(CommentBank.verify(asDrafted, both, {}).replaced).toEqual([]);
+    expect(CommentBank.verify(asDrafted, both, {}, { bank: withN15 }).replaced).toEqual([]);
     expect(CommentBank.CLAIMS.strength(asDrafted.provenance[0], f)).toBe(true);
     expect(CommentBank.CLAIMS.strength(wrong.provenance[0], f)).toBe(false);
   });
