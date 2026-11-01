@@ -24,6 +24,21 @@ import { describe, expect, it } from 'vitest';
    (plan PR 10) runs the same lint on a teacher's own sentences. */
 const { EVALUATIVE, CONTROLLED, plain } = CommentLint;
 
+// Claims about the future (plan, Sentence grammar: never written). A
+// comment says what the gradebook shows now; what a student "will" do,
+// what results "should" show, or what the next term or report will hold
+// is not a fact of theirs. The teacher's own support lines say what the
+// teacher will do in class ("In class, I will…"); they are not claims
+// about the student and are not read for this rule.
+const FUTURE = [
+  /\b(?<!I )will\b/i,
+  /\bshould\b/i,
+  /\b(by|before|at) the (end of (the|this) term|next report)\b/i,
+  /\bnext (term|report)\b/i,
+  /\bfinished the term\b/i,
+  /\bthe (next|coming) (few )?weeks\b/i,
+];
+
 /* ── What the lint reads ───────────────────────────────────────────────── */
 
 const he = { subj: 'he', obj: 'him', poss: 'his', refl: 'himself' };
@@ -32,7 +47,7 @@ function texts() {
   Object.entries(CommentBank.SKILLS).forEach(([fam, rows]) =>
     rows.forEach(r => out.push({ id: 'skill ' + fam + '.' + r.key, text: 'Next, {he} can ' + r.skill + '.' })),
   );
-  CommentBank.SUPPORT_LINES.forEach(l => out.push({ id: 'support ' + l.id, text: l.text }));
+  CommentBank.SUPPORT_LINES.forEach(l => out.push({ id: 'support ' + l.id, text: l.text, support: true }));
   ['build', 'does', 'do'].forEach(form =>
     ['', 'pe', 'arts'].forEach(fam =>
       CommentBank.HABITS.forEach(h =>
@@ -47,7 +62,10 @@ function texts() {
   return out;
 }
 function findings(t) {
-  return CommentLint.findings(t.text);
+  const out = CommentLint.findings(t.text);
+  const p = plain(t.text);
+  if (!t.support) FUTURE.forEach(re => re.test(p) && out.push('future claim: ' + re));
+  return out;
 }
 
 describe('the vocabulary lint', () => {
@@ -59,7 +77,7 @@ describe('the vocabulary lint', () => {
     expect(all.some(t => t.id.startsWith('habit '))).toBe(true);
   });
 
-  it('finds no phrasal verb, idiom, person praise, comparison, long sentence or evaluative word outside the controlled vocabulary', () => {
+  it('finds no phrasal verb, idiom, person praise, comparison, future claim, long sentence or evaluative word outside the controlled vocabulary', () => {
     const bad = texts()
       .map(t => ({ id: t.id, text: t.text, why: findings(t) }))
       .filter(x => x.why.length);
@@ -80,6 +98,12 @@ describe('the vocabulary lint', () => {
     expect(f('{He} [is|are] at the top of the class.').some(x => x.startsWith('comparison'))).toBe(true);
     expect(f('{His} work is stronger than others.').some(x => x.startsWith('comparison'))).toBe(true);
     expect(f('{He} [writes|write] insightful essays.')).toContain('evaluative word: insightful');
+    expect(f('{He} will finish the unit with the class.').some(x => x.startsWith('future claim'))).toBe(true);
+    expect(f('{His} marks should climb by the end of the term.').some(x => x.startsWith('future claim'))).toBe(true);
+    expect(f('Next term, {he} will have more to show.').some(x => x.startsWith('future claim'))).toBe(true);
+    expect(f('The next report will show more.').some(x => x.startsWith('future claim'))).toBe(true);
+    expect(f('Next, {he} can support each claim with evidence from a source.')).toEqual([]);
+    expect(findings({ text: 'In class, I will ask about missing work each week.', support: true })).toEqual([]);
     expect(f('{His} work is solid.')).toContain('evaluative word: solid');
     expect(f('{His} work habits are excellent.')).toEqual([]);
     expect(f('{He} [is|are] earning {gradeLetter} this term, which is {gradeStanding} work.')).toEqual([]);

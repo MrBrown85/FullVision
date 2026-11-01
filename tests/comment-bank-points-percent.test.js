@@ -64,23 +64,42 @@ describe('points work in a Letter class', () => {
     expect(f.work.filter(x => x.id !== a.id).every(x => x.pct === null)).toBe(true);
   });
 
+  // The bank's best-piece sentence (n36) prints no mark; a sentence that
+  // does, as the old examples did, gets the piece's own %.
+  const marked = {
+    id: 'x-mark',
+    part: 'now',
+    group: 'Examples From Work',
+    text: 'A highlight was {assignment}, where {he} reached {level}.',
+    needs: ['assignment', 'level'],
+    claims: ['bestPiece'],
+  };
+  const bank = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([marked]) };
+  const marked1 = ctx => ({
+    text: CommentBank.fill(marked, ctx),
+    ids: ['x-mark'],
+    sentences: [{ id: 'x-mark', part: 'now', text: CommentBank.fill(marked, ctx) }],
+    provenance: [CommentBank.provenance(marked, ctx)],
+  });
+
   it('prints that % beside the piece, never the level as a %', () => {
     const { f } = owen();
     const ctx = CommentBank.context(f, {});
     expect(ctx.assignment).toBe('Primary Source Analysis');
     expect(ctx.level).toBe('85%');
-    expect(CommentBank.fill(byId('n31'), ctx)).toContain('reached 85%.');
+    expect(CommentBank.fill(marked, ctx)).toContain('reached 85%.');
+    expect(CommentBank.fill(byId('n36'), ctx)).toContain('“Primary Source Analysis');
   });
 
   it('is checked by verify(): the right % passes, the level as a % is replaced', () => {
     const { f } = owen();
     const ctx = CommentBank.context(f, {});
-    const d = one('n31', ctx);
-    expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
-    const wrong = one('n31', { ...ctx, level: '87%' });
+    const d = marked1(ctx);
+    expect(CommentBank.verify(d, f, {}, { bank }).replaced).toEqual([]);
+    const wrong = marked1({ ...ctx, level: '87%' });
     expect(wrong.text).toContain('reached 87%.');
-    const v = CommentBank.verify(wrong, f, {});
-    expect(v.replaced[0]).toMatchObject({ sentenceId: 'n31' });
+    const v = CommentBank.verify(wrong, f, {}, { bank });
+    expect(v.replaced[0]).toMatchObject({ sentenceId: 'x-mark' });
     expect(v.replaced[0].failed).toContain('bestPiece');
   });
 

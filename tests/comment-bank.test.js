@@ -71,10 +71,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 233 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(233);
+  it('has 177 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(177);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(233);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(177);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -97,12 +97,17 @@ describe('the bank', () => {
     );
   });
 
-  it('covers every picture with an opening and a closer', () => {
+  it('covers every picture with an opening, and has no Looking Ahead or Work to Revisit group', () => {
     const at = (key, lvl) => COMMENT_BANK.sentences.filter(s => s.when && s.when[key] === lvl);
     ['strong', 'steady', 'challenge', 'early'].forEach(pic => {
       expect(at('picture', pic).filter(s => s.group === 'Openings').length, pic).toBeGreaterThanOrEqual(3);
-      expect(at('picture', pic).filter(s => s.group === 'Looking Ahead').length, pic).toBeGreaterThanOrEqual(2);
     });
+    // The Looking Ahead sentences (claims about the future) and Work to
+    // Revisit (which sent families back to a worksheet) are gone; the
+    // example step keeps only the plan's best-piece sentence.
+    COMMENT_BANK.sentences.forEach(s => expect(['Looking Ahead', 'Work to Revisit'], s.id).not.toContain(s.group));
+    expect(COMMENT_BANK.sentences.filter(s => s.group === 'Examples From Work').map(s => s.id)).toEqual(['n36']);
+    expect(COMMENT_BANK.sentences.some(s => /\{(assignment2|level2|strongWorks|weakWorks)\}/.test(s.text))).toBe(false);
     ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w =>
       expect(at('standing', w).length, w).toBeGreaterThanOrEqual(3),
     );
@@ -330,9 +335,9 @@ describe('focusOptions', () => {
 describe('fits', () => {
   it('does not offer a sentence with a missing slot', () => {
     const ctx = fullContext(P.she);
-    const n31 = COMMENT_BANK.sentences.find(s => s.id === 'n31');
-    expect(CommentBank.fits(n31, ctx)).toBe(true);
-    expect(CommentBank.fits(n31, { ...ctx, assignment: '' })).toBe(false);
+    const n36 = COMMENT_BANK.sentences.find(s => s.id === 'n36');
+    expect(CommentBank.fits(n36, ctx)).toBe(true);
+    expect(CommentBank.fits(n36, { ...ctx, bestPiece: '' })).toBe(false);
     const h60 = COMMENT_BANK.sentences.find(s => s.id === 'h60');
     expect(CommentBank.fits(h60, { ...ctx, attendance: '' })).toBe(false);
   });
@@ -482,18 +487,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 65 sentences (1, 31, 19, 14)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 36 sentences (1, 18, 12, 5)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 31, 19, 14]);
-    expect(CommentBank.fitCount(ctx)).toBe(65);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 18, 12, 5]);
+    expect(CommentBank.fitCount(ctx)).toBe(36);
   });
 
-  it('offers Jasper 59 (1, 29, 16, 13), by the name he goes by', () => {
+  it('offers Jasper 30 (1, 16, 9, 4), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 29, 16, 13]);
-    expect(CommentBank.fitCount(ctx)).toBe(59);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 16, 9, 4]);
+    expect(CommentBank.fitCount(ctx)).toBe(30);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -609,12 +614,16 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const ctx = ctxFor('Cece');
     expect(CommentBank.draft(ctx, { seed: 7 }).text).toBe(CommentBank.draft(ctx, { seed: 7 }).text);
     expect(CommentBank.draft(ctx, { seed: 7 }).text).not.toBe(CommentBank.draft(ctx, { seed: 8 }).text);
-    // The grade sentence leads both; the sentence after it differs.
+    // The grade sentence leads both; the family sentence, which has 18 to
+    // choose from, differs once a classmate has it (the best piece has one
+    // sentence, so it is the same for both).
     const mine = CommentBank.draft(ctx, { seed: 7 });
     const other = CommentBank.draft(ctx, { seed: 7, comments: [mine.text] });
     expect(other.sentences[0].text).toBe(mine.sentences[0].text);
-    expect(other.sentences[1].step).toBe(mine.sentences[1].step);
-    expect(other.sentences[1].text).not.toBe(mine.sentences[1].text);
+    const at = mine.sentences.findIndex(x => x.step === 'home');
+    expect(at).toBeGreaterThan(0);
+    expect(other.sentences[at].step).toBe(mine.sentences[at].step);
+    expect(other.sentences[at].text).not.toBe(mine.sentences[at].text);
   });
 
   it('drafts for every Demo student: four or more sentences, nothing unfilled, nothing quoted twice', () => {
@@ -662,13 +671,14 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const f = CommentBank.facts(cid, st, 'term-2');
     const ctx = CommentBank.context(f, {});
     const top = f.work.slice().sort((a, b) => b.v - a.v || b.d.localeCompare(a.d))[0];
-    const n31 = CommentBank.provenance(byId('n31'), ctx);
-    expect(n31).toMatchObject({
-      sentenceId: 'n31',
+    const n36 = CommentBank.provenance(byId('n36'), ctx);
+    expect(n36).toMatchObject({
+      sentenceId: 'n36',
       claims: ['bestPiece'],
       factKeys: ['work:' + top.id],
-      values: { assignment: top.title, level: ctx.level },
+      values: { bestPiece: ctx.bestPiece },
     });
+    expect(ctx.bestPiece).toContain('“' + top.title);
     // Cece has no competency past the "improved" gate; Mateo's Scientific
     // Communication is.
     expect(ctx.rise).toBe('');
@@ -700,27 +710,43 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   it('drops a best-piece sentence once that work is no longer the best (no no-claim sentence in its part)', () => {
     const f = cece();
     const ctx = CommentBank.context(f, {});
-    const d = one('n31', ctx);
-    const top = d.provenance[0].sources.assignment[0].slice(5);
+    const d = one('n36', ctx);
+    const top = d.provenance[0].sources.bestPiece[0].slice(5);
     const lower = { ...f, work: f.work.map(w => (w.id === top ? { ...w, v: 1 } : w)) };
     const v = CommentBank.verify(d, lower, {});
-    expect(v.replaced).toEqual([{ sentenceId: 'n31', failed: ['slots', 'bestPiece'], by: null }]);
+    expect(v.replaced).toEqual([{ sentenceId: 'n36', failed: ['slots', 'bestPiece'], by: null }]);
     expect(v.text).toBe('');
     expect(v.provenance).toEqual([]);
   });
 
-  it('puts the part’s no-claim sentence in place of a closer whose picture of the term is no longer true', () => {
+  it('puts the part’s no-claim sentence in place of one whose picture of the term is no longer true', () => {
     const f = cece();
     const ctx = CommentBank.context(f, {});
     expect(ctx.picture).toBe('steady');
-    const d = one('w120', ctx);
+    // A sentence in the family's part that claims the picture of the term;
+    // f01 (For the Family) is the part's first no-claim sentence.
+    const steadyS = {
+      id: 'x-steady',
+      part: 'how',
+      group: 'For the Family',
+      text: 'At home, you can ask {him} about this steady term in {course}.',
+      when: { picture: 'steady' },
+      claims: ['picture'],
+    };
+    const bank = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([steadyS]) };
+    const d = {
+      text: CommentBank.fill(steadyS, ctx),
+      ids: ['x-steady'],
+      sentences: [{ id: 'x-steady', part: 'how', text: CommentBank.fill(steadyS, ctx) }],
+      provenance: [CommentBank.provenance(steadyS, ctx)],
+    };
     const harder = { ...f, comps: f.comps.map(c => ({ ...c, now: 1.6, level: 1.6 })) };
-    const v = CommentBank.verify(d, harder, {});
-    expect(v.replaced).toEqual([{ sentenceId: 'w120', failed: ['slots', 'picture'], by: 'w06' }]);
-    expect(byId('w06').claims).toEqual([]);
-    expect(v.ids).toEqual(['w06']);
-    expect(v.text).toBe('Next term, the goal is to continue what is working and to keep using feedback.');
-    expect(v.provenance[0]).toMatchObject({ sentenceId: 'w06', claims: [], factKeys: [] });
+    const v = CommentBank.verify(d, harder, {}, { bank });
+    expect(v.replaced).toEqual([{ sentenceId: 'x-steady', failed: ['slots', 'picture'], by: 'f01' }]);
+    expect(byId('f01').claims).toEqual([]);
+    expect(v.ids).toEqual(['f01']);
+    expect(v.text).toBe('At home, you can ask Cece to explain one idea from Science 8 in her own words.');
+    expect(v.provenance[0]).toMatchObject({ sentenceId: 'f01', claims: [], factKeys: [] });
   });
 
   it('checks a claim the wording makes beyond its slots: late work, work not handed in', () => {
@@ -827,10 +853,10 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     };
     const b59 = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([h59]) };
     expect(CommentBank.verify(d59, f, {}, { bank: b59 }).replaced[0].failed).toEqual(['support']);
-    const bare = { ...byId('w129') };
+    const bare = { ...byId('f01') };
     delete bare.claims;
     const bank = { parts: COMMENT_BANK.parts, sentences: [bare] };
-    expect(CommentBank.verify(one('w129', ctx), f, {}, { bank }).replaced[0].failed).toEqual(['claims']);
+    expect(CommentBank.verify(one('f01', ctx), f, {}, { bank }).replaced[0].failed).toEqual(['claims']);
   });
 
   it('never calls a rising Focus Area the area to build', () => {

@@ -2253,7 +2253,8 @@ window.CommentBank = (function () {
     { key: 'notHandedIn', part: 'habits', groups: ['Not Handed In'], says: 'notHandedIn' },
     { key: 'lateWork', part: 'habits', line: 'lateLine', after: 'notHandedIn' },
     { key: 'overall', part: 'now', groups: ['Overall'] },
-    { key: 'example', part: 'now', groups: ['Examples From Work', "In the Student's Words"] },
+    // The best piece (plan part 2): the one sentence of Examples From Work.
+    { key: 'example', part: 'now', groups: ['Examples From Work'] },
     { key: 'growth', part: 'now', groups: ['Growth This Term'] },
     // One skill from the table when there is one (`prefer`); never a
     // sentence that names a bare competency label (`never`).
@@ -2264,7 +2265,7 @@ window.CommentBank = (function () {
       prefer: 'nextSkill',
       never: ['focus', 'focusLow', 'growthAreas', 'rise', 'fall'],
     },
-    { key: 'goWords', part: 'go', groups: ["In the Student's Words", 'Work to Revisit'] },
+    { key: 'goWords', part: 'go', groups: ["In the Student's Words"] },
     // The teacher's support line for this student, one thing the family can
     // do at home, and the class's closing sentence (plan PR 8). Teacher
     // lines (`line`) are used exactly as typed and are left out when empty.
