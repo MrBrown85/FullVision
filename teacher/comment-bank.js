@@ -1308,11 +1308,8 @@ window.CommentBank = (function () {
 
   /* The name and pronouns a sentence about this student uses. */
   function studentRef(student) {
-    return {
-      name: displayNameFirst(student),
-      pronouns: ReportBlocks.getPronouns(student),
-      onFile: !!String(student.pronouns || '').trim(),
-    };
+    var p = ReportBlocks.getPronouns(student);
+    return { name: displayNameFirst(student), pronouns: p, onFile: p.onFile };
   }
 
   /* ── What FullVision has ───────────────────────────────────────────── */
@@ -1525,6 +1522,7 @@ window.CommentBank = (function () {
     // The class's support lines, closing sentence and late-work line, and
     // this student's own support pick for this report (plan PR 8).
     var family = familyOf(cid);
+    var pronouns = ReportBlocks.getPronouns(student);
 
     return {
       cid: cid,
@@ -1533,8 +1531,8 @@ window.CommentBank = (function () {
       first: student.firstName || displayNameFirst(student),
       course: course.name || '',
       family: family,
-      pronouns: ReportBlocks.getPronouns(student),
-      pronounsOnFile: !!String(student.pronouns || '').trim(),
+      pronouns: pronouns,
+      pronounsOnFile: pronouns.onFile,
       comps: comps,
       work: work,
       record: rec,
