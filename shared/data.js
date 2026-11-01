@@ -10800,6 +10800,34 @@ window.v2.deleteReportTemplate = function (id) {
   return _rpcOrNoop('delete_report_template', { p_id: id });
 };
 
+/* ── The personal comment bank (migrations/20261031_comment_template.sql) ──
+   A teacher's own comment sentences, kept from "Suggested for Your Bank"
+   (teacher/comment-personal.js, plan PR 10). Saves and deletes go through
+   the outbox with an idempotency key; the list is one small read on the
+   Term Questionnaire. In Demo Mode, signed out, offline or before the
+   table exists, the list comes back null and the device copy stands. */
+window.v2.saveCommentTemplate = function (params, options) {
+  params = params || {};
+  return _rpcOrNoop(
+    'save_comment_template',
+    {
+      p_text: String(params.text == null ? '' : params.text).trim(),
+      p_slots: Array.isArray(params.slots) ? params.slots : [],
+      p_condition: params.condition && typeof params.condition === 'object' ? params.condition : {},
+      p_id: _isUuid(params.id) ? params.id : null,
+      p_uses: params.uses != null && Number(params.uses) >= 0 ? Math.floor(Number(params.uses)) : null,
+    },
+    options,
+  );
+};
+window.v2.listCommentTemplates = function () {
+  return _rpcOrNoop('list_comment_templates', {}).then(_listResult);
+};
+window.v2.deleteCommentTemplate = function (id) {
+  if (!_isUuid(id)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('delete_comment_template', { p_id: id });
+};
+
 /* One Issue: { courseId, term, termLabel, paper, form, students } where
    students is [{ enrollmentId, sheets, hash, html }]. The HTML of a whole
    class can run past the outbox's 5 MB cap, so this goes straight to the
