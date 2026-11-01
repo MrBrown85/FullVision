@@ -1832,6 +1832,16 @@ function formatLevel(cid, value, empty) {
   return num;
 }
 
+/* How full a bar for a level from 0 to 4 is, 0–100, so it agrees with the
+   figure beside it (formatLevel): the % the level counts as (Counts As) in a
+   Letter or Both class, level ÷ 4 in a Proficiency class. */
+function levelBarPercent(cid, value) {
+  if (!(value > 0)) return 0;
+  var v = Math.min(4, Number(value));
+  if (courseGradeMode(cid) === 'proficiency') return (v / 4) * 100;
+  return Math.min(100, levelToPercent(cid, v));
+}
+
 /* A level from 0 to 4 as a figure, "3.3", for a block that prints the
    score out of 4 whatever the class's grading style; `empty` when there is
    none. The one place a level is rounded to a decimal. */

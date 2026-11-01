@@ -755,7 +755,7 @@ window.PageStudent = (function () {
         '</span></span><span class="stu-comp-where-track" role="img" aria-label="' +
         esc(r.name + ': ' + formatLevel(cid, r.v) + ' across ' + _plural(r.n, 'score', 'scores')) +
         '"><span style="width:' +
-        Math.round((Math.min(4, r.v) / 4) * 100) +
+        Math.round(levelBarPercent(cid, r.v)) +
         '%;background:' +
         (PROF_COLORS[lvl] || PROF_COLORS[0]) +
         '"></span></span><strong class="stu-comp-where-v">' +

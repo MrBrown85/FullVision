@@ -227,7 +227,7 @@ window.DashOverview = (function () {
           '</span>' +
           '<div class="dash-outcome-bar-track">' +
           '<div class="dash-outcome-bar-fill" style="width:' +
-          (avg > 0 ? (avg / 4) * 100 : 0) +
+          levelBarPercent(cid, avg) +
           '%;background:' +
           (avg > 0 ? 'var(--score-' + r + ')' : 'var(--divider-subtle)') +
           '"></div>' +

@@ -128,7 +128,7 @@ window.MCardWidgets = (function () {
     var secBars = '';
     sections.forEach(function (sec) {
       var secProf = getSectionProficiency(cid, st.id, sec.id);
-      var pct = Math.min(100, Math.round((secProf / MAX_PROF) * 100));
+      var pct = Math.round(levelBarPercent(cid, secProf));
       secBars +=
         '<div class="m-scard-sec-row">' +
         '<div class="m-scard-sec-dot" style="background:' +
