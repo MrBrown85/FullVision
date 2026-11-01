@@ -400,8 +400,10 @@ describe('the taxonomy fields', () => {
       else expect(s.story, s.id).toBeUndefined();
     });
     expect(COMMENT_BANK.sentences.filter(s => s.skill).length).toBeGreaterThan(300);
-    // No sentence conditions on the standing word: the grade sentence says
-    // it once, so the Overall sentences that did were cut (2026-11-01).
-    expect(COMMENT_BANK.sentences.filter(s => s.standing).length).toBe(0);
+    // No Overall sentence conditions on the standing word: the grade
+    // sentence says it once, so the ones that did were cut (2026-11-01).
+    // The grade frames for one proficiency word (gr39-gr78) carry it.
+    expect(COMMENT_BANK.sentences.filter(s => s.standing && s.group !== 'Grade').length).toBe(0);
+    expect(COMMENT_BANK.sentences.filter(s => s.standing).length).toBe(40);
   });
 });

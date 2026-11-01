@@ -213,7 +213,8 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
       expect(d.ids.slice(1).filter(claimsGrade)).toEqual([]);
       // The problem states both counts, in whichever of its frames.
       expect(stepText(d, 'ieProblem'), 'seed ' + n).toMatch(/\bthree\b.*\beight\b|\beight\b.*\bthree\b/);
-      expect(d.text).toContain('The deadline to replace this IE with a grade is [date].');
+      // The deadline, in whichever of its frames, says [date] until one is picked.
+      expect(stepText(d, 'ieDeadline'), 'seed ' + n).toContain('[date]');
       expect(d.text).not.toMatch(/earning a/);
       expect(d.replaced).toEqual([]);
     }

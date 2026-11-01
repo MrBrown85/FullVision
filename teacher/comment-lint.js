@@ -379,6 +379,9 @@ window.CommentLint = (function () {
     good: 'standing word ("very good", "good"); also "work habits are good"',
     satisfactory: 'standing word',
     acceptable: 'standing word ("minimally acceptable")',
+    // The BC proficiency scale's descriptor for Extending ("sophisticated
+    // understanding", the report legend's words): the grade frames say it.
+    sophisticated: 'the proficiency scale’s descriptor for Extending',
     // Claims behind an evidence gate or the gradebook (plan PR 6).
     best: 'the best piece: the highest-marked work',
     strongest: 'the "strongest" gate (strongestOf)',

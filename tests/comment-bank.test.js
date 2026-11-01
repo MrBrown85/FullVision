@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1259 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1259);
+  it('has 1469 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(1469);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1259);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1469);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -138,8 +138,17 @@ describe('the bank', () => {
     // The standing word is said once, by the grade sentence (DRAFT_STEPS
     // `says`), so no Overall sentence conditions on it: the 44 that did
     // (n114-n125, n201-n239, n300) could never be offered and were cut
-    // (2026-11-01).
-    ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w => expect(at('standing', w), w).toEqual([]));
+    // (2026-11-01). Only the grade frames for one proficiency word
+    // (gr39-gr78, round two) condition on it.
+    ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w =>
+      expect(
+        at('standing', w).filter(s => s.group !== 'Grade'),
+        w,
+      ).toEqual([]),
+    );
+    ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w =>
+      expect(at('standing', w).filter(s => s.group === 'Grade').length, w).toBe(10),
+    );
   });
 
   it('keeps the old generator’s cut patterns out: no superlatives, no teacher’s feelings', () => {
@@ -206,6 +215,12 @@ describe('the bank', () => {
       focus: 'nextStep',
       nextStep: 'nextStep',
       nextSkill: 'nextStep',
+      // The strongest skill's key and the even-results slots (round two, lane
+      // G): needed, the skill printed, the word only where the class shows it.
+      strongSkill: 'strength',
+      evenResults: 'evenResults',
+      evenSkill: 'evenResults',
+      evenWord: 'evenResults',
       habitsExcellent: 'habits',
       habitsGood: 'habits',
       habitsAllSeen: 'habits',
@@ -250,7 +265,11 @@ describe('the bank', () => {
                   ? { missing: 'notHandedIn', marks: 'marks', noMarks: 'marks', low: 'lowMarks' }[s.when[k]]
                   : k === 'nextSkill'
                     ? 'nextStep'
-                    : 'habits',
+                    : k === 'strongSkill'
+                      ? 'strength'
+                      : k === 'evenWord'
+                        ? 'evenResults'
+                        : 'habits',
         ),
       );
       if (!s.claims.length) {
@@ -292,6 +311,18 @@ describe('the bank', () => {
             s.id,
           ).toContain(v);
           if (s.group !== 'For the Family') expect(s.needs, s.id).toContain('nextSkill');
+        } else if (k === 'strongSkill') {
+          // A strengths frame for one skill: the key is in the table for its
+          // one kind of class, and it needs the slot verify() checks.
+          expect(s.subjects, s.id).toHaveLength(1);
+          expect(
+            (CommentBank.SKILLS[s.subjects[0]] || []).map(r => r.key),
+            s.id,
+          ).toContain(v);
+          expect(s.needs, s.id).toContain('strongSkill');
+        } else if (k === 'evenWord') {
+          expect(['Emerging', 'Developing', 'Proficient', 'Extending']).toContain(v);
+          expect(s.claims, s.id).toContain('evenResults');
         } else {
           expect(keys, s.id).toContain(k);
           expect(v).toBeGreaterThanOrEqual(1);
@@ -555,18 +586,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // The habits part: Completes Work from the record is the one strong
   // habit, so the four Strong Habits frames (hs11, hs13-hs15) fit, and the
   // five Habit Ratings frames for Completes Work at Consistently.
-  it('knows the Demo class is Science from its name, and offers Cece 63 sentences (9, 18, 11, 25)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 85 sentences (9, 40, 11, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 18, 11, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(63);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 11, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(85);
   });
 
-  it('offers Jasper 64 (9, 18, 12, 25), by the name he goes by', () => {
+  it('offers Jasper 74 (9, 28, 12, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 18, 12, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(64);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 28, 12, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(74);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -663,10 +694,11 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
     // The Demo class has no closing sentence or support lines set, so the
     // comment leaves those out (plan PR 8): the grade, the best piece, the
-    // habits, the next step and the family sentence, under six and
-    // flagged so, never padded.
-    expect(sentences.length).toBe(5);
-    expect(d.short).toBe(true);
+    // habits, the strengths (Cece's results are even: evenComps), the next
+    // step and the family sentence; six, so not flagged short, never padded.
+    expect(sentences.length).toBe(6);
+    expect(d.sentences.some(x => x.step === 'overall')).toBe(true);
+    expect(d.short).toBe(false);
     expect(d.text).not.toMatch(/[{}[\]]/);
     expect(d.sentences[0].text).toContain('Cece');
     // The course is named wherever the story opens with it.
