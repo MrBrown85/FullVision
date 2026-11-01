@@ -848,20 +848,24 @@ test('a rating adds the Habits row and attendance adds and removes its row, with
   for (const k of ['completes', 'ready', 'others', 'part', 'feedback', 'devices']) {
     await page.locator(`[data-action="tqRate"][data-habit="${k}"][data-value="4"]`).click();
   }
-  await expect(page.locator('#tq-narrative')).toHaveValue(/work habits are excellent/);
+  // All six Consistently: one of the excellent frames (hs01, hs02, hs17,
+  // hs18, hs20, hs21), which rotate by seed.
+  const excellent = /work habits are excellent|rated Consistently/;
+  await expect(page.locator('#tq-narrative')).toHaveValue(excellent);
   await expect(rowByLabel('Habits')).toHaveCount(1);
-  await expect(rowByLabel('Habits').locator('.qn-req-text')).toHaveText(/work habits are excellent/);
+  await expect(rowByLabel('Habits').locator('.qn-req-text')).toHaveText(excellent);
 
   await page.locator('#tq-att-absences').fill('3');
   await page.locator('#tq-att-absences').press('Tab');
   await page.locator('#tq-att-lates').fill('1');
   await page.locator('#tq-att-lates').press('Tab');
   await expect(page.locator('#tq-att-note')).toHaveText('Added to the comment.');
-  await expect(page.locator('#tq-narrative')).toHaveValue(/missed three classes and been late once this term\./);
+  // One attendance sentence with both counts in the plan's number forms
+  // ("three classes", "once"); the frame rotates (h60, h74-h78).
+  const attendance = /[^.]*\bthree classes\b[^.]*\bonce\b[^.]*\.|[^.]*\bonce\b[^.]*\bthree classes\b[^.]*\./;
+  await expect(page.locator('#tq-narrative')).toHaveValue(attendance);
   await expect(rowByLabel('Attendance')).toHaveCount(1);
-  await expect(rowByLabel('Attendance').locator('.qn-req-text')).toHaveText(
-    /missed three classes and been late once this term\./,
-  );
+  await expect(rowByLabel('Attendance').locator('.qn-req-text')).toHaveText(attendance);
   await expect(rowByLabel('Attendance').locator('.qn-req-source')).toHaveText('From Attendance above · new');
 
   // Cleared: the sentence and its row go.
@@ -870,7 +874,7 @@ test('a rating adds the Habits row and attendance adds and removes its row, with
   await page.locator('#tq-att-lates').fill('');
   await page.locator('#tq-att-lates').press('Tab');
   await expect(page.locator('#tq-att-note')).toHaveText('Optional. Left out until entered.');
-  await expect(page.locator('#tq-narrative')).not.toHaveValue(/missed three classes/);
+  await expect(page.locator('#tq-narrative')).not.toHaveValue(/three classes/);
   await expect(rowByLabel('Attendance')).toHaveCount(0);
   await expect(rowByLabel('Habits')).toHaveCount(1);
 });
