@@ -70,22 +70,22 @@ const ctxOf = f => CommentBank.context(f, {});
    step. A frame that starts like the sentence before it ("He …" after the
    grade sentence) comes after the others at equal use, so a class, not one
    student, is what reaches every frame. */
-function picks(f, step, n) {
+function picks(f, step, n, exclude) {
   const out = {};
   const comments = [];
   for (let seed = 1; seed <= (n || 40); seed++) {
     // A classmate of their own: a sentence with no pattern (m01, hs11)
     // counts as used through the draft record, by student id.
     const ctx = ctxOf({ ...f, sid: 's' + seed });
-    const d = CommentBank.draft(ctx, { seed, comments: comments.slice() });
+    const d = CommentBank.draft(ctx, { seed, comments: comments.slice(), exclude: exclude || [] });
     comments.push({ sid: 's' + seed, text: d.text });
     const s = d.sentences.find(x => x.step === step);
     if (s) out[s.id] = s.text;
   }
   return out;
 }
-function expectReachable(f, step, want) {
-  const got = picks(f, step);
+function expectReachable(f, step, want, exclude) {
+  const got = picks(f, step, 0, exclude);
   want.forEach(id => expect(Object.keys(got), id + ' never picked').toContain(id));
   Object.keys(got).forEach(id => {
     expect(want, id + ' picked outside its case').toContain(id);
@@ -237,14 +237,19 @@ describe('Work Habits frames', () => {
   it('one habit to build: hs05-hs07, hs28-hs33, named only through the summary slot; then the Habit Ratings frames for that habit', () => {
     // Once every summary frame is in a classmate's comment, the habits step
     // draws the Habit Ratings frames for the one habit rated below Usually
-    // (hl091-hl095: Uses Feedback at Sometimes), which name it too.
+    // (hl091-hl095: Uses Feedback at Sometimes), which name it too. A
+    // Sometimes frame names a thing to do (advises), so only when the
+    // comment has no Next Step sentence: with one, the summary frames alone.
     const cells = COMMENT_BANK.sentences
       .filter(s => s.group === 'Habit Ratings' && s.habit === 'feedback' && s.level === 2)
       .map(s => s.id);
+    const nextSteps = COMMENT_BANK.sentences.filter(s => s.group === 'Next Step').map(s => s.id);
+    expectReachable(hab({ ...all(4), feedback: 2 }), 'habits', ids(5, 7, 'hs').concat(ids(28, 33, 'hs')));
     const got = expectReachable(
       hab({ ...all(4), feedback: 2 }),
       'habits',
       ids(5, 7, 'hs').concat(ids(28, 33, 'hs'), cells),
+      nextSteps,
     );
     Object.entries(got).forEach(([id, t]) => {
       expect(t, id).not.toMatch(/excellent|good|class time|others|taking part|devices|completing/);

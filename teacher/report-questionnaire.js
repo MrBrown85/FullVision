@@ -3546,11 +3546,13 @@ window.ReportQuestionnaire = (function () {
       var story = ['climb', 'slide', 'split', 'hidden', 'newcomer'].find(has);
       if (story) return [story];
       if (has('new')) return ['newcomer'];
-      // A frame for the strongest skill, under its kind of class; an
-      // even-results frame under the word its verb is bound to.
-      if (when.strongSkill) {
-        var sf = fam || _familyOfSkill(when.strongSkill);
-        return [sf ? 'skill:' + sf + ':' + when.strongSkill : 'other'];
+      // A frame for the strongest skill, or for a strength among a tie at
+      // the top (`when.topSkill`), under its kind of class; an even-results
+      // frame under the word its verb is bound to.
+      var skillKey = when.strongSkill || when.topSkill;
+      if (skillKey) {
+        var sf = fam || _familyOfSkill(skillKey);
+        return [sf ? 'skill:' + sf + ':' + skillKey : 'other'];
       }
       if (when.evenWord) return ['even:' + when.evenWord];
       if (fam) return ['fam:' + fam + (when.standing ? ':' + when.standing : '')];
@@ -3659,8 +3661,9 @@ window.ReportQuestionnaire = (function () {
       } catch (e) {
         /* a context built by hand: the steady story */
       }
-      // The strongest skill, else even results, come before the story.
-      if (fam && ctx._strongSkill) out.push('skill:' + fam + ':' + ctx._strongSkill);
+      // The strength's skill (the strongest, else one of a tie at the top),
+      // else even results, come before the story.
+      if (fam && ctx._topSkill) out.push('skill:' + fam + ':' + ctx._topSkill);
       if (ctx._evenWord) out.push('even:' + ctx._evenWord);
       out.push(story);
       if (fam && f.standing) out.push('fam:' + fam + ':' + f.standing);

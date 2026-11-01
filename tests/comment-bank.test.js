@@ -218,6 +218,7 @@ describe('the bank', () => {
       // The strongest skill's key and the even-results slots (round two, lane
       // G): needed, the skill printed, the word only where the class shows it.
       strongSkill: 'strength',
+      topSkill: 'strength',
       evenResults: 'evenResults',
       evenSkill: 'evenResults',
       evenWord: 'evenResults',
@@ -265,7 +266,7 @@ describe('the bank', () => {
                   ? { missing: 'notHandedIn', marks: 'marks', noMarks: 'marks', low: 'lowMarks' }[s.when[k]]
                   : k === 'nextSkill'
                     ? 'nextStep'
-                    : k === 'strongSkill'
+                    : k === 'strongSkill' || k === 'topSkill'
                       ? 'strength'
                       : k === 'evenWord'
                         ? 'evenResults'
@@ -311,15 +312,16 @@ describe('the bank', () => {
             s.id,
           ).toContain(v);
           if (s.group !== 'For the Family') expect(s.needs, s.id).toContain('nextSkill');
-        } else if (k === 'strongSkill') {
-          // A strengths frame for one skill: the key is in the table for its
-          // one kind of class, and it needs the slot verify() checks.
+        } else if (k === 'strongSkill' || k === 'topSkill') {
+          // A strengths frame for one skill (the strongest, or a strength
+          // among a tie at the top): the key is in the table for its one
+          // kind of class, and it needs the slot verify() checks.
           expect(s.subjects, s.id).toHaveLength(1);
           expect(
             (CommentBank.SKILLS[s.subjects[0]] || []).map(r => r.key),
             s.id,
           ).toContain(v);
-          expect(s.needs, s.id).toContain('strongSkill');
+          expect(s.needs, s.id).toContain(k);
         } else if (k === 'evenWord') {
           expect(['Emerging', 'Developing', 'Proficient', 'Extending']).toContain(v);
           expect(s.claims, s.id).toContain('evenResults');

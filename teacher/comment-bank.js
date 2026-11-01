@@ -2298,6 +2298,93 @@ window.CommentBank = (function () {
     return xs.length ? xs[0].skill : '';
   }
 
+  /* A tie at the top (strengths for a tie, Nov 1): nothing passes the
+     "strongest" gate; two or more competencies, each on 3+ scored pieces,
+     sit within half a step of the highest, and every one of them is half a
+     step or more over the rest, of which there is at least one. The tied
+     competencies, highest first (report order on a tie); [] otherwise. A
+     student whose every competency is within half a step is the even
+     case (evenComps), not this one. One of the tied skills is named as a
+     strength, "among the highest", never "strongest" (topSkillOf). */
+  function topTieOf(comps) {
+    if (strongestOf(comps).length) return [];
+    var xs = (comps || [])
+      .filter(function (c) {
+        return c.level > 0;
+      })
+      .sort(function (a, b) {
+        return b.level - a.level;
+      });
+    if (xs.length < 3) return [];
+    var tie = xs.filter(function (c) {
+      return !_atLeast(xs[0].level - c.level, STRONGEST_GAP);
+    });
+    var rest = xs.filter(function (c) {
+      return tie.indexOf(c) < 0;
+    });
+    if (tie.length < 2 || !rest.length) return [];
+    var enough = tie.every(function (c) {
+      return (c.scores || []).length >= STRONGEST_PIECES;
+    });
+    if (!enough || !_atLeast(tie[tie.length - 1].level - rest[0].level, STRONGEST_GAP)) return [];
+    return tie;
+  }
+
+  /* The tied competencies as skills from the table (one per skill key),
+     [{ comp, key, skill }], the next step's competency left out (so the
+     strengths sentence and the next step never name one skill). */
+  function topTieSkills(f) {
+    var out = [];
+    var next = nextStepOf(f.comps);
+    topTieOf(f.comps).forEach(function (c) {
+      if (c === next) return;
+      var sk = skillOf(f.family, c.name);
+      if (
+        !sk ||
+        out.some(function (x) {
+          return x.key === sk.key;
+        })
+      )
+        return;
+      out.push({ comp: c, key: sk.key, skill: sk.skill });
+    });
+    return out;
+  }
+
+  /* The skills named as a tied strength in each class this session, per
+     student: { cid: { sid: skill key } }. Kept in memory only, as _told. */
+  var _topTold = {};
+  function _topUsesFor(cid, sid) {
+    var mine = (cid != null && _topTold[cid]) || {};
+    var out = {};
+    Object.keys(mine).forEach(function (k) {
+      if (k !== String(sid)) out[mine[k]] = (out[mine[k]] || 0) + 1;
+    });
+    return out;
+  }
+
+  /* The student's strength as one skill: the strongest skill past the gate
+     (strengthSkills), else one of a tie at the top (topTieSkills): the
+     skill named for the fewest classmates this session, then the shortest
+     wording, then the highest competency. { comp, key, skill } or null.
+     The order is strongest, then the tie, then even results. */
+  function topSkillOf(f) {
+    var strong = strengthSkills(f);
+    if (strong.length) return strong[0];
+    var uses = _topUsesFor(f.cid, f.sid);
+    var xs = topTieSkills(f);
+    if (!xs.length) return null;
+    return xs
+      .map(function (x, i) {
+        return { x: x, i: i };
+      })
+      .sort(function (a, b) {
+        return (
+          (uses[a.x.key] || 0) - (uses[b.x.key] || 0) || R.wordCount(a.x.skill) - R.wordCount(b.x.skill) || a.i - b.i
+        );
+      })[0].x;
+  }
+
   /* Even results (bank expansion, round two): nothing passes the
      "strongest" gate; every competency with a level, whatever its piece
      count, is within half a proficiency step (the gap the gate needs) of
@@ -2503,6 +2590,9 @@ window.CommentBank = (function () {
     // within half a step; the first two as skills, for the n5xx frames.
     var evenNow = evenComps(f.comps, f.overall);
     var evenSk = evenSkills(f);
+    // The strength as one skill (topSkillOf): the strongest, else one of a
+    // tie at the top (topTieOf), for the frames under `when.topSkill`.
+    var topSk = topSkillOf(f);
     var fallen = drops.length
       ? drops.slice().sort(function (a, b) {
           return tenths(a.start) - tenths(a.now) - (tenths(b.start) - tenths(b.now));
@@ -2624,6 +2714,9 @@ window.CommentBank = (function () {
       // The strongest skill's key (`when.strongSkill`, the per-skill
       // strengths frames): the competency behind the first strength.
       strongSkill: keys('comp', [strongSkills[0] && strongSkills[0].comp]),
+      // The strength as one skill (`when.topSkill`): the strongest, or one
+      // of a tie at the top.
+      topSkill: keys('comp', [topSk && topSk.comp]),
       // Even results (evenComps): every competency the claim rests on, the
       // one named as a skill, and the proficiency word the frame is for.
       evenResults: keys('comp', evenNow),
@@ -2688,6 +2781,7 @@ window.CommentBank = (function () {
     var compNames = {
       strengths: names(strongest),
       strongSkill: names([strongSkills[0] && strongSkills[0].comp]),
+      topSkill: names([topSk && topSk.comp]),
       evenSkill: names([evenSk[0] && evenSk[0].comp]),
       growthAreas: names(lowest),
       rise: names([rises[0]]),
@@ -2727,6 +2821,10 @@ window.CommentBank = (function () {
       // The strongest skill's key (SKILLS), for the per-skill strengths
       // frames (`when.strongSkill`); '' below the "strongest" gate.
       _strongSkill: strongSkills[0] ? strongSkills[0].key : '',
+      // The strength's skill key for the frames that claim a strength, not
+      // the strongest (`when.topSkill`): the strongest skill, else one of a
+      // tie at the top (topSkillOf); '' with neither.
+      _topSkill: topSk ? topSk.key : '',
       // The overall proficiency word while the results are even
       // (`when.evenWord`), in every grading style: a condition only, so a
       // Letter class binds the verb to it without printing it.
@@ -2772,6 +2870,7 @@ window.CommentBank = (function () {
       // The strongest skill's key, needed and never printed: the frames
       // written for one skill say it in their own words.
       strongSkill: strongSkills[0] ? strongSkills[0].key : '',
+      topSkill: topSk ? topSk.key : '',
       // Even results (evenComps): 'yes' while they hold; the highest even
       // competency as a skill; and the proficiency word as the class shows
       // it (f.standing: '' in a Letter class, so no frame prints it there).
@@ -2938,6 +3037,7 @@ window.CommentBank = (function () {
       if (k === 'ieProblem') return ctx._ieProblem === when[k];
       if (k === 'nextSkill') return !!ctx._nextSkill && ctx._nextSkill === when[k];
       if (k === 'strongSkill') return !!ctx._strongSkill && ctx._strongSkill === when[k];
+      if (k === 'topSkill') return !!ctx._topSkill && ctx._topSkill === when[k];
       if (k === 'evenWord') return !!ctx._evenWord && ctx._evenWord === when[k];
       return (ctx._habits || {})[k] === when[k];
     });
@@ -3337,6 +3437,7 @@ window.CommentBank = (function () {
       // and the overall proficiency.
       if (k === 'nextSkill') return ((ctx._facts && ctx._facts.nextSkill) || []).forEach(add);
       if (k === 'strongSkill') return ((ctx._facts && ctx._facts.strongSkill) || []).forEach(add);
+      if (k === 'topSkill') return ((ctx._facts && ctx._facts.topSkill) || []).forEach(add);
       if (k === 'evenWord') return ((ctx._facts && ctx._facts.evenWord) || []).forEach(add);
       add(
         k === 'picture'
@@ -3887,6 +3988,18 @@ window.CommentBank = (function () {
     // the teacher's order puts them.
     if (seq.indexOf('notHandedIn') >= 0 && ctx.missingWork) said.notHandedIn = true;
     if (seq.indexOf('grade') >= 0 && ctx._grade) said.grade = true;
+    // Whether the Next Step step will give the comment its one next step:
+    // it is in the order and a sentence is kept there or fits it. While it
+    // will, no other step takes an advising sentence (a Habit Ratings frame
+    // at Sometimes or Rarely names a thing to do by design): the habits
+    // step takes the summary instead, and the frame stays in Other Wording
+    // and Browse Sentences for the teacher to choose (2026-11-01).
+    var nextFires =
+      seq.indexOf('nextStep') >= 0 &&
+      (!!kept.nextStep ||
+        bank.sentences.some(function (s) {
+          return !exclude[s.id] && _stepFits(s, byKey.nextStep, ctx);
+        }));
     seq.forEach(function (key, at) {
       var step = byKey[key];
       // A class line: the teacher's text, as typed (plan PR 8).
@@ -3946,9 +4059,9 @@ window.CommentBank = (function () {
         )
           return false;
         // One next step a comment (advises): an advising sentence is out
-        // once one is in, and out of every step before the Next Step step,
-        // which gives the comment its one.
-        if (advises(s) && (said.advice || (key !== 'nextStep' && seq.indexOf('nextStep') > at))) return false;
+        // once one is in, and out of every other step while the Next Step
+        // step will give the comment its one (nextFires).
+        if (advises(s) && (said.advice || (key !== 'nextStep' && nextFires))) return false;
         // Once the grade sentence leads, no other sentence states the grade;
         // with a Not Handed In sentence, no other states the missing work.
         if (
@@ -4145,6 +4258,17 @@ window.CommentBank = (function () {
     if (story && tally) {
       _told[cid] = _told[cid] || {};
       _told[cid][sid] = story.id;
+    }
+    // The skill a tied strength named (`when.topSkill`), for classmates'
+    // picks (topSkillOf): the least-named skill of their tie comes first.
+    if (tally) {
+      var top = d.provenance.find(function (pv) {
+        return !!(pv.values || {})['when.topSkill'];
+      });
+      if (top) {
+        _topTold[cid] = _topTold[cid] || {};
+        _topTold[cid][String(sid)] = top.values['when.topSkill'];
+      } else if (_topTold[cid]) delete _topTold[cid][String(sid)];
     }
     // This draft's bank sentences, for classmates' usage (classUsage()).
     if (tally) {
@@ -4714,6 +4838,26 @@ window.CommentBank = (function () {
       var gated = strongestOf(f.comps).map(function (c) {
         return String(c.id);
       });
+      // A frame for a strength, not the strongest (`when.topSkill`): the
+      // competency behind it is the strongest or one of a tie at the top
+      // (topTieOf), now, and the key is the table's skill for it. Which of
+      // the tie was named is a choice (topSkillOf), not a fact, so a
+      // classmate's draft does not make the sentence stale.
+      var tops = _ids(pv, 'topSkill', 'comp');
+      if (_has(pv, 'when.topSkill')) {
+        var tc = tops.length ? _byId(f.comps, tops[0]) : null;
+        var tsk = tc ? skillOf(f.family, tc.name) : null;
+        var tied = topTieOf(f.comps).map(function (c) {
+          return String(c.id);
+        });
+        if (
+          !tsk ||
+          tsk.key !== v['when.topSkill'] ||
+          (_has(pv, 'topSkill') && v.topSkill !== tsk.key) ||
+          (gated.indexOf(String(tc.id)) < 0 && tied.indexOf(String(tc.id)) < 0)
+        )
+          return false;
+      } else if (tops.length) return false;
       var labels = (f.comps || []).map(function (c) {
         return String(c.name || '');
       });
@@ -4721,7 +4865,7 @@ window.CommentBank = (function () {
         return !_has(pv, k) || (!!v[k] && wants.indexOf(v[k]) >= 0 && labels.indexOf(v[k]) < 0);
       };
       return (
-        ids.length > 0 &&
+        ids.length + tops.length > 0 &&
         ids.every(function (id) {
           return gated.indexOf(String(id)) >= 0;
         }) &&
@@ -4940,8 +5084,17 @@ window.CommentBank = (function () {
         var m = k.match(/^when\.(\w+)$/);
         if (
           m &&
-          ['picture', 'standing', 'grade', 'ieProblem', 'path', 'nextSkill', 'strongSkill', 'evenWord'].indexOf(m[1]) <
-            0
+          [
+            'picture',
+            'standing',
+            'grade',
+            'ieProblem',
+            'path',
+            'nextSkill',
+            'strongSkill',
+            'topSkill',
+            'evenWord',
+          ].indexOf(m[1]) < 0
         )
           checks.push(eff[m[1]] === pv.values[k]);
       });
@@ -5591,6 +5744,9 @@ window.CommentBank = (function () {
     climbed: climbed,
     slid: slid,
     strongestOf: strongestOf,
+    topTieOf: topTieOf,
+    topTieSkills: topTieSkills,
+    topSkillOf: topSkillOf,
     nextStepOf: nextStepOf,
     nextSkillOf: nextSkillOf,
     skillOf: skillOf,

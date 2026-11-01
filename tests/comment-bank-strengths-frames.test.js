@@ -231,8 +231,12 @@ describe('even results (evenComps)', () => {
 });
 
 describe('the strengths frames per skill', () => {
-  const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Overall' && s.when && s.when.strongSkill);
-  const forSkill = (family, key) => frames.filter(s => s.subjects[0] === family && s.when.strongSkill === key);
+  // The frames that assert the strongest (`when.strongSkill`) and the ones
+  // that claim a strength, which also fit a tie at the top (`when.topSkill`,
+  // tests/comment-bank-top-tie.test.js).
+  const keyOf = s => (s.when && (s.when.strongSkill || s.when.topSkill)) || '';
+  const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Overall' && keyOf(s));
+  const forSkill = (family, key) => frames.filter(s => s.subjects[0] === family && keyOf(s) === key);
   /* The table row's competency strongest (four, on three pieces), one other
      a full step lower. */
   const strongFacts = (family, row) => facts(family, [comp('a', row.name, 4), comp('b', 'Other Area', 2.5)]);
@@ -255,7 +259,7 @@ describe('the strengths frames per skill', () => {
         expect(mine.length, family + '.' + row.key).toBeGreaterThanOrEqual(3);
         mine.forEach(s => {
           expect(s).toMatchObject({ part: 'now', group: 'Overall', claims: ['strength'], subjects: [family] });
-          expect(s.needs).toEqual(['strongSkill']);
+          expect(s.needs).toEqual([s.when.strongSkill ? 'strongSkill' : 'topSkill']);
           expect(s.text, s.id).not.toMatch(/\{strengths?\}/);
           expect(s.text, s.id).not.toMatch(/\b(competency|level)\b/i);
         });
@@ -280,7 +284,7 @@ describe('the strengths frames per skill', () => {
         mine.forEach((s, i) => {
           const pv = CommentBank.provenance(s, ctx);
           expect(pv.factKeys, s.id).toContain('comp:a');
-          expect(pv.values['when.strongSkill']).toBe(row.key);
+          expect(pv.values[s.when.strongSkill ? 'when.strongSkill' : 'when.topSkill']).toBe(row.key);
           expect(verified(s, texts[i], pv, f, 'overall').replaced, s.id).toEqual([]);
           // The other competency now strongest: the frame no longer holds.
           const swapped = Object.assign({}, f, { comps: [comp('a', row.name, 2.5), comp('b', 'Other Area', 4)] });
