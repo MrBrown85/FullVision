@@ -3251,9 +3251,11 @@ window.CommentBank = (function () {
   /* Steps whose wording does not come from choosing among bank sentences
      are left out: the grade sentence, the attendance sentence and the work
      not handed in each have one wording per fact (the sentence grammar),
-     class lines are the teacher's own text, and the IE path's Required
-     parts are set. */
-  var FIXED_STEPS = { grade: true, attendance: true, notHandedIn: true };
+     the best piece and the next step each have one template by design (the
+     best-piece forms, the skill-table sentence), class lines are the
+     teacher's own text, and the IE path's Required parts are set. What is
+     left is what a teacher can widen with sentences of their own. */
+  var FIXED_STEPS = { grade: true, attendance: true, notHandedIn: true, example: true, nextStep: true };
   function _strengthSteps() {
     return DRAFT_STEPS.filter(function (s) {
       return !!s.groups && !s.line && !s.ie && !s.says && !FIXED_STEPS[s.key];
@@ -3297,10 +3299,11 @@ window.CommentBank = (function () {
      A student's sentences for a part are their pool (stepPool()); the
      students counted with them are every student in the class whose own
      pool is wholly inside it, since those draw only from these sentences.
-     When there are more such students than sentences, some sentence must
-     repeat, and the part is thin for that student. A student counts for a
-     part only when every story their comment can tell runs it; an IE
-     comment counts for none.
+     When there are three or more such students for every sentence, some
+     sentence must serve three or more of them, and the part is thin for
+     that student (the plan's bar; a mere repeat is not thin). A student
+     counts for a part only when every story their comment can tell runs
+     it; an IE comment counts for none.
 
      opts: { termId (the report picker's when left out), students (the
      roster when left out), bank }.
@@ -3309,7 +3312,8 @@ window.CommentBank = (function () {
      thin, worst: { sentences, students } | null }], byStudent: { sid: {
      step: { sentences, students, thin } } } }. A part's `sentences` and
      `students` are the sentences that fit anyone and the students it fits;
-     `worst` is its thin group with the most students over sentences. */
+     `worst` is its thin group with the most students per sentence. */
+  var THIN_PER_SENTENCE = 3;
   function bankStrength(cid, opts) {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
@@ -3361,13 +3365,13 @@ window.CommentBank = (function () {
         var with_ = pools.filter(function (q) {
           return q && q.n <= p.n && inside(q, p);
         }).length;
-        var row = { sentences: p.n, students: with_, thin: with_ > p.n };
+        var row = { sentences: p.n, students: with_, thin: with_ >= THIN_PER_SENTENCE * p.n };
         byStudent[kids[i].sid][step.key] = row;
         if (
           row.thin &&
           (!worst ||
-            row.students - row.sentences > worst.students - worst.sentences ||
-            (row.students - row.sentences === worst.students - worst.sentences && row.students > worst.students))
+            row.students * worst.sentences > worst.students * row.sentences ||
+            (row.students * worst.sentences === worst.students * row.sentences && row.students > worst.students))
         )
           worst = { sentences: row.sentences, students: row.students };
       });
@@ -4364,6 +4368,7 @@ window.CommentBank = (function () {
     classUsage: classUsage,
     nearIdentical: nearIdentical,
     bankStrength: bankStrength,
+    THIN_PER_SENTENCE: THIN_PER_SENTENCE,
     stepPool: stepPool,
     provenance: provenance,
     verify: verify,
