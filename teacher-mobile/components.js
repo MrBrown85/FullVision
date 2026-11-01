@@ -46,8 +46,11 @@ window.MComponents = (function () {
     var subtitle = opts.subtitle
       ? '<div style="font-size:12px;color:var(--text-3);font-weight:400">' + _esc(opts.subtitle) + '</div>'
       : '';
+    // `compact`: the title shows in the bar at rest (no large title below).
     return (
-      '<div class="m-nav-bar" id="m-nav-bar-' +
+      '<div class="m-nav-bar' +
+      (opts.compact ? ' m-nav-bar-compact' : '') +
+      '" id="m-nav-bar-' +
       (opts.id || 'main') +
       '">' +
       '<div class="m-nav-bar-inner">' +
