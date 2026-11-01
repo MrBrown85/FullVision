@@ -623,7 +623,13 @@ test.describe('the Sentences card', () => {
     await page.keyboard.press('Alt+ArrowUp');
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Best Piece');
     await expect(rows(page).first().locator('.qn-req-text')).toContainText('Cece');
-    await expect(rows(page).nth(1).locator('.qn-req-text')).toHaveText(/^She is /);
+    // The grade sentence, in whichever of its frames (the grade step mixes
+    // them by seed): the proficiency word, and her pronoun, not her name.
+    await expect(rows(page).nth(1).locator('.qn-req-label')).toHaveText('Grade');
+    const gradeText = await rows(page).nth(1).locator('.qn-req-text').textContent();
+    expect(gradeText).toMatch(/\b(Emerging|Developing|Proficient|Extending)\b/);
+    expect(gradeText).toMatch(/\b(She|she|Her|her)\b/);
+    expect(gradeText).not.toContain('Cece');
     const moved = await box.inputValue();
     expect(moved).not.toBe(draft);
     expect(moved.startsWith(await rows(page).first().locator('.qn-req-text').textContent())).toBe(true);
@@ -836,6 +842,23 @@ test.describe('the Sentences card', () => {
   });
 });
 
+/* The bank's frames for excellent work habits (needs habitsExcellent), as
+   one pattern over their realised forms: a pronoun or name slot matches a
+   word, a [one|many] verb either form. */
+async function excellentFrames(page) {
+  const texts = await page.evaluate(() =>
+    COMMENT_BANK.sentences.filter(s => (s.needs || []).indexOf('habitsExcellent') >= 0).map(s => s.text),
+  );
+  const alts = texts.map(t =>
+    t
+      .replace(/[.*+?^$()|[\]\\]/g, '\\$&')
+      .replace(/\{\w+\}/g, '[^ ]+')
+      .replace(/\\\[([^|\]]*)\\\|([^\]]*)\\\]/g, '(?:$1|$2)'),
+  );
+  expect(alts.length).toBeGreaterThan(1);
+  return new RegExp(alts.join('|'));
+}
+
 /* The Sentences card follows the comment without another Generate Comment
    (plan PR 11a: a rating redraws only the habits sentence; the States
    mockup's "Attendance entered" board shows the Attendance row). */
@@ -848,9 +871,9 @@ test('a rating adds the Habits row and attendance adds and removes its row, with
   for (const k of ['completes', 'ready', 'others', 'part', 'feedback', 'devices']) {
     await page.locator(`[data-action="tqRate"][data-habit="${k}"][data-value="4"]`).click();
   }
-  // All six Consistently: one of the excellent frames (hs01, hs02, hs17,
-  // hs18, hs20, hs21), which rotate by seed.
-  const excellent = /work habits are excellent|rated Consistently/;
+  // All six rated Consistently: the habits sentence is one of the bank's
+  // excellent frames, whichever the seed picks.
+  const excellent = await excellentFrames(page);
   await expect(page.locator('#tq-narrative')).toHaveValue(excellent);
   await expect(rowByLabel('Habits')).toHaveCount(1);
   await expect(rowByLabel('Habits').locator('.qn-req-text')).toHaveText(excellent);
