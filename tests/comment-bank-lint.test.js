@@ -123,6 +123,19 @@ describe('the vocabulary lint', () => {
     ).toContain('over 20 words: 21');
   });
 
+  it('declares every sentence that says "next step" or "to do next": claims nextStep or advises: true', () => {
+    const undeclared = COMMENT_BANK.sentences
+      .filter(s => CommentLint.advisesText(s.text) && !CommentBank.advises(s))
+      .map(s => s.id);
+    expect(undeclared).toEqual([]);
+    expect(CommentLint.advisesText('{His} next step is to read each comment.')).toBe(true);
+    expect(CommentLint.advisesText('One thing to do next is to ask.')).toBe(true);
+    expect(CommentLint.advisesText('One thing to do is to ask.')).toBe(false);
+    expect(CommentLint.findings('When a piece comes back with comments, {he} [revises|revise] it.')).toContain(
+      'phrasal verb: come back',
+    );
+  });
+
   it('counts a quoted title as one word', () => {
     expect(CommentRealiser.wordCount('His best piece was “What Does the Poster Show, and What Does It Hide?”.')).toBe(
       5,
