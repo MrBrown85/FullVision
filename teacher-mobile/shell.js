@@ -16,6 +16,11 @@
   var _gradeReturnSid = null;
   var _userEmail = '';
   var _userName = '';
+  // Set when Back here calls history.back(), so that popstate is not a
+  // second Back.
+  var _ignorePop = false;
+  // A swipe back in progress.
+  var _swipeActive = false;
 
   /* ── Boot ───────────────────────────────────────────────────── */
   async function boot() {
@@ -52,8 +57,7 @@
     }
 
     _hideAuth();
-    // Clear history so browser back gesture can't return to login
-    history.replaceState(null, '', location.pathname);
+    _resetHistory();
     await _bootApp();
   }
 
@@ -67,6 +71,7 @@
     MC.setupOfflineDetection();
     _renderTab('students');
     _bindEvents();
+    _bindEdgeSwipe();
 
     _hideLoader();
     _initPullToRefresh();
@@ -91,6 +96,15 @@
         _rerenderActiveTab();
       });
     }
+  }
+
+  /* ── History ─────────────────────────────────────────────────
+     The app's root entry, then a guard entry: a back press at the root
+     lands on the root entry and the guard is put back, so the browser never
+     leaves the app. Each pushed screen adds an entry {m: depth}. */
+  function _resetHistory() {
+    history.replaceState({ m: 0 }, '', location.pathname);
+    history.pushState({ m: 0, guard: true }, '');
   }
 
   /* ── Pull to refresh ───────────────────────────────────────── */
@@ -294,8 +308,7 @@
     try {
       await signIn(email.trim(), password);
       _hideAuth();
-      // Clear history so browser back gesture can't return to login
-      history.replaceState(null, '', location.pathname);
+      _resetHistory();
       await _bootApp();
     } catch (err) {
       _authError(err.message || 'Sign in failed. Please try again.');
@@ -514,6 +527,9 @@
     newScreen.classList.add('m-push-enter');
     stack.appendChild(newScreen);
 
+    _navStacks[_activeTab].push('detail');
+    history.pushState({ m: _navStacks[_activeTab].length - 1 }, '');
+
     // Animate
     requestAnimationFrame(function () {
       if (current) current.classList.add('m-push-exit-active');
@@ -523,11 +539,10 @@
       setTimeout(function () {
         if (current) {
           current.classList.remove('m-push-exit-active');
-          current.style.display = 'none';
+          // Unless the new screen is already on its way back out.
+          if (newScreen.parentNode && !_swipeActive) current.style.display = 'none';
         }
         newScreen.classList.remove('m-push-enter-active');
-        _navStacks[_activeTab].push('detail');
-        history.pushState({ screen: 'detail' }, '');
 
         // Setup scroll for new screen
         var navBar = newScreen.querySelector('.m-nav-bar');
@@ -536,7 +551,8 @@
     });
   }
 
-  function _popScreen() {
+  // `fromHistory`: the browser's own back already removed the entry.
+  function _popScreen(fromHistory) {
     var stack = document.getElementById('m-nav-stack');
     var screens = stack.querySelectorAll('.m-screen');
     if (screens.length < 2) return;
@@ -544,7 +560,7 @@
     var top = screens[screens.length - 1];
     var below = screens[screens.length - 2];
     if (_gradeReturnSid && top.id === 'm-screen-grade-swiper') {
-      _returnToStudent(_gradeReturnSid);
+      _returnToStudent(_gradeReturnSid, top);
       return;
     }
 
@@ -555,32 +571,176 @@
     requestAnimationFrame(function () {
       below.classList.remove('m-pop-enter');
       below.classList.add('m-pop-enter-active');
-
       setTimeout(function () {
-        top.remove();
-        below.classList.remove('m-pop-enter-active');
-        _navStacks[_activeTab].pop();
-        if (top.id === 'm-screen-obs-sweep') MSweep.close();
+        _finishPop(top, below, fromHistory);
       }, 360);
     });
   }
 
+  function _finishPop(top, below, fromHistory) {
+    top.remove();
+    below.classList.remove('m-pop-enter-active');
+    _navStacks[_activeTab].pop();
+    if (top.id === 'm-screen-obs-sweep') MSweep.close();
+    // Drop the screen's history entry too, when it has one (a screen put
+    // back by a tab switch has none).
+    if (!fromHistory && history.state && history.state.m > 0) {
+      _ignorePop = true;
+      history.back();
+    }
+  }
+
   /* Back from a grading screen that a student page's Grade button opened:
-     that student's page again, on the Students tab. */
-  function _returnToStudent(sid) {
+     that student's page again, on the Students tab, with the usual slide. */
+  function _returnToStudent(sid, top) {
+    // The grading screen leaves the Grade tab for good.
+    top.removeAttribute('data-restore');
+    top.parentNode.removeChild(top);
     _switchTab('students');
     var stack = document.getElementById('m-nav-stack');
-    var list = stack.querySelector('.m-screen:last-child');
-    var tmp = document.createElement('div');
-    tmp.innerHTML = MStudents.renderDetail(_cid, sid);
-    var screen = tmp.firstElementChild;
-    screen.classList.remove('m-screen-hidden');
-    screen.setAttribute('data-restore', JSON.stringify({ kind: 'detail', sid: sid }));
-    stack.appendChild(screen);
-    if (list) list.style.display = 'none';
-    _navStacks[_activeTab].push('detail');
-    var navBar = screen.querySelector('.m-nav-bar');
-    if (navBar) MC.setupScrollTitle(screen, navBar.id);
+    // The tab switch usually puts the student's page back itself.
+    var screen = stack.querySelector('.m-screen:last-child');
+    if (
+      !(
+        screen &&
+        screen.id === 'm-screen-student-detail' &&
+        screen.getAttribute('data-restore') === JSON.stringify({ kind: 'detail', sid: sid })
+      )
+    ) {
+      var list = screen;
+      var tmp = document.createElement('div');
+      tmp.innerHTML = MStudents.renderDetail(_cid, sid);
+      screen = tmp.firstElementChild;
+      screen.classList.remove('m-screen-hidden');
+      screen.setAttribute('data-restore', JSON.stringify({ kind: 'detail', sid: sid }));
+      stack.appendChild(screen);
+      if (list) list.style.display = 'none';
+      _navStacks[_activeTab].push('detail');
+      var navBar = screen.querySelector('.m-nav-bar');
+      if (navBar) MC.setupScrollTitle(screen, navBar.id);
+    }
+
+    stack.appendChild(top);
+    screen.classList.add('m-pop-enter');
+    top.classList.add('m-pop-exit-active');
+    requestAnimationFrame(function () {
+      screen.classList.remove('m-pop-enter');
+      screen.classList.add('m-pop-enter-active');
+      setTimeout(function () {
+        top.remove();
+        screen.classList.remove('m-pop-enter-active');
+      }, 360);
+    });
+  }
+
+  /* ── Swipe back from the left edge ───────────────────────────
+     A drag from the left edge pulls the top screen aside, the screen under
+     it following; past a third of the width, or a quick flick, it goes back. */
+  function _bindEdgeSwipe() {
+    var stack = document.getElementById('m-nav-stack');
+    var EDGE = 28;
+    var top = null;
+    var below = null;
+    var startX = 0;
+    var startY = 0;
+    var startT = 0;
+    var dx = 0;
+    var width = 0;
+    var decided = false;
+    var active = false;
+
+    stack.addEventListener(
+      'touchstart',
+      function (e) {
+        top = null;
+        var screens = stack.querySelectorAll('.m-screen');
+        if (screens.length < 2) return;
+        if (!document.getElementById('m-sheet-backdrop').classList.contains('u-hidden')) return;
+        var t = e.touches[0];
+        if (t.clientX > EDGE) return;
+        var candidate = screens[screens.length - 1];
+        // Back from this screen goes somewhere else; the plain pop handles it.
+        if (_gradeReturnSid && candidate.id === 'm-screen-grade-swiper') return;
+        top = candidate;
+        below = screens[screens.length - 2];
+        startX = t.clientX;
+        startY = t.clientY;
+        startT = Date.now();
+        dx = 0;
+        width = stack.clientWidth;
+        decided = false;
+        active = false;
+      },
+      { passive: true },
+    );
+
+    stack.addEventListener(
+      'touchmove',
+      function (e) {
+        if (!top) return;
+        var t = e.touches[0];
+        dx = t.clientX - startX;
+        var dy = t.clientY - startY;
+        if (!decided) {
+          if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+          decided = true;
+          if (dx <= 0 || Math.abs(dy) > dx) {
+            top = null;
+            return;
+          }
+          active = true;
+          _swipeActive = true;
+          below.style.display = '';
+          top.classList.add('m-swipe-back');
+          below.classList.add('m-swipe-back');
+        }
+        e.preventDefault();
+        var x = Math.max(0, dx);
+        top.style.transform = 'translateX(' + x + 'px)';
+        below.style.transform = 'translateX(' + -0.3 * (width - x) + 'px)';
+        below.style.setProperty('--m-dim', String(0.12 * (1 - x / width)));
+      },
+      { passive: false },
+    );
+
+    stack.addEventListener(
+      'touchend',
+      function () {
+        if (!top || !active) {
+          top = null;
+          return;
+        }
+        var t = top;
+        var b = below;
+        top = null;
+        _swipeActive = false;
+        var velocity = dx / Math.max(Date.now() - startT, 1);
+        var goBack = dx > width / 3 || velocity > 0.4;
+        t.classList.remove('m-swipe-back');
+        b.classList.remove('m-swipe-back');
+        t.style.transform = '';
+        b.style.removeProperty('--m-dim');
+        if (goBack) {
+          b.style.transform = '';
+          t.classList.add('m-pop-exit-active');
+          b.classList.add('m-pop-enter-active');
+          setTimeout(function () {
+            _finishPop(t, b, false);
+          }, 360);
+        } else {
+          t.classList.add('m-swipe-settle');
+          b.classList.add('m-swipe-settle');
+          b.style.transform = 'translateX(-30%)';
+          setTimeout(function () {
+            t.classList.remove('m-swipe-settle');
+            b.classList.remove('m-swipe-settle');
+            b.style.transform = '';
+            b.style.display = 'none';
+          }, 260);
+        }
+      },
+      { passive: true },
+    );
   }
 
   /* ── Event delegation ───────────────────────────────────────── */
@@ -1117,14 +1277,15 @@
       }
     });
 
-    // Android back button — pop screen instead of exiting app
-    window.addEventListener('popstate', function () {
-      if (_navStacks[_activeTab] && _navStacks[_activeTab].length > 1) {
-        _popScreen();
-      } else {
-        // Prevent exiting the PWA on accidental extra back press
-        history.pushState(null, '');
+    // The browser's back (Android button, edge gesture): the top screen goes
+    // back; at the root the guard entry is put back so the app stays open.
+    window.addEventListener('popstate', function (e) {
+      if (_ignorePop) {
+        _ignorePop = false;
+        return;
       }
+      if (_navStacks[_activeTab] && _navStacks[_activeTab].length > 1) _popScreen(true);
+      if (!(e.state && (e.state.m || e.state.guard))) history.pushState({ m: 0, guard: true }, '');
     });
   }
 
