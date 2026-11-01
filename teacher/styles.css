@@ -936,6 +936,11 @@ body.offline-active #app-dock {
 .student-row-mark.ok {
   color: var(--score-3-text);
 }
+/* An approved comment that no longer matches the gradebook or the class
+   settings (the Term Questionnaire, plan PR 12). */
+.student-row-mark.flag {
+  color: var(--score-2);
+}
 .student-row.roster-hidden {
   display: none !important;
 }

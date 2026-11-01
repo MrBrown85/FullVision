@@ -4336,6 +4336,105 @@ body.qn-roster #gb-sidebar .student-row-note {
   outline-offset: 2px;
   border-radius: 4px;
 }
+/* Marks changed after approval (plan PR 12; the States mockup). */
+.qn-approved-chip {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--score-3-text);
+  background: var(--score-3-bg);
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.qn-stale {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qn-stale-note {
+  padding: 10px 12px;
+  background: var(--report-callout-bg);
+  border-radius: 10px;
+  font-size: var(--text-sm);
+  color: var(--score-2-text);
+  line-height: 1.4;
+}
+.qn-stale-change {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--score-2);
+  border-radius: 10px;
+}
+.qn-stale-line {
+  display: flex;
+  gap: 10px;
+}
+.qn-stale-label {
+  width: 70px;
+  flex: none;
+  font-size: 12px;
+  color: var(--text-2);
+  padding-top: 2px;
+}
+.qn-stale-was {
+  font-size: 14.5px;
+  color: var(--text-2);
+  text-decoration: line-through;
+}
+.qn-stale-now {
+  font-size: 14.5px;
+  background: var(--active-light);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.qn-stale-none {
+  font-size: 14.5px;
+  color: var(--text-2);
+}
+.qn-stale-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+  flex-wrap: wrap;
+}
+.qn-stale-grade {
+  flex: 1;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.qn-stale-keep,
+.qn-stale-use {
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.qn-stale-keep {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.qn-stale-use {
+  border: 0;
+  background: var(--active);
+  color: #fff;
+  font-weight: 600;
+}
+.qn-stale-keep:focus-visible,
+.qn-stale-use:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-stale-hint {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
 /* Show Both: the two comments side by side, shared sentences marked. */
 .qn-info.qn-both {
   width: min(1100px, 100%);

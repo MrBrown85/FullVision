@@ -83,9 +83,10 @@ describe('most specific wins', () => {
     expect(d.text).toBe('');
   });
 
-  it('leaves the exclude list empty on the screen until approvals store their sentence ids', () => {
+  it('fills the exclude list on the screen from last report’s approved record (PR 12)', () => {
     const src = readFileSync('teacher/report-questionnaire.js', 'utf-8');
-    expect(src).toMatch(/exclude: \[\],/);
+    expect(src).not.toMatch(/exclude: \[\],/);
+    expect(src.match(/exclude: lastTermIds\(_activeCourse, st\.id, termId\),/g)).toHaveLength(3);
   });
 });
 

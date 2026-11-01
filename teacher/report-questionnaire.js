@@ -269,6 +269,12 @@ window.ReportQuestionnaire = (function () {
     if (el && el.value.replace(/\s+$/, '') !== plainComment(rating.narrative || '').replace(/\s+$/, '')) {
       data.narrative = el.value.replace(/\s+$/, '');
     }
+    // What the comment was built from, kept with the approval (plan PR 12).
+    data.draftMeta = metaFor(
+      st,
+      'narrative' in data ? data.narrative : plainComment(rating.narrative || ''),
+      data.approvedAt,
+    );
     clearTimeout(_saveTimer);
     upsertTermRating(_activeCourse, st.id, termId, data);
     tqNarrativeDirty = false;
@@ -320,6 +326,216 @@ window.ReportQuestionnaire = (function () {
     if (el && box) box.hidden = !!el.value.trim();
   }
 
+  /* ── Marks changed after approval (plan PR 12) ───────────── */
+
+  /* With each approval the comment's record is kept (term_rating.draft_meta,
+     CommentBank.draftMeta). When a mark it states has changed since, or a
+     class sentence it used was edited, the Teacher Comment card shows the
+     approved sentence struck through and the sentence that is true now,
+     with Keep as Approved or Use the New Sentence, and the roster shows an
+     orange dot in place of the ✓. The app never changes approved text by
+     itself. A rating with no record (approved before the record was kept,
+     or a server without the column) is never flagged. */
+  var _staleCache = {};
+  function staleFor(cid, student, termId) {
+    termId = termId || getTermId();
+    var r = getStudentTermRating(cid, student.id, termId) || {};
+    var meta = r.draftMeta;
+    if (!meta || !Array.isArray(meta.sentences) || !meta.sentences.length) return null;
+    var text = plainComment(r.narrative || '');
+    var key = cid + '|' + student.id + '|' + termId;
+    var sig = JSON.stringify(meta) + '\u0000' + text;
+    var hit = _staleCache[key];
+    if (hit && hit.sig === sig) return hit.v;
+    var cur = _current();
+    var f =
+      cid === _activeCourse && termId === getTermId() && cur && cur.id === student.id
+        ? _facts(student)
+        : CommentBank.facts(cid, student, termId);
+    var v = CommentBank.staleness(meta, f, _picksFor(cid, student, f, termId), { text: text });
+    _staleCache[key] = { sig: sig, v: v };
+    return v;
+  }
+  /* An approved comment that no longer matches: the orange dot. */
+  function _flagged(sid) {
+    var st = (getStudents(_activeCourse) || []).find(function (s) {
+      return String(s.id) === String(sid);
+    });
+    return !!st && !!staleFor(_activeCourse, st);
+  }
+
+  /* The record kept with an approval: the rows on screen as the box has
+     them now. */
+  function metaFor(st, text, at) {
+    var f = _facts(st, true);
+    var key = _rowKey(st);
+    var rows = _rowsFor(st, f);
+    if (text != null) {
+      rows = alignRows(rows, text);
+      _rows[key] = rows;
+    }
+    var prev = (getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).draftMeta || null;
+    return CommentBank.draftMeta(rows, f, { approvedAt: at, prev: prev });
+  }
+
+  /* Last report's approved sentences, for draft()'s exclude: the bank
+     sentences in the record of the latest earlier report that was approved
+     (none when that report has no record). */
+  function lastTermIds(cid, sid, termId) {
+    var n = Number(String(termId).replace(/\D/g, ''));
+    var mine = (getTermRatings(cid) || {})[sid] || {};
+    var best = null;
+    var bestN = 0;
+    Object.keys(mine).forEach(function (k) {
+      if (!/^term-\d+$/.test(k)) return;
+      var m = Number(k.replace(/\D/g, ''));
+      var r = mine[k];
+      if (!(m < n) || m <= bestN || !r || !r.approvedAt) return;
+      best = r;
+      bestN = m;
+    });
+    return best && best.draftMeta ? CommentBank.approvedIds(best.draftMeta) : [];
+  }
+
+  /* "Oct 28" */
+  function _shortDay(iso) {
+    var d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  var CLASS_SENTENCE_NAMES = {
+    closing: 'the closing sentence',
+    support: 'the support line',
+    late_work: 'the late-work line',
+  };
+  function _cap(t) {
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+  }
+  function _sentenceCount(n) {
+    return n === 1 ? 'one sentence no longer matches' : CommentBank.numberWords(n) + ' sentences no longer match';
+  }
+  /* What changed, as the card's note says it: the pieces marked since the
+     approval (the States mockup's "“…” was marked …, so one sentence no
+     longer matches the gradebook."), and any class sentence edited since.
+     The day a mark was entered is not kept, so the note says "after" the
+     approval's day. */
+  function staleNote(stale, day) {
+    var out = [];
+    var marks = stale.changes.filter(function (c) {
+      return c.kind === 'marks';
+    }).length;
+    if (marks) {
+      var p = stale.pieces || [];
+      var q = p.map(function (t) {
+        return CommentRealiser.quoteTitle(t) || '“' + t + '”';
+      });
+      var who =
+        p.length === 1
+          ? q[0] + ' was marked'
+          : p.length === 2
+            ? q[0] + ' and ' + q[1] + ' were marked'
+            : p.length > 2
+              ? _cap(CommentBank.numberWords(p.length)) + ' assignments were marked'
+              : 'Marks changed';
+      out.push(who + ' after ' + day + ', so ' + _sentenceCount(marks) + ' the gradebook.');
+    }
+    var cls = stale.changes.filter(function (c) {
+      return c.kind === 'class';
+    });
+    if (cls.length) {
+      var names = CommentBank.list(
+        cls.map(function (c) {
+          return CLASS_SENTENCE_NAMES[c.key] || 'a class sentence';
+        }),
+      );
+      out.push(_cap(names) + ' changed after ' + day + ', so ' + _sentenceCount(cls.length) + ' your class settings.');
+    }
+    out.push('Approved text is never changed for you.');
+    return out.join(' ');
+  }
+
+  function _staleHtml(cid, student, rating, stale) {
+    var meta = rating.draftMeta || {};
+    var day = _shortDay(rating.approvedAt || meta.approved_at);
+    var marks = stale.changes.some(function (c) {
+      return c.kind === 'marks';
+    });
+    var grade = '';
+    if (marks && stale.hasGrade) {
+      grade =
+        'The grade is now ' +
+        headerGrade(cid, student.id, _facts(student), getTermId()).big +
+        '.' +
+        (stale.gradeChanged ? '' : ' The grade sentence still holds.');
+    }
+    var boxes = stale.changes
+      .map(function (c, k) {
+        var now = c.after
+          ? `<span class="qn-stale-now">${esc(c.after)}</span>`
+          : '<span class="qn-stale-none">Leave this sentence out.</span>';
+        return `<div class="qn-stale-change">
+          <div class="qn-stale-line"><span class="qn-stale-label">Approved</span><span class="qn-stale-was">${esc(c.before)}</span></div>
+          <div class="qn-stale-line"><span class="qn-stale-label">Now true</span>${now}</div>
+          <div class="qn-stale-foot"><span class="qn-stale-grade">${k === 0 ? esc(grade) : ''}</span><button type="button" class="qn-stale-keep" data-action="tqStale" data-do="keep" data-i="${k}" title="Keeps the approved sentence as it is. The comment stays approved.">Keep as Approved</button><button type="button" class="qn-stale-use" data-action="tqStale" data-do="use" data-i="${k}" title="Puts the sentence that is true now in the comment. The comment then needs your approval again.">Use the New Sentence</button></div>
+        </div>`;
+      })
+      .join('');
+    return `<div class="qn-stale" id="tq-stale">
+        <div class="qn-stale-note">${esc(staleNote(stale, day))}</div>
+        ${boxes}
+        ${rating.approvedAt ? '<span class="qn-stale-hint">Using the new sentence clears the approval until you approve again. In the roster, flagged students show an orange dot instead of a ✓.</span>' : ''}
+      </div>`;
+  }
+
+  /* Keep as Approved or Use the New Sentence on change i of the student on
+     screen. Only the teacher's click changes the comment: Use the New
+     Sentence puts the new sentence in place of the approved one, which
+     clears the approval (upsertTermRating does). */
+  function tqStale(what, i) {
+    var st = _current();
+    if (!st) return;
+    tqSaveCurrentIfNeeded();
+    var termId = getTermId();
+    var r = getStudentTermRating(_activeCourse, st.id, termId) || {};
+    var stale = staleFor(_activeCourse, st, termId);
+    var c = stale && stale.changes[Number(i)];
+    if (!c) return;
+    if (what === 'keep') {
+      upsertTermRating(_activeCourse, st.id, termId, {
+        draftMeta: CommentBank.keepApproved(r.draftMeta, c, stale, _facts(st, true)),
+      });
+    } else if (what === 'use') {
+      var text = plainComment(r.narrative || '');
+      var next = _swapSentence(text, c.before, c.after);
+      if (next === text) return;
+      var key = _rowKey(st);
+      var f = _facts(st, true);
+      var rows = _rowsFor(st, f).slice();
+      var at = rows.findIndex(function (x) {
+        return x.text === c.before;
+      });
+      if (at >= 0) {
+        var step = rows[at].step || (r.draftMeta.sentences[c.i] || {}).step || null;
+        if (!c.after) rows.splice(at, 1);
+        else if (c.kind === 'class') rows[at] = _classRow(step, c.after);
+        else {
+          var s = c.id ? _bankById(c.id) : null;
+          var row = s ? rowFromSentence(s, _bankContext(_activeCourse, st, f), step, at === 0) : null;
+          rows[at] = row || Object.assign({}, rows[at], { edited: false });
+          rows[at].text = rows[at].drafted = c.after;
+        }
+        _rows[key] = rows;
+      } else {
+        _rows[key] = alignRows(rows, next);
+      }
+      upsertTermRating(_activeCourse, st.id, termId, { narrative: next });
+      _syncLast(key, _rows[key], next);
+    } else return;
+    rerender();
+    var b = document.querySelector('#tq-stale button') || _box();
+    if (b) b.focus();
+  }
+
   /* ── The roster (the app's sidebar) ───────────────────────── */
 
   /* The sidebar's annotator (ui.js setSidebarAnnotator): under each name
@@ -336,9 +552,14 @@ window.ReportQuestionnaire = (function () {
     var cur = _current();
     var annotate = function (sid) {
       var ok = _approved(sid);
+      var flag = ok && _flagged(sid);
       return {
         sub: ok ? '' : 'Needs Approval',
-        mark: ok ? '<span class="student-row-mark ok" aria-label="Ready">✓</span>' : '',
+        mark: flag
+          ? '<span class="student-row-mark flag" role="img" aria-label="Approved, Something Changed" title="Approved, but a sentence no longer matches the gradebook or your class settings. Open the student to see what changed.">●</span>'
+          : ok
+            ? '<span class="student-row-mark ok" aria-label="Ready">✓</span>'
+            : '',
         hidden: _notReadyOnly && ok && !(cur && cur.id === sid),
       };
     };
@@ -517,7 +738,7 @@ window.ReportQuestionnaire = (function () {
     if (!last || !el || String(el.dataset.sid) !== String(st.id) || _approved(st.id)) return;
     var d = CommentBank.redrawHabits(_bankContext(_activeCourse, st, _facts(st)), last, {
       comments: _classmateComments(_activeCourse, st.id, termId),
-      exclude: [],
+      exclude: lastTermIds(_activeCourse, st.id, termId),
     });
     if (!d) return;
     var text = el.value;
@@ -1106,12 +1327,14 @@ window.ReportQuestionnaire = (function () {
     if (link) link.focus();
   }
 
+  /* The teacher's picks a draft is built with: the habit ratings and the
+     focus. */
+  function _picksFor(cid, student, f, termId) {
+    var rating = getStudentTermRating(cid, student.id, termId || getTermId()) || {};
+    return { habits: rating.habits || {}, focus: rating.focusSectionId || f.focusId };
+  }
   function _bankContext(cid, student, f) {
-    var rating = getStudentTermRating(cid, student.id, getTermId()) || {};
-    return CommentBank.context(f, {
-      habits: rating.habits || {},
-      focus: rating.focusSectionId || f.focusId,
-    });
+    return CommentBank.context(f, _picksFor(cid, student, f));
   }
 
   /* Generate Comment: a draft from the bank, filled in for the student, in
@@ -1156,9 +1379,8 @@ window.ReportQuestionnaire = (function () {
       comments: _classmateComments(_activeCourse, st.id, termId),
       // Each press gives another version: never the text already in the box.
       previous: el.value,
-      // Last term's approved sentences are left out once each approval
-      // stores its sentence ids (draft_meta); none are stored yet.
-      exclude: [],
+      // Last term's approved sentences are left out (its draft_meta).
+      exclude: lastTermIds(_activeCourse, st.id, termId),
       kept: kept,
       order: order,
     });
@@ -1231,12 +1453,15 @@ window.ReportQuestionnaire = (function () {
           })
           .join('')}</div>`;
     }
+    var stale = thisTab ? staleFor(cid, student) : null;
     return `<div class="qn-comment" id="tq-comment-card">
         <div class="qn-comment-top">
           <span class="qn-comment-title">Teacher Comment</span>
+          ${stale && rating.approvedAt ? `<span class="qn-approved-chip">Approved ${esc(_shortDay(rating.approvedAt))}</span>` : ''}
           ${tabs}
           ${thisTab ? '<button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="Writes the comment from the gradebook, your ratings and Student Voice. Press again for another version. Sentences you edited and your order stay.">Generate Comment</button>' : ''}
         </div>
+        ${stale ? _staleHtml(cid, student, rating, stale) : ''}
         ${thisTab ? _basisHtml(cid, student, _facts(student)) : ''}
         ${thisTab ? '<div id="tq-warn-wrap">' + _warnHtml(cid, student, text) + '</div>' : ''}
         ${body}
@@ -2013,14 +2238,79 @@ window.ReportQuestionnaire = (function () {
     return out;
   }
 
+  /* A class line's row: the support line, the closing sentence or the
+     late-work line, as typed. */
+  function _classRow(step, t) {
+    var def = _stepDef(step);
+    return {
+      id: 'class:' + step,
+      step: step,
+      text: t,
+      drafted: t,
+      edited: false,
+      raw: { id: 'class:' + step, part: def.part, step: step, text: t, classLine: true },
+      prov: {
+        sentenceId: 'class:' + step,
+        part: def.part,
+        claims: [],
+        factKeys: ['class.' + step],
+        values: {},
+        classLine: true,
+      },
+      s: null,
+      classLine: true,
+    };
+  }
+
+  /* A row for a sentence of an approved comment, from its record
+     (draft_meta's sentences): the bank sentence it was, with the values it
+     was filled with, Edited as it was; a class line; or the teacher's own. */
+  function _rowFromMeta(x, t, i, ctx) {
+    var s = _bankById(x.id);
+    if (s && !x.class_line) {
+      var r = rowFromSentence(s, ctx, x.step || null, i === 0);
+      r.text = t;
+      r.edited = !!x.edited;
+      if (!r.edited) r.drafted = t;
+      if (x.kept) r.kept = true;
+      if (x.values) r.prov = Object.assign({}, r.prov, { values: x.values, sources: x.sources || r.prov.sources });
+      return r;
+    }
+    if (x.class_line && x.step && _stepDef(x.step) && _stepDef(x.step).line && !x.edited) return _classRow(x.step, t);
+    return {
+      id: 'text:' + i,
+      step: null,
+      text: t,
+      drafted: null,
+      edited: true,
+      raw: null,
+      prov: null,
+      s: null,
+      classLine: false,
+    };
+  }
+
   /* The rows for a comment with no draft in memory (the page reloaded, or
-     a comment typed by hand): each sentence matched to the bank sentence
-     that fills to it, else to one whose pattern it holds, else to a class
-     line; the rest are the teacher's own. */
-  function recoverRows(text, ctx) {
+     a comment typed by hand): each sentence matched to the sentence of the
+     approved comment's record that it is (meta, draft_meta), exactly; else
+     to the bank sentence that fills to it, else to one whose pattern it
+     holds, else to a class line; the rest are the teacher's own. */
+  function recoverRows(text, ctx, meta) {
     var ss = sentencesOf(text);
     var used = {};
+    var mine = (meta && Array.isArray(meta.sentences) ? meta.sentences : []).map(function (x) {
+      return x && x.id != null ? x : null;
+    });
     var rows = ss.map(function (t, i) {
+      var at = mine.findIndex(function (x) {
+        return x && String(x.text) === t;
+      });
+      if (at >= 0) {
+        var x = mine[at];
+        mine[at] = null;
+        used[x.id] = true;
+        return _rowFromMeta(x, t, i, ctx);
+      }
       var exact = COMMENT_BANK.sentences.find(function (s) {
         return (
           !used[s.id] &&
@@ -2054,27 +2344,7 @@ window.ReportQuestionnaire = (function () {
         var def = _stepDef(k);
         return String(ctx[def.line] || '').trim() === t;
       });
-      if (line) {
-        var def = _stepDef(line);
-        return {
-          id: 'class:' + line,
-          step: line,
-          text: t,
-          drafted: t,
-          edited: false,
-          raw: { id: 'class:' + line, part: def.part, step: line, text: t, classLine: true },
-          prov: {
-            sentenceId: 'class:' + line,
-            part: def.part,
-            claims: [],
-            factKeys: ['class.' + line],
-            values: {},
-            classLine: true,
-          },
-          s: null,
-          classLine: true,
-        };
-      }
+      if (line) return _classRow(line, t);
       return {
         id: 'text:' + r.i,
         step: null,
@@ -2094,11 +2364,10 @@ window.ReportQuestionnaire = (function () {
   function _rowsFor(student, f) {
     var key = _rowKey(student);
     if (_rows[key]) return _rows[key];
-    var text = plainComment(
-      (getStudentTermRating(_activeCourse, student.id, getTermId()) || {}).narrative || '',
-    ).trim();
+    var rating = getStudentTermRating(_activeCourse, student.id, getTermId()) || {};
+    var text = plainComment(rating.narrative || '').trim();
     if (!text) return [];
-    _rows[key] = recoverRows(text, _bankContext(_activeCourse, student, f));
+    _rows[key] = recoverRows(text, _bankContext(_activeCourse, student, f), rating.draftMeta);
     return _rows[key];
   }
 
@@ -3431,7 +3700,7 @@ window.ReportQuestionnaire = (function () {
     var d = CommentBank.draft(_bankContext(_activeCourse, st, _facts(st)), {
       seed: _lastSeed[key] || CommentBank.seedFor(st.id + '|' + termId) + (_generated[st.id] || 1),
       comments: _classmateComments(_activeCourse, st.id, termId),
-      exclude: [],
+      exclude: lastTermIds(_activeCourse, st.id, termId),
       kept: kept,
       order: _ordered[key]
         ? rows
@@ -3684,6 +3953,7 @@ window.ReportQuestionnaire = (function () {
     var f = _facts(student, true);
     // Marks may have changed since the page was last drawn.
     _strength = null;
+    _staleCache = {};
     var comment = plainComment((getStudentTermRating(cid, student.id, getTermId()) || {}).narrative || '');
     return `<div class="qn" data-sid="${student.id}">
       <div class="qn-left">
@@ -3810,6 +4080,11 @@ window.ReportQuestionnaire = (function () {
     tqLine: tqLine,
     tqLineChange: tqLineChange,
     tqSentences: tqSentences,
+    tqStale: tqStale,
+    staleFor: staleFor,
+    staleNote: staleNote,
+    metaFor: metaFor,
+    lastTermIds: lastTermIds,
     browseOpen: browseOpen,
     PARTS: PARTS,
     partOf: partOf,
