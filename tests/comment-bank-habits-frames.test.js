@@ -148,7 +148,7 @@ describe('Not Handed In frames', () => {
       expect(t).toMatch(/\bFifteen\b|\b15\b/);
       expect(t).toMatch(/six Current Events assignments/);
     });
-    expect(got.m17).toMatch(/^Fifteen assignments/);
+    expect(got.m17).toMatch(/^This term, 15 assignments/);
     expect(got.m20).toMatch(/the 15 assignments/);
   });
 
@@ -177,8 +177,8 @@ describe('Not Handed In frames', () => {
 describe('Attendance frames', () => {
   const att = (absent, late) => facts({ absent, late });
 
-  it('absences only: h60 (its late half left out) and h61-h66, the classes missed, singular for one', () => {
-    const got = expectReachable(att(3, 0), 'attendance', ['h60'].concat(ids(61, 66, 'h')));
+  it('absences only: h60 (its late half left out) and h62-h66, the classes missed, singular for one', () => {
+    const got = expectReachable(att(3, 0), 'attendance', ['h60'].concat(ids(62, 66, 'h')));
     Object.values(got).forEach(t => {
       expect(t).toMatch(/three classes/);
       expect(t).not.toMatch(/late/);
@@ -187,8 +187,8 @@ describe('Attendance frames', () => {
     Object.values(oneClass).forEach(t => expect(t).toMatch(/one class\b/));
   });
 
-  it('lates only: h60 (its absent half left out) and h67-h72, once, twice, then times', () => {
-    const got = expectReachable(att(0, 2), 'attendance', ['h60'].concat(ids(67, 72, 'h')));
+  it('lates only: h60 (its absent half left out) and h68-h72, once, twice, then times', () => {
+    const got = expectReachable(att(0, 2), 'attendance', ['h60'].concat(ids(68, 72, 'h')));
     Object.values(got).forEach(t => {
       expect(t).toMatch(/\btwice\b/);
       expect(t).not.toMatch(/missed|away|absent/);
@@ -197,8 +197,8 @@ describe('Attendance frames', () => {
     Object.values(picks(att(null, 12), 'attendance')).forEach(t => expect(t).toMatch(/\b12 times\b/));
   });
 
-  it('both counts: h60, h73-h78, both halves said and the exact counts', () => {
-    const got = expectReachable(att(4, 1), 'attendance', ['h60'].concat(ids(73, 78, 'h')));
+  it('both counts: h60, h74-h78, both halves said and the exact counts', () => {
+    const got = expectReachable(att(4, 1), 'attendance', ['h60'].concat(ids(74, 78, 'h')));
     Object.values(got).forEach(t => {
       expect(t).toMatch(/four classes/);
       expect(t).toMatch(/\bonce\b/);
@@ -224,8 +224,8 @@ describe('Attendance frames', () => {
 describe('Work Habits frames', () => {
   const hab = habits => facts({ habits });
 
-  it('excellent: hs01, hs02, hs17-hs21, never a habit name', () => {
-    const got = expectReachable(hab(all(4)), 'habits', ['hs01', 'hs02'].concat(ids(17, 21, 'hs')));
+  it('excellent: hs01, hs02, hs17, hs18, hs20, hs21, never a habit name', () => {
+    const got = expectReachable(hab(all(4)), 'habits', ['hs01', 'hs02', 'hs17', 'hs18', 'hs20', 'hs21']);
     Object.values(got).forEach(t => expect(t).not.toMatch(/Usually|to build|class time|feedback/));
   });
 
@@ -268,6 +268,31 @@ describe('Work Habits frames', () => {
     expectVerifies(hab(all(4)), 'habits', hab({ ...all(4), part: 3 }));
     expectVerifies(hab({ ...all(4), feedback: 2 }), 'habits', hab({ ...all(4), feedback: 3 }));
   });
+
+  it('"all six" and "every one" frames need every habit rated (habitsAllSeen): a Not Seen habit leaves hs01/hs02 (hs03/hs04) only', () => {
+    const notSeen = hab({ ...all(4), devices: 5 });
+    expect(ctxOf(notSeen).habitsExcellent).toBe('yes');
+    expect(ctxOf(notSeen).habitsAllSeen).toBe('');
+    expect(Object.keys(picks(notSeen, 'habits')).sort()).toEqual(['hs01', 'hs02']);
+    const goodNotSeen = hab({ ...all(3), part: 4, others: 5 });
+    expect(Object.keys(picks(goodNotSeen, 'habits')).sort()).toEqual(['hs03', 'hs04']);
+    // Drafted with all six rated, a frame fails verify() once one is Not Seen.
+    const ctx = ctxOf(hab(all(4)));
+    let found = 0;
+    for (let seed = 1; seed <= 40; seed++) {
+      const d = CommentBank.draft(ctx, { seed });
+      const s = d.sentences.find(x => x.step === 'habits');
+      if (!/^hs(17|18|20|21)$/.test(s.id)) continue;
+      found++;
+      expect(CommentBank.verify(d, hab(all(4)), {}).replaced).toEqual([]);
+      const v = CommentBank.verify(d, notSeen, {});
+      expect(
+        v.replaced.map(r => r.sentenceId),
+        s.id,
+      ).toContain(s.id);
+    }
+    expect(found).toBeGreaterThan(0);
+  });
 });
 
 describe('Strong Habits frames (the IE comment)', () => {
@@ -288,15 +313,16 @@ describe('Strong Habits frames (the IE comment)', () => {
     expect(got.hs15).toBe('Among his strengths, he comes to class ready, works well with others and takes part.');
   });
 
-  it('the phrase agrees with singular they, and the name repeats with no pronouns on file', () => {
+  it('the phrase agrees with singular they, and is they/them with no pronouns on file', () => {
     const they = { ...ie({ ...all(2), ready: 4 }), pronouns: THEY };
     expect(ctxOf(they).strongHabits).toBe('come to class ready');
-    const named = { ...they, pronounsOnFile: false };
-    expect(ctxOf(named).strongHabits).toBe('comes to class ready');
+    // No pronouns on file: they/them (#596), through the realiser.
+    const named = { ...ie({ ...all(2), ready: 4 }), pronouns: THEY, pronounsOnFile: false };
+    expect(ctxOf(named).strongHabits).toBe('come to class ready');
     const d = CommentBank.draft(ctxOf(named), { seed: 2 });
     const s = d.sentences.find(x => x.step === 'strongHabits');
-    expect(s.text).toMatch(/Gabriel comes to class ready\.$/);
-    expect(s.text).not.toMatch(/\bthey\b/i);
+    expect(s.text).toMatch(/\bthey come to class ready\.$/i);
+    expect(s.text).not.toMatch(/Gabriel|\bhe\b/);
   });
 
   it('all six Consistently is hs12, and the frames fail verify() once a strong habit drops', () => {
@@ -313,7 +339,7 @@ describe('the frames and the lint', () => {
     const mine = COMMENT_BANK.sentences.filter(s =>
       /^(hs(1[3-9]|[23]\d)|h(6[1-9]|7\d)|m(0[2-9]|1\d|2[01]))$/.test(s.id),
     );
-    expect(mine).toHaveLength(61);
+    expect(mine).toHaveLength(57);
     mine.forEach(s => {
       expect(s.part, s.id).toBe('habits');
       expect(['Work Habits', 'Strong Habits', 'Attendance', 'Not Handed In'], s.id).toContain(s.group);
@@ -331,18 +357,39 @@ describe('the frames and the lint', () => {
     });
   });
 
-  it('no two frames in a group start with the same three words', () => {
-    const groups = {};
-    COMMENT_BANK.sentences
-      .filter(s => s.part === 'habits')
-      .forEach(s => {
-        const key = s.group + '|' + (s.needs || []).join(',');
-        const start = CommentLint.plain(s.text).split(/\s+/).slice(0, 3).join(' ').toLowerCase();
-        groups[key] = groups[key] || {};
-        // hs01/hs02 and hs03/hs04 (plan PR 7) share a start; no new frame does.
-        if (/^(hs(1[3-9]|[23]\d)|h(6[1-9]|7\d)|m(0[2-9]|1\d|2[01]))$/.test(s.id))
-          expect(groups[key][start], s.id + ' starts like ' + groups[key][start]).toBeUndefined();
-        groups[key][start] = s.id;
-      });
+  it('no two frames of a case open with the same three words, as rendered (slot-built h60, m01 and hs11 included)', () => {
+    const ie = { ...facts().grade, basis: 'ie', ieAllowed: true, marked: { mine: 3, all: 8 } };
+    const cases = [
+      facts({ habits: all(4) }),
+      facts({ habits: { ...all(3), part: 4 } }),
+      facts({ habits: { ...all(4), feedback: 2 } }),
+      facts({ habits: { ...all(4), ready: 2, devices: 1 } }),
+      facts({ habits: { completes: 2, ready: 4, others: 4, part: 4, feedback: 2, devices: 3 }, grade: ie }),
+      facts({ absent: 3, late: 0 }),
+      facts({ absent: 0, late: 2 }),
+      facts({ absent: 4, late: 1 }),
+      facts({ notHandedIn: { count: 1, titles: ['Map Quiz'], groups: [] } }),
+      facts({ notHandedIn: { count: 2, titles: ['Map Quiz', 'Poster'], groups: [] } }),
+      facts({ notHandedIn: { count: 4, titles: ['Map Quiz', 'Poster', 'Lab: Heat', 'Essay'], groups: [] } }),
+      facts({
+        notHandedIn: { count: 15, titles: ['Current Events: Week 1'], groups: [{ name: 'Current Events', count: 6 }] },
+      }),
+    ];
+    // hs01/hs02 and hs03/hs04 (plan PR 7) share a start; no other pair does.
+    const allowed = ['hs01|hs02', 'hs03|hs04'];
+    cases.forEach(f => {
+      const ctx = ctxOf(f);
+      const seen = {};
+      COMMENT_BANK.sentences
+        .filter(s => s.part === 'habits' && CommentBank.fits(s, ctx))
+        .forEach(s => {
+          const start = CommentBank.fill(s, ctx).toLowerCase().split(/\s+/).slice(0, 3).join(' ');
+          const key = s.group + '|' + start;
+          const other = seen[key];
+          if (other && allowed.indexOf(other + '|' + s.id) < 0)
+            expect.fail(s.id + ' opens like ' + other + ': ' + CommentBank.fill(s, ctx));
+          seen[key] = s.id;
+        });
+    });
   });
 });

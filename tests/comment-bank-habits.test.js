@@ -117,7 +117,7 @@ describe('the habits sentence in a draft', () => {
     }
     // No pronouns on file: they/them (Colin, Nov 1), in whichever frame.
     const named = habitsSentence(facts({ habits: all(4), pronounsOnFile: false, pronouns: THEY }));
-    expect(named[0].text).toMatch(/(their|they)/i);
+    expect(named[0].text).toMatch(/\b(their|they)\b/i);
     expect(named[0].text).not.toMatch(/Gabriel/);
   });
 

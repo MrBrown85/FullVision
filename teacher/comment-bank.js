@@ -969,8 +969,10 @@ window.CommentBank = (function () {
   function strongHabitsPhrase(f, ks) {
     var toks = strongHabitsTokens(f, ks);
     if (!toks) return '';
-    var p = f.pronouns || { subj: 'they' };
-    return toks[0].verb[f.pronounsOnFile && p.subj === 'they' ? 1 : 0];
+    // Rendered by the realiser after the student as subject, so its
+    // pronoun rule (they/them with none on file) and verb agreement
+    // decide the form; the subject is then dropped.
+    return R.render([{ ref: 'subj' }, ' ', toks[0]], _whoOfFacts(f), { named: true }).replace(/^\S+\s+/, '');
   }
   /* Who a comment is about, for the realiser: { name, p, onFile }. */
   function _whoOfFacts(f) {
@@ -2050,6 +2052,7 @@ window.CommentBank = (function () {
       aboutWork: focusKeys.concat(keys('work', [aboutId])),
       habitsExcellent: habitKeys(hsum.seen),
       habitsGood: habitKeys(hsum.seen),
+      habitsAllSeen: habitKeys(hsum.seen),
       habitToBuild: habitKeys(hsum.build),
       habitsToBuild: habitKeys(hsum.build),
       habitStrengths: habitKeys(strongThree),
@@ -2206,6 +2209,9 @@ window.CommentBank = (function () {
       aboutWork: aboutWork,
       habitsExcellent: hsum.excellent ? 'yes' : '',
       habitsGood: hsum.good ? 'yes' : '',
+      // All six habits carry a rating (none Not Seen): the frames that say
+      // "all six" or "every one" need it (review of #595).
+      habitsAllSeen: hsum.seen.length === HABITS.length ? 'yes' : '',
       habitToBuild: buildWords.length === 1 ? buildWords[0] : '',
       habitsToBuild: buildWords.length === 2 ? list(buildWords) : '',
       habitStrengths: hsum.excellent ? '' : strengthsSentence(f, strongThree),
@@ -4120,6 +4126,7 @@ window.CommentBank = (function () {
       };
       if (_has(pv, 'habitsExcellent')) checks.push(sum.excellent);
       if (_has(pv, 'habitsGood')) checks.push(sum.good);
+      if (_has(pv, 'habitsAllSeen')) checks.push(sum.seen.length === HABITS.length);
       if (_has(pv, 'habitToBuild')) checks.push(sum.build.length === 1 && named('habitToBuild', [1, 2], sum.build));
       if (_has(pv, 'habitsToBuild')) checks.push(sum.build.length === 2 && named('habitsToBuild', [1, 2], sum.build));
       if (_has(pv, 'habitStrengths'))

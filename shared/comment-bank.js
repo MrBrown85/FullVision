@@ -103,8 +103,13 @@
    habit names still come only through the summary's slots. hs06 and hs09
    were reworded so no frame's fixed words sit inside another's (the usage
    pattern counted them as one); hs16 and hs22 were cut (they opened like
-   hs01 and hs03). Every sentence was checked against the acceptability
-   checklist (Ministry, families, students, teachers).
+   hs01 and hs03). The review of #595 (Nov 1): the "all six / every one"
+   frames need habitsAllSeen (no habit Not Seen) so they are literally
+   true; hs19, h61, h67 and h73 were cut (two ideas, or h60's own
+   wording); m06, m11, m12, m15, m17, m21, hs28, hs35, hs36, h66 and h77
+   were reworded for structure or plainness. Every sentence was checked
+   against the acceptability checklist (Ministry, families, students,
+   teachers).
 
    Cut from tqAutoNarrative, and why:
      572-577: Superlatives and teacher-centred praise ('outstanding', 'makes teaching rewarding', 'can't say enough good things').
@@ -294,13 +299,15 @@ var COMMENT_BANK = {
       claims: ['habits'],
       src: 'new',
     },
-    // hs16 and hs22 were cut before the PR: they opened like hs01 and hs03.
+    // hs16, hs19 and hs22 were cut: they opened like hs01 and hs03, or
+    // carried two ideas.
     {
       id: 'hs17',
       part: 'habits',
       group: 'Work Habits',
+      // Only when all six habits carry a rating (none Not Seen).
       text: 'Every one of {his} work habits is rated Consistently this term.',
-      needs: ['habitsExcellent'],
+      needs: ['habitsExcellent', 'habitsAllSeen'],
       claims: ['habits'],
       src: 'new',
     },
@@ -308,17 +315,9 @@ var COMMENT_BANK = {
       id: 'hs18',
       part: 'habits',
       group: 'Work Habits',
+      // Only when all six habits carry a rating (none Not Seen).
       text: 'In work habits, {he} [is|are] rated Consistently in every one.',
-      needs: ['habitsExcellent'],
-      claims: ['habits'],
-      src: 'new',
-    },
-    {
-      id: 'hs19',
-      part: 'habits',
-      group: 'Work Habits',
-      text: 'This term, every work habit is rated Consistently, and {his} work habits are excellent overall.',
-      needs: ['habitsExcellent'],
+      needs: ['habitsExcellent', 'habitsAllSeen'],
       claims: ['habits'],
       src: 'new',
     },
@@ -326,8 +325,9 @@ var COMMENT_BANK = {
       id: 'hs20',
       part: 'habits',
       group: 'Work Habits',
+      // Only when all six habits carry a rating (none Not Seen).
       text: 'Across all six, {his} work habits are excellent, each rated Consistently.',
-      needs: ['habitsExcellent'],
+      needs: ['habitsExcellent', 'habitsAllSeen'],
       claims: ['habits'],
       src: 'new',
     },
@@ -335,8 +335,9 @@ var COMMENT_BANK = {
       id: 'hs21',
       part: 'habits',
       group: 'Work Habits',
+      // Only when all six habits carry a rating (none Not Seen).
       text: '{He} [is|are] rated Consistently on all six work habits.',
-      needs: ['habitsExcellent'],
+      needs: ['habitsExcellent', 'habitsAllSeen'],
       claims: ['habits'],
       src: 'new',
     },
@@ -345,7 +346,7 @@ var COMMENT_BANK = {
       part: 'habits',
       group: 'Work Habits',
       text: 'Each of {his} work habits is rated Usually or Consistently this term.',
-      needs: ['habitsGood'],
+      needs: ['habitsGood', 'habitsAllSeen'],
       claims: ['habits'],
       src: 'new',
     },
@@ -354,7 +355,7 @@ var COMMENT_BANK = {
       part: 'habits',
       group: 'Work Habits',
       text: 'This term, {he} [is|are] rated Usually or Consistently in every work habit.',
-      needs: ['habitsGood'],
+      needs: ['habitsGood', 'habitsAllSeen'],
       claims: ['habits'],
       src: 'new',
     },
@@ -363,7 +364,7 @@ var COMMENT_BANK = {
       part: 'habits',
       group: 'Work Habits',
       text: '{He} [has|have] good work habits, with every one rated Usually or Consistently.',
-      needs: ['habitsGood'],
+      needs: ['habitsGood', 'habitsAllSeen'],
       claims: ['habits'],
       src: 'new',
     },
@@ -372,7 +373,7 @@ var COMMENT_BANK = {
       part: 'habits',
       group: 'Work Habits',
       text: 'Across all six, {his} work habits are good, each rated Usually or Consistently.',
-      needs: ['habitsGood'],
+      needs: ['habitsGood', 'habitsAllSeen'],
       claims: ['habits'],
       src: 'new',
     },
@@ -381,7 +382,7 @@ var COMMENT_BANK = {
       part: 'habits',
       group: 'Work Habits',
       text: 'All six of {his} work habits are rated Usually or Consistently.',
-      needs: ['habitsGood'],
+      needs: ['habitsGood', 'habitsAllSeen'],
       claims: ['habits'],
       src: 'new',
     },
@@ -389,7 +390,7 @@ var COMMENT_BANK = {
       id: 'hs28',
       part: 'habits',
       group: 'Work Habits',
-      text: 'The one work habit to build this term is {habitToBuild}.',
+      text: 'For this term, the one habit to build is {habitToBuild}.',
       needs: ['habitToBuild'],
       claims: ['habits'],
       src: 'new',
@@ -452,7 +453,7 @@ var COMMENT_BANK = {
       id: 'hs35',
       part: 'habits',
       group: 'Work Habits',
-      text: '{His} next steps in work habits are {habitsToBuild}.',
+      text: 'Two habits for {him} to build next: {habitsToBuild}.',
       needs: ['habitsToBuild'],
       claims: ['habits'],
       src: 'new',
@@ -461,7 +462,7 @@ var COMMENT_BANK = {
       id: 'hs36',
       part: 'habits',
       group: 'Work Habits',
-      text: '{His} two work habits to build are {habitsToBuild}.',
+      text: '{He} can build two work habits next: {habitsToBuild}.',
       needs: ['habitsToBuild'],
       claims: ['habits'],
       src: 'new',
@@ -478,15 +479,6 @@ var COMMENT_BANK = {
     // Attendance frames (2026-11-01): the exact counts as slots
     // ({absentClasses} "three classes", {lateTimes} "once"); absences-only
     // and lates-only frames need the other count to be empty or zero.
-    {
-      id: 'h61',
-      part: 'habits',
-      group: 'Attendance',
-      text: '{He} [has|have] missed {absentClasses} this term.',
-      needs: ['absentClasses', 'absentOnly'],
-      claims: ['attendance'],
-      src: 'new',
-    },
     {
       id: 'h62',
       part: 'habits',
@@ -527,17 +519,8 @@ var COMMENT_BANK = {
       id: 'h66',
       part: 'habits',
       group: 'Attendance',
-      text: 'Of the classes so far this term, {he} [has|have] missed {absentClasses}.',
+      text: 'So far this term, {he} [has|have] missed {absentClasses}.',
       needs: ['absentClasses', 'absentOnly'],
-      claims: ['attendance'],
-      src: 'new',
-    },
-    {
-      id: 'h67',
-      part: 'habits',
-      group: 'Attendance',
-      text: '{He} [has|have] been late {lateTimes} this term.',
-      needs: ['lateTimes', 'lateOnly'],
       claims: ['attendance'],
       src: 'new',
     },
@@ -587,15 +570,6 @@ var COMMENT_BANK = {
       src: 'new',
     },
     {
-      id: 'h73',
-      part: 'habits',
-      group: 'Attendance',
-      text: 'This term, {he} [has|have] missed {absentClasses} and been late {lateTimes}.',
-      needs: ['absentClasses', 'lateTimes'],
-      claims: ['attendance'],
-      src: 'new',
-    },
-    {
       id: 'h74',
       part: 'habits',
       group: 'Attendance',
@@ -626,7 +600,7 @@ var COMMENT_BANK = {
       id: 'h77',
       part: 'habits',
       group: 'Attendance',
-      text: 'The attendance record shows {absentClasses} missed and {lateTimes} late this term.',
+      text: 'The attendance record shows {absentClasses} missed this term, with {him} late {lateTimes}.',
       needs: ['absentClasses', 'lateTimes'],
       claims: ['attendance'],
       src: 'new',
@@ -3526,7 +3500,7 @@ var COMMENT_BANK = {
       id: 'm06',
       part: 'habits',
       group: 'Not Handed In',
-      text: 'One assignment is not handed in this term: {missingTitle}.',
+      text: 'This term, one assignment is not handed in: {missingTitle}.',
       needs: ['missingTitle'],
       claims: ['notHandedIn'],
       src: 'new',
@@ -3571,7 +3545,7 @@ var COMMENT_BANK = {
       id: 'm11',
       part: 'habits',
       group: 'Not Handed In',
-      text: 'Two assignments are not handed in this term: {missingTitles}.',
+      text: 'This term, two assignments are not handed in: {missingTitles}.',
       needs: ['missingTitles'],
       claims: ['notHandedIn'],
       src: 'new',
@@ -3580,7 +3554,7 @@ var COMMENT_BANK = {
       id: 'm12',
       part: 'habits',
       group: 'Not Handed In',
-      text: '{missingCount} assignments are not handed in this term.',
+      text: 'This term, {missingCount} assignments are not handed in.',
       needs: ['missingCount', 'missingMany'],
       claims: ['notHandedIn'],
       src: 'new',
@@ -3607,7 +3581,7 @@ var COMMENT_BANK = {
       id: 'm15',
       part: 'habits',
       group: 'Not Handed In',
-      text: 'So far this term, {missingCount} assignments are not handed in.',
+      text: 'The work not handed in this term comes to {missingCount} assignments.',
       needs: ['missingCount', 'missingMany'],
       claims: ['notHandedIn'],
       src: 'new',
@@ -3625,7 +3599,7 @@ var COMMENT_BANK = {
       id: 'm17',
       part: 'habits',
       group: 'Not Handed In',
-      text: '{missingCount} assignments are not handed in this term, including {missingGroup}.',
+      text: 'This term, {missingCount} assignments are not handed in, including {missingGroup}.',
       needs: ['missingCount', 'missingGroup'],
       claims: ['notHandedIn'],
       src: 'new',
@@ -3661,7 +3635,7 @@ var COMMENT_BANK = {
       id: 'm21',
       part: 'habits',
       group: 'Not Handed In',
-      text: 'So far this term, {missingCount} assignments are not handed in, including {missingGroup}.',
+      text: 'The {missingCount} assignments not handed in this term include {missingGroup}.',
       needs: ['missingCount', 'missingGroup'],
       claims: ['notHandedIn'],
       src: 'new',

@@ -60,6 +60,7 @@ function fullContext(p, habits) {
     whose: p.poss,
     habitsExcellent: 'yes',
     habitsGood: 'yes',
+    habitsAllSeen: 'yes',
     habitToBuild: 'taking part in class',
     habitsToBuild: 'using feedback and taking part in class',
     habitStrengths: 'Noor comes to class ready.',
@@ -80,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 633 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(633);
+  it('has 629 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(629);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(633);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(629);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -198,6 +199,7 @@ describe('the bank', () => {
       nextSkill: 'nextStep',
       habitsExcellent: 'habits',
       habitsGood: 'habits',
+      habitsAllSeen: 'habits',
       habitToBuild: 'habits',
       habitsToBuild: 'habits',
       habitStrengths: 'habits',
@@ -625,11 +627,11 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
-    expect(habits.fit).toBe(4 + 7);
+    expect(habits.fit).toBe(4 + 6);
     // The attendance frames for both counts (plan, Sentence grammar: both
-    // halves said, the exact counts): h60 and the six both-count frames.
+    // halves said, the exact counts): h60 and the five both-count frames.
     const att = habits.rows.filter(r => r.group === 'Attendance');
-    expect(att).toHaveLength(7);
+    expect(att).toHaveLength(6);
     expect(att.map(r => r.text)).toContain('She has missed four classes and been late twice this term.');
     att.forEach(r => {
       expect(r.text).toMatch(/four classes/);

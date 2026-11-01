@@ -89,7 +89,7 @@ describe('simulate', () => {
       c.nearIdentical.forEach(pairs => pairs.forEach(p => expect(p.shared).toBeGreaterThanOrEqual(5)));
       c.thin.forEach(t => expect(t.students).toBeGreaterThanOrEqual(3 * t.sentences));
     });
-    // The habits part is no longer thin: seven "excellent" frames serve the
+    // The habits part is no longer thin: six "excellent" frames serve the
     // students rated all Consistently (2026-11-01).
     r.classes.forEach(c => expect(c.thin.map(t => t.step)).not.toContain('habits'));
     expect(r.classes.some(c => c.thin.length > 0)).toBe(true);
