@@ -405,6 +405,62 @@ window.CommentLint = (function () {
     return out;
   }
 
+  /* ── The Note for the Report (plan PR 7) ──────────────────────────── */
+
+  /* The best-piece sentence reads "…, where {he} {note}.", so a note is
+     used only when it starts with a past-tense verb: a word ending in -ed,
+     or one of these irregular past forms. The grader's card
+     (teacher/page-assignments.js) and the comment engine
+     (teacher/comment-bank.js) share this one check. */
+  var PAST_FORMS = [
+    'wrote',
+    'made',
+    'built',
+    'drew',
+    'showed',
+    'gave',
+    'took',
+    'chose',
+    'found',
+    'kept',
+    'led',
+    'read',
+    'said',
+    'put',
+    'set',
+    'used',
+    'began',
+    'brought',
+    'came',
+    'did',
+    'got',
+    'had',
+    'held',
+    'knew',
+    'left',
+    'met',
+    'ran',
+    'saw',
+    'sent',
+    'spoke',
+    'stood',
+    'taught',
+    'thought',
+    'told',
+    'understood',
+    'went',
+    'won',
+  ];
+  function startsPastTense(note) {
+    var m = String(note || '')
+      .trim()
+      .toLowerCase()
+      .match(/^[a-z’'-]+/);
+    if (!m) return false;
+    var w = m[0].replace(/[’'-]+$/, '');
+    return /ed$/.test(w) || PAST_FORMS.indexOf(w) >= 0;
+  }
+
   return {
     PHRASAL: PHRASAL,
     IDIOMS: IDIOMS,
@@ -415,5 +471,7 @@ window.CommentLint = (function () {
     plain: plain,
     words: words,
     findings: findings,
+    PAST_FORMS: PAST_FORMS,
+    startsPastTense: startsPastTense,
   };
 })();

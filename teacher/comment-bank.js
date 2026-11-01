@@ -782,12 +782,18 @@ window.CommentBank = (function () {
 
   /* The teacher's Note for the Report as the sentence uses it: one line,
      its first letter lower case when it starts a plain word ("Linked" →
-     "linked"), no closing period (the sentence adds its own). */
+     "linked"), no closing period (the sentence adds its own). A note that
+     does not start with a past-tense verb (CommentLint.startsPastTense:
+     "clear graphs and a careful method") is left out, so the sentence
+     takes its no-note form; the grader's card says why. */
   function reportNoteText(note) {
     var t = String(note || '')
       .replace(/\s+/g, ' ')
       .trim()
       .replace(/[.\s]+$/, '');
+    if (!t) return '';
+    var lint = window.CommentLint;
+    if (lint && lint.startsPastTense && !lint.startsPastTense(t)) return '';
     if (/^[A-Z][a-z]/.test(t)) t = t.charAt(0).toLowerCase() + t.slice(1);
     return t;
   }
@@ -3116,10 +3122,15 @@ window.CommentBank = (function () {
      story puts it, and one that no longer fits is left out. Returns the
      draft's shape plus habits: { before, after }, the old and new habits
      sentences ('' for none); null without a draft. opts: { comments,
-     exclude, bank } as for draft(). */
+     exclude, bank } as for draft(), and steps: the steps drawn again
+     (the habits sentence's by default; ATTENDANCE_STEPS after the
+     Attendance card changes, which draws the attendance sentence again
+     the same way). */
   var HABIT_STEPS = { habits: true, strongHabits: true };
+  var ATTENDANCE_STEPS = { attendance: true };
   function redrawHabits(ctx, prev, opts) {
     opts = opts || {};
+    var steps = opts.steps || HABIT_STEPS;
     var old = (prev && prev.sentences) || [];
     if (!prev || !old.length) return null;
     var kept = {};
@@ -3127,7 +3138,7 @@ window.CommentBank = (function () {
     old.forEach(function (x) {
       if (!x.step) return;
       order.push(x.step);
-      if (!HABIT_STEPS[x.step]) kept[x.step] = x.text;
+      if (!steps[x.step]) kept[x.step] = x.text;
     });
     var f = ctx._f || null;
     var told = f && _told[f.cid] ? _told[f.cid][f.sid] : undefined;
@@ -3145,11 +3156,11 @@ window.CommentBank = (function () {
     var keptBefore = 0;
     d.sentences.forEach(function (x, i) {
       if (nu) return;
-      if (HABIT_STEPS[x.step]) nu = { s: x, p: d.provenance[i] };
+      if (steps[x.step]) nu = { s: x, p: d.provenance[i] };
       else if (x.kept) keptBefore++;
     });
     var was = old.find(function (x) {
-      return HABIT_STEPS[x.step];
+      return steps[x.step];
     });
     var sentences = [];
     var prov = [];
@@ -3161,7 +3172,7 @@ window.CommentBank = (function () {
       nu.placed = true;
     };
     old.forEach(function (x, i) {
-      if (HABIT_STEPS[x.step]) return put();
+      if (steps[x.step]) return put();
       if (nu && !nu.placed && !was && count === keptBefore) put();
       sentences.push(x);
       prov.push((prev.provenance || [])[i]);
@@ -4364,6 +4375,7 @@ window.CommentBank = (function () {
     forFamily: forFamily,
     draft: draft,
     redrawHabits: redrawHabits,
+    ATTENDANCE_STEPS: ATTENDANCE_STEPS,
     specificity: specificity,
     classUsage: classUsage,
     nearIdentical: nearIdentical,

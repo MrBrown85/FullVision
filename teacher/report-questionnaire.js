@@ -255,9 +255,21 @@ window.ReportQuestionnaire = (function () {
     });
   }
 
+  /* The next student not yet approved, after this one and round to the
+     top; -1 once every comment is approved. */
+  function _nextUnapproved() {
+    var students = getTqStudents();
+    for (var k = 1; k <= students.length; k++) {
+      var i = (tqStudentIndex + k) % students.length;
+      if (!_approved(students[i].id)) return i;
+    }
+    return -1;
+  }
+
   /* Approve and Next: saves the comment as approved and opens the next
-     student (⌘ Return too). On the last student it hands over to the
-     parent, as Save and Next did. */
+     student not yet approved, round to the top (⌘ Return too). Once every
+     comment is approved it stays on this student, drawn as approved, and
+     "Suggested for Your Bank" opens when there is anything to offer. */
   function tqApproveNext() {
     var st = _current();
     var el = _box();
@@ -287,7 +299,9 @@ window.ReportQuestionnaire = (function () {
     tqNarrativeDirty = false;
     _noteForBank(st, true);
     _syncStatus();
-    tqNextStudent();
+    var next = _nextUnapproved();
+    if (next >= 0) _goTo(next);
+    else rerender();
     _offerBank(true);
   }
 
@@ -825,8 +839,11 @@ window.ReportQuestionnaire = (function () {
      ratings (plan PR 7), when Generate wrote this comment and the teacher
      has not edited that sentence or approved the comment. The rest of the
      comment stays as it is. A comment with no habits sentence gets one only
-     while it is exactly as Generate wrote it. */
-  function _redrawHabits(st) {
+     while it is exactly as Generate wrote it. The Sentences card redraws
+     so its rows follow the comment (a row added, changed or taken out).
+     steps: the attendance sentence instead (CommentBank.ATTENDANCE_STEPS),
+     after the Attendance card changes. */
+  function _redrawHabits(st, steps) {
     var termId = getTermId();
     var key = _activeCourse + '|' + st.id + '|' + termId;
     var last = _lastDraft[key];
@@ -835,6 +852,7 @@ window.ReportQuestionnaire = (function () {
     var d = CommentBank.redrawHabits(_bankContext(_activeCourse, st, _facts(st)), last, {
       comments: _classmateComments(_activeCourse, st.id, termId),
       exclude: lastTermIds(_activeCourse, st.id, termId),
+      steps: steps,
     });
     if (!d) return;
     var text = el.value;
@@ -846,15 +864,17 @@ window.ReportQuestionnaire = (function () {
     else return;
     _lastDraft[key] = d;
     _adoptDraft(key, d);
-    if (next === text) {
-      _alignNow();
-      return;
+    if (next !== text) {
+      el.value = next;
+      tqNarrativeDirty = true;
+      tqSaveNarrative();
+      _syncNote();
     }
-    el.value = next;
-    tqNarrativeDirty = true;
-    tqSaveNarrative();
-    _syncNote();
+    // The rows are the draft's now, so _alignNow sees no change of its
+    // own: the card and the marks are redrawn here.
     _alignNow();
+    _syncMarks();
+    _syncRequired();
   }
 
   /* One sentence of the comment in place of another; with none, the old one
@@ -1113,7 +1133,12 @@ window.ReportQuestionnaire = (function () {
     abs.classList.toggle('warn', att.absences != null && att.prevAbsences != null && att.absences < att.prevAbsences);
     late.classList.toggle('warn', att.lates != null && att.prevLates != null && att.lates < att.prevLates);
     var st = _current();
-    if (st) _facts(st, true);
+    if (!st) return;
+    _facts(st, true);
+    // The comment's attendance sentence follows the totals, as the habits
+    // sentence follows a rating: added once a total is entered, taken out
+    // once both are cleared (the States mockup's "Attendance entered").
+    _redrawHabits(st, CommentBank.ATTENDANCE_STEPS);
   }
 
   /* ── The class's report form ───────────────────────────── */

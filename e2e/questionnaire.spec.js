@@ -782,3 +782,76 @@ test.describe('the Sentences card', () => {
     expect(await overflow(page)).toEqual([]);
   });
 });
+
+/* The Sentences card follows the comment without another Generate Comment
+   (plan PR 11a: a rating redraws only the habits sentence; the States
+   mockup's "Attendance entered" board shows the Attendance row). */
+test('a rating adds the Habits row and attendance adds and removes its row, without Generate', async ({ page }) => {
+  await open(page);
+  const rowByLabel = label =>
+    page.locator('#tq-sentences .qn-srow', { has: page.locator('.qn-req-label:text-is("' + label + '")') });
+  await page.locator('#tq-generate').click();
+  await expect(rowByLabel('Habits')).toHaveCount(0);
+  for (const k of ['completes', 'ready', 'others', 'part', 'feedback', 'devices']) {
+    await page.locator(`[data-action="tqRate"][data-habit="${k}"][data-value="4"]`).click();
+  }
+  await expect(page.locator('#tq-narrative')).toHaveValue(/work habits are excellent/);
+  await expect(rowByLabel('Habits')).toHaveCount(1);
+  await expect(rowByLabel('Habits').locator('.qn-req-text')).toHaveText(/work habits are excellent/);
+
+  await page.locator('#tq-att-absences').fill('3');
+  await page.locator('#tq-att-absences').press('Tab');
+  await page.locator('#tq-att-lates').fill('1');
+  await page.locator('#tq-att-lates').press('Tab');
+  await expect(page.locator('#tq-att-note')).toHaveText('Added to the comment.');
+  await expect(page.locator('#tq-narrative')).toHaveValue(/missed three classes and been late once this term\./);
+  await expect(rowByLabel('Attendance')).toHaveCount(1);
+  await expect(rowByLabel('Attendance').locator('.qn-req-text')).toHaveText(
+    /missed three classes and been late once this term\./,
+  );
+  await expect(rowByLabel('Attendance').locator('.qn-req-source')).toHaveText('From Attendance above · new');
+
+  // Cleared: the sentence and its row go.
+  await page.locator('#tq-att-absences').fill('');
+  await page.locator('#tq-att-absences').press('Tab');
+  await page.locator('#tq-att-lates').fill('');
+  await page.locator('#tq-att-lates').press('Tab');
+  await expect(page.locator('#tq-att-note')).toHaveText('Optional. Left out until entered.');
+  await expect(page.locator('#tq-narrative')).not.toHaveValue(/missed three classes/);
+  await expect(rowByLabel('Attendance')).toHaveCount(0);
+  await expect(rowByLabel('Habits')).toHaveCount(1);
+});
+
+/* Approve and Next opens the next student not yet approved, round to the
+   top; it never jumps to Progress Reports. */
+test('Approve and Next on the last student goes round to the next unapproved one; all approved, it stays', async ({
+  page,
+}) => {
+  await open(page);
+  const ids = await page.evaluate(() => ReportQuestionnaire.getTqStudents().map(s => s.id));
+  const last = ids[ids.length - 1];
+  // Everyone approved but Noor and the last student in the roster.
+  await page.evaluate(
+    ({ ids, keep }) => {
+      ids.forEach(id => {
+        if (!keep.includes(id)) upsertTermRating('sci8', id, 'term-2', { approvedAt: new Date().toISOString() });
+      });
+    },
+    { ids, keep: ['st2', last] },
+  );
+  await page.locator(`#gb-sidebar .student-row[data-sid="${last}"]`).click();
+  await expect(page.locator('#tq-ready')).toHaveText(`${ids.length - 2} of ${ids.length} Ready`);
+  await page.evaluate(() => ['missing', 'low'].forEach(id => ReportQuestionnaire.tqSetCheck(id, true)));
+  await page.locator('#tq-approve-next').click();
+  await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
+  await expect(page.locator('.report-seg-btn[data-tab="questionnaire"]')).toHaveClass(/active/);
+  await expect(page.locator('#tq-ready')).toHaveText(`${ids.length - 1} of ${ids.length} Ready`);
+
+  // The last one: every comment approved, so the screen stays on Noor.
+  await page.evaluate(() => ['missing', 'low'].forEach(id => ReportQuestionnaire.tqSetCheck(id, true)));
+  await page.keyboard.press('Meta+Enter');
+  await expect(page.locator('#tq-ready')).toHaveText(`${ids.length} of ${ids.length} Ready`);
+  await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
+  await expect(page.locator('.report-seg-btn[data-tab="questionnaire"]')).toHaveClass(/active/);
+  await expect(page.locator('#gb-sidebar .student-row[data-sid="st2"] .student-row-mark')).toHaveText('✓');
+});
