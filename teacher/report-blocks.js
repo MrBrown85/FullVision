@@ -50,10 +50,21 @@ window.ReportBlocks = (function () {
   }
 
   /* ── Pronoun helpers ─────────────────────────────────────── */
+  /* The pronouns a sentence about this student uses. A stored value counts
+     only when it parses as a set: he/him, she/her, they/them, or a custom
+     subject/object[/possessive] (ze/zir/zir). "prefer not to say", "not
+     set", empty, or anything else means no pronouns on file, and the
+     student reads as they/them/their with plural verbs (Colin, Nov 1,
+     #596). onFile says whether a set parsed. */
   function getPronouns(student) {
-    const p = (student.pronouns || 'they/them').toLowerCase().split('/');
-    const subj = p[0] || 'they';
-    const obj = p[1] || 'them';
+    const raw = String((student && student.pronouns) || '')
+      .trim()
+      .toLowerCase();
+    const parts = raw ? raw.split('/').map(x => x.trim()) : [];
+    const word = x => /^[a-z]{2,}$/.test(x || '');
+    const ok = parts.length >= 2 && parts.length <= 3 && parts.every(word) && parts[0] !== parts[1];
+    const subj = ok ? parts[0] : 'they';
+    const obj = ok ? parts[1] : 'them';
     let poss, refl, verb;
     if (subj === 'she') {
       poss = 'her';
@@ -63,12 +74,16 @@ window.ReportBlocks = (function () {
       poss = 'his';
       refl = 'himself';
       verb = 's';
-    } else {
+    } else if (subj === 'they') {
       poss = 'their';
       refl = 'themselves';
       verb = '';
+    } else {
+      poss = parts[2] || obj;
+      refl = obj + 'self';
+      verb = 's';
     }
-    return { subj, obj, poss, refl, verb, capSubj: subj[0].toUpperCase() + subj.slice(1) };
+    return { subj, obj, poss, refl, verb, capSubj: subj[0].toUpperCase() + subj.slice(1), onFile: ok };
   }
 
   /* ●●●○ for level 3: the level as a shape, so a photocopy still reads it
