@@ -91,7 +91,7 @@ Supersedes D3. Easton Su (History 12) was Proficient-ish everywhere and sat at 6
 Context: `STUDENT-VOICE-PLAN.md`.
 
 1. **Two forms:** a core competency reflection from the grade-by-period templates (three prompts plus the nine-dimension rating) and an optional curricular self-assessment from the course's I-can statements. Neither over ten minutes.
-2. **Codes:** one single-use code per student per questionnaire, expiring at the close date, stored hashed. Since 2026-11-01 the code alone opens only "who are you?": the student gives their birthday or student number, or, with neither on file, a four-digit password printed on the same slip (`student.slip_password`). Colin chose the slip over a separate card: it stops code guessing, not someone holding the slip. `migrations/20261101_questionnaire_identity_check.sql`.
+2. **Codes:** one single-use code per student per questionnaire, expiring at the close date, stored hashed. Since 2026-11-01 the code alone opens only "who are you?": the student gives their birthday or student number, or, with neither on file, a four-digit password printed on the same slip (`student.slip_password`). Colin chose the slip over a separate card: it stops code guessing, not someone holding the slip. `migrations/20261101_questionnaire_identity_check.sql`. A password printed before a roster import added a birthday or number still works; five wrong tries in all lock a slip (`20261101_questionnaire_slip_fixes.sql`).
 3. **Previous answers** are shown only for the three repeated questions.
 4. **Repeated questions:** "What am I good at as a learner?" · "What is hard for me right now?" · "What do I want to get better at, and how?" (September, January, June).
 5. **English first;** translations stored as data on each question.

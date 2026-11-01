@@ -364,6 +364,32 @@ describe('student page: who are you? (a questionnaire slip)', () => {
     expect(root.textContent).toContain('This slip is locked after too many wrong tries.');
   });
 
+  it('a password printed before a birthday or number was added is offered in the same box', async () => {
+    replies.push(Object.assign({}, CHECK, { also_password: true }));
+    T.start(root, '#K7M4QX');
+    await tick();
+    expect(root.textContent).toContain('or the password on your slip');
+    expect(root.querySelector('label[for="sp-ident"]').textContent).toBe('Student Number or Password');
+    type('#sp-ident', '4821');
+    replies.push({ ok: true, parts: PARTS, context: {} });
+    click('[data-act="start"]');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(calls[1].body).toMatchObject({ route: 'verify', student_number: '4821', password: '4821', birthday: null });
+  });
+
+  it('without one, the box asks for the student number only', async () => {
+    replies.push(CHECK);
+    T.start(root, '#K7M4QX');
+    await tick();
+    expect(root.textContent).not.toContain('password');
+    type('#sp-ident', '0123456');
+    replies.push({ ok: false, error: 'slip_locked' });
+    click('[data-act="start"]');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(calls[1].body.password).toBeNull();
+    expect(root.textContent).toContain('Ask your teacher for a new slip.');
+  });
+
   it('a slip printed before passwords says to ask for a new one', async () => {
     replies.push({ ok: false, error: 'reprint' });
     T.start(root, '#K7M4QX');
