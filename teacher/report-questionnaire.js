@@ -158,14 +158,16 @@ window.ReportQuestionnaire = (function () {
     el.style.height = el.scrollHeight + 'px';
   }
 
-  function _plural(n, one, many) {
-    return n + ' ' + (n === 1 ? one : many);
+  /* "1 character", "2 characters"; `count` when n is the number written
+     out ("1,000"). */
+  function _plural(n, one, many, count) {
+    return n + ' ' + (Number(count == null ? n : count) === 1 ? one : many);
   }
   function _countText(text) {
     var n = String(text || '').length;
     var lim = _limit();
     // Over the limit: "1,032 of 1,000 characters" (the States mockup).
-    if (lim && n > lim) return _thousands(n) + ' of ' + _thousands(lim) + ' characters';
+    if (lim && n > lim) return _thousands(n) + ' of ' + _plural(_thousands(lim), 'character', 'characters', lim);
     return _plural(n, 'character', 'characters');
   }
   function _thousands(n) {
@@ -222,17 +224,43 @@ window.ReportQuestionnaire = (function () {
     var course = _courseName(cid);
     var pop = _limitOpen
       ? `<div class="qn-limit" role="dialog" aria-label="Character limit" id="tq-limit">
-          <label class="qn-limit-field">Character limit for ${esc(course)}<input type="number" min="1" step="1" inputmode="numeric" placeholder="No limit" aria-label="Character limit" data-tq-limit="1" id="tq-limit-input" title="Leave it empty for no limit." value="${_limit() || ''}"></label>
+          <label class="qn-limit-field">Character limit for ${esc(course)}<input type="text" inputmode="numeric" autocomplete="off" placeholder="No limit" aria-label="Character limit" aria-describedby="tq-limit-msg" data-tq-limit="1" id="tq-limit-input" title="Leave it empty for no limit." value="${_limit() || ''}"></label>
+          <span class="qn-limit-msg" id="tq-limit-msg" role="alert" hidden></span>
           <span class="qn-limit-hint">The longest comment your school’s report card allows. Approve stays off past it.</span>
         </div>`
       : '';
     return `<span class="qn-count-wrap"><button type="button" class="qn-count-btn${_countFlag(text) ? ' over' : ''}" id="tq-count-btn" data-action="tqLine" data-do="limitMenu" aria-haspopup="dialog" aria-expanded="${_limitOpen}" title="The comment’s length. Click to set the longest comment ${esc(course)} allows."><span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span><span id="tq-limit-text">${esc(_countTail(text))}</span> ▾</button>${pop}</span>`;
   }
-  /* A limit typed: saved for the class (empty: no limit). */
+  /* A limit typed: saved for the class when it is a whole number from 100
+     to 5000, or empty for no limit (CommentBank.parseLimit). Anything else
+     is not saved: the limit stays as it was, the box stays open and says
+     what it takes. Returns whether it was saved. */
+  var LIMIT_MSG =
+    'Enter a whole number from ' +
+    CommentBank.LIMIT_MIN +
+    ' to ' +
+    CommentBank.LIMIT_MAX +
+    ', or leave it empty for no limit.';
   function _setLimit(value) {
-    var n = Math.floor(Number(value));
-    _saveSettings({ charLimit: value !== '' && n > 0 ? n : null });
+    var p = CommentBank.parseLimit(value);
+    _limitMsg(!p.ok);
+    if (!p.ok) return false;
+    _saveSettings({ charLimit: p.limit });
     _syncCount();
+    return true;
+  }
+  /* The limit's message under its box, shown or hidden. */
+  function _limitMsg(on) {
+    var msg = document.getElementById('tq-limit-msg');
+    var input = document.getElementById('tq-limit-input');
+    if (msg) {
+      msg.textContent = on ? LIMIT_MSG : '';
+      msg.hidden = !on;
+    }
+    if (input) {
+      if (on) input.setAttribute('aria-invalid', 'true');
+      else input.removeAttribute('aria-invalid');
+    }
   }
 
   /* Copy: the comment as plain text, ready to paste (⌘⇧C too). */
@@ -1337,19 +1365,38 @@ window.ReportQuestionnaire = (function () {
     return `<div class="qn-info-row"><span class="qn-info-part">${esc(part)}</span><span class="qn-info-from">${esc(from)}</span>${_whoChip(who)}</div>`;
   }
 
+  /* Where the Work Habits come from for the student on screen: "Your six
+     ratings" only once the teacher has rated all six; else how many so
+     far, and Completes Work from the record while it is unrated. */
+  function _habitsInfo(cid, st) {
+    if (!st) return SCREEN_SOURCES[1][1];
+    var f = _facts(st);
+    var n = Object.keys(_ratedByYou(cid, st, f)).length;
+    if (n === CommentBank.HABITS.length) return SCREEN_SOURCES[1][1];
+    var so = n ? CommentBank.numberWords(n) + ' of six so far' : 'none yet';
+    var record = !!_habitsOf(cid, st, f).completes && !_ratedByYou(cid, st, f).completes;
+    return (
+      'Rated by you, Rarely to Consistently: ' +
+      so +
+      '.' +
+      (record ? ' Until you rate it, Completes Work comes from the assignment record.' : '')
+    );
+  }
+
   var INFO_ID = 'tq-info-overlay';
   function _infoHtml(cid) {
     var form = _form(cid);
     var on = ReportSheets.onForm(form);
     var course = (typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name) || '';
     var report = _reportLabel(getTermId());
-    var screen = SCREEN_SOURCES.map(function (r) {
-      return _sourceRow(r[0], r[1], r[2]);
+    var habitsFrom = _habitsInfo(cid, _current());
+    var screen = SCREEN_SOURCES.map(function (r, i) {
+      return _sourceRow(r[0], i === 1 ? habitsFrom : r[1], r[2]);
     }).join('');
     var blocks = on
       .map(function (id) {
         var s = _blockSource(cid, id);
-        return _sourceRow(_blockLabel(id), s[0], s[1]);
+        return _sourceRow(_blockLabel(id), id === 'learner-dimensions' ? habitsFrom : s[0], s[1]);
       })
       .join('');
     var off = Object.keys(ReportSheets.BLOCKS)
@@ -1390,6 +1437,29 @@ window.ReportQuestionnaire = (function () {
     document.body.appendChild(overlay);
     var done = overlay.querySelector('[data-action="tqCloseInfo"]');
     if (done) done.focus();
+  }
+  /* Tab from the sheet's last control goes to its first, Shift-Tab from
+     its first to its last; focus outside the sheet comes back to it. */
+  function _trapTab(e, sheet) {
+    var items = Array.prototype.slice
+      .call(sheet.querySelectorAll('button:not([disabled]), a[href], input, select, textarea, [tabindex="0"]'))
+      .filter(function (x) {
+        return !x.hidden;
+      });
+    if (!items.length) return;
+    var first = items[0];
+    var last = items[items.length - 1];
+    var at = document.activeElement;
+    if (!sheet.contains(at)) {
+      e.preventDefault();
+      (e.shiftKey ? last : first).focus();
+    } else if (e.shiftKey && at === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && at === last) {
+      e.preventDefault();
+      first.focus();
+    }
   }
   function tqCloseInfo() {
     var o = document.getElementById(INFO_ID);
@@ -1621,6 +1691,10 @@ window.ReportQuestionnaire = (function () {
       exclude: lastTermIds(_activeCourse, st.id, termId),
       kept: kept,
       order: order,
+      // Within the class's character limit, the teacher's typed sentences
+      // (kept by keepTyped) counted in.
+      charLimit: _limit(),
+      reserve: _typedLength(rows),
     });
     if (!d.text) return;
     _lastDraft[key] = d;
@@ -2117,7 +2191,8 @@ window.ReportQuestionnaire = (function () {
               : ' Tick “I checked this” on the highlighted sentence' + (ticks.length > 1 ? 's' : '') + ' first.'
             : '';
     if (_claimsBlocked) tail += ' ' + CLAIMS_LINE[_claimsBlocked];
-    if (blocked.indexOf('limit') >= 0) tail += ' Shorten the comment to ' + _limit() + ' characters first.';
+    if (blocked.indexOf('limit') >= 0)
+      tail += ' Shorten the comment to ' + _plural(_limit(), 'character', 'characters') + ' first.';
     var long = blocked.indexOf('long') >= 0 ? longSentences(_boxText(st)).length : 0;
     if (long) tail += ' Shorten the sentence' + (long > 1 ? 's' : '') + ' over 20 words first.';
     btn.disabled = blocked.length > 0;
@@ -2699,6 +2774,13 @@ window.ReportQuestionnaire = (function () {
     var rows = keepTyped(old, rowsFromDraft(d, old));
     _rows[key] = rows;
     return rows;
+  }
+  /* The characters the teacher's typed rows add to a draft (keepTyped puts
+     them back), each with the space before it. */
+  function _typedLength(rows) {
+    return (rows || []).filter(isTyped).reduce(function (n, r) {
+      return n + String(r.text || '').length + 1;
+    }, 0);
   }
   /* A row for a sentence the teacher typed. */
   function typedRow(text, n) {
@@ -3775,16 +3857,61 @@ window.ReportQuestionnaire = (function () {
       f.record,
     );
   }
+  /* The habits the teacher rated for the student this report (Not Seen
+     included), as { key: true }; Completes Work from the record is not
+     one of them (CommentBank.effectiveHabits). */
+  function _ratedByYou(cid, student, f) {
+    var stored = (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits || {};
+    var out = {};
+    CommentBank.HABITS.forEach(function (h) {
+      var v = Number(stored[h.key]);
+      if (v >= 1 && v <= CommentBank.NOT_SEEN) out[h.key] = true;
+    });
+    return out;
+  }
+  /* "From the record: Completes Work, Sometimes": a habit the teacher has
+     not rated, read from the assignment record. */
+  function _fromRecord(k, habits) {
+    return 'From the record: ' + _habitName(k) + ', ' + CommentBank.SCALE[habits[k] - 1];
+  }
+  /* The habits sentence's source line: what the teacher rated ("Collaborates
+     rated Sometimes", "All six rated Consistently") and, apart, what came
+     from the record, never one called the other. */
   function _habitsSource(cid, student, f) {
     var habits = _habitsOf(cid, student, f);
     var h = CommentBank.habitSummary(habits);
+    var mine = _ratedByYou(cid, student, f);
     var rated = function (k) {
-      return _habitName(k) + ' rated ' + CommentBank.SCALE[habits[k] - 1];
+      return mine[k] ? _habitName(k) + ' rated ' + CommentBank.SCALE[habits[k] - 1] : _fromRecord(k, habits);
     };
-    if (h.excellent) return 'All ' + CommentBank.numberWords(h.seen.length) + ' rated Consistently';
-    if (h.good) return 'All ' + CommentBank.numberWords(h.seen.length) + ' rated Usually or Consistently';
+    var yours = function (ks) {
+      return ks.filter(function (k) {
+        return mine[k];
+      });
+    };
+    var record = function (ks) {
+      return ks
+        .filter(function (k) {
+          return !mine[k];
+        })
+        .map(function (k) {
+          return _fromRecord(k, habits);
+        });
+    };
+    if (h.excellent || h.good) {
+      var how = h.excellent ? ' rated Consistently' : ' rated Usually or Consistently';
+      var n = yours(h.seen).length;
+      var from = record(h.seen);
+      if (!from.length) return 'All ' + CommentBank.numberWords(n) + how;
+      return [n ? _cap(CommentBank.numberWords(n)) + how : ''].concat(from).filter(Boolean).join(' · ');
+    }
     if (h.build.length) return h.build.map(rated).join(' · ');
-    if (h.strong.length) return h.strong.map(_habitName).join(', ') + ' rated Consistently';
+    if (h.strong.length) {
+      var strong = yours(h.strong);
+      return (strong.length ? [strong.map(_habitName).join(', ') + ' rated Consistently'] : [])
+        .concat(record(h.strong))
+        .join(' · ');
+    }
     return 'From your Work Habits ratings';
   }
 
@@ -3813,8 +3940,12 @@ window.ReportQuestionnaire = (function () {
       return w ? w.title + ' · ' + f.levelText(w.v) : '';
     }
     if ((m = k.match(/^habit:(.+)$/))) {
-      var v = _habitsOf(cid, student, f)[m[1]];
-      return v ? _habitName(m[1]) + ' rated ' + CommentBank.SCALE[v - 1] : '';
+      var hs = _habitsOf(cid, student, f);
+      var v = hs[m[1]];
+      if (!v) return '';
+      return _ratedByYou(cid, student, f)[m[1]]
+        ? _habitName(m[1]) + ' rated ' + CommentBank.SCALE[v - 1]
+        : _fromRecord(m[1], hs);
     }
     if (/^confidence:/.test(k)) return first + '’s self-assessment';
     if (k === 'voice.goal') return 'From ' + first + '’s goal check-in';
@@ -6222,6 +6353,8 @@ window.ReportQuestionnaire = (function () {
             })
             .filter(Boolean)
         : undefined,
+      charLimit: _limit(),
+      reserve: _typedLength(rows),
     });
     if (!d.text) return;
     _lastDraft[key] = d;
@@ -6476,10 +6609,12 @@ window.ReportQuestionnaire = (function () {
       redraw = true;
     }
     if (_limitOpen && !target.closest('#tq-limit, #tq-count-btn')) {
+      // An entry that is not a limit keeps the box open with its message.
       var input = document.getElementById('tq-limit-input');
-      if (input) _setLimit(input.value);
-      _limitOpen = false;
-      redraw = true;
+      if (!input || _setLimit(input.value)) {
+        _limitOpen = false;
+        redraw = true;
+      }
     }
     if (_wording && !target.closest('#tq-wording-menu, #tq-options-menu, [data-do="wording"], [data-do="options"]')) {
       _wording = null;
@@ -6527,13 +6662,10 @@ window.ReportQuestionnaire = (function () {
       );
       return true;
     }
+    // Escape in the limit cancels: the limit stays as saved.
     var limit = _limitOpen;
     var menu = _supportMenu || _langMenu;
     var langWas = _langMenu;
-    if (limit) {
-      var input = document.getElementById('tq-limit-input');
-      if (input) _setLimit(input.value);
-    }
     var was = _lineEdit;
     _supportMenu = false;
     _langMenu = false;
@@ -6555,10 +6687,11 @@ window.ReportQuestionnaire = (function () {
     );
     return true;
   }
-  /* Return in the limit: saved, and only the limit closes. */
+  /* Return in the limit: saved, and only the limit closes; an entry that
+     is not a limit keeps it open with its message. */
   function closeLimit() {
     var input = document.getElementById('tq-limit-input');
-    if (input) _setLimit(input.value);
+    if (input && !_setLimit(input.value)) return;
     _limitOpen = false;
     _redrawLines('tq-count-btn');
   }
@@ -6655,6 +6788,11 @@ window.ReportQuestionnaire = (function () {
         if (!closeLines()) _closeBrowse();
       } else if (_cal) tqCloseDeadline();
       else closeLines();
+      return;
+    }
+    // Tab and Shift-Tab stay inside the ⓘ sheet while it is open.
+    if (e.key === 'Tab' && document.getElementById(INFO_ID)) {
+      _trapTab(e, document.getElementById(INFO_ID));
       return;
     }
     if (document.getElementById(INFO_ID) || document.getElementById(BOTH_ID)) return;

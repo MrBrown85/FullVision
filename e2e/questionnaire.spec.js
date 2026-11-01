@@ -1484,3 +1484,55 @@ test('Add to My Bank from the comment box: the pill shows only on a typed senten
   await sheet.locator('[role="tab"]', { hasText: 'Strengths' }).click();
   await expect(sheet.locator('.qn-chip-yours')).toHaveCount(0);
 });
+
+/* Live bug hunt 2 (Nov 1): the ⓘ sheet keeps the keyboard focus inside it,
+   and the character limit box never clears the limit on a stray key. */
+test('the ⓘ sheet keeps Tab and Shift-Tab inside it; Escape gives the focus back', async ({ page }) => {
+  await open(page);
+  await page.locator('#tq-info-btn').click();
+  const sheet = page.getByRole('dialog', { name: 'Where This Information Comes From' });
+  await expect(sheet).toBeVisible();
+  const inside = () => page.evaluate(() => !!document.activeElement.closest('#tq-info-overlay'));
+  for (let i = 0; i < 4; i++) {
+    await page.keyboard.press('Tab');
+    expect(await inside()).toBe(true);
+    await page.keyboard.press('Shift+Tab');
+    expect(await inside()).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await expect(page.locator('#tq-info-btn')).toBeFocused();
+});
+
+test('the character limit: 100 to 5000 or empty; a stray letter never clears it; Escape cancels', async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => ReportQuestionnaire.tqLineChange({ dataset: { tqLimit: '1' }, value: '300' }));
+  await expect(page.locator('#tq-limit-text')).toHaveText(/limit 300|remove or shorten/);
+  await page.locator('#tq-count-btn').click();
+  const input = page.locator('#tq-limit-input');
+  await expect(input).toBeFocused();
+  const msg = page.locator('#tq-limit-msg');
+  await expect(msg).toBeHidden();
+  await input.press('End');
+  await page.keyboard.type('e');
+  await page.keyboard.press('Enter');
+  await expect(msg).toBeVisible();
+  await expect(msg).toHaveText('Enter a whole number from 100 to 5000, or leave it empty for no limit.');
+  await expect(input).toHaveAttribute('aria-invalid', 'true');
+  expect(await page.evaluate(() => CommentBank.classSettings('sci8').charLimit)).toBe(300);
+  // Escape cancels: the limit stays, and opens again as saved.
+  await page.keyboard.press('Escape');
+  await expect(input).toHaveCount(0);
+  await expect(page.locator('#tq-count-btn')).toBeFocused();
+  expect(await page.evaluate(() => CommentBank.classSettings('sci8').charLimit)).toBe(300);
+  await page.locator('#tq-count-btn').click();
+  await expect(input).toHaveValue('300');
+  await input.fill('0');
+  await page.keyboard.press('Enter');
+  await expect(msg).toBeVisible();
+  await input.fill('5000');
+  await page.keyboard.press('Enter');
+  await expect(input).toHaveCount(0);
+  expect(await page.evaluate(() => CommentBank.classSettings('sci8').charLimit)).toBe(5000);
+  await expect(page.locator('#tq-limit-text')).toHaveText(' · limit 5000');
+});

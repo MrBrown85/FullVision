@@ -739,7 +739,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const rows = RQ.rowsFromDraft(d);
     const src = r => RQ.rowSource(r, cid, st, f, ctx);
     expect(src(rows[0])).toMatch(/overall, from this term’s scores$/);
-    expect(src({ step: 'habits', edited: false, prov: null })).toMatch(/rated|From your Work Habits ratings/);
+    expect(src({ step: 'habits', edited: false, prov: null })).toMatch(
+      /rated|From the record: |From your Work Habits ratings/,
+    );
     const example = rows.find(r => r.step === 'example');
     expect(src(example)).toMatch(/ · (Emerging|Developing|Proficient|Extending)/);
     const home = rows.find(r => r.step === 'home');
