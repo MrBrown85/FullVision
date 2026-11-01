@@ -7,10 +7,13 @@
  * - The Deadline row stays on the Sentences card, Required, with Pick a
  *   Date in place of a sentence; Approve and Next stays off.
  * - Picking a date puts the sentence in at its place (after Plan, before
- *   Meeting); a new date replaces the date in that sentence only; Clear
- *   Date takes the sentence out again.
- * - A comment saved with "[date]" loses that sentence on load while no
- *   date is picked, and says the date once one is.
+ *   Meeting); a new date replaces the date in that sentence only. There
+ *   is no Clear Date control.
+ * - A comment saved with "[date]" and not approved is shown without that
+ *   sentence while no date is picked, and with the date once one is.
+ *   Nothing is written on load; the cleaned text is saved the next time
+ *   the teacher edits, generates, picks a date or approves. An approved
+ *   comment is never changed.
  */
 import './setup.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -147,6 +150,9 @@ describe('withDeadline: the old [date] placeholder', () => {
     expect(ReportBlocks.renderReportBlock('teacher-narrative', CID, student(), { termId: TERM })).toContain(
       'is December 18.',
     );
+    // An approved comment prints as approved.
+    rate({ reportingBasis: 'ie', ieDeadline: null, approvedAt: '2026-10-30T10:00:00Z' });
+    expect(ReportBlocks.renderReportBlock('teacher-narrative', CID, student(), { termId: TERM })).toContain(B);
   });
 });
 
@@ -208,7 +214,7 @@ describe('the Deadline row and the calendar (teacher/report-questionnaire.js)', 
     expect(RQ.approveBlockers(RQ.getTqStudents()[RQ.tqStudentIndex])).toContain('deadline');
   });
 
-  it('picking a date puts the sentence in after the Plan; a new date replaces only that date; Clear Date takes it out', () => {
+  it('picking a date puts the sentence in after the Plan; a new date replaces only that date; no Clear Date', () => {
     const d = withComment();
     const plan = stepText(d, 'iePlan');
     const meeting = stepText(d, 'ieMeeting');
@@ -238,17 +244,14 @@ describe('the Deadline row and the calendar (teacher/report-questionnaire.js)', 
       d.text.replace(meeting, sentence + ' ' + meeting) + ' ' + own,
     );
 
+    // No Clear Date: the calendar only picks a date.
     RQ.tqOpenDeadline();
     html = open();
-    expect(html).toContain('data-action="tqClearDeadline"');
-    expect(html).toContain('>Clear Date</button>');
-    RQ.tqClearDeadline();
-    expect(saved().ieDeadline).toBe(null);
-    expect(saved().narrative).toBe(d.text + ' ' + own);
-    html = open();
-    expect(deadlineRow(html)).toContain('Pick a Date');
-    expect(deadlineRow(html)).not.toContain('qn-req-text');
+    expect(html).toContain('id="tq-cal"');
     expect(html).not.toContain('Clear Date');
+    expect(html).not.toContain('tqClearDeadline');
+    expect(RQ.tqClearDeadline).toBeUndefined();
+    RQ.tqCloseDeadline();
   });
 
   it('before Generate, the Required rows show the Deadline row with no sentence', () => {
@@ -264,26 +267,77 @@ describe('the Deadline row and the calendar (teacher/report-questionnaire.js)', 
     expect(saved().narrative || '').toBe('');
   });
 
-  it('a comment saved with [date]: on load the sentence goes while no date is picked, else it says the date', () => {
+  /* A comment saved before Nov 2 with the old [date] sentence after the Plan. */
+  function withLegacy(extra) {
     const d = withComment();
     const plan = stepText(d, 'iePlan');
     const legacy = d.text.replace(plan, plan + ' The deadline to replace this IE with a grade is [date].');
-    rate({ narrative: legacy, approvedAt: '2026-10-30T10:00:00Z' });
-    let html = open();
-    expect(saved().narrative).toBe(d.text);
-    expect(saved().approvedAt).toBe('2026-10-30T10:00:00Z');
-    expect(html).not.toContain('[date]');
+    rate(Object.assign({ narrative: legacy }, extra || {}));
+    return { d, legacy };
+  }
+  const box = html => {
+    const m = html.match(/<textarea id="tq-narrative"[^>]*>([^<]*)<\/textarea>/);
+    return m
+      ? m[1]
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+      : null;
+  };
 
-    rate({ narrative: legacy, ieDeadline: '2026-12-18' });
-    html = open();
-    expect(saved().narrative).toBe(legacy.replace('[date]', 'December 18'));
+  it('a saved [date] comment, not approved: shown without the sentence, nothing written on load', () => {
+    const { d, legacy } = withLegacy();
+    const before = JSON.stringify(saved());
+    const html = open();
+    expect(box(html)).toBe(d.text);
     expect(html).not.toContain('[date]');
+    expect(RQ.shownText(saved())).toBe(d.text);
+    // Nothing saved by loading.
+    expect(JSON.stringify(saved())).toBe(before);
+    expect(saved().narrative).toBe(legacy);
   });
 
-  it('settleDeadline leaves a comment without [date] untouched', () => {
-    const d = withComment();
-    RQ.settleDeadline(CID, NOOR.id, TERM);
-    expect(saved().narrative).toBe(d.text);
+  it('a saved [date] comment with a date picked is shown saying the date, still not written', () => {
+    const { legacy } = withLegacy({ ieDeadline: '2026-12-18' });
+    const html = open();
+    expect(box(html)).toBe(legacy.replace('[date]', 'December 18'));
+    expect(saved().narrative).toBe(legacy);
+  });
+
+  it('the cleaned text is saved when the teacher picks a date: the sentence goes in once, at its place', () => {
+    const { d } = withLegacy();
+    open();
+    RQ.tqPickDeadline('2026-12-18');
+    const text = saved().narrative;
+    expect(text).not.toContain('[date]');
+    const sentence = RQ.deadlineSentence(text, 'December 18', null, null);
+    expect(text).toBe(d.text.replace(stepText(d, 'ieMeeting'), sentence + ' ' + stepText(d, 'ieMeeting')));
+  });
+
+  it('the cleaned text is saved when the teacher edits: the box is what is saved', () => {
+    const { d } = withLegacy();
+    const html = open();
+    const el = { value: box(html), dataset: { cid: CID, sid: NOOR.id, term: TERM } };
+    const doc = globalThis.document;
+    globalThis.document = Object.assign({}, doc, {
+      body: { classList: { add() {}, remove() {}, toggle() {}, contains: () => false } },
+      getElementById: id => (id === 'tq-narrative' ? el : doc.getElementById(id)),
+    });
+    try {
+      RQ.tqSaveNarrative();
+      expect(saved().narrative).toBe(d.text);
+    } finally {
+      globalThis.document = doc;
+    }
+  });
+
+  it('an approved comment is never changed, on screen or saved', () => {
+    const { legacy } = withLegacy({ approvedAt: '2026-10-30T10:00:00Z' });
+    const html = open();
+    expect(box(html)).toBe(legacy);
+    expect(saved().narrative).toBe(legacy);
+    expect(saved().approvedAt).toBe('2026-10-30T10:00:00Z');
+    expect(RQ.shownText(saved())).toBe(legacy);
   });
 
   it('deadlineAt: after the Plan, else before Support, Meeting or Closing, else last', () => {

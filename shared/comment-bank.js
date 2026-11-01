@@ -3143,9 +3143,8 @@ var COMMENT_BANK = {
     // the deadline. {ieDeadline} is the date the teacher picked; none is
     // drafted until then (Nov 2). The deadline picker
     // (teacher/report-questionnaire.js tqPickDeadline) puts the sentence in
-    // when a date is picked, finds it by its step and replaces the date in
-    // it when another is picked, whichever frame it is, and takes it out
-    // when the date is cleared.
+    // when a date is picked, and finds it by its step and replaces the date
+    // in it when another is picked, whichever frame it is.
     {
       id: 'ie36',
       part: 'go',

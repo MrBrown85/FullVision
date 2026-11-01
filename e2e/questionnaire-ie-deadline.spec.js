@@ -32,7 +32,7 @@ const deadlineRow = page =>
   page.locator('#tq-sentences .qn-req-row').filter({ has: page.locator('.qn-req-label', { hasText: /^Deadline$/ }) });
 const labels = page => page.locator('#tq-sentences .qn-req-label').allTextContents();
 
-test('Generate leaves the deadline out until a date is picked; picking puts it in, Clear Date takes it out', async ({
+test('Generate leaves the deadline out until a date is picked; picking puts it in, a new date replaces only that date', async ({
   page,
 }) => {
   await open(page);
@@ -75,29 +75,36 @@ test('Generate leaves the deadline out until a date is picked; picking puts it i
   const sentence = await deadlineRow(page).locator('.qn-req-text').textContent();
   expect(picked.replace(sentence + ' ', '')).toBe(drafted);
 
-  // Clear Date: the sentence comes out again and the row asks for a date.
+  // Another date: only the date in that sentence changes. The calendar
+  // has no Clear Date.
   await page.locator('#tq-deadline-btn').click();
-  await page.locator('#tq-cal-clear').click();
-  await expect(page.locator('#tq-cal')).toHaveCount(0);
-  await expect(box).toHaveValue(drafted);
-  expect((await saved(page)).ieDeadline).toBe(null);
-  await expect(deadlineRow(page).locator('#tq-deadline-btn')).toHaveText('Pick a Date');
-  await expect(deadlineRow(page).locator('.qn-req-text')).toHaveCount(0);
-  await expect(page.locator('#tq-approve-next')).toBeDisabled();
+  await expect(page.locator('#tq-cal')).not.toContainText('Clear Date');
+  const next = page.locator('#tq-cal .qn-cal-day:not([disabled])').nth(1);
+  const label2 = await next.getAttribute('aria-label');
+  await next.click();
+  await expect(box).toHaveValue(picked.replace(sentence, sentence.replace(label, label2)));
+  expect((await saved(page)).narrative).toBe(await box.inputValue());
 });
 
-test('a comment saved with [date] loses that sentence on load while no date is picked', async ({ page }) => {
+test('a saved [date] comment is shown without that sentence, written only when a date is picked', async ({ page }) => {
   await open(page);
   await page.locator('#tq-generate').click();
   const drafted = await page.locator('#tq-narrative').inputValue();
-  await page.evaluate(text => {
-    upsertTermRating('sci8', 'st1', 'term-2', {
-      narrative: text + ' The deadline to replace this IE with a grade is [date].',
-    });
-  }, drafted);
+  const legacy = drafted + ' The deadline to replace this IE with a grade is [date].';
+  await page.evaluate(text => upsertTermRating('sci8', 'st1', 'term-2', { narrative: text }), legacy);
   // Opened again: the period picked again.
   await page.locator('#report-period').selectOption('Report 1');
   await page.locator('#report-period').selectOption('Report 2');
   await expect(page.locator('#tq-narrative')).toHaveValue(drafted);
-  expect((await saved(page)).narrative).toBe(drafted);
+  // Nothing written on load.
+  expect((await saved(page)).narrative).toBe(legacy);
+  // Picking a date saves the comment as shown, with the new sentence.
+  await page.locator('#tq-deadline-btn').click();
+  const day = page.locator('#tq-cal .qn-cal-day:not([disabled])').first();
+  const label = await day.getAttribute('aria-label');
+  await day.click();
+  const text = (await saved(page)).narrative;
+  expect(text).not.toContain('[date]');
+  expect(text).toContain(label);
+  await expect(page.locator('#tq-narrative')).toHaveValue(text);
 });
