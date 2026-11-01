@@ -70,12 +70,6 @@ window.PersonalBank = (function () {
   function _v2(name) {
     return window.v2 && typeof window.v2[name] === 'function' ? window.v2[name] : null;
   }
-  function _esc(s) {
-    if (typeof esc === 'function') return esc(s);
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
   function _reEsc(s) {
     return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
@@ -1513,18 +1507,18 @@ window.PersonalBank = (function () {
   function _cardHtml(it) {
     var chips = (it.chips || [])
       .map(function (c) {
-        return `<span class="qn-bank-chip">${_esc(c.from)} → ${_esc(c.to)}</span>`;
+        return `<span class="qn-bank-chip">${esc(c.from)} → ${esc(c.to)}</span>`;
       })
       .join('');
-    return `<div class="qn-bank-card" data-key="${_esc(it.key)}">
-      <span class="qn-bank-from">From ${_esc(it.name)}’s comment</span>
-      <span class="qn-bank-sentence">${_esc(it.text)}</span>
+    return `<div class="qn-bank-card" data-key="${esc(it.key)}">
+      <span class="qn-bank-from">From ${esc(it.name)}’s comment</span>
+      <span class="qn-bank-sentence">${esc(it.text)}</span>
       ${chips ? `<div class="qn-bank-chips"><span class="qn-bank-dim">For other students:</span>${chips}</div>` : ''}
       <div class="qn-bank-row">
-        <span class="qn-bank-dim">${_esc(it.offered)}</span>
+        <span class="qn-bank-dim">${esc(it.offered)}</span>
         <span class="qn-bank-gap"></span>
-        <button type="button" class="qn-btn" data-bank="skip" data-key="${_esc(it.key)}" title="Leaves this sentence out of your bank.">Skip</button>
-        <button type="button" class="qn-generate" data-bank="keep" data-key="${_esc(it.key)}" title="Adds this sentence to your bank. Generate offers it first for students it fits.">Keep</button>
+        <button type="button" class="qn-btn" data-bank="skip" data-key="${esc(it.key)}" title="Leaves this sentence out of your bank.">Skip</button>
+        <button type="button" class="qn-generate" data-bank="keep" data-key="${esc(it.key)}" title="Adds this sentence to your bank. Generate offers it first for students it fits.">Keep</button>
       </div>
     </div>`;
   }
@@ -1536,7 +1530,7 @@ window.PersonalBank = (function () {
     var left = r.left.length
       ? `<div class="qn-bank-out"><span class="qn-bank-out-title">Left out (${r.left.length})</span>${r.left
           .map(function (x) {
-            return `<span>“${_esc(x.text)}” · ${_esc(x.reason)}</span>`;
+            return `<span>“${esc(x.text)}” · ${esc(x.reason)}</span>`;
           })
           .join('')}</div>`
       : '';
@@ -1544,12 +1538,12 @@ window.PersonalBank = (function () {
     var tally = r.pending.length ? shown.length + ' of ' + r.pending.length + ' shown · ' + bank : bank;
     return `<div class="qn-bank" role="document">
       <div class="qn-bank-head">
-        <div class="qn-bank-top"><span class="qn-bank-title" id="tq-bank-title">Suggested for Your Bank</span><span class="qn-bank-dim">${_esc(b.course)} · all ${_esc(String(b.total))} comments approved</span></div>
+        <div class="qn-bank-top"><span class="qn-bank-title" id="tq-bank-title">Suggested for Your Bank</span><span class="qn-bank-dim">${esc(b.course)} · all ${esc(String(b.total))} comments approved</span></div>
         <span class="qn-bank-dim">Sentences you wrote or changed in this class. Keep the ones you would use again, and Generate will offer them first for students they fit. Nothing is kept unless you choose Keep.</span>
       </div>
       <div class="qn-bank-list">${shown.map(_cardHtml).join('')}${left}</div>
       <div class="qn-bank-foot">
-        <span class="qn-bank-dim" id="tq-bank-count">${_esc(tally)}</span>
+        <span class="qn-bank-dim" id="tq-bank-count">${esc(tally)}</span>
         <span class="qn-bank-gap"></span>
         <button type="button" class="qn-btn" data-bank="later" title="Closes this for now. It opens again the next time you open the Term Questionnaire for this class.">Later</button>
         <button type="button" class="qn-generate" data-bank="done" title="Closes this. Sentences you did not keep stay out of your bank.">Done</button>

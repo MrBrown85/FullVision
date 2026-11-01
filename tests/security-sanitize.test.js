@@ -32,6 +32,21 @@ describe('sanitizeHtml', () => {
     expect(result).not.toContain('onerror');
   });
 
+  it('parses into an inert <template>, not a live element', () => {
+    const made = [];
+    const create = globalThis.document.createElement;
+    globalThis.document.createElement = tag => {
+      made.push(tag);
+      return create(tag);
+    };
+    try {
+      expect(sanitizeHtml('<b>Hi</b><img src="x" onerror="alert(1)">')).toBe('<b>Hi</b>');
+    } finally {
+      globalThis.document.createElement = create;
+    }
+    expect(made[0]).toBe('template');
+  });
+
   it('strips javascript: hrefs', () => {
     const result = sanitizeHtml('<a href="javascript:alert(1)">click</a>');
     expect(result).not.toContain('javascript:');

@@ -140,13 +140,6 @@
 
   /* ── Small helpers ─────────────────────────────────────── */
 
-  function _esc(s) {
-    if (typeof esc === 'function') return esc(s);
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-
   function _round2(n) {
     return Math.round(n * 1000) / 1000;
   }
@@ -788,7 +781,7 @@
   /* One labelled field. Every field keeps its place, filled or not, so the
      block reads the same on every class. */
   function _info(label, value) {
-    return '<div class="gp-info-item"><b>' + _esc(label) + ':</b> <span>' + _esc(value) + '</span></div>';
+    return '<div class="gp-info-item"><b>' + esc(label) + ':</b> <span>' + esc(value) + '</span></div>';
   }
 
   /* A turned title: its lines read up the column, with the date and "/n"
@@ -799,13 +792,13 @@
       '<div class="gp-ch-turn">' +
       lines
         .map(function (l) {
-          return '<div>' + _esc(l) + '</div>';
+          return '<div>' + esc(l) + '</div>';
         })
         .join('') +
       '</div>' +
       below
         .map(function (b) {
-          return '<div class="gp-ch-below">' + _esc(b) + '</div>';
+          return '<div class="gp-ch-below">' + esc(b) + '</div>';
         })
         .join('') +
       '</div>'
@@ -835,8 +828,8 @@
     function two(text) {
       var t = String(text == null ? '' : text);
       var at = twoLine ? t.indexOf(' · ') : -1;
-      if (at < 0) return _esc(t);
-      return _esc(t.slice(0, at)) + '<div class="gp-sub">' + _esc(t.slice(at + 3)) + '</div>';
+      if (at < 0) return esc(t);
+      return esc(t.slice(0, at)) + '<div class="gp-sub">' + esc(t.slice(at + 3)) + '</div>';
     }
     function edge(i, c, prevCat) {
       return i === 0 ? ' gp-block-start' : c.catId !== prevCat ? ' gp-cat-start' : '';
@@ -868,7 +861,7 @@
       size.pageHeadH +
       'in">' +
       '<div class="gp-head-school">' +
-      _esc(h.school) +
+      esc(h.school) +
       '</div>' +
       '<div class="gp-head-title">' +
       (opts.attendance ? 'Attendance Sheet' : 'Class Grade Sheet') +
@@ -878,7 +871,7 @@
       ' of ' +
       total +
       '</span><span>' +
-      _esc(h.printed) +
+      esc(h.printed) +
       '</span></div>' +
       '<div class="gp-info">' +
       _info('Class', h.className) +
@@ -924,7 +917,7 @@
         '" colspan="' +
         band.count +
         '"><span>' +
-        _esc(band.name + (cont ? ' (cont.)' : '')) +
+        esc(band.name + (cont ? ' (cont.)' : '')) +
         '</span></th>';
     });
     if (blanks.length) {
@@ -952,7 +945,7 @@
         '" scope="col" data-col="' +
         c.n +
         '" title="' +
-        _esc(c.title) +
+        esc(c.title) +
         '">' +
         _turnedHead(c.lines, c.day ? [] : [c.dateText, c.outOf != null ? '/' + formatPoints(c.outOf) : '']) +
         '</th>';
@@ -978,9 +971,9 @@
 
     // Student rows.
     rows.forEach(function (r) {
-      html += '<tr class="gp-row" data-sid="' + _esc(r.id) + '">';
-      if (showNo) html += '<td class="gp-no">' + _esc(r.studentNumber) + '</td>';
-      if (showName) html += '<td class="gp-name">' + _esc(r.name) + '</td>';
+      html += '<tr class="gp-row" data-sid="' + esc(r.id) + '">';
+      if (showNo) html += '<td class="gp-no">' + esc(r.studentNumber) + '</td>';
+      if (showName) html += '<td class="gp-name">' + esc(r.name) + '</td>';
       var prev = null;
       cols.forEach(function (c, i) {
         var t = r.cells[c.n - 1];
@@ -1037,7 +1030,7 @@
       '<div class="gp-key" style="height:' +
       size.keyH +
       'in">' +
-      (key.marks.length ? 'Key: ' + _esc(key.marks.join(' · ')) : '') +
+      (key.marks.length ? 'Key: ' + esc(key.marks.join(' · ')) : '') +
       '</div>';
     html += '</section>';
     return html;
@@ -1261,7 +1254,7 @@
       '"><span class="gpd-label" id="gpd-l-' +
       key +
       '">' +
-      _esc(label) +
+      esc(label) +
       '</span><button type="button" class="gpd-value" id="gpd-' +
       key +
       '" data-menu="' +
@@ -1273,7 +1266,7 @@
       '"' +
       (off ? ' disabled' : '') +
       '>' +
-      _esc(cur.label) +
+      esc(cur.label) +
       CHEVRON +
       '</button></div>'
     );
@@ -1288,7 +1281,7 @@
       '"><label class="gpd-label" for="gpd-' +
       key +
       '">' +
-      _esc(label) +
+      esc(label) +
       '</label><span class="gpd-switch"><input type="checkbox" role="switch" id="gpd-' +
       key +
       '" data-opt="' +
@@ -1305,13 +1298,13 @@
       '<div class="gpd-row gpd-sub"><label class="gpd-label" for="gpd-' +
       key +
       '">' +
-      _esc(label) +
+      esc(label) +
       '</label><input type="date" class="gpd-date" id="gpd-' +
       key +
       '" data-date="' +
       key +
       '" value="' +
-      _esc(value) +
+      esc(value) +
       '"></div>'
     );
   }
@@ -1329,12 +1322,12 @@
         var d = _assessmentDate(a);
         return (
           '<label class="gpd-pick-option"><input type="checkbox" data-pick="' +
-          _esc(a.id) +
+          esc(a.id) +
           '"' +
           (opts.picked.indexOf(a.id) >= 0 ? ' checked' : '') +
           '><span>' +
-          _esc(a.title || '') +
-          (d ? ' <span class="gpd-help">' + _esc(formatShortDate(d)) + '</span>' : '') +
+          esc(a.title || '') +
+          (d ? ' <span class="gpd-help">' + esc(formatShortDate(d)) + '</span>' : '') +
           '</span></label>'
         );
       })
@@ -1350,7 +1343,7 @@
   function _group(label, rows) {
     return (
       '<div class="gpd-group"><div class="gpd-group-label">' +
-      _esc(label) +
+      esc(label) +
       '</div><div class="gpd-list">' +
       rows +
       '</div></div>'
@@ -1488,9 +1481,9 @@
     return (
       _thumbHtml(model) +
       '<div class="gpd-count" id="gp-status" aria-live="polite"><div class="gpd-count-pages">' +
-      _esc(lines.pages) +
+      esc(lines.pages) +
       '</div><div class="gpd-count-detail">' +
-      _esc(lines.detail) +
+      esc(lines.detail) +
       '</div></div>'
     );
   }
@@ -1501,7 +1494,7 @@
       '<div class="confirm-card grades-print-card">' +
       '<div class="gpd-side">' +
       '<div class="gpd-head"><div class="gpd-title" id="gp-title">Print Grades</div><div class="gpd-class">' +
-      _esc(typeof courseDisplayName === 'function' ? courseDisplayName(course) : course.name || '') +
+      esc(typeof courseDisplayName === 'function' ? courseDisplayName(course) : course.name || '') +
       '</div></div>' +
       '<div class="gpd-preview" id="gpd-preview"></div>' +
       '<div class="gpd-actions"><button type="button" class="confirm-cancel" data-gp="cancel">Cancel</button>' +
@@ -1595,10 +1588,10 @@
           '<button type="button" role="menuitemradio" class="gpd-menu-item" tabindex="-1" aria-checked="' +
           on +
           '" data-menu-item="' +
-          _esc(it.value) +
+          esc(it.value) +
           '">' +
-          _esc(it.label) +
-          (it.help ? '<span class="gpd-menu-help">' + _esc(it.help) + '</span>' : '') +
+          esc(it.label) +
+          (it.help ? '<span class="gpd-menu-help">' + esc(it.help) + '</span>' : '') +
           '</button>'
         );
       })

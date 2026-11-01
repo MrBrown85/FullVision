@@ -5573,17 +5573,7 @@ window.setCellStatus = function (enrollmentId, assessmentId, status) {
 /* ══════════════════════════════════════════════════════════════════
    Utilities (unchanged)
    ══════════════════════════════════════════════════════════════════ */
-function esc(s) {
-  return (s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-function escJs(s) {
-  return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
-}
+// esc (text into HTML) lives in shared/html.js, which every page loads first.
 
 /* Returns a safe CSS color value for inline-style interpolation, or a
  * neutral fallback if the input doesn't match one of the accepted shapes.
@@ -12213,7 +12203,6 @@ window.GB = {
   loadClass,
   preloadClasses,
   esc,
-  escJs,
   initials,
   pronounsSelect,
   fullName,

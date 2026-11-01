@@ -105,12 +105,6 @@ var StudentPage = (function () {
 
   /* ── Small helpers ─────────────────────────────────────────── */
 
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-
   function cleanCode(s) {
     return String(s || '')
       .toUpperCase()

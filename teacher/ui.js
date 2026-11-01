@@ -3,8 +3,11 @@
 /* ── HTML sanitizer for contenteditable output ──────────────── */
 function sanitizeHtml(raw) {
   var allowed = ['B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'BR', 'P', 'DIV', 'SPAN'];
-  var tmp = document.createElement('div');
-  tmp.innerHTML = raw;
+  // Parsed into a <template>, whose content is inert: an <img onerror> in
+  // it doesn't load or fire while it is cleaned, as it could in a <div>.
+  var holder = document.createElement('template');
+  holder.innerHTML = raw;
+  var root = holder.content || holder;
   (function walk(node) {
     for (var i = node.childNodes.length - 1; i >= 0; i--) {
       var child = node.childNodes[i];
@@ -19,8 +22,11 @@ function sanitizeHtml(raw) {
         }
       }
     }
-  })(tmp);
-  return tmp.innerHTML;
+  })(root);
+  if (root === holder) return holder.innerHTML;
+  var out = document.createElement('div');
+  out.appendChild(root);
+  return out.innerHTML;
 }
 
 /* ── Course-switch input lock (P7.3) ───────────────────────── */
