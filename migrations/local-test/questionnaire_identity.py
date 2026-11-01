@@ -8,7 +8,7 @@ PGPORT=54331 PGDATABASE=fv_ss python3 run.py harness.sql student-submit-prelude.
   ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql \\
   ../20261025_student_submit.sql ../20261025_student_submit_phone.sql \\
   ../20261025_student_submit_token_80.sql ../20261025_phone_reports.sql \\
-  ../20261101_questionnaire_identity_check.sql
+  ../20261101_questionnaire_identity_check.sql ../20261101_questionnaire_slip_fixes.sql
 PGPORT=54331 PGDATABASE=fv_ss python3 questionnaire_identity.py
 """
 import os, sys, json, uuid
@@ -110,10 +110,20 @@ r = verify(tok1)
 ok('nothing given is a miss', r.get('error') == 'wrong_identity', r)
 r = verify(tok1, password=pw)
 ok("another student's password is no use", r.get('error') == 'wrong_identity', r)
+ok('tries left count down across the slip', r.get('tries_left') == 1, r)
+sp()
 r = verify(tok1, birthday='not a date')
-ok('a malformed birthday is a miss, not an error', r.get('error') == 'wrong_identity' and r.get('tries_left') == 0, r)
-r = verify(tok1, birthday='2012-05-15')
-ok('five misses lock the session', r == {'ok': False, 'error': 'locked'}, r)
+ok('the fifth miss locks the slip and says so', r == {'ok': False, 'error': 'slip_locked'}, r)
+r = verify(open_(code1)['token'], birthday='2012-05-15')
+ok('a fresh scan of a locked slip stays locked, even with the right birthday', r == {'ok': False, 'error': 'slip_locked'}, r)
+back()
+sp()
+r = verify(open_(code1)['token'], number='555')
+ok('a fresh scan does not reset the count', r == {'ok': False, 'error': 'slip_locked'}, r)
+back()
+ok('each miss is in the log as wrong_identity, with no value',
+   one("select count(*) from student_submit.attempt where outcome = 'wrong_identity' and code_id = (select id from student_access_code where enrollment_id = :e and revoked_at is null)", e=ENR1) == 4)
+as_owner(); c.run("delete from student_submit.attempt where code_id = (select id from student_access_code where enrollment_id = :e and revoked_at is null)", e=ENR1)
 
 r = open_(code1); tok1 = r['token']
 r = verify(tok1, number='0123-456')
@@ -145,16 +155,34 @@ ok("a used slip's student, reissued: still identity", r.get('check') == 'identit
 r = verify(r['token'], birthday='2012-05-15')
 ok('the birthday matches', r.get('ok') is True, r)
 
-# ── The slip locks after ten misses ────────────────────────────────────
+# ── Misses across several scans add up to the slip's five ──────────────
 sp()
+wrong = '0000' if pw != '0000' else '1111'
 for i in range(2):
-    t = open_(code2)['token']
-    for j in range(5):
-        verify(t, password='0000' if pw != '0000' else '1111')
-t = open_(code2)['token']
-r = verify(t, password=pw)
-ok('ten misses on one slip lock it, even with the right password', r == {'ok': False, 'error': 'slip_locked'}, r)
+    verify(open_(code2)['token'], password=wrong)
+r = verify(open_(code2)['token'], password=wrong)
+ok('misses on separate scans count together', r.get('tries_left') == 2, r)
+verify(open_(code2)['token'], password=wrong)
+r = verify(open_(code2)['token'], password=wrong)
+ok('the fifth across scans locks the slip', r == {'ok': False, 'error': 'slip_locked'}, r)
 back()
+
+# ── A password printed before a roster import still works ──────────────
+sp()
+as_owner(); c.run("update student set student_number = '7654321' where id = :s", s=STU2)
+r = open_(code2)
+ok('with a number added since, the phone asks for identity and offers the password', r.get('check') == 'identity' and r.get('also_password') is True, r)
+r = verify(r['token'], number=pw, password=pw)
+ok('the printed password still opens it', r.get('ok') is True, r)
+as_teacher(A)
+re = c.run('select issue_access_codes(:q, :ids::uuid[], :k)', q=qid, ids='{%s}' % ENR2, k=key())[0][0][0]
+ok('a reprint for a student who now has a number prints no password', re.get('password') is None, re)
+ok('and clears the stored one', one('select slip_password from student where id = :s', s=STU2) is None)
+r = open_(re['code'])
+ok('so the new slip is asked for identity only', r.get('check') == 'identity' and r.get('also_password') is False, r)
+back()
+r = open_(c1['code'])
+ok('a student who never had a password is not offered one', r.get('also_password') is False, r)
 
 # ── A student with nothing to check against needs a new slip ───────────
 sp()
@@ -166,7 +194,7 @@ back()
 # ── The log ────────────────────────────────────────────────────────────
 as_owner()
 outcomes = set(x[0] for x in c.run('select distinct outcome from student_submit.attempt'))
-ok('the log records misses and matches', {'wrong_identity', 'verified', 'locked'} <= outcomes, outcomes)
+ok('the log records matches', 'verified' in outcomes, outcomes)
 ok('no birthday, number or password is in the log',
    one("select count(*) from student_submit.attempt where row_to_json(attempt)::text ilike any(array['%2012-05%', '%0123%', :p])", p='%' + pw + '%') == 0)
 

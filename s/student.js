@@ -304,11 +304,18 @@ var StudentPage = (function () {
         msg
       );
     }
+    // A password printed before the teacher added a birthday or number still
+    // works: the same box takes it.
+    var pw = !!state.data.also_password;
     return (
-      '<p class="sp-lead">To make sure it\u2019s you, enter your birthday or your student number.</p>' +
+      '<p class="sp-lead">To make sure it\u2019s you, enter your birthday or your student number' +
+      (pw ? ', or the password on your slip' : '') +
+      '.</p>' +
       birthdayPickers(state) +
       '<div class="sp-or" aria-hidden="true">or</div>' +
-      '<label class="sp-sub-label" for="sp-ident">Student Number</label>' +
+      '<label class="sp-sub-label" for="sp-ident">' +
+      (pw ? 'Student Number or Password' : 'Student Number') +
+      '</label>' +
       '<input id="sp-ident" class="sp-input" inputmode="numeric" autocomplete="off" maxlength="32" value="' +
       esc(state.number) +
       '">' +
@@ -1328,6 +1335,7 @@ var StudentPage = (function () {
       }
       if (some) ident.birthday = y + '-' + String(m).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
       if (typed) ident.student_number = typed;
+      if (typed && S.data.also_password && typed.length <= 16) ident.password = typed;
       if (!some && !typed) {
         S.message = 'Choose your birthday or type your student number.';
         paint();
