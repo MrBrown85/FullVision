@@ -4,3 +4,6 @@ curriculum_by_course.json
 node_modules/
 *.min.js
 .DS_Store
+
+# Archived mockups, kept as they were drawn
+docs/plans/*.html

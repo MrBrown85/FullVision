@@ -37,6 +37,24 @@ describe('docs/ARCHITECTURE.md', () => {
   });
 });
 
+describe('docs/DECISIONS.md', () => {
+  it('links only to files in the repo', () => {
+    const decisions = read('docs/DECISIONS.md');
+    expect(decisions).not.toMatch(/`~\//);
+    const broken = [...decisions.matchAll(/\]\(([^)#:]+)\)/g)]
+      .map(m => m[1])
+      .filter(link => {
+        try {
+          readFileSync(new URL('../docs/' + link, import.meta.url));
+          return false;
+        } catch (e) {
+          return true;
+        }
+      });
+    expect(broken).toEqual([]);
+  });
+});
+
 describe('the work list', () => {
   it('no doc calls codex.md or HANDOFF.md the current work list', () => {
     ['README.md', 'CLAUDE.md', 'docs/ARCHITECTURE.md'].forEach(rel => {
