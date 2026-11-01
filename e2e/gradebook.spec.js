@@ -123,7 +123,8 @@ test.describe('Gradebook — Spreadsheet View', () => {
     await scored.click({ button: 'right' });
     await expect(page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Mark missing' })).toHaveClass(/is-disabled/);
     await expect(page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Excuse' })).toHaveClass(/is-disabled/);
-    await page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Mark missing' }).click();
+    // A disabled menu item (aria-disabled) does nothing when clicked.
+    await page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Mark missing' }).click({ force: true });
     expect((await statuses())['stu-002:assess-001']).toBeUndefined();
     await page.keyboard.press('Escape');
 
