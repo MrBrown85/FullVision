@@ -354,7 +354,7 @@ describe('six to nine sentences', () => {
     expect(d.sentences.length).toBeLessThan(6);
     expect(stepsOf(d)).toEqual(['grade', 'example', 'home']);
     expect(d.text).toBe(
-      'Ines is Proficient on the BC proficiency scale this term. Their best piece was “Energy Lab.” At home, you can ask them to explain how something in the kitchen or garden works.',
+      'Ines is Proficient on the BC proficiency scale this term. Their best piece was “Energy Lab.” At home, you can ask them to explain how one thing in the kitchen works.',
     );
     // Nothing was added to reach six: no habits sentence with no habit
     // rated, no strengths below the gate, no next step on two pieces.
