@@ -1683,6 +1683,9 @@ window.ReportQuestionnaire = (function () {
     rows.forEach(function (r) {
       if (r.edited && r.step && !kept[r.step]) kept[r.step] = r.text;
     });
+    // The teacher's own meeting sentence stands for the Meeting part.
+    var meet = meetingRowAt(rows, CommentBank.reportPath(f));
+    if (meet >= 0 && !kept.ieMeeting) kept.ieMeeting = rows[meet].text;
     var order = _ordered[key]
       ? rows
           .map(function (r) {
@@ -1956,6 +1959,7 @@ window.ReportQuestionnaire = (function () {
     if (basis === 'ie' && !CommentBank.deadlineOk(_activeCourse, rating.ieDeadline, _today())) {
       _iePending = _rowKey(st);
       _cal = { month: _deadlineRange().min.slice(0, 7) };
+      _calDay = _deadlineRange().min;
       rerender();
       _focusAny(['#tq-cal .qn-cal-day:not([disabled])', '#tq-cal']);
       return;
@@ -2312,6 +2316,7 @@ window.ReportQuestionnaire = (function () {
       document.querySelector('#tq-cal .qn-cal-day.on') ||
       document.querySelector('#tq-cal .qn-cal-day:not([disabled])') ||
       document.getElementById('tq-cal');
+    _calDay = (on && on.dataset && on.dataset.date) || picked || range.min;
     if (on) on.focus();
   }
   function tqCloseDeadline() {
@@ -2334,11 +2339,23 @@ window.ReportQuestionnaire = (function () {
       y++;
     }
     _cal.month = y + '-' + _pad(m);
-    if (_iePending) {
-      rerender();
-      _focusSel('#tq-cal [data-dir="' + (Number(dir) < 0 ? -1 : 1) + '"]');
-    } else _syncRequired();
+    if (_iePending) rerender();
+    else _syncRequired();
+    // The focus stays in the calendar (the card was drawn again): on the
+    // button pressed, else (at the end of the range) the same day number in
+    // the new month, else its first day that can be picked, else the
+    // calendar itself. So ↑ and ↓ never move to another student.
+    var day = _ymd(y, m, Math.min(Number(String(_calDay || '').slice(8, 10)) || 1, new Date(y, m, 0).getDate()));
+    _focusAny([
+      '#tq-cal [data-dir="' + (Number(dir) < 0 ? -1 : 1) + '"]:not([disabled])',
+      '#tq-cal .qn-cal-day[data-date="' + day + '"]:not([disabled])',
+      '#tq-cal .qn-cal-day:not([disabled])',
+      '#tq-cal',
+    ]);
   }
+  // The day the calendar opened on (the picked day, else the first that
+  // can be picked), for the same day number in another month.
+  var _calDay = null;
 
   /* Whether a sentence holds the date as the comment says it (`was`:
      "December 18", or [date] until one is picked), as a whole: "December 1"
@@ -2495,7 +2512,7 @@ window.ReportQuestionnaire = (function () {
       // No Deadline sentence yet: it goes in at its place, with the date.
       var row = _deadlineRow(st, f);
       if (row) {
-        rows.splice(deadlineAt(rows), 0, row);
+        rows.splice(deadlineAt(_asParts(rows, 'ie')), 0, row);
         _saveRows(st, rows);
       }
     }
@@ -2581,7 +2598,7 @@ window.ReportQuestionnaire = (function () {
     var check = p.key === 'ieProblem' && checks.length ? checks[0] : '';
     var date = p.key === 'ieDeadline';
     var flag = (check && !_isChecked(student.id, check)) || (date && !picked);
-    var source = _requiredSource(cid, student, f, p.key);
+    var source = p.source || _requiredSource(cid, student, f, p.key);
     var sourceHtml = check
       ? _checkSourceHtml(student.id, check, source, source.replace(/ · check that .*$/, '') + ' · checked')
       : `<span class="qn-req-source">${esc(source)}</span>`;
@@ -4105,6 +4122,30 @@ window.ReportQuestionnaire = (function () {
     var row = unit[0];
     var fixed = i < 0 || _isRequired(row.step, path);
     var handle = fixed ? SPACER : HANDLE;
+    // The teacher's own meeting sentence, typed or kept by Generate.
+    if (
+      path === 'ie' &&
+      i >= 0 &&
+      (i === meetingRowAt(rows, path) || (row.step === 'ieMeeting' && !row.s && row.edited))
+    )
+      return _requiredRowHtml(
+        cid,
+        student,
+        f,
+        {
+          key: 'ieMeeting',
+          label: 'Meeting',
+          text: unit
+            .map(function (r) {
+              return r.text;
+            })
+            .join(' '),
+          source: 'Written by you',
+        },
+        path,
+        i,
+        handle,
+      );
     if (row.step === 'notHandedIn') return _missingRowHtml(cid, f, handle, i);
     if (row.step === 'support') return _supportRowHtml(cid, student, f, handle, i);
     if (row.step === 'languageGoals') return _langRowHtml(cid, student, f, handle, i);
@@ -4371,6 +4412,35 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
+  /* A sentence of the teacher's own asking the family to get in touch or
+     meet: on the IE path it is the comment's Meeting part, as Written by
+     you, and Generate keeps it there instead of adding a second one. */
+  var MEETING_RE =
+    /\b(contact me|call me|e-?mail me|reach (out to )?me|get in touch|(like|want|hope) to meet|meet with (me|you)|set up a (meeting|time)|book a (meeting|time)|a (short )?meeting)\b/i;
+  function meetingRowAt(rows, path) {
+    if (
+      path !== 'ie' ||
+      !rows ||
+      rows.some(function (r) {
+        return r.step === 'ieMeeting';
+      })
+    )
+      return -1;
+    return rows.findIndex(function (r) {
+      return isTyped(r) && MEETING_RE.test(r.text || '');
+    });
+  }
+  /* The rows with the teacher's meeting sentence standing for the Meeting
+     part, for placing the other parts around it. */
+  function _asParts(rows, path) {
+    var at = meetingRowAt(rows, path);
+    return at < 0
+      ? rows
+      : rows.map(function (r, k) {
+          return k === at ? Object.assign({}, r, { step: 'ieMeeting' }) : r;
+        });
+  }
+
   /* The IE comment's parts in its order (the IEPath mockup): where a
      Required row the comment has no sentence for goes. */
   var IE_ORDER = [
@@ -4400,13 +4470,19 @@ window.ReportQuestionnaire = (function () {
     rows.forEach(function (r) {
       has[r.step] = true;
     });
+    // The teacher's own meeting sentence is the Meeting part.
+    var meetAt = meetingRowAt(rows, path);
+    if (meetAt >= 0) has.ieMeeting = true;
+    var leadOf = function (it) {
+      return it.i >= 0 && it.i === meetAt ? 'ieMeeting' : it.unit[0].step;
+    };
     var items = _units(rows).map(function (u) {
       return { unit: u, i: rows.indexOf(u[0]) };
     });
     // An IE comment has no Deadline sentence until a date is picked: its
     // Required row stays, with Pick a Date, where the sentence will go.
     if (ie && !has.ieDeadline) {
-      var at = deadlineAt(rows);
+      var at = deadlineAt(_asParts(rows, path));
       var pos =
         at < rows.length
           ? items.findIndex(function (it) {
@@ -4423,7 +4499,7 @@ window.ReportQuestionnaire = (function () {
         if (has[step]) return;
         var si = IE_ORDER.indexOf(step);
         var next = items.findIndex(function (it) {
-          return IE_ORDER.indexOf(it.unit[0].step) > si;
+          return IE_ORDER.indexOf(leadOf(it)) > si;
         });
         items.splice(next < 0 ? items.length : next, 0, {
           unit: [{ step: step, placeholder: true, text: '' }],
@@ -4444,7 +4520,7 @@ window.ReportQuestionnaire = (function () {
         step === 'closer'
           ? -1
           : items.findIndex(function (it) {
-              var lead = it.unit[0].step;
+              var lead = leadOf(it);
               if (ie && step === 'support') return lead === 'ieMeeting';
               return !!lead && _stepAt(lead) > si;
             });
@@ -6904,9 +6980,10 @@ window.ReportQuestionnaire = (function () {
       return;
     }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    // Arrow keys in the open calendar stay there: they never move to
-    // another student (which would drop an IE waiting for its date).
-    if (_cal && t && t.closest && t.closest('#tq-cal')) {
+    // Arrow keys in the open calendar stay there (and with the focus lost
+    // to the page while it is open): they never move to another student,
+    // which would drop an IE waiting for its date.
+    if (_cal && (!t || t === document.body || (t.closest && t.closest('#tq-cal')))) {
       if (e.stopPropagation) e.stopPropagation();
       return;
     }
@@ -6953,6 +7030,7 @@ window.ReportQuestionnaire = (function () {
     tqDeadlineMonth: tqDeadlineMonth,
     tqPickDeadline: tqPickDeadline,
     deadlineAt: deadlineAt,
+    meetingRowAt: meetingRowAt,
     shownText: _shownText,
     deadlineSentence: _deadlineSentence,
     tqLine: tqLine,

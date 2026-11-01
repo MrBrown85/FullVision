@@ -235,6 +235,61 @@ describe('3. An IE comment written without Generate', () => {
   });
 });
 
+describe('3b. A meeting sentence the teacher typed', () => {
+  // Not a bank sentence: the teacher's own words.
+  const MEET = 'Please call me so we can set up a time to talk.';
+  const TYPED = 'Noor needs more marked work for a grade this term. ' + MEET;
+  const meetingRows = html => html.split('<span class="qn-req-label">Meeting</span>').length - 1;
+
+  it('matches a short list of phrasings, only on the IE path and only for typed rows', () => {
+    const typed = t => RQ.typedRow(t, 1);
+    [
+      'Please contact me to set a time.',
+      'I would like to meet with you about this.',
+      'Please call me at school.',
+    ].forEach(t => expect(RQ.meetingRowAt([typed('Noor is kind.'), typed(t)], 'ie'), t).toBe(1));
+    expect(RQ.meetingRowAt([typed('Noor reads every day.')], 'ie')).toBe(-1);
+    expect(RQ.meetingRowAt([typed(MEET)], '')).toBe(-1);
+    expect(RQ.meetingRowAt([typed(MEET), { step: 'ieMeeting', text: 'x' }], 'ie')).toBe(-1);
+  });
+
+  it('stands for the Meeting row, Written by you, and Generate keeps it instead of adding one', () => {
+    seed();
+    rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18', narrative: TYPED });
+    let html = open();
+    expect(meetingRows(html)).toBe(1);
+    expect(html).toMatch(
+      /<span class="qn-req-label">Meeting<\/span><span class="qn-req-chip">Required<\/span><\/div>\s*<div class="qn-req-body"><span class="qn-req-text">Please call me so we can set up a time to talk\.<\/span><span class="qn-req-source">Written by you<\/span>/,
+    );
+    // Generate fills in the other parts around it, never a second Meeting.
+    const box = {
+      value: TYPED,
+      dataset: { cid: CID, term: TERM, sid: NOOR.id },
+      style: {},
+      scrollHeight: 0,
+      focus() {},
+      select() {},
+      setSelectionRange() {},
+    };
+    els['tq-narrative'] = box;
+    try {
+      RQ.tqGenerate();
+      const text = box.value;
+      expect(text).toContain(MEET);
+      expect(text.split(MEET).length - 1).toBe(1);
+      const bankMeeting = COMMENT_BANK.sentences.filter(x => x.group === 'IE Meeting');
+      const f = factsNow();
+      const ctx = CommentBank.context(f, {});
+      bankMeeting.forEach(x => expect(text).not.toContain(CommentBank.fill(x, ctx)));
+      html = RQ.renderTermQuestionnaire(CID);
+      expect(meetingRows(html)).toBe(1);
+      expect(html).toContain('Written by you');
+    } finally {
+      delete els['tq-narrative'];
+    }
+  });
+});
+
 describe('5. A saved deadline that cannot stand', () => {
   const STALE_SENTENCE = d => `Work submitted by ${d} can replace this IE with a grade.`;
   const comment = d =>
