@@ -2483,7 +2483,39 @@ body.fv-switching-course::after {
   height: auto;
   min-height: 320px;
   max-height: none;
-  margin: 4px 0 44px;
+  margin: 4px 0 0;
+}
+/* Under the stack: "N of M" and All Students, which opens the list sheet. */
+.m-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 44px;
+}
+.m-card-count {
+  font-size: 13px;
+  color: var(--text-3);
+  font-weight: 500;
+}
+.m-card-all {
+  background: var(--surface);
+  border: none;
+  border-radius: 14px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--link);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-search-wrap.m-search-wrap-sheet {
+  padding: 0 0 8px;
+  background: var(--surface);
+}
+.m-list.m-list-sheet {
+  margin: 0;
 }
 .m-card-stack-item {
   position: absolute;
@@ -2564,25 +2596,6 @@ body.fv-switching-course::after {
   align-items: center;
   gap: 14px;
   margin-bottom: 16px;
-}
-.m-scard-customize {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: none;
-  border: none;
-  color: var(--text-3);
-  padding: 10px;
-  cursor: pointer;
-  border-radius: 50%;
-  -webkit-tap-highlight-color: transparent;
-  line-height: 0;
-  z-index: 1;
-  opacity: 0.5;
-}
-.m-scard-customize:active {
-  background: var(--bg-secondary);
-  opacity: 1;
 }
 .m-scard-avatar {
   width: 64px;

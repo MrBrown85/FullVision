@@ -532,7 +532,7 @@
         return;
       }
 
-      // Settings sheet (course switcher + sign out + switch to desktop)
+      // Settings sheet (course switcher, Customize Card on Students, sign out, switch to desktop)
       if (action === 'm-settings') {
         var pickerCourses = getPickerCourses(_cid);
         var courseOpts = pickerCourses
@@ -575,6 +575,9 @@
                 courseOpts +
                 '</select>' +
                 '</div>'
+              : '') +
+            (_activeTab === 'students'
+              ? '<button class="m-btn-primary" style="background:var(--surface);color:var(--text);border:1px solid var(--border)" data-action="m-open-widget-editor">Customize Card</button>'
               : '') +
             '<button class="m-btn-primary" style="background:var(--surface);color:var(--text);border:1px solid var(--border)" data-action="m-switch-desktop">Switch to Desktop</button>' +
             '<button class="m-btn-primary" style="background:none;color:var(--score-1);border:none;margin-top:4px" data-action="m-sign-out">Sign Out</button>' +
@@ -648,9 +651,13 @@
       }
 
       // ── Students tab ──
-      if (action === 'm-set-view') {
-        var mode = target.getAttribute('data-mode');
-        if (mode) MStudents.setViewMode(mode);
+      if (action === 'm-all-students') {
+        MStudents.showAllStudents();
+        return;
+      }
+
+      if (action === 'm-jump-student') {
+        MStudents.jumpToStudent(target.getAttribute('data-sid'));
         return;
       }
 

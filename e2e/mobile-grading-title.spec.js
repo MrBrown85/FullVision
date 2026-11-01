@@ -34,8 +34,7 @@ test('the student page keeps its bar title hidden at rest and fades it in on scr
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  await page.locator('[data-action="m-set-view"][data-mode="list"]').click();
-  await page.locator('[data-action="m-student-detail"]').first().click();
+  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
   const title = page.locator('#m-nav-bar-student-detail .m-nav-bar-title-inline');
   await expect(title).toHaveCSS('opacity', '0');
   // The scroll handler is bound once the page has slid in, so scroll until it fades in.

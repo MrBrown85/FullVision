@@ -6,7 +6,6 @@ window.MStudents = (function () {
   var MC = window.MComponents;
   var ListUI = window.MStudentsList;
   var DetailUI = window.MStudentDetail;
-  var _viewMode = 'cards'; // 'cards' or 'list'
   var _sortMode = 'alpha'; // 'alpha' | 'proficiency' | 'missing' | 'lastObserved'
   var _activeCid = null;
 
@@ -24,32 +23,11 @@ window.MStudents = (function () {
     return badges;
   }
 
-  function _syncViewVisibility(showCards) {
-    var container = document.getElementById('m-student-card-stack');
-    var list = document.getElementById('m-student-list');
-    var search = document.getElementById('m-student-search-wrap');
-    if (search) search.style.display = _viewMode === 'cards' ? 'none' : '';
-    if (container) {
-      container.style.display = showCards ? '' : 'none';
-      // Cards view sizes the stack to the screen (see .m-cards-mode).
-      var content = container.closest('.m-screen-content');
-      if (content) content.classList.toggle('m-cards-mode', showCards);
-    }
-    if (list) {
-      list.style.display = showCards ? 'none' : '';
-      if (!showCards)
-        list.querySelectorAll('.m-cell').forEach(function (c) {
-          c.style.display = '';
-        });
-    }
-  }
-
   /* ── Student List Screen ────────────────────────────────────── */
   function renderList(cid) {
     _activeCid = cid;
     return ListUI.renderList({
       cid: cid,
-      viewMode: _viewMode,
       sortMode: _sortMode,
       renderBadges: _renderBadges,
     });
@@ -65,11 +43,6 @@ window.MStudents = (function () {
 
   function initCardStack(cid) {
     destroyCardStack();
-
-    if (_viewMode === 'list') {
-      _syncViewVisibility(false);
-      return;
-    }
 
     var container = document.getElementById('m-student-card-stack');
     if (!container) return;
@@ -90,6 +63,7 @@ window.MStudents = (function () {
     };
 
     _stackInstance = MCardStack.create(container, students, {
+      counterEl: document.getElementById('m-student-card-count'),
       renderCard: function (st) {
         return _renderStudentCard(st, cid, data);
       },
@@ -101,7 +75,6 @@ window.MStudents = (function () {
       },
     });
 
-    _syncViewVisibility(true);
     _initLongPress(container, cid);
   }
 
@@ -150,25 +123,25 @@ window.MStudents = (function () {
     );
   }
 
-  function setViewMode(mode) {
-    if (mode !== 'cards' && mode !== 'list') return;
-    _viewMode = mode;
+  /* ── All Students sheet: the list, with search ─────────────── */
+  function renderAllStudents(cid) {
+    return ListUI.renderAllStudentsSheet({ cid: cid, sortMode: _sortMode, renderBadges: _renderBadges });
+  }
 
-    // Update toggle buttons
-    document.querySelectorAll('.m-view-toggle-btn').forEach(function (btn) {
-      btn.classList.toggle('active', btn.dataset.mode === mode);
-    });
+  function showAllStudents() {
+    MC.presentSheet(renderAllStudents(_activeCid));
+  }
 
-    if (mode === 'list') {
-      destroyCardStack();
-      _syncViewVisibility(false);
-    } else {
-      // Cards view has no search, so a leftover search is cleared.
-      var input = document.querySelector('[data-action="m-student-search"]');
-      if (input) input.value = '';
-      _showNoMatch('');
-      _syncViewVisibility(true);
-      initCardStack(_activeCid);
+  // Tapping a name in the sheet brings that student's card to the front.
+  function jumpToStudent(sid) {
+    MC.dismissSheet();
+    if (!_stackInstance) return;
+    var students = sortStudents(getStudents(_activeCid), _sortMode, _activeCid);
+    for (var i = 0; i < students.length; i++) {
+      if (students[i].id === sid) {
+        _stackInstance.goTo(i);
+        return;
+      }
     }
   }
 
@@ -182,14 +155,7 @@ window.MStudents = (function () {
   function setSortMode(mode) {
     _sortMode = mode;
     MC.dismissSheet();
-    var listEl = document.getElementById('m-student-list');
-    if (listEl) {
-      var students = sortStudents(getStudents(_activeCid), mode, _activeCid);
-      var allStatuses = getAssignmentStatuses(_activeCid);
-      var allAssessments = getAssessments(_activeCid);
-      listEl.innerHTML = ListUI.buildCells(students, _activeCid, allStatuses, allAssessments, _renderBadges);
-    }
-    if (_viewMode === 'cards') initCardStack(_activeCid);
+    initCardStack(_activeCid);
   }
 
   function showSortSheet() {
@@ -229,19 +195,12 @@ window.MStudents = (function () {
   function filterList(query) {
     var q = (query || '').toLowerCase().trim();
     var matches = 0;
-    if (q) {
-      // Searching: always show filtered list, hide cards
-      _syncViewVisibility(false);
-      document.querySelectorAll('#m-student-list .m-cell').forEach(function (cell) {
-        var name = (cell.querySelector('.m-cell-title') || {}).textContent || '';
-        var match = name.toLowerCase().indexOf(q) >= 0;
-        if (match) matches++;
-        cell.style.display = match ? '' : 'none';
-      });
-    } else {
-      // Search cleared: restore the active view mode
-      _syncViewVisibility(_viewMode === 'cards' && !!_stackInstance);
-    }
+    document.querySelectorAll('#m-student-list .m-cell').forEach(function (cell) {
+      var name = (cell.querySelector('.m-cell-title') || {}).textContent || '';
+      var match = name.toLowerCase().indexOf(q) >= 0;
+      if (match) matches++;
+      cell.style.display = match ? '' : 'none';
+    });
     _showNoMatch(q && !matches ? (query || '').trim() : '');
   }
 
@@ -269,7 +228,9 @@ window.MStudents = (function () {
     filterList: filterList,
     initCardStack: initCardStack,
     destroyCardStack: destroyCardStack,
-    setViewMode: setViewMode,
+    renderAllStudents: renderAllStudents,
+    showAllStudents: showAllStudents,
+    jumpToStudent: jumpToStudent,
     setSortMode: setSortMode,
     showSortSheet: showSortSheet,
   };

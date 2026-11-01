@@ -77,6 +77,11 @@ window.MCardStack = (function () {
     }
 
     function _updateCounter() {
+      // opts.counterEl puts "N of M" in the caller's own element.
+      if (opts.counterEl) {
+        opts.counterEl.textContent = _idx + 1 + ' of ' + _cards.length;
+        return;
+      }
       var counter = containerEl.querySelector('.m-card-counter');
       if (!counter) {
         counter = document.createElement('div');

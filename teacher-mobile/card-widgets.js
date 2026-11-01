@@ -597,17 +597,8 @@ window.MCardWidgets = (function () {
       middleHtml += render(key, st, cid, data);
     }
 
-    var customizeBtn =
-      '<button class="m-scard-customize" data-action="m-open-widget-editor" aria-label="Customize card">' +
-      '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">' +
-      '<line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/>' +
-      '<circle cx="5" cy="4" r="1.5" fill="currentColor"/><circle cx="10" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="12" r="1.5" fill="currentColor"/>' +
-      '</svg>' +
-      '</button>';
-
     return (
       '<div class="m-scard">' +
-      customizeBtn +
       heroHtml +
       '<div class="m-scard-widgets">' +
       middleHtml +
