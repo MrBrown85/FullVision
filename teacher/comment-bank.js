@@ -2568,13 +2568,29 @@ window.CommentBank = (function () {
      student's answer that holds "{name}" or "[a|b]" is never read as a
      slot), a [singular|plural] verb, and the slots built whole (the best
      piece, the strong habits) as their own tokens. */
-  function sentenceTokens(s, ctx) {
+  function _tokensRaw(s, ctx) {
     var own = Object.prototype.hasOwnProperty;
     var toks = ctx._toks || {};
     return R.tokens(s.text, function (k) {
       if (own.call(toks, k) && toks[k] && own.call(ctx, k) && ctx[k]) return toks[k];
       return own.call(ctx, k) && ctx[k] != null ? String(ctx[k]) : '';
     });
+  }
+  function sentenceTokens(s, ctx) {
+    return _tokensRaw(s, ctxFor(s, ctx));
+  }
+
+  /* The context one sentence is filled from (the realiser's length rule,
+     2026-11-01: the realised sentence counts, not the template). When
+     "{strengths}" holds two skills and the sentence filled with both runs
+     past 20 words, the slot holds the strongest skill alone ({strength}),
+     and the provenance records that value. A sentence still over 20 words
+     with one skill is not offered (_compose) and fails verify(). */
+  function ctxFor(s, ctx) {
+    if (!s || !ctx || !/\{strengths\}/.test(String(s.text || ''))) return ctx;
+    if (!ctx.strengths || !ctx.strength || ctx.strengths === ctx.strength) return ctx;
+    if (!R.tooLong(R.render(_tokensRaw(s, ctx), whoOf(ctx), { named: true }))) return ctx;
+    return Object.assign({}, ctx, { strengths: ctx.strength });
   }
   /* Who a context is about: { name, p, onFile }. A context built by hand
      with pronouns counts them as on file. */
@@ -2882,6 +2898,9 @@ window.CommentBank = (function () {
   var CLAIM_FACTS = { lateWork: 'record.late', notHandedIn: 'notHandedIn' };
   function provenance(s, ctx) {
     var own = Object.prototype.hasOwnProperty;
+    // The values as the sentence was filled: one skill in {strengths} when
+    // two would run past 20 words (ctxFor).
+    ctx = ctxFor(s, ctx);
     var values = {};
     var sources = {};
     var factKeys = [];
@@ -3536,8 +3555,9 @@ window.CommentBank = (function () {
           s: s,
           t: t,
           dup: dup ? 1 : 0,
-          // A sentence over 20 words (a quoted title as one) only when
-          // nothing shorter fits (the realiser's length rule).
+          // A sentence over 20 words as realised (a quoted title as one),
+          // after {strengths} has fallen back to one skill (ctxFor), is
+          // not offered (the realiser's length rule, 2026-11-01).
           long: R.tooLong(t) ? 1 : 0,
           // Exhaust before repeat: a sentence no classmate has comes before
           // any a classmate has, the least used next.
@@ -3555,11 +3575,11 @@ window.CommentBank = (function () {
         };
       };
       // A quotation already in the draft is out: now that every title is
-      // quoted (the realiser), the same piece is never named twice. When
-      // the whole tier repeats one, a sentence that asserts nothing stands
-      // in, as for an excluded tier.
+      // quoted (the realiser), the same piece is never named twice. So is
+      // a sentence over 20 words as realised. When the whole tier is out,
+      // a sentence that asserts nothing stands in, as for an excluded tier.
       var fresh = function (x) {
-        return !x.dup;
+        return !x.dup && !x.long;
       };
       var scored = tier.map(score).filter(fresh);
       if (!scored.length)
@@ -3571,7 +3591,7 @@ window.CommentBank = (function () {
           .filter(fresh);
       if (!scored.length) return;
       scored.sort(function (a, b) {
-        return a.long - b.long || a.used - b.used || a.general - b.general || a.repeats - b.repeats || a.r - b.r;
+        return a.used - b.used || a.general - b.general || a.repeats - b.repeats || a.r - b.r;
       });
       var pick = scored[0];
       taken[pick.s.id] = true;
@@ -4244,16 +4264,18 @@ window.CommentBank = (function () {
       var labels = (f.comps || []).map(function (c) {
         return String(c.name || '');
       });
-      var wording = function (k, want) {
-        return !_has(pv, k) || (!!v[k] && v[k] === want && labels.indexOf(v[k]) < 0);
+      var wording = function (k, wants) {
+        return !_has(pv, k) || (!!v[k] && wants.indexOf(v[k]) >= 0 && labels.indexOf(v[k]) < 0);
       };
       return (
         ids.length > 0 &&
         ids.every(function (id) {
           return gated.indexOf(String(id)) >= 0;
         }) &&
-        wording('strengths', strengthsText(f)) &&
-        wording('strength', strengthText(f))
+        // {strengths} holds both skills, or the strongest alone when two
+        // would run the sentence past 20 words (ctxFor).
+        wording('strengths', [strengthsText(f), strengthText(f)]) &&
+        wording('strength', [strengthText(f)])
       );
     },
     // Competencies to build: each below the highest now.
@@ -4552,11 +4574,15 @@ window.CommentBank = (function () {
     },
   };
 
-  /* The claims that fail for one sentence, and 'slots' when a value it was
-     filled with is no longer what the facts give or it no longer fits. */
+  /* The claims that fail for one sentence, 'slots' when a value it was
+     filled with is no longer what the facts give or it no longer fits, and
+     'length' when the sentence as realised runs past 20 words (the
+     realiser's rule; {strengths} already held to one skill by ctxFor). */
   function _failed(s, pv, f, ctx) {
     var own = Object.prototype.hasOwnProperty;
     var out = [];
+    ctx = ctxFor(s, ctx);
+    if (R.tooLong(fill(s, ctx))) out.push('length');
     var stale =
       !_fitsSlots(s, ctx, { story: false }) ||
       Object.keys(pv.values || {}).some(function (k) {
@@ -5020,6 +5046,7 @@ window.CommentBank = (function () {
     stepPool: stepPool,
     provenance: provenance,
     verify: verify,
+    ctxFor: ctxFor,
     factsHash: factsHash,
     marksOf: marksOf,
     draftMeta: draftMeta,

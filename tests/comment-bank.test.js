@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 902 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(902);
+  it('has 864 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(864);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(902);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(864);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -92,12 +92,6 @@ describe('the bank', () => {
     fams.forEach(f => {
       const mine = COMMENT_BANK.sentences.filter(s => s.subjects && s.subjects.indexOf(f) >= 0);
       expect(mine.length, f).toBeGreaterThanOrEqual(6);
-      ['Emerging', 'Developing', 'Proficient'].forEach(w =>
-        expect(
-          mine.some(s => s.when && s.when.standing === w),
-          f + ' ' + w,
-        ).toBe(true),
-      );
     });
     // The habits sentences name a habit only through habitWords, which says
     // Completes Work in PE and Arts their own way. The Not Handed In frames
@@ -141,9 +135,11 @@ describe('the bank', () => {
     COMMENT_BANK.sentences
       .filter(s => /\{strengths?\}/.test(s.text))
       .forEach(s => expect(s.text, s.id).toMatch(/\bcan \{strengths?\}/));
-    ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w =>
-      expect(at('standing', w).length, w).toBeGreaterThanOrEqual(3),
-    );
+    // The standing word is said once, by the grade sentence (DRAFT_STEPS
+    // `says`), so no Overall sentence conditions on it: the 44 that did
+    // (n114-n125, n201-n239, n300) could never be offered and were cut
+    // (2026-11-01).
+    ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w => expect(at('standing', w), w).toEqual([]));
   });
 
   it('keeps the old generator’s cut patterns out: no superlatives, no teacher’s feelings', () => {
@@ -328,7 +324,7 @@ describe('fill', () => {
   it('puts a habit phrase in as the context gives it', () => {
     const hs08 = COMMENT_BANK.sentences.find(s => s.id === 'hs08');
     expect(CommentBank.fill(hs08, fullContext(P.he))).toBe(
-      'His work habits to build next are using feedback and taking part in class.',
+      'His work habits to build are using feedback and taking part in class.',
     );
   });
 });
@@ -559,18 +555,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // The habits part: Completes Work from the record is the one strong
   // habit, so the four Strong Habits frames (hs11, hs13-hs15) fit, and the
   // five Habit Ratings frames for Completes Work at Consistently.
-  it('knows the Demo class is Science from its name, and offers Cece 60 sentences (9, 15, 11, 25)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 63 sentences (9, 18, 11, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 15, 11, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(60);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 18, 11, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(63);
   });
 
-  it('offers Jasper 61 (9, 15, 12, 25), by the name he goes by', () => {
+  it('offers Jasper 64 (9, 18, 12, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 15, 12, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(61);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 18, 12, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(64);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
