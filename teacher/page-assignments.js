@@ -3298,7 +3298,9 @@ window.PageAssignments = (function () {
     // Leaving a field without changing it saves nothing; an untouched blank
     // field used to write a 0. A typed 0 is a score; blank clears.
     if (raw === getPointsScore(cid, sid, aid)) return;
-    if (raw != null) setScore(cid, sid, aid, aid, raw);
+    // setPointsScore saves the one score, as the gradebook and phone do. A
+    // second write under the assessment's own id left a stray entry and
+    // sent the score twice.
     setPointsScore(cid, sid, aid, raw);
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
     if (pctSpan) pctSpan.innerHTML = pointsPctHtml(raw, max, 0);
@@ -3463,7 +3465,7 @@ window.PageAssignments = (function () {
     var assess = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
-    upsertScore(cid, sid, aid, tagId, value, assess ? assess.date : '', assess ? assess.type : 'summative', '', mod);
+    upsertScore(cid, sid, aid, tagId, value, assess ? assess.date : '', scoreTypeFor(assess), '', mod);
   }
 
   /* ── + / − on a proficiency level ───────────────────────── */
@@ -3601,7 +3603,7 @@ window.PageAssignments = (function () {
     });
     var wasActive = el.classList.contains('active');
     var next = wasActive ? 0 : value;
-    upsertScore(cid, sid, aid, tagId, next, assess ? assess.date : '', assess ? assess.type : 'summative', '');
+    upsertScore(cid, sid, aid, tagId, next, assess ? assess.date : '', scoreTypeFor(assess), '');
     group.querySelectorAll('.score-opt').forEach(function (o) {
       o.classList.remove('active');
     });

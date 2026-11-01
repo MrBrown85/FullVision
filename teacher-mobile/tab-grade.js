@@ -1016,14 +1016,6 @@ window.MGrade = (function () {
     card.outerHTML = _renderStudentCard(cid, st, assessment, getScores(cid), getAssignmentStatuses(cid));
   }
 
-  function _scoreType(assessment) {
-    return assessment
-      ? getAssessmentCategoryId(assessment)
-        ? 'summative'
-        : assessment.type || 'formative'
-      : 'summative';
-  }
-
   /* Write one level (and ±) under every key of a criterion, undoable as one. */
   function _writeCriterion(cid, sid, found, level, mod) {
     var aid = found.assessment.id;
@@ -1041,8 +1033,8 @@ window.MGrade = (function () {
         aid,
         tid,
         level,
-        found.assessment.date || getTodayStr(),
-        _scoreType(found.assessment),
+        found.assessment.date || courseToday(cid),
+        scoreTypeFor(found.assessment),
         '',
         mod || 0,
       );
@@ -1178,12 +1170,17 @@ window.MGrade = (function () {
     var assessment = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
-    var type = assessment
-      ? getAssessmentCategoryId(assessment)
-        ? 'summative'
-        : assessment.type || 'formative'
-      : 'summative';
-    upsertScore(cid, sid, aid, tid, e.score, assessment ? assessment.date : getTodayStr(), type, e.note || '', next);
+    upsertScore(
+      cid,
+      sid,
+      aid,
+      tid,
+      e.score,
+      (assessment && assessment.date) || courseToday(cid),
+      scoreTypeFor(assessment),
+      e.note || '',
+      next,
+    );
     clearProfCache();
     MC.haptic();
     _syncModBtns(cid, sid, aid, tid);
@@ -1213,13 +1210,16 @@ window.MGrade = (function () {
     var assessment = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
-    var type = assessment
-      ? getAssessmentCategoryId(assessment)
-        ? 'summative'
-        : assessment.type || 'formative'
-      : 'summative';
-
-    upsertScore(cid, sid, aid, tid, score, assessment ? assessment.date : getTodayStr(), type, '');
+    upsertScore(
+      cid,
+      sid,
+      aid,
+      tid,
+      score,
+      (assessment && assessment.date) || courseToday(cid),
+      scoreTypeFor(assessment),
+      '',
+    );
     clearProfCache();
     MC.haptic();
 
@@ -1257,34 +1257,11 @@ window.MGrade = (function () {
     var newStatus = current === status ? null : status;
     // Missing and Excused never go on work with a score or feedback.
     if (!canSetAssignmentStatus(cid, sid, aid, newStatus)) return;
-    setAssignmentStatus(cid, sid, aid, newStatus);
+    // The desktop's rule (data.js applyAssignmentStatus): NS on proficiency
+    // work zeroes every score under it; clearing NS restores nothing.
+    var clearsScores = applyAssignmentStatus(cid, sid, aid, newStatus);
+    if (clearsScores) clearProfCache();
     MC.haptic();
-
-    // NS auto-zero: match desktop behaviour (page-assignments.js
-    // toggleStudentStatus). Setting NS on proficiency work zeroes every tag
-    // score under it (0 deletes a tag score). Clearing NS does NOT
-    // auto-restore — the teacher has to re-score. On points and
-    // Complete/Incomplete work 0 is a real score that would outlive the NS,
-    // and calc.js already counts NS as 0, so the score is left alone.
-    var assess = getAssessments(cid).find(function (a) {
-      return a.id === aid;
-    });
-    var clearsScores = !!assess && !isPointsScored(assess);
-    if (newStatus === 'NS' && clearsScores) {
-      scoreTagIds(assess, cid).forEach(function (tagId) {
-        upsertScore(
-          cid,
-          sid,
-          aid,
-          tagId,
-          0,
-          assess.date || (typeof courseToday === 'function' ? courseToday(cid) : ''),
-          assess.type || 'summative',
-          '',
-        );
-      });
-      clearProfCache();
-    }
 
     // Update pill states
     var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
