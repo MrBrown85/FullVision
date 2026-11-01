@@ -11,7 +11,8 @@
  *   window.clearRowScores    → clear_row_scores
  *   window.clearColumnScores → clear_column_scores
  *
- * The rubric-vs-tag dispatch reads _cache.v2Gradebook[cid].assessments[aid].has_rubric.
+ * The rubric-vs-tag dispatch reads the cached assessment (_assessmentById):
+ * its competencies (tag_ids) and its rubric's criteria (rubric_id).
  * Non-UUID student / assessment IDs are rejected at the guard (no RPC emitted).
  */
 import './setup.js';
@@ -67,24 +68,31 @@ describe('v2 scoring-dispatch', () => {
     delete _cache.v2Gradebook[CID];
   });
 
-  // Pending the dispatch refactor described at the top of this file.
-  // The current `_persistScoreToCanonical` resolves the criterion via the
-  // local rubric cache + assessment.tagIds (working in production, where
-  // _hydrateCanonicalDetails populates both); these four tests exercise the
-  // future contract — switch on assessment.has_rubric and treat tid as a
-  // tag-or-criterion based on that flag — which also requires updating the
-  // rubric-grid click handler to pass criterion ids and migrating the local
-  // score cache schema. Unblocking all four lands together with that work.
-  // Pre-existing failures on main since b023b2c (2026-04-30); this PR does
-  // not touch the dispatch path.
+  // The dispatch picks the RPC from the cached assessment: a key that is one
+  // of its competencies goes to upsert_tag_score, a criterion of its rubric
+  // to upsert_rubric_score. (These four were skipped from 2026-04-30 to
+  // 2026-11-01: they were written for a has_rubric switch that never
+  // shipped, and their fixtures had no competencies or rubric.)
+  function linkTags() {
+    _cache.v2Gradebook[CID].assessments[0].tag_ids = [TAG_ID, TAG_ID_2];
+  }
+  function linkRubric() {
+    _cache.v2Gradebook[CID].assessments[1].rubric_id = 'rubric-1';
+    _cache.rubrics[CID] = [{ id: 'rubric-1', criteria: [{ id: CRIT_ID, name: 'Evidence' }] }];
+  }
+  afterEach(() => {
+    _cache.rubrics[CID] = undefined;
+  });
+
   describe('_persistScoreToCanonical', () => {
-    it.skip('dispatches to upsert_tag_score for a non-rubric assessment', () => {
+    it("dispatches to upsert_tag_score for one of the assessment's competencies", () => {
+      linkTags();
       _persistScoreToCanonical(CID, ENR, AID_TAG, TAG_ID, 3, '');
       var call = client.calls.find(function (c) {
         return c.name === 'upsert_tag_score';
       });
       expect(call).toBeDefined();
-      expect(call.payload).toEqual({
+      expect(call.payload).toMatchObject({
         p_enrollment_id: ENR,
         p_assessment_id: AID_TAG,
         p_tag_id: TAG_ID,
@@ -92,13 +100,14 @@ describe('v2 scoring-dispatch', () => {
       });
     });
 
-    it.skip('dispatches to upsert_rubric_score when assessment.has_rubric is true', () => {
+    it("dispatches to upsert_rubric_score for a criterion of the assessment's rubric", () => {
+      linkRubric();
       _persistScoreToCanonical(CID, ENR, AID_RUBRIC, CRIT_ID, 4, '');
       var call = client.calls.find(function (c) {
         return c.name === 'upsert_rubric_score';
       });
       expect(call).toBeDefined();
-      expect(call.payload).toEqual({
+      expect(call.payload).toMatchObject({
         p_enrollment_id: ENR,
         p_assessment_id: AID_RUBRIC,
         p_criterion_id: CRIT_ID,
@@ -125,7 +134,8 @@ describe('v2 scoring-dispatch', () => {
       });
     });
 
-    it.skip('can dispatch both tag_score and save_score_comment in one call', () => {
+    it('can dispatch both tag_score and save_score_comment in one call', () => {
+      linkTags();
       _persistScoreToCanonical(CID, ENR, AID_TAG, TAG_ID, 3, 'solid');
       var names = client.calls
         .map(function (c) {
@@ -228,8 +238,8 @@ describe('v2 scoring-dispatch', () => {
   });
 
   describe('persistScoreDiffToCanonical', () => {
-    // Same dispatch refactor as the four sibling tests above — pending.
-    it.skip('dispatches changed rows and zeroes removed rows after a bulk local restore', () => {
+    it('dispatches changed rows and zeroes removed rows after a bulk local restore', () => {
+      linkTags();
       const prev = {
         [ENR]: [
           { assessmentId: AID_TAG, tagId: TAG_ID, score: 4, note: '' },
@@ -245,7 +255,7 @@ describe('v2 scoring-dispatch', () => {
       const tagCalls = client.calls.filter(function (c) {
         return c.name === 'upsert_tag_score';
       });
-      expect(tagCalls).toEqual([
+      expect(tagCalls).toMatchObject([
         {
           name: 'upsert_tag_score',
           payload: {
