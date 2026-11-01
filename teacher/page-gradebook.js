@@ -1531,6 +1531,7 @@ window.PageGradebook = (function () {
         '</span>' +
         '</div>';
     });
+    html += '<div class="gb-grid-rowhead gb-grid-rowhead-stats gb-scores-stats-head">Class Average</div>';
     html += '</div>';
 
     // Q4: Data cells (bottom-right, scrolls both ways — drives the others)
@@ -1618,6 +1619,26 @@ window.PageGradebook = (function () {
 
       html += '</tr>';
     });
+    // Class Average under each column: calc.js's one column rule, written
+    // as the printed sheet and the CSV write it.
+    html += '<tr class="gb-stats-row gb-scores-stats">';
+    sortedAssess.forEach(function (a) {
+      var stats = classColumnAverage(cid, sortedStudents, { assessment: a });
+      if (!stats) {
+        html += '<td class="gb-scores-avg"><span class="gb-avg-val" style="color:var(--text-3)">\u2014</span></td>';
+        return;
+      }
+      var level = isPointsScored(a)
+        ? pointsToProf(stats.pct != null ? stats.pct : 0, 100, getGradingScale(cid))
+        : Math.round(stats.avg);
+      html +=
+        '<td class="gb-scores-avg"><span class="gb-avg-val" style="color:' +
+        (PROF_COLORS[level] || PROF_COLORS[0]) +
+        '">' +
+        (isPointsScored(a) || isCompletionScored(a) ? _csvAverageText(a, stats) : formatLevel(cid, stats.avg)) +
+        '</span></td>';
+    });
+    html += '</tr>';
     html += '</tbody></table></div></div>'; // close table + data + grid
     return html;
   }
@@ -2360,6 +2381,7 @@ window.PageGradebook = (function () {
      Space picks one, Escape closes it and gives focus back. The click that
      closes it does nothing else, so it can't open the grader under it. */
   var _menuReturnFocus = null;
+  var _headClickTimer = null;
   function _wireMenu(menu, invoker) {
     menu.setAttribute('role', 'menu');
     menu.tabIndex = -1;
@@ -3301,6 +3323,20 @@ window.PageGradebook = (function () {
       });
     }
 
+    // A click on a slanted column title opens its menu, after the
+    // double-click time so a double-click (Score Mode) doesn't also open it.
+    if (_inSlantedHeads(e.target)) {
+      var hit = _slantedColAt(e.clientX, e.clientY);
+      clearTimeout(_headClickTimer);
+      if (hit && e.detail <= 1) {
+        var at = { clientX: e.clientX, clientY: e.clientY };
+        _headClickTimer = setTimeout(function () {
+          if (hit.el.isConnected && !_graderOpen()) showHeaderContextMenu(at, hit.el);
+        }, 260);
+      }
+      return;
+    }
+
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
@@ -3453,6 +3489,7 @@ window.PageGradebook = (function () {
     });
     _addDocListener('dblclick', function (e) {
       if (_graderOpen()) return;
+      clearTimeout(_headClickTimer);
       var el = e.target.closest('[data-action-dblclick]');
       if (_inSlantedHeads(e.target)) {
         var hit = _slantedColAt(e.clientX, e.clientY);

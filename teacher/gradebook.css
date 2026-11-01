@@ -754,6 +754,20 @@ th.gb-group-alt {
   background: var(--bg) !important;
   border-top: 1px solid var(--divider-strong);
 }
+/* The Scores view's Class Average row: its rows' 40px height. */
+.gb-scores-stats td.gb-scores-avg {
+  height: 40px;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.gb-scores-avg .gb-avg-val {
+  font-family: var(--font-base);
+}
+.gb-grid-rowheads .gb-scores-stats-head {
+  height: 40px;
+  box-sizing: border-box;
+}
 .gb-stats-row .gb-name {
   font-weight: 700;
   font-size: var(--text-sm);
@@ -953,7 +967,8 @@ th.gb-group-alt {
   display: flex;
   flex-direction: column;
   text-align: left;
-  cursor: default;
+  /* A click on a title opens its column menu. */
+  cursor: pointer;
 }
 .gb-grid-colhead .gb-scores-assess-name,
 .gb-grid-colhead .gb-scores-assess-meta {
