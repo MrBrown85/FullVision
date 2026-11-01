@@ -29,8 +29,18 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
+
+      - name: Regenerate the lockfile (temporary)
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Upload the lockfile (temporary)
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock
+          path: package-lock.json
+          retention-days: 3
 
       - name: Install dependencies
         run: npm ci
@@ -120,12 +130,10 @@ jobs:
   # runner they took 10–14 minutes, so they run once, after a merge to main,
   # not on every push to a pull request; split across two runners they take
   # about seven. Run them locally with `npm run test:e2e` before merging a
-  # change to a page. Not a required check. Pinned to Ubuntu 24.04:
-  # ubuntu-latest moved to 26.04 in October 2026, where Playwright 1.58 can't
-  # install Chromium.
+  # change to a page. Not a required check.
   e2e:
     if: github.event_name != 'pull_request'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     # Only the newest commit on a branch is tested: a new merge to main
     # cancels the run still testing the commit before it. One group per
@@ -148,7 +156,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -196,7 +204,7 @@ jobs:
   e2e-report:
     needs: e2e
     if: always() && (needs.e2e.result == 'success' || needs.e2e.result == 'failure')
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
       group: e2e-report-${{ github.ref }}
@@ -212,7 +220,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
