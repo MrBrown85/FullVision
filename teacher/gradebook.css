@@ -502,6 +502,13 @@
 .gb-score-val.s4 {
   background: var(--score-4);
 }
+/* Dark mode's level colours are light, so their numbers are dark (white on
+   them was about 2.7:1). */
+@media (prefers-color-scheme: dark) {
+  .gb-score-val:not(.s0) {
+    color: #1d1d1f;
+  }
+}
 /* A rubric competency whose criteria disagree: the lowest is shown, with a
    striped fill. */
 .gb-score-val.gb-mixed {
