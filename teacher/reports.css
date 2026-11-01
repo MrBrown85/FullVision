@@ -5826,6 +5826,11 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-browse-group-rows[hidden] {
   display: none;
 }
+.qn-browse-none {
+  padding: 10px 14px 12px 32px;
+  font-size: 13px;
+  color: var(--text-3);
+}
 .qn-browse-row {
   display: flex;
   align-items: center;

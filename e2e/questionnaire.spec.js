@@ -749,32 +749,58 @@ test.describe('the Sentences card', () => {
     await expect(sheet.locator('.qn-browse-row.on .qn-browse-inuse')).toHaveText('In Use');
     await expect(sheet.locator('.qn-browse-row.on .qn-browse-meta')).toHaveText(/^In use/);
     const heads = sheet.locator('.qn-browse-head');
-    await expect(heads.first().locator('.qn-browse-head-label')).toHaveText('Extending to Emerging');
+    await expect(heads.first().locator('.qn-browse-head-label')).toHaveText('Proficient');
     await expect(heads.first().locator('.qn-chip-own')).toHaveText('Cece');
     await expect(heads.first()).toHaveAttribute('aria-expanded', 'true');
-    // Habits: every habit at every rating is its own case; Cece's rated
-    // cells come first and open, the rest closed; a closed case opens on a
-    // click and a sentence can be used from inside it.
-    await sheet.locator('[role="tab"]', { hasText: 'Habits' }).click();
+    // Every sentence: a frame with the word as a slot sits under every
+    // proficiency word, previewed for that word; only Cece's own fits.
     await sheet.locator('#tq-browse-fits').click();
     await sheet.locator('#tq-fits-menu [data-fits="0"]').click();
+    await expect(heads.locator('.qn-browse-head-label')).toContainText([
+      'Proficient',
+      'Excellent',
+      'Very Good',
+      'Good',
+      'Satisfactory',
+      'Minimally Acceptable',
+      'Extending',
+      'Developing',
+      'Emerging',
+    ]);
+    const emerging = sheet.locator('.qn-browse-group[data-case="p:Emerging"]');
+    await emerging.locator('.qn-browse-head').click();
+    await expect(emerging.locator('.qn-browse-sentence').first()).toHaveText(/Emerging/);
+    await expect(emerging.locator('.qn-browse-use').first()).toBeDisabled();
+    const satisfactory = sheet.locator('.qn-browse-group[data-case="w:C"]');
+    await satisfactory.locator('.qn-browse-head').click();
+    await expect(satisfactory.locator('.qn-browse-sentence').first()).toHaveText(
+      /a C\b.*satisfactory|satisfactory.*a C\b/,
+    );
+    // Habits: every habit at every rating is its own case, all 24 shown with
+    // Every sentence, an empty one saying so; Cece's rated cells come first
+    // and open, the rest closed; a closed case opens on a click.
+    await sheet.locator('[role="tab"]', { hasText: 'Habits' }).click();
     await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Every sentence \d+/);
     const labels = await heads.locator('.qn-browse-head-label').allTextContents();
-    // The cells (one per habit and rating, "Uses Feedback · Sometimes") come
-    // before the summary; a bank without a cell's sentences leaves that
-    // heading out, and the fixed order is checked in the unit tests.
     const cells = labels.filter(l => / · (Consistently|Usually|Sometimes|Rarely)$/.test(l));
-    const summary = labels.findIndex(l => /^Summary/.test(l));
-    expect(summary).toBeGreaterThanOrEqual(cells.length);
+    expect(cells.length).toBe(24);
+    expect(cells).toContain('Uses Feedback · Sometimes');
     const ownHeads = sheet.locator('.qn-browse-group.own .qn-browse-head');
-    expect(await ownHeads.count()).toBeGreaterThan(0);
+    // After Cece's own cases: the other cells, then the summary.
+    const rest = labels.slice(await ownHeads.count());
+    expect(rest.slice(0, 18).every(l => / · (Consistently|Usually|Sometimes|Rarely)$/.test(l))).toBe(true);
+    expect(rest[18]).toMatch(/^Summary/);
+    await expect(ownHeads.first().locator('.qn-browse-head-label')).toHaveText('Completes Work · Consistently');
+    await expect(ownHeads.nth(4).locator('.qn-browse-head-label')).toHaveText('Uses Feedback · Sometimes');
     for (const h of await ownHeads.all()) await expect(h).toHaveAttribute('aria-expanded', 'true');
+    const feedback = sheet.locator('.qn-browse-group[data-case="cell:feedback:2"]');
+    await expect(feedback.locator('.qn-browse-row, .qn-browse-none').first()).toBeVisible();
     const closed = sheet.locator('.qn-browse-group:not(.own)').first();
     await expect(closed.locator('.qn-browse-head')).toHaveAttribute('aria-expanded', 'false');
-    await expect(closed.locator('.qn-browse-row').first()).toBeHidden();
+    await expect(closed.locator('.qn-browse-group-rows')).toBeHidden();
     await closed.locator('.qn-browse-head').click();
     await expect(closed.locator('.qn-browse-head')).toHaveAttribute('aria-expanded', 'true');
-    await expect(closed.locator('.qn-browse-row').first()).toBeVisible();
+    await expect(closed.locator('.qn-browse-group-rows')).toBeVisible();
     await expect(closed.locator('.qn-browse-head')).toBeFocused();
     // Next Step: Use from inside a group puts a sentence in the comment and the row says In Use.
     await sheet.locator('[role="tab"]', { hasText: 'Next Step' }).click();
