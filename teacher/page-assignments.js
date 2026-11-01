@@ -1330,8 +1330,7 @@ window.PageAssignments = (function () {
                 '" aria-pressed="' +
                 on +
                 '">' +
-                PROF_LABELS[lv] +
-                (on && state.mod > 0 ? ' +' : on && state.mod < 0 ? ' −' : '') +
+                (on ? scoreLevelText(lv, state.mod) : PROF_LABELS[lv]) +
                 '</button>'
               );
             })
@@ -3528,8 +3527,7 @@ window.PageAssignments = (function () {
     var m = normalizeScoreMod(l, mod);
     return (
       '<span class="rsg-level-name">' +
-      PROF_LABELS[l] +
-      (m ? ' ' + scoreModSuffix(m) : '') +
+      scoreLevelText(l, m) +
       '</span><span class="rsg-mods" role="group" aria-label="Fine-tune ' +
       PROF_LABELS[l] +
       '">' +
@@ -5841,7 +5839,7 @@ window.PageAssignments = (function () {
     if (!window.RubricPrint || typeof RubricPrint.criterionLevel !== 'function') return '';
     var lv = RubricPrint.criterionLevel(getScores(cid)[sid] || [], aid, crit);
     if (!lv || !lv.level) return '';
-    var text = CRIT_LEVEL_NAMES[lv.level] + (lv.mod > 0 ? ' +' : lv.mod < 0 ? ' −' : '');
+    var text = scoreLevelText(lv.level, lv.mod);
     return '<span class="crit-comment-level l' + lv.level + '">' + esc(text) + '</span>';
   }
   // The next criterion comment button on the grid, in reading order: the

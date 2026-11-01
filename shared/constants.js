@@ -369,6 +369,14 @@ function formatScoreLevel(level, mod) {
   return String(level) + scoreModSuffix(normalizeScoreMod(level, mod));
 }
 
+// "Proficient +", "Developing −", "Extending" — one score's level by name,
+// with its + or −. '' with no level.
+function scoreLevelText(level, mod) {
+  if (!(level > 0) || !PROF_LABELS[level]) return '';
+  var m = normalizeScoreMod(level, mod);
+  return PROF_LABELS[level] + (m ? ' ' + scoreModSuffix(m) : '');
+}
+
 /* Complete/Incomplete assessments are scored like a 1-point assessment:
    Complete = 1 (100%), Incomplete = 0 (0%), unmarked = no score. Every
    calculation that handles points handles them through isPointsScored. */
@@ -646,7 +654,8 @@ function getCoreCompetency(id) {
 }
 
 /* ── Traditional Gradebook — grading scale, points, weights ── */
-/* boundaries: the percent a points score needs for each proficiency.
+/* boundaries: the percent a points score needs for each proficiency. Not the
+   letter cutoffs (BC_LETTER_BANDS): 50–59% is a C- but Developing here.
    percents: the percent each proficiency counts as in the course % (Counts
    As). The default is level ÷ 4, so 3 is 75% (docs/DECISIONS.md,
    "Proficiency percents"). */
@@ -677,6 +686,21 @@ const COUNTS_AS_STEPS = [
   { key: '3+', at: 10 / 3 },
   { key: '4-', at: 11 / 3 },
   { key: '4', at: 4 },
+];
+
+/* The BC letter grades and the course % each starts at (DECISIONS: fixed
+   cutoffs). Under 50 is F once the course has ended, IE before
+   (percentageToLetter). `level` is the colour a % in that band takes:
+   A 4, B 3, C+ and C 2, C- and F 1. calc.js reads every letter cutoff from
+   here. DEFAULT_GRADING_SCALE is a different thing: the teacher-editable
+   points → proficiency scale, where 50–59% is Developing. */
+const BC_LETTER_BANDS = [
+  { label: 'A', min: 86, level: 4 },
+  { label: 'B', min: 73, level: 3 },
+  { label: 'C+', min: 67, level: 2 },
+  { label: 'C', min: 60, level: 2 },
+  { label: 'C-', min: 50, level: 1 },
+  { label: 'F', min: 0, level: 1 },
 ];
 
 /* Counts As preset: each step on a BC letter band (A 86, B 73, C+ 67, C 60,
