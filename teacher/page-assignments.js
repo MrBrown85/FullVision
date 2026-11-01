@@ -1519,7 +1519,9 @@ window.PageAssignments = (function () {
           return (
             '<span class="type-badge ' +
             (categoryId ? 'type-badge-s' : 'type-badge-f') +
-            '" style="background:' +
+            '"' +
+            _chipTipAttrs(categoryName, _categoryChipTip(cid, categoryId)) +
+            ' style="background:' +
             t.bg +
             ';color:' +
             t.fg +
@@ -1531,16 +1533,23 @@ window.PageAssignments = (function () {
         (a.rubricId
           ? (function () {
               var r = getRubricById(cid, a.rubricId);
-              return r ? '<span class="rubric-badge">' + _RUBRIC_ICON + esc(r.name) + '</span>' : '';
+              return r
+                ? '<span class="rubric-badge"' +
+                    _chipTipAttrs(r.name, 'The rubric used to grade this work.') +
+                    '>' +
+                    _RUBRIC_ICON +
+                    esc(r.name) +
+                    '</span>'
+                : '';
             })()
           : '') +
         (a.coreCompetencyIds || [])
           .map(function (ccId) {
             var cc = getCoreCompetency(ccId);
             return cc
-              ? '<span class="cc-badge" title="' +
-                  esc(cc.label) +
-                  '" style="border-color:' +
+              ? '<span class="cc-badge"' +
+                  _chipTipAttrs(cc.label, 'Core Competency') +
+                  ' style="border-color:' +
                   cc.color +
                   ';color:' +
                   tintText(cc.color) +
@@ -1823,7 +1832,64 @@ window.PageAssignments = (function () {
   }
 
   /* ── Main render ────────────────────────────────────────── */
+  /* ── Card chip tips ─────────────────────────────────────
+     Hovering or focusing a card's category, rubric or Core Competency chip
+     shows its name and a plain sentence in the shared #gb-tooltip, which is
+     fixed to the window so no scrolling box clips it. */
+  var _chipTipSource = null;
+
+  function _chipTipAttrs(name, text) {
+    return ' tabindex="0" data-chip-tip="' + esc(text) + '" data-chip-tip-name="' + esc(name) + '"';
+  }
+
+  function _categoryChipTip(cid, categoryId) {
+    if (!categoryId) return 'This work has no category.';
+    var category = getCategoryById(cid, categoryId);
+    if (!category) return 'This work’s category can’t be found.';
+    var weight = Number(category.weight || 0);
+    return weight > 0
+      ? 'Category worth ' + weight + '% of the course grade.'
+      : 'Category worth 0%, so this work doesn’t count toward the course grade.';
+  }
+
+  function _showChipTip(chip) {
+    var tip = document.getElementById('gb-tooltip');
+    if (!tip) return;
+    tip.className = 'dark';
+    tip.setAttribute('role', 'tooltip');
+    tip.innerHTML =
+      '<div class="gb-code-tip"><strong>' +
+      esc(chip.dataset.chipTipName) +
+      '</strong><div class="gb-code-tip-group">' +
+      esc(chip.dataset.chipTip) +
+      '</div></div>';
+    tip.style.display = 'block';
+    _chipTipSource = chip;
+    chip.setAttribute('aria-describedby', 'gb-tooltip');
+    var rect = chip.getBoundingClientRect();
+    var left = rect.left + rect.width / 2 - tip.offsetWidth / 2;
+    if (left < 8) left = 8;
+    if (left + tip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - tip.offsetWidth - 8;
+    var top = rect.bottom + 6;
+    if (top + tip.offsetHeight > window.innerHeight - 8) top = rect.top - tip.offsetHeight - 6;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+
+  function _hideChipTip() {
+    if (!_chipTipSource) return;
+    _chipTipSource.removeAttribute('aria-describedby');
+    _chipTipSource = null;
+    var tip = document.getElementById('gb-tooltip');
+    if (tip) {
+      tip.style.display = 'none';
+      tip.className = '';
+      tip.removeAttribute('role');
+    }
+  }
+
   function render() {
+    _hideChipTip();
     if (_grader) return _renderGrader();
     var cid = activeCourse;
     var course = COURSES[cid];
@@ -6714,11 +6780,13 @@ window.PageAssignments = (function () {
 
   function _handleFocus(e) {
     var el = e.target;
+    if (e.type === 'focus' && el && el.dataset && el.dataset.chipTip) _showChipTip(el);
     if (el && el.dataset && el.dataset.actionBlur === 'moduleName') _setModuleDraggable(el, false);
   }
 
   function _handleBlur(e) {
     var el = e.target;
+    if (el === _chipTipSource) _hideChipTip();
     if (el.dataset.actionBlur === 'moduleName') {
       // An empty name is not saved, so the box shows the saved one again.
       var saved = updateModuleName(el.dataset.moduleid, el.value);
@@ -6825,6 +6893,11 @@ window.PageAssignments = (function () {
   function _handleKeydown(e) {
     // One student's grader open on the page (the dialog runs its own).
     if (!_grader && _graderCardKey(e)) return;
+    if (_chipTipSource && e.key === 'Escape') {
+      var focusedChip = e.target === _chipTipSource;
+      _hideChipTip();
+      if (focusedChip) return;
+    }
     if (_filterMenuOpen && e.key === 'Escape') {
       e.preventDefault();
       _setFilterMenu(false);
@@ -7225,6 +7298,8 @@ window.PageAssignments = (function () {
 
   /* ── Mouseenter/mouseleave for rubric tooltips ──────────── */
   function _handleMouseOver(e) {
+    var chip = e.target.closest('[data-chip-tip]');
+    if (chip && chip !== _chipTipSource) _showChipTip(chip);
     var lvl = e.target.closest('.rsg-level[data-action="selectRubricScore"]');
     if (lvl) {
       var aid = lvl.dataset.aid;
@@ -7234,6 +7309,8 @@ window.PageAssignments = (function () {
     }
   }
   function _handleMouseOut(e) {
+    var chip = e.target.closest('[data-chip-tip]');
+    if (chip && chip === _chipTipSource && !(e.relatedTarget && chip.contains(e.relatedTarget))) _hideChipTip();
     var lvl = e.target.closest('.rsg-level[data-action="selectRubricScore"]');
     if (lvl) resetDescriptorBar();
   }
@@ -7314,6 +7391,7 @@ window.PageAssignments = (function () {
     });
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
+    _addDocListener('scroll', _hideChipTip, true);
     render();
     overlay.querySelector('.grader-dialog').focus();
   }
@@ -7800,6 +7878,7 @@ window.PageAssignments = (function () {
     if (active && _grader.overlay.contains(active) && active.blur) active.blur();
     var g = _grader;
     _grader = null;
+    _hideChipTip();
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });
@@ -7889,6 +7968,7 @@ window.PageAssignments = (function () {
     _addDocListener('drop', _handleDrop);
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
+    _addDocListener('scroll', _hideChipTip, true);
     _addDocListener('fv:id-rekeyed', _handleRekey);
     ['change', 'input', 'click'].forEach(function (type) {
       _addDocListener(type, _countsAsAfterEvent);
@@ -7961,6 +8041,7 @@ window.PageAssignments = (function () {
   }
 
   function destroy() {
+    _hideChipTip();
     // Remove all tracked listeners
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
