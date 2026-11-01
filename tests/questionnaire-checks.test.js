@@ -24,7 +24,7 @@ const SIX = [
   'Gabriel is earning a B this term, which is very good work.',
   'His best piece was “Task 4”.',
   'He supports each claim with evidence from a source.',
-  'His work habits are excellent.',
+  'His work habits are steady.',
   'Next, he can explain why an event mattered and who it affected.',
   'Extra help is at lunch on Tuesdays in [Room].',
 ].join(' ');
@@ -206,7 +206,7 @@ describe('the character count and the 20-word rule', () => {
   it('a sentence over 20 words keeps Approve off and the count says so', () => {
     seed();
     const long = 'Gabriel ' + 'really '.repeat(20) + 'tries.';
-    upsertTermRating(CID, GAB.id, TERM, { narrative: long + ' His work habits are excellent.' });
+    upsertTermRating(CID, GAB.id, TERM, { narrative: long + ' His work habits are steady.' });
     const html = open();
     expect(html).toContain('class="qn-count-btn over"');
     expect(html).toContain('<span id="tq-limit-text"> · one sentence is over 20 words</span>');

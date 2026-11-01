@@ -3481,6 +3481,77 @@ window.CommentBank = (function () {
     return { sid: null, text: String(c == null ? '' : c) };
   }
 
+  /* The values a bank sentence was filled with, read back from a sentence
+     of a saved comment (the rows recovered after a reload): each slot as
+     the text has it, when the whole sentence is that bank sentence's
+     wording with its slots filled; null otherwise. A wording of fewer than
+     four words of its own holds too many sentences to read back (pattern),
+     except the Not Handed In sentence, whose wording is the app's own.
+     Pronouns are not slots; a value is read as written, so a sentence whose
+     values changed since fails verify(). */
+  var READ_SHAPES = {
+    missingWork: /^(?:One assignment is|[A-Z][a-z]+(?:-[a-z]+)? assignments are) not handed in[:,.]/,
+  };
+  function _reEsc(t) {
+    return String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+  var _anchored = {};
+  function valuesIn(s, text) {
+    var t = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    var src = String((s && s.text) || '');
+    var whole = src.match(/^\{(\w+)\}$/);
+    if (whole) {
+      var shape = READ_SHAPES[whole[1]];
+      if (!shape || !shape.test(t)) return null;
+      var one = {};
+      one[whole[1]] = t;
+      return one;
+    }
+    // The quick check first: the wording's own pieces are in the text.
+    if (!_holds(s, t, t.toLowerCase())) return null;
+    var key = s.id + '\u0000' + src;
+    var a = _anchored[key];
+    if (!a) {
+      var keys = [];
+      var re = new RegExp(
+        '^' +
+          src
+            .split(/(\{\w+\}|\[[^\]]*\])/)
+            .map(function (part) {
+              var m = part.match(/^\{(\w+)\}$/);
+              if (m) {
+                keys.push(m[1]);
+                // A pronoun or the name is a word or two, never a run of
+                // the teacher's own words.
+                if (PRONOUN_SLOTS[m[1]]) return '([^\\s]+)';
+                if (m[1] === 'name') return '([^\\s]+(?: [^\\s]+)?)';
+                return '(.+?)';
+              }
+              var alt = part.match(/^\[([^|\]]*)\|([^\]]*)\]$/);
+              if (alt) return '(?:' + _reEsc(alt[1]) + '|' + _reEsc(alt[2]) + ')';
+              return _reEsc(part);
+            })
+            .join('') +
+          '$',
+        'i',
+      );
+      a = _anchored[key] = { re: re, keys: keys };
+    }
+    // A title that ends the sentence carries the period inside its closing
+    // quote, or its own ? or ! in place of it (the realiser).
+    var u = t.replace(/\.”$/, '”.').replace(/([?!])”$/, '$1”.');
+    var hit = u.match(a.re) || (u !== t ? t.match(a.re) : null);
+    if (!hit) return null;
+    var out = {};
+    a.keys.forEach(function (k, i) {
+      if (PRONOUN_SLOTS[k] || k in out) return;
+      out[k] = hit[i + 1];
+    });
+    return out;
+  }
+
   /* How many classmates' comments this term hold the sentence. */
   function usedBy(s, comments) {
     var re = pattern(s);
@@ -5583,12 +5654,46 @@ window.CommentBank = (function () {
     },
   };
 
+  /* Where a sentence came from (provenance) as it was filled with the
+     values read back from its text (valuesIn): a skill chosen among
+     several valid ones (the even skill, one of a tie at the top, the
+     highest-marked skill) is put as named when it is still one of them,
+     so its sources are the competency it names, not the one the class's
+     rotation would choose now. */
+  function provenanceAs(s, ctx, values) {
+    var vals = Object.assign({}, values || {});
+    var when = (s && s.when) || {};
+    Object.keys(when).forEach(function (k) {
+      vals['when.' + k] = when[k];
+    });
+    var pv = provenance(s, ctxFor(s, _asNamed({ values: vals }, ctx)));
+    pv.values = Object.assign({}, pv.values, values || {});
+    return pv;
+  }
+
   /* The even skill a sentence named ({evenSkill}) is a choice among the
      student's even skills (evenSkills), not a fact: the context holds the
      one it would choose now, so for the check the context is put as the
      sentence was filled, when the skill named is still one of them. The
      claim (CLAIMS.evenResults) checks the competency behind it. */
   function _asNamed(pv, ctx) {
+    // One of a tie at the top (`when.topSkill`, topSkillOf) is a choice in
+    // the same way: the context as named while that skill is still in the
+    // tie (CLAIMS.strength checks the competency behind it).
+    var vals = (pv && pv.values) || {};
+    var topNamed = vals['when.topSkill'] || vals.topSkill || '';
+    if (topNamed && ctx && ctx._f && topNamed !== ctx._topSkill && !strengthSkills(ctx._f).length) {
+      var tx = topTieSkills(ctx._f).find(function (e) {
+        return e.key === topNamed;
+      });
+      if (tx)
+        ctx = Object.assign({}, ctx, {
+          topSkill: tx.key,
+          _topSkill: tx.key,
+          _facts: Object.assign({}, ctx._facts, { topSkill: ['comp:' + tx.comp.id] }),
+          _compNames: Object.assign({}, ctx._compNames, { topSkill: [tx.comp.name] }),
+        });
+    }
     var hiNamed = (pv && pv.values && pv.values.highestSkill) || '';
     if (hiNamed && ctx && hiNamed !== ctx.highestSkill) {
       var hx = (ctx._highestSkills || []).find(function (e) {
@@ -5937,16 +6042,16 @@ window.CommentBank = (function () {
 
   /* What no longer holds in an approved comment, from its record (meta),
      today's facts (f) and the picks it was drafted with ({ habits, focus }).
-     A sentence is flagged when the facts hash differs and a value it
-     claims changed (verify() fails it), or when it is a class sentence
-     that has been edited since. Sentences the teacher edited, kept as
+     A sentence is flagged when a value it claims no longer holds
+     (verify() fails it), whether or not the facts hash changed, or when it
+     is a class sentence that has been edited since. Sentences the teacher edited, kept as
      approved, or wrote are never flagged.
 
      Returns null when nothing changed, else { changes: [{ i, kind:
      'marks'|'class', key (class: closing, support, late_work), before:
      the approved sentence, after: the sentence that is true now ('' when
      no sentence fits now) }], pieces: titles whose mark changed, hasGrade,
-     gradeChanged, hash }. opts: { text: the saved comment (a change whose
+     gradeChanged, hash, moved: the facts hash differs from the record's }. opts: { text: the saved comment (a change whose
      sentence is no longer in it is dropped), bank }. */
   function staleness(meta, f, picks, opts) {
     opts = opts || {};
@@ -5977,42 +6082,43 @@ window.CommentBank = (function () {
       changes.push({ i: i, kind: 'class', key: k, before: list[i].text, after: now });
     });
 
-    // Marks: only when the facts are not what they were.
+    // Marks: every sentence's claim checked against today's facts, also
+    // when the facts hash is what it was (a comment approved over a draft
+    // the marks had already moved past).
     var hash = factsHash(f);
-    if (meta.facts_hash && meta.facts_hash !== hash) {
-      var byId = {};
-      bank.sentences.forEach(function (s) {
-        byId[s.id] = s;
-      });
-      var at = {};
-      var d = { sentences: [], provenance: [] };
-      list.forEach(function (x, i) {
-        var s = byId[x.id];
-        var check = !!s && !x.edited && !x.kept && !x.class_line && !!x.values;
-        if (check && !(x.id in at)) at[x.id] = i;
-        d.sentences.push({ id: x.id, part: x.part, step: x.step, text: x.text });
-        d.provenance.push(
-          check
-            ? {
-                sentenceId: x.id,
-                part: s.part,
-                claims: (s.claims || []).slice(),
-                factKeys: [],
-                values: x.values,
-                sources: x.sources || {},
-              }
-            : { sentenceId: x.id, kept: true },
-        );
-      });
-      var v = verify(d, f, picks, { bank: bank });
-      (v.replaced || []).forEach(function (r) {
-        var i = at[r.sentenceId];
-        if (i == null) return;
-        var now = _nowTrue(list, i, byId[r.sentenceId], f, ctx, bank);
-        if (now.text === list[i].text) return;
-        changes.push({ i: i, kind: 'marks', before: list[i].text, after: now.text, id: now.id });
-      });
-    }
+    var moved = !!meta.facts_hash && meta.facts_hash !== hash;
+    var byId = {};
+    bank.sentences.forEach(function (s) {
+      byId[s.id] = s;
+    });
+    var at = {};
+    var d = { sentences: [], provenance: [] };
+    list.forEach(function (x, i) {
+      var s = byId[x.id];
+      var check = !!s && !x.edited && !x.kept && !x.class_line && !!x.values;
+      if (check && !(x.id in at)) at[x.id] = i;
+      d.sentences.push({ id: x.id, part: x.part, step: x.step, text: x.text });
+      d.provenance.push(
+        check
+          ? {
+              sentenceId: x.id,
+              part: s.part,
+              claims: (s.claims || []).slice(),
+              factKeys: [],
+              values: x.values,
+              sources: x.sources || {},
+            }
+          : { sentenceId: x.id, kept: true },
+      );
+    });
+    var v = verify(d, f, picks, { bank: bank });
+    (v.replaced || []).forEach(function (r) {
+      var i = at[r.sentenceId];
+      if (i == null) return;
+      var now = _nowTrue(list, i, byId[r.sentenceId], f, ctx, bank);
+      if (now.text === list[i].text) return;
+      changes.push({ i: i, kind: 'marks', before: list[i].text, after: now.text, id: now.id });
+    });
 
     if (opts.text != null) {
       var text = String(opts.text);
@@ -6029,7 +6135,8 @@ window.CommentBank = (function () {
     });
     return {
       changes: changes,
-      pieces: marks ? changedPieces(meta.marks, marksOf(f)) : [],
+      pieces: marks && moved ? changedPieces(meta.marks, marksOf(f)) : [],
+      moved: moved,
       hasGrade: list.some(function (x) {
         return x && x.step === 'grade';
       }),
@@ -6086,6 +6193,8 @@ window.CommentBank = (function () {
     repeatsLast: repeatsLast,
     pattern: pattern,
     usedBy: usedBy,
+    valuesIn: valuesIn,
+    provenanceAs: provenanceAs,
     parts: parts,
     fitCount: fitCount,
     familyOf: familyOf,

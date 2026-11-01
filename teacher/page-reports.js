@@ -1773,6 +1773,9 @@ window.PageReports = (function () {
       tqStale: function () {
         RQ.tqStale(el.dataset.do, el.dataset.i);
       },
+      tqClaim: function () {
+        RQ.tqClaim(el.dataset.do, el.dataset.row);
+      },
       toggleStudentPicker: function () {
         toggleStudentPicker(e);
       },

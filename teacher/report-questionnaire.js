@@ -274,15 +274,21 @@ window.ReportQuestionnaire = (function () {
     var st = _current();
     var el = _box();
     if (!st) return;
-    if (approveBlockers(st).length) {
+    if (_resync(st)) return;
+    // The rows follow the box first, so the bank's suggestions read the
+    // comment as approved (plan PR 10), and the claims are checked against
+    // today's marks.
+    clearTimeout(_alignTimer);
+    _alignNow();
+    _facts(st, true);
+    var blocked = approveBlockers(st);
+    if (blocked.length) {
+      // A sentence found out of date just now: its row shows it.
+      if (blocked.indexOf('claims') >= 0) rerender();
       syncApprove();
       return;
     }
     var termId = getTermId();
-    // The rows follow the box first, so the bank's suggestions read the
-    // comment as approved (plan PR 10).
-    clearTimeout(_alignTimer);
-    _alignNow();
     var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
     var data = { approvedAt: new Date().toISOString() };
     if (el && el.value.replace(/\s+$/, '') !== plainComment(rating.narrative || '').replace(/\s+$/, '')) {
@@ -540,7 +546,11 @@ window.ReportQuestionnaire = (function () {
     var marks = stale.changes.filter(function (c) {
       return c.kind === 'marks';
     }).length;
-    if (marks) {
+    if (marks && stale.moved === false) {
+      // The facts are as they were at approval: the sentence was already
+      // out of date then.
+      out.push(_cap(_sentenceCount(marks)) + ' the gradebook.');
+    } else if (marks) {
       var p = stale.pieces || [];
       var q = p.map(function (t) {
         return CommentRealiser.quoteTitle(t) || '“' + t + '”';
@@ -609,7 +619,7 @@ window.ReportQuestionnaire = (function () {
      clears the approval (upsertTermRating does). */
   function tqStale(what, i) {
     var st = _current();
-    if (!st) return;
+    if (!st || _resync(st)) return;
     tqSaveCurrentIfNeeded();
     var termId = getTermId();
     var r = getStudentTermRating(_activeCourse, st.id, termId) || {};
@@ -696,9 +706,21 @@ window.ReportQuestionnaire = (function () {
      fits." in its place (the States mockup). */
   var _readyText = '';
   var _fitsBlocked = false;
+  // While a sentence no longer matches the gradebook: 'draft' (its row
+  // shows Keep as Written) or 'approved' (the card shows Keep as Approved).
+  var _claimsBlocked = '';
+  var CLAIMS_LINE = {
+    draft: 'Approve and Next is off until you pick Use the New Sentence or Keep as Written.',
+    approved: 'Approve and Next is off until you pick Keep as Approved or Use the New Sentence.',
+  };
   function _syncReadyLine() {
     var line = document.getElementById('tq-ready');
-    if (line) line.textContent = _fitsBlocked ? 'Approve and Next is off until the comment fits.' : _readyText;
+    if (line)
+      line.textContent = _fitsBlocked
+        ? 'Approve and Next is off until the comment fits.'
+        : _claimsBlocked
+          ? CLAIMS_LINE[_claimsBlocked]
+          : _readyText;
   }
   function restoreRoster() {
     if (typeof setSidebarAnnotator === 'function') setSidebarAnnotator(null);
@@ -1670,6 +1692,7 @@ window.ReportQuestionnaire = (function () {
      group when more than one is on offer). Letter Grade is the default. */
   function _basisHtml(cid, student, f) {
     var c = basisChoices(f);
+    var pending = c.ie && _iePending === _rowKey(student);
     var opts = ['grade'];
     if (c.ie) opts.push('ie');
     opts = opts.concat(c.goals);
@@ -1682,32 +1705,61 @@ window.ReportQuestionnaire = (function () {
         : 'Report a letter grade, as for every other student.';
     var btns = opts
       .map(function (b) {
-        var on = c.basis === b;
-        return `<button type="button" role="radio" class="seg-btn" aria-checked="${on}" data-action="tqSetBasis" data-basis="${b}" title="${esc(b === 'grade' ? letterTip : BASIS_TIP[b])}">${esc(BASIS_LABEL[b])}</button>`;
+        // IE waiting for its date: shown as picked, not yet saved.
+        var wait = pending && b === 'ie';
+        var on = !pending && c.basis === b;
+        return `<button type="button" role="radio" class="seg-btn${wait ? ' pending' : ''}" aria-checked="${on}" data-action="tqSetBasis" data-basis="${b}" title="${esc(wait ? IE_PENDING_TIP : b === 'grade' ? letterTip : BASIS_TIP[b])}">${esc(BASIS_LABEL[b])}</button>`;
       })
       .join('');
     var lines = _basisLines(student, f, c)
+      .concat(pending ? [IE_PENDING_LINE] : [])
       .map(function (t) {
         return `<span>${esc(t)}</span>`;
       })
       .join('');
-    return `<div class="qn-basis" id="tq-basis">
+    return `<div class="qn-basis${pending ? ' has-cal' : ''}" id="tq-basis">
       <span class="qn-basis-text">${lines}</span>
       <div class="seg seg-sm qn-basis-seg" role="radiogroup" aria-label="${c.ie ? 'Report this term as' : 'Assess this student against'}">${btns}</div>
+      ${pending ? _calendarHtml('') : ''}
     </div>`;
   }
 
+  /* IE chosen with no deadline yet: nothing is saved until a date is
+     picked (an IE without its date would stay on this device only). The
+     calendar opens at once and the switch shows IE waiting; Escape, a click
+     outside or Letter Grade leaves Letter Grade. */
+  var _iePending = null; // the student's row key while IE waits for its date
+  var IE_PENDING_TIP = 'IE once you pick the deadline. Press Escape to keep Letter Grade.';
+  var IE_PENDING_LINE = 'Pick the deadline to report IE. Until then the report shows the letter grade.';
+  function _cancelIePending() {
+    if (!_iePending) return false;
+    _iePending = null;
+    _cal = null;
+    rerender();
+    _focusSel('#tq-basis [data-basis="ie"]');
+    return true;
+  }
+
   /* A choice on the switch: saved with the deadline for this report (the
-     report and gradebook read it), then the screen redraws. A comment
-     Generate wrote and the teacher has not edited is written again for the
-     new path; an edited one is left as it is. */
+     report and gradebook read it), then the screen redraws. IE with no
+     deadline yet waits for the date (_iePending): picking it saves both
+     together. A comment Generate wrote and the teacher has not edited is
+     written again for the new path; an edited one is left as it is. */
   function tqSetBasis(basis) {
     var st = _current();
     if (!st || !BASIS_LABEL[basis]) return;
     tqSaveCurrentIfNeeded();
     var termId = getTermId();
     var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
+    if (_iePending && basis !== 'ie') _cancelIePending();
     if ((rating.reportingBasis || 'grade') === basis) return;
+    if (basis === 'ie' && !rating.ieDeadline) {
+      _iePending = _rowKey(st);
+      _cal = { month: _deadlineRange().min.slice(0, 7) };
+      rerender();
+      _focusSel('#tq-cal .qn-cal-day:not([disabled])');
+      return;
+    }
     var text = plainComment(rating.narrative || '').trim();
     var last = _lastDraft[_activeCourse + '|' + st.id + '|' + termId];
     var redraft = !!text && !!last && text === last.text.trim();
@@ -1789,15 +1841,126 @@ window.ReportQuestionnaire = (function () {
     syncApprove();
   }
 
+  /* ── Sentences that no longer match the gradebook ───────── */
+
+  /* The comment's bank sentences checked against today's facts before
+     approval (CommentBank.verify, through staleness on the record the
+     approval would keep): a sentence whose claim fails shows on its row
+     what it says and what is true now, with Use the New Sentence or Keep as
+     Written, and Approve and Next stays off until each is chosen. A sentence
+     the teacher edited, wrote or kept is theirs and is not checked. An
+     approved comment shows the same on the Teacher Comment card instead
+     (staleFor). Each: { row, before, after, id }. */
+  var _claimCache = {};
+  function claimChanges(st) {
+    if (!st) return [];
+    var termId = getTermId();
+    var r = getStudentTermRating(_activeCourse, st.id, termId) || {};
+    if (r.approvedAt) return [];
+    var f = _facts(st);
+    var rows = _rowsFor(st, f);
+    if (!rows.length) return [];
+    var at = [];
+    rows.forEach(function (x, i) {
+      if (String(x.text || '').trim()) at.push(i);
+    });
+    // A sentence kept as approved before stays kept (as metaFor keeps it).
+    var meta = CommentBank.draftMeta(rows, f, { prev: r.draftMeta || null });
+    var key = _rowKey(st);
+    var picks = _picksFor(_activeCourse, st, f, termId);
+    var sig = JSON.stringify([meta.sentences, picks]) + '\u0000' + meta.facts_hash;
+    var hit = _claimCache[key];
+    if (hit && hit.sig === sig) return hit.v;
+    var stale = CommentBank.staleness(meta, f, picks, {});
+    var v = ((stale && stale.changes) || [])
+      .filter(function (c) {
+        return c.kind === 'marks' && at[c.i] != null;
+      })
+      .map(function (c) {
+        return { row: at[c.i], before: c.before, after: c.after, id: c.id || null };
+      });
+    _claimCache[key] = { sig: sig, v: v };
+    return v;
+  }
+  /* An approved comment with a sentence that no longer matches: Approve
+     and Next waits for Keep as Approved or Use the New Sentence. */
+  function _approvedChanged(st) {
+    var r = getStudentTermRating(_activeCourse, st.id, getTermId()) || {};
+    var stale = r.approvedAt ? staleFor(_activeCourse, st) : null;
+    return (
+      !!stale &&
+      stale.changes.some(function (c) {
+        return c.kind === 'marks';
+      })
+    );
+  }
+
+  /* What a row says and what is true now, under the row (the marks-changed
+     board of the States mockup, for a comment not yet approved). */
+  function _claimHtml(c) {
+    var now = c.after
+      ? `<span class="qn-stale-now">${esc(c.after)}</span>`
+      : '<span class="qn-stale-none">Leave this sentence out.</span>';
+    return `<div class="qn-stale qn-claim" data-claim-row="${c.row}">
+        <div class="qn-stale-change">
+          <div class="qn-stale-line"><span class="qn-stale-label">Written</span><span class="qn-stale-was">${esc(c.before)}</span></div>
+          <div class="qn-stale-line"><span class="qn-stale-label">Now true</span>${now}</div>
+          <div class="qn-stale-foot"><span class="qn-stale-grade">This sentence no longer matches the gradebook.</span><button type="button" class="qn-stale-keep" data-action="tqClaim" data-do="keep" data-row="${c.row}" title="Keeps the sentence as it is written. It is yours, and it is not checked again.">Keep as Written</button><button type="button" class="qn-stale-use" data-action="tqClaim" data-do="use" data-row="${c.row}" title="Puts the sentence that is true now in the comment.">Use the New Sentence</button></div>
+        </div>
+      </div>`;
+  }
+
+  /* Use the New Sentence or Keep as Written on row i of the student on
+     screen. */
+  function tqClaim(what, i) {
+    var st = _current();
+    if (!st || _resync(st)) return;
+    tqSaveCurrentIfNeeded();
+    var key = _rowKey(st);
+    var f = _facts(st, true);
+    i = Number(i);
+    var c = claimChanges(st).find(function (x) {
+      return x.row === i;
+    });
+    var rows = (_rowsFor(st, f) || []).slice();
+    if (!c || !rows[i]) return;
+    if (what === 'keep') {
+      rows[i] = Object.assign({}, rows[i], { kept: true });
+      _rows[key] = rows;
+      _syncRequired();
+      syncApprove();
+      _focusAny([
+        '#tq-sentences [data-claim-row] .qn-stale-use',
+        '#tq-sentences [data-row="' + i + '"] .qn-srow-handle[tabindex]',
+      ]);
+      return;
+    }
+    if (what !== 'use') return;
+    if (!c.after) rows.splice(i, 1);
+    else {
+      var s = c.id ? _bankById(c.id) : null;
+      var row = s ? rowFromSentence(s, _bankContext(_activeCourse, st, f), rows[i].step, i === 0) : null;
+      rows[i] = row || Object.assign({}, rows[i], { edited: false });
+      rows[i].text = rows[i].drafted = c.after;
+    }
+    _rows[key] = rows;
+    _writeRows(st);
+    _syncRequired();
+    syncApprove();
+    _focusAny(['#tq-sentences [data-claim-row] .qn-stale-use', '#tq-approve-next']);
+  }
+
   /* What keeps Approve and Next off for the student on screen: 'deadline'
-     until an IE's deadline is picked, each check not yet ticked, 'limit'
-     past the class's character limit (plan PR 8) and 'long' while a
-     sentence is over 20 words. */
+     until an IE's deadline is picked, each check not yet ticked, 'claims'
+     while a sentence no longer matches the gradebook, 'limit' past the
+     class's character limit (plan PR 8) and 'long' while a sentence is
+     over 20 words. */
   function approveBlockers(st) {
     if (!st) return [];
     var f = _facts(st);
     var out = [];
     if (CommentBank.reportPath(f) === 'ie' && !f.grade.ieDeadline) out.push('deadline');
+    if (claimChanges(st).length || _approvedChanged(st)) out.push('claims');
     _checksFor(f, _rowsFor(st, f)).forEach(function (id) {
       if (!_checked[_checkKey(st.id, id)]) out.push(id);
     });
@@ -1818,11 +1981,13 @@ window.ReportQuestionnaire = (function () {
     var st = _current();
     var blocked = approveBlockers(st);
     _fitsBlocked = blocked.indexOf('limit') >= 0 || blocked.indexOf('long') >= 0;
+    var approvedNow = !!st && !!(getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).approvedAt;
+    _claimsBlocked = blocked.indexOf('claims') < 0 ? '' : approvedNow ? 'approved' : 'draft';
     _syncReadyLine();
     if (!btn) return;
     var date = blocked.indexOf('deadline') >= 0;
     var ticks = blocked.filter(function (b) {
-      return b !== 'deadline' && b !== 'limit' && b !== 'long';
+      return b !== 'deadline' && b !== 'limit' && b !== 'long' && b !== 'claims';
     });
     var ie = st && CommentBank.reportPath(_facts(st)) === 'ie';
     var tail =
@@ -1835,6 +2000,7 @@ window.ReportQuestionnaire = (function () {
               ? ' Tick “I checked this” first.'
               : ' Tick “I checked this” on the highlighted sentence' + (ticks.length > 1 ? 's' : '') + ' first.'
             : '';
+    if (_claimsBlocked) tail += ' ' + CLAIMS_LINE[_claimsBlocked];
     if (blocked.indexOf('limit') >= 0) tail += ' Shorten the comment to ' + _limit() + ' characters first.';
     var long = blocked.indexOf('long') >= 0 ? longSentences(_boxText(st)).length : 0;
     if (long) tail += ' Shorten the sentence' + (long > 1 ? 's' : '') + ' over 20 words first.';
@@ -1946,6 +2112,7 @@ window.ReportQuestionnaire = (function () {
   }
   function tqCloseDeadline() {
     if (!_cal) return;
+    if (_cancelIePending()) return;
     _cal = null;
     _syncRequired();
     var b = document.getElementById('tq-deadline-btn');
@@ -1963,7 +2130,10 @@ window.ReportQuestionnaire = (function () {
       y++;
     }
     _cal.month = y + '-' + _pad(m);
-    _syncRequired();
+    if (_iePending) {
+      rerender();
+      _focusSel('#tq-cal [data-dir="' + (Number(dir) < 0 ? -1 : 1) + '"]');
+    } else _syncRequired();
   }
 
   /* Whether a sentence holds the date as the comment says it (`was`:
@@ -2063,11 +2233,29 @@ window.ReportQuestionnaire = (function () {
     var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
     var was = CommentBank.deadlineText(rating.ieDeadline);
     var now = CommentBank.deadlineText(iso);
+    // IE waiting for this date: the choice and the date saved together. A
+    // comment Generate wrote and the teacher has not edited is written again
+    // for the IE path (tqSetBasis).
+    var pending = _iePending === _rowKey(st);
+    var redraft = false;
+    if (pending) {
+      var t0 = plainComment(rating.narrative || '').trim();
+      var last0 = _lastDraft[_rowKey(st)];
+      redraft = !!t0 && !!last0 && t0 === last0.text.trim();
+      _iePending = null;
+    }
     upsertTermRating(_activeCourse, st.id, termId, {
-      reportingBasis: rating.reportingBasis || 'grade',
+      reportingBasis: pending ? 'ie' : rating.reportingBasis || 'grade',
       ieDeadline: iso,
     });
     var f = _facts(st, true);
+    if (redraft) {
+      _cal = null;
+      rerender();
+      tqGenerate();
+      _focusSel('#tq-deadline-btn');
+      return;
+    }
     var text = _shownText(getStudentTermRating(_activeCourse, st.id, termId));
     var key = _rowKey(st);
     var last = _lastDraft[key];
@@ -2564,6 +2752,8 @@ window.ReportQuestionnaire = (function () {
     var s = _bankById(x.id);
     if (s && !x.class_line) {
       var r = rowFromSentence(s, ctx, x.step || null, i === 0);
+      // Its realiser tokens hold today's values: the text as written.
+      if (t !== r.text) delete r.raw.toks;
       r.text = t;
       r.edited = !!x.edited;
       if (!r.edited) r.drafted = t;
@@ -2624,6 +2814,36 @@ window.ReportQuestionnaire = (function () {
     return rows.map(function (r) {
       if (r.id) return r;
       var t = r.text;
+      // A bank sentence's wording with other values in its slots (the marks
+      // moved since it was written): the bank sentence, with the values as
+      // written, so verify() checks it; only a real edit is Edited.
+      // One that fits the student today first, then one on the comment's
+      // own path (IE or not), then the first in the bank.
+      var read = null;
+      var b = null;
+      var rank = -1;
+      var ie = ctx._path === 'ie';
+      COMMENT_BANK.sentences.forEach(function (x) {
+        if (used[x.id] || rank === 2) return;
+        var v = CommentBank.valuesIn(x, t);
+        if (!v) return;
+        var k = CommentBank.fits(x, ctx) ? 2 : (x.claims || []).indexOf('ie') >= 0 === ie ? 1 : 0;
+        if (k > rank) {
+          rank = k;
+          b = x;
+          read = v;
+        }
+      });
+      if (b) {
+        used[b.id] = true;
+        var br = rowFromSentence(b, ctx);
+        br.text = br.drafted = t;
+        // A skill chosen among several valid ones is checked as named.
+        br.prov = CommentBank.provenanceAs(b, ctx, read);
+        // Its realiser tokens hold today's values: the text as written.
+        delete br.raw.toks;
+        return br;
+      }
       var s = COMMENT_BANK.sentences.find(function (x) {
         return !used[x.id] && CommentBank.usedBy(x, [t]) > 0;
       });
@@ -2654,11 +2874,53 @@ window.ReportQuestionnaire = (function () {
     });
   }
 
+  /* Whether the rows in memory are still the saved comment. Another tab or
+     device can save a newer one (the class bundle, the cross-tab sync):
+     then they are not, unless the box on screen is this student's and the
+     teacher is typing in it, or it holds the saved text (the rows follow
+     the box, _alignNow). */
+  function _sameSentences(a, b) {
+    return sentencesOf(a).join(' ') === sentencesOf(b).join(' ');
+  }
+  function _rowsCurrent(student) {
+    var rows = _rows[_rowKey(student)];
+    if (!rows) return true;
+    var rating = getStudentTermRating(_activeCourse, student.id, getTermId()) || {};
+    var text = _shownText(rating);
+    var mine = rows
+      .map(function (r) {
+        return r.text;
+      })
+      .join(' ');
+    if (_sameSentences(mine, text)) return true;
+    var el = _box();
+    var shown =
+      el &&
+      String(el.dataset.sid) === String(student.id) &&
+      (!el.dataset.cid || el.dataset.cid === String(_activeCourse)) &&
+      (!el.dataset.term || el.dataset.term === getTermId());
+    return !!shown && (tqNarrativeDirty || _sameSentences(el.value, text));
+  }
+  /* Before an action on the rows: rows built from an older comment are
+     dropped and the screen is drawn again from the saved one, and the
+     action does not run (its row numbers were the old rows'). */
+  function _resync(st) {
+    if (!st || _rowsCurrent(st)) return false;
+    delete _rows[_rowKey(st)];
+    _wording = null;
+    _addAt = null;
+    _own = null;
+    rerender();
+    return true;
+  }
+
   /* The rows on screen for a student: the draft's, or recovered from the
-     saved comment, or none before anything is written. */
+     saved comment, or none before anything is written. Rows built from an
+     older comment than the one saved are built again from the saved one. */
   function _rowsFor(student, f) {
     var key = _rowKey(student);
-    if (_rows[key]) return _rows[key];
+    if (_rows[key] && _rowsCurrent(student)) return _rows[key];
+    delete _rows[key];
     var rating = getStudentTermRating(_activeCourse, student.id, getTermId()) || {};
     var text = _shownText(rating).trim();
     if (!text) return [];
@@ -2673,11 +2935,13 @@ window.ReportQuestionnaire = (function () {
   function composeRows(rows) {
     var r = CommentBank.realise(
       rows.map(function (row) {
-        return row.edited || !row.raw ? { id: row.id, text: row.text } : Object.assign({}, row.raw, { text: row.text });
+        return row.edited || row.kept || !row.raw
+          ? { id: row.id, text: row.text }
+          : Object.assign({}, row.raw, { text: row.text });
       }),
     );
     (r.sentences || []).forEach(function (x, i) {
-      if (rows[i] && !rows[i].edited && x.text) {
+      if (rows[i] && !rows[i].edited && !rows[i].kept && x.text) {
         rows[i].text = x.text;
         rows[i].drafted = x.text;
       }
@@ -2858,7 +3122,7 @@ window.ReportQuestionnaire = (function () {
 
   function _moveRow(i, dir) {
     var st = _current();
-    if (!st) return;
+    if (!st || _resync(st)) return;
     var key = _rowKey(st);
     var rows = _rows[key] || [];
     var next = moveRow(rows, i, dir);
@@ -2872,7 +3136,7 @@ window.ReportQuestionnaire = (function () {
   }
   function _dropRow(i, j, before) {
     var st = _current();
-    if (!st) return;
+    if (!st || _resync(st)) return;
     var key = _rowKey(st);
     var rows = _rows[key] || [];
     var next = dropRow(rows, i, j, before);
@@ -3548,6 +3812,7 @@ window.ReportQuestionnaire = (function () {
      mockup). */
   function _rowListHtml(cid, student, f, rows, path) {
     var ctx = _bankContext(cid, student, f);
+    var claims = claimChanges(student);
     var ie = path === 'ie';
     var has = {};
     rows.forEach(function (r) {
@@ -3595,6 +3860,9 @@ window.ReportQuestionnaire = (function () {
       .map(function (it) {
         var html = _rowHtml(cid, student, f, ctx, rows, it.unit, it.i, path);
         if (it.i < 0) return html;
+        claims.forEach(function (c) {
+          if (it.unit.indexOf(rows[c.row]) >= 0) html += _claimHtml(c);
+        });
         var g = rows.indexOf(it.unit[it.unit.length - 1]) + 1;
         html += _gapHtml(cid, student, f, ctx, rows, g);
         if (_own && _own.where === 'gap' && _own.gap === g) html += _gapOwnHtml(student);
@@ -4558,7 +4826,7 @@ window.ReportQuestionnaire = (function () {
      data-action="tqSentences" with data-do. */
   function tqSentences(what, el) {
     var st = _current();
-    if (!st) return;
+    if (!st || _resync(st)) return;
     var ds = (el && el.dataset) || {};
     var key = _rowKey(st);
     var i = Number(ds.row);
@@ -4996,7 +5264,16 @@ window.ReportQuestionnaire = (function () {
     _limitOpen = false;
     if (_browse) _browse.menu = false;
     if (where === 'gap') {
-      _own = { where: 'gap', mode: 'write', gap: Number(opts.gap) || 0, text: '', part: '', caseId: '', caseKey: '' };
+      _own = {
+        where: 'gap',
+        mode: 'write',
+        gap: Number(opts.gap) || 0,
+        text: '',
+        part: '',
+        caseId: '',
+        caseKey: '',
+        key: _rowKey(st),
+      };
       _syncRequired();
       _ownFocus();
       return;
@@ -5020,6 +5297,7 @@ window.ReportQuestionnaire = (function () {
       part: part,
       caseId: where === 'browse' ? String(opts.caseId || '') : '',
       caseKey: '',
+      key: _rowKey(st),
     };
     if (where === 'row') _syncRequired();
     else _syncBrowse();
@@ -5056,6 +5334,14 @@ window.ReportQuestionnaire = (function () {
   function _ownSave() {
     var st = _current();
     if (!st || !_own) return;
+    // Opened for another student, class or report: dropped, never saved
+    // into this comment.
+    if (_own.key !== _rowKey(st)) {
+      _own = null;
+      _syncRequired();
+      return;
+    }
+    if (_resync(st)) return;
     if (_own.where === 'gap') {
       var atGap = _own;
       if (!atGap.text.trim()) return;
@@ -5858,15 +6144,39 @@ window.ReportQuestionnaire = (function () {
   }
 
   /* ── The page ────────────────────────────────────────────── */
+
+  /* A new student, report or class on screen: nothing left open from the
+     one before follows (the Write Your Own box, a menu, a gap's menu, the
+     calendar, an IE choice waiting for its date, Browse Sentences and the
+     gap it inserts at). */
+  var _screen = null;
+  function _enterScreen(cid, student) {
+    var key = cid + '|' + student.id + '|' + getTermId();
+    if (_screen === key) return;
+    _screen = key;
+    _own = null;
+    _wording = null;
+    _addAt = null;
+    _cal = null;
+    _iePending = null;
+    _supportMenu = false;
+    _langMenu = false;
+    _limitOpen = false;
+    if (_lineEdit === 'own' || _lineEdit === 'ownLang') _lineEdit = null;
+    if (_browse) _closeBrowse(true);
+  }
+
   function renderTermQuestionnaire(cid) {
     var students = getTqStudents();
     if (students.length === 0) return '<div class="empty-state"><div class="empty-state-title">No students</div></div>';
     if (tqStudentIndex >= students.length) tqStudentIndex = 0;
     var student = students[tqStudentIndex];
+    _enterScreen(cid, student);
     var f = _facts(student, true);
     // Marks may have changed since the page was last drawn.
     _strength = null;
     _staleCache = {};
+    _claimCache = {};
     var comment = plainComment((getStudentTermRating(cid, student.id, getTermId()) || {}).narrative || '');
     return `<div class="qn" data-sid="${student.id}">
       <div class="qn-left">
@@ -6006,6 +6316,9 @@ window.ReportQuestionnaire = (function () {
     deadlineOpen: function () {
       return !!_cal;
     },
+    iePending: function () {
+      return !!_iePending;
+    },
     tqDeadlineMonth: tqDeadlineMonth,
     tqPickDeadline: tqPickDeadline,
     deadlineAt: deadlineAt,
@@ -6015,6 +6328,8 @@ window.ReportQuestionnaire = (function () {
     tqLineChange: tqLineChange,
     tqSentences: tqSentences,
     tqStale: tqStale,
+    tqClaim: tqClaim,
+    claimChanges: claimChanges,
     staleFor: staleFor,
     staleNote: staleNote,
     metaFor: metaFor,

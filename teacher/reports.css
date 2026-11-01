@@ -4507,6 +4507,12 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 12.5px;
   color: var(--text-2);
 }
+/* A sentence that no longer matches the gradebook, under its row, before
+   approval: what it says, what is true now, Keep as Written or Use the New
+   Sentence. */
+.qn-claim {
+  padding: 0 14px 10px 44px;
+}
 /* Show Both: the two comments side by side, shared sentences marked. */
 .qn-info.qn-both {
   width: min(1100px, 100%);
@@ -5202,6 +5208,17 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-basis-seg .seg-btn {
   white-space: nowrap;
+}
+/* IE chosen, waiting for its deadline: nothing is saved until a date is
+   picked (the calendar opens under the switch). */
+.qn-basis.has-cal {
+  position: relative;
+}
+.qn-basis-seg .seg-btn.pending {
+  background: var(--seg-thumb);
+  color: var(--active);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--active);
 }
 
 /* The Required sentences of an IE or goals comment. */
