@@ -659,7 +659,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), { habits: rated });
     const d = CommentBank.draft(ctx, { seed: 1 });
     expect(d.sentences.filter(x => x.step === 'habits').map(x => x.text)).toEqual([
-      expect.stringMatching(/taking part in class/),
+      expect.stringMatching(/taking part in class/i),
     ]);
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
     // The Demo class has no closing sentence or support lines set, so the
@@ -669,7 +669,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(sentences.length).toBe(5);
     expect(d.short).toBe(true);
     expect(d.text).not.toMatch(/[{}[\]]/);
-    expect(d.text).toMatch(/^Cece /);
+    expect(d.sentences[0].text).toContain('Cece');
     // The course is named wherever the story opens with it.
     if (d.sentences.some(x => x.step === 'opening')) expect(d.text).toMatch(/Science 8/);
     // Each chosen sentence fits and is in the bank once.

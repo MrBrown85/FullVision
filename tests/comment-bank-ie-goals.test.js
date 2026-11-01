@@ -181,9 +181,10 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     expect(CommentBank.ieOffered(f)).toBe(true);
     expect(CommentBank.reportPath(f)).toBe('');
     expect(ReportQuestionnaire.basisChoices(f)).toMatchObject({ ie: true, goals: [], basis: 'grade' });
-    // Letter Grade is the default: the letter sentence still leads.
+    // Letter Grade is the default: the letter sentence still leads (in one
+    // of its frames; the grade step mixes them by seed).
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(d.ids[0]).toBe('gr01');
+    expect(byId(d.ids[0]).when.grade).toBe('letter');
   });
 
   it('is not offered with marks on half or more, in a Proficiency class, or below grade 10', () => {
@@ -261,7 +262,7 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18' });
     rate({ reportingBasis: 'grade', ieDeadline: '2026-12-18' });
     const d = CommentBank.draft(CommentBank.context(factsNow(), {}), { seed: 1 });
-    expect(d.ids[0]).toBe('gr01');
+    expect(byId(d.ids[0]).when.grade).toBe('letter');
   });
 
   it('is ignored in a Proficiency class', () => {

@@ -274,6 +274,15 @@ describe('Generate in a Letter class', () => {
   });
 
   const claimsGrade = id => (byId(id).claims || []).indexOf('grade') >= 0;
+  /* The grade sentence leads, in one of its frames (bank expansion, Nov
+     1; the grade step mixes them by seed, #595): its kind and the letter
+     and standing word it prints. */
+  const leads = (d, kind, re) => {
+    expect(d.sentences[0].step).toBe('grade');
+    expect(byId(d.ids[0]).when.grade).toBe(kind);
+    expect(d.sentences[0].text).toContain('Noor');
+    expect(d.sentences[0].text).toMatch(re);
+  };
 
   it('opens with the grade from calc.js and states it nowhere else', () => {
     const f = seed('letter', [3, 3, 3, 3]);
@@ -284,7 +293,8 @@ describe('Generate in a Letter class', () => {
     expect(f.grade.pieces).toHaveLength(4);
     for (let seedN = 1; seedN <= 10; seedN++) {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed: seedN });
-      expect(d.sentences[0].text).toBe('Noor is earning a B this term, which is very good work.');
+      leads(d, 'letter', /\ba B\b.*very good|very good.*\ba B\b/i);
+      expect(d.sentences[0].text).not.toMatch(/close to/);
       expect(d.ids.slice(1).filter(claimsGrade), 'seed ' + seedN).toEqual([]);
       expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     }
@@ -294,7 +304,9 @@ describe('Generate in a Letter class', () => {
     const f = seed('letter', [4, 3, 3, 4, 3, 4, 3]);
     expect(f.grade).toMatchObject({ letter: 'B', pct: 85.7, next: { letter: 'A', min: 86 } });
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(d.sentences[0].text).toBe('Noor is earning a B this term, which is very good work and close to an A.');
+    leads(d, 'letterClose', /close to an A/i);
+    expect(d.sentences[0].text).toMatch(/\ba B\b/i);
+    expect(d.sentences[0].text).toMatch(/very good/);
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
   });
 
@@ -303,14 +315,16 @@ describe('Generate in a Letter class', () => {
     expect(f.grade.pct).toBe(85.7);
     expect(CommentBank.trendingDown(f.grade.pieces)).toBe(true);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(d.sentences[0].text).toBe('Noor is earning a B this term, which is very good work.');
+    leads(d, 'letter', /\ba B\b/i);
+    expect(d.sentences[0].text).not.toMatch(/close to/);
   });
 
   it('does not say close to with fewer than six scored pieces', () => {
     const f = seed('letter', [4, 3, 4, 3, 3]);
     expect(f.grade.pct).toBe(85);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(d.sentences[0].text).toBe('Noor is earning a B this term, which is very good work.');
+    leads(d, 'letter', /\ba B\b/i);
+    expect(d.sentences[0].text).not.toMatch(/close to/);
   });
 
   it('catches the sentence after the marks change', () => {
@@ -319,21 +333,22 @@ describe('Generate in a Letter class', () => {
     const lower = seed('letter', [3, 3, 2, 3]); // 68.8%: a C+
     expect(lower.grade.letter).toBe('C+');
     const v = CommentBank.verify(d, lower, {});
-    expect(v.replaced.find(r => r.sentenceId === 'gr01').failed).toEqual(['slots', 'grade']);
-    expect(v.text).not.toMatch(/earning a B/);
+    expect(v.replaced.find(r => r.sentenceId === d.ids[0]).failed).toEqual(['slots', 'grade']);
+    expect(v.text).not.toMatch(/\ba B\b/);
   });
 
   it('uses the letter in a Both class', () => {
     const f = seed('both', [3, 3, 3, 3]);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(d.sentences[0].text).toBe('Noor is earning a B this term, which is very good work.');
+    leads(d, 'letter', /\ba B\b.*very good|very good.*\ba B\b/i);
     expect(d.ids.slice(1).filter(claimsGrade)).toEqual([]);
   });
 
   it('uses the proficiency word in a Proficiency class', () => {
     const f = seed('proficiency', [3, 3, 3, 3]);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(d.sentences[0].text).toBe('Noor is Proficient on the BC proficiency scale this term.');
+    leads(d, 'proficiency', /Proficient/);
+    expect(d.sentences[0].text).toContain('proficiency');
     expect(d.ids.slice(1).filter(claimsGrade)).toEqual([]);
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
   });

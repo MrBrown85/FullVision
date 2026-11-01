@@ -213,7 +213,10 @@ describe('the draft is the plan’s eight parts only', () => {
     ]);
     // The grade sentence, then the best piece with its note (in one of the
     // best-piece frames, bank expansion Nov 1).
-    expect(d.text).toMatch(/^Tomas is earning a B this term, which is very good work\. /);
+    expect(d.sentences[0].step).toBe('grade');
+    expect(d.sentences[0].text).toContain('Tomas');
+    expect(d.sentences[0].text).toMatch(/\ba B\b/);
+    expect(d.sentences[0].text).toMatch(/very good/);
     expect(d.sentences[1].step).toBe('example');
     expect(d.sentences[1].text).toContain('“What Does the Poster Show?”');
     expect(d.sentences[1].text).toContain('linked the poster to the Act.');
@@ -359,9 +362,10 @@ describe('six to nine sentences', () => {
     expect(d.short).toBe(true);
     expect(d.sentences.length).toBeLessThan(6);
     expect(stepsOf(d)).toEqual(['grade', 'example', 'home']);
-    expect(d.text).toMatch(
-      /^Ines is Proficient on the BC proficiency scale this term\. [^.]*“Energy Lab\.” At home, you can ask them to explain how one thing in the kitchen works\.$/,
-    );
+    expect(d.sentences[0].text).toContain('Ines');
+    expect(d.sentences[0].text).toContain('Proficient');
+    expect(d.sentences[1].text).toContain('“Energy Lab');
+    expect(d.sentences[2].step).toBe('home');
     // Nothing was added to reach six: no habits sentence with no habit
     // rated, no strengths below the gate, no next step on two pieces.
     expect(CommentBank.verify(d, thin, {}).text).toBe(d.text);
