@@ -16,7 +16,10 @@ window.MStudentDetail = (function () {
   function _renderSectionCard(cid, sid, sec) {
     var prof = getSectionProficiency(cid, sid, sec.id);
     var profRounded = Math.round(prof);
-    var trend = getSectionTrend(cid, sid, sec.id);
+    // The arrow and the Improving / Dropped line read the same change: the
+    // counted evidence's first and last levels (calc.js evidenceChange).
+    var change = evidenceChange(sectionCountedEvidence(cid, sid, sec.id));
+    var trend = change && change.dir > 0 ? 'up' : change && change.dir < 0 ? 'down' : 'flat';
     var trendIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : '—';
     var trendColor = trend === 'up' ? 'var(--score-3)' : trend === 'down' ? 'var(--score-1)' : 'var(--text-3)';
     var growthData = getSectionGrowthData(cid, sid, sec.id);
@@ -67,32 +70,27 @@ window.MStudentDetail = (function () {
     }
 
     var insightHtml = '';
-    if (allEvidenceScores.length >= 2) {
-      var first = allEvidenceScores[0].score;
-      var last = allEvidenceScores[allEvidenceScores.length - 1].score;
-      var allSame = allEvidenceScores.every(function (s) {
-        return s.score === first;
-      });
-      if (allSame) {
+    if (change) {
+      if (change.same) {
         insightHtml =
           '<div class="m-sec-insight">Consistently <strong>' +
-          PROF_LABELS[Math.round(first)] +
+          PROF_LABELS[change.first] +
           '</strong> across ' +
-          allEvidenceScores.length +
+          change.count +
           ' assessments</div>';
-      } else if (last > first) {
+      } else if (change.dir > 0) {
         insightHtml =
           '<div class="m-sec-insight m-sec-insight-up">Improving from <strong>' +
-          PROF_LABELS[Math.round(first)] +
+          PROF_LABELS[change.first] +
           '</strong> → <strong>' +
-          PROF_LABELS[Math.round(last)] +
+          PROF_LABELS[change.last] +
           '</strong></div>';
-      } else if (last < first) {
+      } else if (change.dir < 0) {
         insightHtml =
           '<div class="m-sec-insight m-sec-insight-down">Dropped from <strong>' +
-          PROF_LABELS[Math.round(first)] +
+          PROF_LABELS[change.first] +
           '</strong> → <strong>' +
-          PROF_LABELS[Math.round(last)] +
+          PROF_LABELS[change.last] +
           '</strong></div>';
       }
     } else if (allEvidenceScores.length === 0) {

@@ -1625,6 +1625,51 @@ function getSectionTrend(cid, studentId, sectionId) {
   return 'flat';
 }
 
+/* How a run of evidence moved, in the words a teacher reads: its first and
+   last scored entries by date, compared by the whole level their words name,
+   so 3 to 3+ is Proficient both times, no change. { first, last (1–4), dir
+   (1 up, -1 down, 0), same (every entry at one level), count }, or null with
+   fewer than two. */
+function evidenceChange(entries) {
+  var list = (entries || [])
+    .filter(_isScoredEvidence)
+    .slice()
+    .sort(function (a, b) {
+      return (a.date || '').localeCompare(b.date || '');
+    });
+  if (list.length < 2) return null;
+  var lv = function (e) {
+    return Math.max(1, Math.min(4, Math.round(Number(e.score))));
+  };
+  var first = lv(list[0]);
+  var last = lv(list[list.length - 1]);
+  return {
+    first: first,
+    last: last,
+    dir: last > first ? 1 : last < first ? -1 : 0,
+    same: list.every(function (e) {
+      return lv(e) === first;
+    }),
+    count: list.length,
+  };
+}
+
+/* A section's evidence that counts toward its level (getCountedTagScores),
+   every competency in it together. */
+function sectionCountedEvidence(cid, studentId, sectionId) {
+  var section = _getSectionById(cid, sectionId);
+  if (!section) return [];
+  var out = [];
+  section.tags.forEach(function (tag) {
+    getCountedTagScores(cid, studentId, tag.id)
+      .filter(_isScoredEvidence)
+      .forEach(function (s) {
+        out.push(s);
+      });
+  });
+  return out;
+}
+
 /** Count the number of scored evidence entries across all tags in a section.
  * @param {string} cid - Course ID
  * @param {string} studentId - Student ID
