@@ -30,6 +30,7 @@ function mockDataLayer(overrides) {
     getStudentQuickObs: () => [],
     getSectionProficiency: () => 3.0,
     getSectionTrend: () => 'flat',
+    sectionCountedEvidence: () => [],
     getSectionGrowthData: () => [],
     renderGrowthSparkline: () => '<span>sparkline</span>',
     getTagScores: () => [],
@@ -246,7 +247,11 @@ describe('Trend display (string comparison fix)', () => {
         ungrouped: [{ id: 's1', name: 'Test Section', shortName: 'Test', tags: [], color: '#888' }],
       }),
       getSectionProficiency: () => 3.0,
-      getSectionTrend: () => 'up',
+      // Developing, then Proficient: the arrow reads the counted evidence's change.
+      sectionCountedEvidence: () => [
+        { score: 2, date: '2026-09-01' },
+        { score: 3, date: '2026-09-08' },
+      ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
     expect(html).toContain('↑');
@@ -261,7 +266,10 @@ describe('Trend display (string comparison fix)', () => {
         ungrouped: [{ id: 's1', name: 'Test Section', shortName: 'Test', tags: [], color: '#888' }],
       }),
       getSectionProficiency: () => 2.0,
-      getSectionTrend: () => 'down',
+      sectionCountedEvidence: () => [
+        { score: 3, date: '2026-09-01' },
+        { score: 2, date: '2026-09-08' },
+      ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
     expect(html).toContain('↓');
@@ -668,5 +676,25 @@ describe('Assessment score chips', () => {
     });
     const html = MStudents.renderDetail(CID, 'stu1');
     expect(html).toContain('—');
+  });
+});
+
+describe('evidenceChange (the phone’s Improving / Dropped line)', () => {
+  const e = (score, date) => ({ score, date });
+
+  it('compares the first and last levels by the word they name', () => {
+    expect(evidenceChange([e(2, '2026-09-01'), e(4, '2026-09-08'), e(3, '2026-09-15')])).toMatchObject({
+      first: 2,
+      last: 3,
+      dir: 1,
+      same: false,
+    });
+    // 3 to 3+ is Proficient both times: no change, one word
+    expect(evidenceChange([e(3, '2026-09-01'), e(10 / 3, '2026-09-08')])).toMatchObject({ dir: 0, same: true });
+  });
+
+  it('orders by date and needs two scored entries', () => {
+    expect(evidenceChange([e(1, '2026-09-08'), e(3, '2026-09-01')]).dir).toBe(-1);
+    expect(evidenceChange([e(3, '2026-09-01'), e(0, '2026-09-08')])).toBeNull();
   });
 });

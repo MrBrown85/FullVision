@@ -257,7 +257,8 @@ window.MCardWidgets = (function () {
     var sections = data.sections || [];
     sections.forEach(function (sec) {
       (sec.tags || []).forEach(function (tag) {
-        getTagScores(cid, st.id, tag.id).forEach(function (s) {
+        // The evidence that counts toward the level (no 0% category work).
+        getCountedTagScores(cid, st.id, tag.id).forEach(function (s) {
           if (s.score > 0) allEvidenceScores.push(s);
         });
       });
@@ -281,8 +282,8 @@ window.MCardWidgets = (function () {
       );
     }
 
-    var firstScore = allEvidenceScores[0].score;
-    var lastScore = allEvidenceScores[allEvidenceScores.length - 1].score;
+    // First and last compared by the level their words name (evidenceChange).
+    var change = evidenceChange(allEvidenceScores);
     // One assessment scores several competencies; count each assessment once.
     var assessmentIds = {};
     allEvidenceScores.forEach(function (s) {
@@ -290,10 +291,10 @@ window.MCardWidgets = (function () {
     });
     var assessmentN = Object.keys(assessmentIds).length;
     var arrowColor, arrowChar;
-    if (lastScore > firstScore) {
+    if (change.dir > 0) {
       arrowColor = 'var(--score-3)';
       arrowChar = '\u2191';
-    } else if (lastScore < firstScore) {
+    } else if (change.dir < 0) {
       arrowColor = 'var(--score-1)';
       arrowChar = '\u2193';
     } else {
@@ -304,7 +305,7 @@ window.MCardWidgets = (function () {
     return (
       '<div class="m-wdg-growth">' +
       '<span class="m-wdg-growth-label">' +
-      (PROF_LABELS[Math.round(firstScore)] || 'No Evidence') +
+      PROF_LABELS[change.first] +
       '</span>' +
       '<span class="m-wdg-growth-arrow" style="color:' +
       arrowColor +
@@ -312,7 +313,7 @@ window.MCardWidgets = (function () {
       arrowChar +
       '</span>' +
       '<span class="m-wdg-growth-label">' +
-      (PROF_LABELS[Math.round(lastScore)] || 'No Evidence') +
+      PROF_LABELS[change.last] +
       '</span>' +
       '<span class="m-wdg-growth-meta"> (' +
       assessmentN +
