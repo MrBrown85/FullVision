@@ -456,6 +456,7 @@ window.PageGradebook = (function () {
       prevData && _scrollKey === scrollKey ? { top: prevData.scrollTop, left: prevData.scrollLeft } : null;
     _scrollKey = scrollKey;
 
+    var refocus = _cellKey(document.activeElement);
     document.getElementById('main').innerHTML = html;
     applyStickyLeft();
     initScrollShadows();
@@ -464,6 +465,161 @@ window.PageGradebook = (function () {
     initGridHoverSync();
     initHeaderResize();
     initColHoverTooltip();
+    var again = refocus && _findCell(refocus);
+    if (again) _selectCell(again);
+    else _initRovingCell();
+  }
+
+  /* ── Selecting a cell ──────────────────────────────────────
+     Each grid is one Tab stop: the selected cell (or the first) has
+     tabindex 0, the rest -1. The selection is the .gb-focus cell and has
+     the keyboard focus, so it survives a redraw and the grader. */
+  function _cellKey(el) {
+    if (!el || !el.matches || !el.matches('#gb-data td[data-aid][data-sid]')) return null;
+    return {
+      scores: el.classList.contains('gb-scores-cell'),
+      aid: el.dataset.aid,
+      sid: el.dataset.sid,
+      tid: el.dataset.tid || '',
+    };
+  }
+  function _findCell(key) {
+    var sel =
+      '#gb-data td' +
+      (key.scores ? '.gb-scores-cell' : '.gb-score') +
+      '[data-aid="' +
+      CSS.escape(key.aid) +
+      '"][data-sid="' +
+      CSS.escape(key.sid) +
+      '"]' +
+      (key.scores ? '' : key.tid ? '[data-tid="' + CSS.escape(key.tid) + '"]' : '[data-pts="1"]');
+    return document.querySelector(sel);
+  }
+  function _selectCell(td, focus) {
+    if (_tipSource && _tipSource.matches && _tipSource.matches('td')) _hideTip();
+    document.querySelectorAll('#gb-data .gb-focus').forEach(function (el) {
+      if (el !== td) el.classList.remove('gb-focus');
+    });
+    document.querySelectorAll('#gb-data td[tabindex="0"]').forEach(function (el) {
+      if (el !== td) el.tabIndex = -1;
+    });
+    td.classList.add('gb-focus');
+    td.tabIndex = 0;
+    if (focus !== false) td.focus({ preventScroll: true });
+    td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    return td;
+  }
+  function _clearSelection() {
+    document.querySelectorAll('#gb-data .gb-focus').forEach(function (el) {
+      el.classList.remove('gb-focus');
+      if (el === document.activeElement) el.blur();
+    });
+  }
+  function _initRovingCell() {
+    var cell = document.querySelector('#gb-data tr[data-sid] td[tabindex]');
+    if (cell) cell.tabIndex = 0;
+  }
+  /* The grid's cells by row: the student rows only, never Class Average. */
+  function _gridMatrix() {
+    var cellSel = viewMode === 'scores' ? 'td.gb-scores-cell' : 'td.gb-score';
+    return Array.prototype.map.call(document.querySelectorAll('#gb-data tbody tr[data-sid]'), function (r) {
+      return r.querySelectorAll(cellSel);
+    });
+  }
+  /* A one-line tip under a selected cell (keyboard only). */
+  function _showCellTip(td, text) {
+    var gbTip = document.getElementById('gb-tooltip');
+    if (!gbTip) return;
+    gbTip.className = 'dark';
+    gbTip.textContent = text;
+    gbTip.style.display = 'block';
+    _tipSource = td;
+    var rect = td.getBoundingClientRect();
+    var left = rect.left + rect.width / 2 - gbTip.offsetWidth / 2;
+    if (left < 8) left = 8;
+    if (left + gbTip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - gbTip.offsetWidth - 8;
+    gbTip.style.left = left + 'px';
+    gbTip.style.top = rect.bottom + 6 + 'px';
+  }
+
+  function _nameCellArrow(e) {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return false;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || !e.target.closest) return false;
+    var rows = _gridMatrix();
+    var names = document.querySelectorAll('#gb-rowheads .gb-grid-rowhead-name');
+    var name = e.key === 'ArrowRight' && e.target.closest('#gb-rowheads .gb-grid-rowhead-name');
+    if (name) {
+      var r = Array.prototype.indexOf.call(names, name);
+      if (r < 0 || !rows[r] || !rows[r][0]) return false;
+      e.preventDefault();
+      _selectCell(rows[r][0]);
+      return true;
+    }
+    var cell = e.key === 'ArrowLeft' && e.target.closest('#gb-data td.gb-focus');
+    if (!cell) return false;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i][0] === cell && names[i]) {
+        e.preventDefault();
+        _clearSelection();
+        names[i].focus();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /* Scores view keys: the arrows and Tab move, Return or Space opens the
+     grader, Shift+F10 or the Menu key opens the cell menu, Escape lets go. */
+  function _scoresKeydown(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.target.closest && e.target.closest('a[data-href], button, [role="menu"]')) return;
+    if (_scoreMode) return;
+    var rows = _gridMatrix();
+    if (!rows.length || !rows[0].length) return;
+    var focused = document.querySelector('#gb-data td.gb-scores-cell.gb-focus');
+    var nav = ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Tab'];
+    if (!focused) {
+      if (['ArrowDown', 'ArrowRight'].indexOf(e.key) >= 0 && !e.target.closest('input, select, textarea')) {
+        e.preventDefault();
+        _selectCell(rows[0][0]);
+      }
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openGrader(focused.dataset.sid, focused.dataset.aid, focused);
+      return;
+    }
+    if (e.key === 'Escape') {
+      _clearSelection();
+      return;
+    }
+    if ((e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
+      e.preventDefault();
+      var r = focused.getBoundingClientRect();
+      showScoreContextMenu({ clientX: r.left + r.width / 2, clientY: r.bottom }, focused);
+      return;
+    }
+    if (nav.indexOf(e.key) < 0) return;
+    var row = -1,
+      col = -1;
+    rows.forEach(function (cells, ri) {
+      var ci = Array.prototype.indexOf.call(cells, focused);
+      if (ci >= 0) {
+        row = ri;
+        col = ci;
+      }
+    });
+    if (row < 0) return;
+    var cols = rows[0].length;
+    // Tab past the row's end (or Shift+Tab before its start) leaves the grid.
+    if (e.key === 'Tab' && (e.shiftKey ? col === 0 : col === cols - 1)) return;
+    e.preventDefault();
+    if (e.key === 'ArrowDown') row = Math.min(row + 1, rows.length - 1);
+    else if (e.key === 'ArrowUp') row = Math.max(row - 1, 0);
+    else if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) col = Math.min(col + 1, cols - 1);
+    else col = Math.max(col - 1, 0);
+    if (rows[row][col]) _selectCell(rows[row][col]);
   }
 
   /* One line under the grid: what the colours and marks mean. */
@@ -1059,7 +1215,8 @@ window.PageGradebook = (function () {
     html += '</div>';
 
     // Q4: Data cells — score grid
-    html += '<div class="gb-grid-data" id="gb-data"><table class="gb-table"><tbody>';
+    html +=
+      '<div class="gb-grid-data" id="gb-data"><table class="gb-table" role="grid" aria-label="Scores by competency"><tbody>';
     sortedStudents.forEach(function (s) {
       html += '<tr data-sid="' + s.id + '">';
       cols.forEach(function (col, i) {
@@ -1083,7 +1240,7 @@ window.PageGradebook = (function () {
             altClass +
             '"' +
             cellStyle +
-            ' data-aid="' +
+            ' tabindex="-1" role="gridcell" data-aid="' +
             col.assessmentId +
             '" data-pts="1" data-cmp="1" data-sid="' +
             s.id +
@@ -1115,7 +1272,7 @@ window.PageGradebook = (function () {
             altClass +
             '"' +
             cellStyle +
-            ' data-aid="' +
+            ' tabindex="-1" role="gridcell" data-aid="' +
             col.assessmentId +
             '" data-pts="1" data-sid="' +
             s.id +
@@ -1156,7 +1313,7 @@ window.PageGradebook = (function () {
             altClass +
             '"' +
             cellStyle +
-            ' data-aid="' +
+            ' tabindex="-1" role="gridcell" data-aid="' +
             col.assessmentId +
             '" data-tid="' +
             col.tagId +
@@ -1361,7 +1518,10 @@ window.PageGradebook = (function () {
     html += '</div>';
 
     // Q4: Data cells (bottom-right, scrolls both ways — drives the others)
-    html += '<div class="gb-grid-data" id="gb-data"><table class="gb-scores-table ' + rowH + '" role="grid"><tbody>';
+    html +=
+      '<div class="gb-grid-data" id="gb-data"><table class="gb-scores-table ' +
+      rowH +
+      '" role="grid" aria-label="Scores"><tbody>';
     sortedStudents.forEach(function (s, si) {
       var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
       html += '<tr class="gb-scores-row' + altClass + '" data-sid="' + s.id + '">';
@@ -1410,7 +1570,7 @@ window.PageGradebook = (function () {
           cellClass +
           '" style="' +
           cellStyle +
-          '" role="gridcell" aria-label="' +
+          '" tabindex="-1" role="gridcell" aria-label="' +
           esc(fullName(s)) +
           ', ' +
           esc(a.title) +
@@ -1745,7 +1905,7 @@ window.PageGradebook = (function () {
     render();
     refreshSidebar();
     var cell = document.querySelector(sel);
-    if (cell) cell.classList.add('gb-focus');
+    if (cell) _selectCell(cell);
     return cell;
   }
 
@@ -2557,31 +2717,22 @@ window.PageGradebook = (function () {
      levels, whichever the work uses. Previous/Next steps through the rows
      in the order shown; closing redraws the gradebook. While it is open the
      gradebook's own listeners stand aside (_graderOpen). */
-  /* The grader steps through the students shown, in their order. A
-     Competencies cell stays selected when it closes, so the keyboard carries
-     on from it. */
+  /* The grader steps through the students shown, in their order. The cell
+     stays selected when it closes, so the keyboard carries on from it. */
   function openGrader(sid, aid, cell) {
     if (!window.PageAssignments || !sid || !aid) return;
     var ids = Array.prototype.map.call(document.querySelectorAll('#gb-data tr[data-sid]'), function (row) {
       return row.dataset.sid;
     });
-    var cellSel =
-      cell && cell.matches('td.gb-score')
-        ? '#gb-data td.gb-score[data-aid="' +
-          CSS.escape(aid) +
-          '"][data-sid="' +
-          CSS.escape(sid) +
-          '"]' +
-          (cell.dataset.tid ? '[data-tid="' + CSS.escape(cell.dataset.tid) + '"]' : '[data-pts="1"]')
-        : null;
+    var key = _cellKey(cell);
     _hideTip();
     PageAssignments.openGrader(activeCourse, aid, sid, {
       studentIds: ids,
       onClose: function () {
         clearProfCache();
         render();
-        var back = cellSel && document.querySelector(cellSel);
-        if (back) back.classList.add('gb-focus');
+        var back = key && _findCell(key);
+        if (back) _selectCell(back);
       },
     });
   }
@@ -2761,12 +2912,8 @@ window.PageGradebook = (function () {
     if (curRow < 0) return;
     var newRow = Math.min(curRow + 1, rows.length - 1);
     if (newRow === curRow) return;
-    focused.classList.remove('gb-focus');
     var newCell = rows[newRow] ? rows[newRow].querySelectorAll('td.gb-score')[curCol] : null;
-    if (newCell) {
-      newCell.classList.add('gb-focus');
-      newCell.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }
+    if (newCell) _selectCell(newCell);
   }
 
   function _handleKeydown(e) {
@@ -2813,6 +2960,13 @@ window.PageGradebook = (function () {
       render();
       return;
     }
+    // → on a student's name goes to their first score; ← on a first score
+    // goes back to the name.
+    if (_nameCellArrow(e)) return;
+    if (viewMode === 'scores') {
+      _scoresKeydown(e);
+      return;
+    }
     if (viewMode !== 'detailed') return;
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
     // Keys on a focused link or button (a student's name, the toolbar) are
@@ -2829,10 +2983,7 @@ window.PageGradebook = (function () {
     if (!focused && ['ArrowDown', 'ArrowRight', 'Tab'].includes(e.key)) {
       e.preventDefault();
       var first = rows[0] ? rows[0].querySelector('td.gb-score') : null;
-      if (first) {
-        first.classList.add('gb-focus');
-        first.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-      }
+      if (first) _selectCell(first);
       return;
     }
     if (!focused) return;
@@ -2882,15 +3033,17 @@ window.PageGradebook = (function () {
       focused.click();
       return;
     } else if (e.key === 'Escape') {
-      focused.classList.remove('gb-focus');
+      _clearSelection();
       return;
     } else if (
       !focused.dataset.kb &&
       (['+', '=', '-', '_', 'Backspace', 'Delete'].includes(e.key) || /^[0-9]$/.test(e.key))
     ) {
       // A competency of rubric work is scored on the rubric: Enter or a
-      // click opens the grader (editScoreCell), and typed scores do nothing.
+      // click opens the grader (editScoreCell), and typed scores do nothing;
+      // the cell says so.
       e.preventDefault();
+      _showCellTip(focused, 'Scored on the rubric. Press Return to open it.');
       return;
     } else if (['+', '=', '-', '_'].includes(e.key)) {
       e.preventDefault();
@@ -2985,12 +3138,8 @@ window.PageGradebook = (function () {
       }
       return;
     } else return;
-    focused.classList.remove('gb-focus');
     var newCell = rows[newRow] ? rows[newRow].querySelectorAll('td.gb-score')[newCol] : null;
-    if (newCell) {
-      newCell.classList.add('gb-focus');
-      newCell.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }
+    if (newCell) _selectCell(newCell);
   }
 
   /* ── Tooltip ─────────────────────────────────────────────── */
@@ -3086,6 +3235,12 @@ window.PageGradebook = (function () {
   function _handleFocusin(e) {
     if (_graderOpen()) return;
     if (!e.target.closest) return;
+    // Tabbing into a grid selects the cell that takes the focus.
+    var cell = e.target.closest('#gb-data td[data-aid][data-sid]');
+    if (cell) {
+      if (!cell.classList.contains('gb-focus')) _selectCell(cell, false);
+      return;
+    }
     var name = e.target.closest('.gb-grid-rowhead-name');
     if (name) {
       _showNameTip(name);
@@ -3109,16 +3264,12 @@ window.PageGradebook = (function () {
   /* ── Delegated click handler ──────────────────────────────── */
   function _handleClick(e) {
     if (_graderOpen()) return;
-    // Click-to-focus for score cells
-    var td = e.target.closest('td.gb-score');
-    var table = document.querySelector('.gb-table');
-    if (td && table) {
-      table.querySelectorAll('.gb-focus').forEach(function (el) {
-        el.classList.remove('gb-focus');
-      });
-      td.classList.add('gb-focus');
-    } else if (table && !e.target.closest('td.gb-score')) {
-      table.querySelectorAll('.gb-focus').forEach(function (el) {
+    // A click selects the cell it lands on (and opens the grader below);
+    // a click anywhere else lets the selection go.
+    var td = e.target.closest('#gb-data td.gb-score, #gb-data td.gb-scores-cell');
+    if (td) _selectCell(td);
+    else if (!e.target.closest('#grader-overlay, .gb-ctx-menu')) {
+      document.querySelectorAll('#gb-data .gb-focus').forEach(function (el) {
         el.classList.remove('gb-focus');
       });
     }
@@ -3253,7 +3404,11 @@ window.PageGradebook = (function () {
       var cell = e.target.closest('.gb-scores-cell');
       if (cell) {
         e.preventDefault();
-        showScoreContextMenu(e, cell);
+        // From the keyboard the event has no pointer position: under the cell.
+        if (!e.clientX && !e.clientY) {
+          var r = cell.getBoundingClientRect();
+          showScoreContextMenu({ clientX: r.left + r.width / 2, clientY: r.bottom }, cell);
+        } else showScoreContextMenu(e, cell);
         return;
       }
       var header = e.target.closest('.gb-grid-colhead, .gb-scores-assess-head');
