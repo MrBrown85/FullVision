@@ -512,8 +512,8 @@ window.ReportBlocks = (function () {
       if (secOverride) {
         // The level the scores give now, worked out here rather than taken
         // from the server.
-        const calculated = Math.round(getSectionProficiencyRaw(cid, student.id, sec.id) * 10) / 10;
-        html += `<div style="font-size:0.62rem;color:var(--text-3);font-style:italic;margin:2px 0 6px;padding-left:2px">Teacher override (calculated: ${calculated} ${PROF_LABELS[Math.round(calculated)] || ''}): ${esc(secOverride.reason)}</div>`;
+        const calculated = getSectionProficiencyRaw(cid, student.id, sec.id);
+        html += `<div style="font-size:0.62rem;color:var(--text-3);font-style:italic;margin:2px 0 6px;padding-left:2px">Teacher override (calculated: ${esc(formatLevel(cid, calculated))} ${PROF_LABELS[Math.round(calculated)] || ''}): ${esc(secOverride.reason)}</div>`;
       }
       sec.tags.forEach(tag => {
         const prof = getTagProficiency(cid, student.id, tag.id);
@@ -934,7 +934,11 @@ window.ReportBlocks = (function () {
 
     // Overall: the class's roll-up now, and then from the same rows.
     const overallNow = getOverallProficiency(cid, sid);
-    const overallThen = avg(live, 'then');
+    // Then rolls up through competency groups as Now does.
+    const overallThen = rollUpSectionLevels(cid, sec => {
+      const r = rowsBySection[sec.id];
+      return r && live.indexOf(r) >= 0 ? r.then : 0;
+    });
     const overallRow =
       options.overall !== false ? tr('Overall', overallThen, overallNow, sum(live), 'report-prof-overall') : '';
 
@@ -1701,7 +1705,6 @@ window.ReportBlocks = (function () {
   function renderBlockCoreCompetencies(cid, student, options) {
     options = options || {};
     const assessments = getAssessments(cid);
-    const scores = getScores(cid)[student.id] || [];
     // Count competency exposure: how many assessments touched each competency, and avg score
     const compData = {};
     CORE_COMPETENCIES.forEach(c => {
@@ -1710,16 +1713,18 @@ window.ReportBlocks = (function () {
     assessments.forEach(a => {
       const ccIds = a.coreCompetencyIds || [];
       if (ccIds.length === 0) return;
-      const aScores = scores.filter(s => s.assessmentId === a.id && s.score > 0);
-      let avg = aScores.length > 0 ? aScores.reduce((sum, s) => sum + scoreModValue(s), 0) / aScores.length : 0;
-      const rubricAvg = getRubricAssessmentScore(cid, a, aScores);
-      if (rubricAvg != null) avg = rubricAvg;
+      if (!assessmentInActiveTerm(cid, a)) return;
+      // The assessment's level as calc.js gives it: points as a share of 4
+      // (18/20 is 3.6, not level 18), rubric criteria by weight, Excused left
+      // out, Missing no evidence. Each counts its Factor times.
+      const avg = getAssessmentOverallScore(cid, student.id, a.id) || 0;
+      const factor = getAssessmentWeight(a);
       ccIds.forEach(ccId => {
         if (compData[ccId]) {
           compData[ccId].count++;
           if (avg > 0) {
-            compData[ccId].totalScore += avg;
-            compData[ccId].scored++;
+            compData[ccId].totalScore += factor * avg;
+            compData[ccId].scored += factor;
           }
         }
       });
