@@ -12,9 +12,7 @@ test('five tabs; a tap switches the panel and is remembered', async ({ page }) =
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
   await page.locator('.m-tab-item[data-tab="students"]').click();
-  // The list view, where each row opens the student.
-  await page.locator('[data-action="m-view-list"], [data-mode="list"]').first().click();
-  await page.locator('[data-action="m-student-detail"]').first().click();
+  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
   const screen = page.locator('#m-screen-student-detail');
   await expect(screen.locator('.m-st-tab .m-st-tab-label')).toHaveText([
     'Competencies',

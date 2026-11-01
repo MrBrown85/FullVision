@@ -54,6 +54,7 @@ test('the first student picked in a sweep is named just under the Sweep bar', as
 test('a Students search with no match says so', async ({ page }) => {
   await enterDemo(page);
   await page.locator('.m-tab-item[data-tab="students"]').click();
+  await page.locator('[data-action="m-all-students"]').click();
   const search = page.locator('.m-search-input');
   await search.fill('zz');
   await expect(page.locator('#m-student-search-empty')).toHaveText('No students match “zz”.');

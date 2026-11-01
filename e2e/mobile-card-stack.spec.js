@@ -1,5 +1,5 @@
 /**
- * The Students card stack fits between the search field and the tab bar on
+ * The Students card stack fits between the top bar and the tab bar on
  * every phone size, and a swipe moves the next card up in place (it eases to
  * full size) instead of rebuilding the stack. Runs in Demo Mode.
  */
@@ -11,7 +11,6 @@ async function enterDemo(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
-  await page.locator('.m-view-toggle-btn[data-mode="cards"]').click();
   await expect(page.locator('.m-card-stack-item[data-depth="0"]')).toBeVisible();
 }
 
@@ -42,7 +41,9 @@ for (const viewport of [
   { width: 375, height: 667 },
   { width: 393, height: 852 },
 ]) {
-  test(`the card and its count sit above the tab bar at ${viewport.width}×${viewport.height}`, async ({ page }) => {
+  test(`the card, its count and All Students sit above the tab bar at ${viewport.width}×${viewport.height}`, async ({
+    page,
+  }) => {
     await page.setViewportSize(viewport);
     await enterDemo(page);
     const m = await page.evaluate(() => {
@@ -50,7 +51,7 @@ for (const viewport of [
       const content = document.querySelector('#m-screen-students-list .m-screen-content');
       return {
         actionsBottom: box('.m-card-stack-item[data-depth="0"] .m-scard-actions').bottom,
-        counterBottom: box('.m-card-counter').bottom,
+        counterBottom: box('.m-card-foot').bottom,
         tabTop: box('#m-tab-bar').top,
         pageScrolls: content.scrollHeight > content.clientHeight,
       };
@@ -70,7 +71,7 @@ test('a swipe moves the next card up in place and keeps the stack', async ({ pag
   });
 
   await swipeTopCard(page);
-  await expect(page.locator('.m-card-counter')).toHaveText('2 of 27');
+  await expect(page.locator('#m-student-card-count')).toHaveText('2 of 27');
   // The card that was behind is now on top: the same element, not a rebuild.
   const top = page.locator('.m-card-stack-item[data-depth="0"]');
   await expect(top).toHaveAttribute('data-test-next', '1');

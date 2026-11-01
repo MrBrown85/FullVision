@@ -27,7 +27,10 @@ window.MStudentsList = (function () {
     return html || '<div class="m-prof-badge" style="background:' + MC.profBg(0) + '">—</div>';
   }
 
-  function buildCells(students, cid, allStatuses, allAssessments, renderBadges) {
+  // `action` is what a tap does: open the profile (default) or, in the
+  // All Students sheet, jump to that student's card.
+  function buildCells(students, cid, allStatuses, allAssessments, renderBadges, action) {
+    action = action || 'm-student-detail';
     var html = '';
     students.forEach(function (st) {
       var grades = studentGradeBadges(cid, st.id);
@@ -45,7 +48,9 @@ window.MStudentsList = (function () {
       var missingDot = hasMissing ? '<div class="m-missing-dot"></div>' : '';
 
       html +=
-        '<div class="m-cell" role="button" tabindex="0" data-action="m-student-detail" data-sid="' +
+        '<div class="m-cell" role="button" tabindex="0" data-action="' +
+        action +
+        '" data-sid="' +
         st.id +
         '">' +
         '<div class="m-cell-avatar" style="background:' +
@@ -69,29 +74,16 @@ window.MStudentsList = (function () {
     return html;
   }
 
+  // Students screen: the card stack only. The list, with search, opens as a
+  // sheet from All Students under the stack (renderAllStudentsSheet).
   function renderList(opts) {
     var cid = opts.cid;
-    var viewMode = opts.viewMode;
-    var sortMode = opts.sortMode;
-    var renderBadges = opts.renderBadges;
     var students = getStudents(cid);
-    students = sortStudents(students, sortMode, cid);
-
-    var toggleHTML =
-      '<div class="m-view-toggle">' +
-      '<button class="m-view-toggle-btn' +
-      (viewMode === 'cards' ? ' active' : '') +
-      '" data-action="m-set-view" data-mode="cards">Cards</button>' +
-      '<button class="m-view-toggle-btn' +
-      (viewMode === 'list' ? ' active' : '') +
-      '" data-action="m-set-view" data-mode="list">List</button>' +
-      '</div>';
 
     var nav = MC.navBar({
       id: 'students-list',
       title: 'Students',
       rightHTML:
-        toggleHTML +
         '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
         '<button class="m-nav-bar-action" data-action="m-sort" title="Sort">' +
         MC.ICONS.sort +
@@ -101,41 +93,45 @@ window.MStudentsList = (function () {
         '</button>',
     });
 
-    // Search is for List view; Cards view hides it (see _syncViewVisibility).
-    var search =
-      '<div class="m-search-wrap" id="m-student-search-wrap"' +
-      (viewMode === 'cards' ? ' style="display:none"' : '') +
-      '><input class="m-search-input" type="search" placeholder="Search students..." data-action="m-student-search" autocomplete="off"></div>';
-    var allStatuses = getAssignmentStatuses(cid);
-    var allAssessments = getAssessments(cid);
-
-    var cells = '';
+    var body;
     if (!students.length) {
-      cells =
+      body =
         '<div class="m-empty"><div class="m-empty-title">No Students</div><div class="m-empty-subtitle">Add students on the desktop app</div></div>';
     } else {
-      cells =
-        '<div class="m-list" id="m-student-list">' +
-        buildCells(students, cid, allStatuses, allAssessments, renderBadges) +
+      body =
+        '<div class="m-card-stack" id="m-student-card-stack"></div>' +
+        '<div class="m-card-foot">' +
+        '<span class="m-card-count" id="m-student-card-count"></span>' +
+        '<button class="m-card-all" data-action="m-all-students">All Students</button>' +
         '</div>';
     }
-
-    var cardStack = students.length ? '<div class="m-card-stack" id="m-student-card-stack"></div>' : '';
 
     return (
       '<div class="m-screen" id="m-screen-students-list">' +
       nav +
-      '<div class="m-screen-content">' +
-      MC.largeTitleHTML('Students') +
-      search +
-      cardStack +
-      cells +
+      '<div class="m-screen-content' +
+      (students.length ? ' m-cards-mode' : '') +
+      '">' +
+      body +
       '</div></div>'
+    );
+  }
+
+  function renderAllStudentsSheet(opts) {
+    var cid = opts.cid;
+    var students = sortStudents(getStudents(cid), opts.sortMode, cid);
+    return (
+      '<div class="m-sheet-title">All Students</div>' +
+      '<div class="m-search-wrap m-search-wrap-sheet"><input class="m-search-input" type="search" placeholder="Search students..." data-action="m-student-search" autocomplete="off"></div>' +
+      '<div class="m-list m-list-sheet" id="m-student-list">' +
+      buildCells(students, cid, getAssignmentStatuses(cid), getAssessments(cid), opts.renderBadges, 'm-jump-student') +
+      '</div>'
     );
   }
 
   return {
     buildCells: buildCells,
     renderList: renderList,
+    renderAllStudentsSheet: renderAllStudentsSheet,
   };
 })();

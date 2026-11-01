@@ -31,8 +31,9 @@ for (const row of [0, 3]) {
     await page.locator('#demo-mode-btn').click();
     await page.waitForURL(/teacher-mobile\//);
     await page.locator('.m-tab-item[data-tab="students"]').click();
-    await page.locator('[data-action="m-set-view"][data-mode="list"]').click();
-    await page.locator('[data-action="m-student-detail"]').nth(row).click();
+    await page.locator('[data-action="m-all-students"]').click();
+    await page.locator('[data-action="m-jump-student"]').nth(row).click();
+    await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
     const detail = page.locator('#m-screen-student-detail');
     const name = (await detail.locator('.m-hero-name').textContent()).trim();
 
@@ -48,9 +49,9 @@ for (const row of [0, 3]) {
     await expect(page.locator('#m-screen-student-detail .m-hero-name')).toHaveText(name);
     await expect(page.locator('#m-screen-grade-swiper')).toHaveCount(0);
 
-    // Back again returns to the list, as from any student page.
+    // Back again returns to the cards, as from any student page.
     await page.locator('#m-screen-student-detail [data-action="m-back"]').click();
     await expect(page.locator('#m-screen-student-detail')).toHaveCount(0);
-    await expect(page.locator('#m-student-list')).toBeVisible();
+    await expect(page.locator('#m-student-card-stack')).toBeVisible();
   });
 }

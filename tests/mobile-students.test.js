@@ -65,11 +65,11 @@ afterEach(() => {
   restoreDataLayer();
 });
 
-/* ── renderList ─────────────────────────────────────────────── */
-describe('MStudents.renderList', () => {
+/* ── All Students sheet ─────────────────────────────────────── */
+describe('MStudents.renderAllStudents', () => {
   it('renders all students as list cells', () => {
     mockDataLayer({});
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('Cece');
     expect(html).toContain('Noor');
     expect(html).toContain('Liam');
@@ -77,7 +77,7 @@ describe('MStudents.renderList', () => {
 
   it('includes role="button" and tabindex on cells for accessibility', () => {
     mockDataLayer({});
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('role="button"');
     expect(html).toContain('tabindex="0"');
   });
@@ -91,13 +91,13 @@ describe('MStudents.renderList', () => {
 
   it('shows IEP badge for designated students', () => {
     mockDataLayer({});
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('m-badge-iep');
   });
 
   it('shows MOD badge for modified students', () => {
     mockDataLayer({});
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('m-badge-mod');
   });
 
@@ -107,21 +107,21 @@ describe('MStudents.renderList', () => {
         { id: 'stu1', firstName: 'Ana', lastName: 'Ruiz', preferred: '', pronouns: '', designations: ['ELL'] },
       ],
     });
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('m-badge-ell');
     expect(html).not.toContain('m-badge-iep');
   });
 
   it('shows proficiency badge with correct value', () => {
     mockDataLayer({ getOverallProficiency: (cid, sid) => (sid === 'stu1' ? 3.5 : 2.0) });
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('3.5');
     expect(html).toContain('2.0');
   });
 
   it('shows dash for zero proficiency', () => {
     mockDataLayer({ getOverallProficiency: () => 0 });
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     // The proficiency badge should show '—' not '0.0'
     expect(html).toContain('—');
     expect(html).not.toContain('>0.0<');
@@ -132,7 +132,7 @@ describe('MStudents.renderList', () => {
       getAssignmentStatuses: () => ({ 'stu1:a1': 'NS' }),
       getAssessments: () => [{ id: 'a1', type: 'summative', date: '2025-01-01', tagIds: ['t1'] }],
     });
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('m-missing-dot');
   });
 
@@ -149,28 +149,48 @@ describe('MStudents.renderList', () => {
         return {};
       },
     });
-    MStudents.renderList(CID);
+    MStudents.renderAllStudents(CID);
     // Should be called exactly once (hoisted), not once per student (3 students)
     expect(assessCalls).toBe(1);
     expect(statusCalls).toBe(1);
   });
 
+  it('cells jump to the student card', () => {
+    mockDataLayer({});
+    const html = MStudents.renderAllStudents(CID);
+    expect(html).toContain('data-action="m-jump-student"');
+    expect(html).not.toContain('data-action="m-student-detail"');
+  });
+
   it('includes search bar', () => {
     mockDataLayer({});
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('m-search-input');
     expect(html).toContain('Search students...');
   });
 
   it('renders pronouns as subtitle', () => {
     mockDataLayer({});
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('she/her');
     expect(html).toContain('he/him');
   });
 });
 
 /* ── renderDetail ───────────────────────────────────────────── */
+describe('MStudents.renderList', () => {
+  it('shows the card stack and All Students, with no title, search or view switch', () => {
+    mockDataLayer({});
+    const html = MStudents.renderList(CID);
+    expect(html).toContain('m-student-card-stack');
+    expect(html).toContain('data-action="m-all-students"');
+    expect(html).toContain('sync-indicator-dot');
+    expect(html).not.toContain('m-title-large');
+    expect(html).not.toContain('m-search-input');
+    expect(html).not.toContain('m-set-view');
+  });
+});
+
 describe('MStudents.renderDetail', () => {
   it('shows hero with student name and proficiency', () => {
     mockDataLayer({});
@@ -435,7 +455,7 @@ describe('Student edge cases', () => {
         { id: 'stu1', firstName: 'Test', lastName: 'User', preferred: '', pronouns: '', designations: [] },
       ],
     });
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('Test User');
     expect(html).not.toContain('m-cell-subtitle'); // no subtitle without pronouns
   });
@@ -446,7 +466,7 @@ describe('Student edge cases', () => {
         { id: 'stu1', firstName: 'Test', lastName: 'User', preferred: '', pronouns: '', designations: null },
       ],
     });
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('Test User');
     expect(html).not.toContain('m-badge');
   });
@@ -457,7 +477,7 @@ describe('Student edge cases', () => {
         { id: 'stu1', firstName: 'Test', lastName: 'User', preferred: '', pronouns: '', designations: [] },
       ],
     });
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).not.toContain('m-badge-iep');
   });
 
@@ -468,7 +488,7 @@ describe('Student edge cases', () => {
       ],
       displayName: st => (st.preferred || st.firstName) + ' ' + st.lastName,
     });
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     expect(html).toContain('Alex Smith');
   });
 
@@ -478,7 +498,7 @@ describe('Student edge cases', () => {
         { id: 'stu1', firstName: 'Test', lastName: 'User', preferred: '', pronouns: '', designations: ['G', 'K'] },
       ],
     });
-    const html = MStudents.renderList(CID);
+    const html = MStudents.renderAllStudents(CID);
     // G has iep:true, K has iep:true AND modified:true
     expect(html).toContain('m-badge-iep');
     expect(html).toContain('m-badge-mod');
