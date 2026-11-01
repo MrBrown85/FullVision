@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1676 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1676);
+  it('has 1703 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(1703);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1676);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1703);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -222,6 +222,9 @@ describe('the bank', () => {
       evenResults: 'evenResults',
       evenSkill: 'evenResults',
       evenWord: 'evenResults',
+      // The highest-marked skill (strengths for a staircase, Nov 2).
+      highestSkill: 'strength',
+      highestTop: 'strength',
       habitsExcellent: 'habits',
       habitsGood: 'habits',
       habitsAllSeen: 'habits',
@@ -266,7 +269,7 @@ describe('the bank', () => {
                   ? { missing: 'notHandedIn', marks: 'marks', noMarks: 'marks', low: 'lowMarks' }[s.when[k]]
                   : k === 'nextSkill'
                     ? 'nextStep'
-                    : k === 'strongSkill' || k === 'topSkill'
+                    : k === 'strongSkill' || k === 'topSkill' || k === 'highestSkill' || k === 'highestWord'
                       ? 'strength'
                       : k === 'evenWord'
                         ? 'evenResults'
@@ -325,6 +328,11 @@ describe('the bank', () => {
         } else if (k === 'evenWord') {
           expect(['Emerging', 'Developing', 'Proficient', 'Extending']).toContain(v);
           expect(s.claims, s.id).toContain('evenResults');
+        } else if (k === 'highestWord') {
+          // The student's own highest-marked skill, at its proficiency word:
+          // the frame needs the skill verify() checks.
+          expect(['Emerging', 'Developing', 'Proficient', 'Extending']).toContain(v);
+          expect(s.needs, s.id).toContain('highestSkill');
         } else {
           expect(keys, s.id).toContain(k);
           expect(v).toBeGreaterThanOrEqual(1);
@@ -596,10 +604,11 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(CommentBank.fitCount(ctx)).toBe(85);
   });
 
-  it('offers Jasper 74 (9, 28, 12, 25), by the name he goes by', () => {
+  it('offers Jasper 80 (9, 34, 12, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 28, 12, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(74);
+    // Overall: 28, and six frames for his own highest-marked skill (Nov 2).
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 34, 12, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(80);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });

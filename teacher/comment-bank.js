@@ -2588,6 +2588,84 @@ window.CommentBank = (function () {
     return xs.length ? xs[0].skill : '';
   }
 
+  /* The student's own highest-marked skill (strengths for a staircase,
+     Nov 2): no other route holds (strongest, a tie at the top, even
+     results), and two or more competencies are judged on 3+ scored pieces
+     (one skill is not a pattern). The competencies at the highest
+     proficiency among the judged ones, as it prints (tenths), the next
+     step's left out; report order. [] otherwise. A fact about the student's
+     own work, never a ranking against anyone else and never "strongest"
+     (the frames say what the work shows in that skill at its proficiency
+     word, `when.highestWord`). */
+  function highestOf(comps, overall) {
+    if (strongestOf(comps).length || topTieOf(comps).length || evenComps(comps, overall).length) return [];
+    var judged = (comps || []).filter(function (c) {
+      return c.level > 0 && (c.scores || []).length >= STRONGEST_PIECES;
+    });
+    if (judged.length < 2) return [];
+    var next = nextStepOf(comps);
+    var pool = judged.filter(function (c) {
+      return c !== next;
+    });
+    if (!pool.length) return [];
+    var top = Math.max.apply(
+      null,
+      pool.map(function (c) {
+        return tenths(c.level);
+      }),
+    );
+    return pool.filter(function (c) {
+      return tenths(c.level) === top;
+    });
+  }
+  /* The highest-marked competencies (highestOf) as skills from the table,
+     one per skill key and never the next step's skill, [{ comp, key, skill,
+     word }], word the competency's own proficiency word. As for a tie
+     (topSkillOf), the skill named for the fewest classmates this session
+     comes first, then the shortest wording, then report order. A frame too
+     long with the first skill takes the next with the same word (ctxFor). */
+  function highestSkills(f) {
+    var next = nextSkillOf(f);
+    var uses = _topUsesFor(f.cid, f.sid);
+    var out = [];
+    highestOf(f.comps, f.overall).forEach(function (c) {
+      var sk = skillOf(f.family, c.name);
+      if (
+        !sk ||
+        (next && next.key === sk.key) ||
+        out.some(function (x) {
+          return x.key === sk.key;
+        })
+      )
+        return;
+      out.push({ comp: c, key: sk.key, skill: sk.skill, word: word(c.level) });
+    });
+    return out
+      .map(function (x, i) {
+        return { x: x, i: i };
+      })
+      .sort(function (a, b) {
+        return (
+          (uses[a.x.key] || 0) - (uses[b.x.key] || 0) || R.wordCount(a.x.skill) - R.wordCount(b.x.skill) || a.i - b.i
+        );
+      })
+      .map(function (p) {
+        return p.x;
+      });
+  }
+  /* Whether the highest-marked skill is at the top of every competency
+     with a level, whatever its piece count: the frames that say "highest"
+     or "furthest along" need it (`highestTop`), so a competency marked once
+     or twice above it never makes them untrue. */
+  function highestIsTop(f, x) {
+    return (
+      !!x &&
+      !(f.comps || []).some(function (c) {
+        return c.level > 0 && tenths(c.level) > tenths(x.comp.level);
+      })
+    );
+  }
+
   /* What a support line fits for this student: the next step's skill when
      the line names it, else a habit rated Sometimes or Rarely that it
      names; null when neither. */
@@ -2724,6 +2802,13 @@ window.CommentBank = (function () {
     // The strength as one skill (topSkillOf): the strongest, else one of a
     // tie at the top (topTieOf), for the frames under `when.topSkill`.
     var topSk = topSkillOf(f);
+    // The student's own highest-marked skill (highestSkills), when no
+    // other route names a strength, for the frames under `when.highestWord`.
+    var hiSk = highestSkills(f);
+    var hiTop = highestIsTop(f, hiSk[0]);
+    var levelled = f.comps.filter(function (c) {
+      return c.level > 0;
+    });
     var fallen = drops.length
       ? drops.slice().sort(function (a, b) {
           return tenths(a.start) - tenths(a.now) - (tenths(b.start) - tenths(b.now));
@@ -2853,6 +2938,10 @@ window.CommentBank = (function () {
       evenResults: keys('comp', evenNow),
       evenSkill: keys('comp', [evenSk[0] && evenSk[0].comp]),
       evenWord: ['overall'].concat(keys('comp', evenNow)),
+      // The highest-marked skill (highestSkills): the competency named;
+      // "highest" over every competency with a level rests on them all.
+      highestSkill: keys('comp', [hiSk[0] && hiSk[0].comp]),
+      highestTop: keys('comp', levelled),
       growthAreas: keys('comp', lowest),
       even: keys('comp', withLevels),
       rise: keys('comp', [rises[0]]),
@@ -2914,6 +3003,7 @@ window.CommentBank = (function () {
       strongSkill: names([strongSkills[0] && strongSkills[0].comp]),
       topSkill: names([topSk && topSk.comp]),
       evenSkill: names([evenSk[0] && evenSk[0].comp]),
+      highestSkill: names([hiSk[0] && hiSk[0].comp]),
       growthAreas: names(lowest),
       rise: names([rises[0]]),
       fall: names([fallen]),
@@ -2964,6 +3054,12 @@ window.CommentBank = (function () {
       // first fills {evenSkill}; a frame too long with it takes the next
       // that fits (ctxFor).
       _evenSkills: evenSk,
+      // The highest-marked skill's key and its own proficiency word
+      // (`when.highestSkill`, `when.highestWord`), and the candidates in
+      // the order they are offered (highestSkills; ctxFor).
+      _highestSkill: hiSk[0] ? hiSk[0].key : '',
+      _highestWord: hiSk[0] ? hiSk[0].word : '',
+      _highestSkills: hiSk,
       _options: options,
       _focus: focus || null,
       _facts: factsOf,
@@ -3013,6 +3109,11 @@ window.CommentBank = (function () {
       evenResults: evenNow.length ? 'yes' : '',
       evenSkill: evenSkillText(f),
       evenWord: evenNow.length ? f.standing || '' : '',
+      // The highest-marked skill in the table's words, and 'yes' when no
+      // competency with a level sits above it (the frames that say
+      // "highest" or "furthest along" need it).
+      highestSkill: hiSk[0] ? hiSk[0].skill : '',
+      highestTop: hiTop ? 'yes' : '',
       growthAreas: list(
         lowest.map(function (c) {
           return c.name;
@@ -3175,6 +3276,8 @@ window.CommentBank = (function () {
       if (k === 'strongSkill') return !!ctx._strongSkill && ctx._strongSkill === when[k];
       if (k === 'topSkill') return !!ctx._topSkill && ctx._topSkill === when[k];
       if (k === 'evenWord') return !!ctx._evenWord && ctx._evenWord === when[k];
+      if (k === 'highestSkill') return !!ctx._highestSkill && ctx._highestSkill === when[k];
+      if (k === 'highestWord') return !!ctx._highestWord && ctx._highestWord === when[k];
       return (ctx._habits || {})[k] === when[k];
     });
   }
@@ -3229,6 +3332,7 @@ window.CommentBank = (function () {
     if (!s || !ctx) return ctx;
     var text = String(s.text || '');
     if (/\{evenSkill\}/.test(text)) return _evenCtxFor(s, ctx);
+    if (/\{highestSkill\}/.test(text)) return _highestCtxFor(s, ctx);
     if (!/\{strengths\}/.test(text)) return ctx;
     if (!ctx.strengths || !ctx.strength || ctx.strengths === ctx.strength) return ctx;
     if (!R.tooLong(R.render(_tokensRaw(s, ctx), whoOf(ctx), { named: true }))) return ctx;
@@ -3255,6 +3359,34 @@ window.CommentBank = (function () {
       if (!long(alt)) return alt;
     }
     return ctx;
+  }
+  /* The same for "{highestSkill}": a frame that runs past 20 words with
+     the first highest-marked skill (highestSkills) holds the next one with
+     the same proficiency word that keeps it within 20, its facts, key and
+     word moved with it. */
+  function _highestCtxFor(s, ctx) {
+    var xs = ctx._highestSkills || [];
+    if (!ctx.highestSkill || xs.length < 2) return ctx;
+    var long = function (c) {
+      return R.tooLong(R.render(_tokensRaw(s, c), whoOf(c), { named: true }));
+    };
+    if (!long(ctx)) return ctx;
+    for (var i = 1; i < xs.length; i++) {
+      if (xs[i].word !== ctx._highestWord) continue;
+      var alt = _withHighest(ctx, xs[i]);
+      if (!long(alt)) return alt;
+    }
+    return ctx;
+  }
+  /* A context with another of the highest-marked skills in the slot. */
+  function _withHighest(ctx, x) {
+    return Object.assign({}, ctx, {
+      highestSkill: x.skill,
+      _highestSkill: x.key,
+      _highestWord: x.word,
+      _facts: Object.assign({}, ctx._facts, { highestSkill: ['comp:' + x.comp.id] }),
+      _compNames: Object.assign({}, ctx._compNames, { highestSkill: [x.comp.name] }),
+    });
   }
   /* Who a context is about: { name, p, onFile }. A context built by hand
      with pronouns counts them as on file. */
@@ -3600,6 +3732,8 @@ window.CommentBank = (function () {
       if (k === 'strongSkill') return ((ctx._facts && ctx._facts.strongSkill) || []).forEach(add);
       if (k === 'topSkill') return ((ctx._facts && ctx._facts.topSkill) || []).forEach(add);
       if (k === 'evenWord') return ((ctx._facts && ctx._facts.evenWord) || []).forEach(add);
+      if (k === 'highestSkill' || k === 'highestWord')
+        return ((ctx._facts && ctx._facts.highestSkill) || []).forEach(add);
       add(
         k === 'picture'
           ? 'picture'
@@ -4452,6 +4586,18 @@ window.CommentBank = (function () {
           });
         named = evSk ? evSk.key : '';
       }
+      // The highest-marked skill named ({highestSkill}), on the same tally.
+      if (!named) {
+        var hi = d.provenance.find(function (pv) {
+          return !!(pv.values || {}).highestSkill;
+        });
+        var hiSk =
+          hi &&
+          (ctx._highestSkills || []).find(function (x) {
+            return x.skill === hi.values.highestSkill;
+          });
+        named = hiSk ? hiSk.key : '';
+      }
       if (named) {
         _topTold[cid] = _topTold[cid] || {};
         _topTold[cid][String(sid)] = named;
@@ -5045,6 +5191,29 @@ window.CommentBank = (function () {
         )
           return false;
       } else if (tops.length) return false;
+      // A frame for the student's own highest-marked skill (highestSkills):
+      // no other route holds, the competency behind it is at the highest
+      // proficiency among the judged ones and not the next step, the skill
+      // is the table's wording for it, the proficiency word bound is its
+      // own, and "highest" over every competency still holds where the
+      // frame needs it (highestTop). Which of a tie was named is a choice,
+      // not a fact.
+      var highs = _ids(pv, 'highestSkill', 'comp');
+      if (highs.length || _has(pv, 'when.highestSkill') || _has(pv, 'when.highestWord')) {
+        var hx = highs.length
+          ? highestSkills(f).find(function (x) {
+              return String(x.comp.id) === highs[0];
+            })
+          : null;
+        if (
+          !hx ||
+          (_has(pv, 'highestSkill') && v.highestSkill !== hx.skill) ||
+          (_has(pv, 'when.highestSkill') && v['when.highestSkill'] !== hx.key) ||
+          (_has(pv, 'when.highestWord') && v['when.highestWord'] !== hx.word) ||
+          (_has(pv, 'highestTop') && !highestIsTop(f, hx))
+        )
+          return false;
+      }
       var labels = (f.comps || []).map(function (c) {
         return String(c.name || '');
       });
@@ -5052,7 +5221,7 @@ window.CommentBank = (function () {
         return !_has(pv, k) || (!!v[k] && wants.indexOf(v[k]) >= 0 && labels.indexOf(v[k]) < 0);
       };
       return (
-        ids.length + tops.length > 0 &&
+        ids.length + tops.length + highs.length > 0 &&
         ids.every(function (id) {
           return gated.indexOf(String(id)) >= 0;
         }) &&
@@ -5293,6 +5462,8 @@ window.CommentBank = (function () {
             'strongSkill',
             'topSkill',
             'evenWord',
+            'highestSkill',
+            'highestWord',
           ].indexOf(m[1]) < 0
         )
           checks.push(eff[m[1]] === pv.values[k]);
@@ -5418,6 +5589,13 @@ window.CommentBank = (function () {
      sentence was filled, when the skill named is still one of them. The
      claim (CLAIMS.evenResults) checks the competency behind it. */
   function _asNamed(pv, ctx) {
+    var hiNamed = (pv && pv.values && pv.values.highestSkill) || '';
+    if (hiNamed && ctx && hiNamed !== ctx.highestSkill) {
+      var hx = (ctx._highestSkills || []).find(function (e) {
+        return e.skill === hiNamed;
+      });
+      if (hx) ctx = _withHighest(ctx, hx);
+    }
     var named = (pv && pv.values && pv.values.evenSkill) || '';
     if (!named || !ctx || named === ctx.evenSkill) return ctx;
     var x = (ctx._evenSkills || []).find(function (e) {
@@ -5975,6 +6153,8 @@ window.CommentBank = (function () {
     evenComps: evenComps,
     evenSkills: evenSkills,
     evenSkillText: evenSkillText,
+    highestOf: highestOf,
+    highestSkills: highestSkills,
     MAX_SENTENCES: MAX_SENTENCES,
     MIN_SENTENCES: MIN_SENTENCES,
     climbed: climbed,

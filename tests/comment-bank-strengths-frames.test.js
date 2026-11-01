@@ -138,7 +138,16 @@ describe('even results (evenComps)', () => {
     const ctx = CommentBank.context(f, {});
     expect(ctx.evenResults).toBe('');
     expect(ctx._evenWord).toBe('');
-    expect(CommentBank.stepPool('overall', ctx)).toEqual([]);
+    // The highest-marked skill holds instead (Nov 2): Evidence, at
+    // Proficient; with a competency on one piece above it, no frame that
+    // says "highest" is offered.
+    const pool = CommentBank.stepPool('overall', ctx);
+    expect(pool.filter(x => x.when && x.when.evenWord)).toEqual([]);
+    expect(pool.length).toBeGreaterThan(0);
+    pool.forEach(x => {
+      expect(x.when.highestWord, x.id).toBe('Proficient');
+      expect(x.needs, x.id).not.toContain('highestTop');
+    });
     const even = evenFacts('Proficient');
     const ectx = CommentBank.context(even, {});
     const s = frames.find(x => x.when.evenWord === 'Proficient');
