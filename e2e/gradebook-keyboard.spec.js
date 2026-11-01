@@ -99,3 +99,22 @@ test('Competencies: a click selects the cell, and typing on rubric work says how
   await page.keyboard.press('3');
   await expect(page.locator('#gb-tooltip')).toHaveText('Scored on the rubric. Press Return to open it.');
 });
+
+test('Competencies: Return saves a points entry and moves to the next student', async ({ page }) => {
+  await page.evaluate(() => {
+    var cid = getActiveCourse();
+    var list = getAssessments(cid);
+    list[1].scoreMode = 'points';
+    list[1].maxPoints = 10;
+    saveAssessments(cid, list);
+  });
+  await page.locator('[data-action="setView"][data-mode="detailed"]').click();
+  const first = page.locator('#gb-data td.gb-score[data-pts="1"][data-sid="stu-001"]');
+  await first.click();
+  await page.keyboard.press('Escape');
+  await expect(first).toBeFocused();
+  await page.keyboard.press('7');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#gb-data td.gb-score[data-pts="1"][data-sid="stu-001"]')).toContainText('7/10');
+  await expect(page.locator('#gb-data td.gb-score[data-pts="1"][data-sid="stu-002"]')).toBeFocused();
+});

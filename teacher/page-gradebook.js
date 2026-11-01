@@ -2051,14 +2051,25 @@ window.PageGradebook = (function () {
       _redrawCompetencyCell(td);
     }
     inp.addEventListener('blur', commit);
+    // Return saves and moves to the next student, as levels and C / I do;
+    // Tab saves and moves right.
     inp.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
         e.preventDefault();
         commit();
+        var cell = document.querySelector('#gb-data td.gb-focus');
+        if (!cell) return;
+        if (e.key === 'Enter') kbAdvanceDown(document.querySelector('.gb-table'), cell);
+        else {
+          var row = cell.parentElement.querySelectorAll('td.gb-score');
+          var next = row[Array.prototype.indexOf.call(row, cell) + 1];
+          if (next) _selectCell(next);
+        }
       } else if (e.key === 'Escape') {
         done = true;
         wrap.remove();
         if (existing) existing.style.display = '';
+        td.focus({ preventScroll: true });
       }
       e.stopPropagation();
     });
