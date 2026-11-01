@@ -548,6 +548,18 @@ window.PersonalBank = (function () {
           return mark({ slot: k, text: '{' + k + '}' }) + dot;
         });
       });
+      // A sentence typed for the bank (e.loose) may name the title without
+      // quotes, with or without its lesson number; the realiser quotes the
+      // slot.
+      if (e.loose)
+        [full, t].forEach(function (title) {
+          if (!title || title.length < 4) return;
+          var bare = new RegExp('(^|[^A-Za-zÀ-ɏ0-9“"])' + _reEsc(title) + '(?![A-Za-zÀ-ɏ0-9”"])', 'g');
+          s = s.replace(bare, function (m, lead) {
+            chip(title, SLOT_LABEL[k]);
+            return lead + mark({ slot: k, text: '{' + k + '}' });
+          });
+        });
     });
     // The class name, the competencies, the next step and the proficiency
     // word, exactly as the context has them.
@@ -835,46 +847,209 @@ window.PersonalBank = (function () {
     var lint = window.CommentLint ? CommentLint.findings(sl.text) : [];
     if (lint.length) return Object.assign(out, { reason: _lintReason(lint[0]) });
 
-    // The condition that was true: the step, the sentence it replaced, the
-    // competencies that sentence was about, the kind of class.
-    var def = _stepDef(row.step);
-    var base = row.s || null;
-    var dataSlots = sl.slots.filter(function (k) {
-      return !/^(he|He|him|his|His|himself)$/.test(k);
-    });
-    var comps = {};
-    var was = (row.prov && row.prov.values) || {};
-    var baseSlots = Object.keys(was).filter(function (k) {
-      return !/^when\./.test(k);
-    });
-    COMP_SLOTS.forEach(function (k) {
-      if (baseSlots.indexOf(k) < 0 || dataSlots.indexOf(k) >= 0) return;
-      var names = ((ctx && ctx._compNames) || {})[k] || [];
-      if (names.length) comps[k] = names.slice();
-    });
-    var needs = _union(base ? base.needs : [], dataSlots);
-    needs = _union(needs, Object.keys(comps));
-    var claims = (base && base.claims) || [];
-    dataSlots.concat(Object.keys(comps)).forEach(function (k) {
-      if (SLOT_CLAIMS[k]) claims = _union(claims, [SLOT_CLAIMS[k]]);
-    });
-    var condition = {
-      step: def.key,
-      part: def.part,
-      group: (base && base.group) || def.groups[0],
-      family: opts.family || (f && f.family) || '',
-      when: (base && base.when) || {},
-      needs: needs,
-      claims: claims,
-    };
-    if (Object.keys(comps).length) condition.comps = comps;
-    if (Object.keys(sl.counts).length) condition.counts = sl.counts;
+    var condition = _condition(sl, { row: row }, ctx, f, opts);
     var template = { text: sl.text, slots: sl.slots, condition: condition };
     return Object.assign(out, {
       template: template,
       chips: sl.chips,
       offered: offeredWhen(condition),
     });
+  }
+
+  /* The condition a template is bound to. bind: { row } for a sentence
+     that sat in a row of the Sentences card (its step, the bank sentence
+     it replaced with its `when`, `needs` and claims, the competencies that
+     sentence was about); or { step, when, needs, claims, group } for a
+     sentence the teacher wrote for a part and, when they chose one, a
+     case. A part with no case is `general`: it claims nothing, so
+     Generate picks it only when nothing more specific fits. Always the
+     kind of class. */
+  function _condition(sl, bind, ctx, f, opts) {
+    opts = opts || {};
+    var row = bind.row || null;
+    var def = _stepDef(row ? row.step : bind.step);
+    var base = row ? row.s || null : null;
+    var dataSlots = sl.slots.filter(function (k) {
+      return !/^(he|He|him|his|His|himself)$/.test(k);
+    });
+    var comps = {};
+    if (row) {
+      var was = (row.prov && row.prov.values) || {};
+      var baseSlots = Object.keys(was).filter(function (k) {
+        return !/^when\./.test(k);
+      });
+      COMP_SLOTS.forEach(function (k) {
+        if (baseSlots.indexOf(k) < 0 || dataSlots.indexOf(k) >= 0) return;
+        var names = ((ctx && ctx._compNames) || {})[k] || [];
+        if (names.length) comps[k] = names.slice();
+      });
+    }
+    var caseNeeds = row ? (base ? base.needs : []) : bind.needs || [];
+    var needs = _union(caseNeeds, dataSlots);
+    needs = _union(needs, Object.keys(comps));
+    var claims = (row ? base && base.claims : bind.claims) || [];
+    dataSlots.concat(Object.keys(comps)).forEach(function (k) {
+      if (SLOT_CLAIMS[k]) claims = _union(claims, [SLOT_CLAIMS[k]]);
+    });
+    var when = Object.assign({}, (row ? base && base.when : bind.when) || {});
+    var condition = {
+      step: def.key,
+      part: def.part,
+      group: (row ? base && base.group : bind.group) || def.groups[0],
+      family: opts.family || (f && f.family) || '',
+      when: when,
+      needs: needs,
+      claims: claims,
+    };
+    if (Object.keys(comps).length) condition.comps = comps;
+    if (Object.keys(sl.counts).length) condition.counts = sl.counts;
+    if (!row && !Object.keys(when).length && !(bind.needs || []).length) condition.general = true;
+    return condition;
+  }
+
+  /* ── A sentence the teacher writes for the bank (Colin, Nov 1) ────────
+     "+ Write Your Own" and "Add to My Bank" on the Term Questionnaire: one
+     line, written for the student on screen, slotted the same way as a
+     suggestion and bound to a row's case or to a part (and a case the
+     teacher picked). The teacher's text is theirs: the lint, the 6–20-word
+     rule, a date, a one-day marker, a quotation, a number and an unknown
+     capitalised word are advice under the box, each in plain words; only
+     a health or designation word and another student's name block the
+     save, since the sentence would be used for other students. */
+
+  // A plain one-word verb for a few phrasal verbs the lint flags.
+  var TRY = {
+    'keep up': 'continue',
+    'find out': 'learn',
+    'figure out': 'solve',
+    'work out': 'solve',
+    'give up': 'stop',
+    'point out': 'show',
+    'carry out': 'do',
+    'set up': 'prepare',
+    'hand in': 'submit',
+    'build on': 'extend',
+    'back up': 'support',
+  };
+  function _q(w) {
+    return '“' + w + '”';
+  }
+  function _reOf(str) {
+    var m = /^\/([\s\S]*)\/([a-z]*)$/.exec(String(str || ''));
+    try {
+      return m ? new RegExp(m[1], m[2]) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function _matchOf(reStr, text) {
+    var re = _reOf(reStr);
+    var m = re && String(text).match(re);
+    return m ? m[0].trim() : '';
+  }
+  /* One lint finding as advice. */
+  function _adviceFor(finding, text) {
+    var m = /^([a-z ]+): ([\s\S]*)$/.exec(finding);
+    var kind = m ? m[1] : finding;
+    var what = m ? m[2] : '';
+    switch (kind) {
+      case 'phrasal verb':
+        return (
+          _q(what) +
+          ' is a phrase families may not know; try ' +
+          (TRY[what] ? _q(TRY[what]) : 'a plain one-word verb') +
+          '.'
+        );
+      case 'idiom': {
+        var hit = _matchOf(what, text);
+        return (hit ? _q(hit) + ' is a saying' : 'This has a saying') + ' families may not know; try plain words.';
+      }
+      case 'person praise':
+        return _q(what) + ' praises the person; say what the work or the habit showed instead.';
+      case 'comparison': {
+        var c = _matchOf(what, text);
+        return (c ? _q(c) + ' compares' : 'This compares') + ' with classmates; a report describes only this student.';
+      }
+      case 'evaluative word':
+        return _q(what) + ' is a judging word the bank leaves out; say what the student did instead.';
+      default:
+        return finding;
+    }
+  }
+  function _leftoverAdvice(left) {
+    if (left === 'a quotation') return 'A quotation fits this student only; leave it out of a bank sentence.';
+    if (left === 'a number') return 'A number fits this student only, so every student’s comment would say it.';
+    var w = left.replace(/^unknown word: /, '');
+    return _q(w) + ' is a name FullVision cannot turn into a slot, so every student’s comment would say it.';
+  }
+
+  /* A template in plain words for the preview under the box ("Saved as:
+     [Name] uses feedback on one piece before the final version."): a
+     name or pronoun slot in brackets, a data slot by its label, a verb in
+     its one-person form. No slot syntax is shown. */
+  var PLAIN = {
+    He: '[Name]',
+    His: '[Name]’s',
+    he: '[he/she/they]',
+    him: '[him/her/them]',
+    his: '[his/her/their]',
+    himself: '[himself/herself/themselves]',
+    name: '[Name]',
+  };
+  function plainWords(template) {
+    return String(template || '')
+      .replace(/\[([^\]|]*)\|([^\]]*)\]/g, '$1')
+      .replace(/\{(\w+)\}/g, function (m, k) {
+        return PLAIN[k] || '[' + (SLOT_LABEL[k] || k) + ']';
+      });
+  }
+
+  /* One sentence the teacher wrote, as a template with advice. bind: see
+     _condition. opts: { others: classmates' names, family }. Returns
+     { text, template, chips, preview, offered, advice: [plain sentences],
+       blocked: '' or why it cannot be saved }; no template for an empty
+     line. */
+  function compose(text, bind, ctx, f, student, opts) {
+    opts = opts || {};
+    var R = _R();
+    text = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    var out = { text: text, template: null, chips: [], preview: '', offered: '', advice: [], blocked: '' };
+    if (!text) return out;
+    var hit = _privateHit(text);
+    if (hit) out.blocked = _q(hit) + ' is a health or designation word; a bank sentence cannot hold one.';
+    var e = entities(ctx, f, student, text);
+    var others = (opts.others || []).filter(function (n) {
+      return e.names.indexOf(n) < 0;
+    });
+    var other = _nameIn(text, others);
+    if (!out.blocked && other)
+      out.blocked = _q(other) + ' is a classmate’s name; a bank sentence cannot name another student.';
+    var n = R.wordCount(text);
+    if (n < MIN_WORDS)
+      out.advice.push('This is ' + _plural(n, 'word', 'words') + '; a bank sentence needs six or more.');
+    else if (n > MAX_WORDS) out.advice.push('This is ' + n + ' words; a report sentence has 20 or fewer.');
+    var oneDay = _oneTime(text);
+    var date = _date(text);
+    if (oneDay) out.advice.push('This is about one day; a bank sentence is used every term.');
+    if (date) out.advice.push('A date fits one report only; a bank sentence is used every term.');
+    e.loose = true;
+    var sl = slotify(text, e);
+    var left = _leftover(sl.text);
+    // A weekday or month is already the one-day or date advice.
+    if (left && !((oneDay || date) && /^unknown word/.test(left))) out.advice.push(_leftoverAdvice(left));
+    (window.CommentLint ? CommentLint.findings(sl.text) : []).forEach(function (fd) {
+      if (/^over 20 words/.test(fd)) return;
+      out.advice.push(_adviceFor(fd, text));
+    });
+    var condition = _condition(sl, bind || {}, ctx, f, opts);
+    condition.own = true;
+    out.template = { text: sl.text, slots: sl.slots, condition: condition };
+    out.chips = sl.chips;
+    out.preview = plainWords(sl.text);
+    out.offered = offeredWhen(condition);
+    return out;
   }
 
   /* An approved comment's sentences that the teacher wrote or changed,
@@ -1011,7 +1186,10 @@ window.PersonalBank = (function () {
   }
 
   /* A kept template as a bank sentence, or null when it no longer reads
-     as one (no step, or the lint flags it). */
+     as one (no step, or the lint flags it). A sentence the teacher wrote
+     for the bank themselves (`own`) is theirs: the lint was advice when
+     they saved it, so it stays. One bound to a part with no case is
+     `general`. */
   function toSentence(row) {
     if (!row || !row.text) return null;
     var c = row.condition || {};
@@ -1029,8 +1207,9 @@ window.PersonalBank = (function () {
     if (c.family) s.subjects = [c.family];
     if (c.comps && Object.keys(c.comps).length) s.comps = c.comps;
     if (c.counts && Object.keys(c.counts).length) s.counts = c.counts;
+    if (c.general) s.general = true;
     if (!window.CommentBank || !CommentBank.stepOf(s) || !stepAllowed(CommentBank.stepOf(s))) return null;
-    if (window.CommentLint && CommentLint.findings(s.text).length) return null;
+    if (!c.own && window.CommentLint && CommentLint.findings(s.text).length) return null;
     return s;
   }
   function sentences() {
@@ -1132,20 +1311,44 @@ window.PersonalBank = (function () {
     return entry;
   }
 
-  /* Remove a kept template, here and on the server. */
-  function remove(id) {
+  /* Take a kept template out of the bank on this device, for an undo
+     toast: the entry comes back, and the server is told only when the
+     toast closes without Undo (purge). */
+  function forget(id) {
     var key = String(id || '').replace(/^mine:/, '');
     var t = list().find(function (x) {
       return x.id === key;
     });
-    if (!t) return false;
+    if (!t) return null;
     _save(
       list().filter(function (x) {
         return x !== t;
       }),
     );
+    return t;
+  }
+  /* Put a forgotten entry back, in front. */
+  function restore(entry) {
+    if (!entry || !entry.text) return false;
+    _save(
+      [entry].concat(
+        list().filter(function (x) {
+          return x.id !== entry.id;
+        }),
+      ),
+    );
+    return true;
+  }
+  /* Delete a forgotten entry on the server (through the outbox). */
+  function purge(entry) {
     var del = _v2('deleteCommentTemplate');
-    if (del && _isUuid(t.id)) del(t.id);
+    if (entry && del && _isUuid(entry.id)) del(entry.id);
+  }
+  /* Remove a kept template, here and on the server. */
+  function remove(id) {
+    var t = forget(id);
+    if (!t) return false;
+    purge(t);
     return true;
   }
 
@@ -1398,6 +1601,8 @@ window.PersonalBank = (function () {
     slotify: slotify,
     entities: entities,
     suggest: suggest,
+    compose: compose,
+    plainWords: plainWords,
     fromRows: fromRows,
     offeredWhen: offeredWhen,
     near: near,
@@ -1405,6 +1610,9 @@ window.PersonalBank = (function () {
     load: load,
     keep: keep,
     remove: remove,
+    forget: forget,
+    restore: restore,
+    purge: purge,
     sentences: sentences,
     toSentence: toSentence,
     count: count,

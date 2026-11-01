@@ -1546,7 +1546,7 @@ window.ReportQuestionnaire = (function () {
       : '';
     var body;
     if (thisTab) {
-      body = `${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" title="The student’s report comment. Type here, or change a sentence in the Sentences card below." data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea></div>
+      body = `${_emptyHtml(cid, student, text)}<div class="qn-text-wrap"><div class="qn-marks" id="tq-marks" aria-hidden="true">${_marksHtml(_rowsFor(student, _facts(student)), text)}</div><textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" title="The student’s report comment. Type here, or change a sentence in the Sentences card below." data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea><button type="button" class="qn-sel-add" id="tq-sel-add" hidden data-action="tqSentences" data-do="ownFromBox" title="Adds the selected sentence to your bank, for other students it fits.">Add to My Bank</button></div>
         <div class="qn-comment-foot" id="tq-comment-foot"${text.trim() ? '' : ' hidden'}>
           ${_countHtml(cid, text)}
           <button type="button" class="qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${COPY_ICON}<span class="qn-copy-label">Copy</span></button>
@@ -2876,6 +2876,11 @@ window.ReportQuestionnaire = (function () {
       ${mine}${others}
       <div class="qn-menu-sep" role="separator"></div>
       <button type="button" role="menuitem" class="qn-menu-add qn-menu-all" data-action="tqSentences" data-do="all" data-row="${i}" title="Opens Browse Sentences on ${esc(part.label)}: every sentence that fits ${esc(first)}.">All ${_plural(_fitCount(part, ctx), esc(low) + ' sentence', esc(low) + ' sentences')}…</button>
+      ${
+        window.PersonalBank && PersonalBank.stepAllowed(row.step)
+          ? `<button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="ownOpen" data-where="row" data-mode="write" data-row="${i}" title="Write a sentence of your own for this part. It goes in your bank and into ${esc(first)}’s comment here.">+ Write Your Own</button>`
+          : ''
+      }
     </div>`;
   }
 
@@ -3127,11 +3132,17 @@ window.ReportQuestionnaire = (function () {
     var edited = unit.some(function (r) {
       return r.edited;
     });
+    // A sentence the teacher typed or changed can go to their bank.
+    var addBank =
+      i >= 0 && window.PersonalBank && !row.classLine && !row.placeholder && (edited || !row.step)
+        ? `<button type="button" class="qn-own-add" data-action="tqSentences" data-do="ownAdd" data-row="${i}" title="Adds this sentence to your bank, for other students it fits.">Add to My Bank</button>`
+        : '';
     var act = edited
-      ? '<span class="qn-edited" title="You changed this sentence. Generate Comment keeps it.">Edited</span>'
+      ? '<span class="qn-edited" title="You changed this sentence. Generate Comment keeps it.">Edited</span>' + addBank
       : row.step && row.s
         ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Shows other ways to say this sentence. Pick one to use it.">Other Wording ▾</button>`
-        : '';
+        : addBank;
+    var ownBox = _own && _own.where === 'row' && _own.index === i ? _ownBoxHtml(student) : '';
     var tint = _isBestRow(row) ? ' best' : row.step === 'attendance' ? ' attendance' : '';
     var text = unit
       .map(function (r) {
@@ -3145,7 +3156,7 @@ window.ReportQuestionnaire = (function () {
       .join('');
     return `<div class="qn-req-row qn-srow${tint}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
       ${handle}<div class="qn-req-part"><span class="qn-req-label">${esc(rowLabel(row, path))}</span></div>
-      <div class="qn-req-body"><span class="qn-req-text">${esc(text)}</span><span class="qn-req-source">${esc(_unitSource(unit, cid, student, f, ctx))}</span>${thin}</div>
+      <div class="qn-req-body"><span class="qn-req-text">${esc(text)}</span><span class="qn-req-source">${esc(_unitSource(unit, cid, student, f, ctx))}</span>${thin}${ownBox}</div>
       ${act}
       ${low ? _checkHtml(student.id, 'low') : ''}
       ${open ? _wordingMenuHtml(cid, student, ctx, rows, i) : ''}
@@ -3692,6 +3703,7 @@ window.ReportQuestionnaire = (function () {
           fits: fits,
           used: usage[s.id] || 0,
           mine: !!s.mine,
+          general: !!s.general,
           inUse: !!inUse[s.id] && !elsewhere,
           case: c,
           at: i,
@@ -3761,12 +3773,12 @@ window.ReportQuestionnaire = (function () {
   /* A case's heading and its rows: the heading opens and closes the
      group; the student's own case is marked with the first name. A case
      with no sentences yet says so. */
-  function _groupHtml(part, id, label, own, first, rowsHtml, n) {
+  function _groupHtml(part, id, label, own, first, rowsHtml, n, extra) {
     var isOpen = _groupOpen(part, id);
     var chip = own
       ? `<span class="qn-chip-own" title="${esc(first)}’s own case, from what FullVision has on file.">${esc(first)}</span>`
       : '';
-    var body = n ? rowsHtml : '<div class="qn-browse-none">No sentences yet.</div>';
+    var body = (n ? rowsHtml : '<div class="qn-browse-none">No sentences yet.</div>') + (extra || '');
     return `<div class="qn-browse-group${own ? ' own' : ''}" data-case="${esc(id)}"><button type="button" class="qn-browse-head" aria-expanded="${isOpen}" data-action="tqSentences" data-do="group" data-case="${esc(id)}" title="${isOpen ? 'Hides' : 'Shows'} the sentences for this case.">${CHEVRON}<span class="qn-browse-head-label">${esc(label)}</span>${chip}<span class="qn-browse-head-n">${n}</span></button><div class="qn-browse-group-rows"${isOpen ? '' : ' hidden'}>${body}</div></div>`;
   }
 
@@ -3780,15 +3792,33 @@ window.ReportQuestionnaire = (function () {
     var match = function (t) {
       return !q || t.toLowerCase().indexOf(q) >= 0;
     };
-    var row = function (text, meta, ctrl, on, mine) {
-      return `<div class="qn-browse-row${on ? ' on' : ''}" tabindex="-1"><div class="qn-browse-text"><span class="qn-browse-sentence">${esc(text)}</span><span class="qn-browse-meta">${esc(meta)}</span></div>${mine ? '<span class="qn-chip-yours" title="A sentence of your own, from a comment you approved.">Yours</span>' : ''}${ctrl}</div>`;
+    // yours: null, or { id, general } for a sentence of the teacher's own:
+    // the Yours chip ("Yours · Any case" when it is bound to no case) and
+    // a × that removes it from their bank, with Undo.
+    var row = function (text, meta, ctrl, on, yours) {
+      var chip = yours
+        ? `<span class="qn-chip-yours" title="${yours.general ? 'A sentence of your own for this part, with no case: Generate uses it when nothing more specific fits.' : 'A sentence of your own.'}">${yours.general ? 'Yours · Any case' : 'Yours'}</span>`
+        : '';
+      var del = yours
+        ? `<button type="button" class="qn-browse-del" data-action="tqSentences" data-do="ownDelete" data-sentence="${esc(yours.id)}" aria-label="Delete this sentence from your bank" title="Removes this sentence from your bank. Undo for a few seconds.">×</button>`
+        : '';
+      return `<div class="qn-browse-row${on ? ' on' : ''}" tabindex="-1"><div class="qn-browse-text"><span class="qn-browse-sentence">${esc(text)}</span><span class="qn-browse-meta">${esc(meta)}</span></div>${chip}${ctrl}${del}</div>`;
+    };
+    // "+ Write Your Own" under each case heading of a part a sentence of
+    // the teacher's own can take, or the box once it is open there, bound
+    // to that case.
+    var addFor = function (caseId) {
+      if (!_ownStep(b.part)) return '';
+      if (_own && _own.where === 'browse' && _own.caseId === caseId)
+        return `<div class="qn-browse-own">${_ownBoxHtml(student)}</div>`;
+      return `<div class="qn-browse-addrow"><button type="button" class="qn-menu-add qn-browse-add" data-action="tqSentences" data-do="ownOpen" data-where="browse" data-mode="write" data-part="${esc(b.part)}" data-case="${esc(caseId)}" title="Write a sentence of your own for this case. It goes in your bank, marked Yours, and is offered here.">+ Write Your Own</button></div>`;
     };
     var inUse = '<span class="qn-browse-inuse">In Use</span>';
     var none = function (text) {
       return `<div class="qn-browse-empty">${esc(text)}</div>`;
     };
-    var group = function (id, label, own, rowsHtml, n) {
-      return _groupHtml(b.part, id, label, own, first, rowsHtml, n);
+    var group = function (id, label, own, rowsHtml, n, extra) {
+      return _groupHtml(b.part, id, label, own, first, rowsHtml, n, extra);
     };
     if (b.part === 'support') {
       // The class's ticked lines, under the class's name; the checklist is
@@ -3815,7 +3845,7 @@ window.ReportQuestionnaire = (function () {
               ? inUse
               : `<button type="button" class="qn-browse-use" data-action="tqSentences" data-do="useLine" data-line="${esc(l.id)}" title="Uses this line in ${esc(first)}’s comment.">Use</button>`,
             on,
-            false,
+            null,
           );
         })
         .join('');
@@ -3826,7 +3856,7 @@ window.ReportQuestionnaire = (function () {
       if (!closing) return none('No closing sentence for ' + course + '. Add one in its row on the Sentences card.');
       if (!match(closing)) return none('No sentences match “' + b.q.trim() + '”.');
       _initGroups(b.part, ['class']);
-      return group('class', course, true, row(closing, 'From your class settings', inUse, true, false), 1);
+      return group('class', course, true, row(closing, 'From your class settings', inUse, true, null), 1);
     }
     var rows = _rowsFor(student, f);
     var used = {};
@@ -3849,11 +3879,11 @@ window.ReportQuestionnaire = (function () {
       var ctrl = r.inUse
         ? inUse
         : `<button type="button" class="qn-browse-use" data-action="tqSentences" data-do="use" data-sentence="${esc(r.id)}"${r.fits ? '' : ' disabled'} title="${esc(r.fits ? 'Puts this sentence in ' + first + '’s comment.' : 'This sentence needs a fact FullVision does not have for ' + first + '.')}">Use</button>`;
-      return row(r.text, meta, ctrl, r.inUse, r.mine);
+      return row(r.text, meta, ctrl, r.inUse, r.mine ? { id: r.id, general: r.general } : null);
     };
     return list.groups
       .map(function (g) {
-        return group(g.id, g.label, g.own, g.rows.map(rowHtml).join(''), g.rows.length);
+        return group(g.id, g.label, g.own, g.rows.map(rowHtml).join(''), g.rows.length, addFor(g.id));
       })
       .join('');
   }
@@ -3910,7 +3940,8 @@ window.ReportQuestionnaire = (function () {
       </div>
       <div class="qn-browse-body">
         <div class="qn-browse-parts" role="tablist" aria-label="Part">${tabs}</div>
-        <div class="qn-browse-bar">${_fitsHtml(student, ctx)}<span class="qn-browse-order">Least used first</span></div>
+        <div class="qn-browse-bar">${_fitsHtml(student, ctx)}<button type="button" class="qn-browse-add-top" data-action="tqSentences" data-do="ownOpen" data-where="top" data-mode="write" title="Write a sentence of your own and choose the part it belongs under.">+ Add to My Bank</button><span class="qn-browse-order">Least used first</span></div>
+        ${_own && _own.where === 'top' ? `<div class="qn-browse-ownwrap">${_ownBoxHtml(student)}</div>` : ''}
         <div class="qn-browse-listwrap"><div class="qn-browse-list" id="tq-browse-list" style="max-height:${sheetHeight()}px">${_browseRowsHtml(cid, student, f, ctx)}</div></div>
         <span class="qn-browse-hint">The list scrolls. Drag the bottom edge to show more at once.</span>
       </div>
@@ -4119,7 +4150,445 @@ window.ReportQuestionnaire = (function () {
       case 'down':
         _moveRow(i, 1);
         return;
+      case 'ownOpen':
+        _ownOpen(ds.where, ds.mode || 'write', { index: i, part: ds.part || '', caseId: ds.case || '' });
+        return;
+      case 'ownAdd': {
+        var own = (_rows[key] || [])[i];
+        _ownOpen('row', 'add', { index: i, text: own ? own.text : '' });
+        return;
+      }
+      case 'ownFromBox': {
+        var at = Number(ds.row);
+        var sel = (_rows[key] || [])[at];
+        if (!(at >= 0) || !sel) return;
+        _ownOpen('row', 'add', { index: at, text: sel.text });
+        return;
+      }
+      case 'ownInput':
+        if (!_own) return;
+        _own.text = String(el.value || '');
+        _ownSync(st);
+        return;
+      case 'ownBind':
+        if (!_own) return;
+        if (ds.tqOwn === 'part') {
+          _own.part = String(el.value || '');
+          _own.caseKey = '';
+          _ownRedraw(st, 'tq-own-part');
+        } else {
+          _own.caseKey = String(el.value || '');
+          _ownSync(st);
+        }
+        return;
+      case 'ownCancel':
+        _ownCancel();
+        return;
+      case 'ownSave':
+        _ownSave();
+        return;
+      case 'ownDelete':
+        _ownDelete(ds.sentence);
+        return;
     }
+  }
+
+  /* ── A sentence of the teacher's own (Colin, Nov 1) ──────────
+     "Can teachers just write their own and add to a bank easily?" One
+     line, written for the student on screen, into the teacher's bank
+     (PersonalBank.compose and keep) from four places: "+ Write Your Own"
+     at the end of a part in Browse Sentences and as the last item of a
+     row's Other Wording menu (bound to that row's case and used in the
+     row); "+ Add to My Bank" at the top of Browse Sentences; and "Add to
+     My Bank" on a sentence the teacher typed or changed (its row on the
+     Sentences card, or the sentence selected in the comment box). A
+     sentence with no row's case takes a "Belongs under" picker: the part,
+     and a case or Any case. The box shows the slotted result in plain
+     words ("Saved as: …") and the lint's advice in orange; only a health
+     or designation word or a classmate's name stops the save. */
+  var _own = null; // { where: 'browse' | 'top' | 'row', mode: 'write' | 'add', index, text, part, caseId, caseKey }
+
+  /* The parts a sentence of the teacher's own can take, and a part's
+     first such step. */
+  function _ownParts() {
+    return PARTS.filter(function (p) {
+      return !!_ownStep(p.id);
+    });
+  }
+  function _ownStep(partId) {
+    var p = PARTS.find(function (x) {
+      return x.id === partId;
+    });
+    if (!p || !window.PersonalBank) return null;
+    return (
+      p.steps.find(function (k) {
+        return PersonalBank.stepAllowed(k);
+      }) || null
+    );
+  }
+  function _ownRow(st) {
+    if (!_own || _own.where !== 'row') return null;
+    return (_rows[_rowKey(st)] || [])[_own.index] || null;
+  }
+  /* Whether the open box is bound already (no picker): to its row's case,
+     or to the case heading it was opened under in Browse Sentences. */
+  function _ownBound(st) {
+    if (_own && _own.where === 'browse' && _own.caseId) return true;
+    var r = _ownRow(st);
+    return !!r && !!r.step && !!r.s && PersonalBank.stepAllowed(r.step);
+  }
+  /* The facts a case needs, beyond the slots a sentence names. */
+  var CASE_NEEDS = [
+    'habitsExcellent',
+    'habitsGood',
+    'habitToBuild',
+    'habitsToBuild',
+    'missingWork',
+    'missingTitle',
+    'missingTitles',
+    'missingGroup',
+    'missingMany',
+    'missingCount',
+    'climb',
+    'slide',
+    'split',
+    'hidden',
+    'newcomer',
+    'new',
+    'bestNote',
+    'assignment',
+    'absentOnly',
+    'lateOnly',
+    'absentClasses',
+    'lateTimes',
+    'attendance',
+  ];
+  /* What a case heading binds a sentence to: a habit cell or summary by
+     its id; any other case by the shared sentence written for it (its
+     `when`, the facts it needs, its group and step); a case with no
+     sentence yet, or one with no condition, binds to the part alone. */
+  function _ownCaseBind(part, id, ctx) {
+    var p = PARTS.find(function (x) {
+      return x.id === part;
+    });
+    var step = _ownStep(part);
+    if (!p || !step) return null;
+    var m = /^cell:(\w+):([1-4])$/.exec(id || '');
+    if (m) {
+      var when = {};
+      when[m[1]] = Number(m[2]);
+      return { step: 'habits', when: when, group: 'Work Habits' };
+    }
+    var sum = {
+      'sum:excellent': 'habitsExcellent',
+      'sum:good': 'habitsGood',
+      'sum:one': 'habitToBuild',
+      'sum:two': 'habitsToBuild',
+    }[id];
+    if (sum) return { step: 'habits', needs: [sum], group: 'Work Habits' };
+    var ok = COMMENT_BANK.sentences.filter(function (x) {
+      var st = CommentBank.stepOf(x);
+      return (
+        !x.mine && p.steps.indexOf(st) >= 0 && PersonalBank.stepAllowed(st) && browseCase(part, x).indexOf(id) >= 0
+      );
+    });
+    var one = ok.filter(function (x) {
+      return browseCase(part, x).length === 1;
+    });
+    var pool = one.length ? one : ok;
+    var s =
+      pool.find(function (x) {
+        return CommentBank.fits(x, ctx);
+      }) || pool[0];
+    if (!s) return { step: step };
+    var needs = (s.needs || []).filter(function (k) {
+      return CASE_NEEDS.indexOf(k) >= 0;
+    });
+    return { step: CommentBank.stepOf(s), when: Object.assign({}, s.when || {}), needs: needs, group: s.group };
+  }
+  function _ownGeneral(bind) {
+    return !bind || (!Object.keys(bind.when || {}).length && !(bind.needs || []).length);
+  }
+  /* The cases the "Belongs under" picker offers: the student's own cases
+     of the part, as the sheet's headings name them, each one that binds
+     to something. */
+  function _ownCases(ctx) {
+    var part = _own.part;
+    var labels = {};
+    browseCases(part).forEach(function (c) {
+      labels[c.id] = c.label;
+    });
+    return browseOwn(part, ctx)
+      .filter(function (id) {
+        return !!labels[id] && !_ownGeneral(_ownCaseBind(part, id, ctx));
+      })
+      .map(function (id) {
+        return { key: id, label: labels[id] };
+      });
+  }
+  function _ownBind(st, ctx) {
+    if (_own.where === 'browse' && _own.caseId)
+      return _ownCaseBind(_own.part, _own.caseId, ctx) || { step: _ownStep(_own.part) };
+    if (_ownBound(st)) return { row: _ownRow(st) };
+    if (_own.caseKey) return _ownCaseBind(_own.part, _own.caseKey, ctx) || { step: _ownStep(_own.part) };
+    return { step: _ownStep(_own.part) };
+  }
+  /* Classmates' names, so a sentence naming one is not saved. */
+  function _othersOf(st) {
+    var others = [];
+    getStudents(_activeCourse).forEach(function (s) {
+      if (s.id === st.id) return;
+      _namesOf(s).forEach(function (n) {
+        if (others.indexOf(n) < 0) others.push(n);
+      });
+    });
+    return others;
+  }
+  function _ownCompose(st) {
+    if (!_own || !window.PersonalBank) return null;
+    var f = _facts(st);
+    var ctx = _bankContext(_activeCourse, st, f);
+    var bind = _ownBind(st, ctx);
+    if (!bind.row && !bind.step) return null;
+    return PersonalBank.compose(_own.text, bind, ctx, f, st, { others: _othersOf(st) });
+  }
+  /* What the box shows under the line: the sentence as it will be saved,
+     when it is offered, and any advice. */
+  function _ownOutHtml(c) {
+    if (!c || !c.template) return '';
+    var out = `<span class="qn-own-saved">Saved as: ${esc(c.preview)}</span><span class="qn-own-offered">${esc(c.offered)}</span>`;
+    if (c.blocked) return out + `<span class="qn-own-why">${esc(c.blocked)}</span>`;
+    return (
+      out +
+      c.advice
+        .map(function (a) {
+          return `<span class="qn-own-why">${esc(a)}</span>`;
+        })
+        .join('')
+    );
+  }
+  function _ownBoxHtml(st) {
+    var o = _own;
+    var first = _first(st);
+    var c = _ownCompose(st);
+    var picker = '';
+    if (!_ownBound(st)) {
+      var ctx = _bankContext(_activeCourse, st, _facts(st));
+      var parts = _ownParts()
+        .map(function (p) {
+          return `<option value="${esc(p.id)}"${p.id === o.part ? ' selected' : ''}>${esc(p.label)}</option>`;
+        })
+        .join('');
+      var cases = _ownCases(ctx)
+        .map(function (x) {
+          return `<option value="${esc(x.key)}"${x.key === o.caseKey ? ' selected' : ''}>${esc(x.label)}</option>`;
+        })
+        .join('');
+      picker = `<div class="qn-own-under"><span class="qn-own-label">Belongs under</span><select class="qn-own-select" id="tq-own-part" data-tq-own="part" aria-label="The part of the comment this sentence belongs under" title="The part of the comment this sentence belongs under.">${parts}</select><select class="qn-own-select" id="tq-own-case" data-tq-own="case" aria-label="The case this sentence is for" title="When Generate may use it: a case that is true for ${esc(first)} now, or any case."><option value=""${o.caseKey ? '' : ' selected'}>Any case</option>${cases}</select></div>`;
+    }
+    var ok = !!c && !!c.template && !c.blocked;
+    return `<div class="qn-own" id="tq-own" role="group" aria-label="A sentence of your own">
+      <input type="text" class="qn-line-input" id="tq-own-input" value="${esc(o.text)}" autocomplete="off" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}.">
+      <span class="qn-own-hint">Write it for this student; FullVision turns the name and pronouns into slots.</span>
+      ${picker}
+      <div class="qn-own-out" id="tq-own-out">${_ownOutHtml(c)}</div>
+      <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqSentences" data-do="ownCancel" title="Closes without saving.">Cancel</button><button type="button" class="qn-line-save" id="tq-own-save" data-action="tqSentences" data-do="ownSave"${ok ? '' : ' disabled'} title="Adds this sentence to your bank.">Save</button></div>
+    </div>`;
+  }
+  /* The preview and advice follow typing in place, so the line keeps its
+     cursor. */
+  function _ownSync(st) {
+    var out = document.getElementById('tq-own-out');
+    var save = document.getElementById('tq-own-save');
+    if (!out || !_own) return;
+    var c = _ownCompose(st);
+    out.innerHTML = _ownOutHtml(c);
+    if (save) save.disabled = !(c && c.template && !c.blocked);
+  }
+  /* The box drawn again (the part changed, so the cases change). */
+  function _ownRedraw(st, focusId) {
+    var box = document.getElementById('tq-own');
+    if (!box || !_own) return;
+    box.outerHTML = _ownBoxHtml(st);
+    var el = focusId && document.getElementById(focusId);
+    if (el) el.focus();
+  }
+  function _ownFocus() {
+    var input = document.getElementById('tq-own-input');
+    if (!input) return;
+    input.focus();
+    var n = input.value.length;
+    try {
+      input.setSelectionRange(n, n);
+    } catch (e) {
+      /* not a text field */
+    }
+    if (input.scrollIntoView) input.scrollIntoView({ block: 'nearest' });
+  }
+  /* Open the box: where (browse: the end of the part's list; top: under
+     the sheet's bar; row: under a row of the Sentences card), mode
+     (write: a new sentence, used in the row when opened from Other
+     Wording; add: the row's own text), opts { index, text, part }. */
+  function _ownOpen(where, mode, opts) {
+    var st = _current();
+    if (!st || !window.PersonalBank) return;
+    opts = opts || {};
+    tqSaveCurrentIfNeeded();
+    _wording = null;
+    _supportMenu = false;
+    _limitOpen = false;
+    if (_browse) _browse.menu = false;
+    var part = opts.part || '';
+    var index = Number(opts.index);
+    if (where === 'row' && !part) {
+      var r = (_rows[_rowKey(st)] || [])[index];
+      var p = r && r.step ? partOf(r.step) : null;
+      part = p && _ownStep(p.id) ? p.id : '';
+    }
+    // The sheet's top button starts on the part that is open.
+    if (where === 'top' && !part && _browse && _ownStep(_browse.part)) part = _browse.part;
+    if (where === 'browse' && !_ownStep(part)) part = '';
+    if (!part) part = (_ownParts()[0] || {}).id || '';
+    _own = {
+      where: where,
+      mode: mode,
+      index: index,
+      text: String(opts.text || ''),
+      part: part,
+      caseId: where === 'browse' ? String(opts.caseId || '') : '',
+      caseKey: '',
+    };
+    if (where === 'row') _syncRequired();
+    else _syncBrowse();
+    _ownFocus();
+  }
+  function _ownCancel() {
+    var was = _own;
+    _own = null;
+    if (!was) return;
+    if (was.where === 'row') {
+      _syncRequired();
+      _focusSel(
+        '#tq-sentences [data-row="' +
+          was.index +
+          '"] [data-do="wording"], #tq-sentences [data-row="' +
+          was.index +
+          '"] .qn-own-add',
+      );
+    } else {
+      _syncBrowse();
+      _focusSel(
+        was.where === 'top' ? '.qn-browse-add-top' : '.qn-browse-add[data-case="' + was.caseId + '"], .qn-browse-add',
+      );
+    }
+  }
+  /* Save: into the bank now (and to the server through the outbox); from
+     Other Wording, into the row as well. In Browse Sentences the sheet
+     shows it under its part, marked Yours. */
+  function _ownSave() {
+    var st = _current();
+    if (!st || !_own) return;
+    var c = _ownCompose(st);
+    if (!c || !c.template || c.blocked) return;
+    var entry = PersonalBank.keep(c.template);
+    var was = _own;
+    _own = null;
+    var s = entry ? _bankById('mine:' + entry.id) : null;
+    var key = _rowKey(st);
+    if (was.where === 'row') {
+      var rows = _rows[key] || [];
+      var row = rows[was.index];
+      var ctx = _bankContext(_activeCourse, st, _facts(st));
+      if (was.mode === 'write' && s && row && row.step && !row.edited && CommentBank.fits(s, ctx)) {
+        rows[was.index] = rowFromSentence(s, ctx, row.step, was.index === 0);
+        _writeRows(st);
+      } else _syncRequired();
+      _focusSel(
+        '#tq-sentences [data-row="' +
+          was.index +
+          '"] [data-do="wording"], #tq-sentences [data-row="' +
+          was.index +
+          '"] .qn-own-add',
+      );
+      return;
+    }
+    if (_browse && s) {
+      var p = partOf(CommentBank.stepOf(s));
+      if (p) _browse.part = p.id;
+      // The new sentence's case opens, so it is seen at once.
+      browseCase(_browse.part, s).forEach(function (c) {
+        _browse.open[_groupKey(_browse.part, c)] = true;
+        _browse.openQ[_groupKey(_browse.part, c)] = true;
+      });
+    }
+    _syncBrowse();
+    if (s) _focusSel('#tq-browse-list [data-sentence="' + s.id + '"]');
+  }
+  /* The × on a Yours row: gone from the bank now, with Undo; the server
+     is told when the toast closes. */
+  function _ownDelete(id) {
+    var entry = PersonalBank.forget(id);
+    if (!entry) return;
+    _syncBrowseList();
+    var undo = function () {
+      PersonalBank.restore(entry);
+      _syncBrowseList();
+    };
+    var commit = function () {
+      PersonalBank.purge(entry);
+    };
+    if (typeof showUndoToast === 'function') showUndoToast('Removed from your bank.', undo, commit, 6000);
+    else commit();
+  }
+
+  /* "Add to My Bank" over the comment box while a sentence the teacher
+     typed or changed is selected: the row the selection sits in, or -1. */
+  function _selRow(st) {
+    var el = _box();
+    if (!el || el.selectionStart == null || el.selectionStart === el.selectionEnd) return -1;
+    var a = el.selectionStart;
+    var b = el.selectionEnd;
+    var text = el.value;
+    var rows = _rows[_rowKey(st)] || _rowsFor(st, _facts(st));
+    var at = 0;
+    var hit = -1;
+    sentencesOf(text).forEach(function (sent, i) {
+      var from = text.indexOf(sent, at);
+      if (from < 0) from = at;
+      var to = from + sent.length;
+      if (hit < 0 && a < to && b > from) hit = i;
+      at = to;
+    });
+    if (hit < 0) return -1;
+    var k = 0;
+    for (var r = 0; r < rows.length; r++) {
+      var n = sentencesOf(rows[r].text).length || 1;
+      if (hit < k + n) return !rows[r].classLine && (rows[r].edited || !rows[r].step) ? r : -1;
+      k += n;
+    }
+    return -1;
+  }
+  function _syncSelAdd() {
+    var st = _current();
+    var btn = document.getElementById('tq-sel-add');
+    if (!st || !btn) return;
+    var r = _selRow(st);
+    btn.hidden = r < 0;
+    btn.dataset.row = String(r);
+  }
+  function _wireSelAdd() {
+    var el = _box();
+    if (!el || el._selAdd) return;
+    el._selAdd = true;
+    ['select', 'keyup', 'mouseup'].forEach(function (ev) {
+      el.addEventListener(ev, _syncSelAdd);
+    });
+    var btn = document.getElementById('tq-sel-add');
+    // The button keeps the box's selection: no blur on its mousedown.
+    if (btn)
+      btn.addEventListener('mousedown', function (e) {
+        e.preventDefault();
+      });
   }
 
   /* ── The class's lines (plan PR 8) ───────────────────────── */
@@ -4687,7 +5156,9 @@ window.ReportQuestionnaire = (function () {
 
   /* Whether a popover or a line's box is open. */
   function linesOpen() {
-    return _supportMenu || _langMenu || _limitOpen || !!_lineEdit || !!_wording || !!(_browse && _browse.menu);
+    return (
+      _supportMenu || _langMenu || _limitOpen || !!_lineEdit || !!_wording || !!_own || !!(_browse && _browse.menu)
+    );
   }
   /* A click outside an open menu or the limit closes it; a box being
      edited stays until Cancel, Save for Class or Escape. */
@@ -4723,6 +5194,10 @@ window.ReportQuestionnaire = (function () {
   /* Escape: the open menu, the limit or the box being edited closes. */
   function closeLines() {
     if (!linesOpen()) return false;
+    if (_own) {
+      _ownCancel();
+      return true;
+    }
     if (_browse && _browse.menu) {
       _browse.menu = false;
       _syncBrowse('tq-browse-fits');
@@ -4809,6 +5284,7 @@ window.ReportQuestionnaire = (function () {
     _fitBox();
     syncApprove();
     _wireDrag();
+    _wireSelAdd();
     // The teacher's own sentences in the bank (plan PR 10), and the
     // suggestions again after Later.
     if (window.PersonalBank) {
@@ -4839,6 +5315,12 @@ window.ReportQuestionnaire = (function () {
       return;
     }
     if (document.getElementById(INFO_ID) || document.getElementById(BOTH_ID)) return;
+    // Return in the box for a sentence of the teacher's own saves it.
+    if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && t && t.id === 'tq-own-input') {
+      e.preventDefault();
+      _ownSave();
+      return;
+    }
     if (browseOpen()) {
       // ↑ ↓ on the sheet's bottom edge make the list shorter or taller.
       if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && t && t.id === 'tq-browse-handle') {
@@ -4928,6 +5410,9 @@ window.ReportQuestionnaire = (function () {
     metaFor: metaFor,
     lastTermIds: lastTermIds,
     browseOpen: browseOpen,
+    ownOpen: function () {
+      return !!_own;
+    },
     PARTS: PARTS,
     partOf: partOf,
     rowLabel: rowLabel,
