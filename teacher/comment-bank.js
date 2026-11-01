@@ -298,7 +298,7 @@ window.CommentBank = (function () {
         key: 'patterns',
         name: 'Sequences and Rules',
         match: /sequence|puzzle|conjecture|generali[sz]|\brules?\b/i,
-        skill: 'find the rule in a pattern and use it to predict',
+        skill: 'find the rule in a pattern and predict the next case',
       },
       {
         key: 'graphs',
@@ -426,7 +426,7 @@ window.CommentBank = (function () {
         key: 'performing',
         name: 'Ensemble and Stage',
         match: /\bstage|ensemble(?! heritage)|\bchoir|\bband\b|\bacting|repertoire|instrument/i,
-        skill: 'rehearse a part until the whole piece plays without stopping',
+        skill: 'rehearse a part until the whole piece runs without stopping',
       },
       {
         key: 'notation',
@@ -438,7 +438,7 @@ window.CommentBank = (function () {
         key: 'camera',
         name: 'Camera and Light',
         match: /camera|lens|exposure|shutter|framing|\bfocus|\bshot\b/i,
-        skill: 'control the light and framing before taking a photo',
+        skill: 'control the light and framing before each photo or shot',
       },
       {
         key: 'documenting',
@@ -493,7 +493,7 @@ window.CommentBank = (function () {
         key: 'nutrition',
         name: 'Eating and Hydration',
         match: /\beating|\bdiet|hydrat|sleep|food choice/i,
-        skill: 'plan a day of food and water for an active day',
+        skill: 'plan the food and water an active day needs',
       },
       {
         key: 'relationships',
@@ -714,7 +714,7 @@ window.CommentBank = (function () {
         key: 'grammar',
         name: 'Grammar',
         match: /grammar|\bverb|tense|structure|accura|conjugat|agreement/i,
-        skill: 'use the right verb form for who is acting and when',
+        skill: 'use the verb form or marker for who is acting and when',
       },
       {
         key: 'culture',
@@ -726,7 +726,7 @@ window.CommentBank = (function () {
         key: 'communicating',
         name: 'Communicating',
         match: /communicat|interact|exchange|express|respond|engag/i,
-        skill: 'use gestures and other words to be understood in the language',
+        skill: 'use another word or a gesture to be understood in the language',
       },
       {
         key: 'understanding',
