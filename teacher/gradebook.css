@@ -23,6 +23,45 @@
   position: relative;
   z-index: 1;
 }
+/* Scores | Competencies keep their widths whichever is chosen: each button
+   reserves its label's bold width, so nothing after them moves. */
+.gb-toolbar .gb-seg-btn {
+  display: inline-grid;
+}
+.gb-toolbar .gb-seg-btn::after {
+  content: attr(data-label);
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 600;
+}
+/* The term picker is as wide as the term shown, not its longest option. */
+.gb-toolbar .term-select {
+  field-sizing: content;
+  max-width: 240px;
+  height: var(--control-h);
+}
+/* Narrower windows keep one row: Export and Print Grades show their icons
+   (both keep their names for screen readers and on hover), Search and a
+   long term's name narrow. */
+.gb-toolbar .gb-tb-icon {
+  display: none;
+}
+@media (max-width: 1180px) {
+  .gb-toolbar .gb-tb-text {
+    display: none;
+  }
+  .gb-toolbar .gb-tb-icon {
+    display: inline-flex;
+  }
+  .gb-toolbar .gb-search-input,
+  .gb-toolbar .gb-search-input:focus {
+    width: 100px;
+  }
+  .gb-toolbar .term-select {
+    max-width: 120px;
+  }
+}
 .gb-toolbar-label {
   font-family: var(--font-base);
   font-size: var(--text-xs);
@@ -1040,9 +1079,19 @@ th.gb-group-alt {
   justify-content: flex-end;
 }
 /* Sort toggle sits in the empty top of the corner, above Student / Overall. */
-.gb-grid-corner-comp .gb-newest-first {
+/* View options sit in the empty top of the corner, above Student / Overall. */
+.gb-corner-tools {
   align-self: flex-start;
   margin-bottom: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+}
+.gb-corner-tools .gb-rubric-cols-select {
+  max-width: 100%;
+  font-size: var(--text-sm);
 }
 .gb-grid-corner-row1 {
   display: flex;
