@@ -48,15 +48,6 @@ function _demoToken() {
   }
 }
 
-function escHtml(s) {
-  return (s == null ? '' : String(s))
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 function formatDeletionDeadline(deletedAt) {
   var ts = Date.parse(deletedAt || '');
   if (!isFinite(ts)) return '30 days from now';
@@ -76,7 +67,7 @@ function showRestoreAccountPrompt(deletionDate) {
     overlay.setAttribute('aria-labelledby', 'restore-account-title');
     overlay.innerHTML = `<div class="confirm-card">
       <div class="confirm-title" id="restore-account-title">Restore Account</div>
-      <div class="confirm-message">Your account is scheduled for deletion on ${escHtml(deletionDate)}. Restore it now?</div>
+      <div class="confirm-message">Your account is scheduled for deletion on ${esc(deletionDate)}. Restore it now?</div>
       <div class="confirm-actions">
         <button class="confirm-cancel" id="restore-continue-btn">Continue deletion</button>
         <button class="confirm-ok primary" id="restore-confirm-btn">Restore</button>

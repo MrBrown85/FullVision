@@ -14,12 +14,6 @@ window.ReportStudio = (function () {
     return window.ReportSheets;
   };
 
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-
   /* The two panes. The canvas holds the fit line, the print settings
      (opts.settingsHtml), the view switch and the preview the sheet engine
      fills. */

@@ -297,17 +297,9 @@ window.MComponents = (function () {
   }
 
   /* ── HTML escape ───────────────────────────────────────────── */
-  /* Safe in element content and in quoted attribute values. Reading
-     innerHTML back from textContent left " and ' as they were, which broke
-     the attributes this is used in (aria-label, data-val, data-search). */
+  /* shared/html.js's esc, under the name the phone code has always used. */
   function _esc(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+    return esc(str);
   }
 
   /* ── Proficiency color (CSS var resolved) ──────────────────── */

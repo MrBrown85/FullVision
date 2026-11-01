@@ -216,6 +216,7 @@ function load(file) {
   runInThisContext(code, { filename: file });
 }
 
+load('shared/html.js');
 load('shared/constants.js');
 load('shared/reporting-term-presets.js');
 load('shared/data.js');

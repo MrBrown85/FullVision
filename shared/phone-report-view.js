@@ -27,12 +27,6 @@ var PhoneReportView = (function () {
   ];
   var STEPS = ['Beginning', 'Growing', 'Confident', 'Leading'];
 
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  }
-
   function day(iso, withYear) {
     if (!iso) return '';
     var t = new Date(String(iso).length === 10 ? iso + 'T12:00:00' : iso);

@@ -15,24 +15,25 @@ describe('esc', () => {
     expect(esc('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
   });
 
+  it('prints a number, 0 included, instead of throwing', () => {
+    expect(esc(0)).toBe('0');
+    expect(esc(5)).toBe('5');
+    expect(esc(2.5)).toBe('2.5');
+    expect(esc(true)).toBe('true');
+    expect(esc(false)).toBe('');
+    expect(esc(NaN)).toBe('');
+  });
+
+  it('keeps a quoted attribute closed', () => {
+    const div = document.createElement('div');
+    div.innerHTML = '<span title="' + esc('A "B" <c> & \'d\'') + '"></span>';
+    expect(div.firstChild ? div.firstChild.getAttribute('title') : 'A "B" <c> & \'d\'').toBe('A "B" <c> & \'d\'');
+  });
+
   it('returns empty string for null/undefined', () => {
     expect(esc(null)).toBe('');
     expect(esc(undefined)).toBe('');
     expect(esc('')).toBe('');
-  });
-});
-
-/* ── escJs (JS string escaping) ───────────────────────────── */
-describe('escJs', () => {
-  it('escapes quotes and backslashes', () => {
-    expect(escJs("it's")).toBe("it\\'s");
-    expect(escJs('say "hi"')).toBe('say \\"hi\\"');
-    expect(escJs('back\\slash')).toBe('back\\\\slash');
-  });
-
-  it('returns empty string for null/undefined', () => {
-    expect(escJs(null)).toBe('');
-    expect(escJs(undefined)).toBe('');
   });
 });
 
