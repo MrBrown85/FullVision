@@ -3581,7 +3581,7 @@ var COMMENT_BANK = {
       id: 'm15',
       part: 'habits',
       group: 'Not Handed In',
-      text: 'The work not handed in this term comes to {missingCount} assignments.',
+      text: 'The work not handed in this term totals {missingCount} assignments.',
       needs: ['missingCount', 'missingMany'],
       claims: ['notHandedIn'],
       src: 'new',
