@@ -144,8 +144,28 @@ describe('MComponents.profBg', () => {
 describe('MComponents.esc', () => {
   it('escapes HTML special characters', () => {
     expect(MComponents.esc('<script>')).toContain('&lt;');
-    expect(MComponents.esc('"quotes"')).toContain('&quot;');
-    expect(MComponents.esc("it's")).toContain("'"); // single quotes don't need escaping in element content
+    expect(MComponents.esc('"quotes"')).toBe('&quot;quotes&quot;');
+    expect(MComponents.esc("it's")).toBe('it&#39;s');
+    expect(MComponents.esc('a & b')).toBe('a &amp; b');
+  });
+
+  // The test DOM escapes " when textContent is set; real browsers do not,
+  // so this must not depend on the DOM.
+  it('escapes quotes without the DOM, so attribute values stay closed', () => {
+    const createElement = document.createElement;
+    document.createElement = () => {
+      throw new Error('esc must not use the DOM');
+    };
+    try {
+      const html = '<div aria-label="' + MComponents.esc('Unit 1 "Test" <b>') + '"></div>';
+      expect(html).toBe('<div aria-label="Unit 1 &quot;Test&quot; &lt;b&gt;"></div>');
+    } finally {
+      document.createElement = createElement;
+    }
+  });
+
+  it('escapes numbers as text', () => {
+    expect(MComponents.esc(42)).toBe('42');
   });
 
   it('returns empty string for falsy input', () => {
