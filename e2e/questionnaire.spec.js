@@ -777,14 +777,22 @@ test.describe('the Sentences card', () => {
       /a C\b.*satisfactory|satisfactory.*a C\b/,
     );
     // Habits: every habit at every rating is its own case, all 24 shown with
-    // Every sentence, an empty one saying so; Cece's rated cells come first
-    // and open, the rest closed; a closed case opens on a click.
+    // Every sentence, each with its frames (hl001–hl120, four or more a
+    // cell); Cece's rated cells come first and open, the rest closed; a
+    // closed case opens on a click.
     await sheet.locator('[role="tab"]', { hasText: 'Habits' }).click();
     await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Every sentence \d+/);
     const labels = await heads.locator('.qn-browse-head-label').allTextContents();
     const cells = labels.filter(l => / · (Consistently|Usually|Sometimes|Rarely)$/.test(l));
     expect(cells.length).toBe(24);
     expect(cells).toContain('Uses Feedback · Sometimes');
+    const cellGroups = sheet.locator('.qn-browse-group[data-case^="cell:"]');
+    await expect(cellGroups).toHaveCount(24);
+    for (const g of await cellGroups.all()) {
+      expect(await g.locator('.qn-browse-row').count()).toBeGreaterThanOrEqual(4);
+      await expect(g.locator('.qn-browse-none')).toHaveCount(0);
+      expect(Number(await g.locator('.qn-browse-head-n').textContent())).toBeGreaterThanOrEqual(4);
+    }
     const ownHeads = sheet.locator('.qn-browse-group.own .qn-browse-head');
     // After Cece's own cases: the other cells, then the summary.
     const rest = labels.slice(await ownHeads.count());
@@ -794,7 +802,8 @@ test.describe('the Sentences card', () => {
     await expect(ownHeads.nth(4).locator('.qn-browse-head-label')).toHaveText('Uses Feedback · Sometimes');
     for (const h of await ownHeads.all()) await expect(h).toHaveAttribute('aria-expanded', 'true');
     const feedback = sheet.locator('.qn-browse-group[data-case="cell:feedback:2"]');
-    await expect(feedback.locator('.qn-browse-row, .qn-browse-none').first()).toBeVisible();
+    await expect(feedback.locator('.qn-browse-row').first()).toBeVisible();
+    await expect(feedback.locator('.qn-browse-use:not([disabled])').first()).toBeVisible();
     const closed = sheet.locator('.qn-browse-group:not(.own)').first();
     await expect(closed.locator('.qn-browse-head')).toHaveAttribute('aria-expanded', 'false');
     await expect(closed.locator('.qn-browse-group-rows')).toBeHidden();
