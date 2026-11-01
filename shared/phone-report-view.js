@@ -17,6 +17,8 @@
 var PhoneReportView = (function () {
   'use strict';
 
+  // The student page (s/) loads this file without constants.js, so it keeps
+  // its own copy of PROF_LABELS's words.
   var WORDS = ['', 'Emerging', 'Developing', 'Proficient', 'Extending'];
   var MEANS = [
     '',

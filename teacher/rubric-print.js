@@ -87,7 +87,7 @@
   };
   var LAYOUT_ORDER = ['full', 'half', 'quarter'];
   var LEVELS = [4, 3, 2, 1];
-  var LEVEL_NAMES = { 4: 'Extending', 3: 'Proficient', 2: 'Developing', 1: 'Emerging' };
+  var LEVEL_NAMES = PROF_LABELS;
   var LINE_ROWS = 36; // write-on lines: a full page's height at the line pitch
   // The BC proficiency scale's general descriptors.
   var GENERAL_LEVELS = {

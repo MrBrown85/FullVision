@@ -4575,7 +4575,7 @@ window.PageAssignments = (function () {
   function showCritTooltip(event, aid, critId, level) {
     var crit = getRubricCriterion(aid, critId);
     if (!crit || !crit.levels || !crit.levels[level]) return;
-    var levelNames = { 4: 'Extending', 3: 'Proficient', 2: 'Developing', 1: 'Emerging' };
+    var levelNames = PROF_LABELS;
     var levelColors = { 4: 'var(--score-4)', 3: 'var(--score-3)', 2: 'var(--score-2)', 1: 'var(--score-1)' };
     var bar = _ensureDescriptorBar();
     bar.querySelector('.rsg-descriptor-label').innerHTML =
@@ -5899,8 +5899,6 @@ window.PageAssignments = (function () {
   // handout. Sheets clip anything taller, so the count turns amber past it.
   var CRIT_COMMENT_QUARTER_FIT = 140;
   var CRIT_COMMENT_MAX = 500;
-  var CRIT_LEVEL_NAMES = { 4: 'Extending', 3: 'Proficient', 2: 'Developing', 1: 'Emerging' };
-
   function _critCommentLevelHtml(cid, sid, aid, crit) {
     if (!window.RubricPrint || typeof RubricPrint.criterionLevel !== 'function') return '';
     var lv = RubricPrint.criterionLevel(getScores(cid)[sid] || [], aid, crit);
