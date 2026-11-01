@@ -10,6 +10,11 @@ on:
   # Run by hand (Actions › CI › Run workflow) to run the browser tests on a branch.
   workflow_dispatch:
 
+# Read-only by default. Only e2e-report gets more: it opens and closes the
+# "Main browser tests are failing" issue.
+permissions:
+  contents: read
+
 jobs:
   test-and-format:
     runs-on: ubuntu-latest
@@ -90,16 +95,30 @@ jobs:
         run: xargs -0 npx prettier --check < /tmp/prettier-files.txt
 
   # Browser tests against dist/ served with the production CSP
-  # (scripts/e2e-server.mjs) and a fake Supabase (e2e/helpers.js). They take
-  # about five minutes, so they run once, after a merge to main, not on every
-  # push to a pull request. Run them locally with `npm run test:e2e` before
-  # merging a change to a page. Not a required check. Pinned to Ubuntu 24.04:
+  # (scripts/e2e-server.mjs) and a fake Supabase (e2e/helpers.js). On one
+  # runner they took 10–14 minutes, so they run once, after a merge to main,
+  # not on every push to a pull request; split across two runners they take
+  # about seven. Run them locally with `npm run test:e2e` before merging a
+  # change to a page. Not a required check. Pinned to Ubuntu 24.04:
   # ubuntu-latest moved to 26.04 in October 2026, where Playwright 1.58 can't
   # install Chromium.
   e2e:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # Only the newest commit on a branch is tested: a new merge to main
+    # cancels the run still testing the commit before it. One group per
+    # shard, because a matrix shares a job's concurrency group and the two
+    # shards would otherwise cancel each other.
+    concurrency:
+      group: e2e-${{ github.ref }}-shard-${{ matrix.shard }}
+      cancel-in-progress: true
+    strategy:
+      # A failure in one shard doesn't stop the other, so the report lists
+      # every failing spec.
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
 
     steps:
       - name: Check out repository
@@ -117,15 +136,178 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      # Playwright's --shard cuts the test list into two contiguous halves,
+      # which put all of report-studio.spec.js (half the run's time) in one
+      # shard: 4 minutes against 10. Each shard takes every other test
+      # location (file:line) instead, so slow files split evenly. Tests made
+      # on one line (a loop) stay together. The count check fails the shard
+      # if its locations select more or fewer tests than the list holds.
+      - name: Pick this shard's tests
+        run: |
+          set -euo pipefail
+          npx playwright test --list --reporter=list | sed -n -E 's/^  \[[^]]+\] › ([^ ]+):[0-9]+ › .*/e2e\/\1/p' > all-locations.txt
+          awk '!seen[$0]++' all-locations.txt | awk -v s=${{ matrix.shard }} 'NR % 2 == s % 2' > shard-locations.txt
+          want=$(grep -cxFf shard-locations.txt all-locations.txt || true)
+          got=$(npx playwright test --list --reporter=list $(cat shard-locations.txt) | sed -n -E 's/^Total: ([0-9]+) tests? .*/\1/p')
+          echo "Shard ${{ matrix.shard }}: ${got:-0} of $(wc -l < all-locations.txt) tests"
+          if [ -z "$want" ] || [ "$want" = 0 ] || [ "$want" != "$got" ]; then
+            echo "::error::Shard ${{ matrix.shard }} should run $want tests but its locations select ${got:-none}."
+            exit 1
+          fi
+
       - name: Run Playwright
-        run: npx playwright test
+        env:
+          PLAYWRIGHT_BLOB_OUTPUT_NAME: report-${{ matrix.shard }}.zip
+        run: npx playwright test --reporter=list,blob $(cat shard-locations.txt)
+
+      - name: Upload this shard's results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 1
+
+  # Merges the two shards into one report, writes the failing and flaky specs
+  # to the run's summary, and keeps one GitHub issue open while main's browser
+  # tests fail: opened (or commented on) by a failing run, closed by the next
+  # passing one. Skipped when the shards were cancelled by a newer commit.
+  e2e-report:
+    needs: e2e
+    if: always() && (needs.e2e.result == 'success' || needs.e2e.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: e2e-report-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download the shard results
+        uses: actions/download-artifact@v4
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: Merge into one report
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: results.json
+        run: npx playwright merge-reports --reporter=html,json ./all-blob-reports
+
+      - name: List failing and flaky specs
+        env:
+          E2E_RESULT: ${{ needs.e2e.result }}
+        run: |
+          node <<'EOF'
+          const fs = require('fs');
+          const rows = [];
+          let stats = null;
+          try {
+            const report = JSON.parse(fs.readFileSync('results.json', 'utf8'));
+            stats = report.stats;
+            const cell = (s) => String(s).replace(/\x1b\[[0-9;]*m/g, '').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+            const walk = (suite, path) => {
+              for (const spec of suite.specs || []) {
+                for (const test of spec.tests || []) {
+                  if (test.status !== 'unexpected' && test.status !== 'flaky') continue;
+                  const failed = (test.results || []).find((r) => r.error);
+                  const error = failed ? failed.error.message || '' : '';
+                  rows.push({
+                    status: test.status === 'flaky' ? 'Flaky' : 'Failed',
+                    spec: cell(`${spec.file}:${spec.line}`),
+                    test: cell([...path, spec.title].join(' › ')),
+                    error: cell(error.split('\n')[0]).slice(0, 160),
+                  });
+                }
+              }
+              for (const child of suite.suites || []) walk(child, [...path, child.title]);
+            };
+            for (const file of report.suites || []) walk(file, []);
+          } catch (err) {
+            console.log(`No merged results: ${err.message}`);
+          }
+          rows.sort((a, b) => a.status.localeCompare(b.status) || a.spec.localeCompare(b.spec));
+          const failed = rows.filter((r) => r.status === 'Failed');
+          let table = '| Result | Spec | Test | Error |\n| --- | --- | --- | --- |\n';
+          table += rows.map((r) => `| ${r.status} | \`${r.spec}\` | ${r.test} | ${r.error} |`).join('\n') + '\n';
+          let summary = '## Browser tests\n\n';
+          if (stats) {
+            summary += `${stats.expected} passed, ${stats.unexpected} failed, ${stats.flaky} flaky, ${stats.skipped} skipped in ${Math.round(stats.duration / 60000)} min (both shards).\n\n`;
+          }
+          if (rows.length) summary += table;
+          else if (process.env.E2E_RESULT === 'failure') summary += 'No failing spec was recorded: a shard failed outside the tests. Open the shard logs.\n';
+          else summary += 'Every spec passed.\n';
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          console.log(summary);
+          // The issue lists only the specs that failed twice.
+          let body = '';
+          if (failed.length) {
+            body = '| Spec | Test | Error |\n| --- | --- | --- |\n';
+            body += failed.map((r) => `| \`${r.spec}\` | ${r.test} | ${r.error} |`).join('\n') + '\n';
+          } else {
+            body = 'No failing spec was recorded: a shard failed outside the tests. Open the shard logs.\n';
+          }
+          fs.writeFileSync('failing-specs.md', body);
+          EOF
 
       - name: Upload the report on failure
-        if: failure()
+        id: report
+        if: needs.e2e.result == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: |
-            playwright-report/
-            test-results/
+          path: playwright-report/
           retention-days: 7
+
+      - name: Open or update the failing-tests issue
+        if: needs.e2e.result == 'failure' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPORT_URL: ${{ steps.report.outputs.artifact-url }}
+        run: |
+          set -euo pipefail
+          title='Main browser tests are failing'
+          {
+            echo "The browser tests failed on main at ${GITHUB_SHA::7}."
+            echo
+            cat failing-specs.md
+            echo
+            echo "Run: $RUN_URL"
+            echo "HTML report (kept 7 days): ${REPORT_URL:-attached to the run}"
+            echo
+            echo "This issue closes itself when main's browser tests pass again."
+          } > issue-body.md
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --label e2e-red --state open --json number --jq '.[0].number // empty')
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file issue-body.md
+          else
+            gh label create e2e-red --repo "$GITHUB_REPOSITORY" --color d73a4a --description "Main's browser tests are failing" --force
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --label e2e-red --body-file issue-body.md
+          fi
+
+      - name: Close the failing-tests issue
+        if: needs.e2e.result == 'success' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          for number in $(gh issue list --repo "$GITHUB_REPOSITORY" --label e2e-red --state open --json number --jq '.[].number'); do
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --comment "Main's browser tests pass again at ${GITHUB_SHA::7}. Run: $RUN_URL"
+          done
