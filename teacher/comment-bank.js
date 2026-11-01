@@ -2298,6 +2298,78 @@ window.CommentBank = (function () {
     return xs.length ? xs[0].skill : '';
   }
 
+  /* Even results (bank expansion, round two): nothing passes the
+     "strongest" gate; every competency with a level, whatever its piece
+     count, is within half a proficiency step (the gap the gate needs) of
+     the others and rounds to the overall proficiency word; and two or more
+     are judged on 3+ scored pieces. So the frames' "every skill", "no
+     skill far above another" and "{evenWord} across the skills" are true
+     as written (the review of #613). The competencies, highest first
+     (report order on a tie); [] when the results are not even. The
+     even-results strengths frames (bank n5xx) are offered on this alone,
+     so a student with level marks still gets a strengths sentence. */
+  function evenComps(comps, overall) {
+    if (strongestOf(comps).length) return [];
+    var xs = (comps || []).filter(function (c) {
+      return c.level > 0;
+    });
+    var judged = xs.filter(function (c) {
+      return (c.scores || []).length >= STRONGEST_PIECES;
+    });
+    if (judged.length < 2) return [];
+    var levels = xs.map(function (c) {
+      return c.level;
+    });
+    if (_atLeast(Math.max.apply(null, levels) - Math.min.apply(null, levels), STRONGEST_GAP)) return [];
+    var w = overall > 0 ? word(overall) : '';
+    if (
+      !w ||
+      xs.some(function (c) {
+        return word(c.level) !== w;
+      })
+    )
+      return [];
+    return xs.slice().sort(function (a, b) {
+      return b.level - a.level;
+    });
+  }
+  /* The even competencies as skills from the table (one per skill key),
+     [{ comp, key, skill }]; the frames print the first ({evenSkill}). The
+     next step's competency (nextStepOf) is left out, so the strengths
+     sentence and the next step never name one skill. The shortest wording
+     comes first (highest competency first on a tie): every even competency
+     is within half a step of the others, so any is a fair example, and the
+     shortest keeps the realised sentence within 20 words (ctxFor's rule) for
+     more students. */
+  function evenSkills(f) {
+    var out = [];
+    var next = nextStepOf(f.comps);
+    evenComps(f.comps, f.overall).forEach(function (c) {
+      // Only a competency judged on 3+ pieces is named as what the
+      // student can do.
+      if (c === next || (c.scores || []).length < STRONGEST_PIECES) return;
+      var sk = skillOf(f.family, c.name);
+      if (
+        !sk ||
+        out.some(function (x) {
+          return x.key === sk.key;
+        })
+      )
+        return;
+      out.push({ comp: c, key: sk.key, skill: sk.skill });
+    });
+    return out
+      .sort(function (x, y) {
+        return R.wordCount(x.skill) - R.wordCount(y.skill);
+      })
+      .slice(0, 2);
+  }
+  /* "{evenSkill}": the first even skill alone, '' with none. */
+  function evenSkillText(f) {
+    var xs = evenSkills(f);
+    return xs.length ? xs[0].skill : '';
+  }
+
   /* What a support line fits for this student: the next step's skill when
      the line names it, else a habit rated Sometimes or Rarely that it
      names; null when neither. */
@@ -2362,7 +2434,7 @@ window.CommentBank = (function () {
   /* The claims a gate decides, and whether a sentence passes them for this
      context: a sentence claiming one below its gate is not eligible. A
      context built by hand, without facts, has nothing to gate. */
-  var GATED = ['strength', 'improved'];
+  var GATED = ['strength', 'improved', 'evenResults'];
   function passesGates(s, ctx) {
     var f = ctx && ctx._f;
     if (!f || !ctx._facts) return true;
@@ -2427,6 +2499,10 @@ window.CommentBank = (function () {
     var strongest = strongestOf(f.comps);
     // The strengths as skills (plan part 3), never the bare labels.
     var strongSkills = strengthSkills(f);
+    // Even results (evenComps): no strongest, every judged competency
+    // within half a step; the first two as skills, for the n5xx frames.
+    var evenNow = evenComps(f.comps, f.overall);
+    var evenSk = evenSkills(f);
     var fallen = drops.length
       ? drops.slice().sort(function (a, b) {
           return tenths(a.start) - tenths(a.now) - (tenths(b.start) - tenths(b.now));
@@ -2545,6 +2621,14 @@ window.CommentBank = (function () {
         }),
       ),
       strength: keys('comp', [strongSkills[0] && strongSkills[0].comp]),
+      // The strongest skill's key (`when.strongSkill`, the per-skill
+      // strengths frames): the competency behind the first strength.
+      strongSkill: keys('comp', [strongSkills[0] && strongSkills[0].comp]),
+      // Even results (evenComps): every competency the claim rests on, the
+      // one named as a skill, and the proficiency word the frame is for.
+      evenResults: keys('comp', evenNow),
+      evenSkill: keys('comp', [evenSk[0] && evenSk[0].comp]),
+      evenWord: ['overall'].concat(keys('comp', evenNow)),
       growthAreas: keys('comp', lowest),
       even: keys('comp', withLevels),
       rise: keys('comp', [rises[0]]),
@@ -2603,6 +2687,8 @@ window.CommentBank = (function () {
     };
     var compNames = {
       strengths: names(strongest),
+      strongSkill: names([strongSkills[0] && strongSkills[0].comp]),
+      evenSkill: names([evenSk[0] && evenSk[0].comp]),
       growthAreas: names(lowest),
       rise: names([rises[0]]),
       fall: names([fallen]),
@@ -2638,6 +2724,13 @@ window.CommentBank = (function () {
       // The next step's skill key (SKILLS), for the frames written for one
       // skill (`when.nextSkill`); '' when there is no next step.
       _nextSkill: next ? next.key : '',
+      // The strongest skill's key (SKILLS), for the per-skill strengths
+      // frames (`when.strongSkill`); '' below the "strongest" gate.
+      _strongSkill: strongSkills[0] ? strongSkills[0].key : '',
+      // The overall proficiency word while the results are even
+      // (`when.evenWord`), in every grading style: a condition only, so a
+      // Letter class binds the verb to it without printing it.
+      _evenWord: evenNow.length && f.overall > 0 ? word(f.overall) : '',
       _options: options,
       _focus: focus || null,
       _facts: factsOf,
@@ -2676,6 +2769,15 @@ window.CommentBank = (function () {
       // is: "{He} can {strengths}." Never a bare competency label.
       strengths: strengthsText(f),
       strength: strengthText(f),
+      // The strongest skill's key, needed and never printed: the frames
+      // written for one skill say it in their own words.
+      strongSkill: strongSkills[0] ? strongSkills[0].key : '',
+      // Even results (evenComps): 'yes' while they hold; the highest even
+      // competency as a skill; and the proficiency word as the class shows
+      // it (f.standing: '' in a Letter class, so no frame prints it there).
+      evenResults: evenNow.length ? 'yes' : '',
+      evenSkill: evenSkillText(f),
+      evenWord: evenNow.length ? f.standing || '' : '',
       growthAreas: list(
         lowest.map(function (c) {
           return c.name;
@@ -2835,6 +2937,8 @@ window.CommentBank = (function () {
       if (k === 'path') return ctx._path === when[k];
       if (k === 'ieProblem') return ctx._ieProblem === when[k];
       if (k === 'nextSkill') return !!ctx._nextSkill && ctx._nextSkill === when[k];
+      if (k === 'strongSkill') return !!ctx._strongSkill && ctx._strongSkill === when[k];
+      if (k === 'evenWord') return !!ctx._evenWord && ctx._evenWord === when[k];
       return (ctx._habits || {})[k] === when[k];
     });
   }
@@ -3228,8 +3332,12 @@ window.CommentBank = (function () {
     var when = s.when || {};
     Object.keys(when).forEach(function (k) {
       values['when.' + k] = when[k];
-      // A frame for one skill rests on the next step's competency.
+      // A frame for one skill rests on the next step's competency, or on
+      // the strongest one; an even-results frame on the even competencies
+      // and the overall proficiency.
       if (k === 'nextSkill') return ((ctx._facts && ctx._facts.nextSkill) || []).forEach(add);
+      if (k === 'strongSkill') return ((ctx._facts && ctx._facts.strongSkill) || []).forEach(add);
+      if (k === 'evenWord') return ((ctx._facts && ctx._facts.evenWord) || []).forEach(add);
       add(
         k === 'picture'
           ? 'picture'
@@ -3608,13 +3716,20 @@ window.CommentBank = (function () {
     var needs = s.needs || [];
     var n = Object.keys(s.when || {}).length;
     if (ctx._bestNote && (needs.indexOf('bestPiece') >= 0 || needs.indexOf('bestNote') >= 0)) n++;
+    // Two for a story, so a frame written for the student's story comes
+    // before one written for the strongest skill (`when.strongSkill`, bank
+    // n6xx-n7xx), which comes before a general one.
     STORY_LEADS.forEach(function (k) {
-      if (needs.indexOf(k) >= 0 && ctx[k]) n++;
+      if (needs.indexOf(k) >= 0 && ctx[k]) n += 2;
     });
     // A Habit Ratings frame is matched on the same ratings as the summary
     // sentence, so its habit condition makes it no more specific: the two
     // share a tier and rotate, least used first (habitCellFits).
     if (s.habit && s.part === 'habits') n--;
+    // A grade frame written for one proficiency word (`when.standing`,
+    // bank gr39-gr78) is no more specific than one for any word: the two
+    // rotate together, so a Proficiency class is not all one frame family.
+    if (s.group === 'Grade' && s.when && s.when.standing) n--;
     return n;
   }
 
@@ -4582,7 +4697,20 @@ window.CommentBank = (function () {
       var v = pv.values || {};
       var ids = _ids(pv, 'strengths', 'comp')
         .concat(_ids(pv, 'strength', 'comp'))
+        .concat(_ids(pv, 'strongSkill', 'comp'))
         .concat(_ids(pv, 'selfStrong', 'confidence'));
+      // A frame for one skill (`when.strongSkill`): the first strength is
+      // still that skill, from the same competency.
+      if (_has(pv, 'when.strongSkill')) {
+        var first = strengthSkills(f)[0];
+        if (
+          !first ||
+          first.key !== v['when.strongSkill'] ||
+          (_has(pv, 'strongSkill') &&
+            (v.strongSkill !== first.key || _ids(pv, 'strongSkill', 'comp')[0] !== String(first.comp.id)))
+        )
+          return false;
+      }
       var gated = strongestOf(f.comps).map(function (c) {
         return String(c.id);
       });
@@ -4602,6 +4730,37 @@ window.CommentBank = (function () {
         wording('strengths', [strengthsText(f), strengthText(f)]) &&
         wording('strength', [strengthText(f)])
       );
+    },
+    // Even results (evenComps): nothing past the "strongest" gate and every
+    // judged competency within half a step, now; the competencies named
+    // are those; the skill is the table's wording for one of them (evenSkills);
+    // the proficiency word, bound or printed, is the overall one, which every
+    // even competency rounds to (printed only where the class shows it,
+    // f.standing).
+    evenResults: function (pv, f) {
+      var v = pv.values || {};
+      var ev = evenComps(f.comps, f.overall);
+      if (!ev.length) return false;
+      var ids = ev.map(function (c) {
+        return String(c.id);
+      });
+      var among = function (slot) {
+        var named = _ids(pv, slot, 'comp');
+        return (
+          named.length > 0 &&
+          named.every(function (id) {
+            return ids.indexOf(id) >= 0;
+          })
+        );
+      };
+      var checks = [];
+      if (_has(pv, 'evenResults'))
+        checks.push(_ids(pv, 'evenResults', 'comp').length === ids.length && among('evenResults'));
+      if (_has(pv, 'evenSkill')) checks.push(among('evenSkill') && !!v.evenSkill && v.evenSkill === evenSkillText(f));
+      var now = f.overall > 0 ? word(f.overall) : '';
+      if (_has(pv, 'when.evenWord')) checks.push(!!now && v['when.evenWord'] === now);
+      if (_has(pv, 'evenWord')) checks.push(!!now && !!f.standing && f.standing === now && v.evenWord === now);
+      return checks.length > 0 && checks.every(Boolean);
     },
     // Competencies to build: each below the highest now.
     growthArea: function (pv, f) {
@@ -4779,7 +4938,11 @@ window.CommentBank = (function () {
       var checks = [];
       Object.keys(pv.values).forEach(function (k) {
         var m = k.match(/^when\.(\w+)$/);
-        if (m && ['picture', 'standing', 'grade', 'ieProblem', 'path', 'nextSkill'].indexOf(m[1]) < 0)
+        if (
+          m &&
+          ['picture', 'standing', 'grade', 'ieProblem', 'path', 'nextSkill', 'strongSkill', 'evenWord'].indexOf(m[1]) <
+            0
+        )
           checks.push(eff[m[1]] === pv.values[k]);
       });
       var named = function (slot, ok, want) {
@@ -5420,6 +5583,9 @@ window.CommentBank = (function () {
     improvedComp: improvedComp,
     strengthSkills: strengthSkills,
     strengthsText: strengthsText,
+    evenComps: evenComps,
+    evenSkills: evenSkills,
+    evenSkillText: evenSkillText,
     MAX_SENTENCES: MAX_SENTENCES,
     MIN_SENTENCES: MIN_SENTENCES,
     climbed: climbed,

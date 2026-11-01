@@ -1951,9 +1951,45 @@ window.ReportQuestionnaire = (function () {
     _syncRequired();
   }
 
+  /* Whether a sentence holds the date as the comment says it (`was`:
+     "December 18", or [date] until one is picked), as a whole: "December 1"
+     is not in "December 18". */
+  function _holdsDate(text, was) {
+    var at = String(text || '').indexOf(was);
+    while (at >= 0) {
+      if (!/[0-9]/.test(text.charAt(at + was.length))) return true;
+      at = text.indexOf(was, at + 1);
+    }
+    return false;
+  }
+  /* The deadline sentence in a comment, whichever IE Deadline frame it is:
+     the drafted sentence of that step (this session's draft, else the rows),
+     never one the teacher edited; else, of the sentences of the text that
+     hold the date, one that also says "IE" before any other, so a date the
+     teacher typed elsewhere in the comment is left alone. '' when none
+     holds it. */
+  function _deadlineSentence(text, was, last, rows) {
+    var drafted = ((last && last.sentences) || rows || []).find(function (x) {
+      return x.step === 'ieDeadline' && !x.edited && !x.kept && _holdsDate(x.text, was);
+    });
+    if (drafted && text.indexOf(drafted.text) >= 0) return drafted.text;
+    var holds = String(text || '')
+      .split(/(?<=[.!?][”"]?)\s+/)
+      .filter(function (x) {
+        return _holdsDate(x, was);
+      });
+    return (
+      holds.find(function (x) {
+        return /\bIE\b/.test(x);
+      }) ||
+      holds[0] ||
+      ''
+    );
+  }
+
   /* A day picked: saved with the reporting basis for this report, and the
      deadline sentence in the comment says the new date in place of [date]
-     (or the date picked before). */
+     (or the date picked before), whichever frame the sentence is. */
   function tqPickDeadline(iso) {
     var st = _current();
     if (!st || !/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return;
@@ -1962,24 +1998,20 @@ window.ReportQuestionnaire = (function () {
     tqSaveCurrentIfNeeded();
     var termId = getTermId();
     var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
-    var sentence = function () {
-      var part = CommentBank.requiredParts(_bankContext(_activeCourse, st, _facts(st))).find(function (p) {
-        return p.key === 'ieDeadline';
-      });
-      return part ? part.text : '';
-    };
-    var before = sentence();
+    var was = CommentBank.deadlineText(rating.ieDeadline);
+    var now = CommentBank.deadlineText(iso);
     upsertTermRating(_activeCourse, st.id, termId, {
       reportingBasis: rating.reportingBasis || 'grade',
       ieDeadline: iso,
     });
     _facts(st, true);
-    var after = sentence();
     var text = plainComment((getStudentTermRating(_activeCourse, st.id, termId) || {}).narrative || '');
-    if (before && after && before !== after && text.indexOf(before) >= 0) {
+    var key = _activeCourse + '|' + st.id + '|' + termId;
+    var last = _lastDraft[key];
+    var before = was !== now ? _deadlineSentence(text, was, last, _rowsFor(st, _facts(st))) : '';
+    var after = before ? before.replace(was, now) : '';
+    if (before && after !== before && text.indexOf(before) >= 0) {
       upsertTermRating(_activeCourse, st.id, termId, { narrative: text.replace(before, after) });
-      var key = _activeCourse + '|' + st.id + '|' + termId;
-      var last = _lastDraft[key];
       if (last) {
         last.text = last.text.replace(before, after);
         last.sentences.forEach(function (x) {
@@ -3423,10 +3455,19 @@ window.ReportQuestionnaire = (function () {
       STORIES.forEach(function (x) {
         add(x[0], x[1]);
       });
+      // Even results (CommentBank.evenComps), by the overall proficiency
+      // word the frame's verb is bound to (bank n5xx).
+      PROFICIENCY_WORDS.forEach(function (w) {
+        add('even:' + w, 'Even Results · ' + w);
+      });
       PROFICIENCY_WORDS.forEach(function (w) {
         add('st:' + w, w);
       });
       FAMILY_ORDER.forEach(function (fam) {
+        // The strongest skill, under its kind of class (bank n6xx-n7xx).
+        (CommentBank.SKILLS[fam] || []).forEach(function (r) {
+          add('skill:' + fam + ':' + r.key, FAMILY_NAMES[fam] + ' · ' + r.name);
+        });
         add('fam:' + fam, FAMILY_NAMES[fam]);
         PROFICIENCY_WORDS.forEach(function (w) {
           add('fam:' + fam + ':' + w, FAMILY_NAMES[fam] + ' · ' + w);
@@ -3505,6 +3546,13 @@ window.ReportQuestionnaire = (function () {
       var story = ['climb', 'slide', 'split', 'hidden', 'newcomer'].find(has);
       if (story) return [story];
       if (has('new')) return ['newcomer'];
+      // A frame for the strongest skill, under its kind of class; an
+      // even-results frame under the word its verb is bound to.
+      if (when.strongSkill) {
+        var sf = fam || _familyOfSkill(when.strongSkill);
+        return [sf ? 'skill:' + sf + ':' + when.strongSkill : 'other'];
+      }
+      if (when.evenWord) return ['even:' + when.evenWord];
       if (fam) return ['fam:' + fam + (when.standing ? ':' + when.standing : '')];
       return [when.standing ? 'st:' + when.standing : 'steady'];
     }
@@ -3611,6 +3659,9 @@ window.ReportQuestionnaire = (function () {
       } catch (e) {
         /* a context built by hand: the steady story */
       }
+      // The strongest skill, else even results, come before the story.
+      if (fam && ctx._strongSkill) out.push('skill:' + fam + ':' + ctx._strongSkill);
+      if (ctx._evenWord) out.push('even:' + ctx._evenWord);
       out.push(story);
       if (fam && f.standing) out.push('fam:' + fam + ':' + f.standing);
       if (fam) out.push('fam:' + fam);
@@ -5404,6 +5455,7 @@ window.ReportQuestionnaire = (function () {
     },
     tqDeadlineMonth: tqDeadlineMonth,
     tqPickDeadline: tqPickDeadline,
+    deadlineSentence: _deadlineSentence,
     tqLine: tqLine,
     tqLineChange: tqLineChange,
     tqSentences: tqSentences,

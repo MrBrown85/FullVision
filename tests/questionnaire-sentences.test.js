@@ -392,6 +392,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     ]);
     expect(RQ.browseCase('strengths', { when: { standing: 'Emerging' } })).toEqual(['st:Emerging']);
     expect(RQ.browseCase('strengths', { needs: ['strengths'] })).toEqual(['steady']);
+    // The strongest skill under its kind of class; even results under the
+    // word the frame's verb is bound to.
+    expect(
+      RQ.browseCase('strengths', { when: { strongSkill: 'evidence' }, needs: ['strongSkill'], subjects: ['socials'] }),
+    ).toEqual(['skill:socials:evidence']);
+    expect(RQ.browseCase('strengths', { when: { evenWord: 'Proficient' }, needs: ['evenWord', 'evenSkill'] })).toEqual([
+      'even:Proficient',
+    ]);
+    expect(RQ.browseCases('strengths').find(c => c.id === 'even:Proficient').label).toBe('Even Results · Proficient');
+    expect(RQ.browseCases('strengths').find(c => c.id === 'skill:socials:evidence').label).toBe(
+      'Social Studies · Evidence',
+    );
     // Habits: a habit at a rating from the fields or from `when`; the summary,
     // strong habits and attendance by needs; the one-slot attendance
     // sentence serves every attendance case.
@@ -458,6 +470,8 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(habits.slice(0, rated.length).every(id => /^cell:/.test(id))).toBe(true);
     expect(habits.some(id => /^sum:/.test(id))).toBe(true);
     expect(RQ.browseOwn('strengths', ctx)).toContain('fam:' + ctx._family);
+    // Cece's results are even (CommentBank.evenComps): her own case first.
+    expect(RQ.browseOwn('strengths', ctx)[0]).toBe('even:' + f.standing);
     expect(RQ.browseOwn('nextStep', ctx)).toContain('home:' + ctx._family);
     expect(RQ.browseOwn('bestPiece', ctx)).toEqual([ctx._bestNote ? 'note' : 'noNote']);
     // Grade, every sentence: the proficiency frames under each word,
@@ -526,9 +540,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const homeS = COMMENT_BANK.sentences.find(s => s.id === home.id);
     if (homeS && homeS.when) expect(src(home)).toMatch(/ · (Emerging|Developing|Proficient|Extending)$/);
     else expect(src(home)).toBe('A general sentence. It states no fact about Cece.');
-    // Cece has no competency past the "strongest" gate, so no strengths
-    // row; one by hand names the competency behind it.
-    expect(rows.some(r => r.step === 'overall')).toBe(false);
+    // Cece has no competency past the "strongest" gate; her results are
+    // even, so the strengths row names the competencies behind it. One by
+    // hand names the competency behind it.
+    const even = rows.find(r => r.step === 'overall');
+    expect(even).toBeTruthy();
+    expect(src(even)).toMatch(/^All six competencies at (Emerging|Developing|Proficient|Extending) · Overall /);
     const c = f.comps[0];
     expect(src({ step: 'overall', edited: false, prov: { factKeys: ['comp:' + c.id] } })).toBe(
       c.name + ' · ' + f.levelText(c.level),
