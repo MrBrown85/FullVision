@@ -1604,7 +1604,7 @@ th.gb-group-alt {
   color: #fff;
 }
 .gb-status-ns {
-  background: var(--score-1);
+  background: var(--score-1-dark);
 }
 .gb-status-exc {
   background: var(--accent-purple);
@@ -1620,7 +1620,7 @@ th.gb-group-alt {
   margin-left: 2px;
   padding: 0 2px;
   border-radius: 4px;
-  background: var(--score-2);
+  background: var(--score-2-text);
   color: #fff;
   font-family: var(--font-base);
   font-size: 9px;
@@ -1628,6 +1628,15 @@ th.gb-group-alt {
   line-height: 13px;
   text-align: center;
   vertical-align: 2px;
+}
+/* The deeper shades keep white text at 4.5:1 or more; dark mode's light
+   shades take dark text instead. */
+@media (prefers-color-scheme: dark) {
+  .gb-status-ns,
+  .gb-status-exc,
+  .gb-late {
+    color: #1d1d1f;
+  }
 }
 .gb-score-val .gb-late {
   position: absolute;
