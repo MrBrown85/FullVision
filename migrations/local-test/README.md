@@ -99,3 +99,23 @@ PGPORT=54331 PGDATABASE=fv_tq python3 term_rating_habits.py
 ```
 
 Result on 2026-10-28 (Postgres 17.10, local): 37 of 37.
+
+## Re-approval date (2026-11-02)
+
+`term_rating_reapprove.py` exercises `20261102_term_rating_reapprove_date.sql`:
+the first approval, a re-approve with the same or no narrative (keeps the
+date), a re-approve with a changed narrative (dated now, audited),
+`approved: false`, approving after a clear, and an edit with no `approved`
+key (clears). Earlier approvals are backdated by hand, since `now()` is fixed
+inside the test's one transaction.
+
+```bash
+PGPORT=54331 PGDATABASE=fv_tq python3 run.py harness.sql term-rating-prelude.sql \
+  ../20261028_term_rating_habits_approval.sql ../20261031_term_rating_reporting_basis.sql \
+  ../20261031_term_rating_draft_meta.sql ../20261102_term_rating_reapprove_date.sql
+PGPORT=54331 PGDATABASE=fv_tq python3 term_rating_reapprove.py
+```
+
+Result on 2026-11-01 (Postgres 16.2, local): 9 of 9 pass; before the
+migration 7 of 9 (the changed-narrative re-approve kept the old date).
+`term_rating_habits.py` still passes 37 of 37.
