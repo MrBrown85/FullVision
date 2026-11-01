@@ -1463,10 +1463,17 @@ window.ReportQuestionnaire = (function () {
     var n = (_generated[st.id] || 0) + 1;
     _generated[st.id] = n;
     // Sentences the teacher edited stay, as written, and so does the order
-    // they set (plan PR 11b). A comment Generate did not write (typed by
-    // hand, or from before this visit) is replaced whole, as before.
+    // they set (plan PR 11b); a sentence they typed stays at its place in
+    // the order (keepTyped, the InsertRows mockup), also in a comment
+    // Generate wrote on an earlier visit. A comment with no bank sentence
+    // at all (written by hand) is replaced whole, as before.
     var wrote = !!_lastDraft[key];
     var rows = _rowsFor(st, f);
+    var replace =
+      !wrote &&
+      !rows.some(function (r) {
+        return !!r.step;
+      });
     var kept = {};
     rows.forEach(function (r) {
       if (r.edited && r.step && !kept[r.step]) kept[r.step] = r.text;
@@ -1491,7 +1498,7 @@ window.ReportQuestionnaire = (function () {
     if (!d.text) return;
     _lastDraft[key] = d;
     _lastSeed[key] = d.seed;
-    _adoptDraft(key, d, !wrote);
+    _adoptDraft(key, d, replace);
     if (!_ordered[key])
       _original[key] = d.sentences
         .map(function (x) {
@@ -1499,6 +1506,7 @@ window.ReportQuestionnaire = (function () {
         })
         .filter(Boolean);
     _wording = null;
+    _addAt = null;
     _writeRows(st);
   }
 
@@ -1568,7 +1576,7 @@ window.ReportQuestionnaire = (function () {
           <span class="qn-comment-title">Teacher Comment</span>
           ${stale && rating.approvedAt ? `<span class="qn-approved-chip">Approved ${esc(_shortDay(rating.approvedAt))}</span>` : ''}
           ${tabs}
-          ${thisTab ? '<button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="Writes the comment from the gradebook, your ratings and Student Voice. Press again for another version. Sentences you edited and your order stay.">Generate Comment</button>' : ''}
+          ${thisTab ? '<button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="Writes the comment from the gradebook, your ratings and Student Voice. Press again for another version. Sentences you typed or edited and your order stay.">Generate Comment</button>' : ''}
         </div>
         ${stale ? _staleHtml(cid, student, rating, stale) : ''}
         ${thisTab ? _basisHtml(cid, student, _facts(student)) : ''}
@@ -2259,10 +2267,10 @@ window.ReportQuestionnaire = (function () {
      Meeting, and Statement for the goals sentence. In the example step
      only the best-piece sentence is Best Piece; a Student Voice quote is
      Voice and any other example Example. The attendance sentence is
-     Attendance (the States mockup). A sentence of the teacher's own that
-     fits no part has none. */
+     Attendance (the States mockup). A sentence the teacher typed is Your
+     Sentence (the InsertRows mockup). */
   function rowLabel(row, path) {
-    if (!row.step) return '';
+    if (!row.step) return isTyped(row) ? 'Your Sentence' : '';
     if (_isRequired(row.step, path)) {
       if (row.step === 'grade') return path === 'ie' ? 'Grade' : 'Statement';
       return IE_LABELS[row.step];
@@ -2352,31 +2360,67 @@ window.ReportQuestionnaire = (function () {
     });
   }
 
-  /* A draft adopted as the rows: the teacher's own sentences that no step
-     carries (step null) go back after the row they followed, unless
-     `replace`: Generate over a comment it did not write starts afresh. */
+  /* Whether a row is a sentence the teacher typed into the comment: no
+     bank sentence, no class line (the Your Sentence row). */
+  function isTyped(row) {
+    return !!row && !row.step && !row.classLine && !row.placeholder;
+  }
+  /* The teacher's typed sentences (old rows with no step) put back among
+     the new rows at their place in the order: after the row they followed,
+     found by its text or its step; else before the row that followed them;
+     else where they were. */
+  function keepTyped(old, rows) {
+    var out = rows.slice();
+    var find = function (r) {
+      if (!r) return -1;
+      return out.findIndex(function (x) {
+        return x.text === r.text || (!!r.step && x.step === r.step);
+      });
+    };
+    old.forEach(function (r, i) {
+      if (!isTyped(r) || find(r) >= 0) return;
+      var at = find(old[i - 1]);
+      if (at >= 0) at++;
+      else {
+        var next = -1;
+        for (var k = i + 1; k < old.length && next < 0; k++) next = find(old[k]);
+        at = next >= 0 ? next : Math.min(i, out.length);
+      }
+      out.splice(at, 0, r);
+    });
+    return out;
+  }
+  /* A draft adopted as the rows: the teacher's typed sentences go back at
+     their place (keepTyped), unless `replace`: Generate over a comment with
+     no bank sentence starts afresh. */
   function _adoptDraft(key, d, replace) {
     var old = _rows[key] || [];
     var rows = rowsFromDraft(d, old);
-    if (replace) old = [];
-    old.forEach(function (r, i) {
-      if (
-        r.step ||
-        rows.some(function (x) {
-          return x.text === r.text;
-        })
-      )
-        return;
-      var before = old[i - 1];
-      var at = before
-        ? rows.findIndex(function (x) {
-            return x.text === before.text || (!!before.step && x.step === before.step);
-          })
-        : -1;
-      rows.splice(at + 1, 0, r);
-    });
+    if (!replace) rows = keepTyped(old, rows);
     _rows[key] = rows;
     return rows;
+  }
+  /* A row for a sentence the teacher typed. */
+  function typedRow(text, n) {
+    return {
+      id: 'text:' + (n == null ? Date.now().toString(36) : n),
+      step: null,
+      text: text,
+      drafted: null,
+      edited: true,
+      raw: null,
+      prov: null,
+      s: null,
+      classLine: false,
+    };
+  }
+  /* The rows with a row put in at `at` (a gap: how many rows come before
+     it). */
+  function insertRow(rows, row, at) {
+    var out = rows.slice();
+    var i = Math.max(0, Math.min(out.length, Number(at) || 0));
+    out.splice(i, 0, row);
+    return out;
   }
 
   /* Who a context is about, for the realiser. */
@@ -2814,6 +2858,7 @@ window.ReportQuestionnaire = (function () {
     _rows[key] = next;
     _ordered[key] = true;
     _wording = null;
+    _addAt = null;
     _writeRows(st);
     _focusRow(next.indexOf(rows[i]));
   }
@@ -2827,6 +2872,7 @@ window.ReportQuestionnaire = (function () {
     _rows[key] = next;
     _ordered[key] = true;
     _wording = null;
+    _addAt = null;
     _writeRows(st);
   }
   function _resetOrder() {
@@ -2836,6 +2882,7 @@ window.ReportQuestionnaire = (function () {
     _rows[key] = resetOrder(_rows[key] || [], _original[key] || []);
     _ordered[key] = false;
     _wording = null;
+    _addAt = null;
     _writeRows(st);
     _focusSel('#tq-browse-btn');
   }
@@ -3002,6 +3049,7 @@ window.ReportQuestionnaire = (function () {
     var rows = _rows[key] || [];
     var s = _bankById(id);
     _wording = null;
+    _addAt = null;
     if (!rows[i] || !s || rows[i].id === id) {
       _syncRequired();
       _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="wording"]');
@@ -3121,6 +3169,7 @@ window.ReportQuestionnaire = (function () {
      weakest skill. An edited sentence says so instead. */
   function rowSource(row, cid, student, f, ctx) {
     var first = _first(student);
+    if (isTyped(row)) return 'Typed by you · kept when you regenerate';
     if (row.edited) return 'Edited by you · kept when you regenerate';
     if (row.step === 'attendance') return 'From Attendance above · new';
     if (row.step === 'grade') return _gradeSource(cid, f);
@@ -3242,21 +3291,30 @@ window.ReportQuestionnaire = (function () {
       );
     var open = !!_wording && _wording.index === i;
     var low = row.step === 'grade' && _checksFor(f, rows).indexOf('low') >= 0;
-    var edited = unit.some(function (r) {
-      return r.edited;
-    });
-    // A sentence the teacher typed or changed can go to their bank.
+    var typed = isTyped(row);
+    var edited =
+      !typed &&
+      unit.some(function (r) {
+        return r.edited;
+      });
+    // A sentence the teacher changed can go to their bank.
     var addBank =
-      i >= 0 && window.PersonalBank && !row.classLine && !row.placeholder && (edited || !row.step)
+      i >= 0 && window.PersonalBank && !row.classLine && !row.placeholder && edited
         ? `<button type="button" class="qn-own-add" data-action="tqSentences" data-do="ownAdd" data-row="${i}" title="Adds this sentence to your bank, for other students it fits.">Add to My Bank</button>`
         : '';
-    var act = edited
-      ? '<span class="qn-edited" title="You changed this sentence. Generate Comment keeps it.">Edited</span>' + addBank
-      : row.step && row.s
-        ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Shows other ways to say this sentence. Pick one to use it.">Other Wording ▾</button>`
-        : addBank;
+    // A sentence the teacher typed: Options (Add to My Bank, Remove From
+    // Comment), the InsertRows mockup.
+    var act = typed
+      ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="options" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Add this sentence to your bank, or remove it.">Options ▾</button>`
+      : edited
+        ? '<span class="qn-edited" title="You changed this sentence. Generate Comment keeps it.">Edited</span>' +
+          addBank
+        : row.step && row.s
+          ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Shows other ways to say this sentence. Pick one to use it.">Other Wording ▾</button>`
+          : addBank;
     var ownBox = _own && _own.where === 'row' && _own.index === i ? _ownBoxHtml(student) : '';
-    var tint = _isBestRow(row) ? ' best' : row.step === 'attendance' ? ' attendance' : '';
+    var added = _justAdded(student, row);
+    var tint = added ? ' added' : _isBestRow(row) ? ' best' : row.step === 'attendance' ? ' attendance' : '';
     var text = unit
       .map(function (r) {
         return r.text;
@@ -3267,12 +3325,197 @@ window.ReportQuestionnaire = (function () {
         return _thinHtml(cid, student, r, i);
       })
       .join('');
+    var source = _unitSource(unit, cid, student, f, ctx) + (added ? ' · added just now' : '');
     return `<div class="qn-req-row qn-srow${tint}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
       ${handle}<div class="qn-req-part"><span class="qn-req-label">${esc(rowLabel(row, path))}</span></div>
-      <div class="qn-req-body"><span class="qn-req-text">${esc(text)}</span><span class="qn-req-source">${esc(_unitSource(unit, cid, student, f, ctx))}</span>${thin}${ownBox}</div>
+      <div class="qn-req-body"><span class="qn-req-text">${esc(text)}</span><span class="qn-req-source">${esc(source)}</span>${thin}${ownBox}</div>
       ${act}
       ${low ? _checkHtml(student.id, 'low') : ''}
-      ${open ? _wordingMenuHtml(cid, student, ctx, rows, i) : ''}
+      ${open ? (typed ? _optionsMenuHtml(i) : _wordingMenuHtml(cid, student, ctx, rows, i)) : ''}
+    </div>`;
+  }
+
+  /* ── Typed rows and adding between rows (the InsertRows mockup) ── */
+
+  /* The row put in just now, tinted for a few seconds with "added just
+     now" on its source line. */
+  var ADDED_FOR = 5000;
+  var _added = null; // { key, id, at }
+  function _justAdded(student, row) {
+    return !!_added && _added.key === _rowKey(student) && _added.id === row.id && Date.now() - _added.at < ADDED_FOR;
+  }
+  function _markAdded(st, row) {
+    _added = { key: _rowKey(st), id: row.id, at: Date.now() };
+  }
+
+  /* The Options menu of a Your Sentence row. */
+  function _optionsMenuHtml(i) {
+    var bank = window.PersonalBank
+      ? `<button type="button" role="menuitem" class="qn-menu-item" data-action="tqSentences" data-do="ownAdd" data-row="${i}" title="Adds this sentence to your bank, for other students it fits."><span class="qn-menu-body"><span class="qn-menu-text">Add to My Bank</span><span class="qn-menu-meta">For other students it fits</span></span></button>`
+      : '';
+    return `<div class="qn-menu qn-options" role="menu" aria-label="Your sentence" id="tq-options-menu">
+      <span class="qn-menu-head">Your Sentence</span>
+      ${bank}
+      <button type="button" role="menuitem" class="qn-menu-item" data-action="tqSentences" data-do="remove" data-row="${i}" title="Takes this sentence out of the comment. ⌘Z puts it back."><span class="qn-menu-body"><span class="qn-menu-text">Remove From Comment</span></span></button>
+    </div>`;
+  }
+
+  /* The sentences the + menu offers at a gap: one for each part missing
+     from the comment that has a sentence fitting the student, drafted
+     around the comment's own sentences (CommentBank.draft with every row
+     kept in its place), so the engine's rules hold: never a second grade
+     sentence, a second next step or a second advising sentence, and a
+     class line only when the class has one. A Required part (the grade on
+     the IE and goals paths, the IE parts; the Deadline sentence comes
+     only from picking a date) is never offered. Each: { step, part, label,
+     id, s, classLine, text }. */
+  function insertChoices(rows, ctx, opts) {
+    opts = opts || {};
+    var path = opts.path !== undefined ? opts.path : CommentBank.reportPath(ctx._f || {});
+    var has = {};
+    var kept = {};
+    var order = [];
+    rows.forEach(function (r) {
+      if (!r.step) return;
+      if (has[r.step]) return;
+      has[r.step] = true;
+      order.push(r.step);
+      // Keyed by the bank sentence when it is one, so its facts count as
+      // said; by the step otherwise.
+      var byId = r.s && !r.edited && CommentBank.stepOf(r.s) === r.step;
+      kept[byId ? r.id : r.step] = r.text;
+    });
+    var d = CommentBank.draft(ctx, {
+      seed: opts.seed || 1,
+      comments: opts.comments,
+      exclude: opts.exclude,
+      kept: kept,
+      order: order,
+      bank: opts.bank,
+      quiet: true,
+    });
+    var out = [];
+    PARTS.forEach(function (p) {
+      if (
+        p.steps.some(function (k) {
+          return has[k];
+        })
+      )
+        return;
+      var at = (d.sentences || []).findIndex(function (x) {
+        return !x.kept && !!x.step && p.steps.indexOf(x.step) >= 0;
+      });
+      if (at < 0) return;
+      var x = d.sentences[at];
+      if (_isRequired(x.step, path)) return;
+      var s = x.classLine ? null : _bankById(x.id);
+      if (!x.classLine && !s) return;
+      out.push({ step: x.step, part: p.id, label: p.label, id: x.id, s: s, classLine: !!x.classLine, text: x.text });
+    });
+    return out;
+  }
+  /* A row for a choice, filled for the student. */
+  function _choiceRow(c, ctx) {
+    if (c.classLine) return _classRow(c.step, c.text);
+    return rowFromSentence(c.s, ctx, c.step);
+  }
+  function _insertOpts(cid, st) {
+    var termId = getTermId();
+    var key = _rowKey(st);
+    return {
+      seed: _lastSeed[key] || CommentBank.seedFor(st.id + '|' + termId),
+      comments: _classmateComments(cid, st.id, termId),
+      exclude: lastTermIds(cid, st.id, termId),
+    };
+  }
+
+  /* A choice put in at a gap: the row there with a brief tint, the
+     sentence at the same place in the comment (the realiser moves the name
+     to the first sentence), the count, the checks and Approve following
+     (_writeRows), and the Options or Other Wording of the new row focused. */
+  function _insertAt(st, g, step, id) {
+    var f = _facts(st);
+    var ctx = _bankContext(_activeCourse, st, f);
+    var key = _rowKey(st);
+    var rows = _rows[key] || _rowsFor(st, f);
+    var c = insertChoices(rows, ctx, _insertOpts(_activeCourse, st)).find(function (x) {
+      return x.id === id && (!step || x.step === step);
+    });
+    if (!c) {
+      _addAt = null;
+      _syncRequired();
+      _focusGap(g);
+      return;
+    }
+    var row = _choiceRow(c, ctx);
+    _rows[key] = insertRow(rows, row, g);
+    _markAdded(st, row);
+    _addAt = null;
+    _wording = null;
+    _writeRows(st);
+    _focusAny([
+      '#tq-sentences [data-row="' + Math.min(g, _rows[key].length - 1) + '"] .qn-line-menu',
+      '#tq-browse-btn',
+    ]);
+  }
+  /* A sentence of the teacher's own, typed at a gap (Write Your Own…):
+     a Your Sentence row there. Its Options menu offers Add to My Bank. */
+  function _insertTyped(st, g, text) {
+    var t = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!t) return false;
+    if (!/[.!?…]["”]?$/.test(t)) t += '.';
+    var key = _rowKey(st);
+    var rows = _rows[key] || _rowsFor(st, _facts(st));
+    var row = typedRow(t);
+    _rows[key] = insertRow(rows, row, g);
+    _markAdded(st, row);
+    _addAt = null;
+    _wording = null;
+    _writeRows(st);
+    _focusSel('#tq-sentences [data-row="' + Math.min(g, _rows[key].length - 1) + '"] [data-do="options"]');
+    return true;
+  }
+
+  /* The + menu at a gap. */
+  var _addAt = null; // the gap (rows before it) whose menu is open
+  function _addMenuHtml(cid, student, f, ctx, rows, g) {
+    var first = _first(student);
+    var items = insertChoices(rows, ctx, _insertOpts(cid, student))
+      .map(function (c) {
+        var row = _choiceRow(c, ctx);
+        return `<button type="button" role="menuitem" class="qn-menu-item qn-add-item" data-action="tqSentences" data-do="insert" data-gap="${g}" data-step="${esc(c.step)}" data-sentence="${esc(c.id)}" title="Puts this sentence in the comment here."><span class="qn-add-part">${esc(c.label)}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(row.text)}</span><span class="qn-menu-meta">${esc(rowSource(row, cid, student, f, ctx))}</span></span></button>`;
+      })
+      .join('');
+    var none = items
+      ? ''
+      : `<span class="qn-menu-meta qn-add-none">Every part with a sentence that fits ${esc(first)} is in the comment.</span>`;
+    return `<div class="qn-menu qn-add-menu" role="menu" aria-label="Add a sentence here" id="tq-add-menu">
+      <span class="qn-menu-head">Add Here</span>
+      ${items}${none}
+      <div class="qn-menu-sep" role="separator"></div>
+      <button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="ownOpen" data-where="gap" data-gap="${g}" title="Opens a line here for a sentence of your own. It goes into the comment at this place.">Write Your Own…</button>
+      <button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="browseAt" data-gap="${g}" title="Opens the full sentence bank. The sentence you pick goes here.">Browse Sentences…</button>
+    </div>`;
+  }
+  /* The gap after a row: a thin line and a + on hover or focus, nothing
+     in the flow (the rows do not move); the + opens the Add Here menu. */
+  function _gapHtml(cid, student, f, ctx, rows, g) {
+    var open = _addAt === g;
+    return `<div class="qn-gap${open ? ' open' : ''}" data-gap="${g}">
+      <span class="qn-gap-line" aria-hidden="true"></span>
+      <button type="button" class="qn-gap-add" data-action="tqSentences" data-do="addMenu" data-gap="${g}" aria-label="Add a sentence here" aria-haspopup="menu" aria-expanded="${open}">+</button>
+      <span class="qn-gap-tip" role="tooltip">Add a sentence here</span>
+      ${open ? _addMenuHtml(cid, student, f, ctx, rows, g) : ''}
+    </div>`;
+  }
+  /* The box for a sentence of the teacher's own at a gap, drawn as the
+     row it will be. */
+  function _gapOwnHtml(student) {
+    return `<div class="qn-req-row qn-srow qn-own-row">
+      ${SPACER}<div class="qn-req-part"><span class="qn-req-label">Your Sentence</span></div>
+      <div class="qn-req-body">${_ownBoxHtml(student)}</div>
     </div>`;
   }
 
@@ -3323,9 +3566,16 @@ window.ReportQuestionnaire = (function () {
             });
       items.splice(pos < 0 ? items.length : pos, 0, { unit: [{ step: step, placeholder: true }], i: -1 });
     });
+    // After each row of the comment, the gap where a sentence can be put in
+    // (the InsertRows mockup): its index is how many rows come before it.
     return items
       .map(function (it) {
-        return _rowHtml(cid, student, f, ctx, rows, it.unit, it.i, path);
+        var html = _rowHtml(cid, student, f, ctx, rows, it.unit, it.i, path);
+        if (it.i < 0) return html;
+        var g = rows.indexOf(it.unit[it.unit.length - 1]) + 1;
+        html += _gapHtml(cid, student, f, ctx, rows, g);
+        if (_own && _own.where === 'gap' && _own.gap === g) html += _gapOwnHtml(student);
+        return html;
       })
       .join('');
   }
@@ -4112,16 +4362,28 @@ window.ReportQuestionnaire = (function () {
     return !!_browse && !!document.getElementById(BROWSE_ID);
   }
 
-  /* The sheet, over the page, on a part. */
-  function _openBrowse(part) {
+  /* The sheet, over the page, on a part. From a gap's + menu (gap: the
+     rows before it), Use puts the sentence in at that gap instead of in
+     the row of its step; each pick goes after the one before. */
+  function _openBrowse(part, gap) {
     var st = _current();
     if (!st) return;
     tqSaveCurrentIfNeeded();
     _closeBrowse(true);
     _wording = null;
+    _addAt = null;
     // open: the groups opened by hand per part and case; openQ: the same
     // while a search is typed; init: the parts whose own cases were opened.
-    _browse = { part: part || 'grade', fits: true, q: '', menu: false, open: {}, openQ: {}, init: {} };
+    _browse = {
+      part: part || 'grade',
+      fits: true,
+      q: '',
+      menu: false,
+      open: {},
+      openQ: {},
+      init: {},
+      gap: gap == null ? null : Number(gap),
+    };
     var overlay = document.createElement('div');
     overlay.id = BROWSE_ID;
     overlay.className = 'confirm-overlay qn-info-overlay qn-browse-overlay';
@@ -4159,10 +4421,16 @@ window.ReportQuestionnaire = (function () {
   }
   function _closeBrowse(quiet) {
     var o = document.getElementById(BROWSE_ID);
+    var gap = _browse ? _browse.gap : null;
     _browse = null;
     if (!o) return;
     o.remove();
-    if (!quiet) _focusSel('#tq-browse-btn');
+    if (quiet) return;
+    if (gap != null) _focusGap(gap);
+    else _focusSel('#tq-browse-btn');
+  }
+  function _focusGap(g) {
+    _focusSel('#tq-sentences .qn-gap[data-gap="' + g + '"] .qn-gap-add');
   }
   /* The sheet redrawn for a new part, filter or comment. */
   function _syncBrowse(focusId) {
@@ -4210,7 +4478,12 @@ window.ReportQuestionnaire = (function () {
     var ctx = _bankContext(_activeCourse, st, f);
     if (!s || !CommentBank.fits(s, ctx)) return;
     var key = _rowKey(st);
-    _rows[key] = useSentence(_rowsFor(st, f), s, ctx);
+    if (_browse && _browse.gap != null) {
+      var row = rowFromSentence(s, ctx, CommentBank.stepOf(s));
+      _rows[key] = insertRow(_rowsFor(st, f), row, _browse.gap);
+      _markAdded(st, row);
+      _browse.gap++;
+    } else _rows[key] = useSentence(_rowsFor(st, f), s, ctx);
     _writeRows(st);
     _syncBrowse();
     _focusSel('#tq-browse-list .qn-browse-row.on');
@@ -4225,15 +4498,62 @@ window.ReportQuestionnaire = (function () {
     var key = _rowKey(st);
     var i = Number(ds.row);
     switch (what) {
-      case 'wording': {
+      case 'wording':
+      case 'options': {
         var open = !!_wording && _wording.index === i;
         _wording = open ? null : { index: i };
+        _addAt = null;
         _supportMenu = false;
         _langMenu = false;
         _limitOpen = false;
         _syncRequired();
-        if (!open) _focusSel('#tq-wording-menu .qn-menu-item.on');
-        else _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="wording"]');
+        if (!open)
+          _focusSel(what === 'options' ? '#tq-options-menu .qn-menu-item' : '#tq-wording-menu .qn-menu-item.on');
+        else _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="' + what + '"]');
+        return;
+      }
+      case 'remove': {
+        tqSaveCurrentIfNeeded();
+        var gone = (_rows[key] || [])[i];
+        if (!gone) return;
+        _rows[key] = (_rows[key] || []).filter(function (r) {
+          return r !== gone;
+        });
+        _wording = null;
+        _writeRows(st);
+        _focusAny([
+          '#tq-sentences [data-row="' + Math.min(i, _rows[key].length - 1) + '"] .qn-srow-handle[tabindex]',
+          '#tq-browse-btn',
+        ]);
+        return;
+      }
+      case 'addMenu': {
+        var g = Number(ds.gap);
+        var was = _addAt === g;
+        _addAt = was ? null : g;
+        _wording = null;
+        _supportMenu = false;
+        _langMenu = false;
+        _limitOpen = false;
+        _syncRequired();
+        if (!was) _focusSel('#tq-add-menu [role="menuitem"]');
+        else _focusGap(g);
+        return;
+      }
+      case 'insert': {
+        tqSaveCurrentIfNeeded();
+        _insertAt(st, Number(ds.gap), ds.step, ds.sentence);
+        return;
+      }
+      case 'browseAt': {
+        var at = Number(ds.gap);
+        var rowsNow = _rows[key] || [];
+        var missing = insertChoices(
+          rowsNow,
+          _bankContext(_activeCourse, st, _facts(st)),
+          _insertOpts(_activeCourse, st),
+        );
+        _openBrowse(missing.length ? missing[0].part : 'grade', at);
         return;
       }
       case 'pick':
@@ -4310,7 +4630,12 @@ window.ReportQuestionnaire = (function () {
         _moveRow(i, 1);
         return;
       case 'ownOpen':
-        _ownOpen(ds.where, ds.mode || 'write', { index: i, part: ds.part || '', caseId: ds.case || '' });
+        _ownOpen(ds.where, ds.mode || 'write', {
+          index: i,
+          part: ds.part || '',
+          caseId: ds.case || '',
+          gap: ds.gap,
+        });
         return;
       case 'ownAdd': {
         var own = (_rows[key] || [])[i];
@@ -4529,6 +4854,14 @@ window.ReportQuestionnaire = (function () {
   function _ownBoxHtml(st) {
     var o = _own;
     var first = _first(st);
+    if (o.where === 'gap') {
+      // At a gap: the sentence goes into the comment there, not the bank.
+      return `<div class="qn-own qn-own-gap" id="tq-own" role="group" aria-label="A sentence of your own">
+      <input type="text" class="qn-line-input" id="tq-own-input" value="${esc(o.text)}" autocomplete="off" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}. It goes into the comment here.">
+      <span class="qn-own-hint">One sentence for this student. Its row’s Options menu can add it to your bank.</span>
+      <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqSentences" data-do="ownCancel" title="Closes without adding anything.">Cancel</button><button type="button" class="qn-line-save" id="tq-own-save" data-action="tqSentences" data-do="ownSave"${o.text.trim() ? '' : ' disabled'} title="Puts this sentence in the comment here.">Add Here</button></div>
+    </div>`;
+    }
     var c = _ownCompose(st);
     var picker = '';
     if (!_ownBound(st)) {
@@ -4559,6 +4892,10 @@ window.ReportQuestionnaire = (function () {
   function _ownSync(st) {
     var out = document.getElementById('tq-own-out');
     var save = document.getElementById('tq-own-save');
+    if (_own && _own.where === 'gap') {
+      if (save) save.disabled = !_own.text.trim();
+      return;
+    }
     if (!out || !_own) return;
     var c = _ownCompose(st);
     out.innerHTML = _ownOutHtml(c);
@@ -4590,13 +4927,20 @@ window.ReportQuestionnaire = (function () {
      Wording; add: the row's own text), opts { index, text, part }. */
   function _ownOpen(where, mode, opts) {
     var st = _current();
-    if (!st || !window.PersonalBank) return;
     opts = opts || {};
+    if (!st || (where !== 'gap' && !window.PersonalBank)) return;
     tqSaveCurrentIfNeeded();
     _wording = null;
+    _addAt = null;
     _supportMenu = false;
     _limitOpen = false;
     if (_browse) _browse.menu = false;
+    if (where === 'gap') {
+      _own = { where: 'gap', mode: 'write', gap: Number(opts.gap) || 0, text: '', part: '', caseId: '', caseKey: '' };
+      _syncRequired();
+      _ownFocus();
+      return;
+    }
     var part = opts.part || '';
     var index = Number(opts.index);
     if (where === 'row' && !part) {
@@ -4625,6 +4969,11 @@ window.ReportQuestionnaire = (function () {
     var was = _own;
     _own = null;
     if (!was) return;
+    if (was.where === 'gap') {
+      _syncRequired();
+      _focusGap(was.gap);
+      return;
+    }
     if (was.where === 'row') {
       _syncRequired();
       _focusSel(
@@ -4647,6 +4996,13 @@ window.ReportQuestionnaire = (function () {
   function _ownSave() {
     var st = _current();
     if (!st || !_own) return;
+    if (_own.where === 'gap') {
+      var atGap = _own;
+      if (!atGap.text.trim()) return;
+      _own = null;
+      _insertTyped(st, atGap.gap, atGap.text);
+      return;
+    }
     var c = _ownCompose(st);
     if (!c || !c.template || c.blocked) return;
     var entry = PersonalBank.keep(c.template);
@@ -5310,6 +5666,13 @@ window.ReportQuestionnaire = (function () {
     var el = sel && document.querySelector(sel);
     if (el) el.focus();
   }
+  /* The first of some selectors that finds anything, in their order. */
+  function _focusAny(sels) {
+    var sel = sels.find(function (x) {
+      return !!document.querySelector(x);
+    });
+    if (sel) _focusSel(sel);
+  }
   function _focusMenu() {
     _focusSel('#tq-support-menu .qn-menu-item.on, #tq-support-menu .qn-menu-item, #tq-support-menu input');
   }
@@ -5317,7 +5680,14 @@ window.ReportQuestionnaire = (function () {
   /* Whether a popover or a line's box is open. */
   function linesOpen() {
     return (
-      _supportMenu || _langMenu || _limitOpen || !!_lineEdit || !!_wording || !!_own || !!(_browse && _browse.menu)
+      _supportMenu ||
+      _langMenu ||
+      _limitOpen ||
+      !!_lineEdit ||
+      !!_wording ||
+      _addAt != null ||
+      !!_own ||
+      !!(_browse && _browse.menu)
     );
   }
   /* A click outside an open menu or the limit closes it; a box being
@@ -5341,8 +5711,12 @@ window.ReportQuestionnaire = (function () {
       _limitOpen = false;
       redraw = true;
     }
-    if (_wording && !target.closest('#tq-wording-menu, [data-do="wording"]')) {
+    if (_wording && !target.closest('#tq-wording-menu, #tq-options-menu, [data-do="wording"], [data-do="options"]')) {
       _wording = null;
+      _syncRequired();
+    }
+    if (_addAt != null && !target.closest('#tq-add-menu, [data-do="addMenu"]')) {
+      _addAt = null;
       _syncRequired();
     }
     if (_browse && _browse.menu && !target.closest('#tq-fits-menu, #tq-browse-fits')) {
@@ -5363,11 +5737,24 @@ window.ReportQuestionnaire = (function () {
       _syncBrowse('tq-browse-fits');
       return true;
     }
+    if (_addAt != null) {
+      var gap = _addAt;
+      _addAt = null;
+      _syncRequired();
+      _focusGap(gap);
+      return true;
+    }
     if (_wording) {
       var at = _wording.index;
       _wording = null;
       _syncRequired();
-      _focusSel('#tq-sentences [data-row="' + at + '"] [data-do="wording"]');
+      _focusSel(
+        '#tq-sentences [data-row="' +
+          at +
+          '"] [data-do="wording"], #tq-sentences [data-row="' +
+          at +
+          '"] [data-do="options"]',
+      );
       return true;
     }
     var limit = _limitOpen;
@@ -5583,6 +5970,11 @@ window.ReportQuestionnaire = (function () {
     rowsFromDraft: rowsFromDraft,
     rowFromSentence: rowFromSentence,
     alignRows: alignRows,
+    isTyped: isTyped,
+    typedRow: typedRow,
+    keepTyped: keepTyped,
+    insertRow: insertRow,
+    insertChoices: insertChoices,
     recoverRows: recoverRows,
     composeRows: composeRows,
     units: _units,
