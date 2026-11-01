@@ -28,6 +28,9 @@ test('rubric competency cells are read-only, open the grader and mark disagreein
   await seedCourse(page);
   await seedStudents(page);
   await seedAssessments(page, [ASSESS]);
+  // This test is about competency columns: Rubrics by Competency (the
+  // default is Rubrics by Criterion).
+  await page.addInitScript(cid => localStorage.setItem('gb_rubricColumns_' + cid, 'competencies'), TEST_COURSE.id);
   await page.addInitScript(({ cid, rubric }) => localStorage.setItem('gb-rubrics-' + cid, JSON.stringify([rubric])), {
     cid: TEST_COURSE.id,
     rubric: RUBRIC,

@@ -74,9 +74,9 @@ describe('rubricCriterionColumns', () => {
 describe('the Competencies view uses them', () => {
   const src = readFileSync(resolve(root, 'teacher/page-gradebook.js'), 'utf-8');
 
-  it('remembers the choice per class and defaults to competencies', () => {
+  it('remembers the choice per class and defaults to criteria', () => {
     expect(src).toContain(
-      "localStorage.getItem('gb_rubricColumns_' + cid) === 'criteria' ? 'criteria' : 'competencies'",
+      "localStorage.getItem('gb_rubricColumns_' + cid) === 'competencies' ? 'competencies' : 'criteria'",
     );
   });
 

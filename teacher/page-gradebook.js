@@ -13,10 +13,11 @@ window.PageGradebook = (function () {
   var activeCourse;
   var viewMode = 'scores';
   /* The Competencies view shows a rubric assessment as one column per
-     competency ('competencies', the default) or one per criterion
-     ('criteria'). Remembered per class on this device. */
+     criterion ('criteria', the default: no score repeated across columns)
+     or one per competency ('competencies'). Remembered per class on this
+     device. */
   function rubricColumnsMode(cid) {
-    return localStorage.getItem('gb_rubricColumns_' + cid) === 'criteria' ? 'criteria' : 'competencies';
+    return localStorage.getItem('gb_rubricColumns_' + cid) === 'competencies' ? 'competencies' : 'criteria';
   }
   function setRubricColumns(mode) {
     localStorage.setItem('gb_rubricColumns_' + activeCourse, mode === 'criteria' ? 'criteria' : 'competencies');
