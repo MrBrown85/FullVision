@@ -73,7 +73,7 @@ test('the tab counts follow the reporting term', async ({ page }) => {
   test.skip(!terms.length, 'Demo class has no reporting terms');
   await select.selectOption(terms[0]);
   await expect(stat).not.toHaveText(allTime);
-  await expect(page.locator('#stu-tab-assess .stu-tab-sub')).not.toContainText('All time');
+  await expect(page.locator('#stu-tab-assess .stu-tab-sub')).not.toContainText('All Time');
 });
 
 test('a Letter class shows percents, not proficiency words', async ({ page }) => {

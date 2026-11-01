@@ -403,7 +403,7 @@ function renderTermPicker(cid) {
     '" aria-label="Reporting term" title="Reporting term: grades count only the assessments dated inside it">' +
     '<option value="all"' +
     (chosen == null ? ' selected' : '') +
-    '>All time</option>';
+    '>All Time</option>';
   terms.forEach(function (t) {
     var now = today && today >= t.starts_on && today <= t.ends_on ? ' (now)' : '';
     html +=

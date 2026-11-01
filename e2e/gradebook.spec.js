@@ -121,14 +121,14 @@ test.describe('Gradebook — Spreadsheet View', () => {
     // A scored cell can't be Missing or Excused.
     const scored = page.locator('.gb-scores-cell[data-sid="stu-002"][data-aid="assess-001"]');
     await scored.click({ button: 'right' });
-    await expect(page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Mark missing' })).toHaveClass(/is-disabled/);
+    await expect(page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Mark Missing' })).toHaveClass(/is-disabled/);
     await expect(page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Excuse' })).toHaveClass(/is-disabled/);
     // A disabled menu item (aria-disabled) does nothing when clicked.
-    await page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Mark missing' }).click({ force: true });
+    await page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Mark Missing' }).click({ force: true });
     expect((await statuses())['stu-002:assess-001']).toBeUndefined();
     await page.keyboard.press('Escape');
 
-    await pick('Mark missing');
+    await pick('Mark Missing');
     expect((await statuses())['stu-001:assess-001']).toBe('NS');
     await expect(cell).toHaveText('M');
 
@@ -136,7 +136,7 @@ test.describe('Gradebook — Spreadsheet View', () => {
     expect((await statuses())['stu-001:assess-001']).toBe('EXC');
     await expect(cell).toContainText('EXC');
 
-    await pick('Undo excuse');
+    await pick('Undo Excuse');
     expect((await statuses())['stu-001:assess-001']).toBeUndefined();
     await expect(cell).not.toContainText('EXC');
     // The other student's cell is untouched.
