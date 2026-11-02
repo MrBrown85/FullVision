@@ -466,6 +466,73 @@ describe('Tag and General Rubrics', () => {
     _competencyDescriptors = null;
   });
 
+  describe('a competency from the curriculum bank', () => {
+    const BANK = {
+      ids: { 'bc.sci9.cc.1': 0 },
+      levels: [
+        [
+          'The student is beginning to ask questions about the natural world.',
+          'The student asks questions about the natural world with growing consistency.',
+          'The student consistently asks questions about the natural world.',
+          'The student asks questions about the natural world with depth and complexity.',
+        ],
+      ],
+    };
+    beforeEach(() => {
+      getTagById(CID, TAG_1).bank_id = 'bc.sci9.cc.1';
+    });
+    afterEach(() => {
+      delete window.BANK_PROFICIENCY;
+      delete getTagById(CID, TAG_1).bank_id;
+      _competencyDescriptors = null;
+    });
+
+    it('prints the bank’s four descriptors once they have loaded', () => {
+      window.BANK_PROFICIENCY = BANK;
+      const r = RubricPrint.defaultRubric(CID, getAssessments(CID)[0]);
+      expect(r.criteria[0].levels).toEqual({
+        1: BANK.levels[0][0],
+        2: BANK.levels[0][1],
+        3: BANK.levels[0][2],
+        4: BANK.levels[0][3],
+      });
+      // A competency with no bank id keeps the general wording.
+      expect(r.criteria[1].levels[3]).toBe(RubricPrint.GENERAL_LEVELS[3]);
+    });
+
+    it('prints the general wording until the bank’s wording has loaded', () => {
+      const r = RubricPrint.defaultRubric(CID, getAssessments(CID)[0]);
+      expect(r.criteria[0].levels[3]).toBe(RubricPrint.GENERAL_LEVELS[3]);
+      expect(RubricPrint.classUsesBankLevels(CID)).toBe(true);
+      window.BANK_PROFICIENCY = BANK;
+      expect(RubricPrint.classUsesBankLevels(CID)).toBe(false);
+    });
+
+    it('lets the teacher’s own wording win, level by level', () => {
+      window.BANK_PROFICIENCY = BANK;
+      const tag = getTagById(CID, TAG_1);
+      localStorage.setItem(
+        'gb-competency-descriptors',
+        JSON.stringify({ [RubricDraft.competencyKey(tag)]: { 3: 'Asks a testable question.' } }),
+      );
+      _competencyDescriptors = null;
+      const r = RubricPrint.defaultRubric(CID, getAssessments(CID)[0]);
+      expect(r.criteria[0].levels[3]).toBe('Asks a testable question.');
+      expect(r.criteria[0].levels[4]).toBe(BANK.levels[0][3]);
+    });
+
+    it('prints the bank’s wording on the student’s sheet', () => {
+      window.BANK_PROFICIENCY = BANK;
+      const html = RubricPrint.renderSheet(RubricPrint.sheetData(CID, AID_TAGS, SID), RubricPrint.DEFAULT_OPTIONS);
+      expect(html).toContain('consistently asks questions about the natural world');
+    });
+
+    it('needs no load when the wording is already there', async () => {
+      window.BANK_PROFICIENCY = BANK;
+      await expect(RubricPrint.loadBankLevels()).resolves.toBe(true);
+    });
+  });
+
   it('builds a General Rubric with one Overall row when there are no competencies, and none for points work', () => {
     const r = RubricPrint.defaultRubric(CID, getAssessments(CID)[1]);
     expect(r.name).toBe('General Rubric');
