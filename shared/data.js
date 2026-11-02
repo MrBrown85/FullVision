@@ -458,7 +458,9 @@ function _exitDegradedMode(bootstrapData) {
     var teacher = bootstrapData.teacher || {};
     var prefs = teacher.preferences || {};
     _teacherId = teacher.id || _teacherId;
-    _cache.courses = _canonicalCoursesToBlob(bootstrapData.courseRows || []);
+    var prevCourses = _coursesBeforeBoot();
+    _cache.courses = _canonicalCoursesToBlob(bootstrapData.courseRows || [], prevCourses);
+    _sendUpCurriculumTags(bootstrapData.courseRows, prevCourses);
     _cache.config = {
       activeCourse: prefs.active_course_id || null,
       viewMode: prefs.view_mode || null,
@@ -1144,7 +1146,8 @@ async function initAllCourses() {
   //     returns existing rows on subsequent sign-ins.
   //   list_teacher_courses() → [{ id, name, grade_level, description, color,
   //     is_archived, display_order, grading_system, calc_method, decay_weight,
-  //     timezone, late_work_policy, created_at, updated_at }, ...]
+  //     timezone, late_work_policy, created_at, updated_at, block,
+  //     curriculum_tags }, ...]
   // On any failure fall back to localStorage so the app still loads offline.
   if (_useSupabase) {
     const sb = getSupabase();
@@ -1154,7 +1157,9 @@ async function initAllCourses() {
       const prefs = teacher.preferences || {};
       _teacherId = teacher.id || _teacherId;
 
-      _cache.courses = _canonicalCoursesToBlob(data.courseRows || []);
+      const prevCourses = _coursesBeforeBoot();
+      _cache.courses = _canonicalCoursesToBlob(data.courseRows || [], prevCourses);
+      _sendUpCurriculumTags(data.courseRows, prevCourses);
       _cache.config = {
         activeCourse: prefs.active_course_id || null,
         viewMode: prefs.view_mode || null,
@@ -4102,6 +4107,7 @@ function _bundleToCache(cid, bundle) {
     );
   }
   _applyBundleCourseConfig(cid, bundle.course_config, bundle.gradebook && bundle.gradebook.course);
+  _applyBundleCurriculumTags(cid, bundle.gradebook && bundle.gradebook.course);
 
   // A field skipped because the teacher edited it mid-load is fetched again;
   // until then the cache isn't the server's version, so don't claim it is.
@@ -4419,6 +4425,15 @@ var _COURSE_CONFIG_COLUMNS = {
   categoryWeights: 'category_weights',
   reportingTerms: 'reporting_terms',
 };
+/* The class's BC Curriculum Link from the bundle's course row. Null there
+   means never saved on the server: this device's link stays, and the next
+   boot sends it up (_sendUpCurriculumTags). */
+function _applyBundleCurriculumTags(cid, courseRow) {
+  if (!courseRow || !Array.isArray(courseRow.curriculum_tags) || !COURSES[cid]) return;
+  COURSES[cid].curriculumTags = courseRow.curriculum_tags.slice();
+  _safeLSSet('gb-courses', JSON.stringify(COURSES));
+}
+
 function _applyBundleCourseConfig(cid, row, courseRow) {
   if (!row || typeof row !== 'object') return;
   var config = Object.assign({}, getCourseConfig(cid) || {});
@@ -4719,11 +4734,16 @@ function _loadPersistedCourseFieldSnapshot(field, cid, fallbackValue) {
                            displayOrder, gradingSystem, calcMethod, decayWeight,
                            timezone, lateWorkPolicy } }
    Policy fields (gradingSystem/calcMethod/decayWeight/lateWorkPolicy/timezone)
-   are populated here; legacy get_course_policy() is retired in v2. */
-function _canonicalCoursesToBlob(rows) {
+   are populated here; legacy get_course_policy() is retired in v2.
+   curriculumTags (the BC Curriculum Link, e.g. ['HIST12']) is the server's
+   curriculum_tags (migrations/20261102_course_curriculum_tags.sql). Null
+   there means the link was never saved on the server, so a link this device
+   kept from before (`prev`) stays, and _sendUpCurriculumTags saves it. */
+function _canonicalCoursesToBlob(rows, prev) {
   var out = {};
   (rows || []).forEach(function (r) {
     if (!r || !r.id) return;
+    var mine = prev && prev[r.id] && Array.isArray(prev[r.id].curriculumTags) ? prev[r.id].curriculumTags : [];
     out[r.id] = {
       id: r.id,
       name: r.name || 'Untitled Class',
@@ -4738,9 +4758,37 @@ function _canonicalCoursesToBlob(rows) {
       timezone: r.timezone || null,
       lateWorkPolicy: r.late_work_policy || null,
       block: r.block || '',
+      curriculumTags: Array.isArray(r.curriculum_tags) ? r.curriculum_tags.slice() : mine.slice(),
     };
   });
   return out;
+}
+
+/* A link only this device holds (saved before the server stored it) goes
+   up once, so the class shows it on every device. */
+function _sendUpCurriculumTags(rows, prev) {
+  if (!_writesEnabled()) return;
+  (rows || []).forEach(function (r) {
+    if (!r || !_isUuid(r.id) || Array.isArray(r.curriculum_tags)) return;
+    var mine = prev && prev[r.id] && prev[r.id].curriculumTags;
+    if (!Array.isArray(mine) || !mine.length) return;
+    _trackPendingSync(
+      _writeRpc('update_course', { p_course_id: r.id, p_patch: { curriculum_tags: mine.slice() } }).then(
+        function (res) {
+          if (res.error) console.warn('update_course (curriculum link upload) failed:', res.error);
+        },
+      ),
+    );
+  });
+}
+
+function _coursesBeforeBoot() {
+  if (_cache.courses && Object.keys(_cache.courses).length) return _cache.courses;
+  try {
+    return JSON.parse(localStorage.getItem('gb-courses') || '{}') || {};
+  } catch (e) {
+    return {};
+  }
 }
 
 /* ── Phase 4 converters: medium-frequency tables ── */
@@ -6085,6 +6133,8 @@ function updateCourse(id, updates) {
       if (updates.timezone !== undefined) patch.timezone = updates.timezone;
       if (updates.lateWorkPolicy !== undefined) patch.late_work_policy = updates.lateWorkPolicy;
       if (updates.block !== undefined) patch.block = updates.block || null;
+      if (updates.curriculumTags !== undefined)
+        patch.curriculum_tags = Array.isArray(updates.curriculumTags) ? updates.curriculumTags.slice() : null;
       if (Object.keys(patch).length > 0 && _isUuid(id)) {
         _trackPendingSync(
           _writeRpc('update_course', { p_course_id: id, p_patch: patch }).then(function (res) {
