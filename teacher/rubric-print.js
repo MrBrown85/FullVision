@@ -19,9 +19,12 @@
 
    An assessment with no rubric of its own prints one too: a Tag Rubric, a
    row per competency it is scored on, or a General Rubric, one Overall row
-   when it has none. Their level cells read the teacher's own wording for a
-   competency (the descriptor bank) or else the BC proficiency scale's
-   general descriptors (GENERAL_LEVELS), never empty boxes.
+   when it has none. Their level cells read, level by level, the teacher's
+   own wording for a competency (the descriptor bank), else the curriculum
+   bank's descriptors for a competency imported from it (tag.bank_id,
+   shared/bank-proficiency.js, loaded on the first such print), else the BC
+   proficiency scale's general descriptors (GENERAL_LEVELS): never empty
+   boxes.
 
    Grade math stays in shared/calc.js (getAssessmentOverallScore,
    formatLevel, levelWord). Pure helpers are exposed for tests; the DOM is
@@ -149,6 +152,62 @@
     return getCompetencyDescriptor(RubricDraft.competencyKey(tag));
   }
 
+  /* The curriculum bank's four descriptors for a competency imported from it
+     (tag.bank_id), keyed 1 (Emerging) to 4 (Extending), from
+     shared/bank-proficiency.js. Null until that file has loaded, and for
+     competencies with no bank id. */
+  function _bankLevels(tag) {
+    var bank = window.BANK_PROFICIENCY;
+    var id = tag && tag.bank_id;
+    if (!bank || !id || bank.ids[id] == null) return null;
+    var set = bank.levels[bank.ids[id]];
+    return set ? { 1: set[0], 2: set[1], 3: set[2], 4: set[3] } : null;
+  }
+
+  /* Load shared/bank-proficiency.js (about 80 KB compressed) the first time a
+     rubric with bank competencies is printed, not on every page. Resolves
+     true when it is there; on a failed load the rubric prints the general
+     wording instead. */
+  var _bankLoading = null;
+  function loadBankLevels() {
+    if (window.BANK_PROFICIENCY) return Promise.resolve(true);
+    if (_bankLoading) return _bankLoading;
+    _bankLoading = new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = '/shared/bank-proficiency.js';
+      s.onload = function () {
+        resolve(!!window.BANK_PROFICIENCY);
+      };
+      s.onerror = function () {
+        _bankLoading = null;
+        resolve(false);
+      };
+      document.head.appendChild(s);
+    });
+    return _bankLoading;
+  }
+
+  // Whether a class has competencies from the bank and their wording hasn't
+  // loaded yet (Reports' Feedback Pages print its Tag Rubrics too).
+  function classUsesBankLevels(cid) {
+    if (window.BANK_PROFICIENCY || typeof getLearningMap !== 'function') return false;
+    var map = getLearningMap(cid) || {};
+    return (map.sections || []).some(function (sec) {
+      return (sec.tags || []).some(function (t) {
+        return !!(t && t.bank_id);
+      });
+    });
+  }
+
+  // Whether an assessment's Tag Rubric would use the bank's wording.
+  function _needsBankLevels(cid, assessment) {
+    if (window.BANK_PROFICIENCY || !assessment || assessment.rubricId || isPointsScored(assessment)) return false;
+    return scoreTagIds(assessment, cid).some(function (tid) {
+      var tag = getTagById(cid, tid);
+      return !!(tag && tag.bank_id);
+    });
+  }
+
   /* The rubric a proficiency assessment without one prints: a Tag Rubric
      (a row per competency it is scored on) or a General Rubric (one Overall
      row). Null for points and Complete/Incomplete work. */
@@ -167,10 +226,13 @@
       .map(function (tid) {
         var tag = getTagById(cid, tid);
         if (!tag) return null;
+        // The teacher's own wording, else the bank's for this competency,
+        // else the BC scale's general wording, level by level.
         var own = _ownLevels(tag) || {};
+        var bank = _bankLevels(tag) || {};
         var levels = {};
         LEVELS.forEach(function (lv) {
-          levels[lv] = (own[lv] && String(own[lv]).trim()) || GENERAL_LEVELS[lv];
+          levels[lv] = (own[lv] && String(own[lv]).trim()) || bank[lv] || GENERAL_LEVELS[lv];
         });
         return { id: tid, name: tag.label || tag.name || tag.code || '', tagIds: [tid], levels: levels };
       })
@@ -1502,6 +1564,19 @@
      does or `mode` is 'blank'. `blankOnly` offers nothing else (another
      class's rubric). */
   function open(cid, aid, openOpts) {
+    // A Tag Rubric with bank competencies waits for the bank's wording (a
+    // moment on the first print only); everything else opens at once.
+    var assessment = aid ? _assessment(cid, aid) : null;
+    if (_needsBankLevels(cid, assessment)) {
+      loadBankLevels().then(function () {
+        _openNow(cid, aid, openOpts);
+      });
+      return;
+    }
+    _openNow(cid, aid, openOpts);
+  }
+
+  function _openNow(cid, aid, openOpts) {
     openOpts = openOpts || {};
     close();
     var assessment = aid ? _assessment(cid, aid) : null;
@@ -1680,6 +1755,8 @@
     DEFAULT_OPTIONS: DEFAULT_OPTIONS,
     criterionLevel: criterionLevel,
     defaultRubric: defaultRubric,
+    loadBankLevels: loadBankLevels,
+    classUsesBankLevels: classUsesBankLevels,
     GENERAL_LEVELS: GENERAL_LEVELS,
     sheetData: sheetData,
     feedbackItems: feedbackItems,

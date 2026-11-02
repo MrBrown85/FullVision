@@ -1,6 +1,6 @@
 {
   "_proficiency": {
-    "description": "Four proficiency descriptors for every competency, in teacher voice, one sentence each, under the grade word cap (12 words at grade 8, 15 at 9–10, 20 at 11–12). Each level echoes its Ministry anchor in data/bc-proficiency-scale.json: 'beginning to', 'with growing consistency', 'consistently', 'with depth and complexity'. Levels change only the qualifier, never the skill. Keyed by competency id. The app doesn't read this file yet.",
+    "description": "Four proficiency descriptors for every competency, in teacher voice, one sentence each, under the grade word cap (12 words at grade 8, 15 at 9–10, 20 at 11–12). Each level echoes its Ministry anchor in data/bc-proficiency-scale.json: 'beginning to', 'with growing consistency', 'consistently', 'with depth and complexity'. Levels change only the qualifier, never the skill. Keyed by competency id. Printed Tag Rubrics read it through shared/bank-proficiency.js, built by scripts/build-curriculum-bank.mjs.",
     "method": "exemplar: written on the cluster's card; reused: same Ministry wording and I Can set as the exemplar, so the exemplar's levels; adapted: the exemplar's skill rewritten for this course's wording and I Can set, then the four levels built from it by template.",
     "approval": "Delegated: Colin Brown asked on Nov 2 2026 for the cards to be treated as approved after one checklist review and one fix round, since he would not see the approval page that night. Not read by Colin card by card.",
     "raw_sha": "as in data/bc-curriculum-ican.json",

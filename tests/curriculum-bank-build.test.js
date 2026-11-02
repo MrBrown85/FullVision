@@ -6,7 +6,7 @@
  */
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { buildBank, buildComment } from '../scripts/build-curriculum-bank.mjs';
+import { buildBank, buildComment, buildProficiency } from '../scripts/build-curriculum-bank.mjs';
 
 describe('the app bank', () => {
   it('is a fresh build of data/bc-curriculum-*.json', () => {
@@ -20,6 +20,22 @@ describe('the app bank', () => {
     const shipped = JSON.parse(js.slice(js.indexOf('{'), js.lastIndexOf(';')));
     expect(shipped).toEqual(buildComment());
     expect(Object.keys(shipped.ids)).toHaveLength(5029);
+  });
+
+  it('ships the level descriptors as a fresh build of data/bc-curriculum-proficiency.json', () => {
+    const js = readFileSync('shared/bank-proficiency.js', 'utf-8');
+    const shipped = JSON.parse(js.slice(js.indexOf('{'), js.lastIndexOf(';')));
+    expect(shipped).toEqual(buildProficiency());
+    expect(Object.keys(shipped.ids)).toHaveLength(5029);
+    // Each set is Emerging, Developing, Proficient, Extending, in that order.
+    const prof = JSON.parse(readFileSync('data/bc-curriculum-proficiency.json', 'utf-8'));
+    const id = 'bc.ss10.cc.1';
+    expect(shipped.levels[shipped.ids[id]]).toEqual([
+      prof[id].levels.emerging,
+      prof[id].levels.developing,
+      prof[id].levels.proficient,
+      prof[id].levels.extending,
+    ]);
   });
 
   it('holds every Ministry course for grades 8–12 and no dropped one', () => {

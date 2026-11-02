@@ -369,6 +369,15 @@ window.PageReports = (function () {
 
     _syncLongFormAuthContext();
 
+    // Feedback Pages print Tag Rubrics in the curriculum bank's wording, which
+    // loads the first time a class with bank competencies needs it; draw now
+    // and again once it is here.
+    if (window.RubricPrint && RubricPrint.classUsesBankLevels && RubricPrint.classUsesBankLevels(cid)) {
+      RubricPrint.loadBankLevels().then(function (ok) {
+        if (ok && activeTab !== 'questionnaire' && activeCourse === cid) renderReports();
+      });
+    }
+
     // Progress Reports › Sent to Phones: this period's report on the
     // students' phones (teacher/phone-reports.js).
     if (phonesView && typeof PhoneReports !== 'undefined') {

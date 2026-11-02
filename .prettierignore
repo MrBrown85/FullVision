@@ -11,3 +11,4 @@ docs/plans/*.html
 
 # Ministry text built by scripts/bc_curriculum.py; written as json.dump output
 data/bc-curriculum-*.json
+shared/bank-proficiency.js
