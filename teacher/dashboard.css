@@ -2259,7 +2259,9 @@ a.dash-ins-name:hover {
 .cm-sidebar-foot {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 4px 16px;
   padding: 8px 14px;
   border-top: 1px solid var(--divider-subtle);
 }
@@ -2277,6 +2279,18 @@ a.dash-ins-name:hover {
 }
 .cm-new-btn:hover {
   color: var(--link);
+}
+.cm-restore-summary {
+  margin: 4px 0 12px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.cm-restore-summary:empty {
+  display: none;
+}
+.cm-restore-note {
+  margin-top: 6px;
+  color: var(--text-3);
 }
 
 .cm-detail {
