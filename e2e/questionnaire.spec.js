@@ -1053,6 +1053,47 @@ test.describe('the Sentences card', () => {
     await expect(gaps.last().locator('.qn-gap-add')).toBeFocused();
   });
 
+  test('Browse Sentences: a sentence that does not fit, used for a classmate, goes in as written and Approve stays on', async ({
+    page,
+  }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    const box = page.locator('#tq-narrative');
+    // A classmate's comment holds a Grade sentence for another case.
+    await page.locator('#tq-browse-btn').click();
+    const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+    await sheet.locator('#tq-browse-fits').click();
+    await sheet.locator('#tq-fits-menu [data-fits="0"]').click();
+    const emerging = sheet.locator('.qn-browse-group[data-case="p:Emerging"]');
+    await emerging.locator('.qn-browse-head').click();
+    const pick = await emerging.locator('.qn-browse-sentence').first().textContent();
+    await page.evaluate(t => {
+      const st = getStudents('sci8').find(s => s.id !== 'st1' && s.pronouns === 'she/her');
+      const text = t.replace(/Cece/g, st.preferredName || st.firstName);
+      upsertTermRating('sci8', st.id, ReportBlocks.getTermId(), { narrative: text });
+    }, pick);
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    const n = await rows(page).count();
+    const before = await box.inputValue();
+    await page.locator('#tq-browse-btn').click();
+    await sheet.locator('#tq-browse-fits').click();
+    await sheet.locator('#tq-fits-menu [data-fits="0"]').click();
+    await emerging.locator('.qn-browse-head').click();
+    // Least used first: the classmate's sentence is now further down.
+    const row = emerging.locator('.qn-browse-row').filter({ hasText: pick });
+    await expect(row.locator('.qn-browse-meta')).toHaveText('Used for 1 classmate');
+    await row.locator('.qn-browse-use').click();
+    await page.keyboard.press('Escape');
+    // Added, never in another row's place: the Grade row is still Cece's.
+    await expect(rows(page)).toHaveCount(n + 1);
+    await expect(rowByLabel(page, 'Grade')).toHaveCount(1);
+    await expect(rowByLabel(page, 'Your Sentence').filter({ hasText: pick })).toHaveCount(1);
+    expect(await box.inputValue()).toContain(pick);
+    expect((await box.inputValue()).length).toBeGreaterThan(before.length);
+    await expect(page.locator('#tq-approve-next')).toBeEnabled();
+  });
+
   test('Browse Sentences: the parts, Fits, least used first, Use and In Use, search; the height is remembered', async ({
     page,
   }) => {
@@ -1110,7 +1151,13 @@ test.describe('the Sentences card', () => {
     const emerging = sheet.locator('.qn-browse-group[data-case="p:Emerging"]');
     await emerging.locator('.qn-browse-head').click();
     await expect(emerging.locator('.qn-browse-sentence').first()).toHaveText(/Emerging/);
-    await expect(emerging.locator('.qn-browse-use').first()).toBeDisabled();
+    // Another case's sentence still has Use (Colin, 2026-11-02: "don't
+    // block users from custom actions"): it goes in as written.
+    await expect(emerging.locator('.qn-browse-use').first()).toBeEnabled();
+    await expect(emerging.locator('.qn-browse-use').first()).toHaveAttribute(
+      'title',
+      'Puts this sentence in Cece’s comment as written, as your own sentence. It may not match Cece’s marks, so check it.',
+    );
     const satisfactory = sheet.locator('.qn-browse-group[data-case="w:C"]');
     await satisfactory.locator('.qn-browse-head').click();
     await expect(satisfactory.locator('.qn-browse-sentence').first()).toHaveText(
@@ -1169,7 +1216,7 @@ test.describe('the Sentences card', () => {
     await use.locator('.qn-browse-use').click();
     await expect(sheet.locator('.qn-browse-row.on .qn-browse-sentence').filter({ hasText: text })).toHaveCount(1);
     await expect(page.locator('#tq-narrative')).toHaveValue(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-    // Every sentence: more rows and more cases, the ones that do not fit with Use off.
+    // Every sentence: more rows and more cases, Use on every one.
     await sheet.locator('#tq-browse-fits').click();
     await expect(sheet.locator('#tq-fits-menu [role="option"]')).toHaveText([
       /Fits Cece\d+$/,
@@ -1179,7 +1226,7 @@ test.describe('the Sentences card', () => {
     await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Every sentence \d+/);
     expect(await rowsList.count()).toBeGreaterThan(fitCount);
     await expect(heads.locator('.qn-browse-head-label', { hasText: /^Social Studies · Evidence$/ })).toHaveCount(1);
-    expect(await sheet.locator('.qn-browse-use[disabled]').count()).toBeGreaterThan(0);
+    await expect(sheet.locator('.qn-browse-use[disabled]')).toHaveCount(0);
     // Search filters across the groups and opens the ones with a match.
     await sheet.locator('#tq-browse-search').fill('At home');
     const matched = sheet.locator('.qn-browse-group');

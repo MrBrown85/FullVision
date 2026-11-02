@@ -375,6 +375,8 @@ Context: a review of the report printer (three passes; its screenshots of real r
 
 15. **The best piece backs up the strength** (Colin, 2026-11-02). Of the pieces tied at the top mark (as the level prints), Generate's best piece is one scored on the strongest competency; then the higher mark, then the most recent, as before. Only the "strongest" gate counts, not a tie at the top, whose named skill rotates across classmates and would move the best piece between sessions.
 
+16. **Never block a teacher's own choice** (Colin, 2026-11-02: "teachers should still be able to manually select sentences that have been used for classmates. don't block users from custom actions like that."). Generate keeps its rules (the facts, least used first, one sentence per skill), but anything the teacher picks or writes goes in. In Browse Sentences, Use is on for every row: a sentence that does not fit the student goes in as the row shows it, as the teacher's own sentence, never checked against the marks. "Used for N classmates" is information only.
+
 ## Printed class grade sheet (2026-10-20)
 
 Context: Colin asked for a class grading spreadsheet that prints like MasterGrade did: student names down the left, assignment titles and dates across the top, a class header, narrow margins, and options when Print Grades opens. The layout follows what MasterGrade, Easy Grade Pro, Gradekeeper, MyEd's Blank Grading Sheet and paper class record books share. `teacher/grades-print.js`.
