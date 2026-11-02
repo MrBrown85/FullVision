@@ -1723,6 +1723,12 @@ test.describe('Printed progress reports', () => {
     await showEveryone(page);
     expect(countPages(await printToPdf(page))).toBe(STUDENTS * 2);
     await expect(page.locator('.report-sheet .report-legend')).toHaveCount(STUDENTS);
+    // The "left blank" note is a screen hint only; the printed back is empty.
+    const note = page.locator('.sheet-blank').first();
+    await expect(note).toBeVisible();
+    await page.emulateMedia({ media: 'print' });
+    await expect(note).toBeHidden();
+    await page.emulateMedia({ media: 'screen' });
   });
 
   test('the letterhead names the class, block, report, term dates and student number; no footer', async ({ page }) => {
