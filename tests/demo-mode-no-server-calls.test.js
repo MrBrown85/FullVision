@@ -123,7 +123,7 @@ describe('Demo Mode sends nothing to Supabase', () => {
 
     const cid = Object.keys(COURSES).find(id => COURSES[id].name === 'Science 9 Demo');
     expect(cid).toBeTruthy();
-    expect(getSections(cid).map(s => s.id)).toEqual(['QAP1']);
+    expect(getSections(cid).map(s => s.tags[0].code)).toEqual(['QAP1']);
     expect(alerts).toEqual([]);
     expect(calls).toEqual([]);
   });
