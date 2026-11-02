@@ -93,6 +93,7 @@ window.GradingSetupCopy = (function () {
       decayWeight: Number(dw),
       recentLimit: getRecentScoreLimit(cid),
       foldersCountAsOne: getFoldersCountAsOne(cid),
+      coursesCountEqually: getCoursesCountEqually(cid),
     };
   }
 
@@ -101,6 +102,7 @@ window.GradingSetupCopy = (function () {
     if (calc.method === 'decayingAvg') label += ' (' + Math.round(calc.decayWeight * 100) + '%)';
     if (calc.recentLimit && calc.method !== 'mostRecent') label += ', last ' + calc.recentLimit + ' scores';
     if (!calc.foldersCountAsOne) label += ', folders not counted as one';
+    if (calc.coursesCountEqually) label += ', each course counted equally';
     return label;
   }
 
@@ -279,7 +281,8 @@ window.GradingSetupCopy = (function () {
         ca.method === cb.method &&
         (ca.method !== 'decayingAvg' || ca.decayWeight === cb.decayWeight) &&
         (ca.recentLimit || null) === (cb.recentLimit || null) &&
-        ca.foldersCountAsOne === cb.foldersCountAsOne;
+        ca.foldersCountAsOne === cb.foldersCountAsOne &&
+        ca.coursesCountEqually === cb.coursesCountEqually;
       add('calcMethod', calcSame ? [] : [_calcLabel(cb) + ' → ' + _calcLabel(ca) + '.']);
     }
     if (groups.roundPercent) {
@@ -443,6 +446,7 @@ window.GradingSetupCopy = (function () {
       cc.decayWeight = calc.decayWeight;
       cc.recentScoreLimit = calc.recentLimit;
       cc.foldersCountAsOne = calc.foldersCountAsOne;
+      cc.coursesCountEqually = calc.coursesCountEqually;
       ccChanged = true;
     }
     if (keys.roundPercent) {

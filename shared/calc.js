@@ -1601,11 +1601,31 @@ function folderAverageNote(cid, groupOrId) {
   return folderCountsAsOne(cid, groupOrId) ? '' : 'Each competency counts on its own.';
 }
 
+/* "Each Course Counts Equally" (course.courses_count_equally): off by
+   default. On, a combined class rolls up each course (subject) on its own
+   and averages the courses, so a course with more competencies or folders
+   doesn't outweigh the other. Only matters with two or more courses. */
+function getCoursesCountEqually(cid) {
+  var cc = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
+  return cc.coursesCountEqually === true;
+}
+
+/* The courses (subjects) that hold competencies, in learning-map order. */
+function courseSubjectIds(cid) {
+  var ids = [];
+  getSections(cid).forEach(function (sec) {
+    if (sec.subject && ids.indexOf(sec.subject) < 0) ids.push(sec.subject);
+  });
+  return ids;
+}
+
 /* An overall level from a level per competency, rolled up as
    getOverallProficiency does: with no groups, the mean of the competencies;
    with groups, one mean per folder that counts as one, plus each other
    competency, then the mean of those. With Folders Count as One off, the
-   mean of every competency. `levelOf(section)` is 0 for a competency with
+   mean of every competency. With Each Course Counts Equally on and two or
+   more courses, each course rolls up that way on its own and the overall
+   is the mean of the courses. `levelOf(section)` is 0 for a competency with
    no level, which is left out. A report's "then" column rolls up the same
    way as its "now". */
 function rollUpSectionLevels(cid, levelOf) {
@@ -1620,23 +1640,44 @@ function rollUpSectionLevels(cid, levelOf) {
       : 0;
   };
   var grouped = getGroupedSections(cid);
-  var hasGroups = grouped.groups.some(function (g) {
-    return g.sections.length > 0;
-  });
-  if (!hasGroups || !getFoldersCountAsOne(cid)) return mean(getSections(cid).map(levelOf));
-  var values = [];
-  grouped.groups.forEach(function (gi) {
-    if (!gi.sections.length) return;
-    if (folderCountsAsOne(cid, gi.group)) values.push(mean(gi.sections.map(levelOf)));
-    else
-      gi.sections.forEach(function (sec) {
-        values.push(levelOf(sec));
-      });
-  });
-  grouped.ungrouped.forEach(function (sec) {
-    values.push(levelOf(sec));
-  });
-  return mean(values);
+  // The roll-up of the competencies `keep` lets through.
+  var rollUp = function (keep) {
+    var groups = grouped.groups.map(function (gi) {
+      return { group: gi.group, sections: gi.sections.filter(keep) };
+    });
+    var hasGroups = groups.some(function (g) {
+      return g.sections.length > 0;
+    });
+    if (!hasGroups || !getFoldersCountAsOne(cid)) return mean(getSections(cid).filter(keep).map(levelOf));
+    var values = [];
+    groups.forEach(function (gi) {
+      if (!gi.sections.length) return;
+      if (folderCountsAsOne(cid, gi.group)) values.push(mean(gi.sections.map(levelOf)));
+      else
+        gi.sections.forEach(function (sec) {
+          values.push(levelOf(sec));
+        });
+    });
+    grouped.ungrouped.filter(keep).forEach(function (sec) {
+      values.push(levelOf(sec));
+    });
+    return mean(values);
+  };
+  var all = function () {
+    return true;
+  };
+  if (getCoursesCountEqually(cid)) {
+    var subjects = courseSubjectIds(cid);
+    if (subjects.length > 1)
+      return mean(
+        subjects.map(function (subjectId) {
+          return rollUp(function (sec) {
+            return sec.subject === subjectId;
+          });
+        }),
+      );
+  }
+  return rollUp(all);
 }
 
 /** Convert an average proficiency to a letter grade and percentage for PHIL12.
@@ -2506,6 +2547,21 @@ function previewFolderCountChange(cid, change) {
   change = change || {};
   var cc = getCourseConfig(cid);
   var group = change.groupId ? getCompetencyGroupById(cid, change.groupId) : null;
+  var target = group || cc;
+  var field = group ? 'countsAsOne' : 'foldersCountAsOne';
+  return _previewOverallChange(cid, target, field, !!change.on);
+}
+
+/* What turning Each Course Counts Equally on or off would do, for its
+   confirm, counted as previewFolderCountChange counts. */
+function previewCoursesEqualChange(cid, on) {
+  return _previewOverallChange(cid, getCourseConfig(cid), 'coursesCountEqually', !!on);
+}
+
+/* Runs the class's own math with target[field] = value and puts the saved
+   value back: how many students' overall proficiency changes, out of how
+   many, and one example. */
+function _previewOverallChange(cid, target, field, value) {
   var students = getStudents(cid);
   var shown = function (v) {
     return v > 0 ? Number(v).toFixed(1) : '';
@@ -2513,13 +2569,11 @@ function previewFolderCountChange(cid, change) {
   var before = students.map(function (s) {
     return shown(getOverallProficiency(cid, s.id));
   });
-  var target = group || cc;
-  var field = group ? 'countsAsOne' : 'foldersCountAsOne';
   var had = Object.prototype.hasOwnProperty.call(target, field);
   var kept = target[field];
   var after;
   try {
-    target[field] = !!change.on;
+    target[field] = value;
     after = students.map(function (s) {
       return shown(getOverallProficiency(cid, s.id));
     });
@@ -2542,6 +2596,9 @@ window.Calc = {
   calcMethodExample,
   getRecentScoreLimit,
   getFoldersCountAsOne,
+  getCoursesCountEqually,
+  courseSubjectIds,
+  previewCoursesEqualChange,
   folderCountsAsOne,
   folderAverageNote,
   previewFolderCountChange,

@@ -3524,6 +3524,7 @@ window.DashClassManager = (function () {
       '</div>' +
       _cmRenderRecentLimit(method, lastN) +
       _cmRenderFoldersCountAsOne(cid) +
+      _cmRenderCoursesCountEqually(cid) +
       _cmRenderPointsScale(cid) +
       '</div>';
 
@@ -3637,6 +3638,39 @@ window.DashClassManager = (function () {
       hint +
       '</span></span>' +
       '<span class="gpd-switch"><input type="checkbox" role="switch" id="cm-folders-count" data-action-change="cmFoldersCountAsOne"' +
+      (on ? ' checked' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
+      '</div>'
+    );
+  }
+
+  /* "Each Course Counts Equally": on, each course in a combined class is
+     rolled up on its own and the courses are averaged; off, one roll-up
+     across every competency. Shown only when the class has two or more
+     courses with competencies. */
+  function _cmRenderCoursesCountEqually(cid) {
+    var subjectIds = courseSubjectIds(cid);
+    if (subjectIds.length < 2) return '';
+    var on = getCoursesCountEqually(cid);
+    var names = getSubjects(cid)
+      .filter(function (s) {
+        return subjectIds.indexOf(s.id) >= 0;
+      })
+      .map(function (s) {
+        return s.name;
+      });
+    var hint = on
+      ? names.length === 2
+        ? esc(names[0]) + ' and ' + esc(names[1]) + ' each make up half of the overall.'
+        : 'Each of the ' + names.length + ' courses makes up an equal share of the overall.'
+      : 'A course with more competencies or folders counts for more in the overall.';
+    return (
+      '<div class="cm-recent-limit cm-folder-count-row">' +
+      '<span class="cm-recent-text"><label class="cm-label" for="cm-courses-equal">Each Course Counts Equally</label>' +
+      '<span class="cm-hint">' +
+      hint +
+      '</span></span>' +
+      '<span class="gpd-switch"><input type="checkbox" role="switch" id="cm-courses-equal" data-action-change="cmCoursesCountEqually"' +
       (on ? ' checked' : '') +
       '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
       '</div>'
@@ -5976,6 +6010,35 @@ window.DashClassManager = (function () {
     if (!cmSelectedCourse) return;
     var cc = getCourseConfig(cmSelectedCourse);
     cc.foldersCountAsOne = on;
+    saveCourseConfig(cmSelectedCourse, cc);
+    if (typeof clearProfCache === 'function') clearProfCache();
+    renderClassManager();
+  }
+
+  // Each Course Counts Equally moves the overall too, so it asks the same way.
+  function cmSetCoursesCountEqually(on) {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    on = !!on;
+    if (on === getCoursesCountEqually(cid)) return;
+    var preview = previewCoursesEqualChange(cid, on);
+    if (!preview.changed) return _cmApplyCoursesCountEqually(on);
+    renderClassManager();
+    showConfirm(
+      on ? 'Count Each Course Equally?' : 'Count Courses by Their Competencies?',
+      _cmGradeChangeMessage(cid, preview) + CM_FOLDER_COUNT_SENT,
+      'Change',
+      'primary',
+      function () {
+        _cmApplyCoursesCountEqually(on);
+      },
+    );
+  }
+
+  function _cmApplyCoursesCountEqually(on) {
+    if (!cmSelectedCourse) return;
+    var cc = getCourseConfig(cmSelectedCourse);
+    cc.coursesCountEqually = on;
     saveCourseConfig(cmSelectedCourse, cc);
     if (typeof clearProfCache === 'function') clearProfCache();
     renderClassManager();
@@ -8502,6 +8565,10 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionChange === 'cmFoldersCountAsOne') {
       cmSetFoldersCountAsOne(el.checked);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmCoursesCountEqually') {
+      cmSetCoursesCountEqually(el.checked);
       return true;
     }
     if (el.dataset.actionChange === 'cmFolderCountsAsOne') {

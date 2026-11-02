@@ -4506,6 +4506,12 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
     if (courseRow.folders_count_as_one === false) config.foldersCountAsOne = false;
     else delete config.foldersCountAsOne;
   }
+  // Each Course Counts Equally, the same way; a bundle from before the
+  // column reads as off.
+  if (courseRow && typeof courseRow === 'object' && 'courses_count_equally' in courseRow) {
+    if (courseRow.courses_count_equally === true) config.coursesCountEqually = true;
+    else delete config.coursesCountEqually;
+  }
   _persistLoadedField(cid, 'courseConfigs', config);
 
   if (!Object.keys(missing).length || !_writesEnabled() || !_isUuid(cid)) return;
@@ -8370,6 +8376,7 @@ function saveCourseConfig(cid, obj) {
       if (obj.recentScoreLimit !== undefined) patch.recent_score_limit = obj.recentScoreLimit || null;
       if (obj.levelOrder === 'asc' || obj.levelOrder === 'desc') patch.level_order = obj.levelOrder;
       if (typeof obj.foldersCountAsOne === 'boolean') patch.folders_count_as_one = obj.foldersCountAsOne;
+      if (typeof obj.coursesCountEqually === 'boolean') patch.courses_count_equally = obj.coursesCountEqually;
       if (Array.isArray(obj.reportingTerms)) patch.reporting_terms = obj.reportingTerms;
       if (Object.keys(patch).length > 0) {
         _trackPendingSync(
