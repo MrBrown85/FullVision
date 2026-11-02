@@ -57,6 +57,10 @@ window.PageGradebook = (function () {
   var _scrollShadowCleanup = null;
   var _scrollKey = null; // class and view of the last render, so a redraw keeps the table's scroll
   var _tipSource = null;
+  // The kind of pointer that last pressed (pointerdown): a tap toggles a
+  // header's tip; a mouse click keeps the tip its hover showed. Safari's
+  // click carries no pointerType of its own.
+  var _lastPointer = 'mouse';
   /* Name-cell tooltip HTML, keyed on student.id. Populated by _setNameTip,
    * read by _showNameTip. Replaces the previous round-trip through
    * data-tip="…" (which relied on every contributor to `tip` using esc()
@@ -1270,7 +1274,7 @@ window.PageGradebook = (function () {
         '" data-tip-tags="' +
         esc(tipTags.join(',')) +
         // Focusable and tappable (Oct 21 decision: tap a code): Tab or a tap shows the tip.
-        '" tabindex="0" role="button" aria-label="' +
+        '" tabindex="0" aria-label="' +
         esc(col.tagText || col.tagCode) +
         '">' +
         esc(col.tagCode) +
@@ -3391,7 +3395,11 @@ window.PageGradebook = (function () {
     if (left < 8) left = 8;
     if (left + gbTip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - gbTip.offsetWidth - 8;
     gbTip.style.left = left + 'px';
-    gbTip.style.top = rect.bottom + 6 + 'px';
+    // A long I Can list stays inside the window.
+    var top = rect.bottom + 6;
+    if (top + gbTip.offsetHeight > window.innerHeight - 8)
+      top = Math.max(8, window.innerHeight - gbTip.offsetHeight - 8);
+    gbTip.style.top = top + 'px';
   }
 
   /* Under the student's row (over it near the bottom of the window), so the
@@ -3505,7 +3513,7 @@ window.PageGradebook = (function () {
     // A tap on a competency's header shows its tip, and a second tap hides it.
     var codeHead = e.target.closest('.gb-grid-tag-header');
     if (codeHead) {
-      if (_tipSource === codeHead && e.pointerType !== 'mouse') _hideTip();
+      if (_tipSource === codeHead && _lastPointer !== 'mouse') _hideTip();
       else _showCodeTip(codeHead);
       return;
     }
@@ -3633,6 +3641,9 @@ window.PageGradebook = (function () {
 
     window._pageSwitchCourse = switchCourse;
 
+    _addDocListener('pointerdown', function (e) {
+      _lastPointer = e.pointerType || 'mouse';
+    });
     _addDocListener('click', _handleClick);
     _addDocListener('contextmenu', function (e) {
       if (_graderOpen()) return;
