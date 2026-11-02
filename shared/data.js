@@ -3129,6 +3129,7 @@ function _canonicalLearningMapToCache(cid, payload) {
       color: g.color || '#6366f1',
       sortOrder: Number(g.display_order ?? g.displayOrder ?? idx),
       displayOrder: Number(g.display_order ?? g.displayOrder ?? idx),
+      countsAsOne: (g.counts_as_one ?? g.countsAsOne) !== false,
     };
   });
   var subjects = [];
@@ -4497,6 +4498,12 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
   // column reads as Extending first.
   if (courseRow && typeof courseRow === 'object' && 'level_order' in courseRow) {
     config.levelOrder = courseRow.level_order === 'asc' ? 'asc' : 'desc';
+  }
+  // Folders Count as One comes on the course row. The server never holds
+  // null there; a bundle from before the column reads as on.
+  if (courseRow && typeof courseRow === 'object' && 'folders_count_as_one' in courseRow) {
+    if (courseRow.folders_count_as_one === false) config.foldersCountAsOne = false;
+    else delete config.foldersCountAsOne;
   }
   _persistLoadedField(cid, 'courseConfigs', config);
 
@@ -7041,6 +7048,7 @@ function _learningMapSignatures(map) {
       g.name || '',
       g.color || null,
       g.displayOrder != null ? Number(g.displayOrder) : gi,
+      g.countsAsOne !== false,
     ]);
   });
   (map.subjects || []).forEach(function (sub, si) {
@@ -7131,6 +7139,7 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
               name: group.name || '',
               color: group.color || null,
               displayOrder: group.displayOrder != null ? Number(group.displayOrder) : gi,
+              countsAsOne: group.countsAsOne !== false,
             },
             options,
           );
@@ -8356,6 +8365,7 @@ function saveCourseConfig(cid, obj) {
       // Null is a choice here (All Scores), so it is sent too.
       if (obj.recentScoreLimit !== undefined) patch.recent_score_limit = obj.recentScoreLimit || null;
       if (obj.levelOrder === 'asc' || obj.levelOrder === 'desc') patch.level_order = obj.levelOrder;
+      if (typeof obj.foldersCountAsOne === 'boolean') patch.folders_count_as_one = obj.foldersCountAsOne;
       if (Array.isArray(obj.reportingTerms)) patch.reporting_terms = obj.reportingTerms;
       if (Object.keys(patch).length > 0) {
         _trackPendingSync(
@@ -11019,6 +11029,8 @@ window.v2.upsertCompetencyGroup = function (params, options) {
       p_name: params.name || '',
       p_color: params.color || null,
       p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+      // Null keeps the folder's saved value.
+      p_counts_as_one: typeof params.countsAsOne === 'boolean' ? params.countsAsOne : null,
     },
     options,
   );

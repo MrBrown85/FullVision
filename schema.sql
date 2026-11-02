@@ -72,6 +72,7 @@ create table course (
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
   curriculum_tags  text[],                                         -- BC bank course keys the class is linked to, e.g. {HIST12} (20261102_course_curriculum_tags)
+  folders_count_as_one boolean not null default true,             -- overall averages each folder first; false: plain mean of every competency (20261102_folders_count_as_one)
   deleted_at       timestamptz                                         -- soft-delete marker; hidden immediately, purged after 30d by fv_retention_cleanup (20261012_course_soft_delete)
 );
 
@@ -92,6 +93,7 @@ create table competency_group (
   name          text        not null,
   color         text        check (color is null or color ~ '^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$'),
   display_order integer     not null default 0,
+  counts_as_one boolean     not null default true,                 -- while the class counts folders as one: averaged first, else its competencies count one by one (20261102_folders_count_as_one)
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   unique (id, course_id)                                           -- competency_group_id_course_uk

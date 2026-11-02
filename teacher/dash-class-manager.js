@@ -3090,6 +3090,14 @@ window.DashClassManager = (function () {
         '</div>';
     }
 
+    // Each folder's Counts as One only matters while the class counts
+    // folders as one, so with that off the switches go and this says why.
+    var foldersCount = getFoldersCountAsOne(cid);
+    if (!foldersCount && compGroups.length > 0) {
+      html +=
+        '<div class="cm-hint cm-folder-count-off">Folders Count as One is off in Grading, so every competency counts the same in the overall.</div>';
+    }
+
     // Render group folders (reuses .mod-folder pattern from assignments page)
     _cmGrouped.groups.forEach(function (gi) {
       var grp = gi.group;
@@ -3124,6 +3132,18 @@ window.DashClassManager = (function () {
         (secs.length !== 1 ? ' Competencies' : ' Competency') +
         '</span>' +
         '<div class="mod-folder-actions" data-stop-prop="true">' +
+        (foldersCount
+          ? '<label class="cm-folder-count" title="On: this folder is averaged first and counts as one competency in the overall. Off: each competency in it counts on its own.">' +
+            '<span class="cm-folder-count-text">Counts as One</span>' +
+            '<span class="gpd-switch"><input type="checkbox" role="switch" aria-label="' +
+            esc(grp.name + ' Counts as One') +
+            '" data-action-change="cmFolderCountsAsOne" data-grpid="' +
+            grp.id +
+            '"' +
+            (grp.countsAsOne !== false ? ' checked' : '') +
+            '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
+            '</label>'
+          : '') +
         '<button class="mod-folder-action delete" data-action="cmDeleteCompGroup" data-grpid="' +
         grp.id +
         '" data-count="' +
@@ -3503,6 +3523,7 @@ window.DashClassManager = (function () {
       '<div class="cm-hint">Every method skips work that hasn’t been scored.</div>' +
       '</div>' +
       _cmRenderRecentLimit(method, lastN) +
+      _cmRenderFoldersCountAsOne(cid) +
       _cmRenderPointsScale(cid) +
       '</div>';
 
@@ -3592,6 +3613,32 @@ window.DashClassManager = (function () {
         })
         .join('') +
       '</select>' +
+      '</div>'
+    );
+  }
+
+  /* "Folders Count as One": on, each folder is averaged first and counts as
+     one competency in the overall; off, every competency counts the same.
+     Each folder's own Counts as One is on its header in Competencies. */
+  function _cmRenderFoldersCountAsOne(cid) {
+    var on = getFoldersCountAsOne(cid);
+    var hasFolders = getGroupedSections(cid).groups.some(function (gi) {
+      return gi.sections.length > 0;
+    });
+    var hint = !hasFolders
+      ? 'This class has no folders with competencies yet.'
+      : on
+        ? 'Each folder is averaged first and counts as one competency in the overall.'
+        : 'Every competency counts the same in the overall. Folders only group them.';
+    return (
+      '<div class="cm-recent-limit cm-folder-count-row">' +
+      '<span class="cm-recent-text"><label class="cm-label" for="cm-folders-count">Folders Count as One</label>' +
+      '<span class="cm-hint">' +
+      hint +
+      '</span></span>' +
+      '<span class="gpd-switch"><input type="checkbox" role="switch" id="cm-folders-count" data-action-change="cmFoldersCountAsOne"' +
+      (on ? ' checked' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
       '</div>'
     );
   }
@@ -5900,6 +5947,74 @@ window.DashClassManager = (function () {
         _cmApplyRecentLimit(next);
       },
     );
+  }
+
+  // Folders Count as One moves the overall, so like a new method it says
+  // how many students first. The switch shows the saved value until confirmed.
+  function cmSetFoldersCountAsOne(on) {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    on = !!on;
+    if (on === getFoldersCountAsOne(cid)) return;
+    var preview = previewFolderCountChange(cid, { on: on });
+    if (!preview.changed) return _cmApplyFoldersCountAsOne(on);
+    renderClassManager();
+    showConfirm(
+      on ? 'Count Each Folder as One?' : 'Count Every Competency the Same?',
+      _cmGradeChangeMessage(cid, preview) + CM_FOLDER_COUNT_SENT,
+      'Change',
+      'primary',
+      function () {
+        _cmApplyFoldersCountAsOne(on);
+      },
+    );
+  }
+
+  var CM_FOLDER_COUNT_SENT = ' Reports already printed or sent and approved comments keep what they say.';
+
+  function _cmApplyFoldersCountAsOne(on) {
+    if (!cmSelectedCourse) return;
+    var cc = getCourseConfig(cmSelectedCourse);
+    cc.foldersCountAsOne = on;
+    saveCourseConfig(cmSelectedCourse, cc);
+    if (typeof clearProfCache === 'function') clearProfCache();
+    renderClassManager();
+  }
+
+  // One folder's Counts as One, from its header in Competencies.
+  function cmSetFolderCountsAsOne(grpId, on) {
+    grpId = _currentId('group', grpId);
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    on = !!on;
+    var current = getCompetencyGroupById(cid, grpId);
+    if (!current || (current.countsAsOne !== false) === on) return;
+    var preview = previewFolderCountChange(cid, { groupId: grpId, on: on });
+    if (!preview.changed) return _cmApplyFolderCountsAsOne(grpId, on);
+    _cmRenderWithScroll();
+    showConfirm(
+      on ? 'Count ' + current.name + ' as One?' : 'Count Each Competency in ' + current.name + '?',
+      _cmGradeChangeMessage(cid, preview) + CM_FOLDER_COUNT_SENT,
+      'Change',
+      'primary',
+      function () {
+        _cmApplyFolderCountsAsOne(grpId, on);
+      },
+    );
+  }
+
+  function _cmApplyFolderCountsAsOne(grpId, on) {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
+    var g = (map.competencyGroups || []).find(function (x) {
+      return x.id === grpId;
+    });
+    if (!g) return;
+    g.countsAsOne = on;
+    saveLearningMap(cid, map);
+    if (typeof clearProfCache === 'function') clearProfCache();
+    _cmRenderWithScroll();
   }
 
   function _cmApplyRecentLimit(n) {
@@ -8266,6 +8381,11 @@ window.DashClassManager = (function () {
         cmCompReviewApply();
       },
     };
+    // A folder's Counts as One switch sits on its header. A click there is
+    // the switch's own: the folder stays as it is, and the click isn't
+    // cancelled, which would undo the switch.
+    if (action === 'cmToggleStdFolder' && e && e.target && e.target.closest && e.target.closest('.cm-folder-count'))
+      return true;
     if (handlers[action]) {
       if (el.tagName !== 'SELECT' && e) e.preventDefault();
       handlers[action]();
@@ -8378,6 +8498,14 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionChange === 'cmRecentLimit') {
       cmSetRecentLimit(el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmFoldersCountAsOne') {
+      cmSetFoldersCountAsOne(el.checked);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmFolderCountsAsOne') {
+      cmSetFolderCountsAsOne(el.dataset.grpid, el.checked);
       return true;
     }
     if (el.dataset.actionChange === 'cmCatMode') {

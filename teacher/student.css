@@ -1695,6 +1695,16 @@ button.ced-obs-row {
   font-weight: 700;
   color: var(--text-2);
 }
+/* A folder that isn't counted as one says so under its name. */
+.stu-group-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stu-group-note {
+  font-weight: 400;
+  color: var(--text-3);
+}
 .stu-comp {
   border-top: 1px solid var(--divider-subtle);
 }

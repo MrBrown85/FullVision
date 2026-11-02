@@ -37,6 +37,7 @@ window.DashInsights = (function () {
         which: { groupId: gi.group.id },
         label: gi.group.name,
         title: gi.group.name,
+        note: folderAverageNote(cid, gi.group),
         color: gi.group.color,
         sectionIds: gi.sections.map(function (s) {
           return s.id;
@@ -107,7 +108,7 @@ window.DashInsights = (function () {
         (comp === col.key ? ' is-picked' : '') +
         '">' +
         '<span class="dash-mix-label" title="' +
-        esc(col.title) +
+        esc(col.title + (col.note ? '\n' + col.note : '')) +
         '">' +
         esc(col.label) +
         '</span>' +
@@ -793,7 +794,12 @@ window.DashInsights = (function () {
           return b.ids.length;
         }),
       );
-      html += '<th scope="col" title="' + esc(col.title) + '"' + _ariaSort('col:' + col.key, current) + '>';
+      html +=
+        '<th scope="col" title="' +
+        esc(col.title + (col.note ? '\n' + col.note : '')) +
+        '"' +
+        _ariaSort('col:' + col.key, current) +
+        '>';
       if (prof) {
         html +=
           '<span class="dash-sg-hist" role="img" aria-label="' +

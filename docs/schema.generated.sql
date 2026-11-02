@@ -145,6 +145,7 @@ table public.competency_group (rls on)
   display_order integer not null default 0
   created_at timestamp with time zone not null default now()
   updated_at timestamp with time zone not null default now()
+  counts_as_one boolean not null default true
   constraint competency_group_color_format CHECK (((color IS NULL) OR (color ~ '^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$'::text)))
   constraint competency_group_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
   constraint competency_group_id_course_uk UNIQUE (id, course_id)
@@ -197,6 +198,7 @@ table public.course (rls on)
   recent_score_limit smallint
   level_order text not null default 'desc'::text
   curriculum_tags text[]
+  folders_count_as_one boolean not null default true
   constraint course_block_len CHECK (((block IS NULL) OR ((char_length(block) >= 1) AND (char_length(block) <= 24))))
   constraint course_calc_method_check CHECK ((calc_method = ANY (ARRAY['average'::text, 'median'::text, 'mostRecent'::text, 'highest'::text, 'mode'::text, 'decayingAvg'::text])))
   constraint course_category_weights_is_object CHECK (((category_weights IS NULL) OR (jsonb_typeof(category_weights) = 'object'::text)))
@@ -1280,7 +1282,7 @@ function public.update_observation(p_id uuid, p_patch jsonb, p_enrollment_ids uu
 function public.update_phone_report(p_id uuid, p_students jsonb, p_expires_on date, p_idempotency_key uuid) returns jsonb
 function public.update_student(p_id uuid, p_patch jsonb) returns void
 function public.upsert_category(p_id uuid, p_course_id uuid, p_name text, p_weight numeric, p_display_order integer, p_idempotency_key uuid) returns uuid
-function public.upsert_competency_group(p_id uuid, p_course_id uuid, p_name text, p_color text, p_display_order integer, p_idempotency_key uuid) returns uuid
+function public.upsert_competency_group(p_id uuid, p_course_id uuid, p_name text, p_color text, p_display_order integer, p_idempotency_key uuid, p_counts_as_one boolean) returns uuid
 function public.upsert_core_self_assessment(p_enrollment_id uuid, p_core_id text, p_term_key text, p_level integer, p_body text, p_goal text) returns uuid
 function public.upsert_dibels_score(p_enrollment_id uuid, p_assessment_id uuid, p_period text, p_orf_wrc integer, p_orf_errors integer, p_maze_correct integer, p_maze_incorrect integer) returns uuid
 function public.upsert_goal(p_enrollment_id uuid, p_section_id uuid, p_body text) returns uuid

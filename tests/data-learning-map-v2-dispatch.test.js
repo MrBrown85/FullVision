@@ -119,7 +119,20 @@ describe('v2 learning-map structural dispatch (window.v2.*)', () => {
         p_color: '#0891b2',
         p_display_order: 1,
         p_idempotency_key: expect.any(String),
+        p_counts_as_one: null,
       });
+    });
+    it('upsert sends Counts as One when given, and null (keep) when not', async () => {
+      await window.v2.upsertCompetencyGroup({ id: GRP_ID, courseId: CID, name: 'CC', countsAsOne: false });
+      await window.v2.upsertCompetencyGroup({ id: GRP_ID, courseId: CID, name: 'CC', countsAsOne: true });
+      var sent = client.calls
+        .filter(function (c) {
+          return c.name === 'upsert_competency_group';
+        })
+        .map(function (c) {
+          return c.payload.p_counts_as_one;
+        });
+      expect(sent).toEqual([false, true]);
     });
     it('delete + reorder', async () => {
       await window.v2.deleteCompetencyGroup(ID1);

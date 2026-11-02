@@ -5596,6 +5596,26 @@ label.cm-cr-row {
 .cm-recent-limit.off .cm-recent-select {
   opacity: 0.5;
 }
+/* Grading tab: Folders Count as One. Curriculum: each folder's Counts as
+   One switch on its header, and the line saying why it's gone. */
+.cm-folder-count-row .gpd-switch {
+  flex-shrink: 0;
+}
+.cm-folder-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+.cm-folder-count-text {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.cm-folder-count-off {
+  margin: 0 0 12px;
+}
 .cm-pts-scale {
   display: flex;
   flex-direction: column;

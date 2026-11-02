@@ -253,7 +253,11 @@ window.DashStudentCards = (function () {
         if (grouped.groups.length > 0) {
           grouped.groups.forEach(function (gi) {
             if (gi.sections.length === 0) return;
-            parts.push({ title: gi.group.name, value: getGroupProficiency(cid, st.id, gi.group.id) });
+            parts.push({
+              title: gi.group.name,
+              value: getGroupProficiency(cid, st.id, gi.group.id),
+              note: folderAverageNote(cid, gi.group),
+            });
           });
           grouped.ungrouped.forEach(function (sec) {
             parts.push({ title: standardTitle(sec), value: getSectionProficiency(cid, st.id, sec.id) });
@@ -269,7 +273,8 @@ window.DashStudentCards = (function () {
           var tip =
             part.title +
             ': ' +
-            (r ? formatLevel(cid, part.value) + (prof ? ' ' + PROF_LABELS[r] : '') : 'not yet assessed');
+            (r ? formatLevel(cid, part.value) + (prof ? ' ' + PROF_LABELS[r] : '') : 'not yet assessed') +
+            (part.note ? '\n' + part.note : '');
           html +=
             '<span class="dash-card-seg" role="img" aria-label="' +
             esc(tip) +

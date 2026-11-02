@@ -311,7 +311,12 @@ window.PageDashboard = (function () {
               }, 0) / vals.length
             : 0;
         sectionClassAvgs.push({
-          section: { shortName: gi.group.name, name: gi.group.name, color: gi.group.color },
+          section: {
+            shortName: gi.group.name,
+            name: gi.group.name,
+            color: gi.group.color,
+            note: folderAverageNote(cid, gi.group),
+          },
           avg: avg,
           count: vals.length,
         });
