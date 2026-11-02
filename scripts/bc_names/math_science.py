@@ -19,7 +19,7 @@ RULES = [
     (r"^Demonstrate and apply mental math", "Mental Math"),
     (r"test conjectures", "Testing Conjectures"),
     (r"^Model (with )?(mathematics|statistics) in", "Modelling in Context"),
-    (r"^Think creatively and with curiosity", "Creative Thinking"),
+    (r"^Think creatively and with curiosity", "Problem Exploration"),
     (r"analyze and create algorithms", "Creating Algorithms"),
     (r"^Engage in spatial reasoning", "Spatial Reasoning"),
     # Mathematics: Understanding and solving
@@ -62,7 +62,7 @@ RULES = [
     (r"^Use appropriate SI units and perform simple unit conversions", "Unit Conversions"),
     (r"collect and record data", "Data Collection"),
     (r"^Ensure that safety and ethical guidelines", "Safety & Ethics"),
-    (r"^Assess risks in the context of personal safety", "Personal Safety"),
+    (r"^Assess risks in the context of personal safety", "Risk Assessment"),
     (r"^Assess risks and address ethical", "Method Risks"),
     (r"^Apply the concepts of accuracy and precision", "Accuracy & Precision"),
     # Science: Processing and analyzing data and information

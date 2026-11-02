@@ -7,7 +7,9 @@
    nowhere: the Comment Bank leaves those competencies out of every strength
    and next-step sentence. This reads data/bc-curriculum-derived.json and
    reports them. It changes nothing; whether to add skill rows or rename is
-   the owner's call.
+   the owner's call. It cannot tell a name that routes to the wrong skill
+   (a keyword inside another word, as "sequence" in "Consequences"); those
+   still need reading by hand.
 
    Usage: node scripts/bc-curriculum-routing.mjs [--list] */
 import { readFileSync } from 'fs';
@@ -51,8 +53,13 @@ for (const [key, course] of Object.entries(derived)) {
     }
 }
 
-const distinct = Object.values(unrouted).reduce((n, names) => n + Object.keys(names).length, 0);
-console.log(`${missed} of ${rows} competencies (${distinct} distinct names) route to no Comment Bank skill`);
+// A name can be unrouted in more than one family ("Collaboration").
+const pairs = Object.values(unrouted).reduce((n, names) => n + Object.keys(names).length, 0);
+const distinct = new Set(Object.values(unrouted).flatMap(names => Object.keys(names))).size;
+console.log(
+  `${missed} of ${rows} competencies route to no Comment Bank skill: ` +
+    `${pairs} family and name pairs, ${distinct} distinct names`,
+);
 for (const [family, names] of Object.entries(unrouted).sort()) {
   console.log(`  ${family}: ${Object.keys(names).length} names`);
   if (process.argv.includes('--list'))

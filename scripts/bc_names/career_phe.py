@@ -12,7 +12,7 @@ COURSES = [
 RULES = [
     # Career Education 8-9
     (r"^Use self-assessment and reflection", "Self-Assessment"),
-    (r"individual purposes and passions", "Purpose & Passion"),
+    (r"individual purposes and passions", "Purpose & Community"),
     (r"personal public identity", "Public Identity"),
     (r"^Demonstrate respect, collaboration, and inclusivity", "Collaboration"),
     (r"diverse perspectives on how work contributes", "Perspectives on Work"),
@@ -20,9 +20,9 @@ RULES = [
     (r"^Set and achieve realistic learning goals", "Goal Setting"),
     (r"influence of curriculum choices", "Curriculum Choices"),
     (r"network of resources and mentors", "Networks & Mentors"),
-    (r"family expectations and traditions", "Family Expectations"),
+    (r"family expectations and traditions", "Career Influences"),
     (r"research skills to expand their knowledge of diverse career", "Career Research"),
-    (r"^Explore volunteer and other new learning experiences", "Volunteer Experience"),
+    (r"^Explore volunteer and other new learning experiences", "New Experiences"),
     (r"^Apply decision-making strategies", "Decision-Making"),
 
     # Career-Life Education 10 and Career-Life Connections 12: profiles and networks
@@ -40,9 +40,9 @@ RULES = [
     # Career-Life Education 10 and Career-Life Connections 12: experience and planning
     (r"^Identify career-life challenges and opportunities", "Career Challenges"),
     (r"^Explore and connect experiential learning", "Learning Connections"),
-    (r"school/work/life balance", "Work-Life Balance"),
+    (r"school/work/life balance", "Balance Strategies"),
     (r"^Explore and reflect on career-life roles", "Career-Life Roles"),
-    (r"^Recognize personal worldviews", "Worldviews"),
+    (r"^Recognize personal worldviews", "Worldview Influence"),
     (r"for post-graduation planning", "Graduation Planning"),
     (r"^Assess personal transferable skills", "Skills Assessment"),
     (r"personal strategies, including social, physical, and financial", "Wellness Strategies"),
@@ -59,7 +59,7 @@ RULES = [
     (r"transferr?able skills specific to the work placement", "Transferable Skills"),
     (r"^Explore (further )?work placement opportunities", "Work Placements"),
     (r"novel and guided approaches to utilize personal strengths", "Using Strengths"),
-    (r"^Assess knowledge of self", "Personal Interests"),
+    (r"^Assess knowledge of self", "Exploring Interests"),
     (r"job search and interview skills", "Job Search"),
     (r"plan to address skill development", "Skill Development"),
     (r"^Demonstrate progression of skills", "Skill Progression"),
@@ -103,7 +103,7 @@ RULES = [
     (r"^Reflect on outcomes of personal healthy-living goals", "Goal Reflection"),
     (r"health-related decisions|reasoned decision-making related to their personal health", "Health Decisions"),
     (r"strategies to pursue personal healthy-living goals", "Healthy-Living Goals"),
-    (r"importance of maintaining personal health", "Maintaining Health"),
+    (r"importance of maintaining personal health", "Explaining Health"),
 
     # PHE 8-10: social and community health
     (r"unsafe, abusive, or exploit", "Safety Strategies"),
@@ -146,6 +146,6 @@ RULES = [
     (r"outdoor leadership skills", "Leadership Skills"),
     (r"^Use applicable communication skills", "Communication Skills"),
     (r"responses to emergency situations", "Emergency Response"),
-    (r"responsibility for personal safety", "Personal Safety"),
+    (r"responsibility for personal safety", "Shared Safety"),
     (r"manage risks", "Risk Management"),
 ]

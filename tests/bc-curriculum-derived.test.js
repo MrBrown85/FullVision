@@ -92,15 +92,58 @@ describe('BC curriculum derived layer', () => {
     }
   });
 
-  it('numbers codes by position under their heading, and Social Studies by concept', () => {
+  it('numbers codes by position under their heading', () => {
     for (const key of keys) {
-      for (const cat of derived[key].categories) {
-        if (source[key].subject === 'Social Studies') {
-          for (const x of cat.competencies) expect(x.code, x.id).toMatch(/^[A-Z]{3}[1-9]?$/);
-          continue;
-        }
+      if (source[key].subject === 'Social Studies') continue;
+      for (const cat of derived[key].categories)
         cat.competencies.forEach((x, i) => expect(x.code, x.id).toBe(cat.stem + (i + 1)));
-      }
+    }
+  });
+
+  it('codes and names Social Studies by the bracket concept, numbered only when a course has it twice', () => {
+    // Owner decisions 7 and 8, kept here apart from the script's own table.
+    const CONCEPT = {
+      significance: ['SIG', 'Significance'],
+      evidence: ['EVI', 'Evidence'],
+      'continuity and change': ['CHG', 'Continuity & Change'],
+      'cause and consequence': ['CAU', 'Cause & Consequence'],
+      perspective: ['PER', 'Perspective'],
+      'ethical judgment': ['ETH', 'Ethical Judgment'],
+      'sense of place': ['PLC', 'Sense of Place'],
+      'evidence and interpretation': ['EVN', 'Geographic Evidence'],
+      'patterns and trends': ['PTR', 'Patterns & Trends'],
+      'geographical value judgments': ['GVJ', 'Value Judgments'],
+      'geographical importance': ['GIM', 'Geographic Merit'],
+      'interactions and associations': ['IAS', 'Factor Interactions'],
+      'critical media literacy': ['CML', 'Media Literacy'],
+    };
+    const UNBRACKETED = [
+      [/^Use [\w ]*inquiry processes/, 'INQ', 'Inquiry'],
+      [/^Use indigenous principles of learning/, 'IPR', 'Indigenous Learning'],
+      [/^Assess the relevance of philosophical ideas/, 'RLV', 'Everyday Relevance'],
+    ];
+    for (const key of keys) {
+      if (source[key].subject !== 'Social Studies') continue;
+      const ss = rows.filter(r => r.key === key);
+      const want = ss.map(r => {
+        const plain = UNBRACKETED.find(([re]) => re.test(r.raw));
+        if (plain) return { stem: plain[1], name: plain[2] };
+        const m = /\(([^()]*)\)$/.exec(r.raw);
+        expect(m && CONCEPT[m[1]], `${r.d.id}: ${r.raw}`).toBeTruthy();
+        return { stem: CONCEPT[m[1]][0], name: CONCEPT[m[1]][1] };
+      });
+      const times = want.reduce((n, w) => ({ ...n, [w.stem]: (n[w.stem] || 0) + 1 }), {});
+      const seen = {};
+      ss.forEach((r, i) => {
+        const { stem, name } = want[i];
+        if (times[stem] > 1) {
+          seen[stem] = (seen[stem] || 0) + 1;
+          expect(r.d.code, r.d.id).toBe(stem + seen[stem]);
+        } else {
+          expect(r.d.code, r.d.id).toBe(stem);
+          expect(r.d.short_label, r.d.id).toBe(name);
+        }
+      });
     }
   });
 
@@ -155,10 +198,14 @@ describe('BC curriculum derived layer', () => {
 
   it('names folders from the Ministry heading, 30 characters or fewer', () => {
     for (const key of keys) {
+      // A course with phases prints "Applied Design" as their parent heading:
+      // it stays in path and is never a folder, however much sits under it.
+      const phased = source[key].categories.some(c => c.path.length > 1);
       source[key].categories.forEach((cat, ci) => {
         const d = derived[key].categories[ci];
         const heading = cat.path.length ? cat.path[cat.path.length - 1] : '';
-        if (source[key].subject === 'Social Studies' || !heading || cat.competencies.length === 1) {
+        const parent = phased && cat.path.length === 1 && heading === 'Applied Design';
+        if (source[key].subject === 'Social Studies' || !heading || cat.competencies.length === 1 || parent) {
           expect(d.folder, `${key} ${heading}`).toBeNull();
           return;
         }
@@ -170,10 +217,18 @@ describe('BC curriculum derived layer', () => {
           `${key} ${d.folder}`,
         ).toEqual([]);
         expect(d.folder, key).not.toMatch(/\(/);
-        // ADST's parent heading stays in path; only its own lowest heading names a folder.
-        if (heading !== 'Applied Design') expect(d.folder, key).not.toBe('Applied Design');
       });
     }
+  });
+
+  it('gives no name the same as a BC Core Competency, which FullVision tracks apart', () => {
+    const core = new Set(CORE_COMPETENCIES.map(c => c.label.toLowerCase()));
+    expect(
+      list(
+        rows.filter(r => core.has(r.d.short_label.toLowerCase())),
+        r => `${r.d.id} ${r.d.short_label}`,
+      ),
+    ).toEqual([]);
   });
 
   it('gives no name the same as its folder', () => {

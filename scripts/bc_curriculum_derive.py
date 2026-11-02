@@ -372,7 +372,10 @@ def course_derived(key, rec, list_name, rules, problems, unplaced, notes):
                 folder, fprov = title_case(heading), "heading"
             if n == 1:
                 folder, fprov = None, "none: one competency under the heading"
+            # Decision 5: in a course with phases, "Applied Design" is the
+            # parent heading and never a folder, whatever it holds.
             if cat["path"] == ["Applied Design"] and phases:
+                folder, fprov = None, "none: printed under Applied Design, above the phases"
                 notes.append(
                     f"{key}: {n} competency printed under Applied Design itself, above the phases; "
                     f"coded {stem}, no folder"
@@ -411,6 +414,8 @@ def course_derived(key, rec, list_name, rules, problems, unplaced, notes):
 
 def check_course(key, rec, cats, problems):
     codes, names = Counter(), Counter()
+    if any(len(c["path"]) > 1 for c in cats) and any(c["folder"] == "Applied Design" for c in cats):
+        problems.append(f"{key}: Applied Design is a folder in a course with phases")
     raws = {x["id"]: x["raw"] for cat in rec["categories"] for x in cat["competencies"]}
     stems = [c["stem"] for c in cats if c["stem"]]
     if len(set(stems)) != len(stems):
@@ -471,6 +476,21 @@ def build(only_list=None):
     for k in owner:
         if k not in src:
             problems.append(f"{k}: in a name list but not in the source")
+    # A rule that never names anything first is dead weight in the review.
+    for ln, l in lists.items():
+        if only_list and ln != only_list:
+            continue
+        fired = {
+            (c["prov"]["rule"].removesuffix(" (printed twice)"), re.sub(r" \d+$", "", c["short_label"]))
+            for k in l["courses"]
+            if k in out
+            for cat in out[k]["categories"]
+            for c in cat["competencies"]
+            if c["prov"]["rule"]
+        }
+        for pat, _, nm, _ in l["rules"]:
+            if (pat, nm) not in fired:
+                problems.append(f"{ln}: rule {pat!r} ({nm}) never names a competency first")
     out["_derived"]["unplaced"] = unplaced
     out["_derived"]["notes"] = notes
     return out, problems, unplaced
