@@ -934,6 +934,16 @@ window.DashClassManager = (function () {
     });
   }
 
+  // Choose Competencies: bank ids the teacher unticked, the preset picked
+  // in Choose Courses (Humanities 8), and the review's grading switches
+  // (null: the default for one course or a combined class).
+  var cwSkipped = {},
+    cwPreset = null,
+    cwFoldersOn = null,
+    cwCoursesEqual = null;
+  // Presets that tick more than one course, in Choose Courses.
+  var CW_PRESETS = [{ id: 'HUM8', name: 'Humanities 8', grade: 8, tags: ['ELA8', 'SS8'] }];
+
   var cwStep2Name = '',
     cwStep2Grade = '',
     cwStep2Desc = '',
@@ -4084,28 +4094,40 @@ window.DashClassManager = (function () {
   }
 
   /* ── Curriculum Wizard ──────────────────────────────────── */
+  /* The wizard's steps, by number: 1 Choose Courses, 2 Choose
+     Competencies, 3 Class Details, 4 Review. A custom class (no courses)
+     skips Choose Competencies, and its bar leaves it out. */
   function renderCmCreateForm() {
     if (cwStep === 1) return renderCwStep1();
-    if (cwStep === 2) return renderCwStep2();
-    if (cwStep === 3) return renderCwStep3();
+    if (cwStep === 2) return renderCwCompetencies();
+    if (cwStep === 3) return renderCwStep2();
+    if (cwStep === 4) return renderCwStep3();
     return '';
   }
 
   function renderCwStepBar() {
-    var labels = ['Choose Courses', 'Class Details', 'Review'];
+    var steps = [
+      [1, 'Choose Courses'],
+      [2, 'Choose Competencies'],
+      [3, 'Class Details'],
+      [4, 'Review'],
+    ].filter(function (s) {
+      return s[0] !== 2 || cwStep === 1 || cwSelectedTags.length > 0;
+    });
     return (
       '<div class="cw-steps">' +
-      labels
-        .map(function (l, i) {
+      steps
+        .map(function (s, i) {
+          var l = s[1];
           var n = i + 1;
-          var cls = n < cwStep ? 'done' : n === cwStep ? 'active' : '';
+          var cls = s[0] < cwStep ? 'done' : s[0] === cwStep ? 'active' : '';
           return (
             (i > 0 ? '<span class="cw-step-arrow">\u203A</span>' : '') +
             '<div class="cw-step ' +
             cls +
             '">' +
             '<span class="cw-step-num">' +
-            (n < cwStep ? '\u2713' : n) +
+            (s[0] < cwStep ? '\u2713' : n) +
             '</span>' +
             '<span>' +
             l +
@@ -4181,66 +4203,72 @@ window.DashClassManager = (function () {
       });
       html += '</div></div>';
 
-      // Course checklist
+      // Course checklist. A preset (Humanities 8) sits first and, while
+      // ticked, stands in for the courses it ticks.
       if (cwSelectedSubject && bySubject[cwSelectedSubject]) {
         var courses = bySubject[cwSelectedSubject];
+        var presets = _cwPresetsFor(cwSelectedGrade, courses);
+        var preset = _cwActivePreset();
         html +=
           '<div class="cm-section"><div class="cm-section-title">Courses</div>' +
           '<div class="cm-hint" style="margin-bottom:8px">Select one or more courses. Multiple selections create a combined class.</div>' +
           '<div class="cw-course-list">';
+        presets.forEach(function (p) {
+          var on = !!preset && preset.id === p.id;
+          html += _cwCourseRow({
+            action: 'cwTogglePreset',
+            key: p.id,
+            on: on,
+            name: p.name,
+            tag: p.tags.join(' + '),
+            counts: _cwCourseCounts(p.tags),
+          });
+        });
         courses.forEach(function (c) {
-          var sel = cwSelectedTags.includes(c.short_tag) ? ' selected' : '';
-          var fullCourse = CURRICULUM_INDEX[c.short_tag];
-          var compCount = 0,
-            catCount = 0;
-          if (fullCourse && fullCourse.categories) {
-            catCount = fullCourse.categories.length;
-            fullCourse.categories.forEach(function (cat) {
-              compCount += (cat.competencies || []).length;
-            });
-          }
-          html +=
-            '<div class="cw-course-item' +
-            sel +
-            '" data-action="cwToggleCourse" data-tag="' +
-            esc(c.short_tag) +
-            '">' +
-            '<span class="cw-course-check">' +
-            (sel ? '\u2713' : '') +
-            '</span>' +
-            '<span class="cw-course-name">' +
-            esc(c.course_name) +
-            '</span>' +
-            '<span class="cw-course-tag">' +
-            esc(c.short_tag) +
-            '</span>' +
-            '<span class="cw-course-count">' +
-            catCount +
-            ' Categories \u00B7 ' +
-            compCount +
-            ' Standards</span>' +
-            '</div>';
+          if (preset && preset.tags.indexOf(c.short_tag) >= 0) return;
+          // The old bank's own HUM8 course gives way to the preset.
+          if (
+            presets.some(function (p) {
+              return p.id === c.short_tag;
+            })
+          )
+            return;
+          html += _cwCourseRow({
+            action: 'cwToggleCourse',
+            key: c.short_tag,
+            on: cwSelectedTags.includes(c.short_tag),
+            name: c.course_name,
+            tag: c.short_tag,
+            counts: _cwCourseCounts([c.short_tag]),
+          });
         });
         html += '</div>';
 
         if (cwSelectedTags.length > 0) {
-          var totalComps = 0;
-          cwSelectedTags.forEach(function (tag) {
-            var full = CURRICULUM_INDEX[tag];
-            if (full && full.categories) {
-              full.categories.forEach(function (cat) {
-                totalComps += (cat.competencies || []).length;
-              });
-            }
-          });
+          var totalComps = _cwCourseCounts(cwSelectedTags).competencies;
+          var lead =
+            preset && cwSelectedTags.length === preset.tags.length
+              ? '<strong>' +
+                esc(preset.name) +
+                '</strong>: ' +
+                esc(
+                  preset.tags
+                    .map(function (tag) {
+                      return CURRICULUM_INDEX[tag].course_name;
+                    })
+                    .join(' and '),
+                )
+              : '<strong>' +
+                cwSelectedTags.length +
+                '</strong> course' +
+                (cwSelectedTags.length !== 1 ? 's' : '') +
+                ' selected';
           html +=
-            '<div class="cw-selection-summary"><strong>' +
-            cwSelectedTags.length +
-            '</strong> course' +
-            (cwSelectedTags.length !== 1 ? 's' : '') +
-            ' selected \u00B7 <strong>' +
+            '<div class="cw-selection-summary">' +
+            lead +
+            ' \u00B7 <strong>' +
             totalComps +
-            '</strong> competencies will become gradebook standards</div>';
+            '</strong> competencies</div>';
         }
         html += '</div>';
       }
@@ -4257,6 +4285,243 @@ window.DashClassManager = (function () {
     return html;
   }
 
+  /* Choose Competencies: each ticked course as a card, its competencies in
+     Ministry order with their full wording, all ticked to start. A Ministry
+     folder is a heading with its figure and Select All / Clear. */
+  function renderCwCompetencies() {
+    var html = '<div class="cm-detail-inner" style="display:block">' + renderCwStepBar();
+    html +=
+      '<div class="cw-cc-intro">The BC curriculum expects every competency to be taught. Untick only what you won\u2019t assess in this class.</div>';
+    var total = 0;
+    var on = 0;
+    cwSelectedTags.forEach(function (tag) {
+      var course = CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
+      if (!course) return;
+      var color = SUBJECT_COLOURS[course.subject] || '#6366f1';
+      var cats = (course.categories || []).filter(function (cat) {
+        return (cat.competencies || []).length;
+      });
+      var n = 0;
+      var nOn = 0;
+      var body = '';
+      cats.forEach(function (cat, ci) {
+        var rows = cat.competencies
+          .map(function (comp) {
+            var key = curriculumCompKey(tag, comp);
+            var ticked = !cwSkipped[key];
+            n++;
+            if (ticked) nOn++;
+            return (
+              '<label class="cw-cc-row' +
+              (ticked ? '' : ' off') +
+              '"><input type="checkbox" class="cw-cc-check"' +
+              (ticked ? ' checked' : '') +
+              ' data-action-change="cwCompToggle" data-key="' +
+              esc(key) +
+              '"><span class="cm-std-code" style="--chip:' +
+              color +
+              '">' +
+              esc(comp.tag || '') +
+              '</span><span class="cw-cc-text"><span class="cw-cc-name">' +
+              esc(comp.short_label || comp.tag || '') +
+              '</span><span class="cw-cc-wording">' +
+              esc(comp.raw || '') +
+              '</span></span></label>'
+            );
+          })
+          .join('');
+        if (cat.folder !== true) {
+          body += '<div class="cw-cc-loose"><div class="cw-cc-rows">' + rows + '</div></div>';
+          return;
+        }
+        var fOn = cat.competencies.filter(function (comp) {
+          return !cwSkipped[curriculumCompKey(tag, comp)];
+        }).length;
+        body +=
+          '<div class="cw-cc-folder" role="group" aria-label="' +
+          esc(cat.name) +
+          '"><div class="cw-cc-folder-head"><span class="cw-cc-folder-name">' +
+          esc(cat.name) +
+          '</span><span class="cw-cc-folder-fig">' +
+          fOn +
+          ' of ' +
+          cat.competencies.length +
+          '</span><span class="cw-cc-folder-acts">' +
+          '<button type="button" class="cw-cc-btn" data-action="cwFolderAll" data-tag="' +
+          esc(tag) +
+          '" data-idx="' +
+          ci +
+          '">Select All</button><button type="button" class="cw-cc-btn" data-action="cwFolderNone" data-tag="' +
+          esc(tag) +
+          '" data-idx="' +
+          ci +
+          '">Clear</button></span></div><div class="cw-cc-rows">' +
+          rows +
+          '</div></div>';
+      });
+      total += n;
+      on += nOn;
+      html +=
+        '<div class="cm-section cw-cc-course"><div class="cw-cc-course-head"><span class="cw-cc-course-name">' +
+        esc(course.course_name) +
+        '</span><span class="cw-course-tag">' +
+        esc(tag) +
+        '</span><span class="cw-cc-course-fig">' +
+        nOn +
+        ' of ' +
+        n +
+        ' Competencies</span></div>' +
+        body +
+        '</div>';
+    });
+    html +=
+      '<div class="cw-selection-summary"><strong>' +
+      on +
+      '</strong> of <strong>' +
+      total +
+      '</strong> competencies selected</div>';
+    html +=
+      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button>' +
+      '<button class="btn btn-primary" data-action="cwCompsNext"' +
+      (on === 0 ? ' disabled style="opacity:0.4;pointer-events:none"' : '') +
+      '>Next</button></div></div>';
+    return html;
+  }
+
+  /* The review's grading switches, worded as the Grading tab words them:
+     Each Course Counts Equally for a combined class, and Folders Count as
+     One. Both can change later in Grading. */
+  function _cwRenderGradingRows(anyFolder) {
+    var g = _cwGrading();
+    var later = ' You can change this later in Grading.';
+    function row(key, id, label, hint, on) {
+      return (
+        '<div class="cm-recent-limit cm-folder-count-row">' +
+        '<span class="cm-recent-text"><label class="cm-label" for="' +
+        id +
+        '">' +
+        label +
+        '</label><span class="cm-hint">' +
+        hint +
+        later +
+        '</span></span>' +
+        '<span class="gpd-switch"><input type="checkbox" role="switch" id="' +
+        id +
+        '" data-action-change="cwRollup" data-key="' +
+        key +
+        '"' +
+        (on ? ' checked' : '') +
+        '><span class="gpd-switch-ui" aria-hidden="true"></span></span>' +
+        '</div>'
+      );
+    }
+    var names = cwSelectedTags
+      .map(function (tag) {
+        return CURRICULUM_INDEX[tag] && CURRICULUM_INDEX[tag].course_name;
+      })
+      .filter(Boolean);
+    var html = '<div class="cm-section cw-grading-rows">';
+    if (names.length > 1)
+      html += row(
+        'courses',
+        'cw-courses-equal',
+        'Each Course Counts Equally',
+        g.coursesCountEqually
+          ? names.length === 2
+            ? esc(names[0]) + ' and ' + esc(names[1]) + ' each make up half of the overall.'
+            : 'Each of the ' + names.length + ' courses makes up an equal share of the overall.'
+          : 'A course with more competencies or folders counts for more in the overall.',
+        g.coursesCountEqually,
+      );
+    html += row(
+      'folders',
+      'cw-folders-count',
+      'Folders Count as One',
+      !anyFolder
+        ? 'This class has no folders with competencies yet.'
+        : g.foldersCountAsOne
+          ? 'Each folder is averaged first and counts as one competency in the overall.'
+          : 'Every competency counts the same in the overall. Folders only group them.',
+      g.foldersCountAsOne,
+    );
+    return html + '</div>';
+  }
+
+  /* One row in Choose Courses: a course, or a preset that ticks several. */
+  function _cwCourseRow(r) {
+    return (
+      '<div class="cw-course-item' +
+      (r.on ? ' selected' : '') +
+      '" data-action="' +
+      r.action +
+      '" data-tag="' +
+      esc(r.key) +
+      '">' +
+      '<span class="cw-course-check">' +
+      (r.on ? '\u2713' : '') +
+      '</span>' +
+      '<span class="cw-course-name">' +
+      esc(r.name) +
+      '</span>' +
+      '<span class="cw-course-tag">' +
+      esc(r.tag) +
+      '</span>' +
+      '<span class="cw-course-count">' +
+      r.counts.competencies +
+      (r.counts.competencies === 1 ? ' Competency' : ' Competencies') +
+      (r.counts.folders ? ' \u00B7 ' + r.counts.folders + (r.counts.folders === 1 ? ' Folder' : ' Folders') : '') +
+      '</span>' +
+      '</div>'
+    );
+  }
+
+  /* Competencies and Ministry folders in these courses (the old bank has
+     no folders). */
+  function _cwCourseCounts(tags) {
+    var out = { competencies: 0, folders: 0 };
+    tags.forEach(function (tag) {
+      var course = CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
+      (course ? course.categories || [] : []).forEach(function (cat) {
+        var n = (cat.competencies || []).length;
+        out.competencies += n;
+        if (cat.folder === true && n) out.folders++;
+      });
+    });
+    return out;
+  }
+
+  /* The presets for this grade whose courses are all in the bank and one of
+     which is in the subject showing. */
+  function _cwPresetsFor(grade, courses) {
+    var here = courses.map(function (c) {
+      return c.short_tag;
+    });
+    return CW_PRESETS.filter(function (p) {
+      return (
+        p.grade === grade &&
+        p.tags.every(function (tag) {
+          return CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
+        }) &&
+        p.tags.some(function (tag) {
+          return here.indexOf(tag) >= 0;
+        })
+      );
+    });
+  }
+
+  /* The ticked preset, while all its courses are still ticked. */
+  function _cwActivePreset() {
+    var p = CW_PRESETS.find(function (x) {
+      return x.id === cwPreset;
+    });
+    if (!p) return null;
+    return p.tags.every(function (tag) {
+      return cwSelectedTags.indexOf(tag) >= 0;
+    })
+      ? p
+      : null;
+  }
+
   function renderCwStep2() {
     var preName = '';
     var preGrade = '';
@@ -4269,7 +4534,7 @@ window.DashClassManager = (function () {
         .map(function (c) {
           return c.course_name;
         });
-      preName = names.join(' / ');
+      preName = names.length ? _cwDefaultName() : '';
       preGrade = cwSelectedGrade ? String(cwSelectedGrade) : '';
     }
     if (cwStep2Grade) preGrade = cwStep2Grade;
@@ -4427,18 +4692,34 @@ window.DashClassManager = (function () {
       '</div></div></div>';
 
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
-      var subjectColors = ['#0891b2', '#7c3aed', '#059669', '#d97706', '#dc2626', '#2563eb', '#db2777', '#4f46e5'];
-      var colorIdx = 0;
+      var anyFolder = false;
       cwSelectedTags.forEach(function (tag) {
         var courseData = CURRICULUM_INDEX[tag];
         if (!courseData) return;
-        var color = subjectColors[colorIdx % subjectColors.length];
-        colorIdx++;
+        var color = SUBJECT_COLOURS[courseData.subject] || '#6366f1';
         var cats = courseData.categories || [];
-        var totalComps = 0;
-        cats.forEach(function (c) {
-          totalComps += (c.competencies || []).length;
+        var isNew = cats.some(function (c) {
+          return 'folder' in c;
         });
+        // Ministry order: a folder row, or one "Not in a Folder" row for each
+        // run of competencies outside folders. The old bank lists its headings.
+        var rows = [];
+        var total = 0;
+        var folders = 0;
+        cats.forEach(function (cat) {
+          var n = (cat.competencies || []).filter(function (comp) {
+            return !cwSkipped[curriculumCompKey(tag, comp)];
+          }).length;
+          if (!n) return;
+          total += n;
+          if (cat.folder === true) {
+            folders++;
+            rows.push({ name: cat.name, n: n, dot: color });
+          } else if (!isNew) rows.push({ name: cat.name, n: n, dot: color });
+          else if (rows.length && rows[rows.length - 1].loose) rows[rows.length - 1].n += n;
+          else rows.push({ name: 'Not in a Folder', n: n, dot: '#aeaeb2', loose: true });
+        });
+        if (folders) anyFolder = true;
         html +=
           '<div class="cw-review-card">' +
           '<div class="cw-review-title" style="color:' +
@@ -4449,26 +4730,28 @@ window.DashClassManager = (function () {
           '<div class="cw-review-meta">' +
           esc(tag) +
           ' \u00B7 ' +
-          totalComps +
-          ' competencies across ' +
-          cats.length +
-          ' categories</div>' +
-          '<div class="cw-review-sections">';
-        cats.forEach(function (cat) {
-          var compCount = (cat.competencies || []).length;
-          html +=
-            '<div class="cw-review-sec"><span class="cw-review-sec-dot" style="background:' +
-            color +
-            '"></span>' +
-            esc(cat.name) +
-            '<span class="cw-review-sec-count">' +
-            compCount +
-            ' Standard' +
-            (compCount !== 1 ? 's' : '') +
-            '</span></div>';
-        });
-        html += '</div></div>';
+          total +
+          (total === 1 ? ' Competency' : ' Competencies') +
+          (folders ? ' \u00B7 ' + folders + (folders === 1 ? ' Folder' : ' Folders') : '') +
+          '</div>' +
+          '<div class="cw-review-sections">' +
+          rows
+            .map(function (r) {
+              return (
+                '<div class="cw-review-sec"><span class="cw-review-sec-dot" style="background:' +
+                r.dot +
+                '"></span>' +
+                esc(r.name) +
+                '<span class="cw-review-sec-count">' +
+                r.n +
+                (r.n === 1 ? ' Competency' : ' Competencies') +
+                '</span></div>'
+              );
+            })
+            .join('') +
+          '</div></div>';
       });
+      html += _cwRenderGradingRows(anyFolder);
     } else {
       html +=
         '<div class="cm-section"><div class="cw-empty-msg">Custom class \u2014 no curriculum data. You can add sections and tags manually after creation.</div></div>';
@@ -4488,6 +4771,10 @@ window.DashClassManager = (function () {
     cwStep2Calc = '';
     cwSelectedSubject = null;
     cwSelectedTags = [];
+    cwSkipped = {};
+    cwPreset = null;
+    cwFoldersOn = null;
+    cwCoursesEqual = null;
     renderClassManager();
   }
 
@@ -4500,12 +4787,56 @@ window.DashClassManager = (function () {
     var idx = cwSelectedTags.indexOf(tag);
     if (idx >= 0) cwSelectedTags.splice(idx, 1);
     else cwSelectedTags.push(tag);
+    cwFoldersOn = null;
+    cwCoursesEqual = null;
     renderClassManager();
+  }
+
+  // A preset ticks its courses together and unticks them together.
+  function cwTogglePreset(id) {
+    var p = CW_PRESETS.find(function (x) {
+      return x.id === id;
+    });
+    if (!p) return;
+    var on = !!_cwActivePreset() && cwPreset === id;
+    cwSelectedTags = cwSelectedTags.filter(function (tag) {
+      return p.tags.indexOf(tag) < 0;
+    });
+    if (on) cwPreset = null;
+    else {
+      cwPreset = id;
+      cwSelectedTags = p.tags.concat(cwSelectedTags);
+    }
+    renderClassManager();
+  }
+
+  function cwCompToggle(key, ticked) {
+    if (ticked) delete cwSkipped[key];
+    else cwSkipped[key] = true;
+    _cmRenderWithScroll();
+  }
+
+  // Select All / Clear for one Ministry folder.
+  function cwFolderSet(tag, idx, ticked) {
+    var course = CURRICULUM_INDEX && CURRICULUM_INDEX[tag];
+    var cat =
+      course &&
+      (course.categories || []).filter(function (c) {
+        return (c.competencies || []).length;
+      })[idx];
+    if (!cat) return;
+    cat.competencies.forEach(function (comp) {
+      var key = curriculumCompKey(tag, comp);
+      if (ticked) delete cwSkipped[key];
+      else cwSkipped[key] = true;
+    });
+    _cmRenderWithScroll();
   }
 
   function cwSkipToCustom() {
     cwSelectedTags = [];
-    cwStep = 2;
+    cwPreset = null;
+    cwStep = 3;
     renderClassManager();
   }
 
@@ -4513,6 +4844,28 @@ window.DashClassManager = (function () {
     if (cwSelectedTags.length === 0) return;
     cwStep = 2;
     renderClassManager();
+  }
+
+  function cwCompsNext() {
+    cwStep = 3;
+    renderClassManager();
+  }
+
+  // The review's grading switches. They don't touch any class until Finish.
+  function cwSetRollup(key, on) {
+    if (key === 'courses') cwCoursesEqual = !!on;
+    else cwFoldersOn = !!on;
+    renderClassManager();
+  }
+
+  /* The wizard's grading switches: what the teacher set on the review, else
+     the default for one course or a combined class. */
+  function _cwGrading() {
+    var d = curriculumGradingDefaults(cwSelectedTags);
+    return {
+      foldersCountAsOne: cwFoldersOn != null ? cwFoldersOn : d.foldersCountAsOne,
+      coursesCountEqually: cwCoursesEqual != null ? cwCoursesEqual : d.coursesCountEqually,
+    };
   }
 
   function cwGoToStep3() {
@@ -4528,12 +4881,13 @@ window.DashClassManager = (function () {
       (document.querySelector('#cm-cg-calc .cm-seg-btn.active') || {}).dataset?.val || _cmDefaultCalcMethod();
     cwStep2Decay = document.getElementById('cm-cg-decay-slider')?.value || '65';
     cwStep2LatePolicy = document.getElementById('cm-new-late-policy')?.value || '';
-    cwStep = 3;
+    cwStep = 4;
     renderClassManager();
   }
 
   function cwGoBack() {
-    if (cwStep === 3) cwStep = 2;
+    if (cwStep === 4) cwStep = 3;
+    else if (cwStep === 3) cwStep = cwSelectedTags.length ? 2 : 1;
     else if (cwStep === 2) cwStep = 1;
     renderClassManager();
   }
@@ -4541,17 +4895,25 @@ window.DashClassManager = (function () {
   function cwGetPreName() {
     if (cwStep2Name) return cwStep2Name;
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
-      return cwSelectedTags
-        .map(function (tag) {
-          return CURRICULUM_INDEX[tag];
-        })
-        .filter(Boolean)
-        .map(function (c) {
-          return c.course_name;
-        })
-        .join(' / ');
+      return _cwDefaultName();
     }
     return '';
+  }
+
+  /* A new class's name: the preset's (Humanities 8) while only its courses
+     are ticked, else the course names. */
+  function _cwDefaultName() {
+    var p = _cwActivePreset();
+    if (p && cwSelectedTags.length === p.tags.length) return p.name;
+    return cwSelectedTags
+      .map(function (tag) {
+        return CURRICULUM_INDEX[tag];
+      })
+      .filter(Boolean)
+      .map(function (c) {
+        return c.course_name;
+      })
+      .join(' / ');
   }
 
   async function cwFinishCreate() {
@@ -4610,14 +4972,14 @@ window.DashClassManager = (function () {
     var defaultTerms = _cmDefaultReportingTerms(course.id, cwStep2Span);
     if (defaultTerms && !(Array.isArray(cc.reportingTerms) && cc.reportingTerms.length))
       cc.reportingTerms = defaultTerms;
-    // One course counts its folders as one; a combined class counts each
-    // course equally instead.
-    if (cwSelectedTags.length > 0) Object.assign(cc, curriculumGradingDefaults(cwSelectedTags));
+    // The review's grading switches: by default one course counts its
+    // folders as one, and a combined class counts each course equally.
+    if (cwSelectedTags.length > 0) Object.assign(cc, _cwGrading());
     saveCourseConfig(course.id, cc);
 
     var dispatchOk = true;
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
-      var map = buildLearningMapFromTags(cwSelectedTags);
+      var map = buildLearningMapFromTags(cwSelectedTags, { skip: Object.keys(cwSkipped) });
       if (map) {
         var mapSaved = saveLearningMap(course.id, map);
         updateCourse(course.id, { curriculumTags: cwSelectedTags.slice() });
@@ -4666,6 +5028,10 @@ window.DashClassManager = (function () {
     cwSelectedGrade = null;
     cwSelectedSubject = null;
     cwSelectedTags = [];
+    cwSkipped = {};
+    cwPreset = null;
+    cwFoldersOn = null;
+    cwCoursesEqual = null;
     cwLoadError = false;
     cwStep2Name = '';
     cwStep2Grade = '';
@@ -8353,6 +8719,18 @@ window.DashClassManager = (function () {
       cwGoToStep2: function () {
         cwGoToStep2();
       },
+      cwTogglePreset: function () {
+        cwTogglePreset(el.dataset.tag);
+      },
+      cwCompsNext: function () {
+        cwCompsNext();
+      },
+      cwFolderAll: function () {
+        cwFolderSet(el.dataset.tag, parseInt(el.dataset.idx, 10), true);
+      },
+      cwFolderNone: function () {
+        cwFolderSet(el.dataset.tag, parseInt(el.dataset.idx, 10), false);
+      },
       cwGoToStep3: function () {
         cwGoToStep3();
       },
@@ -8570,6 +8948,14 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionChange === 'cmFoldersCountAsOne') {
       cmSetFoldersCountAsOne(el.checked);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cwCompToggle') {
+      cwCompToggle(el.dataset.key, el.checked);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cwRollup') {
+      cwSetRollup(el.dataset.key, el.checked);
       return true;
     }
     if (el.dataset.actionChange === 'cmCoursesCountEqually') {

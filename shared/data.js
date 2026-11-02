@@ -6558,7 +6558,8 @@ function getSubjectsByGrade(grade) {
    stable one ("bc.…"). In a combined class, a folder name two courses share
    is prefixed with the course name, and a code two courses share gets a
    course mark ("C" + "CP1"), so no two columns read the same.
-   options.skip: bank ids the teacher unticked in the wizard. */
+   options.skip: competencies the teacher unticked in the wizard, by
+   curriculumCompKey. */
 function buildLearningMapFromTags(shortTags, options) {
   if (!CURRICULUM_INDEX)
     return { subjects: [], sections: [], competencyGroups: [], _customized: true, _version: 1, _flatVersion: 2 };
@@ -6567,14 +6568,15 @@ function buildLearningMapFromTags(shortTags, options) {
     .map(courseTag => ({ courseTag, course: CURRICULUM_INDEX[courseTag] }))
     .filter(x => x.course && x.course.categories && x.course.categories.length);
   const isHybrid = courses.length > 1;
-  const kept = cat => (cat.competencies || []).filter(comp => !skip.has(comp.id));
+  const kept = (courseTag, cat) =>
+    (cat.competencies || []).filter(comp => !skip.has(curriculumCompKey(courseTag, comp)));
 
   // Folder names and codes more than one course uses.
   const folderCourses = {};
   const codeCourses = {};
   courses.forEach(({ courseTag, course }) => {
     course.categories.forEach(cat => {
-      const comps = kept(cat);
+      const comps = kept(courseTag, cat);
       if (!comps.length) return;
       if (cat.folder === true) (folderCourses[cat.name] = folderCourses[cat.name] || new Set()).add(courseTag);
       comps.forEach(comp => {
@@ -6596,7 +6598,7 @@ function buildLearningMapFromTags(shortTags, options) {
     const usedTagIds = {};
 
     for (const category of course.categories) {
-      const comps = kept(category);
+      const comps = kept(courseTag, category);
       if (!comps.length) continue;
 
       let group = null;
@@ -6685,6 +6687,12 @@ function buildLearningMapFromTags(shortTags, options) {
     sec.displayOrder = i;
   });
   return { subjects, sections, competencyGroups, _customized: true, _version: 1, _flatVersion: 2 };
+}
+
+/* How the wizard names one competency of a course: its bank id, or, for
+   an old-bank competency with none, the course and its code. */
+function curriculumCompKey(courseTag, comp) {
+  return comp.id || courseTag + ':' + comp.tag;
 }
 
 /* The grading switches a new curriculum class starts with: one course,

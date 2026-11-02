@@ -5897,3 +5897,126 @@ label.cm-cr-row {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* New Class wizard, Choose Competencies: one card per course, Ministry
+   folders as headings with their figure, each competency with its wording. */
+.cw-cc-intro {
+  color: var(--text);
+  font-size: var(--text-md);
+  margin: 0 0 14px;
+}
+.cm-section.cw-cc-course {
+  padding: 0;
+  overflow: hidden;
+}
+.cw-cc-course-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 20px 24px 12px;
+}
+.cw-cc-course-name {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text);
+}
+.cw-cc-course-fig {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.cw-cc-folder {
+  border-top: 1px solid var(--divider-subtle);
+  padding: 6px 24px 12px;
+}
+.cw-cc-folder-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 8px;
+}
+.cw-cc-folder-name {
+  font-weight: 700;
+  color: var(--text);
+}
+.cw-cc-folder-fig {
+  font-size: var(--text-sm);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  background: #f2f2f4;
+  border-radius: 999px;
+  padding: 1px 9px;
+}
+.cw-cc-folder-acts {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+.cw-cc-btn {
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text);
+  background: #e5e5ea;
+  border: 0;
+  border-radius: 8px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.cw-cc-btn:hover {
+  background: #d8d8de;
+}
+.cw-cc-loose {
+  padding: 2px 24px 14px;
+}
+.cw-cc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cw-cc-row {
+  display: grid;
+  grid-template-columns: 20px auto 1fr;
+  column-gap: 10px;
+  align-items: start;
+  background: #fff;
+  border-radius: 10px;
+  padding: 9px 12px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+}
+.cw-cc-row.off {
+  background: #f2f2f4;
+  box-shadow: none;
+}
+.cw-cc-check {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--active);
+  cursor: pointer;
+}
+.cw-cc-row .cm-std-code {
+  margin-top: 1px;
+}
+.cw-cc-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.cw-cc-name {
+  font-weight: 600;
+  color: var(--text);
+}
+.cw-cc-wording {
+  color: var(--text);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.cm-section.cw-grading-rows > .cm-folder-count-row:first-child {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
