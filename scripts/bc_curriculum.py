@@ -43,7 +43,10 @@ MANIFEST = os.path.join(SOURCES, "manifest.json")
 OUT_SOURCE = os.path.join(REPO, "data", "bc-curriculum-source.json")
 OUT_COURSES = os.path.join(REPO, "data", "bc-curriculum-courses.json")
 OUT_FLAGS = os.path.join(REPO, "data", "bc-curriculum-flags.json")
-BANK = os.path.join(REPO, "curriculum_by_course.json")
+# The bank's course keys and names before the 2026 rebuild, which Ministry
+# pages are matched to. The app's curriculum_by_course.json is now built from
+# data/ by scripts/build-curriculum-bank.mjs, so it can't be the key source.
+BANK = os.path.join(REPO, "data", "bc-curriculum-old-keys.json")
 
 # Subject areas in scope. Second-language areas (languages, fral,
 # francais-langue-premiere) are left out by the owner's decision 2.
