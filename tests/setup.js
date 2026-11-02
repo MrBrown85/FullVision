@@ -245,6 +245,7 @@ load('teacher/student-voice.js');
 load('teacher/learner-profile.js');
 load('shared/phone-report-view.js');
 load('teacher/phone-reports.js');
+load('shared/backup-restore.js');
 load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
 load('teacher/dash-observations.js');

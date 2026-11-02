@@ -2936,6 +2936,7 @@ window.DashClassManager = (function () {
       '<button type="button" class="cm-new-btn" data-action="cmStartCreate">' +
       '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>' +
       'New Class</button>' +
+      '<button type="button" class="cm-new-btn" data-action="cmRestoreBackup">Restore from Backup</button>' +
       '</div>' +
       '</aside>';
     return html;
@@ -6826,11 +6827,15 @@ window.DashClassManager = (function () {
   // Duplicate Class asks which block the copy is for. With a block, the copy
   // keeps the class name ("Philosophy 12", Block B); without one it is
   // "Philosophy 12 (Copy)" as before.
-  /* Everything the class holds, as one JSON file the teacher keeps. */
+  /* Everything the class holds, as one JSON file the teacher keeps.
+     Restore Class from Backup (shared/backup-restore.js) reads it back.
+     courseInfo and rubricChecks are in backups from Nov 2026 on. */
   function cmDownloadBackup(cid) {
     if (!COURSES[cid]) return;
     var data = {
       course: cid,
+      savedAt: new Date().toISOString(),
+      courseInfo: structuredClone(COURSES[cid]),
       students: getStudents(cid),
       categories: getCategories(cid),
       assessments: getAssessments(cid),
@@ -6841,6 +6846,7 @@ window.DashClassManager = (function () {
       learningMap: getLearningMap(cid),
       modules: getModules(cid),
       rubrics: getRubrics(cid),
+      rubricChecks: getRubricChecks(cid),
       statuses: getAssignmentStatuses(cid),
       flags: getFlags(cid),
       goals: getGoals(cid),
@@ -6855,6 +6861,125 @@ window.DashClassManager = (function () {
     a.href = URL.createObjectURL(blob);
     a.download = 'gradebook-' + cid + '-' + new Date().toISOString().slice(0, 10) + '.json';
     a.click();
+  }
+
+  /* Restore Class from Backup: a backup file becomes a new class. Nothing
+     in another class changes (shared/backup-restore.js). */
+  // html-safe: fixed markup; the backup's class name and counts go in through esc().
+  function cmRestoreBackup() {
+    var triggerEl = document.activeElement;
+    var backup = null;
+    var overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'cm-restore-title');
+    overlay.innerHTML =
+      '<div class="confirm-card cm-restore-card">' +
+      '<div class="confirm-title" id="cm-restore-title">Restore Class from Backup</div>' +
+      '<div class="confirm-message">Choose a file saved by Download Class Backup. It becomes a new class with its students, competencies, assessments, scores and reports. Your other classes are not changed.</div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-restore-file">Backup File</label>' +
+      '<input type="file" id="cm-restore-file" accept=".json,application/json"></div>' +
+      '<div class="cm-restore-summary" id="cm-restore-summary" role="status"></div>' +
+      '<div class="cm-field" id="cm-restore-name-field" hidden><label class="cm-label" for="cm-restore-name">Class Name</label>' +
+      '<input type="text" class="cm-input" id="cm-restore-name" maxlength="120"></div>' +
+      '<div class="confirm-actions">' +
+      '<button class="confirm-cancel" id="cm-restore-cancel">Cancel</button>' +
+      '<button class="confirm-ok primary" id="cm-restore-ok" disabled>Restore</button>' +
+      '</div></div>';
+    document.body.appendChild(overlay);
+    var fileInput = overlay.querySelector('#cm-restore-file');
+    var summary = overlay.querySelector('#cm-restore-summary');
+    var nameField = overlay.querySelector('#cm-restore-name-field');
+    var nameInput = overlay.querySelector('#cm-restore-name');
+    var okBtn = overlay.querySelector('#cm-restore-ok');
+    function close() {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey, true);
+      try {
+        if (triggerEl && typeof triggerEl.focus === 'function') triggerEl.focus();
+      } catch (e) {
+        /* the trigger may be gone after a re-render */
+      }
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    }
+    function plural(n, word) {
+      return n + ' ' + word + (n === 1 ? '' : 's');
+    }
+    function showFile(text) {
+      try {
+        backup = FVBackupRestore.parseBackup(text);
+      } catch (err) {
+        backup = null;
+        summary.textContent = err.message;
+        nameField.hidden = true;
+        okBtn.disabled = true;
+        return;
+      }
+      var info = backup.courseInfo || {};
+      var students = (backup.students || []).length;
+      var assessments = (backup.assessments || []).length;
+      var saved = backup.savedAt ? new Date(backup.savedAt) : null;
+      var line = plural(students, 'Student') + ' · ' + plural(assessments, 'Assessment');
+      if (saved && !isNaN(saved.getTime()))
+        line += ' · Saved ' + saved.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+      summary.innerHTML =
+        '<div>' +
+        esc(line) +
+        '</div>' +
+        (backup.courseInfo
+          ? ''
+          : '<div class="cm-restore-note">This backup is from before November 2026 and has no class settings. Set the grade and grading style in Class Details after restoring.</div>');
+      nameInput.value = info.name || '';
+      nameField.hidden = false;
+      okBtn.disabled = false;
+      nameInput.focus();
+    }
+    function restore() {
+      if (!backup) return;
+      var name = nameInput.value.trim() || 'Restored Class';
+      var restored;
+      try {
+        restored = FVBackupRestore.restoreClassFromBackup(backup, { name: name });
+      } catch (err) {
+        console.error('Restore from backup failed:', err);
+        summary.textContent = "This backup couldn't be restored.";
+        return;
+      }
+      close();
+      cmSelectedCourse = restored.cid;
+      cmMode = 'edit';
+      renderClassManager();
+      showSyncToast('Restored ' + name + '.', 'success');
+      restored.sent.catch(function (err) {
+        console.error('import_json_restore failed:', err);
+        if (window.Sentry && typeof window.Sentry.captureException === 'function') window.Sentry.captureException(err);
+        if (cmSelectedCourse === restored.cid) cmSelectedCourse = getActiveCourse();
+        renderClassManager();
+        showSyncToast("Couldn't restore " + name + '. The backup file is unchanged; try again.', 'info');
+      });
+    }
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay || e.target.id === 'cm-restore-cancel') return close();
+      if (e.target.id === 'cm-restore-ok') restore();
+    });
+    nameInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') restore();
+    });
+    fileInput.addEventListener('change', function () {
+      var file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      file.text().then(showFile, function () {
+        showFile('');
+      });
+    });
+    fileInput.focus();
   }
 
   function cmDuplicateCourse(sourceCid) {
@@ -9146,6 +9271,9 @@ window.DashClassManager = (function () {
       },
       cmDownloadBackup: function () {
         cmDownloadBackup(el.dataset.cid);
+      },
+      cmRestoreBackup: function () {
+        cmRestoreBackup();
       },
       cmToggleArchive: function () {
         cmToggleArchive(el.dataset.cid);
