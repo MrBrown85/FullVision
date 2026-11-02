@@ -3348,6 +3348,30 @@ var COMMENT_BANK = {
       claims: ['bestPiece'],
       src: 'new',
     },
+    // Grown 2026-11-02 (competencies in report comments): progress in levels
+    // for a competency from the BC bank that climbed a level or more past the
+    // "improved" gate, by its level words and its cluster's phrase
+    // (progressOf; only where the class shows proficiency words). The skill
+    // comes last, after the levels. The Overall step offers these beside the
+    // where-now frames.
+    {
+      id: 'pg01',
+      part: 'now',
+      group: 'Overall',
+      text: '{He} rose from {progressFrom} to {progressTo} in {his} ability to {progressSkill}.',
+      needs: ['progressFrom', 'progressTo', 'progressSkill'],
+      claims: ['improved'],
+      src: 'new',
+    },
+    {
+      id: 'pg02',
+      part: 'now',
+      group: 'Overall',
+      text: '{He} [has|have] reached {progressTo} in {his} ability to {progressSkill}, up from {progressFrom}.',
+      needs: ['progressFrom', 'progressTo', 'progressSkill'],
+      claims: ['improved'],
+      src: 'new',
+    },
     // Grown 2026-11-02 (competencies in report comments): where the
     // student is now in the first strength, for a competency from the BC
     // bank. {strengthNow} is its cluster's phrase (a bare verb phrase of 9

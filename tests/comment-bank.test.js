@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1700 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1700);
+  it('has 1702 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(1702);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1700);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1702);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -225,6 +225,10 @@ describe('the bank', () => {
       highestTop: 'strength',
       // The first strength at its level now (Nov 2).
       strengthNow: 'strength',
+      // Progress in levels over the term (Nov 2).
+      progressFrom: 'improved',
+      progressTo: 'improved',
+      progressSkill: 'improved',
       habitsExcellent: 'habits',
       habitsGood: 'habits',
       habitsAllSeen: 'habits',
