@@ -2286,33 +2286,39 @@ window.PageAssignments = (function () {
       esc(scoreMode) +
       '">' +
       '<div class="af-mode-cards" role="radiogroup" aria-labelledby="af-scoremode-label">' +
-      SCORE_MODE_CARDS.map(function (m) {
-        return (
-          '<div class="af-mode-item">' +
-          '<button type="button" class="af-mode-card af-scoremode-btn" role="radio" aria-checked="' +
-          (scoreMode === m.mode) +
-          '" aria-describedby="af-mode-tip-' +
-          m.mode +
-          '" data-mode="' +
-          m.mode +
-          '" data-action="setScoreMode">' +
-          m.icon +
-          '<span>' +
-          m.label +
-          '</span></button>' +
-          '<div class="af-mode-tip" role="tooltip" id="af-mode-tip-' +
-          m.mode +
-          '">' +
-          '<div class="af-mode-tip-pic" aria-hidden="true">' +
-          m.picture() +
-          '</div>' +
-          '<div class="af-mode-tip-text">' +
-          m.tip +
-          '</div>' +
-          '</div>' +
-          '</div>'
-        );
-      }).join('') +
+      SCORE_MODE_CARDS.filter(function (m) {
+        // DIBELS only in ELA and Social Studies 8 classes; work that is
+        // already DIBELS keeps its card wherever it is.
+        return m.mode !== 'dibels' || scoreMode === 'dibels' || courseOffersDibels(COURSES[cid]);
+      })
+        .map(function (m) {
+          return (
+            '<div class="af-mode-item">' +
+            '<button type="button" class="af-mode-card af-scoremode-btn" role="radio" aria-checked="' +
+            (scoreMode === m.mode) +
+            '" aria-describedby="af-mode-tip-' +
+            m.mode +
+            '" data-mode="' +
+            m.mode +
+            '" data-action="setScoreMode">' +
+            m.icon +
+            '<span>' +
+            m.label +
+            '</span></button>' +
+            '<div class="af-mode-tip" role="tooltip" id="af-mode-tip-' +
+            m.mode +
+            '">' +
+            '<div class="af-mode-tip-pic" aria-hidden="true">' +
+            m.picture() +
+            '</div>' +
+            '<div class="af-mode-tip-text">' +
+            m.tip +
+            '</div>' +
+            '</div>' +
+            '</div>'
+          );
+        })
+        .join('') +
       '</div>' +
       '</div>' +
       '<div class="af-row af-score-settings">' +

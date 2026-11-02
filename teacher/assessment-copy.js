@@ -65,6 +65,16 @@ window.AssessmentCopy = (function () {
     return !!ka && ka === _courseKey(cb.name);
   }
 
+  /* Whether dstCid can take work scored like `a`: DIBELS only goes to a
+     class linked to an ELA course or Social Studies 8 (constants.js
+     courseOffersDibels). */
+  function offersScoreMode(dstCid, a) {
+    return !isDibelsScored(a) || courseOffersDibels(COURSES[dstCid]);
+  }
+  function _dibelsRefusedText(names) {
+    return 'Not added to ' + _listNames(names) + ': DIBELS is only for ELA and Social Studies 8 classes.';
+  }
+
   /* The teacher's other live classes, same course first. */
   function copyTargets(cid) {
     var sameCourse = [];
@@ -425,7 +435,8 @@ window.AssessmentCopy = (function () {
       patch.dateAssigned = _dateOf(after);
     }
     if (changes.dueDate) patch.dueDate = _dueOf(after) || undefined;
-    if (changes.scoreMode || changes.maxPoints) {
+    if ((changes.scoreMode || changes.maxPoints) && !offersScoreMode(dstCid, after)) skipped.push('scoring mode');
+    else if (changes.scoreMode || changes.maxPoints) {
       patch.scoreMode = after.scoreMode;
       patch.maxPoints = after.maxPoints;
     }
@@ -657,12 +668,23 @@ window.AssessmentCopy = (function () {
      [{ cid, dateAssigned?, dueDate? }]. */
   function copyToClasses(srcCid, a, targets) {
     if (!targets || !targets.length || !a.copyGroup) return Promise.resolve([]);
+    var refused = [];
     return Promise.all(
       targets.map(function (t) {
         return loadClass(t.cid);
       }),
     )
       .then(function () {
+        // DIBELS work goes only to classes that offer DIBELS.
+        targets = targets.filter(function (t) {
+          if (offersScoreMode(t.cid, a)) return true;
+          refused.push(_className(t.cid));
+          return false;
+        });
+        if (!targets.length) {
+          _toast(_dibelsRefusedText(refused));
+          return null;
+        }
         var plans = targets.map(function (t) {
           var p = planCopy(srcCid, a, t.cid);
           p.dates = { dateAssigned: t.dateAssigned, dueDate: t.dueDate };
@@ -682,7 +704,8 @@ window.AssessmentCopy = (function () {
                 return p.dstName;
               }),
             ) +
-            '.',
+            '.' +
+            (refused.length ? ' ' + _dibelsRefusedText(refused) : ''),
         );
         return plans;
       });
@@ -1204,18 +1227,28 @@ window.AssessmentCopy = (function () {
         list.innerHTML = rows
           .map(function (x) {
             var already = x.copyGroup && have[x.copyGroup];
+            var refused = !already && !offersScoreMode(cid, x);
             var cat = _categoryOf(srcCid, x);
             return (
               '<label class="copy-review-check' +
-              (already ? ' af-copy-has' : '') +
+              (already || refused ? ' af-copy-has' : '') +
               '"><input type="checkbox" data-copy-src="' +
               esc(x.id) +
               '"' +
-              (already ? ' disabled' : '') +
+              (already || refused ? ' disabled' : '') +
               '> <span>' +
               esc(x.title) +
               '</span><span class="copy-review-muted"> ' +
-              esc([_dateOf(x), cat ? cat.name : '', already ? 'already here' : ''].filter(Boolean).join(' · ')) +
+              esc(
+                [
+                  _dateOf(x),
+                  cat ? cat.name : '',
+                  already ? 'already here' : '',
+                  refused ? 'DIBELS is only for ELA and Social Studies 8' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
+              ) +
               '</span></label>'
             );
           })

@@ -75,6 +75,15 @@ A 72% test showed 2.9 (Proficient's colour) on the student page, while its compe
 - **The % doesn't change.** Points work still counts its points in the course %.
 - A points 0 and Incomplete are Emerging, the table's bottom, as their competency already read them. Missing points work stays a 0 level.
 
+## Where DIBELS is offered (2026-11-02)
+
+Colin asked that the DIBELS 8 Benchmark be a choice only where it fits: ELA and Social Studies 8.
+
+- **Offered by the class's linked courses** (`course.curriculumTags`), not its name: Social Studies 8 and every English Language Arts course in the bank, grades 8 to 12, English First Peoples included. Humanities 8 (ELA 8 + SS 8) has it. `DIBELS_COURSE_TAGS` / `courseOffersDibels` in `shared/constants.js`; `tests/dibels-offered.test.js` checks the list against the bank.
+- **Every grade uses the Grade 8 goals.** DIBELS 8th Edition publishes benchmarks only through Grade 8, and Colin chose to apply them across the board rather than extrapolate or switch norms for grades 9 to 12. The cut-point lines already say "Grade 8".
+- **Stored work is untouched.** DIBELS work a class already has keeps working and keeps its card in the edit form, whatever the class is linked to. A class with no linked course isn't offered the type until it's linked (Re-link). No live class had DIBELS work on Nov 2.
+- **Copies follow the rule.** Also Add To and Add from Another Class skip classes that don't offer DIBELS and say so; a linked edit to DIBELS leaves such a copy's scoring as it was.
+
 ## Each Course Counts Equally (2026-11-02)
 
 A combined class rolled every competency into one overall, so the course with more competencies or folders outweighed the other. In Humanities 8 (ELA 8 + SS 8) ELA's 20 competencies were 71% of the overall with Folders Count as One off, and SS's 8 were 80% with it on. Colin approved the fix in the curriculum bank stage 4 plan (Nov 2).

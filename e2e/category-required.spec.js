@@ -78,6 +78,12 @@ test.describe('A category on every assessment', () => {
 
   test('DIBELS work needs no category', async ({ page }) => {
     await seedCategories(page, CATEGORIES);
+    // DIBELS is offered only in ELA and Social Studies 8 classes.
+    await page.addInitScript(cid => {
+      const courses = JSON.parse(localStorage.getItem('gb-courses'));
+      courses[cid].curriculumTags = ['ELA8', 'SS8'];
+      localStorage.setItem('gb-courses', JSON.stringify(courses));
+    }, TEST_COURSE.id);
     await gotoApp(page, '/assignments');
     await openNewForm(page);
     await page.locator('[data-action="setScoreMode"][data-mode="dibels"]').click();
