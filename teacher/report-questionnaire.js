@@ -180,10 +180,12 @@ window.ReportQuestionnaire = (function () {
       return CommentRealiser.tooLong(t);
     });
   }
-  /* After the count: why Approve and Next is off (the count turns orange),
-     else the class's limit. */
+  /* After the count: that it is past the class's limit or a sentence is
+     over 20 words (the count turns orange), else the class's limit. Only
+     information: nothing is blocked (Colin, 2026-11-02: "i don't care about
+     comment maximum length for myedbc - don't restrict users"). */
   function _countTail(text) {
-    if (_overLimit(text)) return ' · remove or shorten a sentence';
+    if (_overLimit(text)) return ' · over the limit';
     var n = longSentences(text).length;
     if (n === 1) return ' · one sentence is over 20 words';
     if (n > 1) return ' · ' + CommentBank.numberWords(n) + ' sentences are over 20 words';
@@ -226,7 +228,7 @@ window.ReportQuestionnaire = (function () {
       ? `<div class="qn-limit" role="dialog" aria-label="Character limit" id="tq-limit">
           <label class="qn-limit-field">Character limit for ${esc(course)}<input type="text" inputmode="numeric" autocomplete="off" placeholder="No limit" aria-label="Character limit" aria-describedby="tq-limit-msg" data-tq-limit="1" id="tq-limit-input" title="Leave it empty for no limit." value="${_limit() || ''}"></label>
           <span class="qn-limit-msg" id="tq-limit-msg" role="alert" hidden></span>
-          <span class="qn-limit-hint">The longest comment your school’s report card allows. Approve stays off past it.</span>
+          <span class="qn-limit-hint">The longest comment your school’s report card allows. The count turns orange past it; Approve still works.</span>
         </div>`
       : '';
     return `<span class="qn-count-wrap"><button type="button" class="qn-count-btn${_countFlag(text) ? ' over' : ''}" id="tq-count-btn" data-action="tqLine" data-do="limitMenu" aria-haspopup="dialog" aria-expanded="${_limitOpen}" title="The comment’s length. Click to set the longest comment ${esc(course)} allows."><span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span><span id="tq-limit-text">${esc(_countTail(text))}</span> ▾</button>${pop}</span>`;
@@ -795,11 +797,8 @@ window.ReportQuestionnaire = (function () {
     });
     document.body.classList.add('qn-roster');
   }
-  /* The toolbar's Ready count; while the comment is over the limit or has
-     a sentence over 20 words, "Approve and Next is off until the comment
-     fits." in its place (the States mockup). */
+  /* The toolbar's Ready count. */
   var _readyText = '';
-  var _fitsBlocked = false;
   // While a sentence no longer matches the gradebook: 'draft' (its row
   // shows Keep as Written) or 'approved' (the card shows Keep as Approved).
   var _claimsBlocked = '';
@@ -809,12 +808,7 @@ window.ReportQuestionnaire = (function () {
   };
   function _syncReadyLine() {
     var line = document.getElementById('tq-ready');
-    if (line)
-      line.textContent = _fitsBlocked
-        ? 'Approve and Next is off until the comment fits.'
-        : _claimsBlocked
-          ? CLAIMS_LINE[_claimsBlocked]
-          : _readyText;
+    if (line) line.textContent = _claimsBlocked ? CLAIMS_LINE[_claimsBlocked] : _readyText;
   }
   function restoreRoster() {
     if (typeof setSidebarAnnotator === 'function') setSidebarAnnotator(null);
@@ -1709,10 +1703,6 @@ window.ReportQuestionnaire = (function () {
       exclude: lastTermIds(_activeCourse, st.id, termId),
       kept: kept,
       order: order,
-      // Within the class's character limit, the teacher's typed sentences
-      // (kept by keepTyped) counted in.
-      charLimit: _limit(),
-      reserve: _typedLength(rows),
     });
     if (!d.text) return;
     _lastDraft[key] = d;
@@ -2164,9 +2154,9 @@ window.ReportQuestionnaire = (function () {
 
   /* What keeps Approve and Next off for the student on screen: 'deadline'
      until an IE's deadline is picked, each check not yet ticked, 'claims'
-     while a sentence no longer matches the gradebook, 'limit' past the
-     class's character limit (plan PR 8) and 'long' while a sentence is
-     over 20 words. */
+     while a sentence no longer matches the gradebook. The length never
+     keeps it off: the count says when the comment is past the class's
+     limit or a sentence is over 20 words. */
   function approveBlockers(st) {
     if (!st) return [];
     var f = _facts(st);
@@ -2177,14 +2167,6 @@ window.ReportQuestionnaire = (function () {
     _checksFor(f, _rowsFor(st, f)).forEach(function (id) {
       if (!_checked[_checkKey(st.id, id)]) out.push(id);
     });
-    var el = _box();
-    var text =
-      el && el.dataset.sid === String(st.id)
-        ? el.value
-        : plainComment((getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).narrative || '');
-    text = text.replace(/\s+$/, '');
-    if (_overLimit(text)) out.push('limit');
-    if (longSentences(text).length) out.push('long');
     return out;
   }
 
@@ -2193,14 +2175,13 @@ window.ReportQuestionnaire = (function () {
     var btn = document.getElementById('tq-approve-next');
     var st = _current();
     var blocked = approveBlockers(st);
-    _fitsBlocked = blocked.indexOf('limit') >= 0 || blocked.indexOf('long') >= 0;
     var approvedNow = !!st && !!(getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).approvedAt;
     _claimsBlocked = blocked.indexOf('claims') < 0 ? '' : approvedNow ? 'approved' : 'draft';
     _syncReadyLine();
     if (!btn) return;
     var date = blocked.indexOf('deadline') >= 0;
     var ticks = blocked.filter(function (b) {
-      return b !== 'deadline' && b !== 'deadlineRange' && b !== 'limit' && b !== 'long' && b !== 'claims';
+      return b !== 'deadline' && b !== 'deadlineRange' && b !== 'claims';
     });
     var ie = st && CommentBank.reportPath(_facts(st)) === 'ie';
     var tail =
@@ -2215,19 +2196,8 @@ window.ReportQuestionnaire = (function () {
             : '';
     if (blocked.indexOf('deadlineRange') >= 0) tail = ' ' + _rangeLine() + tail;
     if (_claimsBlocked) tail += ' ' + CLAIMS_LINE[_claimsBlocked];
-    if (blocked.indexOf('limit') >= 0)
-      tail += ' Shorten the comment to ' + _plural(_limit(), 'character', 'characters') + ' first.';
-    var long = blocked.indexOf('long') >= 0 ? longSentences(_boxText(st)).length : 0;
-    if (long) tail += ' Shorten the sentence' + (long > 1 ? 's' : '') + ' over 20 words first.';
     btn.disabled = blocked.length > 0;
     btn.title = APPROVE_TIP + (tail || ' ⌘ Return');
-  }
-  /* The comment on screen for the student, else as saved. */
-  function _boxText(st) {
-    var el = _box();
-    if (!st) return '';
-    if (el && el.dataset.sid === String(st.id)) return el.value;
-    return plainComment((getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).narrative || '');
   }
 
   /* ── The deadline calendar ───────────────────────────────── */
@@ -2818,13 +2788,6 @@ window.ReportQuestionnaire = (function () {
     var rows = keepTyped(old, rowsFromDraft(d, old));
     _rows[key] = rows;
     return rows;
-  }
-  /* The characters the teacher's typed rows add to a draft (keepTyped puts
-     them back), each with the space before it. */
-  function _typedLength(rows) {
-    return (rows || []).filter(isTyped).reduce(function (n, r) {
-      return n + String(r.text || '').length + 1;
-    }, 0);
   }
   /* A row for a sentence the teacher typed. */
   function typedRow(text, n) {
@@ -6570,8 +6533,6 @@ window.ReportQuestionnaire = (function () {
             })
             .filter(Boolean)
         : undefined,
-      charLimit: _limit(),
-      reserve: _typedLength(rows),
     });
     if (!d.text) return;
     _lastDraft[key] = d;
