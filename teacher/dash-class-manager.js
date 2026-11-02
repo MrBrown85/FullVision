@@ -5067,7 +5067,10 @@ window.DashClassManager = (function () {
 
     var dispatchOk = true;
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
-      var map = buildLearningMapFromTags(cwSelectedTags, { skip: Object.keys(cwSkipped) });
+      // Fresh local ids: the built map names rows after the course and its
+      // codes, the same for every class, and a second class made from the
+      // same course in this sitting would otherwise save onto the first's.
+      var map = withFreshLearningMapIds(buildLearningMapFromTags(cwSelectedTags, { skip: Object.keys(cwSkipped) }));
       if (map) {
         var mapSaved = saveLearningMap(course.id, map);
         updateCourse(course.id, { curriculumTags: cwSelectedTags.slice() });
@@ -8563,18 +8566,14 @@ window.DashClassManager = (function () {
         var c = a.cand;
         var sec;
         if (c.section) {
-          // From the curriculum: its subject comes along if the class lacks it.
-          if (
-            c.subject &&
-            !map.subjects.some(function (s) {
-              return s.id === c.subject.id;
-            })
-          ) {
-            map.subjects.push(structuredClone(c.subject));
-          }
+          // From the curriculum, under the class's own course for it (added
+          // if the class lacks it). New rows get fresh ids: the built map's
+          // are the same for every class.
           sec = structuredClone(c.section);
-          sec.id = freshId(c.section.id);
+          sec.id = freshId('');
           sec.tags[0].id = sec.id;
+          var subjectId = _cmClassSubjectFor(map, c.subject);
+          if (subjectId) sec.subject = sec.tags[0].subject = subjectId;
           // Its folder is the built map's; the class's folder of that name
           // takes it.
           delete sec.groupId;
@@ -8661,16 +8660,11 @@ window.DashClassManager = (function () {
         }
         if (grp) sec.groupId = grp.id;
         x.cands.forEach(function (c) {
-          if (
-            c.subject &&
-            !map.subjects.some(function (s) {
-              return s.id === c.subject.id;
-            })
-          )
-            map.subjects.push(structuredClone(c.subject));
           var add = structuredClone(c.section);
-          add.id = freshId(c.section.id);
+          add.id = freshId('');
           add.tags[0].id = add.id;
+          var addSubject = _cmClassSubjectFor(map, c.subject);
+          if (addSubject) add.subject = add.tags[0].subject = addSubject;
           delete add.groupId;
           if (grp) add.groupId = grp.id;
           map.sections.push(add);
@@ -8713,6 +8707,20 @@ window.DashClassManager = (function () {
     _cmCloseCompReview();
     cmTab = 'competencies';
     renderClassManager();
+  }
+
+  /* The class's course for a curriculum candidate's: the one with its id
+     or its name, else a new one with a fresh id. */
+  function _cmClassSubjectFor(map, subject) {
+    if (!subject) return null;
+    var own = (map.subjects || []).find(function (s) {
+      return s.id === subject.id || _cmNorm(s.name) === _cmNorm(subject.name);
+    });
+    if (own) return own.id;
+    var add = structuredClone(subject);
+    add.id = uid();
+    map.subjects.push(add);
+    return add.id;
   }
 
   function _cmFolderNamed(map, name) {
