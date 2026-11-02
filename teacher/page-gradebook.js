@@ -1245,6 +1245,8 @@ window.PageGradebook = (function () {
       var g = colGroupMap[i];
       var altClass = g && g.groupIdx % 2 === 1 ? ' gb-group-alt' : '';
       var tagW = col.colWidth || 54;
+      // The competencies behind the column, for the I Can statements its tip lists.
+      var tipTags = col.isPointsCol ? [] : col.tagIds || (col.tagId ? [col.tagId] : []);
       html +=
         '<div class="gb-grid-tag-header' +
         altClass +
@@ -1265,7 +1267,10 @@ window.PageGradebook = (function () {
         esc(col.tagText || col.tagCode) +
         '" data-tip-group="' +
         esc(col.groupName || '') +
-        '" aria-label="' +
+        '" data-tip-tags="' +
+        esc(tipTags.join(',')) +
+        // Focusable and tappable (Oct 21 decision: tap a code): Tab or a tap shows the tip.
+        '" tabindex="0" role="button" aria-label="' +
         esc(col.tagText || col.tagCode) +
         '">' +
         esc(col.tagCode) +
@@ -3344,11 +3349,40 @@ window.PageGradebook = (function () {
     var code = head.dataset.tipCode;
     var group = head.dataset.tipGroup;
     gbTip.className = 'dark';
+    // The I Can statements of each competency behind the column, named when
+    // there are several (a rubric criterion on two competencies).
+    var cid = activeCourse;
+    var tags = String(head.dataset.tipTags || '')
+      .split(',')
+      .filter(Boolean)
+      .map(function (id) {
+        return getTagById(cid, id);
+      })
+      .filter(function (t) {
+        return t && (t.i_can_statements || []).some(Boolean);
+      });
+    var icans = tags
+      .map(function (t) {
+        return (
+          (tags.length > 1 ? '<div class="gb-code-tip-sub">' + esc(_tagShortCode(t) || t.label || '') + '</div>' : '') +
+          '<ul class="gb-code-tip-icans">' +
+          t.i_can_statements
+            .filter(Boolean)
+            .map(function (x) {
+              return '<li>' + esc(x) + '</li>';
+            })
+            .join('') +
+          '</ul>'
+        );
+      })
+      .join('');
+    // html-safe: code, wording, group and every I Can statement through esc
     gbTip.innerHTML =
       '<div class="gb-code-tip">' +
       (code ? '<strong>' + esc(code) + '</strong> ' : '') +
       esc(head.dataset.tipText) +
       (group ? '<div class="gb-code-tip-group">' + esc(group) + '</div>' : '') +
+      icans +
       '</div>';
     gbTip.style.display = 'block';
     _tipSource = head;
@@ -3425,6 +3459,8 @@ window.PageGradebook = (function () {
     }
     var link = e.target.closest('.gb-grid-assess-group .gb-assess-title');
     if (link) _showAssessTitleTip(link.closest('.gb-grid-assess-group'));
+    var codeHead = e.target.closest('.gb-grid-tag-header');
+    if (codeHead) _showCodeTip(codeHead);
   }
 
   function _handleFocusout(e) {
@@ -3463,6 +3499,14 @@ window.PageGradebook = (function () {
           if (hit.el.isConnected && !_graderOpen()) showHeaderContextMenu(at, hit.el);
         }, 260);
       }
+      return;
+    }
+
+    // A tap on a competency's header shows its tip, and a second tap hides it.
+    var codeHead = e.target.closest('.gb-grid-tag-header');
+    if (codeHead) {
+      if (_tipSource === codeHead && e.pointerType !== 'mouse') _hideTip();
+      else _showCodeTip(codeHead);
       return;
     }
 

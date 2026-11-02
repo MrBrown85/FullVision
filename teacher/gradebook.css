@@ -1506,8 +1506,23 @@ th.gb-group-alt {
   font-weight: 700;
 }
 .gb-code-tip {
-  max-width: 280px;
+  max-width: 340px;
   line-height: 1.35;
+}
+.gb-code-tip-sub {
+  margin-top: 6px;
+  font-weight: 600;
+}
+.gb-code-tip-icans {
+  margin: 6px 0 0;
+  padding-left: 16px;
+}
+.gb-code-tip-icans li {
+  margin: 2px 0;
+}
+.gb-grid-tag-header:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
 }
 .gb-code-tip-group {
   margin-top: 2px;
