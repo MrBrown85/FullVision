@@ -1,0 +1,59 @@
+{
+  "_source": {
+    "description": "The Provincial Proficiency Scale, copied word for word from the Ministry's file by scripts/bc_proficiency_scale.py. Each level's text is its paragraphs on the page, split into sentences; anchor is the phrase from it that descriptors at that level echo.",
+    "title": "Unpacking the Proficiency Scale: Support for Educators",
+    "publisher": "BC Ministry of Education and Child Care",
+    "url": "https://www2.gov.bc.ca/assets/gov/education/administration/kindergarten-to-grade-12/unpacking-the-proficency-scale-support-for-educators.pdf",
+    "page": 2,
+    "format": "pdf",
+    "sha256": "6108a4a65b5862f5c015f2fd6dfe755726b2e91ce97535e5228e072a86ba5881",
+    "fetched": "2026-11-02"
+  },
+  "levels": [
+    {
+      "level": 1,
+      "name": "Emerging",
+      "text": [
+        "\"Emerging\" indicates that a student is just beginning to demonstrate learning in relation to the learning standards but is not yet doing so consistently.",
+        "Emerging isn’t failing.",
+        "Students who are not yet demonstrating any learning in relation to the learning standards can be assessed as Emerging.",
+        "If this is due to insufficient evidence of learning, the student can be assigned an IE."
+      ],
+      "anchor": "just beginning to demonstrate learning"
+    },
+    {
+      "level": 2,
+      "name": "Developing",
+      "text": [
+        "\"Developing\" indicates that a student is demonstrating learning in relation to the learning standards with growing consistency.",
+        "The student is showing initial understanding but is still in the process of developing their competency in relation to the learning standards.",
+        "Developing isn’t failing.",
+        "All students will be developing in some areas and at specific points in time."
+      ],
+      "anchor": "with growing consistency"
+    },
+    {
+      "level": 3,
+      "name": "Proficient",
+      "text": [
+        "\"Proficient\" is the goal for all students.",
+        "A student is Proficient when they demonstrate the expected learning in relation to the learning standards.",
+        "Proficient is not synonymous with perfection.",
+        "Instead, the student is able to demonstrate their learning consistently or most of the time."
+      ],
+      "anchor": "consistently or most of the time"
+    },
+    {
+      "level": 4,
+      "name": "Extending",
+      "text": [
+        "\"Extending\" is not synonymous with perfection.",
+        "A student is Extending when they demonstrate learning, in relation to learning standards, with increasing depth and complexity.",
+        "Extending is not a bonus or a reward and does not necessarily require that students do a greater volume of work or work at a higher grade level.",
+        "Extending is not the goal for all students; Proficient is.",
+        "Therefore, if a student turns in all their work and demonstrates evidence of learning in all learning standards for an area of learning, they are not automatically assigned Extending."
+      ],
+      "anchor": "with increasing depth and complexity"
+    }
+  ]
+}
