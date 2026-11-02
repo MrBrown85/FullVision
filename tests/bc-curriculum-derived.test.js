@@ -120,6 +120,16 @@ describe('BC curriculum derived layer', () => {
     }
   });
 
+  it('gives the same wording the same name in every course', () => {
+    const byRaw = new Map();
+    for (const r of rows) {
+      const name = r.d.short_label.replace(/ \d+$/, '');
+      byRaw.set(r.raw, (byRaw.get(r.raw) || new Set()).add(name));
+    }
+    const split = [...byRaw].filter(([, names]) => names.size > 1);
+    expect(split.map(([raw, names]) => `${[...names].join(' / ')}: ${raw}`)).toEqual([]);
+  });
+
   it('gives no name that is the statement’s first words, cut', () => {
     const cut = rows.filter(r => {
       const lw = words(r.d.short_label);

@@ -181,7 +181,7 @@
           {
             "id": "bc.adst8.cc.10",
             "code": "PR2",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -457,7 +457,7 @@
           {
             "id": "bc.adst8.cc.29",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -517,7 +517,7 @@
           {
             "id": "bc.adst9.cc.3",
             "code": "DF2",
-            "short_label": "Users and Context",
+            "short_label": "Users & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -621,7 +621,7 @@
           {
             "id": "bc.adst9.cc.10",
             "code": "PR2",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -909,7 +909,7 @@
           {
             "id": "bc.adst9.cc.30",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -957,7 +957,7 @@
           {
             "id": "bc.cstu10.cc.2",
             "code": "DF1",
-            "short_label": "Users and Context",
+            "short_label": "Users & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -1049,7 +1049,7 @@
           {
             "id": "bc.cstu10.cc.8",
             "code": "PR2",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -1313,7 +1313,7 @@
           {
             "id": "bc.cstu10.cc.26",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -1753,7 +1753,7 @@
           {
             "id": "bc.cul10.cc.29",
             "code": "TC2",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -1801,7 +1801,7 @@
           {
             "id": "bc.draft10.cc.2",
             "code": "DF1",
-            "short_label": "Users and Context",
+            "short_label": "Users & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -1905,7 +1905,7 @@
           {
             "id": "bc.draft10.cc.9",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -2169,7 +2169,7 @@
           {
             "id": "bc.draft10.cc.27",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -2217,7 +2217,7 @@
           {
             "id": "bc.elrob10.cc.2",
             "code": "DF1",
-            "short_label": "Users and Context",
+            "short_label": "Users & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -2321,7 +2321,7 @@
           {
             "id": "bc.elrob10.cc.9",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -2585,7 +2585,7 @@
           {
             "id": "bc.elrob10.cc.27",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -2737,7 +2737,7 @@
           {
             "id": "bc.ent10.cc.9",
             "code": "PR2",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -3037,7 +3037,7 @@
           {
             "id": "bc.ent10.cc.30",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -3097,7 +3097,7 @@
           {
             "id": "bc.fas10.cc.3",
             "code": "DF2",
-            "short_label": "Needs and Wants",
+            "short_label": "Needs & Wants",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -3189,7 +3189,7 @@
           {
             "id": "bc.fas10.cc.9",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -3871,7 +3871,7 @@
           {
             "id": "bc.fs10.cc.29",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -3931,7 +3931,7 @@
           {
             "id": "bc.mdes10.cc.3",
             "code": "DF1",
-            "short_label": "Users and Context",
+            "short_label": "Users & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -3955,7 +3955,7 @@
           {
             "id": "bc.mdes10.cc.5",
             "code": "DF3",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -4059,7 +4059,7 @@
           {
             "id": "bc.mdes10.cc.12",
             "code": "PR2",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -4335,7 +4335,7 @@
           {
             "id": "bc.mdes10.cc.31",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -4383,7 +4383,7 @@
           {
             "id": "bc.metal10.cc.2",
             "code": "DF1",
-            "short_label": "Users and Context",
+            "short_label": "Users & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -4499,7 +4499,7 @@
           {
             "id": "bc.metal10.cc.10",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -4763,7 +4763,7 @@
           {
             "id": "bc.metal10.cc.28",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -4811,7 +4811,7 @@
           {
             "id": "bc.pwrtech10.cc.2",
             "code": "DF1",
-            "short_label": "Users and Context",
+            "short_label": "Users & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -5143,7 +5143,7 @@
           {
             "id": "bc.pwrtech10.cc.24",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -5191,7 +5191,7 @@
           {
             "id": "bc.techex10.cc.2",
             "code": "DF1",
-            "short_label": "Users and Context",
+            "short_label": "Users & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -5307,7 +5307,7 @@
           {
             "id": "bc.techex10.cc.10",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -5571,7 +5571,7 @@
           {
             "id": "bc.techex10.cc.28",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -5619,7 +5619,7 @@
           {
             "id": "bc.text10.cc.2",
             "code": "DF1",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -5963,7 +5963,7 @@
           {
             "id": "bc.text10.cc.25",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -6011,7 +6011,7 @@
           {
             "id": "bc.wdev10.cc.2",
             "code": "DF1",
-            "short_label": "Users and Context",
+            "short_label": "Users & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -6103,7 +6103,7 @@
           {
             "id": "bc.wdev10.cc.8",
             "code": "PR2",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -6391,7 +6391,7 @@
           {
             "id": "bc.wood10.cc.2",
             "code": "DF1",
-            "short_label": "Users and Context",
+            "short_label": "Users & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -6507,7 +6507,7 @@
           {
             "id": "bc.wood10.cc.10",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -6771,7 +6771,7 @@
           {
             "id": "bc.wood10.cc.28",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -7300,7 +7300,7 @@
           {
             "id": "bc.auto11.cc.13",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -7578,7 +7578,7 @@
           {
             "id": "bc.cis11.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -7970,7 +7970,7 @@
           {
             "id": "bc.cprog11.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -8814,7 +8814,7 @@
           {
             "id": "bc.cul11.cc.30",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -8874,7 +8874,7 @@
           {
             "id": "bc.dcomm11.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9326,7 +9326,7 @@
           {
             "id": "bc.draft11.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9418,7 +9418,7 @@
           {
             "id": "bc.draft11.cc.9",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9488,7 +9488,7 @@
           {
             "id": "bc.draft11.cc.14",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9754,7 +9754,7 @@
           {
             "id": "bc.elec11.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9846,7 +9846,7 @@
           {
             "id": "bc.elec11.cc.9",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9916,7 +9916,7 @@
           {
             "id": "bc.elec11.cc.14",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -10194,7 +10194,7 @@
           {
             "id": "bc.eng11.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -10286,7 +10286,7 @@
           {
             "id": "bc.eng11.cc.9",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -10356,7 +10356,7 @@
           {
             "id": "bc.eng11.cc.14",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11062,7 +11062,7 @@
           {
             "id": "bc.gprod11.cc.4",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11606,7 +11606,7 @@
           {
             "id": "bc.ifr11.cc.9",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11932,7 +11932,7 @@
           {
             "id": "bc.mdes11.cc.4",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -12372,7 +12372,7 @@
           {
             "id": "bc.metal11.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -12476,7 +12476,7 @@
           {
             "id": "bc.metal11.cc.10",
             "code": "PR2",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -12546,7 +12546,7 @@
           {
             "id": "bc.metal11.cc.15",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -13204,7 +13204,7 @@
           {
             "id": "bc.rob11.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -13308,7 +13308,7 @@
           {
             "id": "bc.rob11.cc.10",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -13378,7 +13378,7 @@
           {
             "id": "bc.rob11.cc.15",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -14072,12 +14072,12 @@
           {
             "id": "bc.tour11.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Consumers & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:adst",
-              "rule": "^Identify (and analyze )?potential (users|consumers|user)[, ].*(intended impact|impacts of design)",
+              "rule": "^Identify (and analyze )?potential consumers[, ].*intended impact",
               "raw_sha": "b441cf369e00b3b2"
             }
           },
@@ -14200,7 +14200,7 @@
           {
             "id": "bc.tour11.cc.12",
             "code": "PR3",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -14488,7 +14488,7 @@
           {
             "id": "bc.wood11.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -14592,7 +14592,7 @@
           {
             "id": "bc.wood11.cc.10",
             "code": "PR2",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -14662,7 +14662,7 @@
           {
             "id": "bc.wood11.cc.15",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -15247,7 +15247,7 @@
           {
             "id": "bc.amj12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -15433,7 +15433,7 @@
           {
             "id": "bc.amj12.cc.16",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -15861,7 +15861,7 @@
           {
             "id": "bc.auto12.cc.13",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -16128,7 +16128,7 @@
           {
             "id": "bc.bca12.cc.3",
             "code": "DS3",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -16622,7 +16622,7 @@
           {
             "id": "bc.cdc12.cc.9",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -16936,7 +16936,7 @@
           {
             "id": "bc.cisys12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -17376,7 +17376,7 @@
           {
             "id": "bc.cprog12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -18244,7 +18244,7 @@
           {
             "id": "bc.cul12.cc.32",
             "code": "TC3",
-            "short_label": "Land and Culture",
+            "short_label": "Land & Culture",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -18304,7 +18304,7 @@
           {
             "id": "bc.dmd12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -18768,7 +18768,7 @@
           {
             "id": "bc.draft12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -18942,7 +18942,7 @@
           {
             "id": "bc.draft12.cc.15",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -19208,7 +19208,7 @@
           {
             "id": "bc.ecom12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -20116,7 +20116,7 @@
           {
             "id": "bc.edt12.cc.12",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -20394,7 +20394,7 @@
           {
             "id": "bc.elec12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -20580,7 +20580,7 @@
           {
             "id": "bc.elec12.cc.16",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -20858,7 +20858,7 @@
           {
             "id": "bc.eng12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -21044,7 +21044,7 @@
           {
             "id": "bc.eng12.cc.16",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -21322,7 +21322,7 @@
           {
             "id": "bc.ent12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -22961,7 +22961,7 @@
           {
             "id": "bc.furncab12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -23147,7 +23147,7 @@
           {
             "id": "bc.furncab12.cc.16",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -23425,7 +23425,7 @@
           {
             "id": "bc.gprod12.cc.4",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -23957,7 +23957,7 @@
           {
             "id": "bc.hle12.cc.9",
             "code": "PR1",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -24271,7 +24271,7 @@
           {
             "id": "bc.icd12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -24457,7 +24457,7 @@
           {
             "id": "bc.icd12.cc.16",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -24735,7 +24735,7 @@
           {
             "id": "bc.machw12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -24921,7 +24921,7 @@
           {
             "id": "bc.machw12.cc.16",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -25211,7 +25211,7 @@
           {
             "id": "bc.mdes12.cc.4",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -25651,7 +25651,7 @@
           {
             "id": "bc.mech12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -25837,7 +25837,7 @@
           {
             "id": "bc.mech12.cc.16",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -26115,7 +26115,7 @@
           {
             "id": "bc.metal12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -26267,7 +26267,7 @@
           {
             "id": "bc.metal12.cc.14",
             "code": "PR5",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -26567,7 +26567,7 @@
           {
             "id": "bc.rob12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -26753,7 +26753,7 @@
           {
             "id": "bc.rob12.cc.16",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -27031,7 +27031,7 @@
           {
             "id": "bc.rov12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -27217,7 +27217,7 @@
           {
             "id": "bc.rov12.cc.16",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -27483,12 +27483,12 @@
           {
             "id": "bc.ssf12.cc.2",
             "code": "DF1",
-            "short_label": "Potential Users",
+            "short_label": "Potential Customers",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:adst",
-              "rule": "^Identify potential (users|consumers)",
+              "rule": "^Identify potential consumers or customers",
               "raw_sha": "e654339c2ba984c5"
             }
           },
@@ -28411,12 +28411,12 @@
           {
             "id": "bc.tour12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Consumers & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:adst",
-              "rule": "^Identify (and analyze )?potential (users|consumers|user)[, ].*(intended impact|impacts of design)",
+              "rule": "^Identify (and analyze )?potential consumers[, ].*intended impact",
               "raw_sha": "a3258d40546e8070"
             }
           },
@@ -28527,7 +28527,7 @@
           {
             "id": "bc.tour12.cc.11",
             "code": "PR2",
-            "short_label": "Prototype Planning",
+            "short_label": "Plan Development",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -28815,7 +28815,7 @@
           {
             "id": "bc.wood12.cc.3",
             "code": "DF2",
-            "short_label": "Users and Impacts",
+            "short_label": "Users & Impacts",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -29001,7 +29001,7 @@
           {
             "id": "bc.wood12.cc.16",
             "code": "TS2",
-            "short_label": "Prototype Testing",
+            "short_label": "Testing & Data",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -29626,7 +29626,7 @@
           {
             "id": "bc.arts9.cc.13",
             "code": "CE3",
-            "short_label": "Respect for Audience",
+            "short_label": "Respect for Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -29650,7 +29650,7 @@
           {
             "id": "bc.arts9.cc.15",
             "code": "CE5",
-            "short_label": "Personal Meaning",
+            "short_label": "Meaningful Works",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -29882,7 +29882,7 @@
           {
             "id": "bc.dance9.cc.15",
             "code": "CE3",
-            "short_label": "Collaborative Work",
+            "short_label": "Collaboration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30102,7 +30102,7 @@
           {
             "id": "bc.drama9.cc.14",
             "code": "CE3",
-            "short_label": "Collaborative Work",
+            "short_label": "Collaboration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30578,7 +30578,7 @@
           {
             "id": "bc.visart9.cc.16",
             "code": "CE3",
-            "short_label": "Respect for Audience",
+            "short_label": "Respect for Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30602,7 +30602,7 @@
           {
             "id": "bc.visart9.cc.18",
             "code": "CE5",
-            "short_label": "Personal Meaning",
+            "short_label": "Meaningful Works",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -31114,12 +31114,12 @@
           {
             "id": "bc.chorus10.cc.19",
             "code": "CE2",
-            "short_label": "Community Connection",
+            "short_label": "Wider Connections",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^(Make|Connect) (personal and community )?connections|^Connect with local issues",
+              "rule": "^Make connections (with others on|through music)",
               "raw_sha": "96797548a289482f"
             }
           },
@@ -31406,12 +31406,12 @@
           {
             "id": "bc.cmusic10.cc.19",
             "code": "CE2",
-            "short_label": "Community Connection",
+            "short_label": "Wider Connections",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^(Make|Connect) (personal and community )?connections|^Connect with local issues",
+              "rule": "^Make connections (with others on|through music)",
               "raw_sha": "96797548a289482f"
             }
           },
@@ -32135,12 +32135,12 @@
           {
             "id": "bc.dcomp10.cc.2",
             "code": "EC2",
-            "short_label": "Choreographic Works",
+            "short_label": "Company Performance",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Create, rehearse, refine, and perform",
+              "rule": "^Create, rehearse, refine, and perform with a dance company",
               "raw_sha": "4d287ae72371013f"
             }
           },
@@ -33290,12 +33290,12 @@
           {
             "id": "bc.instmus10.cc.19",
             "code": "CE2",
-            "short_label": "Community Connection",
+            "short_label": "Wider Connections",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^(Make|Connect) (personal and community )?connections|^Connect with local issues",
+              "rule": "^Make connections (with others on|through music)",
               "raw_sha": "96797548a289482f"
             }
           },
@@ -35302,7 +35302,7 @@
           {
             "id": "bc.artstudio11.cc.19",
             "code": "CE3",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37409,7 +37409,7 @@
           {
             "id": "bc.dcond11.cc.13",
             "code": "CD2",
-            "short_label": "Fitness Activities",
+            "short_label": "Body Systems",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -38682,7 +38682,7 @@
           {
             "id": "bc.ftvt11.cc.22",
             "code": "CE3",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -39022,7 +39022,7 @@
           {
             "id": "bc.garts11.cc.22",
             "code": "CE4",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -39654,7 +39654,7 @@
           {
             "id": "bc.meda11.cc.21",
             "code": "CE5",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40226,7 +40226,7 @@
           {
             "id": "bc.photo11.cc.17",
             "code": "CE3",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40554,7 +40554,7 @@
           {
             "id": "bc.sa2d11.cc.20",
             "code": "CE4",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40870,7 +40870,7 @@
           {
             "id": "bc.sa3d11.cc.21",
             "code": "CE5",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -41722,7 +41722,7 @@
           {
             "id": "bc.artstudio12.cc.22",
             "code": "CE4",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -42378,12 +42378,12 @@
           {
             "id": "bc.cmusic12.cc.22",
             "code": "CE3",
-            "short_label": "Community Connection",
+            "short_label": "Wider Connections",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^(Make|Connect) (personal and community )?connections|^Connect with local issues",
+              "rule": "^Make connections (with others on|through music)",
               "raw_sha": "5ea297673e014a25"
             }
           },
@@ -42682,12 +42682,12 @@
           {
             "id": "bc.cp12.cc.18",
             "code": "CE2",
-            "short_label": "Community Connection",
+            "short_label": "Wider Connections",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^(Make|Connect) (personal and community )?connections|^Connect with local issues",
+              "rule": "^Make connections (with others on|through music)",
               "raw_sha": "e9d503def7d8cd17"
             }
           },
@@ -43901,7 +43901,7 @@
           {
             "id": "bc.dcond12.cc.16",
             "code": "CD3",
-            "short_label": "Fitness Activities",
+            "short_label": "Body Systems",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -45246,7 +45246,7 @@
           {
             "id": "bc.ftvt12.cc.23",
             "code": "CE4",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -45586,7 +45586,7 @@
           {
             "id": "bc.garts12.cc.22",
             "code": "CE4",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46266,7 +46266,7 @@
           {
             "id": "bc.meda12.cc.21",
             "code": "CE5",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46874,7 +46874,7 @@
           {
             "id": "bc.photo12.cc.18",
             "code": "CE4",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47190,7 +47190,7 @@
           {
             "id": "bc.sa2d12.cc.20",
             "code": "CE4",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47506,7 +47506,7 @@
           {
             "id": "bc.sa3d12.cc.21",
             "code": "CE5",
-            "short_label": "Career Opportunities",
+            "short_label": "Arts Opportunities",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -48113,7 +48113,7 @@
           {
             "id": "bc.caree8.cc.2",
             "code": "CE2",
-            "short_label": "Purpose and Passion",
+            "short_label": "Purpose & Passion",
             "prov": {
               "folder": "none: no heading",
               "code": "stem+position",
@@ -48197,7 +48197,7 @@
           {
             "id": "bc.caree8.cc.9",
             "code": "CE9",
-            "short_label": "Networks and Mentors",
+            "short_label": "Networks & Mentors",
             "prov": {
               "folder": "none: no heading",
               "code": "stem+position",
@@ -48280,7 +48280,7 @@
           {
             "id": "bc.caree9.cc.2",
             "code": "CE2",
-            "short_label": "Purpose and Passion",
+            "short_label": "Purpose & Passion",
             "prov": {
               "folder": "none: no heading",
               "code": "stem+position",
@@ -48364,7 +48364,7 @@
           {
             "id": "bc.caree9.cc.9",
             "code": "CE9",
-            "short_label": "Networks and Mentors",
+            "short_label": "Networks & Mentors",
             "prov": {
               "folder": "none: no heading",
               "code": "stem+position",
@@ -49959,7 +49959,7 @@
           {
             "id": "bc.ela9.cc.13",
             "code": "CP13",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -50113,7 +50113,7 @@
           {
             "id": "bc.comp10.cc.2",
             "code": "CP2",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -50363,7 +50363,7 @@
           {
             "id": "bc.cw10.cc.2",
             "code": "CP2",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -50601,7 +50601,7 @@
           {
             "id": "bc.efpls10.cc.2",
             "code": "CP2",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -50839,7 +50839,7 @@
           {
             "id": "bc.efpnm10.cc.2",
             "code": "CP2",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -51113,7 +51113,7 @@
           {
             "id": "bc.efpsl10.cc.2",
             "code": "CP2",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -51363,7 +51363,7 @@
           {
             "id": "bc.efpw10.cc.2",
             "code": "CP2",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -51613,7 +51613,7 @@
           {
             "id": "bc.ls10.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -51899,7 +51899,7 @@
           {
             "id": "bc.nm10.cc.4",
             "code": "CP4",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -52161,7 +52161,7 @@
           {
             "id": "bc.sl10.cc.2",
             "code": "CP2",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -52423,7 +52423,7 @@
           {
             "id": "bc.comp11.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -52733,7 +52733,7 @@
           {
             "id": "bc.cw11.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -53127,7 +53127,7 @@
           {
             "id": "bc.efplsnm11.cc.11",
             "code": "CP11",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -53509,7 +53509,7 @@
           {
             "id": "bc.efplssl11.cc.11",
             "code": "CP11",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -53855,7 +53855,7 @@
           {
             "id": "bc.efplsw11.cc.12",
             "code": "CP12",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -54081,7 +54081,7 @@
           {
             "id": "bc.ls11.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -54391,7 +54391,7 @@
           {
             "id": "bc.nmed11.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -54713,7 +54713,7 @@
           {
             "id": "bc.spkn11.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -55047,7 +55047,7 @@
           {
             "id": "bc.comp12.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -55345,7 +55345,7 @@
           {
             "id": "bc.cw12.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -55763,7 +55763,7 @@
           {
             "id": "bc.efp12.cc.11",
             "code": "CP11",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -56013,7 +56013,7 @@
           {
             "id": "bc.es12.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -56323,7 +56323,7 @@
           {
             "id": "bc.ls12.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -56645,7 +56645,7 @@
           {
             "id": "bc.nmed12.cc.4",
             "code": "CP4",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -56955,7 +56955,7 @@
           {
             "id": "bc.spkn12.cc.3",
             "code": "CP3",
-            "short_label": "Cultural Diversity",
+            "short_label": "Societal Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -61349,7 +61349,7 @@
           {
             "id": "bc.phe8.cc.4",
             "code": "PHY4",
-            "short_label": "Safety and Fair Play",
+            "short_label": "Safety & Fair Play",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -61394,7 +61394,7 @@
           {
             "id": "bc.phe8.cc.7",
             "code": "HAV2",
-            "short_label": "Activity and Health",
+            "short_label": "Activity & Health",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -61568,7 +61568,7 @@
           {
             "id": "bc.phe8.cc.20",
             "code": "MW4",
-            "short_label": "Identity and Change",
+            "short_label": "Identity & Change",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -61629,7 +61629,7 @@
           {
             "id": "bc.phe9.cc.4",
             "code": "PHY4",
-            "short_label": "Safety and Fair Play",
+            "short_label": "Safety & Fair Play",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -61674,7 +61674,7 @@
           {
             "id": "bc.phe9.cc.7",
             "code": "HAV2",
-            "short_label": "Activity and Health",
+            "short_label": "Activity & Health",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -61897,7 +61897,7 @@
           {
             "id": "bc.phe10.cc.4",
             "code": "PHY4",
-            "short_label": "Safety and Fair Play",
+            "short_label": "Safety & Fair Play",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -62140,7 +62140,7 @@
           {
             "id": "bc.phe10.cc.22",
             "code": "MW5",
-            "short_label": "Activity and Health",
+            "short_label": "Activity & Health",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -62201,7 +62201,7 @@
           {
             "id": "bc.al11.cc.4",
             "code": "HW4",
-            "short_label": "Activity and Health",
+            "short_label": "Activity & Health",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -62222,7 +62222,7 @@
           {
             "id": "bc.al11.cc.5",
             "code": "SF1",
-            "short_label": "Safety and Fair Play",
+            "short_label": "Safety & Fair Play",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -62442,7 +62442,7 @@
           {
             "id": "bc.fc11.cc.11",
             "code": "TR2",
-            "short_label": "Fitness Planning",
+            "short_label": "Fitness Program",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -62596,7 +62596,7 @@
           {
             "id": "bc.oded11.cc.7",
             "code": "OS7",
-            "short_label": "Strengths and Growth",
+            "short_label": "Strengths & Growth",
             "prov": {
               "folder": "short list",
               "code": "stem+position",
@@ -63021,7 +63021,7 @@
           {
             "id": "bc.fc12.cc.11",
             "code": "TR2",
-            "short_label": "Fitness Planning",
+            "short_label": "Fitness Program",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -63668,7 +63668,7 @@
           {
             "id": "bc.sci8.cc.27",
             "code": "CM2",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -64086,7 +64086,7 @@
           {
             "id": "bc.sci9.cc.30",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -64504,7 +64504,7 @@
           {
             "id": "bc.sci10.cc.30",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -64934,7 +64934,7 @@
           {
             "id": "bc.chem11.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -65364,7 +65364,7 @@
           {
             "id": "bc.earth11.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -65794,7 +65794,7 @@
           {
             "id": "bc.envsci11.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -66224,7 +66224,7 @@
           {
             "id": "bc.ls11sci.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -66654,7 +66654,7 @@
           {
             "id": "bc.phys11.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -67084,7 +67084,7 @@
           {
             "id": "bc.sfc11.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -67514,7 +67514,7 @@
           {
             "id": "bc.anat12.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -67944,7 +67944,7 @@
           {
             "id": "bc.chem12.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -68374,7 +68374,7 @@
           {
             "id": "bc.envsci12.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -68804,7 +68804,7 @@
           {
             "id": "bc.geo12.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -69234,7 +69234,7 @@
           {
             "id": "bc.phys12.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -69664,7 +69664,7 @@
           {
             "id": "bc.spsci12.cc.31",
             "code": "CM3",
-            "short_label": "Sense of Place",
+            "short_label": "Place Perspectives",
             "prov": {
               "folder": "heading",
               "code": "stem+position",

@@ -97,6 +97,6 @@ RULES = [
     # Science: Communicating
     (r"^Communicate ideas, findings, and solutions", "Sharing Findings"),
     (r"^Communicate scientific ideas", "Scientific Argument"),
-    (r"^Express and reflect on a variety of experiences", "Sense of Place"),
+    (r"^Express and reflect on a variety of experiences", "Place Perspectives"),
     (r"^Formulate physical or mental theoretical models", "Theoretical Models"),
 ]

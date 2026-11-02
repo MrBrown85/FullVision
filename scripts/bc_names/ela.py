@@ -45,7 +45,7 @@ RULES = [
     (r"role of oral traditions in First Peoples cultures", "Oral Traditions"),
     (r"roles? of story", "Story & Tradition"),
     (r"protocols and ownership", "Protocol & Ownership"),
-    (r"diversity (within and across|among) First Peoples", "Cultural Diversity"),
+    (r"diversity (within and across|among) First Peoples", "Societal Diversity"),
     (r"influence of (land/)?place", "Influence of Place"),
     (r"First Peoples languages and texts reflect", "Language & Worldview"),
     (r"new media affect First Peoples", "New Media Effects"),

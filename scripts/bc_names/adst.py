@@ -32,11 +32,13 @@ RULES = [
     (r"^Identify key features or potential users", "User Requirements"),
     (r"^Identify requirements, intended impacts", "Service Requirements"),
     (r"^Identify context and requirements", "People Involved"),
-    (r"^Identify needs and wants", "Needs and Wants"),
-    (r"^Identify (and analyze )?potential (users|consumers|user)[, ].*(intended impact|impacts of design)", "Users and Impacts"),
-    (r"^Identify potential users,? (societal impacts, )?(and )?(other )?relevant contextual", "Users and Context"),
+    (r"^Identify needs and wants", "Needs & Wants"),
+    (r"^Identify (and analyze )?potential consumers[, ].*intended impact", "Consumers & Impacts"),
+    (r"^Identify (and analyze )?potential (users|consumers|user)[, ].*(intended impact|impacts of design)", "Users & Impacts"),
+    (r"^Identify potential users,? (societal impacts, )?(and )?(other )?relevant contextual", "Users & Context"),
     (r"^Identify potential consumers and contexts", "Consumer Context"),
     (r"^Identify and analyze potential (users|consumers)", "User Analysis"),
+    (r"^Identify potential consumers or customers", "Potential Customers"),
     (r"^Identify potential (users|consumers)", "Potential Users"),
     (r"^Identify criteria for success", "Success Criteria"),
     (r"^Make inferences about premises and constraints", "Constraint Inference"),
@@ -83,7 +85,7 @@ RULES = [
     # Prototyping: planning, materials, building and recording.
     (r"sources of information to develop a plan", "Informed Planning"),
     (r"^Identify and use sources of information", "Information Sources"),
-    (r"^(Choose a form( for prototyping)? and )?develop a (product |product and/or service |product plan and/or service )?plan|^Visualize possibilities and develop a plan|^Choose a form", "Prototype Planning"),
+    (r"^(Choose a form( for prototyping)? and )?develop a (product |product and/or service |product plan and/or service )?plan|^Visualize possibilities and develop a plan|^Choose a form", "Plan Development"),
     (r"^Explore and test a variety of materials", "Material Testing"),
     (r"^(Evaluate|Consider) a variety of materials", "Material Evaluation"),
     (r"ingredients and materials for effective use", "Ingredient Analysis"),
@@ -101,7 +103,7 @@ RULES = [
 
     # Testing: building tests, gathering feedback, acting on it.
     (r"^Test the first version", "Prototype Testing"),
-    (r"^Develop an appropriate test, conduct|^Develop an appropriate test of the prototype, conduct", "Prototype Testing"),
+    (r"^Develop an appropriate test, conduct|^Develop an appropriate test of the prototype, conduct", "Testing & Data"),
     (r"^(Develop|Use) an appropriate test to determine the success of (a|the) (standard )?recipe", "Recipe Testing"),
     (r"^Use an appropriate test to determine the success of the dish", "Dish Testing"),
     (r"^Develop (an )?appropriate tests?", "Test Design"),
@@ -181,7 +183,7 @@ RULES = [
     # Applied Technologies: choosing tools and weighing their impacts.
     (r"^(Select|Choose), (and as needed|adapt)", "Tool Selection"),
     (r"impacts, including unintended negative consequences, of (the )?choices", "Technology Impacts"),
-    (r"land, natural resources, and culture", "Land and Culture"),
+    (r"land, natural resources, and culture", "Land & Culture"),
     (r"social, cultural, and environmental conditions", "Cultural Influences"),
     (r"cultural beliefs, values, and ethical positions", "Cultural Values"),
     (r"societal change", "Societal Change"),
