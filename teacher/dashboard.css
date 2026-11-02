@@ -6020,3 +6020,30 @@ label.cm-cr-row {
   margin-top: 0;
   padding-top: 0;
 }
+
+/* Competency list: each card's name with its wording's first line under it
+   (hidden once the card is open), and runs of competencies outside folders
+   sitting among the folders. */
+.cm-std-titles {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cm-std-line {
+  font-size: var(--text-sm);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cm-std-card.open .cm-std-line {
+  display: none;
+}
+.cm-comp-list .mod-folder.cm-loose-run > .mod-folder-body {
+  padding-top: 0;
+}
+.cm-std-ican-none {
+  color: var(--text);
+}

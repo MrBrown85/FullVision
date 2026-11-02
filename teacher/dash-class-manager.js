@@ -125,6 +125,53 @@ window.DashClassManager = (function () {
     return !!(tag && tag.source_text && (tag.text || '').trim() !== tag.source_text.trim());
   }
 
+  /* The read-only line under a competency's wording: where it came from.
+     From the rebuilt bank, the course and the Ministry's own headings,
+     looked up by its bank id ("BC Curriculum · Drafting 10 · Applied
+     Design › Prototyping"); the bank loads the first time it's needed. From
+     the old bank, its heading; hand-made, its category. */
+  function _cmStdSource(sec, tag, subName) {
+    if (tag.bank_id) {
+      var place = _cmBankPlace(tag.bank_id);
+      if (place)
+        return ['BC Curriculum', place.course]
+          .concat(place.path.length ? [place.path.join(' \u203A ')] : [])
+          .join(' · ');
+      return 'BC Curriculum' + (subName ? ' · ' + subName : '');
+    }
+    return (tag.source_text ? 'BC Curriculum' : 'Category') + (sec.name ? ' · ' + sec.name : '');
+  }
+
+  var _cmBankPlaces = null;
+  var _cmBankPlacesOf = null;
+  var _cmBankLoading = false;
+  function _cmBankPlace(bankId) {
+    if (!CURRICULUM_INDEX) {
+      if (!_cmBankLoading && typeof loadCurriculumIndex === 'function') {
+        _cmBankLoading = true;
+        loadCurriculumIndex().then(function (idx) {
+          _cmBankLoading = false;
+          if (idx && cmMode === 'edit') _cmRenderWithScroll();
+        });
+      }
+      return null;
+    }
+    if (!_cmBankPlaces || _cmBankPlacesOf !== CURRICULUM_INDEX) {
+      _cmBankPlaces = {};
+      _cmBankPlacesOf = CURRICULUM_INDEX;
+      Object.keys(CURRICULUM_INDEX).forEach(function (key) {
+        var course = CURRICULUM_INDEX[key];
+        (course.categories || []).forEach(function (cat) {
+          var path = Array.isArray(cat.path) ? cat.path : cat.folder ? [cat.name] : [];
+          (cat.competencies || []).forEach(function (comp) {
+            if (comp.id) _cmBankPlaces[comp.id] = { course: course.course_name, path: path };
+          });
+        });
+      });
+    }
+    return _cmBankPlaces[bankId] || null;
+  }
+
   function _cmRenderStdCard(sec, lm, compGroups) {
     if (cmCompSelect) return _cmRenderStdSelectRow(sec);
     var tag = sec.tags[0] || {};
@@ -166,10 +213,14 @@ window.DashClassManager = (function () {
       '>' +
       esc(code) +
       '</span>' +
-      '<span class="cm-std-label" data-fallback="' +
+      '<span class="cm-std-titles"><span class="cm-std-label" data-fallback="' +
       esc(sec.shortName || sec.name || '') +
       '">' +
       esc(title) +
+      '</span>' +
+      // The wording's first line, so names that sound alike can be told
+      // apart without opening the card.
+      (tag.text ? '<span class="cm-std-line">' + esc(tag.text) + '</span>' : '') +
       '</span>' +
       '<span class="cm-std-meta">' +
       (edited ? '<span class="cm-std-flag">Wording Edited</span>' : '') +
@@ -246,8 +297,7 @@ window.DashClassManager = (function () {
         : '<div class="cm-std-wording">' +
           (tag.text ? '<p>' + esc(tag.text) + '</p>' : '<p class="cm-std-wording-empty">No wording yet.</p>') +
           '<span class="cm-std-source">' +
-          (tag.source_text ? 'BC Curriculum' : 'Category') +
-          (sec.name ? ' · ' + esc(sec.name) : '') +
+          esc(_cmStdSource(sec, tag, subName)) +
           (edited ? ' · Edited' : '') +
           '</span>' +
           '</div>') +
@@ -296,9 +346,11 @@ window.DashClassManager = (function () {
       '</div>' +
       '</div>' +
       // Where the statements print today: reports show the first one.
-      '<div class="cm-std-shown"><span class="cm-std-shown-label">Shown in:</span>' +
-      '<span class="cm-std-shown-chip">Printed Reports \u00B7 first statement</span>' +
-      '<span class="cm-std-shown-chip">Rubric Drafts</span>' +
+      (icans.length
+        ? '<div class="cm-std-shown"><span class="cm-std-shown-label">Shown in:</span>' +
+          '<span class="cm-std-shown-chip">Printed Reports \u00B7 first statement</span>' +
+          '<span class="cm-std-shown-chip">Rubric Drafts</span>'
+        : '<div class="cm-std-shown"><span class="cm-std-ican-none">No I Can statements yet. Reports print nothing for this competency until you add one.</span>') +
       '<button type="button" class="cm-add-link" data-action="cmStdHelp" data-secid="' +
       sec.id +
       '">Where These Appear</button></div>' +
@@ -3108,10 +3160,42 @@ window.DashClassManager = (function () {
         '<div class="cm-hint cm-folder-count-off">Folders Count as One is off in Grading, so every competency counts the same in the overall.</div>';
     }
 
+    // Competencies outside folders sit where their order puts them among
+    // the folders (Ministry order for an imported class: Understanding
+    // Context before Defining), each run a drop target for "no folder".
+    var _cmSecIndex = {};
+    (lm.sections || []).forEach(function (sec, i) {
+      _cmSecIndex[sec.id] = i;
+    });
+    var _cmLoose = _cmGrouped.ungrouped.slice();
+    function _cmLooseRun(before) {
+      var run = [];
+      while (_cmLoose.length && (before == null || _cmSecIndex[_cmLoose[0].id] < before)) run.push(_cmLoose.shift());
+      if (!run.length) return '';
+      return (
+        '<div class="mod-folder no-module open cm-loose-run" data-folder-drop="__none__"><div class="mod-folder-body">' +
+        run
+          .map(function (sec) {
+            return _cmRenderStdCard(sec, lm, compGroups);
+          })
+          .join('') +
+        '</div></div>'
+      );
+    }
+
     // Render group folders (reuses .mod-folder pattern from assignments page)
     _cmGrouped.groups.forEach(function (gi) {
       var grp = gi.group;
       var secs = gi.sections;
+      if (secs.length)
+        html += _cmLooseRun(
+          Math.min.apply(
+            null,
+            secs.map(function (s) {
+              return _cmSecIndex[s.id];
+            }),
+          ),
+        );
       var isOpen = !_cmCollapsedStdFolders[grp.id];
       html +=
         '<div class="mod-folder' +
@@ -3172,8 +3256,12 @@ window.DashClassManager = (function () {
       html += '</div></div>';
     });
 
-    // Ungrouped standards
-    if (_cmGrouped.ungrouped.length > 0 || compGroups.length > 0) {
+    // The rest of the competencies outside folders, after the last folder.
+    // With none, the Ungrouped drop target stays so a card can leave its
+    // folder.
+    if (compGroups.length > 0 && _cmGrouped.ungrouped.length > 0) {
+      html += _cmLooseRun(null);
+    } else if (compGroups.length > 0) {
       var ungOpen = !_cmCollapsedStdFolders['__none__'];
       html +=
         '<div class="mod-folder no-module' +
