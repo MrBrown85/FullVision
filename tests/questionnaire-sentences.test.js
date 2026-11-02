@@ -385,22 +385,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(RQ.insertChoices(typedOnly, ctx, { seed: 3, path: 'ie' }).map(c => c.part)).not.toContain('grade');
   });
 
-  it('replacedBy and gapPart: from a gap, a part the comment has once only replaces its row; Browse opens on a part that can go in', () => {
+  it('gapPart: Browse opens on a part that can go in', () => {
     const { d, ctx } = draftFor(cece());
     const rows = RQ.rowsFromDraft(d);
-    const grade = COMMENT_BANK.sentences.find(s => CommentBank.stepOf(s) === 'grade' && s.id !== rows[0].id);
-    expect(RQ.replacedBy(rows, grade)).toBe(0);
-    const next = rows.findIndex(r => r.step === 'nextStep');
-    const other = COMMENT_BANK.sentences.find(s => CommentBank.stepOf(s) === 'nextStep' && s.id !== rows[next].id);
-    expect(RQ.replacedBy(rows, other)).toBe(next);
-    // An advising sentence of another step replaces the comment's advising row.
-    const advising = COMMENT_BANK.sentences.find(s => s.advises === true && CommentBank.stepOf(s) !== 'nextStep');
-    expect(advising).toBeTruthy();
-    expect(RQ.replacedBy(rows, advising)).toBe(next);
-    // A part not in the comment goes in: -1.
-    const habit = COMMENT_BANK.sentences.find(s => CommentBank.stepOf(s) === 'habits' && !s.advises);
-    expect(RQ.replacedBy(rows, habit)).toBe(-1);
-    expect(RQ.replacedBy([], grade)).toBe(-1);
     // Browse from a gap: the first part that can go in; with every drafted
     // part in, the first part with no row (Habits for Cece: nothing rated);
     // with every part in, Grade.
@@ -493,17 +480,19 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(RQ.alternatives({ step: 'closer', s: null }, ctx, {}, {})).toEqual([]);
   });
 
-  it('useSentence: a sentence replaces the row of its step, or takes a new row where its step falls', () => {
+  it('useSentence: a sentence is added where its step falls, after any row of that step, never in its place', () => {
     const { d, ctx } = draftFor(cece());
     const rows = RQ.rowsFromDraft(d);
-    const home = rows.find(r => r.step === 'home');
+    const at = rows.findIndex(r => r.step === 'home');
+    const home = rows[at];
     const other = COMMENT_BANK.sentences.find(
       s => CommentBank.stepOf(s) === 'home' && s.id !== home.id && CommentBank.fits(s, ctx),
     );
     const out = RQ.useSentence(rows, other, ctx);
-    expect(out.length).toBe(rows.length);
-    expect(out.find(r => r.step === 'home').id).toBe(other.id);
-    expect(out.find(r => r.step === 'home').text).toMatch(/^At home, you can ask her/);
+    expect(out.length).toBe(rows.length + 1);
+    expect(out[at].id).toBe(home.id);
+    expect(out[at + 1].id).toBe(other.id);
+    expect(out[at + 1].text).toMatch(/^At home, you can ask her/);
     const without = rows.filter(r => r.step !== 'home');
     const added = RQ.useSentence(without, other, ctx);
     expect(added.length).toBe(without.length + 1);

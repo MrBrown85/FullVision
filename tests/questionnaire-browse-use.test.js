@@ -139,3 +139,23 @@ describe('Use on a sentence that does not fit', () => {
     expect(RQ.approveBlockers(PRI)).not.toContain('claims');
   });
 });
+
+describe('Use adds, never swaps', () => {
+  beforeEach(seed);
+
+  it('a second Strengths sentence goes in after the first, and the comment grows', () => {
+    const c = ctx();
+    const fits = RQ.browseList('strengths', c, {}).rows.filter(r => r.fits);
+    expect(fits.length).toBeGreaterThan(1);
+    upsertTermRating(CID, PRI.id, TERM, { narrative: '' });
+    open();
+    RQ.tqSentences('use', { dataset: { sentence: fits[0].id, case: fits[0].case } });
+    const one = narrative();
+    const second = fits.find(r => one.indexOf(r.text.slice(10, 40)) < 0);
+    RQ.tqSentences('use', { dataset: { sentence: second.id, case: second.case } });
+    const two = narrative();
+    expect(two.length).toBeGreaterThan(one.length);
+    expect(two.indexOf(one.trim().slice(0, 40))).toBe(0);
+    expect(two).toContain(second.text.slice(10, 40));
+  });
+});
