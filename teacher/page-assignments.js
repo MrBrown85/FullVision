@@ -2006,12 +2006,21 @@ window.PageAssignments = (function () {
   /* ── Assessment Form ────────────────────────────────────── */
   // One row of the competency checklist. The row reads the competency's own
   // wording; the section name (often just the category) is the last fallback.
+  var _afIcanSeq = 0;
   function _afTagRow(sec, selTags) {
     var tag = sec.tags[0];
     if (!tag) return '';
     var checked = selTags.includes(tag.id);
     var wording = tag.text || tag.source_text || sec.name;
+    // The competency's I Can statements, behind a toggle beside the row
+    // (Nov 2 mockup, batch 2): outside the label, so it never ticks the box.
+    var icans = (tag.i_can_statements || []).filter(function (x) {
+      return String(x || '').trim();
+    });
+    // Unique per drawing, so two open forms never share a list.
+    var listId = 'af-icans-' + sec.id + '-' + ++_afIcanSeq;
     return (
+      '<div class="af-tag-row">' +
       '<label class="af-tag-item' +
       (checked ? ' checked' : '') +
       '" data-section="' +
@@ -2034,7 +2043,26 @@ window.PageAssignments = (function () {
       '<span class="af-tag-name">' +
       esc(wording) +
       '</span>' +
-      '</label>'
+      '</label>' +
+      (icans.length
+        ? '<button type="button" class="af-tag-ican-toggle" data-action="afToggleIcans" aria-expanded="false" aria-controls="' +
+          esc(listId) +
+          '"><span class="af-tag-ican-caret" aria-hidden="true">\u25B8</span>' +
+          icans.length +
+          ' I Can</button>'
+        : '') +
+      '</div>' +
+      (icans.length
+        ? '<ul class="af-tag-icans" id="' +
+          esc(listId) +
+          '" hidden>' +
+          icans
+            .map(function (x) {
+              return '<li>' + esc(x) + '</li>';
+            })
+            .join('') +
+          '</ul>'
+        : '')
     );
   }
 
@@ -6869,6 +6897,15 @@ window.PageAssignments = (function () {
       },
       expandAllAssess: function () {
         expandAllAssess();
+      },
+      // A competency's I Can statements on the form, shown or hidden.
+      afToggleIcans: function () {
+        var list = document.getElementById(el.getAttribute('aria-controls'));
+        if (!list) return;
+        var open = list.hidden;
+        list.hidden = !open;
+        el.setAttribute('aria-expanded', String(open));
+        el.classList.toggle('open', open);
       },
       collapseAllAssess: function () {
         collapseAllAssess();
