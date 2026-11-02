@@ -99,6 +99,23 @@ describe('Use on a sentence that does not fit', () => {
     expect(src('Priya had a strong term.')).toBe('Typed by you · kept when you regenerate');
   });
 
+  it('a frame that fits the student, under another case, goes in as that case shows it', () => {
+    upsertTermRating(CID, PRI.id, TERM, { narrative: 'Priya had a strong term.' });
+    open();
+    const c = ctx();
+    const row = RQ.browseList('grade', c, {}).rows.find(
+      r =>
+        !r.fits &&
+        CommentBank.fits(
+          COMMENT_BANK.sentences.find(x => x.id === r.id),
+          c,
+        ),
+    );
+    expect(row).toBeTruthy();
+    RQ.tqSentences('use', { dataset: { sentence: row.id, case: row.case } });
+    expect(narrative()).toContain(row.text.replace(/\.$/, ''));
+  });
+
   it('a sentence used for a classmate that does not fit the student goes in for them too', () => {
     // Mateo's marks are lower, so his grade sentence is another letter's.
     _cache.scores[CID][MAT.id].forEach(x => (x.score = 2));
