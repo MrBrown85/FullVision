@@ -46,7 +46,16 @@ describe('the best piece, Strongest and Growing agree everywhere', () => {
       const f = CommentBank.facts(cid, st, ReportBlocks.getTermId());
       const best = CommentBank.bestPieceOf(f);
       expect(RQ.bestPiece(f)).toBe(best);
-      if (best) expect(CommentBank.context(f, {}).bestPiece).toContain(best.title);
+      if (best)
+        expect(CommentBank.context(f, {}).bestPiece).toBe(
+          CommentBank.bestPieceSentence({
+            title: best.title,
+            note: best.note,
+            name: f.name,
+            pronouns: f.pronouns,
+            onFile: f.pronounsOnFile,
+          }),
+        );
     });
   });
 
@@ -69,5 +78,19 @@ describe('the best piece, Strongest and Growing agree everywhere', () => {
       if (next) expect(tags[next.id]).toBe('Next step');
     });
     expect(named).toBeGreaterThan(0);
+  });
+
+  it('takes the override as the level of a competency with evidence this term, as calc.js does', () => {
+    const st = getStudents(cid)[0];
+    const c = CommentBank.compsOf(cid, st).find(x => x.scores.length > 0);
+    const was = getOverrides;
+    globalThis.getOverrides = () => ({ [st.id]: { [c.id]: { level: 4, reason: 'Portfolio' } } });
+    try {
+      const after = CommentBank.compsOf(cid, st).find(x => x.id === c.id);
+      expect(after.level).toBe(4);
+      expect(after.now).toBe(c.now);
+    } finally {
+      globalThis.getOverrides = was;
+    }
   });
 });

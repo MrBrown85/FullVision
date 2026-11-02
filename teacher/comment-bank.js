@@ -2127,6 +2127,15 @@ window.CommentBank = (function () {
     return { count: titles.length, titles: titles, groups: groups };
   }
 
+  /* Whether an assessment is in the active term, and its date: the term's
+     work and its competencies' scores read the same rule. */
+  function _inTerm(cid, a) {
+    return !!a && assessmentInActiveTerm(cid, a);
+  }
+  function _dateOf(a) {
+    return (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date) || '';
+  }
+
   /* One student's competencies this term, with a level now (calc.js
      startAndNow): every score per competency, oldest to newest, its level at
      the start of the term and now. The comment's gates (strongestOf,
@@ -2139,11 +2148,12 @@ window.CommentBank = (function () {
       byId[a.id] = a;
     });
     var inTerm = function (a) {
-      return !!a && assessmentInActiveTerm(cid, a);
+      return _inTerm(cid, a);
     };
-    var dateOf = function (a) {
-      return (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date) || '';
-    };
+    var dateOf = _dateOf;
+    // A teacher's override is the competency's level in a term with
+    // evidence (DECISIONS, overrides), as calc.js getSectionProficiency has it.
+    var overrides = (typeof getOverrides === 'function' && (getOverrides(cid) || {})[sid]) || {};
     var sections = ReportBlocks.reportSections(cid);
     return sections
       .map(function (sec) {
@@ -2187,8 +2197,14 @@ window.CommentBank = (function () {
           scores: scores,
           start: sn ? sn.start : 0,
           now: sn ? sn.now : 0,
-          // The level now even without dated scores, for strengths.
-          level: sn ? sn.now : getSectionProficiency(cid, sid, sec.id),
+          // The level now even without dated scores, for strengths; the
+          // teacher's override when there is evidence this term.
+          level:
+            sn && overrides[sec.id] && overrides[sec.id].level > 0
+              ? overrides[sec.id].level
+              : sn
+                ? sn.now
+                : getSectionProficiency(cid, sid, sec.id),
           iCans: iCans,
         };
       })
@@ -2201,17 +2217,11 @@ window.CommentBank = (function () {
   function facts(cid, student, termId) {
     var sid = student.id;
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
-    var byId = {};
     var assessments = getAssessments(cid) || [];
-    assessments.forEach(function (a) {
-      byId[a.id] = a;
-    });
     var inTerm = function (a) {
-      return !!a && assessmentInActiveTerm(cid, a);
+      return _inTerm(cid, a);
     };
-    var dateOf = function (a) {
-      return (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date) || '';
-    };
+    var dateOf = _dateOf;
 
     var sections = ReportBlocks.reportSections(cid);
     var comps = compsOf(cid, student);
