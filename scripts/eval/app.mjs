@@ -40,6 +40,7 @@ export function readJson(path, what) {
 }
 
 const FILES = [
+  'shared/html.js',
   'shared/constants.js',
   'shared/reporting-term-presets.js',
   'shared/data.js',

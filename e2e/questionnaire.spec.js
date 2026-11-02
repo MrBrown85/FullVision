@@ -294,7 +294,7 @@ test('At a Glance: the best piece and the skills with Strongest and Next step', 
   const expected = await page.evaluate(() => {
     const st = getStudents('sci8').find(s => s.id === 'st1');
     const f = CommentBank.facts('sci8', st, 'term-2');
-    const best = ReportQuestionnaire.bestPiece(f.work);
+    const best = ReportQuestionnaire.bestPiece(f);
     const tags = ReportQuestionnaire.skillTags(f.comps);
     return {
       best: best.title,
@@ -597,7 +597,7 @@ test.describe('the Sentences card', () => {
           'sci8',
           getStudents('sci8').find(s => s.id === 'st1'),
           'term-2',
-        ).work,
+        ),
       );
       saveScoreReportNote('sci8', 'st1', best.id, 'kept a field journal with dated sketches');
     });

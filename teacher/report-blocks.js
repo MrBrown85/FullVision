@@ -1855,13 +1855,16 @@ window.ReportBlocks = (function () {
     const obs = getStudentQuickObs(cid, student.id).filter(o =>
       _inActiveTerm(cid, String(o.date || o.created || '').slice(0, 10)),
     ).length;
-    const levels = _reportSections(cid)
-      .map(sec => ({ sec: sec, sp: getSectionProficiency(cid, student.id, sec.id) }))
-      .filter(x => x.sp > 0)
-      .sort((a, b) => b.sp - a.sp);
-    const name = x => (x ? esc(x.sec.shortName || x.sec.name) : '\u2014');
-    const strongest = levels[0] || null;
-    const growing = levels.length > 1 ? levels[levels.length - 1] : null;
+    // Strongest and Growing by the comment's evidence gates (CommentBank
+    // strongestOf, nextStepOf: 3+ pieces this term), so the box, At a Glance
+    // and the comment name the same competencies; a dash when none passes.
+    const secs = _reportSections(cid);
+    const bank = typeof CommentBank !== 'undefined' ? CommentBank : null;
+    const comps = bank ? bank.compsOf(cid, student) : [];
+    const secOf = c => (c ? secs.find(s => s.id === c.id) || null : null);
+    const name = sec => (sec ? esc(sec.shortName || sec.name) : '\u2014');
+    const strongest = bank ? secOf(bank.strongestOf(comps)[0]) : null;
+    const growing = bank ? secOf(bank.nextStepOf(comps)) : null;
     const fig = (value, label, word) =>
       `<div class="report-glance-fig${word ? ' word' : ''}"><div class="report-glance-value">${value}</div><div class="report-glance-label">${label}</div></div>`;
     return `<div class="report-block-box report-term-glance">
