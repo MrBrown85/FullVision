@@ -1,0 +1,895 @@
+{
+  "_note": "Course names and grades of the BC bank before the 2026 rebuild (curriculum_by_course.json at b131776). scripts/bc_curriculum.py matches Ministry pages to these keys; the app bank is now built from data/ by scripts/build-curriculum-bank.mjs.",
+  "CSTU10": {
+    "course_name": "Computer Studies 10",
+    "grade": 10
+  },
+  "CUL10": {
+    "course_name": "Culinary Arts 10",
+    "grade": 10
+  },
+  "DRAFT10": {
+    "course_name": "Drafting 10",
+    "grade": 10
+  },
+  "ELROB10": {
+    "course_name": "Electronics and Robotics 10",
+    "grade": 10
+  },
+  "ENT10": {
+    "course_name": "Entrepreneurship and Marketing 10",
+    "grade": 10
+  },
+  "FAS10": {
+    "course_name": "Family and Society 10",
+    "grade": 10
+  },
+  "FS10": {
+    "course_name": "Food Studies 10",
+    "grade": 10
+  },
+  "MDES10": {
+    "course_name": "Media Design 10",
+    "grade": 10
+  },
+  "METAL10": {
+    "course_name": "Metalwork 10",
+    "grade": 10
+  },
+  "PWRTECH10": {
+    "course_name": "Power Technology 10",
+    "grade": 10
+  },
+  "TECHEX10": {
+    "course_name": "Technology Explorations 10",
+    "grade": 10
+  },
+  "TEXT10": {
+    "course_name": "Textiles 10",
+    "grade": 10
+  },
+  "WDEV10": {
+    "course_name": "Web Development 10",
+    "grade": 10
+  },
+  "WOOD10": {
+    "course_name": "Woodwork 10",
+    "grade": 10
+  },
+  "ARTSTUDIO10": {
+    "course_name": "Art Studio 10",
+    "grade": 10
+  },
+  "CHORUS10": {
+    "course_name": "Choral Music 10",
+    "grade": 10
+  },
+  "CMUSIC10": {
+    "course_name": "Contemporary Music 10",
+    "grade": 10
+  },
+  "DCHORE10": {
+    "course_name": "Dance Choreography 10",
+    "grade": 10
+  },
+  "DCOMP10": {
+    "course_name": "Dance Company 10",
+    "grade": 10
+  },
+  "DANCE10": {
+    "course_name": "Dance Foundations 10",
+    "grade": 10
+  },
+  "DTEP10": {
+    "course_name": "Dance Technique and Performance 10",
+    "grade": 10
+  },
+  "DRAMA10": {
+    "course_name": "Drama 10",
+    "grade": 10
+  },
+  "INSTMUS10": {
+    "course_name": "Instrumental Music 10",
+    "grade": 10
+  },
+  "MEDIA10": {
+    "course_name": "Media Arts 10",
+    "grade": 10
+  },
+  "MTHEATRE10": {
+    "course_name": "Musical Theatre 10",
+    "grade": 10
+  },
+  "PHOTO10": {
+    "course_name": "Photography 10",
+    "grade": 10
+  },
+  "SA2D10": {
+    "course_name": "Studio Arts 2D 10",
+    "grade": 10
+  },
+  "SA3D10": {
+    "course_name": "Studio Arts 3D 10",
+    "grade": 10
+  },
+  "THCO10": {
+    "course_name": "Theatre Company 10",
+    "grade": 10
+  },
+  "THPROD10": {
+    "course_name": "Theatre Production 10",
+    "grade": 10
+  },
+  "CLE10": {
+    "course_name": "Career-Life Education",
+    "grade": 10
+  },
+  "COMP10": {
+    "course_name": "Composition 10",
+    "grade": 10
+  },
+  "CW10": {
+    "course_name": "Creative Writing 10",
+    "grade": 10
+  },
+  "EFPLS10": {
+    "course_name": "EFP Literary Studies 10",
+    "grade": 10
+  },
+  "EFPNM10": {
+    "course_name": "EFP New Media 10",
+    "grade": 10
+  },
+  "EFPSL10": {
+    "course_name": "EFP Spoken Language 10",
+    "grade": 10
+  },
+  "EFPW10": {
+    "course_name": "EFP Writing 10",
+    "grade": 10
+  },
+  "ELA10": {
+    "course_name": "English Language Arts 10",
+    "grade": 10
+  },
+  "LS10": {
+    "course_name": "Literary Studies 10",
+    "grade": 10
+  },
+  "NM10": {
+    "course_name": "New Media 10",
+    "grade": 10
+  },
+  "SL10": {
+    "course_name": "Spoken Language 10",
+    "grade": 10
+  },
+  "FPC10": {
+    "course_name": "Foundations of Mathematics and Pre-calculus 10",
+    "grade": 10
+  },
+  "WPM10": {
+    "course_name": "Workplace Mathematics 10",
+    "grade": 10
+  },
+  "PHE10": {
+    "course_name": "Physical and Health Education 10",
+    "grade": 10
+  },
+  "SCI10": {
+    "course_name": "Science 10",
+    "grade": 10
+  },
+  "SS10": {
+    "course_name": "Social Studies 10",
+    "grade": 10
+  },
+  "ACCT11": {
+    "course_name": "Accounting 11",
+    "grade": 11
+  },
+  "AUTO11": {
+    "course_name": "Automotive Technology 11",
+    "grade": 11
+  },
+  "CIS11": {
+    "course_name": "Computer Information Systems 11",
+    "grade": 11
+  },
+  "CPROG11": {
+    "course_name": "Computer Programming 11",
+    "grade": 11
+  },
+  "CUL11": {
+    "course_name": "Culinary Arts 11",
+    "grade": 11
+  },
+  "DCOMM11": {
+    "course_name": "Digital Communications 11",
+    "grade": 11
+  },
+  "DRAFT11": {
+    "course_name": "Drafting 11",
+    "grade": 11
+  },
+  "ELEC11": {
+    "course_name": "Electronics 11",
+    "grade": 11
+  },
+  "ENG11": {
+    "course_name": "Engineering 11",
+    "grade": 11
+  },
+  "FS11": {
+    "course_name": "Food Studies 11",
+    "grade": 11
+  },
+  "GPROD11": {
+    "course_name": "Graphic Production 11",
+    "grade": 11
+  },
+  "IFR11": {
+    "course_name": "Interpersonal and Family Relationships 11",
+    "grade": 11
+  },
+  "MKTG11": {
+    "course_name": "Marketing and Promotion 11",
+    "grade": 11
+  },
+  "MDES11": {
+    "course_name": "Media Design 11",
+    "grade": 11
+  },
+  "METAL11": {
+    "course_name": "Metalwork 11",
+    "grade": 11
+  },
+  "ROB11": {
+    "course_name": "Robotics 11",
+    "grade": 11
+  },
+  "TEXT11": {
+    "course_name": "Textiles 11",
+    "grade": 11
+  },
+  "TOUR11": {
+    "course_name": "Tourism 11",
+    "grade": 11
+  },
+  "WOOD11": {
+    "course_name": "Woodwork 11",
+    "grade": 11
+  },
+  "ARTSTUDIO11": {
+    "course_name": "Art Studio 11",
+    "grade": 11
+  },
+  "CHOR11": {
+    "course_name": "Choral Music 11",
+    "grade": 11
+  },
+  "COMP_PROD11": {
+    "course_name": "Composition and Production 11",
+    "grade": 11
+  },
+  "CMUSIC11": {
+    "course_name": "Contemporary Music 11",
+    "grade": 11
+  },
+  "DCHORE11": {
+    "course_name": "Dance Choreography 11",
+    "grade": 11
+  },
+  "DCOMP11": {
+    "course_name": "Dance Company 11",
+    "grade": 11
+  },
+  "DCOND11": {
+    "course_name": "Dance Conditioning 11",
+    "grade": 11
+  },
+  "DFOUND11": {
+    "course_name": "Dance Foundations 11",
+    "grade": 11
+  },
+  "DANCE11": {
+    "course_name": "Dance Technique and Performance 11",
+    "grade": 11
+  },
+  "DSD11": {
+    "course_name": "Directing and Script Development 11",
+    "grade": 11
+  },
+  "DRAMA11": {
+    "course_name": "Drama 11",
+    "grade": 11
+  },
+  "FTVT11": {
+    "course_name": "Film and Television 11",
+    "grade": 11
+  },
+  "GARTS11": {
+    "course_name": "Graphic Arts 11",
+    "grade": 11
+  },
+  "INSTMUS11": {
+    "course_name": "Instrumental Music 11",
+    "grade": 11
+  },
+  "MEDA11": {
+    "course_name": "Media Arts 11",
+    "grade": 11
+  },
+  "MTHEATRE11": {
+    "course_name": "Musical Theatre 11",
+    "grade": 11
+  },
+  "PHOTO11": {
+    "course_name": "Photography 11",
+    "grade": 11
+  },
+  "SA2D11": {
+    "course_name": "Studio Arts 2D 11",
+    "grade": 11
+  },
+  "SA3D11": {
+    "course_name": "Studio Arts 3D 11",
+    "grade": 11
+  },
+  "THCO11": {
+    "course_name": "Theatre Company 11",
+    "grade": 11
+  },
+  "THPROD11": {
+    "course_name": "Theatre Production 11",
+    "grade": 11
+  },
+  "CLE11": {
+    "course_name": "Career-Life Education (Grade 11 context)",
+    "grade": 11
+  },
+  "COMP11": {
+    "course_name": "Composition 11",
+    "grade": 11
+  },
+  "CW11": {
+    "course_name": "Creative Writing 11",
+    "grade": 11
+  },
+  "EFPLSNM11": {
+    "course_name": "EFP Literary Studies and New Media 11",
+    "grade": 11
+  },
+  "EFPLSSL11": {
+    "course_name": "EFP Literary Studies and Spoken Language 11",
+    "grade": 11
+  },
+  "EFPLSW11": {
+    "course_name": "EFP Literary Studies and Writing 11",
+    "grade": 11
+  },
+  "LS11": {
+    "course_name": "Literary Studies 11",
+    "grade": 11
+  },
+  "NMED11": {
+    "course_name": "New Media 11",
+    "grade": 11
+  },
+  "SPKN11": {
+    "course_name": "Spoken Language 11",
+    "grade": 11
+  },
+  "CS11": {
+    "course_name": "Computer Science 11",
+    "grade": 11
+  },
+  "FOM11": {
+    "course_name": "Foundations of Mathematics 11",
+    "grade": 11
+  },
+  "HOM11": {
+    "course_name": "History of Mathematics 11",
+    "grade": 11
+  },
+  "PC11": {
+    "course_name": "Pre-calculus 11",
+    "grade": 11
+  },
+  "WPM11": {
+    "course_name": "Workplace Mathematics 11",
+    "grade": 11
+  },
+  "AL11": {
+    "course_name": "Active Living 11",
+    "grade": 11
+  },
+  "FC11": {
+    "course_name": "Fitness and Conditioning 11",
+    "grade": 11
+  },
+  "ODED11": {
+    "course_name": "Outdoor Education 11",
+    "grade": 11
+  },
+  "PHE11": {
+    "course_name": "Physical and Health Education 11",
+    "grade": 11
+  },
+  "CHEM11": {
+    "course_name": "Chemistry 11",
+    "grade": 11
+  },
+  "EARTH11": {
+    "course_name": "Earth Sciences 11",
+    "grade": 11
+  },
+  "ENVSCI11": {
+    "course_name": "Environmental Science 11",
+    "grade": 11
+  },
+  "LS11SCI": {
+    "course_name": "Life Sciences 11",
+    "grade": 11
+  },
+  "PHYS11": {
+    "course_name": "Physics 11",
+    "grade": 11
+  },
+  "SFC11": {
+    "course_name": "Science for Citizens 11",
+    "grade": 11
+  },
+  "BCFP11": {
+    "course_name": "BC First Peoples 11",
+    "grade": 11
+  },
+  "ESS11": {
+    "course_name": "Explorations in Social Studies 11",
+    "grade": 11
+  },
+  "INDS11": {
+    "course_name": "Indigenous Studies 11",
+    "grade": 11
+  },
+  "PHYG11": {
+    "course_name": "Physical Geography 11",
+    "grade": 11
+  },
+  "ACCT12": {
+    "course_name": "Accounting 12",
+    "grade": 12
+  },
+  "AMJ12": {
+    "course_name": "Art Metal and Jewellery 12",
+    "grade": 12
+  },
+  "AUTO12": {
+    "course_name": "Automotive Technology 12",
+    "grade": 12
+  },
+  "BCA12": {
+    "course_name": "Business Computer Applications 12",
+    "grade": 12
+  },
+  "CDC12": {
+    "course_name": "Child Development and Caregiving 12",
+    "grade": 12
+  },
+  "CIS12": {
+    "course_name": "Contemporary Indigenous Studies 12",
+    "grade": 12
+  },
+  "CPROG12": {
+    "course_name": "Computer Programming 12",
+    "grade": 12
+  },
+  "CUL12": {
+    "course_name": "Culinary Arts 12",
+    "grade": 12
+  },
+  "DMD12": {
+    "course_name": "Digital Media Development 12",
+    "grade": 12
+  },
+  "DRAFT12": {
+    "course_name": "Drafting 12",
+    "grade": 12
+  },
+  "ECOM12": {
+    "course_name": "E-Commerce 12",
+    "grade": 12
+  },
+  "ECON12": {
+    "course_name": "Economic Theory 12",
+    "grade": 12
+  },
+  "ELEC12": {
+    "course_name": "Electronics 12",
+    "grade": 12
+  },
+  "EDT12": {
+    "course_name": "Engine and Drivetrain 12",
+    "grade": 12
+  },
+  "ENG12": {
+    "course_name": "Engineering 12",
+    "grade": 12
+  },
+  "ENT12": {
+    "course_name": "Entrepreneurship 12",
+    "grade": 12
+  },
+  "FASH12": {
+    "course_name": "Fashion Industry 12",
+    "grade": 12
+  },
+  "FACCT12": {
+    "course_name": "Financial Accounting 12",
+    "grade": 12
+  },
+  "FS12": {
+    "course_name": "Food Studies 12",
+    "grade": 12
+  },
+  "FURNCAB12": {
+    "course_name": "Furniture and Cabinetry 12",
+    "grade": 12
+  },
+  "GPROD12": {
+    "course_name": "Graphic Production 12",
+    "grade": 12
+  },
+  "HLE12": {
+    "course_name": "Housing and Living Environments 12",
+    "grade": 12
+  },
+  "ICD12": {
+    "course_name": "Industrial Coding and Design 12",
+    "grade": 12
+  },
+  "MACHW12": {
+    "course_name": "Machining and Welding 12",
+    "grade": 12
+  },
+  "MECH12": {
+    "course_name": "Mechatronics 12",
+    "grade": 12
+  },
+  "MDES12": {
+    "course_name": "Media Design 12",
+    "grade": 12
+  },
+  "METAL12": {
+    "course_name": "Metalwork 12",
+    "grade": 12
+  },
+  "ROV12": {
+    "course_name": "Remotely Operated Vehicles and Drones 12",
+    "grade": 12
+  },
+  "ROB12": {
+    "course_name": "Robotics 12",
+    "grade": 12
+  },
+  "SSF12": {
+    "course_name": "Specialized Studies in Food 12",
+    "grade": 12
+  },
+  "TEXT12": {
+    "course_name": "Textiles 12",
+    "grade": 12
+  },
+  "TOUR12": {
+    "course_name": "Tourism 12",
+    "grade": 12
+  },
+  "WOOD12": {
+    "course_name": "Woodwork 12",
+    "grade": 12
+  },
+  "ARTSTUDIO12": {
+    "course_name": "Art Studio 12",
+    "grade": 12
+  },
+  "CHOR12": {
+    "course_name": "Choral Music 12",
+    "grade": 12
+  },
+  "CP12": {
+    "course_name": "Composition and Production 12",
+    "grade": 12
+  },
+  "CMUSIC12": {
+    "course_name": "Contemporary Music 12",
+    "grade": 12
+  },
+  "DCHORE12": {
+    "course_name": "Dance Choreography 12",
+    "grade": 12
+  },
+  "DCOMP12": {
+    "course_name": "Dance Company 12",
+    "grade": 12
+  },
+  "DCOND12": {
+    "course_name": "Dance Conditioning 12",
+    "grade": 12
+  },
+  "DFOUND12": {
+    "course_name": "Dance Foundations 12",
+    "grade": 12
+  },
+  "DANCE12": {
+    "course_name": "Dance Technique and Performance 12",
+    "grade": 12
+  },
+  "DSD12": {
+    "course_name": "Directing and Script Development 12",
+    "grade": 12
+  },
+  "DRAMA12": {
+    "course_name": "Drama 12",
+    "grade": 12
+  },
+  "FTVT12": {
+    "course_name": "Film and Television 12",
+    "grade": 12
+  },
+  "GARTS12": {
+    "course_name": "Graphic Arts 12",
+    "grade": 12
+  },
+  "INSTMUS12": {
+    "course_name": "Instrumental Music 12",
+    "grade": 12
+  },
+  "MEDA12": {
+    "course_name": "Media Arts 12",
+    "grade": 12
+  },
+  "MTHEATRE12": {
+    "course_name": "Musical Theatre 12",
+    "grade": 12
+  },
+  "PHOTO12": {
+    "course_name": "Photography 12",
+    "grade": 12
+  },
+  "SA2D12": {
+    "course_name": "Studio Arts 2D 12",
+    "grade": 12
+  },
+  "SA3D12": {
+    "course_name": "Studio Arts 3D 12",
+    "grade": 12
+  },
+  "THCO12": {
+    "course_name": "Theatre Company 12",
+    "grade": 12
+  },
+  "THPROD12": {
+    "course_name": "Theatre Production 12",
+    "grade": 12
+  },
+  "CLC12": {
+    "course_name": "Career-Life Connections",
+    "grade": 12
+  },
+  "COMP12": {
+    "course_name": "Composition 12",
+    "grade": 12
+  },
+  "CW12": {
+    "course_name": "Creative Writing 12",
+    "grade": 12
+  },
+  "EFP12": {
+    "course_name": "English First Peoples 12",
+    "grade": 12
+  },
+  "ES12": {
+    "course_name": "English Studies 12",
+    "grade": 12
+  },
+  "LS12": {
+    "course_name": "Literary Studies 12",
+    "grade": 12
+  },
+  "NMED12": {
+    "course_name": "New Media 12",
+    "grade": 12
+  },
+  "SPKN12": {
+    "course_name": "Spoken Language 12",
+    "grade": 12
+  },
+  "APPM12": {
+    "course_name": "Apprenticeship Mathematics 12",
+    "grade": 12
+  },
+  "CALC12": {
+    "course_name": "Calculus 12",
+    "grade": 12
+  },
+  "CS12": {
+    "course_name": "Computer Science 12",
+    "grade": 12
+  },
+  "FOM12": {
+    "course_name": "Foundations of Mathematics 12",
+    "grade": 12
+  },
+  "GEO12": {
+    "course_name": "Geology 12",
+    "grade": 12
+  },
+  "PC12": {
+    "course_name": "Pre-calculus 12",
+    "grade": 12
+  },
+  "STAT12": {
+    "course_name": "Statistics 12",
+    "grade": 12
+  },
+  "WPM12": {
+    "course_name": "Workplace Mathematics 12",
+    "grade": 12
+  },
+  "AL12": {
+    "course_name": "Active Living 12",
+    "grade": 12
+  },
+  "FC12": {
+    "course_name": "Fitness and Conditioning 12",
+    "grade": 12
+  },
+  "ODED12": {
+    "course_name": "Outdoor Education 12",
+    "grade": 12
+  },
+  "PHE12": {
+    "course_name": "Physical and Health Education 12",
+    "grade": 12
+  },
+  "ANAT12": {
+    "course_name": "Anatomy and Physiology 12",
+    "grade": 12
+  },
+  "BIO12": {
+    "course_name": "Biology 12",
+    "grade": 12
+  },
+  "CHEM12": {
+    "course_name": "Chemistry 12",
+    "grade": 12
+  },
+  "ENVSCI12": {
+    "course_name": "Environmental Science 12",
+    "grade": 12
+  },
+  "PHYS12": {
+    "course_name": "Physics 12",
+    "grade": 12
+  },
+  "HIST12": {
+    "course_name": "20th Century World History 12",
+    "grade": 12
+  },
+  "ASIA12": {
+    "course_name": "Asian Studies 12",
+    "grade": 12
+  },
+  "BCFP12": {
+    "course_name": "B.C. First Peoples 12",
+    "grade": 12
+  },
+  "CC12": {
+    "course_name": "Comparative Cultures 12",
+    "grade": 12
+  },
+  "REL12": {
+    "course_name": "Comparative World Religions 12",
+    "grade": 12
+  },
+  "GEN12": {
+    "course_name": "Genocide Studies 12",
+    "grade": 12
+  },
+  "HGEO12": {
+    "course_name": "Human Geography 12",
+    "grade": 12
+  },
+  "LAW12": {
+    "course_name": "Law Studies 12",
+    "grade": 12
+  },
+  "PHIL12": {
+    "course_name": "Philosophy 12",
+    "grade": 12
+  },
+  "PGEO12": {
+    "course_name": "Physical Geography 12",
+    "grade": 12
+  },
+  "POL12": {
+    "course_name": "Political Studies 12",
+    "grade": 12
+  },
+  "SJ12": {
+    "course_name": "Social Justice 12",
+    "grade": 12
+  },
+  "URB12": {
+    "course_name": "Urban Studies 12",
+    "grade": 12
+  },
+  "ADST8": {
+    "course_name": "Applied Design, Skills and Technologies 8",
+    "grade": 8
+  },
+  "ARTS8": {
+    "course_name": "Arts Education 8",
+    "grade": 8
+  },
+  "CAREE8": {
+    "course_name": "Career Education 8",
+    "grade": 8
+  },
+  "ELA8": {
+    "course_name": "English Language Arts 8",
+    "grade": 8
+  },
+  "MATH8": {
+    "course_name": "Mathematics 8",
+    "grade": 8
+  },
+  "PHE8": {
+    "course_name": "Physical and Health Education 8",
+    "grade": 8
+  },
+  "SCI8": {
+    "course_name": "Science 8",
+    "grade": 8
+  },
+  "SS8": {
+    "course_name": "Social Studies 8",
+    "grade": 8
+  },
+  "ADST9": {
+    "course_name": "Applied Design, Skills and Technologies 9",
+    "grade": 9
+  },
+  "ARTS9": {
+    "course_name": "Arts Education 9",
+    "grade": 9
+  },
+  "CAREE9": {
+    "course_name": "Career Education 9",
+    "grade": 9
+  },
+  "ELA9": {
+    "course_name": "English Language Arts 9",
+    "grade": 9
+  },
+  "MATH9": {
+    "course_name": "Mathematics 9",
+    "grade": 9
+  },
+  "PHE9": {
+    "course_name": "Physical and Health Education 9",
+    "grade": 9
+  },
+  "SCI9": {
+    "course_name": "Science 9",
+    "grade": 9
+  },
+  "SS9": {
+    "course_name": "Social Studies 9",
+    "grade": 9
+  },
+  "HUM8": {
+    "course_name": "Humanities 8",
+    "grade": 8
+  }
+}
