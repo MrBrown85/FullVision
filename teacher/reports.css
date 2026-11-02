@@ -1346,6 +1346,10 @@
   .sheet-note {
     display: none !important;
   }
+  /* The blank back of a duplex sheet prints empty; the note is a screen hint. */
+  .sheet-blank {
+    visibility: hidden !important;
+  }
   .rb-preview.report-sheets-on {
     background: #fff !important;
     display: block !important;
