@@ -84,7 +84,7 @@ describe('session-expired long-form guard', () => {
     expect(res.error && res.error.handledSessionExpired).toBe(true);
   });
 
-  it('uses the same long-form retry path when idle timeout already marked the draft session expired', async () => {
+  it('uses the same long-form retry path when the draft session was already marked expired', async () => {
     var calls = 0;
     globalThis.getSupabase = function () {
       return {

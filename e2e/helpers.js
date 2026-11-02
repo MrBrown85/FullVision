@@ -788,10 +788,6 @@ export async function mockAuth(page) {
     });
 
     window.__ENV = { SUPABASE_URL: 'https://fake.supabase.co', SUPABASE_KEY: 'fake-key' };
-
-    // Keep the idle timeout from signing the test out.
-    window._idleTimeout = null;
-    window._resetIdleTimer = () => {};
   }, TEACHER);
 
   // The fake client above stands in for the real library.
@@ -990,8 +986,6 @@ export async function mockPersistentAuthFlow(
     }
 
     window.__ENV = { SUPABASE_URL: 'https://fake.supabase.co', SUPABASE_KEY: 'fake-key' };
-    window._idleTimeout = null;
-    window._resetIdleTimer = () => {};
     window.__e2eAuthListeners = window.__e2eAuthListeners || [];
 
     const noopPromise = value => Promise.resolve(value);

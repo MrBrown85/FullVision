@@ -174,11 +174,9 @@
    *
    * Unsent changes in the offline queue would be lost by the wipe, so by
    * default the sign-out stops and resolves { unsent: n } instead; the caller
-   * asks the teacher and calls again with { force: true }. { keepQueue: true }
-   * (idle timeout, where nobody is there to ask) signs out but leaves the
-   * queue in place: entries carry their owner's id, so only the same teacher's
-   * next session sends them and anyone else's discards them.
-   * @param {{force?: boolean, keepQueue?: boolean}} [opts]
+   * asks the teacher and calls again with { force: true }. It ends this
+   * device's session only; other devices stay signed in.
+   * @param {{force?: boolean}} [opts]
    * @returns {Promise<void|{unsent: number}>}
    */
   function _isNetworkAuthError(error) {
@@ -209,12 +207,14 @@
     if (typeof waitForPendingSyncs === 'function') {
       await waitForPendingSyncs(5000);
     }
-    if (!opts.force && !opts.keepQueue) {
+    if (!opts.force) {
       const unsent = await _unsentQueueCount();
       if (unsent > 0) return { unsent: unsent };
     }
     try {
-      const { error } = await sb.auth.signOut();
+      // This device only: signing out of the laptop leaves the phone and other
+      // computers signed in (Supabase's default ends every session).
+      const { error } = await sb.auth.signOut({ scope: 'local' });
       if (error) console.warn('Sign-out error (proceeding anyway):', error.message);
     } catch (err) {
       console.warn('Sign-out exception (proceeding anyway):', err);
@@ -228,7 +228,6 @@
       // td- prefix (cross-portal prefs like td-mobile-pref)
       // fv- prefix (offline write queue + dead letters, which hold student data)
       if (!key) continue;
-      if (key.startsWith('fv-') && opts.keepQueue) continue;
       if (
         key.startsWith('gb-') ||
         key.startsWith('gb_') ||
@@ -376,26 +375,4 @@
       window.location.href = '/login.html';
     }
   });
-})();
-
-// Idle timeout: sign out after 30 minutes of inactivity on shared computers
-// Skip on login page — signOut() there causes pointless reload
-(function () {
-  if (window.location.pathname.indexOf('login') !== -1) return;
-  var _idleTimer = null;
-  var IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
-  function resetIdleTimer() {
-    if (_idleTimer) clearTimeout(_idleTimer);
-    _idleTimer = setTimeout(function () {
-      if (typeof isLongFormAuthContextActive === 'function' && isLongFormAuthContextActive()) {
-        if (typeof markLongFormSessionExpired === 'function') markLongFormSessionExpired();
-        return;
-      }
-      if (typeof signOut === 'function') signOut({ keepQueue: true });
-    }, IDLE_TIMEOUT);
-  }
-  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(function (evt) {
-    document.addEventListener(evt, resetIdleTimer, { passive: true });
-  });
-  resetIdleTimer();
 })();
