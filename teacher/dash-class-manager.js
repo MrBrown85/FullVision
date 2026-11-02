@@ -113,6 +113,9 @@ window.DashClassManager = (function () {
   // Card state that lives outside the learning map: which cards are editing
   // their wording, and the I Can statement being dragged.
   var _cmWordingEdit = {};
+  // Cards whose Levels are open for Write Your Own, by section id.
+  var _cmLevelsEdit = {};
+  var _cmLevelsBankAsked = false;
   var _cmIcanDrag = null;
 
   // The same code the gradebook heads the column with.
@@ -345,6 +348,7 @@ window.DashClassManager = (function () {
       '">' +
       '</div>' +
       '</div>' +
+      _cmLevelsHtml(sec, tag) +
       // Where the statements print today: reports show the first one.
       (icans.length
         ? '<div class="cm-std-shown"><span class="cm-std-shown-label">Shown in:</span>' +
@@ -9074,6 +9078,109 @@ window.DashClassManager = (function () {
     });
   }
 
+  /* The card's Levels (Nov 2 mockup, batch 2): each level's descriptor and
+     next step, read-only, by the printed rubric's rule (CompetencyWording:
+     the teacher's own, else the bank's, else the BC general wording). Write
+     Your Own opens the four levels for the teacher's own wording, saved to
+     the descriptor bank printed rubrics read; a level left empty keeps the
+     other wording. */
+  function _cmLevelsHtml(sec, tag) {
+    if (!tag || !tag.id || !window.CompetencyWording || !window.RubricPrint) return '';
+    var levels = [1, 2, 3, 4];
+    var lines = levels.map(function (l) {
+      return CompetencyWording.lines(tag, l);
+    });
+    if (lines[0] && !lines[0].ready && !_cmLevelsBankAsked && RubricPrint.loadBankLevels) {
+      _cmLevelsBankAsked = true;
+      RubricPrint.loadBankLevels().then(function (ok) {
+        if (ok) renderClassManager();
+      });
+    }
+    var editing = !!_cmLevelsEdit[sec.id];
+    var own = (typeof RubricDraft !== 'undefined' && getCompetencyDescriptor(RubricDraft.competencyKey(tag))) || {};
+    var head =
+      '<div class="cm-std-section-head"><span class="cm-label cm-std-section-label" id="cm-std-levels-label-' +
+      sec.id +
+      '">Levels</span>' +
+      (editing
+        ? ''
+        : '<button type="button" class="cm-std-link" data-action="cmLevelsEdit" data-secid="' +
+          sec.id +
+          '">Write Your Own</button>') +
+      '</div>';
+    var body = editing
+      ? '<div class="cm-levels-edit">' +
+        levels
+          .map(function (l, i) {
+            return (
+              '<label class="cm-levels-edit-row"><span class="cm-levels-word">' +
+              esc(lines[i].word) +
+              '</span><textarea class="cm-textarea cm-levels-input" rows="2" data-level="' +
+              l +
+              '" data-stop-prop="true">' +
+              esc(own[l] || lines[i].descriptor) +
+              '</textarea></label>'
+            );
+          })
+          .join('') +
+        '<p class="cm-levels-hint">Leave a level empty to use the curriculum wording.</p>' +
+        '<div class="cm-levels-actions"><button type="button" class="btn btn-ghost" data-action="cmLevelsCancel" data-secid="' +
+        sec.id +
+        '">Cancel</button><button type="button" class="btn btn-primary" data-action="cmLevelsSave" data-secid="' +
+        sec.id +
+        '">Save</button></div></div>'
+      : '<div class="cm-levels-list">' +
+        lines
+          .map(function (x) {
+            return (
+              '<div class="cm-level-row"><span class="cm-levels-word">' +
+              esc(x.word) +
+              '</span><span class="cm-level-desc">' +
+              esc(x.descriptor) +
+              (x.next ? '<span class="cm-level-next">Next step: ' + esc(x.next) + '</span>' : '') +
+              '</span></div>'
+            );
+          })
+          .join('') +
+        '</div>';
+    return '<div class="cm-std-levels" aria-labelledby="cm-std-levels-label-' + sec.id + '">' + head + body + '</div>';
+  }
+
+  function cmLevelsEdit(secId) {
+    var entry = _cmStdEntry(secId);
+    if (!entry) return;
+    _cmLevelsEdit[entry.sec.id] = true;
+    renderClassManager();
+    requestAnimationFrame(function () {
+      var el = document.querySelector('#cm-std-' + entry.sec.id + ' .cm-levels-input');
+      if (el) el.focus();
+    });
+  }
+  function cmLevelsCancel(secId) {
+    delete _cmLevelsEdit[_currentId('section', secId)];
+    delete _cmLevelsEdit[secId];
+    renderClassManager();
+  }
+  /* Saves what differs from the curriculum wording as the teacher's own; a
+     level left empty, or the same as that wording, forgets the own text. */
+  function cmLevelsSave(secId) {
+    var entry = _cmStdEntry(secId);
+    if (!entry || typeof RubricDraft === 'undefined') return;
+    var key = RubricDraft.competencyKey(entry.tag);
+    var entries = [];
+    document.querySelectorAll('#cm-std-' + entry.sec.id + ' .cm-levels-input').forEach(function (ta) {
+      var level = Number(ta.dataset.level);
+      var text = String(ta.value || '').trim();
+      var base = RubricPrint.levelWording(entry.tag, level, true).text;
+      var baseLine = window.CompetencyWording ? CompetencyWording.sentence(base) : base;
+      if (text === baseLine || text === base) text = '';
+      entries.push({ key: key, level: level, text: text });
+    });
+    if (key) saveCompetencyDescriptors(entries);
+    delete _cmLevelsEdit[entry.sec.id];
+    renderClassManager();
+  }
+
   function cmStdEditWording(secId) {
     var entry = _cmStdEntry(secId);
     if (!entry) return;
@@ -9461,6 +9568,15 @@ window.DashClassManager = (function () {
       },
       cmStdEditWording: function () {
         cmStdEditWording(el.dataset.secid);
+      },
+      cmLevelsEdit: function () {
+        cmLevelsEdit(el.dataset.secid);
+      },
+      cmLevelsCancel: function () {
+        cmLevelsCancel(el.dataset.secid);
+      },
+      cmLevelsSave: function () {
+        cmLevelsSave(el.dataset.secid);
       },
       cmStdRestoreWording: function () {
         cmStdRestoreWording(el.dataset.secid);
