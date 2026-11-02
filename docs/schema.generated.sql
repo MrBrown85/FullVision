@@ -199,6 +199,7 @@ table public.course (rls on)
   level_order text not null default 'desc'::text
   curriculum_tags text[]
   folders_count_as_one boolean not null default true
+  courses_count_equally boolean not null default false
   constraint course_block_len CHECK (((block IS NULL) OR ((char_length(block) >= 1) AND (char_length(block) <= 24))))
   constraint course_calc_method_check CHECK ((calc_method = ANY (ARRAY['average'::text, 'median'::text, 'mostRecent'::text, 'highest'::text, 'mode'::text, 'decayingAvg'::text])))
   constraint course_category_weights_is_object CHECK (((category_weights IS NULL) OR (jsonb_typeof(category_weights) = 'object'::text)))

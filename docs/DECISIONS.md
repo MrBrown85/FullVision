@@ -75,6 +75,17 @@ A 72% test showed 2.9 (Proficient's colour) on the student page, while its compe
 - **The % doesn't change.** Points work still counts its points in the course %.
 - A points 0 and Incomplete are Emerging, the table's bottom, as their competency already read them. Missing points work stays a 0 level.
 
+## Each Course Counts Equally (2026-11-02)
+
+A combined class rolled every competency into one overall, so the course with more competencies or folders outweighed the other. In Humanities 8 (ELA 8 + SS 8) ELA's 20 competencies were 71% of the overall with Folders Count as One off, and SS's 8 were 80% with it on. Colin approved the fix in the curriculum bank stage 4 plan (Nov 2).
+
+- **Grading tab, "Each Course Counts Equally"** (`course.courses_count_equally`, default off). On, each course (subject) is rolled up on its own by the usual rules (Folders Count as One and each folder's Counts as One apply inside it), then the courses are averaged. Shown only when the class has two or more courses with competencies.
+- **Off is the old math exactly.** No grade changed when the column was added. `migrations/20261102_courses_count_equally.sql`.
+- **Proficiency only.** Letter and percent come from assignments and don't move.
+- **It asks first** when grades move, with the grade-change count, like Folders Count as One.
+- **Copy Grading Setup copies it** with the calculation method. Duplicate Class copies it.
+- The New Class wizard will turn it on for combined classes (stage 4, PR 4).
+
 ## Folders Count as One (2026-11-02)
 
 A class's overall proficiency averaged each folder (competency group) first and counted it as one competency (`rollUpSectionLevels`). Teachers ask for it: a folder of small competencies is one big competency. Colin wanted teachers to turn it off themselves, for the class or for one folder.
