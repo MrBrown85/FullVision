@@ -5281,7 +5281,7 @@ window.ReportQuestionnaire = (function () {
                   '’s comment as written, as your own sentence. It may not match ' +
                   first +
                   '’s marks, so check it.'
-              : b.gap != null && _replacedBy(rows, _bankById(r.id) || {}) < 0
+              : b.gap != null
                 ? 'Puts this sentence in ' + first + '’s comment, at the place you chose.'
                 : 'Puts this sentence in ' + first + '’s comment.',
           )}">Use</button>`;
@@ -5448,22 +5448,12 @@ window.ReportQuestionnaire = (function () {
     list.innerHTML = _browseRowsHtml(_activeCourse, st, f, _bankContext(_activeCourse, st, f));
   }
 
-  /* Use: the sentence in the row of its step, or a new row where its step
-     falls. */
+  /* Use: the sentence in a new row where its step falls, after any row of
+     that step. */
   function useSentence(rows, s, ctx) {
     var step = CommentBank.stepOf(s);
     if (!step) return rows;
-    var row = rowFromSentence(s, ctx, step);
-    var out = rows.slice();
-    var at = out.findIndex(function (r) {
-      return r.step === step;
-    });
-    if (at >= 0) {
-      out[at] = row;
-      return out;
-    }
-    out.splice(_stepPos(out, step), 0, row);
-    return out;
+    return insertRow(rows, rowFromSentence(s, ctx, step), _stepPos(rows, step));
   }
   /* Where a row of `step` goes in: after the last row of a step at or
      before it. */
@@ -5474,21 +5464,6 @@ window.ReportQuestionnaire = (function () {
       if (r.step && _stepAt(r.step) <= si) pos = i + 1;
     });
     return pos;
-  }
-  /* The row a bank sentence picked at a gap replaces, or -1 to put it in
-     there: the row of the same step (one grade sentence, one next step, one
-     Not Handed In), or, for an advising sentence, the comment's advising
-     row (one next step a comment, the engine's rule). */
-  function _replacedBy(rows, s) {
-    var step = CommentBank.stepOf(s);
-    var at = rows.findIndex(function (r) {
-      return !!step && r.step === step;
-    });
-    if (at >= 0) return at;
-    if (!CommentBank.advises(s)) return -1;
-    return rows.findIndex(function (r) {
-      return !!r.s && CommentBank.advises(r.s);
-    });
   }
   /* The part Browse Sentences opens on from a gap: the first that can be
      put in there, else the first the comment has no row for, else Grade. */
@@ -5515,51 +5490,34 @@ window.ReportQuestionnaire = (function () {
       }) || null
     );
   }
-  /* Use on a sentence that does not fit the student (a fact missing, or
-     another case's sentence): it goes in as the row shows it, as the
-     teacher's own sentence, so it is theirs to check and is never checked
-     against the marks (Colin, 2026-11-02: "don't block users from custom
-     actions"). At the gap, else where its step falls. */
-  function _useAsWritten(st, s, ctx, hit) {
-    var b = _browse || {};
-    var row = typedRow(hit ? hit.text : _preview(s, ctx));
-    row.from = s.id;
-    var key = _rowKey(st);
-    var rows = _rowsFor(st, _facts(st));
-    var at = b.gap != null ? b.gap : _stepPos(rows, CommentBank.stepOf(s));
-    _rows[key] = insertRow(rows, row, at);
-    _markAdded(st, row);
-    if (b.gap != null) b.gap++;
-  }
+  /* Use in Browse Sentences adds the sentence to the comment, at the gap
+     the sheet was opened from, else where its step falls, after any row
+     of that step; it never takes another row's place, so a teacher can
+     add as many as they like (Colin, 2026-11-02: "when i'm browsing
+     sentences, i should be able to add ones i like, and make the comment
+     longer"). A sentence that does not fit the student (a fact missing, or
+     another case's sentence) goes in as the row shows it, as the teacher's
+     own sentence, so it is theirs to check and is never checked against
+     the marks ("don't block users from custom actions"). */
   function _useSentence(st, id, caseId) {
     var s = _bankById(id);
+    if (!s) return;
     var f = _facts(st);
     var ctx = _bankContext(_activeCourse, st, f);
-    if (!s) return;
+    var b = _browse || {};
+    var step = CommentBank.stepOf(s);
     var hit = _browseRow(s, ctx, caseId);
-    if (hit ? !hit.fits : !CommentBank.fits(s, ctx)) {
-      _useAsWritten(st, s, ctx, hit);
-      _writeRows(st);
-      _syncBrowse();
-      _focusSel('#tq-browse-list .qn-browse-row.on');
-      return;
+    var row;
+    if (hit ? hit.fits : CommentBank.fits(s, ctx)) row = rowFromSentence(s, ctx, step);
+    else {
+      row = typedRow(hit ? hit.text : _preview(s, ctx));
+      row.from = s.id;
     }
     var key = _rowKey(st);
     var rows = _rowsFor(st, f);
-    var at = _browse && _browse.gap != null ? _replacedBy(rows, s) : -1;
-    if (_browse && _browse.gap != null && at < 0) {
-      var row = rowFromSentence(s, ctx, CommentBank.stepOf(s));
-      _rows[key] = insertRow(rows, row, _browse.gap);
-      _markAdded(st, row);
-      _browse.gap++;
-    } else if (at >= 0) {
-      // From a gap, a part the comment has once only (its step, or an
-      // advising sentence) takes the place of that row, never a second
-      // time; the gap stays for the next pick.
-      var next = rows.slice();
-      next[at] = rowFromSentence(s, ctx, rows[at].step, at === 0);
-      _rows[key] = next;
-    } else _rows[key] = useSentence(rows, s, ctx);
+    _rows[key] = insertRow(rows, row, b.gap != null ? b.gap : _stepPos(rows, step));
+    _markAdded(st, row);
+    if (b.gap != null) b.gap++;
     _writeRows(st);
     _syncBrowse();
     _focusSel('#tq-browse-list .qn-browse-row.on');
@@ -7149,7 +7107,6 @@ window.ReportQuestionnaire = (function () {
     keepTyped: keepTyped,
     insertRow: insertRow,
     insertChoices: insertChoices,
-    replacedBy: _replacedBy,
     gapPart: _gapPart,
     recoverRows: recoverRows,
     composeRows: composeRows,

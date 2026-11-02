@@ -924,7 +924,7 @@ test.describe('the Sentences card', () => {
     await expect(page.locator('#tq-marks .qn-mark.added')).toHaveCount(0);
   });
 
-  test('Browse Sentences… from a gap: opens on a part that can go in; Use replaces a part the comment has once only; ⌘A Delete then Generate at once', async ({
+  test('Browse Sentences… from a gap: opens on a part that can go in; Use adds at the gap, never in another row’s place; ⌘A Delete then Generate at once', async ({
     page,
   }) => {
     await open(page);
@@ -940,16 +940,17 @@ test.describe('the Sentences card', () => {
     await page.locator('#tq-add-menu [data-do="browseAt"]').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
     await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Habits');
-    // A second grade sentence is never put in: Use on Grade replaces the
-    // grade row, the row count unchanged, the first row still Grade.
+    // Use adds, even a second grade sentence (Colin, 2026-11-02: "i should
+    // be able to add ones i like, and make the comment longer"): it goes
+    // in at the gap and the first Grade row stays as it was.
     await sheet.locator('[role="tab"]', { hasText: 'Grade' }).click();
     const use = sheet.locator('.qn-browse-use:enabled').first();
-    await expect(use).toHaveAttribute('title', 'Puts this sentence in Cece’s comment.');
+    await expect(use).toHaveAttribute('title', /^Puts this sentence in Cece’s comment/);
     await use.click();
-    await expect(rows(page)).toHaveCount(n);
-    await expect(rowByLabel(page, 'Grade')).toHaveCount(1);
+    await expect(rows(page)).toHaveCount(n + 1);
+    await expect(rowByLabel(page, 'Grade')).toHaveCount(2);
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
-    expect(await rows(page).first().locator('.qn-req-text').textContent()).not.toBe(gradeWas);
+    expect(await rows(page).first().locator('.qn-req-text').textContent()).toBe(gradeWas);
     await expect(rowByLabel(page, 'Next Step')).toHaveCount(1);
     // A Strengths sentence from the same sheet, with the strengths row gone,
     // goes in at the gap: its Use says so.
@@ -969,7 +970,7 @@ test.describe('the Sentences card', () => {
     );
     await sheet.locator('.qn-browse-use:enabled').first().click();
     await expect(rows(page).last().locator('.qn-req-label')).toHaveText('Strengths');
-    await expect(rows(page)).toHaveCount(n);
+    await expect(rows(page)).toHaveCount(n + 1);
     await page.keyboard.press('Escape');
     // The keyboard focus on a menu item is filled like a hover.
     await gaps.last().locator('.qn-gap-add').click();
@@ -1034,8 +1035,8 @@ test.describe('the Sentences card', () => {
     expect(ReportQuestionnaireSentences(await box.inputValue())[2]).toBe(
       'Cece explained her lab results clearly to the class.',
     );
-    // Browse Sentences… from the last gap: a part the comment has once
-    // only (Strengths) is replaced in its row, never put in twice.
+    // Browse Sentences… from the last gap: a second Strengths sentence is
+    // added there; the first stays.
     const n = await rows(page).count();
     await gaps.last().locator('.qn-gap-add').click();
     await menu.locator('[data-do="browseAt"]').click();
@@ -1045,9 +1046,11 @@ test.describe('the Sentences card', () => {
     const use = sheet.locator('.qn-browse-use:enabled').first();
     const pick = await use.locator('..').locator('.qn-browse-sentence').textContent();
     await use.click();
-    await expect(rows(page)).toHaveCount(n);
-    await expect(rowByLabel(page, 'Strengths')).toHaveCount(1);
-    expect((await rowByLabel(page, 'Strengths').locator('.qn-req-text').textContent()).slice(4)).toBe(pick.slice(4));
+    await expect(rows(page)).toHaveCount(n + 1);
+    await expect(rowByLabel(page, 'Strengths')).toHaveCount(2);
+    expect((await rowByLabel(page, 'Strengths').last().locator('.qn-req-text').textContent()).slice(4)).toBe(
+      pick.slice(4),
+    );
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
     await expect(gaps.last().locator('.qn-gap-add')).toBeFocused();
