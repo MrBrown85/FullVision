@@ -6387,3 +6387,18 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-browse-overlay ~ .undo-toast {
   z-index: 10003;
 }
+
+/* The class's shared next step, with the Closing row (Nov 2 mockup). */
+.qn-shared-step {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text);
+}
+.qn-shared-step b {
+  font-weight: 600;
+}
+.qn-shared-count {
+  color: var(--text-2);
+}
