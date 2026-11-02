@@ -483,11 +483,12 @@ export async function mockAuth(page) {
         rubric_id: a.rubricId || null,
         module_id: a.moduleId || null,
         core_competency_ids: a.coreCompetencyIds || [],
-        collab_mode: null,
+        collab_mode: { pair: 'pairs', group: 'groups' }[a.collaboration] || null,
         collab_config: {
           pairs: a.pairs || [],
           groups: a.groups || [],
           excludedStudents: a.excludedStudents || [],
+          ...(a.groupCount ? { groupCount: a.groupCount } : {}),
         },
         has_rubric: !!a.rubricId,
         date_assigned: a.date || null,
