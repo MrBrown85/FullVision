@@ -189,12 +189,14 @@ window.DashInsights = (function () {
       })
       .join('');
     // Everyone in the band is at one level, so they share its next step.
-    var next = _colNextStep(cid, col, pop.level);
+    var next = _bandNextStep(cid, col, pop.level, band.ids);
     return (
       '<div class="dash-mix-pop-head"><span>' +
       esc(col.label + ' · ' + band.label + ' · ' + band.ids.length) +
       '</span><button type="button" class="dash-mix-pop-close" data-action="mixClose" aria-label="Close">×</button></div>' +
-      (next ? '<div class="dash-mix-pop-next"><b>Shared next step:</b> ' + esc(next) + '</div>' : '') +
+      (next
+        ? '<div class="dash-mix-pop-next">' + _nextHead('Shared next step', next) + esc(next.text) + '</div>'
+        : '') +
       '<div class="dash-ins-people">' +
       people +
       '</div>' +
@@ -456,16 +458,71 @@ window.DashInsights = (function () {
     );
   }
 
-  /* The curriculum bank's next step for one competency's column at a
-     value's level (CompetencyWording.nextStep): '' for a folder column,
-     which holds several competencies, or one with no bank id. */
-  function _colNextStep(cid, col, value) {
-    if (!col || !col.sectionIds || col.sectionIds.length !== 1 || !(value > 0) || !window.CompetencyWording) return '';
+  /* The curriculum bank's next step for one competency at a value's level
+     (CompetencyWording.nextStep): '' for one with no bank id. */
+  function _secNextStep(cid, secId, value) {
+    if (!(value > 0) || !window.CompetencyWording) return '';
     var sec = getSections(cid).find(function (x) {
-      return x.id === col.sectionIds[0];
+      return x.id === secId;
     });
     var tag = sec && sec.tags && sec.tags[0];
     return tag ? CompetencyWording.nextStep(tag, Math.max(1, Math.min(4, Math.round(value)))) : '';
+  }
+  function _secLabel(cid, secId) {
+    var sec = getSections(cid).find(function (x) {
+      return x.id === secId;
+    });
+    var tag = sec && sec.tags && sec.tags[0];
+    return (sec && (sec.shortName || (tag && (tag.label || tag.name)) || sec.name)) || '';
+  }
+  /* A student's lowest competency in a folder column: the lowest
+     proficiency with a score, the one with more pieces on a tie, then the
+     first in the folder. { secId, value } or null. */
+  function _folderLowest(cid, col, sid) {
+    var best = null;
+    col.sectionIds.forEach(function (secId) {
+      var v = getSectionProficiency(cid, sid, secId);
+      if (!(v > 0)) return;
+      var n = getSectionEvidenceCount(cid, sid, secId);
+      if (!best || v < best.value || (v === best.value && n > best.n)) best = { secId: secId, value: v, n: n };
+    });
+    return best;
+  }
+  /* A column's next step for one student: a competency's step at their
+     value; in a folder, the step of their lowest competency there, at
+     their level on it, named (Colin, 2026-11-02). { text, label } or
+     null. */
+  function _colNextStep(cid, col, value, sid) {
+    if (!col || !col.sectionIds || !col.sectionIds.length) return null;
+    if (col.sectionIds.length === 1) {
+      var one = _secNextStep(cid, col.sectionIds[0], value);
+      return one ? { text: one, label: '' } : null;
+    }
+    var low = sid ? _folderLowest(cid, col, sid) : null;
+    var text = low ? _secNextStep(cid, low.secId, low.value) : '';
+    return text ? { text: text, label: _secLabel(cid, low.secId) } : null;
+  }
+  /* A band's shared next step: a competency's step at the band's level; in
+     a folder, the competency that is lowest for the most students in the
+     band (the first in the folder on a tie), at the band's level, named
+     (Colin, 2026-11-02). { text, label } or null. */
+  function _bandNextStep(cid, col, level, ids) {
+    if (!col || !col.sectionIds || col.sectionIds.length < 2) return _colNextStep(cid, col, level);
+    var count = {};
+    ids.forEach(function (sid) {
+      var low = _folderLowest(cid, col, sid);
+      if (low) count[low.secId] = (count[low.secId] || 0) + 1;
+    });
+    var top = null;
+    col.sectionIds.forEach(function (secId) {
+      if (count[secId] && (!top || count[secId] > count[top])) top = secId;
+    });
+    var text = top ? _secNextStep(cid, top, level) : '';
+    return text ? { text: text, label: _secLabel(cid, top) } : null;
+  }
+  /* "Next step:" or, in a folder, "Next step (Data Patterns):". */
+  function _nextHead(head, next) {
+    return '<b>' + head + (next.label ? ' (' + esc(next.label) + ')' : '') + ':</b> ';
   }
 
   function _facts(cid, m, p, comp) {
@@ -504,14 +561,14 @@ window.DashInsights = (function () {
     });
     if (p.missing.length > 2) f.push(p.missing.length - 2 + ' more missing or late');
     // The student's next step in that competency, on its own line (Nov 2 mockup).
-    var next = named ? _colNextStep(cid, named.col, named.value) : '';
+    var next = named ? _colNextStep(cid, named.col, named.value, p.student.id) : null;
     return (
       f
         .map(function (x) {
           return '<span class="dash-na-fact">' + x + '</span>';
         })
         .join(' <span class="dash-na-sep" aria-hidden="true">·</span> ') +
-      (next ? '<span class="dash-na-next"><b>Next step:</b> ' + esc(next) + '</span>' : '')
+      (next ? '<span class="dash-na-next">' + _nextHead('Next step', next) + esc(next.text) + '</span>' : '')
     );
   }
 
