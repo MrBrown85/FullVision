@@ -71,6 +71,7 @@ create table course (
   round_percent    boolean,                                        -- true whole %, false one decimal, null follow grade level (20261016_course_round_percent)
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
+  curriculum_tags  text[],                                         -- BC bank course keys the class is linked to, e.g. {HIST12} (20261102_course_curriculum_tags)
   deleted_at       timestamptz                                         -- soft-delete marker; hidden immediately, purged after 30d by fv_retention_cleanup (20261012_course_soft_delete)
 );
 

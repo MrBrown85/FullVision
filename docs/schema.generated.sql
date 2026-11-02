@@ -196,6 +196,7 @@ table public.course (rls on)
   block text
   recent_score_limit smallint
   level_order text not null default 'desc'::text
+  curriculum_tags text[]
   constraint course_block_len CHECK (((block IS NULL) OR ((char_length(block) >= 1) AND (char_length(block) <= 24))))
   constraint course_calc_method_check CHECK ((calc_method = ANY (ARRAY['average'::text, 'median'::text, 'mostRecent'::text, 'highest'::text, 'mode'::text, 'decayingAvg'::text])))
   constraint course_category_weights_is_object CHECK (((category_weights IS NULL) OR (jsonb_typeof(category_weights) = 'object'::text)))
@@ -1228,7 +1229,7 @@ function public.list_removed_sections(p_course_id uuid) returns jsonb
 function public.list_report_issues(p_course_id uuid, p_term integer) returns jsonb
 function public.list_report_templates() returns jsonb
 function public.list_rubric_copies(p_copy_group uuid) returns TABLE(rubric_id uuid, course_id uuid, course_name text, name text)
-function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_level text, description text, color text, is_archived boolean, display_order integer, grading_system text, calc_method text, decay_weight numeric, timezone text, late_work_policy text, created_at timestamp with time zone, updated_at timestamp with time zone, block text)
+function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_level text, description text, color text, is_archived boolean, display_order integer, grading_system text, calc_method text, decay_weight numeric, timezone text, late_work_policy text, created_at timestamp with time zone, updated_at timestamp with time zone, block text, curriculum_tags text[])
 function public.reenrol_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
 function public.relink_student(p_ghost_student_id uuid, p_canonical_student_id uuid) returns jsonb
 function public.remove_section(p_id uuid, p_idempotency_key uuid) returns jsonb
