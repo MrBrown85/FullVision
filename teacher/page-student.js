@@ -683,6 +683,7 @@ window.PageStudent = (function () {
       '</span></span>' +
       '<span class="dash-tag-chevron" aria-hidden="true">&#9654;</span>' +
       '</button>' +
+      _compNowHtml(cid, tag, sp) +
       _compWhereHtml(ctx, entries) +
       CompetencyEvidence.drawerHtml(cid, studentId, sec, tag, drawerId) +
       '<div class="stu-comp-override">' +
@@ -726,6 +727,33 @@ window.PageStudent = (function () {
 
   /* A competency's scores split by the kind of work they came from, so a
      teacher sees where the skill shows best. Shown in the open row. */
+  /* The open drawer's header (Nov 2 mockup): where the student is now, the
+     level's descriptor (CompetencyWording), and the next step toward the
+     level above. The level word follows the class's grading style
+     (levelWord: none in a Letter class). A bank competency's wording loads
+     the first time, and the page draws again once it is here. */
+  var _bankAsked = false;
+  function _compNowHtml(cid, tag, sp) {
+    if (!(sp > 0) || !window.CompetencyWording) return '';
+    var l = CompetencyWording.lines(tag, Math.max(1, Math.min(4, Math.round(sp))));
+    if (!l || (!l.descriptor && !l.next)) return '';
+    if (!l.ready && !_bankAsked && window.RubricPrint && RubricPrint.loadBankLevels) {
+      _bankAsked = true;
+      RubricPrint.loadBankLevels().then(function (ok) {
+        if (ok && activeCourse === cid && document.querySelector('.stu-comp')) render();
+      });
+    }
+    var word = levelWord(cid, sp);
+    return (
+      '<div class="stu-comp-now">' +
+      (l.descriptor
+        ? '<div><b>Now' + (word ? ' \u00b7 ' + esc(word) : '') + ':</b> ' + esc(l.descriptor) + '</div>'
+        : '') +
+      (l.next ? '<div><b>Next step:</b> ' + esc(l.next) + '</div>' : '') +
+      '</div>'
+    );
+  }
+
   function _compWhereHtml(ctx, entries) {
     var cid = ctx.cid;
     var byType = {};

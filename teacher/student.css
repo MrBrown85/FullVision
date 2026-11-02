@@ -2854,6 +2854,21 @@ button.stu-bd-row:focus-visible {
   border-radius: var(--radius-sm);
   background: var(--bg);
 }
+.stu-comp-now {
+  display: none;
+  margin: 0 4px 10px;
+  padding: 2px 14px 0;
+  font-size: var(--text-base);
+  line-height: 1.4;
+  color: var(--text);
+}
+.stu-comp-now div + div {
+  margin-top: 4px;
+}
+.stu-comp-now b {
+  font-weight: 600;
+}
+.stu-comp-row.open ~ .stu-comp-now,
 .stu-comp-row.open ~ .stu-comp-where,
 .stu-comp .dash-tag-row.open ~ .tag-detail {
   display: block;
