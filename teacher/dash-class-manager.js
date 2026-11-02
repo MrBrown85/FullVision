@@ -4610,6 +4610,9 @@ window.DashClassManager = (function () {
     var defaultTerms = _cmDefaultReportingTerms(course.id, cwStep2Span);
     if (defaultTerms && !(Array.isArray(cc.reportingTerms) && cc.reportingTerms.length))
       cc.reportingTerms = defaultTerms;
+    // One course counts its folders as one; a combined class counts each
+    // course equally instead.
+    if (cwSelectedTags.length > 0) Object.assign(cc, curriculumGradingDefaults(cwSelectedTags));
     saveCourseConfig(course.id, cc);
 
     var dispatchOk = true;
@@ -7824,6 +7827,8 @@ window.DashClassManager = (function () {
           sec = structuredClone(c.section);
           sec.id = freshId(c.section.id);
           sec.tags[0].id = sec.id;
+          // Its folder is the built map's, not the class's.
+          delete sec.groupId;
         } else {
           if (!map.subjects.length) map.subjects.push({ id: 'subj1', name: 'General', color: '#6366f1' });
           var sub = map.subjects[0];
