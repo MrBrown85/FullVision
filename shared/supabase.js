@@ -125,8 +125,24 @@
     if (!sb) throw new Error('Supabase not initialized');
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error) throw error;
+    _leaveDemoMode();
     return data;
   };
+
+  /* A real sign-in ends Demo Mode. requireAuth() checks the demo flags before
+   * the session, so flags left from Try Demo Mode kept a signed-in teacher in
+   * the sample class and their own classes never loaded. enterDemoMode()
+   * wipes every gb-* key before seeding, so while the flags are set all gb-*
+   * data on this device is demo data and is safe to drop. */
+  function _leaveDemoMode() {
+    if (localStorage.getItem('gb-demo-mode') === null && localStorage.getItem('gb-demo-mode-token') === null) return;
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('gb-')) keys.push(key);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+  }
 
   window.refreshSupabaseSession = async function () {
     const sb = getSupabase();
