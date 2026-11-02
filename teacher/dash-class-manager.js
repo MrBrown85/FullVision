@@ -9,6 +9,7 @@ window.DashClassManager = (function () {
     _listeners.push({ type: type, handler: handler, options: options });
   }
   function _removeAllListeners() {
+    closeColorPop();
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });
@@ -2611,6 +2612,7 @@ window.DashClassManager = (function () {
   }
   function closeClassManager() {
     classManagerOpen = false;
+    closeColorPop();
     // Hand a course switch made in here back to the parent, so it re-syncs its
     // own activeCourse, loads that course's data and renders it. Without this
     // the parent falls back to whichever class was active before the manager
@@ -3106,15 +3108,12 @@ window.DashClassManager = (function () {
         '">' +
         '<span class="mod-folder-grip">\u2807</span>' +
         '<span class="mod-folder-chevron">\u25B6</span>' +
-        '<span class="mod-folder-color" style="background:' +
-        grp.color +
-        '" title="Change colour" data-action="openColorPicker" data-stop-prop="true">' +
-        '<input type="color" value="' +
-        grp.color +
-        '" data-action-change="cmCompGroupColor" data-grpid="' +
+        '<button type="button" class="mod-folder-color" style="background:' +
+        cssColor(grp.color) +
+        '" title="Change colour" aria-label="Change colour" aria-haspopup="dialog" draggable="false"' +
+        ' data-action="cmOpenGroupColorPop" data-grpid="' +
         grp.id +
-        '">' +
-        '</span>' +
+        '" data-stop-prop="true"></button>' +
         '<input class="mod-folder-name-input" value="' +
         esc(grp.name) +
         '" draggable="false" data-stop-prop="true" data-action-blur="cmCompGroupName" data-grpid="' +
@@ -6447,6 +6446,27 @@ window.DashClassManager = (function () {
     }
   }
 
+  /* Competency group colour: the swatch opens the shared colour popover (ui.js). */
+  function cmOpenGroupColorPop(swatch) {
+    var grpId = swatch.dataset.grpid;
+    var map = cmSelectedCourse && getLearningMap(cmSelectedCourse);
+    var g = ((map && map.competencyGroups) || []).find(function (x) {
+      return x.id === _currentId('group', grpId);
+    });
+    if (!g) return;
+    openColorPop(swatch, {
+      key: 'group:' + grpId,
+      colors: CM_GROUP_COLORS,
+      current: g.color,
+      label: 'Group colour',
+      findSwatch: function () {
+        return document.querySelector('.mod-folder-color[data-grpid="' + grpId + '"]');
+      },
+      onPick: function (color) {
+        cmUpdateCompGroupColor(grpId, color);
+      },
+    });
+  }
   function cmUpdateCompGroupColor(grpId, color) {
     grpId = _currentId('group', grpId);
     if (!cmSelectedCourse) return;
@@ -8192,9 +8212,8 @@ window.DashClassManager = (function () {
       cmToggleStdFolder: function () {
         cmToggleStdFolder(el.dataset.uid);
       },
-      openColorPicker: function () {
-        var inp = el.querySelector('input[type="color"]');
-        if (inp) inp.click();
+      cmOpenGroupColorPop: function () {
+        cmOpenGroupColorPop(el);
       },
       cmBlockChip: function () {
         blockChipSelect(el);
@@ -8355,10 +8374,6 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionChange === 'cmStdColor') {
       cmUpdateStdColor(el.dataset.secid, el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmCompGroupColor') {
-      cmUpdateCompGroupColor(el.dataset.grpid, el.value);
       return true;
     }
     if (el.dataset.actionChange === 'cmRecentLimit') {

@@ -1738,15 +1738,12 @@ window.PageAssignments = (function () {
         '<span class="mod-folder-chevron" aria-hidden="true">' +
         _MODULE_CHEVRON +
         '</span>' +
-        '<span class="mod-folder-color" style="background:' +
+        '<button type="button" class="mod-folder-color" style="background:' +
         cssColor(u.color || '#6366f1') +
-        '" title="Change colour" data-action="openColorPicker" data-stop-prop="true">' +
-        '<input type="color" value="' +
-        esc(u.color || '#6366f1') +
-        '" data-action-change="moduleColor" data-moduleid="' +
+        '" title="Change colour" aria-label="Change colour" aria-haspopup="dialog" draggable="false"' +
+        ' data-action="openModuleColorPop" data-moduleid="' +
         u.id +
-        '">' +
-        '</span>' +
+        '" data-stop-prop="true"></button>' +
         '<input class="mod-folder-name-input" value="' +
         esc(u.name) +
         '" size="' +
@@ -6364,6 +6361,26 @@ window.PageAssignments = (function () {
       render();
     }
   }
+  /* Module colour: the swatch opens the shared colour popover (ui.js). */
+  function openModuleColorPop(swatch) {
+    var moduleId = swatch.dataset.moduleid;
+    var u = getModules(activeCourse).find(function (x) {
+      return x.id === moduleId;
+    });
+    if (!u) return;
+    openColorPop(swatch, {
+      key: 'module:' + moduleId,
+      colors: MODULE_COLORS,
+      current: u.color || '#6366f1',
+      label: 'Module colour',
+      findSwatch: function () {
+        return document.querySelector('.mod-folder-color[data-moduleid="' + moduleId + '"]');
+      },
+      onPick: function (color) {
+        updateModuleColor(moduleId, color);
+      },
+    });
+  }
   function deleteModule(moduleId, assessCount) {
     var msg =
       assessCount > 0
@@ -6703,8 +6720,8 @@ window.PageAssignments = (function () {
       addModuleInline: function () {
         addModuleInline();
       },
-      openColorPicker: function () {
-        el.querySelector('input').click();
+      openModuleColorPop: function () {
+        openModuleColorPop(el);
       },
       setRubricView: function () {
         setRubricView(el.dataset.aid, el.dataset.rubric === 'true');
@@ -7021,10 +7038,6 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionChange === 'autoSetDueDate') {
       autoSetDueDate();
-      return;
-    }
-    if (el.dataset.actionChange === 'moduleColor') {
-      updateModuleColor(el.dataset.moduleid, el.value);
       return;
     }
     if (el.dataset.actionChange === 'tagCheckbox') {
@@ -8613,6 +8626,7 @@ window.PageAssignments = (function () {
 
   function destroy() {
     _hideChipTip();
+    closeColorPop();
     // Remove all tracked listeners
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
