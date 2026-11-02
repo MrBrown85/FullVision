@@ -114,6 +114,13 @@ The old bank (`curriculum_by_course.json`) was written by an early model and had
 10. **The best piece names the skill it shows; one sentence per skill** (Colin, 2026-11-02). With no Note for the Report on the best piece, its sentence adds the phrase of a bank competency the piece scored Proficient or above on: "Her best piece was “X”, which shows she can …" (`bestPieceSkillOf`). It never takes a skill the comment can name elsewhere (the strengths, a tie at the top, even results, the highest-marked skill, the next step), by `SKILLS` key, so no comment makes two sentences on one skill. A note says what the piece shows itself and is used as written.
 11. **Progress in levels** (Colin, 2026-11-02). A bank competency that climbed a level or more over the term, past the "improved" gate, can be said in the Overall step beside the where-now sentence: "Maya rose from Developing to Proficient in her ability to …" or "… has reached Proficient in her ability to …, up from Developing" (`progressOf`, frames pg01–pg02). Level words, so only where the class shows them; the skill last; never the next step's skill; phrases of 9 words or fewer so it stays within 20. The frames passed two rounds of independent review (an earlier "from beginning to … to doing it" shape misread and was dropped).
 
+## Staying signed in (2026-11-02)
+
+Teachers complained of being signed out "way too quickly and frequently". A 30-minute idle timer, written for shared computers, signed a teacher out after 30 minutes without input in one tab, and Supabase's default sign-out ended every session: an idle laptop signed the phone out too. Colin: teachers aren't using shared computers.
+
+- **No idle sign-out.** A teacher stays signed in on their own device until they sign out; the device's own lock protects it, and Supabase refreshes the session.
+- **Sign Out ends this device's session only** (`signOut({ scope: 'local' })`). It still clears the device's saved class data, and still stops first when changes haven't reached the server.
+
 ## A category on every assessment (2026-11-01)
 
 Colin chose option A on Kanban card t4. Microsoft Teams Assignments requires a category on every assignment once a class has categories. FullVision didn't: in a class with categories, work with no category counted toward nothing in the course % (`assessmentCourseWorth` kind `uncategorized`) and toward a competency only when that competency had no categorized work, with nothing on screen to say so. The form also chose the first category for the teacher without saying so.

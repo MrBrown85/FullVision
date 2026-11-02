@@ -2,11 +2,11 @@
  * signOut() and the offline write queue — shared/supabase.js.
  *
  * The queue (fv-sync-queue-v1 / fv-sync-dead-letter-v1) holds student names
- * and observation text, so a sign-out on a shared computer must clear it. But
- * clearing it throws away changes that never reached the server, so an
- * explicit sign-out stops and reports them first, and the idle-timeout
- * sign-out (nobody there to ask) keeps them for the same teacher's next
- * session.
+ * and observation text, so a sign-out clears it. But clearing it throws
+ * away changes that never reached the server, so a sign-out stops and
+ * reports them first. A sign-out ends this device's session only, and
+ * nothing signs a teacher out for being idle (teachers use their own
+ * devices).
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
@@ -40,7 +40,13 @@ function loadSupabase(queueStats) {
     },
   };
   globalThis.sessionStorage = { clear() {} };
-  globalThis.document = { cookie: '', addEventListener() {} };
+  globalThis.__docListeners = [];
+  globalThis.document = {
+    cookie: '',
+    addEventListener(evt) {
+      globalThis.__docListeners.push(evt);
+    },
+  };
   globalThis.addEventListener = () => {};
   try {
     globalThis.location = { pathname: '/teacher/app.html', hostname: 'fullvision.ca', href: '' };
@@ -55,7 +61,8 @@ function loadSupabase(queueStats) {
     createClient() {
       return {
         auth: {
-          async signOut() {
+          async signOut(opts) {
+            globalThis.__signOutOpts = opts;
             return { error: null };
           },
           onAuthStateChange() {
@@ -112,12 +119,16 @@ describe('signOut and unsent offline changes', () => {
     expect(window.location.href).toBe('/login.html');
   });
 
-  it('keeps the owner-stamped queue on an idle-timeout sign-out', async () => {
-    loadSupabase({ queued: 2, deadLettered: 0 });
-    await window.signOut({ keepQueue: true });
-    expect(localStorage.getItem('fv-sync-queue-v1')).not.toBeNull();
-    expect(localStorage.getItem('gb-students-c1')).toBeNull();
-    expect(localStorage.getItem('sb-example-auth-token')).toBeNull();
-    expect(window.location.href).toBe('/login.html');
+  it('signs out this device only, so the phone and other computers stay signed in', async () => {
+    loadSupabase({ queued: 0, deadLettered: 0 });
+    await window.signOut();
+    expect(globalThis.__signOutOpts).toEqual({ scope: 'local' });
+  });
+
+  it('never signs a teacher out for being idle', () => {
+    loadSupabase({ queued: 0, deadLettered: 0 });
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt =>
+      expect(globalThis.__docListeners).not.toContain(evt),
+    );
   });
 });
