@@ -592,6 +592,20 @@ button.dash-mix-below:hover,
   justify-content: space-between;
   font-weight: 600;
 }
+.dash-mix-pop-next {
+  line-height: 1.4;
+  color: var(--text);
+}
+.dash-mix-pop-next b,
+.dash-na-next b {
+  font-weight: 600;
+  color: var(--text);
+}
+/* A Needs Attention row's next step, on its own line under the facts. */
+.dash-na-next {
+  display: block;
+  color: var(--text);
+}
 .dash-mix-pop-close {
   border: 0;
   background: transparent;
