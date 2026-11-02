@@ -77,40 +77,44 @@ function openColorPop(swatch, opts) {
   pop.className = 'color-pop';
   pop.setAttribute('role', 'dialog');
   pop.setAttribute('aria-label', opts.label || 'Colour');
-  pop.innerHTML =
-    '<div class="color-pop-grid">' +
-    opts.colors
-      .map(function (c) {
-        return (
-          '<button type="button" class="color-pop-opt' +
-          (c === current ? ' selected' : '') +
-          '" data-color="' +
-          c +
-          '" style="background:' +
-          c +
-          '" aria-label="' +
-          c +
-          '" aria-pressed="' +
-          (c === current) +
-          '"></button>'
-        );
-      })
-      .join('') +
-    '</div>' +
-    '<div class="color-pop-custom">' +
-    '<span class="color-pop-custom-label">Custom</span>' +
-    '<input type="color" class="color-pop-well" value="' +
-    current +
-    '" aria-label="Choose a custom colour">' +
-    '<input type="text" class="color-pop-hex" value="' +
-    current +
-    '" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex colour">' +
-    '</div>';
+  var grid = document.createElement('div');
+  grid.className = 'color-pop-grid';
+  opts.colors.forEach(function (c) {
+    var opt = document.createElement('button');
+    opt.type = 'button';
+    opt.className = 'color-pop-opt' + (c === current ? ' selected' : '');
+    opt.dataset.color = c;
+    opt.style.background = c;
+    opt.setAttribute('aria-label', c);
+    opt.setAttribute('aria-pressed', String(c === current));
+    grid.appendChild(opt);
+  });
+  var custom = document.createElement('div');
+  custom.className = 'color-pop-custom';
+  var label = document.createElement('span');
+  label.className = 'color-pop-custom-label';
+  label.textContent = 'Custom';
+  var well = document.createElement('input');
+  well.type = 'color';
+  well.className = 'color-pop-well';
+  well.value = current;
+  well.setAttribute('aria-label', 'Choose a custom colour');
+  var hex = document.createElement('input');
+  hex.type = 'text';
+  hex.className = 'color-pop-hex';
+  hex.value = current;
+  hex.maxLength = 7;
+  hex.spellcheck = false;
+  hex.autocomplete = 'off';
+  hex.setAttribute('aria-label', 'Hex colour');
+  custom.appendChild(label);
+  custom.appendChild(well);
+  custom.appendChild(hex);
+  pop.appendChild(grid);
+  pop.appendChild(custom);
   document.body.appendChild(pop);
   _placeColorPop();
 
-  var well = pop.querySelector('.color-pop-well');
-  var hex = pop.querySelector('.color-pop-hex');
   function apply(color) {
     closeColorPop();
     if (color && color !== current) opts.onPick(color);
