@@ -740,7 +740,9 @@ window.PageStudent = (function () {
     if (!l.ready && !_bankAsked && window.RubricPrint && RubricPrint.loadBankLevels) {
       _bankAsked = true;
       RubricPrint.loadBankLevels().then(function (ok) {
-        if (ok && activeCourse === cid && document.querySelector('.stu-comp')) render();
+        // Offline: ask again on the next draw.
+        if (!ok) _bankAsked = false;
+        else if (activeCourse === cid) _refreshNowHeaders(cid);
       });
     }
     var word = levelWord(cid, sp);
@@ -752,6 +754,24 @@ window.PageStudent = (function () {
       (l.next ? '<div><b>Next step:</b> ' + esc(l.next) + '</div>' : '') +
       '</div>'
     );
+  }
+
+  /* The headers drawn again in place once the bank's wording is here, so
+     the page keeps its scroll and focus. */
+  function _refreshNowHeaders(cid) {
+    document.querySelectorAll('.stu-comp-row[data-tagid]').forEach(function (row) {
+      var tag = getTagById(cid, row.dataset.tagid);
+      var sec = tag && getSectionForTag(cid, tag.id);
+      if (!sec) return;
+      var old =
+        row.nextElementSibling && row.nextElementSibling.classList.contains('stu-comp-now')
+          ? row.nextElementSibling
+          : null;
+      var html = _compNowHtml(cid, tag, getSectionProficiency(cid, studentId, sec.id));
+      if (old) old.remove();
+      // html-safe: _compNowHtml escapes the level word, descriptor and step
+      if (html) row.insertAdjacentHTML('afterend', html);
+    });
   }
 
   function _compWhereHtml(ctx, entries) {
