@@ -4,11 +4,396 @@
     "covers": [
       "Social Studies",
       "English Language Arts",
-      "CLE10",
       "Science",
-      "Mathematics"
+      "Mathematics",
+      "Physical and Health Education",
+      "Career Education"
     ],
     "raw_sha": "sha256 of the competency's raw text (UTF-8), first 16 hex characters, as in data/bc-curriculum-derived.json"
+  },
+  "bc.caree8.cc.1": {
+    "course": "CAREE8",
+    "cluster": "car-self-assessment",
+    "i_can_statements": [
+      "I can use a self-assessment to describe my strengths",
+      "I can give examples of skills I have",
+      "I can reflect on what I like to do and why"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "2e546771325e0320"
+    }
+  },
+  "bc.caree8.cc.2": {
+    "course": "CAREE8",
+    "cluster": "car-purpose-community",
+    "i_can_statements": [
+      "I can ask myself how my passions and purpose help my community",
+      "I can ask others how their passions and purpose help their community",
+      "I can link a career choice to a local or global need"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "b8758c3313c0612d"
+    }
+  },
+  "bc.caree8.cc.3": {
+    "course": "CAREE8",
+    "cluster": "car-public-identity",
+    "i_can_statements": [
+      "I can explain how my public identity can affect my job chances",
+      "I can identify what others can see about me online and offline"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "0dd2b13403cba812"
+    }
+  },
+  "bc.caree8.cc.4": {
+    "course": "CAREE8",
+    "cluster": "car-collaboration",
+    "i_can_statements": [
+      "I can work with others to solve problems as a team",
+      "I can respond respectfully to others' ideas in a group",
+      "I can include everyone's ideas when we solve a problem"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "4efb18f15bf63940"
+    }
+  },
+  "bc.caree8.cc.5": {
+    "course": "CAREE8",
+    "cluster": "car-perspectives-on-work",
+    "i_can_statements": [
+      "I can describe different views on how work helps our community",
+      "I can explore a view on work by giving reasons and examples",
+      "I can explain how one type of work helps society"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "7c8ecc17eaa36c66"
+    }
+  },
+  "bc.caree8.cc.6": {
+    "course": "CAREE8",
+    "cluster": "car-workplace-safety",
+    "i_can_statements": [
+      "I can demonstrate safety skills while I work",
+      "I can identify safety risks in a work space",
+      "I can explain why workplace safety is important"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "826d57dcb73bba9c"
+    }
+  },
+  "bc.caree8.cc.7": {
+    "course": "CAREE8",
+    "cluster": "car-goal-setting",
+    "i_can_statements": [
+      "I can set realistic learning goals and work to reach them",
+      "I can keep working on my goal when it gets hard",
+      "I can adjust my plan when a setback happens"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "91ea66d52de5d13b"
+    }
+  },
+  "bc.caree8.cc.8": {
+    "course": "CAREE8",
+    "cluster": "car-curriculum-choices",
+    "i_can_statements": [
+      "I can explain how my course choices can affect my career path",
+      "I can describe how activities outside class can affect my career path"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "f7eab45b9c7be4b9"
+    }
+  },
+  "bc.caree8.cc.9": {
+    "course": "CAREE8",
+    "cluster": "car-networks-mentors",
+    "i_can_statements": [
+      "I can explain how mentors and resources can help me explore careers",
+      "I can identify mentors and resources in my own network",
+      "I can use a mentor or resource to explore a career"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "6994cbfc64d26390"
+    }
+  },
+  "bc.caree8.cc.10": {
+    "course": "CAREE8",
+    "cluster": "car-career-influences",
+    "i_can_statements": [
+      "I can ask myself how family and community shape my career choices",
+      "I can ask others how family expectations and traditions shaped their careers",
+      "I can ask others how community needs shaped their career choices"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "df8176369b6d62bb"
+    }
+  },
+  "bc.caree8.cc.11": {
+    "course": "CAREE8",
+    "cluster": "car-career-research",
+    "i_can_statements": [
+      "I can use different research methods to find career information",
+      "I can describe different kinds of careers that are new to me",
+      "I can sort careers into clusters that need similar skills"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "d55a650a34ad5acd"
+    }
+  },
+  "bc.caree8.cc.12": {
+    "course": "CAREE8",
+    "cluster": "car-new-experiences",
+    "i_can_statements": [
+      "I can try volunteer work or another new learning experience",
+      "I can describe a need I noticed during a new experience",
+      "I can suggest a new idea to meet a need I noticed"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "84abd032e1292fd1"
+    }
+  },
+  "bc.caree8.cc.13": {
+    "course": "CAREE8",
+    "cluster": "car-decision-making",
+    "i_can_statements": [
+      "I can use a decision-making strategy to solve a real-life problem",
+      "I can adjust my strategy when the situation changes"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "11d938e6d65e4dcd"
+    }
+  },
+  "bc.caree9.cc.1": {
+    "course": "CAREE9",
+    "cluster": "car-self-assessment",
+    "i_can_statements": [
+      "I can use a self-assessment to describe my strengths",
+      "I can give examples of skills I have",
+      "I can reflect on what I like to do and why"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "2e546771325e0320"
+    }
+  },
+  "bc.caree9.cc.2": {
+    "course": "CAREE9",
+    "cluster": "car-purpose-community",
+    "i_can_statements": [
+      "I can ask myself how my passions and purpose help my community",
+      "I can ask others how their passions and purpose help their community",
+      "I can link a career choice to a local or global need"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "b8758c3313c0612d"
+    }
+  },
+  "bc.caree9.cc.3": {
+    "course": "CAREE9",
+    "cluster": "car-public-identity",
+    "i_can_statements": [
+      "I can explain how my public identity can affect my job chances",
+      "I can identify what others can see about me online and offline"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "0dd2b13403cba812"
+    }
+  },
+  "bc.caree9.cc.4": {
+    "course": "CAREE9",
+    "cluster": "car-collaboration",
+    "i_can_statements": [
+      "I can work with others to solve problems as a team",
+      "I can respond respectfully to others' ideas in a group",
+      "I can include everyone's ideas when we solve a problem"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "4efb18f15bf63940"
+    }
+  },
+  "bc.caree9.cc.5": {
+    "course": "CAREE9",
+    "cluster": "car-perspectives-on-work",
+    "i_can_statements": [
+      "I can describe different views on how work helps our community",
+      "I can explore a view on work by giving reasons and examples",
+      "I can explain how one type of work helps society"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "7c8ecc17eaa36c66"
+    }
+  },
+  "bc.caree9.cc.6": {
+    "course": "CAREE9",
+    "cluster": "car-workplace-safety",
+    "i_can_statements": [
+      "I can demonstrate safety skills while I work",
+      "I can identify safety risks in a work space",
+      "I can explain why workplace safety is important"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "826d57dcb73bba9c"
+    }
+  },
+  "bc.caree9.cc.7": {
+    "course": "CAREE9",
+    "cluster": "car-goal-setting",
+    "i_can_statements": [
+      "I can set realistic learning goals and work to reach them",
+      "I can keep working on my goal when it gets hard",
+      "I can adjust my plan when a setback happens"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "91ea66d52de5d13b"
+    }
+  },
+  "bc.caree9.cc.8": {
+    "course": "CAREE9",
+    "cluster": "car-curriculum-choices",
+    "i_can_statements": [
+      "I can explain how my course choices can affect my career path",
+      "I can describe how activities outside class can affect my career path"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "f7eab45b9c7be4b9"
+    }
+  },
+  "bc.caree9.cc.9": {
+    "course": "CAREE9",
+    "cluster": "car-networks-mentors",
+    "i_can_statements": [
+      "I can explain how mentors and resources can help me explore careers",
+      "I can identify mentors and resources in my own network",
+      "I can use a mentor or resource to explore a career"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "6994cbfc64d26390"
+    }
+  },
+  "bc.caree9.cc.10": {
+    "course": "CAREE9",
+    "cluster": "car-career-influences",
+    "i_can_statements": [
+      "I can ask myself how family and community shape my career choices",
+      "I can ask others how family expectations and traditions shaped their careers",
+      "I can ask others how community needs shaped their career choices"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "df8176369b6d62bb"
+    }
+  },
+  "bc.caree9.cc.11": {
+    "course": "CAREE9",
+    "cluster": "car-career-research",
+    "i_can_statements": [
+      "I can use different research methods to find career information",
+      "I can describe different kinds of careers that are new to me",
+      "I can sort careers into clusters that need similar skills"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "d55a650a34ad5acd"
+    }
+  },
+  "bc.caree9.cc.12": {
+    "course": "CAREE9",
+    "cluster": "car-new-experiences",
+    "i_can_statements": [
+      "I can try volunteer work or another new learning experience",
+      "I can describe a need I noticed during a new experience",
+      "I can suggest a new idea to meet a need I noticed"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "84abd032e1292fd1"
+    }
+  },
+  "bc.caree9.cc.13": {
+    "course": "CAREE9",
+    "cluster": "car-decision-making",
+    "i_can_statements": [
+      "I can use a decision-making strategy to solve a real-life problem",
+      "I can adjust my strategy when the situation changes"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.caree8.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "11d938e6d65e4dcd"
+    }
   },
   "bc.cle10.cc.1": {
     "course": "CLE10",
@@ -187,6 +572,952 @@
       "exemplar": "bc.cle10.cc.12",
       "approved_by_owner": true,
       "raw_sha": "99d4578be9c0adfc"
+    }
+  },
+  "bc.ywt11.cc.1": {
+    "course": "YWT11",
+    "cluster": "car-training-plan",
+    "i_can_statements": [
+      "I can work with my teacher and employer to develop my trade training plan",
+      "I can identify the trade-specific skills to include in my training plan"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "817c26fa636edc74"
+    }
+  },
+  "bc.ywt11.cc.2": {
+    "course": "YWT11",
+    "cluster": "car-trade-skills",
+    "i_can_statements": [
+      "I can apply the trade-specific skills from my training plan at my work placement",
+      "I can match the tasks I do at my placement to my training plan"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "a02df4618436659d"
+    }
+  },
+  "bc.ywt11.cc.3": {
+    "course": "YWT11",
+    "cluster": "car-transferable-skills",
+    "i_can_statements": [
+      "I can identify transferrable skills I use at my work placement",
+      "I can explain how a skill from my work placement could be used in other jobs"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "6573e528955a5374"
+    }
+  },
+  "bc.ywt11.cc.4": {
+    "course": "YWT11",
+    "cluster": "car-work-placements",
+    "i_can_statements": [
+      "I can research work placement opportunities in my chosen trade",
+      "I can compare work placement options to find one that fits my goals"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "5df93af0e946b3c6"
+    }
+  },
+  "bc.ywt11.cc.5": {
+    "course": "YWT11",
+    "cluster": "car-respectful-work",
+    "i_can_statements": [
+      "I can work respectfully with others to reach a common goal",
+      "I can do my share of the work on my own to help reach a common goal",
+      "I can make helpful contributions that move us toward the common goal"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "298ce2c8f336cb77"
+    }
+  },
+  "bc.ywt11.cc.6": {
+    "course": "YWT11",
+    "cluster": "car-workplace-ethics",
+    "i_can_statements": [
+      "I can describe how I show cultural sensitivity to the people I work with",
+      "I can explain how workplace ethics guide the choices I make at work",
+      "I can identify the workplace etiquette expected at my work placement"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "3aca75ec46ba5f7f"
+    }
+  },
+  "bc.ywt11.cc.7": {
+    "course": "YWT11",
+    "cluster": "car-community-care",
+    "i_can_statements": [
+      "I can help care for the people I work with at my work placement",
+      "I can take steps to care for myself at my work placement",
+      "I can take steps to help care for my community"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "f9ef5966f0628dea"
+    }
+  },
+  "bc.ywt11.cc.8": {
+    "course": "YWT11",
+    "cluster": "car-risk-identification",
+    "i_can_statements": [
+      "I can determine the safety risks at my work placement before I start",
+      "I can find information about workplace safety before my placement starts"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "b7bf0ea495168a61"
+    }
+  },
+  "bc.ywt11.cc.9": {
+    "course": "YWT11",
+    "cluster": "car-safety-procedures",
+    "i_can_statements": [
+      "I can follow BC and work-site safety procedures at my work placement",
+      "I can identify the safety procedures required by BC law and by my work site",
+      "I can make safety procedures part of how I do my everyday tasks"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "eff1fc1b66c032d7"
+    }
+  },
+  "bc.ywt11.cc.10": {
+    "course": "YWT11",
+    "cluster": "car-work-reflection",
+    "i_can_statements": [
+      "I can reflect on my work experience to identify my strengths",
+      "I can keep a regular record of my work experience",
+      "I can identify the employability skills I use in my work placement",
+      "I can identify work skills I want to improve next"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "751736990edd7a8b"
+    }
+  },
+  "bc.ywt11.cc.11": {
+    "course": "YWT11",
+    "cluster": "car-problem-solving",
+    "i_can_statements": [
+      "I can reflect on the problem-solving strategies I used at my work placement",
+      "I can describe a strategy I used to solve a problem on my own and how it worked",
+      "I can explain how I worked with others to solve a problem at work"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "c90abb1b4f0a28ce"
+    }
+  },
+  "bc.clc12.cc.1": {
+    "course": "CLC12",
+    "cluster": "car-worldview-influence",
+    "i_can_statements": [
+      "I can recognize how my worldviews and perspectives influence my values and actions",
+      "I can describe my own worldviews and perspectives",
+      "I can explain how my worldviews and perspectives shape the future I want"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "136135b449f0f446"
+    }
+  },
+  "bc.clc12.cc.2": {
+    "course": "CLC12",
+    "cluster": "car-graduation-planning",
+    "i_can_statements": [
+      "I can analyze internal and external factors that affect my career-life choices",
+      "I can identify the internal and external factors that apply to my own situation",
+      "I can use internal and external factors to inform choices in my post-graduation plan"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "7b2be9fa8ddd7d30"
+    }
+  },
+  "bc.clc12.cc.3": {
+    "course": "CLC12",
+    "cluster": "car-skills-assessment",
+    "i_can_statements": [
+      "I can assess my transferable skills using evidence from my experiences",
+      "I can identify which of my transferable skills are strengths",
+      "I can identify which transferable skills I need to refine further"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "72348d099fb8c6ca"
+    }
+  },
+  "bc.clc12.cc.4": {
+    "course": "CLC12",
+    "cluster": "car-wellness-strategies",
+    "i_can_statements": [
+      "I can evaluate whether my personal strategies help me maintain my well-being",
+      "I can explore social and physical strategies that support my well-being",
+      "I can explore financial strategies that help me maintain my well-being"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "ca5bb03b5241a0b7"
+    }
+  },
+  "bc.clc12.cc.5": {
+    "course": "CLC12",
+    "cluster": "car-mentorship",
+    "i_can_statements": [
+      "I can collaborate with a mentor to inform my career-life development and exploration",
+      "I can describe how I used a mentor's advice in my career-life development and exploration"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.cle10.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "b2073ac3ba144ca4"
+    }
+  },
+  "bc.clc12.cc.6": {
+    "course": "CLC12",
+    "cluster": "car-networking",
+    "i_can_statements": [
+      "I can connect with people in my personal, education, and employment networks",
+      "I can use my networks to find resources for life after graduation",
+      "I can build relationships in my networks that support my plans after graduation"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "ea35a8acc5ba9630"
+    }
+  },
+  "bc.clc12.cc.7": {
+    "course": "CLC12",
+    "cluster": "car-profile-creation",
+    "i_can_statements": [
+      "I can create personal and public profiles that present me to others",
+      "I can critique my profiles and identify changes that would make them stronger",
+      "I can explain how my profiles help me advocate for and market myself"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "620044b506000bec"
+    }
+  },
+  "bc.clc12.cc.8": {
+    "course": "CLC12",
+    "cluster": "car-safe-interactions",
+    "i_can_statements": [
+      "I can interact respectfully with others in multiple career-life contexts",
+      "I can include others in my interactions in career-life contexts",
+      "I can interact safely with others in career-life contexts",
+      "I can reflect on how I interact with others in career-life contexts"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.cle10.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "aa648f6d861149c3"
+    }
+  },
+  "bc.clc12.cc.9": {
+    "course": "CLC12",
+    "cluster": "car-preferred-futures",
+    "i_can_statements": [
+      "I can think creatively to come up with possible futures for myself",
+      "I can explore possibilities for the personal life I would like",
+      "I can explore employment and education options that fit the future I want"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "613f7a9dac44a22e"
+    }
+  },
+  "bc.clc12.cc.10": {
+    "course": "CLC12",
+    "cluster": "car-learning-approaches",
+    "i_can_statements": [
+      "I can apply my preferred approaches to learning to support my career-life development",
+      "I can identify the approaches to learning that work best for me",
+      "I can use my preferred approaches to learning to advocate for what I need"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "ac4c5ce0d4a3de6e"
+    }
+  },
+  "bc.clc12.cc.11": {
+    "course": "CLC12",
+    "cluster": "car-career-exploration",
+    "i_can_statements": [
+      "I can explore career-life options that interest me",
+      "I can describe what I learned from my career-life exploration",
+      "I can evaluate how useful my career-life exploration was"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "6b8dc99dca43c826"
+    }
+  },
+  "bc.clc12.cc.12": {
+    "course": "CLC12",
+    "cluster": "car-learning-highlights",
+    "i_can_statements": [
+      "I can assess my growth in the Core Competencies using my experiences in and out of school",
+      "I can reflect on what I have learned from experiences in school and out of school",
+      "I can share highlights of my learning journey with others"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "418a76bc687f098c"
+    }
+  },
+  "bc.clc12.cc.13": {
+    "course": "CLC12",
+    "cluster": "car-capstone",
+    "i_can_statements": [
+      "I can design a capstone project that represents my learning",
+      "I can assemble the pieces of my capstone into a finished whole",
+      "I can present my capstone to an audience"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.clc12.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "5c0a53274dbc15b6"
+    }
+  },
+  "bc.wex12a.cc.1": {
+    "course": "WEX12A",
+    "cluster": "car-using-strengths",
+    "i_can_statements": [
+      "I can identify new ways of my own to use my strengths and skills",
+      "I can identify approaches others suggest for using my strengths and skills",
+      "I can identify ways of working that fit my personal preferences"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.wex12a.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "173bda98d90c65b5"
+    }
+  },
+  "bc.wex12a.cc.2": {
+    "course": "WEX12A",
+    "cluster": "car-exploring-interests",
+    "i_can_statements": [
+      "I can assess my strengths and skills to explore work placement options",
+      "I can identify personal areas of interest for a work placement",
+      "I can connect my interests to possible work placement options"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.wex12a.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "d1f32df58c92643f"
+    }
+  },
+  "bc.wex12a.cc.3": {
+    "course": "WEX12A",
+    "cluster": "car-job-search",
+    "i_can_statements": [
+      "I can apply job search skills to find jobs that fit me",
+      "I can apply interview skills to answer questions in a job interview"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.wex12a.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "42493b408b6bd06a"
+    }
+  },
+  "bc.wex12a.cc.4": {
+    "course": "WEX12A",
+    "cluster": "car-transferable-skills",
+    "i_can_statements": [
+      "I can identify transferrable skills I use at my work placement",
+      "I can explain how a skill from my work placement could be used in other jobs"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "6573e528955a5374"
+    }
+  },
+  "bc.wex12a.cc.5": {
+    "course": "WEX12A",
+    "cluster": "car-skill-development",
+    "i_can_statements": [
+      "I can develop a plan to build and refine the skills I need for work",
+      "I can identify which of my work skills I need to develop or refine"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.wex12a.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "80b3604ffb4f69b6"
+    }
+  },
+  "bc.wex12a.cc.6": {
+    "course": "WEX12A",
+    "cluster": "car-risk-identification",
+    "i_can_statements": [
+      "I can determine the safety risks at my work placement before I start",
+      "I can find information about workplace safety before my placement starts"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "b7bf0ea495168a61"
+    }
+  },
+  "bc.wex12a.cc.7": {
+    "course": "WEX12A",
+    "cluster": "car-safety-procedures",
+    "i_can_statements": [
+      "I can follow BC and work-site safety procedures at my work placement",
+      "I can identify the safety procedures required by BC law and by my work site",
+      "I can make safety procedures part of how I do my everyday tasks"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.ywt11.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "255e859f623852f3"
+    }
+  },
+  "bc.wex12a.cc.8": {
+    "course": "WEX12A",
+    "cluster": "car-workplace-ethics",
+    "i_can_statements": [
+      "I can describe how I show cultural sensitivity to the people I work with",
+      "I can explain how workplace ethics guide the choices I make at work",
+      "I can identify the workplace etiquette expected at my work placement"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "3aca75ec46ba5f7f"
+    }
+  },
+  "bc.wex12a.cc.9": {
+    "course": "WEX12A",
+    "cluster": "car-skill-progression",
+    "i_can_statements": [
+      "I can demonstrate progress in the skills I have learned at my work placement",
+      "I can identify the specific skills my work placement requires",
+      "I can compare my skill level at the start of my placement with my skill level now"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.wex12a.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "81a9b0208555cb1e"
+    }
+  },
+  "bc.wex12a.cc.10": {
+    "course": "WEX12A",
+    "cluster": "car-community-care",
+    "i_can_statements": [
+      "I can help care for the people I work with at my work placement",
+      "I can take steps to care for myself at my work placement",
+      "I can take steps to help care for my community"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "f9ef5966f0628dea"
+    }
+  },
+  "bc.wex12a.cc.11": {
+    "course": "WEX12A",
+    "cluster": "car-respectful-work",
+    "i_can_statements": [
+      "I can work respectfully with others to reach a common goal",
+      "I can do my share of the work on my own to help reach a common goal",
+      "I can make helpful contributions that move us toward the common goal"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "298ce2c8f336cb77"
+    }
+  },
+  "bc.wex12a.cc.12": {
+    "course": "WEX12A",
+    "cluster": "car-hours-documentation",
+    "i_can_statements": [
+      "I can document my work experience in an ongoing record of my hours",
+      "I can show that I have completed the required hours"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.wex12a.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "49471f6afdb28a6d"
+    }
+  },
+  "bc.wex12a.cc.13": {
+    "course": "WEX12A",
+    "cluster": "car-pathway-reflection",
+    "i_can_statements": [
+      "I can reflect regularly on what I am doing and learning in my work experience",
+      "I can document my work experience regularly throughout my placement",
+      "I can explain how my work experience connects to my current and future pathways"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.wex12a.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "7c69054d0283935f"
+    }
+  },
+  "bc.wex12a.cc.14": {
+    "course": "WEX12A",
+    "cluster": "car-problem-solving",
+    "i_can_statements": [
+      "I can reflect on the problem-solving strategies I used at my work placement",
+      "I can describe a strategy I used to solve a problem on my own and how it worked",
+      "I can explain how I worked with others to solve a problem at work"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "c90abb1b4f0a28ce"
+    }
+  },
+  "bc.wex12b.cc.1": {
+    "course": "WEX12B",
+    "cluster": "car-using-strengths",
+    "i_can_statements": [
+      "I can apply new ways of my own to use my strengths and skills",
+      "I can apply approaches others suggest for using my strengths and skills",
+      "I can apply ways of working that fit my personal preferences"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.wex12a.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "8358971131f34673"
+    }
+  },
+  "bc.wex12b.cc.2": {
+    "course": "WEX12B",
+    "cluster": "car-exploring-interests",
+    "i_can_statements": [
+      "I can assess my strengths and skills to explore work placement options",
+      "I can assess what my prior work experience shows about my skills",
+      "I can identify personal areas of interest for a work placement",
+      "I can connect my interests to possible work placement options"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.wex12a.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "15417f0d35c75e8a"
+    }
+  },
+  "bc.wex12b.cc.3": {
+    "course": "WEX12B",
+    "cluster": "car-job-search",
+    "i_can_statements": [
+      "I can refine job search skills to find jobs that fit me",
+      "I can refine interview skills to answer questions in a job interview"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.wex12a.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "fb52906a33cb4807"
+    }
+  },
+  "bc.wex12b.cc.4": {
+    "course": "WEX12B",
+    "cluster": "car-transferable-skills",
+    "i_can_statements": [
+      "I can identify transferrable skills I use at my work placement",
+      "I can apply transferrable skills to tasks at my work placement",
+      "I can reflect on how a skill from my work placement could be used in other jobs"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.ywt11.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "8994d9f18cf076ad"
+    }
+  },
+  "bc.wex12b.cc.5": {
+    "course": "WEX12B",
+    "cluster": "car-skill-development",
+    "i_can_statements": [
+      "I can carry out a plan to build and refine the skills I need for work",
+      "I can identify which of my work skills I need to develop or refine"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.wex12a.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "ab63eef9f83fa053"
+    }
+  },
+  "bc.wex12b.cc.6": {
+    "course": "WEX12B",
+    "cluster": "car-risk-identification",
+    "i_can_statements": [
+      "I can determine the safety risks at my work placement before I start",
+      "I can find information about workplace safety before my placement starts"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "b7bf0ea495168a61"
+    }
+  },
+  "bc.wex12b.cc.7": {
+    "course": "WEX12B",
+    "cluster": "car-safety-procedures",
+    "i_can_statements": [
+      "I can follow BC and work-site safety procedures at my work placement",
+      "I can identify the safety procedures required by BC law and by my work site",
+      "I can make safety procedures part of how I do my everyday tasks"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.ywt11.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "255e859f623852f3"
+    }
+  },
+  "bc.wex12b.cc.8": {
+    "course": "WEX12B",
+    "cluster": "car-workplace-ethics",
+    "i_can_statements": [
+      "I can describe how I show cultural sensitivity to the people I work with",
+      "I can explain how workplace ethics guide the choices I make at work",
+      "I can identify the workplace etiquette expected at my work placement"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.ywt11.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "f8637cfa6900ffe5"
+    }
+  },
+  "bc.wex12b.cc.9": {
+    "course": "WEX12B",
+    "cluster": "car-skill-progression",
+    "i_can_statements": [
+      "I can demonstrate progress in the skills I have learned at my work placement",
+      "I can identify the specific skills my work placement requires",
+      "I can compare my skill level at the start of my placement with my skill level now"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.wex12a.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "81a9b0208555cb1e"
+    }
+  },
+  "bc.wex12b.cc.10": {
+    "course": "WEX12B",
+    "cluster": "car-community-care",
+    "i_can_statements": [
+      "I can help care for the people I work with at my work placement",
+      "I can take steps to care for myself at my work placement",
+      "I can take steps to help care for my community"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "f9ef5966f0628dea"
+    }
+  },
+  "bc.wex12b.cc.11": {
+    "course": "WEX12B",
+    "cluster": "car-respectful-work",
+    "i_can_statements": [
+      "I can work respectfully with others to reach a common goal",
+      "I can do my share of the work on my own to help reach a common goal",
+      "I can make helpful contributions that move us toward the common goal"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "298ce2c8f336cb77"
+    }
+  },
+  "bc.wex12b.cc.12": {
+    "course": "WEX12B",
+    "cluster": "car-hours-documentation",
+    "i_can_statements": [
+      "I can document my work experience in an ongoing record of my hours",
+      "I can show that I have completed the required hours"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.wex12a.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "49471f6afdb28a6d"
+    }
+  },
+  "bc.wex12b.cc.13": {
+    "course": "WEX12B",
+    "cluster": "car-pathway-reflection",
+    "i_can_statements": [
+      "I can reflect regularly on what I am doing and learning in my work experience",
+      "I can document my work experience regularly throughout my placement",
+      "I can explain how my work experience connects to my current and future pathways"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.wex12a.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "7c69054d0283935f"
+    }
+  },
+  "bc.wex12b.cc.14": {
+    "course": "WEX12B",
+    "cluster": "car-problem-solving",
+    "i_can_statements": [
+      "I can reflect on the problem-solving strategies I used at my work placement",
+      "I can describe a strategy I used to solve a problem on my own and how it worked",
+      "I can explain how I worked with others to solve a problem at work"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "c90abb1b4f0a28ce"
+    }
+  },
+  "bc.ywt12.cc.1": {
+    "course": "YWT12",
+    "cluster": "car-training-plan",
+    "i_can_statements": [
+      "I can work with my teacher and employer to develop my trade training plan",
+      "I can identify the trade-specific skills to include in my training plan"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "817c26fa636edc74"
+    }
+  },
+  "bc.ywt12.cc.2": {
+    "course": "YWT12",
+    "cluster": "car-trade-skills",
+    "i_can_statements": [
+      "I can further develop and apply the trade-specific skills from my training plan at my work placement",
+      "I can match the tasks I do at my placement to my training plan",
+      "I can show how my trade-specific skills have progressed over time"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.ywt11.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "8177843be4d03aa6"
+    }
+  },
+  "bc.ywt12.cc.3": {
+    "course": "YWT12",
+    "cluster": "car-transferable-skills",
+    "i_can_statements": [
+      "I can use transferrable skills at my work placement",
+      "I can explain how a skill from my work placement could be used in other jobs"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.ywt11.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "d06b959dfdf29a3e"
+    }
+  },
+  "bc.ywt12.cc.4": {
+    "course": "YWT12",
+    "cluster": "car-work-placements",
+    "i_can_statements": [
+      "I can research further work placement opportunities in my chosen trade",
+      "I can compare work placement options to find one that fits my future goals"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.ywt11.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "8e9a8a62cbc5d769"
+    }
+  },
+  "bc.ywt12.cc.5": {
+    "course": "YWT12",
+    "cluster": "car-respectful-work",
+    "i_can_statements": [
+      "I can work respectfully with others to reach a common goal",
+      "I can do my share of the work on my own to help reach a common goal",
+      "I can make helpful contributions that move us toward the common goal"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "298ce2c8f336cb77"
+    }
+  },
+  "bc.ywt12.cc.6": {
+    "course": "YWT12",
+    "cluster": "car-workplace-ethics",
+    "i_can_statements": [
+      "I can describe how I show cultural sensitivity to the people I work with",
+      "I can explain how workplace ethics guide the choices I make at work",
+      "I can identify the workplace etiquette expected at my work placement"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.ywt11.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "f8637cfa6900ffe5"
+    }
+  },
+  "bc.ywt12.cc.7": {
+    "course": "YWT12",
+    "cluster": "car-community-care",
+    "i_can_statements": [
+      "I can help care for the people I work with at my work placement",
+      "I can take steps to care for myself at my work placement",
+      "I can take steps to help care for my community",
+      "I can describe how I care for myself, others and my community"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.ywt11.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "95cb4beb39833a57"
+    }
+  },
+  "bc.ywt12.cc.8": {
+    "course": "YWT12",
+    "cluster": "car-risk-identification",
+    "i_can_statements": [
+      "I can determine the safety risks at my work placement before I start",
+      "I can find information about workplace safety before my placement starts"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "b7bf0ea495168a61"
+    }
+  },
+  "bc.ywt12.cc.9": {
+    "course": "YWT12",
+    "cluster": "car-safety-procedures",
+    "i_can_statements": [
+      "I can follow BC and work-site safety procedures at my work placement",
+      "I can identify the safety procedures required by BC law and by my work site",
+      "I can make safety procedures part of how I do my everyday tasks"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "eff1fc1b66c032d7"
+    }
+  },
+  "bc.ywt12.cc.10": {
+    "course": "YWT12",
+    "cluster": "car-work-reflection",
+    "i_can_statements": [
+      "I can reflect on my work experience to identify my strengths",
+      "I can keep a regular record of my work experience",
+      "I can identify the employability skills I use in my work placement",
+      "I can identify work skills I want to improve next"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "751736990edd7a8b"
+    }
+  },
+  "bc.ywt12.cc.11": {
+    "course": "YWT12",
+    "cluster": "car-problem-solving",
+    "i_can_statements": [
+      "I can reflect on the problem-solving strategies I used at my work placement",
+      "I can describe a strategy I used to solve a problem on my own and how it worked",
+      "I can explain how I worked with others to solve a problem at work"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt11.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "c90abb1b4f0a28ce"
+    }
+  },
+  "bc.ywt12.cc.12": {
+    "course": "YWT12",
+    "cluster": "car-plan-refinement",
+    "i_can_statements": [
+      "I can recognize how my career skills have progressed in my trade",
+      "I can refine my trade-specific training plan based on my progress",
+      "I can identify the next skills my training plan should focus on"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.ywt12.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "9f79a7cd6fc8bd0b"
     }
   },
   "bc.ela8.cc.1": {
@@ -13217,6 +14548,2019 @@
       "exemplar": "bc.fpc10.cc.18",
       "approved_by_owner": true,
       "raw_sha": "3ef2aa1ccfb623a1"
+    }
+  },
+  "bc.phe8.cc.1": {
+    "course": "PHE8",
+    "cluster": "phe-movement-skills",
+    "i_can_statements": [
+      "I can apply fundamental movement skills in a variety of physical activities",
+      "I can refine my movement skills through practice",
+      "I can use my movement skills in different environments"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "a80963eb0458eb28"
+    }
+  },
+  "bc.phe8.cc.2": {
+    "course": "PHE8",
+    "cluster": "phe-movement-concepts",
+    "i_can_statements": [
+      "I can apply movement concepts and strategies in different physical activities",
+      "I can develop a strategy and use it during a physical activity",
+      "I can use the same movement concept in a different activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "e853fe0a46308c2b"
+    }
+  },
+  "bc.phe8.cc.3": {
+    "course": "PHE8",
+    "cluster": "phe-exertion-monitoring",
+    "i_can_statements": [
+      "I can use a method to check how hard I am working",
+      "I can adjust my effort based on what I measure"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "cb42196d4a864126"
+    }
+  },
+  "bc.phe8.cc.4": {
+    "course": "PHE8",
+    "cluster": "phe-safety-fair-play",
+    "i_can_statements": [
+      "I can demonstrate safe practices in physical activities",
+      "I can show fair play with teammates and opponents",
+      "I can take a leadership role in a physical activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "03278a8be1c1e5cf"
+    }
+  },
+  "bc.phe8.cc.5": {
+    "course": "PHE8",
+    "cluster": "phe-activity-preferences",
+    "i_can_statements": [
+      "I can describe what I like about my preferred physical activities",
+      "I can name the types of physical activity I prefer"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "a0599340814baaa0"
+    }
+  },
+  "bc.phe8.cc.6": {
+    "course": "PHE8",
+    "cluster": "phe-fitness-activity",
+    "i_can_statements": [
+      "I can take part in daily physical activity to improve my fitness",
+      "I can choose activities that target a health component of fitness",
+      "I can stay active over time to maintain my fitness"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "5a3a501994f22b92"
+    }
+  },
+  "bc.phe8.cc.7": {
+    "course": "PHE8",
+    "cluster": "phe-activity-health",
+    "i_can_statements": [
+      "I can describe how being active can influence my health and fitness",
+      "I can describe how activity at school and home affects my fitness",
+      "I can describe how activity in my community affects my health"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "782ec933137e1462"
+    }
+  },
+  "bc.phe8.cc.8": {
+    "course": "PHE8",
+    "cluster": "phe-eating-strategies",
+    "i_can_statements": [
+      "I can come up with strategies to encourage healthy eating choices",
+      "I can adjust my healthy eating strategies for different settings"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "066c274a60434657"
+    }
+  },
+  "bc.phe8.cc.9": {
+    "course": "PHE8",
+    "cluster": "phe-healthy-choices",
+    "i_can_statements": [
+      "I can assess how a factor influences a healthy choice",
+      "I can name factors that influence healthy choices",
+      "I can assess the possible health effects of a choice"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "82e39f2254b2413f"
+    }
+  },
+  "bc.phe8.cc.10": {
+    "course": "PHE8",
+    "cluster": "phe-health-messages",
+    "i_can_statements": [
+      "I can analyze how health messages influence people's behaviour",
+      "I can identify factors that shape a health message",
+      "I can compare health messages from different sources"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "e7d7064f40ece00e"
+    }
+  },
+  "bc.phe8.cc.11": {
+    "course": "PHE8",
+    "cluster": "phe-healthy-living-goals",
+    "i_can_statements": [
+      "I can apply strategies to work toward my healthy-living goals",
+      "I can identify strategies that could help me reach a healthy-living goal"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "4b19d4434acd5c7b"
+    }
+  },
+  "bc.phe8.cc.12": {
+    "course": "PHE8",
+    "cluster": "phe-goal-reflection",
+    "i_can_statements": [
+      "I can reflect on whether I reached my healthy-living goal",
+      "I can assess which strategies helped me toward my goal"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "5c7c78e9b223f46e"
+    }
+  },
+  "bc.phe8.cc.13": {
+    "course": "PHE8",
+    "cluster": "phe-safety-strategies",
+    "i_can_statements": [
+      "I can propose strategies for avoiding unsafe or exploitive situations",
+      "I can propose ways to respond to an unsafe or abusive situation",
+      "I can explain how a strategy helps someone stay safe"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "c2846d45fbbd4c46"
+    }
+  },
+  "bc.phe8.cc.14": {
+    "course": "PHE8",
+    "cluster": "phe-bullying-responses",
+    "i_can_statements": [
+      "I can propose strategies for responding to bullying",
+      "I can propose ways to respond to discrimination",
+      "I can propose a response that challenges stereotyping"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe9.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "164076e8220cc4e2"
+    }
+  },
+  "bc.phe8.cc.15": {
+    "course": "PHE8",
+    "cluster": "phe-relationship-skills",
+    "i_can_statements": [
+      "I can propose strategies for building healthy relationships",
+      "I can propose ways to maintain a healthy relationship over time",
+      "I can explain how a strategy supports a healthy relationship"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.15",
+      "approved_by_owner": true,
+      "raw_sha": "159a31e53d2b121d"
+    }
+  },
+  "bc.phe8.cc.16": {
+    "course": "PHE8",
+    "cluster": "phe-community-health",
+    "i_can_statements": [
+      "I can create strategies to promote health and well-being at school",
+      "I can create strategies to promote health and well-being in my community"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.16",
+      "approved_by_owner": true,
+      "raw_sha": "e2369fac73527548"
+    }
+  },
+  "bc.phe8.cc.17": {
+    "course": "PHE8",
+    "cluster": "phe-promoting-well-being",
+    "i_can_statements": [
+      "I can assess strategies for promoting mental well-being",
+      "I can describe strategies that support my own mental well-being",
+      "I can describe ways to support the mental well-being of others"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.17",
+      "approved_by_owner": true,
+      "raw_sha": "5787fffdc57b82d6"
+    }
+  },
+  "bc.phe8.cc.18": {
+    "course": "PHE8",
+    "cluster": "phe-supporting-others",
+    "i_can_statements": [
+      "I can describe strategies that help others with mental well-being problems",
+      "I can describe strategies that help others with substance use problems",
+      "I can assess how useful a strategy is for helping someone else"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.18",
+      "approved_by_owner": true,
+      "raw_sha": "6a9955b01304a379"
+    }
+  },
+  "bc.phe8.cc.19": {
+    "course": "PHE8",
+    "cluster": "phe-managing-change",
+    "i_can_statements": [
+      "I can create strategies for managing physical changes during puberty",
+      "I can create strategies for managing emotional and social changes in adolescence",
+      "I can assess whether a strategy helps me manage a change"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe9.cc.18",
+      "approved_by_owner": true,
+      "raw_sha": "b197dc84d01962bd"
+    }
+  },
+  "bc.phe8.cc.20": {
+    "course": "PHE8",
+    "cluster": "phe-identity-change",
+    "i_can_statements": [
+      "I can describe how a transition can affect someone's identity",
+      "I can name different kinds of transitions and changes people go through"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.20",
+      "approved_by_owner": true,
+      "raw_sha": "aecf12ab77df2375"
+    }
+  },
+  "bc.phe9.cc.1": {
+    "course": "PHE9",
+    "cluster": "phe-movement-skills",
+    "i_can_statements": [
+      "I can apply fundamental movement skills in a variety of physical activities",
+      "I can refine my movement skills through practice",
+      "I can use my movement skills in different environments"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "a80963eb0458eb28"
+    }
+  },
+  "bc.phe9.cc.2": {
+    "course": "PHE9",
+    "cluster": "phe-movement-concepts",
+    "i_can_statements": [
+      "I can apply movement concepts and strategies in different physical activities",
+      "I can develop a strategy and use it during a physical activity",
+      "I can use the same movement concept in a different activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "e853fe0a46308c2b"
+    }
+  },
+  "bc.phe9.cc.3": {
+    "course": "PHE9",
+    "cluster": "phe-exertion-monitoring",
+    "i_can_statements": [
+      "I can use a method to check how hard I am working",
+      "I can adjust my effort based on what I measure"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "cb42196d4a864126"
+    }
+  },
+  "bc.phe9.cc.4": {
+    "course": "PHE9",
+    "cluster": "phe-safety-fair-play",
+    "i_can_statements": [
+      "I can demonstrate safe practices in physical activities",
+      "I can show fair play with teammates and opponents",
+      "I can take a leadership role in a physical activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "03278a8be1c1e5cf"
+    }
+  },
+  "bc.phe9.cc.5": {
+    "course": "PHE9",
+    "cluster": "phe-activity-preferences",
+    "i_can_statements": [
+      "I can describe what I like about my preferred physical activities",
+      "I can name the types of physical activity I prefer"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "a0599340814baaa0"
+    }
+  },
+  "bc.phe9.cc.6": {
+    "course": "PHE9",
+    "cluster": "phe-fitness-activity",
+    "i_can_statements": [
+      "I can take part in daily physical activity to improve my fitness",
+      "I can choose activities that target a health component of fitness",
+      "I can stay active over time to maintain my fitness"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "5a3a501994f22b92"
+    }
+  },
+  "bc.phe9.cc.7": {
+    "course": "PHE9",
+    "cluster": "phe-activity-health",
+    "i_can_statements": [
+      "I can describe how being active can influence my health and fitness",
+      "I can describe how activity at school and home affects my fitness",
+      "I can describe how activity in my community affects my health"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "782ec933137e1462"
+    }
+  },
+  "bc.phe9.cc.8": {
+    "course": "PHE9",
+    "cluster": "phe-healthy-choices",
+    "i_can_statements": [
+      "I can propose healthy choices that support lifelong health and well-being",
+      "I can describe how a healthy choice supports lifelong health",
+      "I can describe how a healthy choice supports well-being"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "c655c731016f1097"
+    }
+  },
+  "bc.phe9.cc.9": {
+    "course": "PHE9",
+    "cluster": "phe-health-messages",
+    "i_can_statements": [
+      "I can analyze how health messages influence people's behaviour",
+      "I can identify factors that shape a health message",
+      "I can compare health messages from different sources"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "e7d7064f40ece00e"
+    }
+  },
+  "bc.phe9.cc.10": {
+    "course": "PHE9",
+    "cluster": "phe-healthy-living-goals",
+    "i_can_statements": [
+      "I can apply strategies to work toward my healthy-living goals",
+      "I can identify strategies that could help me reach a healthy-living goal"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "4b19d4434acd5c7b"
+    }
+  },
+  "bc.phe9.cc.11": {
+    "course": "PHE9",
+    "cluster": "phe-goal-reflection",
+    "i_can_statements": [
+      "I can reflect on whether I reached my healthy-living goal",
+      "I can assess which strategies helped me toward my goal"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "5c7c78e9b223f46e"
+    }
+  },
+  "bc.phe9.cc.12": {
+    "course": "PHE9",
+    "cluster": "phe-safety-strategies",
+    "i_can_statements": [
+      "I can propose strategies for avoiding unsafe or exploitive situations",
+      "I can propose ways to respond to an unsafe or abusive situation",
+      "I can explain how a strategy helps someone stay safe"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "c2846d45fbbd4c46"
+    }
+  },
+  "bc.phe9.cc.13": {
+    "course": "PHE9",
+    "cluster": "phe-bullying-responses",
+    "i_can_statements": [
+      "I can analyze strategies for responding to bullying",
+      "I can compare ways to respond to discrimination",
+      "I can explain how a response can challenge stereotyping"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe9.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "8eaf052134ffc41a"
+    }
+  },
+  "bc.phe9.cc.14": {
+    "course": "PHE9",
+    "cluster": "phe-relationship-skills",
+    "i_can_statements": [
+      "I can propose strategies for building healthy relationships",
+      "I can propose ways to maintain a healthy relationship over time",
+      "I can explain how a strategy supports a healthy relationship"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.15",
+      "approved_by_owner": true,
+      "raw_sha": "159a31e53d2b121d"
+    }
+  },
+  "bc.phe9.cc.15": {
+    "course": "PHE9",
+    "cluster": "phe-community-health",
+    "i_can_statements": [
+      "I can create strategies to promote health and well-being at school",
+      "I can create strategies to promote health and well-being in my community"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.16",
+      "approved_by_owner": true,
+      "raw_sha": "e2369fac73527548"
+    }
+  },
+  "bc.phe9.cc.16": {
+    "course": "PHE9",
+    "cluster": "phe-promoting-well-being",
+    "i_can_statements": [
+      "I can analyze strategies for promoting mental well-being",
+      "I can analyze strategies that support my own mental well-being",
+      "I can analyze ways to support the mental well-being of others"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.17",
+      "approved_by_owner": true,
+      "raw_sha": "0ca22bc973b0fbaf"
+    }
+  },
+  "bc.phe9.cc.17": {
+    "course": "PHE9",
+    "cluster": "phe-supporting-others",
+    "i_can_statements": [
+      "I can assess strategies that help others with mental well-being problems",
+      "I can assess strategies that help others with substance use problems"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.18",
+      "approved_by_owner": true,
+      "raw_sha": "ddad0dee15d1b1ca"
+    }
+  },
+  "bc.phe9.cc.18": {
+    "course": "PHE9",
+    "cluster": "phe-managing-change",
+    "i_can_statements": [
+      "I can create strategies for managing physical changes during puberty",
+      "I can create strategies for managing emotional and social changes in adolescence",
+      "I can evaluate whether a strategy helps me manage a change"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe9.cc.18",
+      "approved_by_owner": true,
+      "raw_sha": "e54c5e0abcb5fafb"
+    }
+  },
+  "bc.phe9.cc.19": {
+    "course": "PHE9",
+    "cluster": "phe-identity-factors",
+    "i_can_statements": [
+      "I can describe factors that shape a person's identity",
+      "I can explain how social factors shape personal identity",
+      "I can explain how cultural factors shape personal identity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe9.cc.19",
+      "approved_by_owner": true,
+      "raw_sha": "75599de449afe3a0"
+    }
+  },
+  "bc.phe10.cc.1": {
+    "course": "PHE10",
+    "cluster": "phe-movement-skills",
+    "i_can_statements": [
+      "I can apply movement skills in a variety of physical activities",
+      "I can refine my movement skills through practice",
+      "I can use my movement skills in different environments"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "d15e5b1fcc2d064a"
+    }
+  },
+  "bc.phe10.cc.2": {
+    "course": "PHE10",
+    "cluster": "phe-movement-concepts",
+    "i_can_statements": [
+      "I can apply movement concepts and strategies in different physical activities",
+      "I can refine a strategy and use it during a physical activity",
+      "I can use the same movement concept in a different activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "791206ee8513cfc7"
+    }
+  },
+  "bc.phe10.cc.3": {
+    "course": "PHE10",
+    "cluster": "phe-exertion-monitoring",
+    "i_can_statements": [
+      "I can use a method to check how hard I am working",
+      "I can adjust my effort based on what I measure"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "cb42196d4a864126"
+    }
+  },
+  "bc.phe10.cc.4": {
+    "course": "PHE10",
+    "cluster": "phe-safety-fair-play",
+    "i_can_statements": [
+      "I can demonstrate safe practices in physical activities",
+      "I can show fair play with teammates and opponents",
+      "I can take a leadership role in a physical activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "83ff3ea9154a63e3"
+    }
+  },
+  "bc.phe10.cc.5": {
+    "course": "PHE10",
+    "cluster": "phe-activity-preferences",
+    "i_can_statements": [
+      "I can take part in the types of physical activity I prefer",
+      "I can name the types of physical activity I prefer"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "5561b35fe381be5e"
+    }
+  },
+  "bc.phe10.cc.6": {
+    "course": "PHE10",
+    "cluster": "phe-motivational-factors",
+    "i_can_statements": [
+      "I can explain how motivational factors influence participation in physical activities",
+      "I can identify motivational factors that affect participation in physical activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe10.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "889ba26b9db43bce"
+    }
+  },
+  "bc.phe10.cc.7": {
+    "course": "PHE10",
+    "cluster": "phe-fitness-activity",
+    "i_can_statements": [
+      "I can take part in physical activity to improve my fitness",
+      "I can choose activities that target a health component of fitness",
+      "I can stay active over time to maintain my fitness"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "7f03f15f5d4d291e"
+    }
+  },
+  "bc.phe10.cc.8": {
+    "course": "PHE10",
+    "cluster": "phe-lifelong-activity",
+    "i_can_statements": [
+      "I can explain how getting better at a physical activity builds my confidence",
+      "I can explain how building skill encourages me to keep doing physical activities for life",
+      "I can describe how I have gotten better at a physical activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.al11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "5ddbac104046f7fd"
+    }
+  },
+  "bc.phe10.cc.9": {
+    "course": "PHE10",
+    "cluster": "phe-overcoming-barriers",
+    "i_can_statements": [
+      "I can plan ways to overcome barriers to taking part in physical activity",
+      "I can identify barriers that could limit my participation in physical activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe10.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "00714260dd596e45"
+    }
+  },
+  "bc.phe10.cc.10": {
+    "course": "PHE10",
+    "cluster": "phe-health-messages",
+    "i_can_statements": [
+      "I can analyze how health messages might influence people's health and well-being",
+      "I can explain how a health message might influence my health and well-being"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "8423350fc40f64d4"
+    }
+  },
+  "bc.phe10.cc.11": {
+    "course": "PHE10",
+    "cluster": "phe-healthy-living-goals",
+    "i_can_statements": [
+      "I can apply strategies to work toward my healthy-living goals",
+      "I can identify strategies that could help me reach a healthy-living goal"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "4b19d4434acd5c7b"
+    }
+  },
+  "bc.phe10.cc.12": {
+    "course": "PHE10",
+    "cluster": "phe-goal-reflection",
+    "i_can_statements": [
+      "I can reflect on whether I reached my healthy-living goal",
+      "I can assess how well different strategies helped me toward my goal"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "eaba73cf98c8858c"
+    }
+  },
+  "bc.phe10.cc.13": {
+    "course": "PHE10",
+    "cluster": "phe-health-decisions",
+    "i_can_statements": [
+      "I can analyze how my health decisions help me reach a healthy-living goal",
+      "I can name the decisions that affect my healthy-living goal"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe10.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "8e545dc6be1c55ff"
+    }
+  },
+  "bc.phe10.cc.14": {
+    "course": "PHE10",
+    "cluster": "phe-safety-strategies",
+    "i_can_statements": [
+      "I can propose strategies for avoiding unsafe or exploitative situations",
+      "I can propose ways to respond to an unsafe or abusive situation",
+      "I can explain how a strategy helps someone stay safe"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "9185d4d73e35428a"
+    }
+  },
+  "bc.phe10.cc.15": {
+    "course": "PHE10",
+    "cluster": "phe-bullying-responses",
+    "i_can_statements": [
+      "I can analyze strategies for responding to bullying",
+      "I can compare ways to respond to discrimination",
+      "I can explain how a response can challenge stereotyping"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe9.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "8eaf052134ffc41a"
+    }
+  },
+  "bc.phe10.cc.16": {
+    "course": "PHE10",
+    "cluster": "phe-relationship-skills",
+    "i_can_statements": [
+      "I can develop skills for maintaining healthy relationships",
+      "I can develop skills for responding to interpersonal conflict",
+      "I can explain how a skill supports a healthy relationship"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.15",
+      "approved_by_owner": true,
+      "raw_sha": "30aab9f872a34c3a"
+    }
+  },
+  "bc.phe10.cc.17": {
+    "course": "PHE10",
+    "cluster": "phe-social-influences",
+    "i_can_statements": [
+      "I can analyze how a social influence could affect health",
+      "I can identify social influences that can affect health"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe10.cc.17",
+      "approved_by_owner": true,
+      "raw_sha": "ab21db0f6d262d43"
+    }
+  },
+  "bc.phe10.cc.18": {
+    "course": "PHE10",
+    "cluster": "phe-promoting-well-being",
+    "i_can_statements": [
+      "I can evaluate strategies for promoting mental well-being",
+      "I can explain how a strategy promotes mental well-being"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.17",
+      "approved_by_owner": true,
+      "raw_sha": "4f1378785738433f"
+    }
+  },
+  "bc.phe10.cc.19": {
+    "course": "PHE10",
+    "cluster": "phe-substance-use-causes",
+    "i_can_statements": [
+      "I can identify factors that can lead to substance use",
+      "I can explain how a factor can contribute to substance use"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe10.cc.19",
+      "approved_by_owner": true,
+      "raw_sha": "e6e5fe3b16daaa3a"
+    }
+  },
+  "bc.phe10.cc.20": {
+    "course": "PHE10",
+    "cluster": "phe-managing-change",
+    "i_can_statements": [
+      "I can create strategies for managing physical changes during puberty",
+      "I can create strategies for managing emotional and social changes in adolescence",
+      "I can evaluate whether a strategy helps me manage a change"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe9.cc.18",
+      "approved_by_owner": true,
+      "raw_sha": "e54c5e0abcb5fafb"
+    }
+  },
+  "bc.phe10.cc.21": {
+    "course": "PHE10",
+    "cluster": "phe-identity-factors",
+    "i_can_statements": [
+      "I can describe factors that shape a person's identity",
+      "I can explain how social factors shape personal identity",
+      "I can explain how cultural factors shape personal identity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe9.cc.19",
+      "approved_by_owner": true,
+      "raw_sha": "75599de449afe3a0"
+    }
+  },
+  "bc.phe10.cc.22": {
+    "course": "PHE10",
+    "cluster": "phe-activity-health",
+    "i_can_statements": [
+      "I can describe how being active can influence my mental well-being and overall health",
+      "I can describe how physical activity affects my mental well-being",
+      "I can describe how physical activity affects my overall health"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "1842714ad164eaa7"
+    }
+  },
+  "bc.al11.cc.1": {
+    "course": "AL11",
+    "cluster": "phe-lifelong-activity",
+    "i_can_statements": [
+      "I can explain how getting better at a physical activity builds my confidence",
+      "I can explain how building skill encourages me to keep doing an activity for life",
+      "I can describe how I have gotten better at a physical activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.al11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "8fb77c5dacbc370d"
+    }
+  },
+  "bc.al11.cc.2": {
+    "course": "AL11",
+    "cluster": "phe-explaining-health",
+    "i_can_statements": [
+      "I can explain why maintaining my personal health is important",
+      "I can describe what maintaining personal health involves"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.al11.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "95c2a404f467e0d4"
+    }
+  },
+  "bc.al11.cc.3": {
+    "course": "AL11",
+    "cluster": "phe-motivational-factors",
+    "i_can_statements": [
+      "I can explain how motivational factors influence participation in recreational activities",
+      "I can identify motivational factors that affect participation in recreational activities"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe10.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "de53f435e56c255e"
+    }
+  },
+  "bc.al11.cc.4": {
+    "course": "AL11",
+    "cluster": "phe-activity-health",
+    "i_can_statements": [
+      "I can describe how different types of physical activity can influence my health and mental well-being",
+      "I can describe how a type of physical activity affects my health",
+      "I can describe how a type of physical activity affects my mental well-being"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "80f1643f25e38b93"
+    }
+  },
+  "bc.al11.cc.5": {
+    "course": "AL11",
+    "cluster": "phe-safety-fair-play",
+    "i_can_statements": [
+      "I can demonstrate safe practices in physical activities",
+      "I can show fair play with teammates and opponents",
+      "I can take a leadership role in a physical activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "83ff3ea9154a63e3"
+    }
+  },
+  "bc.al11.cc.6": {
+    "course": "AL11",
+    "cluster": "phe-injury-prevention",
+    "i_can_statements": [
+      "I can explain how using proper technique helps prevent injury",
+      "I can connect a proper technique to the injury it prevents"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.al11.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "a2a5641d725e97d7"
+    }
+  },
+  "bc.al11.cc.7": {
+    "course": "AL11",
+    "cluster": "phe-event-planning",
+    "i_can_statements": [
+      "I can plan a recreational event or other physical activity I choose",
+      "I can organize what is needed to run the event or activity",
+      "I can take part safely in recreational events and activities I choose"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.al11.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "3b83cf97abc897b9"
+    }
+  },
+  "bc.al11.cc.8": {
+    "course": "AL11",
+    "cluster": "phe-exertion-monitoring",
+    "i_can_statements": [
+      "I can use a method to check how hard I am working",
+      "I can adjust my effort based on what I measure"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "cb42196d4a864126"
+    }
+  },
+  "bc.al11.cc.9": {
+    "course": "AL11",
+    "cluster": "phe-overcoming-barriers",
+    "i_can_statements": [
+      "I can plan ways to overcome barriers to taking part in physical activity",
+      "I can identify barriers that could limit my participation in physical activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe10.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "00714260dd596e45"
+    }
+  },
+  "bc.fc11.cc.1": {
+    "course": "FC11",
+    "cluster": "phe-fitness-activity",
+    "i_can_statements": [
+      "I can take part in daily physical activity to improve my fitness",
+      "I can choose activities that target a health component of fitness",
+      "I can stay active over time to maintain my fitness"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "0b5ebe77ad729724"
+    }
+  },
+  "bc.fc11.cc.2": {
+    "course": "FC11",
+    "cluster": "phe-fitness-goals",
+    "i_can_statements": [
+      "I can apply strategies to pursue my personal fitness goals",
+      "I can identify strategies that help me work toward a fitness goal",
+      "I can reflect on how my chosen strategies affected my fitness goals"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "dcc70400689590d7"
+    }
+  },
+  "bc.fc11.cc.3": {
+    "course": "FC11",
+    "cluster": "phe-eating-performance",
+    "i_can_statements": [
+      "I can describe how healthy eating relates to my performance in fitness activities",
+      "I can describe how healthy eating relates to overall health",
+      "I can identify links between overall health and performance in fitness activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "3b34d596b4f94ae9"
+    }
+  },
+  "bc.fc11.cc.4": {
+    "course": "FC11",
+    "cluster": "phe-health-messages",
+    "i_can_statements": [
+      "I can analyze how health messages influence health and well-being",
+      "I can compare health messages from different sources"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "063c6cdf5aeefa5f"
+    }
+  },
+  "bc.fc11.cc.5": {
+    "course": "FC11",
+    "cluster": "phe-fitness-myths",
+    "i_can_statements": [
+      "I can analyze the claims a fitness myth or fad makes",
+      "I can compare what different fitness myths and fads claim"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "ec1812a08f7d25ee"
+    }
+  },
+  "bc.fc11.cc.6": {
+    "course": "FC11",
+    "cluster": "phe-overcoming-barriers",
+    "i_can_statements": [
+      "I can plan ways to overcome barriers to taking part in fitness and conditioning activities",
+      "I can identify barriers that could limit my participation in fitness and conditioning activities"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe10.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "c46c6d45644abba8"
+    }
+  },
+  "bc.fc11.cc.7": {
+    "course": "FC11",
+    "cluster": "phe-lifelong-activity",
+    "i_can_statements": [
+      "I can explain how getting better at fitness and conditioning activities builds my confidence",
+      "I can explain how building skill encourages me to keep doing physical activities for life",
+      "I can describe how I have gotten better at a fitness and conditioning activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.al11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "638fbb93dd258c19"
+    }
+  },
+  "bc.fc11.cc.8": {
+    "course": "FC11",
+    "cluster": "phe-muscle-training",
+    "i_can_statements": [
+      "I can describe how muscles produce movement in different parts of the body",
+      "I can identify the main muscles used in a movement",
+      "I can describe how to train the muscles used in a movement"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "a56db86e8a4c461b"
+    }
+  },
+  "bc.fc11.cc.9": {
+    "course": "FC11",
+    "cluster": "phe-training-styles",
+    "i_can_statements": [
+      "I can describe how a training style affects fitness results",
+      "I can name the fitness results that different training styles produce"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "2da750eed6fca309"
+    }
+  },
+  "bc.fc11.cc.10": {
+    "course": "FC11",
+    "cluster": "phe-exercise-technique",
+    "i_can_statements": [
+      "I can demonstrate appropriate exercise technique in a variety of fitness activities",
+      "I can develop correct technique for an exercise through practice",
+      "I can adjust my technique to suit different fitness activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "2e9413c424a9372a"
+    }
+  },
+  "bc.fc11.cc.11": {
+    "course": "FC11",
+    "cluster": "phe-fitness-program",
+    "i_can_statements": [
+      "I can create a personalized fitness program that fits my goals",
+      "I can carry out my personalized fitness program as planned"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "db9a8cd64df478e0"
+    }
+  },
+  "bc.fc11.cc.12": {
+    "course": "FC11",
+    "cluster": "phe-body-systems",
+    "i_can_statements": [
+      "I can describe how different types of fitness activities influence the muscular and cardiovascular systems",
+      "I can identify the fitness activities that mainly train the muscular system",
+      "I can identify the fitness activities that mainly train the cardiovascular system"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "aebffb084ca97cc8"
+    }
+  },
+  "bc.fc11.cc.13": {
+    "course": "FC11",
+    "cluster": "phe-leadership-skills",
+    "i_can_statements": [
+      "I can use different leadership skills during fitness activities",
+      "I can lead others in different types of fitness activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "6c46f465fce79a9e"
+    }
+  },
+  "bc.fc11.cc.14": {
+    "course": "FC11",
+    "cluster": "phe-fitness-etiquette",
+    "i_can_statements": [
+      "I can follow the expectations of each type of fitness activity",
+      "I can adjust what I do to suit each fitness setting"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.14",
+      "approved_by_owner": true,
+      "raw_sha": "22b2aa915be8ac2d"
+    }
+  },
+  "bc.fc11.cc.15": {
+    "course": "FC11",
+    "cluster": "phe-safety-practices",
+    "i_can_statements": [
+      "I can apply safety practices in different types of fitness activities",
+      "I can use safety practices that protect me while I train",
+      "I can use safety practices that protect others during fitness activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.15",
+      "approved_by_owner": true,
+      "raw_sha": "391a4a06a77ad3c0"
+    }
+  },
+  "bc.oded11.cc.1": {
+    "course": "ODED11",
+    "cluster": "phe-outdoor-activities",
+    "i_can_statements": [
+      "I can take an active part in outdoor activities",
+      "I can take part in many different kinds of outdoor activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "13dae63bedc01383"
+    }
+  },
+  "bc.oded11.cc.2": {
+    "course": "ODED11",
+    "cluster": "phe-outdoor-skills",
+    "i_can_statements": [
+      "I can demonstrate a variety of skills for outdoor activities",
+      "I can develop new skills for outdoor activities through practice"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "66d452a8ab202775"
+    }
+  },
+  "bc.oded11.cc.3": {
+    "course": "ODED11",
+    "cluster": "phe-exertion-monitoring",
+    "i_can_statements": [
+      "I can check how hard I am working during outdoor activities",
+      "I can check my energy level during outdoor activities"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "38353f4524710961"
+    }
+  },
+  "bc.oded11.cc.4": {
+    "course": "ODED11",
+    "cluster": "phe-condition-monitoring",
+    "i_can_statements": [
+      "I can check the environmental conditions around me during an outdoor activity",
+      "I can track changes in environmental conditions as an outdoor activity goes on"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "786c9bcf04265e14"
+    }
+  },
+  "bc.oded11.cc.5": {
+    "course": "ODED11",
+    "cluster": "phe-outdoor-preparation",
+    "i_can_statements": [
+      "I can explain what food and drink I need for an outdoor activity",
+      "I can explain what I need to get ready before an outdoor activity",
+      "I can explain what I need while taking part in an outdoor activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "093e314a297c8c80"
+    }
+  },
+  "bc.oded11.cc.6": {
+    "course": "ODED11",
+    "cluster": "phe-lifelong-activity",
+    "i_can_statements": [
+      "I can explain how getting better at an outdoor activity builds my confidence",
+      "I can explain how building skill encourages me to keep doing an activity for life",
+      "I can describe how I have gotten better at an outdoor activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.al11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "f9ac9a92d4fdede0"
+    }
+  },
+  "bc.oded11.cc.7": {
+    "course": "ODED11",
+    "cluster": "phe-self-knowledge",
+    "i_can_statements": [
+      "I can identify my strengths and areas for growth",
+      "I can describe one of my strengths and give an example of it",
+      "I can explain an area for growth I want to work on"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "6372cbd9531d2c3b"
+    }
+  },
+  "bc.oded11.cc.8": {
+    "course": "ODED11",
+    "cluster": "phe-impact-reduction",
+    "i_can_statements": [
+      "I can plan ways to reduce the impact of an outdoor activity on the local environment",
+      "I can identify potential impacts an outdoor activity could have on the local environment",
+      "I can carry out my plan to reduce impacts during an outdoor activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "f5deaa4e114659ab"
+    }
+  },
+  "bc.oded11.cc.9": {
+    "course": "ODED11",
+    "cluster": "phe-cultural-sensitivity",
+    "i_can_statements": [
+      "I can use an outdoor location in a way that respects its cultural and local importance",
+      "I can describe why an outdoor location may be culturally important",
+      "I can describe local concerns about how an outdoor location is used"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "9fc7f1b5d61e7a78"
+    }
+  },
+  "bc.oded11.cc.10": {
+    "course": "ODED11",
+    "cluster": "phe-collaboration",
+    "i_can_statements": [
+      "I can collaborate with others during outdoor activities",
+      "I can share tasks with others across a variety of outdoor activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "ce84f3b0e35fd615"
+    }
+  },
+  "bc.oded11.cc.11": {
+    "course": "ODED11",
+    "cluster": "phe-communication-skills",
+    "i_can_statements": [
+      "I can use communication skills that suit the situation when I interact with others",
+      "I can choose how to communicate based on who I am talking with"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "1f3055bbd1db251e"
+    }
+  },
+  "bc.oded11.cc.12": {
+    "course": "ODED11",
+    "cluster": "phe-emergency-response",
+    "i_can_statements": [
+      "I can respond appropriately to an emergency during an outdoor activity",
+      "I can identify when a situation during an outdoor activity is an emergency"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "80908c9c0df680c4"
+    }
+  },
+  "bc.oded11.cc.13": {
+    "course": "ODED11",
+    "cluster": "phe-safety-for-all",
+    "i_can_statements": [
+      "I can take steps to keep myself safe during outdoor activities",
+      "I can take steps to help keep others safe during outdoor activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "15c9dd7080b3f010"
+    }
+  },
+  "bc.oded11.cc.14": {
+    "course": "ODED11",
+    "cluster": "phe-risk-management",
+    "i_can_statements": [
+      "I can assess the risks in different types of outdoor activities",
+      "I can manage risks as they come up during an outdoor activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.14",
+      "approved_by_owner": true,
+      "raw_sha": "266e1345e30db080"
+    }
+  },
+  "bc.al12.cc.1": {
+    "course": "AL12",
+    "cluster": "phe-lifelong-activity",
+    "i_can_statements": [
+      "I can explain how getting better at a physical activity builds my confidence",
+      "I can explain how building skill encourages me to keep doing an activity for life",
+      "I can describe how I have gotten better at a physical activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.al11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "8fb77c5dacbc370d"
+    }
+  },
+  "bc.al12.cc.2": {
+    "course": "AL12",
+    "cluster": "phe-health-decisions",
+    "i_can_statements": [
+      "I can make reasoned decisions about my personal health and well-being",
+      "I can explain the reasons behind a decision about my health",
+      "I can name the decisions that affect my health and well-being"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe10.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "1b2443b432fc6d39"
+    }
+  },
+  "bc.al12.cc.3": {
+    "course": "AL12",
+    "cluster": "phe-injury-prevention",
+    "i_can_statements": [
+      "I can explain how proper technique and use of equipment reduce the chance of injury",
+      "I can connect a proper technique to the injury risk it reduces",
+      "I can connect proper use of equipment to the injury risk it reduces"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.al11.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "b9a7558eb83e7a8a"
+    }
+  },
+  "bc.al12.cc.4": {
+    "course": "AL12",
+    "cluster": "phe-safe-participation",
+    "i_can_statements": [
+      "I can participate safely and appropriately in physical activities",
+      "I can identify safety risks in an activity and act to reduce them",
+      "I can participate in a way that suits the activity and its setting"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.al12.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "c4c24e7faaab2b6e"
+    }
+  },
+  "bc.al12.cc.5": {
+    "course": "AL12",
+    "cluster": "phe-recreation",
+    "i_can_statements": [
+      "I can engage in a variety of recreational activities",
+      "I can take part in recreational activities in different environments"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.al12.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "cf24126035334c9e"
+    }
+  },
+  "bc.al12.cc.6": {
+    "course": "AL12",
+    "cluster": "phe-overcoming-barriers",
+    "i_can_statements": [
+      "I can overcome barriers to taking part in physical activity",
+      "I can identify barriers that could limit my participation in physical activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe10.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "8e6ff0e3c9a7860c"
+    }
+  },
+  "bc.al12.cc.7": {
+    "course": "AL12",
+    "cluster": "phe-activity-strategies",
+    "i_can_statements": [
+      "I can refine my strategies to participate in a variety of physical activities",
+      "I can identify which strategies work for me in a physical activity",
+      "I can adjust a strategy to suit a different physical activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.al12.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "38ae87aefdf76675"
+    }
+  },
+  "bc.al12.cc.8": {
+    "course": "AL12",
+    "cluster": "phe-exertion-monitoring",
+    "i_can_statements": [
+      "I can use a method to check how hard I am working",
+      "I can adjust my effort based on what I measure"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.phe8.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "cb42196d4a864126"
+    }
+  },
+  "bc.al12.cc.9": {
+    "course": "AL12",
+    "cluster": "phe-activity-leadership",
+    "i_can_statements": [
+      "I can demonstrate leadership skills in physical activity and recreation",
+      "I can use problem-solving strategies when I lead an activity",
+      "I can identify the skills a physical activity or recreation leader needs"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.al12.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "d5cf097cdc1177e1"
+    }
+  },
+  "bc.al12.cc.10": {
+    "course": "AL12",
+    "cluster": "phe-event-planning",
+    "i_can_statements": [
+      "I can plan a recreational event or other physical activity I choose",
+      "I can organize what is needed to run the event or activity",
+      "I can take part safely in recreational events and activities I choose"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.al11.cc.7",
+      "approved_by_owner": true,
+      "raw_sha": "3b83cf97abc897b9"
+    }
+  },
+  "bc.fc12.cc.1": {
+    "course": "FC12",
+    "cluster": "phe-fitness-activity",
+    "i_can_statements": [
+      "I can take part in daily physical activity to improve my fitness",
+      "I can choose activities that target a health component of fitness",
+      "I can stay active over time to maintain my fitness"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.6",
+      "approved_by_owner": true,
+      "raw_sha": "0b5ebe77ad729724"
+    }
+  },
+  "bc.fc12.cc.2": {
+    "course": "FC12",
+    "cluster": "phe-fitness-goals",
+    "i_can_statements": [
+      "I can apply strategies to pursue my personal fitness goals",
+      "I can identify strategies that help me work toward a fitness goal",
+      "I can reflect on how my chosen strategies affected my fitness goals"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "dcc70400689590d7"
+    }
+  },
+  "bc.fc12.cc.3": {
+    "course": "FC12",
+    "cluster": "phe-lifestyle-analysis",
+    "i_can_statements": [
+      "I can analyze how lifestyle patterns affect performance in fitness activities",
+      "I can identify lifestyle patterns that relate to performance in fitness activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc12.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "b7eb54bf791e0a82"
+    }
+  },
+  "bc.fc12.cc.4": {
+    "course": "FC12",
+    "cluster": "phe-health-messages",
+    "i_can_statements": [
+      "I can analyze how health messages influence health and well-being",
+      "I can critique health messages from different sources",
+      "I can compare health messages from different sources"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "1ed6f8a12ba702e2"
+    }
+  },
+  "bc.fc12.cc.5": {
+    "course": "FC12",
+    "cluster": "phe-fitness-myths",
+    "i_can_statements": [
+      "I can analyze the claims a fitness myth or fad makes",
+      "I can compare what different fitness myths and fads claim",
+      "I can critique the claims of a fitness myth or fad"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.fc11.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "7faf938743623de7"
+    }
+  },
+  "bc.fc12.cc.6": {
+    "course": "FC12",
+    "cluster": "phe-overcoming-barriers",
+    "i_can_statements": [
+      "I can plan ways to overcome barriers to taking part in fitness and conditioning activities",
+      "I can identify barriers that could limit my participation in fitness and conditioning activities"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe10.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "c46c6d45644abba8"
+    }
+  },
+  "bc.fc12.cc.7": {
+    "course": "FC12",
+    "cluster": "phe-lifelong-activity",
+    "i_can_statements": [
+      "I can explain how getting better at fitness and conditioning activities builds my confidence",
+      "I can explain how building skill encourages me to keep doing physical activities for life",
+      "I can describe how I have gotten better at a fitness and conditioning activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.al11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "638fbb93dd258c19"
+    }
+  },
+  "bc.fc12.cc.8": {
+    "course": "FC12",
+    "cluster": "phe-muscle-training",
+    "i_can_statements": [
+      "I can describe how muscles produce movement in different parts of the body",
+      "I can identify the main muscles used in a movement",
+      "I can describe how to train the muscles used in a movement"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "a56db86e8a4c461b"
+    }
+  },
+  "bc.fc12.cc.9": {
+    "course": "FC12",
+    "cluster": "phe-training-styles",
+    "i_can_statements": [
+      "I can describe how a training style affects fitness results",
+      "I can name the fitness results that different training styles produce"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "2da750eed6fca309"
+    }
+  },
+  "bc.fc12.cc.10": {
+    "course": "FC12",
+    "cluster": "phe-exercise-technique",
+    "i_can_statements": [
+      "I can demonstrate appropriate exercise technique in a variety of fitness activities",
+      "I can develop correct technique for an exercise through practice",
+      "I can adjust my technique to suit different fitness activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "2e9413c424a9372a"
+    }
+  },
+  "bc.fc12.cc.11": {
+    "course": "FC12",
+    "cluster": "phe-fitness-program",
+    "i_can_statements": [
+      "I can create a personalized fitness program that fits my goals",
+      "I can carry out my personalized fitness program as planned",
+      "I can reflect on how well my fitness program worked for me"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.fc11.cc.11",
+      "approved_by_owner": true,
+      "raw_sha": "25889409cddefbd1"
+    }
+  },
+  "bc.fc12.cc.12": {
+    "course": "FC12",
+    "cluster": "phe-body-systems",
+    "i_can_statements": [
+      "I can analyze how different types of fitness activities influence the muscular and cardiovascular systems",
+      "I can identify the fitness activities that mainly train the muscular system",
+      "I can identify the fitness activities that mainly train the cardiovascular system"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.fc11.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "e52bfc1e3bd81b92"
+    }
+  },
+  "bc.fc12.cc.13": {
+    "course": "FC12",
+    "cluster": "phe-leadership-skills",
+    "i_can_statements": [
+      "I can use different leadership skills during fitness activities",
+      "I can lead others in different types of fitness activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "6c46f465fce79a9e"
+    }
+  },
+  "bc.fc12.cc.14": {
+    "course": "FC12",
+    "cluster": "phe-fitness-etiquette",
+    "i_can_statements": [
+      "I can follow the expectations of each type of fitness activity",
+      "I can adjust what I do to suit each fitness setting"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.14",
+      "approved_by_owner": true,
+      "raw_sha": "22b2aa915be8ac2d"
+    }
+  },
+  "bc.fc12.cc.15": {
+    "course": "FC12",
+    "cluster": "phe-safety-practices",
+    "i_can_statements": [
+      "I can apply safety practices in different types of fitness activities",
+      "I can use safety practices that protect me while I train",
+      "I can use safety practices that protect others during fitness activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.fc11.cc.15",
+      "approved_by_owner": true,
+      "raw_sha": "391a4a06a77ad3c0"
+    }
+  },
+  "bc.oded12.cc.1": {
+    "course": "ODED12",
+    "cluster": "phe-outdoor-activities",
+    "i_can_statements": [
+      "I can take an active part in and lead outdoor activities",
+      "I can take part in many different kinds of outdoor activities",
+      "I can lead others during an outdoor activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.oded11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "79e6bd48809a9a0e"
+    }
+  },
+  "bc.oded12.cc.2": {
+    "course": "ODED12",
+    "cluster": "phe-outdoor-skills",
+    "i_can_statements": [
+      "I can demonstrate a variety of skills for outdoor activities",
+      "I can develop new skills for outdoor activities through practice"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.2",
+      "approved_by_owner": true,
+      "raw_sha": "66d452a8ab202775"
+    }
+  },
+  "bc.oded12.cc.3": {
+    "course": "ODED12",
+    "cluster": "phe-exertion-monitoring",
+    "i_can_statements": [
+      "I can check how hard I am working",
+      "I can check my energy level",
+      "I can check how hard others are working",
+      "I can check the energy levels of others"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.phe8.cc.3",
+      "approved_by_owner": true,
+      "raw_sha": "4a099cbdaec85b00"
+    }
+  },
+  "bc.oded12.cc.4": {
+    "course": "ODED12",
+    "cluster": "phe-condition-monitoring",
+    "i_can_statements": [
+      "I can check the environmental conditions around me during an outdoor activity",
+      "I can track changes in environmental conditions as an outdoor activity goes on"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.4",
+      "approved_by_owner": true,
+      "raw_sha": "786c9bcf04265e14"
+    }
+  },
+  "bc.oded12.cc.5": {
+    "course": "ODED12",
+    "cluster": "phe-outdoor-preparation",
+    "i_can_statements": [
+      "I can analyze the nutritional and other requirements of an outdoor activity",
+      "I can explain what food and drink I need for an outdoor activity",
+      "I can explain what I need to get ready before an outdoor activity",
+      "I can explain what I need while taking part in an outdoor activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.oded11.cc.5",
+      "approved_by_owner": true,
+      "raw_sha": "2d0785b0995f7ccd"
+    }
+  },
+  "bc.oded12.cc.6": {
+    "course": "ODED12",
+    "cluster": "phe-lifelong-activity",
+    "i_can_statements": [
+      "I can explain how getting better at an outdoor activity builds my confidence",
+      "I can explain how building skill encourages me to keep doing an activity for life",
+      "I can describe how I have gotten better at an outdoor activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.al11.cc.1",
+      "approved_by_owner": true,
+      "raw_sha": "f9ac9a92d4fdede0"
+    }
+  },
+  "bc.oded12.cc.7": {
+    "course": "ODED12",
+    "cluster": "phe-impact-reduction",
+    "i_can_statements": [
+      "I can plan ways to reduce the impact of an outdoor activity on the local environment",
+      "I can identify potential impacts an outdoor activity could have on the local environment",
+      "I can carry out my plan to reduce impacts during an outdoor activity"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.8",
+      "approved_by_owner": true,
+      "raw_sha": "f5deaa4e114659ab"
+    }
+  },
+  "bc.oded12.cc.8": {
+    "course": "ODED12",
+    "cluster": "phe-cultural-sensitivity",
+    "i_can_statements": [
+      "I can use an outdoor location in a way that respects its cultural and local importance",
+      "I can explain why an outdoor location may be culturally important",
+      "I can explain local concerns about how an outdoor location is used"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.oded11.cc.9",
+      "approved_by_owner": true,
+      "raw_sha": "244cd9d35e21cfdd"
+    }
+  },
+  "bc.oded12.cc.9": {
+    "course": "ODED12",
+    "cluster": "phe-collaboration",
+    "i_can_statements": [
+      "I can collaborate with others during outdoor activities",
+      "I can share tasks with others across a variety of outdoor activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.10",
+      "approved_by_owner": true,
+      "raw_sha": "ce84f3b0e35fd615"
+    }
+  },
+  "bc.oded12.cc.10": {
+    "course": "ODED12",
+    "cluster": "phe-emergency-response",
+    "i_can_statements": [
+      "I can respond appropriately to an emergency during an outdoor activity",
+      "I can identify when a situation during an outdoor activity is an emergency"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.12",
+      "approved_by_owner": true,
+      "raw_sha": "80908c9c0df680c4"
+    }
+  },
+  "bc.oded12.cc.11": {
+    "course": "ODED12",
+    "cluster": "phe-safety-for-all",
+    "i_can_statements": [
+      "I can take steps to keep myself safe during outdoor activities",
+      "I can take steps to help keep others safe during outdoor activities"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded11.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "15c9dd7080b3f010"
+    }
+  },
+  "bc.oded12.cc.12": {
+    "course": "ODED12",
+    "cluster": "phe-risk-management",
+    "i_can_statements": [
+      "I can anticipate the risks in different types of outdoor activities",
+      "I can manage risks as they come up during an outdoor activity"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.oded11.cc.14",
+      "approved_by_owner": true,
+      "raw_sha": "4d171c3f4a5daa10"
+    }
+  },
+  "bc.oded12.cc.13": {
+    "course": "ODED12",
+    "cluster": "phe-leadership-skills",
+    "i_can_statements": [
+      "I can use outdoor leadership skills when interacting with others",
+      "I can use communication skills when interacting with others"
+    ],
+    "prov": {
+      "method": "adapted",
+      "exemplar": "bc.fc11.cc.13",
+      "approved_by_owner": true,
+      "raw_sha": "1ba7529119200167"
+    }
+  },
+  "bc.oded12.cc.14": {
+    "course": "ODED12",
+    "cluster": "phe-communication",
+    "i_can_statements": [
+      "I can communicate and collaborate with others on expeditions and teams",
+      "I can share ideas and information with others on an expedition",
+      "I can work with team members toward a shared goal",
+      "I can collaborate with others in the community"
+    ],
+    "prov": {
+      "method": "exemplar",
+      "exemplar": "bc.oded12.cc.14",
+      "approved_by_owner": true,
+      "raw_sha": "fc1cf05c83224522"
     }
   },
   "bc.sci8.cc.1": {
