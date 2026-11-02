@@ -1485,6 +1485,10 @@ th.gb-group-alt {
   align-items: center;
   gap: 5px;
 }
+/* Graded Separately: Late's small letter, in dark grey. */
+.gb-late.gb-separate {
+  background: #545458;
+}
 .gb-key-item .gb-late {
   margin-left: 0;
   vertical-align: 0;

@@ -645,6 +645,11 @@ window.PageGradebook = (function () {
 
   /* One line under the grid: what the colours and marks mean. */
   function _keyHtml() {
+    var cid = activeCourse;
+    // Graded Separately is in the key only in a class where someone is.
+    var separate = getAssessments(cid).some(function (a) {
+      return a && Array.isArray(a.gradedSeparately) && a.gradedSeparately.length > 0;
+    });
     var html = '<div class="gb-key" aria-label="Key">';
     [1, 2, 3, 4].forEach(function (n) {
       html +=
@@ -659,6 +664,7 @@ window.PageGradebook = (function () {
       '<span class="gb-key-item"><span class="gb-status gb-status-ns">M</span>Missing</span>' +
       '<span class="gb-key-item"><span class="gb-status gb-status-exc">EXC</span>Excused</span>' +
       '<span class="gb-key-item"><span class="gb-late">L</span>Late</span>' +
+      (separate ? '<span class="gb-key-item"><span class="gb-late gb-separate">S</span>Graded Separately</span>' : '') +
       '<span class="gb-key-item"><span class="gb-key-dash">\u2014</span>No Score</span>' +
       '</div>';
     return html;
@@ -1539,6 +1545,7 @@ window.PageGradebook = (function () {
         '<span class="gb-scores-assess-meta">' +
         shortDate +
         maxPts +
+        (_collabMetaText(a) ? (shortDate || maxPts ? ' \u00b7 ' : '') + _collabMetaText(a) : '') +
         (assessmentNeedsCategory(cid, a)
           ? (shortDate || maxPts ? ' \u00b7 ' : '') +
             '<span class="gb-needs-category" title="' +
@@ -1643,13 +1650,15 @@ window.PageGradebook = (function () {
           display = statusMark;
         } else if (cmpMark) {
           cellStyle = cmpMark === 'complete' ? 'color:var(--score-3)' : 'color:var(--score-1)';
-          display = cell.text + (cell.late ? lateMarkHtml() : '');
+          display =
+            cell.text + (cell.late ? lateMarkHtml() : '') + (isGradedSeparately(a, s.id) ? separateMarkHtml() : '');
         } else if (cell.kind === 'points' || cell.kind === 'level') {
           var r = cell.level;
           cellStyle = 'background:' + PROF_TINT[r] + ';color:' + PROF_COLORS[r];
           display =
             (cell.kind === 'level' ? _levelCellHtml(cid, cell.value) : esc(cell.text)) +
-            (cell.late ? lateMarkHtml() : '');
+            (cell.late ? lateMarkHtml() : '') +
+            (isGradedSeparately(a, s.id) ? separateMarkHtml() : '');
           // Warning for out-of-range: above 4 on proficiency work, above the
           // extra-credit cap (twice the maximum) on points work.
           if (cell.outOfRange) cellClass = ' gb-scores-warning';
@@ -1978,6 +1987,19 @@ window.PageGradebook = (function () {
   /* Late keeps the score and adds an L after it, as the printed sheet does. */
   function lateMarkHtml() {
     return '<span class="gb-late" title="Late">L</span>';
+  }
+
+  /* A Pair or Group member graded on their own (Grade Separately) gets an S
+     after their score, in the same small-letter style as Late. */
+  function separateMarkHtml() {
+    return '<span class="gb-late gb-separate" title="Graded Separately">S</span>';
+  }
+
+  /* " · Group" or " · Pair" after the date of work graded by group. */
+  function _collabMetaText(a) {
+    var lists = a.collaboration === 'pair' ? a.pairs : a.collaboration === 'group' ? a.groups : null;
+    if (!lists || !lists.length) return '';
+    return a.collaboration === 'pair' ? 'Pair' : 'Group';
   }
 
   function completionCellHtml(mark) {
