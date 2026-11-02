@@ -904,7 +904,8 @@ describe('stage 3 blocks', () => {
     const t = text(html);
     expect(t).toContain('Proficiency Curricular Competencies · Science 8');
     expect(t).toContain('Competency Start of Term Now Change Assessed');
-    expect(t).toContain('Overall 3.0 Proficient 3.3 Proficient +0.3 3');
+    // Assessed counts each assessment once, however many competencies it scored.
+    expect(t).toContain('Overall 3.0 Proficient 3.3 Proficient +0.3 2');
     expect(t).toContain('Question and Predict 3.0 Proficient 3.2 Proficient +0.2 2');
     expect(t).toContain('Plan Investigations — 3.4 Proficient — 1');
     expect(t).toContain('Evaluate Methods — — — 0');
@@ -930,19 +931,44 @@ describe('stage 3 blocks', () => {
     const half = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { size: 'half' }));
     expect(half).toContain('Competency Start Now Change Ev.');
     expect(half).not.toContain('Proficient');
-    // Groups: a heading per group, the rest under Other Competencies; Each Group averages.
+    // Folders. As Graded (the default) prints a folder the grade counts as
+    // one as one row, averaged as calc.js does; the rest print one by one
+    // under Other Competencies. Each Competency puts a heading over each
+    // folder's competencies; Each Folder makes every folder one row.
     stub('getGroupedSections', () => ({
       groups: [{ group: { id: 'g1', name: 'Inquiry' }, sections: [secs[0], secs[1]] }],
       ungrouped: [secs[2]],
     }));
     stub('getGroupProficiency', () => 3.3);
-    const grouped = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, {}));
-    expect(grouped).toContain('Inquiry Question and Predict');
-    expect(grouped).toContain('Other Competencies Evaluate Methods');
+    const asGraded = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, {}));
+    expect(asGraded).toContain('Inquiry · 2 3.0 Proficient 3.3 Proficient +0.3 2');
+    expect(asGraded).not.toContain('Inquiry Question and Predict');
+    expect(asGraded).toContain('Other Competencies Evaluate Methods');
+    // The highest and lowest lines name what the report prints: the folder.
+    expect(asGraded).toContain('Highest now: Inquiry 3.3.');
+    const each = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { rows: 'each' }));
+    expect(each).toContain('Inquiry Question and Predict');
+    expect(each).toContain('Other Competencies Evaluate Methods');
     const byGroup = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { rows: 'group' }));
-    expect(byGroup).toContain('Group Start of Term Now Change Assessed');
-    expect(byGroup).toContain('Inquiry · 2 3.0 Proficient 3.3 Proficient +0.3 3');
+    expect(byGroup).toContain('Inquiry · 2 3.0 Proficient 3.3 Proficient +0.3 2');
     expect(byGroup).toContain('Other Competencies Evaluate Methods');
+    // A folder the grade doesn't count as one (Folders Count as One off, or
+    // the folder's own switch off) prints its competencies under its name.
+    stub('folderCountsAsOne', () => false);
+    const notOne = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, {}));
+    expect(notOne).toContain('Inquiry Question and Predict');
+    expect(text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { rows: 'group' }))).toContain(
+      'Inquiry · 2',
+    );
+    // Only folders: the column says Group.
+    stub('folderCountsAsOne', () => true);
+    stub('getGroupedSections', () => ({
+      groups: [{ group: { id: 'g1', name: 'Inquiry' }, sections: [secs[0], secs[1], secs[2]] }],
+      ungrouped: [],
+    }));
+    expect(text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, {}))).toContain(
+      'Group Start of Term Now Change Assessed',
+    );
     // Nothing to print without competencies.
     stub('getSections', () => []);
     stub('getGroupedSections', () => ({ groups: [], ungrouped: [] }));
