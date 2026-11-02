@@ -5502,11 +5502,6 @@ window.ReportQuestionnaire = (function () {
     });
     return p ? p.id : 'grade';
   }
-  /* Use on a sentence that does not fit the student (a fact missing, or
-     another case's sentence): it goes in as the row shows it, as the
-     teacher's own sentence, so it is theirs to check and is never checked
-     against the marks (Colin, 2026-11-02: "don't block users from custom
-     actions"). At the gap, else where its step falls. */
   /* The Browse row a Use came from: the sentence under its case, with the
      text it shows and whether it fits the student. A frame can fit the
      student and still sit under another case, previewed for that case
@@ -5520,6 +5515,11 @@ window.ReportQuestionnaire = (function () {
       }) || null
     );
   }
+  /* Use on a sentence that does not fit the student (a fact missing, or
+     another case's sentence): it goes in as the row shows it, as the
+     teacher's own sentence, so it is theirs to check and is never checked
+     against the marks (Colin, 2026-11-02: "don't block users from custom
+     actions"). At the gap, else where its step falls. */
   function _useAsWritten(st, s, ctx, hit) {
     var b = _browse || {};
     var row = typedRow(hit ? hit.text : _preview(s, ctx));
