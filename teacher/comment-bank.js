@@ -2904,6 +2904,33 @@ window.CommentBank = (function () {
     return { comp: n.comp, text: n.steps[word(n.comp.level)] || n.skill };
   }
 
+  /* The next step most of the class shares (Colin, 2026-11-02), for the
+     teacher's own closing line: each student's next step at their level
+     (levelStepOf, a bank competency) or as the table's skill (nextSkillOf),
+     counted across the students. { text, count, total }, or null when no
+     step is shared by two or more. opts: { termId, students }. */
+  function sharedNextStep(cid, opts) {
+    var counts = {};
+    var order = [];
+    var total = 0;
+    ((opts && opts.students) || []).forEach(function (st) {
+      var f = facts(cid, st, opts.termId);
+      total++;
+      var ls = levelStepOf(f);
+      var ns = ls ? null : nextSkillOf(f);
+      var text = ls ? ls.text : ns ? ns.skill : '';
+      if (!text) return;
+      if (!counts[text]) order.push(text);
+      counts[text] = (counts[text] || 0) + 1;
+    });
+    var best = null;
+    order.forEach(function (t) {
+      if (!best || counts[t] > counts[best]) best = t;
+    });
+    if (!best || counts[best] < 2) return null;
+    return { text: best, count: counts[best], total: total };
+  }
+
   /* The strengths (plan, target comment part 3): the competencies past the
      "strongest" gate (strongestOf), each as its skill in plain words from
      the table, [{ comp, key, skill }]. A competency the table has no skill
@@ -7074,6 +7101,7 @@ window.CommentBank = (function () {
     topSkillOf: topSkillOf,
     nextStepOf: nextStepOf,
     levelStepOf: levelStepOf,
+    sharedNextStep: sharedNextStep,
     skillFor: skillFor,
     bankEntry: bankEntry,
     nextSkillOf: nextSkillOf,

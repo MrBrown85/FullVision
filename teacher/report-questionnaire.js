@@ -6388,15 +6388,32 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
+  /* The next step most of the class shares (CommentBank.sharedNextStep),
+     shown with the Closing row for the teacher's own closing line (Nov 2
+     mockup). Worked out once per drawing of the page. */
+  var _shared = null;
+  function _sharedStepHtml(cid) {
+    var termId = getTermId();
+    var key = cid + '|' + termId;
+    if (!_shared || _shared.key !== key)
+      _shared = { key: key, r: CommentBank.sharedNextStep(cid, { termId: termId, students: getTqStudents() }) };
+    var r = _shared.r;
+    if (!r) return '';
+    var step = r.text.charAt(0).toUpperCase() + r.text.slice(1).replace(/[.!?]*$/, '.');
+    return `<span class="qn-shared-step"><b>Shared next step:</b> ${esc(step)} <span class="qn-shared-count">${r.count} of ${r.total} students</span></span>`;
+  }
+
   function _closingRowHtml(cid, handle, i) {
     var course = _courseName(cid);
     var closing = CommentBank.classSettings(cid).closing;
+    var shared = _sharedStepHtml(cid);
     handle = handle || '';
     if (_lineEdit === 'closing')
       return `<div class="qn-req-row qn-line-row" id="tq-row-closing"${_rowAttr(i)}>
         ${handle}<div class="qn-req-part"><span class="qn-req-label">Closing</span></div>
         <div class="qn-req-body qn-line-edit-body">
           <input type="text" class="qn-line-input" id="tq-line-closing" data-tq-line-input="closing" aria-label="Closing sentence for ${esc(course)}" title="Used exactly as you type it, at the end of each new comment." value="${esc(closing)}">
+          ${shared}
           <span class="qn-req-source">Ends every new comment in ${esc(course)}. Approved comments are flagged so you can update or keep each one. Leave it empty to end without one.</span>
           <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqLine" data-do="cancel" title="Keeps the closing sentence as it was.">Cancel</button><button type="button" class="qn-line-save" data-action="tqLine" data-do="saveClosing" title="Saves this closing sentence for every comment in ${esc(course)}.">Save for Class</button></div>
         </div>
@@ -6404,7 +6421,7 @@ window.ReportQuestionnaire = (function () {
     if (!closing)
       return `<div class="qn-req-row qn-line-row" id="tq-row-closing"${_rowAttr(i)}>
         ${handle}<div class="qn-req-part"><span class="qn-req-label">Closing</span></div>
-        <span class="qn-line-empty">No closing sentence for this class.</span>
+        <div class="qn-req-body"><span class="qn-line-empty">No closing sentence for this class.</span>${shared}</div>
         <button type="button" class="qn-line-choose" data-action="tqLine" data-do="editClosing" title="Write a sentence to end every comment in ${esc(course)}.">Add One…</button>
       </div>`;
     return `<div class="qn-req-row qn-line-row" id="tq-row-closing"${_rowAttr(i)}>
@@ -6889,6 +6906,7 @@ window.ReportQuestionnaire = (function () {
     _syncPronouns(cid, student, f);
     // Marks may have changed since the page was last drawn.
     _strength = null;
+    _shared = null;
     _staleCache = {};
     _claimCache = {};
     var comment = plainComment((getStudentTermRating(cid, student.id, getTermId()) || {}).narrative || '');
