@@ -697,6 +697,7 @@ window.ObsCapture = (function () {
       return (
         '<div class="obsc-item' +
         (o.on ? ' selected' : '') +
+        (o.desc ? ' has-desc' : '') +
         '" role="option" tabindex="-1" aria-selected="' +
         !!o.on +
         '" data-obsc="' +
@@ -877,10 +878,11 @@ window.ObsCapture = (function () {
         // Each level's descriptor for the competency picked (Nov 2 mockup,
         // batch 2), by the printed rubric's rule (CompetencyWording).
         var lvTag = state.competencyId && typeof getTagById === 'function' ? getTagById(cid, state.competencyId) : null;
+        var lvFirst = lvTag && window.CompetencyWording ? CompetencyWording.lines(lvTag, 1) : null;
+        // A bank competency's wording loads for the next time the menu opens.
+        if (lvFirst && !lvFirst.ready && window.RubricPrint && RubricPrint.loadBankLevels) RubricPrint.loadBankLevels();
         levelOrderFor(cid).forEach(function (n) {
           var w = lvTag && window.CompetencyWording ? CompetencyWording.lines(lvTag, n) : null;
-          // A bank competency's wording loads for the next time the menu opens.
-          if (w && !w.ready && window.RubricPrint && RubricPrint.loadBankLevels) RubricPrint.loadBankLevels();
           h += item('setLevel', n, levelLabel(n), { on: state.level === n, desc: w ? w.descriptor : '' });
         });
         h += item('setLevel', '', 'No level', { on: !state.level });

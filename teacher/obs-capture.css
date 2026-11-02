@@ -435,7 +435,7 @@ span.obsc-chip-label {
   line-height: 1.3;
   color: var(--text-2);
 }
-.obsc-item:has(.obsc-item-desc) {
+.obsc-item.has-desc {
   align-items: flex-start;
 }
 /* The level menu with its descriptors shows whole, "No level" included. */
