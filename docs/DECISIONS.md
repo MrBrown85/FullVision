@@ -96,6 +96,7 @@ A class's overall proficiency averaged each folder (competency group) first and 
 - **Folder rows keep their average** in every view. Where a folder isn't counted as one, teacher views add "Each competency counts on its own." (student page and phone under the name; dashboard tooltips). Family reports, phone reports and the CSV don't.
 - **Either switch asks first** when grades move, with the grade-change count, and says printed or sent reports and approved comments keep what they say.
 - **Copy Grading Setup copies the class switch** with the calculation method. Duplicate Class copies both.
+- **The printed report shows what is graded** (Colin, 2026-11-02: "those are what gets reported, not necessarily the granular detail"). The Proficiency block's Rows default to **As Graded**: a folder that counts as one prints as one row with its average, and a folder that doesn't prints its competencies under its name. Each Folder and Each Competency are still choices. The competency detail stays in the gradebook, on the student page and on the Feedback Pages. A full Ministry course (Science 8 has 27 competencies in six folders) then fits the Report Card's sheet. Assessed counts each assessment once, however many competencies it scored.
 
 ## The BC curriculum bank (2026-11-02)
 

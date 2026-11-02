@@ -934,7 +934,6 @@ window.ReportBlocks = (function () {
       const v = list.map(r => r[k]).filter(x => x > 0);
       return v.length ? v.reduce((t, x) => t + x, 0) / v.length : 0;
     };
-    const sum = list => list.reduce((t, r) => t + r.ev.count, 0);
 
     // Overall: the class's roll-up now, and then from the same rows.
     const overallNow = getOverallProficiency(cid, sid);
@@ -943,47 +942,83 @@ window.ReportBlocks = (function () {
       const r = rowsBySection[sec.id];
       return r && live.indexOf(r) >= 0 ? r.then : 0;
     });
+    // Assessed: each assessment once, however many competencies it scored.
+    const assessedOnce = rs => {
+      const ids = new Set();
+      rs.forEach(r => r.ev.list.forEach(w => ids.add(w.a || w)));
+      return ids.size;
+    };
     const overallRow =
-      options.overall !== false ? tr('Overall', overallThen, overallNow, sum(live), 'report-prof-overall') : '';
+      options.overall !== false
+        ? tr('Overall', overallThen, overallNow, assessedOnce(live), 'report-prof-overall')
+        : '';
 
-    // The rows: blocks that never split across columns.
+    // The rows: blocks that never split across columns. A folder prints as
+    // one row (its competencies averaged, as calc.js does) or as its
+    // competencies under its name. Rows (options.rows): As Graded ('auto',
+    // the default) prints a folder as one row where the grade counts it as
+    // one (folderCountsAsOne); Each Folder ('group') every folder; Each
+    // Competency ('each') none. Competencies in no folder print one by one.
     const blocks = [];
-    const byGroup = options.rows === 'group' && hasGroups;
+    const printed = [];
+    const rowsMode = options.rows === 'group' || options.rows === 'each' ? options.rows : 'auto';
+    const asOne = g =>
+      rowsMode === 'group' ||
+      (rowsMode === 'auto' && (typeof folderCountsAsOne !== 'function' || folderCountsAsOne(cid, g.group)));
+    // A folder's work: each assessment once, at its best score in the folder.
+    const folderEvidence = rs => {
+      const byA = new Map();
+      rs.forEach(r =>
+        r.ev.list.forEach(w => {
+          const prev = byA.get(w.a || w);
+          if (!prev || w.score > prev.score) byA.set(w.a || w, w);
+        }),
+      );
+      const list = Array.from(byA.values());
+      return { count: list.length, list };
+    };
+    let folderRowsOnly = hasGroups;
     if (hasGroups) {
       const loose = grouped.ungrouped.map(sec => rowsBySection[sec.id]).filter(r => live.indexOf(r) >= 0);
-      if (byGroup) {
-        const groupRows = grouped.groups
-          .filter(g => g.sections.length)
-          .map(g => {
-            const rs = g.sections.map(sec => rowsBySection[sec.id]).filter(r => live.indexOf(r) >= 0);
-            return {
-              name: g.group.name,
-              then: avg(rs, 'then'),
-              now: getGroupProficiency(cid, sid, g.group.id),
-              ev: { count: sum(rs) },
-              count: rs.length,
-            };
-          })
-          .filter(r => r.count);
-        blocks.push(sortRows(groupRows).map(r => tr(r.name, r.then, r.now, r.ev.count, 'report-prof-group', r.count)));
-        if (loose.length)
-          blocks.push(
-            [headRow('Other Competencies')].concat(sortRows(loose).map(r => tr(r.name, r.then, r.now, r.ev.count))),
-          );
-      } else {
-        grouped.groups.forEach(g => {
-          const rs = g.sections.map(sec => rowsBySection[sec.id]).filter(r => live.indexOf(r) >= 0);
-          if (!rs.length) return;
+      let run = [];
+      const flush = () => {
+        if (run.length)
+          blocks.push(sortRows(run).map(r => tr(r.name, r.then, r.now, r.ev.count, 'report-prof-group', r.count)));
+        run = [];
+      };
+      grouped.groups.forEach(g => {
+        const rs = g.sections.map(sec => rowsBySection[sec.id]).filter(r => live.indexOf(r) >= 0);
+        if (!rs.length) return;
+        if (asOne(g)) {
+          const row = {
+            name: g.group.name,
+            then: avg(rs, 'then'),
+            now: getGroupProficiency(cid, sid, g.group.id),
+            ev: folderEvidence(rs),
+            count: rs.length,
+          };
+          run.push(row);
+          printed.push(row);
+        } else {
+          flush();
+          folderRowsOnly = false;
           blocks.push([headRow(g.group.name)].concat(sortRows(rs).map(r => tr(r.name, r.then, r.now, r.ev.count))));
-        });
-        if (loose.length)
-          blocks.push(
-            [headRow('Other Competencies')].concat(sortRows(loose).map(r => tr(r.name, r.then, r.now, r.ev.count))),
-          );
+          rs.forEach(r => printed.push(r));
+        }
+      });
+      flush();
+      if (loose.length) {
+        folderRowsOnly = false;
+        blocks.push(
+          [headRow('Other Competencies')].concat(sortRows(loose).map(r => tr(r.name, r.then, r.now, r.ev.count))),
+        );
+        loose.forEach(r => printed.push(r));
       }
     } else {
       blocks.push(sortRows(live).map(r => tr(r.name, r.then, r.now, r.ev.count)));
+      live.forEach(r => printed.push(r));
     }
+    const byGroup = hasGroups && folderRowsOnly;
     const total = blocks.reduce((t, b) => t + b.length, 0);
     const twoCols = !half && !byGroup && total > 12;
     const nameLabel = byGroup ? 'Group' : 'Competency';
@@ -1018,7 +1053,7 @@ window.ReportBlocks = (function () {
     // lowest work in them.
     let facts = '';
     if (options.facts !== false) {
-      const ranked = live
+      const ranked = printed
         .filter(r => r.now > 0)
         .slice()
         .sort((a, b) => b.now - a.now);

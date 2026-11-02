@@ -183,10 +183,13 @@ window.ReportSheets = (function () {
         {
           key: 'rows',
           label: 'Rows',
-          def: 'each',
+          // As Graded: a folder that counts as one in the grade prints as
+          // one row, so the report shows what the grade is made of.
+          def: 'auto',
           choices: [
+            { v: 'auto', label: 'As Graded' },
+            { v: 'group', label: 'Each Folder' },
             { v: 'each', label: 'Each Competency' },
-            { v: 'group', label: 'Each Group' },
           ],
           groups: true,
         },
