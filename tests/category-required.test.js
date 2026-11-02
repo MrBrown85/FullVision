@@ -130,6 +130,8 @@ describe('copying into a class with categories', () => {
   });
 
   it('lets DIBELS work go in with no category', async () => {
+    // DIBELS copies only to a class that offers it (an ELA course).
+    COURSES[CATS].curriculumTags = ['LS10'];
     const done = AssessmentCopy.copyToClasses(SRC, quiz({ scoreMode: 'dibels', maxPoints: undefined }), [
       { cid: CATS },
     ]);

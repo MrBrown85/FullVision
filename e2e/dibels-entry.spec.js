@@ -89,3 +89,57 @@ test('the grade editor shows one student’s card and levels, not a grade', asyn
   await dialog.locator('[data-grader="close"], .grader-done').first().click();
   await expect(page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-dibels"]')).toContainText('Core');
 });
+
+// DIBELS is offered by the class's linked courses: Social Studies 8 and any
+// English Language Arts course (docs/DECISIONS.md, 2026-11-02).
+async function linkCourses(page, tags) {
+  await page.addInitScript(
+    ({ cid, tags }) => {
+      const courses = JSON.parse(localStorage.getItem('gb-courses'));
+      courses[cid].curriculumTags = tags;
+      localStorage.setItem('gb-courses', JSON.stringify(courses));
+    },
+    { cid: TEST_COURSE.id, tags },
+  );
+}
+const dibelsCard = page => page.locator('#new-assess-form [data-action="setScoreMode"][data-mode="dibels"]');
+
+test.describe('who is offered DIBELS', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+  });
+
+  for (const [name, tags] of [
+    ['Humanities 8', ['ELA8', 'SS8']],
+    ['Social Studies 8', ['SS8']],
+    ['English Studies 12', ['ES12']],
+  ]) {
+    test(`a ${name} class has the DIBELS card`, async ({ page }) => {
+      await linkCourses(page, tags);
+      await gotoApp(page, '/assignments');
+      await page.locator('[data-action="showNewForm"]').first().click();
+      await expect(dibelsCard(page)).toHaveCount(1);
+    });
+  }
+
+  test('a Science 8 class has no DIBELS card', async ({ page }) => {
+    await gotoApp(page, '/assignments');
+    await page.locator('[data-action="showNewForm"]').first().click();
+    await expect(page.locator('#new-assess-form [data-action="setScoreMode"][data-mode="points"]')).toHaveCount(1);
+    await expect(dibelsCard(page)).toHaveCount(0);
+  });
+
+  test('DIBELS work a class already has keeps its card when edited', async ({ page }) => {
+    await page.addInitScript(
+      ({ assessment, cid }) => {
+        localStorage.setItem('gb-assessments-' + cid, JSON.stringify([assessment]));
+      },
+      { assessment: ASSESSMENT, cid: TEST_COURSE.id },
+    );
+    await gotoApp(page, '/assignments');
+    await page.locator('#ac-assess-dibels [data-action="editAssess"]').first().click();
+    await expect(dibelsCard(page)).toHaveAttribute('aria-checked', 'true');
+  });
+});

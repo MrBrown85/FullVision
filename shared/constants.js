@@ -392,6 +392,50 @@ function isDibelsScored(assessment) {
   return !!assessment && (assessment.scoreMode || assessment.score_mode) === 'dibels';
 }
 
+/* The BC courses whose classes are offered the DIBELS 8 Benchmark type:
+   Social Studies 8 and every English Language Arts course, grades 8 to 12
+   (the bank's subject "English Language Arts", English First Peoples
+   included), so Humanities 8 (ELA 8 + SS 8) has it. Every grade is scored on
+   the Grade 8 goals below: DIBELS publishes none past Grade 8. Decided by
+   the class's linked courses (curriculumTags), not its name; DIBELS work a
+   class already has keeps working whatever it's linked to.
+   tests/dibels-offered.test.js checks the list against the bank. */
+var DIBELS_COURSE_TAGS = [
+  'SS8',
+  'ELA8',
+  'ELA9',
+  'COMP10',
+  'CW10',
+  'EFPLS10',
+  'EFPNM10',
+  'EFPSL10',
+  'EFPW10',
+  'LS10',
+  'NM10',
+  'SL10',
+  'COMP11',
+  'CW11',
+  'EFPLSNM11',
+  'EFPLSSL11',
+  'EFPLSW11',
+  'LS11',
+  'NMED11',
+  'SPKN11',
+  'COMP12',
+  'CW12',
+  'EFP12',
+  'ES12',
+  'LS12',
+  'NMED12',
+  'SPKN12',
+];
+function courseOffersDibels(course) {
+  var tags = (course && course.curriculumTags) || [];
+  return tags.some(function (t) {
+    return DIBELS_COURSE_TAGS.indexOf(String(t).toUpperCase()) >= 0;
+  });
+}
+
 /* DIBELS 8th Edition Grade 8 benchmark goals (University of Oregon, goals
    updated July 2020, reformatted October 2025): the lowest score in each
    support level, per window. Above = Blue (core support, negligible risk),
