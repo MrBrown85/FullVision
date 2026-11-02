@@ -765,6 +765,18 @@ body.fv-switching-course::after {
   color: var(--text-3);
   margin-top: 1px;
 }
+.m-sec-now {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.m-sec-now div + div {
+  margin-top: 4px;
+}
+.m-sec-now b {
+  font-weight: 600;
+}
 .m-sec-insight {
   font-size: 13px;
   color: var(--text-2);
