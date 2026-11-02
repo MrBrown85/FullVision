@@ -1282,6 +1282,22 @@
         return;
       }
 
+      if (
+        action === 'm-grade-group-more' ||
+        action === 'm-grade-separate' ||
+        action === 'm-grade-rejoin' ||
+        action === 'm-grade-rejoin-yes'
+      ) {
+        var gFn = {
+          'm-grade-group-more': MGrade.openMemberSheet,
+          'm-grade-separate': MGrade.gradeSeparately,
+          'm-grade-rejoin': MGrade.confirmBackToGroup,
+          'm-grade-rejoin-yes': MGrade.backToGroup,
+        }[action];
+        gFn(_cid, target.getAttribute('data-aid'), target.getAttribute('data-sid'));
+        return;
+      }
+
       if (action === 'm-grade-jump') {
         var idx = parseInt(target.getAttribute('data-idx'));
         MGrade.jumpToStudent(idx);
