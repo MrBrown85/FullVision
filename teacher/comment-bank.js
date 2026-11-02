@@ -2000,7 +2000,9 @@ window.CommentBank = (function () {
   }
 
   /* "{His} best piece was “{title}”, where {he} {note}." With no note:
-     "{His} best piece was “{title}.”" A title's own ? or ! stays inside the
+     "{His} best piece was “{title}.”", or with the skill the piece shows
+     (o.skill, bestPieceSkillOf): "{His} best piece was “{title},” which
+     shows {he} can {skill}." A title's own ? or ! stays inside the
      quotes; the period ends inside the closing quote, any comma after it.
      As tokens for the realiser, so the name moves to it when it comes
      first. o: { title, note }. null with no title. */
@@ -2010,6 +2012,8 @@ window.CommentBank = (function () {
     if (!title) return null;
     var note = reportNoteText(o.note);
     var piece = { value: title, title: true };
+    if (!note && o.skill)
+      return [{ ref: 'poss' }, ' best piece was ', piece, ', which shows ', { ref: 'subj' }, ' can ' + o.skill + '.'];
     if (!note) return [{ ref: 'poss' }, ' best piece was ', piece, '.'];
     return [
       { ref: 'poss' },
@@ -2938,6 +2942,44 @@ window.CommentBank = (function () {
     return w ? { comp: x.comp, key: x.key, skill: x.skill, word: w } : null;
   }
 
+  /* The skill a best piece with no teacher note shows (Colin, 2026-11-02):
+     of the competencies from the BC bank the piece was scored on at
+     Proficient or above, the highest-scored (the first in report order on
+     a tie), in its cluster's phrase. One sentence per skill: never a skill
+     the comment can name elsewhere (the strengths, a tie at the top, even
+     results, the highest-marked skill, the next step), by SKILLS key, and
+     only while the sentence stays within 20 words. { comp, key, skill } or
+     null; null with a note, which says what the piece shows itself. */
+  function bestPieceSkillOf(f, w) {
+    if (!w || reportNoteText(w.note)) return null;
+    var taken = {};
+    [strengthSkills(f), topTieSkills(f), evenSkills(f), highestSkills(f), [nextSkillOf(f)]].forEach(function (xs) {
+      (xs || []).forEach(function (x) {
+        if (x) taken[x.key] = true;
+      });
+    });
+    var pick = null;
+    var pickV = 0;
+    (f.comps || []).forEach(function (c) {
+      var sc = (c.scores || []).find(function (x) {
+        return x.id === w.id;
+      });
+      var e = sc && c.bankId ? bankEntry(c.bankId) : null;
+      if (!e || taken[e.key] || !(Math.round(Number(sc.v)) >= 3) || !(Number(sc.v) > pickV)) return;
+      pick = { comp: c, key: e.key, skill: e.phrase };
+      pickV = Number(sc.v);
+    });
+    if (!pick) return null;
+    var text = bestPieceSentence({
+      title: w.title,
+      skill: pick.skill,
+      name: f.name,
+      pronouns: f.pronouns,
+      onFile: f.pronounsOnFile,
+    });
+    return R.tooLong(text) ? null : pick;
+  }
+
   /* The work this term, best first: the one rule for "best piece" that the
      comment and At a Glance both read (bestPieceOf). Of the pieces tied at
      the top (as the level prints, tenths), one scored on the strongest
@@ -3382,6 +3424,10 @@ window.CommentBank = (function () {
       return a.v - b.v || b.d.localeCompare(a.d);
     });
     var top = best[0];
+    // The skill the best piece shows, said when it has no note
+    // (bestPieceSkillOf).
+    var topPieceSkill = top ? bestPieceSkillOf(f, top) : null;
+    var topSkillText = topPieceSkill ? topPieceSkill.skill : '';
     var weak = low[0] && top && tenths(low[0].v) < tenths(top.v) ? low[0] : null;
     // Titles in quotes, the lesson number dropped (the realiser's rule).
     var the = function (w) {
@@ -3512,7 +3558,7 @@ window.CommentBank = (function () {
       fellCount: keys('comp', fell),
       assignment: keys('work', [top]),
       level: keys('work', [top]),
-      bestPiece: keys('work', [top]),
+      bestPiece: keys('work', [top]).concat(keys('comp', [topPieceSkill && topPieceSkill.comp])),
       assignment2: keys('work', [weak]),
       level2: keys('work', [weak]),
       strongWorks: keys('work', best.slice(0, 2)),
@@ -3643,7 +3689,7 @@ window.CommentBank = (function () {
       // habit a Habit Ratings frame may be drafted for (habitCellFits).
       _habitAlone: hsum.build.length === 1 ? hsum.build[0] : '',
       _toks: {
-        bestPiece: top ? bestPieceTokens({ title: top.title, note: top.note }) : null,
+        bestPiece: top ? bestPieceTokens({ title: top.title, note: top.note, skill: topSkillText }) : null,
         habitStrengths: hsum.excellent ? null : strengthsTokens(f, strongThree),
         strongHabits: hsum.excellent ? null : strongHabitsTokens(f, strongThree),
       },
@@ -3713,7 +3759,14 @@ window.CommentBank = (function () {
       newcomer: af.joinedLate ? 'yes' : '',
       // The whole best-piece sentence, with the teacher's note when there is one.
       bestPiece: top
-        ? bestPieceSentence({ title: top.title, note: top.note, name: f.name, pronouns: p, onFile: f.pronounsOnFile })
+        ? bestPieceSentence({
+            title: top.title,
+            note: top.note,
+            skill: topSkillText,
+            name: f.name,
+            pronouns: p,
+            onFile: f.pronounsOnFile,
+          })
         : '',
       assignment2: weak ? weak.title : '',
       level2: weak ? workMark(f, weak) : '',
@@ -6061,6 +6114,7 @@ window.CommentBank = (function () {
               bestPieceSentence({
                 title: bw.title,
                 note: bw.note,
+                skill: (bestPieceSkillOf(f, bw) || {}).skill || '',
                 name: f.name,
                 pronouns: f.pronouns,
                 onFile: f.pronounsOnFile,
@@ -6987,6 +7041,7 @@ window.CommentBank = (function () {
     strongestOf: strongestOf,
     strengthNowOf: strengthNowOf,
     bestPieceOf: bestPieceOf,
+    bestPieceSkillOf: bestPieceSkillOf,
     compsOf: compsOf,
     topTieOf: topTieOf,
     topTieSkills: topTieSkills,
