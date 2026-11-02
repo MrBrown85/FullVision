@@ -1085,6 +1085,35 @@ window.CommentBank = (function () {
     return null;
   }
 
+  /* The bank's comment entry for a competency imported from the BC bank
+     (tag.bank_id): its cluster's phrase, SKILLS key and next steps by level
+     (data/bc-curriculum-comment.json, shipped as shared/bank-comment.js).
+     A cluster with no SKILLS key gets its own key, so no line written for a
+     table skill is bound to it. null when the id is not in the bank. */
+  function bankEntry(bankId) {
+    var b = typeof window !== 'undefined' ? window.BANK_COMMENT : null;
+    var i = b && b.ids ? b.ids[bankId] : null;
+    var row = i != null && b.clusters ? b.clusters[i] : null;
+    if (!row) return null;
+    return {
+      key: row[1] || 'bank.' + i,
+      phrase: row[0],
+      steps: { Emerging: row[2], Developing: row[3], Proficient: row[4] },
+    };
+  }
+
+  /* The skill a comment names a competency by: the bank's phrase for its
+     cluster when it came from the bank (Colin, 2026-11-02: one phrase per
+     cluster, by bank id), else the table's skill for its label (skillOf),
+     for classes not re-linked to the bank. { key, name, skill, steps? } or
+     null. */
+  function skillFor(f, c) {
+    if (!c) return null;
+    var e = c.bankId ? bankEntry(c.bankId) : null;
+    if (e) return { key: e.key, name: c.name, skill: e.phrase, steps: e.steps };
+    return skillOf(f.family, c.name);
+  }
+
   /* ── The class's lines (plan PR 8) ─────────────────────────────────── */
 
   /* Support lines a teacher can tick for a class: what they will do in
@@ -2148,6 +2177,14 @@ window.CommentBank = (function () {
           // The competency's own label, as the printed report names it; the
           // section name is the curriculum category, shared by several.
           name: ReportBlocks.competencyLabel(sec),
+          // The bank id of its first competency from the BC bank, for the
+          // phrase and next steps a comment names it by (skillFor).
+          bankId:
+            (
+              (sec.tags || []).find(function (t) {
+                return !!t.bank_id;
+              }) || {}
+            ).bank_id || null,
           scores: scores,
           start: sn ? sn.start : 0,
           now: sn ? sn.now : 0,
@@ -2820,8 +2857,18 @@ window.CommentBank = (function () {
      for it. */
   function nextSkillOf(f) {
     var c = nextStepOf(f.comps);
-    var sk = c ? skillOf(f.family, c.name) : null;
-    return sk ? { comp: c, key: sk.key, name: sk.name, skill: sk.skill } : null;
+    var sk = skillFor(f, c);
+    return sk ? { comp: c, key: sk.key, name: sk.name, skill: sk.skill, steps: sk.steps || null } : null;
+  }
+
+  /* The next step at the student's level (Colin, 2026-11-02): for a bank
+     competency, its cluster's step toward the level above the next-step
+     competency's level now; at Extending, the phrase itself. { comp, text }
+     or null for a competency with no bank entry. */
+  function levelStepOf(f) {
+    var n = nextSkillOf(f);
+    if (!n || !n.steps) return null;
+    return { comp: n.comp, text: n.steps[word(n.comp.level)] || n.skill };
   }
 
   /* The strengths (plan, target comment part 3): the competencies past the
@@ -2831,7 +2878,7 @@ window.CommentBank = (function () {
   function strengthSkills(f) {
     return strongestOf(f.comps)
       .map(function (c) {
-        var sk = skillOf(f.family, c.name);
+        var sk = skillFor(f, c);
         return sk ? { comp: c, key: sk.key, skill: sk.skill } : null;
       })
       .filter(Boolean);
@@ -2896,7 +2943,7 @@ window.CommentBank = (function () {
     var next = nextStepOf(f.comps);
     topTieOf(f.comps).forEach(function (c) {
       if (c === next) return;
-      var sk = skillOf(f.family, c.name);
+      var sk = skillFor(f, c);
       if (
         !sk ||
         out.some(function (x) {
@@ -2999,7 +3046,7 @@ window.CommentBank = (function () {
       // Only a competency judged on 3+ pieces is named as what the
       // student can do.
       if (c === next || (c.scores || []).length < STRONGEST_PIECES) return;
-      var sk = skillOf(f.family, c.name);
+      var sk = skillFor(f, c);
       if (
         !sk ||
         out.some(function (x) {
@@ -3069,7 +3116,7 @@ window.CommentBank = (function () {
     var uses = _topUsesFor(f.cid, f.sid);
     var out = [];
     highestOf(f.comps, f.overall).forEach(function (c) {
-      var sk = skillOf(f.family, c.name);
+      var sk = skillFor(f, c);
       if (
         !sk ||
         (next && next.key === sk.key) ||
@@ -3346,6 +3393,8 @@ window.CommentBank = (function () {
     var focusKeys = keys('comp', [focus]);
     // The next step as a skill, and the class's lines (plan PR 8).
     var next = nextSkillOf(f);
+    // The next step at the student's level, for a bank competency (levelStepOf).
+    var lstep = levelStepOf(f);
     var support = supportChoice(f, habits);
     var goal = languageGoalChoice(f);
     var lines = f.classLines || {};
@@ -3420,6 +3469,7 @@ window.CommentBank = (function () {
       focusLow: focusKeys,
       nextStep: focusKeys,
       nextSkill: keys('comp', [next && next.comp]),
+      levelStep: keys('comp', [lstep && lstep.comp]),
       seeWork: focusKeys.concat(keys('work', [seeId])),
       aboutWork: focusKeys.concat(keys('work', [aboutId])),
       habitsExcellent: habitKeys(hsum.seen),
@@ -3474,6 +3524,7 @@ window.CommentBank = (function () {
       ),
       nextStep: names([focus]),
       nextSkill: names([next && next.comp]),
+      levelStep: names([lstep && lstep.comp]),
     };
     var missingN = _missingCount(f);
     var absentN = Math.floor(Number(f.absent)) || 0;
@@ -3625,6 +3676,8 @@ window.CommentBank = (function () {
       nextStep: iCan,
       // One skill in plain words for the next step, never the bare label.
       nextSkill: next ? next.skill : '',
+      // The next step toward the level above, from the bank (levelStepOf).
+      levelStep: lstep ? lstep.text : '',
       // The teacher's own text, exactly as typed: the support line for this
       // student, the class's closing sentence and its late-work line.
       supportLine: support ? support.line.text : '',
@@ -4178,7 +4231,8 @@ window.CommentBank = (function () {
       key: 'nextStep',
       part: 'go',
       groups: ['Next Step'],
-      prefer: 'nextSkill',
+      // The bank's step at the student's level first, then the table's skill.
+      prefer: ['levelStep', 'nextSkill'],
       never: ['focus', 'focusLow', 'growthAreas', 'rise', 'fall'],
     },
     // The teacher's support line for this student, one thing the family can
@@ -4693,7 +4747,11 @@ window.CommentBank = (function () {
     )
       return false;
     if (step.key === 'habits' && s.habit && !habitCellFits(s, ctx)) return false;
-    if (step.prefer && ctx[step.prefer] && (s.needs || []).indexOf(step.prefer) < 0) return false;
+    // The first preferred slot the context has: a sentence must use it.
+    var pref = [].concat(step.prefer || []).find(function (k) {
+      return !!ctx[k];
+    });
+    if (pref && (s.needs || []).indexOf(pref) < 0) return false;
     if (
       step.never &&
       slotsOf(s).some(function (k) {
@@ -5750,7 +5808,7 @@ window.CommentBank = (function () {
       var tops = _ids(pv, 'topSkill', 'comp');
       if (_has(pv, 'when.topSkill')) {
         var tc = tops.length ? _byId(f.comps, tops[0]) : null;
-        var tsk = tc ? skillOf(f.family, tc.name) : null;
+        var tsk = skillFor(f, tc);
         var tied = topTieOf(f.comps).map(function (c) {
           return String(c.id);
         });
@@ -5831,7 +5889,7 @@ window.CommentBank = (function () {
       // competency on 3+ pieces, in the table's wording for it, holds.
       if (_has(pv, 'evenSkill')) {
         var ec = _byId(f.comps, _ids(pv, 'evenSkill', 'comp')[0]);
-        var esk = ec ? skillOf(f.family, ec.name) : null;
+        var esk = skillFor(f, ec);
         checks.push(
           among('evenSkill') &&
             !!esk &&
@@ -5991,6 +6049,11 @@ window.CommentBank = (function () {
       if (_has(pv, 'when.nextSkill') && !_has(pv, 'nextSkill')) {
         var ns = nextSkillOf(f);
         return !!ns && ns.key === pv.values['when.nextSkill'];
+      }
+      // The bank's next step at the student's level (levelStepOf).
+      if (_has(pv, 'levelStep')) {
+        var ls = levelStepOf(f);
+        return !!ls && _ids(pv, 'levelStep', 'comp')[0] === String(ls.comp.id) && pv.values.levelStep === ls.text;
       }
       if (_has(pv, 'nextSkill')) {
         var n = nextSkillOf(f);
@@ -6836,6 +6899,8 @@ window.CommentBank = (function () {
     topTieSkills: topTieSkills,
     topSkillOf: topSkillOf,
     nextStepOf: nextStepOf,
+    levelStepOf: levelStepOf,
+    skillFor: skillFor,
     nextSkillOf: nextSkillOf,
     skillOf: skillOf,
     NO_SKILL: NO_SKILL,

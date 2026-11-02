@@ -20,6 +20,11 @@
  * The shape is what buildLearningMapFromTags (shared/data.js) and the New
  * Class wizard read; tests/helpers/bc-bank-fixture.js reads it back.
  *
+ * It also builds shared/bank-comment.js, what Generate names a bank
+ * competency by (data/bc-curriculum-comment.json): window.BANK_COMMENT =
+ * { ids: { competency id: cluster index }, clusters: [[phrase, skill key or
+ * null, next step at Emerging, at Developing, at Proficient], ...] }.
+ *
  * Usage: node scripts/build-curriculum-bank.mjs [--check]
  *   --check  fail if the committed files differ from a fresh build. */
 import { readFileSync, writeFileSync } from 'fs';
@@ -68,17 +73,46 @@ export function buildBank() {
   return { bank, missing };
 }
 
+export function buildComment() {
+  const comment = read('data/bc-curriculum-comment.json');
+  const ican = read('data/bc-curriculum-ican.json');
+  const keys = Object.keys(comment)
+    .filter(k => k[0] !== '_')
+    .sort();
+  const index = {};
+  const clusters = keys.map((k, i) => {
+    index[k] = i;
+    const c = comment[k];
+    return [c.phrase, c.skill_key, c.next_steps.emerging, c.next_steps.developing, c.next_steps.proficient];
+  });
+  const ids = {};
+  Object.keys(ican)
+    .filter(k => k[0] !== '_')
+    .sort()
+    .forEach(id => {
+      if (index[ican[id].cluster] == null) throw new Error(id + ' has no comment cluster');
+      ids[id] = index[ican[id].cluster];
+    });
+  return { ids, clusters };
+}
+
 function main() {
   const check = process.argv.includes('--check');
   const { bank, missing } = buildBank();
   const json = JSON.stringify(bank, null, 2) + '\n';
   const js = 'window._CURRICULUM_DATA = ' + JSON.stringify(bank) + ';\n';
+  const commentJs =
+    '/* Built by scripts/build-curriculum-bank.mjs from data/bc-curriculum-comment.json; do not edit. */\n' +
+    'window.BANK_COMMENT = ' +
+    JSON.stringify(buildComment()) +
+    ';\n';
   if (check) {
     const sameJson = readFileSync(resolve(root, 'curriculum_by_course.json'), 'utf-8') === json;
     const sameJs = readFileSync(resolve(root, 'curriculum_data.js'), 'utf-8') === js;
-    if (!sameJson || !sameJs) {
+    const sameComment = readFileSync(resolve(root, 'shared/bank-comment.js'), 'utf-8') === commentJs;
+    if (!sameJson || !sameJs || !sameComment) {
       console.error(
-        'curriculum_by_course.json or curriculum_data.js is not a fresh build; run node scripts/build-curriculum-bank.mjs',
+        'curriculum_by_course.json, curriculum_data.js or shared/bank-comment.js is not a fresh build; run node scripts/build-curriculum-bank.mjs',
       );
       process.exit(1);
     }
@@ -87,6 +121,7 @@ function main() {
   }
   writeFileSync(resolve(root, 'curriculum_by_course.json'), json);
   writeFileSync(resolve(root, 'curriculum_data.js'), js);
+  writeFileSync(resolve(root, 'shared/bank-comment.js'), commentJs);
   const comps = Object.values(bank).reduce(
     (n, c) => n + c.categories.reduce((m, cat) => m + cat.competencies.length, 0),
     0,

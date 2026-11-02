@@ -1,6 +1,7 @@
 vendor/
 curriculum_data.js
 curriculum_by_course.json
+shared/bank-comment.js
 node_modules/
 *.min.js
 .DS_Store

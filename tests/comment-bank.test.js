@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1701 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1701);
+  it('has 1706 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(1706);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1701);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1706);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -215,6 +215,7 @@ describe('the bank', () => {
       focus: 'nextStep',
       nextStep: 'nextStep',
       nextSkill: 'nextStep',
+      levelStep: 'nextStep',
       // The strongest skill's key and the even-results slots (round two, lane
       // G): needed, the skill printed, the word only where the class shows it.
       strongSkill: 'strength',
