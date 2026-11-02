@@ -2951,11 +2951,13 @@ window.CommentBank = (function () {
     (f.comps || []).forEach(function (c) {
       var e = c.bankId ? bankEntry(c.bankId) : null;
       if (!e || (next && next.key === e.key)) return;
+      // The level reached is the competency's level as the report shows it
+      // (c.level: a teacher's override where there is one).
       var from = word(c.start);
-      var to = word(c.now);
-      if (!from || !to || !(Math.round(c.now) > Math.round(c.start)) || !improvedComp(c)) return;
+      var to = word(c.level);
+      if (!from || !to || !(Math.round(c.level) > Math.round(c.start)) || !improvedComp(c)) return;
       if (R.wordCount(e.phrase) > 9) return;
-      var gain = Math.round(c.now) - Math.round(c.start);
+      var gain = Math.round(c.level) - Math.round(c.start);
       if (!pick || gain > pick.gain) pick = { comp: c, key: e.key, from: from, to: to, skill: e.phrase, gain: gain };
     });
     return pick;
