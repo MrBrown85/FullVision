@@ -69,3 +69,28 @@ test('typed wording survives a redraw of the card from another field', async ({ 
     'Finds patterns and connections in data with growing consistency.',
   );
 });
+
+test('a competency with no bank wording shows the general wording as the printed rubric has it', async ({ page }) => {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // The first competency, taken off the bank, with no wording of the teacher's own.
+  const label = await page.evaluate(() => {
+    const sec = getSections('sci8')[0];
+    const tag = sec.tags[0];
+    delete tag.bank_id;
+    localStorage.removeItem('gb-competency-descriptors');
+    _competencyDescriptors = null;
+    return tag.label;
+  });
+  await page.locator('button', { hasText: 'Class Management' }).first().click();
+  await page
+    .locator('button', { hasText: /^Competencies/ })
+    .first()
+    .click();
+  const card = page.locator('.cm-std-card', { has: page.locator('.cm-std-label', { hasText: label }) }).first();
+  await card.locator('.cm-std-header').click();
+  const general = await page.evaluate(() => RubricPrint.GENERAL_LEVELS);
+  const rows = card.locator('.cm-level-desc');
+  await expect(rows.nth(0)).toContainText(general[1]);
+  await expect(rows.nth(3)).toContainText(general[4]);
+});

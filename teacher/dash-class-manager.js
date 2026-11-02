@@ -9088,7 +9088,12 @@ window.DashClassManager = (function () {
     if (!tag || !tag.id || !window.CompetencyWording || !window.RubricPrint) return '';
     var levels = [1, 2, 3, 4];
     var lines = levels.map(function (l) {
-      return CompetencyWording.lines(tag, l);
+      var x = CompetencyWording.lines(tag, l);
+      // The BC general wording reads in full here, "The student
+      // demonstrates …", as the printed Tag Rubric has it.
+      var raw = CompetencyWording.levelWording(tag, l).text;
+      if (x && raw === CompetencyWording.GENERAL[l]) x.descriptor = raw;
+      return x;
     });
     if (lines[0] && !lines[0].ready && !_cmLevelsBankAsked && RubricPrint.loadBankLevels) {
       _cmLevelsBankAsked = true;
