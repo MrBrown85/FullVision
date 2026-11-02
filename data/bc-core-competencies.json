@@ -1,0 +1,257 @@
+{
+  "_source": {
+    "description": "The Ministry's descriptions of the BC Core Competencies, copied by scripts/bc_core_competencies.py: each one's description and facets, word for word. Only Unicode NFC and whitespace are normalised.",
+    "licence_note": "© Province of British Columbia. Reproduced from curriculum.gov.bc.ca; permission requested."
+  },
+  "COM": {
+    "name": "Communicating",
+    "description": [
+      "Communicating encompasses the set of abilities that people use to impart and exchange information, experiences, and ideas; to explore the world around them; and to understand and effectively use communication forms, strategies, and technologies. Communicating provides a bridge between peoples’ learning, their personal and social identity, and the world in which they interact.",
+      "People who communicate effectively use their skills and strategies intentionally to ensure understanding their audience. They communicate in an increasing variety of contexts, for a variety of purposes, and often with multiple audiences."
+    ],
+    "facets": [
+      {
+        "name": "Connecting and engaging with others",
+        "text": [
+          "Students engage in informal and structured conversations in which they listen, contribute, develop understanding and relationships, and learn to consider diverse perspectives. This facet of communication is closely linked to the building and sustaining of relationships at home, at school, in the community, and through social media."
+        ]
+      },
+      {
+        "name": "Focusing on intent and purpose",
+        "text": [
+          "Students communicate with intention and purpose. They understand that communication can influence, entertain, teach, inspire, and help us make sense of the world and our experiences. They recognize the role the audience plays in constructing meaning, and they make strategic choices to help convey their messages and create their intended impact. They draw from a range of forms, media, and techniques, monitoring and adjusting their approaches and assessing their effects."
+        ]
+      },
+      {
+        "name": "Acquiring and presenting information",
+        "text": [
+          "Students communicate by receiving and presenting information. They inquire into topics of interest and topics related to their studies. They acquire information from a variety of sources, including people, print materials, and media; this may involve listening, viewing, or reading, and requires understanding of how to interpret information. They present information for many purposes and audiences, and their presentations often feature media and technology."
+        ]
+      }
+    ],
+    "group": "Communication",
+    "source": {
+      "url": "https://curriculum.gov.bc.ca/competencies/communication/communicating",
+      "format": "web",
+      "sha256": "93a82318335731ea02555a46b0b5fea05c80219165c33eb1c7d0e47e3acb3ee8",
+      "fetched": "2026-11-02"
+    }
+  },
+  "COL": {
+    "name": "Collaborating",
+    "description": [
+      "Collaborating involves the skills, strategies, and dispositions that people use to work together to pursue common purposes and accomplish common goals.",
+      "People who collaborate effectively recognize how combining others’ perspectives, strategies, and efforts with their own enhances collective understanding, use, and impact. They value the contributions of group members, interact supportively and effectively using inclusive practices, and strive for shared commitment and mutual benefit."
+    ],
+    "facets": [
+      {
+        "name": "Working collectively",
+        "text": [
+          "Students combine their efforts with those of others to effectively accomplish learning and tasks. As members of a group, they appreciate interdependence and cooperation, commit to needed roles and responsibilities, and are conscientious about contributing. They also negotiate respectfully and follow through on plans, strategies, and actions as they share resources, time, and spaces for collaborative projects."
+        ]
+      },
+      {
+        "name": "Supporting group interactions",
+        "text": [
+          "Students engage with others in ways that build and sustain trusting relationships and contribute to collective approaches. They value diverse perspectives and integrate the ideas of others with their own to tackle tasks, issues, and problems. Students seek to distribute leadership, listen actively, take turns in discussions, acknowledge contributions, and identify missing voices. They regulate the group’s interactions together, mutually encouraging one another, creating space for marginalized voices, and applying constructive strategies to navigate through misunderstandings, struggles, and conflict."
+        ]
+      },
+      {
+        "name": "Determining common purposes",
+        "text": [
+          "Students develop shared understandings of information, issues, situations, and problems in pursuit of common purposes and goals. They honour various group processes and proactively support movement forward, including refocusing on intended goals as needed. They revise plans according to mutual deliberations and strive for consensus. As co-members of a group, students see one another as valuable resources, commit to impact and collective success, assess group results and processes, and share in the recognition of achievements."
+        ]
+      }
+    ],
+    "group": "Communication",
+    "source": {
+      "url": "https://curriculum.gov.bc.ca/competencies/communication/collaborating",
+      "format": "web",
+      "sha256": "a7ba8420c12f4855c550ca34c7906e8e65e08f2c03356409e66e543c29b75010",
+      "fetched": "2026-11-02"
+    }
+  },
+  "CT": {
+    "name": "Creative Thinking",
+    "description": [
+      "Creative Thinking involves the generation of ideas and concepts that are novel and innovative in the context in which they are generated, reflection on their value to the individual or others, and the development of chosen ideas and concepts from thought to reality.",
+      "People who think creatively are curious and open-minded, have a sense of wonder and joy in learning, demonstrate a willingness to think divergently, and are comfortable with complexity. A creative thinker reflects on existing ideas and concepts; uses imagination, inventiveness, resourcefulness, and flexibility; and is willing to take risks to go beyond existing knowledge."
+    ],
+    "facets": [
+      {
+        "name": "Creating and innovating",
+        "text": [
+          "Students get creative ideas that are novel and have value. An idea may be new to the student or their peers, and it may be novel for their age group or the larger community. It may be new to a particular context or absolutely new. The idea or product may have value in a variety of ways and contexts – it may be fun, provide a sense of accomplishment, solve a problem, be a form of self-expression, provoke reflection, or provide a new perspective that influences the way people think or act. It can have a positive impact on the individual, classmates, the community, or the world."
+        ]
+      },
+      {
+        "name": "Generating and incubating",
+        "text": [
+          "Students may generate creative ideas through free play, engagement with other’s ideas, or consideration of a problem or constraint, and/or because of their interests and passions. New ideas and inspirations can spontaneously arise from the unconscious mind, but students can also develop strategies to facilitate the generation of ideas – learning a lot about something, engaging in a period of reflection, providing time for incubation, and doing relaxing or automatic activities to quiet their conscious mind. The capacity for creative thinking expands as individuals increase their range of ideas and concepts to recombine them into new ideas. The ideas available as raw material for creative thinking depend on previous experiences and learning, as well as students’ cultural legacies."
+        ]
+      },
+      {
+        "name": "Evaluating and developing",
+        "text": [
+          "Students reflect on their creative ideas in order to decide which ones to develop. They consider whether their idea would ultimately support the well-being of self, community, and the land. They do this with a sense of place and taking into consideration unintended consequences for other living things and our planet. If they decide to develop an idea, they work individually and/or collaboratively to refine it and work to realize it. This may require accessing the knowledge of those who have gone before, building the necessary skills, sustaining perseverance, using failure productively over time, and reflecting on process and results. It may also require the generation of additional creative ideas to come up with solutions to problems along the way."
+        ]
+      }
+    ],
+    "group": "Thinking",
+    "source": {
+      "url": "https://curriculum.gov.bc.ca/competencies/thinking/creative-thinking",
+      "format": "web",
+      "sha256": "1c8402c9902753668fecc6c4d87669b35a5c858a4800780f77dec6e26ff70d44",
+      "fetched": "2026-11-02"
+    }
+  },
+  "CRT": {
+    "name": "Critical Thinking and Reflective Thinking",
+    "description": [
+      "Critical and Reflective Thinking encompasses a set of abilities that students use to examine their own thinking and that of others. This involves making judgments based on reasoning, where students consider options, analyze options using specific criteria, and draw conclusions.",
+      "People who think critically and reflectively are analytical and investigative, willing to question and challenge their own thoughts, ideas, and assumptions and challenge those of others. They reflect on the information they receive through observation, experience, and other forms of communication to solve problems, design products, understand events, and address issues. A critical thinker uses their ideas, experiences, and reflections to set goals, make judgments, and refine their thinking."
+    ],
+    "facets": [
+      {
+        "name": "Analyzing and critiquing",
+        "text": [
+          "Students learn to analyze and make judgments about a work, a position, a process, a performance, or another product or act. They reflect to consider purpose and perspectives, pinpoint evidence, use explicit or implicit criteria, make defensible judgments or assessments, and draw conclusions. Students have opportunities for analysis and critique through engagement in formal tasks, informal tasks, and ongoing activities."
+        ]
+      },
+      {
+        "name": "Questioning and investigating",
+        "text": [
+          "Students learn to engage in inquiry when they identify and investigate questions, challenges, key issues, or problematic situations in their studies, lives, and communities and in the media. They develop and refine questions; create and carry out plans; gather, interpret, and synthesize information and evidence; and reflect to draw reasoned conclusions. Critical thinking activities may focus on one part of the process, such as questioning, and reach a simple conclusion, while others may involve more complex inquiry requiring extensive thought and reflection."
+        ]
+      },
+      {
+        "name": "Designing and developing",
+        "text": [
+          "Students think critically to develop ideas. Their ideas may lead to the designing of products or methods or the development of performances and representations in response to problems, events, issues, and needs. They work with clear purpose and consider the potential uses or audiences of their work. They explore possibilities, develop and reflect on processes, monitor progress, and adjust procedures in light of criteria and feedback."
+        ]
+      },
+      {
+        "name": "Reflecting and assessing",
+        "text": [
+          "Students apply critical, metacognitive, and reflective thinking in given situations, and relate this thinking to other experiences, using this process to identify ways to improve or adapt their approach to learning. They reflect on and assess their experiences, thinking, learning processes, work, and progress in relation to their purposes. Students give, receive, and act on feedback and set goals individually and collaboratively. They determine the extent to which they have met their goals and can set new ones."
+        ]
+      }
+    ],
+    "group": "Thinking",
+    "source": {
+      "url": "https://curriculum.gov.bc.ca/competencies/thinking/critical-and-reflective-thinking",
+      "format": "web",
+      "sha256": "a5852d4b0a576482f4553e19a9c31a580b7196f7e8dc4dbf2f357fcab7534fca",
+      "fetched": "2026-11-02"
+    }
+  },
+  "PPI": {
+    "name": "Positive Personal and Cultural Identity",
+    "description": [
+      "Positive Personal and Cultural Identity involves the awareness, understanding, and appreciation of the factors that contribute to a healthy sense of oneself; it includes knowledge of one’s family background, heritage(s), language(s), beliefs, and perspectives in a pluralistic society.",
+      "People who have a positive personal and cultural identity value their personal and cultural narratives and understand how these shape their identity. They exhibit a sense of self-worth, self-awareness, and positive identity to become confident individuals who take satisfaction in who they are and what they can do. They contribute to their own well-being and to the well-being of their family, community, and society."
+    ],
+    "facets": [
+      {
+        "name": "Understanding relationships and cultural contexts",
+        "text": [
+          "Students understand that their relationships and cultural contexts help to shape who they are. This includes culture in its broadest sense, including how one identifies in terms of ethnicity, nationality, language(s), abilities, sexual orientation, gender identity, age, geographic region, and religious or spiritual beliefs. Students explore who they are in terms of their relationship to others and their relationship to the world (people and place) around them."
+        ]
+      },
+      {
+        "name": "Recognizing personal values and choices",
+        "text": [
+          "Students define who they are by what they value. They understand how what they value has been influenced by their life experiences. They identify how their values help to shape their choices, in all contexts of their lives."
+        ]
+      },
+      {
+        "name": "Identifying personal strengths and abilities",
+        "text": [
+          "Students acknowledge their strengths and abilities, and they intentionally consider these as assets, helping them in all aspects of their lives. Students understand that they are unique and are a part of larger, and often multiple, communities. They explain how they are using their strengths and abilities in their families, their relationships, and their communities."
+        ]
+      }
+    ],
+    "group": "Personal and Social",
+    "source": {
+      "url": "https://curriculum.gov.bc.ca/competencies/personal-and-social/positive-personal-and-cultural-identity",
+      "format": "web",
+      "sha256": "968d2a075ff504ee8ba581d2efa3f4fee217d2253d25f3a863bfd94133d94ea5",
+      "fetched": "2026-11-02"
+    }
+  },
+  "PAR": {
+    "name": "Personal Awareness & Responsibility",
+    "description": [
+      "Personal Awareness and Responsibility involves understanding the connections between personal and social behaviour and well-being; it encourages people to make constructive and ethical decisions and act on them.",
+      "People who are personally aware and responsible demonstrate self-respect, persevere in difficult situations, and exercise responsibility. They understand that there are consequences for their decisions and actions. A personally aware and responsible individual takes steps to ensure their well-being, sets goals and monitors progress, regulates emotions and manages stress, and recognizes and advocates for their own rights."
+    ],
+    "facets": [
+      {
+        "name": "Self-advocating",
+        "text": [
+          "Students who are personally aware and responsible have a sense of self-worth and a growing confidence in a variety of situations. They value themselves, their ideas, and their accomplishments. They are able to express their needs and seek help when needed, find purpose and motivation, act on decisions, and advocate for themselves."
+        ]
+      },
+      {
+        "name": "Self-regulating",
+        "text": [
+          "Students who are personally aware and responsible take ownership of their choices and actions. They set goals, monitor progress, and understand their emotions, using that understanding to regulate actions and reactions. They are aware that learning involves patience and time. They can persevere in difficult situations, and to understand how their actions affect themselves and others."
+        ]
+      },
+      {
+        "name": "Well-being",
+        "text": [
+          "Students who are personally aware and responsible recognize the factors that affect their holistic wellness and take increasing responsibility for caring for themselves. They keep themselves healthy and stay active, manage stress, and express a sense of personal well-being. They make choices that contribute to their safety in their communities, including their online communities and use of social media. They recognize their personal responsibility for their happiness and have strategies that help them find peace in challenging situations."
+        ]
+      }
+    ],
+    "group": "Personal and Social",
+    "source": {
+      "url": "https://curriculum.gov.bc.ca/competencies/personal-and-social/personal-awareness-and-responsibility",
+      "format": "web",
+      "sha256": "d01c6f4082d23d6691dcabd1967669a5702a88786fcfc7740df07731e28b46ba",
+      "fetched": "2026-11-02"
+    }
+  },
+  "SAR": {
+    "name": "Social Awareness and Responsibility",
+    "description": [
+      "Social Awareness and Responsibility involves the awareness, understanding, and appreciation of connections among people, including between people and the natural environment. Social Awareness and Responsibility focuses on interacting with others and the natural world in respectful and caring ways.",
+      "People who are socially aware and responsible contribute to the well-being of their social and physical environments. They support the development of welcoming and inclusive communities, where people feel safe and have a sense of belonging.",
+      "A socially aware and responsible individual contributes positively to their family, community, and environment; empathizes with others and appreciates their perspectives; resolves problems peacefully; and develops and sustains healthy relationships."
+    ],
+    "facets": [
+      {
+        "name": "Building relationships",
+        "text": [
+          "Students build and maintain diverse, positive peer and intergenerational relationships. They are aware and respectful of others’ needs and feelings and share their own in appropriate ways. They adjust their words and actions to care for their relationships."
+        ]
+      },
+      {
+        "name": "Contributing to community and caring for the environment",
+        "text": [
+          "Students develop awareness of and take responsibility for their social, physical, and natural environments by working independently and collaboratively for the benefit of others, communities, and the environment. They are aware of the impact of their decisions, actions, and footprint. They advocate for and act to bring about positive change."
+        ]
+      },
+      {
+        "name": "Resolving problems",
+        "text": [
+          "Students identify and develop an appreciation for different perspectives on issues. They show empathy, disagree respectfully, and create space for others to use their voices. They generate, use, and evaluate strategies to resolve problems."
+        ]
+      },
+      {
+        "name": "Valuing diversity",
+        "text": [
+          "Students value diversity, defend human rights, advocate for issues, and interact ethically with others. They are inclusive in their language and behaviour and recognize that everyone has something to contribute. Their approach to inclusive relationships exemplifies commitment to developing positive communities."
+        ]
+      }
+    ],
+    "group": "Personal and Social",
+    "source": {
+      "url": "https://curriculum.gov.bc.ca/competencies/personal-and-social/social-awareness-and-responsibility",
+      "format": "web",
+      "sha256": "3808521d496e11fc840c456dfe6cefb6c4c5cb239150117e49028898631be41b",
+      "fetched": "2026-11-02"
+    }
+  }
+}
