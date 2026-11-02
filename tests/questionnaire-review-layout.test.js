@@ -27,14 +27,14 @@ describe('standingWord', () => {
 });
 
 describe('bestPiece', () => {
-  it('is the highest-marked piece, the latest when two tie, none without work', () => {
+  it('is the comment’s best piece: the highest-marked, the latest when two tie, none without work', () => {
     const work = [
       { title: 'Lab 1', v: 3.5, d: '2026-09-10' },
       { title: 'Quiz', v: 4, d: '2026-09-20' },
       { title: 'Lab 2', v: 4, d: '2026-10-01' },
     ];
-    expect(RQ.bestPiece(work).title).toBe('Lab 2');
-    expect(RQ.bestPiece([])).toBeNull();
+    expect(RQ.bestPiece({ work, comps: [] }).title).toBe('Lab 2');
+    expect(RQ.bestPiece({ work: [], comps: [] })).toBeNull();
   });
 });
 

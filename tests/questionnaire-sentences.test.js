@@ -807,7 +807,7 @@ describe('the card drawn for a Demo Mode student', () => {
     const termId = ReportBlocks.getTermId();
     // A Note for the Report on the best piece, so the draft carries the
     // best-piece sentence (plan PR 7).
-    const best = RQ.bestPiece(CommentBank.facts(cid, st, termId).work);
+    const best = RQ.bestPiece(CommentBank.facts(cid, st, termId));
     saveScoreReportNote(cid, st.id, best.id, 'labelled every part of the circuit');
     const f = CommentBank.facts(cid, st, termId);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: CommentBank.seedFor(st.id) });

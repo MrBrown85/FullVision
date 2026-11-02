@@ -2127,13 +2127,15 @@ window.CommentBank = (function () {
     return { count: titles.length, titles: titles, groups: groups };
   }
 
-  /* One student's term, from the data layer. Reads no DOM. */
-  function facts(cid, student, termId) {
+  /* One student's competencies this term, with a level now (calc.js
+     startAndNow): every score per competency, oldest to newest, its level at
+     the start of the term and now. The comment's gates (strongestOf,
+     nextStepOf) and the printed This Term at a Glance read the same list,
+     so they name the same competencies. Reads no DOM. */
+  function compsOf(cid, student) {
     var sid = student.id;
-    var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
     var byId = {};
-    var assessments = getAssessments(cid) || [];
-    assessments.forEach(function (a) {
+    (getAssessments(cid) || []).forEach(function (a) {
       byId[a.id] = a;
     });
     var inTerm = function (a) {
@@ -2142,11 +2144,8 @@ window.CommentBank = (function () {
     var dateOf = function (a) {
       return (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date) || '';
     };
-
-    // Every score this term per competency, oldest to newest, and the level
-    // at the start of the term and now (calc.js startAndNow).
     var sections = ReportBlocks.reportSections(cid);
-    var comps = sections
+    return sections
       .map(function (sec) {
         var scores = [];
         (sec.tags || []).forEach(function (tag) {
@@ -2196,6 +2195,26 @@ window.CommentBank = (function () {
       .filter(function (c) {
         return c.level > 0;
       });
+  }
+
+  /* One student's term, from the data layer. Reads no DOM. */
+  function facts(cid, student, termId) {
+    var sid = student.id;
+    var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
+    var byId = {};
+    var assessments = getAssessments(cid) || [];
+    assessments.forEach(function (a) {
+      byId[a.id] = a;
+    });
+    var inTerm = function (a) {
+      return !!a && assessmentInActiveTerm(cid, a);
+    };
+    var dateOf = function (a) {
+      return (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date) || '';
+    };
+
+    var sections = ReportBlocks.reportSections(cid);
+    var comps = compsOf(cid, student);
 
     // The assessed work this term, one level per assessment.
     var work = assessments
@@ -2897,6 +2916,34 @@ window.CommentBank = (function () {
     return xs.length ? xs[0].skill : '';
   }
 
+  /* The work this term, best first: the one rule for "best piece" that the
+     comment and At a Glance both read (bestPieceOf). Of the pieces tied at
+     the top (as the level prints, tenths), one scored on the strongest
+     competency comes first, so the best piece backs up the strength (Colin,
+     2026-11-02); then the higher mark, then the most recent. Only the
+     "strongest" gate counts: a tie at the top names its skill by rotation
+     across classmates (topSkillOf), which would move the best piece between
+     sessions and flag approved comments as changed. */
+  function bestOrderOf(f) {
+    var strongSk = strengthSkills(f)[0];
+    var strongComp = strongSk ? strongSk.comp : null;
+    var onStrength = function (w) {
+      return strongComp &&
+        (strongComp.scores || []).some(function (s) {
+          return s.id === w.id;
+        })
+        ? 1
+        : 0;
+    };
+    return (f.work || []).slice().sort(function (a, b) {
+      return tenths(b.v) - tenths(a.v) || onStrength(b) - onStrength(a) || b.v - a.v || String(b.d).localeCompare(a.d);
+    });
+  }
+  /* The best piece this term (bestOrderOf), or null with no scored work. */
+  function bestPieceOf(f) {
+    return bestOrderOf(f)[0] || null;
+  }
+
   /* A tie at the top (strengths for a tie, Nov 1): nothing passes the
      "strongest" gate; two or more competencies, each on 3+ scored pieces,
      sit within half a step of the highest, and every one of them is half a
@@ -3302,26 +3349,9 @@ window.CommentBank = (function () {
         })[0]
       : null;
 
-    // Work: best and lowest this term. Of the pieces tied at the top (as
-    // the level prints, tenths), one scored on the strongest competency
-    // comes first, so the best piece backs up the strength (Colin,
-    // 2026-11-02); then the higher mark, then the most recent. Only the
-    // "strongest" gate counts: a tie at the top names its skill by rotation
-    // across classmates (topSkillOf), which would move the best piece
-    // between sessions and flag approved comments as changed.
-    var strongSk = strengthSkills(f)[0];
-    var strongComp = strongSk ? strongSk.comp : null;
-    var onStrength = function (w) {
-      return strongComp &&
-        (strongComp.scores || []).some(function (s) {
-          return s.id === w.id;
-        })
-        ? 1
-        : 0;
-    };
-    var best = f.work.slice().sort(function (a, b) {
-      return tenths(b.v) - tenths(a.v) || onStrength(b) - onStrength(a) || b.v - a.v || b.d.localeCompare(a.d);
-    });
+    // Work: best and lowest this term. The best piece follows the one rule
+    // At a Glance reads too (bestOrderOf).
+    var best = bestOrderOf(f);
     var low = f.work.slice().sort(function (a, b) {
       return a.v - b.v || b.d.localeCompare(a.d);
     });
@@ -6895,6 +6925,8 @@ window.CommentBank = (function () {
     climbed: climbed,
     slid: slid,
     strongestOf: strongestOf,
+    bestPieceOf: bestPieceOf,
+    compsOf: compsOf,
     topTieOf: topTieOf,
     topTieSkills: topTieSkills,
     topSkillOf: topSkillOf,

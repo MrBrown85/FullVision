@@ -1036,13 +1036,10 @@ window.ReportQuestionnaire = (function () {
     });
   }
 
-  /* The highest-marked piece this term; the latest when two tie. */
-  function bestPiece(work) {
-    var best = null;
-    (work || []).forEach(function (w) {
-      if (!best || w.v > best.v || (w.v === best.v && String(w.d) > String(best.d))) best = w;
-    });
-    return best;
+  /* The best piece this term, by the comment's rule (CommentBank.bestPieceOf),
+     so At a Glance and the comment name the same piece. f: the facts. */
+  function bestPiece(f) {
+    return CommentBank.bestPieceOf(f);
   }
 
   /* Work labelled Missing this term (status NS), whatever its due date:
@@ -1077,7 +1074,7 @@ window.ReportQuestionnaire = (function () {
 
   // html-safe: competency names, titles, notes, marks and missing work esc()'d; tags are fixed words
   function _glanceHtml(cid, student, f) {
-    var best = bestPiece(f.work);
+    var best = bestPiece(f);
     // The best piece's mark as the comment prints it: in a Letter class,
     // points work's own % (CommentBank.workMark, calc.js), never its level
     // as a %.
@@ -4062,7 +4059,7 @@ window.ReportQuestionnaire = (function () {
       if (w && bits.indexOf(w) < 0) bits.push(w);
     });
     if (_isBestRow(row)) {
-      var top = bestPiece(f.work);
+      var top = bestPiece(f);
       if (top && String(top.note || '').trim()) bits.push('your note for the report');
     }
     return bits.join(' · ') || 'A general sentence. It states no fact about ' + first + '.';

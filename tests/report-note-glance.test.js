@@ -43,7 +43,7 @@ describe('At a Glance: the note for the report', () => {
 
   it('asks for a note on the best piece when it has none', () => {
     const st = cece();
-    const best = RQ.bestPiece(CommentBank.facts(cid, st, 'term-2').work);
+    const best = RQ.bestPiece(CommentBank.facts(cid, st, 'term-2'));
     const html = show(st);
     expect(html).toContain('No note for the report yet · ');
     expect(html).toContain('data-action="tqAddReportNote" data-aid="' + best.id + '"');
@@ -52,7 +52,7 @@ describe('At a Glance: the note for the report', () => {
 
   it('shows the note under the best piece once it has one', () => {
     const st = cece();
-    const best = RQ.bestPiece(CommentBank.facts(cid, st, 'term-2').work);
+    const best = RQ.bestPiece(CommentBank.facts(cid, st, 'term-2'));
     saveScoreReportNote(cid, st.id, best.id, 'kept a field journal with dated sketches');
     try {
       const html = show(st);
