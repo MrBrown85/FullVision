@@ -5,7 +5,7 @@
     "unplaced": [],
     "notes": [
       "EDT12: 1 competency printed under Applied Design itself, above the phases; coded DS, no folder",
-      "bc.drama11.cc.20: the Ministry prints this statement twice in DRAMA11; named 'Audience Awareness 2'",
+      "bc.drama11.cc.20: the Ministry prints this statement twice in DRAMA11; named 'Awareness of All 2'",
       "bc.artstudio12.cc.8: the Ministry prints this statement twice in ARTSTUDIO12; named 'Material Choices 2'",
       "bc.ss8.cc.2: SS8 has this concept twice; coded SIG1, named 'Significance'",
       "bc.ss8.cc.3: SS8 has this concept twice; coded SIG2, named 'Significance Claims'",
@@ -1825,7 +1825,7 @@
           {
             "id": "bc.draft10.cc.4",
             "code": "DF3",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -2241,7 +2241,7 @@
           {
             "id": "bc.elrob10.cc.4",
             "code": "DF3",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -3374,7 +3374,7 @@
           {
             "id": "bc.fas10.cc.22",
             "code": "SK3",
-            "short_label": "Cultural Sensitivity",
+            "short_label": "Etiquette Reflection",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -4407,7 +4407,7 @@
           {
             "id": "bc.metal10.cc.4",
             "code": "DF3",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -4835,7 +4835,7 @@
           {
             "id": "bc.pwrtech10.cc.4",
             "code": "DF3",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -5215,7 +5215,7 @@
           {
             "id": "bc.techex10.cc.4",
             "code": "DF3",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -6415,7 +6415,7 @@
           {
             "id": "bc.wood10.cc.4",
             "code": "DF3",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -6880,7 +6880,7 @@
           {
             "id": "bc.acct11.cc.8",
             "code": "DS8",
-            "short_label": "Data Sources",
+            "short_label": "Data & Efficiencies",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -7162,7 +7162,7 @@
           {
             "id": "bc.auto11.cc.4",
             "code": "DF3",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -7910,7 +7910,7 @@
           {
             "id": "bc.cis11.cc.25",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -8248,7 +8248,7 @@
           {
             "id": "bc.cprog11.cc.22",
             "code": "SH3",
-            "short_label": "Extensions by Others",
+            "short_label": "Concept Extensions",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -8350,7 +8350,7 @@
           {
             "id": "bc.cprog11.cc.29",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -8362,7 +8362,7 @@
           {
             "id": "bc.cprog11.cc.30",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -8745,12 +8745,12 @@
           {
             "id": "bc.cul11.cc.25",
             "code": "SK1",
-            "short_label": "Best Practices",
+            "short_label": "Safety & Practices",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:adst",
-              "rule": "best practices of culinary professionalism",
+              "rule": "culinary professionalism and safety procedures",
               "raw_sha": "50ec63f5262789b0"
             }
           },
@@ -9152,7 +9152,7 @@
           {
             "id": "bc.dcomm11.cc.22",
             "code": "SH3",
-            "short_label": "Extensions by Others",
+            "short_label": "Concept Extensions",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9254,7 +9254,7 @@
           {
             "id": "bc.dcomm11.cc.29",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9266,7 +9266,7 @@
           {
             "id": "bc.dcomm11.cc.30",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9350,7 +9350,7 @@
           {
             "id": "bc.draft11.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9778,7 +9778,7 @@
           {
             "id": "bc.elec11.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -10218,7 +10218,7 @@
           {
             "id": "bc.eng11.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -10978,7 +10978,7 @@
           {
             "id": "bc.fs11.cc.26",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -10990,7 +10990,7 @@
           {
             "id": "bc.fs11.cc.27",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11328,7 +11328,7 @@
           {
             "id": "bc.gprod11.cc.22",
             "code": "SH3",
-            "short_label": "Extensions by Others",
+            "short_label": "Concept Extensions",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11442,7 +11442,7 @@
           {
             "id": "bc.gprod11.cc.30",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11454,7 +11454,7 @@
           {
             "id": "bc.gprod11.cc.31",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11791,7 +11791,7 @@
           {
             "id": "bc.ifr11.cc.22",
             "code": "SK3",
-            "short_label": "Cultural Sensitivity",
+            "short_label": "Etiquette Reflection",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11848,7 +11848,7 @@
           {
             "id": "bc.ifr11.cc.26",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11860,7 +11860,7 @@
           {
             "id": "bc.ifr11.cc.27",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -12198,7 +12198,7 @@
           {
             "id": "bc.mdes11.cc.22",
             "code": "SH3",
-            "short_label": "Extensions by Others",
+            "short_label": "Concept Extensions",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -12300,7 +12300,7 @@
           {
             "id": "bc.mdes11.cc.29",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -12312,7 +12312,7 @@
           {
             "id": "bc.mdes11.cc.30",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -12396,7 +12396,7 @@
           {
             "id": "bc.metal11.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -13132,7 +13132,7 @@
           {
             "id": "bc.mktg11.cc.24",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -13144,7 +13144,7 @@
           {
             "id": "bc.mktg11.cc.25",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -13228,7 +13228,7 @@
           {
             "id": "bc.rob11.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -14000,7 +14000,7 @@
           {
             "id": "bc.text11.cc.26",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -14012,7 +14012,7 @@
           {
             "id": "bc.text11.cc.27",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -14416,7 +14416,7 @@
           {
             "id": "bc.tour11.cc.26",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -14428,7 +14428,7 @@
           {
             "id": "bc.tour11.cc.27",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -14512,7 +14512,7 @@
           {
             "id": "bc.wood11.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -14977,7 +14977,7 @@
           {
             "id": "bc.acct12.cc.8",
             "code": "DS8",
-            "short_label": "Data Sources",
+            "short_label": "Data & Efficiencies",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -15271,7 +15271,7 @@
           {
             "id": "bc.amj12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -15723,7 +15723,7 @@
           {
             "id": "bc.auto12.cc.4",
             "code": "DF3",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -16422,7 +16422,7 @@
           {
             "id": "bc.bca12.cc.26",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -16807,7 +16807,7 @@
           {
             "id": "bc.cdc12.cc.22",
             "code": "SK3",
-            "short_label": "Cultural Sensitivity",
+            "short_label": "Etiquette Reflection",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -16864,7 +16864,7 @@
           {
             "id": "bc.cdc12.cc.26",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -16876,7 +16876,7 @@
           {
             "id": "bc.cdc12.cc.27",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -17214,7 +17214,7 @@
           {
             "id": "bc.cisys12.cc.22",
             "code": "SH3",
-            "short_label": "Extensions by Others",
+            "short_label": "Concept Extensions",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -17316,7 +17316,7 @@
           {
             "id": "bc.cisys12.cc.29",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -17654,7 +17654,7 @@
           {
             "id": "bc.cprog12.cc.22",
             "code": "SH3",
-            "short_label": "Extensions by Others",
+            "short_label": "Concept Extensions",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -17756,7 +17756,7 @@
           {
             "id": "bc.cprog12.cc.29",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -17768,7 +17768,7 @@
           {
             "id": "bc.cprog12.cc.30",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -18175,12 +18175,12 @@
           {
             "id": "bc.cul12.cc.27",
             "code": "SK1",
-            "short_label": "Best Practices",
+            "short_label": "Safety & Practices",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:adst",
-              "rule": "best practices of culinary professionalism",
+              "rule": "culinary professionalism and safety procedures",
               "raw_sha": "50ec63f5262789b0"
             }
           },
@@ -18594,7 +18594,7 @@
           {
             "id": "bc.dmd12.cc.23",
             "code": "SH3",
-            "short_label": "Extensions by Others",
+            "short_label": "Concept Extensions",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -18696,7 +18696,7 @@
           {
             "id": "bc.dmd12.cc.30",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -18708,7 +18708,7 @@
           {
             "id": "bc.dmd12.cc.31",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -18792,7 +18792,7 @@
           {
             "id": "bc.draft12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -19600,7 +19600,7 @@
           {
             "id": "bc.ecom12.cc.30",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -19612,7 +19612,7 @@
           {
             "id": "bc.ecom12.cc.31",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -19907,7 +19907,7 @@
           {
             "id": "bc.econbus12.cc.22",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -19919,7 +19919,7 @@
           {
             "id": "bc.econbus12.cc.23",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -19946,7 +19946,7 @@
             "code": "DS1",
             "short_label": "Interpreting Factors",
             "prov": {
-              "folder": "none: one competency under the heading",
+              "folder": "none: printed under Applied Design, above the phases",
               "code": "stem+position",
               "short_label": "rule:adst",
               "rule": "^Interpret circumstances of or factors",
@@ -19990,7 +19990,7 @@
           {
             "id": "bc.edt12.cc.4",
             "code": "DF3",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -20418,7 +20418,7 @@
           {
             "id": "bc.elec12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -20882,7 +20882,7 @@
           {
             "id": "bc.eng12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -21714,7 +21714,7 @@
           {
             "id": "bc.ent12.cc.30",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -21726,7 +21726,7 @@
           {
             "id": "bc.ent12.cc.31",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -21835,7 +21835,7 @@
           {
             "id": "bc.facct12.cc.8",
             "code": "DS8",
-            "short_label": "Data Sources",
+            "short_label": "Data & Efficiencies",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -22473,7 +22473,7 @@
           {
             "id": "bc.fash12.cc.28",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -22485,7 +22485,7 @@
           {
             "id": "bc.fash12.cc.29",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -22889,7 +22889,7 @@
           {
             "id": "bc.fs12.cc.26",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -22901,7 +22901,7 @@
           {
             "id": "bc.fs12.cc.27",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -22985,7 +22985,7 @@
           {
             "id": "bc.furncab12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -23793,7 +23793,7 @@
           {
             "id": "bc.gprod12.cc.29",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -23805,7 +23805,7 @@
           {
             "id": "bc.gprod12.cc.30",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -24142,7 +24142,7 @@
           {
             "id": "bc.hle12.cc.22",
             "code": "SK3",
-            "short_label": "Cultural Sensitivity",
+            "short_label": "Etiquette Reflection",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -24199,7 +24199,7 @@
           {
             "id": "bc.hle12.cc.26",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -24211,7 +24211,7 @@
           {
             "id": "bc.hle12.cc.27",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -24295,7 +24295,7 @@
           {
             "id": "bc.icd12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -24759,7 +24759,7 @@
           {
             "id": "bc.machw12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -25477,7 +25477,7 @@
           {
             "id": "bc.mdes12.cc.22",
             "code": "SH3",
-            "short_label": "Extensions by Others",
+            "short_label": "Concept Extensions",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -25579,7 +25579,7 @@
           {
             "id": "bc.mdes12.cc.29",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -25591,7 +25591,7 @@
           {
             "id": "bc.mdes12.cc.30",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -25675,7 +25675,7 @@
           {
             "id": "bc.mech12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -26139,7 +26139,7 @@
           {
             "id": "bc.metal12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -26591,7 +26591,7 @@
           {
             "id": "bc.rob12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -27055,7 +27055,7 @@
           {
             "id": "bc.rov12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -27887,7 +27887,7 @@
           {
             "id": "bc.ssf12.cc.30",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -27899,7 +27899,7 @@
           {
             "id": "bc.ssf12.cc.31",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -28339,7 +28339,7 @@
           {
             "id": "bc.text12.cc.29",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -28351,7 +28351,7 @@
           {
             "id": "bc.text12.cc.30",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -28743,7 +28743,7 @@
           {
             "id": "bc.tour12.cc.25",
             "code": "TC3",
-            "short_label": "Societal Change",
+            "short_label": "Technology & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -28755,7 +28755,7 @@
           {
             "id": "bc.tour12.cc.26",
             "code": "TC4",
-            "short_label": "Cultural Values",
+            "short_label": "Culture & Technology",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -28839,7 +28839,7 @@
           {
             "id": "bc.wood12.cc.5",
             "code": "DF4",
-            "short_label": "Activity Format",
+            "short_label": "Group or Solo Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -29301,12 +29301,12 @@
           {
             "id": "bc.arts8.cc.6",
             "code": "RR2",
-            "short_label": "Skills & Techniques",
+            "short_label": "Critical Appraisal",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_visual",
-              "rule": "^(Develop|Refine)\\b.*\\bskills\\b",
+              "rule": "critically appraise",
               "raw_sha": "3c64a121888698a5"
             }
           },
@@ -29536,12 +29536,12 @@
           {
             "id": "bc.arts9.cc.7",
             "code": "RR2",
-            "short_label": "Skills & Techniques",
+            "short_label": "Critical Appraisal",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_visual",
-              "rule": "^(Develop|Refine)\\b.*\\bskills\\b",
+              "rule": "critically appraise",
               "raw_sha": "b81fcc80960b3882"
             }
           }
@@ -29626,7 +29626,7 @@
           {
             "id": "bc.arts9.cc.13",
             "code": "CE3",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -29687,12 +29687,12 @@
           {
             "id": "bc.dance9.cc.1",
             "code": "EC1",
-            "short_label": "Artistic Choices",
+            "short_label": "Mood & Meaning",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^(Intentionally |Purposefully )?select(,)? (and combine|combine|dance elements|dramatic elements|musical elements|the elements)",
+              "rule": "^Select and combine (the )?(dramatic )?elements.* to intentionally create a particular mood",
               "raw_sha": "36afdb4db40e3cdd"
             }
           },
@@ -29870,7 +29870,7 @@
           {
             "id": "bc.dance9.cc.14",
             "code": "CE2",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -29919,12 +29919,12 @@
           {
             "id": "bc.drama9.cc.1",
             "code": "EC1",
-            "short_label": "Artistic Choices",
+            "short_label": "Mood & Meaning",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^(Intentionally |Purposefully )?select(,)? (and combine|combine|dance elements|dramatic elements|musical elements|the elements)",
+              "rule": "^Select and combine (the )?(dramatic )?elements.* to intentionally create a particular mood",
               "raw_sha": "5225fe494ecc0f01"
             }
           },
@@ -30090,7 +30090,7 @@
           {
             "id": "bc.drama9.cc.13",
             "code": "CE2",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30322,7 +30322,7 @@
           {
             "id": "bc.music9.cc.13",
             "code": "CE2",
-            "short_label": "Synchronicity",
+            "short_label": "Ensemble Risk-Taking",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30334,7 +30334,7 @@
           {
             "id": "bc.music9.cc.14",
             "code": "CE3",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30464,19 +30464,19 @@
           {
             "id": "bc.visart9.cc.8",
             "code": "RR2",
-            "short_label": "Skills & Techniques",
+            "short_label": "Critical Appraisal",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_visual",
-              "rule": "^(Develop|Refine)\\b.*\\bskills\\b",
+              "rule": "critically appraise",
               "raw_sha": "0ec00a854c4a4bb0"
             }
           },
           {
             "id": "bc.visart9.cc.9",
             "code": "RR3",
-            "short_label": "Artistic Development",
+            "short_label": "Process Reflection",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30578,7 +30578,7 @@
           {
             "id": "bc.visart9.cc.16",
             "code": "CE3",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30663,7 +30663,7 @@
           {
             "id": "bc.artstudio10.cc.3",
             "code": "EC3",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30777,7 +30777,7 @@
           {
             "id": "bc.artstudio10.cc.11",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30846,7 +30846,7 @@
           {
             "id": "bc.artstudio10.cc.16",
             "code": "CE2",
-            "short_label": "Cultural Contexts",
+            "short_label": "Works in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -31021,12 +31021,12 @@
           {
             "id": "bc.chorus10.cc.12",
             "code": "CD1",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "c4c128c81b955d4e"
             }
           },
@@ -31069,7 +31069,7 @@
           {
             "id": "bc.chorus10.cc.16",
             "code": "CD5",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -31313,12 +31313,12 @@
           {
             "id": "bc.cmusic10.cc.12",
             "code": "CD1",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "c4c128c81b955d4e"
             }
           },
@@ -31361,7 +31361,7 @@
           {
             "id": "bc.cmusic10.cc.16",
             "code": "CD5",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -31479,7 +31479,7 @@
           {
             "id": "bc.dance10.cc.2",
             "code": "EC2",
-            "short_label": "Articulate Body",
+            "short_label": "Body as Instrument",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -31620,12 +31620,12 @@
           {
             "id": "bc.dance10.cc.13",
             "code": "RR4",
-            "short_label": "Respect for Others",
+            "short_label": "Self, Others & Place",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Demonstrate respect for",
+              "rule": "^Demonstrate respect for self, others, audience, and place",
               "raw_sha": "7dc84969d8559b0c"
             }
           }
@@ -31641,12 +31641,12 @@
           {
             "id": "bc.dance10.cc.14",
             "code": "CD1",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "cfb96df5dec0396b"
             }
           },
@@ -31960,12 +31960,12 @@
           {
             "id": "bc.dchore10.cc.15",
             "code": "RR6",
-            "short_label": "Respect for Others",
+            "short_label": "Self, Others & Place",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Demonstrate respect for",
+              "rule": "^Demonstrate respect for self, others, audience, and place",
               "raw_sha": "7dc84969d8559b0c"
             }
           }
@@ -32098,7 +32098,7 @@
           {
             "id": "bc.dchore10.cc.25",
             "code": "CE6",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -32147,7 +32147,7 @@
           {
             "id": "bc.dcomp10.cc.3",
             "code": "EC3",
-            "short_label": "Articulate Body",
+            "short_label": "Body as Instrument",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -32324,7 +32324,7 @@
           {
             "id": "bc.dcomp10.cc.17",
             "code": "RR5",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -32426,7 +32426,7 @@
           {
             "id": "bc.dcomp10.cc.24",
             "code": "CE5",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -32682,7 +32682,7 @@
           {
             "id": "bc.drama10.cc.18",
             "code": "CE2",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -32755,7 +32755,7 @@
           {
             "id": "bc.dtep10.cc.3",
             "code": "EC3",
-            "short_label": "Articulate Body",
+            "short_label": "Body as Instrument",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -32896,7 +32896,7 @@
           {
             "id": "bc.dtep10.cc.14",
             "code": "RR5",
-            "short_label": "Duty to Others",
+            "short_label": "Self, Others & Place",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -33245,7 +33245,7 @@
           {
             "id": "bc.instmus10.cc.16",
             "code": "CD5",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -33375,7 +33375,7 @@
           {
             "id": "bc.media10.cc.3",
             "code": "EC3",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -33501,7 +33501,7 @@
           {
             "id": "bc.media10.cc.12",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -33745,19 +33745,19 @@
           {
             "id": "bc.mtheatre10.cc.12",
             "code": "CD1",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "019d6a28bb44525a"
             }
           },
           {
             "id": "bc.mtheatre10.cc.13",
             "code": "CD2",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -33899,7 +33899,7 @@
           {
             "id": "bc.photo10.cc.4",
             "code": "EC4",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -33989,7 +33989,7 @@
           {
             "id": "bc.photo10.cc.10",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34034,7 +34034,7 @@
           {
             "id": "bc.photo10.cc.13",
             "code": "CE1",
-            "short_label": "Cultural Contexts",
+            "short_label": "Works in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34107,7 +34107,7 @@
           {
             "id": "bc.sa2d10.cc.3",
             "code": "EC3",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34245,7 +34245,7 @@
           {
             "id": "bc.sa2d10.cc.13",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34290,7 +34290,7 @@
           {
             "id": "bc.sa2d10.cc.16",
             "code": "CE1",
-            "short_label": "Cultural Contexts",
+            "short_label": "Works in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34363,7 +34363,7 @@
           {
             "id": "bc.sa3d10.cc.3",
             "code": "EC3",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34477,7 +34477,7 @@
           {
             "id": "bc.sa3d10.cc.11",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34522,7 +34522,7 @@
           {
             "id": "bc.sa3d10.cc.14",
             "code": "CE1",
-            "short_label": "Cultural Contexts",
+            "short_label": "Works in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34664,7 +34664,7 @@
           {
             "id": "bc.thco10.cc.8",
             "code": "RR3",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34977,7 +34977,7 @@
           {
             "id": "bc.thprod10.cc.14",
             "code": "CD5",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -35221,7 +35221,7 @@
           {
             "id": "bc.artstudio11.cc.13",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -35573,7 +35573,7 @@
           {
             "id": "bc.chor11.cc.18",
             "code": "CD6",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -35889,7 +35889,7 @@
           {
             "id": "bc.cmusic11.cc.17",
             "code": "CD6",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -36335,7 +36335,7 @@
           {
             "id": "bc.dance11.cc.3",
             "code": "EC3",
-            "short_label": "Articulate Body",
+            "short_label": "Body as Instrument",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -36488,7 +36488,7 @@
           {
             "id": "bc.dance11.cc.15",
             "code": "RR5",
-            "short_label": "Duty to Others",
+            "short_label": "Self, Others & Place",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -36626,7 +36626,7 @@
           {
             "id": "bc.dance11.cc.25",
             "code": "CE5",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -36687,7 +36687,7 @@
           {
             "id": "bc.dchore11.cc.4",
             "code": "EC4",
-            "short_label": "Conveying Mood",
+            "short_label": "Composing for Effect",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -36930,7 +36930,7 @@
           {
             "id": "bc.dchore11.cc.22",
             "code": "CE4",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37003,7 +37003,7 @@
           {
             "id": "bc.dcomp11.cc.5",
             "code": "EC5",
-            "short_label": "Articulate Body",
+            "short_label": "Body as Instrument",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37222,7 +37222,7 @@
           {
             "id": "bc.dcomp11.cc.21",
             "code": "CE5",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37376,7 +37376,7 @@
           {
             "id": "bc.dcond11.cc.11",
             "code": "RR4",
-            "short_label": "Duty to Others",
+            "short_label": "Self, Others & Place",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37442,7 +37442,7 @@
           {
             "id": "bc.dcond11.cc.15",
             "code": "CE2",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37491,7 +37491,7 @@
           {
             "id": "bc.dfound11.cc.3",
             "code": "EC3",
-            "short_label": "Articulate Body",
+            "short_label": "Body as Instrument",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37632,12 +37632,12 @@
           {
             "id": "bc.dfound11.cc.14",
             "code": "RR4",
-            "short_label": "Respect for Others",
+            "short_label": "Self, Others & Place",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Demonstrate respect for",
+              "rule": "^Demonstrate respect for self, others, audience, and place",
               "raw_sha": "7dc84969d8559b0c"
             }
           },
@@ -37758,7 +37758,7 @@
           {
             "id": "bc.dfound11.cc.23",
             "code": "CE4",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37912,7 +37912,7 @@
           {
             "id": "bc.drama11.cc.11",
             "code": "RR3",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -38038,7 +38038,7 @@
           {
             "id": "bc.drama11.cc.20",
             "code": "CE3",
-            "short_label": "Audience Awareness 2",
+            "short_label": "Awareness of All 2",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -38261,12 +38261,12 @@
           {
             "id": "bc.dsd11.cc.12",
             "code": "CD1",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "1ada1a251ad4b82b"
             }
           },
@@ -38330,7 +38330,7 @@
           {
             "id": "bc.dsd11.cc.17",
             "code": "CE3",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -38767,7 +38767,7 @@
           {
             "id": "bc.garts11.cc.3",
             "code": "EC3",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -38929,7 +38929,7 @@
           {
             "id": "bc.garts11.cc.15",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -39435,7 +39435,7 @@
           {
             "id": "bc.meda11.cc.5",
             "code": "EC5",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -39549,7 +39549,7 @@
           {
             "id": "bc.meda11.cc.13",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -39844,7 +39844,7 @@
           {
             "id": "bc.mtheatre11.cc.11",
             "code": "RR4",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -39889,12 +39889,12 @@
           {
             "id": "bc.mtheatre11.cc.14",
             "code": "CD1",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "571ca4e241ba161d"
             }
           },
@@ -40055,7 +40055,7 @@
           {
             "id": "bc.photo11.cc.5",
             "code": "EC5",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40157,7 +40157,7 @@
           {
             "id": "bc.photo11.cc.12",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40202,7 +40202,7 @@
           {
             "id": "bc.photo11.cc.15",
             "code": "CE1",
-            "short_label": "Cultural Contexts",
+            "short_label": "Works in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40461,7 +40461,7 @@
           {
             "id": "bc.sa2d11.cc.13",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40639,7 +40639,7 @@
           {
             "id": "bc.sa3d11.cc.4",
             "code": "EC4",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40777,7 +40777,7 @@
           {
             "id": "bc.sa3d11.cc.14",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40834,7 +40834,7 @@
           {
             "id": "bc.sa3d11.cc.18",
             "code": "CE2",
-            "short_label": "Cultural Contexts",
+            "short_label": "Works in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -41012,7 +41012,7 @@
           {
             "id": "bc.thco11.cc.8",
             "code": "RR3",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -41268,7 +41268,7 @@
           {
             "id": "bc.thprod11.cc.8",
             "code": "RR3",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -41313,12 +41313,12 @@
           {
             "id": "bc.thprod11.cc.11",
             "code": "CD2",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "6fc7df49c5c046db"
             }
           },
@@ -41349,7 +41349,7 @@
           {
             "id": "bc.thprod11.cc.14",
             "code": "CD5",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -41617,7 +41617,7 @@
           {
             "id": "bc.artstudio12.cc.14",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -42779,7 +42779,7 @@
           {
             "id": "bc.dance12.cc.3",
             "code": "EC3",
-            "short_label": "Articulate Body",
+            "short_label": "Body as Instrument",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -42920,7 +42920,7 @@
           {
             "id": "bc.dance12.cc.14",
             "code": "RR5",
-            "short_label": "Duty to Others",
+            "short_label": "Self, Others & Place",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -43058,7 +43058,7 @@
           {
             "id": "bc.dance12.cc.24",
             "code": "CE5",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -43119,7 +43119,7 @@
           {
             "id": "bc.dchore12.cc.4",
             "code": "EC4",
-            "short_label": "Conveying Mood",
+            "short_label": "Composing for Effect",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -43362,7 +43362,7 @@
           {
             "id": "bc.dchore12.cc.22",
             "code": "CE5",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -43423,7 +43423,7 @@
           {
             "id": "bc.dcomp12.cc.4",
             "code": "EC4",
-            "short_label": "Articulate Body",
+            "short_label": "Body as Instrument",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -43678,7 +43678,7 @@
           {
             "id": "bc.dcomp12.cc.23",
             "code": "CE5",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -43856,7 +43856,7 @@
           {
             "id": "bc.dcond12.cc.13",
             "code": "RR5",
-            "short_label": "Duty to Others",
+            "short_label": "Self, Others & Place",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -43946,7 +43946,7 @@
           {
             "id": "bc.dcond12.cc.19",
             "code": "CE3",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -44007,7 +44007,7 @@
           {
             "id": "bc.dfound12.cc.3",
             "code": "EC3",
-            "short_label": "Articulate Body",
+            "short_label": "Body as Instrument",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -44148,12 +44148,12 @@
           {
             "id": "bc.dfound12.cc.14",
             "code": "RR4",
-            "short_label": "Respect for Others",
+            "short_label": "Self, Others & Place",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Demonstrate respect for",
+              "rule": "^Demonstrate respect for self, others, audience, and place",
               "raw_sha": "7dc84969d8559b0c"
             }
           },
@@ -44286,7 +44286,7 @@
           {
             "id": "bc.dfound12.cc.24",
             "code": "CE5",
-            "short_label": "Personal Safety",
+            "short_label": "Injury Prevention",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -44497,12 +44497,12 @@
           {
             "id": "bc.drama12.cc.15",
             "code": "CD1",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "86614c90dda2b4d2"
             }
           },
@@ -44578,7 +44578,7 @@
           {
             "id": "bc.drama12.cc.21",
             "code": "CE3",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -44813,12 +44813,12 @@
           {
             "id": "bc.dsd12.cc.13",
             "code": "CD1",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "1ada1a251ad4b82b"
             }
           },
@@ -44882,7 +44882,7 @@
           {
             "id": "bc.dsd12.cc.18",
             "code": "CE3",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -45153,7 +45153,7 @@
           {
             "id": "bc.ftvt12.cc.16",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -45331,7 +45331,7 @@
           {
             "id": "bc.garts12.cc.3",
             "code": "EC3",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -45493,7 +45493,7 @@
           {
             "id": "bc.garts12.cc.15",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46047,7 +46047,7 @@
           {
             "id": "bc.meda12.cc.5",
             "code": "EC5",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46161,7 +46161,7 @@
           {
             "id": "bc.meda12.cc.13",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46468,7 +46468,7 @@
           {
             "id": "bc.mtheatre12.cc.12",
             "code": "RR4",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46513,19 +46513,19 @@
           {
             "id": "bc.mtheatre12.cc.15",
             "code": "CD1",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "f7773d8699216183"
             }
           },
           {
             "id": "bc.mtheatre12.cc.16",
             "code": "CD2",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46691,7 +46691,7 @@
           {
             "id": "bc.photo12.cc.5",
             "code": "EC5",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46793,7 +46793,7 @@
           {
             "id": "bc.photo12.cc.12",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46838,7 +46838,7 @@
           {
             "id": "bc.photo12.cc.15",
             "code": "CE1",
-            "short_label": "Cultural Contexts",
+            "short_label": "Works in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47097,7 +47097,7 @@
           {
             "id": "bc.sa2d12.cc.13",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47275,7 +47275,7 @@
           {
             "id": "bc.sa3d12.cc.4",
             "code": "EC4",
-            "short_label": "Audience Focus",
+            "short_label": "Intended Audience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47389,7 +47389,7 @@
           {
             "id": "bc.sa3d12.cc.12",
             "code": "CD1",
-            "short_label": "Sharing Artwork",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47425,7 +47425,7 @@
           {
             "id": "bc.sa3d12.cc.15",
             "code": "CD4",
-            "short_label": "Cross-Cultural Views",
+            "short_label": "Cross-Cultural Work",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47470,7 +47470,7 @@
           {
             "id": "bc.sa3d12.cc.18",
             "code": "CE2",
-            "short_label": "Cultural Contexts",
+            "short_label": "Works in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47648,7 +47648,7 @@
           {
             "id": "bc.thco12.cc.8",
             "code": "RR3",
-            "short_label": "Audience Awareness",
+            "short_label": "Awareness of All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47729,12 +47729,12 @@
           {
             "id": "bc.thco12.cc.14",
             "code": "CD4",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for Company",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Demonstrate respect for",
+              "rule": "^Demonstrate respect for self, company",
               "raw_sha": "61b71be9ae24e8a5"
             }
           }
@@ -47904,7 +47904,7 @@
           {
             "id": "bc.thprod12.cc.7",
             "code": "RR3",
-            "short_label": "Respect for Others",
+            "short_label": "Respect for All",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47961,12 +47961,12 @@
           {
             "id": "bc.thprod12.cc.11",
             "code": "CD2",
-            "short_label": "Documentation",
+            "short_label": "Document & Share",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "^Document|^Describe and document",
+              "rule": "^Document, share",
               "raw_sha": "6fc7df49c5c046db"
             }
           },
@@ -48113,7 +48113,7 @@
           {
             "id": "bc.caree8.cc.2",
             "code": "CE2",
-            "short_label": "Purpose & Passion",
+            "short_label": "Purpose & Community",
             "prov": {
               "folder": "none: no heading",
               "code": "stem+position",
@@ -48209,7 +48209,7 @@
           {
             "id": "bc.caree8.cc.10",
             "code": "CE10",
-            "short_label": "Family Expectations",
+            "short_label": "Career Influences",
             "prov": {
               "folder": "none: no heading",
               "code": "stem+position",
@@ -48233,7 +48233,7 @@
           {
             "id": "bc.caree8.cc.12",
             "code": "CE12",
-            "short_label": "Volunteer Experience",
+            "short_label": "New Experiences",
             "prov": {
               "folder": "none: no heading",
               "code": "stem+position",
@@ -48280,7 +48280,7 @@
           {
             "id": "bc.caree9.cc.2",
             "code": "CE2",
-            "short_label": "Purpose & Passion",
+            "short_label": "Purpose & Community",
             "prov": {
               "folder": "none: no heading",
               "code": "stem+position",
@@ -48376,7 +48376,7 @@
           {
             "id": "bc.caree9.cc.10",
             "code": "CE10",
-            "short_label": "Family Expectations",
+            "short_label": "Career Influences",
             "prov": {
               "folder": "none: no heading",
               "code": "stem+position",
@@ -48400,7 +48400,7 @@
           {
             "id": "bc.caree9.cc.12",
             "code": "CE12",
-            "short_label": "Volunteer Experience",
+            "short_label": "New Experiences",
             "prov": {
               "folder": "none: no heading",
               "code": "stem+position",
@@ -48563,7 +48563,7 @@
           {
             "id": "bc.cle10.cc.10",
             "code": "EXP4",
-            "short_label": "Work-Life Balance",
+            "short_label": "Balance Strategies",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -48775,7 +48775,7 @@
           {
             "id": "bc.clc12.cc.1",
             "code": "EX1",
-            "short_label": "Worldviews",
+            "short_label": "Worldview Influence",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -48983,7 +48983,7 @@
           {
             "id": "bc.wex12a.cc.2",
             "code": "CW2",
-            "short_label": "Personal Interests",
+            "short_label": "Exploring Interests",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -49191,7 +49191,7 @@
           {
             "id": "bc.wex12b.cc.2",
             "code": "CW2",
-            "short_label": "Personal Interests",
+            "short_label": "Exploring Interests",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -57789,7 +57789,7 @@
           {
             "id": "bc.fpc10.cc.5",
             "code": "RM5",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -58045,7 +58045,7 @@
           {
             "id": "bc.wpm10.cc.5",
             "code": "RM5",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -58289,7 +58289,7 @@
           {
             "id": "bc.cs11.cc.4",
             "code": "RM4",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -58545,7 +58545,7 @@
           {
             "id": "bc.fom11.cc.5",
             "code": "RM5",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -58777,7 +58777,7 @@
           {
             "id": "bc.hom11.cc.3",
             "code": "RM3",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -59057,7 +59057,7 @@
           {
             "id": "bc.pc11.cc.5",
             "code": "RM5",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -59313,7 +59313,7 @@
           {
             "id": "bc.wpm11.cc.5",
             "code": "RM5",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -59569,7 +59569,7 @@
           {
             "id": "bc.appm12.cc.5",
             "code": "RM5",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -59825,7 +59825,7 @@
           {
             "id": "bc.calc12.cc.5",
             "code": "RM5",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -60069,7 +60069,7 @@
           {
             "id": "bc.cs12.cc.4",
             "code": "RM4",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -60325,7 +60325,7 @@
           {
             "id": "bc.fom12.cc.5",
             "code": "RM5",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -60593,7 +60593,7 @@
           {
             "id": "bc.geom12.cc.6",
             "code": "RM6",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -60849,7 +60849,7 @@
           {
             "id": "bc.pc12.cc.5",
             "code": "RM5",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -61105,7 +61105,7 @@
           {
             "id": "bc.stat12.cc.5",
             "code": "RM5",
-            "short_label": "Creative Thinking",
+            "short_label": "Problem Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -62177,7 +62177,7 @@
           {
             "id": "bc.al11.cc.2",
             "code": "HW2",
-            "short_label": "Maintaining Health",
+            "short_label": "Explaining Health",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -62686,7 +62686,7 @@
           {
             "id": "bc.oded11.cc.13",
             "code": "CTS4",
-            "short_label": "Personal Safety",
+            "short_label": "Safety for All",
             "prov": {
               "folder": "short list",
               "code": "stem+position",
@@ -63241,7 +63241,7 @@
           {
             "id": "bc.oded12.cc.11",
             "code": "CTS3",
-            "short_label": "Personal Safety",
+            "short_label": "Safety for All",
             "prov": {
               "folder": "short list",
               "code": "stem+position",
@@ -64820,7 +64820,7 @@
           {
             "id": "bc.chem11.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -65250,7 +65250,7 @@
           {
             "id": "bc.earth11.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -65680,7 +65680,7 @@
           {
             "id": "bc.envsci11.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -66110,7 +66110,7 @@
           {
             "id": "bc.ls11sci.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -66540,7 +66540,7 @@
           {
             "id": "bc.phys11.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -66970,7 +66970,7 @@
           {
             "id": "bc.sfc11.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -67400,7 +67400,7 @@
           {
             "id": "bc.anat12.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -67830,7 +67830,7 @@
           {
             "id": "bc.chem12.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -68260,7 +68260,7 @@
           {
             "id": "bc.envsci12.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -68690,7 +68690,7 @@
           {
             "id": "bc.geo12.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -69120,7 +69120,7 @@
           {
             "id": "bc.phys12.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -69550,7 +69550,7 @@
           {
             "id": "bc.spsci12.cc.23",
             "code": "EV10",
-            "short_label": "Personal Safety",
+            "short_label": "Risk Assessment",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -70876,7 +70876,7 @@
           {
             "id": "bc.hgeo12.cc.6",
             "code": "GIM",
-            "short_label": "Geographic Merit",
+            "short_label": "Importance",
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
@@ -71185,7 +71185,7 @@
           {
             "id": "bc.pgeo12.cc.6",
             "code": "GIM",
-            "short_label": "Geographic Merit",
+            "short_label": "Importance",
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",

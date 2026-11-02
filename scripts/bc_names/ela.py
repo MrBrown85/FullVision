@@ -24,7 +24,6 @@ RULES = [
     # Comprehend and connect: form, structure and literary craft
     (r"text structures and (understand )?how they contribute", "Text Structures"),
     (r"forms?, (formats, )?(structures, )?(and )?(features|genres).*reflect", "Text Form & Purpose"),
-    (r"features, forms, and genres of texts reflect", "Text Form & Purpose"),
     (r"forms, formats, structures, and features of texts enhance", "Text Form & Meaning"),
     (r"new media techniques and devices reflect", "Media Techniques"),
     (r"^Examine how specific new media techniques", "New Media Techniques"),
@@ -35,7 +34,6 @@ RULES = [
     (r"^Think critically.*to explore ideas", "Idea Exploration"),
     (r"^Think critically.*to analyze ideas", "Idea Analysis"),
     (r"contexts, values, and perspectives in (oral and other )?texts, including", "Contexts & Values"),
-    (r"^Recognize and analyze personal, social, cultural contexts", "Contexts & Values"),
     (r"^Recognize personal, social, and cultural contexts, as well as", "Contexts & Values"),
     (r"contexts, values, and perspectives in", "Text Perspectives"),
     (r"identities in First Peoples texts", "Identity in Texts"),
