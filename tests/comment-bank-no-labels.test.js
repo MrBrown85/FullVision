@@ -52,12 +52,15 @@ describe('no bare competency labels in the shared bank', () => {
           const ctx = CommentBank.context(f, {});
           const labels = f.comps.map(c => c.name).filter(Boolean);
           COMMENT_BANK.sentences
-            .filter(s => s.group !== 'Teacher' && CommentBank.fits(s, ctx))
+            .filter(s => CommentBank.fits(s, ctx))
             .forEach(s => {
               offered++;
               const text = CommentBank.fill(s, ctx);
               expect(text, s.id).not.toMatch(/“I can/);
-              labels.forEach(l => expect(text.includes(l), s.id + ': ' + l + ' in ' + text).toBe(false));
+              labels.forEach(l => {
+                const word = new RegExp('(^|[^A-Za-z])' + l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|[^A-Za-z])');
+                expect(word.test(text), s.id + ': ' + l + ' in ' + text).toBe(false);
+              });
             });
         });
       });
