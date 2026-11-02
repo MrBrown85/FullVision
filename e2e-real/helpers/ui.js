@@ -63,13 +63,17 @@ export async function toggleCurriculumTag(page, tag) {
   }, tag);
 }
 
+// Step 2 here is Class Details (it passes Choose Competencies with every
+// competency ticked); step 3 is Review.
 export async function wizardGoToStep(page, step) {
   if (step !== 2 && step !== 3) throw new Error('wizardGoToStep accepts 2 or 3');
-  const action = step === 2 ? 'cwGoToStep2' : 'cwGoToStep3';
-  await page.evaluate(a => {
-    const btn = document.querySelector(`[data-action="${a}"]`);
-    window.DashClassManager.handleAction(a, btn, null);
-  }, action);
+  const actions = step === 2 ? ['cwGoToStep2', 'cwCompsNext'] : ['cwGoToStep3'];
+  for (const a of actions) {
+    await page.evaluate(a => {
+      const btn = document.querySelector(`[data-action="${a}"]`);
+      window.DashClassManager.handleAction(a, btn, null);
+    }, a);
+  }
   await page.waitForSelector(step === 2 ? '#cm-new-name' : '[data-action="cwFinishCreate"]', { timeout: 5000 });
 }
 
