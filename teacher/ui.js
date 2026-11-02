@@ -1,5 +1,167 @@
 /* gb-ui.js — Shared UI components for FullVision */
 
+/* ── Colour popover ────────────────────────────────────────── */
+/* A colour swatch opens this small popover under it: the preset colours,
+   then a Custom row (a colour well and a hex box), so a teacher can pick
+   any colour in any browser. It lives on <body> so a page render doesn't
+   remove it, and follows its swatch as the page scrolls or re-renders.
+   opts: key (which swatch is open), colors, current, label,
+   findSwatch() (the live swatch after a render), onPick(color). */
+var _colorPopOpts = null;
+var _COLOR_POP_HEX_RE = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
+function normHexColor(v) {
+  var m = _COLOR_POP_HEX_RE.exec(String(v || '').trim());
+  if (!m) return null;
+  var h = m[1].toLowerCase();
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  return '#' + h;
+}
+function closeColorPop() {
+  if (!_colorPopOpts) return;
+  var pop = document.getElementById('color-pop');
+  if (pop) pop.remove();
+  _colorPopOpts = null;
+  document.removeEventListener('mousedown', _colorPopOutside, true);
+  document.removeEventListener('keydown', _colorPopKey, true);
+  window.removeEventListener('scroll', _placeColorPop, true);
+  window.removeEventListener('resize', _placeColorPop);
+}
+function _placeColorPop() {
+  var pop = document.getElementById('color-pop');
+  if (!pop || !_colorPopOpts) return;
+  var sw = _colorPopOpts.findSwatch();
+  if (!sw) return _colorPopAway();
+  var r = sw.getBoundingClientRect();
+  var w = pop.offsetWidth;
+  var h = pop.offsetHeight;
+  var top = r.bottom + 6;
+  if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+  pop.style.top = top + 'px';
+}
+// Closing by clicking away or on the swatch keeps a custom colour the
+// teacher has previewed; Escape drops it.
+function _colorPopAway() {
+  var opts = _colorPopOpts;
+  var pending = opts && opts.pending;
+  closeColorPop();
+  if (pending) opts.onPick(pending);
+}
+function _colorPopOutside(e) {
+  if (e.target.closest('#color-pop')) return;
+  var sw = _colorPopOpts && _colorPopOpts.findSwatch();
+  if (sw && sw.contains(e.target)) return;
+  _colorPopAway();
+}
+function _colorPopKey(e) {
+  if (e.key !== 'Escape') return;
+  e.stopPropagation();
+  var opts = _colorPopOpts;
+  closeColorPop();
+  var sw = opts && opts.findSwatch();
+  if (sw) {
+    sw.style.background = opts.orig;
+    sw.focus();
+  }
+}
+function openColorPop(swatch, opts) {
+  var wasThis = _colorPopOpts && _colorPopOpts.key === opts.key;
+  _colorPopAway();
+  if (wasThis) return;
+  var current = normHexColor(opts.current) || opts.colors[0];
+  _colorPopOpts = opts;
+  opts.orig = current;
+  opts.pending = '';
+  var pop = document.createElement('div');
+  pop.id = 'color-pop';
+  pop.className = 'color-pop';
+  pop.setAttribute('role', 'dialog');
+  pop.setAttribute('aria-label', opts.label || 'Colour');
+  var grid = document.createElement('div');
+  grid.className = 'color-pop-grid';
+  opts.colors.forEach(function (c) {
+    var opt = document.createElement('button');
+    opt.type = 'button';
+    opt.className = 'color-pop-opt' + (c === current ? ' selected' : '');
+    opt.dataset.color = c;
+    opt.style.background = c;
+    opt.setAttribute('aria-label', c);
+    opt.setAttribute('aria-pressed', String(c === current));
+    grid.appendChild(opt);
+  });
+  var custom = document.createElement('div');
+  custom.className = 'color-pop-custom';
+  var label = document.createElement('span');
+  label.className = 'color-pop-custom-label';
+  label.textContent = 'Custom';
+  var well = document.createElement('input');
+  well.type = 'color';
+  well.className = 'color-pop-well';
+  well.value = current;
+  well.setAttribute('aria-label', 'Choose a custom colour');
+  var hex = document.createElement('input');
+  hex.type = 'text';
+  hex.className = 'color-pop-hex';
+  hex.value = current;
+  hex.maxLength = 7;
+  hex.spellcheck = false;
+  hex.autocomplete = 'off';
+  hex.setAttribute('aria-label', 'Hex colour');
+  custom.appendChild(label);
+  custom.appendChild(well);
+  custom.appendChild(hex);
+  pop.appendChild(grid);
+  pop.appendChild(custom);
+  document.body.appendChild(pop);
+  _placeColorPop();
+
+  function apply(color) {
+    closeColorPop();
+    if (color && color !== current) opts.onPick(color);
+  }
+  pop.addEventListener('click', function (e) {
+    var opt = e.target.closest('.color-pop-opt');
+    if (opt) apply(opt.dataset.color);
+  });
+  // The well and the hex box preview on the swatch as the teacher picks;
+  // the colour is saved when the well's picker closes or Enter is pressed.
+  function preview(color) {
+    var sw = opts.findSwatch();
+    if (sw) sw.style.background = color;
+    opts.pending = color === current ? '' : color;
+  }
+  well.addEventListener('input', function () {
+    hex.value = well.value;
+    hex.classList.remove('invalid');
+    preview(well.value);
+  });
+  well.addEventListener('change', function () {
+    apply(normHexColor(well.value));
+  });
+  hex.addEventListener('input', function () {
+    var c = normHexColor(hex.value);
+    hex.classList.toggle('invalid', !c && hex.value.trim() !== '');
+    if (c) {
+      well.value = c;
+      preview(c);
+    }
+  });
+  hex.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var c = normHexColor(hex.value);
+    if (c) apply(c);
+    else hex.classList.add('invalid');
+  });
+
+  document.addEventListener('mousedown', _colorPopOutside, true);
+  document.addEventListener('keydown', _colorPopKey, true);
+  window.addEventListener('scroll', _placeColorPop, true);
+  window.addEventListener('resize', _placeColorPop);
+  var sel = pop.querySelector('.color-pop-opt.selected') || pop.querySelector('.color-pop-opt');
+  if (sel) sel.focus({ preventScroll: true });
+}
+
 /* ── HTML sanitizer for contenteditable output ──────────────── */
 function sanitizeHtml(raw) {
   var allowed = ['B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'BR', 'P', 'DIV', 'SPAN'];
