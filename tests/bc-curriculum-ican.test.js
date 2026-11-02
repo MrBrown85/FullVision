@@ -1,9 +1,10 @@
 /**
  * data/bc-curriculum-ican.json holds the I Can statements for BC curriculum
  * competencies (stage 3 of the bank rebuild), keyed by competency id in
- * data/bc-curriculum-source.json. So far it covers Social Studies, English
- * Language Arts, Science, Mathematics, Physical and Health Education and
- * Career Education. These checks read only the two JSON files and keep their
+ * data/bc-curriculum-source.json. It covers every subject in the source:
+ * Social Studies, English Language Arts, Science, Mathematics, Physical and
+ * Health Education, Career Education, Applied Design, Skills and Technologies
+ * and Arts Education. These checks read only the two JSON files and keep their
  * own rules, apart from whatever produced the statements.
  */
 import { createHash } from 'crypto';
@@ -20,6 +21,8 @@ const SUBJECTS = new Set([
   'Mathematics',
   'Physical and Health Education',
   'Career Education',
+  'Applied Design, Skills and Technologies',
+  'Arts Education',
 ]);
 const rows = Object.entries(source)
   .filter(([key, course]) => !key.startsWith('_') && SUBJECTS.has(course.subject))
@@ -39,8 +42,8 @@ const sha = raw => createHash('sha256').update(raw, 'utf8').digest('hex').slice(
 const words = s => s.split(/\s+/).filter(Boolean).length;
 
 describe('BC curriculum I Can statements', () => {
-  it('covers every competency in its six subjects, and nothing else', () => {
-    expect(rows.length).toBeGreaterThan(1700);
+  it('covers every competency in its eight subjects, and nothing else', () => {
+    expect(rows.length).toBe(5029);
     expect(rows.filter(r => !r.ic).map(r => r.id)).toEqual([]);
     const ids = new Set(rows.map(r => r.id));
     expect(Object.keys(ican).filter(id => !id.startsWith('_') && !ids.has(id))).toEqual([]);

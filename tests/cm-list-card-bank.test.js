@@ -110,6 +110,13 @@ describe('the card', () => {
 
   it('says reports print nothing while a competency has no I Can statements', () => {
     setUpClass(['DRAFT10']);
+    // Every bank course now has I Can statements, so clear them here.
+    getLearningMap(CID).sections.forEach(sec =>
+      sec.tags.forEach(tag => {
+        tag.i_can_statements = [];
+        tag.text = '';
+      }),
+    );
     openTab();
     expect(main.innerHTML).toContain(
       'No I Can statements yet. Reports print nothing for this competency until you add one.',
