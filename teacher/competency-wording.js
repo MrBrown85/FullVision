@@ -68,5 +68,5 @@ window.CompetencyWording = (function () {
     return out.join('');
   }
 
-  return { lines: lines, html: html, nextStep: nextStep };
+  return { lines: lines, html: html, nextStep: nextStep, sentence: _sentence };
 })();

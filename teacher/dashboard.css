@@ -5259,6 +5259,57 @@ a.dash-ins-name:hover {
   flex: 1;
 }
 /* Where a competency's I Can statements print */
+/* A competency's Levels (Nov 2 mockup, batch 2): read-only descriptors and
+   next steps, or the four fields of Write Your Own. */
+.cm-std-levels {
+  margin-top: 16px;
+}
+.cm-levels-list {
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.cm-level-row,
+.cm-levels-edit-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+}
+.cm-levels-word {
+  font-weight: 600;
+  color: var(--text);
+}
+.cm-level-desc {
+  line-height: 1.4;
+  color: var(--text);
+}
+.cm-level-next {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-2);
+}
+.cm-levels-edit-row {
+  align-items: start;
+}
+.cm-levels-input {
+  width: 100%;
+  min-height: 52px;
+}
+.cm-levels-hint {
+  margin: 4px 0 0;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.cm-levels-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
 .cm-std-shown {
   display: flex;
   align-items: center;
