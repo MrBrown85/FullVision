@@ -61,7 +61,8 @@ const keyOf = (family, label) => {
 
 describe('the skill table against curriculum_by_course.json', () => {
   it('reads every course and competency, in a known kind of class', () => {
-    expect(competencies.length).toBeGreaterThan(1600);
+    // The rebuilt bank (stage 6): 226 courses, 5,029 competencies.
+    expect(competencies.length).toBe(5029);
     competencies.forEach(c => expect(c.family, c.code).toBeTruthy());
     Object.keys(ORIGINAL).forEach(fam =>
       ORIGINAL[fam].forEach(key =>
@@ -74,9 +75,13 @@ describe('the skill table against curriculum_by_course.json', () => {
   });
 
   it('(a) keeps every competency that had a skill on main on that same skill', () => {
+    // Bank names a reviewer found wrong for their skill (CommentBank.NO_SKILL)
+    // route to no skill on purpose (tests/comment-bank-routing-main.test.js).
+    const excluded = (family, label) =>
+      (CommentBank.NO_SKILL[family] || []).some(n => n.toLowerCase() === label.toLowerCase());
     const changed = competencies
       .map(c => ({ ...c, was: originalKey(c.family, c.label), now: keyOf(c.family, c.label) }))
-      .filter(c => c.was && c.was !== c.now);
+      .filter(c => c.was && c.was !== c.now && !excluded(c.family, c.label));
     expect(changed).toEqual([]);
     // The original rows come first in every family, so the rule holds by
     // construction and the new rows catch only what fell through.

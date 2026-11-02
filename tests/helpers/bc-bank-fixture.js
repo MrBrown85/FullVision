@@ -1,5 +1,5 @@
-/* A course in the rebuilt bank's shape, made from data/bc-curriculum-*.json
-   the way stage 6 will write curriculum_by_course.json:
+/* A course from the app's BC curriculum bank (curriculum_by_course.json,
+   built from data/ by scripts/build-curriculum-bank.mjs):
 
      { course_name, grade, subject, categories: [
          { name, folder, path, competencies: [
@@ -13,33 +13,12 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const read = name => JSON.parse(readFileSync(resolve(root, 'data', name), 'utf-8'));
-let SRC, DER, ICAN;
+let BANK;
 
 export function newBankCourse(key) {
-  SRC = SRC || read('bc-curriculum-source.json');
-  DER = DER || read('bc-curriculum-derived.json');
-  ICAN = ICAN || read('bc-curriculum-ican.json');
-  const src = SRC[key];
-  const raw = {};
-  src.categories.forEach(c => c.competencies.forEach(x => (raw[x.id] = x.raw)));
-  return {
-    course_name: src.course_name,
-    grade: src.grade,
-    subject: src.subject,
-    categories: DER[key].categories.map(c => ({
-      name: c.folder || c.competencies[0].short_label,
-      folder: !!c.folder,
-      path: c.path,
-      competencies: c.competencies.map(x => ({
-        id: x.id,
-        tag: x.code,
-        short_label: x.short_label,
-        raw: raw[x.id],
-        i_can_statements: (ICAN[x.id] || {}).i_can_statements || [],
-      })),
-    })),
-  };
+  BANK = BANK || JSON.parse(readFileSync(resolve(root, 'curriculum_by_course.json'), 'utf-8'));
+  if (!BANK[key]) throw new Error(key + ' is not in curriculum_by_course.json');
+  return structuredClone(BANK[key]);
 }
 
 export function newBankIndex(keys) {

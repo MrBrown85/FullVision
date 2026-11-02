@@ -1055,7 +1055,8 @@ describe('competency names in an imported class', () => {
     _cache.termRatings[cid] = {};
     clearProfCache();
     const names = CommentBank.facts(cid, st, 'term-1').comps.map(c => c.name);
-    expect(names).toEqual(['Critical Thinking', 'Interpret Graphics', 'Cite Sources']);
+    // The Ministry's own SS 8 competencies, named by the rebuilt bank.
+    expect(names).toEqual(['Inquiry', 'Significance', 'Significance Claims']);
     expect(names).toEqual(ReportBlocks.reportSections(cid).slice(0, 3).map(ReportBlocks.competencyLabel));
     expect(names).not.toContain('Use Social Studies inquiry processes and skills');
     delete COURSES[cid];
@@ -1107,7 +1108,7 @@ describe('wording by kind of class', () => {
       ['DRAMA10', 'arts'],
       ['MATH8', 'math'],
       ['FS10', 'adst'],
-      ['ELA10', 'ela'],
+      ['COMP10', 'ela'],
       ['SS8', 'socials'],
       ['SCI10', 'science'],
       ['CLE10', 'career'],

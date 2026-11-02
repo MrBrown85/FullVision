@@ -1,6 +1,7 @@
 /**
  * Competency labels in curriculum_by_course.json read as names, not as the
- * first words of a statement cut short (scripts/clean-competency-labels.py).
+ * first words of a statement cut short. The bank is built from data/ by
+ * scripts/build-curriculum-bank.mjs (the names from data/bc-curriculum-derived.json).
  * The questionnaire's Comment Bank and the printed Proficiency block put
  * them in sentences ("her strongest work is in …").
  */

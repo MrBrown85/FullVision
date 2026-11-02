@@ -52,11 +52,13 @@ test('Re-link review: ticks and Keep Mine / Use the Curriculum Version keep focu
   await page.keyboard.press('Space');
   await expect(add).toBeFocused();
   await expect(add).not.toBeChecked();
-  const mine = page.locator('[data-action-change="cmCompReviewPick"][data-group="changed"][data-pick="mine"]').first();
+  // The demo class's competencies came from the old bank, so the rebuilt
+  // bank offers them under Replaced in the Curriculum.
+  const mine = page.locator('[data-action-change="cmCompReviewPick"][data-group="replaced"][data-pick="mine"]').first();
   await mine.focus();
   await page.keyboard.press('ArrowRight');
   const theirs = page
-    .locator('[data-action-change="cmCompReviewPick"][data-group="changed"][data-pick="theirs"]')
+    .locator('[data-action-change="cmCompReviewPick"][data-group="replaced"][data-pick="theirs"]')
     .first();
   await expect(theirs).toBeFocused();
   await expect(theirs).toBeChecked();
