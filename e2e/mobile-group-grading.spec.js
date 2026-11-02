@@ -15,6 +15,10 @@ async function open(page) {
     const cid = Object.keys(COURSES)[0];
     const list = getAssessments(cid);
     const a = list.find(x => x.title === 'Science Fair Proposal');
+    // An ungraded group: Demo Mode's students each have their own grade here.
+    const sc = getScores(cid);
+    Object.keys(sc).forEach(sid => (sc[sid] = sc[sid].filter(e => e.assessmentId !== a.id)));
+    saveScores(cid, sc);
     const ids = sortStudents(getStudents(cid), 'alpha').map(s => s.id);
     a.collaboration = 'group';
     a.groups = [ids.slice(0, 4), ids.slice(4, 8), ids.slice(8, 12)];

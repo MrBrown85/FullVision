@@ -15,6 +15,10 @@ async function setUp(page) {
   const info = await page.evaluate(() => {
     const list = getAssessments('sci8');
     const a = list.find(x => x.title === 'Science Fair Proposal');
+    // An ungraded group: Demo Mode's students each have their own grade here.
+    const sc = getScores('sci8');
+    Object.keys(sc).forEach(sid => (sc[sid] = sc[sid].filter(e => e.assessmentId !== a.id)));
+    saveScores('sci8', sc);
     const ids = sortStudents(getStudents('sci8'), 'lastName').map(s => s.id);
     a.collaboration = 'group';
     a.groups = [ids.slice(0, 4), ids.slice(4, 8), ids.slice(8, 12)];
@@ -111,4 +115,18 @@ test('Missing stays per student, and → steps group by group', async ({ page })
   await expect(dialog.locator('.grader-student')).toHaveText('Group 2');
   await dialog.locator('[data-grader="prev"]').click();
   await expect(dialog.locator('.grader-student')).toHaveText('Group 1');
+});
+
+test('from the gradebook, → follows the rows on screen', async ({ page }) => {
+  const info = await setUp(page);
+  // Rows on screen: a member of Group 3, then one of Group 1.
+  await page.evaluate(({ aid, ids }) => {
+    PageAssignments.openGrader('sci8', aid, ids[8], { studentIds: [ids[8], ids[0]] });
+  }, info);
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog.locator('.grader-student')).toHaveText('Group 3');
+  await expect(dialog.locator('[data-grader="prev"]')).toBeDisabled();
+  await dialog.locator('[data-grader="next"]').click();
+  await expect(dialog.locator('.grader-student')).toHaveText('Group 1');
+  await expect(dialog.locator('[data-grader="next"]')).toBeDisabled();
 });

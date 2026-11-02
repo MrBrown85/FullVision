@@ -4062,12 +4062,14 @@ window.PageAssignments = (function () {
      graded separately follows their group as their own block, with Graded
      Separately From and Back to Group Grade. DIBELS stays per student. */
   var _groupRows = {};
+  // Set while the rubric view draws its Additional Tags rows.
+  var _groupStripOff = false;
 
   // The students the list shows for `a`: one per group (the member its
   // grade comes from), members graded separately and students in no group,
   // in the dialog's order. Only groups with someone the search shows.
   function _groupRowStudents(cid, a, students) {
-    var units = isDibelsScored(a) ? null : _graderUnits(cid, a);
+    var units = _graderUnits(cid, a);
     delete _groupRows[a.id];
     if (!units) return students;
     var shown = {};
@@ -4083,20 +4085,18 @@ window.PageAssignments = (function () {
     var list = [];
     units.forEach(function (unit) {
       if (
-        !unit.some(function (m) {
+        !_unitIds(unit).some(function (m) {
           return shown[m];
         })
       )
         return;
-      var view = _graderGroupView(cid, a, unit[0]);
-      if (view) {
-        rows[view.source] = { view: view };
-        list.push(byId[view.source]);
+      if (unit.linked) {
+        rows[unit.source] = { view: Object.assign({ label: collabGroupLabel(unit.group) }, unit) };
+        list.push(byId[unit.source]);
         return;
       }
-      var group = getCollabGroupOf(a, unit[0]);
-      if (group) rows[unit[0]] = { separateFrom: group };
-      list.push(byId[unit[0]]);
+      if (unit.separateFrom) rows[unit.sid] = { separateFrom: unit.separateFrom };
+      list.push(byId[unit.sid]);
     });
     _groupRows[a.id] = rows;
     return list.filter(Boolean);
@@ -4155,7 +4155,7 @@ window.PageAssignments = (function () {
   function _groupSeparateNoteHtml(aid, sid, group) {
     return (
       '<span class="rsg-separate-note">' +
-      esc('Graded Separately From ' + _collabGroupLabel(group)) +
+      esc('Graded Separately From ' + collabGroupLabel(group)) +
       '</span><button type="button" class="grader-member-back" data-action="groupBackToGroup" data-aid="' +
       aid +
       '" data-sid="' +
@@ -4225,7 +4225,7 @@ window.PageAssignments = (function () {
       '" data-score="0" data-scope="row"><div class="col-fill-dot" style="background:var(--surface-2);color:var(--text-3)">0</div> Clear</div>' +
       '</div></div></div>' +
       '</div>' +
-      (row && row.view ? _groupMembersStripHtml(cid, aid, row.view) : '')
+      (row && row.view && !_groupStripOff ? _groupMembersStripHtml(cid, aid, row.view) : '')
     );
   }
   /* The student's Overall Comment under their criteria (score.comment, the
@@ -4664,7 +4664,13 @@ window.PageAssignments = (function () {
       html +=
         '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">' +
         '<div style="font-size:0.75rem;color:var(--text-3);font-weight:600;margin-bottom:6px">Additional Tags (not in rubric)</div>';
-      html += renderTagGrid(cid, a, extraTagObjs, students, scores);
+      // The group's name and members strip are drawn once, above.
+      _groupStripOff = true;
+      try {
+        html += renderTagGrid(cid, a, extraTagObjs, students, scores);
+      } finally {
+        _groupStripOff = false;
+      }
       html += '</div>';
     }
     return html;
@@ -7601,6 +7607,8 @@ window.PageAssignments = (function () {
           : sortStudents(getStudents(cid), 'lastName').map(function (s) {
               return s.id;
             }),
+      // The gradebook's rows, in their order: group work steps through these.
+      rowOrder: opts.studentIds && opts.studentIds.length ? opts.studentIds.slice() : null,
       onClose: opts.onClose || null,
     };
     overlay.addEventListener('mousedown', function (e) {
@@ -7771,7 +7779,7 @@ window.PageAssignments = (function () {
       });
     }
     var i = _grader.studentIds.indexOf(st.id);
-    var steps = _graderUnits(cid, a);
+    var steps = _graderSteps(cid, a);
     var u = steps ? _graderUnitIndex(steps, st.id) : -1;
     dialog.querySelector('.grader-title').textContent = a.title || 'Assessment';
     dialog.querySelector('.grader-counts-as').textContent = _countsAsText(cid, a);
@@ -7918,83 +7926,68 @@ window.PageAssignments = (function () {
   var _GRADER_MORE_ICON =
     '<svg width="16" height="4" viewBox="0 0 16 4" aria-hidden="true"><circle cx="2" cy="2" r="1.8" fill="currentColor"/><circle cx="8" cy="2" r="1.8" fill="currentColor"/><circle cx="14" cy="2" r="1.8" fill="currentColor"/></svg>';
 
-  function _collabGroupLabel(group) {
-    return (group.kind === 'pair' ? 'Pair ' : 'Group ') + (group.index + 1);
-  }
-
   // The group view for `sid` (a member still graded with their group), or
-  // null. `source` is the first such member who isn't Missing or Excused,
-  // or the first of them when every one is.
+  // null: { group, label, members, linked, source } (groupGradingUnits).
   function _graderGroupView(cid, a, sid) {
-    var group = getCollabGroupOf(a, sid);
-    if (!group || isGradedSeparately(a, sid)) return null;
-    var known = {};
-    getStudents(cid).forEach(function (s) {
-      known[s.id] = true;
-    });
-    var members = group.members.filter(function (m) {
-      return known[m];
-    });
-    var linked = members.filter(function (m) {
-      return !isGradedSeparately(a, m);
-    });
-    var source =
-      linked.find(function (m) {
-        var status = getAssignmentStatus(cid, m, a.id);
-        return status !== 'NS' && status !== 'EXC';
-      }) || linked[0];
-    return { group: group, label: _collabGroupLabel(group), members: members, source: source };
+    var units = _graderUnits(cid, a);
+    var unit =
+      units &&
+      units.find(function (u) {
+        return u.linked && u.linked.indexOf(sid) >= 0;
+      });
+    return unit ? Object.assign({ label: collabGroupLabel(unit.group) }, unit) : null;
   }
 
-  // The dialog's steps on group work, each a list of student ids: a group's
-  // members still graded with it, then each member graded separately on
-  // their own, then everyone in no group. Null on other work.
+  // Group work's grading units in the class's last-name order (null on
+  // other work).
   function _graderUnits(cid, a) {
-    var kind = a && (a.collaboration === 'pair' ? 'pairs' : a.collaboration === 'group' ? 'groups' : null);
-    var lists = (kind && a[kind]) || [];
-    if (!lists.length) return null;
-    var students = sortStudents(getStudents(cid), 'lastName');
-    var known = {};
-    students.forEach(function (s) {
-      known[s.id] = true;
-    });
-    var units = [];
-    var placed = {};
-    lists.forEach(function (members) {
-      var here = (members || []).filter(function (m) {
-        return known[m];
-      });
-      here.forEach(function (m) {
-        placed[m] = true;
-      });
-      var linked = here.filter(function (m) {
-        return !isGradedSeparately(a, m);
-      });
-      if (linked.length) units.push(linked);
-      here.forEach(function (m) {
-        if (isGradedSeparately(a, m)) units.push([m]);
-      });
-    });
-    students.forEach(function (s) {
-      if (!placed[s.id]) units.push([s.id]);
-    });
-    return units;
+    return groupGradingUnits(
+      cid,
+      a,
+      sortStudents(getStudents(cid), 'lastName').map(function (s) {
+        return s.id;
+      }),
+    );
+  }
+  // The student ids a unit stands for: a group's linked members, or one.
+  function _unitIds(unit) {
+    return unit.linked || [unit.sid];
   }
   function _graderUnitIndex(units, sid) {
-    for (var i = 0; i < units.length; i++) if (units[i].indexOf(sid) >= 0) return i;
+    for (var i = 0; i < units.length; i++) if (_unitIds(units[i]).indexOf(sid) >= 0) return i;
     return -1;
+  }
+  // The dialog's steps: from the gradebook, only the units with a row on
+  // screen, in the rows' order; otherwise every unit.
+  function _graderSteps(cid, a) {
+    var units = _graderUnits(cid, a);
+    var rows = _grader && _grader.rowOrder;
+    if (!units || !rows) return units;
+    var at = function (unit) {
+      return _unitIds(unit).reduce(function (best, id) {
+        var i = rows.indexOf(id);
+        return i >= 0 && (best < 0 || i < best) ? i : best;
+      }, -1);
+    };
+    return units
+      .filter(function (u) {
+        return at(u) >= 0;
+      })
+      .sort(function (x, y) {
+        return at(x) - at(y);
+      });
   }
 
   // ← → on group work. False on other work, which steps student by student.
   function _graderStepGroup(dir) {
     var cid = activeCourse;
     var a = _assessmentById(cid, _grader.aid);
-    var units = _graderUnits(cid, a);
+    var units = _graderSteps(cid, a);
     if (!units) return false;
     var next = units[_graderUnitIndex(units, focusStudentId) + dir];
     if (_graderUnitIndex(units, focusStudentId) < 0 || !next) return true;
     _grader.menuSid = null;
-    focusStudentId = next[0];
+    focusStudentId = next.source || next.sid;
     render();
     return true;
   }
@@ -8017,13 +8010,10 @@ window.PageAssignments = (function () {
       // The group stays open; it draws from another member now if it drew
       // from this one.
       if (focusStudentId === sid) {
-        var view = _graderGroupView(
-          cid,
-          a,
-          (getCollabGroupOf(a, sid) || { members: [] }).members.find(function (m) {
-            return !isGradedSeparately(a, m);
-          }),
-        );
+        var stillLinked = (getCollabGroupOf(a, sid) || { members: [] }).members.find(function (m) {
+          return !isGradedSeparately(a, m);
+        });
+        var view = stillLinked && _graderGroupView(cid, a, stillLinked);
         if (view) focusStudentId = view.source;
       }
       refreshSidebarGrades();
@@ -8043,17 +8033,20 @@ window.PageAssignments = (function () {
     });
     var group = getCollabGroupOf(a, sid);
     if (!st || !group) return;
+    var done = function () {
+      setGradedSeparately(cid, a.id, sid, false);
+      refreshSidebarGrades();
+      render();
+    };
+    // Nobody to copy from: nothing is replaced, so nothing to ask.
+    if (!backToGroupGradeSource(cid, a.id, sid)) return done();
     var first = displayNameFirst(st);
     showConfirm(
       'Back to Group Grade?',
-      first + '’s own levels, comments and Overall Comment will be replaced by ' + _collabGroupLabel(group) + '’s.',
+      first + '’s own levels, comments and Overall Comment will be replaced by ' + collabGroupLabel(group) + '’s.',
       'Back to Group Grade',
       'primary',
-      function () {
-        setGradedSeparately(cid, a.id, sid, false);
-        refreshSidebarGrades();
-        render();
-      },
+      done,
     );
   }
 
@@ -8143,7 +8136,7 @@ window.PageAssignments = (function () {
     var line = dialog.querySelector('.grader-separate-line');
     var group = !view && isGradedSeparately(a, sid) ? getCollabGroupOf(a, sid) : null;
     var lineHtml = group
-      ? esc('Graded Separately From ' + _collabGroupLabel(group)) +
+      ? esc('Graded Separately From ' + collabGroupLabel(group)) +
         '<button type="button" class="grader-member-back" data-grader="rejoin" data-sid="' +
         sid +
         '">Back to Group Grade</button>'

@@ -200,3 +200,110 @@ describe('rubric checkboxes', () => {
     expect(getRubricCheckIds(CID, 'a', 'grp')).toEqual([]);
   });
 });
+
+describe('review fixes (Nov 1 2026)', () => {
+  it('moves a member with a grade of their own to Graded Separately instead of writing over it', () => {
+    // b and c were graded before the groups were made: b differs from a.
+    saveScores(CID, {
+      a: [{ assessmentId: 'grp', tagId: 't1', score: 3, type: 'summative', date: '2026-10-31' }],
+      b: [{ assessmentId: 'grp', tagId: 't1', score: 1, type: 'summative', date: '2026-10-31' }],
+      c: [{ assessmentId: 'grp', tagId: 't1', score: 3, type: 'summative', date: '2026-10-31' }],
+    });
+    upsertScore(CID, 'a', 'grp', 't2', 4, '', 'summative', '');
+    expect(levels('b', 'grp')).toEqual([['t1', 1, 0]]);
+    expect(isLinkedGroupMember(CID, 'grp', 'b')).toBe(false);
+    expect(levels('c', 'grp')).toEqual([
+      ['t1', 3, 0],
+      ['t2', 4, 0],
+    ]);
+  });
+
+  it('a status taken off through a bulk save copies the group grade back', () => {
+    var st = getAssignmentStatuses(CID);
+    st['c:grp'] = 'NS';
+    saveAssignmentStatuses(CID, st);
+    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
+    expect(levels('c', 'grp')).toEqual([]);
+    st = getAssignmentStatuses(CID);
+    delete st['c:grp'];
+    saveAssignmentStatuses(CID, st);
+    expect(levels('c', 'grp')).toEqual([['t1', 3, 0]]);
+  });
+
+  it('a bulk Missing on a graded member clears their copy', () => {
+    upsertScore(CID, 'a', 'grp', 't1', 3, '', 'summative', '');
+    var st = getAssignmentStatuses(CID);
+    st['b:grp'] = 'EXC';
+    saveAssignmentStatuses(CID, st);
+    expect(levels('b', 'grp')).toEqual([]);
+    expect(levels('c', 'grp')).toEqual([['t1', 3, 0]]);
+  });
+
+  it('old rubric keys in storage are not read as changed grades', () => {
+    var list = getAssessments(CID);
+    var rub = list.find(x => x.id === 'grp');
+    rub.rubricId = 'r1';
+    rub.tagIds = ['t1'];
+    saveAssessments(CID, list);
+    saveRubrics(CID, [{ id: 'r1', name: 'R', criteria: [{ id: 'c1', name: 'C', tagIds: ['t1'], levels: {} }] }]);
+    // Stored before criteria had their own keys; a and b already differ.
+    _cache.scores[CID] = undefined;
+    localStorage.setItem(
+      'gb-scores-' + CID,
+      JSON.stringify({
+        a: [{ assessmentId: 'grp', tagId: 't1', score: 3, type: 'summative', date: '2026-10-31' }],
+        b: [{ assessmentId: 'grp', tagId: 't1', score: 2, type: 'summative', date: '2026-10-31' }],
+      }),
+    );
+    var scores = getScores(CID);
+    scores.d = [{ assessmentId: 'solo', tagId: 't1', score: 3, type: 'summative', date: '2026-10-31' }];
+    saveScores(CID, scores);
+    expect(isLinkedGroupMember(CID, 'grp', 'b')).toBe(true);
+    expect(levels('b', 'grp')).toEqual([['c1', 2, 0]]);
+  });
+
+  it('never grades DIBELS work by group, and keeps its Missing rule', () => {
+    var list = getAssessments(CID);
+    list.push({
+      id: 'dib',
+      title: 'DIBELS',
+      date: '2026-10-31',
+      type: 'summative',
+      tagIds: [],
+      scoreMode: 'dibels',
+      collaboration: 'group',
+      groups: [['a', 'b']],
+    });
+    saveAssessments(CID, list);
+    expect(getCollabGroupOf(list[list.length - 1], 'a')).toBe(null);
+    saveDibelsScore(CID, 'a', 'dib', 'boy', { orfWrc: 120 });
+    expect(canSetAssignmentStatus(CID, 'a', 'dib', 'NS')).toBe(false);
+  });
+
+  it('Back to Group Grade has nobody to copy from when the rest are Excused', () => {
+    setGradedSeparately(CID, 'pr', 'b', true);
+    setAssignmentStatus(CID, 'a', 'pr', 'EXC');
+    expect(backToGroupGradeSource(CID, 'pr', 'b')).toBe(null);
+    setAssignmentStatus(CID, 'a', 'pr', null);
+    expect(backToGroupGradeSource(CID, 'pr', 'b')).toBe('a');
+  });
+
+  it('groupGradingUnits lists groups, then separated members, then the rest', () => {
+    setGradedSeparately(CID, 'grp', 'b', true);
+    var a = getAssessments(CID).find(x => x.id === 'grp');
+    var units = groupGradingUnits(CID, a, ['a', 'b', 'c', 'd', 'e', 'z']);
+    expect(units.map(u => (u.linked ? 'G' + (u.group.index + 1) + ':' + u.source : u.sid))).toEqual([
+      'G1:a',
+      'b',
+      'G2:d',
+      'z',
+    ]);
+    expect(
+      groupGradingUnits(
+        CID,
+        getAssessments(CID).find(x => x.id === 'solo'),
+        ['a'],
+      ),
+    ).toBe(null);
+  });
+});

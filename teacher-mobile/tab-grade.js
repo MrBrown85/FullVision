@@ -521,67 +521,37 @@ window.MGrade = (function () {
   var _MORE_ICON =
     '<svg width="16" height="4" viewBox="0 0 16 4" aria-hidden="true"><circle cx="2" cy="2" r="1.8" fill="currentColor"/><circle cx="8" cy="2" r="1.8" fill="currentColor"/><circle cx="14" cy="2" r="1.8" fill="currentColor"/></svg>';
 
-  function _collabLists(a) {
-    var lists = a && (a.collaboration === 'pair' ? a.pairs : a.collaboration === 'group' ? a.groups : null);
-    return lists || [];
-  }
-  function _groupLabel(group) {
-    return (group.kind === 'pair' ? 'Pair ' : 'Group ') + (group.index + 1);
-  }
-  function _isWithheld(cid, sid, aid) {
-    var status = getAssignmentStatus(cid, sid, aid);
-    return status === 'NS' || status === 'EXC';
-  }
-
-  // The swiper's cards in order: on group work a card per group (its
-  // linked members' grade, drawn from the first who isn't Missing or
-  // Excused), each followed by its members graded separately, then the
-  // students in no group; on other work a card per student.
+  // The swiper's cards in order: on group work a card per group (drawn from
+  // the member its grade comes from), each followed by its members graded
+  // separately, then the students in no group (groupGradingUnits, shared
+  // with the desktop); on other work a card per student.
   function _swiperUnits(cid, a) {
     var students = sortStudents(getStudents(cid).slice(), 'alpha');
-    var lists = _collabLists(a);
-    if (!lists.length)
-      return students.map(function (st) {
-        return { st: st, label: displayName(st) };
-      });
     var byId = {};
     students.forEach(function (st) {
       byId[st.id] = st;
     });
-    var units = [];
-    var placed = {};
-    lists.forEach(function (members, index) {
-      var here = (members || []).filter(function (m) {
-        return byId[m];
+    var units = groupGradingUnits(
+      cid,
+      a,
+      students.map(function (st) {
+        return st.id;
+      }),
+    );
+    if (!units)
+      return students.map(function (st) {
+        return { st: st, label: displayName(st) };
       });
-      here.forEach(function (m) {
-        placed[m] = true;
-      });
-      var group = { kind: a.collaboration === 'pair' ? 'pair' : 'group', index: index, members: here };
-      var linked = here.filter(function (m) {
-        return !isGradedSeparately(a, m);
-      });
-      if (linked.length) {
-        var source =
-          linked.find(function (m) {
-            return !_isWithheld(cid, m, a.id);
-          }) || linked[0];
-        units.push({
-          st: byId[source],
-          label: _groupLabel(group),
-          thumb: (group.kind === 'pair' ? 'P' : 'G') + (index + 1),
-          view: { group: group, members: here },
-        });
-      }
-      here.forEach(function (m) {
-        if (isGradedSeparately(a, m))
-          units.push({ st: byId[m], label: displayNameWithLast(byId[m]), separateFrom: group });
-      });
+    return units.map(function (u) {
+      if (u.linked)
+        return {
+          st: byId[u.source],
+          label: collabGroupLabel(u.group),
+          thumb: (u.group.kind === 'pair' ? 'P' : 'G') + (u.group.index + 1),
+          view: { group: u.group, members: u.members },
+        };
+      return { st: byId[u.sid], label: displayNameWithLast(byId[u.sid]), separateFrom: u.separateFrom || null };
     });
-    students.forEach(function (st) {
-      if (!placed[st.id]) units.push({ st: st, label: displayNameWithLast(st) });
-    });
-    return units;
   }
 
   // "3 of 27"; on group work the card's name first: "Group 2 · 2 of 9".
@@ -594,7 +564,7 @@ window.MGrade = (function () {
   function _groupCardHeadHtml(cid, a, view) {
     return (
       '<div class="m-group-title">' +
-      MC.esc(_groupLabel(view.group)) +
+      MC.esc(collabGroupLabel(view.group)) +
       '</div>' +
       '<div class="m-group-members">' +
       view.members
@@ -657,7 +627,7 @@ window.MGrade = (function () {
     return (
       '<div class="m-group-separate">' +
       '<div class="m-group-separate-text">' +
-      MC.esc('Graded Separately From ' + _groupLabel(group)) +
+      MC.esc('Graded Separately From ' + collabGroupLabel(group)) +
       '</div>' +
       '<button class="m-group-back" data-action="m-grade-rejoin" data-sid="' +
       sid +
@@ -722,6 +692,8 @@ window.MGrade = (function () {
     });
     var group = getCollabGroupOf(a, sid);
     if (!st || !group) return;
+    // Nobody to copy from: nothing is replaced, so nothing to ask.
+    if (!backToGroupGradeSource(cid, aid, sid)) return backToGroup(cid, aid, sid);
     MC.presentSheet(
       '<div class="m-group-sheet">' +
         '<div class="m-group-sheet-title is-question">Back to Group Grade?</div>' +
@@ -729,7 +701,7 @@ window.MGrade = (function () {
         MC.esc(
           displayNameFirst(st) +
             '’s own levels, comments and Overall Comment will be replaced by ' +
-            _groupLabel(group) +
+            collabGroupLabel(group) +
             '’s.',
         ) +
         '</p>' +
@@ -761,12 +733,11 @@ window.MGrade = (function () {
     var students = units.map(function (u) {
       return u.st;
     });
-    _swiperLabels =
-      assessment.collaboration && _collabLists(assessment).length
-        ? units.map(function (u) {
-            return u.label;
-          })
-        : null;
+    _swiperLabels = groupGradingUnits(cid, assessment, [])
+      ? units.map(function (u) {
+          return u.label;
+        })
+      : null;
     var allScores = getScores(cid);
     _currentIdx = 0;
 
@@ -1560,7 +1531,7 @@ window.MGrade = (function () {
     var a = getAssessments(cid).find(function (x) {
       return x.id === aid;
     });
-    if (_collabLists(a).length) _redrawSwiper(cid, aid);
+    if (groupGradingUnits(cid, a, [])) _redrawSwiper(cid, aid);
   }
 
   function undoLastScore() {

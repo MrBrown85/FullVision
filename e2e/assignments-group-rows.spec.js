@@ -15,6 +15,10 @@ async function setUp(page) {
   const info = await page.evaluate(() => {
     const list = getAssessments('sci8');
     const a = list.find(x => x.title === 'Science Fair Proposal');
+    // An ungraded group: Demo Mode's students each have their own grade here.
+    const sc = getScores('sci8');
+    Object.keys(sc).forEach(sid => (sc[sid] = sc[sid].filter(e => e.assessmentId !== a.id)));
+    saveScores('sci8', sc);
     const ids = sortStudents(getStudents('sci8'), 'lastName').map(s => s.id);
     a.collaboration = 'group';
     a.groups = [ids.slice(0, 4), ids.slice(4, 8), ids.slice(8, 12)];
@@ -69,4 +73,31 @@ test('Grade Separately from the strip, and Back to Group Grade', async ({ page }
   await page.locator('.confirm-overlay').getByRole('button', { name: 'Back to Group Grade' }).click();
   await expect(card.locator('.rsg-separate-note')).toHaveCount(0);
   await expect(card.locator('.rsg-student').nth(1).locator('.rsg-student-name').first()).toHaveText('Group 2');
+});
+
+test('a competency outside the rubric doesn’t draw the members strip twice', async ({ page }) => {
+  await page.goto('/login.html');
+  await page.locator('#demo-mode-btn').click();
+  await page.waitForURL(/\/dashboard/);
+  const aid = await page.evaluate(() => {
+    const list = getAssessments('sci8');
+    const a = list.find(x => x.title === 'Science Fair Proposal');
+    // An ungraded group: Demo Mode's students each have their own grade here.
+    const sc = getScores('sci8');
+    Object.keys(sc).forEach(sid => (sc[sid] = sc[sid].filter(e => e.assessmentId !== a.id)));
+    saveScores('sci8', sc);
+    const ids = sortStudents(getStudents('sci8'), 'lastName').map(s => s.id);
+    const inRubric = new Set(getRubricById('sci8', a.rubricId).criteria.flatMap(c => c.tagIds || []));
+    const extra = getAllTags('sci8').find(t => !inRubric.has(t.id));
+    a.tagIds = (a.tagIds || []).concat([extra.id]);
+    a.collaboration = 'group';
+    a.groups = [ids.slice(0, 4), ids.slice(4, 8)];
+    saveAssessments('sci8', list);
+    return a.id;
+  });
+  await page.goto('/assignments?course=sci8');
+  await page.locator(`[data-action="toggleAssess"][data-aid="${aid}"]`).click();
+  const card = page.locator(`#ac-${aid}`);
+  await expect(card).toContainText('Additional Tags');
+  await expect(card.locator('.rsg-group-members')).toHaveCount(2);
 });
