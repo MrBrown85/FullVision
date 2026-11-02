@@ -71,6 +71,8 @@ window.CompetencyWording = (function () {
   function loadBank() {
     if (window.BANK_PROFICIENCY && window.BANK_COMMENT) return Promise.resolve(true);
     if (_loading) return _loading;
+    // No page to load into (a test, a worker): the other wording stays.
+    if (typeof document === 'undefined' || !document.head) return Promise.resolve(false);
     _loading = Promise.all([
       _script('/shared/bank-proficiency.js', function () {
         return !!window.BANK_PROFICIENCY;
