@@ -710,9 +710,14 @@ window.ObsCapture = (function () {
         (o.on ? '✓' : '') +
         '</span>' +
         (o.dot ? '<span class="obsc-dot" style="background:' + o.dot + '"></span>' : '') +
-        '<span class="obsc-item-label">' +
-        esc(label) +
-        '</span>' +
+        // A second line under the label (o.desc): the level's descriptor.
+        (o.desc
+          ? '<span class="obsc-item-text"><span class="obsc-item-label">' +
+            esc(label) +
+            '</span><span class="obsc-item-desc">' +
+            esc(o.desc) +
+            '</span></span>'
+          : '<span class="obsc-item-label">' + esc(label) + '</span>') +
         (o.hint ? '<span class="obsc-item-hint">' + esc(o.hint) + '</span>' : '') +
         '</div>'
       );
@@ -869,8 +874,14 @@ window.ObsCapture = (function () {
       } else if (name === 'level') {
         h +=
           '<div class="obsc-menu-note">What level does this look like? Evidence only; it never changes a grade.</div><div class="obsc-menu-list">';
+        // Each level's descriptor for the competency picked (Nov 2 mockup,
+        // batch 2), by the printed rubric's rule (CompetencyWording).
+        var lvTag = state.competencyId && typeof getTagById === 'function' ? getTagById(cid, state.competencyId) : null;
         levelOrderFor(cid).forEach(function (n) {
-          h += item('setLevel', n, levelLabel(n), { on: state.level === n });
+          var w = lvTag && window.CompetencyWording ? CompetencyWording.lines(lvTag, n) : null;
+          // A bank competency's wording loads for the next time the menu opens.
+          if (w && !w.ready && window.RubricPrint && RubricPrint.loadBankLevels) RubricPrint.loadBankLevels();
+          h += item('setLevel', n, levelLabel(n), { on: state.level === n, desc: w ? w.descriptor : '' });
         });
         h += item('setLevel', '', 'No level', { on: !state.level });
         h += '</div>';
