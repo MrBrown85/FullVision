@@ -256,6 +256,7 @@ window.PageAssignments = (function () {
      assessments. A focused rubric row moves to the new student's first row. */
   function stepFocusStudent(dir) {
     if (!focusStudentId) return;
+    if (_grader && _graderStepGroup(dir)) return;
     var ids = _grader
       ? _grader.studentIds
       : Array.prototype.filter
@@ -7434,7 +7435,14 @@ window.PageAssignments = (function () {
       if (!btn) return;
       var what = btn.dataset.grader;
       if (what === 'close') closeGrader();
-      else stepFocusStudent(what === 'next' ? 1 : -1);
+      else if (what === 'next' || what === 'prev') stepFocusStudent(what === 'next' ? 1 : -1);
+      else _graderGroupAction(what, btn.dataset.sid);
+    });
+    // A click anywhere but the open ⋯ menu closes it.
+    overlay.addEventListener('mousedown', function (e) {
+      if (!_grader || !_grader.menuSid || e.target.closest('.grader-member-menu, .grader-member-more')) return;
+      _grader.menuSid = null;
+      _refreshGraderChrome();
     });
     // The Note for the Report: the preview follows each key, the note saves
     // on Enter or leaving the box (and so before Done, a step or closing).
@@ -7482,6 +7490,11 @@ window.PageAssignments = (function () {
     if (document.getElementById('rubric-modal') || document.querySelector('.confirm-overlay')) return;
     if (window.RubricBank && RubricBank.isOpen()) return;
     e.preventDefault();
+    if (_grader.menuSid) {
+      _grader.menuSid = null;
+      _refreshGraderChrome();
+      return;
+    }
     closeGrader();
   }
 
@@ -7555,6 +7568,8 @@ window.PageAssignments = (function () {
         '<span class="grader-spacer"></span>' +
         '<div class="grader-status" role="group" aria-label="Status"></div>' +
         '</div>' +
+        '<div class="grader-separate-line" hidden></div>' +
+        '<section class="grader-members" aria-labelledby="grader-members-title" hidden></section>' +
         '<div class="grader-body"></div>' +
         '<section class="grader-report-note" aria-labelledby="grader-report-note-title">' +
         '<div class="grader-report-note-head"><h2 id="grader-report-note-title">Note for the Report</h2>' +
@@ -7570,16 +7585,32 @@ window.PageAssignments = (function () {
         '<span class="grader-hint">← → change student · Esc closes</span>' +
         '<span class="grader-grade-label">Grade</span><span class="grader-grade"></span>' +
         '</div>';
+    // Group work shows the group: its grade is drawn from (and saved for)
+    // the member it copies from, so that member is the focus.
+    var view = _graderGroupView(cid, a, st.id);
+    if (view && view.source !== st.id) {
+      focusStudentId = view.source;
+      st = getStudents(cid).find(function (x) {
+        return x.id === view.source;
+      });
+    }
     var i = _grader.studentIds.indexOf(st.id);
+    var steps = _graderUnits(cid, a);
+    var u = steps ? _graderUnitIndex(steps, st.id) : -1;
     dialog.querySelector('.grader-title').textContent = a.title || 'Assessment';
     dialog.querySelector('.grader-counts-as').textContent = _countsAsText(cid, a);
     var needsCat = dialog.querySelector('.grader-needs-category');
     needsCat.hidden = !assessmentNeedsCategory(cid, a);
     needsCat.textContent = NEEDS_CATEGORY_LABEL;
     needsCat.title = NEEDS_CATEGORY_TIP;
-    dialog.querySelector('.grader-student').textContent = displayNameWithLast(st);
-    dialog.querySelector('[data-grader="prev"]').disabled = !(i > 0);
-    dialog.querySelector('[data-grader="next"]').disabled = !(i >= 0 && i < _grader.studentIds.length - 1);
+    dialog.querySelector('.grader-student').textContent = view ? view.label : displayNameWithLast(st);
+    dialog.querySelector('[data-grader="prev"]').disabled = steps ? !(u > 0) : !(i > 0);
+    dialog.querySelector('[data-grader="next"]').disabled = steps
+      ? !(u >= 0 && u < steps.length - 1)
+      : !(i >= 0 && i < _grader.studentIds.length - 1);
+    dialog.querySelector('[data-grader="prev"]').setAttribute('aria-label', view ? 'Previous' : 'Previous student');
+    dialog.querySelector('[data-grader="next"]').setAttribute('aria-label', view ? 'Next' : 'Next student');
+    _grader.source = view ? view.source : null;
     dialog.querySelector('.grader-toolbar-start').innerHTML = _graderPrintButton(cid, a);
     // html-safe: a.id is our id; _graderHtml is reviewed
     dialog.querySelector('.grader-body').innerHTML =
@@ -7700,6 +7731,255 @@ window.PageAssignments = (function () {
     );
   }
 
+  /* ── Group work in the dialog (Group grading, shared/data.js) ──
+     Pair and Group work is graded once per group: the dialog shows the
+     group's name, a card of its members (each with their own Missing |
+     Excused | Late and a ⋯ menu with Grade Separately), and the grading
+     controls of the member the group's grade is copied from. A member
+     graded separately gets their own view, as any student. ← → step group
+     by group, each group followed by its members graded separately, then
+     the students in no group. */
+  var _GRADER_MORE_ICON =
+    '<svg width="16" height="4" viewBox="0 0 16 4" aria-hidden="true"><circle cx="2" cy="2" r="1.8" fill="currentColor"/><circle cx="8" cy="2" r="1.8" fill="currentColor"/><circle cx="14" cy="2" r="1.8" fill="currentColor"/></svg>';
+
+  function _collabGroupLabel(group) {
+    return (group.kind === 'pair' ? 'Pair ' : 'Group ') + (group.index + 1);
+  }
+
+  // The group view for `sid` (a member still graded with their group), or
+  // null. `source` is the first such member who isn't Missing or Excused,
+  // or the first of them when every one is.
+  function _graderGroupView(cid, a, sid) {
+    var group = getCollabGroupOf(a, sid);
+    if (!group || isGradedSeparately(a, sid)) return null;
+    var known = {};
+    getStudents(cid).forEach(function (s) {
+      known[s.id] = true;
+    });
+    var members = group.members.filter(function (m) {
+      return known[m];
+    });
+    var linked = members.filter(function (m) {
+      return !isGradedSeparately(a, m);
+    });
+    var source =
+      linked.find(function (m) {
+        var status = getAssignmentStatus(cid, m, a.id);
+        return status !== 'NS' && status !== 'EXC';
+      }) || linked[0];
+    return { group: group, label: _collabGroupLabel(group), members: members, source: source };
+  }
+
+  // The dialog's steps on group work, each a list of student ids: a group's
+  // members still graded with it, then each member graded separately on
+  // their own, then everyone in no group. Null on other work.
+  function _graderUnits(cid, a) {
+    var kind = a && (a.collaboration === 'pair' ? 'pairs' : a.collaboration === 'group' ? 'groups' : null);
+    var lists = (kind && a[kind]) || [];
+    if (!lists.length) return null;
+    var students = sortStudents(getStudents(cid), 'lastName');
+    var known = {};
+    students.forEach(function (s) {
+      known[s.id] = true;
+    });
+    var units = [];
+    var placed = {};
+    lists.forEach(function (members) {
+      var here = (members || []).filter(function (m) {
+        return known[m];
+      });
+      here.forEach(function (m) {
+        placed[m] = true;
+      });
+      var linked = here.filter(function (m) {
+        return !isGradedSeparately(a, m);
+      });
+      if (linked.length) units.push(linked);
+      here.forEach(function (m) {
+        if (isGradedSeparately(a, m)) units.push([m]);
+      });
+    });
+    students.forEach(function (s) {
+      if (!placed[s.id]) units.push([s.id]);
+    });
+    return units;
+  }
+  function _graderUnitIndex(units, sid) {
+    for (var i = 0; i < units.length; i++) if (units[i].indexOf(sid) >= 0) return i;
+    return -1;
+  }
+
+  // ← → on group work. False on other work, which steps student by student.
+  function _graderStepGroup(dir) {
+    var cid = activeCourse;
+    var a = _assessmentById(cid, _grader.aid);
+    var units = _graderUnits(cid, a);
+    if (!units) return false;
+    var next = units[_graderUnitIndex(units, focusStudentId) + dir];
+    if (_graderUnitIndex(units, focusStudentId) < 0 || !next) return true;
+    _grader.menuSid = null;
+    focusStudentId = next[0];
+    render();
+    return true;
+  }
+
+  // The members card's buttons: the ⋯ menu, Grade Separately, Back to
+  // Group Grade and a separated member's name, which opens their view.
+  function _graderGroupAction(what, sid) {
+    var cid = activeCourse;
+    var aid = _grader.aid;
+    var a = _assessmentById(cid, aid);
+    if (!a || !sid) return;
+    if (what === 'member-menu') {
+      _grader.menuSid = _grader.menuSid === sid ? null : sid;
+      _refreshGraderChrome();
+      var item = _grader.menuSid && _grader.overlay.querySelector('.grader-member-menu:not([hidden]) button');
+      if (item) item.focus();
+    } else if (what === 'separate') {
+      _grader.menuSid = null;
+      setGradedSeparately(cid, aid, sid, true);
+      // The group stays open; it draws from another member now if it drew
+      // from this one.
+      if (focusStudentId === sid) {
+        var view = _graderGroupView(
+          cid,
+          a,
+          (getCollabGroupOf(a, sid) || { members: [] }).members.find(function (m) {
+            return !isGradedSeparately(a, m);
+          }),
+        );
+        if (view) focusStudentId = view.source;
+      }
+      refreshSidebarGrades();
+      render();
+    } else if (what === 'rejoin') {
+      _confirmBackToGroupGrade(cid, a, sid);
+    } else if (what === 'open-member') {
+      _grader.menuSid = null;
+      focusStudentId = sid;
+      render();
+    }
+  }
+
+  function _confirmBackToGroupGrade(cid, a, sid) {
+    var st = getStudents(cid).find(function (x) {
+      return x.id === sid;
+    });
+    var group = getCollabGroupOf(a, sid);
+    if (!st || !group) return;
+    var first = displayNameFirst(st);
+    showConfirm(
+      'Back to Group Grade?',
+      first + '’s own levels, comments and Overall Comment will be replaced by ' + _collabGroupLabel(group) + '’s.',
+      'Back to Group Grade',
+      'primary',
+      function () {
+        setGradedSeparately(cid, a.id, sid, false);
+        refreshSidebarGrades();
+        render();
+      },
+    );
+  }
+
+  // html-safe: names go through esc(); ids are ours; labels are constants
+  function _graderMemberHtml(cid, a, st, menuSid) {
+    var sid = st.id;
+    var name = esc(displayNameWithLast(st));
+    var status = getAssignmentStatus(cid, sid, a.id);
+    var statusHtml =
+      '<div class="grader-status" role="group" aria-label="Status for ' +
+      name +
+      '">' +
+      _graderStatusButtons(a.id, sid, status, ['NS', 'EXC', 'LATE']) +
+      '</div>';
+    if (isGradedSeparately(a, sid)) {
+      var grade = _graderGrade(cid, a, sid);
+      return (
+        '<div class="grader-member is-separate">' +
+        '<div class="grader-member-top"><button type="button" class="grader-member-name is-link" data-grader="open-member" data-sid="' +
+        sid +
+        '">' +
+        name +
+        '</button></div>' +
+        '<div class="grader-member-separate">Graded Separately<span class="grader-grade' +
+        (grade.tone ? ' tone-' + grade.tone : '') +
+        '">' +
+        esc(grade.text) +
+        '</span></div>' +
+        statusHtml +
+        '<button type="button" class="grader-member-back" data-grader="rejoin" data-sid="' +
+        sid +
+        '">Back to Group Grade</button>' +
+        '</div>'
+      );
+    }
+    var open = menuSid === sid;
+    return (
+      '<div class="grader-member">' +
+      '<div class="grader-member-top"><span class="grader-member-name">' +
+      name +
+      '</span><button type="button" class="grader-member-more" data-grader="member-menu" data-sid="' +
+      sid +
+      '" aria-label="More for ' +
+      name +
+      '" aria-haspopup="menu" aria-expanded="' +
+      open +
+      '">' +
+      _GRADER_MORE_ICON +
+      '</button></div>' +
+      statusHtml +
+      '<div class="grader-member-menu" role="menu"' +
+      (open ? '' : ' hidden') +
+      '><button type="button" role="menuitem" data-grader="separate" data-sid="' +
+      sid +
+      '">Grade Separately</button></div>' +
+      '</div>'
+    );
+  }
+
+  // The members card (group view) and the Graded Separately From line (a
+  // member graded separately), redrawn only when they change.
+  function _refreshGroupChrome(dialog, cid, a, sid, view) {
+    var card = dialog.querySelector('.grader-members');
+    var html = '';
+    if (view) {
+      var byId = {};
+      getStudents(cid).forEach(function (s) {
+        byId[s.id] = s;
+      });
+      html =
+        '<h2 class="grader-members-title" id="grader-members-title">' +
+        (view.group.kind === 'pair' ? 'Pair Members' : 'Group Members') +
+        '</h2><div class="grader-members-grid">' +
+        view.members
+          .map(function (m) {
+            return _graderMemberHtml(cid, a, byId[m], _grader.menuSid);
+          })
+          .join('') +
+        '</div>';
+    }
+    if (_grader.membersHtml !== html) {
+      // html-safe: built by _graderMemberHtml, names escaped there
+      card.innerHTML = html;
+      _grader.membersHtml = html;
+    }
+    card.hidden = !view;
+    var line = dialog.querySelector('.grader-separate-line');
+    var group = !view && isGradedSeparately(a, sid) ? getCollabGroupOf(a, sid) : null;
+    var lineHtml = group
+      ? esc('Graded Separately From ' + _collabGroupLabel(group)) +
+        '<button type="button" class="grader-member-back" data-grader="rejoin" data-sid="' +
+        sid +
+        '">Back to Group Grade</button>'
+      : '';
+    if (_grader.lineHtml !== lineHtml) {
+      // html-safe: the label goes through esc(); sid is our id
+      line.innerHTML = lineHtml;
+      _grader.lineHtml = lineHtml;
+    }
+    line.hidden = !group;
+  }
+
   /* The parts of the dialog that change with every click: the status
      control, the Note for the Report and the grade. */
   function _refreshGraderChrome() {
@@ -7711,6 +7991,11 @@ window.PageAssignments = (function () {
     });
     var dialog = _grader.overlay.querySelector('.grader-dialog');
     if (!a || !sid || !dialog) return;
+    var view = _graderGroupView(cid, a, sid);
+    // The member the group's grade comes from changed (Missing, Excused or
+    // Grade Separately): draw the group again from the new one.
+    if ((view ? view.source : null) !== (_grader.source || null)) return render();
+    _refreshGroupChrome(dialog, cid, a, sid, view);
     var status = getAssignmentStatus(cid, sid, a.id);
     // A DIBELS benchmark is given on the day or not at all: no Late.
     var statusHtml = _graderStatusButtons(a.id, sid, status, isDibelsScored(a) ? ['NS', 'EXC'] : ['NS', 'EXC', 'LATE']);
@@ -7724,7 +8009,13 @@ window.PageAssignments = (function () {
     }
     // Missing and Excused set the grading controls aside, as the grids do.
     dialog.querySelector('.grader-body').classList.toggle('is-locked', status === 'NS' || status === 'EXC');
+    dialog.querySelector('.grader-status').hidden = !!view;
+    dialog.querySelector('.grader-hint').textContent = view
+      ? '\u2190 \u2192 change group \u00B7 Esc closes'
+      : '\u2190 \u2192 change student \u00B7 Esc closes';
     _refreshReportNote(dialog, cid, a, sid);
+    // The Note for the Report is one student's; the group view has none.
+    if (view) dialog.querySelector('.grader-report-note').hidden = true;
     var grade = _graderGrade(cid, a, sid);
     var pill = dialog.querySelector('.grader-grade');
     pill.textContent = grade.text;

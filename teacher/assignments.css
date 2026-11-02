@@ -4853,6 +4853,162 @@
 .grader-status-btn.is-late {
   background: var(--score-2);
 }
+/* Group work (Group grading): the members card, one tile per member with
+   their own Missing | Excused | Late and a ⋯ menu; a member graded
+   separately shows their grade and Back to Group Grade instead. The card
+   sits in the dialog's lane like the Overall Comment and Note for the
+   Report cards. */
+.grader-members {
+  margin: 0 16px;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 14px 16px 16px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 0 0 0.5px var(--divider-medium);
+}
+.grader-members[hidden],
+.grader-separate-line[hidden],
+.grader-status[hidden] {
+  display: none;
+}
+.grader-members-title {
+  margin: 0 0 12px;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text);
+}
+.grader-members-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.grader-member {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 10px 12px;
+  border-radius: 12px;
+  background: rgba(118, 118, 128, 0.08);
+}
+.grader-member-top {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 28px;
+}
+.grader-member-name {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+button.grader-member-name {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--active);
+  cursor: pointer;
+  text-align: left;
+}
+.grader-member-more {
+  width: 30px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.14);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.grader-member-more[aria-expanded='true'] {
+  background: rgba(118, 118, 128, 0.28);
+}
+.grader-member-menu {
+  position: absolute;
+  top: 44px;
+  right: 6px;
+  z-index: 5;
+  min-width: 200px;
+  padding: 5px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 0.5px var(--divider-medium),
+    0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.grader-member-menu[hidden] {
+  display: none;
+}
+.grader-member-menu button {
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.grader-member-menu button:hover,
+.grader-member-menu button:focus-visible {
+  background: rgba(0, 122, 255, 0.1);
+}
+.grader-member .grader-status-btn {
+  padding: 0 10px;
+}
+.grader-member-separate {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.grader-member-separate .grader-grade {
+  font-size: var(--text-sm);
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.grader-member-back {
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.14);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.grader-member-back:hover {
+  background: rgba(118, 118, 128, 0.22);
+}
+/* "Graded Separately From Group 2" under a separated member's name. */
+.grader-separate-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: -6px;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
 .grader-body .assess-card {
   border: none;
   box-shadow: none;
