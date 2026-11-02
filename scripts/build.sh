@@ -8,7 +8,7 @@ cp index.html login.html login.css login-auth.js privacy.html dist/
 cp manifest.json sw.js dist/
 [ -f favicon.svg ] && cp favicon.svg dist/ || true
 [ -f robots.txt ] && cp robots.txt dist/ || true
-cp curriculum_data.js curriculum_by_course.json dist/
+cp curriculum_data.js curriculum_by_course.json curriculum_crosswalk.json dist/
 cp roster-template.csv _headers dist/
 
 # App directories

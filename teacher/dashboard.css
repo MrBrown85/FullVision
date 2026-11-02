@@ -6047,3 +6047,32 @@ label.cm-cr-row {
 .cm-std-ican-none {
   color: var(--text);
 }
+
+/* Re-link review: a competency's wording under its name, and the
+   curriculum's replacements for an older class's competency. */
+.cm-cr-wording {
+  display: block;
+  color: var(--text);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  margin-top: 2px;
+}
+.cm-cr-repl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.cm-cr-repl-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: start;
+}
+.cm-cr-repl-item .cm-cr-name {
+  font-size: var(--text-sm);
+}
+.cm-relink-dropped {
+  color: var(--text);
+  margin-bottom: 12px;
+}

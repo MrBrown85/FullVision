@@ -6578,12 +6578,46 @@ window.DashClassManager = (function () {
     var course = COURSES[cid];
     cwSelectedTags = course && course.curriculumTags ? course.curriculumTags.slice() : [];
     cwLoadError = false;
-    loadCurriculumIndex().then(function (idx) {
+    Promise.all([loadCurriculumIndex(), _cmLoadCrosswalk()]).then(function (got) {
+      var idx = got[0];
       cwCurriculumLoaded = !!idx;
       cwLoadError = !idx;
+      if (idx) cwSelectedTags = _cmRelinkTags(cwSelectedTags, got[1]);
       renderClassManager();
     });
     renderClassManager();
+  }
+
+  /* The courses Re-link starts with: the class's own, less any the bank
+     dropped. A dropped course whose successors are settled (Humanities 8 →
+     ELA 8 + SS 8) brings them in; the others are listed for the teacher. */
+  function _cmRelinkTags(tags, cw) {
+    var out = [];
+    tags.forEach(function (k) {
+      var note = cw && cw.courses && cw.courses[k];
+      if (CURRICULUM_INDEX[k] || !note || !note.dropped) {
+        if (CURRICULUM_INDEX[k] && out.indexOf(k) < 0) out.push(k);
+        return;
+      }
+      if (note.decided)
+        note.successors.forEach(function (s) {
+          if (CURRICULUM_INDEX[s] && out.indexOf(s) < 0) out.push(s);
+        });
+    });
+    return out;
+  }
+
+  /* The class's courses the bank no longer has, with what replaces them. */
+  function _cmDroppedCourses(cid) {
+    var cw = window._CURRICULUM_CROSSWALK || _cmCrosswalk;
+    var tags = (COURSES[cid] && COURSES[cid].curriculumTags) || [];
+    return tags
+      .filter(function (k) {
+        return CURRICULUM_INDEX && !CURRICULUM_INDEX[k] && cw && cw.courses && cw.courses[k] && cw.courses[k].dropped;
+      })
+      .map(function (k) {
+        return Object.assign({ key: k }, cw.courses[k]);
+      });
   }
 
   function cmRelinkCancel() {
@@ -6613,6 +6647,25 @@ window.DashClassManager = (function () {
       } else if (cwLoadError) {
         html += '<div class="cw-empty-msg">Could not load BC Curriculum data.</div>';
       } else {
+        _cmDroppedCourses(cid).forEach(function (d) {
+          var names = d.successors
+            .filter(function (k) {
+              return CURRICULUM_INDEX[k];
+            })
+            .map(function (k) {
+              return CURRICULUM_INDEX[k].course_name;
+            });
+          html +=
+            '<div class="cm-hint cm-relink-dropped">' +
+            esc(d.name) +
+            ' is no longer a BC curriculum course. ' +
+            (d.decided
+              ? 'Its courses are ticked below: ' + esc(names.join(' and ')) + '.'
+              : names.length
+                ? 'The courses that replace it: ' + esc(names.join(', ')) + '. Tick the ones this class teaches.'
+                : '') +
+            '</div>';
+        });
         html += '<div class="cm-field"><label class="cm-label">Grade</label><div class="cw-grade-row">';
         [8, 9, 10, 11, 12].forEach(function (g) {
           html +=
@@ -7700,9 +7753,9 @@ window.DashClassManager = (function () {
 
   // Pair incoming competencies with sections, one pass per key so a
   // wording match is never taken by an earlier code or title match.
-  function _cmMatch(cands, secs, keys) {
-    var pairs = {};
-    var used = {};
+  function _cmMatch(cands, secs, keys, start) {
+    var pairs = start ? start.pairs : {};
+    var used = start ? start.used : {};
     keys.forEach(function (key) {
       cands.forEach(function (c, ci) {
         if (pairs[ci] != null) return;
@@ -7722,6 +7775,16 @@ window.DashClassManager = (function () {
   }
 
   var CM_MATCH_KEYS = [
+    // The bank's own id: a class built from the rebuilt bank.
+    {
+      cand: function (c) {
+        return c.bank_id || '';
+      },
+      sec: function (s) {
+        var t = s.tags[0] || {};
+        return t.bank_id ? [t.bank_id] : [];
+      },
+    },
     {
       cand: function (c) {
         return _cmNorm(c.source_text || c.text);
@@ -7758,7 +7821,21 @@ window.DashClassManager = (function () {
     var removed = getRemovedSections(cid).filter(function (r) {
       return r && r.section && r.section.tags && r.section.tags[0];
     });
-    var live = _cmMatch(cands, secs, CM_MATCH_KEYS);
+    // Bank ids first; then, for an older class, the crosswalk from the old
+    // bank (its competencies match their old wording there, and the
+    // curriculum's version is a replacement, not the teacher's edit); then
+    // wording, code and title.
+    var live = _cmMatch(cands, secs, CM_MATCH_KEYS.slice(0, 1));
+    var replacedBy = opts.kind === 'curriculum' ? _cmCrosswalkPairs(cid, secs, live, cands, opts.tags || []) : {};
+    var takenCand = {};
+    Object.keys(replacedBy).forEach(function (si) {
+      live.used[si] = true;
+      replacedBy[si].forEach(function (ci) {
+        takenCand[ci] = true;
+        live.pairs[ci] = -1;
+      });
+    });
+    _cmMatch(cands, secs, CM_MATCH_KEYS.slice(1), live);
     var rest = [];
     cands.forEach(function (c, ci) {
       if (live.pairs[ci] == null) rest.push(ci);
@@ -7779,31 +7856,128 @@ window.DashClassManager = (function () {
       tags: opts.tags || [],
       add: [],
       changed: [],
+      replaced: [],
+      fill: [],
       onlyMine: [],
       same: [],
       showSame: false,
     };
+    // A class built from the rebuilt bank left out what it doesn't have on
+    // purpose, so new competencies start unticked there.
+    var builtFromBank = secs.some(function (s) {
+      return s.tags[0].bank_id;
+    });
     cands.forEach(function (c, ci) {
+      if (takenCand[ci]) return;
       var si = live.pairs[ci];
       if (si == null) {
         var ri = back.pairs[rest.indexOf(ci)];
-        review.add.push({ cand: c, removed: ri != null ? removed[ri].section : null, on: true });
+        var removedSec = ri != null ? removed[ri].section : null;
+        review.add.push({ cand: c, removed: removedSec, on: !!removedSec || !builtFromBank });
         return;
       }
       var sec = secs[si];
       var tag = sec.tags[0];
-      var same =
+      var sameNameAndWording =
         _cmNorm(_cmCompTitle(sec)) === _cmNorm(c.label) &&
         // A competency with no wording yet differs only if the rest does.
-        (!_cmNorm(tag.text) || _cmNorm(tag.text) === _cmNorm(c.text)) &&
-        _cmSameList(tag.i_can_statements, c.icans);
-      if (same) review.same.push({ sec: sec });
+        (!_cmNorm(tag.text) || _cmNorm(tag.text) === _cmNorm(c.text));
+      if (sameNameAndWording && _cmSameList(tag.i_can_statements, c.icans)) review.same.push({ sec: sec });
+      // No I Can statements yet, and the curriculum has some: an update.
+      else if (sameNameAndWording && !(tag.i_can_statements || []).length && c.icans.length)
+        review.fill.push({ sec: sec, cand: c });
       else review.changed.push({ sec: sec, cand: c, pick: 'mine' });
     });
     secs.forEach(function (sec, i) {
-      if (!live.used[i]) review.onlyMine.push({ sec: sec, pick: 'keep' });
+      if (replacedBy[i])
+        // An older class's competency and the curriculum's replacement.
+        review.replaced.push({
+          sec: sec,
+          cands: replacedBy[i].map(function (ci) {
+            return cands[ci];
+          }),
+          pick: 'mine',
+        });
+      else if (!live.used[i]) review.onlyMine.push({ sec: sec, pick: 'keep' });
     });
     return review;
+  }
+
+  /* The crosswalk from the old bank (curriculum_crosswalk.json), loaded
+     with the curriculum for Re-link. */
+  var _cmCrosswalk = null;
+  function _cmLoadCrosswalk() {
+    if (window._CURRICULUM_CROSSWALK) return Promise.resolve((_cmCrosswalk = window._CURRICULUM_CROSSWALK));
+    if (_cmCrosswalk) return Promise.resolve(_cmCrosswalk);
+    if (typeof fetch !== 'function') return Promise.resolve(null);
+    return fetch('/curriculum_crosswalk.json')
+      .then(function (res) {
+        return res.ok ? res.json() : null;
+      })
+      .then(function (data) {
+        _cmCrosswalk = data;
+        return data;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  /* For each class competency no match took, the incoming competencies the
+     crosswalk says replace it: by section index, a list of candidate
+     indexes in the crosswalk's order. Matched by the old wording, else by
+     the old code where only one old competency had it. */
+  function _cmCrosswalkPairs(cid, secs, live, cands, tags) {
+    var cw = window._CURRICULUM_CROSSWALK || _cmCrosswalk;
+    var out = {};
+    if (!cw || !cw.pairs) return out;
+    var olds = ((COURSES[cid] && COURSES[cid].curriculumTags) || []).concat(tags);
+    var rows = [];
+    olds.forEach(function (k) {
+      if (cw.pairs[k] && rows.indexOf(cw.pairs[k]) < 0) rows.push(cw.pairs[k]);
+    });
+    if (!rows.length) return out;
+    rows = [].concat.apply([], rows);
+    var freeCand = {};
+    cands.forEach(function (c, ci) {
+      if (live.pairs[ci] == null && c.bank_id) freeCand[c.bank_id] = ci;
+    });
+    secs.forEach(function (sec, si) {
+      if (live.used[si]) return;
+      var tag = sec.tags[0];
+      var words = [_cmNorm(tag.source_text), _cmNorm(tag.text)].filter(Boolean);
+      var row = rows.find(function (r) {
+        return words.indexOf(_cmNorm(r.raw)) >= 0;
+      });
+      if (!row) {
+        var code = _cmNorm(_cmStdCode(tag));
+        var byCode = rows.filter(function (r) {
+          return code && _cmNorm(r.code) === code;
+        });
+        if (byCode.length === 1) row = byCode[0];
+      }
+      if (!row) return;
+      var got = row.to
+        .map(function (id) {
+          return freeCand[id];
+        })
+        .filter(function (ci) {
+          return ci != null;
+        });
+      if (!got.length) return;
+      // Already the curriculum's wording and name: an ordinary match.
+      if (
+        got.some(function (ci) {
+          return words.indexOf(_cmNorm(cands[ci].text)) >= 0 && _cmNorm(_cmCompTitle(sec)) === _cmNorm(cands[ci].label);
+        })
+      )
+        return;
+      got.forEach(function (ci) {
+        delete freeCand[cands[ci].bank_id];
+      });
+      out[si] = got;
+    });
+    return out;
   }
 
   /* Open the review. A signed-in teacher's removed competencies come from
@@ -7834,12 +8008,19 @@ window.DashClassManager = (function () {
     var built = buildLearningMapFromTags(tags) || { subjects: [], sections: [] };
     return (built.sections || []).map(function (sec) {
       var tag = sec.tags[0] || {};
+      var group = (built.competencyGroups || []).find(function (g) {
+        return g.id === sec.groupId;
+      });
       return {
         code: tag.code || '',
         label: tag.label || '',
         text: tag.text || '',
         source_text: tag.source_text || '',
         icans: (tag.i_can_statements || []).slice(),
+        bank_id: tag.bank_id || '',
+        // Its Ministry folder, by name: the class's folder of that name
+        // takes it.
+        folder: group ? group.name : '',
         section: sec,
         subject: (built.subjects || []).find(function (s) {
           return s.id === sec.subject;
@@ -7877,7 +8058,7 @@ window.DashClassManager = (function () {
     var linked = (r.tags || [])
       .map(function (t) {
         var c = CURRICULUM_INDEX ? CURRICULUM_INDEX[t] : null;
-        return (c ? c.course_name : t) + ' (' + t + ')';
+        return c ? c.course_name : t;
       })
       .join(', ');
     function chip(sec, code) {
@@ -7913,6 +8094,92 @@ window.DashClassManager = (function () {
       '. Competencies are matched by code and curriculum wording, so nothing is added twice. Nothing changes until you press Apply.</div>' +
       '</div>';
 
+    // An older class's competency and the curriculum's replacement for it.
+    html += group('Replaced in the Curriculum', r.replaced, function (x, i) {
+      var tag = x.sec.tags[0];
+      var many = x.cands.length > 1;
+      var folder = many ? x.cands[0].folder : '';
+      var hasFolder =
+        folder &&
+        (getLearningMap(cid).competencyGroups || []).some(function (g) {
+          return _cmNorm(g.name) === _cmNorm(folder);
+        });
+      var note = !many
+        ? 'Your scores stay with it.'
+        : 'Adds these ' +
+          x.cands.length +
+          (folder ? (hasFolder ? ' to your ' + folder + ' folder' : ' in a new folder, ' + folder) : '') +
+          '. Your ' +
+          (_cmStdCode(tag) || _cmCompTitle(x.sec)) +
+          (folder ? ' moves into the same folder and keeps its scores.' : ' keeps its scores.') +
+          ' Nothing is renamed, so no grade changes.';
+      function option(pick, label, inner) {
+        return (
+          '<label class="cm-cr-option' +
+          (x.pick === pick ? ' on' : '') +
+          '">' +
+          '<input type="radio" name="cm-cr-replaced-' +
+          i +
+          '"' +
+          (x.pick === pick ? ' checked' : '') +
+          ' data-action-change="cmCompReviewPick" data-group="replaced" data-idx="' +
+          i +
+          '" data-pick="' +
+          pick +
+          '">' +
+          '<span class="cm-cr-text"><span class="cm-cr-pick">' +
+          label +
+          '</span>' +
+          inner +
+          '</span>' +
+          '</label>'
+        );
+      }
+      return (
+        '<div class="cm-cr-changed">' +
+        '<div class="cm-cr-changed-head">' +
+        chip(x.sec, _cmStdCode(tag)) +
+        '<span class="cm-cr-note">' +
+        _cmScoresNote(cid, tag) +
+        (_cmScoredAssessments(cid, tag.id) ? ' Scores stay either way.' : '') +
+        '</span></div>' +
+        '<div class="cm-cr-options" role="radiogroup" aria-label="' +
+        esc(_cmCompTitle(x.sec)) +
+        '">' +
+        option(
+          'mine',
+          'Keep Mine',
+          '<span class="cm-cr-name">' +
+            esc(_cmCompTitle(x.sec)) +
+            '</span>' +
+            (tag.text ? '<span class="cm-cr-wording">' + esc(tag.text) + '</span>' : ''),
+        ) +
+        option(
+          'theirs',
+          many ? 'Add the Curriculum Version' : 'Use the Curriculum Version',
+          '<span class="cm-cr-note">' +
+            esc(note) +
+            '</span><span class="cm-cr-repl-list">' +
+            x.cands
+              .map(function (c) {
+                return (
+                  '<span class="cm-cr-repl-item">' +
+                  chip(x.sec, c.code) +
+                  '<span class="cm-cr-text"><span class="cm-cr-name">' +
+                  esc(c.label || c.text) +
+                  '</span><span class="cm-cr-wording">' +
+                  esc(c.text) +
+                  '</span></span></span>'
+                );
+              })
+              .join('') +
+            '</span>',
+        ) +
+        '</div>' +
+        '</div>'
+      );
+    });
+
     html += group(
       file ? 'In the File, Not in Your Class' : 'In the Curriculum, Not in Your Class',
       r.add,
@@ -7930,10 +8197,13 @@ window.DashClassManager = (function () {
           chip(src, code) +
           '<span class="cm-cr-text"><span class="cm-cr-name">' +
           esc(a.removed ? _cmCompTitle(a.removed) : a.cand.label || a.cand.text) +
-          '</span><span class="cm-cr-note">' +
-          (a.removed ? 'You removed this from the class earlier. ' : '') +
-          _cmIcanNote(n) +
-          '.</span></span>' +
+          '</span>' +
+          (a.removed
+            ? '<span class="cm-cr-note">You removed this from the class earlier. ' + _cmIcanNote(n) + '.</span>'
+            : a.cand.text && a.cand.text !== a.cand.label
+              ? '<span class="cm-cr-wording">' + esc(a.cand.text) + '</span>'
+              : '<span class="cm-cr-note">' + _cmIcanNote(n) + '.</span>') +
+          '</span>' +
           '<span class="cm-cr-verb">' +
           (a.removed ? 'Add Back' : 'Add') +
           '</span>' +
@@ -8113,6 +8383,10 @@ window.DashClassManager = (function () {
       theirs: r.changed.filter(function (c) {
         return c.pick === 'theirs';
       }),
+      replaced: (r.replaced || []).filter(function (x) {
+        return x.pick === 'theirs';
+      }),
+      fill: r.fill || [],
       remove: r.onlyMine.filter(function (o) {
         return o.pick === 'remove';
       }),
@@ -8122,7 +8396,7 @@ window.DashClassManager = (function () {
 
   function _cmCompReviewCount(r) {
     var p = _cmCompReviewParts(r);
-    return p.back.length + p.add.length + p.theirs.length + p.remove.length;
+    return p.back.length + p.add.length + p.theirs.length + p.replaced.length + p.fill.length + p.remove.length;
   }
 
   function _cmCompReviewSummary(r) {
@@ -8167,6 +8441,26 @@ window.DashClassManager = (function () {
             'competencies',
           ),
       );
+    if (p.replaced.length)
+      phrases.push(
+        'use the curriculum version of ' +
+          _cmJoinNames(
+            names(p.replaced, function (x) {
+              return _cmCompTitle(x.sec);
+            }),
+            'competencies',
+          ),
+      );
+    if (p.fill.length)
+      phrases.push(
+        'add I Can statements to ' +
+          _cmJoinNames(
+            names(p.fill, function (x) {
+              return _cmCompTitle(x.sec);
+            }),
+            'competencies',
+          ),
+      );
     if (p.remove.length)
       phrases.push(
         'remove ' +
@@ -8178,7 +8472,7 @@ window.DashClassManager = (function () {
           ),
       );
     var tail =
-      p.theirs.length || p.remove.length
+      p.theirs.length || p.replaced.length || p.remove.length
         ? ' Scores are kept.'
         : r.onlyMine.length
           ? ' Your edits and your own competencies stay.'
@@ -8248,7 +8542,7 @@ window.DashClassManager = (function () {
       restoreCompetency(cid, a.removed.id);
     });
 
-    if (p.add.length || p.theirs.length) {
+    if (p.add.length || p.theirs.length || p.replaced.length || p.fill.length) {
       var map = ensureCustomLearningMap(cid);
       if (!map.subjects) map.subjects = [];
       if (!map.sections) map.sections = [];
@@ -8281,8 +8575,11 @@ window.DashClassManager = (function () {
           sec = structuredClone(c.section);
           sec.id = freshId(c.section.id);
           sec.tags[0].id = sec.id;
-          // Its folder is the built map's, not the class's.
+          // Its folder is the built map's; the class's folder of that name
+          // takes it.
           delete sec.groupId;
+          var own = c.folder && _cmFolderNamed(map, c.folder);
+          if (own) sec.groupId = own.id;
         } else {
           if (!map.subjects.length) map.subjects.push({ id: 'subj1', name: 'General', color: '#6366f1' });
           var sub = map.subjects[0];
@@ -8329,6 +8626,64 @@ window.DashClassManager = (function () {
         }
         map.sections.push(sec);
       });
+      // Replaced in the Curriculum. One for one: the competency takes the
+      // curriculum's name, code and wording in place, keeping its scores.
+      // One for several: the several are added in their Ministry folder and
+      // the competency moves into it, unchanged.
+      p.replaced.forEach(function (x) {
+        var sec = map.sections.find(function (s) {
+          return s.id === _currentId('section', x.sec.id);
+        });
+        if (!sec || !sec.tags[0]) return;
+        if (x.cands.length === 1) {
+          var c = x.cands[0];
+          var tag = sec.tags[0];
+          tag.label = c.label;
+          tag.code = c.code;
+          tag.text = c.text;
+          tag.source_text = c.source_text;
+          tag.i_can_statements = c.icans.slice();
+          tag.bank_id = c.bank_id || null;
+          sec.name = tag.name = c.label;
+          sec.shortName = tag.shortName = c.section.shortName;
+          return;
+        }
+        var folder = x.cands[0].folder;
+        var grp = folder ? _cmFolderNamed(map, folder) : null;
+        if (folder && !grp) {
+          grp = {
+            id: 'grp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+            name: folder,
+            color: sec.color || '#6366f1',
+            sortOrder: map.competencyGroups.length,
+          };
+          map.competencyGroups.push(grp);
+        }
+        if (grp) sec.groupId = grp.id;
+        x.cands.forEach(function (c) {
+          if (
+            c.subject &&
+            !map.subjects.some(function (s) {
+              return s.id === c.subject.id;
+            })
+          )
+            map.subjects.push(structuredClone(c.subject));
+          var add = structuredClone(c.section);
+          add.id = freshId(c.section.id);
+          add.tags[0].id = add.id;
+          delete add.groupId;
+          if (grp) add.groupId = grp.id;
+          map.sections.push(add);
+        });
+      });
+      // No I Can statements yet: the curriculum's.
+      p.fill.forEach(function (x) {
+        var sec = map.sections.find(function (s) {
+          return s.id === _currentId('section', x.sec.id);
+        });
+        if (sec && sec.tags[0] && !(sec.tags[0].i_can_statements || []).length)
+          sec.tags[0].i_can_statements = x.cand.icans.slice();
+      });
       p.theirs.forEach(function (ch) {
         var sec = map.sections.find(function (s) {
           return s.id === _currentId('section', ch.sec.id);
@@ -8358,6 +8713,12 @@ window.DashClassManager = (function () {
     _cmCloseCompReview();
     cmTab = 'competencies';
     renderClassManager();
+  }
+
+  function _cmFolderNamed(map, name) {
+    return (map.competencyGroups || []).find(function (g) {
+      return _cmNorm(g.name) === _cmNorm(name);
+    });
   }
 
   /* The Remove confirm: what it does to grades, then that the scores are
