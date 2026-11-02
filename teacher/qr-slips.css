@@ -11,7 +11,7 @@
   pointer-events: none;
   background: #fff;
   color: #000;
-  font-family: var(--font-base, system-ui, sans-serif);
+  font-family: var(--font-base);
 }
 .qs-page {
   width: 8in;

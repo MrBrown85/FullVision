@@ -297,7 +297,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   font-weight: 700;
   cursor: pointer;
@@ -654,7 +654,7 @@
 }
 .af-tip-pts-max {
   margin-left: -2px;
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-base);
   color: var(--text-2);
 }
@@ -838,7 +838,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-family: 'SF Mono', ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .collab-group-card.drag-over {
   border-color: var(--active);
@@ -950,7 +950,7 @@
   flex: 1;
 }
 .af-section-badge {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 700;
   color: #fff;
@@ -1062,7 +1062,7 @@
   cursor: pointer;
 }
 .af-tag-id {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   font-weight: 600;
   /* Sized to the code: a fixed 32px let codes like "Questioning" run into the name. */
@@ -1586,7 +1586,7 @@
 /* Core competency badge on assess header */
 .cc-badge {
   display: inline-block;
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: 600;
   padding: 1px 7px;
