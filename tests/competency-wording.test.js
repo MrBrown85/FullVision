@@ -90,4 +90,28 @@ describe('CompetencyWording', () => {
     const l = CompetencyWording.lines(tag({ bank_id: undefined, i_can_statements: ['I can <b>bold</b>'] }), 1);
     expect(CompetencyWording.html(l)).toContain('I can &lt;b&gt;bold&lt;/b&gt;');
   });
+
+  it('reads the bank’s next steps as CommentBank does, and the general wording as print does', () => {
+    const b = window.BANK_COMMENT;
+    Object.keys(b.ids)
+      .slice(0, 400)
+      .forEach(id => {
+        const e = CommentBank.bankEntry(id);
+        [1, 2, 3].forEach(lv => {
+          const want = e.steps[['Emerging', 'Developing', 'Proficient'][lv - 1]];
+          const got = CompetencyWording.nextStep({ bank_id: id }, lv);
+          expect(got.toLowerCase().replace(/\.$/, ''), id + ' ' + lv).toBe(
+            String(want).toLowerCase().replace(/\.$/, ''),
+          );
+        });
+      });
+    expect(CompetencyWording.GENERAL).toEqual(RubricPrint.GENERAL_LEVELS);
+  });
+
+  it('is the rule RubricPrint.levelWording reads', () => {
+    window.BANK_PROFICIENCY = BANK;
+    [1, 2, 3, 4].forEach(lv => {
+      expect(RubricPrint.levelWording(tag(), lv)).toEqual(CompetencyWording.levelWording(tag(), lv));
+    });
+  });
 });

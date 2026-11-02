@@ -170,6 +170,8 @@
      wording hasn't loaded (loadBankLevels), so a caller can ask again. */
   function levelWording(tag, level, skipOwn) {
     // skipOwn: the wording the teacher's own replaces (Class Management's Write Your Own).
+    // The one rule lives in CompetencyWording, which the hovers and the phone read too.
+    if (window.CompetencyWording) return CompetencyWording.levelWording(tag, level, skipOwn);
     var own = (!skipOwn && _ownLevels(tag)) || {};
     var bank = _bankLevels(tag) || {};
     var text = (own[level] && String(own[level]).trim()) || bank[level] || GENERAL_LEVELS[level] || '';

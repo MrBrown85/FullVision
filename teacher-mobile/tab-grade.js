@@ -723,6 +723,7 @@ window.MGrade = (function () {
   }
 
   function renderSwiper(cid, aid) {
+    _swiperCid = cid;
     var assessments = getAssessments(cid);
     var assessment = assessments.find(function (a) {
       return a.id === aid;
@@ -1595,6 +1596,15 @@ window.MGrade = (function () {
   function setupSwiper(cid, aid) {
     var swiper = document.getElementById('m-swiper');
     if (!swiper) return;
+    // A bank competency's wording, ready for the level sheet.
+    var assess = (getAssessments(cid) || []).find(function (a) {
+      return a.id === aid;
+    });
+    var hasBank = ((assess && assess.tagIds) || []).some(function (t) {
+      var tag = getTagById(cid, t);
+      return tag && tag.bank_id;
+    });
+    if (hasBank && window.CompetencyWording) CompetencyWording.loadBank();
 
     // Points field: tapping selects the number so typing replaces it; Done
     // or tapping away saves. The tap's mouseup would put the caret back, so
@@ -1764,7 +1774,105 @@ window.MGrade = (function () {
     _updateThumbGraded(cid, aid);
   }
 
+  /* ── Press and hold a level (Nov 2 mockup, batch 2) ──────────────
+     Holding a competency's 1–4 button for about half a second opens a
+     sheet: the competency, the level, its descriptor, what Proficient
+     means (the I Can statements) and the next step (CompetencyWording).
+     Letting go doesn't score; a quick tap still does, and a finger that
+     moves first cancels the hold. */
+  var HOLD_MS = 450;
+  var _hold = null;
+  var _swiperCid = null;
+
+  function _levelSheetHtml(cid, tag, level) {
+    var l = CompetencyWording.lines(tag, level);
+    if (!l) return '';
+    var word = typeof levelWord === 'function' ? levelWord(cid, level) : l.word;
+    return (
+      '<div class="m-level-sheet">' +
+      '<h2 class="m-level-sheet-title">' +
+      MC.esc(tag.label || tag.code || '') +
+      '</h2>' +
+      '<div class="m-level-sheet-level">' +
+      level +
+      (word ? ' \u00b7 ' + MC.esc(word) : '') +
+      '</div>' +
+      (l.descriptor ? '<p>' + MC.esc(l.descriptor) + '</p>' : '') +
+      (l.iCans.length
+        ? '<p><b>Proficient means:</b></p><ul>' +
+          l.iCans
+            .map(function (x) {
+              return '<li>' + MC.esc(x) + '</li>';
+            })
+            .join('') +
+          '</ul>'
+        : '') +
+      (l.next ? '<p><b>Next step:</b> ' + MC.esc(l.next) + '</p>' : '') +
+      '</div>'
+    );
+  }
+
+  function showLevelSheet(btn) {
+    var cid = _swiperCid;
+    var tag = cid && typeof getTagById === 'function' ? getTagById(cid, btn.getAttribute('data-tid')) : null;
+    var level = parseInt(btn.getAttribute('data-score'), 10);
+    if (!tag || !window.CompetencyWording) return;
+    var html = _levelSheetHtml(cid, tag, level);
+    if (!html) return;
+    MC.presentSheet(html, { half: true });
+    var l = CompetencyWording.lines(tag, level);
+    if (l && !l.ready)
+      CompetencyWording.loadBank().then(function (ok) {
+        var box = document.querySelector('#m-sheet-container .m-level-sheet');
+        // html-safe: _levelSheetHtml escapes the label, level word, descriptor, I Can statements and step (MC.esc)
+        if (ok && box) box.outerHTML = _levelSheetHtml(cid, tag, level);
+      });
+  }
+
+  function _holdDown(e) {
+    var btn = e.target.closest && e.target.closest('.m-score-btn[data-tid]');
+    if (!btn) return;
+    if (_hold) clearTimeout(_hold.timer);
+    _hold = {
+      btn: btn,
+      x: e.clientX,
+      y: e.clientY,
+      shown: false,
+      timer: setTimeout(function () {
+        _hold.shown = true;
+        showLevelSheet(btn);
+      }, HOLD_MS),
+    };
+  }
+  function _holdMove(e) {
+    if (!_hold || _hold.shown) return;
+    if (Math.abs(e.clientX - _hold.x) + Math.abs(e.clientY - _hold.y) > 10) {
+      clearTimeout(_hold.timer);
+      _hold = null;
+    }
+  }
+  function _holdUp() {
+    if (!_hold) return;
+    clearTimeout(_hold.timer);
+    if (!_hold.shown) _hold = null;
+  }
+  // The click that ends a hold is swallowed, so the level isn't scored.
+  function _holdClick(e) {
+    if (!_hold) return;
+    var held = _hold.shown && _hold.btn.contains(e.target);
+    _hold = null;
+    if (!held) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  document.addEventListener('pointerdown', _holdDown);
+  document.addEventListener('pointermove', _holdMove);
+  document.addEventListener('pointerup', _holdUp);
+  document.addEventListener('pointercancel', _holdUp);
+  document.addEventListener('click', _holdClick, true);
+
   return {
+    showLevelSheet: showLevelSheet,
     renderPicker: renderPicker,
     filterAssessments: filterAssessments,
     openFilterSheet: openFilterSheet,

@@ -1995,7 +1995,39 @@ body.fv-switching-course::after {
   gap: 8px;
   justify-content: center;
 }
+/* A level's sheet, from holding its button (Nov 2 mockup, batch 2). */
+.m-level-sheet {
+  padding: 4px 4px 12px;
+  color: var(--text);
+}
+.m-level-sheet-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+.m-level-sheet-level {
+  margin: 2px 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.m-level-sheet p {
+  margin: 0 0 10px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.m-level-sheet ul {
+  margin: 2px 0 10px;
+  padding-left: 20px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+.m-level-sheet b {
+  font-weight: 600;
+}
 .m-score-btn {
+  -webkit-touch-callout: none;
+  user-select: none;
   width: 52px;
   height: 52px;
   border-radius: 50%;
