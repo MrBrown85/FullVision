@@ -2935,6 +2935,34 @@ window.CommentBank = (function () {
      to", "with growing consistency", "consistently", "with depth and
      complexity"). The strongest gate already needs 3+ pieces. { comp, key,
      skill, word } or null. */
+  /* Progress in levels over the term (Colin, 2026-11-02): a competency from
+     the BC bank that climbed a level or more from the start of the term to
+     now, past the "improved" gate (improvedComp), named by its level words
+     and its cluster's phrase: "Maya rose from Developing to Proficient in
+     her ability to explain the causes and results of an event." The largest
+     climb; never the next step's skill (one sentence per skill); only where
+     the class shows proficiency words (f.standing), and only while the
+     phrase leaves the sentence within 20 words (9 words at most). { comp,
+     key, from, to, skill } or null. */
+  function progressOf(f) {
+    if (!f.standing) return null;
+    var next = nextSkillOf(f);
+    var pick = null;
+    (f.comps || []).forEach(function (c) {
+      var e = c.bankId ? bankEntry(c.bankId) : null;
+      if (!e || (next && next.key === e.key)) return;
+      // The level reached is the competency's level as the report shows it
+      // (c.level: a teacher's override where there is one).
+      var from = word(c.start);
+      var to = word(c.level);
+      if (!from || !to || !(Math.round(c.level) > Math.round(c.start)) || !improvedComp(c)) return;
+      if (R.wordCount(e.phrase) > 9) return;
+      var gain = Math.round(c.level) - Math.round(c.start);
+      if (!pick || gain > pick.gain) pick = { comp: c, key: e.key, from: from, to: to, skill: e.phrase, gain: gain };
+    });
+    return pick;
+  }
+
   function strengthNowOf(f) {
     var x = strengthSkills(f)[0];
     if (!x || !x.steps) return null;
@@ -2953,11 +2981,13 @@ window.CommentBank = (function () {
   function bestPieceSkillOf(f, w) {
     if (!w || reportNoteText(w.note)) return null;
     var taken = {};
-    [strengthSkills(f), topTieSkills(f), evenSkills(f), highestSkills(f), [nextSkillOf(f)]].forEach(function (xs) {
-      (xs || []).forEach(function (x) {
-        if (x) taken[x.key] = true;
-      });
-    });
+    [strengthSkills(f), topTieSkills(f), evenSkills(f), highestSkills(f), [nextSkillOf(f)], [progressOf(f)]].forEach(
+      function (xs) {
+        (xs || []).forEach(function (x) {
+          if (x) taken[x.key] = true;
+        });
+      },
+    );
     var pick = null;
     var pickV = 0;
     (f.comps || []).forEach(function (c) {
@@ -3397,6 +3427,8 @@ window.CommentBank = (function () {
     // the bank's phrase with the Ministry qualifier for its level word, for
     // a competency from the BC bank (strengthNowOf).
     var nowSk = strengthNowOf(f);
+    // Progress in levels over the term, for a bank competency (progressOf).
+    var prog = progressOf(f);
     // Even results (evenComps): no strongest, every judged competency
     // within half a step; the first two as skills, for the n5xx frames.
     var evenNow = evenComps(f.comps, f.overall);
@@ -3539,6 +3571,9 @@ window.CommentBank = (function () {
       strongSkill: keys('comp', [strongSkills[0] && strongSkills[0].comp]),
       // The first strength at its level now (`when.strengthWord`).
       strengthNow: keys('comp', [nowSk && nowSk.comp]),
+      progressFrom: keys('comp', [prog && prog.comp]),
+      progressTo: keys('comp', [prog && prog.comp]),
+      progressSkill: keys('comp', [prog && prog.comp]),
       // The strength as one skill (`when.topSkill`): the strongest, or one
       // of a tie at the top.
       topSkill: keys('comp', [topSk && topSk.comp]),
@@ -3612,6 +3647,9 @@ window.CommentBank = (function () {
       strengths: names(strongest),
       strongSkill: names([strongSkills[0] && strongSkills[0].comp]),
       strengthNow: names([nowSk && nowSk.comp]),
+      progressFrom: names([prog && prog.comp]),
+      progressTo: names([prog && prog.comp]),
+      progressSkill: names([prog && prog.comp]),
       topSkill: names([topSk && topSk.comp]),
       evenSkill: names([evenSk[0] && evenSk[0].comp]),
       highestSkill: names([hiSk[0] && hiSk[0].comp]),
@@ -3721,6 +3759,10 @@ window.CommentBank = (function () {
       // The first strength in the bank's phrase, said at its level by the
       // frame (`when.strengthWord`): "{He} can consistently {strengthNow}."
       strengthNow: nowSk ? nowSk.skill : '',
+      // "{He} rose from {progressFrom} to {progressTo} in {his} ability to {progressSkill}."
+      progressFrom: prog ? prog.from : '',
+      progressTo: prog ? prog.to : '',
+      progressSkill: prog ? prog.skill : '',
       topSkill: topSk ? topSk.key : '',
       // Even results (evenComps): 'yes' while they hold; the highest even
       // competency as a skill; and the proficiency word as the class shows
@@ -4820,6 +4862,9 @@ window.CommentBank = (function () {
     var needs = s.needs || [];
     var n = Object.keys(s.when || {}).length;
     if (ctx._bestNote && (needs.indexOf('bestPiece') >= 0 || needs.indexOf('bestNote') >= 0)) n++;
+    // Progress in levels is as specific as the where-now frames
+    // (`when.strengthWord`): the two share the Overall step's tier.
+    if (ctx.progressSkill && needs.indexOf('progressSkill') >= 0) n++;
     // Two for a story, so a frame written for the student's story comes
     // before one written for the strongest skill (`when.strongSkill`, bank
     // n6xx-n7xx), which comes before a general one.
@@ -4879,7 +4924,7 @@ window.CommentBank = (function () {
       step.preferSoft &&
       (s.mine ||
         (s.needs || []).some(function (k) {
-          return STORY_SLOTS.indexOf(k) >= 0;
+          return STORY_SLOTS.indexOf(k) >= 0 || k === 'progressSkill';
         }));
     if (pref && !soft && (s.needs || []).indexOf(pref) < 0) return false;
     if (
@@ -6073,6 +6118,17 @@ window.CommentBank = (function () {
       // The marks climbed over the term (the climb story): the scored
       // pieces' % past the "improved" gate (climbed).
       if (_has(pv, 'climb')) checks.push(climbed((f.grade && f.grade.pieces) || []));
+      // Progress in levels: the same competency, climb and phrase (progressOf).
+      if (_has(pv, 'progressSkill')) {
+        var pg = progressOf(f);
+        checks.push(
+          !!pg &&
+            _ids(pv, 'progressSkill', 'comp')[0] === String(pg.comp.id) &&
+            pv.values.progressSkill === pg.skill &&
+            (!_has(pv, 'progressFrom') || pv.values.progressFrom === pg.from) &&
+            (!_has(pv, 'progressTo') || pv.values.progressTo === pg.to),
+        );
+      }
       return checks.length > 0 && checks.every(Boolean);
     },
     // Joined the class two weeks or more after it began, this term (the
@@ -7066,6 +7122,7 @@ window.CommentBank = (function () {
     slid: slid,
     strongestOf: strongestOf,
     strengthNowOf: strengthNowOf,
+    progressOf: progressOf,
     bestPieceOf: bestPieceOf,
     bestPieceSkillOf: bestPieceSkillOf,
     compsOf: compsOf,
