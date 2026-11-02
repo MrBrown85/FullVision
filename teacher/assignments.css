@@ -5257,6 +5257,44 @@ button.grader-member-name {
     gap: 10px;
   }
 }
+/* A competency level's three lines (CompetencyWording) over the foot,
+   while the level is hovered, focused or held: absolutely placed, so the
+   dialog keeps its size. */
+.grader-dialog {
+  position: relative;
+}
+.grdl-wording-bar {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 64px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 16px;
+  background: var(--surface-glass);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid var(--overlay-pressed);
+  border-radius: var(--radius);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.1),
+    0 1px 4px rgba(0, 0, 0, 0.05);
+  font-size: var(--text-base);
+  line-height: 1.35;
+  color: var(--text);
+  pointer-events: none;
+}
+.grdl-wording-bar[hidden] {
+  display: none;
+}
+/* Holding a level on a touch screen shows its lines, not the callout. */
+.grdl-level,
+.rsg-level {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
 .grader-foot {
   flex-shrink: 0;
   height: 56px;
