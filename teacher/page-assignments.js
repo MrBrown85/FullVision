@@ -4834,12 +4834,43 @@ window.PageAssignments = (function () {
   var _tagBarShown = false;
   var _tagBarHide = null;
   var _bankLoadAsked = false;
+  // A competency level on the class grid or in the grader dialog.
+  var TAG_LEVEL_SEL = '.rsg-level[data-action="selectTagLevel"], .grdl-level[data-action="graderTagLevel"]';
   function showTagLevelBar(el) {
     clearTimeout(_tagBarHide);
-    var tag = getTagById(activeCourse, el.dataset.tagid);
+    var grader = el.classList.contains('grdl-level');
+    var tag = getTagById(activeCourse, grader ? el.dataset.tag : el.dataset.tagid);
     var l = window.CompetencyWording ? CompetencyWording.lines(tag, parseInt(el.dataset.level, 10)) : null;
     var lines = l ? CompetencyWording.html(l) : '';
     if (!lines) return;
+    if (grader) _showGraderLevelBar(el, lines);
+    else _showGridLevelBar(el, tag, lines);
+    // Asked once: offline, the bar keeps the other wording rather than
+    // adding the script again on every hover.
+    if (!l.ready && !_bankLoadAsked && window.RubricPrint && RubricPrint.loadBankLevels) {
+      _bankLoadAsked = true;
+      RubricPrint.loadBankLevels().then(function (ok) {
+        if (ok && _tagBarLevel === el && document.body.contains(el)) showTagLevelBar(el);
+      });
+    }
+  }
+  /* In the grader the lines sit in a bar over the dialog's foot (the
+     card names the competency), so the dialog doesn't change size. */
+  function _showGraderLevelBar(el, lines) {
+    var dlg = el.closest('.grader-dialog');
+    if (!dlg) return;
+    var bar = dlg.querySelector('.grdl-wording-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'grdl-wording-bar';
+      dlg.appendChild(bar);
+    }
+    _tagBarLevel = el;
+    // html-safe: CompetencyWording.html escapes the descriptor, I Can statements and step
+    bar.innerHTML = lines;
+    bar.hidden = false;
+  }
+  function _showGridLevelBar(el, tag, lines) {
     var bar = _ensureDescriptorBar();
     bar.classList.add('is-lines');
     if (bar.style.display !== 'flex') {
@@ -4856,14 +4887,6 @@ window.PageAssignments = (function () {
     text.classList.add('is-lines');
     // html-safe: CompetencyWording.html escapes the descriptor, I Can statements and step
     text.innerHTML = lines;
-    // Asked once: offline, the bar keeps the other wording rather than
-    // adding the script again on every hover.
-    if (!l.ready && !_bankLoadAsked && window.RubricPrint && RubricPrint.loadBankLevels) {
-      _bankLoadAsked = true;
-      RubricPrint.loadBankLevels().then(function (ok) {
-        if (ok && _tagBarLevel === el && document.body.contains(el)) showTagLevelBar(el);
-      });
-    }
   }
   /* Leaving a level: after this event, so moving straight to the next
      level (which shows its own lines) doesn't flash the bar. */
@@ -4879,6 +4902,9 @@ window.PageAssignments = (function () {
   function _clearTagLevelBar(bar) {
     _tagBarLevel = null;
     _tagBarShown = false;
+    document.querySelectorAll('.grdl-wording-bar').forEach(function (b) {
+      b.hidden = true;
+    });
     if (!bar || !bar.classList.contains('is-lines')) return;
     bar.classList.remove('is-lines');
     bar.querySelector('.rsg-descriptor-text').classList.remove('is-lines');
@@ -7652,7 +7678,7 @@ window.PageAssignments = (function () {
       var level = parseInt(lvl.dataset.level, 10);
       if (aid && critid && level) showCritTooltip(e, aid, critid, level);
     }
-    var tagLvl = e.target.closest('.rsg-level[data-action="selectTagLevel"]');
+    var tagLvl = e.target.closest(TAG_LEVEL_SEL);
     if (tagLvl && tagLvl !== _tagBarLevel) showTagLevelBar(tagLvl);
   }
   function _handleMouseOut(e) {
@@ -7660,18 +7686,53 @@ window.PageAssignments = (function () {
     if (chip && chip === _chipTipSource && !(e.relatedTarget && chip.contains(e.relatedTarget))) _hideChipTip();
     var lvl = e.target.closest('.rsg-level[data-action="selectRubricScore"]');
     if (lvl) resetDescriptorBar();
-    var tagLvl = e.target.closest('.rsg-level[data-action="selectTagLevel"]');
+    var tagLvl = e.target.closest(TAG_LEVEL_SEL);
     if (tagLvl && !(e.relatedTarget && tagLvl.contains(e.relatedTarget))) hideTagLevelBar();
   }
 
   // A competency level reached by Tab shows its lines too.
   function _handleFocusIn(e) {
-    var tagLvl = e.target.closest && e.target.closest('.rsg-level[data-action="selectTagLevel"]');
+    var tagLvl = e.target.closest && e.target.closest(TAG_LEVEL_SEL);
     if (tagLvl) showTagLevelBar(tagLvl);
   }
   function _handleFocusOut(e) {
-    var tagLvl = e.target.closest && e.target.closest('.rsg-level[data-action="selectTagLevel"]');
+    var tagLvl = e.target.closest && e.target.closest(TAG_LEVEL_SEL);
     if (tagLvl && !(e.relatedTarget && tagLvl.contains(e.relatedTarget))) hideTagLevelBar();
+  }
+
+  /* Press and hold a grader level on a touch screen (iPad): its lines show
+     while the finger stays down, and letting go doesn't pick the level. A
+     quick tap still picks it. */
+  var HOLD_MS = 450;
+  var _hold = null;
+  function _handlePointerDown(e) {
+    if (e.pointerType !== 'touch') return;
+    var lvl = e.target.closest && e.target.closest('.grdl-level[data-action="graderTagLevel"]');
+    if (!lvl) return;
+    clearTimeout(_hold && _hold.timer);
+    _hold = {
+      el: lvl,
+      shown: false,
+      timer: setTimeout(function () {
+        _hold.shown = true;
+        showTagLevelBar(lvl);
+      }, HOLD_MS),
+    };
+  }
+  function _handlePointerUp() {
+    if (!_hold) return;
+    clearTimeout(_hold.timer);
+    if (_hold.shown) hideTagLevelBar();
+    else _hold = null;
+  }
+  // The click that ends a hold is swallowed, so the level isn't picked.
+  function _handleHoldClick(e) {
+    if (!_hold) return;
+    var held = _hold.shown && _hold.el.contains(e.target);
+    _hold = null;
+    if (!held) return;
+    e.preventDefault();
+    e.stopPropagation();
   }
 
   /* ── Grader dialog ───────────────────────────────────────
@@ -7762,6 +7823,12 @@ window.PageAssignments = (function () {
     });
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
+    _addDocListener('focusin', _handleFocusIn);
+    _addDocListener('focusout', _handleFocusOut);
+    _addDocListener('pointerdown', _handlePointerDown);
+    _addDocListener('pointerup', _handlePointerUp);
+    _addDocListener('pointercancel', _handlePointerUp);
+    _addDocListener('click', _handleHoldClick, true);
     _addDocListener('scroll', _hideChipTip, true);
     render();
     overlay.querySelector('.grader-dialog').focus();
