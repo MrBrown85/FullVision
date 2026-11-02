@@ -103,6 +103,13 @@ describe('the best piece names its skill', () => {
     expect(CommentBank.context(plain, {}).bestPiece).toBe('Their best piece was “Task 2.”');
   });
 
+  it('names none when the only Proficient skill on the piece is one the comment names already', () => {
+    // Perspective is now the strength alongside Evidence (both half a step
+    // over Significance): both are taken.
+    const f = withWork([3.6, 3.6, 2]);
+    expect(CommentBank.bestPieceSkillOf(f, CommentBank.bestPieceOf(f))).toBeNull();
+  });
+
   it('leaves the skill to the teacher’s note when there is one', () => {
     const f = withWork([3.8, 3, 2]);
     f.work[2].note = 'compared two accounts of the strike';

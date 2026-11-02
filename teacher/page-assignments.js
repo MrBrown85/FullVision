@@ -8292,8 +8292,18 @@ window.PageAssignments = (function () {
       return x.id === input.dataset.aid;
     });
     if (!preview || !st || !a) return;
+    // With no note, the skill the piece shows, as the comment would say it
+    // (CommentBank.bestPieceSkillOf).
+    var skill = '';
+    if (!String(input.value || '').trim() && CommentBank.bestPieceSkillOf) {
+      var f = CommentBank.facts(cid, st);
+      var w = (f.work || []).find(function (x) {
+        return x.id === a.id;
+      });
+      skill = (w && (CommentBank.bestPieceSkillOf(f, w) || {}).skill) || '';
+    }
     var sentence = CommentBank.bestPieceSentence(
-      Object.assign({ title: a.title, note: input.value }, CommentBank.studentRef(st)),
+      Object.assign({ title: a.title, note: input.value, skill: skill }, CommentBank.studentRef(st)),
     )
       .replace(/\u201C/g, '\u2018')
       .replace(/\u201D/g, '\u2019');
