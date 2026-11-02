@@ -622,6 +622,12 @@ function categoryTintByIndex(idx, fallbackName) {
   for (var i = 0; i < label.length; i++) h = (h * 31 + label.charCodeAt(i)) | 0;
   return CATEGORY_PALETTE[((h % CATEGORY_PALETTE.length) + CATEGORY_PALETTE.length) % CATEGORY_PALETTE.length];
 }
+/* A class with categories needs one on every scored assessment (data.js
+   categoryRequired). The form says why next to its Category field; work
+   saved before the rule is marked where it appears. */
+const CATEGORY_REQUIRED_HINT = 'This class has categories, so each assignment needs one to count toward the grade.';
+const NEEDS_CATEGORY_LABEL = 'Needs a Category';
+const NEEDS_CATEGORY_TIP = 'This class has categories, so this work needs one. Edit the assignment to choose one.';
 if (typeof window !== 'undefined') {
   window.CATEGORY_PALETTE = CATEGORY_PALETTE;
   window.categoryTintByIndex = categoryTintByIndex;

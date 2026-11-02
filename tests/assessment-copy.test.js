@@ -124,8 +124,9 @@ describe('assessment copies across classes', () => {
     var a = Object.assign(essay(), { categoryId: 'a-quiz' });
     var plan = AssessmentCopy.planCopy(A, a, B);
     expect(plan.category.needsChoice).toBe(true);
-    // Defaults to the first category in display order.
-    expect(plan.category.id).toBe('b-quiz');
+    // The teacher picks it: nothing is chosen for them.
+    expect(plan.category.id).toBe(null);
+    expect(plan.category.required).toBe(true);
   });
 
   it('needs no category in a class that has none', () => {

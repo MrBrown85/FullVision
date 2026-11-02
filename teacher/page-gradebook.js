@@ -1204,17 +1204,25 @@ window.PageGradebook = (function () {
         '">' +
         esc(a.title) +
         '</a>' +
-        '<div class="gb-assess-meta"><span class="gb-assess-type-pill ' +
-        categoryClass +
-        '" style="background:' +
-        catTint.bg +
-        ';color:' +
-        catTint.fg +
-        '" title="' +
-        esc(categoryName) +
-        '">' +
-        esc(categoryName) +
-        '</span><span class="gb-assess-date">' +
+        '<div class="gb-assess-meta">' +
+        (assessmentNeedsCategory(cid, a)
+          ? '<span class="gb-assess-type-pill gb-needs-category" title="' +
+            esc(NEEDS_CATEGORY_TIP) +
+            '">' +
+            esc(NEEDS_CATEGORY_LABEL) +
+            '</span>'
+          : '<span class="gb-assess-type-pill ' +
+            categoryClass +
+            '" style="background:' +
+            catTint.bg +
+            ';color:' +
+            catTint.fg +
+            '" title="' +
+            esc(categoryName) +
+            '">' +
+            esc(categoryName) +
+            '</span>') +
+        '<span class="gb-assess-date">' +
         formatShortDate(a.date) +
         '</span>' +
         badges +
@@ -1531,6 +1539,14 @@ window.PageGradebook = (function () {
         '<span class="gb-scores-assess-meta">' +
         shortDate +
         maxPts +
+        (assessmentNeedsCategory(cid, a)
+          ? (shortDate || maxPts ? ' \u00b7 ' : '') +
+            '<span class="gb-needs-category" title="' +
+            esc(NEEDS_CATEGORY_TIP) +
+            '">' +
+            esc(NEEDS_CATEGORY_LABEL) +
+            '</span>'
+          : '') +
         '</span>' +
         '</div>' +
         '</div>' +

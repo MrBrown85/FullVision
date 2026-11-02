@@ -1815,6 +1815,19 @@ body.offline-active #app-dock {
   background: var(--surface-2);
   color: var(--text-2);
 }
+/* Scored work with no category in a class that has categories
+   (data.js assessmentNeedsCategory): the card chip, the grader's mark and
+   the gradebook header's pill and line. */
+.type-badge-needs,
+.gb-assess-type-pill.gb-needs-category {
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+  font-weight: 600;
+}
+.gb-needs-category {
+  color: var(--score-2-text);
+  font-weight: 600;
+}
 
 /* ── Tags ───────────────────────────────────────────────────── */
 .tag-chip {
