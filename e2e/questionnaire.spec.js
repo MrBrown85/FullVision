@@ -177,12 +177,13 @@ test('the roster marks survive a sidebar redraw; arrows move without approving a
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('#gb-sidebar .student-row.selected')).toHaveAttribute('data-sid', sam);
   await expect(page.locator('.qn-name')).toHaveText('Sam Blackwood');
-  // Sam's Demo comment has a sentence over 20 words, so the Ready count
-  // gives way to why Approve and Next is off (PR 11c, the States mockup).
-  await expect(page.locator('#tq-ready')).toHaveText('Approve and Next is off until the comment fits.');
+  // Sam's Demo comment has a sentence over 20 words: the count says so,
+  // and Approve and Next stays on (Colin, 2026-11-02: "don't restrict
+  // users").
+  await expect(page.locator('#tq-ready')).toHaveText('2 of 27 Ready');
   await expect(page.locator('#tq-limit-text')).toHaveText(' · one sentence is over 20 words');
   await expect(page.locator('#tq-count-btn')).toHaveClass(/over/);
-  await expect(page.locator('#tq-approve-next')).toBeDisabled();
+  await expect(page.locator('#tq-approve-next')).toBeEnabled();
   await row(noor).click();
   await expect(page.locator('#tq-ready')).toHaveText('2 of 27 Ready');
   // Leaving the questionnaire gives the grades back.
@@ -406,7 +407,7 @@ test.describe('checks and approval', () => {
     await expect(page.locator('#tq-approve-next')).toBeEnabled();
   });
 
-  test('the missing-work row waits for I checked this; a sentence over 20 words keeps Approve off', async ({
+  test('the missing-work row waits for I checked this; a sentence over 20 words or past the limit leaves Approve on', async ({
     page,
   }) => {
     await open(page);
@@ -445,21 +446,19 @@ test.describe('checks and approval', () => {
     await expect(row.locator('.qn-req-ctrl')).toHaveClass(/on/);
     await expect(row.locator('.qn-req-source').last()).toHaveText('1 of 22 · checked');
     await expect(approve).toBeEnabled();
-    // A sentence over 20 words: the count turns orange and says why.
+    // A sentence over 20 words: the count turns orange and says so;
+    // Approve and Next stays on.
     await toEnd(page);
     await page.keyboard.type(' She ' + 'really '.repeat(19) + 'tries.');
     await expect(page.locator('#tq-count-btn')).toHaveClass(/over/);
     await expect(page.locator('#tq-limit-text')).toHaveText(' · one sentence is over 20 words');
-    await expect(page.locator('#tq-ready')).toHaveText('Approve and Next is off until the comment fits.');
-    await expect(approve).toBeDisabled();
-    await expect(approve).toHaveAttribute(
-      'title',
-      'Saves this comment to the report card and opens the next student. Shorten the sentence over 20 words first.',
-    );
-    // Over the class's limit, the count says so instead.
+    await expect(page.locator('#tq-ready')).toHaveText('0 of 27 Ready');
+    await expect(approve).toBeEnabled();
+    // Over the class's limit, the count says so instead; Approve stays on.
     await page.evaluate(() => ReportQuestionnaire.tqLineChange({ dataset: { tqLimit: '1' }, value: '200' }));
     await expect(page.locator('#tq-count')).toHaveText(/^\d{3} of 200 characters$/);
-    await expect(page.locator('#tq-limit-text')).toHaveText(' · remove or shorten a sentence');
+    await expect(page.locator('#tq-limit-text')).toHaveText(' · over the limit');
+    await expect(approve).toBeEnabled();
     await page.evaluate(() => ReportQuestionnaire.tqLineChange({ dataset: { tqLimit: '1' }, value: '' }));
     // Shortened: Approve and Next is back, and approving ticks the roster.
     await page.evaluate(() => {
@@ -1557,7 +1556,7 @@ test('the ⓘ sheet keeps Tab and Shift-Tab inside it; Escape gives the focus ba
 test('the character limit: 100 to 5000 or empty; a stray letter never clears it; Escape cancels', async ({ page }) => {
   await open(page);
   await page.evaluate(() => ReportQuestionnaire.tqLineChange({ dataset: { tqLimit: '1' }, value: '300' }));
-  await expect(page.locator('#tq-limit-text')).toHaveText(/limit 300|remove or shorten/);
+  await expect(page.locator('#tq-limit-text')).toHaveText(/limit 300|over the limit/);
   await page.locator('#tq-count-btn').click();
   const input = page.locator('#tq-limit-input');
   await expect(input).toBeFocused();
@@ -1608,7 +1607,7 @@ test('the character limit with the keyboard: Escape cancels; Return, Tab and a c
   await page.keyboard.press('Enter');
   await expect(input).toHaveCount(0);
   expect(await saved()).toBe(350);
-  await expect(page.locator('#tq-limit-text')).toHaveText(/ · limit 350| · remove or shorten a sentence/);
+  await expect(page.locator('#tq-limit-text')).toHaveText(/ · limit 350| · over the limit/);
   // Escape cancels: the blur as the box closes saves nothing.
   await openBox();
   await typeIn('600');
@@ -1631,5 +1630,5 @@ test('the character limit with the keyboard: Escape cancels; Return, Tab and a c
   await page.locator('.qn-name').click();
   await expect(input).toHaveCount(0);
   expect(await saved()).toBe(500);
-  await expect(page.locator('#tq-limit-text')).toHaveText(/ · limit 500| · remove or shorten a sentence/);
+  await expect(page.locator('#tq-limit-text')).toHaveText(/ · limit 500| · over the limit/);
 });
