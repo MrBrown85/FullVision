@@ -1,10 +1,9 @@
 /**
  * Live bug hunt 2 (Nov 1 2026), Term Questionnaire, items 4 and 7–10:
  *
- * 4. Generate kept to the class's character limit: over it, the draft
- *    drops the family line, then attendance, then the strengths, then the
- *    habits sentence, nothing else; when even that cannot fit, the draft is
- *    kept as is and the count says why.
+ * 4. Generate never cuts a draft to the class's character limit, and the
+ *    limit never keeps Approve off (Colin, 2026-11-02: "i don't care about
+ *    comment maximum length for myedbc - don't restrict users").
  * 7. A new entry in the limit box is a whole number from 100 to 5000 or
  *    nothing; any other says so and never clears the limit; Escape
  *    cancels, its blur saving nothing. A limit older code saved below 100
@@ -144,146 +143,19 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
     localStorage.clear();
   });
 
-  describe('4. Generate keeps to the character limit', () => {
-    const DROP = ['home', 'attendance', 'overall', 'habits', 'strongHabits'];
-    // The steps a fitted draft left out, in the drop order: the family line
-    // goes before attendance, attendance before the strengths, and so on.
-    const expectDropOrder = (whole, fitted) => {
-      const left = fitted.sentences.map(x => x.id);
-      const ids = whole.sentences.map(x => x.id);
-      // The fitted draft is the whole draft less some sentences, in order.
-      expect(left).toEqual(ids.filter(id => left.indexOf(id) >= 0));
-      const gone = whole.sentences.filter(x => left.indexOf(x.id) < 0).map(x => x.step);
-      gone.forEach(step => expect(DROP).toContain(step));
-      const furthest = Math.max(-1, ...gone.map(s => DROP.indexOf(s)));
-      whole.sentences
-        .filter(x => DROP.indexOf(x.step) >= 0 && DROP.indexOf(x.step) < furthest)
-        .forEach(x => expect(gone, x.step).toContain(x.step));
-    };
-
-    it('fits every draft in Report 2 to 350 and to 500, the grade sentence kept', () => {
-      const students = getStudents(cid);
-      let dropped = 0;
-      [350, 500].forEach(limit => {
-        students.forEach(st => {
-          const whole = draftOf(st);
-          const d = draftOf(st, { charLimit: limit });
-          expect(d.text.length, st.firstName + ' at ' + limit).toBeLessThanOrEqual(limit);
-          expect(d.overLimit).toBeFalsy();
-          expect(d.sentences[0].step).toBe(whole.sentences[0].step);
-          if (whole.sentences.some(x => x.step === 'grade')) expect(d.sentences.map(x => x.step)).toContain('grade');
-          if (whole.text.length <= limit) expect(d.text).toBe(whole.text);
-          else dropped++;
-          expectDropOrder(whole, d);
-        });
-      });
-      // The live run: 9 of 10 drafts were over 350 before.
-      expect(dropped).toBeGreaterThan(10);
-    });
-
-    it('never drops the next step, the best piece, Not Handed In or the first sentence; past that the draft is kept', () => {
-      const KEEP = ['grade', 'nextStep', 'example', 'notHandedIn', 'lateWork', 'support', 'closer'];
-      getStudents(cid).forEach(st => {
-        const whole = draftOf(st);
-        const steps = whole.sentences.map(x => x.step);
-        // Only the four droppable steps out: what is left is the floor.
-        const floor = whole.sentences.filter((x, i) => i === 0 || DROP.indexOf(x.step) < 0);
-        const min = floor.map(x => x.text).join(' ').length;
-        [min - 1, 200].forEach(limit => {
-          const d = draftOf(st, { charLimit: limit });
-          const left = d.sentences.map(x => x.step);
-          KEEP.filter(k => steps.indexOf(k) >= 0).forEach(k => expect(left, st.firstName + ' ' + k).toContain(k));
-          expect(left[0]).toBe(steps[0]);
-          if (d.text.length > limit) {
-            expect(d.overLimit).toBe(true);
-            expect(d.text).toBe(whole.text);
-          }
-        });
-        // Just under the floor: nothing more can go, so the whole draft stays.
-        const under = draftOf(st, { charLimit: min - 1 });
-        expect(under.overLimit, st.firstName).toBe(true);
-        expect(under.text).toBe(whole.text);
-      });
-    });
-
-    it('drops the family line first, then the strengths', () => {
-      const st = byName('Tyler');
-      const whole = draftOf(st);
-      expect(whole.sentences.map(x => x.step)).toEqual(expect.arrayContaining(['grade', 'home', 'overall']));
-      const noHome = whole.text.length - whole.sentences.find(x => x.step === 'home').text.length - 1;
-      const d = draftOf(st, { charLimit: noHome });
-      expect(d.sentences.map(x => x.step)).not.toContain('home');
-      expect(d.sentences.map(x => x.step)).toContain('overall');
-      const tight = draftOf(st, { charLimit: noHome - 1 });
-      expect(tight.sentences.map(x => x.step)).not.toContain('home');
-      expect(tight.sentences.map(x => x.step)).not.toContain('overall');
-      expect(tight.text.length).toBeLessThanOrEqual(noHome - 1);
-    });
-
-    it('keeps the whole draft when a limit smaller than the grade sentence cannot be met', () => {
-      getStudents(cid).forEach(st => {
-        const whole = draftOf(st);
-        const first = whole.sentences[0].text.length;
-        const d = draftOf(st, { charLimit: first - 1 });
-        expect(d.text, st.firstName).toBe(whole.text);
-        expect(d.overLimit).toBe(true);
-      });
-    });
-
-    it('never drops a sentence the teacher kept, and counts typed sentences against the limit', () => {
-      const st = byName('Tyler');
-      const whole = draftOf(st);
-      const home = whole.sentences.find(x => x.step === 'home').text;
-      const d = draftOf(st, { charLimit: 350, kept: { home } });
-      expect(d.sentences.find(x => x.step === 'home').text).toBe(home);
-      expect(d.text.length).toBeLessThanOrEqual(350);
-      const typed = 'I enjoyed having Tyler in class this term.';
-      const r = draftOf(st, { charLimit: 350, reserve: typed.length + 1 });
-      expect(r.text.length + typed.length + 1).toBeLessThanOrEqual(350);
-    });
-
-    it('keeps the IE Required sentences (Report 1, Raj)', () => {
-      useTerm(1);
-      const st = byName('Raj');
-      expect(CommentBank.reportPath(factsOf(st))).toBe('ie');
-      const whole = draftOf(st);
-      const required = ['grade', 'ieProblem', 'iePlan', 'ieDeadline', 'ieMeeting'];
-      [100, 250].forEach(limit => {
-        const d = draftOf(st, { charLimit: limit });
-        whole.sentences
-          .filter(x => required.indexOf(x.step) >= 0)
-          .forEach(x =>
-            expect(
-              d.sentences.map(y => y.step),
-              x.step,
-            ).toContain(x.step),
-          );
-        expect(d.text.length <= limit || d.overLimit).toBe(true);
-      });
-      useTerm(2);
-    });
-
-    it('Generate on the review screen keeps to the class’s limit, the typed sentence counted in', () => {
+  describe('4. the limit is only information', () => {
+    it('Generate on the review screen gives the whole draft past the class’s limit, and Approve stays on', () => {
       setLimit(350);
       const over = getStudents(cid).filter(st => draftOf(st).text.length > 350);
       expect(over.length).toBeGreaterThan(10);
-      over.slice(0, 6).forEach(st => {
+      over.slice(0, 3).forEach(st => {
         upsertTermRating(cid, st.id, term(), { narrative: '' });
         open(st);
         box.value = '';
         RQ.tqGenerate();
-        expect(box.value.length, st.firstName).toBeGreaterThan(0);
-        expect(box.value.length, st.firstName).toBeLessThanOrEqual(350);
+        expect(box.value.length, st.firstName).toBeGreaterThan(350);
+        expect(RQ.approveBlockers(st), st.firstName).not.toContain('limit');
       });
-      // With a sentence the teacher typed, kept by Generate.
-      const st = over[over.length - 1];
-      const typed = 'I enjoyed having this student in class this term.';
-      upsertTermRating(cid, st.id, term(), { narrative: typed });
-      open(st);
-      box.value = typed;
-      RQ.tqGenerate();
-      expect(box.value).toContain(typed);
-      expect(box.value.length).toBeLessThanOrEqual(350);
       setLimit(null);
     });
   });
@@ -310,7 +182,7 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
       upsertTermRating(cid, st.id, term(), { narrative: 'x'.repeat(70) });
       open(st);
       box.value = 'x'.repeat(70);
-      expect(RQ.approveBlockers(st)).toContain('limit');
+      expect(RQ.approveBlockers(st)).not.toContain('limit');
       RQ.tqLine('limitMenu');
       expect(RQ.renderTermQuestionnaire(cid)).toContain('title="Leave it empty for no limit." value="50"');
       // Left as it was, Return keeps it; a new entry under 100 is refused.
@@ -364,7 +236,7 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
         RQ.clickOutside({ closest: () => null });
         expect(RQ.linesOpen()).toBe(true);
       });
-      expect(RQ.approveBlockers(st)).toContain('limit');
+      expect(RQ.approveBlockers(st)).not.toContain('limit');
       // A valid number clears the message and is saved.
       input.value = '400';
       RQ.tqLineChange(input);
@@ -530,8 +402,8 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
       expect(html).not.toContain('1 characters');
       expect(html).toContain('<span class="qn-count-text" id="tq-count">29 of 1 character</span>');
       RQ.syncApprove();
-      expect(btn.title).toContain('Shorten the comment to 1 character first.');
-      expect(btn.title).not.toContain('1 characters');
+      expect(btn.disabled).toBe(false);
+      expect(btn.title).not.toContain('Shorten');
       setLimit(null);
     });
   });

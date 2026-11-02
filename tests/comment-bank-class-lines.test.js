@@ -542,7 +542,7 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(CommentBank.context(f, {}).supportLine).toBe('In class, I will give feedback on source work each week.');
   });
 
-  it('sets the character limit from the count; Approve stays off past it', () => {
+  it('sets the character limit from the count; past it the count turns orange and Approve stays on', () => {
     seed();
     upsertTermRating(CID, GAB.id, TERM, { narrative: 'x'.repeat(120) });
     open();
@@ -550,19 +550,19 @@ describe('the class settings (report_config) and the review screen', () => {
     const html = RQ.renderTermQuestionnaire(CID);
     expect(html).toContain('Character limit for History 12');
     expect(html).toContain('placeholder="No limit"');
-    expect(html).toContain('The longest comment your school’s report card allows. Approve stays off past it.');
+    expect(html).toContain(
+      'The longest comment your school’s report card allows. The count turns orange past it; Approve still works.',
+    );
     RQ.tqLineChange({ dataset: { tqLimit: '1' }, value: '100' });
     expect(settings().charLimit).toBe(100);
     const st = RQ.getTqStudents()[RQ.tqStudentIndex];
-    expect(RQ.approveBlockers(st)).toEqual(['limit']);
+    expect(RQ.approveBlockers(st)).toEqual([]);
     RQ.syncApprove();
-    expect(btn.disabled).toBe(true);
-    expect(btn.title).toBe(
-      'Saves this comment to the report card and opens the next student. Shorten the comment to 100 characters first.',
-    );
-    // Over the limit, the count says why (the States mockup).
+    expect(btn.disabled).toBe(false);
+    expect(btn.title).toBe('Saves this comment to the report card and opens the next student. ⌘ Return');
+    // Over the limit, the count says so.
     expect(RQ.renderTermQuestionnaire(CID)).toContain(
-      '<span class="qn-count-text" id="tq-count">120 of 100 characters</span><span id="tq-limit-text"> · remove or shorten a sentence</span>',
+      '<span class="qn-count-text" id="tq-count">120 of 100 characters</span><span id="tq-limit-text"> · over the limit</span>',
     );
     expect(RQ.renderTermQuestionnaire(CID)).toContain('class="qn-count-btn over"');
     RQ.tqLineChange({ dataset: { tqLimit: '1' }, value: '' });

@@ -181,7 +181,7 @@ describe('the Not Handed In row and Approve and Next', () => {
 });
 
 describe('the character count and the 20-word rule', () => {
-  it('says why past the limit and turns orange; the Ready line says Approve is off', () => {
+  it('says so past the limit and turns orange; Approve stays on', () => {
     seed();
     upsertTermRating(CID, GAB.id, TERM, { narrative: SIX });
     saveReportConfig(CID, { form: { sides: [] }, commentSettings: { charLimit: 200 } });
@@ -192,33 +192,30 @@ describe('the character count and the 20-word rule', () => {
     expect(html).toContain(
       '<span class="qn-count-text" id="tq-count">' +
         SIX.length +
-        ' of 200 characters</span><span id="tq-limit-text"> · remove or shorten a sentence</span>',
+        ' of 200 characters</span><span id="tq-limit-text"> · over the limit</span>',
     );
-    expect(RQ.approveBlockers(current())).toEqual(['limit']);
+    expect(RQ.approveBlockers(current())).toEqual([]);
     RQ.syncRoster();
     RQ.syncApprove();
-    expect(btn.disabled).toBe(true);
-    expect(ready.textContent).toBe('Approve and Next is off until the comment fits.');
+    expect(btn.disabled).toBe(false);
+    expect(ready.textContent).toBe('0 of 2 Ready');
     saveReportConfig(CID, { form: { sides: [] }, commentSettings: { charLimit: null } });
     RQ.syncApprove();
     expect(ready.textContent).toBe('0 of 2 Ready');
   });
-  it('a sentence over 20 words keeps Approve off and the count says so', () => {
+  it('a sentence over 20 words: the count says so and Approve stays on', () => {
     seed();
     const long = 'Gabriel ' + 'really '.repeat(20) + 'tries.';
     upsertTermRating(CID, GAB.id, TERM, { narrative: long + ' His work habits are steady.' });
     const html = open();
     expect(html).toContain('class="qn-count-btn over"');
     expect(html).toContain('<span id="tq-limit-text"> · one sentence is over 20 words</span>');
-    expect(RQ.approveBlockers(current())).toEqual(['long']);
+    expect(RQ.approveBlockers(current())).toEqual([]);
     RQ.syncApprove();
-    expect(btn.disabled).toBe(true);
-    expect(btn.title).toBe(
-      'Saves this comment to the report card and opens the next student. Shorten the sentence over 20 words first.',
-    );
+    expect(btn.disabled).toBe(false);
     upsertTermRating(CID, GAB.id, TERM, { narrative: long + ' ' + long });
     expect(open()).toContain('<span id="tq-limit-text"> · two sentences are over 20 words</span>');
-    expect(RQ.approveBlockers(current())).toEqual(['long']);
+    expect(RQ.approveBlockers(current())).toEqual([]);
   });
   it('a comment that fits shows the limit after the count, as before', () => {
     seed();
