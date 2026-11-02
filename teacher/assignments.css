@@ -2914,6 +2914,22 @@
   color: var(--text-2);
   margin: 6px 0 0;
 }
+/* Why scored work in a class with categories needs one (shown while
+   none is chosen in the form or the copy dialog). */
+.af-category-hint {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  margin: 4px 0 0;
+}
+.af-category-hint[hidden] {
+  display: none;
+}
+.grader-needs-category {
+  margin-top: 2px;
+}
+.grader-needs-category[hidden] {
+  display: none;
+}
 
 /* Rubric badge on assessment cards */
 .rubric-badge {

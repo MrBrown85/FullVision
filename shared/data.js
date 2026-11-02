@@ -2779,6 +2779,20 @@ function getAssessmentCategoryName(cid, assessment) {
   return category && category.name ? category.name : 'Unknown Category';
 }
 
+/* A class with categories needs one on every scored assessment, as Teams
+   does once categories are on (docs/DECISIONS.md, "A category on every
+   assessment"). DIBELS work counts toward no grade, so it may have none. */
+function categoryRequired(cid, assessment) {
+  return (getCategories(cid) || []).length > 0 && !isDibelsScored(assessment);
+}
+
+// Work that should have a category and has none, or one that's gone.
+function assessmentNeedsCategory(cid, assessment) {
+  return (
+    !!assessment && categoryRequired(cid, assessment) && !getCategoryById(cid, _getAssessmentCategoryId(assessment))
+  );
+}
+
 function _normalizeProfileObservations(observations) {
   return (observations || [])
     .map(function (ob) {
@@ -12231,6 +12245,8 @@ window.GB = {
   getCategoryById,
   getAssessmentCategoryId,
   getAssessmentCategoryName,
+  categoryRequired,
+  assessmentNeedsCategory,
   getAssessments,
   saveAssessments,
   getOverrides,

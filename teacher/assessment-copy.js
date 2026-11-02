@@ -181,20 +181,22 @@ window.AssessmentCopy = (function () {
   function planCopy(srcCid, a, dstCid) {
     var plan = { srcCid: srcCid, dstCid: dstCid, dstName: _className(dstCid), notes: [], needsReview: false };
 
-    // Category: same name, or the teacher picks one. A class with categories
-    // needs one on every assessment (docs/grading-compliance-plan.md 1.4).
+    // Category: same name, or the teacher picks one; nothing is picked for
+    // them. A class with categories needs one on every scored assessment
+    // (data.js categoryRequired); DIBELS work may go in with none.
     var dstCats = (getCategories(dstCid) || []).slice().sort(function (x, y) {
       return (x.displayOrder || 0) - (y.displayOrder || 0);
     });
     var srcCat = _categoryOf(srcCid, a);
     var catHit = srcCat ? _byName(dstCats, srcCat.name) : null;
     plan.category = {
-      id: catHit ? catHit.id : dstCats.length ? dstCats[0].id : null,
+      id: catHit ? catHit.id : null,
       srcName: srcCat ? srcCat.name : '',
       options: dstCats.map(function (c) {
         return { id: c.id, name: c.name };
       }),
       needsChoice: !catHit && dstCats.length > 0,
+      required: categoryRequired(dstCid, a),
     };
     if (plan.category.needsChoice) plan.needsReview = true;
 
@@ -564,7 +566,10 @@ window.AssessmentCopy = (function () {
               (p.category.srcName ? 'There’s no “' + esc(p.category.srcName) + '” category here. Use' : 'Category') +
               ' <select class="af-input" data-copy-cat="' +
               i +
+              '" aria-describedby="copy-cat-hint-' +
+              i +
               '">' +
+              '<option value="" selected>Choose a Category</option>' +
               p.category.options
                 .map(function (o) {
                   return (
@@ -578,7 +583,10 @@ window.AssessmentCopy = (function () {
                   );
                 })
                 .join('') +
-              '</select></label>';
+              '</select></label>' +
+              (p.category.required
+                ? '<p class="af-category-hint" id="copy-cat-hint-' + i + '">' + esc(CATEGORY_REQUIRED_HINT) + '</p>'
+                : '');
           }
           p.notes.forEach(function (n) {
             out += '<div class="copy-review-note">' + esc(n) + '</div>';
@@ -591,7 +599,33 @@ window.AssessmentCopy = (function () {
         html: html,
         okLabel: okLabel || 'Add',
         cancelLabel: 'Don’t add',
+        onOpen: function (root) {
+          // A choice clears the outline a stopped OK left, and the hint.
+          root.addEventListener('change', function (e) {
+            var sel = e.target.closest('[data-copy-cat]');
+            if (!sel) return;
+            sel.style.border = '';
+            sel.removeAttribute('aria-invalid');
+            var hint = root.querySelector('#' + sel.getAttribute('aria-describedby'));
+            if (hint) hint.hidden = !!sel.value;
+          });
+        },
         onOk: function (root) {
+          // Scored work can't go into a class with categories without one.
+          var missing = needs
+            .map(function (p, i) {
+              var sel = root.querySelector('[data-copy-cat="' + i + '"]');
+              return sel && !sel.value && p.category.required ? sel : null;
+            })
+            .filter(Boolean);
+          if (missing.length) {
+            missing.forEach(function (sel) {
+              sel.style.border = '2px solid var(--score-1)';
+              sel.setAttribute('aria-invalid', 'true');
+            });
+            missing[0].focus();
+            return false;
+          }
           needs.forEach(function (p, i) {
             var sel = root.querySelector('[data-copy-cat="' + i + '"]');
             if (sel) p.category.id = sel.value || null;

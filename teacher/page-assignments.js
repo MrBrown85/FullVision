@@ -1520,6 +1520,14 @@ window.PageAssignments = (function () {
         '</span>' +
         '<span class="assess-meta">' +
         (function () {
+          if (assessmentNeedsCategory(cid, a))
+            return (
+              '<span class="type-badge type-badge-needs"' +
+              _chipTipAttrs(NEEDS_CATEGORY_LABEL, NEEDS_CATEGORY_TIP) +
+              '>' +
+              esc(NEEDS_CATEGORY_LABEL) +
+              '</span>'
+            );
           var idx = categoryId
             ? (getCategories(cid) || []).findIndex(function (c) {
                 return c.id === categoryId;
@@ -2050,6 +2058,11 @@ window.PageAssignments = (function () {
     newCollaboration = collaboration;
     var allModules = getModules(cid);
     var categories = _getSortedCategories(cid);
+    var needsPick =
+      categories.length > 0 &&
+      !categories.some(function (c) {
+        return c.id === categoryId;
+      });
     var scoreMode = assess ? assess.scoreMode || 'proficiency' : 'proficiency';
     var maxPoints = assess ? assess.maxPoints || 100 : 100;
     var weight = getAssessmentWeight(assess);
@@ -2154,10 +2167,14 @@ window.PageAssignments = (function () {
       '<div class="af-row">' +
       '<div class="af-field" style="flex:1">' +
       '<label class="af-label">Category</label>' +
-      '<select class="af-input" id="af-category">' +
-      // A class with categories needs one on every assessment, or the work
-      // counts toward no letter grade (Schoology and Teams both require it).
-      (categories.length === 0 ? '<option value="">No Category</option>' : '') +
+      '<select class="af-input" id="af-category" aria-describedby="af-category-hint">' +
+      // A class with categories needs one on every scored assessment, as
+      // Teams does; the teacher picks it, nothing is chosen for them.
+      (categories.length === 0
+        ? '<option value="">No Category</option>'
+        : needsPick
+          ? '<option value="" selected>Choose a Category</option>'
+          : '') +
       categories
         .map(function (category) {
           return (
@@ -2174,7 +2191,11 @@ window.PageAssignments = (function () {
       '</select>' +
       (categories.length === 0
         ? '<div class="af-rubric-info">No grading categories configured for this course yet.</div>'
-        : '') +
+        : '<p class="af-category-hint" id="af-category-hint"' +
+          (needsPick && scoreMode !== 'dibels' ? '' : ' hidden') +
+          '>' +
+          esc(CATEGORY_REQUIRED_HINT) +
+          '</p>') +
       '</div>' +
       '<div class="af-field" style="flex:1">' +
       '<label class="af-label">Evidence Type</label>' +
@@ -2308,7 +2329,7 @@ window.PageAssignments = (function () {
       '<div class="af-counts-as" id="af-counts-as" aria-live="polite">' +
       esc(
         _countsAsText(cid, {
-          categoryId: categoryId || (categories[0] ? categories[0].id : ''),
+          categoryId: needsPick ? '' : categoryId,
           rubricId: assess ? assess.rubricId || '' : '',
           scoreMode: scoreMode,
           maxPoints: maxPoints,
@@ -2527,6 +2548,11 @@ window.PageAssignments = (function () {
     var line = document.getElementById('af-counts-as');
     if (!line) return;
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    // The Category field's hint already says why work with none is short.
+    if (_refreshCategoryHint()) {
+      line.textContent = '';
+      return;
+    }
     line.textContent = _countsAsText(activeCourse, {
       categoryId: (document.getElementById('af-category') || {}).value || '',
       rubricId: mode === 'proficiency' ? (document.getElementById('af-rubric') || {}).value || '' : '',
@@ -2535,6 +2561,34 @@ window.PageAssignments = (function () {
       weight: _formAssessWeight(),
     });
   }
+  /* Shows the Category field's hint while scored work in a class with
+     categories has none chosen; true when it shows. A choice clears the
+     red outline a stopped save left. */
+  function _refreshCategoryHint() {
+    var sel = document.getElementById('af-category');
+    var hint = document.getElementById('af-category-hint');
+    if (!sel || !hint) return false;
+    var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    var show = !sel.value && categoryRequired(activeCourse, { scoreMode: mode });
+    hint.hidden = !show;
+    if (!show) {
+      sel.style.border = '';
+      sel.removeAttribute('aria-invalid');
+    }
+    return show;
+  }
+
+  /* A save of scored work with no category, in a class with categories,
+     stops at the Category field. */
+  function _formCategoryChosen() {
+    if (!_refreshCategoryHint()) return true;
+    var sel = document.getElementById('af-category');
+    sel.style.border = '2px solid var(--score-1)';
+    sel.setAttribute('aria-invalid', 'true');
+    sel.focus();
+    return false;
+  }
+
   function _countsAsAfterEvent() {
     if (document.getElementById('af-counts-as')) setTimeout(_refreshFormCountsAs, 0);
   }
@@ -2638,6 +2692,7 @@ window.PageAssignments = (function () {
       }
       return;
     }
+    if (!_formCategoryChosen()) return;
     var dateAssigned = (document.getElementById('af-date-assigned') || {}).value || courseToday(activeCourse);
     var date = dateAssigned;
     var description = (document.getElementById('af-desc') ? document.getElementById('af-desc').value : '').trim();
@@ -2748,6 +2803,7 @@ window.PageAssignments = (function () {
       }
       return;
     }
+    if (!_formCategoryChosen()) return;
     var dateAssigned = (document.getElementById('af-date-assigned') || {}).value || courseToday(activeCourse);
     var date = dateAssigned;
     var description = (document.getElementById('af-desc') ? document.getElementById('af-desc').value : '').trim();
@@ -7483,6 +7539,7 @@ window.PageAssignments = (function () {
         '<div class="grader-toolbar">' +
         '<div class="grader-toolbar-start"></div>' +
         '<div class="grader-title-wrap"><h2 class="grader-title" id="grader-title"></h2>' +
+        '<span class="type-badge type-badge-needs grader-needs-category" hidden></span>' +
         '<p class="grader-counts-as"></p></div>' +
         '<div class="grader-toolbar-end"><button type="button" class="grader-done" data-grader="close">Done</button></div>' +
         '</div>' +
@@ -7516,6 +7573,10 @@ window.PageAssignments = (function () {
     var i = _grader.studentIds.indexOf(st.id);
     dialog.querySelector('.grader-title').textContent = a.title || 'Assessment';
     dialog.querySelector('.grader-counts-as').textContent = _countsAsText(cid, a);
+    var needsCat = dialog.querySelector('.grader-needs-category');
+    needsCat.hidden = !assessmentNeedsCategory(cid, a);
+    needsCat.textContent = NEEDS_CATEGORY_LABEL;
+    needsCat.title = NEEDS_CATEGORY_TIP;
     dialog.querySelector('.grader-student').textContent = displayNameWithLast(st);
     dialog.querySelector('[data-grader="prev"]').disabled = !(i > 0);
     dialog.querySelector('[data-grader="next"]').disabled = !(i >= 0 && i < _grader.studentIds.length - 1);

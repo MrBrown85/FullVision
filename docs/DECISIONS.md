@@ -75,6 +75,16 @@ A 72% test showed 2.9 (Proficient's colour) on the student page, while its compe
 - **The % doesn't change.** Points work still counts its points in the course %.
 - A points 0 and Incomplete are Emerging, the table's bottom, as their competency already read them. Missing points work stays a 0 level.
 
+## A category on every assessment (2026-11-01)
+
+Colin chose option A on Kanban card t4. Microsoft Teams Assignments requires a category on every assignment once a class has categories. FullVision didn't: in a class with categories, work with no category counted toward nothing in the course % (`assessmentCourseWorth` kind `uncategorized`) and toward a competency only when that competency had no categorized work, with nothing on screen to say so. The form also chose the first category for the teacher without saying so.
+
+1. **In a class with at least one category, scored work can't be saved without one** (`categoryRequired`, `shared/data.js`). The assignment form (create and edit) opens on "Choose a Category" when the work has none and says why under the field; Save stops there. Copying to other classes (the form's Classes field and Add From Another Class) asks the same way when the other class has no category of the same name, and Add waits for a choice. Nothing is chosen for the teacher.
+2. **DIBELS work needs no category:** it counts toward no grade.
+3. **A class with no categories is unchanged.** Its only choice is No Category.
+4. **Work saved before the rule is marked "Needs a Category"** (`assessmentNeedsCategory`) on its assignment card, its gradebook header (Scores and Competencies) and in the grader, so the teacher can fix it. How it counts is unchanged.
+5. The phone can't create or edit assignments, so it has nothing to require.
+
 ## New class defaults (2026-10-25)
 
 - **Grades 8–9:** Proficiency, Rubric Levels Emerging First, Mean.
