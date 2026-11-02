@@ -3255,9 +3255,25 @@ window.CommentBank = (function () {
         })[0]
       : null;
 
-    // Work: best and lowest this term.
+    // Work: best and lowest this term. Of the pieces tied at the top (as
+    // the level prints, tenths), one scored on the strongest competency
+    // comes first, so the best piece backs up the strength (Colin,
+    // 2026-11-02); then the higher mark, then the most recent. Only the
+    // "strongest" gate counts: a tie at the top names its skill by rotation
+    // across classmates (topSkillOf), which would move the best piece
+    // between sessions and flag approved comments as changed.
+    var strongSk = strengthSkills(f)[0];
+    var strongComp = strongSk ? strongSk.comp : null;
+    var onStrength = function (w) {
+      return strongComp &&
+        (strongComp.scores || []).some(function (s) {
+          return s.id === w.id;
+        })
+        ? 1
+        : 0;
+    };
     var best = f.work.slice().sort(function (a, b) {
-      return b.v - a.v || b.d.localeCompare(a.d);
+      return tenths(b.v) - tenths(a.v) || onStrength(b) - onStrength(a) || b.v - a.v || b.d.localeCompare(a.d);
     });
     var low = f.work.slice().sort(function (a, b) {
       return a.v - b.v || b.d.localeCompare(a.d);
