@@ -92,19 +92,33 @@ describe('Use on a sentence that does not fit', () => {
     expect(text).toContain('Priya had a strong term.');
     expect(text).toContain(row.text.replace(/\.$/, ''));
     expect(RQ.approveBlockers(PRI)).not.toContain('claims');
+    // A fact it had no value for shows as …, and the row says to fill it in.
+    const f = CommentBank.facts(CID, PRI, TERM);
+    const src = t => RQ.rowSource({ step: null, text: t, edited: true }, CID, PRI, f, c);
+    expect(src('One assignment is not handed in: ….')).toBe('Typed by you · fill in the … · kept when you regenerate');
+    expect(src('Priya had a strong term.')).toBe('Typed by you · kept when you regenerate');
   });
 
-  it('a sentence used for a classmate goes in for the student too', () => {
-    const c = ctx();
-    const fit = RQ.browseList('strengths', c, {}).rows.find(r => r.fits);
-    const s = CommentBank.fill(
-      COMMENT_BANK.sentences.find(x => x.id === fit.id),
-      CommentBank.context(CommentBank.facts(CID, MAT, TERM), {}),
-    );
-    upsertTermRating(CID, MAT.id, TERM, { narrative: s });
+  it('a sentence used for a classmate that does not fit the student goes in for them too', () => {
+    // Mateo's marks are lower, so his grade sentence is another letter's.
+    _cache.scores[CID][MAT.id].forEach(x => (x.score = 2));
+    clearProfCache();
+    const mctx = CommentBank.context(CommentBank.facts(CID, MAT, TERM), {});
+    const theirs = RQ.browseList('grade', mctx, {}).rows.find(r => r.fits);
+    upsertTermRating(CID, MAT.id, TERM, { narrative: theirs.text });
     upsertTermRating(CID, PRI.id, TERM, { narrative: 'Priya had a strong term.' });
     open();
-    RQ.tqSentences('use', { dataset: { sentence: fit.id, case: fit.case } });
-    expect(narrative()).toContain(fit.text.replace(/\.$/, '').slice(10));
+    const usage = CommentBank.classUsage(
+      COMMENT_BANK,
+      [{ sid: MAT.id, text: theirs.text, names: ['Mateo', 'Silva'] }],
+      CID,
+      PRI.id,
+    );
+    expect(usage[theirs.id], theirs.text).toBe(1);
+    const row = RQ.browseList('grade', ctx(), {}).rows.find(r => r.id === theirs.id && r.case === theirs.case);
+    expect(row.fits).toBe(false);
+    RQ.tqSentences('use', { dataset: { sentence: row.id, case: row.case } });
+    expect(narrative()).toContain(row.text.replace(/\.$/, '').slice(0, 20));
+    expect(RQ.approveBlockers(PRI)).not.toContain('claims');
   });
 });

@@ -4024,7 +4024,11 @@ window.ReportQuestionnaire = (function () {
      weakest skill. An edited sentence says so instead. */
   function rowSource(row, cid, student, f, ctx) {
     var first = _first(student);
-    if (isTyped(row)) return 'Typed by you · kept when you regenerate';
+    // A sentence put in from Browse with a fact missing shows it as …
+    if (isTyped(row))
+      return /…/.test(row.text)
+        ? 'Typed by you · fill in the … · kept when you regenerate'
+        : 'Typed by you · kept when you regenerate';
     if (row.edited) return 'Edited by you · kept when you regenerate';
     if (row.step === 'attendance') return 'From Attendance above · new';
     if (row.step === 'grade') return _gradeSource(cid, f);
