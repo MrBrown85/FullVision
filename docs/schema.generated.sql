@@ -948,6 +948,7 @@ table public.tag (rls on)
   updated_at timestamp with time zone not null default now()
   i_can_statements text[] not null default '{}'::text[]
   source_text text
+  bank_id text
   constraint tag_pkey PRIMARY KEY (id)
   constraint tag_section_id_fkey FOREIGN KEY (section_id) REFERENCES public.section(id) ON DELETE CASCADE
   CREATE UNIQUE INDEX tag_pkey ON public.tag USING btree (id)
@@ -1298,7 +1299,7 @@ function public.upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value
 function public.upsert_section(p_id uuid, p_subject_id uuid, p_name text, p_color text, p_competency_group_id uuid, p_display_order integer, p_idempotency_key uuid) returns uuid
 function public.upsert_section_override(p_enrollment_id uuid, p_section_id uuid, p_level integer, p_reason text) returns uuid
 function public.upsert_subject(p_id uuid, p_course_id uuid, p_name text, p_color text, p_display_order integer, p_idempotency_key uuid) returns uuid
-function public.upsert_tag(p_id uuid, p_section_id uuid, p_label text, p_code text, p_i_can_text text, p_display_order integer, p_idempotency_key uuid, p_i_can_statements text[], p_source_text text) returns uuid
+function public.upsert_tag(p_id uuid, p_section_id uuid, p_label text, p_code text, p_i_can_text text, p_display_order integer, p_idempotency_key uuid, p_i_can_statements text[], p_source_text text, p_bank_id text) returns uuid
 function public.upsert_tag_score(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid, p_value integer, p_modifier smallint, p_comment text) returns uuid
 function public.withdraw_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
 function student_submit._clean_answer(p_kind text, p_options jsonb, p_core_ids text[], p_value jsonb) returns jsonb security definer

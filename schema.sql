@@ -125,6 +125,7 @@ create table tag (
   i_can_text    text,         -- the competency's wording, despite the name
   i_can_statements text[]   not null default '{}',
   source_text   text,         -- the curriculum wording it started with
+  bank_id       text,         -- BC curriculum bank competency id it was imported from, e.g. bc.draft10.cc.11 (20261102_tag_bank_id)
   display_order integer     not null default 0,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()

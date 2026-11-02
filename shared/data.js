@@ -3161,6 +3161,7 @@ function _canonicalLearningMapToCache(cid, payload) {
           text: tag.i_can_text || tag.iCanText || tag.text || '',
           i_can_statements: tag.i_can_statements || tag.iCanStatements || [],
           source_text: tag.source_text || null,
+          bank_id: tag.bank_id || null,
           color: tag.color || sectionColor,
           subject: subject.id,
           name: sectionName,
@@ -6760,6 +6761,7 @@ function mergeRemovedSectionsFromServer(cid, rows) {
             text: t.i_can_text || '',
             i_can_statements: t.i_can_statements || [],
             source_text: t.source_text || null,
+            bank_id: t.bank_id || null,
           };
         }),
       },
@@ -7077,6 +7079,7 @@ function _learningMapSignatures(map) {
         _stringifyICanText(tag),
         _iCanStatementsOf(tag),
         tag.source_text || null,
+        tag.bank_id || null,
         tag.displayOrder != null ? Number(tag.displayOrder) : Number(tag.sortOrder || ti),
       ]);
     });
@@ -7194,6 +7197,7 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
               iCanText: _stringifyICanText(tag),
               iCanStatements: _iCanStatementsOf(tag),
               sourceText: tag.source_text || null,
+              bankId: tag.bank_id || null,
               displayOrder: tag.displayOrder != null ? Number(tag.displayOrder) : Number(tag.sortOrder || ti),
             },
             options,
@@ -11091,6 +11095,7 @@ window.v2.upsertTag = function (params, options) {
       p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
       p_i_can_statements: Array.isArray(params.iCanStatements) ? params.iCanStatements : null,
       p_source_text: params.sourceText || null,
+      p_bank_id: params.bankId || null,
     },
     options,
   );
