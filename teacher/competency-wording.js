@@ -27,13 +27,10 @@ window.CompetencyWording = (function () {
   /* The bank cluster's next step for a level (1–3), as a sentence; '' with
      no bank id, at Extending, or when the cluster has none. */
   function nextStep(tag, level) {
-    var id = tag && tag.bank_id;
-    var b = window.BANK_COMMENT;
-    var i = id && b && b.ids ? b.ids[id] : null;
-    var row = i != null && b.clusters ? b.clusters[i] : null;
+    var e = tag && tag.bank_id && window.CommentBank ? CommentBank.bankEntry(tag.bank_id) : null;
     // Steps exist below Extending: Emerging (1) to Proficient (3).
-    if (!row || !(level >= 1 && level <= 3)) return '';
-    return _sentence(row[level + 1]);
+    if (!e || !(level >= 1 && level <= 3)) return '';
+    return _sentence(e.steps[PROF_LABELS[level]]);
   }
 
   /* The three lines for a competency at a level (1–4): { word, descriptor,

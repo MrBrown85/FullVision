@@ -4816,6 +4816,9 @@ window.PageAssignments = (function () {
   function hideDescriptorBar() {
     var bar = document.getElementById('rsg-descriptor-bar');
     if (bar) bar.style.display = 'none';
+    // A competency level's lines go too, so a rubric card shown next
+    // starts from its own prompt.
+    _clearTagLevelBar(bar);
   }
   function resetDescriptorBar() {
     var bar = document.getElementById('rsg-descriptor-bar');
@@ -4829,7 +4832,10 @@ window.PageAssignments = (function () {
      pointer. */
   var _tagBarLevel = null;
   var _tagBarShown = false;
+  var _tagBarHide = null;
+  var _bankLoadAsked = false;
   function showTagLevelBar(el) {
+    clearTimeout(_tagBarHide);
     var tag = getTagById(activeCourse, el.dataset.tagid);
     var l = window.CompetencyWording ? CompetencyWording.lines(tag, parseInt(el.dataset.level, 10)) : null;
     var lines = l ? CompetencyWording.html(l) : '';
@@ -4850,21 +4856,33 @@ window.PageAssignments = (function () {
     text.classList.add('is-lines');
     // html-safe: CompetencyWording.html escapes the descriptor, I Can statements and step
     text.innerHTML = lines;
-    if (!l.ready && window.RubricPrint && RubricPrint.loadBankLevels)
+    // Asked once: offline, the bar keeps the other wording rather than
+    // adding the script again on every hover.
+    if (!l.ready && !_bankLoadAsked && window.RubricPrint && RubricPrint.loadBankLevels) {
+      _bankLoadAsked = true;
       RubricPrint.loadBankLevels().then(function (ok) {
         if (ok && _tagBarLevel === el && document.body.contains(el)) showTagLevelBar(el);
       });
+    }
   }
+  /* Leaving a level: after this event, so moving straight to the next
+     level (which shows its own lines) doesn't flash the bar. */
   function hideTagLevelBar() {
-    if (!_tagBarLevel) return;
+    clearTimeout(_tagBarHide);
+    _tagBarHide = setTimeout(function () {
+      if (!_tagBarLevel) return;
+      var bar = document.getElementById('rsg-descriptor-bar');
+      if (bar && _tagBarShown) bar.style.display = 'none';
+      _clearTagLevelBar(bar);
+    }, 0);
+  }
+  function _clearTagLevelBar(bar) {
     _tagBarLevel = null;
-    var bar = document.getElementById('rsg-descriptor-bar');
-    if (!bar) return;
+    _tagBarShown = false;
+    if (!bar || !bar.classList.contains('is-lines')) return;
     bar.classList.remove('is-lines');
     bar.querySelector('.rsg-descriptor-text').classList.remove('is-lines');
     _resetDescriptorBarContent(bar);
-    if (_tagBarShown) bar.style.display = 'none';
-    _tagBarShown = false;
   }
 
   function showCritTooltip(event, aid, critId, level) {

@@ -58,3 +58,18 @@ test('a level reached with Tab shows its lines too', async ({ page }) => {
   await page.keyboard.press('Shift+Tab');
   await expect(bar).toContainText('Proficient:');
 });
+
+test('a rubric card opened after scoring a competency shows its own prompt', async ({ page }) => {
+  const card = await open(page);
+  const level = card.locator('.rsg-criterion-row[data-student="st1"][data-tag="IP"] .rsg-level.l2');
+  await level.scrollIntoViewIfNeeded();
+  await level.hover();
+  await level.click();
+  const rubric = page.locator('#ac-sci8a1');
+  await rubric.scrollIntoViewIfNeeded();
+  if (!(await rubric.evaluate(el => el.classList.contains('open')))) await rubric.locator('.assess-title').click();
+  const bar = page.locator('#rsg-descriptor-bar');
+  await expect(bar).toBeVisible();
+  await expect(bar).toContainText('Hover a rubric level to see its descriptor');
+  await expect(bar).not.toContainText('Proficient means:');
+});

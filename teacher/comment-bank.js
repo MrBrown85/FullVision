@@ -7075,6 +7075,7 @@ window.CommentBank = (function () {
     nextStepOf: nextStepOf,
     levelStepOf: levelStepOf,
     skillFor: skillFor,
+    bankEntry: bankEntry,
     nextSkillOf: nextSkillOf,
     skillOf: skillOf,
     NO_SKILL: NO_SKILL,
