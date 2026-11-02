@@ -2,8 +2,9 @@
  * data/bc-curriculum-ican.json holds the I Can statements for BC curriculum
  * competencies (stage 3 of the bank rebuild), keyed by competency id in
  * data/bc-curriculum-source.json. So far it covers Social Studies, English
- * Language Arts and CLE10. These checks read only the two JSON files and keep
- * their own rules, apart from whatever produced the statements.
+ * Language Arts, CLE10, Science and Mathematics. These checks read only the
+ * two JSON files and keep their own rules, apart from whatever produced the
+ * statements.
  */
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
@@ -12,8 +13,8 @@ import { describe, expect, it } from 'vitest';
 const source = JSON.parse(readFileSync('data/bc-curriculum-source.json', 'utf-8'));
 const ican = JSON.parse(readFileSync('data/bc-curriculum-ican.json', 'utf-8'));
 
-const covered = (key, course) =>
-  course.subject === 'Social Studies' || course.subject === 'English Language Arts' || key === 'CLE10';
+const SUBJECTS = new Set(['Social Studies', 'English Language Arts', 'Science', 'Mathematics']);
+const covered = (key, course) => SUBJECTS.has(course.subject) || key === 'CLE10';
 const rows = Object.entries(source)
   .filter(([key, course]) => !key.startsWith('_') && covered(key, course))
   .flatMap(([key, course]) =>
@@ -32,8 +33,8 @@ const sha = raw => createHash('sha256').update(raw, 'utf8').digest('hex').slice(
 const words = s => s.split(/\s+/).filter(Boolean).length;
 
 describe('BC curriculum I Can statements', () => {
-  it('covers every Social Studies, English Language Arts and CLE10 competency, and nothing else', () => {
-    expect(rows.length).toBeGreaterThan(700);
+  it('covers every Social Studies, English Language Arts, Science, Mathematics and CLE10 competency, and nothing else', () => {
+    expect(rows.length).toBeGreaterThan(1500);
     expect(rows.filter(r => !r.ic).map(r => r.id)).toEqual([]);
     const ids = new Set(rows.map(r => r.id));
     expect(Object.keys(ican).filter(id => !id.startsWith('_') && !ids.has(id))).toEqual([]);
