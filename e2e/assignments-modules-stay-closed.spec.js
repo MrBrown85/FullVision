@@ -5,6 +5,8 @@ import { test, expect } from '@playwright/test';
 test('a closed module stays closed after leaving Assignments', async ({ page }) => {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   // Two modules, each holding one assessment.
   await page.evaluate(() => {
     const cid = getActiveCourse();

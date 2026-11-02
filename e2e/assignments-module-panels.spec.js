@@ -6,6 +6,8 @@ import { test, expect } from '@playwright/test';
 test('modules draw as tinted panels with their header', async ({ page }) => {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(() => {
     const cid = getActiveCourse();
     const now = new Date().toISOString();

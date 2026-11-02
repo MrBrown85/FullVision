@@ -7,6 +7,8 @@ import { test, expect } from '@playwright/test';
 async function openStudent(page, first) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   const sid = await page.evaluate(n => getStudents('sci8').find(s => s.firstName === n).id, first);
   await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid + '&course=sci8&tab=profile');
   await page.locator('.lp-layout').waitFor();

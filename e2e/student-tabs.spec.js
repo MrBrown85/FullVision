@@ -8,6 +8,8 @@ import { test, expect } from '@playwright/test';
 async function openCece(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   const sid = await page.evaluate(() => getStudents(getActiveCourse()).find(s => s.firstName === 'Cece').id);
   await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid);
   await page.locator('.stu-tabs').waitFor();
@@ -27,7 +29,9 @@ test('five tabs, Competencies first, and the arrow keys move between them', asyn
     'Learner Profile',
   ]);
   await expect(page.locator('#stu-tab-comps')).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#stu-tab-comps .stu-tab-stat')).toHaveText('6 of 6 Proficient');
+  // Cece is Proficient or above on all 24 of her scored competencies; three
+  // of the 27 have no work yet.
+  await expect(page.locator('#stu-tab-comps .stu-tab-stat')).toHaveText('27 of 27 Proficient');
   await expect(tabs).toHaveCount(5);
   await page.locator('#stu-tab-comps').focus();
   await page.keyboard.press('ArrowRight');
@@ -79,6 +83,7 @@ test('the tab counts follow the reporting term', async ({ page }) => {
 test('a Letter class shows percents, not proficiency words', async ({ page }) => {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   const sid = await page.evaluate(() => {
     const cid = getActiveCourse();
     COURSES[cid].gradingSystem = 'letter';
@@ -87,7 +92,7 @@ test('a Letter class shows percents, not proficiency words', async ({ page }) =>
   });
   await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid);
   await page.locator('.stu-tabs').waitFor();
-  await expect(page.locator('#stu-tab-comps .stu-tab-stat')).toHaveText('6 of 6 Scored');
+  await expect(page.locator('#stu-tab-comps .stu-tab-stat')).toHaveText('27 of 27 Scored');
   await expect(page.locator('.stu-comp-level .stu-level').first()).toHaveText(/^\d+%$/);
 });
 
@@ -140,6 +145,7 @@ test('the dashboard opens the tab that matches where the teacher clicked', async
 test('the Competencies tab has no Competency Profile list', async ({ page }) => {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   const sid = await page.evaluate(() => {
     window.__profileCalls = 0;
     window.v2.getStudentProfile = function () {

@@ -1703,7 +1703,9 @@ button.ced-obs-row {
   font-weight: 700;
   white-space: nowrap;
   background: var(--surface-2);
-  color: var(--text-3);
+  /* The no-evidence dash: --text-3 on --surface-2 is 3.95:1 in dark mode,
+     below the 4.5:1 that 13px text needs; --text-2 is 5.1:1 dark, 4.7:1 light. */
+  color: var(--text-2);
 }
 .stu-level-1 {
   background: var(--score-1-bg);

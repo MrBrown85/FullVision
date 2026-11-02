@@ -12,6 +12,8 @@ async function openExam(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
   await page.locator('#m-grade-list .m-cell', { hasText: 'Mid-Year Comprehensive Exam' }).click();
@@ -32,9 +34,9 @@ test('typed points replace the score, clamp like the desktop, and reach the grad
   const card = await openExam(page);
   const sid = await card.getAttribute('data-sid');
   await expect(card.locator('.m-score-tag-label')).toHaveText([
-    'Question and Predict',
-    'Identify Patterns',
-    'Evaluate Methods',
+    'Sustained Inquiry',
+    'Data Representation',
+    'Informed Skepticism',
   ]);
 
   const field = card.locator('.m-pts-input');

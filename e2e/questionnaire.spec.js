@@ -7,6 +7,8 @@ test.use({ viewport: { width: 1440, height: 900 } });
 async function open(page, student = 'st1') {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   // On the Report Card: a new report has no Teacher Comment block.
   await page.evaluate(() => {
     const cfg = getReportConfig('sci8') || {};
@@ -188,7 +190,8 @@ test('the roster marks survive a sidebar redraw; arrows move without approving a
   await page.locator('.report-seg-btn[data-tab="progress"]').click();
   await expect(page.locator('#gb-sidebar .student-row-note')).toHaveCount(0);
   await expect(page.locator('#gb-sidebar-extra')).toHaveCount(0);
-  await expect(cece.locator('.student-row-prof').first()).toBeVisible();
+  // Cece's Report Card runs to two sheets, so her row shows that instead.
+  await expect(row(noor).locator('.student-row-prof').first()).toBeVisible();
 });
 
 test('Generate Comment drafts from the bank; the box grows, the count follows, ⌘Z brings the old text back', async ({

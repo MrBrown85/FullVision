@@ -13051,21 +13051,26 @@ window.loadSeedIfNeeded = function () {
   // gets the empty class manager, never a fake class.
   if (typeof isDemoMode !== 'function' || !isDemoMode()) return Promise.resolve();
   // Already loaded this session — call directly (handles re-seed after data reset)
+  // The demo class is built from the curriculum bank, so it loads first; a
+  // failed load seeds the old built-in map instead.
+  var bank =
+    typeof loadCurriculumIndex === 'function' ? loadCurriculumIndex().catch(function () {}) : Promise.resolve();
   if (typeof seedIfNeeded === 'function') {
-    seedIfNeeded();
-    return Promise.resolve();
+    return bank.then(function () {
+      seedIfNeeded();
+    });
   }
   // User deliberately wiped all data — never auto-seed
   if (localStorage.getItem('gb-data-wiped') === '1') return Promise.resolve();
   // Lazy-load the script, then seed
-  return new Promise(function (resolve) {
+  var script = new Promise(function (resolve) {
     var s = document.createElement('script');
-    s.src = '/shared/seed-data.js?v=44';
-    s.onload = function () {
-      if (typeof seedIfNeeded === 'function') seedIfNeeded();
-      resolve();
-    };
+    s.src = '/shared/seed-data.js?v=45';
+    s.onload = resolve;
     s.onerror = resolve;
     document.head.appendChild(s);
+  });
+  return Promise.all([script, bank]).then(function () {
+    if (typeof seedIfNeeded === 'function') seedIfNeeded();
   });
 };
