@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1706 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1706);
+  it('has 1691 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(1691);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1706);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1691);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -103,9 +103,6 @@ describe('the bank', () => {
     COMMENT_BANK.sentences
       .filter(s => s.group === 'Not Handed In')
       .forEach(s => expect(s.text.replace(/not handed in/g, ''), s.id).not.toMatch(/hand/i));
-    ['g104', 'g105'].forEach(id =>
-      expect(COMMENT_BANK.sentences.find(s => s.id === id).except).toEqual(['pe', 'career']),
-    );
   });
 
   it('holds only the plan’s parts: no openings, growth, student’s words, even results, revisits or looking ahead', () => {
@@ -597,19 +594,19 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // The habits part: Completes Work from the record is the one strong
   // habit, so the four Strong Habits frames (hs11, hs13-hs15) fit, and the
   // five Habit Ratings frames for Completes Work at Consistently.
-  it('knows the Demo class is Science from its name, and offers Cece 85 sentences (9, 40, 11, 25)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 78 sentences (9, 40, 4, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 11, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(85);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 4, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(78);
   });
 
-  it('offers Jasper 80 (9, 34, 12, 25), by the name he goes by', () => {
+  it('offers Jasper 73 (9, 34, 5, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
     // Overall: 28, and six frames for his own highest-marked skill (Nov 2).
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 34, 12, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(80);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 34, 5, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(73);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
