@@ -261,6 +261,7 @@ load('teacher/student-evidence.js');
 load('teacher/competency-evidence.js');
 load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
+load('teacher/competency-wording.js');
 load('teacher/report-feedback.js');
 load('teacher/report-feedback-cards.js');
 load('teacher/grades-print.js');

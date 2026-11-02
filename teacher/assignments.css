@@ -4024,6 +4024,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A competency level's three lines (CompetencyWording): the level and its
+   descriptor, what Proficient means, the next step. */
+.rsg-descriptor-bar.is-lines {
+  align-items: flex-start;
+  /* Shown on every hover: no slide, which would also replace the bar's
+     centring transform while it runs. */
+  animation: none;
+}
+.rsg-descriptor-text.is-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: normal;
+  overflow: visible;
+  color: var(--text);
+}
+.cw-line b {
+  font-weight: 600;
+}
 .rsg-descriptor-bar .rsg-descriptor-idle {
   font-size: var(--text-sm);
   color: var(--text-3);

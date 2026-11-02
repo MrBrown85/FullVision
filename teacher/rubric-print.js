@@ -164,6 +164,17 @@
     return set ? { 1: set[0], 2: set[1], 3: set[2], 4: set[3] } : null;
   }
 
+  /* One competency's wording at a level (1–4), by the printed rubric's
+     rule: the teacher's own, else the bank's, else the BC scale's general
+     wording. { text, ready }: ready is false while a bank competency's
+     wording hasn't loaded (loadBankLevels), so a caller can ask again. */
+  function levelWording(tag, level) {
+    var own = _ownLevels(tag) || {};
+    var bank = _bankLevels(tag) || {};
+    var text = (own[level] && String(own[level]).trim()) || bank[level] || GENERAL_LEVELS[level] || '';
+    return { text: text, ready: !(tag && tag.bank_id && !window.BANK_PROFICIENCY) };
+  }
+
   /* Load shared/bank-proficiency.js (about 80 KB compressed) the first time a
      rubric with bank competencies is printed, not on every page. Resolves
      true when it is there; on a failed load the rubric prints the general
@@ -1756,6 +1767,7 @@
     criterionLevel: criterionLevel,
     defaultRubric: defaultRubric,
     loadBankLevels: loadBankLevels,
+    levelWording: levelWording,
     classUsesBankLevels: classUsesBankLevels,
     GENERAL_LEVELS: GENERAL_LEVELS,
     sheetData: sheetData,

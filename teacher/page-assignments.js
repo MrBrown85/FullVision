@@ -4816,11 +4816,75 @@ window.PageAssignments = (function () {
   function hideDescriptorBar() {
     var bar = document.getElementById('rsg-descriptor-bar');
     if (bar) bar.style.display = 'none';
+    // A competency level's lines go too, so a rubric card shown next
+    // starts from its own prompt.
+    _clearTagLevelBar(bar);
   }
   function resetDescriptorBar() {
     var bar = document.getElementById('rsg-descriptor-bar');
     if (bar) _resetDescriptorBarContent(bar);
   }
+  /* A competency's level on the class grid (renderTagGrid): its three
+     lines (CompetencyWording) in the descriptor bar, shown while the level
+     is hovered or focused. The bar is fixed over the page, so nothing
+     moves. A bank competency's wording loads the first time; the lines
+     fill again once it is here, while the level is still under the
+     pointer. */
+  var _tagBarLevel = null;
+  var _tagBarShown = false;
+  var _tagBarHide = null;
+  var _bankLoadAsked = false;
+  function showTagLevelBar(el) {
+    clearTimeout(_tagBarHide);
+    var tag = getTagById(activeCourse, el.dataset.tagid);
+    var l = window.CompetencyWording ? CompetencyWording.lines(tag, parseInt(el.dataset.level, 10)) : null;
+    var lines = l ? CompetencyWording.html(l) : '';
+    if (!lines) return;
+    var bar = _ensureDescriptorBar();
+    bar.classList.add('is-lines');
+    if (bar.style.display !== 'flex') {
+      bar.style.display = 'flex';
+      _tagBarShown = true;
+    }
+    _tagBarLevel = el;
+    // html-safe: the competency's label through esc; the lines escape their own text (CompetencyWording.html)
+    bar.querySelector('.rsg-descriptor-label').innerHTML = esc(
+      _rubricTagName(tag, getSectionForTag(activeCourse, tag.id)),
+    );
+    bar.querySelector('.rsg-descriptor-tags').innerHTML = '';
+    var text = bar.querySelector('.rsg-descriptor-text');
+    text.classList.add('is-lines');
+    // html-safe: CompetencyWording.html escapes the descriptor, I Can statements and step
+    text.innerHTML = lines;
+    // Asked once: offline, the bar keeps the other wording rather than
+    // adding the script again on every hover.
+    if (!l.ready && !_bankLoadAsked && window.RubricPrint && RubricPrint.loadBankLevels) {
+      _bankLoadAsked = true;
+      RubricPrint.loadBankLevels().then(function (ok) {
+        if (ok && _tagBarLevel === el && document.body.contains(el)) showTagLevelBar(el);
+      });
+    }
+  }
+  /* Leaving a level: after this event, so moving straight to the next
+     level (which shows its own lines) doesn't flash the bar. */
+  function hideTagLevelBar() {
+    clearTimeout(_tagBarHide);
+    _tagBarHide = setTimeout(function () {
+      if (!_tagBarLevel) return;
+      var bar = document.getElementById('rsg-descriptor-bar');
+      if (bar && _tagBarShown) bar.style.display = 'none';
+      _clearTagLevelBar(bar);
+    }, 0);
+  }
+  function _clearTagLevelBar(bar) {
+    _tagBarLevel = null;
+    _tagBarShown = false;
+    if (!bar || !bar.classList.contains('is-lines')) return;
+    bar.classList.remove('is-lines');
+    bar.querySelector('.rsg-descriptor-text').classList.remove('is-lines');
+    _resetDescriptorBarContent(bar);
+  }
+
   function showCritTooltip(event, aid, critId, level) {
     var crit = getRubricCriterion(aid, critId);
     if (!crit || !crit.levels || !crit.levels[level]) return;
@@ -7588,12 +7652,26 @@ window.PageAssignments = (function () {
       var level = parseInt(lvl.dataset.level, 10);
       if (aid && critid && level) showCritTooltip(e, aid, critid, level);
     }
+    var tagLvl = e.target.closest('.rsg-level[data-action="selectTagLevel"]');
+    if (tagLvl && tagLvl !== _tagBarLevel) showTagLevelBar(tagLvl);
   }
   function _handleMouseOut(e) {
     var chip = e.target.closest('[data-chip-tip]');
     if (chip && chip === _chipTipSource && !(e.relatedTarget && chip.contains(e.relatedTarget))) _hideChipTip();
     var lvl = e.target.closest('.rsg-level[data-action="selectRubricScore"]');
     if (lvl) resetDescriptorBar();
+    var tagLvl = e.target.closest('.rsg-level[data-action="selectTagLevel"]');
+    if (tagLvl && !(e.relatedTarget && tagLvl.contains(e.relatedTarget))) hideTagLevelBar();
+  }
+
+  // A competency level reached by Tab shows its lines too.
+  function _handleFocusIn(e) {
+    var tagLvl = e.target.closest && e.target.closest('.rsg-level[data-action="selectTagLevel"]');
+    if (tagLvl) showTagLevelBar(tagLvl);
+  }
+  function _handleFocusOut(e) {
+    var tagLvl = e.target.closest && e.target.closest('.rsg-level[data-action="selectTagLevel"]');
+    if (tagLvl && !(e.relatedTarget && tagLvl.contains(e.relatedTarget))) hideTagLevelBar();
   }
 
   /* ── Grader dialog ───────────────────────────────────────
@@ -8559,6 +8637,8 @@ window.PageAssignments = (function () {
     _addDocListener('drop', _handleDrop);
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
+    _addDocListener('focusin', _handleFocusIn);
+    _addDocListener('focusout', _handleFocusOut);
     _addDocListener('scroll', _hideChipTip, true);
     _addDocListener('fv:id-rekeyed', _handleRekey);
     ['click', 'change', 'focusout', 'fv:rubric-prints-changed'].forEach(function (type) {
