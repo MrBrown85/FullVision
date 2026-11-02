@@ -710,7 +710,8 @@ body.fv-switching-course::after {
     padding 0.3s ease-out;
 }
 .m-section-card.m-expanded .m-section-detail {
-  max-height: 500px;
+  /* Room for Now and Next above a long timeline. */
+  max-height: 800px;
   padding: 12px 16px 14px;
 }
 /* Section detail: score timeline + insights */
@@ -764,6 +765,18 @@ body.fv-switching-course::after {
   font-size: 12px;
   color: var(--text-3);
   margin-top: 1px;
+}
+.m-sec-now {
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.m-sec-now div + div {
+  margin-top: 4px;
+}
+.m-sec-now b {
+  font-weight: 600;
 }
 .m-sec-insight {
   font-size: 13px;

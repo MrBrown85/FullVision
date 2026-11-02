@@ -138,9 +138,57 @@ window.MStudentDetail = (function () {
       '</span>' +
       '</div>' +
       '<div class="m-section-detail">' +
+      _secNowHtml(cid, sid, sec, prof) +
       timelineHtml +
       insightHtml +
       '</div>' +
+      '</div>'
+    );
+  }
+
+  /* Where the student is now and the next step (Nov 2 mockup, batch 2), at
+     the top of an opened competency, as the desktop student page has it:
+     the level's descriptor and the next step toward the level above
+     (CompetencyWording). The level word follows the class's grading style.
+     A bank competency's wording loads the first time and fills in place. */
+  var _bankAsked = false;
+  // The class last drawn, for the refresh once the bank's wording lands.
+  var _nowCid = null;
+  function _secNowHtml(cid, sid, sec, prof) {
+    _nowCid = cid;
+    var tag = sec && sec.tags ? sec.tags[0] : null;
+    if (!(prof > 0) || !tag || !window.CompetencyWording) return '';
+    var l = CompetencyWording.lines(tag, Math.max(1, Math.min(4, Math.round(prof))));
+    if (!l || (!l.descriptor && !l.next)) return '';
+    if (!l.ready && !_bankAsked) {
+      _bankAsked = true;
+      CompetencyWording.loadBank().then(function (ok) {
+        if (!ok) {
+          _bankAsked = false;
+          return;
+        }
+        var at = _nowCid;
+        document.querySelectorAll('.m-section-card[data-sec] .m-sec-now').forEach(function (box) {
+          var card = box.closest('.m-section-card');
+          var s = (getSections(at) || []).find(function (x) {
+            return x.id === card.getAttribute('data-sec');
+          });
+          var sid = box.getAttribute('data-sid');
+          if (!s || !sid) return;
+          // html-safe: _secNowHtml escapes the level word, descriptor and step (MC.esc)
+          box.outerHTML = _secNowHtml(at, sid, s, getSectionProficiency(at, sid, s.id));
+        });
+      });
+    }
+    var word = typeof levelWord === 'function' ? levelWord(cid, prof) : '';
+    return (
+      '<div class="m-sec-now" data-sid="' +
+      MC.esc(sid) +
+      '">' +
+      (l.descriptor
+        ? '<div><b>Now' + (word ? ' \u00b7 ' + MC.esc(word) : '') + ':</b> ' + MC.esc(l.descriptor) + '</div>'
+        : '') +
+      (l.next ? '<div><b>Next step:</b> ' + MC.esc(l.next) + '</div>' : '') +
       '</div>'
     );
   }
