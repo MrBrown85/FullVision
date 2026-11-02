@@ -152,7 +152,10 @@ window.MStudentDetail = (function () {
      (CompetencyWording). The level word follows the class's grading style.
      A bank competency's wording loads the first time and fills in place. */
   var _bankAsked = false;
+  // The class last drawn, for the refresh once the bank's wording lands.
+  var _nowCid = null;
   function _secNowHtml(cid, sid, sec, prof) {
+    _nowCid = cid;
     var tag = sec && sec.tags ? sec.tags[0] : null;
     if (!(prof > 0) || !tag || !window.CompetencyWording) return '';
     var l = CompetencyWording.lines(tag, Math.max(1, Math.min(4, Math.round(prof))));
@@ -164,15 +167,16 @@ window.MStudentDetail = (function () {
           _bankAsked = false;
           return;
         }
+        var at = _nowCid;
         document.querySelectorAll('.m-section-card[data-sec] .m-sec-now').forEach(function (box) {
           var card = box.closest('.m-section-card');
-          var s = (getSections(cid) || []).find(function (x) {
+          var s = (getSections(at) || []).find(function (x) {
             return x.id === card.getAttribute('data-sec');
           });
           var sid = box.getAttribute('data-sid');
           if (!s || !sid) return;
           // html-safe: _secNowHtml escapes the level word, descriptor and step (MC.esc)
-          box.outerHTML = _secNowHtml(cid, sid, s, getSectionProficiency(cid, sid, s.id));
+          box.outerHTML = _secNowHtml(at, sid, s, getSectionProficiency(at, sid, s.id));
         });
       });
     }
