@@ -3243,6 +3243,7 @@ function _assessmentFromDetail(existing, detail) {
     if (a.collab_config.groups) next.groups = a.collab_config.groups;
     if (a.collab_config.excludedStudents) next.excludedStudents = a.collab_config.excludedStudents;
     if (a.collab_config.groupCount) next.groupCount = a.collab_config.groupCount;
+    if (a.collab_config.gradedSeparately) next.gradedSeparately = a.collab_config.gradedSeparately;
   }
   // The server's list is the truth, empty included: an assessment whose last
   // competency was unlinked has none.
@@ -3804,6 +3805,7 @@ function _v2GradebookToCache(cid, payload) {
     if (collabConfig.groups) assessment.groups = collabConfig.groups;
     if (collabConfig.excludedStudents) assessment.excludedStudents = collabConfig.excludedStudents;
     if (collabConfig.groupCount) assessment.groupCount = collabConfig.groupCount;
+    if (collabConfig.gradedSeparately) assessment.gradedSeparately = collabConfig.gradedSeparately;
     return assessment;
   });
 
@@ -7330,6 +7332,9 @@ function hasScoreOrFeedback(cid, sid, aid) {
 function canSetAssignmentStatus(cid, sid, aid, status) {
   if (status !== 'NS' && status !== 'EXC') return true;
   if (getAssignmentStatus(cid, sid, aid) === status) return true;
+  // A linked group member's score is the group's copy; Missing or Excused
+  // clears it (setAssignmentStatus, Group grading).
+  if (isLinkedGroupMember(cid, aid, sid)) return true;
   return !hasScoreOrFeedback(cid, sid, aid);
 }
 function setAssignmentStatus(cid, sid, aid, status) {
@@ -8661,6 +8666,7 @@ function _assessmentChanged(a, b) {
     JSON.stringify(a.groups || []) !== JSON.stringify(b.groups || []) ||
     JSON.stringify(a.excludedStudents || []) !== JSON.stringify(b.excludedStudents || []) ||
     (a.groupCount || 0) !== (b.groupCount || 0) ||
+    JSON.stringify(a.gradedSeparately || []) !== JSON.stringify(b.gradedSeparately || []) ||
     (a.maxPoints || 0) !== (b.maxPoints || 0) ||
     (a.weight || 1) !== (b.weight || 1) ||
     (a.evidenceType || '') !== (b.evidenceType || '') ||
@@ -8697,6 +8703,9 @@ function _collabConfigFromAssessment(a) {
   }
   // The group panel's Number of Groups, kept even before any groups are made.
   if (_canonicalCollabModeFromAssessment(a) === 'groups' && a.groupCount > 0) config.groupCount = a.groupCount;
+  if (a && Array.isArray(a.gradedSeparately) && a.gradedSeparately.length) {
+    config.gradedSeparately = a.gradedSeparately;
+  }
   return Object.keys(config).length ? config : null;
 }
 
@@ -9273,6 +9282,285 @@ function setPointsScore(cid, sid, aid, rawScore) {
   if (changed) saveScores(cid, scores);
   return scores;
 }
+
+/* ── Group grading ──────────────────────────────────────────────
+   Pair and Group work is graded once per group, the Teams way: a level,
+   + / −, points or mark, criterion comment, checkbox or Overall Comment
+   saved for one member is copied to every other member still graded with
+   the group. Each member keeps real score rows, so grades, reports and the
+   gradebook read them like anyone's.
+   - Grade Separately takes a member out (assessment.gradedSeparately, in
+     collab_config): they keep their copy and changes stop reaching them.
+     Back to Group Grade puts them back and copies the group's grade again.
+   - Missing, Excused and Late stay per student. A member who is Missing or
+     Excused gets no group grade, and marking them clears their copy; taking
+     the status off copies the group's grade back.
+   - The Note for the Report and DIBELS stay per student. */
+
+/* The pair or group `sid` is in on assessment `a`: { kind, index, members },
+   or null for individual work and students in no group. */
+function getCollabGroupOf(a, sid) {
+  if (!a || !sid) return null;
+  var kind = a.collaboration === 'pair' ? 'pair' : a.collaboration === 'group' ? 'group' : null;
+  if (!kind) return null;
+  var list = (kind === 'pair' ? a.pairs : a.groups) || [];
+  for (var i = 0; i < list.length; i++) {
+    if (Array.isArray(list[i]) && list[i].indexOf(sid) >= 0) return { kind: kind, index: i, members: list[i] };
+  }
+  return null;
+}
+function isGradedSeparately(a, sid) {
+  return !!a && Array.isArray(a.gradedSeparately) && a.gradedSeparately.indexOf(sid) >= 0;
+}
+/* True when `sid` takes the group grade on `aid`: in a pair or group and
+   not graded separately. A Missing or Excused member is still linked; they
+   just get no grade while the status is on. */
+function isLinkedGroupMember(cid, aid, sid) {
+  var a = _assessmentById(cid, aid);
+  return !!getCollabGroupOf(a, sid) && !isGradedSeparately(a, sid);
+}
+function _isGroupWithheld(cid, sid, aid) {
+  var status = getAssignmentStatus(cid, sid, aid);
+  return status === 'NS' || status === 'EXC';
+}
+/* The other members of `sid`'s group still graded with it. */
+function _linkedGroupPeers(cid, a, sid) {
+  var group = getCollabGroupOf(a, sid);
+  if (!group) return [];
+  return group.members.filter(function (m) {
+    return m !== sid && !isGradedSeparately(a, m);
+  });
+}
+
+var _groupWriteDepth = 0;
+
+/* What a member's grade on `aid` is, for telling whether it changed. */
+function _groupGradeKey(scores, sid, aid) {
+  return JSON.stringify(
+    (scores[sid] || [])
+      .filter(function (e) {
+        return e && e.assessmentId === aid;
+      })
+      .map(function (e) {
+        return [e.tagId, e.score, e.mod || 0, e.note || '', e.critNote || '', e.critBeyond || ''];
+      })
+      .sort(),
+  );
+}
+
+/* Copy `sid`'s grade on `aid` to every other linked member who isn't Missing
+   or Excused. Nothing is copied from a member who is graded separately,
+   Missing or Excused. */
+function _syncGroupFrom(cid, aid, sid) {
+  var a = _assessmentById(cid, aid);
+  if (!a || !isLinkedGroupMember(cid, aid, sid) || _isGroupWithheld(cid, sid, aid)) return;
+  var targets = _linkedGroupPeers(cid, a, sid).filter(function (m) {
+    return !_isGroupWithheld(cid, m, aid);
+  });
+  if (!targets.length) return;
+  _groupWriteDepth++;
+  try {
+    var scores = getScores(cid);
+    var source = (scores[sid] || []).filter(function (e) {
+      return e && e.assessmentId === aid;
+    });
+    var sourceKey = _groupGradeKey(scores, sid, aid);
+    var bySourceTag = {};
+    source.forEach(function (e) {
+      bySourceTag[e.tagId] = e;
+    });
+    var changed = false;
+    targets.forEach(function (m) {
+      if (_groupGradeKey(scores, m, aid) === sourceKey) return;
+      var own = (scores[m] || []).filter(function (e) {
+        return e && e.assessmentId === aid;
+      });
+      // The diff save sends values and new comments but not cleared ones,
+      // so a comment the source no longer has is cleared first.
+      if (getScoreComment(cid, m, aid) && !getScoreComment(cid, sid, aid)) saveScoreComment(cid, m, aid, '');
+      own.forEach(function (e) {
+        var src = bySourceTag[e.tagId] || {};
+        ['critNote', 'critBeyond'].forEach(function (field) {
+          if (!e[field] || src[field]) return;
+          if (_rubricCriterionById(cid, a, e.tagId)) _saveRubricCriterionNote(cid, m, aid, e.tagId, '', field);
+          else if (field === 'critNote') saveTagComment(cid, m, aid, e.tagId, '');
+        });
+      });
+      scores = getScores(cid);
+      _replaceGroupEntries(cid, scores, a, m, source);
+      changed = true;
+    });
+    if (changed) saveScores(cid, scores);
+    var checks = getRubricCheckIds(cid, sid, aid);
+    targets.forEach(function (m) {
+      var mine = getRubricCheckIds(cid, m, aid);
+      checks.forEach(function (id) {
+        if (mine.indexOf(id) < 0) setRubricCheck(cid, m, aid, id, true);
+      });
+      mine.forEach(function (id) {
+        if (checks.indexOf(id) < 0) setRubricCheck(cid, m, aid, id, false);
+      });
+    });
+    if (changed) _broadcastChange(cid, 'scores');
+  } finally {
+    _groupWriteDepth--;
+  }
+}
+
+/* Copy the group's grade to `sid` from the first other linked member who
+   isn't Missing or Excused. With none, `sid` keeps what they have. */
+function _copyGroupGradeTo(cid, aid, sid) {
+  var a = _assessmentById(cid, aid);
+  var from = _linkedGroupPeers(cid, a, sid).find(function (m) {
+    return !_isGroupWithheld(cid, m, aid);
+  });
+  if (from) _syncGroupFrom(cid, aid, from);
+}
+
+/* `m`'s entries for `aid` become `entries`. A Note for the Report stays on
+   them, or on an empty entry when there are none. */
+function _replaceGroupEntries(cid, scores, a, m, entries) {
+  var aid = a.id;
+  var reportNote = getScoreReportNote(cid, m, aid);
+  var next = entries.map(function (e) {
+    var copy = _cloneValue(e);
+    copy.id = m + ':' + aid + ':' + e.tagId;
+    if (reportNote) copy.reportNote = reportNote;
+    else delete copy.reportNote;
+    return copy;
+  });
+  if (!next.length && reportNote) {
+    var key = _noteOnlyScoreKey(cid, a);
+    next.push({
+      id: m + ':' + aid + ':' + key,
+      assessmentId: aid,
+      tagId: key,
+      score: isPointsScored(a) ? null : 0,
+      date: a.date || courseToday(cid),
+      type: scoreTypeFor(a),
+      note: '',
+      reportNote: reportNote,
+      created: new Date().toISOString(),
+    });
+  }
+  scores[m] = (scores[m] || [])
+    .filter(function (e) {
+      return !(e && e.assessmentId === aid);
+    })
+    .concat(next);
+}
+
+/* Remove `sid`'s copy of the group grade on `aid`. */
+function _clearGroupCopy(cid, aid, sid) {
+  var a = _assessmentById(cid, aid);
+  if (!a) return;
+  _groupWriteDepth++;
+  try {
+    if (getScoreComment(cid, sid, aid)) saveScoreComment(cid, sid, aid, '');
+    var scores = getScores(cid);
+    if (_groupGradeKey(scores, sid, aid) !== '[]') {
+      _replaceGroupEntries(cid, scores, a, sid, []);
+      saveScores(cid, scores);
+    }
+    getRubricCheckIds(cid, sid, aid).forEach(function (id) {
+      setRubricCheck(cid, sid, aid, id, false);
+    });
+  } finally {
+    _groupWriteDepth--;
+  }
+}
+
+/* Grade Separately (on) or Back to Group Grade (off). */
+function setGradedSeparately(cid, aid, sid, on) {
+  var assessments = getAssessments(cid);
+  var a = assessments.find(function (x) {
+    return x.id === aid;
+  });
+  if (!a || !getCollabGroupOf(a, sid) || isGradedSeparately(a, sid) === !!on) return false;
+  var list = (a.gradedSeparately || []).filter(function (id) {
+    return id !== sid;
+  });
+  if (on) list.push(sid);
+  if (list.length) a.gradedSeparately = list;
+  else delete a.gradedSeparately;
+  saveAssessments(cid, assessments);
+  if (!on && !_isGroupWithheld(cid, sid, aid)) _copyGroupGradeTo(cid, aid, sid);
+  return true;
+}
+
+/* Every grade write below runs as before, then copies the member's grade
+   to the rest of their group. Writes made while copying aren't copied
+   again. */
+function _copiedToGroup(write) {
+  return function (cid, sid, aid) {
+    _groupWriteDepth++;
+    var out;
+    try {
+      out = write.apply(this, arguments);
+    } finally {
+      _groupWriteDepth--;
+    }
+    if (_groupWriteDepth === 0) _syncGroupFrom(cid, aid, sid);
+    return out;
+  };
+}
+upsertScore = _copiedToGroup(upsertScore);
+setPointsScore = _copiedToGroup(setPointsScore);
+setCompletionMark = _copiedToGroup(setCompletionMark);
+saveScoreComment = _copiedToGroup(saveScoreComment);
+saveRubricCriterionComment = _copiedToGroup(saveRubricCriterionComment);
+saveRubricCriterionBeyond = _copiedToGroup(saveRubricCriterionBeyond);
+saveTagComment = _copiedToGroup(saveTagComment);
+setRubricCheck = _copiedToGroup(setRubricCheck);
+
+/* A whole-blob save (clearing a cell, an undo) is copied from each member
+   whose grade it changed. */
+var _saveScoresUngrouped = saveScores;
+saveScores = function (cid, obj) {
+  if (_groupWriteDepth > 0) return _saveScoresUngrouped(cid, obj);
+  var linked = [];
+  getAssessments(cid).forEach(function (a) {
+    if (!a || (a.collaboration !== 'pair' && a.collaboration !== 'group')) return;
+    ((a.collaboration === 'pair' ? a.pairs : a.groups) || []).forEach(function (members) {
+      (members || []).forEach(function (sid) {
+        if (!isGradedSeparately(a, sid)) linked.push({ aid: a.id, sid: sid, group: members });
+      });
+    });
+  });
+  if (!linked.length) return _saveScoresUngrouped(cid, obj);
+  var before = _loadPersistedCourseFieldSnapshot('scores', cid, {});
+  var keys = linked.map(function (l) {
+    return _groupGradeKey(before, l.sid, l.aid);
+  });
+  _groupWriteDepth++;
+  var out;
+  try {
+    out = _saveScoresUngrouped(cid, obj);
+  } finally {
+    _groupWriteDepth--;
+  }
+  var synced = [];
+  linked.forEach(function (l, i) {
+    if (synced.indexOf(l.group) >= 0 || _isGroupWithheld(cid, l.sid, l.aid)) return;
+    if (_groupGradeKey(obj || {}, l.sid, l.aid) === keys[i]) return;
+    synced.push(l.group);
+    _syncGroupFrom(cid, l.aid, l.sid);
+  });
+  return out;
+};
+
+/* Missing or Excused on a linked member clears their copy of the group
+   grade; taking it off copies the group's grade back. */
+var _setAssignmentStatusUngrouped = setAssignmentStatus;
+setAssignmentStatus = function (cid, sid, aid, status) {
+  var wasWithheld = _isGroupWithheld(cid, sid, aid);
+  var out = _setAssignmentStatusUngrouped(cid, sid, aid, status);
+  if (out === false || !isLinkedGroupMember(cid, aid, sid)) return out;
+  var withheld = _isGroupWithheld(cid, sid, aid);
+  if (withheld && !wasWithheld) _clearGroupCopy(cid, aid, sid);
+  else if (!withheld && wasWithheld) _copyGroupGradeTo(cid, aid, sid);
+  return out;
+};
 
 /* ── Active Course ──────────────────────────────────────────── */
 function getActiveCourse() {
@@ -11398,7 +11686,7 @@ function deleteWithdrawnStudent(cid, sid) {
   var named = l => Array.isArray(l) && l.some(item => (Array.isArray(item) ? item : [item]).includes(sid));
   var changed = false;
   assessments.forEach(function (a) {
-    if (!named(a.excludedStudents) && !named(a.pairs) && !named(a.groups)) return;
+    if (!named(a.excludedStudents) && !named(a.pairs) && !named(a.groups) && !named(a.gradedSeparately)) return;
     changed = true;
     if (a.excludedStudents) {
       a.excludedStudents = a.excludedStudents.filter(id => id !== sid);
@@ -11411,6 +11699,10 @@ function deleteWithdrawnStudent(cid, sid) {
     if (a.groups) {
       a.groups = a.groups.map(g => g.filter(id => id !== sid)).filter(g => g.length > 0);
       if (a.groups.length === 0) delete a.groups;
+    }
+    if (a.gradedSeparately) {
+      a.gradedSeparately = a.gradedSeparately.filter(id => id !== sid);
+      if (a.gradedSeparately.length === 0) delete a.gradedSeparately;
     }
   });
   if (changed) saveAssessments(cid, assessments);
