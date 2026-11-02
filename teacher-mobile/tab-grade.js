@@ -508,6 +508,248 @@ window.MGrade = (function () {
   }
 
   /* ── Student Card Swiper Screen ─────────────────────────────── */
+  /* ── Group work (Group grading, shared/data.js) ─────────────────
+     Pair and Group work is graded one group at a time, as on the desktop.
+     The strip shows a circle per group (G1, G2 …); a group's card lists its
+     members, each with their own M | EXC | LATE and a ⋯ button whose sheet
+     has Grade Separately; its levels are those of the member the group's
+     grade is copied from, and saving them fills every member. A member
+     graded separately gets a card of their own after their group, with
+     Graded Separately From and Back to Group Grade (which asks first). */
+  var _GROUP_THUMB_COLOR = '#6e7b87';
+  var _swiperLabels = null;
+  var _MORE_ICON =
+    '<svg width="16" height="4" viewBox="0 0 16 4" aria-hidden="true"><circle cx="2" cy="2" r="1.8" fill="currentColor"/><circle cx="8" cy="2" r="1.8" fill="currentColor"/><circle cx="14" cy="2" r="1.8" fill="currentColor"/></svg>';
+
+  function _collabLists(a) {
+    var lists = a && (a.collaboration === 'pair' ? a.pairs : a.collaboration === 'group' ? a.groups : null);
+    return lists || [];
+  }
+  function _groupLabel(group) {
+    return (group.kind === 'pair' ? 'Pair ' : 'Group ') + (group.index + 1);
+  }
+  function _isWithheld(cid, sid, aid) {
+    var status = getAssignmentStatus(cid, sid, aid);
+    return status === 'NS' || status === 'EXC';
+  }
+
+  // The swiper's cards in order: on group work a card per group (its
+  // linked members' grade, drawn from the first who isn't Missing or
+  // Excused), each followed by its members graded separately, then the
+  // students in no group; on other work a card per student.
+  function _swiperUnits(cid, a) {
+    var students = sortStudents(getStudents(cid).slice(), 'alpha');
+    var lists = _collabLists(a);
+    if (!lists.length)
+      return students.map(function (st) {
+        return { st: st, label: displayName(st) };
+      });
+    var byId = {};
+    students.forEach(function (st) {
+      byId[st.id] = st;
+    });
+    var units = [];
+    var placed = {};
+    lists.forEach(function (members, index) {
+      var here = (members || []).filter(function (m) {
+        return byId[m];
+      });
+      here.forEach(function (m) {
+        placed[m] = true;
+      });
+      var group = { kind: a.collaboration === 'pair' ? 'pair' : 'group', index: index, members: here };
+      var linked = here.filter(function (m) {
+        return !isGradedSeparately(a, m);
+      });
+      if (linked.length) {
+        var source =
+          linked.find(function (m) {
+            return !_isWithheld(cid, m, a.id);
+          }) || linked[0];
+        units.push({
+          st: byId[source],
+          label: _groupLabel(group),
+          thumb: (group.kind === 'pair' ? 'P' : 'G') + (index + 1),
+          view: { group: group, members: here },
+        });
+      }
+      here.forEach(function (m) {
+        if (isGradedSeparately(a, m))
+          units.push({ st: byId[m], label: displayNameWithLast(byId[m]), separateFrom: group });
+      });
+    });
+    students.forEach(function (st) {
+      if (!placed[st.id]) units.push({ st: st, label: displayNameWithLast(st) });
+    });
+    return units;
+  }
+
+  // "3 of 27"; on group work the card's name first: "Group 2 · 2 of 9".
+  function _subtitleText(idx, total) {
+    var label = _swiperLabels && _swiperLabels[idx];
+    return (label ? label + ' · ' : '') + (idx + 1) + ' of ' + total;
+  }
+
+  // html-safe: names go through MC.esc; ids are ours; labels are constants
+  function _groupCardHeadHtml(cid, a, view) {
+    return (
+      '<div class="m-group-title">' +
+      MC.esc(_groupLabel(view.group)) +
+      '</div>' +
+      '<div class="m-group-members">' +
+      view.members
+        .map(function (m) {
+          var st = getStudents(cid).find(function (x) {
+            return x.id === m;
+          });
+          var name = MC.esc(displayNameWithLast(st));
+          if (isGradedSeparately(a, m))
+            return (
+              '<div class="m-group-member"><span class="m-group-member-name">' +
+              name +
+              '</span><span class="m-group-member-note">Graded Separately</span></div>'
+            );
+          var status = getAssignmentStatus(cid, m, a.id);
+          var pill = function (val, label) {
+            return (
+              '<button class="m-status-pill m-group-pill' +
+              (status === val ? ' m-status-active' : '') +
+              '" data-action="m-grade-status" data-val="' +
+              val +
+              '" data-sid="' +
+              m +
+              '" data-aid="' +
+              a.id +
+              '" aria-label="' +
+              label +
+              ', ' +
+              name +
+              '">' +
+              (val === 'NS' ? 'M' : val) +
+              '</button>'
+            );
+          };
+          return (
+            '<div class="m-group-member"><span class="m-group-member-name">' +
+            name +
+            '</span>' +
+            pill('NS', 'Missing') +
+            pill('EXC', 'Excused') +
+            pill('LATE', 'Late') +
+            '<button class="m-group-more" data-action="m-grade-group-more" data-sid="' +
+            m +
+            '" data-aid="' +
+            a.id +
+            '" aria-label="More for ' +
+            name +
+            '">' +
+            _MORE_ICON +
+            '</button></div>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  // html-safe: the label goes through MC.esc; ids are ours
+  function _separateLineHtml(aid, sid, group) {
+    return (
+      '<div class="m-group-separate">' +
+      '<div class="m-group-separate-text">' +
+      MC.esc('Graded Separately From ' + _groupLabel(group)) +
+      '</div>' +
+      '<button class="m-group-back" data-action="m-grade-rejoin" data-sid="' +
+      sid +
+      '" data-aid="' +
+      aid +
+      '">Back to Group Grade</button>' +
+      '</div>'
+    );
+  }
+
+  // Draw the swiper's cards and strip again in place, on the same card.
+  function _redrawSwiper(cid, aid) {
+    var swiper = document.getElementById('m-swiper');
+    var strip = document.getElementById('m-thumb-strip');
+    if (!swiper || !strip) return;
+    var idx = _currentIdx;
+    var tmp = document.createElement('div');
+    // html-safe: renderSwiper escapes its text (see _renderStudentCard)
+    tmp.innerHTML = renderSwiper(cid, aid);
+    // html-safe: copied from the checked renderSwiper markup above
+    swiper.innerHTML = tmp.querySelector('#m-swiper').innerHTML;
+    // html-safe: copied from the checked renderSwiper markup above
+    strip.innerHTML = tmp.querySelector('#m-thumb-strip').innerHTML;
+    var total = strip.querySelectorAll('.m-thumb').length;
+    jumpToStudent(Math.min(idx, total - 1), true);
+  }
+
+  // ⋯ on a member: a sheet with their name, Grade Separately and Cancel.
+  function openMemberSheet(cid, aid, sid) {
+    var st = getStudents(cid).find(function (x) {
+      return x.id === sid;
+    });
+    if (!st) return;
+    MC.presentSheet(
+      '<div class="m-group-sheet">' +
+        '<div class="m-group-sheet-title">' +
+        MC.esc(displayNameWithLast(st)) +
+        '</div>' +
+        '<button class="m-group-sheet-btn" data-action="m-grade-separate" data-sid="' +
+        sid +
+        '" data-aid="' +
+        aid +
+        '">Grade Separately</button>' +
+        '<button class="m-group-sheet-btn m-group-sheet-cancel" data-action="m-sheet-cancel">Cancel</button>' +
+        '</div>',
+      { half: true },
+    );
+  }
+  function gradeSeparately(cid, aid, sid) {
+    MC.dismissSheet();
+    setGradedSeparately(cid, aid, sid, true);
+    MC.haptic();
+    _redrawSwiper(cid, aid);
+  }
+  // Back to Group Grade asks first: it replaces the member's own grade.
+  function confirmBackToGroup(cid, aid, sid) {
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === aid;
+    });
+    var st = getStudents(cid).find(function (x) {
+      return x.id === sid;
+    });
+    var group = getCollabGroupOf(a, sid);
+    if (!st || !group) return;
+    MC.presentSheet(
+      '<div class="m-group-sheet">' +
+        '<div class="m-group-sheet-title is-question">Back to Group Grade?</div>' +
+        '<p class="m-group-sheet-text">' +
+        MC.esc(
+          displayNameFirst(st) +
+            '’s own levels, comments and Overall Comment will be replaced by ' +
+            _groupLabel(group) +
+            '’s.',
+        ) +
+        '</p>' +
+        '<button class="m-group-sheet-btn" data-action="m-grade-rejoin-yes" data-sid="' +
+        sid +
+        '" data-aid="' +
+        aid +
+        '">Back to Group Grade</button>' +
+        '<button class="m-group-sheet-btn m-group-sheet-cancel" data-action="m-sheet-cancel">Cancel</button>' +
+        '</div>',
+      { half: true },
+    );
+  }
+  function backToGroup(cid, aid, sid) {
+    MC.dismissSheet();
+    setGradedSeparately(cid, aid, sid, false);
+    MC.haptic();
+    _redrawSwiper(cid, aid);
+  }
+
   function renderSwiper(cid, aid) {
     var assessments = getAssessments(cid);
     var assessment = assessments.find(function (a) {
@@ -515,23 +757,32 @@ window.MGrade = (function () {
     });
     if (!assessment) return '<div class="m-screen"><div class="m-empty">Assessment not found</div></div>';
 
-    var students = getStudents(cid);
-    students = sortStudents(students.slice(), 'alpha');
+    var units = _swiperUnits(cid, assessment);
+    var students = units.map(function (u) {
+      return u.st;
+    });
+    _swiperLabels =
+      assessment.collaboration && _collabLists(assessment).length
+        ? units.map(function (u) {
+            return u.label;
+          })
+        : null;
     var allScores = getScores(cid);
     _currentIdx = 0;
 
     var nav = MC.navBar({
       id: 'grade-swiper',
       title: assessment.title,
-      subtitle: '1 of ' + students.length,
+      subtitle: _subtitleText(0, students.length),
       backLabel: 'Grade',
     });
 
-    // Student thumbnail strip
+    // Student thumbnail strip: a group's circle says G1, G2 … (P1 … for pairs).
     var thumbs = '<div class="m-thumb-strip" id="m-thumb-strip">';
     students.forEach(function (st, idx) {
-      var color = MC.avatarColor(st.id);
-      var initials = MC.avatarInitials(st);
+      var unit = units[idx];
+      var color = unit.view ? _GROUP_THUMB_COLOR : MC.avatarColor(st.id);
+      var initials = unit.view ? unit.thumb : MC.avatarInitials(st);
       var stScores = allScores[st.id] || [];
       var isGraded = stScores.some(function (s) {
         return s.assessmentId === aid && isScoreEntered(assessment, s);
@@ -546,6 +797,8 @@ window.MGrade = (function () {
         color +
         '" data-action="m-grade-jump" data-idx="' +
         idx +
+        '" data-sid="' +
+        st.id +
         '">' +
         MC.esc(initials) +
         '</div>';
@@ -555,8 +808,8 @@ window.MGrade = (function () {
     // Swiper cards
     var allStatuses = getAssignmentStatuses(cid);
     var swiper = '<div class="m-swiper" id="m-swiper">';
-    students.forEach(function (st) {
-      swiper += _renderStudentCard(cid, st, assessment, allScores, allStatuses);
+    students.forEach(function (st, idx) {
+      swiper += _renderStudentCard(cid, st, assessment, allScores, allStatuses, units[idx]);
     });
     swiper += '</div>';
 
@@ -571,7 +824,7 @@ window.MGrade = (function () {
   }
 
   // html-safe: names, labels and criterion text go through MC.esc; colours through cssColor or avatarColor's constants; ids, levels and points are ours or numbers; _criterionGroupHtml, _completionBtnsHtml, _modBtnsHtml and pointsPctHtml are checked.
-  function _renderStudentCard(cid, st, assessment, allScores, allStatuses) {
+  function _renderStudentCard(cid, st, assessment, allScores, allStatuses, unit) {
     var color = MC.avatarColor(st.id);
     var initials = MC.avatarInitials(st);
     var name = displayName(st);
@@ -604,6 +857,8 @@ window.MGrade = (function () {
       badges +
       '</div>' +
       '</div></div>';
+    if (unit && unit.view) header = _groupCardHeadHtml(cid, assessment, unit.view);
+    else if (unit && unit.separateFrom) header += _separateLineHtml(assessment.id, st.id, unit.separateFrom);
 
     // Score selectors for each tag
     var tagGroups = '';
@@ -789,6 +1044,9 @@ window.MGrade = (function () {
       assessment.id +
       '">LATE</button>' +
       '</div>';
+
+    // A group's members each have their own status, in the list above.
+    if (unit && unit.view) statusRow = '';
 
     return (
       '<div class="m-swiper-card" data-sid="' +
@@ -1014,7 +1272,10 @@ window.MGrade = (function () {
       return s.id === sid;
     });
     if (!card || !assessment || !st) return;
-    card.outerHTML = _renderStudentCard(cid, st, assessment, getScores(cid), getAssignmentStatuses(cid));
+    var unit = _swiperUnits(cid, assessment).find(function (u) {
+      return u.st.id === sid;
+    });
+    card.outerHTML = _renderStudentCard(cid, st, assessment, getScores(cid), getAssignmentStatuses(cid), unit);
   }
 
   /* Write one level (and ±) under every key of a criterion, undoable as one. */
@@ -1091,9 +1352,9 @@ window.MGrade = (function () {
     var left = swiper.scrollLeft;
     var scores = getScores(cid);
     var statuses = getAssignmentStatuses(cid);
-    swiper.innerHTML = sortStudents(getStudents(cid).slice(), 'alpha')
-      .map(function (st) {
-        return _renderStudentCard(cid, st, assessment, scores, statuses);
+    swiper.innerHTML = _swiperUnits(cid, assessment)
+      .map(function (u) {
+        return _renderStudentCard(cid, u.st, assessment, scores, statuses, u);
       })
       .join('');
     swiper.scrollLeft = left;
@@ -1295,6 +1556,11 @@ window.MGrade = (function () {
     if (newStatus === 'NS' && clearsScores) {
       _updateThumbGraded(cid, aid);
     }
+    // Group work: a member's status can change whose grade the card shows.
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === aid;
+    });
+    if (_collabLists(a).length) _redrawSwiper(cid, aid);
   }
 
   function undoLastScore() {
@@ -1358,8 +1624,6 @@ window.MGrade = (function () {
   function setupSwiper(cid, aid) {
     var swiper = document.getElementById('m-swiper');
     if (!swiper) return;
-    var students = getStudents(cid);
-    students = sortStudents(students.slice(), 'alpha');
 
     // Points field: tapping selects the number so typing replaces it; Done
     // or tapping away saves. The tap's mouseup would put the caret back, so
@@ -1397,10 +1661,11 @@ window.MGrade = (function () {
         _scrollRAF = requestAnimationFrame(function () {
           _scrollRAF = null;
           var idx = Math.round(swiper.scrollLeft / swiper.clientWidth);
-          if (idx !== _currentIdx && idx >= 0 && idx < students.length) {
+          var total = document.querySelectorAll('#m-thumb-strip .m-thumb').length;
+          if (idx !== _currentIdx && idx >= 0 && idx < total) {
             _currentIdx = idx;
             _updateCurrentThumb(idx);
-            _updateSubtitle(idx, students.length);
+            _updateSubtitle(idx, total);
           }
         });
       },
@@ -1434,7 +1699,7 @@ window.MGrade = (function () {
       var assessment = titleInline.textContent.split('\n')[0];
       // Keep just the number part
       var sub = titleInline.querySelector('div');
-      if (sub) sub.textContent = idx + 1 + ' of ' + total;
+      if (sub) sub.textContent = _subtitleText(idx, total);
     }
   }
 
@@ -1443,17 +1708,13 @@ window.MGrade = (function () {
     document.querySelectorAll('.m-status-pill[data-aid="' + aid + '"]').forEach(function (pill) {
       pill.disabled = !canSetAssignmentStatus(cid, pill.dataset.sid, aid, pill.dataset.val);
     });
-    var students = getStudents(cid);
-    students = sortStudents(students.slice(), 'alpha');
     var allScores = getScores(cid);
     var assessment = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
     var thumbs = document.querySelectorAll('#m-thumb-strip .m-thumb');
-    thumbs.forEach(function (t, i) {
-      if (i >= students.length) return;
-      var st = students[i];
-      var stScores = allScores[st.id] || [];
+    thumbs.forEach(function (t) {
+      var stScores = allScores[t.dataset.sid] || [];
       var isGraded = stScores.some(function (s) {
         return s.assessmentId === aid && isScoreEntered(assessment, s);
       });
@@ -1554,6 +1815,10 @@ window.MGrade = (function () {
     undoLastScore: undoLastScore,
     setupSwiper: setupSwiper,
     jumpToStudent: jumpToStudent,
+    openMemberSheet: openMemberSheet,
+    gradeSeparately: gradeSeparately,
+    confirmBackToGroup: confirmBackToGroup,
+    backToGroup: backToGroup,
     getCurrentIndex: function () {
       return _currentIdx;
     },

@@ -609,9 +609,9 @@ describe('MGrade.setStatus', () => {
     const html = MGrade.renderSwiper(CID, 'a1');
     // Card for stu1 (NS) and stu2 (EXC) should have the disable class;
     // stu3 (LATE) should NOT — LATE doesn't disable grading.
-    const stu1Idx = html.indexOf('data-sid="stu1"');
-    const stu2Idx = html.indexOf('data-sid="stu2"');
-    const stu3Idx = html.indexOf('data-sid="stu3"');
+    const stu1Idx = html.indexOf('m-swiper-card" data-sid="stu1"');
+    const stu2Idx = html.indexOf('m-swiper-card" data-sid="stu2"');
+    const stu3Idx = html.indexOf('m-swiper-card" data-sid="stu3"');
     const next = idx => html.slice(idx, idx + 600);
     expect(next(stu1Idx)).toContain('m-card-status-disabled');
     expect(next(stu2Idx)).toContain('m-card-status-disabled');

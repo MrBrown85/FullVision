@@ -3982,3 +3982,109 @@ body.fv-switching-course::after {
   flex-shrink: 0;
   accent-color: var(--active);
 }
+
+/* Group work (Group grading): a group's card names the group and lists its
+   members, each with their own M | EXC | LATE and a ⋯ button; a member
+   graded separately has a line and Back to Group Grade under their name. */
+.m-group-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.m-group-members {
+  margin-bottom: 14px;
+}
+.m-group-member {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+}
+.m-group-member-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.m-group-member-note {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.m-status-pill.m-group-pill {
+  min-height: 32px;
+  min-width: 38px;
+  padding: 0 6px;
+  font-size: 11.5px;
+}
+.m-group-more {
+  width: 36px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.m-group-separate {
+  margin: -8px 0 16px;
+}
+.m-group-separate-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.m-group-back {
+  margin-top: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+}
+.m-group-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+.m-group-sheet-title {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-2);
+  padding: 4px 0 8px;
+}
+.m-group-sheet-title.is-question {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+.m-group-sheet-text {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--text);
+}
+.m-group-sheet-btn {
+  min-height: 56px;
+  border: none;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--active);
+  font: inherit;
+  font-size: 18px;
+}
+.m-group-sheet-cancel {
+  font-weight: 600;
+}
