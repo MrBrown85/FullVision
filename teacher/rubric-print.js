@@ -185,6 +185,8 @@
   var _bankLoading = null;
   function loadBankLevels() {
     if (window.BANK_PROFICIENCY) return Promise.resolve(true);
+    // One loader for the bank's files, so a page never fetches them twice.
+    if (window.CompetencyWording) return CompetencyWording.loadBank();
     if (_bankLoading) return _bankLoading;
     // No page to load into (a test, a worker): the other wording stays.
     if (typeof document === 'undefined' || !document.head) return Promise.resolve(false);

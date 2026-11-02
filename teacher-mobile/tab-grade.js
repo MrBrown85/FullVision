@@ -1830,6 +1830,8 @@ window.MGrade = (function () {
   }
 
   function _holdDown(e) {
+    // A finger or pen: a mouse's slow click still scores.
+    if (e.pointerType === 'mouse') return;
     var btn = e.target.closest && e.target.closest('.m-score-btn[data-tid]');
     if (!btn) return;
     if (_hold) clearTimeout(_hold.timer);
