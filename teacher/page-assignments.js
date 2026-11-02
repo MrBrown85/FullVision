@@ -2006,6 +2006,7 @@ window.PageAssignments = (function () {
   /* ── Assessment Form ────────────────────────────────────── */
   // One row of the competency checklist. The row reads the competency's own
   // wording; the section name (often just the category) is the last fallback.
+  var _afIcanSeq = 0;
   function _afTagRow(sec, selTags) {
     var tag = sec.tags[0];
     if (!tag) return '';
@@ -2016,7 +2017,8 @@ window.PageAssignments = (function () {
     var icans = (tag.i_can_statements || []).filter(function (x) {
       return String(x || '').trim();
     });
-    var listId = 'af-icans-' + sec.id;
+    // Unique per drawing, so two open forms never share a list.
+    var listId = 'af-icans-' + sec.id + '-' + ++_afIcanSeq;
     return (
       '<div class="af-tag-row">' +
       '<label class="af-tag-item' +

@@ -15,7 +15,7 @@ test('the I Can toggle shows the statements without ticking the competency', asy
   await row.scrollIntoViewIfNeeded();
   const toggle = row.locator('.af-tag-ican-toggle');
   await expect(toggle).toHaveText('▸' + icans.length + ' I Can');
-  const list = page.locator('#af-icans-IP');
+  const list = page.locator('[id^="af-icans-IP-"]');
   await expect(list).toBeHidden();
   await toggle.click();
   await expect(list).toBeVisible();
