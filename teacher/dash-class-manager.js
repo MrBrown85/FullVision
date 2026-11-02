@@ -7726,6 +7726,14 @@ window.DashClassManager = (function () {
       .toLowerCase();
   }
 
+  // Wording compared without its closing full stop or curly quotes.
+  function _cmLoose(s) {
+    return _cmNorm(s)
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201c\u201d]/g, '"')
+      .replace(/[.\s]+$/, '');
+  }
+
   function _cmSameList(a, b) {
     a = (a || []).map(_cmNorm);
     b = (b || []).map(_cmNorm);
@@ -7832,7 +7840,13 @@ window.DashClassManager = (function () {
     // curriculum's version is a replacement, not the teacher's edit); then
     // wording, code and title.
     var live = _cmMatch(cands, secs, CM_MATCH_KEYS.slice(0, 1));
-    var replacedBy = opts.kind === 'curriculum' ? _cmCrosswalkPairs(cid, secs, live, cands, opts.tags || []) : {};
+    var crosswalk =
+      opts.kind === 'curriculum' ? _cmCrosswalkPairs(cid, secs, live, cands, opts.tags || []) : { by: {}, exact: {} };
+    var replacedBy = crosswalk.by;
+    Object.keys(crosswalk.match).forEach(function (si) {
+      live.used[si] = true;
+      live.pairs[crosswalk.match[si]] = Number(si);
+    });
     var takenCand = {};
     Object.keys(replacedBy).forEach(function (si) {
       live.used[si] = true;
@@ -7888,7 +7902,16 @@ window.DashClassManager = (function () {
         _cmNorm(_cmCompTitle(sec)) === _cmNorm(c.label) &&
         // A competency with no wording yet differs only if the rest does.
         (!_cmNorm(tag.text) || _cmNorm(tag.text) === _cmNorm(c.text));
-      if (sameNameAndWording && _cmSameList(tag.i_can_statements, c.icans)) review.same.push({ sec: sec });
+      // An older class's competency whose wording the Ministry kept already
+      // matches, whatever name the old bank gave it.
+      if (crosswalk.exact[si] && _cmLoose(tag.text) === _cmLoose(c.text)) sameNameAndWording = true;
+      if (
+        sameNameAndWording &&
+        (crosswalk.exact[si] || _cmSameList(tag.i_can_statements, c.icans)) &&
+        (tag.i_can_statements || []).length
+      )
+        review.same.push({ sec: sec });
+      else if (sameNameAndWording && _cmSameList(tag.i_can_statements, c.icans)) review.same.push({ sec: sec });
       // No I Can statements yet, and the curriculum has some: an update.
       else if (sameNameAndWording && !(tag.i_can_statements || []).length && c.icans.length)
         review.fill.push({ sec: sec, cand: c });
@@ -7932,10 +7955,13 @@ window.DashClassManager = (function () {
   /* For each class competency no match took, the incoming competencies the
      crosswalk says replace it: by section index, a list of candidate
      indexes in the crosswalk's order. Matched by the old wording, else by
-     the old code where only one old competency had it. */
+     the old code when only one old competency and only one of the class's
+     has it. An old competency whose wording the Ministry kept (an "exact"
+     row) isn't a replacement: the wording match takes it, and it's listed
+     in exact so the review treats it as already matching. */
   function _cmCrosswalkPairs(cid, secs, live, cands, tags) {
     var cw = window._CURRICULUM_CROSSWALK || _cmCrosswalk;
-    var out = {};
+    var out = { by: {}, exact: {}, match: {} };
     if (!cw || !cw.pairs) return out;
     var olds = ((COURSES[cid] && COURSES[cid].curriculumTags) || []).concat(tags);
     var rows = [];
@@ -7948,21 +7974,38 @@ window.DashClassManager = (function () {
     cands.forEach(function (c, ci) {
       if (live.pairs[ci] == null && c.bank_id) freeCand[c.bank_id] = ci;
     });
+    function wordsOf(sec) {
+      var tag = sec.tags[0];
+      return [_cmNorm(tag.source_text), _cmNorm(tag.text)].filter(Boolean);
+    }
+    function codeOf(sec) {
+      return _cmNorm(_cmStdCode(sec.tags[0]));
+    }
+    var byWording = secs.map(function (sec) {
+      var words = wordsOf(sec);
+      return (
+        rows.find(function (r) {
+          return words.indexOf(_cmNorm(r.raw)) >= 0;
+        }) || null
+      );
+    });
+    var codeCount = {};
+    secs.forEach(function (sec) {
+      var code = codeOf(sec);
+      if (code) codeCount[code] = (codeCount[code] || 0) + 1;
+    });
     secs.forEach(function (sec, si) {
       if (live.used[si]) return;
-      var tag = sec.tags[0];
-      var words = [_cmNorm(tag.source_text), _cmNorm(tag.text)].filter(Boolean);
-      var row = rows.find(function (r) {
-        return words.indexOf(_cmNorm(r.raw)) >= 0;
-      });
+      var row = byWording[si];
       if (!row) {
-        var code = _cmNorm(_cmStdCode(tag));
+        var code = codeOf(sec);
         var byCode = rows.filter(function (r) {
           return code && _cmNorm(r.code) === code;
         });
-        if (byCode.length === 1) row = byCode[0];
+        if (byCode.length === 1 && codeCount[code] === 1 && byWording.indexOf(byCode[0]) < 0) row = byCode[0];
       }
       if (!row) return;
+      var words = wordsOf(sec);
       var got = row.to
         .map(function (id) {
           return freeCand[id];
@@ -7971,17 +8014,23 @@ window.DashClassManager = (function () {
           return ci != null;
         });
       if (!got.length) return;
-      // Already the curriculum's wording and name: an ordinary match.
-      if (
-        got.some(function (ci) {
-          return words.indexOf(_cmNorm(cands[ci].text)) >= 0 && _cmNorm(_cmCompTitle(sec)) === _cmNorm(cands[ci].label);
-        })
-      )
+      // The Ministry kept the wording: the same competency, matched here so
+      // a trailing full stop can't split them.
+      var same = got.find(function (ci) {
+        return words.some(function (w) {
+          return _cmLoose(w) === _cmLoose(cands[ci].text);
+        });
+      });
+      if (same != null && (row.kind === 'exact' || row.to.length === 1)) {
+        out.exact[si] = true;
+        out.match[si] = same;
+        delete freeCand[cands[same].bank_id];
         return;
+      }
       got.forEach(function (ci) {
         delete freeCand[cands[ci].bank_id];
       });
-      out[si] = got;
+      out.by[si] = got;
     });
     return out;
   }
@@ -8104,21 +8153,7 @@ window.DashClassManager = (function () {
     html += group('Replaced in the Curriculum', r.replaced, function (x, i) {
       var tag = x.sec.tags[0];
       var many = x.cands.length > 1;
-      var folder = many ? x.cands[0].folder : '';
-      var hasFolder =
-        folder &&
-        (getLearningMap(cid).competencyGroups || []).some(function (g) {
-          return _cmNorm(g.name) === _cmNorm(folder);
-        });
-      var note = !many
-        ? 'Your scores stay with it.'
-        : 'Adds these ' +
-          x.cands.length +
-          (folder ? (hasFolder ? ' to your ' + folder + ' folder' : ' in a new folder, ' + folder) : '') +
-          '. Your ' +
-          (_cmStdCode(tag) || _cmCompTitle(x.sec)) +
-          (folder ? ' moves into the same folder and keeps its scores.' : ' keeps its scores.') +
-          ' Nothing is renamed, so no grade changes.';
+      var note = !many ? 'Your scores stay with it.' : _cmReplacedNote(cid, x);
       function option(pick, label, inner) {
         return (
           '<label class="cm-cr-option' +
@@ -8447,12 +8482,28 @@ window.DashClassManager = (function () {
             'competencies',
           ),
       );
-    if (p.replaced.length)
+    var replacedOne = p.replaced.filter(function (x) {
+      return x.cands.length === 1;
+    });
+    var replacedMany = p.replaced.filter(function (x) {
+      return x.cands.length > 1;
+    });
+    if (replacedOne.length)
       phrases.push(
         'use the curriculum version of ' +
           _cmJoinNames(
-            names(p.replaced, function (x) {
+            names(replacedOne, function (x) {
               return _cmCompTitle(x.sec);
+            }),
+            'competencies',
+          ),
+      );
+    if (replacedMany.length)
+      phrases.push(
+        'add the curriculum version of ' +
+          _cmJoinNames(
+            names(replacedMany, function (x) {
+              return _cmCompTitle(x.sec) + ' (' + x.cands.length + ' competencies)';
             }),
             'competencies',
           ),
@@ -8537,162 +8588,42 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
-  function cmCompReviewApply() {
+  /* Apply the review. Changes to the learning map that would move any
+     student's overall proficiency ask first, with the count, as the
+     grading settings do. */
+  function cmCompReviewApply(confirmed) {
     var r = cmCompReview;
     if (!r) return;
     var cid = r.cid;
     var p = _cmCompReviewParts(r);
+    var touchesMap = p.add.length || p.theirs.length || p.replaced.length || p.fill.length;
+
+    if (touchesMap && confirmed !== true) {
+      var preview = previewLearningMapChange(cid, function (copy) {
+        _cmApplyReviewToMap(cid, copy, p);
+      });
+      if (preview.changed) {
+        showConfirm(
+          'Change Grades?',
+          _cmGradeChangeMessage(cid, preview) + CM_FOLDER_COUNT_SENT,
+          'Apply Changes',
+          'primary',
+          function () {
+            cmCompReviewApply(true);
+          },
+        );
+        return;
+      }
+    }
 
     // Put removed competencies back first: each brings its scores with it.
     p.back.forEach(function (a) {
       restoreCompetency(cid, a.removed.id);
     });
 
-    if (p.add.length || p.theirs.length || p.replaced.length || p.fill.length) {
+    if (touchesMap) {
       var map = ensureCustomLearningMap(cid);
-      if (!map.subjects) map.subjects = [];
-      if (!map.sections) map.sections = [];
-      if (!map.competencyGroups) map.competencyGroups = [];
-      var taken = {};
-      map.sections.forEach(function (s) {
-        taken[s.id] = true;
-      });
-      getRemovedSections(cid).forEach(function (x) {
-        if (x && x.section) taken[x.section.id] = true;
-      });
-      function freshId(base) {
-        var id = base && !taken[base] ? base : (base ? base + '_' : '') + uid();
-        taken[id] = true;
-        return id;
-      }
-      p.add.forEach(function (a) {
-        var c = a.cand;
-        var sec;
-        if (c.section) {
-          // From the curriculum, under the class's own course for it (added
-          // if the class lacks it). New rows get fresh ids: the built map's
-          // are the same for every class.
-          sec = structuredClone(c.section);
-          sec.id = freshId('');
-          sec.tags[0].id = sec.id;
-          var subjectId = _cmClassSubjectFor(map, c.subject);
-          if (subjectId) sec.subject = sec.tags[0].subject = subjectId;
-          // Its folder is the built map's; the class's folder of that name
-          // takes it.
-          delete sec.groupId;
-          var own = c.folder && _cmFolderNamed(map, c.folder);
-          if (own) sec.groupId = own.id;
-        } else {
-          if (!map.subjects.length) map.subjects.push({ id: 'subj1', name: 'General', color: '#6366f1' });
-          var sub = map.subjects[0];
-          var id = freshId('');
-          var label = c.label || c.text.slice(0, 40);
-          var short = label.split(' ')[0];
-          sec = {
-            id: id,
-            subject: sub.id,
-            name: label,
-            shortName: short,
-            color: sub.color,
-            tags: [
-              {
-                id: id,
-                code: c.code || undefined,
-                label: label,
-                text: c.text,
-                i_can_statements: c.icans.slice(),
-                color: sub.color,
-                subject: sub.id,
-                name: label,
-                shortName: short,
-              },
-            ],
-          };
-          if (!sec.tags[0].code) delete sec.tags[0].code;
-          if (c.folder) {
-            var grp = map.competencyGroups.find(function (g) {
-              return _cmNorm(g.name) === _cmNorm(c.folder);
-            });
-            if (!grp) {
-              var gi = map.competencyGroups.length;
-              grp = {
-                id: 'grp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-                name: c.folder,
-                color: '#6366f1',
-                sortOrder: gi,
-              };
-              map.competencyGroups.push(grp);
-            }
-            sec.groupId = grp.id;
-          }
-        }
-        map.sections.push(sec);
-      });
-      // Replaced in the Curriculum. One for one: the competency takes the
-      // curriculum's name, code and wording in place, keeping its scores.
-      // One for several: the several are added in their Ministry folder and
-      // the competency moves into it, unchanged.
-      p.replaced.forEach(function (x) {
-        var sec = map.sections.find(function (s) {
-          return s.id === _currentId('section', x.sec.id);
-        });
-        if (!sec || !sec.tags[0]) return;
-        if (x.cands.length === 1) {
-          var c = x.cands[0];
-          var tag = sec.tags[0];
-          tag.label = c.label;
-          tag.code = c.code;
-          tag.text = c.text;
-          tag.source_text = c.source_text;
-          tag.i_can_statements = c.icans.slice();
-          tag.bank_id = c.bank_id || null;
-          sec.name = tag.name = c.label;
-          sec.shortName = tag.shortName = c.section.shortName;
-          return;
-        }
-        var folder = x.cands[0].folder;
-        var grp = folder ? _cmFolderNamed(map, folder) : null;
-        if (folder && !grp) {
-          grp = {
-            id: 'grp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
-            name: folder,
-            color: sec.color || '#6366f1',
-            sortOrder: map.competencyGroups.length,
-          };
-          map.competencyGroups.push(grp);
-        }
-        if (grp) sec.groupId = grp.id;
-        x.cands.forEach(function (c) {
-          var add = structuredClone(c.section);
-          add.id = freshId('');
-          add.tags[0].id = add.id;
-          var addSubject = _cmClassSubjectFor(map, c.subject);
-          if (addSubject) add.subject = add.tags[0].subject = addSubject;
-          delete add.groupId;
-          if (grp) add.groupId = grp.id;
-          map.sections.push(add);
-        });
-      });
-      // No I Can statements yet: the curriculum's.
-      p.fill.forEach(function (x) {
-        var sec = map.sections.find(function (s) {
-          return s.id === _currentId('section', x.sec.id);
-        });
-        if (sec && sec.tags[0] && !(sec.tags[0].i_can_statements || []).length)
-          sec.tags[0].i_can_statements = x.cand.icans.slice();
-      });
-      p.theirs.forEach(function (ch) {
-        var sec = map.sections.find(function (s) {
-          return s.id === _currentId('section', ch.sec.id);
-        });
-        if (!sec || !sec.tags[0]) return;
-        var tag = sec.tags[0];
-        if (ch.cand.label) tag.label = ch.cand.label;
-        tag.text = ch.cand.text;
-        tag.i_can_statements = ch.cand.icans.slice();
-        if (ch.cand.source_text) tag.source_text = ch.cand.source_text;
-      });
-      map._flatVersion = 2;
+      _cmApplyReviewToMap(cid, map, p);
       saveLearningMap(cid, map);
     }
 
@@ -8712,6 +8643,147 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
+  /* The review's changes to a learning map: Replaced in the Curriculum
+     first (it makes the Ministry folders), then the additions, the I Can
+     fills and the curriculum versions. */
+  function _cmApplyReviewToMap(cid, map, p) {
+    if (!map.subjects) map.subjects = [];
+    if (!map.sections) map.sections = [];
+    if (!map.competencyGroups) map.competencyGroups = [];
+    var taken = {};
+    map.sections.forEach(function (s) {
+      taken[s.id] = true;
+    });
+    getRemovedSections(cid).forEach(function (x) {
+      if (x && x.section) taken[x.section.id] = true;
+    });
+    function freshId(base) {
+      var id = base && !taken[base] ? base : (base ? base + '_' : '') + uid();
+      taken[id] = true;
+      return id;
+    }
+    function findSec(id) {
+      return map.sections.find(function (s) {
+        return s.id === _currentId('section', id);
+      });
+    }
+    // The class's folder with a Ministry folder's name, made if missing.
+    function folderFor(name, color) {
+      if (!name) return null;
+      var grp = _cmFolderNamed(map, name);
+      if (!grp) {
+        grp = {
+          id: 'grp_' + uid(),
+          name: name,
+          color: color || '#6366f1',
+          sortOrder: map.competencyGroups.length,
+        };
+        map.competencyGroups.push(grp);
+      }
+      return grp;
+    }
+    // A curriculum competency as a new row of this class.
+    function addFromCurriculum(c, grp) {
+      var add = structuredClone(c.section);
+      add.id = freshId('');
+      add.tags[0].id = add.id;
+      var subjectId = _cmClassSubjectFor(map, c.subject);
+      if (subjectId) add.subject = add.tags[0].subject = subjectId;
+      delete add.groupId;
+      if (grp) add.groupId = grp.id;
+      map.sections.push(add);
+    }
+
+    // Replaced in the Curriculum. One for one: the competency takes the
+    // curriculum's name, code, wording and course in place, keeping its
+    // scores. One for several: each statement goes in its own Ministry
+    // folder, and the competency moves, unchanged, into the folder most of
+    // them go to.
+    p.replaced.forEach(function (x) {
+      var sec = findSec(x.sec.id);
+      if (!sec || !sec.tags[0]) return;
+      var tag = sec.tags[0];
+      var lead = x.cands[0];
+      var subjectId = _cmClassSubjectFor(map, lead.subject);
+      if (subjectId && sec.subject !== subjectId) {
+        sec.subject = tag.subject = subjectId;
+        sec.color = tag.color = lead.section.color;
+      }
+      if (x.cands.length === 1) {
+        tag.label = lead.label;
+        tag.code = lead.code;
+        tag.text = lead.text;
+        tag.source_text = lead.source_text;
+        tag.i_can_statements = lead.icans.slice();
+        tag.bank_id = lead.bank_id || null;
+        sec.name = tag.name = lead.label;
+        sec.shortName = tag.shortName = lead.section.shortName;
+        return;
+      }
+      var home = _cmReplacedHome(x);
+      if (home) sec.groupId = folderFor(home, sec.color).id;
+      x.cands.forEach(function (c) {
+        addFromCurriculum(c, folderFor(c.folder, c.section.color));
+      });
+    });
+
+    p.add.forEach(function (a) {
+      var c = a.cand;
+      if (c.section) {
+        // From the curriculum: the class's folder with its Ministry
+        // folder's name takes it.
+        addFromCurriculum(c, c.folder ? _cmFolderNamed(map, c.folder) : null);
+        return;
+      }
+      if (!map.subjects.length) map.subjects.push({ id: 'subj1', name: 'General', color: '#6366f1' });
+      var sub = map.subjects[0];
+      var id = freshId('');
+      var label = c.label || c.text.slice(0, 40);
+      var short = label.split(' ')[0];
+      var sec = {
+        id: id,
+        subject: sub.id,
+        name: label,
+        shortName: short,
+        color: sub.color,
+        tags: [
+          {
+            id: id,
+            code: c.code || undefined,
+            label: label,
+            text: c.text,
+            i_can_statements: c.icans.slice(),
+            color: sub.color,
+            subject: sub.id,
+            name: label,
+            shortName: short,
+          },
+        ],
+      };
+      if (!sec.tags[0].code) delete sec.tags[0].code;
+      if (c.folder) sec.groupId = folderFor(c.folder, '#6366f1').id;
+      map.sections.push(sec);
+    });
+
+    // No I Can statements yet: the curriculum's.
+    p.fill.forEach(function (x) {
+      var sec = findSec(x.sec.id);
+      if (sec && sec.tags[0] && !(sec.tags[0].i_can_statements || []).length)
+        sec.tags[0].i_can_statements = x.cand.icans.slice();
+    });
+
+    p.theirs.forEach(function (ch) {
+      var sec = findSec(ch.sec.id);
+      if (!sec || !sec.tags[0]) return;
+      var tag = sec.tags[0];
+      if (ch.cand.label) tag.label = ch.cand.label;
+      tag.text = ch.cand.text;
+      tag.i_can_statements = ch.cand.icans.slice();
+      if (ch.cand.source_text) tag.source_text = ch.cand.source_text;
+    });
+    map._flatVersion = 2;
+  }
+
   /* The class's course for a curriculum candidate's: the one with its id
      or its name, else a new one with a fresh id. */
   function _cmClassSubjectFor(map, subject) {
@@ -8724,6 +8796,44 @@ window.DashClassManager = (function () {
     add.id = uid();
     map.subjects.push(add);
     return add.id;
+  }
+
+  /* Where Add the Curriculum Version puts things, in words: each Ministry
+     folder the statements go to, and where the old competency goes. */
+  function _cmReplacedNote(cid, x) {
+    var map = getLearningMap(cid);
+    var folders = [];
+    x.cands.forEach(function (c) {
+      if (c.folder && folders.indexOf(c.folder) < 0) folders.push(c.folder);
+    });
+    var where = folders.map(function (name) {
+      return _cmFolderNamed(map, name) ? 'your ' + name + ' folder' : 'a new folder, ' + name;
+    });
+    var home = _cmReplacedHome(x);
+    return (
+      'Adds these ' +
+      x.cands.length +
+      (where.length ? ' in ' + where.join(' and ') : '') +
+      '. Your ' +
+      (_cmStdCode(x.sec.tags[0]) || _cmCompTitle(x.sec)) +
+      (home
+        ? (where.length === 1 ? ' moves into the same folder' : ' moves into the ' + home + ' folder') +
+          ' and keeps its scores.'
+        : ' keeps its scores.') +
+      ' Nothing is renamed.'
+    );
+  }
+
+  // The Ministry folder most of a merged line's statements go to.
+  function _cmReplacedHome(x) {
+    var count = {};
+    var best = '';
+    x.cands.forEach(function (c) {
+      if (!c.folder) return;
+      count[c.folder] = (count[c.folder] || 0) + 1;
+      if (!best || count[c.folder] > count[best]) best = c.folder;
+    });
+    return best;
   }
 
   function _cmFolderNamed(map, name) {

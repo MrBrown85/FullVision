@@ -2552,6 +2552,42 @@ function previewFolderCountChange(cid, change) {
   return _previewOverallChange(cid, target, field, !!change.on);
 }
 
+/* What a change to the class's competencies would do to the overall
+   proficiency, for its confirm, counted as previewFolderCountChange counts:
+   `change(copy)` makes the change on a copy of the learning map, the class's
+   own math runs on the copy, and the saved map is put back. */
+function previewLearningMapChange(cid, change) {
+  var students = getStudents(cid);
+  var shown = function (v) {
+    return v > 0 ? Number(v).toFixed(1) : '';
+  };
+  var before = students.map(function (s) {
+    return shown(getOverallProficiency(cid, s.id));
+  });
+  var saved = _cache.learningMaps[cid];
+  var copy = structuredClone(getLearningMap(cid));
+  var after;
+  try {
+    change(copy);
+    _cache.learningMaps[cid] = copy;
+    if (typeof clearProfCache === 'function') clearProfCache();
+    after = students.map(function (s) {
+      return shown(getOverallProficiency(cid, s.id));
+    });
+  } finally {
+    _cache.learningMaps[cid] = saved;
+    if (typeof clearProfCache === 'function') clearProfCache();
+  }
+  var changed = 0;
+  var example = null;
+  students.forEach(function (s, i) {
+    if (before[i] === after[i]) return;
+    changed++;
+    if (!example && before[i] && after[i]) example = { name: fullName(s), before: before[i], after: after[i] };
+  });
+  return { changed: changed, total: students.length, example: example };
+}
+
 /* What turning Each Course Counts Equally on or off would do, for its
    confirm, counted as previewFolderCountChange counts. */
 function previewCoursesEqualChange(cid, on) {
@@ -2599,6 +2635,7 @@ window.Calc = {
   getCoursesCountEqually,
   courseSubjectIds,
   previewCoursesEqualChange,
+  previewLearningMapChange,
   folderCountsAsOne,
   folderAverageNote,
   previewFolderCountChange,
