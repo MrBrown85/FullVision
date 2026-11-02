@@ -58,3 +58,38 @@ test('the headers are one Tab stop, and the arrow keys move between them', async
   await expect(page.locator('#gb-tooltip')).toBeVisible();
   expect(await head.count()).toBe(1);
 });
+
+test('header keys stay on the headers: Home and End, the grid keeps its place and its line', async ({ page }) => {
+  await open(page);
+  const heads = page.locator('.gb-grid-tag-header');
+  await expect(page.locator('.gb-grid-colheads-row2')).toHaveAttribute('role', 'group');
+  // A selected score cell doesn't move when a header takes the arrows.
+  const cell = page.locator('#gb-data td.gb-score').first();
+  await cell.click();
+  await expect(cell).toHaveClass(/gb-focus/);
+  await heads.first().focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(heads.nth(1)).toBeFocused();
+  await expect(cell).toHaveClass(/gb-focus/);
+  // End reaches the last header, and the headers stay over their columns.
+  await page.keyboard.press('End');
+  const last = heads.last();
+  await expect(last).toBeFocused();
+  const cells = page.locator('#gb-data tbody tr').first().locator('td.gb-score');
+  const hb = await last.boundingBox();
+  const cb = await cells.last().boundingBox();
+  expect(Math.abs(hb.x - cb.x)).toBeLessThan(3);
+  await page.keyboard.press('Home');
+  await expect(heads.first()).toBeFocused();
+});
+
+test('the Tab stop stays on the header it moved to through a redraw', async ({ page }) => {
+  await open(page);
+  const heads = page.locator('.gb-grid-tag-header');
+  await heads.first().focus();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.evaluate(() => window.Router.navigate('/gradebook?course=sci8'));
+  await expect(page.locator('.gb-grid-tag-header').nth(2)).toHaveAttribute('tabindex', '0');
+  await expect(page.locator('.gb-grid-tag-header[tabindex="0"]')).toHaveCount(1);
+});
