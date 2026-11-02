@@ -1688,7 +1688,7 @@ window.PageAssignments = (function () {
           : '') +
         (focusSt
           ? _inlineGraderHtml(cid, a, tagObjs, focusSt, scores)
-          : _graderHtml(cid, a, tagObjs, focusStudentId ? [] : students, scores)) +
+          : _graderHtml(cid, a, tagObjs, focusStudentId ? [] : _groupRowStudents(cid, a, students), scores)) +
         '</div>' +
         '</div>';
       return c;
@@ -3121,7 +3121,11 @@ window.PageAssignments = (function () {
       aid +
       '">' +
       '<span class="ldg-name">' +
-      esc(displayNameWithLast(st)) +
+      esc(
+        _groupRowFor(aid, st.id) && _groupRowFor(aid, st.id).view
+          ? _groupRowFor(aid, st.id).view.label
+          : displayNameWithLast(st),
+      ) +
       '</span>'
     );
   }
@@ -3221,9 +3225,10 @@ window.PageAssignments = (function () {
         '<div class="cmp-cell">' +
         completionButtonsHtml(a.id, st.id, getCompletionMark(cid, st.id, a.id)) +
         '</div>' +
-        ledgerStatusHtml(a.id, st.id, stStatus) +
+        _ledgerStatusOrNoteHtml(a.id, st.id, stStatus) +
         ledgerOverallCommentHtml(cid, a.id, st) +
-        '</div>';
+        '</div>' +
+        _ledgerMembersHtml(cid, a.id, st.id);
     });
     html += '</div>';
     return html;
@@ -3346,9 +3351,10 @@ window.PageAssignments = (function () {
         pointsPctHtml(raw, max, 0) +
         '</span>' +
         '</div>' +
-        ledgerStatusHtml(a.id, st.id, stStatus) +
+        _ledgerStatusOrNoteHtml(a.id, st.id, stStatus) +
         ledgerOverallCommentHtml(cid, a.id, st) +
-        '</div>';
+        '</div>' +
+        _ledgerMembersHtml(cid, a.id, st.id);
     });
     html += '<div class="ldg-stats"></div>' + '</div>';
     return html;
@@ -3595,6 +3601,9 @@ window.PageAssignments = (function () {
       // One student's grader on the page: redraw its status, lock and grade.
       render();
     }
+    // Group work: a member's status can change which member the group's
+    // rows come from, and the strip has no row of its own to update.
+    if (!_grader && _groupRows[aid]) render();
     refreshSidebarGrades(sid);
   }
 
@@ -4045,17 +4054,164 @@ window.PageAssignments = (function () {
       '</div>'
     );
   }
+  /* ── Group work on the page (Group grading, shared/data.js) ──
+     The list grades Pair and Group work one group at a time, as the dialog
+     does: a block named for the group, a strip of its members (each with
+     Late | Excused | Missing and a ⋯ menu with Grade Separately), and the
+     grading rows of the member the group's grade is copied from. A member
+     graded separately follows their group as their own block, with Graded
+     Separately From and Back to Group Grade. DIBELS stays per student. */
+  var _groupRows = {};
+
+  // The students the list shows for `a`: one per group (the member its
+  // grade comes from), members graded separately and students in no group,
+  // in the dialog's order. Only groups with someone the search shows.
+  function _groupRowStudents(cid, a, students) {
+    var units = isDibelsScored(a) ? null : _graderUnits(cid, a);
+    delete _groupRows[a.id];
+    if (!units) return students;
+    var shown = {};
+    var byId = {};
+    students.forEach(function (st) {
+      shown[st.id] = true;
+      byId[st.id] = st;
+    });
+    getStudents(cid).forEach(function (st) {
+      if (!byId[st.id]) byId[st.id] = st;
+    });
+    var rows = {};
+    var list = [];
+    units.forEach(function (unit) {
+      if (
+        !unit.some(function (m) {
+          return shown[m];
+        })
+      )
+        return;
+      var view = _graderGroupView(cid, a, unit[0]);
+      if (view) {
+        rows[view.source] = { view: view };
+        list.push(byId[view.source]);
+        return;
+      }
+      var group = getCollabGroupOf(a, unit[0]);
+      if (group) rows[unit[0]] = { separateFrom: group };
+      list.push(byId[unit[0]]);
+    });
+    _groupRows[a.id] = rows;
+    return list.filter(Boolean);
+  }
+  function _groupRowFor(aid, sid) {
+    return (_groupRows[aid] && _groupRows[aid][sid]) || null;
+  }
+
+  // html-safe: names go through esc(); ids are ours; labels are constants
+  function _groupMembersStripHtml(cid, aid, view) {
+    var a = _assessmentById(cid, aid);
+    var byId = {};
+    getStudents(cid).forEach(function (st) {
+      byId[st.id] = st;
+    });
+    return (
+      '<div class="rsg-group-members" data-stop-prop="true">' +
+      view.members
+        .map(function (m) {
+          var st = byId[m];
+          var name = esc(displayNameWithLast(st));
+          if (isGradedSeparately(a, m))
+            return (
+              '<div class="rsg-group-member is-separate"><span class="rsg-group-member-name">' +
+              name +
+              '</span><span class="rsg-group-member-note">Graded Separately</span></div>'
+            );
+          return (
+            '<div class="rsg-group-member"><span class="rsg-group-member-name">' +
+            name +
+            '</span><div class="grader-status rsg-status" role="group" aria-label="Status for ' +
+            name +
+            '">' +
+            _graderStatusButtons(aid, m, getAssignmentStatus(cid, m, aid), ['LATE', 'EXC', 'NS']) +
+            '</div><button type="button" class="grader-member-more" data-action="groupMemberMenu" data-aid="' +
+            aid +
+            '" data-sid="' +
+            m +
+            '" aria-label="More for ' +
+            name +
+            '" aria-haspopup="menu" aria-expanded="false">' +
+            _GRADER_MORE_ICON +
+            '</button><div class="grader-member-menu" role="menu" hidden><button type="button" role="menuitem" data-action="groupGradeSeparately" data-aid="' +
+            aid +
+            '" data-sid="' +
+            m +
+            '">Grade Separately</button></div></div>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  // html-safe: the label goes through esc(); ids are ours
+  function _groupSeparateNoteHtml(aid, sid, group) {
+    return (
+      '<span class="rsg-separate-note">' +
+      esc('Graded Separately From ' + _collabGroupLabel(group)) +
+      '</span><button type="button" class="grader-member-back" data-action="groupBackToGroup" data-aid="' +
+      aid +
+      '" data-sid="' +
+      sid +
+      '">Back to Group Grade</button>'
+    );
+  }
+
+  // A ledger row's status cell, or an empty cell on a group's row (its
+  // members' statuses are in the strip under it).
+  function _ledgerStatusOrNoteHtml(aid, sid, stStatus) {
+    var row = _groupRowFor(aid, sid);
+    return row && row.view ? '<div class="ldg-status"></div>' : ledgerStatusHtml(aid, sid, stStatus);
+  }
+  // Under a ledger row: a group's members, or a separated member's note.
+  function _ledgerMembersHtml(cid, aid, sid) {
+    var row = _groupRowFor(aid, sid);
+    if (row && row.view) return _groupMembersStripHtml(cid, aid, row.view);
+    if (row && row.separateFrom)
+      return '<div class="rsg-group-members">' + _groupSeparateNoteHtml(aid, sid, row.separateFrom) + '</div>';
+    return '';
+  }
+
+  // The strip's ⋯ menu: one open at a time; a click elsewhere closes it.
+  function _closeGroupMenus(except) {
+    document.querySelectorAll('.rsg-group-members .grader-member-menu').forEach(function (menu) {
+      if (menu === except) return;
+      menu.hidden = true;
+      var more = menu.parentNode.querySelector('.grader-member-more');
+      if (more) more.setAttribute('aria-expanded', 'false');
+    });
+  }
+  function _toggleGroupMenu(btn) {
+    var menu = btn.parentNode.querySelector('.grader-member-menu');
+    if (!menu) return;
+    _closeGroupMenus(menu);
+    menu.hidden = !menu.hidden;
+    btn.setAttribute('aria-expanded', String(!menu.hidden));
+    if (!menu.hidden) menu.querySelector('button').focus();
+  }
+
   /* A student's row in the whole-class grid: the name, Late | Excused |
      Missing, and the row's fill menu. */
   function _rsgStudentHeadHtml(cid, aid, st, status, fillAction) {
+    var row = _groupRowFor(aid, st.id);
     return (
       '<div class="rsg-student-head">' +
       '<span class="rsg-student-name">' +
-      esc(displayNameWithLast(st)) +
+      esc(row && row.view ? row.view.label : displayNameWithLast(st)) +
       '</span>' +
-      '<div class="grader-status rsg-status" role="group" aria-label="Status" data-stop-prop="true">' +
-      _graderStatusButtons(aid, st.id, status, ['LATE', 'EXC', 'NS']) +
-      '</div>' +
+      (row && row.view
+        ? ''
+        : '<div class="grader-status rsg-status" role="group" aria-label="Status" data-stop-prop="true">' +
+          _graderStatusButtons(aid, st.id, status, ['LATE', 'EXC', 'NS']) +
+          '</div>' +
+          (row && row.separateFrom ? _groupSeparateNoteHtml(aid, st.id, row.separateFrom) : '')) +
       '<div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Set this student\'s levels" aria-label="Set this student\'s levels">' +
       _ROW_FILL_ICON +
       '<div class="col-fill-menu" data-stop-prop="true">' +
@@ -4068,7 +4224,8 @@ window.PageAssignments = (function () {
       st.id +
       '" data-score="0" data-scope="row"><div class="col-fill-dot" style="background:var(--surface-2);color:var(--text-3)">0</div> Clear</div>' +
       '</div></div></div>' +
-      '</div>'
+      '</div>' +
+      (row && row.view ? _groupMembersStripHtml(cid, aid, row.view) : '')
     );
   }
   /* The student's Overall Comment under their criteria (score.comment, the
@@ -4076,7 +4233,8 @@ window.PageAssignments = (function () {
      clicked, three while it holds text; it saves as the teacher types and
      when they leave it, level or not. */
   function _overallCommentFieldHtml(cid, aid, st, cls) {
-    var first = displayNameFirst(st);
+    var row = _groupRowFor(aid, st.id);
+    var first = row && row.view ? row.view.label : displayNameFirst(st);
     var text = getScoreComment(cid, st.id, aid);
     return (
       '<textarea class="' +
@@ -6449,6 +6607,8 @@ window.PageAssignments = (function () {
 
   /* ── Delegated click handler ────────────────────────────── */
   function _handleClick(e) {
+    if (!e.target.closest('.rsg-group-members .grader-member-menu, .rsg-group-members .grader-member-more'))
+      _closeGroupMenus();
     // KB focus on score cells
     var critRow = e.target.closest('.rsg-criterion-row');
     if (critRow) {
@@ -6680,6 +6840,17 @@ window.PageAssignments = (function () {
       },
       toggleStudentStatus: function () {
         toggleStudentStatus(el.dataset.aid, el.dataset.sid, el.dataset.status);
+      },
+      groupMemberMenu: function () {
+        _toggleGroupMenu(el);
+      },
+      groupGradeSeparately: function () {
+        setGradedSeparately(activeCourse, el.dataset.aid, el.dataset.sid, true);
+        refreshSidebarGrades();
+        render();
+      },
+      groupBackToGroup: function () {
+        _confirmBackToGroupGrade(activeCourse, _assessmentById(activeCourse, el.dataset.aid), el.dataset.sid);
       },
       openCommentPopover: function () {
         openCommentPopover(el.dataset.cid, el.dataset.sid, el.dataset.aid);
@@ -6965,6 +7136,11 @@ window.PageAssignments = (function () {
   function _handleKeydown(e) {
     // One student's grader open on the page (the dialog runs its own).
     if (!_grader && _graderCardKey(e)) return;
+    if (e.key === 'Escape' && document.querySelector('.rsg-group-members .grader-member-menu:not([hidden])')) {
+      e.preventDefault();
+      _closeGroupMenus();
+      return;
+    }
     if (_chipTipSource && e.key === 'Escape') {
       var focusedChip = e.target === _chipTipSource;
       _hideChipTip();

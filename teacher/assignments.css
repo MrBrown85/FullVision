@@ -3034,6 +3034,49 @@
   align-items: center;
   gap: 14px;
 }
+/* Group work on the page: the group's members under its name, each with
+   their own status and ⋯ menu (Group grading). */
+.rsg-group-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ldg-grid .rsg-group-members {
+  align-items: center;
+  padding: 0 16px 12px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+}
+.rsg-group-member {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 6px 0 10px;
+  border-radius: 10px;
+  background: rgba(118, 118, 128, 0.08);
+}
+.rsg-group-member.is-separate {
+  padding-right: 10px;
+}
+.rsg-group-member-name {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+.rsg-group-member-note {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text);
+}
+.rsg-group-member .grader-member-menu {
+  top: 42px;
+}
+.rsg-separate-note {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
 .rsg-student-name {
   font-size: 1.3125rem;
   font-weight: 700;
