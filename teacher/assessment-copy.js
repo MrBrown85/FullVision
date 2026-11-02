@@ -435,7 +435,10 @@ window.AssessmentCopy = (function () {
       patch.dateAssigned = _dateOf(after);
     }
     if (changes.dueDate) patch.dueDate = _dueOf(after) || undefined;
-    if ((changes.scoreMode || changes.maxPoints) && !offersScoreMode(dstCid, after)) skipped.push('scoring mode');
+    // A copy that is already DIBELS stays DIBELS; only turning one into
+    // DIBELS needs a class that offers it.
+    var refusedMode = !offersScoreMode(dstCid, after) && !isDibelsScored(copy);
+    if ((changes.scoreMode || changes.maxPoints) && refusedMode) skipped.push('scoring mode');
     else if (changes.scoreMode || changes.maxPoints) {
       patch.scoreMode = after.scoreMode;
       patch.maxPoints = after.maxPoints;

@@ -97,4 +97,12 @@ describe('copying DIBELS work', () => {
     var ok = AssessmentCopy.planLinkedEdit(HUM, before, after, ENG, Object.assign({}, copy, { id: 'eng-1' }));
     expect(ok.patch.scoreMode).toBe('dibels');
   });
+
+  it('a linked edit to DIBELS work leaves a DIBELS copy in a class without it as DIBELS', () => {
+    var before = dibels();
+    var after = Object.assign(dibels(), { maxPoints: 5 });
+    var plan = AssessmentCopy.planLinkedEdit(HUM, before, after, SCI, Object.assign(dibels(), { id: 'sci-1' }));
+    expect(plan.skipped).not.toContain('scoring mode');
+    expect(plan.patch.scoreMode).toBe('dibels');
+  });
 });
