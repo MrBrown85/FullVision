@@ -1182,13 +1182,91 @@
   transform: scale(1.15);
   transition: transform 0.1s;
 }
-.mod-folder-color input[type='color'] {
-  opacity: 0;
-  width: 0;
-  height: 0;
-  position: absolute;
-  top: 0;
-  left: 0;
+.mod-folder-color {
+  border: 0;
+  padding: 0;
+}
+
+/* Module colour popover: preset colours, then a Custom row. */
+.mod-color-pop {
+  position: fixed;
+  z-index: var(--z-popover);
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.16),
+    0 0 0 0.5px var(--overlay-pressed);
+  padding: 12px;
+  width: 196px;
+}
+.mod-color-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 28px);
+  gap: 8px;
+  justify-content: space-between;
+}
+.mod-color-opt {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.mod-color-opt.selected,
+.mod-color-opt:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--text);
+  outline: none;
+}
+.mod-color-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.mod-color-custom-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.mod-color-well {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.mod-color-well::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.mod-color-well::-webkit-color-swatch {
+  border: 0;
+  border-radius: 8px;
+}
+.mod-color-well::-moz-color-swatch {
+  border: 0;
+  border-radius: 8px;
+}
+.mod-color-hex {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: 0.875rem var(--font-base);
+  color: var(--text);
+  background: var(--surface);
+}
+.mod-color-hex.invalid {
+  border-color: var(--score-1);
 }
 .mod-folder-name {
   font-size: 1rem;
