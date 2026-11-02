@@ -188,10 +188,13 @@ window.DashInsights = (function () {
         return _personChip(cid, byId[sid], dist.values[sid]);
       })
       .join('');
+    // Everyone in the band is at one level, so they share its next step.
+    var next = _colNextStep(cid, col, pop.level);
     return (
       '<div class="dash-mix-pop-head"><span>' +
       esc(col.label + ' · ' + band.label + ' · ' + band.ids.length) +
       '</span><button type="button" class="dash-mix-pop-close" data-action="mixClose" aria-label="Close">×</button></div>' +
+      (next ? '<div class="dash-mix-pop-next"><b>Shared next step:</b> ' + esc(next) + '</div>' : '') +
       '<div class="dash-ins-people">' +
       people +
       '</div>' +
@@ -453,21 +456,38 @@ window.DashInsights = (function () {
     );
   }
 
+  /* The curriculum bank's next step for one competency's column at a
+     value's level (CompetencyWording.nextStep): '' for a folder column,
+     which holds several competencies, or one with no bank id. */
+  function _colNextStep(cid, col, value) {
+    if (!col || !col.sectionIds || col.sectionIds.length !== 1 || !(value > 0) || !window.CompetencyWording) return '';
+    var sec = getSections(cid).find(function (x) {
+      return x.id === col.sectionIds[0];
+    });
+    var tag = sec && sec.tags && sec.tags[0];
+    return tag ? CompetencyWording.nextStep(tag, Math.max(1, Math.min(4, Math.round(value)))) : '';
+  }
+
   function _facts(cid, m, p, comp) {
     var f = [];
+    // The competency the row names, for its next step.
+    var named = null;
     if (comp) {
       var hit = p.below.find(function (b) {
         return b.col.key === comp;
       });
       if (hit) f.push(_compFact(cid, hit.col, hit.value));
+      named = hit || null;
     } else if (p.below.length === 1) {
       f.push(_compFact(cid, p.below[0].col, p.below[0].value));
+      named = p.below[0];
     } else if (p.below.length > 1) {
       var low = p.below.reduce(function (a, b) {
         return b.value < a.value ? b : a;
       });
       f.push('Below ' + esc(PROF_LABELS[m.rule.below]) + ' on <b>' + p.below.length + '</b> of ' + m.lists.length);
       f.push(_compFact(cid, low.col, low.value, 'Lowest'));
+      named = low;
     }
     if (p.overdue) {
       f.push(
@@ -483,11 +503,16 @@ window.DashInsights = (function () {
       );
     });
     if (p.missing.length > 2) f.push(p.missing.length - 2 + ' more missing or late');
-    return f
-      .map(function (x) {
-        return '<span class="dash-na-fact">' + x + '</span>';
-      })
-      .join(' <span class="dash-na-sep" aria-hidden="true">·</span> ');
+    // The student's next step in that competency, on its own line (Nov 2 mockup).
+    var next = named ? _colNextStep(cid, named.col, named.value) : '';
+    return (
+      f
+        .map(function (x) {
+          return '<span class="dash-na-fact">' + x + '</span>';
+        })
+        .join(' <span class="dash-na-sep" aria-hidden="true">·</span> ') +
+      (next ? '<span class="dash-na-next"><b>Next step:</b> ' + esc(next) + '</span>' : '')
+    );
   }
 
   var NA_FILTERS = ['all', 'below', 'notobs', 'nostr', 'missing'];
