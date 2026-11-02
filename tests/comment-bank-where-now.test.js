@@ -121,6 +121,19 @@ describe('where the student is now', () => {
     if (o) expect(o.id).not.toMatch(/^wn/);
   });
 
+  it('still lets the teacher’s own Overall sentence and the story’s frames fill the step', () => {
+    const f = withWork([3.1, 2.4, 2]);
+    const ctx = CommentBank.context(f, {});
+    const mine = { id: 'mine-1', part: 'now', group: 'Overall', text: '{He} works hard.', mine: true };
+    const story = { id: 'story-1', part: 'now', group: 'Overall', text: '{His} marks climbed.', needs: ['climb'] };
+    const plain = { id: 'plain-1', part: 'now', group: 'Overall', text: '{He} can {strength}.', needs: ['strength'] };
+    const pool = (...sentences) =>
+      CommentBank.stepPool('overall', Object.assign({}, ctx, { climb: 'yes' }), { sentences }).map(s => s.id);
+    expect(pool(mine, plain)).toEqual(['mine-1']);
+    expect(pool(story, plain)).toEqual(['story-1']);
+    expect(pool(plain)).toEqual([]);
+  });
+
   it('fails verify() once the level word changes', () => {
     const f = withWork([3.1, 2.4, 2]);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1, quiet: true });

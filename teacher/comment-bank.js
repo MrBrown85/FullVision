@@ -4284,8 +4284,9 @@ window.CommentBank = (function () {
     { key: 'lateWork', part: 'habits', line: 'lateLine', after: 'notHandedIn' },
     // The strengths (plan part 3): one or two skills from the table.
     // The first strength at its level now, for a bank competency
-    // (strengthNow), else one or two skills from the table.
-    { key: 'overall', part: 'now', groups: ['Overall'], prefer: 'strengthNow' },
+    // (strengthNow), else one or two skills from the table; the teacher's
+    // own sentences and the story's frames stay in (preferSoft).
+    { key: 'overall', part: 'now', groups: ['Overall'], prefer: 'strengthNow', preferSoft: true },
     // The best piece (plan part 2): the one sentence of Examples From Work.
     { key: 'example', part: 'now', groups: ['Examples From Work'] },
     // The Language Goals line (plan PR 3b): a template the teacher picked,
@@ -4819,7 +4820,15 @@ window.CommentBank = (function () {
     var pref = [].concat(step.prefer || []).find(function (k) {
       return !!ctx[k];
     });
-    if (pref && (s.needs || []).indexOf(pref) < 0) return false;
+    // A step whose preference is soft (`preferSoft`) still takes the
+    // teacher's own sentences and the ones bound to the term's story.
+    var soft =
+      step.preferSoft &&
+      (s.mine ||
+        (s.needs || []).some(function (k) {
+          return STORY_SLOTS.indexOf(k) >= 0;
+        }));
+    if (pref && !soft && (s.needs || []).indexOf(pref) < 0) return false;
     if (
       step.never &&
       slotsOf(s).some(function (k) {
