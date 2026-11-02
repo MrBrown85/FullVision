@@ -57,6 +57,10 @@ window.PageGradebook = (function () {
   var _scrollShadowCleanup = null;
   var _scrollKey = null; // class and view of the last render, so a redraw keeps the table's scroll
   var _tipSource = null;
+  // The kind of pointer that last pressed (pointerdown): a tap toggles a
+  // header's tip; a mouse click keeps the tip its hover showed. Safari's
+  // click carries no pointerType of its own.
+  var _lastPointer = 'mouse';
   /* Name-cell tooltip HTML, keyed on student.id. Populated by _setNameTip,
    * read by _showNameTip. Replaces the previous round-trip through
    * data-tip="…" (which relied on every contributor to `tip` using esc()
@@ -1245,6 +1249,8 @@ window.PageGradebook = (function () {
       var g = colGroupMap[i];
       var altClass = g && g.groupIdx % 2 === 1 ? ' gb-group-alt' : '';
       var tagW = col.colWidth || 54;
+      // The competencies behind the column, for the I Can statements its tip lists.
+      var tipTags = col.isPointsCol ? [] : col.tagIds || (col.tagId ? [col.tagId] : []);
       html +=
         '<div class="gb-grid-tag-header' +
         altClass +
@@ -1265,7 +1271,10 @@ window.PageGradebook = (function () {
         esc(col.tagText || col.tagCode) +
         '" data-tip-group="' +
         esc(col.groupName || '') +
-        '" aria-label="' +
+        '" data-tip-tags="' +
+        esc(tipTags.join(',')) +
+        // Focusable and tappable (Oct 21 decision: tap a code): Tab or a tap shows the tip.
+        '" tabindex="0" aria-label="' +
         esc(col.tagText || col.tagCode) +
         '">' +
         esc(col.tagCode) +
@@ -3344,11 +3353,40 @@ window.PageGradebook = (function () {
     var code = head.dataset.tipCode;
     var group = head.dataset.tipGroup;
     gbTip.className = 'dark';
+    // The I Can statements of each competency behind the column, named when
+    // there are several (a rubric criterion on two competencies).
+    var cid = activeCourse;
+    var tags = String(head.dataset.tipTags || '')
+      .split(',')
+      .filter(Boolean)
+      .map(function (id) {
+        return getTagById(cid, id);
+      })
+      .filter(function (t) {
+        return t && (t.i_can_statements || []).some(Boolean);
+      });
+    var icans = tags
+      .map(function (t) {
+        return (
+          (tags.length > 1 ? '<div class="gb-code-tip-sub">' + esc(_tagShortCode(t) || t.label || '') + '</div>' : '') +
+          '<ul class="gb-code-tip-icans">' +
+          t.i_can_statements
+            .filter(Boolean)
+            .map(function (x) {
+              return '<li>' + esc(x) + '</li>';
+            })
+            .join('') +
+          '</ul>'
+        );
+      })
+      .join('');
+    // html-safe: code, wording, group and every I Can statement through esc
     gbTip.innerHTML =
       '<div class="gb-code-tip">' +
       (code ? '<strong>' + esc(code) + '</strong> ' : '') +
       esc(head.dataset.tipText) +
       (group ? '<div class="gb-code-tip-group">' + esc(group) + '</div>' : '') +
+      icans +
       '</div>';
     gbTip.style.display = 'block';
     _tipSource = head;
@@ -3357,7 +3395,11 @@ window.PageGradebook = (function () {
     if (left < 8) left = 8;
     if (left + gbTip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - gbTip.offsetWidth - 8;
     gbTip.style.left = left + 'px';
-    gbTip.style.top = rect.bottom + 6 + 'px';
+    // A long I Can list stays inside the window.
+    var top = rect.bottom + 6;
+    if (top + gbTip.offsetHeight > window.innerHeight - 8)
+      top = Math.max(8, window.innerHeight - gbTip.offsetHeight - 8);
+    gbTip.style.top = top + 'px';
   }
 
   /* Under the student's row (over it near the bottom of the window), so the
@@ -3425,6 +3467,8 @@ window.PageGradebook = (function () {
     }
     var link = e.target.closest('.gb-grid-assess-group .gb-assess-title');
     if (link) _showAssessTitleTip(link.closest('.gb-grid-assess-group'));
+    var codeHead = e.target.closest('.gb-grid-tag-header');
+    if (codeHead) _showCodeTip(codeHead);
   }
 
   function _handleFocusout(e) {
@@ -3463,6 +3507,14 @@ window.PageGradebook = (function () {
           if (hit.el.isConnected && !_graderOpen()) showHeaderContextMenu(at, hit.el);
         }, 260);
       }
+      return;
+    }
+
+    // A tap on a competency's header shows its tip, and a second tap hides it.
+    var codeHead = e.target.closest('.gb-grid-tag-header');
+    if (codeHead) {
+      if (_tipSource === codeHead && _lastPointer !== 'mouse') _hideTip();
+      else _showCodeTip(codeHead);
       return;
     }
 
@@ -3589,6 +3641,9 @@ window.PageGradebook = (function () {
 
     window._pageSwitchCourse = switchCourse;
 
+    _addDocListener('pointerdown', function (e) {
+      _lastPointer = e.pointerType || 'mouse';
+    });
     _addDocListener('click', _handleClick);
     _addDocListener('contextmenu', function (e) {
       if (_graderOpen()) return;
