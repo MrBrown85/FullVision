@@ -2819,7 +2819,7 @@
           {
             "id": "bc.ent10.cc.15",
             "code": "TS3",
-            "short_label": "Idea Recreation",
+            "short_label": "Idea Decisions",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -3431,7 +3431,7 @@
           {
             "id": "bc.fas10.cc.26",
             "code": "TC3",
-            "short_label": "Cultural Influences",
+            "short_label": "Conditions & Tools",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -8248,7 +8248,7 @@
           {
             "id": "bc.cprog11.cc.22",
             "code": "SH3",
-            "short_label": "Concept Building",
+            "short_label": "Extensions by Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -9152,7 +9152,7 @@
           {
             "id": "bc.dcomm11.cc.22",
             "code": "SH3",
-            "short_label": "Concept Building",
+            "short_label": "Extensions by Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11328,7 +11328,7 @@
           {
             "id": "bc.gprod11.cc.22",
             "code": "SH3",
-            "short_label": "Concept Building",
+            "short_label": "Extensions by Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -11514,7 +11514,7 @@
           {
             "id": "bc.ifr11.cc.3",
             "code": "DF2",
-            "short_label": "People Involved",
+            "short_label": "Wishes & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -12198,7 +12198,7 @@
           {
             "id": "bc.mdes11.cc.22",
             "code": "SH3",
-            "short_label": "Concept Building",
+            "short_label": "Extensions by Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -16530,7 +16530,7 @@
           {
             "id": "bc.cdc12.cc.3",
             "code": "DF2",
-            "short_label": "People Involved",
+            "short_label": "Wishes & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -17214,7 +17214,7 @@
           {
             "id": "bc.cisys12.cc.22",
             "code": "SH3",
-            "short_label": "Concept Building",
+            "short_label": "Extensions by Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -17654,7 +17654,7 @@
           {
             "id": "bc.cprog12.cc.22",
             "code": "SH3",
-            "short_label": "Concept Building",
+            "short_label": "Extensions by Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -18072,7 +18072,7 @@
           {
             "id": "bc.cul12.cc.20",
             "code": "MK2",
-            "short_label": "Culinary Creations",
+            "short_label": "Artistic Application",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -18594,7 +18594,7 @@
           {
             "id": "bc.dmd12.cc.23",
             "code": "SH3",
-            "short_label": "Concept Building",
+            "short_label": "Extensions by Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -23865,7 +23865,7 @@
           {
             "id": "bc.hle12.cc.3",
             "code": "DF2",
-            "short_label": "People Involved",
+            "short_label": "Wishes & Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -25477,7 +25477,7 @@
           {
             "id": "bc.mdes12.cc.22",
             "code": "SH3",
-            "short_label": "Concept Building",
+            "short_label": "Extensions by Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -29244,7 +29244,7 @@
           {
             "id": "bc.arts8.cc.2",
             "code": "EC2",
-            "short_label": "Purposeful Play",
+            "short_label": "Artistic Creation",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -29455,7 +29455,7 @@
           {
             "id": "bc.arts9.cc.1",
             "code": "EC1",
-            "short_label": "Purposeful Play",
+            "short_label": "Artistic Creation",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -29723,12 +29723,12 @@
           {
             "id": "bc.dance9.cc.4",
             "code": "EC4",
-            "short_label": "Cultural Context",
+            "short_label": "Arts in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "understanding (and appreciation )?of personal, social|contexts of dramatic works",
+              "rule": "understanding (and appreciation )?of personal, social",
               "raw_sha": "80e7e5b6274d24c7"
             }
           },
@@ -29955,12 +29955,12 @@
           {
             "id": "bc.drama9.cc.4",
             "code": "EC4",
-            "short_label": "Cultural Context",
+            "short_label": "Arts in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "understanding (and appreciation )?of personal, social|contexts of dramatic works",
+              "rule": "understanding (and appreciation )?of personal, social",
               "raw_sha": "adbfb80704455200"
             }
           },
@@ -30163,12 +30163,12 @@
           {
             "id": "bc.music9.cc.2",
             "code": "EC2",
-            "short_label": "Cultural Context",
+            "short_label": "Arts in Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "understanding (and appreciation )?of personal, social|contexts of dramatic works",
+              "rule": "understanding (and appreciation )?of personal, social",
               "raw_sha": "9325481525113221"
             }
           },
@@ -30371,7 +30371,7 @@
           {
             "id": "bc.visart9.cc.1",
             "code": "EC1",
-            "short_label": "Purposeful Play",
+            "short_label": "Artistic Creation",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30675,7 +30675,7 @@
           {
             "id": "bc.artstudio10.cc.4",
             "code": "EC4",
-            "short_label": "Meaning & Intent",
+            "short_label": "Meaning & Emotion",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30756,7 +30756,7 @@
           {
             "id": "bc.artstudio10.cc.10",
             "code": "RR4",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -30924,7 +30924,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "3ba20b8adce250f0"
             }
           },
@@ -31216,7 +31216,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "3ba20b8adce250f0"
             }
           },
@@ -31953,7 +31953,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "b2850470cb429b4d"
             }
           },
@@ -32212,7 +32212,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "d877679e4d2df21b"
             }
           },
@@ -32597,7 +32597,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "53ecf160bad50d85"
             }
           },
@@ -32896,7 +32896,7 @@
           {
             "id": "bc.dtep10.cc.14",
             "code": "RR5",
-            "short_label": "Social Awareness",
+            "short_label": "Duty to Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -32913,7 +32913,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "b2850470cb429b4d"
             }
           }
@@ -33100,7 +33100,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "3ba20b8adce250f0"
             }
           },
@@ -33480,7 +33480,7 @@
           {
             "id": "bc.media10.cc.11",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -33887,7 +33887,7 @@
           {
             "id": "bc.photo10.cc.3",
             "code": "EC3",
-            "short_label": "Meaning & Intent",
+            "short_label": "Meaning & Emotion",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34131,7 +34131,7 @@
           {
             "id": "bc.sa2d10.cc.5",
             "code": "EC5",
-            "short_label": "Meaning & Intent",
+            "short_label": "Meaning & Emotion",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34224,7 +34224,7 @@
           {
             "id": "bc.sa2d10.cc.12",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34375,7 +34375,7 @@
           {
             "id": "bc.sa3d10.cc.4",
             "code": "EC4",
-            "short_label": "Meaning & Intent",
+            "short_label": "Meaning & Emotion",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -34456,7 +34456,7 @@
           {
             "id": "bc.sa3d10.cc.10",
             "code": "RR4",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -35200,7 +35200,7 @@
           {
             "id": "bc.artstudio11.cc.12",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -35416,7 +35416,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "3ba20b8adce250f0"
             }
           },
@@ -35630,7 +35630,7 @@
           {
             "id": "bc.chor11.cc.22",
             "code": "CE4",
-            "short_label": "Arts & Society",
+            "short_label": "Culture & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -35744,7 +35744,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "3ba20b8adce250f0"
             }
           },
@@ -36043,7 +36043,7 @@
           {
             "id": "bc.comp_prod11.cc.4",
             "code": "EC4",
-            "short_label": "Body & Mind",
+            "short_label": "Mind-Body Connection",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -36084,7 +36084,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "3ba20b8adce250f0"
             }
           },
@@ -36136,7 +36136,7 @@
           {
             "id": "bc.comp_prod11.cc.11",
             "code": "RR3",
-            "short_label": "Aural Health",
+            "short_label": "Music & Health",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -36488,7 +36488,7 @@
           {
             "id": "bc.dance11.cc.15",
             "code": "RR5",
-            "short_label": "Social Awareness",
+            "short_label": "Duty to Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -36505,7 +36505,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "b2850470cb429b4d"
             }
           }
@@ -37271,7 +37271,7 @@
           {
             "id": "bc.dcond11.cc.3",
             "code": "EC3",
-            "short_label": "Muscle & Cardio",
+            "short_label": "Training Methods",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37307,7 +37307,7 @@
           {
             "id": "bc.dcond11.cc.6",
             "code": "EC6",
-            "short_label": "Flexibility",
+            "short_label": "Flexibility Methods",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37319,7 +37319,7 @@
           {
             "id": "bc.dcond11.cc.7",
             "code": "EC7",
-            "short_label": "Body Alignment",
+            "short_label": "Alignment & Injury",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37376,7 +37376,7 @@
           {
             "id": "bc.dcond11.cc.11",
             "code": "RR4",
-            "short_label": "Social Awareness",
+            "short_label": "Duty to Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37397,7 +37397,7 @@
           {
             "id": "bc.dcond11.cc.12",
             "code": "CD1",
-            "short_label": "Healthy Eating",
+            "short_label": "Eating & Performance",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -37941,7 +37941,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "db93042826a1c357"
             }
           },
@@ -38228,12 +38228,12 @@
           {
             "id": "bc.dsd11.cc.10",
             "code": "RR3",
-            "short_label": "Influence of Context",
+            "short_label": "Impact of Drama",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of dramatic works",
               "raw_sha": "f61be92362738fc9"
             }
           },
@@ -38568,7 +38568,7 @@
           {
             "id": "bc.ftvt11.cc.14",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -38658,7 +38658,7 @@
           {
             "id": "bc.ftvt11.cc.20",
             "code": "CE1",
-            "short_label": "Responsibility",
+            "short_label": "Responsible Practice",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -38694,7 +38694,7 @@
           {
             "id": "bc.ftvt11.cc.23",
             "code": "CE4",
-            "short_label": "Culture & Society",
+            "short_label": "Cultural Influences",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -38779,7 +38779,7 @@
           {
             "id": "bc.garts11.cc.4",
             "code": "EC4",
-            "short_label": "Cross-Cultural Views",
+            "short_label": "Cultural Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -38908,7 +38908,7 @@
           {
             "id": "bc.garts11.cc.14",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -39136,7 +39136,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "3ba20b8adce250f0"
             }
           },
@@ -39338,7 +39338,7 @@
           {
             "id": "bc.instmus11.cc.21",
             "code": "CE4",
-            "short_label": "Arts & Society",
+            "short_label": "Culture & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -39528,7 +39528,7 @@
           {
             "id": "bc.meda11.cc.12",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -39606,7 +39606,7 @@
           {
             "id": "bc.meda11.cc.17",
             "code": "CE1",
-            "short_label": "Responsibility",
+            "short_label": "Responsible Practice",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40019,7 +40019,7 @@
           {
             "id": "bc.photo11.cc.2",
             "code": "EC2",
-            "short_label": "Cross-Cultural Views",
+            "short_label": "Cultural Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40440,7 +40440,7 @@
           {
             "id": "bc.sa2d11.cc.12",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40651,7 +40651,7 @@
           {
             "id": "bc.sa3d11.cc.5",
             "code": "EC5",
-            "short_label": "Meaning & Intent",
+            "short_label": "Meaning & Emotion",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -40756,7 +40756,7 @@
           {
             "id": "bc.sa3d11.cc.13",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -41036,7 +41036,7 @@
           {
             "id": "bc.thco11.cc.10",
             "code": "RR5",
-            "short_label": "Personal Experience",
+            "short_label": "Using Experience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -41596,7 +41596,7 @@
           {
             "id": "bc.artstudio12.cc.13",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -41900,7 +41900,7 @@
           {
             "id": "bc.chor12.cc.11",
             "code": "RR5",
-            "short_label": "Personal Growth",
+            "short_label": "Rehearsing Ideas",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -42152,7 +42152,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "3ba20b8adce250f0"
             }
           },
@@ -42499,7 +42499,7 @@
           {
             "id": "bc.cp12.cc.5",
             "code": "EC5",
-            "short_label": "Body & Mind",
+            "short_label": "Mind-Body Connection",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -42580,7 +42580,7 @@
           {
             "id": "bc.cp12.cc.11",
             "code": "RR3",
-            "short_label": "Aural Health",
+            "short_label": "Music & Health",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -42920,7 +42920,7 @@
           {
             "id": "bc.dance12.cc.14",
             "code": "RR5",
-            "short_label": "Social Awareness",
+            "short_label": "Duty to Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -42937,7 +42937,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "b2850470cb429b4d"
             }
           }
@@ -43727,7 +43727,7 @@
           {
             "id": "bc.dcond12.cc.3",
             "code": "EC3",
-            "short_label": "Muscle & Cardio",
+            "short_label": "Training Methods",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -43775,7 +43775,7 @@
           {
             "id": "bc.dcond12.cc.7",
             "code": "EC7",
-            "short_label": "Flexibility",
+            "short_label": "Flexibility Methods",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -43856,7 +43856,7 @@
           {
             "id": "bc.dcond12.cc.13",
             "code": "RR5",
-            "short_label": "Social Awareness",
+            "short_label": "Duty to Others",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -43889,7 +43889,7 @@
           {
             "id": "bc.dcond12.cc.15",
             "code": "CD2",
-            "short_label": "Healthy Eating",
+            "short_label": "Eating & Performance",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -44464,12 +44464,12 @@
           {
             "id": "bc.drama12.cc.13",
             "code": "RR5",
-            "short_label": "Cultural Context",
+            "short_label": "Contexts of Drama",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "understanding (and appreciation )?of personal, social|contexts of dramatic works",
+              "rule": "contexts of dramatic works",
               "raw_sha": "1fe83b7cbb47b97c"
             }
           },
@@ -44768,7 +44768,7 @@
           {
             "id": "bc.dsd12.cc.10",
             "code": "RR2",
-            "short_label": "Connection to Others",
+            "short_label": "Linking Experiences",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -44780,12 +44780,12 @@
           {
             "id": "bc.dsd12.cc.11",
             "code": "RR3",
-            "short_label": "Influence of Context",
+            "short_label": "Impact of Drama",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of dramatic works",
               "raw_sha": "d6687625defa713f"
             }
           },
@@ -45120,7 +45120,7 @@
           {
             "id": "bc.ftvt12.cc.14",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -45210,7 +45210,7 @@
           {
             "id": "bc.ftvt12.cc.20",
             "code": "CE1",
-            "short_label": "Responsibility",
+            "short_label": "Responsible Practice",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -45258,7 +45258,7 @@
           {
             "id": "bc.ftvt12.cc.24",
             "code": "CE5",
-            "short_label": "Culture & Society",
+            "short_label": "Cultural Influences",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -45343,7 +45343,7 @@
           {
             "id": "bc.garts12.cc.4",
             "code": "EC4",
-            "short_label": "Cross-Cultural Views",
+            "short_label": "Cultural Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -45472,7 +45472,7 @@
           {
             "id": "bc.garts12.cc.14",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -45700,7 +45700,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:arts_performing",
-              "rule": "influences of (social|context|dramatic works)|contexts and their influences|^Reflect on the influences",
+              "rule": "influences of (social|context)|contexts and their influences|^Reflect on the influences",
               "raw_sha": "3ba20b8adce250f0"
             }
           },
@@ -45926,7 +45926,7 @@
           {
             "id": "bc.instmus12.cc.23",
             "code": "CE4",
-            "short_label": "Arts & Society",
+            "short_label": "Culture & Society",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46140,7 +46140,7 @@
           {
             "id": "bc.meda12.cc.12",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46218,7 +46218,7 @@
           {
             "id": "bc.meda12.cc.17",
             "code": "CE1",
-            "short_label": "Responsibility",
+            "short_label": "Responsible Practice",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -46655,7 +46655,7 @@
           {
             "id": "bc.photo12.cc.2",
             "code": "EC2",
-            "short_label": "Cross-Cultural Views",
+            "short_label": "Cultural Exploration",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47076,7 +47076,7 @@
           {
             "id": "bc.sa2d12.cc.12",
             "code": "RR5",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47287,7 +47287,7 @@
           {
             "id": "bc.sa3d12.cc.5",
             "code": "EC5",
-            "short_label": "Meaning & Intent",
+            "short_label": "Meaning & Emotion",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47368,7 +47368,7 @@
           {
             "id": "bc.sa3d12.cc.11",
             "code": "RR4",
-            "short_label": "Context Influences",
+            "short_label": "Influence of Context",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -47672,7 +47672,7 @@
           {
             "id": "bc.thco12.cc.10",
             "code": "RR5",
-            "short_label": "Personal Experience",
+            "short_label": "Using Experience",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -48971,7 +48971,7 @@
           {
             "id": "bc.wex12a.cc.1",
             "code": "CW1",
-            "short_label": "Personal Strengths",
+            "short_label": "Using Strengths",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -49179,7 +49179,7 @@
           {
             "id": "bc.wex12b.cc.1",
             "code": "CW1",
-            "short_label": "Personal Strengths",
+            "short_label": "Using Strengths",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -49558,7 +49558,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "406779049611b821"
             }
           },
@@ -49820,7 +49820,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "406779049611b821"
             }
           },
@@ -49964,7 +49964,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "c7872a2cf0d4b1ef"
             }
           },
@@ -50118,7 +50118,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "eea0b3ecbd40c73a"
             }
           },
@@ -50130,7 +50130,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "607eeab00f55c098"
             }
           },
@@ -50368,7 +50368,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "e972ccaa903ade86"
             }
           },
@@ -50380,7 +50380,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "607eeab00f55c098"
             }
           },
@@ -50606,7 +50606,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "eea0b3ecbd40c73a"
             }
           },
@@ -50844,7 +50844,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "118386c4bafee630"
             }
           },
@@ -50868,7 +50868,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "856d3c9d79089ba2"
             }
           },
@@ -51118,7 +51118,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "eea0b3ecbd40c73a"
             }
           },
@@ -51368,7 +51368,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "eea0b3ecbd40c73a"
             }
           },
@@ -51404,7 +51404,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "607eeab00f55c098"
             }
           },
@@ -51618,7 +51618,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "eea0b3ecbd40c73a"
             }
           },
@@ -51642,7 +51642,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "607eeab00f55c098"
             }
           },
@@ -51899,12 +51899,12 @@
           {
             "id": "bc.nm10.cc.4",
             "code": "CP4",
-            "short_label": "Societal Diversity",
+            "short_label": "Cultural Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity among First Peoples cultures",
               "raw_sha": "0855980fdaf2bca7"
             }
           },
@@ -51916,7 +51916,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "607eeab00f55c098"
             }
           },
@@ -52161,12 +52161,12 @@
           {
             "id": "bc.sl10.cc.2",
             "code": "CP2",
-            "short_label": "Societal Diversity",
+            "short_label": "Cultural Diversity",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity among First Peoples cultures",
               "raw_sha": "0e746a29209abf65"
             }
           },
@@ -52178,7 +52178,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "607eeab00f55c098"
             }
           },
@@ -52428,7 +52428,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "817d8a10eb7992d1"
             }
           },
@@ -52452,7 +52452,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "607eeab00f55c098"
             }
           },
@@ -52738,7 +52738,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "9838b7248eeff3d8"
             }
           },
@@ -52762,7 +52762,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "607eeab00f55c098"
             }
           },
@@ -53024,7 +53024,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "856d3c9d79089ba2"
             }
           },
@@ -53132,7 +53132,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "9838b7248eeff3d8"
             }
           },
@@ -53406,7 +53406,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "347c2ca608363776"
             }
           },
@@ -53514,7 +53514,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "9838b7248eeff3d8"
             }
           },
@@ -53740,7 +53740,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "607eeab00f55c098"
             }
           },
@@ -53860,7 +53860,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "9838b7248eeff3d8"
             }
           },
@@ -54086,7 +54086,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "9838b7248eeff3d8"
             }
           },
@@ -54110,7 +54110,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "4544245513392e6c"
             }
           },
@@ -54396,7 +54396,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "9838b7248eeff3d8"
             }
           },
@@ -54420,7 +54420,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "856d3c9d79089ba2"
             }
           },
@@ -54718,7 +54718,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "9838b7248eeff3d8"
             }
           },
@@ -54742,7 +54742,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "4544245513392e6c"
             }
           },
@@ -55052,7 +55052,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "387692b7fec0203f"
             }
           },
@@ -55071,12 +55071,12 @@
           {
             "id": "bc.comp12.cc.5",
             "code": "CP5",
-            "short_label": "Information Access",
+            "short_label": "Information Use",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Use information",
               "raw_sha": "513e6b7cfa7b91d1"
             }
           },
@@ -55350,7 +55350,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "387692b7fec0203f"
             }
           },
@@ -55369,12 +55369,12 @@
           {
             "id": "bc.cw12.cc.5",
             "code": "CP5",
-            "short_label": "Information Access",
+            "short_label": "Information Use",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Use information",
               "raw_sha": "513e6b7cfa7b91d1"
             }
           },
@@ -55660,7 +55660,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Access information",
               "raw_sha": "856d3c9d79089ba2"
             }
           },
@@ -55768,7 +55768,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "29b42bb6373f756f"
             }
           },
@@ -56018,7 +56018,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "e972ccaa903ade86"
             }
           },
@@ -56037,12 +56037,12 @@
           {
             "id": "bc.es12.cc.5",
             "code": "CP5",
-            "short_label": "Information Access",
+            "short_label": "Information Use",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Use information",
               "raw_sha": "9efb1a00af7b29c2"
             }
           },
@@ -56328,7 +56328,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "387692b7fec0203f"
             }
           },
@@ -56347,12 +56347,12 @@
           {
             "id": "bc.ls12.cc.5",
             "code": "CP5",
-            "short_label": "Information Access",
+            "short_label": "Information Use",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Use information",
               "raw_sha": "9efb1a00af7b29c2"
             }
           },
@@ -56650,7 +56650,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "387692b7fec0203f"
             }
           },
@@ -56669,12 +56669,12 @@
           {
             "id": "bc.nmed12.cc.6",
             "code": "CP6",
-            "short_label": "Information Access",
+            "short_label": "Information Use",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Use information",
               "raw_sha": "9efb1a00af7b29c2"
             }
           },
@@ -56960,7 +56960,7 @@
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "diversity (within and across|among) First Peoples",
+              "rule": "diversity within and across First Peoples",
               "raw_sha": "387692b7fec0203f"
             }
           },
@@ -56979,12 +56979,12 @@
           {
             "id": "bc.spkn12.cc.5",
             "code": "CP5",
-            "short_label": "Information Access",
+            "short_label": "Information Use",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:ela",
-              "rule": "^(Access|Use) information",
+              "rule": "^Use information",
               "raw_sha": "9efb1a00af7b29c2"
             }
           },
@@ -57846,7 +57846,7 @@
           {
             "id": "bc.fpc10.cc.9",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -58102,7 +58102,7 @@
           {
             "id": "bc.wpm10.cc.9",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -58346,7 +58346,7 @@
           {
             "id": "bc.cs11.cc.8",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -58602,7 +58602,7 @@
           {
             "id": "bc.fom11.cc.9",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -58846,7 +58846,7 @@
           {
             "id": "bc.hom11.cc.8",
             "code": "UND5",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -59114,7 +59114,7 @@
           {
             "id": "bc.pc11.cc.9",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -59370,7 +59370,7 @@
           {
             "id": "bc.wpm11.cc.9",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -59626,7 +59626,7 @@
           {
             "id": "bc.appm12.cc.9",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -59882,7 +59882,7 @@
           {
             "id": "bc.calc12.cc.9",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -60126,7 +60126,7 @@
           {
             "id": "bc.cs12.cc.8",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -60382,7 +60382,7 @@
           {
             "id": "bc.fom12.cc.9",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -60650,7 +60650,7 @@
           {
             "id": "bc.geom12.cc.10",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -60906,7 +60906,7 @@
           {
             "id": "bc.pc12.cc.9",
             "code": "UND4",
-            "short_label": "Persistence",
+            "short_label": "Persistent Solving",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -61406,12 +61406,12 @@
           {
             "id": "bc.phe8.cc.8",
             "code": "HAV3",
-            "short_label": "Healthy Eating",
+            "short_label": "Eating Strategies",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:career_phe",
-              "rule": "healthy eating",
+              "rule": "promoting healthy eating",
               "raw_sha": "066c274a60434657"
             }
           },
@@ -62328,12 +62328,12 @@
           {
             "id": "bc.fc11.cc.3",
             "code": "HAV3",
-            "short_label": "Healthy Eating",
+            "short_label": "Eating & Performance",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
               "short_label": "rule:career_phe",
-              "rule": "healthy eating",
+              "rule": "relationships between healthy eating",
               "raw_sha": "3b34d596b4f94ae9"
             }
           },
@@ -62487,7 +62487,7 @@
           {
             "id": "bc.fc11.cc.14",
             "code": "SR2",
-            "short_label": "Appropriate Conduct",
+            "short_label": "Fitness Etiquette",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -62596,7 +62596,7 @@
           {
             "id": "bc.oded11.cc.7",
             "code": "OS7",
-            "short_label": "Strengths & Growth",
+            "short_label": "Self-Knowledge",
             "prov": {
               "folder": "short list",
               "code": "stem+position",
@@ -63066,7 +63066,7 @@
           {
             "id": "bc.fc12.cc.14",
             "code": "SR2",
-            "short_label": "Appropriate Conduct",
+            "short_label": "Fitness Etiquette",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -63311,7 +63311,7 @@
           {
             "id": "bc.sci8.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -63693,7 +63693,7 @@
           {
             "id": "bc.sci9.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -64111,7 +64111,7 @@
           {
             "id": "bc.sci10.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -64529,7 +64529,7 @@
           {
             "id": "bc.chem11.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -64959,7 +64959,7 @@
           {
             "id": "bc.earth11.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -65389,7 +65389,7 @@
           {
             "id": "bc.envsci11.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -65819,7 +65819,7 @@
           {
             "id": "bc.ls11sci.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -66249,7 +66249,7 @@
           {
             "id": "bc.phys11.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -66679,7 +66679,7 @@
           {
             "id": "bc.sfc11.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -67109,7 +67109,7 @@
           {
             "id": "bc.anat12.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -67539,7 +67539,7 @@
           {
             "id": "bc.chem12.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -67969,7 +67969,7 @@
           {
             "id": "bc.envsci12.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -68399,7 +68399,7 @@
           {
             "id": "bc.geo12.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -68829,7 +68829,7 @@
           {
             "id": "bc.phys12.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -69259,7 +69259,7 @@
           {
             "id": "bc.spsci12.cc.1",
             "code": "QP1",
-            "short_label": "Scientific Curiosity",
+            "short_label": "Sustained Inquiry",
             "prov": {
               "folder": "heading",
               "code": "stem+position",
@@ -69691,7 +69691,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -69703,8 +69703,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(significance) twice",
+              "short_label": "list",
+              "rule": "^Assess the significance of",
               "raw_sha": "c01217e27960115f"
             }
           },
@@ -69715,8 +69715,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(significance) twice",
+              "short_label": "list",
+              "rule": "creators of accounts, narratives",
               "raw_sha": "4534bc87ea1cacc2"
             }
           },
@@ -69798,7 +69798,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -69870,8 +69870,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(ethical judgment) twice",
+              "short_label": "list",
+              "rule": "^Recognize implicit and explicit ethical judgments",
               "raw_sha": "ad705bcc251043c0"
             }
           },
@@ -69882,8 +69882,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(ethical judgment) twice",
+              "short_label": "list",
+              "rule": "^Make reasoned ethical judgments about actions in the past",
               "raw_sha": "793d420d4d6482c4"
             }
           }
@@ -69905,7 +69905,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -70000,7 +70000,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -70095,7 +70095,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -70190,7 +70190,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -70285,7 +70285,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -70297,8 +70297,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(significance) twice",
+              "short_label": "list",
+              "rule": "^Assess the significance of",
               "raw_sha": "6f4e719b6227e763"
             }
           },
@@ -70309,8 +70309,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(significance) twice",
+              "short_label": "list",
+              "rule": "creators of accounts, narratives",
               "raw_sha": "81afd16c49ad1fcc"
             }
           },
@@ -70345,8 +70345,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(cause and consequence) twice",
+              "short_label": "list",
+              "rule": "^Assess the long- and short-term causes",
               "raw_sha": "6a9e279bfdbdaf9b"
             }
           },
@@ -70357,8 +70357,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(cause and consequence) twice",
+              "short_label": "list",
+              "rule": "connectedness or the reciprocal relationship between people and place",
               "raw_sha": "5df8a3837cd9457f"
             }
           },
@@ -70369,8 +70369,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(perspective) twice",
+              "short_label": "list",
+              "rule": "^Explain different perspectives on past and present",
               "raw_sha": "6174c89a2d3b9400"
             }
           },
@@ -70381,8 +70381,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(perspective) twice",
+              "short_label": "list",
+              "rule": "^Explain and infer perspectives and sense of place",
               "raw_sha": "01f301d4fa43c3fa"
             }
           },
@@ -70416,7 +70416,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -70511,7 +70511,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "2640bbfdf02560f0"
             }
@@ -70618,7 +70618,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -70666,8 +70666,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(cause and consequence) twice",
+              "short_label": "list",
+              "rule": "^Assess how historical conditions influenced",
               "raw_sha": "46e01084024c29c3"
             }
           },
@@ -70678,8 +70678,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(cause and consequence) twice",
+              "short_label": "list",
+              "rule": "^Assess how economic theories affected",
               "raw_sha": "72b35e4b94655000"
             }
           },
@@ -70725,7 +70725,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -70820,7 +70820,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "ec04de049923b732"
             }
@@ -70868,15 +70868,15 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(geographical value judgments) twice",
+              "short_label": "list",
+              "rule": "^Evaluate how particular geographic actions",
               "raw_sha": "839aa55f9e84b80e"
             }
           },
           {
             "id": "bc.hgeo12.cc.6",
             "code": "GIM",
-            "short_label": "Importance of Places",
+            "short_label": "Geographic Merit",
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
@@ -70904,8 +70904,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(geographical value judgments) twice",
+              "short_label": "list",
+              "rule": "^Make reasoned ethical judgments about controversial actions",
               "raw_sha": "a91ea509323c9a8b"
             }
           }
@@ -70927,7 +70927,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "f42a780fb248d336"
             }
@@ -71022,7 +71022,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "a07fc94b12928e92"
             }
@@ -71094,8 +71094,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(ethical judgment) twice",
+              "short_label": "list",
+              "rule": "^Make reasoned ethical judgments about legal systems",
               "raw_sha": "e8e22c4c991de70e"
             }
           },
@@ -71106,8 +71106,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(ethical judgment) twice",
+              "short_label": "list",
+              "rule": "^Make reasoned ethical judgments about controversial decisions",
               "raw_sha": "68dff90f69b496a5"
             }
           }
@@ -71129,7 +71129,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "6254af71b00b3195"
             }
@@ -71177,15 +71177,15 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(geographical value judgments) twice",
+              "short_label": "list",
+              "rule": "^Evaluate how particular geographic actions",
               "raw_sha": "1eedbaea32d3a8df"
             }
           },
           {
             "id": "bc.pgeo12.cc.6",
             "code": "GIM",
-            "short_label": "Importance of Places",
+            "short_label": "Geographic Merit",
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
@@ -71213,8 +71213,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(geographical value judgments) twice",
+              "short_label": "list",
+              "rule": "^Make reasoned ethical judgments about controversial actions",
               "raw_sha": "29b0f87dc46de986"
             }
           }
@@ -71236,7 +71236,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "0719b18c6c720319"
             }
@@ -71331,7 +71331,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "44fb37798d70989d"
             }
@@ -71426,7 +71426,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -71521,7 +71521,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -71616,7 +71616,7 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
+              "short_label": "list",
               "rule": "^Use [\\w ]*inquiry processes",
               "raw_sha": "3d4b54d6782fc44a"
             }
@@ -71688,8 +71688,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(ethical judgment) twice",
+              "short_label": "list",
+              "rule": "^Recognize implicit and explicit ethical judgments",
               "raw_sha": "ad705bcc251043c0"
             }
           },
@@ -71700,8 +71700,8 @@
             "prov": {
               "folder": "none: Social Studies",
               "code": "concept",
-              "short_label": "concept",
-              "rule": "(ethical judgment) twice",
+              "short_label": "list",
+              "rule": "^Make reasoned ethical judgments about current and past issues",
               "raw_sha": "32f00921ee41f1d8"
             }
           }

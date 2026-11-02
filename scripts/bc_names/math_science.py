@@ -26,7 +26,7 @@ RULES = [
     (r"^Apply multiple strategies to solve problems", "Solution Strategies"),
     (r"^Apply flexible and strategic approaches to solve problems", "Solution Strategies"),
     (r"^Apply flexible and strategic approaches to explore statistical questions", "Question Strategies"),
-    (r"^Solve problems with persistence", "Persistence"),
+    (r"^Solve problems with persistence", "Persistent Solving"),
     (r"^Explore research questions with persistence", "Research Questions"),
     (r"^Develop, demonstrate, and apply .*understanding", "Concept Development"),
     (r"^Visualize to explore", "Visualization"),
@@ -50,7 +50,7 @@ RULES = [
     (r"^Incorporate First Peoples worldviews", "First Peoples Views"),
     (r"^Use mistakes as opportunities", "Using Mistakes"),
     # Science: Questioning and predicting
-    (r"^Demonstrate a sustained intellectual curiosity", "Scientific Curiosity"),
+    (r"^Demonstrate a sustained intellectual curiosity", "Sustained Inquiry"),
     (r"^Make observations aimed at identifying their own questions", "Observation"),
     (r"^Identify a question to answer", "Inquiry Questions"),
     (r"hypotheses", "Hypotheses"),

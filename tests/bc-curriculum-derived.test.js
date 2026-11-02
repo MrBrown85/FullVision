@@ -108,8 +108,15 @@ describe('BC curriculum derived layer', () => {
     const titleCase = n =>
       n
         .split(' ')
-        .every((w, i) => w === '&' || (i > 0 && SHORT.has(w)) || w.split('-').every(p => /^[A-Z0-9]/.test(p)));
-    const bad = rows.filter(r => r.d.short_label.length > 20 || !titleCase(r.d.short_label));
+        .every((w, i) =>
+          w === '&' || (i > 0 && SHORT.has(w.toLowerCase()))
+            ? w === '&' || w === w.toLowerCase()
+            : w.split('-').every(p => /^[A-Z0-9]/.test(p)),
+        );
+    // Names use "&", never the word "and".
+    const bad = rows.filter(
+      r => r.d.short_label.length > 20 || !titleCase(r.d.short_label) || /\band\b/i.test(r.d.short_label),
+    );
     expect(list(bad, r => `${r.d.id} ${r.d.short_label}`)).toEqual([]);
     for (const key of keys) {
       const names = rows.filter(r => r.key === key).map(r => r.d.short_label.toLowerCase());
@@ -181,6 +188,32 @@ describe('BC curriculum derived layer', () => {
       expect(typeof r.d.prov.rule, r.d.id).toBe('string');
       expect(r.d.prov.folder, r.d.id).toMatch(/^(heading|short list|none: .+)$/);
     }
+  });
+
+  it('marks Social Studies names from a hand list as such', () => {
+    // A concept used twice (SIG1, SIG2) or a statement with no concept (INQ)
+    // is named from a list in the script, not from the bracket concept.
+    const ss = rows.filter(r => r.subject === 'Social Studies');
+    const listed = ss.filter(r => /\d$/.test(r.d.code) || ['INQ', 'IPR', 'RLV'].includes(r.d.code));
+    expect(
+      list(
+        listed.filter(r => r.d.prov.short_label !== 'list'),
+        r => r.d.id,
+      ),
+    ).toEqual([]);
+    expect(
+      list(
+        listed.filter(r => r.d.prov.rule.startsWith('(')),
+        r => r.d.id,
+      ),
+    ).toEqual([]);
+    const concept = ss.filter(r => !listed.includes(r));
+    expect(
+      list(
+        concept.filter(r => r.d.prov.short_label !== 'concept'),
+        r => r.d.id,
+      ),
+    ).toEqual([]);
   });
 
   it('is exactly what the script builds', () => {

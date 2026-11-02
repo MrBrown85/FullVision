@@ -58,7 +58,7 @@ RULES = [
     (r"apply trade-specific skills", "Trade Skills"),
     (r"transferr?able skills specific to the work placement", "Transferable Skills"),
     (r"^Explore (further )?work placement opportunities", "Work Placements"),
-    (r"novel and guided approaches to utilize personal strengths", "Personal Strengths"),
+    (r"novel and guided approaches to utilize personal strengths", "Using Strengths"),
     (r"^Assess knowledge of self", "Personal Interests"),
     (r"job search and interview skills", "Job Search"),
     (r"plan to address skill development", "Skill Development"),
@@ -96,7 +96,8 @@ RULES = [
     (r"prevents injury|reduces the chance of injury", "Injury Prevention"),
 
     # PHE 8-10 and Active Living: healthy living
-    (r"healthy eating", "Healthy Eating"),
+    (r"relationships between healthy eating", "Eating & Performance"),
+    (r"promoting healthy eating", "Eating Strategies"),
     (r"healthy choices", "Healthy Choices"),
     (r"health messages", "Health Messages"),
     (r"^Reflect on outcomes of personal healthy-living goals", "Goal Reflection"),
@@ -129,7 +130,7 @@ RULES = [
     (r"personalized fitness program", "Fitness Program"),
     (r"influence the muscular", "Body Systems"),
     (r"^Demonstrate a variety of leadership skills", "Leadership Skills"),
-    (r"appropriate behaviours in different types of fitness", "Appropriate Conduct"),
+    (r"appropriate behaviours in different types of fitness", "Fitness Etiquette"),
     (r"^Apply safety practices", "Safety Practices"),
 
     # Outdoor Education 11-12
@@ -137,7 +138,7 @@ RULES = [
     (r"skills for outdoor activities", "Outdoor Skills"),
     (r"^Monitor environmental conditions", "Condition Monitoring"),
     (r"nutritional considerations", "Outdoor Preparation"),
-    (r"^Understand their strengths and areas for growth", "Strengths & Growth"),
+    (r"^Understand their strengths and areas for growth", "Self-Knowledge"),
     (r"reduce potential impacts of outdoor activities", "Impact Reduction"),
     (r"cultural and place-based sensitivities", "Cultural Sensitivity"),
     (r"^Communicate and collaborate effectively", "Communication"),

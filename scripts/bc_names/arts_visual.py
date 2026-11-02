@@ -11,7 +11,7 @@ COURSES = [
 
 RULES = [
     # Explore and create: making work, choosing materials, taking risks, refining skills.
-    (r"^Create\b.*\bcollaboratively and as an individual", "Purposeful Play"),
+    (r"^Create\b.*\bcollaboratively and as an individual", "Artistic Creation"),
     (r"^Create .*using (sensory inspiration, )?imagination", "Creative Inquiry"),
     (r"^Create .*(with an audience in mind|for a specific audience)", "Audience Focus"),
     (r"^Develop film or television projects for an intended audience", "Audience & Message"),
@@ -22,7 +22,7 @@ RULES = [
     (r"^Adhere to safety protocols", "Safety Protocols"),
     (r"^(Develop|Refine)\b.*\bskills\b.*\bstyles\b", "Style & Technique"),
     (r"^(Develop|Refine)\b.*\bskills\b", "Skills & Techniques"),
-    (r"possibilities and cross-cultural perspectives", "Cross-Cultural Views"),
+    (r"possibilities and cross-cultural perspectives", "Cultural Exploration"),
     (r"^Communicate cross-cultural perspectives", "Cross-Cultural Views"),
     (r"take creative risks", "Creative Risk-Taking"),
     (r"^(Explore|Examine) artistic possibilities using", "Artistic Exploration"),
@@ -31,7 +31,7 @@ RULES = [
     (r"^Explore historical and contemporary Canadian", "Canadian Film & TV"),
     (r"^Explore historical and contemporary global", "Global Film & TV"),
     (r"^Explore, view, and create moving images", "Viewing & Creating"),
-    (r"^Express meaning, intent, and emotions?", "Meaning & Intent"),
+    (r"^Express meaning, intent, and emotions?", "Meaning & Emotion"),
     (r"^Improvise", "Improvisation"),
     (r"^(Intentionally )?select and combine moving-image", "Moving-Image Choices"),
     (r"^Intentionally select and combine materials", "Material Choices"),
@@ -51,7 +51,7 @@ RULES = [
     (r"how meaning is communicated in moving images", "Meaning & Technique"),
     (r"how (artists|photographers)\b.*\buse\b", "Art Analysis"),
     (r"personal answers to aesthetic questions", "Aesthetic Questions"),
-    (r"influences of .*contexts (on|in)\b", "Context Influences"),
+    (r"influences of .*contexts (on|in)\b", "Influence of Context"),
     (r"how moving images relate to a specific place", "Place & Time"),
     (r"reciprocal process of (a )?critique", "Reciprocal Critique"),
     (r"^Understand the purpose of a critique", "Using Critique"),
@@ -99,7 +99,7 @@ RULES = [
     (r"digital citizenship", "Digital Citizenship"),
     (r"professional opportunities", "Arts Opportunities"),
     (r"relationships between .*culture(s)?, and society", "Culture & Society"),
-    (r"impacts of culture and society", "Culture & Society"),
-    (r"personal and social responsibility", "Responsibility"),
+    (r"impacts of culture and society", "Cultural Influences"),
+    (r"personal and social responsibility", "Responsible Practice"),
     (r"^Collaborate through reciprocal relationships", "Collaboration"),
 ]

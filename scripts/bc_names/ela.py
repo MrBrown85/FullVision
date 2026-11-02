@@ -13,7 +13,8 @@ COURSES = [
 RULES = [
     # Comprehend and connect: reading, sources and strategies
     (r"^Read for enjoyment", "Personal Reading"),
-    (r"^(Access|Use) information", "Information Access"),
+    (r"^Use information", "Information Use"),
+    (r"^Access information", "Information Access"),
     (r"relevance, accuracy, and reliability of texts", "Text Reliability"),
     (r"^Synthesize ideas", "Idea Synthesis"),
     (r"strategies .*comprehend", "Text Comprehension"),
@@ -45,7 +46,8 @@ RULES = [
     (r"role of oral traditions in First Peoples cultures", "Oral Traditions"),
     (r"roles? of story", "Story & Tradition"),
     (r"protocols and ownership", "Protocol & Ownership"),
-    (r"diversity (within and across|among) First Peoples", "Societal Diversity"),
+    (r"diversity among First Peoples cultures", "Cultural Diversity"),
+    (r"diversity within and across First Peoples", "Societal Diversity"),
     (r"influence of (land/)?place", "Influence of Place"),
     (r"First Peoples languages and texts reflect", "Language & Worldview"),
     (r"new media affect First Peoples", "New Media Effects"),

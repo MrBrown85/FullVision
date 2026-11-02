@@ -156,7 +156,7 @@ SS_CONCEPTS = {
     "evidence and interpretation": ("EVN", "Geographic Evidence"),
     "patterns and trends": ("PTR", "Patterns & Trends"),
     "geographical value judgments": ("GVJ", "Value Judgments"),
-    "geographical importance": ("GIM", "Importance of Places"),
+    "geographical importance": ("GIM", "Geographic Merit"),
     "interactions and associations": ("IAS", "Factor Interactions"),
     "critical media literacy": ("CML", "Media Literacy"),
 }
@@ -224,10 +224,16 @@ def name_problems(name, raw, siblings):
     if len(name) > NAME_MAX:
         p.append(f"longer than {NAME_MAX} characters")
     for i, w in enumerate(name.split(" ")):
-        if w == "&" or (i > 0 and w in SHORT_WORDS):
+        if w == "&":
+            continue
+        if i > 0 and w.lower() in SHORT_WORDS:
+            if w != w.lower():
+                p.append(f"short word not lower case: {w}")
             continue
         if not all(part[:1].isupper() or part[:1].isdigit() for part in w.split("-")):
             p.append(f"not Title Case: {w}")
+    if re.search(r"\band\b", name, re.I):
+        p.append('spells "and"; names use "&"')
     if name.split(" ")[-1].lower() in DANGLING:
         p.append("ends in a function word")
     lw, rw = content_words(name), content_words(raw)
@@ -300,25 +306,26 @@ def ss_course(key, rec, problems, notes):
         hit = next(((c, n, p) for p, c, n in SS_UNBRACKETED if re.search(p, raw)), None)
         m = re.search(r"\(([^()]*)\)\s*$", raw)
         if hit:
-            rows.append({"x": x, "code": hit[0], "name": hit[1], "rule": hit[2], "concept": None})
+            rows.append({"x": x, "code": hit[0], "name": hit[1], "rule": hit[2], "concept": None, "how": "list"})
             if m and hit[0] == "INQ":
                 notes.append(f"{x['id']}: inquiry statement tagged ({m.group(1)}) by the Ministry; coded INQ")
         elif m and m.group(1) in SS_CONCEPTS:
             c, n = SS_CONCEPTS[m.group(1)]
-            rows.append({"x": x, "code": c, "name": n, "rule": f"({m.group(1)})", "concept": m.group(1)})
+            rows.append({"x": x, "code": c, "name": n, "rule": f"({m.group(1)})", "concept": m.group(1), "how": "concept"})
         else:
             problems.append(f"{x['id']}: no Social Studies concept for: {raw[:90]}")
-            rows.append({"x": x, "code": None, "name": None, "rule": None, "concept": None})
+            rows.append({"x": x, "code": None, "name": None, "rule": None, "concept": None, "how": None})
     count = Counter(r["code"] for r in rows if r["code"])
     seen = Counter()
     for r in rows:
         if r["code"] and count[r["code"]] > 1:
             seen[r["code"]] += 1
             r["code"] = f"{r['code']}{seen[r['code']]}"
-            hit = next((n for p, n in SS_TWICE if re.search(p, r["x"]["raw"])), None)
+            # The name now comes from the SS_TWICE list, not the concept.
+            pat, hit = next(((p, n) for p, n in SS_TWICE if re.search(p, r["x"]["raw"])), (None, None))
             if not hit:
                 problems.append(f"{r['x']['id']}: concept appears twice in {key} and no SS_TWICE name fits")
-            r["name"], r["rule"] = hit, (r["rule"] or "") + " twice"
+            r["name"], r["rule"], r["how"] = hit, pat, "list"
             notes.append(f"{r['x']['id']}: {key} has this concept twice; coded {r['code']}, named {hit!r}")
     out = []
     for r in rows:
@@ -330,7 +337,7 @@ def ss_course(key, rec, problems, notes):
                 "prov": {
                     "folder": "none: Social Studies",
                     "code": "concept",
-                    "short_label": "concept" if r["concept"] or r["code"] == "INQ" else "list",
+                    "short_label": r["how"],
                     "rule": r["rule"],
                     "raw_sha": raw_sha(r["x"]["raw"]),
                 },
