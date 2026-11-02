@@ -70,3 +70,12 @@ test('holding a level on a touch screen shows its lines and doesn’t pick it', 
     'true',
   );
 });
+
+test('the lines go when the grader moves to another student', async ({ page }) => {
+  const dlg = await open(page);
+  await dlg.locator('.grdl-card[data-tag="IP"] .grdl-level[data-level="2"]').focus();
+  const bar = dlg.locator('.grdl-wording-bar');
+  await expect(bar).toBeVisible();
+  await page.evaluate(() => PageAssignments.openGrader('sci8', 'sci8a2', 'st2'));
+  await expect(page.locator('.grader-dialog .grdl-wording-bar:visible')).toHaveCount(0);
+});

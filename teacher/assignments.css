@@ -5290,7 +5290,8 @@ button.grader-member-name {
   display: none;
 }
 /* Holding a level on a touch screen shows its lines, not the callout. */
-.grdl-level {
+.grdl-level,
+.rsg-level {
   -webkit-touch-callout: none;
   user-select: none;
 }

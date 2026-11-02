@@ -7679,7 +7679,8 @@ window.PageAssignments = (function () {
       if (aid && critid && level) showCritTooltip(e, aid, critid, level);
     }
     var tagLvl = e.target.closest(TAG_LEVEL_SEL);
-    if (tagLvl && tagLvl !== _tagBarLevel) showTagLevelBar(tagLvl);
+    // A tap's emulated mouseover is not a hover: on touch, holding shows the lines.
+    if (tagLvl && tagLvl !== _tagBarLevel && Date.now() - _lastTouch > 800) showTagLevelBar(tagLvl);
   }
   function _handleMouseOut(e) {
     var chip = e.target.closest('[data-chip-tip]');
@@ -7700,24 +7701,36 @@ window.PageAssignments = (function () {
     if (tagLvl && !(e.relatedTarget && tagLvl.contains(e.relatedTarget))) hideTagLevelBar();
   }
 
-  /* Press and hold a grader level on a touch screen (iPad): its lines show
-     while the finger stays down, and letting go doesn't pick the level. A
-     quick tap still picks it. */
+  /* Press and hold a competency level on a touch screen (iPad), in the
+     grader or on the class grid: its lines show while the finger stays
+     down, and letting go doesn't pick the level. A quick tap still picks
+     it; moving the finger off first cancels the hold. */
   var HOLD_MS = 450;
   var _hold = null;
+  var _lastTouch = 0;
   function _handlePointerDown(e) {
     if (e.pointerType !== 'touch') return;
-    var lvl = e.target.closest && e.target.closest('.grdl-level[data-action="graderTagLevel"]');
+    _lastTouch = Date.now();
+    var lvl = e.target.closest && e.target.closest(TAG_LEVEL_SEL);
     if (!lvl) return;
     clearTimeout(_hold && _hold.timer);
     _hold = {
       el: lvl,
+      x: e.clientX,
+      y: e.clientY,
       shown: false,
       timer: setTimeout(function () {
         _hold.shown = true;
         showTagLevelBar(lvl);
       }, HOLD_MS),
     };
+  }
+  function _handlePointerMove(e) {
+    if (!_hold || _hold.shown || e.pointerType !== 'touch') return;
+    if (Math.abs(e.clientX - _hold.x) + Math.abs(e.clientY - _hold.y) > 10) {
+      clearTimeout(_hold.timer);
+      _hold = null;
+    }
   }
   function _handlePointerUp() {
     if (!_hold) return;
@@ -7826,6 +7839,7 @@ window.PageAssignments = (function () {
     _addDocListener('focusin', _handleFocusIn);
     _addDocListener('focusout', _handleFocusOut);
     _addDocListener('pointerdown', _handlePointerDown);
+    _addDocListener('pointermove', _handlePointerMove);
     _addDocListener('pointerup', _handlePointerUp);
     _addDocListener('pointercancel', _handlePointerUp);
     _addDocListener('click', _handleHoldClick, true);
@@ -7890,6 +7904,8 @@ window.PageAssignments = (function () {
   }
 
   function _renderGrader() {
+    // A level's lines belong to the student drawn before.
+    _clearTagLevelBar(null);
     var cid = activeCourse;
     var dialog = _grader.overlay.querySelector('.grader-dialog');
     var a = getAssessments(cid).find(function (x) {
@@ -8706,6 +8722,11 @@ window.PageAssignments = (function () {
     _addDocListener('mouseout', _handleMouseOut);
     _addDocListener('focusin', _handleFocusIn);
     _addDocListener('focusout', _handleFocusOut);
+    _addDocListener('pointerdown', _handlePointerDown);
+    _addDocListener('pointermove', _handlePointerMove);
+    _addDocListener('pointerup', _handlePointerUp);
+    _addDocListener('pointercancel', _handlePointerUp);
+    _addDocListener('click', _handleHoldClick, true);
     _addDocListener('scroll', _hideChipTip, true);
     _addDocListener('fv:id-rekeyed', _handleRekey);
     ['click', 'change', 'focusout', 'fv:rubric-prints-changed'].forEach(function (type) {
