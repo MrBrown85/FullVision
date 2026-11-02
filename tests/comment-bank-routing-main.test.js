@@ -23,6 +23,8 @@ describe('Comment Bank routing of labels in use today', () => {
   });
 
   it('routes the excluded bank names to no skill, and excludes no label in use today', () => {
+    // The 110 an independent review found wrong after the first pass and the 63 of the final review.
+    expect(Object.values(CommentBank.NO_SKILL).flat().length).toBe(173);
     for (const [family, names] of Object.entries(CommentBank.NO_SKILL))
       for (const name of names) {
         expect(CommentBank.skillOf(family, name), `${family}: ${name}`).toBeNull();
@@ -51,6 +53,6 @@ describe('Comment Bank routing of labels in use today', () => {
   it('matches a bank name only whole, so a longer label is not swept in', () => {
     expect(CommentBank.skillOf('science', 'Hypotheses').key).toBe('questioning');
     expect(CommentBank.skillOf('science', 'Hypotheses and Models')).toBeNull();
-    expect(CommentBank.skillOf('arts', 'Dance, Drama & Music').key).toBe('performing');
+    expect(CommentBank.skillOf('arts', 'Ideas & Emotions').key).toBe('communicating');
   });
 });
