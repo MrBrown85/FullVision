@@ -184,6 +184,8 @@
   function loadBankLevels() {
     if (window.BANK_PROFICIENCY) return Promise.resolve(true);
     if (_bankLoading) return _bankLoading;
+    // No page to load into (a test, a worker): the other wording stays.
+    if (typeof document === 'undefined' || !document.head) return Promise.resolve(false);
     _bankLoading = new Promise(function (resolve) {
       var s = document.createElement('script');
       s.src = '/shared/bank-proficiency.js';
