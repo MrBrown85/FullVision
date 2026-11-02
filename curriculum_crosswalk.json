@@ -1,0 +1,2946 @@
+{
+  "_crosswalk": {
+    "description": "Old curriculum bank (curriculum_by_course.json before the 2026 rebuild) → rebuilt bank ids, for Re-link. pairs[old course] lists each old competency (its code and wording) with the new competencies that replace it: one for a rewording, several where the old line joined several Ministry statements. Old competencies with no Ministry counterpart, or no clear one, are left out and stay the teacher’s own. courses lists old course keys that were dropped or renamed. Built from ~/reports/stage4-crosswalk/ with a hand pass (stage 4 plan, Nov 2 2026)."
+  },
+  "courses": {
+    "EFPLS10": {
+      "name": "EFP Literary Studies 10",
+      "now": "Literary Studies 10"
+    },
+    "EFPNM10": {
+      "name": "EFP New Media 10",
+      "now": "New Media 10"
+    },
+    "EFPSL10": {
+      "name": "EFP Spoken Language 10",
+      "now": "Spoken Language 10"
+    },
+    "EFPW10": {
+      "name": "EFP Writing 10",
+      "now": "Writing 10"
+    },
+    "ELA10": {
+      "name": "English Language Arts 10",
+      "dropped": true,
+      "successors": ["COMP10", "CW10", "LS10", "NM10", "SL10"],
+      "decided": false
+    },
+    "COMP_PROD11": {
+      "name": "Composition and Production 11",
+      "now": "Composition & Production 11"
+    },
+    "FTVT11": {
+      "name": "Film and Television 11",
+      "now": "Film & Television 11"
+    },
+    "CLE11": {
+      "name": "Career-Life Education (Grade 11 context)",
+      "dropped": true,
+      "successors": ["CLE10"],
+      "decided": false
+    },
+    "EFPLSNM11": {
+      "name": "EFP Literary Studies and New Media 11",
+      "now": "EFP: Literary Studies + New Media 11"
+    },
+    "EFPLSSL11": {
+      "name": "EFP Literary Studies and Spoken Language 11",
+      "now": "EFP: Literary Studies + Spoken Language 11"
+    },
+    "EFPLSW11": {
+      "name": "EFP Literary Studies and Writing 11",
+      "now": "EFP: Literary Studies + Writing 11"
+    },
+    "PHE11": {
+      "name": "Physical and Health Education 11",
+      "dropped": true,
+      "successors": ["AL11", "FC11", "ODED11"],
+      "decided": false
+    },
+    "BCFP11": {
+      "name": "BC First Peoples 11",
+      "dropped": true,
+      "successors": ["BCFP12"],
+      "decided": false
+    },
+    "INDS11": {
+      "name": "Indigenous Studies 11",
+      "dropped": true,
+      "successors": ["CIS12", "BCFP12"],
+      "decided": false
+    },
+    "PHYG11": {
+      "name": "Physical Geography 11",
+      "dropped": true,
+      "successors": ["PGEO12"],
+      "decided": false
+    },
+    "CP12": {
+      "name": "Composition and Production 12",
+      "now": "Composition & Production 12"
+    },
+    "FTVT12": {
+      "name": "Film and Television 12",
+      "now": "Film & Television 12"
+    },
+    "WPM12": {
+      "name": "Workplace Mathematics 12",
+      "dropped": true,
+      "successors": ["WPM11", "APPM12"],
+      "decided": false
+    },
+    "PHE12": {
+      "name": "Physical and Health Education 12",
+      "dropped": true,
+      "successors": ["AL12", "FC12", "ODED12"],
+      "decided": false
+    },
+    "BIO12": {
+      "name": "Biology 12",
+      "dropped": true,
+      "successors": ["ANAT12"],
+      "decided": false
+    },
+    "HUM8": {
+      "name": "Humanities 8",
+      "dropped": true,
+      "successors": ["ELA8", "SS8"],
+      "decided": true
+    }
+  },
+  "pairs": {
+    "DANCE10": [
+      {
+        "code": "DA1",
+        "raw": "Demonstrate dance elements and techniques in various historical and contemporary styles; develop body as expressive instrument; explore interplay of movement, sound, image, and form to convey meaning; express meaning, intent, and emotion through movement; select dance elements and techniques to create innovative movement phrases; create and perform phrases individually and collaboratively; use choreographic devices to generate movement; take creative risks; consider audience and venue while composing and performing.",
+        "to": [
+          "bc.dance10.cc.1",
+          "bc.dance10.cc.2",
+          "bc.dance10.cc.3",
+          "bc.dance10.cc.4",
+          "bc.dance10.cc.5",
+          "bc.dance10.cc.6",
+          "bc.dance10.cc.7",
+          "bc.dance10.cc.8",
+          "bc.dance10.cc.9"
+        ],
+        "kind": "merged"
+      },
+      {
+        "code": "DA2",
+        "raw": "Describe and respond to movement using dance vocabulary; reflect on rehearsal and performance experiences; receive and apply constructive feedback; demonstrate respect for self, others, audience, and place.",
+        "to": ["bc.dance10.cc.10", "bc.dance10.cc.11", "bc.dance10.cc.12", "bc.dance10.cc.13"],
+        "kind": "merged"
+      },
+      {
+        "code": "DA3",
+        "raw": "Document, share, and appreciate dance works in various contexts; perform exercises, steps, and combinations in varied contexts; develop strategies to communicate ideas and emotions through dance; use dance to address personal and social issues; express identity and values through movement compositions.",
+        "to": ["bc.dance10.cc.14", "bc.dance10.cc.15", "bc.dance10.cc.16", "bc.dance10.cc.17", "bc.dance10.cc.18"],
+        "kind": "merged"
+      },
+      {
+        "code": "DA4",
+        "raw": "Demonstrate responsibility in creating, performing, and responding to dance; explore local, national, global, and intercultural performers and genres; explore First Peoples perspectives and cultural knowledge through movement; examine how dance impacts cultures and societies; build personal and community connections through dance.",
+        "to": ["bc.dance10.cc.19", "bc.dance10.cc.20", "bc.dance10.cc.21", "bc.dance10.cc.22", "bc.dance10.cc.23"],
+        "kind": "merged"
+      }
+    ],
+    "DRAMA10": [
+      {
+        "code": "DR1",
+        "raw": "Develop dramatic works expressing ideas and emotions through presentation or performance; build a repertoire of dramatic skills and techniques; intentionally select and combine drama conventions; experiment with props, processes, and technologies; create works with specific audiences in mind; improvise and embrace creative risks.",
+        "to": [
+          "bc.drama10.cc.2",
+          "bc.drama10.cc.3",
+          "bc.drama10.cc.5",
+          "bc.drama10.cc.6",
+          "bc.drama10.cc.7",
+          "bc.drama10.cc.8"
+        ],
+        "kind": "merged"
+      },
+      {
+        "code": "DR2",
+        "raw": "Analyze and respond to dramatic works using drama-specific language; apply feedback to refine creative ideas; connect dramatic works to personal experiences; examine social, cultural, historical, and environmental influences on drama.",
+        "to": ["bc.drama10.cc.9", "bc.drama10.cc.10", "bc.drama10.cc.11", "bc.drama10.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "DR3",
+        "raw": "Document and respond to dramatic works through various media; use symbolism and imagery to convey meaning; express personal voice regarding environmental and social issues.",
+        "to": ["bc.drama10.cc.14", "bc.drama10.cc.16"],
+        "kind": "merged"
+      },
+      {
+        "code": "DR4",
+        "raw": "Demonstrate responsibility in creating and performing; respect self, others, and audiences; explore First Peoples perspectives and cultural knowledge through drama; build family and community connections.",
+        "to": ["bc.drama10.cc.17", "bc.drama10.cc.18", "bc.drama10.cc.19", "bc.drama10.cc.20"],
+        "kind": "merged"
+      }
+    ],
+    "CLE10": [
+      {
+        "code": "EI",
+        "raw": "Examine the influences of personal and public profiles on career-life opportunities; examine the risks and benefits associated with personal and public digital footprints; examine the role of personal and employment networks in exploring opportunities.",
+        "to": ["bc.cle10.cc.1", "bc.cle10.cc.2", "bc.cle10.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "AMG",
+        "raw": "Apply a mentor's guidance in career-life exploration; collaborate with supportive community members to explore reciprocal influences of career-life choices; communicate to highlight personal strengths, talents, accomplishments, and abilities.",
+        "to": ["bc.cle10.cc.4", "bc.cle10.cc.5", "bc.cle10.cc.6"],
+        "kind": "merged"
+      },
+      {
+        "code": "DIR",
+        "raw": "Demonstrate inclusive, respectful, and safe interactions in diverse career-life environments; identify challenges and opportunities and generate and apply strategies; explore and connect experiential learning with possible career-life pathways; practise effective strategies for healthy school/work/life balance.",
+        "to": ["bc.cle10.cc.7", "bc.cle10.cc.8", "bc.cle10.cc.9", "bc.cle10.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "ER",
+        "raw": "Explore and reflect on career-life roles and personal growth; develop preliminary profiles and flexible plans for career-life learning journeys.",
+        "to": ["bc.cle10.cc.11", "bc.cle10.cc.12"],
+        "kind": "merged"
+      }
+    ],
+    "COMP10": [
+      {
+        "code": "RA",
+        "raw": "Recognize and appreciate the role of story in expressing First Peoples perspectives; recognize diversity within First Peoples societies.",
+        "to": ["bc.comp10.cc.1", "bc.comp10.cc.2"],
+        "kind": "merged"
+      },
+      {
+        "code": "AIV",
+        "raw": "Access information from varied sources; explore relevance, accuracy, and reliability to inform writing.",
+        "to": ["bc.comp10.cc.3", "bc.comp10.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "TCC",
+        "raw": "Think critically and creatively about ideas within and beyond texts; identify bias, contradictions, and distortions.",
+        "to": ["bc.comp10.cc.7", "bc.comp10.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "EHL",
+        "raw": "Explore how language constructs personal and cultural identities; construct meaningful personal connections.",
+        "to": ["bc.comp10.cc.8", "bc.comp10.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "EIR",
+        "raw": "Exchange ideas respectfully from diverse perspectives to build shared understanding.",
+        "to": ["bc.comp10.cc.11"],
+        "kind": "reworded"
+      },
+      {
+        "code": "RT",
+        "raw": "Respond to text in personal, creative, and critical ways.",
+        "to": ["bc.comp10.cc.12"],
+        "kind": "exact"
+      },
+      {
+        "code": "RTI",
+        "raw": "Refine texts to improve clarity and impact; demonstrate speaking and listening skills.",
+        "to": ["bc.comp10.cc.13", "bc.comp10.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "UWD",
+        "raw": "Use writing and design processes to plan, develop, and create engaging texts for varied purposes and audiences.",
+        "to": ["bc.comp10.cc.15"],
+        "kind": "reworded"
+      },
+      {
+        "code": "ESO",
+        "raw": "Express and support opinions with evidence; use Canadian conventions; use citations.",
+        "to": ["bc.comp10.cc.16"],
+        "kind": "reworded"
+      },
+      {
+        "code": "TII",
+        "raw": "Transform ideas and information to create original texts.",
+        "to": ["bc.comp10.cc.19"],
+        "kind": "exact"
+      }
+    ],
+    "CW10": [
+      {
+        "code": "RA",
+        "raw": "Recognize and appreciate the role of story, narrative, and oral tradition in expressing First Peoples perspectives, values, beliefs, and points of view.",
+        "to": ["bc.cw10.cc.1"],
+        "kind": "exact"
+      },
+      {
+        "code": "AID",
+        "raw": "Access information for diverse purposes and from varied sources to inform writing; apply comprehension strategies to texts.",
+        "to": ["bc.cw10.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "TCC",
+        "raw": "Think critically, creatively, and reflectively to explore ideas within, between, and beyond texts; identify bias, contradictions, and distortions.",
+        "to": ["bc.cw10.cc.6", "bc.cw10.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "EHL",
+        "raw": "Explore how language constructs personal and cultural identities; construct meaningful personal connections.",
+        "to": ["bc.cw10.cc.7", "bc.cw10.cc.8"],
+        "kind": "merged"
+      },
+      {
+        "code": "REI",
+        "raw": "Respectfully exchange ideas and viewpoints from diverse perspectives to build shared understanding.",
+        "to": ["bc.cw10.cc.10"],
+        "kind": "reworded"
+      },
+      {
+        "code": "RT",
+        "raw": "Respond to text in personal, creative, and critical ways; assess and refine texts through language manipulation.",
+        "to": ["bc.cw10.cc.11", "bc.cw10.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "UWD",
+        "raw": "Use writing and design processes to plan, develop, and create engaging texts; express and support opinions with evidence.",
+        "to": ["bc.cw10.cc.14", "bc.cw10.cc.15"],
+        "kind": "merged"
+      },
+      {
+        "code": "UCS",
+        "raw": "Use Canadian spelling, grammar, and punctuation conventions appropriately; use acknowledgements and citations; transform ideas to create original texts.",
+        "to": ["bc.cw10.cc.16", "bc.cw10.cc.17", "bc.cw10.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "ELA10": [
+      {
+        "code": "AAS",
+        "raw": "Apply appropriate strategies to comprehend written, oral, visual, and multimodal texts; analyze how texts use literary elements, techniques, and devices to create meaning; examine how multiple perspectives are presented in texts; connect prior knowledge and personal experience to make inferences and draw conclusions; recognize and respect First Peoples perspectives, knowledge, and ways of knowing in texts.",
+        "to": ["bc.comp10.cc.5", "bc.cw10.cc.2"],
+        "kind": "merged"
+      }
+    ],
+    "LS10": [
+      {
+        "code": "RE",
+        "raw": "Read for enjoyment and personal goals.",
+        "to": ["bc.ls10.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "RA",
+        "raw": "Recognize and appreciate the role of story, narrative, and oral tradition in expressing First Peoples perspectives.",
+        "to": ["bc.ls10.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "RDW",
+        "raw": "Recognize diversity within First Peoples societies represented in texts.",
+        "to": ["bc.ls10.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "RI",
+        "raw": "Recognize the influence of place in First Peoples and other Canadian texts.",
+        "to": ["bc.ls10.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AID",
+        "raw": "Access information for diverse purposes; evaluate relevance, accuracy, and reliability.",
+        "to": ["bc.ls10.cc.5", "bc.ls10.cc.6"],
+        "kind": "merged"
+      },
+      {
+        "code": "TCI",
+        "raw": "Think critically about ideas within and beyond texts; identify bias, contradictions, and distortions.",
+        "to": ["bc.ls10.cc.9", "bc.ls10.cc.13"],
+        "kind": "merged"
+      },
+      {
+        "code": "EIR",
+        "raw": "Exchange ideas respectfully from diverse perspectives to build shared understanding.",
+        "to": ["bc.ls10.cc.14"],
+        "kind": "reworded"
+      },
+      {
+        "code": "RT",
+        "raw": "Respond to text in personal, creative, and critical ways.",
+        "to": ["bc.ls10.cc.15"],
+        "kind": "exact"
+      },
+      {
+        "code": "RTI",
+        "raw": "Refine texts to improve clarity and impact; express opinions with evidence.",
+        "to": ["bc.ls10.cc.16", "bc.ls10.cc.19"],
+        "kind": "merged"
+      },
+      {
+        "code": "DSL",
+        "raw": "Demonstrate speaking and listening skills in formal and informal contexts.",
+        "to": ["bc.ls10.cc.17"],
+        "kind": "reworded"
+      }
+    ],
+    "NM10": [
+      {
+        "code": "RC",
+        "raw": "Recognize the complexities of digital citizenship; read for enjoyment and personal goals.",
+        "to": ["bc.nm10.cc.1", "bc.nm10.cc.2"],
+        "kind": "merged"
+      },
+      {
+        "code": "ESN",
+        "raw": "Explore story and narrative in expressing First Peoples perspectives in new media; explore diversity among First Peoples cultures in new media.",
+        "to": ["bc.nm10.cc.3", "bc.nm10.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "AID",
+        "raw": "Access information from diverse sources; apply comprehension strategies to multimodal texts; identify bias, contradictions, and distortions.",
+        "to": ["bc.nm10.cc.5", "bc.nm10.cc.7", "bc.nm10.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "RHF",
+        "raw": "Recognize how forms and features enhance meaning; explore how language constructs identities.",
+        "to": ["bc.nm10.cc.8", "bc.nm10.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "REI",
+        "raw": "Respectfully exchange ideas and viewpoints from diverse perspectives; use digital media to collaborate and communicate.",
+        "to": ["bc.nm10.cc.13", "bc.nm10.cc.18"],
+        "kind": "merged"
+      },
+      {
+        "code": "RT",
+        "raw": "Respond to text in personal, creative, and critical ways; assess and refine texts to improve clarity and impact.",
+        "to": ["bc.nm10.cc.14", "bc.nm10.cc.15"],
+        "kind": "merged"
+      },
+      {
+        "code": "UWD",
+        "raw": "Use writing and design processes for varied audiences and purposes; use conventions and citations; transform ideas to create original texts.",
+        "to": ["bc.nm10.cc.17", "bc.nm10.cc.22"],
+        "kind": "merged"
+      }
+    ],
+    "SL10": [
+      {
+        "code": "LF",
+        "raw": "Recognize and appreciate the role of story, narrative, and oral tradition in expressing First Peoples perspectives, values, beliefs, and points of view.",
+        "to": ["bc.sl10.cc.1"],
+        "kind": "exact"
+      },
+      {
+        "code": "CS",
+        "raw": "Recognize and appreciate the diversity among First Peoples cultures; access information from diverse sources.",
+        "to": ["bc.sl10.cc.2", "bc.sl10.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "AAS",
+        "raw": "Apply appropriate strategies to comprehend written, oral, visual, and multimodal texts; identify bias, contradictions, and distortions.",
+        "to": ["bc.sl10.cc.4", "bc.sl10.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "EHL",
+        "raw": "Explore how language constructs personal and cultural identities; construct meaningful personal connections.",
+        "to": ["bc.sl10.cc.8", "bc.sl10.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "REI",
+        "raw": "Respectfully exchange ideas and viewpoints from diverse perspectives to build shared understanding.",
+        "to": ["bc.sl10.cc.11"],
+        "kind": "reworded"
+      },
+      {
+        "code": "ART",
+        "raw": "Assess and refine texts to improve clarity and impact; demonstrate speaking and listening skills in formal and informal contexts.",
+        "to": ["bc.sl10.cc.12", "bc.sl10.cc.13"],
+        "kind": "merged"
+      },
+      {
+        "code": "EAS",
+        "raw": "Explore appropriate spoken language formats for intended purposes; express and support opinions with evidence.",
+        "to": ["bc.sl10.cc.14", "bc.sl10.cc.16"],
+        "kind": "merged"
+      },
+      {
+        "code": "TII",
+        "raw": "Transform ideas and information to create original texts; use acknowledgements and citations.",
+        "to": ["bc.sl10.cc.19", "bc.sl10.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "FPC10": [
+      {
+        "code": "DTS",
+        "raw": "Develop thinking strategies to solve puzzles and play games; explore, analyze, and apply mathematical ideas using reason, technology, and other tools; estimate reasonably and demonstrate fluent, flexible, strategic thinking about number; model with mathematics in situational contexts; think creatively and with curiosity when exploring problems.",
+        "to": ["bc.fpc10.cc.1", "bc.fpc10.cc.2", "bc.fpc10.cc.3", "bc.fpc10.cc.4", "bc.fpc10.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "DDA",
+        "raw": "Develop, demonstrate, and apply mathematical understanding through play, story, inquiry, and problem solving; visualize to explore and illustrate mathematical concepts; apply flexible and strategic approaches to solve problems; solve problems with persistence and positive disposition; engage in problem-solving connected with place, story, cultural practices.",
+        "to": ["bc.fpc10.cc.6", "bc.fpc10.cc.7", "bc.fpc10.cc.8", "bc.fpc10.cc.9", "bc.fpc10.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "EJM",
+        "raw": "Explain and justify mathematical ideas and decisions in many ways; represent mathematical ideas in concrete, pictorial, and symbolic forms; use mathematical vocabulary in classroom discussions; take risks when offering ideas in classroom discourse.",
+        "to": ["bc.fpc10.cc.11", "bc.fpc10.cc.12", "bc.fpc10.cc.13", "bc.fpc10.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "RMT",
+        "raw": "Reflect on mathematical thinking; connect mathematical concepts with each other and personal interests; use mistakes as opportunities to advance learning; incorporate First Peoples worldviews, perspectives, and practices.",
+        "to": ["bc.fpc10.cc.15", "bc.fpc10.cc.16", "bc.fpc10.cc.17", "bc.fpc10.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "WPM10": [
+      {
+        "code": "DTS",
+        "raw": "Develop thinking strategies to solve puzzles and play games; explore, analyze, and apply mathematical ideas using reason, technology, and tools; estimate reasonably and demonstrate fluent, flexible, and strategic thinking about number; model mathematics in situational contexts; think creatively and with curiosity when exploring problems.",
+        "to": ["bc.wpm10.cc.1", "bc.wpm10.cc.2", "bc.wpm10.cc.3", "bc.wpm10.cc.4", "bc.wpm10.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "DAC",
+        "raw": "Develop and apply conceptual understanding through play, story, inquiry, and problem solving; visualize mathematical concepts and relationships; apply flexible and strategic approaches to solve problems; solve problems with persistence and positive disposition; engage in problem-solving connected with place, story, and cultural practices.",
+        "to": ["bc.wpm10.cc.6", "bc.wpm10.cc.7", "bc.wpm10.cc.8", "bc.wpm10.cc.9", "bc.wpm10.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "EJM",
+        "raw": "Explain and justify mathematical ideas and decisions in many ways; represent mathematical ideas in concrete, pictorial, and symbolic forms; use mathematical vocabulary in classroom discussions; take risks when offering ideas in classroom discourse.",
+        "to": ["bc.wpm10.cc.11", "bc.wpm10.cc.12", "bc.wpm10.cc.13", "bc.wpm10.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "RMT",
+        "raw": "Reflect on mathematical thinking; connect mathematical concepts with each other and personal interests; use mistakes as opportunities to advance learning; incorporate First Peoples worldviews, perspectives, knowledge, and practices.",
+        "to": ["bc.wpm10.cc.15", "bc.wpm10.cc.16", "bc.wpm10.cc.17", "bc.wpm10.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "PHE10": [
+      {
+        "code": "DRA",
+        "raw": "Develop, refine, and apply fundamental movement skills in various physical activities; develop and apply movement concepts and strategies in different activities; apply methods for monitoring and adjusting exertion levels; demonstrate safety, fair play, and leadership in physical activities; identify preferred types of physical activity.",
+        "to": ["bc.phe10.cc.1", "bc.phe10.cc.2", "bc.phe10.cc.3", "bc.phe10.cc.4", "bc.phe10.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "RPA",
+        "raw": "Participate daily in fitness-enhancing physical activity; describe how school, home, and community activities influence health; develop strategies for promoting healthy eating choices; assess factors influencing healthy choices; identify and analyze health message sources and their behavioural influence; identify and apply personal healthy-living goal strategies; reflect on outcomes and assess personal goal strategies.",
+        "to": ["bc.phe10.cc.5", "bc.phe10.cc.11", "bc.phe10.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "SW",
+        "raw": "Propose strategies for avoiding and/or responding to unsafe or exploitative situations; propose strategies for responding to discrimination, stereotyping, and bullying; propose strategies for developing and maintaining healthy relationships; create strategies for promoting school and community well-being.",
+        "to": ["bc.phe10.cc.14", "bc.phe10.cc.15", "bc.phe10.cc.16", "bc.phe10.cc.18"],
+        "kind": "merged"
+      },
+      {
+        "code": "DAS",
+        "raw": "Describe and assess strategies for promoting mental well-being; describe and assess strategies for managing mental health and substance use problems; create and assess strategies for managing physical, emotional, and social changes during puberty; explore and describe transition and change impacts on identities.",
+        "to": ["bc.phe10.cc.18", "bc.phe10.cc.20"],
+        "kind": "merged"
+      }
+    ],
+    "SCI10": [
+      {
+        "code": "DSI",
+        "raw": "Demonstrate sustained intellectual curiosity about a scientific topic or problem; make observations and identify questions; formulate multiple hypotheses and predict multiple outcomes.",
+        "to": ["bc.sci10.cc.1", "bc.sci10.cc.2", "bc.sci10.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "CIP",
+        "raw": "Collaboratively and individually plan and conduct investigations; assess risks; select appropriate equipment; follow safety and ethical guidelines.",
+        "to": ["bc.sci10.cc.4", "bc.sci10.cc.5", "bc.sci10.cc.6", "bc.sci10.cc.7"],
+        "kind": "merged"
+      },
+      {
+        "code": "AFP",
+        "raw": "Apply First Peoples perspectives and local environmental knowledge; seek patterns, trends, and connections; construct and analyze graphs and models; draw evidence-based conclusions.",
+        "to": ["bc.sci10.cc.9", "bc.sci10.cc.10", "bc.sci10.cc.11", "bc.sci10.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "EMI",
+        "raw": "Evaluate methods; identify errors and alternative explanations; question assumptions; analyze validity of information sources; consider social, ethical, and environmental implications.",
+        "to": ["bc.sci10.cc.14", "bc.sci10.cc.17", "bc.sci10.cc.22", "bc.sci10.cc.21"],
+        "kind": "merged"
+      },
+      {
+        "code": "CC",
+        "raw": "Contribute to care for self, others, community, and world; transfer learning to new situations; generate refined ideas for solving local or global problems.",
+        "to": ["bc.sci10.cc.23", "bc.sci10.cc.24", "bc.sci10.cc.25", "bc.sci10.cc.26"],
+        "kind": "merged"
+      },
+      {
+        "code": "FPM",
+        "raw": "Formulate physical or mental models to describe a phenomenon; communicate scientific ideas, claims, and arguments with evidence and appropriate language.",
+        "to": ["bc.sci10.cc.28", "bc.sci10.cc.29"],
+        "kind": "merged"
+      }
+    ],
+    "SS10": [
+      {
+        "code": "USS",
+        "raw": "Use Social Studies inquiry processes to ask questions, gather and analyze information, and communicate findings.",
+        "to": ["bc.ss10.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Assess the significance of people, places, events, or developments in Canadian and world history.",
+        "to": ["bc.ss10.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "ACA",
+        "raw": "Assess competing accounts by investigating source reliability and adequacy of evidence.",
+        "to": ["bc.ss10.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CCC",
+        "raw": "Compare and contrast continuities and changes for different groups.",
+        "to": ["bc.ss10.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AHU",
+        "raw": "Assess how underlying conditions and the actions of individuals or groups influence historical and contemporary events.",
+        "to": ["bc.ss10.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "EID",
+        "raw": "Explain and infer different perspectives on past or present issues by considering prevailing norms, values, and worldviews.",
+        "to": ["bc.ss10.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "MRE",
+        "raw": "Make reasoned ethical judgments about actions in the past and present.",
+        "to": ["bc.ss10.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "DANCE11": [
+      {
+        "code": "AE",
+        "raw": "Analyze and evaluate dance works using advanced dance vocabulary; apply feedback to refine artistic work; examine the relationship between dance and its cultural and historical context.",
+        "to": ["bc.dance11.cc.11", "bc.dance11.cc.16"],
+        "kind": "merged"
+      }
+    ],
+    "FTVT11": [
+      {
+        "code": "RP",
+        "raw": "Reflect on personal film and television production practices",
+        "to": ["bc.ftvt11.cc.13"],
+        "kind": "reworded"
+      }
+    ],
+    "GARTS11": [
+      {
+        "code": "AG",
+        "raw": "Analyze graphic design and visual communication",
+        "to": ["bc.garts11.cc.12"],
+        "kind": "reworded"
+      }
+    ],
+    "MTHEATRE11": [
+      {
+        "code": "PM",
+        "raw": "Perform musical theatre material with presence and engagement",
+        "to": ["bc.mtheatre11.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SD",
+        "raw": "Share and discuss musical theatre work",
+        "to": ["bc.mtheatre11.cc.14"],
+        "kind": "reworded"
+      }
+    ],
+    "THCO11": [
+      {
+        "code": "DC",
+        "raw": "Develop character and performance skills",
+        "to": ["bc.thco11.cc.2"],
+        "kind": "reworded"
+      }
+    ],
+    "CLE11": [
+      {
+        "code": "EI",
+        "raw": "Examine the influences of personal and public profiles on career-life opportunities; examine risks and benefits of digital footprints; examine the role of personal and employment networks in exploring opportunities.",
+        "to": ["bc.cle10.cc.1", "bc.cle10.cc.2", "bc.cle10.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "AM",
+        "raw": "Apply a mentor's guidance in career-life exploration; collaborate with supportive community members to explore reciprocal influences of career-life choices; communicate to highlight personal strengths, talents, accomplishments, and abilities.",
+        "to": ["bc.cle10.cc.4", "bc.cle10.cc.5", "bc.cle10.cc.6"],
+        "kind": "merged"
+      },
+      {
+        "code": "DI",
+        "raw": "Demonstrate inclusive, respectful, and safe interactions in diverse career-life environments; identify challenges and opportunities and generate and apply strategies; explore and connect experiential learning with possible career-life pathways; practise effective strategies for healthy school/work/life balance.",
+        "to": ["bc.cle10.cc.7", "bc.cle10.cc.8", "bc.cle10.cc.9", "bc.cle10.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "ER",
+        "raw": "Explore and reflect on career-life roles and personal growth; develop preliminary profiles and flexible plans for career-life learning journeys.",
+        "to": ["bc.cle10.cc.11", "bc.cle10.cc.12"],
+        "kind": "merged"
+      }
+    ],
+    "COMP11": [
+      {
+        "code": "RE",
+        "raw": "Read for enjoyment and to achieve personal goals; recognize and understand First Peoples perspectives and diversity; understand influence of land/place.",
+        "to": ["bc.comp11.cc.1", "bc.comp11.cc.3", "bc.comp11.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "AI",
+        "raw": "Access information for diverse purposes; evaluate relevance, accuracy, and reliability of texts.",
+        "to": ["bc.comp11.cc.5", "bc.comp11.cc.6"],
+        "kind": "merged"
+      },
+      {
+        "code": "AC",
+        "raw": "Apply comprehension strategies; recognize how forms, formats, and features shape meaning; think critically and creatively; evaluate literary elements; identify bias, contradictions, distortions, omissions.",
+        "to": ["bc.comp11.cc.8", "bc.comp11.cc.9", "bc.comp11.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "RE2",
+        "raw": "Respectfully exchange ideas from diverse perspectives to build shared understandings and extend thinking.",
+        "to": ["bc.comp11.cc.15"],
+        "kind": "reworded"
+      },
+      {
+        "code": "RT",
+        "raw": "Respond to text personally, creatively, and critically; demonstrate speaking and listening skills across contexts.",
+        "to": ["bc.comp11.cc.16", "bc.comp11.cc.17"],
+        "kind": "merged"
+      },
+      {
+        "code": "UW",
+        "raw": "Use writing and design processes to plan, develop, and create texts; express and support opinions with evidence; reflect on and refine texts.",
+        "to": ["bc.comp11.cc.18", "bc.comp11.cc.19", "bc.comp11.cc.20"],
+        "kind": "merged"
+      },
+      {
+        "code": "UC",
+        "raw": "Use conventions proficiently; use citations; transform ideas to create original texts; experiment with genres and styles.",
+        "to": ["bc.comp11.cc.23", "bc.comp11.cc.24"],
+        "kind": "merged"
+      }
+    ],
+    "CW11": [
+      {
+        "code": "RE",
+        "raw": "Read for enjoyment and personal goals; recognize First Peoples perspectives and diversity; understand land/place influence in texts.",
+        "to": ["bc.cw11.cc.1", "bc.cw11.cc.3", "bc.cw11.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "AI",
+        "raw": "Access information from diverse sources; recognize how forms and features shape purposes and messages; think critically and creatively; identify bias, contradictions, distortions.",
+        "to": ["bc.cw11.cc.5", "bc.cw11.cc.6", "bc.cw11.cc.7", "bc.cw11.cc.13"],
+        "kind": "merged"
+      },
+      {
+        "code": "EI",
+        "raw": "Exchange ideas respectfully; respond to texts creatively and critically; demonstrate speaking and listening skills across contexts.",
+        "to": ["bc.cw11.cc.15", "bc.cw11.cc.16"],
+        "kind": "merged"
+      },
+      {
+        "code": "UW",
+        "raw": "Use writing processes to create texts for various purposes and audiences; reflect, assess, and refine for clarity and effectiveness; manipulate language purposefully.",
+        "to": ["bc.cw11.cc.17", "bc.cw11.cc.19", "bc.cw11.cc.23"],
+        "kind": "merged"
+      },
+      {
+        "code": "ES",
+        "raw": "Express and support opinions with evidence; use conventions and citations; transform ideas to create original texts across genres.",
+        "to": ["bc.cw11.cc.18", "bc.cw11.cc.22"],
+        "kind": "merged"
+      }
+    ],
+    "LS11": [
+      {
+        "code": "RE",
+        "raw": "Read for enjoyment and to achieve personal goals.",
+        "to": ["bc.ls11.cc.1"],
+        "kind": "exact"
+      },
+      {
+        "code": "US",
+        "raw": "Understand story and oral tradition's role in expressing First Peoples worldviews; recognize diversity within First Peoples societies; understand land/place influence.",
+        "to": ["bc.ls11.cc.2", "bc.ls11.cc.3", "bc.ls11.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "ER",
+        "raw": "Evaluate relevance, accuracy, and reliability of texts; consider credibility, currency, bias.",
+        "to": ["bc.ls11.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AC",
+        "raw": "Apply comprehension strategies to written, oral, visual, and multimodal texts; guide inquiry and extend thinking.",
+        "to": ["bc.ls11.cc.7"],
+        "kind": "reworded"
+      },
+      {
+        "code": "TC",
+        "raw": "Think critically and creatively; recognize personal, social, cultural contexts; understand how language constructs identities; evaluate literary elements; discern nuanced word meanings; identify bias, contradictions, distortions, omissions.",
+        "to": ["bc.ls11.cc.9", "bc.ls11.cc.11", "bc.ls11.cc.14", "bc.ls11.cc.15"],
+        "kind": "merged"
+      },
+      {
+        "code": "RT",
+        "raw": "Respond to texts personally, creatively, and critically; demonstrate speaking and listening skills in formal and informal contexts.",
+        "to": ["bc.ls11.cc.17", "bc.ls11.cc.18"],
+        "kind": "merged"
+      },
+      {
+        "code": "AC2",
+        "raw": "Apply Canadian spelling, grammar, and punctuation conventions; use citations; recognize intellectual property and First Peoples protocols; transform ideas to create original texts.",
+        "to": ["bc.ls11.cc.22", "bc.ls11.cc.23", "bc.ls11.cc.24"],
+        "kind": "merged"
+      }
+    ],
+    "FOM11": [
+      {
+        "code": "DT",
+        "raw": "Develop thinking strategies to solve puzzles and play games; explore, analyze, and apply mathematical ideas using reason, technology, and tools; estimate reasonably and demonstrate fluent, flexible, and strategic thinking; model with mathematics in situational contexts; think creatively and with curiosity when exploring problems.",
+        "to": ["bc.fom11.cc.1", "bc.fom11.cc.2", "bc.fom11.cc.3", "bc.fom11.cc.4", "bc.fom11.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "DM",
+        "raw": "Develop mathematical understanding through play, story, inquiry, and problem solving; visualize to explore and illustrate concepts; apply flexible and strategic approaches; solve with persistence and positive disposition; engage in problem-solving connected with place, story, and cultural practices.",
+        "to": ["bc.fom11.cc.6", "bc.fom11.cc.7", "bc.fom11.cc.8", "bc.fom11.cc.9", "bc.fom11.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "EJ",
+        "raw": "Explain and justify mathematical ideas and decisions in many ways; represent mathematical ideas in concrete, pictorial, and symbolic forms; use mathematical vocabulary in discussions; take risks when offering ideas.",
+        "to": ["bc.fom11.cc.11", "bc.fom11.cc.12", "bc.fom11.cc.13", "bc.fom11.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "RM",
+        "raw": "Reflect on mathematical thinking; connect concepts with each other and personal interests; use mistakes as opportunities to advance learning; incorporate First Peoples worldviews, perspectives, knowledge, and practices.",
+        "to": ["bc.fom11.cc.15", "bc.fom11.cc.16", "bc.fom11.cc.17", "bc.fom11.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "HOM11": [
+      {
+        "code": "AC",
+        "raw": "Analyze and compare mathematical approaches from different cultures to understand diverse problem-solving strategies.",
+        "to": ["bc.hom11.cc.4"],
+        "kind": "reworded"
+      }
+    ],
+    "PC11": [
+      {
+        "code": "DT",
+        "raw": "Develop thinking strategies to solve puzzles and play games; explore, analyze, and apply mathematical ideas using reason, technology, and other tools; estimate reasonably and demonstrate fluent, flexible, and strategic thinking about number; model with mathematics in situational contexts; think creatively and with curiosity and wonder when exploring problems.",
+        "to": ["bc.pc11.cc.1", "bc.pc11.cc.2", "bc.pc11.cc.3", "bc.pc11.cc.4", "bc.pc11.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "DD",
+        "raw": "Develop, demonstrate, and apply conceptual understanding through play, story, inquiry, and problem solving; visualize to explore and illustrate mathematical concepts and relationships; apply flexible and strategic approaches to solve problems; solve with persistence and positive disposition; engage in problem-solving connected with place, story, cultural practices.",
+        "to": ["bc.pc11.cc.6", "bc.pc11.cc.7", "bc.pc11.cc.8", "bc.pc11.cc.9", "bc.pc11.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "EJ",
+        "raw": "Explain and justify mathematical ideas and decisions in many ways; represent mathematical ideas in concrete, pictorial, and symbolic forms; use mathematical vocabulary and language; take risks when offering ideas in classroom discourse.",
+        "to": ["bc.pc11.cc.11", "bc.pc11.cc.12", "bc.pc11.cc.13", "bc.pc11.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "RM",
+        "raw": "Reflect on mathematical thinking; connect mathematical concepts with each other, with other areas, and with personal interests; use mistakes as opportunities to advance learning; incorporate First Peoples worldviews, perspectives, knowledge, and practices.",
+        "to": ["bc.pc11.cc.15", "bc.pc11.cc.16", "bc.pc11.cc.17", "bc.pc11.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "WPM11": [
+      {
+        "code": "DT",
+        "raw": "Develop thinking strategies to solve puzzles and play games; explore, analyze, and apply mathematical ideas using reason, technology, and tools; estimate reasonably and demonstrate fluent, flexible, strategic thinking about number; model with mathematics in situational contexts; think creatively and with curiosity when exploring problems.",
+        "to": ["bc.wpm11.cc.1", "bc.wpm11.cc.2", "bc.wpm11.cc.3", "bc.wpm11.cc.4", "bc.wpm11.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "DD",
+        "raw": "Develop, demonstrate, and apply conceptual understanding through play, story, inquiry, and problem solving; visualize to explore and illustrate mathematical concepts; apply flexible and strategic approaches to solve problems; solve problems with persistence and positive disposition; engage in problem-solving connected with place, story, cultural practices, and perspectives.",
+        "to": ["bc.wpm11.cc.6", "bc.wpm11.cc.7", "bc.wpm11.cc.8", "bc.wpm11.cc.9", "bc.wpm11.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "EJ",
+        "raw": "Explain and justify mathematical ideas and decisions in many ways; represent mathematical ideas in concrete, pictorial, and symbolic forms; use mathematical vocabulary in classroom discussions; take risks when offering ideas in classroom discourse.",
+        "to": ["bc.wpm11.cc.11", "bc.wpm11.cc.12", "bc.wpm11.cc.13", "bc.wpm11.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "RM",
+        "raw": "Reflect on mathematical thinking; connect mathematical concepts with each other, other areas, and personal interests; use mistakes as opportunities to advance learning; incorporate First Peoples worldviews, perspectives, knowledge, and practices.",
+        "to": ["bc.wpm11.cc.15", "bc.wpm11.cc.16", "bc.wpm11.cc.17", "bc.wpm11.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "ODED11": [
+      {
+        "code": "IO",
+        "raw": "Identify outdoor hazards and assess risk levels; apply risk mitigation strategies; make informed decisions about outdoor activities and conditions; respond to emergencies appropriately.",
+        "to": ["bc.oded11.cc.14"],
+        "kind": "reworded"
+      }
+    ],
+    "PHE11": [
+      {
+        "code": "DR",
+        "raw": "Develop, refine, and apply fundamental movement skills in various physical activities; develop and apply movement concepts and strategies in different activities; apply methods for monitoring and adjusting exertion levels; demonstrate safety, fair play, and leadership in physical activities; identify preferred types of physical activity.",
+        "to": ["bc.al11.cc.8", "bc.al11.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "RPA",
+        "raw": "Participate daily in fitness-enhancing physical activity; describe how school, home, and community activities influence health; develop strategies for promoting healthy eating choices; assess factors influencing healthy choices; identify and analyze health message sources and their behavioural influence; identify and apply personal healthy-living goal strategies; reflect on outcomes and assess personal goal strategies.",
+        "to": ["bc.fc11.cc.1", "bc.fc11.cc.2"],
+        "kind": "merged"
+      }
+    ],
+    "CHEM11": [
+      {
+        "code": "DS",
+        "raw": "Demonstrate sustained intellectual curiosity about a scientific topic; make observations to identify questions; formulate multiple hypotheses and predict outcomes.",
+        "to": ["bc.chem11.cc.1", "bc.chem11.cc.2", "bc.chem11.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "IL",
+        "raw": "Interpret local environments; apply First Peoples perspectives; seek patterns and trends; construct and analyze models and diagrams; draw evidence-based conclusions.",
+        "to": ["bc.chem11.cc.8", "bc.chem11.cc.9", "bc.chem11.cc.11", "bc.chem11.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "AM",
+        "raw": "Assess methods and identify errors; improve procedures; evaluate model validity; question bias; consider how knowledge evolves over time.",
+        "to": ["bc.chem11.cc.16", "bc.chem11.cc.18"],
+        "kind": "merged"
+      },
+      {
+        "code": "DP",
+        "raw": "Design projects with real-world connections; solve problems through inquiry; implement multiple strategies; consider the role of scientists in innovation.",
+        "to": ["bc.chem11.cc.25", "bc.chem11.cc.28"],
+        "kind": "merged"
+      },
+      {
+        "code": "FT",
+        "raw": "Formulate theoretical models; communicate scientific ideas with evidence-based arguments using appropriate language and conventions.",
+        "to": ["bc.chem11.cc.29", "bc.chem11.cc.30"],
+        "kind": "merged"
+      }
+    ],
+    "EARTH11": [
+      {
+        "code": "DS",
+        "raw": "Demonstrate sustained intellectual curiosity; formulate hypotheses about natural phenomena; make observations to identify questions.",
+        "to": ["bc.earth11.cc.1", "bc.earth11.cc.2"],
+        "kind": "merged"
+      },
+      {
+        "code": "IP",
+        "raw": "Identify patterns in data; apply scientific concepts to draw evidence-based conclusions; apply First Peoples perspectives.",
+        "to": ["bc.earth11.cc.12", "bc.earth11.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "CE",
+        "raw": "Construct evidence-based arguments using appropriate scientific language and representations.",
+        "to": ["bc.earth11.cc.30"],
+        "kind": "reworded"
+      }
+    ],
+    "ENVSCI11": [
+      {
+        "code": "DS",
+        "raw": "Demonstrate sustained intellectual curiosity; make observations to identify questions; formulate multiple hypotheses.",
+        "to": ["bc.envsci11.cc.1", "bc.envsci11.cc.2", "bc.envsci11.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "IE",
+        "raw": "Interpret environments; apply Indigenous perspectives; seek patterns in data; construct models; draw evidence-based conclusions.",
+        "to": ["bc.envsci11.cc.8", "bc.envsci11.cc.11", "bc.envsci11.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "DP",
+        "raw": "Design projects with local and global connections; contribute to problem-solving through inquiry.",
+        "to": ["bc.envsci11.cc.25", "bc.envsci11.cc.26"],
+        "kind": "merged"
+      },
+      {
+        "code": "FT",
+        "raw": "Formulate theoretical models; communicate scientific ideas using appropriate language and evidence-based arguments.",
+        "to": ["bc.envsci11.cc.29", "bc.envsci11.cc.30"],
+        "kind": "merged"
+      }
+    ],
+    "LS11SCI": [
+      {
+        "code": "DS",
+        "raw": "Demonstrate sustained intellectual curiosity; make observations to identify questions about nature; formulate multiple hypotheses and predict outcomes.",
+        "to": ["bc.ls11sci.cc.1", "bc.ls11sci.cc.2", "bc.ls11sci.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "IL",
+        "raw": "Interpret local environments; apply First Peoples perspectives; identify patterns and trends; construct graphs and models; draw evidence-based conclusions; analyze cause-and-effect relationships.",
+        "to": ["bc.ls11sci.cc.8", "bc.ls11sci.cc.9", "bc.ls11sci.cc.11", "bc.ls11sci.cc.12", "bc.ls11sci.cc.13"],
+        "kind": "merged"
+      },
+      {
+        "code": "AM",
+        "raw": "Assess methods for errors and uncertainties; describe improvements; evaluate model validity; question assumptions and bias; consider evolving knowledge; critically analyze information sources.",
+        "to": ["bc.ls11sci.cc.16", "bc.ls11sci.cc.22"],
+        "kind": "merged"
+      },
+      {
+        "code": "CC",
+        "raw": "Contribute to community care; design collaborative projects with local and global connections; solve real-world problems; consider scientists' roles in innovation.",
+        "to": ["bc.ls11sci.cc.24", "bc.ls11sci.cc.25", "bc.ls11sci.cc.28"],
+        "kind": "merged"
+      },
+      {
+        "code": "FT",
+        "raw": "Formulate theoretical models; construct evidence-based arguments; communicate scientific ideas using appropriate language and conventions.",
+        "to": ["bc.ls11sci.cc.30"],
+        "kind": "reworded"
+      }
+    ],
+    "PHYS11": [
+      {
+        "code": "DS",
+        "raw": "Demonstrate sustained intellectual curiosity; make observations to identify questions about natural phenomena; formulate multiple hypotheses and predict quantitative outcomes.",
+        "to": ["bc.phys11.cc.1", "bc.phys11.cc.2", "bc.phys11.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "IP",
+        "raw": "Identify patterns; construct graphs and diagrams; draw evidence-based conclusions; analyze cause-and-effect relationships using mathematical models.",
+        "to": ["bc.phys11.cc.11", "bc.phys11.cc.12", "bc.phys11.cc.13"],
+        "kind": "merged"
+      },
+      {
+        "code": "AM",
+        "raw": "Assess methods for sources of error; improve investigations; evaluate validity of models; critically analyze information sources.",
+        "to": ["bc.phys11.cc.16", "bc.phys11.cc.22"],
+        "kind": "merged"
+      },
+      {
+        "code": "DS2",
+        "raw": "Design solutions to real-world problems; implement multiple problem-solving strategies; consider the role of scientists in innovation.",
+        "to": ["bc.phys11.cc.27", "bc.phys11.cc.28"],
+        "kind": "merged"
+      },
+      {
+        "code": "C",
+        "raw": "Formulate theoretical models; communicate scientific ideas with evidence-based arguments using appropriate mathematical language.",
+        "to": ["bc.phys11.cc.29", "bc.phys11.cc.30"],
+        "kind": "merged"
+      }
+    ],
+    "SFC11": [
+      {
+        "code": "QAP",
+        "raw": "Demonstrate sustained curiosity about scientific topics of personal, local, or global interest; make observations to identify questions; formulate multiple hypotheses and predict outcomes.",
+        "to": ["bc.sfc11.cc.1", "bc.sfc11.cc.2", "bc.sfc11.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "PAC",
+        "raw": "Collaboratively plan and select appropriate investigation methods; assess risks and ethical issues; use SI units and equipment to collect reliable data; apply accuracy and precision concepts.",
+        "to": ["bc.sfc11.cc.4", "bc.sfc11.cc.5", "bc.sfc11.cc.6", "bc.sfc11.cc.7"],
+        "kind": "merged"
+      },
+      {
+        "code": "PAA",
+        "raw": "Use local and First Peoples knowledge; analyze patterns and trends; construct and interpret graphs and models; draw evidence-based conclusions; analyze cause-and-effect relationships.",
+        "to": ["bc.sfc11.cc.9", "bc.sfc11.cc.11", "bc.sfc11.cc.12", "bc.sfc11.cc.13"],
+        "kind": "merged"
+      },
+      {
+        "code": "AAI",
+        "raw": "Contribute to community care through collaborative approaches; design projects with local and global applications; solve real-world problems; implement multiple strategies.",
+        "to": ["bc.sfc11.cc.24", "bc.sfc11.cc.25"],
+        "kind": "merged"
+      }
+    ],
+    "ESS11": [
+      {
+        "code": "USS",
+        "raw": "Use Social Studies inquiry processes to ask questions, gather and analyze ideas, and communicate findings.",
+        "to": ["bc.ess11.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "S",
+        "raw": "Assess the significance of people, places, events, phenomena, ideas, or developments.",
+        "to": ["bc.ess11.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "E",
+        "raw": "Assess the credibility and justifiability of evidence, data, and interpretations.",
+        "to": ["bc.ess11.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CAC",
+        "raw": "Compare and contrast continuities and changes, trends and patterns for different people or developments.",
+        "to": ["bc.ess11.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CAC2",
+        "raw": "Assess the short- and long-term causes and expected and unexpected consequences of actions and developments.",
+        "to": ["bc.ess11.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "P",
+        "raw": "Infer and explain different perspectives on people, places, events, or developments.",
+        "to": ["bc.ess11.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "EJ",
+        "raw": "Make reasoned ethical judgments and determine appropriate ways to respond.",
+        "to": ["bc.ess11.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "BCA12": [
+      {
+        "code": "AD3",
+        "raw": "Design integrated business solutions using multiple software applications",
+        "to": ["bc.bca12.cc.18"],
+        "kind": "reworded"
+      }
+    ],
+    "CIS12": [
+      {
+        "code": "CI",
+        "raw": "Use Social Studies inquiry processes and Indigenous principles of learning to investigate issues and communicate findings.",
+        "to": ["bc.cis12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "IL",
+        "raw": "Assess and compare the significance of interconnections between people, places, and events in Indigenous contexts.",
+        "to": ["bc.cis12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Ask questions and corroborate inferences using Indigenous knowledge and a variety of sources.",
+        "to": ["bc.cis12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SA",
+        "raw": "Compare and contrast continuities and changes for Indigenous groups across time and place.",
+        "to": ["bc.cis12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "MP",
+        "raw": "Explain different perspectives on Indigenous issues from Indigenous and non-Indigenous viewpoints.",
+        "to": ["bc.cis12.cc.7"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CF",
+        "raw": "Make reasoned ethical claims about actions in the past and present related to Indigenous peoples.",
+        "to": ["bc.cis12.cc.8"],
+        "kind": "reworded"
+      }
+    ],
+    "ECON12": [
+      {
+        "code": "CI",
+        "raw": "Use Social Studies inquiry to investigate economic theories and their social impacts.",
+        "to": ["bc.econ12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "EA",
+        "raw": "Assess the significance of theoretical developments in economic thought.",
+        "to": ["bc.econ12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "EA1",
+        "raw": "Compare and contrast continuities and changes in economic thought over time.",
+        "to": ["bc.econ12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "MP",
+        "raw": "Explain different perspectives on economic issues through worldviews and belief systems.",
+        "to": ["bc.econ12.cc.7"],
+        "kind": "reworded"
+      },
+      {
+        "code": "EAB",
+        "raw": "Make reasoned ethical judgments about the application of economic theories.",
+        "to": ["bc.econ12.cc.8"],
+        "kind": "reworded"
+      }
+    ],
+    "SA2D12": [
+      {
+        "code": "TEE",
+        "raw": "Demonstrate the highest level of technical mastery in 2D media; develop a cohesive body of work reflecting a personal artistic vision; take sophisticated and purposeful creative risks.",
+        "to": ["bc.sa2d12.cc.17", "bc.sa2d12.cc.3"],
+        "kind": "merged"
+      }
+    ],
+    "SA3D12": [
+      {
+        "code": "VD",
+        "raw": "Reflect on artistic development and personal voice",
+        "to": ["bc.sa3d12.cc.17"],
+        "kind": "reworded"
+      }
+    ],
+    "CLC12": [
+      {
+        "code": "PEW",
+        "raw": "Recognize personal worldviews and perspectives, considering their influence on values, actions, and preferred futures; analyze internal and external factors to inform personal career-life choices for post-graduation planning; assess personal transferable skills, and identify strengths and those requiring refinement; explore and evaluate personal strategies to maintain well-being.",
+        "to": ["bc.clc12.cc.1", "bc.clc12.cc.2", "bc.clc12.cc.3", "bc.clc12.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "COL",
+        "raw": "Collaborate with a mentor to inform career-life development and exploration; engage with personal, education, and employment networks to cultivate post-graduation resources and social capital; create and critique personal and public profiles for self-advocacy and marketing; demonstrate and reflect on inclusive, respectful, and safe interactions in multiple career-life contexts.",
+        "to": ["bc.clc12.cc.5", "bc.clc12.cc.6", "bc.clc12.cc.7", "bc.clc12.cc.8"],
+        "kind": "merged"
+      },
+      {
+        "code": "POP",
+        "raw": "Explore possibilities for preferred personal and education/employment futures; identify and apply preferred approaches to learning for ongoing development; engage in, reflect on, and evaluate career-life exploration.",
+        "to": ["bc.clc12.cc.9", "bc.clc12.cc.10", "bc.clc12.cc.11"],
+        "kind": "merged"
+      },
+      {
+        "code": "EXR",
+        "raw": "Reflect on experiences and assess Core Competencies development; design, assemble, and present a Capstone Project.",
+        "to": ["bc.clc12.cc.12", "bc.clc12.cc.13"],
+        "kind": "merged"
+      }
+    ],
+    "CW12": [
+      {
+        "code": "REE",
+        "raw": "Read for enjoyment and personal goals; understand and appreciate First Peoples perspectives, diversity, and land/place influence.",
+        "to": ["bc.cw12.cc.1", "bc.cw12.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "USI",
+        "raw": "Use information for diverse purposes; evaluate relevance, accuracy, and reliability; understand how forms and features reflect purposes; think critically and creatively to analyze ideas.",
+        "to": ["bc.cw12.cc.5", "bc.cw12.cc.6", "bc.cw12.cc.7", "bc.cw12.cc.8"],
+        "kind": "merged"
+      },
+      {
+        "code": "IDU",
+        "raw": "Identify and understand contexts, values, and perspectives; understand how language constructs identities; construct connections; evaluate literary elements.",
+        "to": ["bc.cw12.cc.9", "bc.cw12.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "REA",
+        "raw": "Respectfully exchange ideas from diverse perspectives to build shared understanding and transform thinking; respond to text in personal, creative, and critical ways.",
+        "to": ["bc.cw12.cc.13", "bc.cw12.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "SEA",
+        "raw": "Select and apply speaking and listening skills in varied contexts; use writing and design processes; express and support opinions with evidence; assess and refine texts; manipulate language purposefully; use figurative and literal language; use writers' practices.",
+        "to": ["bc.cw12.cc.15", "bc.cw12.cc.18", "bc.cw12.cc.19", "bc.cw12.cc.23", "bc.cw12.cc.24", "bc.cw12.cc.25"],
+        "kind": "merged"
+      },
+      {
+        "code": "USC",
+        "raw": "Use Canadian conventions proficiently; use acknowledgements and citations; transform ideas to create original texts using varied genres, forms, structures, and styles.",
+        "to": ["bc.cw12.cc.20", "bc.cw12.cc.21", "bc.cw12.cc.22"],
+        "kind": "merged"
+      }
+    ],
+    "EFP12": [
+      {
+        "code": "HOF",
+        "raw": "Analyze how First Peoples languages and texts reflect their cultures, knowledge, histories, and worldviews.",
+        "to": ["bc.efp12.cc.1"],
+        "kind": "exact"
+      },
+      {
+        "code": "ACI",
+        "raw": "Access information for diverse purposes from various sources; evaluate relevance, accuracy, and reliability; apply comprehension strategies; analyze how different forms and features reflect purposes, audiences, and messages.",
+        "to": ["bc.efp12.cc.2", "bc.efp12.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "THC",
+        "raw": "Think critically, creatively, and reflectively; recognize personal, social, and cultural contexts; understand how language constructs and reflects identities; construct meaningful personal connections; evaluate literary elements; analyze diversity within First Peoples societies; assess authenticity; analyze influence of land/place; examine significance of First Peoples language terms; discern nuanced word meanings; identify bias, contradictions, distortions, and omissions.",
+        "to": [
+          "bc.efp12.cc.5",
+          "bc.efp12.cc.6",
+          "bc.efp12.cc.7",
+          "bc.efp12.cc.8",
+          "bc.efp12.cc.11",
+          "bc.efp12.cc.12",
+          "bc.efp12.cc.13",
+          "bc.efp12.cc.14",
+          "bc.efp12.cc.15",
+          "bc.efp12.cc.16"
+        ],
+        "kind": "merged"
+      },
+      {
+        "code": "REE",
+        "raw": "Respectfully exchange ideas and viewpoints from diverse perspectives; demonstrate speaking and listening skills; select and apply appropriate oral communication formats; express and support opinions with evidence.",
+        "to": ["bc.efp12.cc.17", "bc.efp12.cc.18", "bc.efp12.cc.19", "bc.efp12.cc.20"],
+        "kind": "merged"
+      },
+      {
+        "code": "RET",
+        "raw": "Respond to texts personally, creatively, and critically; use writing and design processes; assess and refine texts; experiment with genres, forms, and styles.",
+        "to": ["bc.efp12.cc.21", "bc.efp12.cc.23", "bc.efp12.cc.24"],
+        "kind": "merged"
+      },
+      {
+        "code": "USC",
+        "raw": "Use conventions of First Peoples and Canadian spelling, syntax, and diction appropriately; transform ideas and information to create original texts; recognize intellectual property rights and community protocols.",
+        "to": ["bc.efp12.cc.25", "bc.efp12.cc.26", "bc.efp12.cc.27"],
+        "kind": "merged"
+      }
+    ],
+    "ES12": [
+      {
+        "code": "REE",
+        "raw": "Read for enjoyment and achievement; recognize First Peoples perspectives, diversity, and land/place influence.",
+        "to": ["bc.es12.cc.1", "bc.es12.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "REA",
+        "raw": "Evaluate relevance, accuracy, and reliability of texts; apply comprehension strategies in varied contexts to guide inquiry and transform thinking.",
+        "to": ["bc.es12.cc.6", "bc.es12.cc.7"],
+        "kind": "merged"
+      },
+      {
+        "code": "LIA",
+        "raw": "Understand and appreciate how different forms and features reflect purposes and messages; think critically and creatively to analyze ideas within, between, and beyond texts.",
+        "to": ["bc.es12.cc.8", "bc.es12.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "PEA",
+        "raw": "Recognize and analyze personal, social, cultural contexts; appreciate how language constructs identities; construct meaningful personal connections; analyze literary elements; discern nuanced word meanings; identify bias, contradictions, omissions.",
+        "to": ["bc.es12.cc.11", "bc.es12.cc.12", "bc.es12.cc.15"],
+        "kind": "merged"
+      },
+      {
+        "code": "REI",
+        "raw": "Respectfully exchange ideas from diverse perspectives to build shared understanding and transform thinking.",
+        "to": ["bc.es12.cc.16"],
+        "kind": "reworded"
+      },
+      {
+        "code": "RET",
+        "raw": "Respond to text personally, creatively, and critically; select and apply appropriate speaking and listening skills; demonstrate formal and informal communication.",
+        "to": ["bc.es12.cc.17", "bc.es12.cc.18"],
+        "kind": "merged"
+      },
+      {
+        "code": "USW",
+        "raw": "Use writing and design processes; express and support opinions with evidence to achieve purpose; reflect, assess, and refine texts.",
+        "to": ["bc.es12.cc.20", "bc.es12.cc.21"],
+        "kind": "merged"
+      },
+      {
+        "code": "USC",
+        "raw": "Use Canadian spelling, grammar, and punctuation proficiently; use citations; transform ideas to create original texts using varied genres, forms, structures, and styles.",
+        "to": ["bc.es12.cc.22", "bc.es12.cc.24"],
+        "kind": "merged"
+      }
+    ],
+    "LS12": [
+      {
+        "code": "REE",
+        "raw": "Read for enjoyment and personal goals; understand and appreciate First Peoples perspectives, diversity, and land/place influence.",
+        "to": ["bc.ls12.cc.1", "bc.ls12.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "USI",
+        "raw": "Use information for diverse purposes; evaluate relevance, accuracy, and reliability; select and apply appropriate strategies to comprehend, guide inquiry, and transform thinking.",
+        "to": ["bc.ls12.cc.5", "bc.ls12.cc.6", "bc.ls12.cc.7"],
+        "kind": "merged"
+      },
+      {
+        "code": "LIA",
+        "raw": "Understand and appreciate how different forms and features reflect purposes; think critically and creatively to analyze ideas within, between, and beyond texts.",
+        "to": ["bc.ls12.cc.8", "bc.ls12.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "PEA",
+        "raw": "Recognize and analyze personal, social, cultural contexts; understand how language constructs identities; construct connections; analyze literary elements; recognize text structures; discern nuanced word meanings.",
+        "to": ["bc.ls12.cc.10", "bc.ls12.cc.11", "bc.ls12.cc.14", "bc.ls12.cc.15"],
+        "kind": "merged"
+      },
+      {
+        "code": "REA",
+        "raw": "Respectfully exchange ideas from diverse perspectives to build shared understanding and transform thinking.",
+        "to": ["bc.ls12.cc.16"],
+        "kind": "reworded"
+      },
+      {
+        "code": "RET",
+        "raw": "Respond to text personally, creatively, and critically; select and apply speaking and listening skills for varied formal and informal contexts; use writing and design processes.",
+        "to": ["bc.ls12.cc.17", "bc.ls12.cc.18"],
+        "kind": "merged"
+      },
+      {
+        "code": "EXS",
+        "raw": "Express and support opinions with evidence; reflect, assess, and refine texts; use conventions proficiently; use citations; transform ideas to create original texts.",
+        "to": ["bc.ls12.cc.20", "bc.ls12.cc.21", "bc.ls12.cc.24"],
+        "kind": "merged"
+      }
+    ],
+    "APPM12": [
+      {
+        "code": "USL",
+        "raw": "Use logic and patterns to solve puzzles and play games; use reasoning and logic to explore, analyze, and apply mathematical ideas; estimate reasonably; demonstrate and apply mental math strategies; use tools or technology to explore and create patterns and relationships; model mathematics in contextualized experiences.",
+        "to": ["bc.appm12.cc.1", "bc.appm12.cc.2", "bc.appm12.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "MUS",
+        "raw": "Apply multiple strategies to solve problems in both abstract and contextualized situations; develop, demonstrate, and apply mathematical understanding through play, inquiry, and problem solving; visualize to explore mathematical concepts; engage in problem-solving experiences that are connected to place, story, cultural practices, and perspectives.",
+        "to": ["bc.appm12.cc.6", "bc.appm12.cc.7", "bc.appm12.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "USM",
+        "raw": "Use mathematical vocabulary and language to contribute to mathematical discussions; explain and justify mathematical ideas and decisions; communicate mathematical thinking in many ways; represent mathematical ideas in concrete, pictorial, and symbolic forms.",
+        "to": ["bc.appm12.cc.13", "bc.appm12.cc.11", "bc.appm12.cc.15", "bc.appm12.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "MAT",
+        "raw": "Reflect on mathematical thinking; connect mathematical concepts to each other and to other areas and personal interests; use mathematical arguments to support personal choices; incorporate First Peoples worldviews and perspectives to make connections to mathematical concepts.",
+        "to": ["bc.appm12.cc.15", "bc.appm12.cc.16", "bc.appm12.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "CALC12": [
+      {
+        "code": "THS",
+        "raw": "Develop thinking strategies to solve puzzles and play games; explore, analyze, and apply mathematical ideas using reason, technology, and tools; estimate reasonably and demonstrate fluent, flexible thinking about number; model with mathematics in situational contexts; think creatively with curiosity.",
+        "to": ["bc.calc12.cc.1", "bc.calc12.cc.2", "bc.calc12.cc.3", "bc.calc12.cc.4", "bc.calc12.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "COU",
+        "raw": "Develop conceptual understanding through play, story, inquiry, and problem solving; visualize to explore and illustrate mathematical concepts; apply flexible and strategic approaches to solve problems; solve with persistence and positive disposition; engage in place-based problem-solving.",
+        "to": ["bc.calc12.cc.6", "bc.calc12.cc.7", "bc.calc12.cc.8", "bc.calc12.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "EXJ",
+        "raw": "Explain and justify mathematical ideas and decisions in multiple ways; represent mathematical ideas in concrete, pictorial, and symbolic forms; use mathematical vocabulary in discussions; take risks when offering ideas.",
+        "to": ["bc.calc12.cc.11", "bc.calc12.cc.12", "bc.calc12.cc.13", "bc.calc12.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "MAT",
+        "raw": "Reflect on mathematical thinking; connect mathematical concepts with each other and personal interests; use mistakes as opportunities to advance learning; incorporate First Peoples worldviews and practices.",
+        "to": ["bc.calc12.cc.15", "bc.calc12.cc.16", "bc.calc12.cc.17", "bc.calc12.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "FOM12": [
+      {
+        "code": "THS",
+        "raw": "Develop thinking strategies to solve puzzles and play games; explore, analyze, and apply mathematical ideas using reason, technology, and other tools; estimate reasonably; model with mathematics in situational contexts; think creatively with curiosity.",
+        "to": ["bc.fom12.cc.1", "bc.fom12.cc.2", "bc.fom12.cc.4", "bc.fom12.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "DED",
+        "raw": "Develop, demonstrate, and apply mathematical understanding through play, story, inquiry, and problem solving; visualize to explore and illustrate mathematical concepts; apply flexible and strategic approaches; solve with persistence and positive disposition; engage in place-based problem-solving.",
+        "to": ["bc.fom12.cc.6", "bc.fom12.cc.7", "bc.fom12.cc.8", "bc.fom12.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "EXJ",
+        "raw": "Explain and justify mathematical ideas and decisions in many ways; represent mathematical ideas in concrete, pictorial, and symbolic forms; use mathematical vocabulary; take risks when offering ideas.",
+        "to": ["bc.fom12.cc.11", "bc.fom12.cc.12", "bc.fom12.cc.13", "bc.fom12.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "MAT",
+        "raw": "Reflect on mathematical thinking; connect concepts with each other, other areas, and personal interests; use mistakes as opportunities to advance learning; incorporate First Peoples worldviews, perspectives, knowledge, and practices.",
+        "to": ["bc.fom12.cc.15", "bc.fom12.cc.16", "bc.fom12.cc.17", "bc.fom12.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "GEO12": [
+      {
+        "code": "QAP",
+        "raw": "Sustain intellectual curiosity; make observations to identify questions; formulate multiple hypotheses.",
+        "to": ["bc.geo12.cc.2", "bc.geo12.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "IP",
+        "raw": "Classify and interpret data; apply First Peoples perspectives; analyze patterns and relationships; construct and interpret models.",
+        "to": ["bc.geo12.cc.9", "bc.geo12.cc.13", "bc.geo12.cc.11"],
+        "kind": "merged"
+      },
+      {
+        "code": "EM",
+        "raw": "Evaluate methods and identify errors; improve investigation quality; assess validity of models; consider ethical implications.",
+        "to": ["bc.geo12.cc.15", "bc.geo12.cc.21"],
+        "kind": "merged"
+      },
+      {
+        "code": "SC",
+        "raw": "Formulate theoretical models; communicate scientific ideas with evidence; express perspectives through place-based connections.",
+        "to": ["bc.geo12.cc.29", "bc.geo12.cc.31"],
+        "kind": "merged"
+      }
+    ],
+    "PC12": [
+      {
+        "code": "THS",
+        "raw": "Develop thinking strategies to solve puzzles and games; explore, analyze, and apply mathematical ideas using reason, technology, and tools; estimate reasonably and demonstrate fluent, flexible, strategic thinking about numbers; model mathematics in situational contexts; think creatively with curiosity and wonder.",
+        "to": ["bc.pc12.cc.1", "bc.pc12.cc.2", "bc.pc12.cc.3", "bc.pc12.cc.4", "bc.pc12.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "COU",
+        "raw": "Develop conceptual understanding through play, story, inquiry, and problem solving; visualize to explore mathematical concepts and relationships; apply flexible and strategic approaches to solve problems; solve with persistence and positive disposition; engage in place-based problem-solving.",
+        "to": ["bc.pc12.cc.6", "bc.pc12.cc.7", "bc.pc12.cc.8", "bc.pc12.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "EXJ",
+        "raw": "Explain and justify mathematical ideas and decisions in many ways; represent mathematical ideas in concrete, pictorial, and symbolic forms; use mathematical vocabulary in discussions; take risks when offering ideas in discourse.",
+        "to": ["bc.pc12.cc.11", "bc.pc12.cc.12", "bc.pc12.cc.13", "bc.pc12.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "MAT",
+        "raw": "Reflect on mathematical thinking; connect mathematical concepts with each other, other areas, and personal interests; use mistakes as opportunities to advance learning; incorporate First Peoples worldviews, perspectives, knowledge, and practices.",
+        "to": ["bc.pc12.cc.15", "bc.pc12.cc.16", "bc.pc12.cc.17", "bc.pc12.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "WPM12": [
+      {
+        "code": "THS",
+        "raw": "Develop thinking strategies; explore and apply mathematical ideas using reason, technology, and tools; estimate reasonably; model with mathematics in situational contexts; think creatively with curiosity.",
+        "to": ["bc.wpm11.cc.1", "bc.wpm11.cc.2", "bc.wpm11.cc.4", "bc.wpm11.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "COU",
+        "raw": "Develop and apply conceptual understanding through inquiry and problem solving; visualize mathematical concepts; apply flexible and strategic approaches; solve with persistence; engage in place-based problem-solving.",
+        "to": ["bc.wpm11.cc.6", "bc.wpm11.cc.7", "bc.wpm11.cc.8", "bc.wpm11.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "EXJ",
+        "raw": "Explain and justify mathematical ideas in many ways; represent ideas in concrete, pictorial, and symbolic forms; use mathematical vocabulary; take risks in discourse.",
+        "to": ["bc.wpm11.cc.11", "bc.wpm11.cc.12", "bc.wpm11.cc.13", "bc.wpm11.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "MAT",
+        "raw": "Reflect on mathematical thinking; connect concepts with each other and personal interests; use mistakes as learning opportunities; incorporate First Peoples worldviews, perspectives, knowledge, and practices.",
+        "to": ["bc.wpm11.cc.15", "bc.wpm11.cc.16", "bc.wpm11.cc.17", "bc.wpm11.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "AL12": [
+      {
+        "code": "BAP",
+        "raw": "Understand barriers to physical activity participation; adapt activities and environments for accessibility; support people with different abilities and health conditions; promote equity in physical activity.",
+        "to": ["bc.al12.cc.6"],
+        "kind": "reworded"
+      }
+    ],
+    "PHE12": [
+      {
+        "code": "PAD",
+        "raw": "Participate daily in fitness-enhancing physical activity; describe how school, home, and community activities influence health; develop strategies for promoting healthy eating choices; assess factors influencing healthy choices; identify and analyze health message sources and their behavioural influence; identify and apply personal healthy-living goal strategies; reflect on outcomes and assess personal goal strategies.",
+        "to": ["bc.fc12.cc.1", "bc.fc12.cc.2"],
+        "kind": "merged"
+      }
+    ],
+    "ANAT12": [
+      {
+        "code": "SUI",
+        "raw": "Demonstrate sustained intellectual curiosity; formulate multiple hypotheses about scientific topics.",
+        "to": ["bc.anat12.cc.1", "bc.anat12.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "COD",
+        "raw": "Collaboratively design investigations using appropriate methods and SI units while assessing risks.",
+        "to": ["bc.anat12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "PAD",
+        "raw": "Seek patterns in data; construct graphs; draw evidence-based conclusions.",
+        "to": ["bc.anat12.cc.11", "bc.anat12.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "ASM",
+        "raw": "Assess methods for errors; evaluate model validity; critically analyze information sources.",
+        "to": ["bc.anat12.cc.16", "bc.anat12.cc.22"],
+        "kind": "merged"
+      },
+      {
+        "code": "STS",
+        "raw": "Implement strategies to solve problems with local or global applications.",
+        "to": ["bc.anat12.cc.27"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SCI",
+        "raw": "Present scientific ideas using evidence-based arguments and appropriate scientific language.",
+        "to": ["bc.anat12.cc.30"],
+        "kind": "reworded"
+      }
+    ],
+    "BIO12": [
+      {
+        "code": "SUI",
+        "raw": "Demonstrate a sustained intellectual curiosity about a scientific topic or problem of personal interest; make observations aimed at identifying their own questions, including increasingly complex ones, about the natural world; formulate multiple hypotheses and predict multiple outcomes.",
+        "to": ["bc.anat12.cc.1", "bc.anat12.cc.2", "bc.anat12.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "INM",
+        "raw": "Collaboratively and individually plan, select, and use appropriate investigation methods, including field work and lab experiments, to collect reliable data; assess risks and address ethical, cultural, and environmental issues associated with their proposed methods; use appropriate SI units and apply significant figures conventions; and record and organize data using a range of tools.",
+        "to": ["bc.anat12.cc.4", "bc.anat12.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "ENA",
+        "raw": "Experience and interpret the local environment; apply First Peoples perspectives and knowledge, other ways of knowing, and local knowledge as sources of information; seek and analyze patterns, trends, and connections in data, including describing relationships between variables, and identifying inconsistencies; construct, analyze, and interpret graphs, models, and diagrams; use knowledge of scientific concepts to draw conclusions consistent with evidence.",
+        "to": ["bc.anat12.cc.8", "bc.anat12.cc.9", "bc.anat12.cc.10", "bc.anat12.cc.11", "bc.anat12.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "MEE",
+        "raw": "Evaluate their methods and experimental conditions, including identifying sources of error or uncertainty, confounding variables, and limitations; describe specific ways to improve their investigation methods; evaluate the validity and limitations of a model; and demonstrate an understanding of the importance of peer review.",
+        "to": ["bc.anat12.cc.14", "bc.anat12.cc.15", "bc.anat12.cc.16"],
+        "kind": "merged"
+      },
+      {
+        "code": "COC",
+        "raw": "Contribute to care for self, others, and community through personal or collaborative approaches; transfer and apply learning to new situations; generate and introduce new or refined ideas when problem solving; and contribute to finding solutions to problems at a local and/or global level.",
+        "to": ["bc.anat12.cc.24", "bc.anat12.cc.26"],
+        "kind": "merged"
+      }
+    ],
+    "CHEM12": [
+      {
+        "code": "QAP",
+        "raw": "Sustain intellectual curiosity; make observations to identify questions; formulate multiple hypotheses and predict outcomes.",
+        "to": ["bc.chem12.cc.2", "bc.chem12.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "IG",
+        "raw": "Interpret environments; apply First Peoples perspectives; seek patterns in data; construct and analyze graphs and models; draw evidence-based conclusions.",
+        "to": ["bc.chem12.cc.8", "bc.chem12.cc.9", "bc.chem12.cc.11", "bc.chem12.cc.12"],
+        "kind": "merged"
+      }
+    ],
+    "ENVSCI12": [
+      {
+        "code": "QAP",
+        "raw": "Demonstrate sustained intellectual curiosity about scientific topics of personal, local, or global interest; make observations to identify questions; formulate multiple hypotheses and predict outcomes.",
+        "to": ["bc.envsci12.cc.1", "bc.envsci12.cc.2", "bc.envsci12.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "PI",
+        "raw": "Collaboratively plan and select appropriate investigation methods; assess risks and ethical issues; use SI units and equipment systematically; apply accuracy and precision concepts.",
+        "to": ["bc.envsci12.cc.4", "bc.envsci12.cc.5", "bc.envsci12.cc.7"],
+        "kind": "merged"
+      },
+      {
+        "code": "IG",
+        "raw": "Interpret local environments; apply First Peoples perspectives; analyze patterns and trends; construct and interpret graphs; draw evidence-based conclusions; analyze cause-and-effect relationships.",
+        "to": ["bc.envsci12.cc.8", "bc.envsci12.cc.9", "bc.envsci12.cc.11", "bc.envsci12.cc.12", "bc.envsci12.cc.13"],
+        "kind": "merged"
+      },
+      {
+        "code": "EM",
+        "raw": "Assess methods and identify error sources; improve investigation quality; evaluate model validity; recognize bias; connect to science careers; critically analyze information sources.",
+        "to": ["bc.envsci12.cc.15", "bc.envsci12.cc.16", "bc.envsci12.cc.19", "bc.envsci12.cc.22"],
+        "kind": "merged"
+      },
+      {
+        "code": "DP",
+        "raw": "Contribute to community care; design projects with local and global connections; solve real-life problems; consider scientists' roles in innovation.",
+        "to": ["bc.envsci12.cc.24", "bc.envsci12.cc.25", "bc.envsci12.cc.27", "bc.envsci12.cc.28"],
+        "kind": "merged"
+      }
+    ],
+    "PHYS12": [
+      {
+        "code": "QAP",
+        "raw": "Demonstrate sustained intellectual curiosity; formulate multiple hypotheses about natural phenomena; predict quantitative outcomes.",
+        "to": ["bc.phys12.cc.1", "bc.phys12.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "IG",
+        "raw": "Seek patterns in data; construct and interpret graphs and models; draw evidence-based conclusions.",
+        "to": ["bc.phys12.cc.11", "bc.phys12.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "EM",
+        "raw": "Assess experimental methods; identify error sources; evaluate model validity; consider social and ethical implications.",
+        "to": ["bc.phys12.cc.16", "bc.phys12.cc.21"],
+        "kind": "merged"
+      }
+    ],
+    "HIST12": [
+      {
+        "code": "HI",
+        "raw": "Use historical inquiry to ask questions, gather, interpret, and analyze ideas, and communicate findings.",
+        "to": ["bc.hist12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HD",
+        "raw": "Assess the significance of people, locations, events, and developments in 20th century world history.",
+        "to": ["bc.hist12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Assess the justification for competing historical accounts by investigating source reliability and adequacy of evidence.",
+        "to": ["bc.hist12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SA",
+        "raw": "Compare and contrast continuities and changes for different groups at particular times and places.",
+        "to": ["bc.hist12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Assess how underlying conditions and the actions of individuals or groups affect events, decisions, and developments.",
+        "to": ["bc.hist12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF1",
+        "raw": "Explain different perspectives on past or present people, places, issues, and events.",
+        "to": ["bc.hist12.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Make reasoned ethical judgments about controversial actions in the past or present.",
+        "to": ["bc.hist12.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "ASIA12": [
+      {
+        "code": "CI",
+        "raw": "Use Social Studies inquiry processes to investigate Asian history, culture, and contemporary issues.",
+        "to": ["bc.asia12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HD",
+        "raw": "Assess the significance of people, locations, events, or developments in Asian history and contemporary affairs.",
+        "to": ["bc.asia12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Assess competing accounts of Asian history and current events by evaluating source reliability.",
+        "to": ["bc.asia12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SA",
+        "raw": "Compare and contrast continuities and changes across Asian nations and peoples.",
+        "to": ["bc.asia12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Assess how conditions and the actions of groups affect events in Asia.",
+        "to": ["bc.asia12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "MP",
+        "raw": "Explain different perspectives on Asian history and contemporary issues.",
+        "to": ["bc.asia12.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CE",
+        "raw": "Make reasoned ethical judgments about actions in Asian history and contemporary affairs.",
+        "to": ["bc.asia12.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "BCFP12": [
+      {
+        "code": "RR",
+        "raw": "Draw conclusions, assess positions, demonstrate leadership, identify problems, evaluate data, interpret maps/graphs/tables, cite sources, construct visual representations.",
+        "to": ["bc.bcfp12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Assess the significance of people, events, places, issues, or developments in the past and present. Identify what creators of accounts, narratives, or maps have determined to be significant.",
+        "to": ["bc.bcfp12.cc.2", "bc.bcfp12.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "HA",
+        "raw": "Characterize different time periods in BC First Peoples history and identify key turning points.",
+        "to": ["bc.bcfp12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "MC5",
+        "raw": "Assess the connectedness and reciprocal relationship between people and place.",
+        "to": ["bc.bcfp12.cc.7"],
+        "kind": "reworded"
+      },
+      {
+        "code": "MR",
+        "raw": "Make reasoned ethical judgments and assess appropriate ways to remember, reconcile, or respond.",
+        "to": ["bc.bcfp12.cc.10"],
+        "kind": "reworded"
+      }
+    ],
+    "CC12": [
+      {
+        "code": "CI",
+        "raw": "Use Social Studies inquiry processes to investigate cultures and communicate findings.",
+        "to": ["bc.cc12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CS",
+        "raw": "Assess and compare the significance of cultural expressions at particular times and places.",
+        "to": ["bc.cc12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Evaluate inferences about cultural artifacts and sources: content, origins, purposes, context.",
+        "to": ["bc.cc12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CA",
+        "raw": "Analyze continuities and changes in diverse cultures.",
+        "to": ["bc.cc12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CF",
+        "raw": "Explain different perspectives on past and present cultures.",
+        "to": ["bc.cc12.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CE",
+        "raw": "Make reasoned ethical judgments about cultural actions and appropriate ways to remember and respond.",
+        "to": ["bc.cc12.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "REL12": [
+      {
+        "code": "CI",
+        "raw": "Use Social Studies inquiry to investigate religious traditions and communicate findings respectfully.",
+        "to": ["bc.rel12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "US",
+        "raw": "Explain the significance of texts, philosophies, events, or developments within belief systems.",
+        "to": ["bc.rel12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Compare and evaluate religious artifacts as evidence of cultural influence.",
+        "to": ["bc.rel12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Assess the origins and influences of religious movements and groups.",
+        "to": ["bc.rel12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CF",
+        "raw": "Explain different religious perspectives on past or present people, places, issues, or events.",
+        "to": ["bc.rel12.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "PS",
+        "raw": "Assess the accuracy of religious representations in media and popular culture.",
+        "to": ["bc.rel12.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "GEN12": [
+      {
+        "code": "HA",
+        "raw": "Assess the significance of genocides and compare how different groups view their historical importance.",
+        "to": ["bc.gen12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Evaluate the credibility and reliability of sources on genocide, including survivor testimony and denial claims.",
+        "to": ["bc.gen12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Assess the causes and consequences of genocide, distinguishing intended from unintended outcomes.",
+        "to": ["bc.gen12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "MP",
+        "raw": "Explain differing perspectives on genocide through norms, values, worldviews, and beliefs.",
+        "to": ["bc.gen12.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SA",
+        "raw": "Make reasoned ethical judgments about genocide, considering historical context.",
+        "to": ["bc.gen12.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "HGEO12": [
+      {
+        "code": "CI",
+        "raw": "Use geographic inquiry processes to ask questions and analyze data from multiple sources.",
+        "to": ["bc.hgeo12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Assess the significance of places by identifying their physical and human characteristics.",
+        "to": ["bc.hgeo12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Assess geographic evidence and interpretations by investigating source reliability.",
+        "to": ["bc.hgeo12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SA",
+        "raw": "Draw conclusions about variation and distribution of geographic phenomena over time and space.",
+        "to": ["bc.hgeo12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CE",
+        "raw": "Evaluate how geographic actions and events influence human practices and outcomes.",
+        "to": ["bc.hgeo12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CE1",
+        "raw": "Evaluate what makes geographic phenomena or locations worthy of attention.",
+        "to": ["bc.hgeo12.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SP",
+        "raw": "Identify and assess how human and environmental factors influence each other.",
+        "to": ["bc.hgeo12.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "LAW12": [
+      {
+        "code": "CI",
+        "raw": "Use Social Studies inquiry processes to ask questions and analyze legal concepts, issues, and procedures.",
+        "to": ["bc.law12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "EE",
+        "raw": "Assess and compare the significance and impact of legal systems or codes.",
+        "to": ["bc.law12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CA",
+        "raw": "Analyze continuities and changes in legal systems across jurisdictions.",
+        "to": ["bc.law12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "MP",
+        "raw": "Explain and infer multiple perspectives on legal systems or codes.",
+        "to": ["bc.law12.cc.6"],
+        "kind": "reworded"
+      }
+    ],
+    "PHIL12": [
+      {
+        "code": "CI",
+        "raw": "Use philosophical inquiry and reasoning skills to engage with arguments and questions.",
+        "to": ["bc.phil12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "EE",
+        "raw": "Assess the relevance of philosophical ideas for everyday life and current social/political issues.",
+        "to": ["bc.phil12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CP",
+        "raw": "Analyze philosophical ideas, assess their significance, and compare justifications for different perspectives.",
+        "to": ["bc.phil12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SA",
+        "raw": "Compare continuity, change, and divergence across philosophical ideas, disciplines, and schools of thought.",
+        "to": ["bc.phil12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "MP",
+        "raw": "Explain different philosophical perspectives considering norms, values, worldviews, and beliefs.",
+        "to": ["bc.phil12.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "PGEO12": [
+      {
+        "code": "CI",
+        "raw": "Use geographic inquiry and literacy skills to investigate Earth's physical systems.",
+        "to": ["bc.pgeo12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Assess interpretations of geographic evidence by investigating source reliability.",
+        "to": ["bc.pgeo12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Assess the significance of places by identifying their physical features.",
+        "to": ["bc.pgeo12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SA",
+        "raw": "Draw conclusions about variation and distribution of physical geographic phenomena.",
+        "to": ["bc.pgeo12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CE",
+        "raw": "Evaluate how geographic events and actions affect human practices.",
+        "to": ["bc.pgeo12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SP",
+        "raw": "Identify and assess how human and environmental factors influence each other.",
+        "to": ["bc.pgeo12.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "POL12": [
+      {
+        "code": "CI",
+        "raw": "Use Social Studies inquiry processes to investigate political issues and communicate findings.",
+        "to": ["bc.pol12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Assess the significance of political issues, ideologies, decisions, and forces.",
+        "to": ["bc.pol12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LFB",
+        "raw": "Assess how underlying conditions and the actions of individuals or groups affect political events and outcomes.",
+        "to": ["bc.pol12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LFC",
+        "raw": "Explain and infer different perspectives on political systems and events.",
+        "to": ["bc.pol12.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "US",
+        "raw": "Make reasoned ethical judgments about political decisions and systems.",
+        "to": ["bc.pol12.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "SJ12": [
+      {
+        "code": "CI",
+        "raw": "Use Social Studies inquiry processes to investigate social justice issues and communicate findings.",
+        "to": ["bc.sj12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Assess and compare the significance of people, events, or developments regarding social justice.",
+        "to": ["bc.sj12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Assess competing accounts of social justice issues by evaluating source reliability and evidence.",
+        "to": ["bc.sj12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SA",
+        "raw": "Compare and contrast continuities and changes for different groups across times and places.",
+        "to": ["bc.sj12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF1",
+        "raw": "Determine and assess causes and consequences of social injustice, decisions, and movements.",
+        "to": ["bc.sj12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CF",
+        "raw": "Explain different perspectives on past and present social justice issues.",
+        "to": ["bc.sj12.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CE",
+        "raw": "Make reasoned ethical judgments about controversial social justice actions and issues.",
+        "to": ["bc.sj12.cc.7"],
+        "kind": "reworded"
+      }
+    ],
+    "URB12": [
+      {
+        "code": "CI",
+        "raw": "Use Social Studies inquiry processes to investigate urban issues and communicate findings.",
+        "to": ["bc.urb12.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Assess and compare the significance of factors that influence urbanization.",
+        "to": ["bc.urb12.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Ask questions about sources to corroborate inferences about urban issues.",
+        "to": ["bc.urb12.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF1",
+        "raw": "Identify continuity and change in the development of urban spaces.",
+        "to": ["bc.urb12.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LFB",
+        "raw": "Assess the causes and consequences of urban policy decisions.",
+        "to": ["bc.urb12.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "GT",
+        "raw": "Explain the forces that shape opinions and decisions on urban issues.",
+        "to": ["bc.urb12.cc.6"],
+        "kind": "reworded"
+      }
+    ],
+    "ARTS8": [
+      {
+        "code": "LE",
+        "raw": "Intentionally select and apply materials, movements, technologies, and techniques by combining artistic elements and principles to express moods, ideas, and messages; create artistic works collaboratively and individually using imagination, inquiry, and experimentation; explore relationships between identity, place, culture, and belonging; demonstrate understanding of personal, social, cultural, and environmental contexts in the arts.",
+        "to": ["bc.arts8.cc.1", "bc.arts8.cc.2", "bc.arts8.cc.3", "bc.arts8.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "AS",
+        "raw": "Describe and analyze how artists use processes, materials, and technologies to create and communicate; develop and critically appraise own and others' ideas to improve artistic quality; reflect on artworks to understand artists' motivations; interpret works using knowledge from various learning areas; respond to artworks using worldly knowledge and personal experience.",
+        "to": ["bc.arts8.cc.5", "bc.arts8.cc.6", "bc.arts8.cc.8", "bc.arts8.cc.9"],
+        "kind": "merged"
+      },
+      {
+        "code": "AA",
+        "raw": "Adapt skills, processes, materials, movements, and techniques for new contexts and audiences; interpret and communicate ideas using symbols, elements, and principles; take creative risks in expressing feelings, ideas, and experiences; describe and respond to artworks; document, choreograph, perform, and share creative works; use arts to address environmental and global issues.",
+        "to": [
+          "bc.arts8.cc.10",
+          "bc.arts8.cc.11",
+          "bc.arts8.cc.12",
+          "bc.arts8.cc.13",
+          "bc.arts8.cc.14",
+          "bc.arts8.cc.15"
+        ],
+        "kind": "merged"
+      }
+    ],
+    "CAREE8": [
+      {
+        "code": "DS",
+        "raw": "Use self-assessment and reflection to develop awareness of their strengths, preferences, and skills; recognize the impact of personal public identity; demonstrate respect, collaboration, and inclusivity when solving problems with others; set and achieve realistic learning goals with perseverance and resilience.",
+        "to": ["bc.caree8.cc.1", "bc.caree8.cc.3", "bc.caree8.cc.4", "bc.caree8.cc.7"],
+        "kind": "merged"
+      },
+      {
+        "code": "EC",
+        "raw": "Question how individual purposes and passions address local and global community needs; explore diverse perspectives on how work contributes to community and society; appreciate networks of resources and mentors in career exploration; apply research skills to explore diverse career possibilities and career clusters.",
+        "to": ["bc.caree8.cc.2", "bc.caree8.cc.5", "bc.caree8.cc.9", "bc.caree8.cc.11"],
+        "kind": "merged"
+      },
+      {
+        "code": "LP",
+        "raw": "Recognize how curriculum and co-curricular activities influence career paths; question family expectations and community needs in career decisions; explore volunteer opportunities that stimulate entrepreneurial and innovative thinking; apply decision-making strategies to life, work, or community problems; demonstrate safety skills and appreciate workplace safety.",
+        "to": ["bc.caree8.cc.8", "bc.caree8.cc.10", "bc.caree8.cc.12", "bc.caree8.cc.13", "bc.caree8.cc.6"],
+        "kind": "merged"
+      }
+    ],
+    "ELA8": [
+      {
+        "code": "AI",
+        "raw": "Access information and ideas for diverse purposes from a variety of sources and evaluate their relevance, accuracy, and reliability.",
+        "to": ["bc.ela8.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CS",
+        "raw": "Apply appropriate strategies to comprehend written, oral, and visual texts, guide inquiry, and extend thinking.",
+        "to": ["bc.ela8.cc.2"],
+        "kind": "exact"
+      },
+      {
+        "code": "SI",
+        "raw": "Synthesize ideas from a variety of sources to build understanding.",
+        "to": ["bc.ela8.cc.3"],
+        "kind": "exact"
+      },
+      {
+        "code": "IG",
+        "raw": "Recognize and appreciate how different features, forms, and genres of texts reflect different purposes, audiences, and messages.",
+        "to": ["bc.ela8.cc.4"],
+        "kind": "exact"
+      },
+      {
+        "code": "CT",
+        "raw": "Think critically, creatively, and reflectively to explore ideas within, between, and beyond texts.",
+        "to": ["bc.ela8.cc.5"],
+        "kind": "exact"
+      },
+      {
+        "code": "CL",
+        "raw": "Recognize and identify the role of personal, social, and cultural contexts, values, and perspectives in texts.",
+        "to": ["bc.ela8.cc.6"],
+        "kind": "exact"
+      },
+      {
+        "code": "CS",
+        "raw": "Recognize how language constructs personal, social, and cultural identity.",
+        "to": ["bc.ela8.cc.7"],
+        "kind": "exact"
+      },
+      {
+        "code": "PC",
+        "raw": "Construct meaningful personal connections between self, text, and world.",
+        "to": ["bc.ela8.cc.8"],
+        "kind": "exact"
+      },
+      {
+        "code": "CR",
+        "raw": "Respond to text in personal, creative, and critical ways.",
+        "to": ["bc.ela8.cc.9"],
+        "kind": "exact"
+      },
+      {
+        "code": "LT",
+        "raw": "Recognize how literary elements, techniques, and devices enhance and shape meaning.",
+        "to": ["bc.ela8.cc.10"],
+        "kind": "exact"
+      },
+      {
+        "code": "TA",
+        "raw": "Recognize an increasing range of text structures and how they contribute to meaning.",
+        "to": ["bc.ela8.cc.11"],
+        "kind": "exact"
+      },
+      {
+        "code": "LF",
+        "raw": "Recognize and appreciate the role of story, narrative, and oral tradition in expressing First Peoples perspectives.",
+        "to": ["bc.ela8.cc.12"],
+        "kind": "reworded"
+      },
+      {
+        "code": "IL",
+        "raw": "Develop an awareness of the protocols and ownership associated with First Peoples texts.",
+        "to": ["bc.ela8.cc.13"],
+        "kind": "exact"
+      },
+      {
+        "code": "LF1",
+        "raw": "Exchange ideas and viewpoints to build shared understanding and extend thinking.",
+        "to": ["bc.ela8.cc.14"],
+        "kind": "exact"
+      },
+      {
+        "code": "LE",
+        "raw": "Use writing and design processes to plan, develop, and create engaging and meaningful literary and informational texts for a variety of purposes and audiences.",
+        "to": ["bc.ela8.cc.15"],
+        "kind": "exact"
+      },
+      {
+        "code": "AS",
+        "raw": "Assess and refine texts to improve their clarity, effectiveness, and impact according to purpose, audience, and message.",
+        "to": ["bc.ela8.cc.16"],
+        "kind": "exact"
+      },
+      {
+        "code": "LFB",
+        "raw": "Use an increasing repertoire of conventions of Canadian spelling, grammar, and punctuation.",
+        "to": ["bc.ela8.cc.17"],
+        "kind": "exact"
+      },
+      {
+        "code": "NW",
+        "raw": "Use and experiment with oral storytelling processes.",
+        "to": ["bc.ela8.cc.18"],
+        "kind": "exact"
+      },
+      {
+        "code": "LFC",
+        "raw": "Select and use appropriate features, forms, and genres according to audience, purpose, and message.",
+        "to": ["bc.ela8.cc.19"],
+        "kind": "exact"
+      },
+      {
+        "code": "CT2",
+        "raw": "Transform ideas and information to create original texts.",
+        "to": ["bc.ela8.cc.20"],
+        "kind": "exact"
+      }
+    ],
+    "MATH8": [
+      {
+        "code": "RC",
+        "raw": "Use logic and patterns to solve puzzles and play games; apply reasoning and logic to explore, analyze, and apply mathematical ideas; estimate reasonably; demonstrate and apply mental math strategies; use tools or technology to explore patterns and test conjectures; model mathematics in contextualized experiences.",
+        "to": ["bc.math8.cc.1", "bc.math8.cc.2", "bc.math8.cc.3", "bc.math8.cc.4", "bc.math8.cc.5", "bc.math8.cc.6"],
+        "kind": "merged"
+      },
+      {
+        "code": "PS",
+        "raw": "Apply multiple strategies to solve problems in abstract and contextualized situations; develop and demonstrate mathematical understanding through play, inquiry, and problem solving; visualize to explore mathematical concepts; engage in problem-solving connected to place, story, and cultural practices.",
+        "to": ["bc.math8.cc.7", "bc.math8.cc.8", "bc.math8.cc.9", "bc.math8.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "CS",
+        "raw": "Use mathematical vocabulary and language in discussions; explain and justify mathematical ideas and decisions; communicate mathematical thinking in multiple ways; represent mathematical ideas in concrete, pictorial, and symbolic forms.",
+        "to": ["bc.math8.cc.11", "bc.math8.cc.12", "bc.math8.cc.13", "bc.math8.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "MC",
+        "raw": "Reflect on mathematical thinking; connect mathematical concepts to other areas and personal interests; use mathematical arguments to support personal choices; incorporate First Peoples worldviews and perspectives.",
+        "to": ["bc.math8.cc.15", "bc.math8.cc.16", "bc.math8.cc.17", "bc.math8.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "PHE8": [
+      {
+        "code": "DS",
+        "raw": "Develop, refine, and apply fundamental movement skills in various physical activities; develop and apply movement concepts and strategies in different activities; apply methods for monitoring and adjusting exertion levels; demonstrate safety, fair play, and leadership in physical activities; identify preferred types of physical activity.",
+        "to": ["bc.phe8.cc.1", "bc.phe8.cc.2", "bc.phe8.cc.3", "bc.phe8.cc.4", "bc.phe8.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "RPA",
+        "raw": "Participate daily in fitness-enhancing physical activity; describe how school, home, and community activities influence health; develop strategies for promoting healthy eating choices; assess factors influencing healthy choices; identify and analyze health message sources and their behavioural influence; identify and apply personal healthy-living goal strategies; reflect on outcomes and assess personal goal strategies.",
+        "to": [
+          "bc.phe8.cc.6",
+          "bc.phe8.cc.7",
+          "bc.phe8.cc.8",
+          "bc.phe8.cc.9",
+          "bc.phe8.cc.10",
+          "bc.phe8.cc.11",
+          "bc.phe8.cc.12"
+        ],
+        "kind": "merged"
+      },
+      {
+        "code": "PH",
+        "raw": "Propose strategies for avoiding and/or responding to unsafe or exploitative situations; propose strategies for responding to discrimination, stereotyping, and bullying; propose strategies for developing and maintaining healthy relationships; create strategies for promoting school and community well-being.",
+        "to": ["bc.phe8.cc.13", "bc.phe8.cc.14", "bc.phe8.cc.15", "bc.phe8.cc.16"],
+        "kind": "merged"
+      },
+      {
+        "code": "HW",
+        "raw": "Describe and assess strategies for promoting mental well-being; describe and assess strategies for managing mental health and substance use problems; create and assess strategies for managing physical, emotional, and social changes during puberty; explore and describe transition and change impacts on identities.",
+        "to": ["bc.phe8.cc.17", "bc.phe8.cc.18", "bc.phe8.cc.19", "bc.phe8.cc.20"],
+        "kind": "merged"
+      }
+    ],
+    "SCI8": [
+      {
+        "code": "QAP",
+        "raw": "Demonstrate sustained intellectual curiosity about a scientific topic or problem of personal interest.",
+        "to": ["bc.sci8.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "IP",
+        "raw": "Construct and use methods to represent data; seek patterns and connections; apply First Peoples perspectives as information sources.",
+        "to": ["bc.sci8.cc.14", "bc.sci8.cc.12"],
+        "kind": "merged"
+      },
+      {
+        "code": "EM",
+        "raw": "Reflect on investigation methods; identify sources of error; consider social, ethical, and environmental implications.",
+        "to": ["bc.sci8.cc.17", "bc.sci8.cc.21"],
+        "kind": "merged"
+      },
+      {
+        "code": "CA",
+        "raw": "Contribute to care for self, others, community, and world; transfer learning to new situations; generate ideas when problem-solving.",
+        "to": ["bc.sci8.cc.22", "bc.sci8.cc.24", "bc.sci8.cc.25"],
+        "kind": "merged"
+      },
+      {
+        "code": "SC",
+        "raw": "Communicate findings using scientific language and digital technologies; express varied experiences and perspectives of place.",
+        "to": ["bc.sci8.cc.26", "bc.sci8.cc.27"],
+        "kind": "merged"
+      }
+    ],
+    "SS8": [
+      {
+        "code": "CT",
+        "raw": "Select and defend a variety of approaches to historical inquiry, including the use of critical thinking tools.",
+        "to": ["bc.ss8.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CI",
+        "raw": "Accurately cite sources for information gathered through research.",
+        "to": ["bc.ss8.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HA",
+        "raw": "Assess the significance of an explorer, invention, or historical event by applying criteria for historical significance.",
+        "to": ["bc.ss8.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Identify what creators of accounts or narratives have chosen to emphasize as significant.",
+        "to": ["bc.ss8.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SA",
+        "raw": "Characterize different time periods in history, identifying examples of progress and decline, and key turning points.",
+        "to": ["bc.ss8.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CE",
+        "raw": "Determine causation in historical events, distinguishing between systemic factors and unpredictable actions, and examining short- and long-term consequences.",
+        "to": ["bc.ss8.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HA1",
+        "raw": "Assess the moral dimensions of historical events and recognize the limitations of applying present-day values to the past.",
+        "to": ["bc.ss8.cc.8"],
+        "kind": "reworded"
+      }
+    ],
+    "ARTS9": [
+      {
+        "code": "LE",
+        "raw": "Generate artistic works individually and collaboratively using imagination, inquiry, and purposeful play; investigate materials, environments, and techniques by combining elements and processes; recognize personal, social, cultural, historical, and environmental contexts; examine identity, place, culture, and belonging; intentionally combine elements to establish specific moods or meanings.",
+        "to": ["bc.arts9.cc.1", "bc.arts9.cc.2", "bc.arts9.cc.3", "bc.arts9.cc.4"],
+        "kind": "merged"
+      },
+      {
+        "code": "SCW",
+        "raw": "Transfer learned abilities for new contexts, purposes, and audiences; compose and develop ideas using symbolism, imagery, and artistic elements; refine and document creative works to strengthen presentation or performance.",
+        "to": ["bc.arts9.cc.8", "bc.arts9.cc.9", "bc.arts9.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "CE",
+        "raw": "Examine artworks and creative processes to inform personal growth; embrace creative experimentation; show regard for self, peers, and audiences; work reciprocally during artistic creation; develop meaningful artistic collections demonstrating understanding of social and cultural contexts; demonstrate increasingly sophisticated engagement with curriculum content.",
+        "to": ["bc.arts9.cc.15", "bc.arts9.cc.16"],
+        "kind": "merged"
+      }
+    ],
+    "CAREE9": [
+      {
+        "code": "DS",
+        "raw": "Use self-assessment and reflection to develop awareness of strengths, preferences, and skills; recognize the impact of personal public identity in the workplace; demonstrate respect, collaboration, and inclusivity when solving problems; set and achieve realistic learning goals with perseverance and resilience.",
+        "to": ["bc.caree9.cc.1", "bc.caree9.cc.3", "bc.caree9.cc.4", "bc.caree9.cc.7"],
+        "kind": "merged"
+      },
+      {
+        "code": "EC",
+        "raw": "Question how individual purposes and passions can support community needs when considering career choices; explore diverse perspectives on how work contributes to community and society; appreciate the value of mentors and resource networks; apply research skills to expand knowledge of diverse career possibilities and clusters.",
+        "to": ["bc.caree9.cc.2", "bc.caree9.cc.5", "bc.caree9.cc.9", "bc.caree9.cc.11"],
+        "kind": "merged"
+      },
+      {
+        "code": "LP",
+        "raw": "Recognize how curriculum choices influence career paths; question the role of family expectations and community needs in career choices; explore volunteer experiences and new learning that stimulate entrepreneurial and innovative thinking; apply decision-making strategies and adjust them to new situations; demonstrate safety skills and appreciate workplace safety.",
+        "to": ["bc.caree9.cc.8", "bc.caree9.cc.10", "bc.caree9.cc.12", "bc.caree9.cc.13", "bc.caree9.cc.6"],
+        "kind": "merged"
+      }
+    ],
+    "ELA9": [
+      {
+        "code": "AI",
+        "raw": "Access information and ideas for diverse purposes from a variety of sources and evaluate their relevance, accuracy, and reliability.",
+        "to": ["bc.ela9.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CS",
+        "raw": "Apply appropriate strategies to comprehend written, oral, and visual texts, guide inquiry, and extend thinking.",
+        "to": ["bc.ela9.cc.2"],
+        "kind": "exact"
+      },
+      {
+        "code": "SI",
+        "raw": "Synthesize ideas from a variety of sources to build understanding.",
+        "to": ["bc.ela9.cc.3"],
+        "kind": "exact"
+      },
+      {
+        "code": "IG",
+        "raw": "Recognize how different features, forms, and genres of texts reflect different purposes, audiences, and messages.",
+        "to": ["bc.ela9.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CT",
+        "raw": "Think critically, creatively, and reflectively to explore ideas within, between, and beyond texts.",
+        "to": ["bc.ela9.cc.5"],
+        "kind": "exact"
+      },
+      {
+        "code": "CL",
+        "raw": "Recognize and identify the role of personal, social, and cultural contexts, values, and perspectives in texts.",
+        "to": ["bc.ela9.cc.6"],
+        "kind": "exact"
+      },
+      {
+        "code": "CS",
+        "raw": "Recognize how language constructs personal, social, and cultural identity.",
+        "to": ["bc.ela9.cc.7"],
+        "kind": "exact"
+      },
+      {
+        "code": "PC",
+        "raw": "Construct meaningful personal connections between self, text, and world.",
+        "to": ["bc.ela9.cc.8"],
+        "kind": "exact"
+      },
+      {
+        "code": "CR",
+        "raw": "Respond to text in personal, creative, and critical ways.",
+        "to": ["bc.ela9.cc.9"],
+        "kind": "exact"
+      },
+      {
+        "code": "LT",
+        "raw": "Explain how literary elements, techniques, and devices enhance and shape meaning.",
+        "to": ["bc.ela9.cc.10"],
+        "kind": "exact"
+      },
+      {
+        "code": "TA",
+        "raw": "Recognize an increasing range of text structures and how they contribute to meaning.",
+        "to": ["bc.ela9.cc.11"],
+        "kind": "exact"
+      },
+      {
+        "code": "LF",
+        "raw": "Recognize and appreciate the role of story, narrative, and oral tradition in expressing First Peoples perspectives, values, beliefs, and points of view.",
+        "to": ["bc.ela9.cc.12"],
+        "kind": "exact"
+      },
+      {
+        "code": "IL",
+        "raw": "Develop awareness of the diversity within and across First Peoples societies represented in texts.",
+        "to": ["bc.ela9.cc.13"],
+        "kind": "reworded"
+      },
+      {
+        "code": "IL1",
+        "raw": "Recognize the influence of place in First Peoples and other Canadian texts.",
+        "to": ["bc.ela9.cc.14"],
+        "kind": "exact"
+      },
+      {
+        "code": "LF1",
+        "raw": "Exchange ideas and viewpoints to build shared understanding and extend thinking.",
+        "to": ["bc.ela9.cc.15"],
+        "kind": "exact"
+      },
+      {
+        "code": "LE",
+        "raw": "Use writing and design processes to plan, develop, and create engaging and meaningful literary and informational texts for a variety of purposes and audiences.",
+        "to": ["bc.ela9.cc.16"],
+        "kind": "exact"
+      },
+      {
+        "code": "AS",
+        "raw": "Assess and refine texts to improve their clarity, effectiveness, and impact according to purpose, audience, and message.",
+        "to": ["bc.ela9.cc.17"],
+        "kind": "exact"
+      },
+      {
+        "code": "LFB",
+        "raw": "Use an increasing repertoire of conventions of Canadian spelling, grammar, and punctuation.",
+        "to": ["bc.ela9.cc.18"],
+        "kind": "exact"
+      },
+      {
+        "code": "NW",
+        "raw": "Use and experiment with oral storytelling processes.",
+        "to": ["bc.ela9.cc.19"],
+        "kind": "exact"
+      },
+      {
+        "code": "LFC",
+        "raw": "Select and use appropriate features, forms, and genres according to audience, purpose, and message.",
+        "to": ["bc.ela9.cc.20"],
+        "kind": "exact"
+      },
+      {
+        "code": "CT2",
+        "raw": "Transform ideas and information to create original texts.",
+        "to": ["bc.ela9.cc.21"],
+        "kind": "exact"
+      },
+      {
+        "code": "PW",
+        "raw": "Express an opinion and support it with credible evidence.",
+        "to": ["bc.ela9.cc.22"],
+        "kind": "exact"
+      }
+    ],
+    "MATH9": [
+      {
+        "code": "RC",
+        "raw": "Apply logic and patterns to solve puzzles and games; employ reasoning to explore and apply mathematical ideas; estimate reasonably; apply mental math strategies; use technology to explore patterns and test ideas; model mathematics in contextualized experiences.",
+        "to": ["bc.math9.cc.1", "bc.math9.cc.2", "bc.math9.cc.3", "bc.math9.cc.4", "bc.math9.cc.5", "bc.math9.cc.6"],
+        "kind": "merged"
+      },
+      {
+        "code": "PS",
+        "raw": "Apply multiple strategies to solve abstract and contextualized problems; develop understanding through play, inquiry, and problem solving; visualize to explore concepts; engage in problem-solving connected to place, story, and cultural practices.",
+        "to": ["bc.math9.cc.7", "bc.math9.cc.8", "bc.math9.cc.9", "bc.math9.cc.10"],
+        "kind": "merged"
+      },
+      {
+        "code": "CS",
+        "raw": "Use mathematical vocabulary in discussions; explain and justify mathematical ideas; communicate thinking concretely, pictorially, and symbolically; represent ideas in multiple forms.",
+        "to": ["bc.math9.cc.11", "bc.math9.cc.12", "bc.math9.cc.14"],
+        "kind": "merged"
+      },
+      {
+        "code": "MC",
+        "raw": "Reflect on mathematical thinking; connect concepts across disciplines and personal interests; use arguments to support personal choices; incorporate First Peoples worldviews and perspectives.",
+        "to": ["bc.math9.cc.15", "bc.math9.cc.16", "bc.math9.cc.17", "bc.math9.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "PHE9": [
+      {
+        "code": "DS",
+        "raw": "Develop, refine, and apply fundamental movement skills in various physical activities; develop and apply movement concepts and strategies in different activities; apply methods for monitoring and adjusting exertion levels; demonstrate safety, fair play, and leadership in physical activities; identify preferred types of physical activity.",
+        "to": ["bc.phe9.cc.1", "bc.phe9.cc.2", "bc.phe9.cc.3", "bc.phe9.cc.4", "bc.phe9.cc.5"],
+        "kind": "merged"
+      },
+      {
+        "code": "RPA",
+        "raw": "Participate daily in fitness-enhancing physical activity; describe how school, home, and community activities influence health; develop strategies for promoting healthy eating choices; assess factors influencing healthy choices; identify and analyze health message sources and their behavioural influence; identify and apply personal healthy-living goal strategies; reflect on outcomes and assess personal goal strategies.",
+        "to": ["bc.phe9.cc.6", "bc.phe9.cc.7", "bc.phe9.cc.14", "bc.phe9.cc.9", "bc.phe9.cc.10", "bc.phe9.cc.11"],
+        "kind": "merged"
+      },
+      {
+        "code": "PH",
+        "raw": "Propose strategies for avoiding and/or responding to unsafe or exploitative situations; propose strategies for responding to discrimination, stereotyping, and bullying; propose strategies for developing and maintaining healthy relationships; create strategies for promoting school and community well-being.",
+        "to": ["bc.phe9.cc.12", "bc.phe9.cc.13", "bc.phe9.cc.14", "bc.phe9.cc.15"],
+        "kind": "merged"
+      },
+      {
+        "code": "HW",
+        "raw": "Describe and assess strategies for promoting mental well-being; describe and assess strategies for managing mental health and substance use problems; create and assess strategies for managing physical, emotional, and social changes during puberty; explore and describe transition and change impacts on identities.",
+        "to": ["bc.phe9.cc.16", "bc.phe9.cc.17", "bc.phe9.cc.18"],
+        "kind": "merged"
+      }
+    ],
+    "SCI9": [
+      {
+        "code": "QAP",
+        "raw": "Demonstrate sustained intellectual curiosity; identify increasingly complex questions about nature; formulate multiple hypotheses and predict multiple outcomes.",
+        "to": ["bc.sci9.cc.1", "bc.sci9.cc.2", "bc.sci9.cc.3"],
+        "kind": "merged"
+      },
+      {
+        "code": "IG",
+        "raw": "Apply First Peoples perspectives; seek patterns, trends, and connections; construct and analyze graphs and models; analyze cause-and-effect relationships.",
+        "to": ["bc.sci9.cc.9", "bc.sci9.cc.11", "bc.sci9.cc.13"],
+        "kind": "merged"
+      },
+      {
+        "code": "EM",
+        "raw": "Evaluate methods; identify errors and alternative explanations; consider knowledge change over time; exercise informed skepticism; consider social, ethical, and environmental implications.",
+        "to": ["bc.sci9.cc.18", "bc.sci9.cc.21"],
+        "kind": "merged"
+      },
+      {
+        "code": "AAI",
+        "raw": "Transfer learning to new situations; generate refined ideas; find solutions to local/global problems through inquiry.",
+        "to": ["bc.sci9.cc.24", "bc.sci9.cc.25", "bc.sci9.cc.26"],
+        "kind": "merged"
+      },
+      {
+        "code": "SC",
+        "raw": "Formulate theoretical models; communicate scientific ideas and evidence-based arguments; express varied worldviews through place.",
+        "to": ["bc.sci9.cc.28", "bc.sci9.cc.30"],
+        "kind": "merged"
+      }
+    ],
+    "SS9": [
+      {
+        "code": "CI",
+        "raw": "Ask questions and gather, interpret, and analyze ideas using Social Studies inquiry processes.",
+        "to": ["bc.ss9.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HA",
+        "raw": "Assess historical importance and compare varying perspectives on historical significance.",
+        "to": ["bc.ss9.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "AS",
+        "raw": "Assess the justification for competing historical accounts by examining source reliability.",
+        "to": ["bc.ss9.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "SA",
+        "raw": "Compare and contrast continuities and changes for different groups at the same time period.",
+        "to": ["bc.ss9.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CE",
+        "raw": "Evaluate how prevailing conditions and the actions of individuals or groups affect events.",
+        "to": ["bc.ss9.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LF",
+        "raw": "Explain different perspectives on past or present people, places, issues, or events by considering prevailing norms, values, worldviews, and beliefs.",
+        "to": ["bc.ss9.cc.6"],
+        "kind": "reworded"
+      }
+    ],
+    "HUM8": [
+      {
+        "code": "LS-TG",
+        "raw": "Recognize and explain different types of stories and texts, including their styles, purposes, and genres, and understand how visual elements enhance graphic texts.",
+        "to": ["bc.ela8.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "LS-EI",
+        "raw": "Judge whether the information in texts is relevant, accurate, and trustworthy.",
+        "to": ["bc.ela8.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CC-CS",
+        "raw": "Apply different strategies to comprehend texts, think deeply, and link ideas to gain new insights.",
+        "to": ["bc.ela8.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CC-PC",
+        "raw": "Connect personal experiences and broader world understanding to what is read, viewed, or listened to, interacting with texts in meaningful ways.",
+        "to": ["bc.ela8.cc.8"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CM-EX",
+        "raw": "Exchange ideas and viewpoints with others to build shared understanding and extend thinking.",
+        "to": ["bc.ela8.cc.14"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CM-WD",
+        "raw": "Use writing and design processes to plan, develop, and create meaningful texts that engage different audiences and serve various purposes.",
+        "to": ["bc.ela8.cc.15"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CM-AR",
+        "raw": "Assess and refine texts to make them clearer, more effective, and impactful, fitting the purpose, audience, and message.",
+        "to": ["bc.ela8.cc.16"],
+        "kind": "reworded"
+      },
+      {
+        "code": "CM-SG",
+        "raw": "Use Canadian spelling, grammar, and punctuation more accurately, continuing to learn and apply conventions in writing.",
+        "to": ["bc.ela8.cc.17"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HT-IS",
+        "raw": "Use Social Studies inquiry skills to ask questions, analyze ideas, and share what has been learned.",
+        "to": ["bc.ss8.cc.1"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HT-HS",
+        "raw": "Evaluate the significance of historical events, people, places, and developments.",
+        "to": ["bc.ss8.cc.2"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HT-IA",
+        "raw": "Understand what is considered significant in historical accounts, narratives, maps, or texts.",
+        "to": ["bc.ss8.cc.3"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HT-SR",
+        "raw": "Judge the reliability of various sources and the strength of the evidence they provide.",
+        "to": ["bc.ss8.cc.4"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HT-CC",
+        "raw": "Describe different historical periods and identify significant moments of change.",
+        "to": ["bc.ss8.cc.5"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HT-CQ",
+        "raw": "Determine the main causes of historical events and their immediate and long-lasting effects.",
+        "to": ["bc.ss8.cc.6"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HT-PE",
+        "raw": "Explain various viewpoints on historical or current events and compare different cultural values and beliefs.",
+        "to": ["bc.ss8.cc.7"],
+        "kind": "reworded"
+      },
+      {
+        "code": "HT-EJ",
+        "raw": "Make ethical judgments about historical decisions and understand the challenges of learning lessons from the past.",
+        "to": ["bc.ss8.cc.8"],
+        "kind": "reworded"
+      }
+    ]
+  }
+}
