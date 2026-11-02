@@ -84,7 +84,7 @@ A combined class rolled every competency into one overall, so the course with mo
 - **Proficiency only.** Letter and percent come from assignments and don't move.
 - **It asks first** when grades move, with the grade-change count, like Folders Count as One.
 - **Copy Grading Setup copies it** with the calculation method. Duplicate Class copies it.
-- The New Class wizard will turn it on for combined classes (stage 4, PR 4).
+- The New Class wizard turns it on for combined classes and says so on its review step (#724).
 
 ## Folders Count as One (2026-11-02)
 
@@ -96,6 +96,17 @@ A class's overall proficiency averaged each folder (competency group) first and 
 - **Folder rows keep their average** in every view. Where a folder isn't counted as one, teacher views add "Each competency counts on its own." (student page and phone under the name; dashboard tooltips). Family reports, phone reports and the CSV don't.
 - **Either switch asks first** when grades move, with the grade-change count, and says printed or sent reports and approved comments keep what they say.
 - **Copy Grading Setup copies the class switch** with the calculation method. Duplicate Class copies both.
+
+## The BC curriculum bank (2026-11-02)
+
+The old bank (`curriculum_by_course.json`) was written by an early model and had drifted from the Ministry: paraphrased and merged competencies, invented courses (Biology 12, ELA 10, PHE 11/12 and others) and no organizer headings. Colin had it rebuilt from the Ministry's own files (Nov 1–2; plan and decisions in `~/reports/Curriculum competency bank structure.md`).
+
+1. **The Ministry's words, copied by script.** `scripts/bc_curriculum.py` downloads each course's DOCX from curriculum.gov.bc.ca and stores every Big Idea, curricular competency and Content item word for word, with its organizer path, the file's URL, date and SHA-256 (`data/bc-curriculum-source.json`). A golden test proves every string matches the source. Scope: every Ministry course for grades 8–12 except second languages (226 courses, 5,029 competencies). Courses with no official page were dropped. Big Ideas and Content are stored for later use; the app doesn't show them yet.
+2. **Folders, codes and names by rule** (`scripts/bc_curriculum_derive.py`, `data/bc-curriculum-derived.json`). Ministry organizer headings become folders, except one-competency headings and Social Studies and Philosophy, which have none. Codes are a heading stem plus position (UC1, DF1–DF3) or the SS concept code (INQ, SIG, EVI, CHG, CAU, PER, ETH), and are frozen once published. Each competency is named from its own short label; the heading goes to the folder.
+3. **I Can statements written ahead of time, approved by Colin** (`data/bc-curriculum-ican.json`, all 5,029). Competencies that express one idea across courses form a cluster. Colin approved one exemplar set per cluster on an approval page. Every other course's set was adapted from it, changing only what that course's wording changes, and checked by a yes/no checklist. CI checks count, opening words, banned words, grade word caps and the Ministry text's hash. **The app makes no AI calls**: the statements are data. Each entry stores the hash of the text it was written from, so a Ministry revision flags the statements built on it.
+4. **New classes import from the bank; old classes change only by Re-link.** The New Class wizard has a Choose Competencies step (all ticked, Select All / Clear per folder) and a Humanities 8 preset (ELA 8 + SS 8, exact wording; the rewritten HUM8 entry is gone). Each imported competency saves its bank id (`tag.bank_id`). Re-link pairs an older class with the bank through an old-to-new crosswalk and changes nothing until the teacher applies it. Brett_K's classes were left alone.
+5. **The card shows where a competency comes from:** "BC Curriculum · Drafting 10 · Applied Design › Prototyping", read from the bank id.
+6. **Keeping it current.** Re-fetch the Ministry files each June and review what changed; the hashes show which statements need rewriting. Permission to reproduce the Ministry's text has been requested from the Province (QPIPPCopyright@gov.bc.ca), and FullVision ships without waiting for the answer.
 
 ## A category on every assessment (2026-11-01)
 

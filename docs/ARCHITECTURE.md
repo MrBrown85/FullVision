@@ -86,7 +86,7 @@ Desktop or mobile modules then layer on top of that shared runtime.
 
 ### Static and lazy-loaded assets
 
-- `curriculum_data.js` and `curriculum_by_course.json` are the static BC curriculum index and should be treated as reference data, not core boot state.
+- `curriculum_data.js` and `curriculum_by_course.json` are the static BC curriculum index the app loads, generated from the bank in `data/bc-curriculum-*.json` (Ministry text, folders and codes, I Can statements). Treat them as reference data, not core boot state, and regenerate rather than edit them.
 - `shared/seed-data.js` builds the Demo Mode sample class.
 - `shared/auto-update.js` reloads a long-open tab after a deploy at a safe moment, without a prompt.
 
