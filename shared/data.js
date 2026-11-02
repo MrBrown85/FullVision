@@ -3228,6 +3228,7 @@ function _assessmentFromDetail(existing, detail) {
     if (a.collab_config.pairs) next.pairs = a.collab_config.pairs;
     if (a.collab_config.groups) next.groups = a.collab_config.groups;
     if (a.collab_config.excludedStudents) next.excludedStudents = a.collab_config.excludedStudents;
+    if (a.collab_config.groupCount) next.groupCount = a.collab_config.groupCount;
   }
   // The server's list is the truth, empty included: an assessment whose last
   // competency was unlinked has none.
@@ -3788,6 +3789,7 @@ function _v2GradebookToCache(cid, payload) {
     if (collabConfig.pairs) assessment.pairs = collabConfig.pairs;
     if (collabConfig.groups) assessment.groups = collabConfig.groups;
     if (collabConfig.excludedStudents) assessment.excludedStudents = collabConfig.excludedStudents;
+    if (collabConfig.groupCount) assessment.groupCount = collabConfig.groupCount;
     return assessment;
   });
 
@@ -8644,6 +8646,7 @@ function _assessmentChanged(a, b) {
     JSON.stringify(a.pairs || []) !== JSON.stringify(b.pairs || []) ||
     JSON.stringify(a.groups || []) !== JSON.stringify(b.groups || []) ||
     JSON.stringify(a.excludedStudents || []) !== JSON.stringify(b.excludedStudents || []) ||
+    (a.groupCount || 0) !== (b.groupCount || 0) ||
     (a.maxPoints || 0) !== (b.maxPoints || 0) ||
     (a.weight || 1) !== (b.weight || 1) ||
     (a.evidenceType || '') !== (b.evidenceType || '') ||
@@ -8678,6 +8681,8 @@ function _collabConfigFromAssessment(a) {
   if (a && Array.isArray(a.excludedStudents) && a.excludedStudents.length) {
     config.excludedStudents = a.excludedStudents;
   }
+  // The group panel's Number of Groups, kept even before any groups are made.
+  if (_canonicalCollabModeFromAssessment(a) === 'groups' && a.groupCount > 0) config.groupCount = a.groupCount;
   return Object.keys(config).length ? config : null;
 }
 

@@ -173,6 +173,45 @@ describe('v2 assessment CRUD dispatch', () => {
     });
   });
 
+  describe('group count', () => {
+    it('sends Number of Groups in collab_config, even with no groups made', async () => {
+      await _canonicalUpdateAssessment(
+        client,
+        CID,
+        AID,
+        { title: 'T', collaboration: 'group', groupCount: 6 },
+        { title: 'T', collaboration: 'group', groupCount: 4 },
+      );
+      var call = client.calls.find(function (c) {
+        return c.name === 'save_collab';
+      });
+      expect(call.payload).toEqual({ p_id: AID, p_mode: 'groups', p_config: { groupCount: 6 } });
+    });
+
+    it('leaves it out for pairs', async () => {
+      await _canonicalUpdateAssessment(client, CID, AID, {
+        title: 'T',
+        collaboration: 'pair',
+        pairs: [['a', 'b']],
+        groupCount: 6,
+      });
+      var call = client.calls.find(function (c) {
+        return c.name === 'save_collab';
+      });
+      expect(call.payload.p_config).toEqual({ pairs: [['a', 'b']] });
+    });
+
+    it('reads it back from the server row', () => {
+      var a = _assessmentFromDetail(
+        {},
+        { assessment: { id: AID, collab_mode: 'groups', collab_config: { groups: [['a'], []], groupCount: 2 } } },
+      );
+      expect(a.collaboration).toBe('group');
+      expect(a.groupCount).toBe(2);
+      expect(a.groups).toEqual([['a'], []]);
+    });
+  });
+
   describe('_canonicalDeleteAssessment', () => {
     it('calls delete_assessment with the assessment id', async () => {
       await _canonicalDeleteAssessment(client, CID, AID);

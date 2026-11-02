@@ -100,48 +100,10 @@ window.AssignCollab = (function () {
           'Click <strong>Random Pairs</strong> to auto-pair, or <strong>Manual</strong> to drag students into pairs.' +
           '</div>';
       } else {
-        html += '<div class="collab-groups-container">';
-        collabPairs.forEach(function (pair, gi) {
-          html +=
-            '<div class="collab-group-card" data-group="' +
-            gi +
-            '" data-collab-drop="' +
-            gi +
-            '">' +
-            '<div class="collab-group-header"><span>Pair ' +
-            (gi + 1) +
-            '</span><span>' +
-            pair.length +
-            ' student' +
-            (pair.length !== 1 ? 's' : '') +
-            '</span></div>';
-          pair.forEach(function (sid) {
-            var st = students.find(function (s) {
-              return s.id === sid;
-            });
-            if (!st) return;
-            html +=
-              '<div class="collab-group-member" draggable="true" data-collab-drag-sid="' +
-              sid +
-              '" data-collab-drag-group="' +
-              gi +
-              '">' +
-              '<span class="member-avatar" style="background:' +
-              _avatarColor(sid) +
-              '">' +
-              initials(st) +
-              '</span>' +
-              '<span>' +
-              esc(displayName(st)) +
-              '</span>' +
-              '</div>';
-          });
-          html += '</div>';
-        });
-        html += '</div>';
+        html += _cardsHtml(collabPairs, 'Pair', students);
       }
       html += '</div>';
-      mount.innerHTML = html;
+      mount.innerHTML = html; // html-safe: names go through esc() in _memberHtml
     } else if (newCollaboration === 'group') {
       var total = students.length;
       var perGroup = Math.floor(total / collabGroupCount);
@@ -184,49 +146,77 @@ window.AssignCollab = (function () {
           'Click <strong>Randomize</strong> to auto-assign groups, or <strong>Manual</strong> to drag students.' +
           '</div>';
       } else {
-        html += '<div class="collab-groups-container">';
-        collabGroups.forEach(function (group, gi) {
-          html +=
-            '<div class="collab-group-card" data-group="' +
-            gi +
-            '" data-collab-drop="' +
-            gi +
-            '">' +
-            '<div class="collab-group-header"><span>Group ' +
-            (gi + 1) +
-            '</span><span>' +
-            group.length +
-            ' student' +
-            (group.length !== 1 ? 's' : '') +
-            '</span></div>';
-          group.forEach(function (sid) {
-            var st = students.find(function (s) {
-              return s.id === sid;
-            });
-            if (!st) return;
-            html +=
-              '<div class="collab-group-member" draggable="true" data-collab-drag-sid="' +
-              sid +
-              '" data-collab-drag-group="' +
-              gi +
-              '">' +
-              '<span class="member-avatar" style="background:' +
-              _avatarColor(sid) +
-              '">' +
-              initials(st) +
-              '</span>' +
-              '<span>' +
-              esc(displayName(st)) +
-              '</span>' +
-              '</div>';
-          });
-          html += '</div>';
-        });
-        html += '</div>';
+        html += _cardsHtml(collabGroups, 'Group', students);
       }
       html += '</div>';
-      mount.innerHTML = html;
+      mount.innerHTML = html; // html-safe: names go through esc() in _memberHtml
     }
+  }
+
+  /* One card per pair or group, then an Unassigned card for anyone not in
+     one (everyone, right after Manual). The Unassigned card is drop target -1. */
+  function _cardsHtml(arr, noun, students) {
+    var placed = new Set();
+    arr.forEach(function (g) {
+      g.forEach(function (sid) {
+        placed.add(sid);
+      });
+    });
+    var html = '<div class="collab-groups-container">';
+    arr.forEach(function (group, gi) {
+      html += _cardHtml(noun + ' ' + (gi + 1), gi, group, students);
+    });
+    var unassigned = students
+      .filter(function (s) {
+        return !placed.has(s.id);
+      })
+      .map(function (s) {
+        return s.id;
+      });
+    if (unassigned.length) html += _cardHtml('Unassigned', -1, unassigned, students);
+    return html + '</div>';
+  }
+
+  function _cardHtml(title, gi, sids, students) {
+    var html =
+      '<div class="collab-group-card" data-group="' +
+      gi +
+      '" data-collab-drop="' +
+      gi +
+      '">' +
+      '<div class="collab-group-header"><span>' +
+      esc(title) +
+      '</span><span>' +
+      sids.length +
+      ' student' +
+      (sids.length !== 1 ? 's' : '') +
+      '</span></div>';
+    sids.forEach(function (sid) {
+      var st = students.find(function (s) {
+        return s.id === sid;
+      });
+      if (st) html += _memberHtml(st, gi);
+    });
+    return html + '</div>';
+  }
+
+  function _memberHtml(st, gi) {
+    return (
+      '<div class="collab-group-member" draggable="true" data-collab-drag-sid="' +
+      esc(st.id) +
+      '" data-collab-drag-group="' +
+      gi +
+      '">' +
+      '<span class="member-avatar" style="background:' +
+      _avatarColor(st.id) +
+      '">' +
+      esc(initials(st)) +
+      '</span>' +
+      '<span>' +
+      esc(displayName(st)) +
+      '</span>' +
+      '</div>'
+    );
   }
 
   function collabToggleStudent(sid, checked) {
@@ -275,10 +265,39 @@ window.AssignCollab = (function () {
     collabGroupMode = 'random';
     renderCollabPanel();
   }
+  /* Manual keeps any pairs already made; with none, it lays out empty pairs
+     and every student starts in Unassigned. */
+  function collabManualPairs() {
+    if (collabPairs.length === 0) {
+      var count = Math.max(1, Math.floor(getCollabStudents().length / 2));
+      collabPairs = Array.from({ length: count }, function () {
+        return [];
+      });
+    }
+    collabPairMode = 'manual';
+    renderCollabPanel();
+  }
+  function collabManualGroups() {
+    if (collabGroups.length === 0) {
+      collabGroups = Array.from({ length: collabGroupCount }, function () {
+        return [];
+      });
+    }
+    collabGroupMode = 'manual';
+    renderCollabPanel();
+  }
   function collabSetGroupCount(delta) {
     var students = getCollabStudents();
-    collabGroupCount = Math.max(2, Math.min(students.length, collabGroupCount + delta));
-    if (collabGroups.length > 0) collabRandomGroups();
+    var next = Math.max(2, Math.min(students.length, collabGroupCount + delta));
+    if (next === collabGroupCount) return;
+    collabGroupCount = next;
+    if (collabGroups.length > 0 && collabGroupMode === 'manual') {
+      // Manual groups stay put: add an empty group, or drop the last one and
+      // send its students back to Unassigned.
+      while (collabGroups.length < collabGroupCount) collabGroups.push([]);
+      if (collabGroups.length > collabGroupCount) collabGroups = collabGroups.slice(0, collabGroupCount);
+      renderCollabPanel();
+    } else if (collabGroups.length > 0) collabRandomGroups();
     else renderCollabPanel();
   }
   function collabDragStart(e, sid, fromGroup) {
@@ -293,18 +312,16 @@ window.AssignCollab = (function () {
     if (dropEl) dropEl.classList.remove('drag-over');
     if (_dragSid == null || _dragFromGroup === toGroup) return;
     var arr = newCollaboration === 'pair' ? collabPairs : collabGroups;
-    if (!arr[_dragFromGroup] || !arr[toGroup]) return;
-    var idx = arr[_dragFromGroup].indexOf(_dragSid);
-    if (idx >= 0) arr[_dragFromGroup].splice(idx, 1);
-    arr[toGroup].push(_dragSid);
-    if (newCollaboration === 'pair')
-      collabPairs = collabPairs.filter(function (g) {
-        return g.length > 0;
-      });
-    else
-      collabGroups = collabGroups.filter(function (g) {
-        return g.length > 0;
-      });
+    // -1 is the Unassigned card. Emptied pairs and groups stay so they can be
+    // filled again.
+    if ((_dragFromGroup !== -1 && !arr[_dragFromGroup]) || (toGroup !== -1 && !arr[toGroup])) return;
+    if (_dragFromGroup !== -1) {
+      var idx = arr[_dragFromGroup].indexOf(_dragSid);
+      if (idx >= 0) arr[_dragFromGroup].splice(idx, 1);
+    }
+    if (toGroup !== -1) arr[toGroup].push(_dragSid);
+    if (newCollaboration === 'pair') collabPairMode = 'manual';
+    else collabGroupMode = 'manual';
     _dragSid = null;
     _dragFromGroup = null;
     renderCollabPanel();
@@ -314,6 +331,8 @@ window.AssignCollab = (function () {
     collabPairs = assess && assess.pairs ? structuredClone(assess.pairs) : [];
     collabGroups = assess && assess.groups ? structuredClone(assess.groups) : [];
     collabGroupCount = assess && assess.groupCount ? assess.groupCount : 4;
+    // Emptied groups can drop out (a withdrawn student's group); keep the count.
+    while (collabGroups.length > 0 && collabGroups.length < collabGroupCount) collabGroups.push([]);
     collabPairMode = collabPairs.length > 0 ? 'manual' : 'random';
     collabGroupMode = collabGroups.length > 0 ? 'manual' : 'random';
   }
@@ -329,6 +348,8 @@ window.AssignCollab = (function () {
     collabCheckNone: collabCheckNone,
     collabRandomPairs: collabRandomPairs,
     collabRandomGroups: collabRandomGroups,
+    collabManualPairs: collabManualPairs,
+    collabManualGroups: collabManualGroups,
     collabSetGroupCount: collabSetGroupCount,
     collabDragStart: collabDragStart,
     collabDrop: collabDrop,
