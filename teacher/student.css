@@ -1298,6 +1298,45 @@
 .override-level-btn.selected[data-level='1'] {
   background: var(--score-1);
 }
+/* Each level with its descriptor beside it; the calculated level on a
+   light fill (Nov 2 mockup, batch 2). */
+.override-levels.has-wording {
+  flex-direction: column;
+  gap: 6px;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+.override-level-row {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+}
+.override-level-row.is-calc {
+  background: var(--bg);
+}
+.override-levels.has-wording .override-level-btn {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+}
+.override-levels.has-wording .override-level-btn:last-child {
+  border-right: 1px solid var(--border);
+}
+.override-level-desc {
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--text);
+}
+.override-level-calc {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
 .override-reason {
   width: 100%;
   padding: 8px 12px;

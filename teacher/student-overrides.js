@@ -20,6 +20,18 @@ window.StudentOverrides = (function () {
     var override = getSectionOverride(activeCourse, studentId, secId);
     var rawProf = getSectionProficiencyRaw(activeCourse, studentId, secId);
     setSelectedLevel(override ? override.level : 0);
+    // Each level's one-line descriptor beside its button, and the calculated
+    // level marked (Nov 2 mockup, batch 2).
+    var sec = (getSections(activeCourse) || []).find(function (x) {
+      return x.id === secId;
+    });
+    var tag = sec && sec.tags ? sec.tags[0] : null;
+    var calcLevel = rawProf > 0 ? Math.max(1, Math.min(4, Math.round(rawProf))) : 0;
+    var calcText = [formatLevel(activeCourse, rawProf), levelWord(activeCourse, rawProf)].filter(Boolean).join(' ');
+    var wording = function (l) {
+      var w = window.CompetencyWording && tag ? CompetencyWording.lines(tag, l) : null;
+      return w ? w.descriptor : '';
+    };
 
     var html =
       '<div class="override-panel-header">' +
@@ -29,14 +41,16 @@ window.StudentOverrides = (function () {
       '">&times;</button>' +
       '</div>' +
       '<div class="override-calculated">Calculated: <strong>' +
-      esc([formatLevel(activeCourse, rawProf), levelWord(activeCourse, rawProf)].filter(Boolean).join(' ')) +
+      esc(calcText) +
       '</strong></div>' +
-      '<div class="override-levels">' +
+      '<div class="override-levels has-wording">' +
       // In the class's Rubric Levels order.
       levelOrderFor(activeCourse)
         .map(function (l) {
           return (
-            '<button class="override-level-btn' +
+            '<div class="override-level-row' +
+            (l === calcLevel ? ' is-calc' : '') +
+            '"><button class="override-level-btn' +
             (getSelectedLevel() === l ? ' selected' : '') +
             '" data-level="' +
             l +
@@ -46,7 +60,12 @@ window.StudentOverrides = (function () {
             l +
             ' ' +
             PROF_LABELS[l] +
-            '</button>'
+            '</button><span class="override-level-desc" data-level="' +
+            l +
+            '">' +
+            esc(wording(l)) +
+            (l === calcLevel ? '<span class="override-level-calc">Calculated: ' + esc(calcText) + '</span>' : '') +
+            '</span></div>'
           );
         })
         .join('') +
@@ -73,6 +92,18 @@ window.StudentOverrides = (function () {
     // html-safe: the reason and calculated level are escaped; secId is our section id; levels and labels are fixed.
     panel.innerHTML = html;
     panel.style.display = '';
+    // A bank competency's wording loads late: the descriptors fill in place once it is here.
+    var first = window.CompetencyWording && tag ? CompetencyWording.lines(tag, 1) : null;
+    if (first && !first.ready && window.RubricPrint && RubricPrint.loadBankLevels)
+      RubricPrint.loadBankLevels().then(function (ok) {
+        if (!ok) return;
+        panel.querySelectorAll('.override-level-desc').forEach(function (d) {
+          var l = parseInt(d.dataset.level, 10);
+          var calc = d.querySelector('.override-level-calc');
+          d.textContent = wording(l);
+          if (calc) d.appendChild(calc);
+        });
+      });
   }
 
   function selectOverrideLevel(level, currentLevel, setSelectedLevel, getSelectedLevel) {
