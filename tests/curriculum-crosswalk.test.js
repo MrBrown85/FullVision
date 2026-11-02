@@ -70,7 +70,14 @@ describe('Re-link for an older class', () => {
       name: r.code,
       color: '#0891b2',
       tags: [
-        { id: 's' + i, code: r.code, label: r.label || r.code, text: r.raw, source_text: r.raw, i_can_statements: [] },
+        {
+          id: 's' + i,
+          code: r.code,
+          label: r.label || r.code,
+          text: r.raw,
+          source_text: r.raw,
+          i_can_statements: ['I can do what the old bank said.'],
+        },
       ],
     }));
     saveCourses({ [CID]: { id: CID, name: 'Old Class', gradingSystem: 'proficiency', curriculumTags: [course] } });
@@ -171,11 +178,19 @@ describe('Re-link for an older class', () => {
     CURRICULUM_INDEX = newBankIndex(['ELA9']);
     var rows = CROSSWALK.pairs.ELA9;
     oldClass('ELA9', rows);
+    var all = rows;
     relink();
-    expect(main.innerHTML).toContain('Replaced in the Curriculum</h3><span>' + rows.length + '</span>');
-    var ai = rows.findIndex(r => r.code === 'AI');
+    // The 19 whose wording the Ministry kept already match; the 3 rewordings are offered.
+    var reworded = rows.filter(r => r.kind !== 'exact');
+    expect(reworded).toHaveLength(3);
+    expect(main.innerHTML).toContain('Replaced in the Curriculum</h3><span>3</span>');
+    expect(main.innerHTML).toContain('Already Match the Curriculum <span>19</span>');
+    expect(main.innerHTML).not.toContain('You Changed These');
+    rows = reworded;
+    var ai = all.findIndex(r => r.code === 'AI');
+    var aiReplaced = rows.findIndex(r => r.code === 'AI');
     DashClassManager.handleChange({
-      dataset: { actionChange: 'cmCompReviewPick', group: 'replaced', idx: String(ai), pick: 'theirs' },
+      dataset: { actionChange: 'cmCompReviewPick', group: 'replaced', idx: String(aiReplaced), pick: 'theirs' },
       checked: true,
     });
     DashClassManager.handleAction('cmCompReviewApply', { dataset: {} });

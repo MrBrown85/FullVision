@@ -256,8 +256,8 @@
       {
         "code": "ESO",
         "raw": "Express and support opinions with evidence; use Canadian conventions; use citations.",
-        "to": ["bc.comp10.cc.16"],
-        "kind": "reworded"
+        "to": ["bc.comp10.cc.16", "bc.comp10.cc.17"],
+        "kind": "merged"
       },
       {
         "code": "TII",
@@ -542,13 +542,13 @@
       {
         "code": "RPA",
         "raw": "Participate daily in fitness-enhancing physical activity; describe how school, home, and community activities influence health; develop strategies for promoting healthy eating choices; assess factors influencing healthy choices; identify and analyze health message sources and their behavioural influence; identify and apply personal healthy-living goal strategies; reflect on outcomes and assess personal goal strategies.",
-        "to": ["bc.phe10.cc.5", "bc.phe10.cc.11", "bc.phe10.cc.12"],
+        "to": ["bc.phe10.cc.11", "bc.phe10.cc.12", "bc.phe10.cc.7", "bc.phe10.cc.10"],
         "kind": "merged"
       },
       {
         "code": "SW",
         "raw": "Propose strategies for avoiding and/or responding to unsafe or exploitative situations; propose strategies for responding to discrimination, stereotyping, and bullying; propose strategies for developing and maintaining healthy relationships; create strategies for promoting school and community well-being.",
-        "to": ["bc.phe10.cc.14", "bc.phe10.cc.15", "bc.phe10.cc.16", "bc.phe10.cc.18"],
+        "to": ["bc.phe10.cc.14", "bc.phe10.cc.15", "bc.phe10.cc.16"],
         "kind": "merged"
       },
       {
@@ -728,7 +728,7 @@
       {
         "code": "AC",
         "raw": "Apply comprehension strategies; recognize how forms, formats, and features shape meaning; think critically and creatively; evaluate literary elements; identify bias, contradictions, distortions, omissions.",
-        "to": ["bc.comp11.cc.8", "bc.comp11.cc.9", "bc.comp11.cc.14"],
+        "to": ["bc.comp11.cc.8", "bc.comp11.cc.9", "bc.comp11.cc.14", "bc.comp11.cc.13"],
         "kind": "merged"
       },
       {
@@ -752,7 +752,7 @@
       {
         "code": "UC",
         "raw": "Use conventions proficiently; use citations; transform ideas to create original texts; experiment with genres and styles.",
-        "to": ["bc.comp11.cc.23", "bc.comp11.cc.24"],
+        "to": ["bc.comp11.cc.23", "bc.comp11.cc.24", "bc.comp11.cc.21"],
         "kind": "merged"
       }
     ],
@@ -772,7 +772,7 @@
       {
         "code": "EI",
         "raw": "Exchange ideas respectfully; respond to texts creatively and critically; demonstrate speaking and listening skills across contexts.",
-        "to": ["bc.cw11.cc.15", "bc.cw11.cc.16"],
+        "to": ["bc.cw11.cc.15", "bc.cw11.cc.16", "bc.cw11.cc.14"],
         "kind": "merged"
       },
       {
@@ -816,7 +816,7 @@
       {
         "code": "TC",
         "raw": "Think critically and creatively; recognize personal, social, cultural contexts; understand how language constructs identities; evaluate literary elements; discern nuanced word meanings; identify bias, contradictions, distortions, omissions.",
-        "to": ["bc.ls11.cc.9", "bc.ls11.cc.11", "bc.ls11.cc.14", "bc.ls11.cc.15"],
+        "to": ["bc.ls11.cc.9", "bc.ls11.cc.11", "bc.ls11.cc.14", "bc.ls11.cc.15", "bc.ls11.cc.10", "bc.ls11.cc.13"],
         "kind": "merged"
       },
       {
@@ -950,7 +950,7 @@
       {
         "code": "IL",
         "raw": "Interpret local environments; apply First Peoples perspectives; seek patterns and trends; construct and analyze models and diagrams; draw evidence-based conclusions.",
-        "to": ["bc.chem11.cc.8", "bc.chem11.cc.9", "bc.chem11.cc.11", "bc.chem11.cc.12"],
+        "to": ["bc.chem11.cc.8", "bc.chem11.cc.9", "bc.chem11.cc.11", "bc.chem11.cc.12", "bc.chem11.cc.10"],
         "kind": "merged"
       },
       {
@@ -962,7 +962,7 @@
       {
         "code": "DP",
         "raw": "Design projects with real-world connections; solve problems through inquiry; implement multiple strategies; consider the role of scientists in innovation.",
-        "to": ["bc.chem11.cc.25", "bc.chem11.cc.28"],
+        "to": ["bc.chem11.cc.25", "bc.chem11.cc.28", "bc.chem11.cc.27"],
         "kind": "merged"
       },
       {
@@ -982,7 +982,7 @@
       {
         "code": "IP",
         "raw": "Identify patterns in data; apply scientific concepts to draw evidence-based conclusions; apply First Peoples perspectives.",
-        "to": ["bc.earth11.cc.12", "bc.earth11.cc.9"],
+        "to": ["bc.earth11.cc.12", "bc.earth11.cc.9", "bc.earth11.cc.10"],
         "kind": "merged"
       },
       {
@@ -1002,7 +1002,7 @@
       {
         "code": "IE",
         "raw": "Interpret environments; apply Indigenous perspectives; seek patterns in data; construct models; draw evidence-based conclusions.",
-        "to": ["bc.envsci11.cc.8", "bc.envsci11.cc.11", "bc.envsci11.cc.12"],
+        "to": ["bc.envsci11.cc.8", "bc.envsci11.cc.11", "bc.envsci11.cc.12", "bc.envsci11.cc.10"],
         "kind": "merged"
       },
       {
@@ -1028,13 +1028,20 @@
       {
         "code": "IL",
         "raw": "Interpret local environments; apply First Peoples perspectives; identify patterns and trends; construct graphs and models; draw evidence-based conclusions; analyze cause-and-effect relationships.",
-        "to": ["bc.ls11sci.cc.8", "bc.ls11sci.cc.9", "bc.ls11sci.cc.11", "bc.ls11sci.cc.12", "bc.ls11sci.cc.13"],
+        "to": [
+          "bc.ls11sci.cc.8",
+          "bc.ls11sci.cc.9",
+          "bc.ls11sci.cc.11",
+          "bc.ls11sci.cc.12",
+          "bc.ls11sci.cc.13",
+          "bc.ls11sci.cc.10"
+        ],
         "kind": "merged"
       },
       {
         "code": "AM",
         "raw": "Assess methods for errors and uncertainties; describe improvements; evaluate model validity; question assumptions and bias; consider evolving knowledge; critically analyze information sources.",
-        "to": ["bc.ls11sci.cc.16", "bc.ls11sci.cc.22"],
+        "to": ["bc.ls11sci.cc.16", "bc.ls11sci.cc.22", "bc.ls11sci.cc.17"],
         "kind": "merged"
       },
       {
@@ -1046,8 +1053,8 @@
       {
         "code": "FT",
         "raw": "Formulate theoretical models; construct evidence-based arguments; communicate scientific ideas using appropriate language and conventions.",
-        "to": ["bc.ls11sci.cc.30"],
-        "kind": "reworded"
+        "to": ["bc.ls11sci.cc.30", "bc.ls11sci.cc.29"],
+        "kind": "merged"
       }
     ],
     "PHYS11": [
@@ -1066,7 +1073,7 @@
       {
         "code": "AM",
         "raw": "Assess methods for sources of error; improve investigations; evaluate validity of models; critically analyze information sources.",
-        "to": ["bc.phys11.cc.16", "bc.phys11.cc.22"],
+        "to": ["bc.phys11.cc.16", "bc.phys11.cc.22", "bc.phys11.cc.15"],
         "kind": "merged"
       },
       {
@@ -1098,13 +1105,13 @@
       {
         "code": "PAA",
         "raw": "Use local and First Peoples knowledge; analyze patterns and trends; construct and interpret graphs and models; draw evidence-based conclusions; analyze cause-and-effect relationships.",
-        "to": ["bc.sfc11.cc.9", "bc.sfc11.cc.11", "bc.sfc11.cc.12", "bc.sfc11.cc.13"],
+        "to": ["bc.sfc11.cc.9", "bc.sfc11.cc.11", "bc.sfc11.cc.12", "bc.sfc11.cc.13", "bc.sfc11.cc.10"],
         "kind": "merged"
       },
       {
         "code": "AAI",
         "raw": "Contribute to community care through collaborative approaches; design projects with local and global applications; solve real-world problems; implement multiple strategies.",
-        "to": ["bc.sfc11.cc.24", "bc.sfc11.cc.25"],
+        "to": ["bc.sfc11.cc.24", "bc.sfc11.cc.25", "bc.sfc11.cc.27"],
         "kind": "merged"
       }
     ],
@@ -1288,7 +1295,7 @@
       {
         "code": "IDU",
         "raw": "Identify and understand contexts, values, and perspectives; understand how language constructs identities; construct connections; evaluate literary elements.",
-        "to": ["bc.cw12.cc.9", "bc.cw12.cc.10"],
+        "to": ["bc.cw12.cc.9", "bc.cw12.cc.10", "bc.cw12.cc.11", "bc.cw12.cc.12"],
         "kind": "merged"
       },
       {
@@ -1300,7 +1307,15 @@
       {
         "code": "SEA",
         "raw": "Select and apply speaking and listening skills in varied contexts; use writing and design processes; express and support opinions with evidence; assess and refine texts; manipulate language purposefully; use figurative and literal language; use writers' practices.",
-        "to": ["bc.cw12.cc.15", "bc.cw12.cc.18", "bc.cw12.cc.19", "bc.cw12.cc.23", "bc.cw12.cc.24", "bc.cw12.cc.25"],
+        "to": [
+          "bc.cw12.cc.15",
+          "bc.cw12.cc.18",
+          "bc.cw12.cc.19",
+          "bc.cw12.cc.23",
+          "bc.cw12.cc.24",
+          "bc.cw12.cc.25",
+          "bc.cw12.cc.17"
+        ],
         "kind": "merged"
       },
       {
@@ -1336,7 +1351,8 @@
           "bc.efp12.cc.13",
           "bc.efp12.cc.14",
           "bc.efp12.cc.15",
-          "bc.efp12.cc.16"
+          "bc.efp12.cc.16",
+          "bc.efp12.cc.10"
         ],
         "kind": "merged"
       },
@@ -1349,7 +1365,7 @@
       {
         "code": "RET",
         "raw": "Respond to texts personally, creatively, and critically; use writing and design processes; assess and refine texts; experiment with genres, forms, and styles.",
-        "to": ["bc.efp12.cc.21", "bc.efp12.cc.23", "bc.efp12.cc.24"],
+        "to": ["bc.efp12.cc.21", "bc.efp12.cc.23", "bc.efp12.cc.24", "bc.efp12.cc.22"],
         "kind": "merged"
       },
       {
@@ -1399,7 +1415,7 @@
       {
         "code": "USW",
         "raw": "Use writing and design processes; express and support opinions with evidence to achieve purpose; reflect, assess, and refine texts.",
-        "to": ["bc.es12.cc.20", "bc.es12.cc.21"],
+        "to": ["bc.es12.cc.20", "bc.es12.cc.21", "bc.es12.cc.19"],
         "kind": "merged"
       },
       {
@@ -1431,7 +1447,7 @@
       {
         "code": "PEA",
         "raw": "Recognize and analyze personal, social, cultural contexts; understand how language constructs identities; construct connections; analyze literary elements; recognize text structures; discern nuanced word meanings.",
-        "to": ["bc.ls12.cc.10", "bc.ls12.cc.11", "bc.ls12.cc.14", "bc.ls12.cc.15"],
+        "to": ["bc.ls12.cc.10", "bc.ls12.cc.11", "bc.ls12.cc.14", "bc.ls12.cc.15", "bc.ls12.cc.12", "bc.ls12.cc.13"],
         "kind": "merged"
       },
       {
@@ -1443,13 +1459,13 @@
       {
         "code": "RET",
         "raw": "Respond to text personally, creatively, and critically; select and apply speaking and listening skills for varied formal and informal contexts; use writing and design processes.",
-        "to": ["bc.ls12.cc.17", "bc.ls12.cc.18"],
+        "to": ["bc.ls12.cc.17", "bc.ls12.cc.18", "bc.ls12.cc.19"],
         "kind": "merged"
       },
       {
         "code": "EXS",
         "raw": "Express and support opinions with evidence; reflect, assess, and refine texts; use conventions proficiently; use citations; transform ideas to create original texts.",
-        "to": ["bc.ls12.cc.20", "bc.ls12.cc.21", "bc.ls12.cc.24"],
+        "to": ["bc.ls12.cc.20", "bc.ls12.cc.21", "bc.ls12.cc.24", "bc.ls12.cc.22"],
         "kind": "merged"
       }
     ],
@@ -1457,7 +1473,7 @@
       {
         "code": "USL",
         "raw": "Use logic and patterns to solve puzzles and play games; use reasoning and logic to explore, analyze, and apply mathematical ideas; estimate reasonably; demonstrate and apply mental math strategies; use tools or technology to explore and create patterns and relationships; model mathematics in contextualized experiences.",
-        "to": ["bc.appm12.cc.1", "bc.appm12.cc.2", "bc.appm12.cc.4"],
+        "to": ["bc.appm12.cc.1", "bc.appm12.cc.2", "bc.appm12.cc.4", "bc.appm12.cc.3"],
         "kind": "merged"
       },
       {
@@ -1469,7 +1485,7 @@
       {
         "code": "USM",
         "raw": "Use mathematical vocabulary and language to contribute to mathematical discussions; explain and justify mathematical ideas and decisions; communicate mathematical thinking in many ways; represent mathematical ideas in concrete, pictorial, and symbolic forms.",
-        "to": ["bc.appm12.cc.13", "bc.appm12.cc.11", "bc.appm12.cc.15", "bc.appm12.cc.12"],
+        "to": ["bc.appm12.cc.13", "bc.appm12.cc.11", "bc.appm12.cc.12"],
         "kind": "merged"
       },
       {
@@ -1509,7 +1525,7 @@
       {
         "code": "THS",
         "raw": "Develop thinking strategies to solve puzzles and play games; explore, analyze, and apply mathematical ideas using reason, technology, and other tools; estimate reasonably; model with mathematics in situational contexts; think creatively with curiosity.",
-        "to": ["bc.fom12.cc.1", "bc.fom12.cc.2", "bc.fom12.cc.4", "bc.fom12.cc.5"],
+        "to": ["bc.fom12.cc.1", "bc.fom12.cc.2", "bc.fom12.cc.4", "bc.fom12.cc.5", "bc.fom12.cc.3"],
         "kind": "merged"
       },
       {
@@ -1535,25 +1551,25 @@
       {
         "code": "QAP",
         "raw": "Sustain intellectual curiosity; make observations to identify questions; formulate multiple hypotheses.",
-        "to": ["bc.geo12.cc.2", "bc.geo12.cc.3"],
+        "to": ["bc.geo12.cc.2", "bc.geo12.cc.3", "bc.geo12.cc.1"],
         "kind": "merged"
       },
       {
         "code": "IP",
         "raw": "Classify and interpret data; apply First Peoples perspectives; analyze patterns and relationships; construct and interpret models.",
-        "to": ["bc.geo12.cc.9", "bc.geo12.cc.13", "bc.geo12.cc.11"],
+        "to": ["bc.geo12.cc.9", "bc.geo12.cc.13", "bc.geo12.cc.11", "bc.geo12.cc.10"],
         "kind": "merged"
       },
       {
         "code": "EM",
         "raw": "Evaluate methods and identify errors; improve investigation quality; assess validity of models; consider ethical implications.",
-        "to": ["bc.geo12.cc.15", "bc.geo12.cc.21"],
+        "to": ["bc.geo12.cc.15", "bc.geo12.cc.21", "bc.geo12.cc.14"],
         "kind": "merged"
       },
       {
         "code": "SC",
         "raw": "Formulate theoretical models; communicate scientific ideas with evidence; express perspectives through place-based connections.",
-        "to": ["bc.geo12.cc.29", "bc.geo12.cc.31"],
+        "to": ["bc.geo12.cc.29", "bc.geo12.cc.31", "bc.geo12.cc.30"],
         "kind": "merged"
       }
     ],
@@ -1587,7 +1603,7 @@
       {
         "code": "THS",
         "raw": "Develop thinking strategies; explore and apply mathematical ideas using reason, technology, and tools; estimate reasonably; model with mathematics in situational contexts; think creatively with curiosity.",
-        "to": ["bc.wpm11.cc.1", "bc.wpm11.cc.2", "bc.wpm11.cc.4", "bc.wpm11.cc.5"],
+        "to": ["bc.wpm11.cc.1", "bc.wpm11.cc.2", "bc.wpm11.cc.4", "bc.wpm11.cc.5", "bc.wpm11.cc.3"],
         "kind": "merged"
       },
       {
@@ -1641,7 +1657,7 @@
       {
         "code": "PAD",
         "raw": "Seek patterns in data; construct graphs; draw evidence-based conclusions.",
-        "to": ["bc.anat12.cc.11", "bc.anat12.cc.12"],
+        "to": ["bc.anat12.cc.11", "bc.anat12.cc.12", "bc.anat12.cc.10"],
         "kind": "merged"
       },
       {
@@ -1699,13 +1715,13 @@
       {
         "code": "QAP",
         "raw": "Sustain intellectual curiosity; make observations to identify questions; formulate multiple hypotheses and predict outcomes.",
-        "to": ["bc.chem12.cc.2", "bc.chem12.cc.3"],
+        "to": ["bc.chem12.cc.2", "bc.chem12.cc.3", "bc.chem12.cc.1"],
         "kind": "merged"
       },
       {
         "code": "IG",
         "raw": "Interpret environments; apply First Peoples perspectives; seek patterns in data; construct and analyze graphs and models; draw evidence-based conclusions.",
-        "to": ["bc.chem12.cc.8", "bc.chem12.cc.9", "bc.chem12.cc.11", "bc.chem12.cc.12"],
+        "to": ["bc.chem12.cc.8", "bc.chem12.cc.9", "bc.chem12.cc.11", "bc.chem12.cc.12", "bc.chem12.cc.10"],
         "kind": "merged"
       }
     ],
@@ -1719,13 +1735,20 @@
       {
         "code": "PI",
         "raw": "Collaboratively plan and select appropriate investigation methods; assess risks and ethical issues; use SI units and equipment systematically; apply accuracy and precision concepts.",
-        "to": ["bc.envsci12.cc.4", "bc.envsci12.cc.5", "bc.envsci12.cc.7"],
+        "to": ["bc.envsci12.cc.4", "bc.envsci12.cc.5", "bc.envsci12.cc.7", "bc.envsci12.cc.6"],
         "kind": "merged"
       },
       {
         "code": "IG",
         "raw": "Interpret local environments; apply First Peoples perspectives; analyze patterns and trends; construct and interpret graphs; draw evidence-based conclusions; analyze cause-and-effect relationships.",
-        "to": ["bc.envsci12.cc.8", "bc.envsci12.cc.9", "bc.envsci12.cc.11", "bc.envsci12.cc.12", "bc.envsci12.cc.13"],
+        "to": [
+          "bc.envsci12.cc.8",
+          "bc.envsci12.cc.9",
+          "bc.envsci12.cc.11",
+          "bc.envsci12.cc.12",
+          "bc.envsci12.cc.13",
+          "bc.envsci12.cc.10"
+        ],
         "kind": "merged"
       },
       {
@@ -1751,13 +1774,13 @@
       {
         "code": "IG",
         "raw": "Seek patterns in data; construct and interpret graphs and models; draw evidence-based conclusions.",
-        "to": ["bc.phys12.cc.11", "bc.phys12.cc.12"],
+        "to": ["bc.phys12.cc.11", "bc.phys12.cc.12", "bc.phys12.cc.10"],
         "kind": "merged"
       },
       {
         "code": "EM",
         "raw": "Assess experimental methods; identify error sources; evaluate model validity; consider social and ethical implications.",
-        "to": ["bc.phys12.cc.16", "bc.phys12.cc.21"],
+        "to": ["bc.phys12.cc.16", "bc.phys12.cc.21", "bc.phys12.cc.14"],
         "kind": "merged"
       }
     ],
@@ -1853,7 +1876,7 @@
       {
         "code": "RR",
         "raw": "Draw conclusions, assess positions, demonstrate leadership, identify problems, evaluate data, interpret maps/graphs/tables, cite sources, construct visual representations.",
-        "to": ["bc.bcfp12.cc.4"],
+        "to": ["bc.bcfp12.cc.1"],
         "kind": "reworded"
       },
       {
@@ -2482,13 +2505,13 @@
       {
         "code": "IP",
         "raw": "Construct and use methods to represent data; seek patterns and connections; apply First Peoples perspectives as information sources.",
-        "to": ["bc.sci8.cc.14", "bc.sci8.cc.12"],
+        "to": ["bc.sci8.cc.14", "bc.sci8.cc.12", "bc.sci8.cc.13"],
         "kind": "merged"
       },
       {
         "code": "EM",
         "raw": "Reflect on investigation methods; identify sources of error; consider social, ethical, and environmental implications.",
-        "to": ["bc.sci8.cc.17", "bc.sci8.cc.21"],
+        "to": ["bc.sci8.cc.17", "bc.sci8.cc.21", "bc.sci8.cc.16"],
         "kind": "merged"
       },
       {
@@ -2758,7 +2781,7 @@
       {
         "code": "RPA",
         "raw": "Participate daily in fitness-enhancing physical activity; describe how school, home, and community activities influence health; develop strategies for promoting healthy eating choices; assess factors influencing healthy choices; identify and analyze health message sources and their behavioural influence; identify and apply personal healthy-living goal strategies; reflect on outcomes and assess personal goal strategies.",
-        "to": ["bc.phe9.cc.6", "bc.phe9.cc.7", "bc.phe9.cc.14", "bc.phe9.cc.9", "bc.phe9.cc.10", "bc.phe9.cc.11"],
+        "to": ["bc.phe9.cc.6", "bc.phe9.cc.7", "bc.phe9.cc.9", "bc.phe9.cc.10", "bc.phe9.cc.11", "bc.phe9.cc.8"],
         "kind": "merged"
       },
       {
@@ -2784,13 +2807,13 @@
       {
         "code": "IG",
         "raw": "Apply First Peoples perspectives; seek patterns, trends, and connections; construct and analyze graphs and models; analyze cause-and-effect relationships.",
-        "to": ["bc.sci9.cc.9", "bc.sci9.cc.11", "bc.sci9.cc.13"],
+        "to": ["bc.sci9.cc.9", "bc.sci9.cc.11", "bc.sci9.cc.13", "bc.sci9.cc.10"],
         "kind": "merged"
       },
       {
         "code": "EM",
         "raw": "Evaluate methods; identify errors and alternative explanations; consider knowledge change over time; exercise informed skepticism; consider social, ethical, and environmental implications.",
-        "to": ["bc.sci9.cc.18", "bc.sci9.cc.21"],
+        "to": ["bc.sci9.cc.18", "bc.sci9.cc.21", "bc.sci9.cc.14", "bc.sci9.cc.20"],
         "kind": "merged"
       },
       {
@@ -2802,7 +2825,7 @@
       {
         "code": "SC",
         "raw": "Formulate theoretical models; communicate scientific ideas and evidence-based arguments; express varied worldviews through place.",
-        "to": ["bc.sci9.cc.28", "bc.sci9.cc.30"],
+        "to": ["bc.sci9.cc.28", "bc.sci9.cc.30", "bc.sci9.cc.29"],
         "kind": "merged"
       }
     ],
