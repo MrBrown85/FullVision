@@ -41,8 +41,6 @@ window.PageAssignments = (function () {
   var _mergeTargetId = null;
   var _mergeHoverTimer = null;
   var _mergeAnimating = false;
-  var collabPairMode = 'random';
-  var collabGroupMode = 'random';
   var focusStudentId = null;
   var _searchTimer = null;
   // Collaboration delegation (now in assign-collab.js)
@@ -78,6 +76,14 @@ window.PageAssignments = (function () {
   }
   function collabRandomGroups() {
     AC.collabRandomGroups();
+    _syncCollabState();
+  }
+  function collabManualPairs() {
+    AC.collabManualPairs();
+    _syncCollabState();
+  }
+  function collabManualGroups() {
+    AC.collabManualGroups();
     _syncCollabState();
   }
   function collabSetGroupCount(delta) {
@@ -2726,8 +2732,8 @@ window.PageAssignments = (function () {
     if (newCollaboration !== 'individual') newAssess.collaboration = newCollaboration;
     if (collabExcluded.size > 0) newAssess.excludedStudents = Array.from(collabExcluded);
     if (newCollaboration === 'pair' && collabPairs.length > 0) newAssess.pairs = collabPairs;
-    if (newCollaboration === 'group' && collabGroups.length > 0) {
-      newAssess.groups = collabGroups;
+    if (newCollaboration === 'group') {
+      if (collabGroups.length > 0) newAssess.groups = collabGroups;
       newAssess.groupCount = collabGroupCount;
     }
     var scoreModeVal = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
@@ -6727,20 +6733,16 @@ window.PageAssignments = (function () {
         collabCheckNone();
       },
       collabRandomPairs: function () {
-        collabPairMode = 'random';
         collabRandomPairs();
       },
       collabManualPairs: function () {
-        collabPairMode = 'manual';
-        renderCollabPanel();
+        collabManualPairs();
       },
       collabRandomGroups: function () {
-        collabGroupMode = 'random';
         collabRandomGroups();
       },
       collabManualGroups: function () {
-        collabGroupMode = 'manual';
-        renderCollabPanel();
+        collabManualGroups();
       },
       collabSetGroupCount: function () {
         collabSetGroupCount(parseInt(el.dataset.delta, 10));
