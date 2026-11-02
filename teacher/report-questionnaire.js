@@ -5253,6 +5253,7 @@ window.ReportQuestionnaire = (function () {
     var used = {};
     rows.forEach(function (r) {
       used[r.id] = true;
+      if (r.from) used[r.from] = true;
     });
     var list = browseList(b.part, ctx, { fits: b.fits, q: b.q, usage: _usage(cid, student), inUse: used });
     _initGroups(b.part, list.own);
@@ -5269,9 +5270,13 @@ window.ReportQuestionnaire = (function () {
       var meta = r.inUse ? 'In use' + (n ? ' · used for ' + _plural(n, 'classmate', 'classmates') : '') : _usedMeta(n);
       var ctrl = r.inUse
         ? inUse
-        : `<button type="button" class="qn-browse-use" data-action="tqSentences" data-do="use" data-sentence="${esc(r.id)}"${r.fits ? '' : ' disabled'} title="${esc(
+        : `<button type="button" class="qn-browse-use" data-action="tqSentences" data-do="use" data-sentence="${esc(r.id)}" data-case="${esc(r.case)}" title="${esc(
             !r.fits
-              ? 'This sentence needs a fact FullVision does not have for ' + first + '.'
+              ? 'Puts this sentence in ' +
+                  first +
+                  '’s comment as written, as your own sentence. It may not match ' +
+                  first +
+                  '’s marks, so check it.'
               : b.gap != null && _replacedBy(rows, _bankById(r.id) || {}) < 0
                 ? 'Puts this sentence in ' + first + '’s comment, at the place you chose.'
                 : 'Puts this sentence in ' + first + '’s comment.',
@@ -5453,13 +5458,18 @@ window.ReportQuestionnaire = (function () {
       out[at] = row;
       return out;
     }
+    out.splice(_stepPos(out, step), 0, row);
+    return out;
+  }
+  /* Where a row of `step` goes in: after the last row of a step at or
+     before it. */
+  function _stepPos(rows, step) {
     var si = _stepAt(step);
     var pos = 0;
-    out.forEach(function (r, i) {
+    rows.forEach(function (r, i) {
       if (r.step && _stepAt(r.step) <= si) pos = i + 1;
     });
-    out.splice(pos, 0, row);
-    return out;
+    return pos;
   }
   /* The row a bank sentence picked at a gap replaces, or -1 to put it in
      there: the row of the same step (one grade sentence, one next step, one
@@ -5488,11 +5498,38 @@ window.ReportQuestionnaire = (function () {
     });
     return p ? p.id : 'grade';
   }
-  function _useSentence(st, id) {
+  /* Use on a sentence that does not fit the student (a fact missing, or
+     another case's sentence): it goes in as the row shows it, as the
+     teacher's own sentence, so it is theirs to check and is never checked
+     against the marks (Colin, 2026-11-02: "don't block users from custom
+     actions"). At the gap, else where its step falls. */
+  function _useAsWritten(st, s, ctx, caseId) {
+    var b = _browse || {};
+    var part = b.part || (partOf(CommentBank.stepOf(s)) || {}).id;
+    var hit = browseList(part, ctx, {}).rows.find(function (r) {
+      return r.id === s.id && (!caseId || r.case === caseId);
+    });
+    var row = typedRow(hit ? hit.text : _preview(s, ctx));
+    row.from = s.id;
+    var key = _rowKey(st);
+    var rows = _rowsFor(st, _facts(st));
+    var at = b.gap != null ? b.gap : _stepPos(rows, CommentBank.stepOf(s));
+    _rows[key] = insertRow(rows, row, at);
+    _markAdded(st, row);
+    if (b.gap != null) b.gap++;
+  }
+  function _useSentence(st, id, caseId) {
     var s = _bankById(id);
     var f = _facts(st);
     var ctx = _bankContext(_activeCourse, st, f);
-    if (!s || !CommentBank.fits(s, ctx)) return;
+    if (!s) return;
+    if (!CommentBank.fits(s, ctx)) {
+      _useAsWritten(st, s, ctx, caseId);
+      _writeRows(st);
+      _syncBrowse();
+      _focusSel('#tq-browse-list .qn-browse-row.on');
+      return;
+    }
     var key = _rowKey(st);
     var rows = _rowsFor(st, f);
     var at = _browse && _browse.gap != null ? _replacedBy(rows, s) : -1;
@@ -5646,7 +5683,7 @@ window.ReportQuestionnaire = (function () {
       }
       case 'use':
         tqSaveCurrentIfNeeded();
-        _useSentence(st, ds.sentence);
+        _useSentence(st, ds.sentence, ds.case);
         return;
       case 'useLine':
         tqLine('pickSupport', { dataset: { line: ds.line } });
