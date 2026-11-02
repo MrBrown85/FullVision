@@ -227,6 +227,7 @@ describe('v2 learning-map structural dispatch (window.v2.*)', () => {
         p_display_order: 0,
         p_i_can_statements: null,
         p_source_text: null,
+        p_bank_id: null,
         p_idempotency_key: expect.any(String),
       });
     });
