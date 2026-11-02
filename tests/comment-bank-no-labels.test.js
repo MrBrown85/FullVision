@@ -27,6 +27,40 @@ describe('no bare competency labels in the shared bank', () => {
     );
   });
 
+  it('keeps a retired sentence in a saved draft as written', () => {
+    const f = {
+      cid: 'retired',
+      sid: 's1',
+      name: 'Noor',
+      first: 'Noor',
+      family: 'science',
+      pronouns: { subj: 'they', obj: 'them', poss: 'their', refl: 'themselves' },
+      pronounsOnFile: true,
+      comps: [],
+      work: [],
+      voice: {},
+      confidence: [],
+      record: { total: 0, handed: 0, late: 0, missing: 0 },
+      notHandedIn: { count: 0, titles: [], groups: [] },
+      habits: {},
+      overall: 0,
+      standing: '',
+      letter: '',
+      grade: { mode: 'proficiency', pieces: [] },
+      levelText: () => '',
+      classLines: { support: [], pick: null, closing: '', late: '', charLimit: null },
+    };
+    const text = 'Their next step is in Evidence: “I can weigh evidence.”';
+    const d = {
+      text,
+      sentences: [{ id: 'g01', step: 'nextStep', text }],
+      provenance: [{ sentenceId: 'g01', values: {}, sources: {}, facts: [] }],
+    };
+    const r = CommentBank.verify(d, f, {});
+    expect(r.replaced).toEqual([]);
+    expect(r.sentences[0].text).toBe(text);
+  });
+
   describe('Demo Mode: every sentence a student is offered', () => {
     let cid, saved;
     beforeAll(() => {
