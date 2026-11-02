@@ -9096,7 +9096,8 @@ window.DashClassManager = (function () {
         if (ok) renderClassManager();
       });
     }
-    var editing = !!_cmLevelsEdit[sec.id];
+    // The open form: { drafts: { level: text }, base: { level: text the field was filled with } }.
+    var editing = _cmLevelsEdit[sec.id] || null;
     var own = (typeof RubricDraft !== 'undefined' && getCompetencyDescriptor(RubricDraft.competencyKey(tag))) || {};
     var head =
       '<div class="cm-std-section-head"><span class="cm-label cm-std-section-label" id="cm-std-levels-label-' +
@@ -9112,13 +9113,17 @@ window.DashClassManager = (function () {
       ? '<div class="cm-levels-edit">' +
         levels
           .map(function (l, i) {
+            if (!(l in editing.base)) editing.base[l] = own[l] || lines[i].descriptor;
+            var val = l in editing.drafts ? editing.drafts[l] : editing.base[l];
             return (
               '<label class="cm-levels-edit-row"><span class="cm-levels-word">' +
               esc(lines[i].word) +
               '</span><textarea class="cm-textarea cm-levels-input" rows="2" data-level="' +
               l +
-              '" data-stop-prop="true">' +
-              esc(own[l] || lines[i].descriptor) +
+              '" data-secid="' +
+              sec.id +
+              '" data-stop-prop="true" data-action-input="cmLevelsDraft">' +
+              esc(val) +
               '</textarea></label>'
             );
           })
@@ -9149,7 +9154,7 @@ window.DashClassManager = (function () {
   function cmLevelsEdit(secId) {
     var entry = _cmStdEntry(secId);
     if (!entry) return;
-    _cmLevelsEdit[entry.sec.id] = true;
+    _cmLevelsEdit[entry.sec.id] = { drafts: {}, base: {} };
     renderClassManager();
     requestAnimationFrame(function () {
       var el = document.querySelector('#cm-std-' + entry.sec.id + ' .cm-levels-input');
@@ -9161,16 +9166,25 @@ window.DashClassManager = (function () {
     delete _cmLevelsEdit[secId];
     renderClassManager();
   }
-  /* Saves what differs from the curriculum wording as the teacher's own; a
-     level left empty, or the same as that wording, forgets the own text. */
+  // What the teacher types is kept as they type, so a redraw of the card
+  // (another field's save) keeps it.
+  function cmLevelsDraft(secId, level, val) {
+    var form = _cmLevelsEdit[secId] || _cmLevelsEdit[_currentId('section', secId)];
+    if (form) form.drafts[level] = val;
+  }
+  /* Saves each level the teacher changed: its text as their own, or, emptied,
+     back to the curriculum wording. A level left as it was filled is not
+     saved, so wording shown before the bank loaded never becomes their own. */
   function cmLevelsSave(secId) {
     var entry = _cmStdEntry(secId);
-    if (!entry || typeof RubricDraft === 'undefined') return;
+    var form = entry && _cmLevelsEdit[entry.sec.id];
+    if (!form || typeof RubricDraft === 'undefined') return;
     var key = RubricDraft.competencyKey(entry.tag);
     var entries = [];
-    document.querySelectorAll('#cm-std-' + entry.sec.id + ' .cm-levels-input').forEach(function (ta) {
-      var level = Number(ta.dataset.level);
-      var text = String(ta.value || '').trim();
+    Object.keys(form.drafts).forEach(function (l) {
+      var level = Number(l);
+      var text = String(form.drafts[l] || '').trim();
+      if (text === String(form.base[l] || '').trim()) return;
       var base = RubricPrint.levelWording(entry.tag, level, true).text;
       var baseLine = window.CompetencyWording ? CompetencyWording.sentence(base) : base;
       if (text === baseLine || text === base) text = '';
@@ -9686,6 +9700,10 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionInput === 'cmStdCodeLive') {
       cmStdCodeLive(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionInput === 'cmLevelsDraft') {
+      cmLevelsDraft(el.dataset.secid, Number(el.dataset.level), el.value);
       return true;
     }
     if (el.dataset.actionInput === 'cmStdLabelLive') {

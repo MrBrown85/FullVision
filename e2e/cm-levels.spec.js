@@ -55,3 +55,17 @@ test('Levels shows each descriptor and next step; Write Your Own saves to the de
   await card.locator('[data-action="cmLevelsSave"]').click();
   await expect(card.locator('.cm-level-row').nth(1)).toContainText('with growing consistency');
 });
+
+test('typed wording survives a redraw of the card from another field', async ({ page }) => {
+  const card = await open(page);
+  await card.locator('[data-action="cmLevelsEdit"]').click();
+  await card.locator('.cm-levels-input[data-level="3"]').fill('Names the trend and the outlier');
+  // The Code field's blur saves and redraws the manager.
+  const code = card.locator('.cm-std-code-input');
+  await code.fill('IPX');
+  await code.blur();
+  await expect(card.locator('.cm-levels-input[data-level="3"]')).toHaveValue('Names the trend and the outlier');
+  await expect(card.locator('.cm-levels-input[data-level="2"]')).toHaveValue(
+    'Finds patterns and connections in data with growing consistency.',
+  );
+});
