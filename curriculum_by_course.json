@@ -6344,18 +6344,18 @@
     "subject": "Social Studies",
     "categories": [
       {
-        "name": "Use Social Studies inquiry processes and skills",
+        "name": "Inquiry",
         "competencies": [
           {
-            "id": "cc_ss10_inquiry_1",
+            "id": "bc.ss10.cc.1",
             "short_label": "Inquiry",
-            "tag": "USS",
-            "raw": "Use Social Studies inquiry processes to ask questions, gather and analyze information, and communicate findings.",
+            "tag": "INQ",
+            "raw": "Use Social Studies inquiry processes and skills to ask questions; gather, interpret, and analyze ideas; and communicate findings and decisions",
             "i_can_statements": [
-              "I can develop meaningful research questions about Canadian history and current events.",
-              "I can collect and organize information from a variety of credible sources.",
-              "I can present my conclusions clearly in writing, discussion, or multimedia.",
-              "I can adjust my conclusions when I find new or contradictory evidence."
+              "I can ask a question and investigate it using Social Studies inquiry",
+              "I can gather ideas from sources and interpret what they mean",
+              "I can analyze the ideas I gather to answer my question",
+              "I can communicate my findings and the decisions I reached"
             ]
           }
         ]
@@ -6364,14 +6364,14 @@
         "name": "Significance",
         "competencies": [
           {
-            "id": "cc_ss10_sig_1",
+            "id": "bc.ss10.cc.2",
             "short_label": "Significance",
-            "tag": "AS",
-            "raw": "Assess the significance of people, places, events, or developments in Canadian and world history.",
+            "tag": "SIG",
+            "raw": "Assess the significance of people, places, events, or developments, and compare varying perspectives on their significance at particular times and places, and from group to group (significance)",
             "i_can_statements": [
-              "I can explain what makes a person, event, or development historically significant.",
-              "I can show how the same event can be seen as more or less significant depending on who you ask.",
-              "I can evaluate significance using criteria like duration, breadth of impact, and depth of change."
+              "I can explain why a person, place, or event was significant",
+              "I can use criteria to assess how significant a development was",
+              "I can compare how different groups saw the significance of an event"
             ]
           }
         ]
@@ -6380,48 +6380,46 @@
         "name": "Evidence",
         "competencies": [
           {
-            "id": "cc_ss10_ev_1",
+            "id": "bc.ss10.cc.3",
             "short_label": "Evidence",
-            "tag": "ACA",
-            "raw": "Assess competing accounts by investigating source reliability and adequacy of evidence.",
+            "tag": "EVI",
+            "raw": "Assess the justification for competing accounts after investigating points of contention, reliability of sources, and adequacy of evidence, including data (evidence)",
             "i_can_statements": [
-              "I can compare two accounts of the same event and evaluate which is better supported.",
-              "I can identify bias, perspective, and purpose in a historical or media source.",
-              "I can explain what makes some evidence stronger than others.",
-              "I can identify gaps or silences in historical accounts."
+              "I can assess how well competing accounts are justified",
+              "I can identify the points of contention between accounts",
+              "I can assess the reliability of a source",
+              "I can judge whether evidence, including data, is adequate"
             ]
           }
         ]
       },
       {
-        "name": "Continuity and Change",
+        "name": "Continuity & Change",
         "competencies": [
           {
-            "id": "cc_ss10_cc_1",
-            "short_label": "Continuity and Change",
-            "tag": "CCC",
-            "raw": "Compare and contrast continuities and changes for different groups.",
+            "id": "bc.ss10.cc.4",
+            "short_label": "Continuity & Change",
+            "tag": "CHG",
+            "raw": "Compare and contrast continuities and changes for different groups at particular times and places (continuity and change)",
             "i_can_statements": [
-              "I can describe how life changed for Canadians during a specific era.",
-              "I can identify what aspects of Canadian society have remained consistent across time.",
-              "I can show how the same historical period was experienced differently by different groups (e.g., First Nations vs. settlers, men vs. women)."
+              "I can compare and contrast continuities for different groups at a particular time and place",
+              "I can compare and contrast changes for different groups at a particular time and place"
             ]
           }
         ]
       },
       {
-        "name": "Cause and Consequence",
+        "name": "Cause & Consequence",
         "competencies": [
           {
-            "id": "cc_ss10_caus_1",
-            "short_label": "Cause and Consequence",
-            "tag": "AHU",
-            "raw": "Assess how underlying conditions and the actions of individuals or groups influence historical and contemporary events.",
+            "id": "bc.ss10.cc.5",
+            "short_label": "Cause & Consequence",
+            "tag": "CAU",
+            "raw": "Assess how underlying conditions and the actions of individuals or groups influence events, decisions, or developments, and analyze multiple consequences (cause and consequence)",
             "i_can_statements": [
-              "I can identify multiple layers of cause for a historical event.",
-              "I can evaluate how one person's or group's actions changed the course of events.",
-              "I can trace the short- and long-term consequences of a policy, law, or decision.",
-              "I can distinguish between causes that were economic, political, social, or ideological."
+              "I can assess how underlying conditions influenced an event, decision, or development",
+              "I can assess how the actions of individuals or groups influenced an event or decision",
+              "I can analyze the multiple consequences of an event or decision"
             ]
           }
         ]
@@ -6430,14 +6428,14 @@
         "name": "Perspective",
         "competencies": [
           {
-            "id": "cc_ss10_persp_1",
+            "id": "bc.ss10.cc.6",
             "short_label": "Perspective",
-            "tag": "EID",
-            "raw": "Explain and infer different perspectives on past or present issues by considering prevailing norms, values, and worldviews.",
+            "tag": "PER",
+            "raw": "Explain and infer different perspectives on past or present people, places, issues, or events by considering prevailing norms, values, worldviews, and beliefs (perspective)",
             "i_can_statements": [
-              "I can explain how a Canadian government policy was seen differently by different communities.",
-              "I can take the perspective of a marginalized group and explain how they experienced a historical event.",
-              "I can compare how Indigenous and non-Indigenous Canadians might view the same law or event."
+              "I can explain different perspectives on a past or present issue or event",
+              "I can infer how people in the past or present saw an issue",
+              "I can show how prevailing norms and worldviews shaped a perspective"
             ]
           }
         ]
@@ -6446,15 +6444,14 @@
         "name": "Ethical Judgment",
         "competencies": [
           {
-            "id": "cc_ss10_eth_1",
+            "id": "bc.ss10.cc.7",
             "short_label": "Ethical Judgment",
-            "tag": "MRE",
-            "raw": "Make reasoned ethical judgments about actions in the past and present.",
+            "tag": "ETH",
+            "raw": "Make reasoned ethical judgments about actions in the past and present, and assess appropriate ways to remember and respond (ethical judgment)",
             "i_can_statements": [
-              "I can make an ethical judgment about a Canadian government policy while considering historical context.",
-              "I can discuss what 'reconciliation' means and what it might require of individuals and the government.",
-              "I can evaluate whether apologies and redress are adequate responses to historical injustices.",
-              "I can distinguish between acknowledging wrongdoing and assigning collective guilt."
+              "I can make a reasoned ethical judgment about a past or present action",
+              "I can assess appropriate ways to remember a past action",
+              "I can assess appropriate ways to respond to an action"
             ]
           }
         ]
@@ -26561,18 +26558,18 @@
     "subject": "Social Studies",
     "categories": [
       {
-        "name": "Use historical inquiry processes and skills",
+        "name": "Inquiry",
         "competencies": [
           {
-            "id": "cc_hist12_inquiry_1",
-            "short_label": "Historical Inquiry",
-            "tag": "HI",
-            "raw": "Use historical inquiry to ask questions, gather, interpret, and analyze ideas, and communicate findings.",
+            "id": "bc.hist12.cc.1",
+            "short_label": "Inquiry",
+            "tag": "INQ",
+            "raw": "Use historical inquiry processes and skills to ask questions; gather, interpret, and analyze ideas; and communicate findings and decisions",
             "i_can_statements": [
-              "I can formulate meaningful historical inquiry questions.",
-              "I can gather and evaluate historical sources to build a reasoned argument.",
-              "I can present my historical findings in a well-structured and evidence-based format.",
-              "I can revise my interpretations when confronted with new evidence."
+              "I can ask a question and investigate it using historical inquiry",
+              "I can gather ideas from sources and interpret what they mean",
+              "I can analyze the ideas I gather to answer my question",
+              "I can communicate my findings and the decisions I reached"
             ]
           }
         ]
@@ -26581,14 +26578,14 @@
         "name": "Significance",
         "competencies": [
           {
-            "id": "cc_hist12_sig_1",
+            "id": "bc.hist12.cc.2",
             "short_label": "Significance",
-            "tag": "HD",
-            "raw": "Assess the significance of people, locations, events, and developments in 20th century world history.",
+            "tag": "SIG",
+            "raw": "Assess the significance of people, locations, events, and developments, and compare varying perspectives on their historical significance at particular times and places, and from group to group (significance)",
             "i_can_statements": [
-              "I can apply criteria (scale, duration, depth of change) to evaluate historical significance.",
-              "I can compare how the same event is viewed as significant by different nations or groups.",
-              "I can argue for a ranking of the most significant events of the 20th century with evidence."
+              "I can explain why a person, place, or event was significant",
+              "I can use criteria to assess how significant a development was",
+              "I can compare how different groups saw the significance of an event"
             ]
           }
         ]
@@ -26597,47 +26594,46 @@
         "name": "Evidence",
         "competencies": [
           {
-            "id": "cc_hist12_ev_1",
-            "short_label": "Analyze Sources",
-            "tag": "AS",
-            "raw": "Assess the justification for competing historical accounts by investigating source reliability and adequacy of evidence.",
+            "id": "bc.hist12.cc.3",
+            "short_label": "Evidence",
+            "tag": "EVI",
+            "raw": "Assess the justification for competing historical accounts after investigating points of contention, reliability of sources, and adequacy of evidence (evidence)",
             "i_can_statements": [
-              "I can compare two competing historical accounts and evaluate which is more credible.",
-              "I can identify bias, perspective, and motive in primary and secondary sources.",
-              "I can explain what evidence is sufficient to support a historical claim.",
-              "I can analyze propaganda as a historical source."
+              "I can assess how well competing historical accounts are justified",
+              "I can identify the points of contention between accounts",
+              "I can assess the reliability of a source",
+              "I can judge whether evidence is adequate"
             ]
           }
         ]
       },
       {
-        "name": "Continuity and Change",
+        "name": "Continuity & Change",
         "competencies": [
           {
-            "id": "cc_hist12_cc_1",
-            "short_label": "Continuity and Change",
-            "tag": "SA",
-            "raw": "Compare and contrast continuities and changes for different groups at particular times and places.",
+            "id": "bc.hist12.cc.4",
+            "short_label": "Continuity & Change",
+            "tag": "CHG",
+            "raw": "Compare and contrast continuities and changes for different groups at particular times and places (continuity and change)",
             "i_can_statements": [
-              "I can trace how the role of women changed across the 20th century in different countries.",
-              "I can identify what stayed constant in international relations even as specific events changed.",
-              "I can compare how different nations experienced the same global event (e.g., WWII, the Cold War)."
+              "I can compare and contrast continuities for different groups at a particular time and place",
+              "I can compare and contrast changes for different groups at a particular time and place"
             ]
           }
         ]
       },
       {
-        "name": "Cause and Consequence",
+        "name": "Cause & Consequence",
         "competencies": [
           {
-            "id": "cc_hist12_caus_1",
-            "short_label": "Historical Cause and Effect",
-            "tag": "LF",
-            "raw": "Assess how underlying conditions and the actions of individuals or groups affect events, decisions, and developments.",
+            "id": "bc.hist12.cc.5",
+            "short_label": "Cause & Consequence",
+            "tag": "CAU",
+            "raw": "Assess how underlying conditions and the actions of individuals or groups affect events, decisions, and developments, and analyze multiple consequences (cause and consequence)",
             "i_can_statements": [
-              "I can identify the MAIN (Militarism, Alliances, Imperialism, Nationalism) causes of WWI.",
-              "I can evaluate how one leader's decisions (e.g., Hitler, Stalin, Churchill) changed the course of history.",
-              "I can trace the long-term consequences of events like the Treaty of Versailles or the dropping of atomic bombs."
+              "I can assess how underlying conditions affected an event, decision, or development",
+              "I can assess how the actions of individuals or groups affected an event or decision",
+              "I can analyze the multiple consequences of an event or decision"
             ]
           }
         ]
@@ -26646,14 +26642,13 @@
         "name": "Perspective",
         "competencies": [
           {
-            "id": "cc_hist12_persp_1",
-            "short_label": "Historical Perspective",
-            "tag": "LF1",
-            "raw": "Explain different perspectives on past or present people, places, issues, and events.",
+            "id": "bc.hist12.cc.6",
+            "short_label": "Perspective",
+            "tag": "PER",
+            "raw": "Explain different perspectives on past or present people, places, issues, and events by considering prevailing norms, values, worldviews, and beliefs (perspective)",
             "i_can_statements": [
-              "I can explain how the same Cold War event looked different from American, Soviet, and non-aligned perspectives.",
-              "I can analyze how colonized peoples experienced decolonization differently from European powers.",
-              "I can avoid imposing present-day values anachronistically on historical figures."
+              "I can explain different perspectives on a past or present issue or event",
+              "I can show how prevailing norms and worldviews shaped a perspective"
             ]
           }
         ]
@@ -26662,14 +26657,13 @@
         "name": "Ethical Judgment",
         "competencies": [
           {
-            "id": "cc_hist12_eth_1",
+            "id": "bc.hist12.cc.7",
             "short_label": "Ethical Judgment",
-            "tag": "AS",
-            "raw": "Make reasoned ethical judgments about controversial actions in the past or present.",
+            "tag": "ETH",
+            "raw": "Make reasoned ethical judgments about controversial actions in the past or present, and assess whether we have a responsibility to respond (ethical judgment)",
             "i_can_statements": [
-              "I can make an ethical judgment about the decision to use atomic weapons, considering context and consequences.",
-              "I can evaluate the responsibility of bystanders and non-combatants during genocide.",
-              "I can argue whether modern nations have a responsibility to respond to historical injustices committed by their predecessors."
+              "I can make a reasoned ethical judgment about a controversial past or present action",
+              "I can assess whether we have a responsibility to respond to an action"
             ]
           }
         ]
@@ -27540,66 +27534,96 @@
     "subject": "Social Studies",
     "categories": [
       {
-        "name": "Reasoning and Inquiry",
+        "name": "Inquiry",
         "competencies": [
           {
-            "id": "cc_phil12_reason_1",
-            "short_label": "Critical Inquiry",
-            "tag": "CI",
-            "raw": "Use philosophical inquiry and reasoning skills to engage with arguments and questions.",
+            "id": "bc.phil12.cc.1",
+            "short_label": "Inquiry",
+            "tag": "INQ",
+            "raw": "Use philosophical inquiry processes and reasoning skills to respond to arguments and questions related to major issues in philosophy",
             "i_can_statements": [
-              "I can construct a valid logical argument using deductive and inductive reasoning.",
-              "I can identify and name common logical fallacies.",
-              "I can participate in Socratic dialogue, responding to challenges with reasoned answers.",
-              "I can distinguish between a valid argument and a sound argument."
+              "I can use philosophical inquiry and reasoning skills to respond to an argument about a major issue in philosophy",
+              "I can use philosophical inquiry and reasoning skills to respond to a question about a major issue in philosophy"
             ]
           }
         ]
       },
       {
-        "name": "Application",
+        "name": "Everyday Relevance",
         "competencies": [
           {
-            "id": "cc_phil12_app_1",
-            "short_label": "Application",
-            "tag": "EE",
-            "raw": "Assess the relevance of philosophical ideas for everyday life and current social/political issues.",
+            "id": "bc.phil12.cc.2",
+            "short_label": "Everyday Relevance",
+            "tag": "RLV",
+            "raw": "Assess the relevance of philosophical ideas for everyday life and current social and political issues",
             "i_can_statements": [
-              "I can apply an ethical theory (e.g., utilitarianism) to a real-world dilemma.",
-              "I can connect a philosophical concept (e.g., justice, freedom) to a contemporary political issue.",
-              "I can explain how philosophical thinking applies to decisions in my own life."
+              "I can assess how relevant a philosophical idea is to everyday life",
+              "I can explain how a philosophical idea applies to a current social issue",
+              "I can explain how a philosophical idea applies to a current political issue"
             ]
           }
         ]
       },
       {
-        "name": "Analysis and Assessment",
+        "name": "Significance",
         "competencies": [
           {
-            "id": "cc_phil12_anal_1",
-            "short_label": "Compare Perspectives",
-            "tag": "CP",
-            "raw": "Analyze philosophical ideas, assess their significance, and compare justifications for different perspectives.",
+            "id": "bc.phil12.cc.3",
+            "short_label": "Significance",
+            "tag": "SIG",
+            "raw": "Analyze philosophical ideas and assess their significance (significance)",
             "i_can_statements": [
-              "I can analyze a philosophical text and identify its central claim and supporting arguments.",
-              "I can compare two philosophical positions on the same question and evaluate which is better justified.",
-              "I can assess the strengths and weaknesses of a philosophical argument."
+              "I can explain why a philosophical idea is significant",
+              "I can use criteria to assess how significant a philosophical idea is",
+              "I can analyze a philosophical idea"
             ]
           }
         ]
       },
       {
-        "name": "Historical Understanding",
+        "name": "Evidence",
         "competencies": [
           {
-            "id": "cc_phil12_hist_1",
-            "short_label": "Historical Understanding",
-            "tag": "SA",
-            "raw": "Compare continuity, change, and divergence across philosophical ideas, disciplines, and schools of thought.",
+            "id": "bc.phil12.cc.4",
+            "short_label": "Evidence",
+            "tag": "EVI",
+            "raw": "Compare the justification for different philosophical perspectives after investigating points of contention and the strengths and weaknesses of various arguments (evidence)",
             "i_can_statements": [
-              "I can trace how a philosophical idea (e.g., the concept of justice) has evolved from ancient to modern times.",
-              "I can explain how historical context shaped a philosopher's ideas.",
-              "I can compare philosophical traditions across cultures (e.g., Western, Indigenous, Eastern)."
+              "I can compare how well different philosophical perspectives are justified",
+              "I can identify the points of contention between philosophical perspectives",
+              "I can identify the strengths and weaknesses of an argument"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Continuity & Change",
+        "competencies": [
+          {
+            "id": "bc.phil12.cc.5",
+            "short_label": "Continuity & Change",
+            "tag": "CHG",
+            "raw": "Compare and contrast continuity, change, and divergence of ideas, disciplines, and schools of thought (continuity and change)",
+            "i_can_statements": [
+              "I can compare and contrast continuity, change and divergence of ideas, disciplines and schools of thought",
+              "I can identify continuity in ideas, disciplines or schools of thought",
+              "I can identify change in ideas, disciplines or schools of thought",
+              "I can identify where ideas, disciplines or schools of thought diverge"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Cause & Consequence",
+        "competencies": [
+          {
+            "id": "bc.phil12.cc.6",
+            "short_label": "Cause & Consequence",
+            "tag": "CAU",
+            "raw": "Assess the development and impact of diverse ideas and systems of thought (cause and consequence)",
+            "i_can_statements": [
+              "I can assess how diverse ideas and systems of thought developed",
+              "I can assess the impact of diverse ideas and systems of thought"
             ]
           }
         ]
@@ -27608,14 +27632,13 @@
         "name": "Perspective",
         "competencies": [
           {
-            "id": "cc_phil12_persp_1",
-            "short_label": "Multiple Perspectives",
-            "tag": "MP",
-            "raw": "Explain different philosophical perspectives considering norms, values, worldviews, and beliefs.",
+            "id": "bc.phil12.cc.7",
+            "short_label": "Perspective",
+            "tag": "PER",
+            "raw": "Explain different philosophical perspectives by considering the norms, values, worldviews, and beliefs of the philosophers who developed them (perspective)",
             "i_can_statements": [
-              "I can explain how a philosopher's social context influenced their philosophical positions.",
-              "I can represent a philosophical position I disagree with accurately and charitably.",
-              "I can compare feminist philosophy with traditional Western philosophy on a shared question."
+              "I can explain different philosophical perspectives",
+              "I can show how a philosopher's norms and worldviews shaped their perspective"
             ]
           }
         ]

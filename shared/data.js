@@ -72,6 +72,7 @@ const _cache = {
   modules: {}, // keyed by cid
   rubrics: {}, // keyed by cid
   rubricChecks: {}, // keyed by cid — ticked Advanced Rubric checkboxes { 'sid:aid': [checkId, …] }
+  rubricPrints: {}, // keyed by cid — printed rubric handouts { 'sid:aid': { at: ISO, hash } }
   dibels: {}, // keyed by cid — DIBELS raw scores { 'sid:aid': { boy|moy|eoy: { orfWrc, orfErrors, mazeCorrect, mazeIncorrect } } }
   flags: {}, // keyed by cid
   goals: {}, // keyed by cid
@@ -102,6 +103,7 @@ const _DATA_KEYS = {
   modules: 'modules',
   rubrics: 'rubrics',
   rubricChecks: 'rubric-checks',
+  rubricPrints: 'rubric-prints',
   dibels: 'dibels',
   flags: 'flags',
   goals: 'goals',
@@ -458,7 +460,9 @@ function _exitDegradedMode(bootstrapData) {
     var teacher = bootstrapData.teacher || {};
     var prefs = teacher.preferences || {};
     _teacherId = teacher.id || _teacherId;
-    _cache.courses = _canonicalCoursesToBlob(bootstrapData.courseRows || []);
+    var prevCourses = _coursesBeforeBoot();
+    _cache.courses = _canonicalCoursesToBlob(bootstrapData.courseRows || [], prevCourses);
+    _sendUpCurriculumTags(bootstrapData.courseRows, prevCourses);
     _cache.config = {
       activeCourse: prefs.active_course_id || null,
       viewMode: prefs.view_mode || null,
@@ -761,6 +765,7 @@ var _ECHO_SAFE_RPCS = {
   upsert_tag_score: true,
   upsert_rubric_score: true,
   set_rubric_check: true,
+  set_rubric_printed: true,
   upsert_dibels_score: true,
   set_score_status: true,
   save_score_comment: true,
@@ -1144,7 +1149,8 @@ async function initAllCourses() {
   //     returns existing rows on subsequent sign-ins.
   //   list_teacher_courses() → [{ id, name, grade_level, description, color,
   //     is_archived, display_order, grading_system, calc_method, decay_weight,
-  //     timezone, late_work_policy, created_at, updated_at }, ...]
+  //     timezone, late_work_policy, created_at, updated_at, block,
+  //     curriculum_tags }, ...]
   // On any failure fall back to localStorage so the app still loads offline.
   if (_useSupabase) {
     const sb = getSupabase();
@@ -1154,7 +1160,9 @@ async function initAllCourses() {
       const prefs = teacher.preferences || {};
       _teacherId = teacher.id || _teacherId;
 
-      _cache.courses = _canonicalCoursesToBlob(data.courseRows || []);
+      const prevCourses = _coursesBeforeBoot();
+      _cache.courses = _canonicalCoursesToBlob(data.courseRows || [], prevCourses);
+      _sendUpCurriculumTags(data.courseRows, prevCourses);
       _cache.config = {
         activeCourse: prefs.active_course_id || null,
         viewMode: prefs.view_mode || null,
@@ -2272,9 +2280,13 @@ function _rekeyStudentRefs(cid, localId, serverId) {
   _rekeyField('statuses', cid, function (statuses) {
     return _rekeyStatusKeys(statuses, localId, serverId);
   });
-  // Ticked checkboxes and DIBELS scores are keyed 'sid:aid' like statuses.
+  // Ticked checkboxes, printed rubrics and DIBELS scores are keyed 'sid:aid'
+  // like statuses.
   _rekeyField('rubricChecks', cid, function (checks) {
     return _rekeyStatusKeys(checks, localId, serverId);
+  });
+  _rekeyField('rubricPrints', cid, function (prints) {
+    return _rekeyStatusKeys(prints, localId, serverId);
   });
   _rekeyField('dibels', cid, function (dibels) {
     return _rekeyStatusKeys(dibels, localId, serverId);
@@ -2290,6 +2302,9 @@ function _rekeyAssessmentRefs(cid, localId, serverId) {
   });
   _rekeyField('rubricChecks', cid, function (checks) {
     return _rekeyStatusKeys(checks, localId, serverId);
+  });
+  _rekeyField('rubricPrints', cid, function (prints) {
+    return _rekeyStatusKeys(prints, localId, serverId);
   });
   _rekeyField('dibels', cid, function (dibels) {
     return _rekeyStatusKeys(dibels, localId, serverId);
@@ -4031,6 +4046,27 @@ function _bundleRubricChecks(gb) {
   return out;
 }
 
+/* print_rows → { 'sid:aid': { at, hash } }: the completed rubrics printed
+   (migrations/20261102_rubric_print.sql). Keys are written in row order so
+   the same data always produces the same cache. */
+function _bundleRubricPrints(gb) {
+  var students = gb.students || [];
+  var assessments = gb.assessments || [];
+  var out = {};
+  (gb.print_rows || [])
+    .slice()
+    .sort(function (a, b) {
+      return a[0] - b[0] || a[1] - b[1];
+    })
+    .forEach(function (r) {
+      var sid = students[r[0]] && students[r[0]].enrollment_id;
+      var aid = assessments[r[1]] && assessments[r[1]].id;
+      if (!sid || !aid || !r[2] || !r[3]) return;
+      out[sid + ':' + aid] = { at: String(r[2]), hash: String(r[3]) };
+    });
+  return out;
+}
+
 function _bundleToCache(cid, bundle) {
   var gb = bundle.gradebook || {};
 
@@ -4045,6 +4081,9 @@ function _bundleToCache(cid, bundle) {
   // pointing into the roster, assessment and check lists. A bundle from
   // before the checks has none; the class then has no ticks.
   _persistLoadedField(cid, 'rubricChecks', _bundleRubricChecks(gb));
+  // Printed rubrics: [student, assessment, printed_at, hash] rows. A bundle
+  // from before them has none; nothing in the class shows as printed.
+  _persistLoadedField(cid, 'rubricPrints', _bundleRubricPrints(gb));
 
   var map = _canonicalLearningMapToCache(cid, bundle.learning_map || {});
   var emptyMap = !(map.subjects && map.subjects.length) && !(map.sections && map.sections.length);
@@ -4102,6 +4141,7 @@ function _bundleToCache(cid, bundle) {
     );
   }
   _applyBundleCourseConfig(cid, bundle.course_config, bundle.gradebook && bundle.gradebook.course);
+  _applyBundleCurriculumTags(cid, bundle.gradebook && bundle.gradebook.course);
 
   // A field skipped because the teacher edited it mid-load is fetched again;
   // until then the cache isn't the server's version, so don't claim it is.
@@ -4419,6 +4459,15 @@ var _COURSE_CONFIG_COLUMNS = {
   categoryWeights: 'category_weights',
   reportingTerms: 'reporting_terms',
 };
+/* The class's BC Curriculum Link from the bundle's course row. Null there
+   means never saved on the server: this device's link stays, and the next
+   boot sends it up (_sendUpCurriculumTags). */
+function _applyBundleCurriculumTags(cid, courseRow) {
+  if (!courseRow || !Array.isArray(courseRow.curriculum_tags) || !COURSES[cid]) return;
+  COURSES[cid].curriculumTags = courseRow.curriculum_tags.slice();
+  _safeLSSet('gb-courses', JSON.stringify(COURSES));
+}
+
 function _applyBundleCourseConfig(cid, row, courseRow) {
   if (!row || typeof row !== 'object') return;
   var config = Object.assign({}, getCourseConfig(cid) || {});
@@ -4525,6 +4574,7 @@ function _loadCourseFromLS(cid) {
   _cache.rubrics[cid] = _safeParseLS('gb-rubrics-' + cid, []);
   _noteRubricsSet(cid);
   _cache.rubricChecks[cid] = _safeParseLS('gb-rubric-checks-' + cid, {});
+  _cache.rubricPrints[cid] = _safeParseLS('gb-rubric-prints-' + cid, {});
 
   // Learning map: check localStorage first, then fall back to LEARNING_MAP constant
   const lmRaw = _safeParseLS('gb-learningmap-' + cid, null);
@@ -4719,11 +4769,16 @@ function _loadPersistedCourseFieldSnapshot(field, cid, fallbackValue) {
                            displayOrder, gradingSystem, calcMethod, decayWeight,
                            timezone, lateWorkPolicy } }
    Policy fields (gradingSystem/calcMethod/decayWeight/lateWorkPolicy/timezone)
-   are populated here; legacy get_course_policy() is retired in v2. */
-function _canonicalCoursesToBlob(rows) {
+   are populated here; legacy get_course_policy() is retired in v2.
+   curriculumTags (the BC Curriculum Link, e.g. ['HIST12']) is the server's
+   curriculum_tags (migrations/20261102_course_curriculum_tags.sql). Null
+   there means the link was never saved on the server, so a link this device
+   kept from before (`prev`) stays, and _sendUpCurriculumTags saves it. */
+function _canonicalCoursesToBlob(rows, prev) {
   var out = {};
   (rows || []).forEach(function (r) {
     if (!r || !r.id) return;
+    var mine = prev && prev[r.id] && Array.isArray(prev[r.id].curriculumTags) ? prev[r.id].curriculumTags : [];
     out[r.id] = {
       id: r.id,
       name: r.name || 'Untitled Class',
@@ -4738,9 +4793,37 @@ function _canonicalCoursesToBlob(rows) {
       timezone: r.timezone || null,
       lateWorkPolicy: r.late_work_policy || null,
       block: r.block || '',
+      curriculumTags: Array.isArray(r.curriculum_tags) ? r.curriculum_tags.slice() : mine.slice(),
     };
   });
   return out;
+}
+
+/* A link only this device holds (saved before the server stored it) goes
+   up once, so the class shows it on every device. */
+function _sendUpCurriculumTags(rows, prev) {
+  if (!_writesEnabled()) return;
+  (rows || []).forEach(function (r) {
+    if (!r || !_isUuid(r.id) || Array.isArray(r.curriculum_tags)) return;
+    var mine = prev && prev[r.id] && prev[r.id].curriculumTags;
+    if (!Array.isArray(mine) || !mine.length) return;
+    _trackPendingSync(
+      _writeRpc('update_course', { p_course_id: r.id, p_patch: { curriculum_tags: mine.slice() } }).then(
+        function (res) {
+          if (res.error) console.warn('update_course (curriculum link upload) failed:', res.error);
+        },
+      ),
+    );
+  });
+}
+
+function _coursesBeforeBoot() {
+  if (_cache.courses && Object.keys(_cache.courses).length) return _cache.courses;
+  try {
+    return JSON.parse(localStorage.getItem('gb-courses') || '{}') || {};
+  } catch (e) {
+    return {};
+  }
 }
 
 /* ── Phase 4 converters: medium-frequency tables ── */
@@ -6085,6 +6168,8 @@ function updateCourse(id, updates) {
       if (updates.timezone !== undefined) patch.timezone = updates.timezone;
       if (updates.lateWorkPolicy !== undefined) patch.late_work_policy = updates.lateWorkPolicy;
       if (updates.block !== undefined) patch.block = updates.block || null;
+      if (updates.curriculumTags !== undefined)
+        patch.curriculum_tags = Array.isArray(updates.curriculumTags) ? updates.curriculumTags.slice() : null;
       if (Object.keys(patch).length > 0 && _isUuid(id)) {
         _trackPendingSync(
           _writeRpc('update_course', { p_course_id: id, p_patch: patch }).then(function (res) {
@@ -6126,6 +6211,7 @@ function _clearCourseLocalState(id) {
     'modules',
     'rubrics',
     'rubric-checks',
+    'rubric-prints',
     'statuses',
     'quick-obs',
     'term-ratings',
@@ -7857,6 +7943,65 @@ function _setRubricCheckOne(cid, sid, aid, checkId, on) {
   return list;
 }
 
+/* ── Printed rubrics (migrations/20261102_rubric_print.sql) ──────────────
+   Print Rubrics records each scored student it prints: a rubric_print row
+   (enrollment, assessment) with the time and a fingerprint of what the sheet
+   showed (RubricPrint.fingerprint in teacher/rubric-print.js). In the cache
+   they are { 'sid:aid': { at, hash } }, in localStorage under
+   gb-rubric-prints-<cid>, written through the outbox with set_rubric_printed
+   so a print made offline is recorded later. Nothing here changes a score. */
+function getRubricPrints(cid) {
+  if (_cache.rubricPrints[cid] !== undefined) return _cache.rubricPrints[cid];
+  var stored = _safeParseLS('gb-rubric-prints-' + cid, {});
+  _cache.rubricPrints[cid] = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+  return _cache.rubricPrints[cid];
+}
+/* One student's print of one assessment's rubric, or null. */
+function getRubricPrint(cid, sid, aid) {
+  var p = getRubricPrints(cid)[sid + ':' + aid];
+  return p && p.at && p.hash ? { at: String(p.at), hash: String(p.hash) } : null;
+}
+/* Record prints, or clear them, for several students at once. `marks` is
+   [{ sid, hash, at? }]; a mark with no hash clears that student's print.
+   The cache changes at once; each row goes up as its own write. */
+function setRubricPrints(cid, aid, marks) {
+  if (!cid || !aid || !Array.isArray(marks) || !marks.length) return;
+  var prints = getRubricPrints(cid);
+  var sent = [];
+  marks.forEach(function (m) {
+    if (!m || !m.sid) return;
+    var key = m.sid + ':' + aid;
+    var hash = m.hash ? String(m.hash).slice(0, 64) : '';
+    if (hash) {
+      var at = m.at || new Date().toISOString();
+      var prev = prints[key];
+      if (prev && prev.at === at && prev.hash === hash) return;
+      prints[key] = { at: at, hash: hash };
+      sent.push({ sid: m.sid, hash: hash, at: at });
+    } else {
+      if (!prints[key]) return;
+      delete prints[key];
+      sent.push({ sid: m.sid, hash: null, at: null });
+    }
+  });
+  if (!sent.length) return;
+  _saveCourseField('rubricPrints', cid, prints);
+  if (!_writesEnabled() || !_isSendableId(aid)) return;
+  sent.forEach(function (m) {
+    if (!_isSendableId(m.sid)) return;
+    _trackPendingSync(
+      _writeRpc('set_rubric_printed', {
+        p_enrollment_id: m.sid,
+        p_assessment_id: aid,
+        p_hash: m.hash,
+        p_printed_at: m.at,
+      }).then(function (res) {
+        if (res && res.error) _reportScoreWriteFailure('set_rubric_printed', res.error);
+      }),
+    );
+  });
+}
+
 /* ── Competency descriptors (one teacher's own wording) ──────────────
    { competencyKey: { 1: text, 2: text, 3: text, 4: text } }, the start of a
    "From competency" draft (RubricDraft.competencyKey makes the keys). Per
@@ -8940,9 +9085,11 @@ function _cleanOrphanedScores(cid, validArr) {
   if (dropScores(scores)) _saveCourseField('scores', cid, scores);
   var statuses = getAssignmentStatuses(cid);
   if (dropStatuses(statuses)) _saveCourseField('statuses', cid, statuses);
-  // Ticked checkboxes are keyed 'sid:aid' like statuses.
+  // Ticked checkboxes and printed rubrics are keyed 'sid:aid' like statuses.
   var checks = getRubricChecks(cid);
   if (dropStatuses(checks)) _saveCourseField('rubricChecks', cid, checks);
+  var prints = getRubricPrints(cid);
+  if (dropStatuses(prints)) _saveCourseField('rubricPrints', cid, prints);
   var dibels = getDibelsScores(cid);
   if (dropStatuses(dibels)) _saveCourseField('dibels', cid, dibels);
   if (_hasServerState('scores', cid)) dropScores(_serverState.scores[cid]);

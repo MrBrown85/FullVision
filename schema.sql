@@ -71,6 +71,7 @@ create table course (
   round_percent    boolean,                                        -- true whole %, false one decimal, null follow grade level (20261016_course_round_percent)
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
+  curriculum_tags  text[],                                         -- BC bank course keys the class is linked to, e.g. {HIST12} (20261102_course_curriculum_tags)
   deleted_at       timestamptz                                         -- soft-delete marker; hidden immediately, purged after 30d by fv_retention_cleanup (20261012_course_soft_delete)
 );
 
@@ -317,6 +318,17 @@ create table rubric_check_score (
   check_id      uuid        not null references criterion_check(id) on delete cascade,
   created_at    timestamptz not null default now(),
   primary key (enrollment_id, assessment_id, check_id)
+);
+
+-- A completed rubric handout printed for one student: when, and a fingerprint
+-- of what the sheet showed, so the client can tell when it has changed since
+-- (20261102_rubric_print).
+create table rubric_print (
+  enrollment_id uuid        not null references enrollment(id) on delete cascade,
+  assessment_id uuid        not null references assessment(id) on delete cascade,
+  printed_at    timestamptz not null default now(),
+  content_hash  text        not null,                              -- 1..64 chars
+  primary key (enrollment_id, assessment_id)
 );
 
 -- A teacher's own wording for a competency's rubric levels: where "From
