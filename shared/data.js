@@ -6606,7 +6606,7 @@ function buildLearningMapFromTags(shortTags, options) {
         const shared = isHybrid && folderCourses[category.name].size > 1;
         group = {
           id: 'grp_' + courseTag + '_' + competencyGroups.length,
-          name: shared ? course.course_name + ': ' + category.name : category.name,
+          name: shared ? _curriculumFolderPrefix(courseTag, courses) + ': ' + category.name : category.name,
           color: colour,
           sortOrder: competencyGroups.length,
           displayOrder: competencyGroups.length,
@@ -6689,10 +6689,24 @@ function buildLearningMapFromTags(shortTags, options) {
   return { subjects, sections, competencyGroups, _customized: true, _version: 1, _flatVersion: 2 };
 }
 
-/* How the wizard names one competency of a course: its bank id, or, for
-   an old-bank competency with none, the course and its code. */
+/* How the wizard names one competency of a course: its bank id, or, in the
+   old bank, whose ids can repeat within a course, the course and the
+   competency's place in it. */
 function curriculumCompKey(courseTag, comp) {
-  return comp.id || courseTag + ':' + comp.tag;
+  if (typeof comp.id === 'string' && comp.id.indexOf('bc.') === 0) return comp.id;
+  const course = CURRICULUM_INDEX && CURRICULUM_INDEX[courseTag];
+  const all = course ? (course.categories || []).flatMap(cat => cat.competencies || []) : [];
+  const at = all.indexOf(comp);
+  return courseTag + ':' + (at >= 0 ? at : comp.id || comp.tag);
+}
+
+/* What a folder name two courses share is prefixed with: the course name,
+   or, when another course in the class has the same name (English First
+   Peoples Literary Studies 10 and Literary Studies 10), the name and key. */
+function _curriculumFolderPrefix(courseTag, courses) {
+  const name = CURRICULUM_INDEX[courseTag].course_name;
+  const twin = courses.some(x => x.courseTag !== courseTag && x.course.course_name === name);
+  return twin ? name + ' (' + courseTag + ')' : name;
 }
 
 /* The grading switches a new curriculum class starts with: one course,

@@ -151,7 +151,7 @@ window.DashClassManager = (function () {
         _cmBankLoading = true;
         loadCurriculumIndex().then(function (idx) {
           _cmBankLoading = false;
-          if (idx && cmMode === 'edit') _cmRenderWithScroll();
+          if (idx && classManagerOpen && cmMode === 'edit') _cmRenderWithScroll();
         });
       }
       return null;
@@ -4625,6 +4625,8 @@ window.DashClassManager = (function () {
       preName = names.length ? _cwDefaultName() : '';
       preGrade = cwSelectedGrade ? String(cwSelectedGrade) : '';
     }
+    // A name the teacher typed stays when they come back from Review.
+    if (cwStep2Name) preName = cwStep2Name;
     if (cwStep2Grade) preGrade = cwStep2Grade;
     var grading = cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: preGrade });
     var calc = cwStep2Calc || _cmDefaultCalcMethod();
@@ -5007,7 +5009,8 @@ window.DashClassManager = (function () {
   async function cwFinishCreate() {
     var name = cwStep2Name || cwGetPreName();
     if (!name.trim()) {
-      cwStep = 2;
+      // Back to Class Details, where the name is typed.
+      cwStep = 3;
       renderClassManager();
       requestAnimationFrame(function () {
         var el = document.getElementById('cm-new-name');
