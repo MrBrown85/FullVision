@@ -320,6 +320,17 @@ create table rubric_check_score (
   primary key (enrollment_id, assessment_id, check_id)
 );
 
+-- A completed rubric handout printed for one student: when, and a fingerprint
+-- of what the sheet showed, so the client can tell when it has changed since
+-- (20261102_rubric_print).
+create table rubric_print (
+  enrollment_id uuid        not null references enrollment(id) on delete cascade,
+  assessment_id uuid        not null references assessment(id) on delete cascade,
+  printed_at    timestamptz not null default now(),
+  content_hash  text        not null,                              -- 1..64 chars
+  primary key (enrollment_id, assessment_id)
+);
+
 -- A teacher's own wording for a competency's rubric levels: where "From
 -- competency" drafts start (20261018_competency_descriptor). Keyed by the
 -- client's competency key (label + I-can text), never a tag id.

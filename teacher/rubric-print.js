@@ -102,7 +102,7 @@
   var DEFAULT_OPTIONS = {
     mode: 'completed', // completed | blank
     copies: 1, // blank copies
-    students: 'scored', // scored | all | pick
+    students: 'scored', // unprinted | changed | scored | all | pick
     picked: [],
     layout: 'full',
     nameStyle: 'preferred', // preferred | first; the last name always follows
@@ -435,6 +435,12 @@
   function selectStudents(cid, aid, opts) {
     var students = getStudents(cid);
     if (opts.students === 'all') return students;
+    if (opts.students === 'unprinted' || opts.students === 'changed') {
+      var want = opts.students === 'unprinted' ? 'unprinted' : 'changed';
+      return students.filter(function (s) {
+        return printState(cid, aid, s.id).kind === want;
+      });
+    }
     if (opts.students === 'pick') {
       var picked = opts.picked || [];
       return students.filter(function (s) {
@@ -459,6 +465,163 @@
     return (rubric.criteria || []).some(function (criterion) {
       return criterionLevel(entries, aid, criterion).level > 0;
     });
+  }
+
+  /* ── Printed rubrics ────────────────────────────────────────
+     Print Rubrics records each scored student it prints (setRubricPrints in
+     shared/data.js, migrations/20261102_rubric_print.sql). A print keeps a
+     fingerprint of what the sheet showed; when the sheet would show
+     something else now, the rubric has changed since it was printed. */
+
+  // A 53-bit string hash (cyrb53), as 14 hex digits. Not for security: it
+  // only tells one sheet's content from another's.
+  function _hash(str) {
+    var h1 = 0xdeadbeef,
+      h2 = 0x41c6ce57;
+    for (var i = 0; i < str.length; i++) {
+      var ch = str.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    var n = 4294967296 * (2097151 & h2) + (h1 >>> 0);
+    return ('00000000000000' + n.toString(16)).slice(-14);
+  }
+
+  /* What a student's completed rubric shows, as a fingerprint: each
+     criterion's level, ± and comments, the overall level, the feedback, the
+     ticked checkboxes and the status. Not the name or what is included,
+     which the dialog sets each time. '' when there is nothing scored. */
+  function fingerprint(cid, aid, sid) {
+    var assessment = _assessment(cid, aid);
+    if (!assessment || isPointsScored(assessment)) return '';
+    var data = sheetData(cid, aid, sid);
+    if (!data || !data.scored) return '';
+    var parts = {
+      rows: data.rows.map(function (r) {
+        return [r.criterion.id, r.level || 0, r.mod || 0, r.mixed ? 1 : 0, r.comment || '', r.beyond || ''];
+      }),
+      overall: data.overall ? data.overall.value : null,
+      feedback: data.feedback || '',
+      ticked: (data.ticked || []).slice().sort(),
+      status: data.status || '',
+    };
+    return _hash(JSON.stringify(parts));
+  }
+
+  /* Where one student's completed rubric stands:
+       { kind: 'unscored' }            nothing to print
+       { kind: 'unprinted' }           scored, never printed
+       { kind: 'printed', at }         printed, and the same now
+       { kind: 'changed', at }         printed, and different now
+     `at` is the ISO time of the last print. */
+  function printState(cid, aid, sid) {
+    var print = typeof getRubricPrint === 'function' ? getRubricPrint(cid, sid, aid) : null;
+    var now = fingerprint(cid, aid, sid);
+    if (!now) return { kind: 'unscored', at: print ? print.at : null };
+    if (!print) return { kind: 'unprinted', at: null };
+    return { kind: print.hash === now ? 'printed' : 'changed', at: print.at };
+  }
+
+  /* Whether any student's rubric for this assessment has been printed. */
+  function hasPrints(cid, aid) {
+    if (!aid || typeof getRubricPrints !== 'function') return false;
+    var prints = getRubricPrints(cid);
+    var suffix = ':' + aid;
+    return Object.keys(prints).some(function (k) {
+      return k.slice(-suffix.length) === suffix;
+    });
+  }
+
+  // "Oct 30", in the teacher's own time zone.
+  function _printDate(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  }
+
+  var _PRINTER_ICON =
+    '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 6V2h7v4"/><rect x="2" y="6" width="12" height="5.5" rx="1.2"/><path d="M4.5 9.5h7V14h-7z"/></svg>';
+
+  /* The small Printed / Changed Since Printed marker beside a student's name
+     on the Assignments page and in the grader. Empty and hidden when the
+     rubric has not been printed. refreshMarks keeps it current. */
+  function _markInner(state) {
+    if (state.kind === 'printed') return _PRINTER_ICON + 'Printed ' + esc(_printDate(state.at));
+    if (state.kind === 'changed') return _PRINTER_ICON + 'Changed Since Printed';
+    return '';
+  }
+  function _markClass(state) {
+    return 'rp-mark' + (state.kind === 'changed' ? ' is-changed' : '');
+  }
+  // Only a printed rubric needs its fingerprint worked out: the marker is
+  // drawn for every student row on the page.
+  function _markState(cid, aid, sid) {
+    var printed = typeof getRubricPrint === 'function' && getRubricPrint(cid, sid, aid);
+    return printed ? printState(cid, aid, sid) : { kind: 'unprinted', at: null };
+  }
+  function markHtml(cid, aid, sid) {
+    var state = _markState(cid, aid, sid);
+    var on = state.kind === 'printed' || state.kind === 'changed';
+    return (
+      '<span class="' +
+      _markClass(state) +
+      '" data-rp-mark-sid="' +
+      esc(sid) +
+      '" data-rp-mark-aid="' +
+      esc(aid) +
+      '"' +
+      (on ? '' : ' hidden') +
+      '>' +
+      (on ? _markInner(state) : '') +
+      '</span>'
+    );
+  }
+  function refreshMarks(cid, root) {
+    (root || document).querySelectorAll('[data-rp-mark-sid]').forEach(function (el) {
+      var state = _markState(cid, el.dataset.rpMarkAid, el.dataset.rpMarkSid);
+      var on = state.kind === 'printed' || state.kind === 'changed';
+      var html = on ? _markInner(state) : '';
+      var cls = _markClass(state);
+      if (el.className !== cls) el.className = cls;
+      el.hidden = !on;
+      // html-safe: _markInner is a constant icon plus esc()'d date text
+      if (el.innerHTML !== html) el.innerHTML = html;
+    });
+  }
+
+  function _notifyPrintsChanged(cid, aid) {
+    try {
+      document.dispatchEvent(new CustomEvent('fv:rubric-prints-changed', { detail: { cid: cid, aid: aid } }));
+    } catch (e) {
+      /* no listeners is fine */
+    }
+  }
+
+  /* Record the completed rubrics a print job holds: every scored student in
+     it. Returns what Undo puts back: each student's print before this one. */
+  function markPrinted(cid, aid, sids) {
+    var at = new Date().toISOString();
+    var marks = [];
+    var before = [];
+    sids.forEach(function (sid) {
+      var hash = fingerprint(cid, aid, sid);
+      if (!hash) return;
+      var prev = getRubricPrint(cid, sid, aid);
+      before.push(prev ? { sid: sid, hash: prev.hash, at: prev.at } : { sid: sid, hash: null });
+      marks.push({ sid: sid, hash: hash, at: at });
+    });
+    if (marks.length) {
+      setRubricPrints(cid, aid, marks);
+      _notifyPrintsChanged(cid, aid);
+    }
+    return before;
+  }
+
+  function unmarkPrinted(cid, aid, sid) {
+    setRubricPrints(cid, aid, [{ sid: sid, hash: null }]);
+    _notifyPrintsChanged(cid, aid);
   }
 
   /* The layout for a number of picked students: one on a full page, two
@@ -1029,25 +1192,102 @@
     var scoredCount = students.filter(function (s) {
       return isStudentScored(cid, aid, s.id);
     }).length;
+    // Once any of this work's rubrics are printed, the window offers what is
+    // left to print and what has changed since, and says which is which.
+    var printed = hasPrints(cid, aid);
+    var states = {};
+    var counts = { unprinted: 0, changed: 0 };
+    if (printed) {
+      students.forEach(function (s) {
+        states[s.id] = printState(cid, aid, s.id);
+        if (counts[states[s.id].kind] !== undefined) counts[states[s.id].kind]++;
+      });
+    }
     html += '<fieldset class="rp-group"><legend>Students</legend>';
+    if (printed) {
+      html += _radio(
+        'rp-students',
+        'unprinted',
+        opts.students === 'unprinted',
+        'Not Yet Printed',
+        '(' + counts.unprinted + ')',
+      );
+      html += _radio(
+        'rp-students',
+        'changed',
+        opts.students === 'changed',
+        'Changed Since Printed',
+        '(' + counts.changed + ')',
+      );
+    }
     html += _radio('rp-students', 'scored', opts.students === 'scored', 'All Scored Students', '(' + scoredCount + ')');
     html += _radio('rp-students', 'all', opts.students === 'all', 'All Students', '(' + students.length + ')');
     html += _radio('rp-students', 'pick', opts.students === 'pick', 'Pick Students');
     // Always shown: ticking a name switches to Pick Students.
     html += '<div class="rp-pick">';
     students.forEach(function (s) {
+      var state = states[s.id];
+      var tag = '';
+      if (!isStudentScored(cid, aid, s.id)) tag = '<span class="rp-help">not scored</span>';
+      else if (state && state.kind === 'printed')
+        tag = '<span class="rp-help">printed ' + esc(_printDate(state.at)) + '</span>';
+      else if (state && state.kind === 'changed')
+        tag = '<span class="rp-tag is-changed">changed since ' + esc(_printDate(state.at)) + '</span>';
+      else if (state && state.kind === 'unprinted') tag = '<span class="rp-tag is-new">not printed</span>';
+      var canUnmark = state && (state.kind === 'printed' || state.kind === 'changed');
       html +=
-        '<label class="rp-option rp-pick-option"><input type="checkbox" data-pick="' +
+        '<div class="rp-pick-row' +
+        (canUnmark ? ' can-unmark' : '') +
+        '"><label class="rp-option rp-pick-option"><input type="checkbox" data-pick="' +
         esc(s.id) +
         '"' +
         (opts.picked.indexOf(s.id) >= 0 ? ' checked' : '') +
         '><span>' +
         esc(displayName(s)) +
-        (isStudentScored(cid, aid, s.id) ? '' : ' <span class="rp-help">not scored</span>') +
-        '</span></label>';
+        (tag ? ' ' + tag : '') +
+        '</span></label>' +
+        (canUnmark
+          ? '<button type="button" class="rp-unmark" data-rp="unmark" data-sid="' +
+            esc(s.id) +
+            '">Mark Not Printed</button>'
+          : '') +
+        '</div>';
     });
     html += '</div></fieldset>';
     return html;
+  }
+
+  /* The Already Printed box under the status: how many of this work's
+     rubrics were printed and when, and who has changed since. */
+  function _printedSummaryText(cid, aid) {
+    if (!hasPrints(cid, aid)) return null;
+    var printed = [];
+    var changed = [];
+    getStudents(cid).forEach(function (s) {
+      var state = printState(cid, aid, s.id);
+      if (state.kind === 'printed' || state.kind === 'changed') printed.push(state.at);
+      if (state.kind === 'changed') changed.push(displayName(s));
+    });
+    if (!printed.length) return null;
+    var days = {};
+    printed.forEach(function (at) {
+      days[_printDate(at)] = true;
+    });
+    var latest = printed.slice().sort().pop();
+    var n = printed.length;
+    var first =
+      (n === 1 ? '1 rubric printed' : n + ' rubrics printed') +
+      (Object.keys(days).length === 1 ? ' ' + _printDate(latest) : ', most recently ' + _printDate(latest)) +
+      '.';
+    var second = '';
+    if (changed.length) {
+      var c = changed.length;
+      second =
+        (c === 1 ? '1 has changed since then' : c + ' have changed since then') +
+        (c <= 4 ? ': ' + changed.join(', ') : '') +
+        '.';
+    }
+    return { first: first, second: second };
   }
 
   function _nameGroupHtml(opts) {
@@ -1063,7 +1303,8 @@
       '<div class="rp-side"><div class="rp-legend">Preview</div>' +
       '<div class="rp-preview" id="rp-preview" aria-hidden="true"></div>' +
       '<div class="rp-preview-count" id="rp-preview-count"></div>' +
-      '<div class="rp-status" id="rp-status" aria-live="polite"></div></div>';
+      '<div class="rp-status" id="rp-status" aria-live="polite"></div>' +
+      '<div class="rp-status rp-printed" id="rp-printed" hidden></div></div>';
     html += '</div>';
     html +=
       '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-rp="cancel">Cancel</button>';
@@ -1173,6 +1414,18 @@
       status.classList.toggle('is-warning', out.overflowing > 0);
     }
     _drawPreview(out);
+    var printedBox = document.getElementById('rp-printed');
+    if (printedBox) {
+      var summary = !blank && !_state.scoreOnly ? _printedSummaryText(_state.cid, _state.aid) : null;
+      printedBox.hidden = !summary;
+      // html-safe: both lines go through esc(); the heading is a constant
+      printedBox.innerHTML = summary
+        ? '<span class="rp-printed-title">Already Printed</span><span>' +
+          esc(summary.first) +
+          '</span>' +
+          (summary.second ? '<span>' + esc(summary.second) + '</span>' : '')
+        : '';
+    }
     var printBtn = document.querySelector('#' + OVERLAY_ID + ' [data-rp="print"]');
     if (printBtn) {
       printBtn.disabled = !out.sheets;
@@ -1275,6 +1528,9 @@
       opts.students = 'pick';
       opts.picked = [sid];
       opts.layout = layoutForCount(1);
+    } else if (opts.mode === 'completed' && !scoreOnly && hasPrints(cid, aid)) {
+      // Some are printed already: start on the ones that are not.
+      opts.students = 'unprinted';
     } else {
       opts.students = 'all';
     }
@@ -1305,6 +1561,7 @@
       if (!btn) return;
       if (btn.dataset.rp === 'cancel') close();
       else if (btn.dataset.rp === 'print') _printFromDialog();
+      else if (btn.dataset.rp === 'unmark') _unmarkFromDialog(overlay, btn.dataset.sid);
     });
     overlay.addEventListener('change', function (e) {
       var t = e.target;
@@ -1317,6 +1574,8 @@
         _state.aid = t.value;
         _state.opts.picked = [];
         if (_state.opts.students === 'pick') _state.opts.students = 'all';
+        var tracked = _state.opts.students === 'unprinted' || _state.opts.students === 'changed';
+        if (tracked && !hasPrints(_state.cid, _state.aid)) _state.opts.students = 'all';
         return _redraw(overlay, '#rp-assessment');
       }
       if (t && t.dataset && t.dataset.pick !== undefined) _onPick(overlay, t);
@@ -1353,13 +1612,42 @@
     if (first && first.focus) first.focus();
   }
 
+  /* Mark Not Printed on a name in the list (a student who was away when
+     the sheets went back): their rubric counts as not printed again. */
+  function _unmarkFromDialog(overlay, sid) {
+    if (!_state || !sid) return;
+    _readOptionsFromDialog(overlay);
+    unmarkPrinted(_state.cid, _state.aid, sid);
+    // Nothing printed any more: the two print choices go with it.
+    var tracked = _state.opts.students === 'unprinted' || _state.opts.students === 'changed';
+    if (tracked && !hasPrints(_state.cid, _state.aid)) _state.opts.students = 'all';
+    _redraw(overlay, 'input[data-pick="' + sid + '"]');
+  }
+
   function _printFromDialog() {
     if (!_state) return;
     var cid = _state.cid,
       aid = _state.aid,
-      opts = _state.opts;
+      opts = _state.opts,
+      scoreOnly = _state.scoreOnly;
     close();
-    print(cid, aid, opts);
+    var out = print(cid, aid, opts);
+    if (scoreOnly || opts.mode !== 'completed' || !aid || !out.sheets) return;
+    var sids = selectStudents(cid, aid, opts).map(function (s) {
+      return s.id;
+    });
+    var before = markPrinted(cid, aid, sids);
+    if (!before.length || typeof showUndoToast !== 'function') return;
+    var n = before.length;
+    showUndoToast(
+      'Marked ' + (n === 1 ? '1 rubric' : n + ' rubrics') + ' as printed.',
+      function () {
+        setRubricPrints(cid, aid, before);
+        _notifyPrintsChanged(cid, aid);
+      },
+      null,
+      8000,
+    );
   }
 
   function close() {
@@ -1401,6 +1689,13 @@
     MAX_COPIES: MAX_COPIES,
     selectStudents: selectStudents,
     isStudentScored: isStudentScored,
+    fingerprint: fingerprint,
+    printState: printState,
+    hasPrints: hasPrints,
+    markHtml: markHtml,
+    refreshMarks: refreshMarks,
+    markPrinted: markPrinted,
+    unmarkPrinted: unmarkPrinted,
     pageCount: pageCount,
     layoutForCount: layoutForCount,
     printName: printName,

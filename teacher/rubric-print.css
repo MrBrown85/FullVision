@@ -541,6 +541,53 @@
   font-size: var(--text-sm);
   padding: 2px 0;
 }
+/* A name in the list with its print state, and Mark Not Printed on hover
+   or keyboard focus for a printed one. */
+.rp-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 26px;
+}
+.rp-pick-row .rp-pick-option {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+.rp-tag {
+  font-weight: 600;
+}
+.rp-tag.is-changed {
+  color: var(--score-2-text);
+}
+.rp-tag.is-new {
+  color: var(--active);
+}
+.rp-unmark {
+  display: none;
+  flex-shrink: 0;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--active);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rp-pick-row.can-unmark:hover .rp-unmark,
+.rp-pick-row.can-unmark:focus-within .rp-unmark {
+  display: inline-block;
+}
+.rp-pick-row.can-unmark:hover .rp-pick-option .rp-help,
+.rp-pick-row.can-unmark:hover .rp-pick-option .rp-tag,
+.rp-pick-row.can-unmark:focus-within .rp-pick-option .rp-help,
+.rp-pick-row.can-unmark:focus-within .rp-pick-option .rp-tag {
+  display: none;
+}
 .rp-status {
   font-family: var(--font-base);
   font-size: var(--text-sm);
@@ -561,6 +608,18 @@
   .rp-tiles.is-three {
     grid-template-columns: 1fr;
   }
+}
+.rp-printed {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rp-printed[hidden] {
+  display: none;
+}
+.rp-printed-title {
+  font-weight: 600;
+  color: var(--text);
 }
 .rp-status.is-warning {
   color: var(--score-1-text, #991b1b);
@@ -608,4 +667,25 @@
   margin-bottom: 0.3em;
   font-weight: 700;
   font-size: 1.05em;
+}
+
+/* ── Printed marker (Assignments page and grader) ───────────
+   Beside a student's name once their completed rubric is printed: plain
+   small text, grey when it matches what was printed, amber when it has
+   changed since. */
+.rp-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.rp-mark.is-changed {
+  color: var(--score-2-text);
+}
+.rp-mark[hidden] {
+  display: none;
 }

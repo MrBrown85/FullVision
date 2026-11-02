@@ -4197,6 +4197,19 @@ window.PageAssignments = (function () {
     if (!menu.hidden) menu.querySelector('button').focus();
   }
 
+  /* The small Printed / Changed Since Printed marker beside a name, once the
+     student's completed rubric has been printed (teacher/rubric-print.js). */
+  function _printMarkHtml(cid, aid, sid) {
+    return window.RubricPrint && RubricPrint.markHtml ? RubricPrint.markHtml(cid, aid, sid) : '';
+  }
+  // A level, comment or status may have changed what the sheet would show.
+  function _refreshPrintMarks() {
+    if (window.RubricPrint && RubricPrint.refreshMarks && activeCourse) RubricPrint.refreshMarks(activeCourse);
+  }
+  function _queuePrintMarks() {
+    setTimeout(_refreshPrintMarks, 0);
+  }
+
   /* A student's row in the whole-class grid: the name, Late | Excused |
      Missing, and the row's fill menu. */
   function _rsgStudentHeadHtml(cid, aid, st, status, fillAction) {
@@ -4206,6 +4219,7 @@ window.PageAssignments = (function () {
       '<span class="rsg-student-name">' +
       esc(row && row.view ? row.view.label : displayNameWithLast(st)) +
       '</span>' +
+      (row && row.view ? '' : _printMarkHtml(cid, aid, st.id)) +
       (row && row.view
         ? ''
         : '<div class="grader-status rsg-status" role="group" aria-label="Status" data-stop-prop="true">' +
@@ -7652,6 +7666,9 @@ window.PageAssignments = (function () {
     ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
       _addDocListener(type, _graderAfterEvent);
     });
+    ['click', 'change', 'focusout', 'fv:rubric-prints-changed'].forEach(function (type) {
+      _addDocListener(type, _queuePrintMarks);
+    });
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
     _addDocListener('scroll', _hideChipTip, true);
@@ -7749,6 +7766,7 @@ window.PageAssignments = (function () {
         '<button type="button" class="grader-step" data-grader="next" aria-label="Next student">' +
         _GRADER_CHEVRON_RIGHT +
         '</button>' +
+        '<span class="grader-print-mark"></span>' +
         '<span class="grader-spacer"></span>' +
         '<div class="grader-status" role="group" aria-label="Status"></div>' +
         '</div>' +
@@ -7896,6 +7914,7 @@ window.PageAssignments = (function () {
       '<h4 class="grader-inline-name">' +
       esc(displayNameWithLast(st)) +
       '</h4>' +
+      _printMarkHtml(cid, a.id, st.id) +
       '<div class="grader-status" role="group" aria-label="Status">' +
       _graderStatusButtons(a.id, st.id, status, isDibelsScored(a) ? ['EXC', 'NS'] : ['LATE', 'EXC', 'NS']) +
       '</div>' +
@@ -8183,6 +8202,14 @@ window.PageAssignments = (function () {
       ? '\u2190 \u2192 change group \u00B7 Esc closes'
       : '\u2190 \u2192 change student \u00B7 Esc closes';
     _refreshReportNote(dialog, cid, a, sid);
+    // Printed / Changed Since Printed beside the name (teacher/rubric-print.js).
+    var markHtml = view ? '' : _printMarkHtml(cid, a.id, sid);
+    var markBox = dialog.querySelector('.grader-print-mark');
+    if (markBox && _grader.markHtml !== markHtml) {
+      // html-safe: _printMarkHtml is RubricPrint.markHtml, which escapes its text
+      markBox.innerHTML = markHtml;
+      _grader.markHtml = markHtml;
+    }
     // The Note for the Report is one student's; the group view has none.
     if (view) dialog.querySelector('.grader-report-note').hidden = true;
     var grade = _graderGrade(cid, a, sid);
@@ -8511,6 +8538,9 @@ window.PageAssignments = (function () {
     _addDocListener('mouseout', _handleMouseOut);
     _addDocListener('scroll', _hideChipTip, true);
     _addDocListener('fv:id-rekeyed', _handleRekey);
+    ['click', 'change', 'focusout', 'fv:rubric-prints-changed'].forEach(function (type) {
+      _addDocListener(type, _queuePrintMarks);
+    });
     ['change', 'input', 'click'].forEach(function (type) {
       _addDocListener(type, _countsAsAfterEvent);
     });

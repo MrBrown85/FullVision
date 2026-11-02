@@ -58,7 +58,7 @@ describe('_stampIdempotencyKey', () => {
 
 describe('FV_IDEMPOTENT_RPCS', () => {
   it('names exactly the endpoints the server retrofitted', () => {
-    // Verified against pg_proc: these 41 are the public functions carrying a
+    // Verified against pg_proc: these 42 are the public functions carrying a
     // p_idempotency_key argument (the three student ones from
     // migrations/20261019_withdraw_students.sql, the six report-form ones
     // from migrations/20261020_report_template / _report_issue / _guardian,
@@ -68,7 +68,8 @@ describe('FV_IDEMPOTENT_RPCS', () => {
     // the four phone-report ones from migrations/20261025_phone_reports.sql,
     // save_score_report_note from migrations/20261031_score_report_note.sql,
     // and save_comment_template / delete_comment_template from
-    // migrations/20261031_comment_template.sql, live once it is applied).
+    // migrations/20261031_comment_template.sql, live once it is applied),
+    // and set_rubric_printed from migrations/20261102_rubric_print.sql.
     // Keep in lockstep with the database.
     expect(Object.keys(FV_IDEMPOTENT_RPCS).sort()).toEqual([
       'close_phone_report',
@@ -99,6 +100,7 @@ describe('FV_IDEMPOTENT_RPCS', () => {
       'save_report_template',
       'save_score_report_note',
       'set_questionnaire_on',
+      'set_rubric_printed',
       'update_phone_report',
       'upsert_category',
       'upsert_competency_group',
