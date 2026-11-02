@@ -997,6 +997,57 @@
 .af-tag-item:last-child {
   border-bottom: none;
 }
+/* A competency row with its I Can toggle beside it (Nov 2 mockup, batch 2). */
+.af-tag-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--overlay-hover);
+}
+.af-tag-row:last-of-type {
+  border-bottom: none;
+}
+.af-tag-row .af-tag-item {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+.af-tag-ican-toggle {
+  flex: none;
+  margin-right: 8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--active);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.af-tag-ican-toggle:hover {
+  background: var(--overlay-hover);
+}
+.af-tag-ican-caret {
+  display: inline-block;
+  margin-right: 4px;
+  transition: transform 0.12s;
+}
+.af-tag-ican-toggle.open .af-tag-ican-caret {
+  transform: rotate(90deg);
+}
+.af-tag-icans {
+  margin: 2px 8px 8px 22px;
+  padding: 6px 12px 6px 22px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text);
+}
+.af-tag-icans li {
+  margin: 2px 0;
+}
 .af-tag-item:hover {
   background: rgba(0, 122, 255, 0.03);
 }
