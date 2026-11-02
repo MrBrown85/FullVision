@@ -341,10 +341,12 @@ window.MStudentDetail = (function () {
         if (!gi.sections.length) return;
         var groupProf = getGroupProficiency(cid, sid, gi.group.id);
         var groupRounded = Math.round(groupProf);
+        var groupNote = folderAverageNote(cid, gi.group);
         sectionCards +=
           '<div class="m-group-header">' +
           '<span class="m-group-name">' +
           MC.esc(gi.group.label || gi.group.name) +
+          (groupNote ? '<span class="m-group-note">' + MC.esc(groupNote) + '</span>' : '') +
           '</span>' +
           '<span class="m-group-prof" style="color:' +
           MC.profBg(groupRounded) +

@@ -798,9 +798,11 @@ window.PageStudent = (function () {
     if (hasGroups) {
       grouped.groups.forEach(function (gi) {
         if (!gi.sections.length) return;
+        var note = folderAverageNote(cid, gi.group);
         html +=
-          '<h3 class="stu-group-head"><span>' +
+          '<h3 class="stu-group-head"><span class="stu-group-name">' +
           esc(gi.group.name) +
+          (note ? '<span class="stu-group-note">' + esc(note) + '</span>' : '') +
           '</span>' +
           _levelPill(cid, getGroupProficiency(cid, studentId, gi.group.id)) +
           '</h3>';

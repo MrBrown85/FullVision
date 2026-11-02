@@ -1574,12 +1574,40 @@ function getOverallProficiency(cid, studentId) {
   });
 }
 
+/* "Folders Count as One" (course.folders_count_as_one): on by default, a
+   class averages each folder first and counts it as one competency. Off,
+   the overall is the plain mean of every competency. */
+function getFoldersCountAsOne(cid) {
+  var cc = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
+  return cc.foldersCountAsOne !== false;
+}
+
+/* Whether a folder is averaged first in the overall: the class counts
+   folders as one and the folder's own "Counts as One"
+   (competency_group.counts_as_one) is on. Both default on. */
+function folderCountsAsOne(cid, groupOrId) {
+  if (!getFoldersCountAsOne(cid)) return false;
+  var group = groupOrId;
+  if (typeof groupOrId === 'string') {
+    group = (typeof getCompetencyGroupById === 'function' && getCompetencyGroupById(cid, groupOrId)) || null;
+  }
+  return !group || group.countsAsOne !== false;
+}
+
+/* The note a teacher view shows beside a folder's average when that
+   folder isn't counted as one, so its average isn't read as part of the
+   overall. Empty when it is. */
+function folderAverageNote(cid, groupOrId) {
+  return folderCountsAsOne(cid, groupOrId) ? '' : 'Each competency counts on its own.';
+}
+
 /* An overall level from a level per competency, rolled up as
    getOverallProficiency does: with no groups, the mean of the competencies;
-   with groups, one mean per group plus each ungrouped competency, then the
-   mean of those. `levelOf(section)` is 0 for a competency with no level,
-   which is left out. A report's "then" column rolls up the same way as its
-   "now". */
+   with groups, one mean per folder that counts as one, plus each other
+   competency, then the mean of those. With Folders Count as One off, the
+   mean of every competency. `levelOf(section)` is 0 for a competency with
+   no level, which is left out. A report's "then" column rolls up the same
+   way as its "now". */
 function rollUpSectionLevels(cid, levelOf) {
   var mean = function (list) {
     var v = list.filter(function (p) {
@@ -1595,10 +1623,15 @@ function rollUpSectionLevels(cid, levelOf) {
   var hasGroups = grouped.groups.some(function (g) {
     return g.sections.length > 0;
   });
-  if (!hasGroups) return mean(getSections(cid).map(levelOf));
+  if (!hasGroups || !getFoldersCountAsOne(cid)) return mean(getSections(cid).map(levelOf));
   var values = [];
   grouped.groups.forEach(function (gi) {
-    if (gi.sections.length) values.push(mean(gi.sections.map(levelOf)));
+    if (!gi.sections.length) return;
+    if (folderCountsAsOne(cid, gi.group)) values.push(mean(gi.sections.map(levelOf)));
+    else
+      gi.sections.forEach(function (sec) {
+        values.push(levelOf(sec));
+      });
   });
   grouped.ungrouped.forEach(function (sec) {
     values.push(levelOf(sec));
@@ -2464,10 +2497,54 @@ function previewCompetencyRemoval(cid, sectionIds) {
   return { changed: changed, total: students.length, example: example };
 }
 
+/* What turning Folders Count as One on or off would do, for its confirm:
+   how many students' overall proficiency changes, out of how many, and one
+   example. `change` is { on } for the class, or { groupId, on } for one
+   folder's Counts as One. Runs the class's own math with the change and
+   puts the saved value back. */
+function previewFolderCountChange(cid, change) {
+  change = change || {};
+  var cc = getCourseConfig(cid);
+  var group = change.groupId ? getCompetencyGroupById(cid, change.groupId) : null;
+  var students = getStudents(cid);
+  var shown = function (v) {
+    return v > 0 ? Number(v).toFixed(1) : '';
+  };
+  var before = students.map(function (s) {
+    return shown(getOverallProficiency(cid, s.id));
+  });
+  var target = group || cc;
+  var field = group ? 'countsAsOne' : 'foldersCountAsOne';
+  var had = Object.prototype.hasOwnProperty.call(target, field);
+  var kept = target[field];
+  var after;
+  try {
+    target[field] = !!change.on;
+    after = students.map(function (s) {
+      return shown(getOverallProficiency(cid, s.id));
+    });
+  } finally {
+    if (had) target[field] = kept;
+    else delete target[field];
+  }
+  var changed = 0;
+  var example = null;
+  students.forEach(function (s, i) {
+    if (before[i] === after[i]) return;
+    changed++;
+    if (!example && before[i] && after[i]) example = { name: fullName(s), before: before[i], after: after[i] };
+  });
+  return { changed: changed, total: students.length, example: example };
+}
+
 /* ── Namespace ──────────────────────────────────────────────── */
 window.Calc = {
   calcMethodExample,
   getRecentScoreLimit,
+  getFoldersCountAsOne,
+  folderCountsAsOne,
+  folderAverageNote,
+  previewFolderCountChange,
   previewCompetencyRemoval,
   formatCoursePercent,
   previewCalcMethodChange,

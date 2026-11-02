@@ -825,6 +825,14 @@ body.fv-switching-course::after {
   font-weight: 600;
   color: var(--text-2);
 }
+/* A folder that isn't counted as one says so under its name. */
+.m-group-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-3);
+}
 .m-group-prof {
   font-size: 17px;
   font-weight: 700;

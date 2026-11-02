@@ -75,6 +75,17 @@ A 72% test showed 2.9 (Proficient's colour) on the student page, while its compe
 - **The % doesn't change.** Points work still counts its points in the course %.
 - A points 0 and Incomplete are Emerging, the table's bottom, as their competency already read them. Missing points work stays a 0 level.
 
+## Folders Count as One (2026-11-02)
+
+A class's overall proficiency averaged each folder (competency group) first and counted it as one competency (`rollUpSectionLevels`). Teachers ask for it: a folder of small competencies is one big competency. Colin wanted teachers to turn it off themselves, for the class or for one folder.
+
+- **Grading tab, "Folders Count as One"** (`course.folders_count_as_one`, default on). Off, the overall is the plain mean of every competency; folders only group them.
+- **Each folder's "Counts as One"** switch on its header in the Competencies tab (`competency_group.counts_as_one`, default on). While the class is on, a folder that is off adds each of its competencies to the overall on its own. While the class is off the switches are hidden and a line says why.
+- **On everywhere is the old math exactly.** No grade changed when the columns were added. `migrations/20261102_folders_count_as_one.sql`.
+- **Folder rows keep their average** in every view. Where a folder isn't counted as one, teacher views add "Each competency counts on its own." (student page and phone under the name; dashboard tooltips). Family reports, phone reports and the CSV don't.
+- **Either switch asks first** when grades move, with the grade-change count, and says printed or sent reports and approved comments keep what they say.
+- **Copy Grading Setup copies the class switch** with the calculation method. Duplicate Class copies both.
+
 ## A category on every assessment (2026-11-01)
 
 Colin chose option A on Kanban card t4. Microsoft Teams Assignments requires a category on every assignment once a class has categories. FullVision didn't: in a class with categories, work with no category counted toward nothing in the course % (`assessmentCourseWorth` kind `uncategorized`) and toward a competency only when that competency had no categorized work, with nothing on screen to say so. The form also chose the first category for the teacher without saying so.

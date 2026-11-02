@@ -221,7 +221,7 @@ window.DashOverview = (function () {
         html +=
           '<div class="dash-outcome-row">' +
           '<span class="dash-outcome-label" title="' +
-          esc(sec.name || sec.shortName || '') +
+          esc((sec.name || sec.shortName || '') + (sec.note ? '\n' + sec.note : '')) +
           '">' +
           esc(sec.shortName || sec.name) +
           '</span>' +
