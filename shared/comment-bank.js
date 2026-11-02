@@ -3348,6 +3348,57 @@ var COMMENT_BANK = {
       claims: ['bestPiece'],
       src: 'new',
     },
+    // Grown 2026-11-02 (competencies in report comments, plan decision 2):
+    // the next step at the student's level for a competency from the BC
+    // bank. {levelStep} is the cluster's step toward the level above
+    // (data/bc-curriculum-comment.json): a bare verb phrase of 12 words at
+    // most, so every frame stays within 20 words. The Next Step step prefers
+    // these over the table's per-skill sentences when the slot has a value.
+    {
+      id: 'ls01',
+      part: 'go',
+      group: 'Next Step',
+      text: 'Next, {he} can {levelStep}.',
+      needs: ['levelStep'],
+      claims: ['nextStep'],
+      src: 'new',
+    },
+    {
+      id: 'ls02',
+      part: 'go',
+      group: 'Next Step',
+      text: 'The next step for {him} is to {levelStep}.',
+      needs: ['levelStep'],
+      claims: ['nextStep'],
+      src: 'new',
+    },
+    {
+      id: 'ls03',
+      part: 'go',
+      group: 'Next Step',
+      text: 'After this term’s work, {he} can {levelStep}.',
+      needs: ['levelStep'],
+      claims: ['nextStep'],
+      src: 'new',
+    },
+    {
+      id: 'ls04',
+      part: 'go',
+      group: 'Next Step',
+      text: 'One thing {he} can try next is to {levelStep}.',
+      needs: ['levelStep'],
+      claims: ['nextStep'],
+      src: 'new',
+    },
+    {
+      id: 'ls05',
+      part: 'go',
+      group: 'Next Step',
+      text: 'To keep growing, {he} can {levelStep}.',
+      needs: ['levelStep'],
+      claims: ['nextStep'],
+      src: 'new',
+    },
     {
       id: 'g01',
       part: 'go',

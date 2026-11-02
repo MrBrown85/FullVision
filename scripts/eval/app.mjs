@@ -50,6 +50,7 @@ const FILES = [
   'teacher/report-blocks.js',
   'shared/comment-bank.js',
   'teacher/comment-realiser.js',
+  'shared/bank-comment.js',
   'teacher/comment-bank.js',
   'shared/questionnaire-templates.js',
   'teacher/questionnaires.js',

@@ -6,13 +6,20 @@
  */
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { buildBank } from '../scripts/build-curriculum-bank.mjs';
+import { buildBank, buildComment } from '../scripts/build-curriculum-bank.mjs';
 
 describe('the app bank', () => {
   it('is a fresh build of data/bc-curriculum-*.json', () => {
     const { bank, missing } = buildBank();
     expect(JSON.parse(readFileSync('curriculum_by_course.json', 'utf-8'))).toEqual(bank);
     expect(missing).toEqual([]);
+  });
+
+  it('ships the comment phrases as a fresh build of data/bc-curriculum-comment.json', () => {
+    const js = readFileSync('shared/bank-comment.js', 'utf-8');
+    const shipped = JSON.parse(js.slice(js.indexOf('{'), js.lastIndexOf(';')));
+    expect(shipped).toEqual(buildComment());
+    expect(Object.keys(shipped.ids)).toHaveLength(5029);
   });
 
   it('holds every Ministry course for grades 8–12 and no dropped one', () => {
