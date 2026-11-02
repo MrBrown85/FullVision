@@ -1244,7 +1244,9 @@ window.PageGradebook = (function () {
     });
     html += '</div>';
     // Row 2: tag code headers
-    html += '<div class="gb-grid-colheads-row2">';
+    // A group for screen readers, saying how to move along it (_handleHeaderKeys).
+    html +=
+      '<div class="gb-grid-colheads-row2" role="group" aria-label="Competency columns. Use the left and right arrow keys to move between them.">';
     cols.forEach(function (col, i) {
       var g = colGroupMap[i];
       var altClass = g && g.groupIdx % 2 === 1 ? ' gb-group-alt' : '';
@@ -1277,7 +1279,7 @@ window.PageGradebook = (function () {
         // One Tab stop for the whole row of headers (the first); the arrow
         // keys move between them (_handleHeaderKeys).
         '" tabindex="' +
-        (i === 0 ? '0' : '-1') +
+        (i === (_headerStop < cols.length ? _headerStop : 0) ? '0' : '-1') +
         '" aria-label="' +
         esc(col.tagText || col.tagCode) +
         '">' +
@@ -3143,6 +3145,8 @@ window.PageGradebook = (function () {
       render();
       return;
     }
+    // Keys on a competency header move along the headers (_handleHeaderKeys), not the grid.
+    if (e.target.closest && e.target.closest('.gb-grid-tag-header')) return;
     // → on a student's name goes to their first score; ← on a first score
     // goes back to the name.
     if (_nameCellArrow(e)) return;
@@ -3448,16 +3452,32 @@ window.PageGradebook = (function () {
 
   /* ← and → move between the competency headers, carrying the one Tab stop
      with the focus, so Tab reaches the score grid after a single header. */
+  // The header that holds the Tab stop, kept across redraws.
+  var _headerStop = 0;
   function _handleHeaderKeys(e) {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) < 0) return;
     var head = e.target.closest && e.target.closest('.gb-grid-tag-header');
     if (!head) return;
-    var next = e.key === 'ArrowRight' ? head.nextElementSibling : head.previousElementSibling;
-    if (!next || !next.classList.contains('gb-grid-tag-header')) return;
+    var heads = Array.prototype.slice.call(head.parentElement.querySelectorAll('.gb-grid-tag-header'));
+    var at = heads.indexOf(head);
+    var to = e.key === 'Home' ? 0 : e.key === 'End' ? heads.length - 1 : e.key === 'ArrowRight' ? at + 1 : at - 1;
+    var next = heads[to];
     e.preventDefault();
+    if (!next || next === head) return;
     head.setAttribute('tabindex', '-1');
     next.setAttribute('tabindex', '0');
-    next.focus();
+    _headerStop = to;
+    // The header row follows the score grid's scroll (a transform), so the
+    // grid scrolls to bring the header into view rather than the row itself.
+    next.focus({ preventScroll: true });
+    var data = document.getElementById('gb-data');
+    var colheads = document.getElementById('gb-colheads');
+    if (data && colheads) {
+      var box = colheads.getBoundingClientRect();
+      var r = next.getBoundingClientRect();
+      if (r.right > box.right) data.scrollLeft += r.right - box.right + 8;
+      else if (r.left < box.left) data.scrollLeft -= box.left - r.left + 8;
+    }
   }
 
   function _hideTip() {
