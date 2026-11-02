@@ -45,3 +45,16 @@ test.describe('on a touch screen', () => {
     await expect(tip).toBeHidden();
   });
 });
+
+test('the headers are one Tab stop, and the arrow keys move between them', async ({ page }) => {
+  const { head } = await open(page);
+  const heads = page.locator('.gb-grid-tag-header');
+  await expect(heads.locator('xpath=self::*[@tabindex="0"]')).toHaveCount(1);
+  await heads.first().focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(heads.nth(1)).toBeFocused();
+  await expect(heads.nth(1)).toHaveAttribute('tabindex', '0');
+  await expect(heads.first()).toHaveAttribute('tabindex', '-1');
+  await expect(page.locator('#gb-tooltip')).toBeVisible();
+  expect(await head.count()).toBe(1);
+});

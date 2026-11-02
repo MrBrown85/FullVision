@@ -1274,7 +1274,11 @@ window.PageGradebook = (function () {
         '" data-tip-tags="' +
         esc(tipTags.join(',')) +
         // Focusable and tappable (Oct 21 decision: tap a code): Tab or a tap shows the tip.
-        '" tabindex="0" aria-label="' +
+        // One Tab stop for the whole row of headers (the first); the arrow
+        // keys move between them (_handleHeaderKeys).
+        '" tabindex="' +
+        (i === 0 ? '0' : '-1') +
+        '" aria-label="' +
         esc(col.tagText || col.tagCode) +
         '">' +
         esc(col.tagCode) +
@@ -3442,6 +3446,20 @@ window.PageGradebook = (function () {
     gbTip.style.top = rect.bottom + 6 + 'px';
   }
 
+  /* ← and → move between the competency headers, carrying the one Tab stop
+     with the focus, so Tab reaches the score grid after a single header. */
+  function _handleHeaderKeys(e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    var head = e.target.closest && e.target.closest('.gb-grid-tag-header');
+    if (!head) return;
+    var next = e.key === 'ArrowRight' ? head.nextElementSibling : head.previousElementSibling;
+    if (!next || !next.classList.contains('gb-grid-tag-header')) return;
+    e.preventDefault();
+    head.setAttribute('tabindex', '-1');
+    next.setAttribute('tabindex', '0');
+    next.focus();
+  }
+
   function _hideTip() {
     var gbTip = document.getElementById('gb-tooltip');
     if (gbTip) {
@@ -3687,6 +3705,7 @@ window.PageGradebook = (function () {
     _addDocListener('input', _handleInput);
     _addDocListener('change', _handleChange);
     _addDocListener('keydown', _handleKeydown);
+    _addDocListener('keydown', _handleHeaderKeys);
     _addDocListener('mouseover', _handleMouseover);
     _addDocListener('mouseout', _handleMouseout);
     _addDocListener('focusin', _handleFocusin);
