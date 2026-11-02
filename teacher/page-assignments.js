@@ -6347,162 +6347,25 @@ window.PageAssignments = (function () {
       render();
     }
   }
-  /* Module colour: the swatch opens a small popover with the preset
-     colours and a Custom row (a colour well and a hex box), so a teacher
-     can pick any colour in any browser. It lives on <body> so a render()
-     doesn't remove it. */
-  var _HEX_RE = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i;
-  function _normHex(v) {
-    var m = _HEX_RE.exec(String(v || '').trim());
-    if (!m) return null;
-    var h = m[1].toLowerCase();
-    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
-    return '#' + h;
-  }
-  function closeModuleColorPop() {
-    var pop = document.getElementById('mod-color-pop');
-    if (!pop) return;
-    pop.remove();
-    document.removeEventListener('mousedown', _modColorOutside, true);
-    document.removeEventListener('keydown', _modColorKey, true);
-    window.removeEventListener('scroll', _placeModuleColorPop, true);
-    window.removeEventListener('resize', _placeModuleColorPop);
-  }
-  // Keeps the popover under its swatch as the page scrolls or re-renders.
-  function _placeModuleColorPop() {
-    var pop = document.getElementById('mod-color-pop');
-    if (!pop) return;
-    var sw = document.querySelector('.mod-folder-color[data-moduleid="' + pop.dataset.moduleid + '"]');
-    if (!sw) return _modColorAway();
-    var r = sw.getBoundingClientRect();
-    var w = pop.offsetWidth;
-    var h = pop.offsetHeight;
-    var top = r.bottom + 6;
-    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
-    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
-    pop.style.top = top + 'px';
-  }
-  // Closing by clicking away or on the swatch keeps a custom
-  // colour the teacher has previewed; Escape drops it.
-  function _modColorAway() {
-    var pop = document.getElementById('mod-color-pop');
-    var pending = pop && pop.dataset.pending;
-    var mid = pop && pop.dataset.moduleid;
-    closeModuleColorPop();
-    if (pending) updateModuleColor(mid, pending);
-  }
-  function _modColorOutside(e) {
-    if (e.target.closest('#mod-color-pop') || e.target.closest('.mod-folder-color')) return;
-    _modColorAway();
-  }
-  function _modColorKey(e) {
-    if (e.key !== 'Escape') return;
-    e.stopPropagation();
-    var pop = document.getElementById('mod-color-pop');
-    var mid = pop && pop.dataset.moduleid;
-    var orig = pop && pop.dataset.orig;
-    closeModuleColorPop();
-    var sw = mid && document.querySelector('.mod-folder-color[data-moduleid="' + mid + '"]');
-    if (sw) {
-      sw.style.background = orig;
-      sw.focus();
-    }
-  }
+  /* Module colour: the swatch opens the shared colour popover (ui.js). */
   function openModuleColorPop(swatch) {
     var moduleId = swatch.dataset.moduleid;
-    var open = document.getElementById('mod-color-pop');
-    var wasThis = open && open.dataset.moduleid === moduleId;
-    _modColorAway();
-    if (wasThis) return;
     var u = getModules(activeCourse).find(function (x) {
       return x.id === moduleId;
     });
     if (!u) return;
-    var current = _normHex(u.color) || '#6366f1';
-    var pop = document.createElement('div');
-    pop.id = 'mod-color-pop';
-    pop.className = 'mod-color-pop';
-    pop.setAttribute('role', 'dialog');
-    pop.setAttribute('aria-label', 'Module colour');
-    pop.dataset.moduleid = moduleId;
-    pop.dataset.orig = current;
-    pop.innerHTML =
-      '<div class="mod-color-grid">' +
-      MODULE_COLORS.map(function (c) {
-        return (
-          '<button type="button" class="mod-color-opt' +
-          (c === current ? ' selected' : '') +
-          '" data-color="' +
-          c +
-          '" style="background:' +
-          c +
-          '" aria-label="' +
-          c +
-          '" aria-pressed="' +
-          (c === current) +
-          '"></button>'
-        );
-      }).join('') +
-      '</div>' +
-      '<div class="mod-color-custom">' +
-      '<span class="mod-color-custom-label">Custom</span>' +
-      '<input type="color" class="mod-color-well" value="' +
-      current +
-      '" aria-label="Choose a custom colour">' +
-      '<input type="text" class="mod-color-hex" value="' +
-      current +
-      '" maxlength="7" spellcheck="false" autocomplete="off" aria-label="Hex colour">' +
-      '</div>';
-    document.body.appendChild(pop);
-    _placeModuleColorPop();
-
-    var well = pop.querySelector('.mod-color-well');
-    var hex = pop.querySelector('.mod-color-hex');
-    function apply(color) {
-      closeModuleColorPop();
-      if (color && color !== current) updateModuleColor(moduleId, color);
-    }
-    pop.addEventListener('click', function (e) {
-      var opt = e.target.closest('.mod-color-opt');
-      if (opt) apply(opt.dataset.color);
+    openColorPop(swatch, {
+      key: 'module:' + moduleId,
+      colors: MODULE_COLORS,
+      current: u.color || '#6366f1',
+      label: 'Module colour',
+      findSwatch: function () {
+        return document.querySelector('.mod-folder-color[data-moduleid="' + moduleId + '"]');
+      },
+      onPick: function (color) {
+        updateModuleColor(moduleId, color);
+      },
     });
-    // The well and the hex box preview on the swatch as the teacher picks;
-    // the colour is saved when the well's picker closes or Enter is pressed.
-    function preview(color) {
-      var sw = document.querySelector('.mod-folder-color[data-moduleid="' + moduleId + '"]');
-      if (sw) sw.style.background = color;
-      pop.dataset.pending = color === current ? '' : color;
-    }
-    well.addEventListener('input', function () {
-      hex.value = well.value;
-      hex.classList.remove('invalid');
-      preview(well.value);
-    });
-    well.addEventListener('change', function () {
-      apply(_normHex(well.value));
-    });
-    hex.addEventListener('input', function () {
-      var c = _normHex(hex.value);
-      hex.classList.toggle('invalid', !c && hex.value.trim() !== '');
-      if (c) {
-        well.value = c;
-        preview(c);
-      }
-    });
-    hex.addEventListener('keydown', function (e) {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      var c = _normHex(hex.value);
-      if (c) apply(c);
-      else hex.classList.add('invalid');
-    });
-
-    document.addEventListener('mousedown', _modColorOutside, true);
-    document.addEventListener('keydown', _modColorKey, true);
-    window.addEventListener('scroll', _placeModuleColorPop, true);
-    window.addEventListener('resize', _placeModuleColorPop);
-    var sel = pop.querySelector('.mod-color-opt.selected') || pop.querySelector('.mod-color-opt');
-    if (sel) sel.focus({ preventScroll: true });
   }
   function deleteModule(moduleId, assessCount) {
     var msg =
@@ -8733,7 +8596,7 @@ window.PageAssignments = (function () {
 
   function destroy() {
     _hideChipTip();
-    closeModuleColorPop();
+    closeColorPop();
     // Remove all tracked listeners
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);

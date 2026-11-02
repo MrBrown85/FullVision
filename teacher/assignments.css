@@ -1187,8 +1187,8 @@
   padding: 0;
 }
 
-/* Module colour popover: preset colours, then a Custom row. */
-.mod-color-pop {
+/* Colour popover (ui.js openColorPop): preset colours, then a Custom row. */
+.color-pop {
   position: fixed;
   z-index: var(--z-popover);
   background: var(--surface);
@@ -1199,13 +1199,13 @@
   padding: 12px;
   width: 196px;
 }
-.mod-color-grid {
+.color-pop-grid {
   display: grid;
   grid-template-columns: repeat(5, 28px);
   gap: 8px;
   justify-content: space-between;
 }
-.mod-color-opt {
+.color-pop-opt {
   width: 28px;
   height: 28px;
   border-radius: 8px;
@@ -1213,14 +1213,14 @@
   padding: 0;
   cursor: pointer;
 }
-.mod-color-opt.selected,
-.mod-color-opt:focus-visible {
+.color-pop-opt.selected,
+.color-pop-opt:focus-visible {
   box-shadow:
     0 0 0 2px var(--surface),
     0 0 0 4px var(--text);
   outline: none;
 }
-.mod-color-custom {
+.color-pop-custom {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1228,12 +1228,12 @@
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
-.mod-color-custom-label {
+.color-pop-custom-label {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--text);
 }
-.mod-color-well {
+.color-pop-well {
   width: 28px;
   height: 28px;
   padding: 0;
@@ -1243,18 +1243,18 @@
   cursor: pointer;
   flex-shrink: 0;
 }
-.mod-color-well::-webkit-color-swatch-wrapper {
+.color-pop-well::-webkit-color-swatch-wrapper {
   padding: 0;
 }
-.mod-color-well::-webkit-color-swatch {
+.color-pop-well::-webkit-color-swatch {
   border: 0;
   border-radius: 8px;
 }
-.mod-color-well::-moz-color-swatch {
+.color-pop-well::-moz-color-swatch {
   border: 0;
   border-radius: 8px;
 }
-.mod-color-hex {
+.color-pop-hex {
   flex: 1;
   min-width: 0;
   height: 28px;
@@ -1265,7 +1265,7 @@
   color: var(--text);
   background: var(--surface);
 }
-.mod-color-hex.invalid {
+.color-pop-hex.invalid {
   border-color: var(--score-1);
 }
 .mod-folder-name {
