@@ -6530,8 +6530,9 @@ window.CommentBank = (function () {
         return;
       }
       // A sentence the teacher kept is theirs, as written, and so is a class
-      // line (support, closing, late work): not checked.
-      if (pv.kept || pv.classLine) {
+      // line (support, closing, late work), and a sentence the bank has since
+      // retired (RETIRED): not checked.
+      if (pv.kept || pv.classLine || (!byId[pv.sentenceId] && RETIRED[pv.sentenceId])) {
         sentences.push(d.sentences[i]);
         out.push(pv);
         return;
@@ -6562,6 +6563,31 @@ window.CommentBank = (function () {
     // A stand-in is filled for its place like the rest (the realiser).
     return _realised({ sentences: sentences, provenance: out, replaced: replaced });
   }
+
+  /* Bank sentences retired since a draft could have used them (Nov 2: the
+     Next Step frames that named a bare label or quoted an I Can). A saved
+     draft keeps one as written rather than having it swapped for a
+     sentence the teacher didn't choose. */
+  var RETIRED = {};
+  [
+    'g01',
+    'g03',
+    'g101',
+    'g102',
+    'g103',
+    'g104',
+    'g105',
+    'g107',
+    'g201',
+    'g206',
+    'g209',
+    'g216',
+    'g219',
+    'g221',
+    'g223',
+  ].forEach(function (id) {
+    RETIRED[id] = true;
+  });
 
   /* ── Marks changed after approval (plan PR 12) ─────────────────────── */
 
