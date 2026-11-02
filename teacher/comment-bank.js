@@ -2908,7 +2908,7 @@ window.CommentBank = (function () {
     return strongestOf(f.comps)
       .map(function (c) {
         var sk = skillFor(f, c);
-        return sk ? { comp: c, key: sk.key, skill: sk.skill } : null;
+        return sk ? { comp: c, key: sk.key, skill: sk.skill, steps: sk.steps || null } : null;
       })
       .filter(Boolean);
   }
@@ -2924,6 +2924,18 @@ window.CommentBank = (function () {
   function strengthText(f) {
     var xs = strengthSkills(f);
     return xs.length ? xs[0].skill : '';
+  }
+  /* The first strength where the student is now (Colin, 2026-11-02): for a
+     competency from the BC bank, its cluster's phrase and the level word it
+     is at, which the frame says with the Ministry qualifier ("is beginning
+     to", "with growing consistency", "consistently", "with depth and
+     complexity"). The strongest gate already needs 3+ pieces. { comp, key,
+     skill, word } or null. */
+  function strengthNowOf(f) {
+    var x = strengthSkills(f)[0];
+    if (!x || !x.steps) return null;
+    var w = word(x.comp.level);
+    return w ? { comp: x.comp, key: x.key, skill: x.skill, word: w } : null;
   }
 
   /* The work this term, best first: the one rule for "best piece" that the
@@ -3339,6 +3351,10 @@ window.CommentBank = (function () {
     var strongest = strongestOf(f.comps);
     // The strengths as skills (plan part 3), never the bare labels.
     var strongSkills = strengthSkills(f);
+    // Where the student is now in the first strength (Colin, 2026-11-02):
+    // the bank's phrase with the Ministry qualifier for its level word, for
+    // a competency from the BC bank (strengthNowOf).
+    var nowSk = strengthNowOf(f);
     // Even results (evenComps): no strongest, every judged competency
     // within half a step; the first two as skills, for the n5xx frames.
     var evenNow = evenComps(f.comps, f.overall);
@@ -3475,6 +3491,8 @@ window.CommentBank = (function () {
       // The strongest skill's key (`when.strongSkill`, the per-skill
       // strengths frames): the competency behind the first strength.
       strongSkill: keys('comp', [strongSkills[0] && strongSkills[0].comp]),
+      // The first strength at its level now (`when.strengthWord`).
+      strengthNow: keys('comp', [nowSk && nowSk.comp]),
       // The strength as one skill (`when.topSkill`): the strongest, or one
       // of a tie at the top.
       topSkill: keys('comp', [topSk && topSk.comp]),
@@ -3547,6 +3565,7 @@ window.CommentBank = (function () {
     var compNames = {
       strengths: names(strongest),
       strongSkill: names([strongSkills[0] && strongSkills[0].comp]),
+      strengthNow: names([nowSk && nowSk.comp]),
       topSkill: names([topSk && topSk.comp]),
       evenSkill: names([evenSk[0] && evenSk[0].comp]),
       highestSkill: names([hiSk[0] && hiSk[0].comp]),
@@ -3591,6 +3610,8 @@ window.CommentBank = (function () {
       // The strongest skill's key (SKILLS), for the per-skill strengths
       // frames (`when.strongSkill`); '' below the "strongest" gate.
       _strongSkill: strongSkills[0] ? strongSkills[0].key : '',
+      // The first strength's level word, for `when.strengthWord`.
+      _strengthWord: nowSk ? nowSk.word : '',
       // The strength's skill key for the frames that claim a strength, not
       // the strongest (`when.topSkill`): the strongest skill, else one of a
       // tie at the top (topSkillOf); '' with neither.
@@ -3651,6 +3672,9 @@ window.CommentBank = (function () {
       // The strongest skill's key, needed and never printed: the frames
       // written for one skill say it in their own words.
       strongSkill: strongSkills[0] ? strongSkills[0].key : '',
+      // The first strength in the bank's phrase, said at its level by the
+      // frame (`when.strengthWord`): "{He} can consistently {strengthNow}."
+      strengthNow: nowSk ? nowSk.skill : '',
       topSkill: topSk ? topSk.key : '',
       // Even results (evenComps): 'yes' while they hold; the highest even
       // competency as a skill; and the proficiency word as the class shows
@@ -3829,6 +3853,7 @@ window.CommentBank = (function () {
       if (k === 'evenWord') return !!ctx._evenWord && ctx._evenWord === when[k];
       if (k === 'highestSkill') return !!ctx._highestSkill && ctx._highestSkill === when[k];
       if (k === 'highestWord') return !!ctx._highestWord && ctx._highestWord === when[k];
+      if (k === 'strengthWord') return !!ctx._strengthWord && ctx._strengthWord === when[k];
       return (ctx._habits || {})[k] === when[k];
     });
   }
@@ -4258,7 +4283,9 @@ window.CommentBank = (function () {
     { key: 'notHandedIn', part: 'habits', groups: ['Not Handed In'], says: 'notHandedIn' },
     { key: 'lateWork', part: 'habits', line: 'lateLine', after: 'notHandedIn' },
     // The strengths (plan part 3): one or two skills from the table.
-    { key: 'overall', part: 'now', groups: ['Overall'] },
+    // The first strength at its level now, for a bank competency
+    // (strengthNow), else one or two skills from the table.
+    { key: 'overall', part: 'now', groups: ['Overall'], prefer: 'strengthNow' },
     // The best piece (plan part 2): the one sentence of Examples From Work.
     { key: 'example', part: 'now', groups: ['Examples From Work'] },
     // The Language Goals line (plan PR 3b): a template the teacher picked,
@@ -4354,6 +4381,7 @@ window.CommentBank = (function () {
       // and the overall proficiency.
       if (k === 'nextSkill') return ((ctx._facts && ctx._facts.nextSkill) || []).forEach(add);
       if (k === 'strongSkill') return ((ctx._facts && ctx._facts.strongSkill) || []).forEach(add);
+      if (k === 'strengthWord') return ((ctx._facts && ctx._facts.strengthNow) || []).forEach(add);
       if (k === 'topSkill') return ((ctx._facts && ctx._facts.topSkill) || []).forEach(add);
       if (k === 'evenWord') return ((ctx._facts && ctx._facts.evenWord) || []).forEach(add);
       if (k === 'highestSkill' || k === 'highestWord')
@@ -5824,7 +5852,20 @@ window.CommentBank = (function () {
       var ids = _ids(pv, 'strengths', 'comp')
         .concat(_ids(pv, 'strength', 'comp'))
         .concat(_ids(pv, 'strongSkill', 'comp'))
+        .concat(_ids(pv, 'strengthNow', 'comp'))
         .concat(_ids(pv, 'selfStrong', 'confidence'));
+      // The first strength at its level now (`when.strengthWord`): still the
+      // same competency, phrase and level word.
+      if (_has(pv, 'strengthNow') || _has(pv, 'when.strengthWord')) {
+        var sn = strengthNowOf(f);
+        if (
+          !sn ||
+          (_has(pv, 'strengthNow') &&
+            (v.strengthNow !== sn.skill || _ids(pv, 'strengthNow', 'comp')[0] !== String(sn.comp.id))) ||
+          (_has(pv, 'when.strengthWord') && v['when.strengthWord'] !== sn.word)
+        )
+          return false;
+      }
       // A frame for one skill (`when.strongSkill`): the first strength is
       // still that skill, from the same competency.
       if (_has(pv, 'when.strongSkill')) {
@@ -6935,6 +6976,7 @@ window.CommentBank = (function () {
     climbed: climbed,
     slid: slid,
     strongestOf: strongestOf,
+    strengthNowOf: strengthNowOf,
     bestPieceOf: bestPieceOf,
     compsOf: compsOf,
     topTieOf: topTieOf,
