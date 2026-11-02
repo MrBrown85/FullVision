@@ -11,7 +11,11 @@
    (a keyword inside another word, as "sequence" in "Consequences"); those
    still need reading by hand.
 
-   Usage: node scripts/bc-curriculum-routing.mjs [--list] */
+   --routes prints every routed name with its skill, marking the ones a
+   row's keyword pattern caught rather than its list of bank names: those
+   were never checked by hand and are where a wrong skill hides.
+
+   Usage: node scripts/bc-curriculum-routing.mjs [--list] [--routes] */
 import { readFileSync } from 'fs';
 import vm from 'vm';
 
@@ -38,6 +42,7 @@ const FAMILY = {
 };
 
 const unrouted = {};
+const routed = {};
 let rows = 0;
 let missed = 0;
 for (const [key, course] of Object.entries(derived)) {
@@ -46,7 +51,11 @@ for (const [key, course] of Object.entries(derived)) {
   for (const cat of course.categories)
     for (const c of cat.competencies) {
       rows++;
-      if (CB.skillOf(family, c.short_label)) continue;
+      const sk = CB.skillOf(family, c.short_label);
+      if (sk) {
+        routed[family + '|' + c.short_label] = { family, name: c.short_label, sk };
+        continue;
+      }
       missed++;
       const names = (unrouted[family] = unrouted[family] || {});
       (names[c.short_label] = names[c.short_label] || []).push(key);
@@ -67,4 +76,15 @@ for (const [family, names] of Object.entries(unrouted).sort()) {
       console.log(
         `    ${name} (${keys.length}: ${[...new Set(keys)].slice(0, 4).join(', ')}${keys.length > 4 ? ', …' : ''})`,
       );
+}
+
+if (process.argv.includes('--routes')) {
+  // A row's own pattern, without the bank names withNames added to it.
+  const byKeyword = (family, name) =>
+    CB.SKILLS[family].find(r => new RegExp(r.match.source.split('|^(?:')[0], r.match.flags).test(name));
+  const list = Object.values(routed).sort((a, b) => (a.family + a.name).localeCompare(b.family + b.name));
+  const keyword = list.filter(r => byKeyword(r.family, r.name)?.key === r.sk.key);
+  console.log(`\n${list.length} routed names; ${keyword.length} caught by a keyword (marked *):`);
+  for (const r of list)
+    console.log(`  ${keyword.includes(r) ? '*' : ' '} ${r.family}: ${r.name} → ${r.sk.key}: ${r.sk.skill}`);
 }

@@ -172,6 +172,17 @@ window.CommentBank = (function () {
 
   /* ── Competencies as skills (plan PR 8) ────────────────────────────── */
 
+  /* The names data/bc-curriculum-derived.json gives BC competencies
+     (stage 2 of the bank rebuild) whose skill the row's own pattern
+     misses. Each is matched whole, so no other label moves to a
+     different skill. */
+  function withNames(pattern, names) {
+    var whole = names.map(function (n) {
+      return n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    });
+    return new RegExp(pattern.source + '|^(?:' + whole.join('|') + ')$', pattern.flags);
+  }
+
   /* The competency-to-skill table, per kind of class: a competency's label
      (as the report names it) matched in order, first match wins, to one
      skill in plain words. `skill` finishes "Next, {he} can …", so it starts
@@ -200,13 +211,18 @@ window.CommentBank = (function () {
       {
         key: 'cause',
         name: 'Cause and Consequence',
-        match: /cause|consequence|effect/i,
+        match: withNames(/cause|consequence|effect/i, [
+          'Factor Interactions',
+          'Impact on People',
+          'Theory Impacts',
+          'Theory Origins',
+        ]),
         skill: 'explain the causes and results of an event',
       },
       {
         key: 'continuity',
         name: 'Continuity and Change',
-        match: /continuity|change|patterns and trends/i,
+        match: withNames(/continuity|change|patterns and trends/i, ['Patterns & Trends']),
         skill: 'explain what changed over time and what stayed the same',
       },
       {
@@ -226,37 +242,47 @@ window.CommentBank = (function () {
       {
         key: 'evaluating',
         name: 'Evaluating',
-        match: /evaluat/i,
+        match: withNames(/evaluat/i, [
+          'Assumptions & Bias',
+          'Method Improvement',
+          'Method Reflection',
+          'Sources of Error',
+        ]),
         skill: 'judge how reliable results are and how to improve the method',
       },
       {
         key: 'questioning',
         name: 'Questioning and Predicting',
-        match: /question|predict|curiosity/i,
+        match: withNames(/question|predict|curiosity/i, ['Hypotheses', 'Observation']),
         skill: 'ask a testable question and make a prediction',
       },
       {
         key: 'planning',
         name: 'Planning and Conducting',
-        match: /plan|conduct|investigat/i,
+        match: withNames(/plan|conduct|investigat/i, ['Accuracy & Precision', 'Variable Control']),
         skill: 'plan a fair test and record measurements carefully',
       },
       {
         key: 'processing',
         name: 'Processing and Analyzing',
-        match: /process|analy[sz]|data|graph|pattern/i,
+        match: withNames(/process|analy[sz]|data|graph|pattern/i, ['Cause & Effect', 'Drawing Conclusions']),
         skill: 'describe the pattern in the data and what it shows',
       },
       {
         key: 'applying',
         name: 'Applying and Innovating',
-        match: /appl[yi]|innovat/i,
+        match: withNames(/appl[yi]|innovat/i, [
+          'Finding Solutions',
+          'Idea Generation',
+          'Solution Strategies',
+          'Transfer of Learning',
+        ]),
         skill: 'apply a science idea to a problem in daily life',
       },
       {
         key: 'communicating',
         name: 'Communicating',
-        match: /communicat/i,
+        match: withNames(/communicat/i, ['Scientific Argument', 'Sharing Findings']),
         skill: 'explain results clearly, using science words and a labelled graph',
       },
     ],
@@ -270,13 +296,13 @@ window.CommentBank = (function () {
       {
         key: 'connecting',
         name: 'Connecting and Reflecting',
-        match: /connect|reflect/i,
+        match: withNames(/connect|reflect/i, ['Supporting Choices']),
         skill: 'connect a math idea to a real situation',
       },
       {
         key: 'reasoning',
         name: 'Reasoning and Modelling',
-        match: /reason|model|logic|pattern|thinking/i,
+        match: withNames(/reason|model|logic|pattern|thinking/i, ['Justification']),
         skill: 'explain why a method works, not just the steps',
       },
       {
@@ -341,31 +367,38 @@ window.CommentBank = (function () {
       {
         key: 'speaking',
         name: 'Exchanging Ideas',
-        match: /exchang|speak|oral|discuss|listen/i,
+        match: withNames(/exchang|speak|oral|discuss|listen/i, ['Media Collaboration']),
         skill: 'share an idea in discussion and respond to what others say',
       },
       {
         key: 'information',
         name: 'Accessing Information',
-        match: /access|information|research/i,
+        match: withNames(/access|information|research/i, ['Source Citation', 'Rights & Protocols']),
         skill: 'find information in a reliable source and name where it was found',
       },
       {
         key: 'reading',
         name: 'Comprehend and Connect',
-        match: /comprehen|read|respond|text|literary|literature|analy[sz]/i,
+        match: withNames(/comprehen|read|respond|text|literary|literature|analy[sz]/i, [
+          'Influence of Place',
+          'Story & Tradition',
+          'Language & Worldview',
+          'Techniques & Devices',
+          'New Media Techniques',
+          'Media Techniques',
+        ]),
         skill: 'support an idea about a text with details from it',
       },
       {
         key: 'thinking',
         name: 'Thinking Critically',
-        match: /critical|thinking/i,
+        match: withNames(/critical|thinking/i, ['Idea Exploration', 'Opinion & Evidence', 'Personal Response']),
         skill: 'explain a view of a text and give reasons for it',
       },
       {
         key: 'writing',
         name: 'Create and Communicate',
-        match: /writ|compos|creat|communicat/i,
+        match: withNames(/writ|compos|creat|communicat/i, ['Multimedia Design']),
         skill: 'plan a piece of writing before drafting it',
       },
     ],
@@ -373,31 +406,100 @@ window.CommentBank = (function () {
       {
         key: 'reflecting',
         name: 'Reason and Reflect',
-        match: /reason|reflect|critique|critical|analy[sz]|evaluat|judg/i,
+        match: withNames(/reason|reflect|critique|critical|analy[sz]|evaluat|judg/i, [
+          'Artist Motivations',
+          'Dance Interpretation',
+          'Describing Art',
+          'Interpretation',
+          'Interpreting Art',
+          'Responding to Art',
+          'Selection Design',
+          'Structure & Form',
+          'Material Choices 2',
+          'Dance Vocabulary',
+          'Linking Experiences',
+          'Props & Technology',
+          'Musical Vocabulary',
+        ]),
         skill: 'explain the choices in a piece and what they add',
       },
       {
         key: 'creating',
         name: 'Explore and Create',
-        match: /explor|creat|compos|experiment|express/i,
+        match: withNames(/explor|creat|compos|experiment|express/i, [
+          'Idea Generation',
+          'Improvisation',
+          'Combining Genres',
+          'Musical Ideas',
+          'Choreographic Device',
+          'Dialogue & Action',
+          'Words & Action',
+          'Voice & Style',
+          'Script Innovation',
+          'Design Innovation',
+          'Movement Interplay',
+          'Resolving Challenges',
+          'Orchestration',
+          'Production Design',
+        ]),
         skill: 'try more than one idea before choosing one to develop',
       },
       {
         key: 'communicating',
         name: 'Communicate and Document',
-        match: /communicat|document|present|perform|shar|exhibit/i,
+        match: withNames(/communicat|document|present|perform|shar|exhibit/i, [
+          'Ideas & Emotions',
+          'Ideas & Perspectives',
+          'Thoughts & Emotions',
+          'Meaning & Emotion',
+          'Cultural Identity',
+          'Personal Voice',
+          'Responding to Issues',
+          'Global Issues',
+          'Choreographic Intent',
+          'Specialized Language',
+          'Personal Insights',
+          'Audience & Venue',
+          'Personal Narrative',
+          'Cross-Cultural Work',
+        ]),
         skill: 'present work and explain the ideas behind it',
       },
       {
         key: 'connecting',
         name: 'Connect and Expand',
-        match: /connect|expand|context|tradition/i,
+        match: withNames(/connect|expand|context|tradition/i, [
+          'Ways of Knowing',
+          'Culture & Society',
+          'Cultural Influences',
+          'Music & Change',
+          'Music & Issues',
+          'Impact of Drama',
+          'Land & Resources',
+          'Place & Time',
+          'Aesthetic Experience',
+          'Dramatic Experience',
+          'Canadian Film & TV',
+          'Global Film & TV',
+          'Artist Contributions',
+          'Dance Innovators',
+          'Meaningful Works',
+        ]),
         skill: 'connect a piece to the time and place that made it',
       },
       {
         key: 'technique',
         name: 'Technique',
-        match: /techni|skill|rehears|practi/i,
+        match: withNames(/techni|skill|rehears|practi/i, [
+          'Core & Turnout',
+          'Movement Awareness',
+          'Somatic Approaches',
+          'Musicianship',
+          'Dance Forms',
+          'Specialization',
+          'Gestural Vocabulary',
+          'Body as Instrument',
+        ]),
         skill: 'practise one hard technique until it is steady',
       },
       // Dance, drama, music, visual arts and photography sub-skills (lane
@@ -406,8 +508,10 @@ window.CommentBank = (function () {
       {
         key: 'planning',
         name: 'Planning a Piece',
-        match:
+        match: withNames(
           /plan(ning)? (a|the|each) (piece|work|composition|project)|sketch\b|thumbnail|storyboard|outline|brainstorm/i,
+          ['Production Planning', 'Production'],
+        ),
         skill: 'plan a piece with a sketch or outline before the final version',
       },
       {
@@ -419,19 +523,28 @@ window.CommentBank = (function () {
       {
         key: 'elements',
         name: 'Elements and Principles',
-        match: /element|principle|colou?r|\bline\b|shape|texture|rhythm|dynamics|\btempo\b|pitch|harmony|melody/i,
+        match: withNames(
+          /element|principle|colou?r|\bline\b|shape|texture|rhythm|dynamics|\btempo\b|pitch|harmony|melody/i,
+          ['Genre Qualities'],
+        ),
         skill: 'name the elements used in a piece and the effect of each',
       },
       {
         key: 'performing',
         name: 'Ensemble and Stage',
-        match: /\bstage|ensemble(?! heritage)|\bchoir|\bband\b|\bacting|repertoire|instrument/i,
+        match: withNames(/\bstage|ensemble(?! heritage)|\bchoir|\bband\b|\bacting|repertoire|instrument/i, [
+          'Movement Phrases',
+          'Motifs & Phrases',
+          'Choreographic Works',
+        ]),
         skill: 'rehearse a part until the whole piece runs without stopping',
       },
       {
         key: 'notation',
         name: 'Reading Notation',
-        match: /notation|sight-?read|read(ing)? music|music theory|\bscore\b|\bscales?\b(?= and| on)/i,
+        match: withNames(/notation|sight-?read|read(ing)? music|music theory|\bscore\b|\bscales?\b(?= and| on)/i, [
+          'Musical Symbols',
+        ]),
         skill: 'read written music and play or clap it in time',
       },
       {
@@ -448,23 +561,28 @@ window.CommentBank = (function () {
       },
     ],
     pe: [
-      { key: 'safety', name: 'Safety', match: /safe|risk|injur/i, skill: 'explain how to stay safe in an activity' },
+      {
+        key: 'safety',
+        name: 'Safety',
+        match: withNames(/safe|risk|injur/i, ['Emergency Response', 'Condition Monitoring']),
+        skill: 'explain how to stay safe in an activity',
+      },
       {
         key: 'wellbeing',
         name: 'Well-being',
-        match: /well-?being|mental|health|wellness|nutrition/i,
+        match: withNames(/well-?being|mental|health|wellness|nutrition/i, ['Lifestyle Analysis']),
         skill: 'describe one healthy choice and how it helps the body or mind',
       },
       {
         key: 'leading',
         name: 'Leadership',
-        match: /lead|coach|social|community/i,
+        match: withNames(/lead|coach|social|community/i, ['Collaboration', 'Communication']),
         skill: 'encourage teammates and include others in an activity',
       },
       {
         key: 'fitness',
         name: 'Fitness',
-        match: /fitness|active|activity|training|strength|cardio/i,
+        match: withNames(/fitness|active|activity|training|strength|cardio/i, ['Goal Reflection']),
         skill: 'set a fitness goal and track progress toward it',
       },
       {
@@ -524,13 +642,24 @@ window.CommentBank = (function () {
       {
         key: 'testing',
         name: 'Testing',
-        match: /test|prototyp|evaluat|iterat|feedback|revision/i,
+        match: withNames(/test|prototyp|evaluat|iterat|feedback|revision/i, [
+          'Critique Application',
+          'Critique Editing',
+          'Results Application',
+          'Idea Decisions',
+          'Procedure Changes',
+        ]),
         skill: 'test a prototype and use the results to improve it',
       },
       {
         key: 'sharing',
         name: 'Sharing',
-        match: /shar|present|document|portfolio|communicat/i,
+        match: withNames(/shar|present|document|portfolio|communicat/i, [
+          'Process Reflection',
+          'New Possibilities',
+          'Concept Extensions',
+          'Outcome Format',
+        ]),
         skill: 'explain how a project was made and what could be improved',
       },
       {
@@ -564,7 +693,9 @@ window.CommentBank = (function () {
       {
         key: 'foodPrep',
         name: 'Recipes and Kitchen Skills',
-        match: /recipe|knife|kitchen|meal prep|culinary|bak(e|ing)\b|food prep|mise en place|plating/i,
+        match: withNames(/recipe|knife|kitchen|meal prep|culinary|bak(e|ing)\b|food prep|mise en place|plating/i, [
+          'Food Creation',
+        ]),
         skill: 'follow a recipe in order, measuring each ingredient and timing each step',
       },
       {
@@ -623,25 +754,33 @@ window.CommentBank = (function () {
       {
         key: 'self',
         name: 'Self-Awareness',
-        match: /self|awareness|worldview|identity|personal/i,
+        match: withNames(/self|awareness|worldview|identity|personal/i, [
+          'Using Strengths',
+          'Sharing Strengths',
+          'Skills Assessment',
+          'Transferable Skills',
+        ]),
         skill: 'name personal strengths and connect them to a future goal',
       },
       {
         key: 'connecting',
         name: 'Connections',
-        match: /connect|interact|mentor|network|experience|workplace|reflect/i,
+        match: withNames(/connect|interact|mentor|network|experience|workplace|reflect/i, [
+          'Problem Solving',
+          'Learning Highlights',
+        ]),
         skill: 'reflect on a work or volunteer experience and what it taught',
       },
       {
         key: 'exploring',
         name: 'Exploring Careers',
-        match: /explor|career|possibilit/i,
+        match: withNames(/explor|career|possibilit/i, ['Work Placements']),
         skill: 'research one career path and what it requires',
       },
       {
         key: 'planning',
         name: 'Planning',
-        match: /plan|life/i,
+        match: withNames(/plan|life/i, ['Preferred Futures', 'Skill Development']),
         skill: 'set a goal for after school and the steps toward it',
       },
       // Career Life Education sub-skills (lane H, Nov 1), after the four
@@ -737,11 +876,210 @@ window.CommentBank = (function () {
     ],
   };
 
+  /* BC bank names (data/bc-curriculum-derived.json) that a row's keyword
+     catches but whose competency that row's skill misdescribes, as an
+     independent review found: "Relationship Skills" is not a movement
+     skill. A wrong skill in a report is worse than none, so these route
+     to no skill. Labels in use today are not listed, so none of them
+     moves. */
+  var NO_SKILL = {
+    adst: [
+      'Potential Customers',
+      'Design Creation',
+      'Technique Selection',
+      'Decision Evaluation',
+      'Feedback Revisions',
+      'Feedback Sources',
+      'Goal Identification',
+      'Idea Evaluation',
+      'Iteration Records',
+      'Material Testing',
+      'Plan Evaluation',
+      'Prototype Building',
+      'Prototype Form',
+      'Prototype Procedures',
+      'Scenario Feedback',
+      'Integrated Software',
+      'Financial Status',
+      'Financial Strength',
+      'Idea Collaboration',
+      'User Collaboration',
+      'Consumer Context',
+      'Context Research',
+      'Design Goals',
+      'Design Issues',
+      'Design Reflection',
+      'Design Research',
+      'Plan Execution',
+      'Users & Context',
+      'Wishes & Context',
+      'Draft Approach',
+      'Culinary Decisions',
+      'Kitchen Capabilities',
+      'Kitchen Contribution',
+      'Recipe Selection',
+      'Interpersonal Safety',
+      'Impact Evaluation',
+      'Material Evaluation',
+      'Skill Evaluation',
+      'Strategy Evaluation',
+      'Conditions & Tools',
+      'Culture & Technology',
+      'Role of Technology',
+      'Technology & Society',
+      'Technology Impacts',
+      'Group or Solo Work',
+    ],
+    arts: [
+      'Anticipated Response',
+      'Audience & Message',
+      'Audience Impact',
+      'Dramatic Conventions',
+      'Intended Audience',
+      'Intended Message',
+      'Personal Style',
+      'Purpose & Audience',
+      'Symbolism & Imagery',
+      'Symbolism & Metaphor',
+      'Writing & Directing',
+      'Contextual Design',
+      'Music Trends',
+      'Story & Narrative',
+      'Story & Values',
+      'Styles & Genres',
+      'Creative Risk-Taking',
+      'Musical Risk-Taking',
+      'Artistic Choices',
+      'Element Manipulation',
+      'Materials & Tools',
+      'Mood & Meaning',
+      'Moving-Image Choices',
+      'Dance, Drama & Music',
+      'Ensemble Role',
+      'Material Choices',
+      'Adapting Technique',
+      'Dance Performance',
+      'Performance Skills',
+      'Performance Goals',
+      'Eating & Performance',
+      'Performers & Genres',
+      'Refining Performance',
+      'Community Connection',
+      'Company Connection',
+      'Global Connection',
+      'Making Connections',
+      'Mind-Body Connection',
+      'Personal Connections',
+      'Wider Connections',
+      'Composer Intent',
+      'Composing for Effect',
+      'Composition',
+      'Composition Design',
+      'Composition Skills',
+      'Creative Choices',
+      'Expressive Technique',
+      'Movement Principles',
+      'Diverse Repertoire',
+      'Instrument Care',
+      'Feedback Reflection',
+      'Process Reflection',
+      'Production Analysis',
+      'Reciprocal Critique',
+      'Rehearsal Reflection',
+      'Self-Reflection',
+      'Using Critique',
+      'Design & Refinement',
+      'Phrase Refinement',
+      'Adapting Skills',
+      'Leadership Skills',
+      'Meaning & Technique',
+      'Responsible Practice',
+      'Safe Practice',
+      'Self-Care Practice',
+      'Technical Vocabulary',
+    ],
+    career: [
+      'Purpose & Community',
+      'Employment Networks',
+      'Mentorship',
+      'Networking',
+      'Networks & Mentors',
+      'Safe Interactions',
+      'Workplace Ethics',
+      'Workplace Safety',
+      'Career Challenges',
+      'Career Influences',
+      'Career-Life Choices',
+      'Career-Life Plans',
+      'Decision-Making',
+      'Public Identity',
+      'Worldview Influence',
+    ],
+    ela: [
+      'Personal Reading',
+      'Oral Traditions',
+      'Text Authenticity',
+      'Text Reliability',
+      'Listener Engagement',
+      'Oral Formats',
+      'Form Selection',
+      'Media Selection',
+    ],
+    math: [
+      'Representation',
+      'Puzzles & Games',
+      'Concept Development',
+      'Persistent Solving',
+      'Reflection',
+      'Mental Math',
+      'Historical Symbols',
+      'Consequences of Math',
+      'Modelling in Context',
+      'Place-Based Thinking',
+      'Spatial Reasoning',
+      'Problem Exploration',
+      'Strategy Critique',
+    ],
+    pe: [
+      'Recreation',
+      'Eating Strategies',
+      'Outdoor Preparation',
+      'Bullying Responses',
+      'Safety Strategies',
+      'Community Health',
+      'Managing Change',
+      'Activity Preferences',
+      'Activity Strategies',
+      'Fitness Activity',
+      'Fitness Etiquette',
+      'Fitness Myths',
+      'Lifelong Activity',
+      'Muscle Training',
+      'Training Styles',
+      'Social Influences',
+      'Communication Skills',
+      'Relationship Skills',
+      'Outdoor Activities',
+      'Substance Use Causes',
+      'Health Messages',
+    ],
+    science: ['Data Collection', 'Data Recording', 'Source Validity'],
+    socials: ['Ethics in Sources', 'Geographic Evidence'],
+  };
+  var NO_SKILL_SET = {};
+  Object.keys(NO_SKILL).forEach(function (family) {
+    NO_SKILL_SET[family] = {};
+    NO_SKILL[family].forEach(function (n) {
+      NO_SKILL_SET[family][n.toLowerCase()] = true;
+    });
+  });
+
   /* The skill a competency stands for in this kind of class: { key, name,
      skill }, or null when the table has none for its label. */
   function skillOf(family, label) {
     var rows = SKILLS[family] || [];
     var t = String(label || '');
+    if (NO_SKILL_SET[family] && NO_SKILL_SET[family][t.toLowerCase()]) return null;
     for (var i = 0; t && i < rows.length; i++)
       if (rows[i].match.test(t)) return { key: rows[i].key, name: rows[i].name, skill: rows[i].skill };
     return null;
@@ -6484,6 +6822,7 @@ window.CommentBank = (function () {
     nextStepOf: nextStepOf,
     nextSkillOf: nextSkillOf,
     skillOf: skillOf,
+    NO_SKILL: NO_SKILL,
     SKILLS: SKILLS,
     SUPPORT_LINES: SUPPORT_LINES,
     supportLinesFor: supportLinesFor,
