@@ -146,6 +146,6 @@ RULES = [
     (r"outdoor leadership skills", "Leadership Skills"),
     (r"^Use applicable communication skills", "Communication Skills"),
     (r"responses to emergency situations", "Emergency Response"),
-    (r"responsibility for personal safety", "Shared Safety"),
+    (r"responsibility for personal safety", "Safety for All"),
     (r"manage risks", "Risk Management"),
 ]

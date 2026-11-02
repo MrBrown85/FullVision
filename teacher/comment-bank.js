@@ -475,7 +475,7 @@ window.CommentBank = (function () {
           'Personal Narrative',
           'Writing & Directing',
           'Personal Style',
-          'Cultural Messages',
+          'Cross-Cultural Work',
         ]),
         skill: 'present work and explain the ideas behind it',
       },
@@ -677,7 +677,7 @@ window.CommentBank = (function () {
         match: withNames(/shar|present|document|portfolio|communicat/i, [
           'Process Reflection',
           'New Possibilities',
-          'Extensions by Others',
+          'Concept Extensions',
           'Outcome Format',
         ]),
         skill: 'explain how a project was made and what could be improved',
@@ -896,11 +896,146 @@ window.CommentBank = (function () {
     ],
   };
 
+  /* BC bank names (data/bc-curriculum-derived.json) that a row's keyword
+     catches but whose competency that row's skill misdescribes, as an
+     independent review found: "Relationship Skills" is not a movement
+     skill. A wrong skill in a report is worse than none, so these route
+     to no skill. Labels in use today are not listed, so none of them
+     moves. */
+  var NO_SKILL = {
+    adst: [
+      'Financial Status',
+      'Financial Strength',
+      'Idea Collaboration',
+      'User Collaboration',
+      'Consumer Context',
+      'Context Research',
+      'Design Goals',
+      'Design Issues',
+      'Design Reflection',
+      'Design Research',
+      'Plan Execution',
+      'Users & Context',
+      'Wishes & Context',
+      'Draft Approach',
+      'Culinary Decisions',
+      'Kitchen Capabilities',
+      'Kitchen Contribution',
+      'Recipe Selection',
+      'Interpersonal Safety',
+      'Impact Evaluation',
+      'Material Evaluation',
+      'Skill Evaluation',
+      'Strategy Evaluation',
+      'Conditions & Tools',
+      'Culture & Technology',
+      'Role of Technology',
+      'Technology & Society',
+      'Technology Impacts',
+      'Group or Solo Work',
+    ],
+    arts: [
+      'Dance Performance',
+      'Performance Skills',
+      'Performance Goals',
+      'Eating & Performance',
+      'Performers & Genres',
+      'Refining Performance',
+      'Community Connection',
+      'Company Connection',
+      'Global Connection',
+      'Making Connections',
+      'Mind-Body Connection',
+      'Personal Connections',
+      'Wider Connections',
+      'Composer Intent',
+      'Composing for Effect',
+      'Composition',
+      'Composition Design',
+      'Composition Skills',
+      'Creative Choices',
+      'Expressive Technique',
+      'Movement Principles',
+      'Diverse Repertoire',
+      'Instrument Care',
+      'Feedback Reflection',
+      'Process Reflection',
+      'Production Analysis',
+      'Reciprocal Critique',
+      'Rehearsal Reflection',
+      'Self-Reflection',
+      'Using Critique',
+      'Design & Refinement',
+      'Phrase Refinement',
+      'Adapting Skills',
+      'Leadership Skills',
+      'Meaning & Technique',
+      'Responsible Practice',
+      'Safe Practice',
+      'Self-Care Practice',
+      'Technical Vocabulary',
+    ],
+    career: [
+      'Employment Networks',
+      'Mentorship',
+      'Networking',
+      'Networks & Mentors',
+      'Safe Interactions',
+      'Workplace Ethics',
+      'Workplace Safety',
+      'Career Challenges',
+      'Career Influences',
+      'Career-Life Choices',
+      'Career-Life Plans',
+      'Decision-Making',
+      'Public Identity',
+      'Worldview Influence',
+    ],
+    ela: ['Personal Reading', 'Oral Traditions'],
+    math: [
+      'Reflection',
+      'Mental Math',
+      'Historical Symbols',
+      'Consequences of Math',
+      'Modelling in Context',
+      'Place-Based Thinking',
+      'Spatial Reasoning',
+      'Problem Exploration',
+      'Strategy Critique',
+    ],
+    pe: [
+      'Activity Preferences',
+      'Activity Strategies',
+      'Fitness Activity',
+      'Fitness Etiquette',
+      'Fitness Myths',
+      'Lifelong Activity',
+      'Muscle Training',
+      'Training Styles',
+      'Social Influences',
+      'Communication Skills',
+      'Relationship Skills',
+      'Outdoor Activities',
+      'Substance Use Causes',
+      'Health Messages',
+    ],
+    science: ['Data Collection', 'Data Recording'],
+    socials: ['Ethics in Sources'],
+  };
+  var NO_SKILL_SET = {};
+  Object.keys(NO_SKILL).forEach(function (family) {
+    NO_SKILL_SET[family] = {};
+    NO_SKILL[family].forEach(function (n) {
+      NO_SKILL_SET[family][n.toLowerCase()] = true;
+    });
+  });
+
   /* The skill a competency stands for in this kind of class: { key, name,
      skill }, or null when the table has none for its label. */
   function skillOf(family, label) {
     var rows = SKILLS[family] || [];
     var t = String(label || '');
+    if (NO_SKILL_SET[family] && NO_SKILL_SET[family][t.toLowerCase()]) return null;
     for (var i = 0; t && i < rows.length; i++)
       if (rows[i].match.test(t)) return { key: rows[i].key, name: rows[i].name, skill: rows[i].skill };
     return null;
@@ -6643,6 +6778,7 @@ window.CommentBank = (function () {
     nextStepOf: nextStepOf,
     nextSkillOf: nextSkillOf,
     skillOf: skillOf,
+    NO_SKILL: NO_SKILL,
     SKILLS: SKILLS,
     SUPPORT_LINES: SUPPORT_LINES,
     supportLinesFor: supportLinesFor,

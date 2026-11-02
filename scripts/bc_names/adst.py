@@ -46,7 +46,7 @@ RULES = [
     (r"^Make decisions about premises and boundaries", "Boundary Decisions"),
     (r"^Establish a point of view|^Choose a direction and point of view", "Point of View"),
     (r"^Identify and analyze points of view", "Points of View"),
-    (r"^Determine whether activity is collaborative", "Activity Format"),
+    (r"^Determine whether activity is collaborative", "Group or Solo Work"),
     (r"^Identify potential issues and troubleshoot", "Troubleshooting"),
     (r"^(Identify|Demonstrate) (the )?tasks involved in (completing|replicating) a recipe", "Recipe Tasks"),
     (r"^Demonstrate the tasks involved in designing", "Dish Development"),
@@ -162,7 +162,7 @@ RULES = [
     (r"^Identify new goals", "Goal Identification"),
     (r"ability to work effectively", "Self-Assessment"),
     (r"new (design )?possibilities", "New Possibilities"),
-    (r"^Consider how others might build", "Extensions by Others"),
+    (r"^Consider how others might build", "Concept Extensions"),
 
     # Applied Skills: safety, skill development and etiquette.
     (r"interpersonal strategies", "Interpersonal Safety"),

@@ -156,7 +156,7 @@ SS_CONCEPTS = {
     "evidence and interpretation": ("EVN", "Geographic Evidence"),
     "patterns and trends": ("PTR", "Patterns & Trends"),
     "geographical value judgments": ("GVJ", "Value Judgments"),
-    "geographical importance": ("GIM", "Geographic Merit"),
+    "geographical importance": ("GIM", "Importance"),
     "interactions and associations": ("IAS", "Factor Interactions"),
     "critical media literacy": ("CML", "Media Literacy"),
 }
