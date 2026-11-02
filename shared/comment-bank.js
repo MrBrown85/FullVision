@@ -3348,6 +3348,104 @@ var COMMENT_BANK = {
       claims: ['bestPiece'],
       src: 'new',
     },
+    // Grown 2026-11-02 (competencies in report comments): where the
+    // student is now in the first strength, for a competency from the BC
+    // bank. {strengthNow} is its cluster's phrase (a bare verb phrase of 9
+    // words at most); the frame says it at the level word with the
+    // Ministry scale's qualifier (data/bc-proficiency-scale.json), placed
+    // before the phrase or after a comma so it never reads as part of the
+    // phrase's last noun. The Overall step prefers these when the slot has
+    // a value.
+    {
+      id: 'wn01',
+      part: 'now',
+      group: 'Overall',
+      text: '{He} [is|are] beginning to {strengthNow}.',
+      needs: ['strengthNow'],
+      when: { strengthWord: 'Emerging' },
+      claims: ['strength'],
+      src: 'new',
+    },
+    {
+      id: 'wn02',
+      part: 'now',
+      group: 'Overall',
+      text: '{He} [shows|show] early skill in learning to {strengthNow}.',
+      needs: ['strengthNow'],
+      when: { strengthWord: 'Emerging' },
+      claims: ['strength'],
+      src: 'new',
+    },
+    {
+      id: 'wn03',
+      part: 'now',
+      group: 'Overall',
+      text: 'With growing consistency, {he} can {strengthNow}.',
+      needs: ['strengthNow'],
+      when: { strengthWord: 'Developing' },
+      claims: ['strength'],
+      src: 'new',
+    },
+    {
+      id: 'wn04',
+      part: 'now',
+      group: 'Overall',
+      text: '{His} work shows growing consistency as {he} [learns|learn] to {strengthNow}.',
+      needs: ['strengthNow'],
+      when: { strengthWord: 'Developing' },
+      claims: ['strength'],
+      src: 'new',
+    },
+    {
+      id: 'wn05',
+      part: 'now',
+      group: 'Overall',
+      text: 'More and more often, {he} can {strengthNow}.',
+      needs: ['strengthNow'],
+      when: { strengthWord: 'Developing' },
+      claims: ['strength'],
+      src: 'new',
+    },
+    {
+      id: 'wn06',
+      part: 'now',
+      group: 'Overall',
+      text: '{He} can consistently {strengthNow}.',
+      needs: ['strengthNow'],
+      when: { strengthWord: 'Proficient' },
+      claims: ['strength'],
+      src: 'new',
+    },
+    {
+      id: 'wn07',
+      part: 'now',
+      group: 'Overall',
+      text: '{His} work shows that {he} can consistently {strengthNow}.',
+      needs: ['strengthNow'],
+      when: { strengthWord: 'Proficient' },
+      claims: ['strength'],
+      src: 'new',
+    },
+    {
+      id: 'wn08',
+      part: 'now',
+      group: 'Overall',
+      text: 'With depth and complexity, {he} can {strengthNow}.',
+      needs: ['strengthNow'],
+      when: { strengthWord: 'Extending' },
+      claims: ['strength'],
+      src: 'new',
+    },
+    {
+      id: 'wn09',
+      part: 'now',
+      group: 'Overall',
+      text: '{He} can {strengthNow}, and {he} [does|do] this with depth and complexity.',
+      needs: ['strengthNow'],
+      when: { strengthWord: 'Extending' },
+      claims: ['strength'],
+      src: 'new',
+    },
     // Grown 2026-11-02 (competencies in report comments, plan decision 2):
     // the next step at the student's level for a competency from the BC
     // bank. {levelStep} is the cluster's step toward the level above

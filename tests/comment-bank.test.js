@@ -81,10 +81,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1691 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1691);
+  it('has 1700 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(1700);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1691);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1700);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -223,6 +223,8 @@ describe('the bank', () => {
       // The highest-marked skill (strengths for a staircase, Nov 2).
       highestSkill: 'strength',
       highestTop: 'strength',
+      // The first strength at its level now (Nov 2).
+      strengthNow: 'strength',
       habitsExcellent: 'habits',
       habitsGood: 'habits',
       habitsAllSeen: 'habits',
@@ -267,7 +269,11 @@ describe('the bank', () => {
                   ? { missing: 'notHandedIn', marks: 'marks', noMarks: 'marks', low: 'lowMarks' }[s.when[k]]
                   : k === 'nextSkill'
                     ? 'nextStep'
-                    : k === 'strongSkill' || k === 'topSkill' || k === 'highestSkill' || k === 'highestWord'
+                    : k === 'strongSkill' ||
+                        k === 'topSkill' ||
+                        k === 'highestSkill' ||
+                        k === 'highestWord' ||
+                        k === 'strengthWord'
                       ? 'strength'
                       : k === 'evenWord'
                         ? 'evenResults'
@@ -331,6 +337,11 @@ describe('the bank', () => {
           // the frame needs the skill verify() checks.
           expect(['Emerging', 'Developing', 'Proficient', 'Extending']).toContain(v);
           expect(s.needs, s.id).toContain('highestSkill');
+        } else if (k === 'strengthWord') {
+          // The first strength at its level now: the frame needs the phrase
+          // verify() checks.
+          expect(['Emerging', 'Developing', 'Proficient', 'Extending']).toContain(v);
+          expect(s.needs, s.id).toContain('strengthNow');
         } else {
           expect(keys, s.id).toContain(k);
           expect(v).toBeGreaterThanOrEqual(1);
