@@ -183,7 +183,7 @@
   transition: width 0.3s;
 }
 .gp-section-val {
-  font-family: 'SF Mono', ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   font-weight: 600;
   width: 24px;
@@ -606,7 +606,7 @@
 /* Small CC badges on evidence timeline */
 .cc-badge-sm {
   display: inline-block;
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-2xs);
   font-weight: 600;
   padding: 1px 5px;
@@ -939,7 +939,7 @@
   flex-shrink: 0;
 }
 .desig-check-code {
-  font-family: 'SF Mono', ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-weight: 700;
   color: var(--link);
   font-size: var(--text-sm);
@@ -1151,7 +1151,7 @@
   box-sizing: border-box;
   height: 22px;
   border-radius: var(--radius-xs);
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   font-weight: 700;
   color: #fff;
@@ -1162,12 +1162,12 @@
   color: var(--text);
 }
 .gt-score-empty {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
   color: var(--text-3);
 }
 .gt-cell-avg {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-mono);
   font-size: var(--text-base);
   white-space: nowrap;
 }
