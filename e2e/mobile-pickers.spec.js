@@ -26,6 +26,8 @@ test('the Assessment picker keeps its header, searches, and dates its rows', asy
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.locator('.m-tab-item[data-tab="observe"]').click();
   await page.locator('[data-action="m-obs-new"]').click();
 
@@ -49,6 +51,6 @@ test('the Assessment picker keeps its header, searches, and dates its rows', asy
   await page.evaluate(() => (document.querySelector('#m-sheet-container .m-sheet-content').scrollTop = 400));
   await expectHeaderShowing(page);
   await picker.locator('.m-pick-search').fill('plan');
-  await expect(shownRows(page).filter({ hasText: 'Plan Investigations' })).toHaveCount(1);
+  await expect(shownRows(page).filter({ hasText: 'Investigation Plans' })).toHaveCount(1);
   await expect(picker.locator('.m-pick-section:visible')).toHaveCount(1);
 });

@@ -8,6 +8,8 @@ test.use({ viewport: { width: 1440, height: 900 } });
 async function open(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(() => {
     COURSES.sci8.gradingSystem = 'letter';
     COURSES.sci8.gradeLevel = '10';

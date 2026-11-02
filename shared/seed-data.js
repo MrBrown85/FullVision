@@ -515,6 +515,77 @@ function seedIfNeeded() {
     return current(obs);
   }
 
+  /* ── The demo's competencies ──────────────────────────────────
+     The sample work below was written against six broad areas of Science 8
+     (QAP, PI, IP, EM, CA, SC), one per Ministry folder. With the bank loaded,
+     rubric work becomes one competency from each area's folder (DEMO_AREAS),
+     its assessments and criteria alike, and other work gets the competencies
+     picked for it (DEMO_WORK). */
+  const demoBankMap =
+    typeof buildLearningMapFromTags === 'function' && typeof CURRICULUM_INDEX !== 'undefined' && CURRICULUM_INDEX
+      ? buildLearningMapFromTags(['SCI8'])
+      : null;
+  // Rubric work: each area becomes the competency at the rubric's place in
+  // DEMO_RUBRICS, for its assessments and its criteria alike.
+  const DEMO_AREAS = {
+    QAP: ['QP3', 'QP4', 'QP5', 'QP2'],
+    PI: ['PC2', 'PC3', 'PC1', 'PC5'],
+    IP: ['PA4', 'PA5', 'PA3', 'PA1'],
+    EM: ['EV2', 'EV1', 'EV4', 'EV3'],
+    CA: ['AP3', 'AP4', 'AP1', 'AP2'],
+    SC: ['CM1', 'CM2', 'CM1', 'CM2'],
+  };
+  // Other work: the competencies each piece assesses, picked for its title.
+  // With the rubric work they reach every competency
+  // (tests/demo-seed-bank.test.js).
+  const DEMO_WORK = {
+    sci8a2: ['PA5', 'CM1'], // Immune System Quick Check
+    sci8a7: ['PA3', 'EV5'], // Atomic Theory & Elements Quiz
+    sci8a10: ['PC3', 'PC4'], // Mid-Year Lab Skills Check
+    sci8a17: ['PC4', 'EV2'], // Forces & Motion Quick Check
+    sci8q1: ['PA5'], // Cell Structure Quiz
+    sci8q2: ['PA3'], // Periodic Table Quiz
+    sci8q3: ['CM1'], // KMT Vocabulary Check
+    sci8q5: ['PA1'], // Ecology Matching Quiz
+    sci8q6: ['PA4'], // Chemical Formulas Quiz
+    sci8q7: ['QP1'], // Plate Tectonics Quiz
+    sci8q8: ['PA4'], // Energy Forms Quiz
+    sci8q9: ['PC3'], // Microscope Skills Check
+    sci8q10: ['QP2'], // Scientific Method Quiz
+    sci8q11: ['PA5'], // Body Systems Quiz
+    sci8q12: ['PA3'], // Data Reading Quiz
+    sci8t1: ['PA5', 'CM1'], // Cells & Body Systems Unit Test
+    sci8t2: ['PA4', 'EV1'], // Chemistry & Matter Unit Test
+    sci8t3: ['PA1', 'EV6'], // Earth Science Unit Test
+    sci8t4: ['PA1', 'PA2', 'AP1'], // Ecology & Environment Unit Test
+    sci8t5: ['QP1', 'PA3', 'EV5'], // Mid-Year Comprehensive Exam
+  };
+  // The rubrics in order; the four the sample work uses come first.
+  const DEMO_RUBRICS = [
+    'rub_sci8_lab',
+    'rub_sci8_research',
+    'rub_sci8_report',
+    'rub_sci8_expdesign',
+    'rub_sci8_grouppres',
+    'rub_sci8_datagraph',
+    'rub_sci8_reflect',
+    'rub_sci8_debate',
+    'rub_sci8_model',
+    'rub_sci8_fieldwork',
+    'rub_sci8_techdesign',
+    'rub_sci8_peerreview',
+  ];
+  const demoCodes = Object.values(DEMO_AREAS)
+    .concat(Object.values(DEMO_WORK))
+    .reduce((all, list) => all.concat(list), []);
+  const demoUsesBank = !!demoBankMap && demoCodes.every(code => demoBankMap.sections.some(sec => sec.id === code));
+  function demoTagIds(ids, rubricId, assessmentId) {
+    if (!demoUsesBank) return ids;
+    if (!rubricId && DEMO_WORK[assessmentId]) return DEMO_WORK[assessmentId].slice();
+    const place = Math.max(0, DEMO_RUBRICS.indexOf(rubricId));
+    return (ids || []).map(id => (DEMO_AREAS[id] ? DEMO_AREAS[id][place % DEMO_AREAS[id].length] : id));
+  }
+
   /* ════════════════════════════════════════════════════════════
      SCIENCE 8 — SCI8
      ════════════════════════════════════════════════════════════ */
@@ -527,8 +598,13 @@ function seedIfNeeded() {
   if (COURSES.sci8 && getStudents('sci8').length === 0 && getWithdrawnStudents('sci8').length === 0) {
     _didSeed = true;
     saveStudents('sci8', current(SHARED_ROSTER));
-    // Seed the learning map from built-in constants
-    if (LEARNING_MAP && LEARNING_MAP.sci8) {
+    // The learning map comes from the curriculum bank, as the New Class
+    // wizard builds it: Science 8's 27 competencies in six Ministry folders,
+    // with the Ministry's wording and the bank's I Can statements and levels.
+    // Only if the bank can't load does it fall back to the old built-in map.
+    if (demoBankMap) {
+      saveLearningMap('sci8', demoBankMap);
+    } else if (LEARNING_MAP && LEARNING_MAP.sci8) {
       saveLearningMap('sci8', structuredClone(LEARNING_MAP.sci8));
     }
     saveCategories('sci8', structuredClone(SCI8_CATEGORIES));
@@ -1015,6 +1091,9 @@ function seedIfNeeded() {
         created: new Date('2026-03-04').toISOString(),
       },
     );
+    sci8Assessments.forEach(a => {
+      if (a.tagIds && a.tagIds.length) a.tagIds = demoTagIds(a.tagIds, a.rubricId, a.id);
+    });
     const sci8SeedAssessments = normalizeSci8Assessments(sci8Assessments);
     saveAssessments('sci8', current(sci8SeedAssessments));
 
@@ -1497,6 +1576,11 @@ function seedIfNeeded() {
           },
         ],
       },
+    );
+    sci8Rubrics.forEach(r =>
+      (r.criteria || []).forEach(c => {
+        c.tagIds = demoTagIds(c.tagIds, r.id, null);
+      }),
     );
     saveRubrics('sci8', current(sci8Rubrics));
 

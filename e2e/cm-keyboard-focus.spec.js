@@ -10,6 +10,8 @@ async function enterDemo(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/\/dashboard/);
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
 }
 
 async function openCompetencies(page) {
@@ -52,13 +54,13 @@ test('Re-link review: ticks and Keep Mine / Use the Curriculum Version keep focu
   await page.keyboard.press('Space');
   await expect(add).toBeFocused();
   await expect(add).not.toBeChecked();
-  // The demo class's competencies came from the old bank, so the rebuilt
-  // bank offers them under Replaced in the Curriculum.
-  const mine = page.locator('[data-action-change="cmCompReviewPick"][data-group="replaced"][data-pick="mine"]').first();
+  // The demo class comes from the bank, so the renamed one is under You
+  // Changed These.
+  const mine = page.locator('[data-action-change="cmCompReviewPick"][data-group="changed"][data-pick="mine"]').first();
   await mine.focus();
   await page.keyboard.press('ArrowRight');
   const theirs = page
-    .locator('[data-action-change="cmCompReviewPick"][data-group="replaced"][data-pick="theirs"]')
+    .locator('[data-action-change="cmCompReviewPick"][data-group="changed"][data-pick="theirs"]')
     .first();
   await expect(theirs).toBeFocused();
   await expect(theirs).toBeChecked();

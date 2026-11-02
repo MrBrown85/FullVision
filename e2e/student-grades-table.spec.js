@@ -7,6 +7,8 @@ import { test, expect } from '@playwright/test';
 async function openCece(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   const sid = await page.evaluate(() => getStudents(getActiveCourse()).find(s => s.firstName === 'Cece').id);
   await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid);
   await page.locator('.stu-tabs').waitFor();
@@ -31,8 +33,8 @@ test('a points assessment shows its points out of the most', async ({ page }) =>
 test('a level keeps its + or −', async ({ page }) => {
   await openCece(page);
   // The Competencies tab names the latest score as teachers write it.
-  const questioning = page.locator('.stu-comp-row', { hasText: 'Questioning and Predicting' });
-  await expect(questioning.locator('.stu-comp-latest')).toContainText('3− on Science Fair Proposal');
+  const observation = page.getByRole('button', { name: /^Observation \d/ });
+  await expect(observation.locator('.stu-comp-latest')).toContainText('3− on Science Fair Proposal');
   await page.locator('#stu-tab-assess').click();
   await expect(row(page, 'Chemical Reactions Lab').locator('.stu-assess-score')).toHaveText('3.3');
 });

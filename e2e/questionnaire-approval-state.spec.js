@@ -7,6 +7,8 @@ test.use({ viewport: { width: 1440, height: 900 } });
 async function open(page, student = 'st1') {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(() => {
     const cfg = getReportConfig('sci8') || {};
     saveReportConfig('sci8', Object.assign({}, cfg, { form: ReportSheets.form() }));
@@ -21,11 +23,16 @@ async function go(page, student) {
 }
 const saved = (page, sid) => page.evaluate(s => getStudentTermRating('sci8', s, 'term-2') || {}, sid);
 
-/* Liam's Generate draft names his best piece this term; returns its title. */
+/* Liam's Generate draft names his best piece this term; returns its title
+   and the whole sentence that names it. */
 async function generateLiam(page) {
   await page.locator('#tq-generate').click();
   await expect(page.locator('#tq-narrative')).toHaveValue(/best piece was “/);
-  return (await page.locator('#tq-narrative').inputValue()).match(/best piece was “(.+?)[.?!]?”/)[1];
+  const text = await page.locator('#tq-narrative').inputValue();
+  return {
+    best: text.match(/best piece was “(.+?)[.?!]?”/)[1],
+    sentence: text.match(/His best piece was “[^”]+”(?:,[^.?!]*[.?!])?/)[0],
+  };
 }
 
 /* That piece marked down in the gradebook: a level of 1, or 1 point. */
@@ -44,22 +51,22 @@ async function approveLiamThenMarkDown(page) {
   await page.evaluate(() => upsertTermRating('sci8', 'st4', 'term-2', { narrative: '' }));
   await go(page, 'st5');
   await go(page, 'st4');
-  const best = await generateLiam(page);
+  const piece = await generateLiam(page);
   for (const cb of await page.locator('[data-tq-check]').all()) await cb.check();
   await page.locator('#tq-approve-next').click();
   await expect.poll(async () => (await saved(page, 'st4')).approvedAt).toBeTruthy();
-  await markDown(page, best);
-  return best;
+  await markDown(page, piece.best);
+  return piece;
 }
 
 test('a mark changed after approval: the notice and the orange dot', async ({ page }) => {
-  const best = await approveLiamThenMarkDown(page);
+  const { best, sentence } = await approveLiamThenMarkDown(page);
   await go(page, 'st5');
   await go(page, 'st4');
   const board = page.locator('#tq-stale');
   await expect(board).toBeVisible();
   await expect(board.locator('.qn-stale-note')).toContainText('“' + best + '” was marked after');
-  await expect(board.locator('.qn-stale-was').first()).toHaveText('His best piece was “' + best + '.”');
+  await expect(board.locator('.qn-stale-was').first()).toHaveText(sentence);
   await expect(board.locator('.qn-stale-keep').first()).toHaveText('Keep as Approved');
   await expect(page.locator('#gb-sidebar .student-row[data-sid="st4"] .student-row-mark.flag')).toHaveText('●');
   await expect(page.locator('#tq-approve-next')).toBeDisabled();
@@ -73,7 +80,7 @@ test('a mark changed before approval: the row shows it and Approve and Next wait
   await page.evaluate(() => upsertTermRating('sci8', 'st4', 'term-2', { narrative: '' }));
   await go(page, 'st5');
   await go(page, 'st4');
-  const best = await generateLiam(page);
+  const { best, sentence } = await generateLiam(page);
   for (const cb of await page.locator('[data-tq-check]').all()) await cb.check();
   // Marked down in another tab of the gradebook, then Approve and Next.
   await markDown(page, best);
@@ -81,7 +88,7 @@ test('a mark changed before approval: the row shows it and Approve and Next wait
   expect((await saved(page, 'st4')).approvedAt).toBeFalsy();
   await expect(page.locator('.qn').first()).toHaveAttribute('data-sid', 'st4');
   const claim = page.locator('#tq-sentences .qn-claim').first();
-  await expect(claim.locator('.qn-stale-was')).toHaveText('His best piece was “' + best + '.”');
+  await expect(claim.locator('.qn-stale-was')).toHaveText(sentence);
   await expect(claim.locator('.qn-stale-label').first()).toHaveText('Written');
   await expect(claim.locator('.qn-stale-keep')).toHaveText('Keep as Written');
   await expect(page.locator('#tq-approve-next')).toBeDisabled();
@@ -97,7 +104,7 @@ test('a mark changed before approval: the row shows it and Approve and Next wait
   await expect(page.locator('#tq-approve-next')).toBeEnabled();
   await page.locator('#tq-approve-next').click();
   await expect.poll(async () => (await saved(page, 'st4')).approvedAt).toBeTruthy();
-  expect((await saved(page, 'st4')).narrative).not.toContain('His best piece was “' + best + '.”');
+  expect((await saved(page, 'st4')).narrative).not.toContain(sentence);
 });
 
 test('Write Your Own on one student does not follow to the next', async ({ page }) => {
@@ -117,6 +124,7 @@ test('Write Your Own on one student does not follow to the next', async ({ page 
 test('IE with no date: the calendar opens, nothing saves until a date; Escape keeps Letter Grade', async ({ page }) => {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(() => {
     COURSES.sci8.gradingSystem = 'letter';
     COURSES.sci8.gradeLevel = '10';

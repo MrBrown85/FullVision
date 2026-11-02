@@ -12,6 +12,8 @@ async function setUp(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/\/dashboard/);
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   const info = await page.evaluate(() => {
     const list = getAssessments('sci8');
     const a = list.find(x => x.title === 'Science Fair Proposal');
@@ -79,6 +81,8 @@ test('a competency outside the rubric doesn’t draw the members strip twice', a
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/\/dashboard/);
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   const aid = await page.evaluate(() => {
     const list = getAssessments('sci8');
     const a = list.find(x => x.title === 'Science Fair Proposal');

@@ -14,6 +14,8 @@ async function openLab(page, makeAdvanced, title = 'Chemical Reactions Lab') {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/teacher-mobile\//);
+  // The demo class seeds after the curriculum bank loads.
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
   if (makeAdvanced) {
     await page.evaluate(() => {
       const cid = Object.keys(COURSES)[0];
