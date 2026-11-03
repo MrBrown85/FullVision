@@ -1236,6 +1236,13 @@
   flex: 0 0 auto;
   margin-top: auto;
 }
+/* The line naming the student at the top of a Continued side. */
+.sheet-continued {
+  flex: 0 0 auto;
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  color: #000;
+}
 .sheet-footer {
   flex: 0 0 auto;
   display: flex;

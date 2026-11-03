@@ -543,6 +543,11 @@ test.describe('Page Studio', () => {
     await expect(page.locator('.sheet-zoom').nth(1).locator('.sheet-cell[data-block="grade-table"]')).toHaveCount(1);
     await expect(page.locator('.sheet-label').nth(0)).toHaveText('Front');
     await expect(page.locator('.sheet-label').nth(1)).toHaveText('Continued');
+    // A loose Continued sheet names its student and class at the top.
+    const name = await page.locator('.sheet-zoom').nth(0).locator('.report-student-name').textContent();
+    await expect(page.locator('.sheet-zoom').nth(1).locator('.sheet-body > :first-child')).toHaveText(
+      new RegExp('^' + name + ' · Science 8.* \\(continued\\)$'),
+    );
     await expect(page.locator('#studio-fit .studio-fit-link')).toHaveText('Continues on the back for 27 students');
     expect(await overflowing(page)).toEqual([]);
     await undo(page).click();
