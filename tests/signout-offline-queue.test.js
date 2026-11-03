@@ -127,6 +127,28 @@ describe('signOut and unsent offline changes', () => {
     expect(globalThis.__signOutOpts).toEqual({ scope: 'local' });
   });
 
+  it('deletes the printed report copies in IndexedDB before leaving', async () => {
+    loadSupabase({ queued: 0, deadLettered: 0 });
+    const deleted = [];
+    globalThis.indexedDB = {
+      deleteDatabase(name) {
+        const req = {};
+        setTimeout(() => {
+          deleted.push(name);
+          req.onsuccess && req.onsuccess();
+        }, 0);
+        return req;
+      },
+    };
+    try {
+      await window.signOut();
+      expect(deleted).toEqual(['fv-report-issues']);
+      expect(window.location.href).toBe('/login.html');
+    } finally {
+      delete globalThis.indexedDB;
+    }
+  });
+
   describe('a delete still in its Undo window', () => {
     it('commits before the wipe, so nothing it saves stays on the device', async () => {
       loadSupabase({ queued: 0, deadLettered: 0 });
