@@ -85,7 +85,7 @@ test('no Same As row and no counts on the chips; the focus box follows the point
   await expect(page.locator('#af-codes-focus .af-codes-focus-count')).toContainText('this year');
 });
 
-test('List shows one line each, and the choice is remembered', async ({ page }) => {
+test('List shows one row each with the whole wording, and the choice is remembered', async ({ page }) => {
   await openForm(page);
   await page.locator('.af-comp-view [data-view="list"]').click();
   await expect(page.locator('.af-card-competencies')).toHaveAttribute('data-view', 'list');
@@ -93,7 +93,9 @@ test('List shows one line each, and the choice is remembered', async ({ page }) 
   const row = page.locator('.af-tag-row', { has: page.locator('.af-tag-cb[value="QP3"]') });
   await row.locator('.af-tag-name').click();
   expect(await ticked(page)).toEqual(['QP3']);
-  // The page doesn't scroll sideways with one-line rows.
+  // The whole wording shows, not cut off.
+  expect(await row.locator('.af-tag-name').evaluate(e => e.scrollWidth <= e.clientWidth + 1)).toBe(true);
+  // The page doesn't scroll sideways.
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
   // A ticked competency counts as filled in, so Cancel asks first.
   await page.locator('[data-action="cancelAssessForm"]').click();
