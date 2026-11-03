@@ -3033,12 +3033,28 @@ window.CommentBank = (function () {
 
   /* The work this term, best first: the one rule for "best piece" that the
      comment and At a Glance both read (bestPieceOf). Of the pieces tied at
-     the top (as the level prints, tenths), one scored on the strongest
+     the top mark as it prints (markRank), one scored on the strongest
      competency comes first, so the best piece backs up the strength (Colin,
      2026-11-02); then the higher mark, then the most recent. Only the
      "strongest" gate counts: a tie at the top names its skill by rotation
      across classmates (topSkillOf), which would move the best piece between
      sessions and flag approved comments as changed. */
+  /* A piece's mark as the comment prints it (workMark), to rank pieces: in
+     a Letter class its % (points work's own, other work its level's), so
+     18/20 is below 20/20 though both are proficiency 4; else its level in
+     tenths. */
+  function markRank(f, w) {
+    if (f.grade && f.grade.mode === 'letter') {
+      var pct = parseFloat(workMark(f, w));
+      if (!isNaN(pct)) return pct;
+    }
+    return tenths(w.v);
+  }
+  function _maxMark(f) {
+    return (f.work || []).reduce(function (m, w) {
+      return Math.max(m, markRank(f, w));
+    }, -Infinity);
+  }
   function bestOrderOf(f) {
     var strongSk = strengthSkills(f)[0];
     var strongComp = strongSk ? strongSk.comp : null;
@@ -3051,7 +3067,9 @@ window.CommentBank = (function () {
         : 0;
     };
     return (f.work || []).slice().sort(function (a, b) {
-      return tenths(b.v) - tenths(a.v) || onStrength(b) - onStrength(a) || b.v - a.v || String(b.d).localeCompare(a.d);
+      return (
+        markRank(f, b) - markRank(f, a) || onStrength(b) - onStrength(a) || b.v - a.v || String(b.d).localeCompare(a.d)
+      );
     });
   }
   /* The best piece this term (bestOrderOf), or null with no scored work. */
@@ -6148,14 +6166,16 @@ window.CommentBank = (function () {
     },
     // The highest-marked work this term, with the proficiency it reached.
     bestPiece: function (pv, f) {
-      var top = _maxTenths(f.work, 'v');
+      // The top mark as it prints (markRank): in a Letter class a 90% piece
+      // is not the highest beside a 100% one.
+      var top = _maxMark(f);
       var checks = [];
       // The whole best-piece sentence: the top piece, said with its note.
       if (_has(pv, 'bestPiece')) {
         var bw = _byId(f.work, _ids(pv, 'bestPiece', 'work')[0]);
         checks.push(
           !!bw &&
-            tenths(bw.v) === top &&
+            markRank(f, bw) === top &&
             pv.values.bestPiece ===
               bestPieceSentence({
                 title: bw.title,
@@ -6170,13 +6190,15 @@ window.CommentBank = (function () {
       ['assignment', 'seeWork'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
         var w = _byId(f.work, _ids(pv, slot, 'work')[0]);
-        checks.push(!!w && w.title === pv.values[slot] && tenths(w.v) === top);
+        checks.push(!!w && w.title === pv.values[slot] && markRank(f, w) === top);
         if (w && slot === 'assignment' && _has(pv, 'level')) checks.push(pv.values.level === workMark(f, w));
       });
       // The Note for the Report as a slot: the top piece's note, as written.
       if (_has(pv, 'bestNote')) {
         var bn = _byId(f.work, _ids(pv, 'bestNote', 'work')[0]);
-        checks.push(!!bn && tenths(bn.v) === top && !!pv.values.bestNote && pv.values.bestNote === noteSlot(bn.note));
+        checks.push(
+          !!bn && markRank(f, bn) === top && !!pv.values.bestNote && pv.values.bestNote === noteSlot(bn.note),
+        );
       }
       if (_has(pv, 'strongWorks'))
         checks.push(

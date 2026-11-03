@@ -23,7 +23,8 @@
  *   name    a classmate's name in the comment
  *   title   a quoted title that is no assignment in the class; one in a
  *           "not handed in" sentence that is not labelled Missing; one called
- *           the best or strongest that is not the student's highest mark; one
+ *           the best, strongest or highest that is not the student's highest
+ *           mark as it prints (the % in a Letter class); one
  *           given a mark the student has no mark on
  *   level   the mark printed beside a title is not the student's mark on it
  *   number  a count of work not handed in (and its group), classes missed,
@@ -161,8 +162,17 @@ export function truthOf(cid, student, f, classStudents) {
       pct: pctOf.has(w.id) ? pctOf.get(w.id) : null,
     });
   });
-  const top = Math.max(0, ...(f.work || []).map(w => w.v));
-  const best = new Set((f.work || []).filter(w => w.v === top).map(w => titleKey(w.title)));
+  // The highest mark as it prints: in a Letter class each piece's % (its
+  // own on points work, its level's otherwise, calc.js), so 18/20 is not
+  // tied with 20/20; else its level.
+  const letter = f.grade && f.grade.mode === 'letter';
+  const markOf = w => {
+    if (!letter) return w.v;
+    const pct = pctOf.has(w.id) ? pctOf.get(w.id) : g.levelToPercent(cid, w.v);
+    return Math.round(pct);
+  };
+  const top = Math.max(0, ...(f.work || []).map(markOf));
+  const best = new Set((f.work || []).filter(w => markOf(w) === top).map(w => titleKey(w.title)));
   const gr = f.grade || {};
   const fell = (f.comps || []).filter(
     c => c.start > 0 && c.now > 0 && Math.round(c.start) === 4 && Math.round(c.now) === 3,
@@ -294,7 +304,7 @@ export function checkComment(text, truth) {
         if (!truth.missing.has(p.key)) err('title', p.title, 'work labelled Missing', sentence);
       });
     }
-    if (pieces.length === 1 && /\b(best|strongest)\b/i.test(plain) && !truth.best.has(pieces[0].key)) {
+    if (pieces.length === 1 && /\b(best|strongest|highest)\b/i.test(plain) && !truth.best.has(pieces[0].key)) {
       err('title', pieces[0].title, 'one of the highest-marked pieces', sentence);
     }
 
