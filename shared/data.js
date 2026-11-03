@@ -8060,7 +8060,7 @@ function saveRubricChecks(cid, checks) {
    (with their ± and comments) and ticked checkboxes move to them. On this
    device at once, in the cache and its saved copy, so a later save sends
    nothing for the move; on the server in one transaction
-   (move_rubric_scores, which checks every target is on the copied rubric
+   (move_rubric_scores, migrations/20261102_move_rubric_scores.sql, which checks every target is on the copied rubric
    and that rubric is in the assessment's class). Other assessments are
    untouched. maps: { rubricId, criteria: { old: new }, checks: { old: new } } */
 function moveRubricScores(cid, aid, maps) {

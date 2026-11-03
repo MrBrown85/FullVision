@@ -70,7 +70,7 @@ describe('FV_IDEMPOTENT_RPCS', () => {
     // and save_comment_template / delete_comment_template from
     // migrations/20261031_comment_template.sql, live once it is applied),
     // set_rubric_printed from migrations/20261102_rubric_print.sql, and
-    // move_rubric_scores (redesign PR 10, live once its SQL is applied).
+    // move_rubric_scores from migrations/20261102_move_rubric_scores.sql.
     // Keep in lockstep with the database.
     expect(Object.keys(FV_IDEMPOTENT_RPCS).sort()).toEqual([
       'close_phone_report',
