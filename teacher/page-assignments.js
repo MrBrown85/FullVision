@@ -2134,7 +2134,12 @@ window.PageAssignments = (function () {
     // Title
     html +=
       '<div class="af-field">' +
-      '<label class="af-label">Assignment Title</label>' +
+      '<div class="af-title-label-row"><label class="af-label" for="af-title">Assignment Title</label>' +
+      // Start From a Past Assessment (redesign PR 12): new work only.
+      (isEdit
+        ? ''
+        : '<button type="button" class="af-link-btn" data-action="startFromPast" aria-haspopup="dialog">Start From a Past Assessment</button>') +
+      '</div>' +
       '<input class="af-input" id="af-title" type="text" value="' +
       esc(title) +
       '" placeholder="e.g. Persuasive Essay \u2014 Rights & Freedoms">' +
@@ -3890,6 +3895,203 @@ window.PageAssignments = (function () {
           if (t) t.value = typed;
         }
       });
+  }
+
+  /* ── Start From a Past Assessment (redesign PR 12) ──────────────
+     A picker of the teacher's assessments in every class, this one first,
+     searched by title. Picking one fills the form: title, scoring, Max
+     Points, Factor, competencies (matched by name from another class, as
+     copying does), Core Competencies and the rubric (from another class, a
+     copy held until Create). Dates reset to today; the title is selected.
+     Nothing is saved until Create Assessment. */
+  function startFromPast() {
+    var cid = activeCourse;
+    var trigger = document.activeElement;
+    var others = Object.keys(COURSES || {}).filter(function (id) {
+      return id !== cid;
+    });
+    var overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'af-past-title');
+    // html-safe: static markup; rows are built with esc() below
+    overlay.innerHTML =
+      '<div class="confirm-card af-past-card">' +
+      '<div class="confirm-title" id="af-past-title">Start From a Past Assessment</div>' +
+      '<input class="af-input af-past-find" id="af-past-find" type="search" placeholder="Search by title" aria-label="Search by title" autocomplete="off">' +
+      '<div class="af-past-list" id="af-past-list" role="listbox" aria-label="Past assessments">Loading\u2026</div>' +
+      '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-past="cancel">Cancel</button></div>' +
+      '</div>';
+    var rows = [];
+    var close = function () {
+      overlay.remove();
+      if (trigger && document.body.contains(trigger) && trigger.focus) trigger.focus();
+    };
+    var draw = function () {
+      var list = overlay.querySelector('#af-past-list');
+      var q = (overlay.querySelector('#af-past-find').value || '').trim().toLowerCase();
+      var shown = rows.filter(function (r) {
+        return !q || r.a.title.toLowerCase().indexOf(q) >= 0;
+      });
+      if (!shown.length) {
+        list.textContent = rows.length ? 'No assessment matches.' : 'You have no assessments yet.';
+        return;
+      }
+      var lastClass = null;
+      // html-safe: every value goes through esc()
+      list.innerHTML = shown
+        .slice(0, 200)
+        .map(function (r, i) {
+          var head = '';
+          if (r.cid !== lastClass) {
+            lastClass = r.cid;
+            head = '<div class="af-past-group">' + esc(r.cid === cid ? 'This Class' : r.className) + '</div>';
+          }
+          return (
+            head +
+            '<button type="button" class="af-past-row" role="option" aria-selected="false" data-past-i="' +
+            rows.indexOf(r) +
+            '"' +
+            (i === 0 ? ' tabindex="0"' : ' tabindex="-1"') +
+            '><span class="af-past-name">' +
+            esc(r.a.title) +
+            '</span><span class="af-past-meta">' +
+            esc(r.meta) +
+            '</span></button>'
+          );
+        })
+        .join('');
+    };
+    var pick = function (r) {
+      close();
+      _fillFromPast(r.cid, r.a);
+    };
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay || e.target.closest('[data-past="cancel"]')) return close();
+      var row = e.target.closest('[data-past-i]');
+      if (row) pick(rows[Number(row.dataset.pastI)]);
+    });
+    overlay.addEventListener('input', draw);
+    overlay.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        return close();
+      }
+      var all = Array.from(overlay.querySelectorAll('.af-past-row'));
+      var at = all.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        var next = all[Math.max(0, Math.min(all.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))];
+        if (next) next.focus();
+      } else if (e.key === 'Enter' && e.target.id === 'af-past-find' && all[0]) {
+        e.preventDefault();
+        all[0].click();
+      }
+    });
+    document.body.appendChild(overlay);
+    overlay.querySelector('#af-past-find').focus();
+    // Each class's assessments appear as it loads (this one at once).
+    var classes = [cid].concat(
+      others.sort(function (x, y) {
+        return _pastClassName(x).localeCompare(_pastClassName(y));
+      }),
+    );
+    var byDate = function (x, y) {
+      return String(y.dateAssigned || y.date || '').localeCompare(String(x.dateAssigned || x.date || ''));
+    };
+    var collect = function () {
+      if (!document.body.contains(overlay)) return;
+      rows = [];
+      classes.forEach(function (id) {
+        (getAssessments(id) || [])
+          .slice()
+          .sort(byDate)
+          .forEach(function (a) {
+            if (!a || !a.title) return;
+            rows.push({
+              cid: id,
+              a: a,
+              className: _pastClassName(id),
+              meta: [a.dateAssigned || a.date || '', _pastModeLabel(a)].filter(Boolean).join(' \u00b7 '),
+            });
+          });
+      });
+      var focused = overlay.contains(document.activeElement) && document.activeElement.id === 'af-past-find';
+      draw();
+      if (focused) overlay.querySelector('#af-past-find').focus();
+    };
+    collect();
+    if (window.AssessmentCopy)
+      others.forEach(function (id) {
+        AssessmentCopy.loadClass(id).then(collect);
+      });
+  }
+  function _pastClassName(id) {
+    return (COURSES[id] && courseDisplayName(COURSES[id])) || 'Another Class';
+  }
+  function _pastModeLabel(a) {
+    var m = a.scoreMode || 'proficiency';
+    if (m === 'points') return (a.maxPoints || 100) + ' Points';
+    if (m === 'complete') return 'Complete/Incomplete';
+    if (m === 'dibels') return 'DIBELS';
+    return 'Proficiency';
+  }
+
+  function _fillFromPast(srcCid, a) {
+    var cid = activeCourse;
+    var title = document.getElementById('af-title');
+    if (!title) return;
+    title.value = a.title || '';
+    title.style.border = '';
+    var mode = a.scoreMode || 'proficiency';
+    if (!document.querySelector('.af-scoremode-btn[data-mode="' + mode + '"]')) mode = 'proficiency';
+    setScoreMode(mode);
+    var mp = document.getElementById('af-maxpoints');
+    if (mp && mode === 'points') mp.value = a.maxPoints || 100;
+    var w = document.getElementById('af-weight');
+    var wv = String(a.weight != null ? a.weight : 1);
+    if (w && w.querySelector('option[value="' + CSS.escape(wv) + '"]')) w.value = wv;
+    // Rubric first: it decides the competencies while it's chosen.
+    _useRubricInForm('');
+    var rubric = mode === 'proficiency' && a.rubricId ? getRubricById(srcCid, a.rubricId) : null;
+    if (rubric && srcCid === cid) {
+      _useRubricInForm(rubric.id);
+    } else if (rubric && window.RubricLibrary) {
+      _holdFormRubric(RubricLibrary.cloneRubric(srcCid, cid, rubric));
+    }
+    if (!rubric) {
+      var ids = srcCid === cid ? a.tagIds || [] : AssessmentCopy.mapTags(srcCid, cid, a.tagIds).ids;
+      sameAsTags(ids.join(','));
+    }
+    var cc = a.coreCompetencyIds || [];
+    document.querySelectorAll('.af-cc-chip').forEach(function (chip) {
+      chip.classList.toggle('active', cc.indexOf(chip.dataset.cc) >= 0);
+    });
+    var assigned = document.getElementById('af-date-assigned');
+    if (assigned) assigned.value = courseToday(cid);
+    autoSetDueDate();
+    _refreshCountsToward();
+    title.focus();
+    title.select();
+  }
+
+  /* Hold a rubric made for this form (saved only on Create, PR 8) and
+     choose it. */
+  function _holdFormRubric(held) {
+    _pendingFormRubric = held;
+    var dd = document.getElementById('af-rubric');
+    if (dd) {
+      var opt = dd.querySelector('option[value="' + held.id + '"]');
+      if (!opt) {
+        opt = document.createElement('option');
+        opt.value = held.id;
+        dd.appendChild(opt);
+      }
+      opt.textContent = held.name + ' (' + held.criteria.length + ' criteria)';
+      dd.value = held.id;
+    }
+    onRubricSelect(held.id);
   }
 
   /* Create and Add Another keeps what a run of similar work shares: Classes
@@ -7050,25 +7252,13 @@ window.PageAssignments = (function () {
       var held = structuredClone(_editingRubric);
       delete held._forForm;
       delete held._isNew;
-      _pendingFormRubric = held;
       _editingRubric = null;
       _rubricBefore = null;
       _rubricScored = {};
       _rubricDirty = false;
       var heldModal = document.getElementById('rubric-modal');
       if (heldModal) heldModal.remove();
-      var dd = document.getElementById('af-rubric');
-      if (dd) {
-        var opt = dd.querySelector('option[value="' + held.id + '"]');
-        if (!opt) {
-          opt = document.createElement('option');
-          opt.value = held.id;
-          dd.appendChild(opt);
-        }
-        opt.textContent = held.name + ' (' + held.criteria.length + ' criteria)';
-        dd.value = held.id;
-      }
-      onRubricSelect(held.id);
+      _holdFormRubric(held);
       return;
     }
     delete _editingRubric._forForm;
@@ -8008,6 +8198,9 @@ window.PageAssignments = (function () {
       },
       deleteAssess: function () {
         deleteAssess(el.dataset.aid);
+      },
+      startFromPast: function () {
+        startFromPast();
       },
       saveAndAddAnother: function () {
         saveNewAssess(true);

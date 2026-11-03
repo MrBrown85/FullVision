@@ -64,7 +64,8 @@ test('Ctrl/⌘+Shift+Enter creates and adds another', async ({ page }) => {
 test('editing has no Create and Add Another', async ({ page }) => {
   await openForm(page);
   await page.locator('[data-action="cancelAssessForm"]').click();
-  await page.locator('[data-action="editAssess"]').first().click();
+  const aid = await page.evaluate(() => getAssessments('sci8')[0].id);
+  await page.evaluate(id => document.querySelector(`[data-action="editAssess"][data-aid="${id}"]`).click(), aid);
   await expect(page.locator('.af-heading-title')).toHaveText('Edit Assessment');
   await expect(page.locator('[data-action="saveAndAddAnother"]')).toHaveCount(0);
 });
