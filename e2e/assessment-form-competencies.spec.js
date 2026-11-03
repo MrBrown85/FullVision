@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 /* The assessment form's competency picker (redesign PR 4, 2026-11-02):
-   Codes (one-click chips by Ministry group, with counts and a focus box)
+   Codes (one-click chips by Ministry group, and a focus box)
    and List (one line each), behind a switch remembered on this device;
-   Same As; type to narrow, Enter ticks; with a rubric, the rubric's
+   type to narrow, Enter ticks; with a rubric, the rubric's
    competencies, read only. Demo Mode, Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -72,13 +72,19 @@ test('type to narrow; Enter ticks the first match; arrows move between chips', a
   expect(await ticked(page)).toEqual(['QP2', 'PC2']);
 });
 
-test('Same As ticks exactly a recent assessment’s competencies', async ({ page }) => {
+test('no Same As row and no counts on the chips; the focus box waits for a pause', async ({ page }) => {
   await openForm(page);
-  const btn = page.locator('.af-same-as-btn').first();
-  const want = (await btn.getAttribute('data-tags')).split(',');
-  await page.locator('.af-code[data-tag="CM2"]').click();
-  await btn.click();
-  expect((await ticked(page)).sort()).toEqual(want.slice().sort());
+  // Removed Nov 2 (Colin): both distracted from the competencies.
+  await expect(page.locator('.af-same-as')).toHaveCount(0);
+  expect(await page.locator('.af-code').first().innerText()).not.toMatch(/\d+$/);
+  await page.locator('.af-code[data-tag="EV4"]').hover();
+  const code = page.locator('#af-codes-focus .af-codes-focus-code');
+  // Not at once: a teacher who is only clicking never sees it change.
+  await page.waitForTimeout(150);
+  await expect(code).toHaveCount(0);
+  await expect(code).toHaveText('EV4');
+  // The count lives in the focus box.
+  await expect(page.locator('#af-codes-focus .af-codes-focus-count')).toContainText('this year');
 });
 
 test('List shows one line each, and the choice is remembered', async ({ page }) => {

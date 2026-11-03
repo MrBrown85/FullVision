@@ -67,7 +67,10 @@ test('Date Assigned names its term; keyboard focus puts the tip over the field',
     const t = getReportingTerms('sci8').find(x => d >= x.starts_on && d <= x.ends_on);
     return t ? t.label : null;
   });
-  await page.locator('#af-date-assigned').focus();
+  // Reached with the keyboard, so it shows at once.
+  await page.locator('#af-module').focus();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#af-date-assigned')).toBeFocused();
   await expect(tip(page)).toContainText(term ? 'In ' + term : 'Its scores count in All Time only.');
   const [t, f] = await Promise.all([tip(page).boundingBox(), page.locator('#af-date-assigned').boundingBox()]);
   expect(t.y + t.height).toBeLessThanOrEqual(f.y);
@@ -111,7 +114,24 @@ test('a field focused below the fold keeps its tip as the page scrolls to it', a
   await openForm(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.locator('#af-weight').focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#af-weight')).toBeFocused();
   await page.waitForTimeout(300);
   await expect(tip(page)).toBeVisible();
   await expect(tip(page)).toContainText('Factor 1x (Normal)');
+});
+
+test('a hover waits for a pause; passing over a field shows nothing', async ({ page }) => {
+  await openForm(page);
+  await page.locator('#af-weight').hover();
+  await page.waitForTimeout(150);
+  await expect(tip(page)).toBeHidden();
+  await expect(tip(page)).toBeVisible();
+  // Passing over Core Competencies on the way somewhere else.
+  await page.mouse.move(5, 5);
+  await page.locator('.af-cc-chip[data-cc="COL"]').hover();
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(700);
+  await expect(tip(page)).toBeHidden();
 });
