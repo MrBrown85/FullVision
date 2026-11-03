@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { serverRekeysRubrics } from './helpers.js';
 
 /* Edit a Copy on scored work (redesign PR 10, 2026-11-02): the copy is
    offered, and this assessment's rubric scores move to the copy's criteria,
@@ -6,10 +7,11 @@ import { test, expect } from '@playwright/test';
    theirs. Demo Mode, Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test('a copy of a shared rubric takes this assessment’s scores with it', async ({ page }) => {
+async function copyTakesScores(page, online) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  if (online) await page.evaluate(serverRekeysRubrics);
   await page.evaluate(() => window.Router.navigate('/assignments?course=sci8'));
   await expect(page.locator('[data-action="editAssess"]').first()).toBeAttached();
   // A scored assessment on a rubric another assessment also uses.
@@ -77,6 +79,14 @@ test('a copy of a shared rubric takes this assessment’s scores with it', async
   expect(after.mine.some(e => before.crits.includes(e.tagId))).toBe(false);
   // The other assessment on the original rubric keeps its scores.
   expect(after.theirs).toEqual(before.theirs);
+}
+
+test('a copy of a shared rubric takes this assessment’s scores with it', async ({ page }) => {
+  await copyTakesScores(page, false);
+});
+
+test('signed in, the copy keeps its place on the assessment and takes the scores', async ({ page }) => {
+  await copyTakesScores(page, true);
 });
 
 test('a criterion removed from the copy keeps its scores off the others', async ({ page }) => {
