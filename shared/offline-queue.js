@@ -34,6 +34,9 @@
  *   (see _pump). Cell writes in one column still run in parallel with each
  *   other.
  *
+ * Restore: an entry naming a record of a class restore (import_json_restore)
+ *   still queued ahead of it waits until the restore lands.
+ *
  * Blocked: an entry whose payload names a record the server doesn't have yet
  *   (a local id whose create is still queued) carries those ids in
  *   blocked_on and is held, with everything behind it on its key. When the
@@ -164,6 +167,41 @@
 
   function _isBarrier(entry) {
     return !!BARRIER_ENDPOINTS[entry.endpoint];
+  }
+
+  /* A class restore (import_json_restore) writes a whole class, with ids
+     made on this device, in one transaction. A write naming any of those
+     records waits until the restore lands; sent first, it would find
+     nothing and fail. The ids are every row id in the payload. */
+  var _restoreIdsByEntry = {};
+
+  function _restoredIds(entry) {
+    if (entry.endpoint !== 'import_json_restore') return null;
+    if (_restoreIdsByEntry[entry.id]) return _restoreIdsByEntry[entry.id];
+    var ids = {};
+    var tables = (entry.payload && entry.payload.p_payload) || {};
+    Object.keys(tables).forEach(function (name) {
+      if (!Array.isArray(tables[name])) return;
+      tables[name].forEach(function (row) {
+        if (row && typeof row.id === 'string') ids[row.id] = true;
+      });
+    });
+    _restoreIdsByEntry[entry.id] = ids;
+    return ids;
+  }
+
+  function _namesAny(entry, ids) {
+    var p = entry.payload || {};
+    return Object.keys(p).some(function (name) {
+      var v = p[name];
+      if (typeof v === 'string') return !!ids[v];
+      return (
+        Array.isArray(v) &&
+        v.some(function (x) {
+          return typeof x === 'string' && !!ids[x];
+        })
+      );
+    });
   }
 
   function _isTransient(res) {
@@ -895,6 +933,15 @@
         data: res.data,
       });
       _resolveWaiters(entry.id, res);
+      if (_restoreIdsByEntry[entry.id]) {
+        delete _restoreIdsByEntry[entry.id];
+        // The writes a restore held go on the next turn, after its caller
+        // has applied what the server returned (backup-restore.js).
+        setTimeout(function () {
+          _pump(false);
+        }, 0);
+        return;
+      }
       _pump(false);
       return;
     }
@@ -1031,6 +1078,7 @@
     var busyKeys = {};
     var touched = {}; // assessment → an earlier entry names it
     var barred = {}; // assessment → an earlier column write is still queued
+    var restoring = []; // ids of each earlier class restore still queued
     var entries = _readQueue().entries;
     for (var i = 0; i < entries.length; i++) {
       var entry = entries[i];
@@ -1042,6 +1090,14 @@
         touched[assessment] = true;
         if (barrier) barred[assessment] = true;
       }
+      if (
+        restoring.some(function (ids) {
+          return _namesAny(entry, ids);
+        })
+      )
+        gated = true;
+      var restored = _restoredIds(entry);
+      if (restored) restoring.push(restored);
       if (busyKeys[key]) continue;
       busyKeys[key] = true;
       if (gated) continue;
