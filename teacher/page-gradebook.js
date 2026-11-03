@@ -332,7 +332,11 @@ window.PageGradebook = (function () {
       (activeFilterCount > 0 ? ', ' + activeFilterCount + ' active' : '') +
       '">' +
       '<span class="filter-icon" aria-hidden="true">☰</span> Filters' +
-      (activeFilterCount > 0 ? ' <span class="filter-count">' + activeFilterCount + '</span>' : '') +
+      // The count's place is kept when there is none, so turning a filter
+      // on doesn't push the search box along.
+      (activeFilterCount > 0
+        ? ' <span class="filter-count">' + activeFilterCount + '</span>'
+        : ' <span class="filter-count is-empty" aria-hidden="true">0</span>') +
       '</button>';
 
     html +=
@@ -1147,8 +1151,10 @@ window.PageGradebook = (function () {
         });
       }
       var colCount = cols.length - start;
-      var unitW = criterionCols.length > 0 ? 96 : 54;
-      var groupW = Math.max(120, colCount * unitW);
+      // The header is at least 120px; the columns under it share that
+      // width, so every header sits exactly over its own columns.
+      var unitW = Math.max(criterionCols.length > 0 ? 96 : 54, Math.ceil(120 / colCount));
+      var groupW = colCount * unitW;
       var colW = colCount === 1 ? groupW : unitW;
       // Set colWidth on each column in this group
       for (var ci = start; ci < cols.length; ci++) cols[ci].colWidth = colW;
@@ -1796,7 +1802,11 @@ window.PageGradebook = (function () {
   function _setNameTip(cid, student, sections) {
     var grade = studentGradeSummary(cid, student.id, viewedReportTerm(cid));
     var word = levelWord(cid, getOverallProficiency(cid, student.id));
+    // The full name first: the name column cuts long ones off.
     var tip =
+      '<div class="gb-tip-name">' +
+      esc(fullName(student)) +
+      '</div>' +
       '<div class="gb-tip-head">Course Grade</div>' +
       '<div class="gb-tip-grade" style="color:' +
       (grade.text ? PROF_COLORS[grade.level] || PROF_COLORS[0] : 'var(--text-3)') +
@@ -1864,7 +1874,7 @@ window.PageGradebook = (function () {
         (r ? PROF_COLORS[r] : 'var(--text-3)') +
         '">' +
         esc(r ? levelText(cid, sp) : PROF_LABELS[0]) +
-        (r && n ? ' <span class="gb-tip-count">(' + n + ')</span>' : '') +
+        (r && n ? ' <span class="gb-tip-count">· ' + n + (n === 1 ? ' assessment' : ' assessments') + '</span>' : '') +
         '</span></div>';
     });
     var handedIn = Object.keys(allIds).length;
@@ -1875,7 +1885,7 @@ window.PageGradebook = (function () {
         handedIn +
         (handedIn === 1 ? ' assessment' : ' assessments') +
         ' handed in</div>';
-    tip += rows;
+    tip += '<div class="gb-tip-rows">' + rows + '</div>';
     tip +=
       '<div class="gb-tip-note gb-tip-foot">Evidence in ' +
       withEvidence +
@@ -3420,6 +3430,9 @@ window.PageGradebook = (function () {
     // html-safe: tipHtml is built by _setNameTip, which escapes category and section names and grade text.
     gbTip.innerHTML = tipHtml;
     gbTip.style.display = 'block';
+    // A long competency list goes into two columns so the card fits the
+    // window; past that it is cut at the window's height.
+    gbTip.classList.toggle('gb-tip-wide', gbTip.offsetHeight > window.innerHeight - 16);
     _tipSource = name;
     var row = name.closest('.gb-grid-rowhead') || name;
     var rect = row.getBoundingClientRect();
