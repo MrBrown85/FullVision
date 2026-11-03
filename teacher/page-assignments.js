@@ -2492,6 +2492,15 @@ window.PageAssignments = (function () {
       esc(title) +
       '" placeholder="e.g. Persuasive Essay \u2014 Rights & Freedoms">' +
       '</div>';
+    // Description, right under the title (teachers preferred it there to
+    // More Options, Colin, Nov 2).
+    html +=
+      '<div class="af-field">' +
+      '<label class="af-label" for="af-desc">Description</label>' +
+      '<textarea class="af-textarea" id="af-desc" rows="1" placeholder="Describe the assignment, expectations, and criteria\u2026">' +
+      esc(description) +
+      '</textarea>' +
+      '</div>';
 
     // Which classes this assessment goes to (Teams' "Assign to"), right
     // under the title so it is seen before the details are filled in.
@@ -2814,29 +2823,20 @@ window.PageAssignments = (function () {
       '<div id="collab-panel-mount"></div>' +
       '</section>';
 
-    // More Options: Description and Evidence Type, open when either is set.
-    var moreOpen = !!description || (evidence && evidence !== 'written');
+    // More Options: Evidence Type, open when it isn't Written.
+    var moreOpen = !!(evidence && evidence !== 'written');
     html +=
       '<section class="af-card af-card-more">' +
       '<button type="button" class="af-more-toggle" data-action="toggleMoreOptions" aria-expanded="' +
       moreOpen +
       '" aria-controls="af-more-body">' +
       '<span class="af-card-title">More Options</span>' +
-      '<span class="af-more-hint">Description, Evidence Type</span>' +
+      '<span class="af-more-hint">Evidence Type</span>' +
       '<svg class="af-more-chev" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>' +
       '</button>' +
       '<div class="af-more-body" id="af-more-body"' +
       (moreOpen ? '' : ' hidden') +
       '>';
-    // Description
-    html +=
-      '<div class="af-field">' +
-      '<label class="af-label">Description</label>' +
-      '<textarea class="af-textarea" id="af-desc" rows="1" placeholder="Describe the assignment, expectations, and criteria\u2026">' +
-      esc(description) +
-      '</textarea>' +
-      '</div>';
-
     html +=
       '<div class="af-field">' +
       '<label class="af-label">Evidence Type</label>' +
