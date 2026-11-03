@@ -111,6 +111,8 @@ window.PageAssignments = (function () {
   // A rubric made from the assessment form (blank, drafted or a copy) waits
   // here, unsaved, until the assessment is created (redesign PR 8).
   var _pendingFormRubric = null;
+  // Scores to move to a copied rubric once the edit is saved (PR 10).
+  var _scoreMoveAfterSave = null;
   // An Advanced Rubric checkbox being dragged to a new place in its level.
   var _dragCheck = null;
   var _rubricDirty = false;
@@ -2973,7 +2975,7 @@ window.PageAssignments = (function () {
           ? ' This one has scores for ' +
             scored +
             (scored === 1 ? ' student' : ' students') +
-            ', so a copy for it isn’t offered.'
+            '. A copy takes them with it; the other assessments keep theirs.'
           : ''),
       [
         { label: 'Cancel', style: 'cancel' },
@@ -2987,7 +2989,6 @@ window.PageAssignments = (function () {
         {
           label: 'Edit a Copy for ' + title,
           style: 'primary',
-          disabled: !!scored,
           run: function () {
             editRubricCopyForForm(rubric.id);
           },
@@ -3051,6 +3052,18 @@ window.PageAssignments = (function () {
             });
       return next;
     });
+    // Where each criterion and checkbox came from, by position, so this
+    // assessment's scores can move to the copy when it's saved (PR 10).
+    if (_editingAssessId && _scoredStudentCount(cid, _editingAssessId)) {
+      copy._copiedFrom = (src.criteria || []).map(function (c) {
+        return {
+          id: c.id,
+          checks: (c.checks || []).map(function (k) {
+            return k.id;
+          }),
+        };
+      });
+    }
     var title = ((document.getElementById('af-title') || {}).value || '').trim();
     copy.name = src.name + (title ? ' · ' + title : ' (Copy)');
     copy.title = copy.name;
@@ -3567,6 +3580,7 @@ window.PageAssignments = (function () {
     _showingNewForm = false;
     _editingAssessId = null;
     _pendingFormRubric = null;
+    _scoreMoveAfterSave = null;
     var form = document.getElementById('new-assess-form');
     if (form) form.style.display = 'none';
   }
@@ -3581,6 +3595,10 @@ window.PageAssignments = (function () {
     if (!held || !dd || dd.value !== held.id || mode !== 'proficiency') return false;
     var cid = activeCourse;
     _pendingFormRubric = null;
+    var copiedFrom = held._copiedFrom;
+    var editing = _editingAssessId;
+    held = structuredClone(held);
+    delete held._copiedFrom;
     var list = structuredClone(getRubrics(cid)).concat([held]);
     if (window.RubricDraft && typeof saveCompetencyDescriptors === 'function') {
       saveCompetencyDescriptors(
@@ -3595,6 +3613,7 @@ window.PageAssignments = (function () {
     }
     Promise.resolve(saveRubrics(cid, list)).then(function (result) {
       var finalId = result && result.idMap && result.idMap[held.id] ? result.idMap[held.id] : held.id;
+      if (copiedFrom && editing) _scoreMoveAfterSave = _scoreMoveMaps(cid, editing, finalId, copiedFrom, result);
       var box = document.getElementById('af-rubric');
       if (box) {
         var opt = box.querySelector('option[value="' + held.id + '"]');
@@ -3604,6 +3623,27 @@ window.PageAssignments = (function () {
       then();
     });
     return true;
+  }
+
+  /* Old → new criterion and checkbox ids for a saved copy, matched by
+     position (the copy keeps the original's order). */
+  function _scoreMoveMaps(cid, aid, rid, copiedFrom, result) {
+    var saved =
+      ((result && result.rubrics) || []).find(function (r) {
+        return r.id === rid;
+      }) || getRubricById(cid, rid);
+    if (!saved) return null;
+    var maps = { aid: aid, rubricId: rid, criteria: {}, checks: {} };
+    copiedFrom.forEach(function (from, i) {
+      var to = (saved.criteria || [])[i];
+      if (!to) return;
+      maps.criteria[from.id] = to.id;
+      from.checks.forEach(function (kid, j) {
+        var tk = (to.checks || [])[j];
+        if (tk) maps.checks[kid] = tk.id;
+      });
+    });
+    return maps;
   }
 
   /* Cancel on a new assessment that has something in it asks first: a
@@ -3934,6 +3974,9 @@ window.PageAssignments = (function () {
     var after = structuredClone(assessments[idx]);
     var srcCid = activeCourse;
     saveAssessments(activeCourse, assessments);
+    var move = _scoreMoveAfterSave;
+    _scoreMoveAfterSave = null;
+    if (move && move.aid === aid && after.rubricId === move.rubricId) moveRubricScores(activeCourse, aid, move);
     var carried = _carryOverallToCompetencies(activeCourse, before, after);
     openAssessIds.add(aid);
     hideNewForm();

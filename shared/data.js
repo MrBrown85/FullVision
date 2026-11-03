@@ -8055,6 +8055,47 @@ function getRubricChecks(cid) {
 function saveRubricChecks(cid, checks) {
   _saveCourseField('rubricChecks', cid, checks && typeof checks === 'object' && !Array.isArray(checks) ? checks : {});
 }
+/* Edit a Copy on scored work (assessment form redesign PR 10): the copy's
+   criteria and checkboxes have new ids, so this assessment's rubric scores
+   (with their ± and comments) and ticked checkboxes move to them. On this
+   device at once, in the cache and its saved copy, so a later save sends
+   nothing for the move; on the server in one transaction
+   (move_rubric_scores, which checks every target is on the copied rubric
+   and that rubric is in the assessment's class). Other assessments are
+   untouched. maps: { rubricId, criteria: { old: new }, checks: { old: new } } */
+function moveRubricScores(cid, aid, maps) {
+  var crit = (maps && maps.criteria) || {};
+  var chk = (maps && maps.checks) || {};
+  if (!aid || !Object.keys(crit).length) return Promise.resolve({ data: 0, error: null });
+  var scores = getScores(cid) || {};
+  var next = {};
+  Object.keys(scores).forEach(function (sid) {
+    var list = scores[sid];
+    next[sid] = Array.isArray(list)
+      ? list.map(function (e) {
+          if (!e || e.assessmentId !== aid || !crit[e.tagId]) return e;
+          var to = crit[e.tagId];
+          return Object.assign({}, e, { tagId: to, id: aid + ':' + to });
+        })
+      : list;
+  });
+  _saveCourseField('scores', cid, next);
+  var checks = Object.assign({}, getRubricChecks(cid));
+  Object.keys(checks).forEach(function (key) {
+    if (key.split(':')[1] !== aid || !Array.isArray(checks[key])) return;
+    checks[key] = checks[key].map(function (id) {
+      return chk[id] || id;
+    });
+  });
+  _saveCourseField('rubricChecks', cid, checks);
+  if (typeof clearProfCache === 'function') clearProfCache();
+  return _writeRpc('move_rubric_scores', {
+    p_assessment_id: aid,
+    p_rubric_id: maps.rubricId || null,
+    p_criterion_map: crit,
+    p_check_map: chk,
+  });
+}
 /* The ids of the checkboxes ticked for one student on one assessment. */
 function getRubricCheckIds(cid, sid, aid) {
   var list = getRubricChecks(cid)[sid + ':' + aid];
