@@ -4654,12 +4654,14 @@ window.PageAssignments = (function () {
     if (!title) return fallback;
     return /\brubric$/i.test(title) ? title : title + ' Rubric';
   }
-  /* Create / Save Changes with a blank the teacher has written in: keep it.
+  /* Create / Save Changes with a blank the teacher has written in: keep it,
+     open or folded away (its tab clicked again, or another start opened).
      True while scored work asks first; `resume` runs the save again once the
      teacher changes the rubric. */
   function _commitOpenBlank(resume) {
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
-    if (!(_startOpen === 'blank' && _blank && _blank.touched && mode === 'proficiency')) return false;
+    var written = _blank && (_startOpen === 'blank' ? _blank.touched : _blankWritten());
+    if (!(written && mode === 'proficiency')) return false;
     var asking = true;
     var held = false;
     _blankSave(true, function () {

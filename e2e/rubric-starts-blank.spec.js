@@ -80,6 +80,20 @@ test('Create keeps a touched blank without Save Rubric, named after the assessme
   await expect.poll(async () => ((await savedRubric(page)) || {}).name).toBe('Density Lab Rubric');
 });
 
+test('Create keeps a written blank folded away by its tab', async ({ page }) => {
+  await openForm(page);
+  await editor(page).locator('[data-ge="level"][data-i="0"][data-level="4"]').fill('Goes beyond.');
+  await page.locator('.af-rubric-start[data-start="blank"]').click();
+  await expect(editor(page)).toHaveCount(0);
+  await page.locator('[data-action="saveNewAssess"]').click();
+  await expect
+    .poll(async () => {
+      const r = await savedRubric(page);
+      return r && r !== 'none' ? [r.name, r.criteria[0].levels[4]] : r;
+    })
+    .toEqual(['Density Lab Rubric', 'Goes beyond.']);
+});
+
 test('signed in, Create keeps the rubric on the new assessment', async ({ page }) => {
   await openForm(page);
   await page.evaluate(serverRekeysRubrics);
