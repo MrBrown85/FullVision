@@ -1278,9 +1278,33 @@
 .af-card-scoring .af-score-settings:empty {
   display: none;
 }
+/* The footer (redesign PR 3): stays at the bottom of the window while the
+   form is in view, with what the work counts toward beside the buttons. */
 #new-assess-form > .af-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -16px -16px;
+  padding: 12px 16px;
   border-top: 0;
-  padding-top: 4px;
+  background: var(--surface);
+  border-radius: 0 0 calc(var(--radius) - 2px) calc(var(--radius) - 2px);
+  box-shadow:
+    0 -1px 0 rgba(0, 0, 0, 0.08),
+    0 -8px 20px rgba(0, 0, 0, 0.06);
+}
+#new-assess-form > .af-actions .btn {
+  min-height: 40px;
+  padding: 0 18px;
+}
+.af-counts-toward {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--text);
+  line-height: 1.4;
 }
 
 /* ── Assignment toolbar ─────────────────────────────────────── */
