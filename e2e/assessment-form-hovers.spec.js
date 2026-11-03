@@ -84,8 +84,8 @@ test('the rubric lists its criteria and how often it is used', async ({ page }) 
     return { id: x.id, name: x.name, n: x.criteria.length };
   });
   await page.locator('[data-action="chooseRubric"]').first().click();
-  await page.locator(`#rubric-bank-overlay .rb-row[data-rid="${r.id}"]`).click();
-  await page.locator('#rubric-bank-overlay [data-rb="pick-use"]').click();
+  await page.locator(`#af-rubric-view .af-start-row[data-rid="${r.id}"]`).click();
+  await page.locator('#af-rubric-view [data-action="startPickUse"]').click();
   await page.locator('.af-rubric-card-name').first().hover();
   await expect(tip(page).locator('.gb-tip-head')).toContainText(r.name);
   await expect(tip(page).locator('.gb-tip-row')).toHaveCount(r.n);

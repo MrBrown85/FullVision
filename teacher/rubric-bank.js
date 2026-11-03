@@ -65,11 +65,11 @@ window.RubricBank = (function () {
   }
 
   /* A rubric matches when its name or a linked competency contains the query. */
-  function matches(cid, rubric, query) {
+  function matches(cid, rubric, query, picking) {
     var q = _norm(query);
     if (!q) return true;
     if (_norm(rubric.name).indexOf(q) >= 0) return true;
-    if (_s && _s.pick) {
+    if (picking || (_s && _s.pick)) {
       var onAssessment = usesOf(cid, rubric.id).some(function (a) {
         return _norm(a.title).indexOf(q) >= 0;
       });
@@ -561,7 +561,7 @@ window.RubricBank = (function () {
   function pickGroups(cid, query, tagIds) {
     var want = tagIds || [];
     var list = _rubrics(cid).filter(function (r) {
-      return matches(cid, r, query);
+      return matches(cid, r, query, true);
     });
     var shared = function (r) {
       var codes = {};
@@ -1506,5 +1506,6 @@ window.RubricBank = (function () {
     duplicate: duplicate,
     rename: rename,
     gridHtml: gridHtml,
+    pickGroups: pickGroups,
   };
 })();

@@ -46,8 +46,8 @@ test('changing the rubric of scored work asks first', async ({ page }) => {
   const a = await editScored(page, true);
   const other = await page.evaluate(rid => getRubrics('sci8').find(r => r.id !== rid).id, a.rubricId);
   await page.locator('.af-rubric-card [data-action="chooseRubric"]').click();
-  await page.locator(`#rubric-bank-overlay .rb-row[data-rid="${other}"]`).click();
-  await page.locator('#rubric-bank-overlay [data-rb="pick-use"]').click();
+  await page.locator(`#af-rubric-view .af-start-row[data-rid="${other}"]`).click();
+  await page.locator('#af-rubric-view [data-action="startPickUse"]').click();
   await expect(page.locator('#af-dialog-title')).toHaveText('Change the Rubric?');
   await page.locator('.af-dialog-card button', { hasText: 'Cancel' }).click();
   await expect(page.locator('#af-rubric')).toHaveValue(a.rubricId);
