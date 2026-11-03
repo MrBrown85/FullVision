@@ -108,7 +108,9 @@ describe('No score writer works out the type on its own', () => {
   });
 });
 
-describe('a points score edited after the grader', () => {
+// setPointsScore keeps one entry per points cell, so an edit after the
+// grader replaces its score. The source check above keeps the grader on it.
+describe('a points score saved twice through setPointsScore', () => {
   it('shows the new points in the cell and the course %', () => {
     // A student no earlier test marked Missing.
     COURSES[CID] = { id: CID, name: 'T', gradingSystem: 'letter', gradeLevel: '11' };
