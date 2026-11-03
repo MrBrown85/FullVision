@@ -26,13 +26,13 @@ test('Factor sits on the mode row with plain words', async ({ page }) => {
 
 test('each mode shows only what it needs', async ({ page }) => {
   await openForm(page);
-  await expect(page.locator('#af-rubric')).toBeVisible();
+  await expect(page.locator('#af-rubric-wrap')).toBeVisible();
   await expect(page.locator('#af-maxpoints')).toBeHidden();
   await page.locator('.af-scoremode-btn[data-mode="points"]').click();
-  await expect(page.locator('#af-rubric')).toBeHidden();
+  await expect(page.locator('#af-rubric-wrap')).toBeHidden();
   await expect(page.locator('#af-maxpoints')).toBeVisible();
   await page.locator('.af-scoremode-btn[data-mode="complete"]').click();
-  await expect(page.locator('#af-rubric')).toBeHidden();
+  await expect(page.locator('#af-rubric-wrap')).toBeHidden();
   await expect(page.locator('#af-maxpoints')).toBeHidden();
   await expect(page.locator('#af-weight')).toBeVisible();
 });
@@ -40,6 +40,7 @@ test('each mode shows only what it needs', async ({ page }) => {
 test('a rubric survives a trip through Points, and Points saves none', async ({ page }) => {
   await openForm(page);
   const rid = await page.evaluate(() => getRubrics('sci8')[0].id);
+  await page.locator('[data-action="chooseRubric"]').first().click();
   await page.selectOption('#af-rubric', rid);
   await page.locator('.af-scoremode-btn[data-mode="points"]').click();
   await page.locator('#af-maxpoints-picks [data-value="25"]').click();
@@ -70,5 +71,5 @@ test('DIBELS shows its line and no Factor, in a class that offers it', async ({ 
   await page.locator('.af-scoremode-btn[data-mode="dibels"]').click();
   await expect(page.locator('#af-dibels-note')).toBeVisible();
   await expect(page.locator('#af-weight')).toBeHidden();
-  await expect(page.locator('#af-rubric')).toBeHidden();
+  await expect(page.locator('#af-rubric-wrap')).toBeHidden();
 });

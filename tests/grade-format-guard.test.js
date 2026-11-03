@@ -39,7 +39,7 @@ const PROF_LABELS_USES = {
   'teacher/dash-insights.js': 8,
   'teacher/dash-observations.js': 1,
   'teacher/dash-student-cards.js': 1,
-  'teacher/page-assignments.js': 22,
+  'teacher/page-assignments.js': 23, // + Edit My Wording's level labels (rubric rows), Nov 2
   'teacher/page-gradebook.js': 2,
   'teacher/page-student.js': 2,
   'teacher/report-blocks.js': 21,

@@ -1,0 +1,90 @@
+import { test, expect } from '@playwright/test';
+
+/* The rubric in the assessment form (redesign PR 6, 2026-11-02): a chosen
+   rubric is a card with its wording; with none, four ways to start one;
+   graded on competencies with no rubric, the Competency Rubric shows each
+   level's wording, and Edit My Wording keeps the teacher's own. Demo Mode,
+   Science 8. */
+test.use({ viewport: { width: 1440, height: 900 } });
+
+async function openForm(page) {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => window.Router.navigate('/assignments?course=sci8'));
+  await page.locator('button', { hasText: 'New Assessment' }).first().click();
+  await expect(page.locator('#af-title')).toBeVisible();
+}
+
+test('with no rubric, four ways to start; Draft waits for competencies', async ({ page }) => {
+  await openForm(page);
+  await expect(page.locator('#af-rubric-label')).toHaveText('Rubric (optional)');
+  const starts = page.locator('.af-rubric-start b');
+  await expect(starts).toHaveText([
+    'Choose a Rubric',
+    'Draft From Competencies',
+    'Copy From Another Class',
+    'Blank Rubric',
+  ]);
+  await expect(page.locator('[data-action="draftRubricFromComps"]')).toBeDisabled();
+  await page.locator('.af-code[data-tag="QP3"]').click();
+  await expect(page.locator('[data-action="draftRubricFromComps"]')).toBeEnabled();
+});
+
+test('a chosen rubric is a card with its wording; Pick Another Rubric changes it', async ({ page }) => {
+  await openForm(page);
+  const r = await page.evaluate(() => {
+    const x = getRubrics('sci8')[0];
+    return { id: x.id, name: x.name, first: x.criteria[0].levels[3] };
+  });
+  await page.locator('[data-action="chooseRubric"]').first().click();
+  await page.selectOption('#af-rubric', r.id);
+  const card = page.locator('#af-rubric-view .af-rubric-card');
+  await expect(card.locator('.af-rubric-card-name')).toHaveText(r.name);
+  await expect(card.locator('.rb-grid')).toContainText(r.first);
+  await expect(page.locator('#af-rubric-label')).toHaveText('Rubric');
+  await card.locator('[data-action="chooseRubric"]').click();
+  await page.selectOption('#af-rubric', '');
+  await expect(page.locator('.af-rubric-start')).toHaveCount(4);
+});
+
+test('the Competency Rubric shows the wording of each level for the chosen ones', async ({ page }) => {
+  await openForm(page);
+  await page.locator('.af-code[data-tag="QP3"]').click();
+  const want = await page.evaluate(async () => {
+    await CompetencyWording.loadBank();
+    return CompetencyWording.levelWording(getTagById('sci8', 'QP3'), 3).text;
+  });
+  const grid = page.locator('#af-tag-rubric .rb-grid');
+  await expect(grid).toContainText(want);
+  // A rubric replaces it.
+  await page.locator('[data-action="chooseRubric"]').first().click();
+  await page.selectOption('#af-rubric', { index: 1 });
+  await expect(page.locator('#af-tag-rubric .rb-grid')).toHaveCount(0);
+});
+
+test('Edit My Wording keeps the teacher’s own words for a level', async ({ page }) => {
+  await openForm(page);
+  await page.locator('.af-code[data-tag="QP3"]').click();
+  await page.locator('[data-action="editMyWording"]').click();
+  const box = page.locator('.af-wording-card textarea[data-tag="QP3"][data-level="3"]');
+  await box.fill('Asks a clear question that an investigation can answer.');
+  await page.locator('[data-wording="save"]').click();
+  await expect(page.locator('#af-tag-rubric .rb-grid')).toContainText(
+    'Asks a clear question that an investigation can answer.',
+  );
+});
+
+test('Draft From Competencies opens the editor with their wording', async ({ page }) => {
+  await openForm(page);
+  await page.fill('#af-title', 'Density Lab');
+  await page.locator('.af-code[data-tag="QP3"]').click();
+  await page.locator('.af-code[data-tag="PA4"]').click();
+  await page.locator('[data-action="draftRubricFromComps"]').click();
+  await expect(page.locator('#rubric-modal')).toBeVisible();
+  const draft = await page.evaluate(() => {
+    const m = document.getElementById('rubric-modal');
+    return m ? m.textContent : '';
+  });
+  expect(draft).toContain('Inquiry Questions');
+});

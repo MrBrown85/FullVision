@@ -2258,16 +2258,19 @@ window.PageAssignments = (function () {
       '<p class="af-dibels-note" id="af-dibels-note"' +
       (scoreMode === 'dibels' ? '' : ' hidden') +
       '>Words Correct, Errors and Maze are entered at the Beginning, Middle and End of Year, and their levels are worked out on the Grade 8 goals. It counts toward no grade and needs no category.</p>';
-    // Rubric selector
+    // Rubric (redesign PR 6): a chosen rubric shows as a card with its
+    // wording; with none, four ways to start one. The select stays the
+    // form's record of the rubric; it shows only while choosing.
     var rubricsList = getRubrics(cid);
     var selRubricId = assess ? assess.rubricId || '' : '';
     html +=
       '<div class="af-field af-rubric-field" id="af-rubric-wrap"' +
       (scoreMode === 'proficiency' ? '' : ' hidden') +
       '>' +
-      '<label class="af-label">Rubric</label>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
-      '<select class="af-rubric-select" id="af-rubric" data-action-change="onRubricSelect" style="flex:1 1 140px;min-width:0">' +
+      '<div class="af-label" id="af-rubric-label">Rubric</div>' +
+      '<div class="af-rubric-view" id="af-rubric-view"></div>' +
+      '<div class="af-rubric-pick" id="af-rubric-pick" hidden>' +
+      '<select class="af-rubric-select af-input" id="af-rubric" data-action-change="onRubricSelect" aria-labelledby="af-rubric-label">' +
       '<option value="">None</option>' +
       rubricsList
         .map(function (r) {
@@ -2285,8 +2288,7 @@ window.PageAssignments = (function () {
         })
         .join('') +
       '</select>' +
-      '<button type="button" class="btn btn-ghost" data-action="newRubricFromForm" style="white-space:nowrap;font-size:0.8125rem;padding:7px 12px">+ New Rubric</button>' +
-      '<button type="button" class="btn btn-ghost" data-action="rubricFromClass" style="white-space:nowrap;font-size:0.8125rem;padding:7px 12px">From another class</button>' +
+      '<button type="button" class="btn btn-ghost" data-action="cancelRubricPick">Cancel</button>' +
       '</div>' +
       '</div>';
 
@@ -2391,7 +2393,7 @@ window.PageAssignments = (function () {
         html += _afTagRow(sec, selTags);
       });
     }
-    html += '</div></div>' + _untaggedNote(cid, selTags.length > 0);
+    html += '</div></div>' + _untaggedNote(cid, selTags.length > 0) + '<div id="af-tag-rubric"></div>';
     _afTagCounts = null;
 
     // Core Competencies
@@ -2776,6 +2778,251 @@ window.PageAssignments = (function () {
     if (note) note.hidden = !!document.querySelector('.af-tag-cb:checked');
   }
 
+  /* ── The rubric in the form (redesign PR 6, 2026-11-02) ─────
+     A chosen rubric shows as a card: its name, how many other assessments
+     use it, and the Rubric Bank's own grid with every level's wording. With
+     none: four ways to start one. Graded on competencies with no rubric,
+     the Competency Rubric shows the chosen competencies' level wording, the
+     same the handout prints (RubricPrint's rule, CompetencyWording). */
+  function _renderRubricView() {
+    var view = document.getElementById('af-rubric-view');
+    var sel = document.getElementById('af-rubric');
+    if (!view || !sel) return;
+    var cid = activeCourse;
+    var rubric = sel.value ? getRubricById(cid, sel.value) : null;
+    var label = document.getElementById('af-rubric-label');
+    if (label) label.textContent = rubric ? 'Rubric' : 'Rubric (optional)';
+    var picking = !document.getElementById('af-rubric-pick').hidden;
+    if (rubric) {
+      var editingId = _editingAssessId;
+      var others = getAssessments(cid).filter(function (a) {
+        return a.rubricId === rubric.id && a.id !== editingId;
+      }).length;
+      var n = (rubric.criteria || []).length;
+      view.innerHTML =
+        '<div class="af-rubric-card">' +
+        '<div class="af-rubric-card-head"><span class="af-rubric-card-name">' +
+        esc(rubric.name) +
+        '</span><span class="af-rubric-card-meta">' +
+        esc(
+          n +
+            (n === 1 ? ' criterion' : ' criteria') +
+            ' · ' +
+            (others
+              ? 'also on ' + others + (others === 1 ? ' other assessment' : ' other assessments')
+              : 'used only here'),
+        ) +
+        '</span><span class="af-gap"></span>' +
+        '<button type="button" class="btn btn-ghost" data-action="editRubricFromForm">Edit Rubric</button>' +
+        '<button type="button" class="btn btn-ghost" data-action="chooseRubric">Pick Another Rubric</button>' +
+        '</div>' +
+        // html-safe: RubricBank.gridHtml escapes every name and descriptor
+        (window.RubricBank ? RubricBank.gridHtml(cid, rubric) : '') +
+        '</div>';
+      return;
+    }
+    if (picking) {
+      view.innerHTML = '';
+      return;
+    }
+    var hasComps = !!document.querySelector('.af-tag-cb:checked');
+    var count = rubricsListCount(cid);
+    view.innerHTML =
+      '<div class="af-rubric-starts">' +
+      '<button type="button" class="af-rubric-start" data-action="chooseRubric"' +
+      (count ? '' : ' disabled') +
+      '><b>Choose a Rubric</b><span>' +
+      esc(
+        count
+          ? 'From this class’s ' + count + (count === 1 ? ' rubric.' : ' rubrics.')
+          : 'This class has no rubrics yet.',
+      ) +
+      '</span></button>' +
+      '<button type="button" class="af-rubric-start" data-action="draftRubricFromComps"' +
+      (hasComps ? '' : ' disabled') +
+      '><b>Draft From Competencies</b><span>' +
+      esc(hasComps ? 'Starts from the Competency Rubric below, wording and all.' : 'Choose competencies below first.') +
+      '</span></button>' +
+      '<button type="button" class="af-rubric-start" data-action="rubricFromClass"><b>Copy From Another Class</b><span>Matched to this class’s competencies.</span></button>' +
+      '<button type="button" class="af-rubric-start" data-action="newRubricFromForm"><b>Blank Rubric</b><span>Start from nothing.</span></button>' +
+      '</div>';
+  }
+  function rubricsListCount(cid) {
+    return getRubrics(cid).length;
+  }
+
+  // Choose a Rubric: the class's rubrics in a menu, until the picker window.
+  function chooseRubric() {
+    var pick = document.getElementById('af-rubric-pick');
+    if (!pick) return;
+    pick.hidden = false;
+    _renderRubricView();
+    var sel = document.getElementById('af-rubric');
+    if (sel) sel.focus();
+  }
+  function cancelRubricPick() {
+    var pick = document.getElementById('af-rubric-pick');
+    if (pick) pick.hidden = true;
+    _renderRubricView();
+  }
+
+  function editRubricFromForm() {
+    var sel = document.getElementById('af-rubric');
+    if (sel && sel.value) editRubricUI(sel.value);
+  }
+
+  /* Draft From Competencies: a criterion for each competency chosen, with
+     the Competency Rubric's wording (the teacher's own, else the bank's,
+     else the BC scale's), opened in the editor to name and save. */
+  function draftRubricFromComps() {
+    var cid = activeCourse;
+    var tags = Array.from(document.querySelectorAll('.af-tag-cb:checked'))
+      .map(function (cb) {
+        return getTagById(cid, cb.value);
+      })
+      .filter(Boolean);
+    if (!tags.length || !window.CompetencyWording) return;
+    var title = ((document.getElementById('af-title') || {}).value || '').trim();
+    CompetencyWording.loadBank().then(function () {
+      newRubricUI();
+      if (!_editingRubric) return;
+      _editingRubric.name = title ? title + ' Rubric' : 'New Rubric';
+      _editingRubric.criteria = tags.map(function (tag) {
+        var levels = {};
+        [1, 2, 3, 4].forEach(function (l) {
+          levels[l] = CompetencyWording.levelWording(tag, l).text;
+        });
+        return {
+          id: uid(),
+          name: tag.label || tag.shortName || tag.code || 'Criterion',
+          tagIds: [tag.id],
+          levels: levels,
+          weight: 1,
+          levelValues: null,
+          checks: [],
+        };
+      });
+      _rubricDirty = true;
+      renderRubricEditor();
+    });
+  }
+
+  // The Competency Rubric: the chosen competencies, a row each, with the
+  // wording of every level. Only for proficiency work with no rubric.
+  function _renderTagRubric() {
+    var slot = document.getElementById('af-tag-rubric');
+    if (!slot) return;
+    var cid = activeCourse;
+    var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    var hasRubric = !!(document.getElementById('af-rubric') || {}).value;
+    var tags = Array.from(document.querySelectorAll('.af-tag-cb:checked'))
+      .map(function (cb) {
+        return getTagById(cid, cb.value);
+      })
+      .filter(Boolean);
+    if (mode !== 'proficiency' || hasRubric || !tags.length || !window.CompetencyWording || !window.RubricBank) {
+      slot.innerHTML = '';
+      return;
+    }
+    var ready = true;
+    var criteria = tags.map(function (tag) {
+      var levels = {};
+      [1, 2, 3, 4].forEach(function (l) {
+        var w = CompetencyWording.levelWording(tag, l);
+        if (!w.ready) ready = false;
+        levels[l] = w.text;
+      });
+      return { id: tag.id, name: (tag.code || tag.id) + ' · ' + (tag.label || ''), tagIds: [], levels: levels };
+    });
+    slot.innerHTML =
+      '<div class="af-rubric-card af-tag-rubric-card">' +
+      '<div class="af-rubric-card-head"><span class="af-rubric-card-name">Competency Rubric</span>' +
+      '<span class="af-rubric-card-meta">How each competency will be scored. The same words print on the handout.</span>' +
+      '<span class="af-gap"></span>' +
+      '<button type="button" class="btn btn-ghost" data-action="editMyWording">Edit My Wording</button></div>' +
+      // html-safe: RubricBank.gridHtml escapes every name and descriptor
+      RubricBank.gridHtml(cid, { criteria: criteria }) +
+      '<div class="af-tag-rubric-note">Your wording is used wherever these competencies appear, in every class.</div>' +
+      '</div>';
+    if (!ready) {
+      CompetencyWording.loadBank().then(function (ok) {
+        if (ok) _renderTagRubric();
+      });
+    }
+  }
+
+  /* Edit My Wording: the four levels of each chosen competency, in the
+     teacher's own words, kept in the descriptor bank (per teacher, every
+     class, every later rubric and handout). */
+  function editMyWording() {
+    var cid = activeCourse;
+    var tags = Array.from(document.querySelectorAll('.af-tag-cb:checked'))
+      .map(function (cb) {
+        return getTagById(cid, cb.value);
+      })
+      .filter(Boolean);
+    if (!tags.length || !window.CompetencyWording || !window.RubricDraft) return;
+    var html =
+      '<div class="confirm-card af-wording-card" role="document">' +
+      '<div class="confirm-title" id="af-wording-title">Edit My Wording</div>' +
+      '<div class="confirm-message">Your wording for each level is used wherever these competencies appear, in every class: rubrics, drafts and printed handouts. Leave a level empty to use the curriculum bank’s wording.</div>' +
+      '<div class="af-wording-list">';
+    tags.forEach(function (tag) {
+      var own = getCompetencyDescriptor(RubricDraft.competencyKey(tag)) || {};
+      html +=
+        '<fieldset class="af-wording-set"><legend>' +
+        esc((tag.code || tag.id) + ' · ' + (tag.label || '')) +
+        '</legend>';
+      [4, 3, 2, 1].forEach(function (l) {
+        var bank = CompetencyWording.levelWording(tag, l, true).text;
+        html +=
+          '<label class="af-wording-level"><span>' +
+          esc(PROF_LABELS[l]) +
+          '</span><textarea class="af-input" rows="2" data-tag="' +
+          esc(tag.id) +
+          '" data-level="' +
+          l +
+          '" placeholder="' +
+          esc(bank) +
+          '">' +
+          esc(own[l] || '') +
+          '</textarea></label>';
+      });
+      html += '</fieldset>';
+    });
+    html +=
+      '</div><div class="confirm-actions"><button type="button" class="confirm-cancel" data-wording="cancel">Cancel</button>' +
+      '<button type="button" class="confirm-ok primary" data-wording="save">Save My Wording</button></div></div>';
+    var overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'af-wording-title');
+    overlay.innerHTML = html; // html-safe: every value above goes through esc()
+    document.body.appendChild(overlay);
+    var close = function () {
+      overlay.remove();
+    };
+    overlay.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-wording]');
+      if (e.target === overlay || (b && b.dataset.wording === 'cancel')) return close();
+      if (!b || b.dataset.wording !== 'save') return;
+      var entries = [];
+      overlay.querySelectorAll('textarea[data-tag]').forEach(function (ta) {
+        var tag = getTagById(cid, ta.dataset.tag);
+        if (tag) entries.push({ key: RubricDraft.competencyKey(tag), level: Number(ta.dataset.level), text: ta.value });
+      });
+      saveCompetencyDescriptors(entries);
+      close();
+      _renderTagRubric();
+    });
+    overlay.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') close();
+    });
+    var first = overlay.querySelector('textarea');
+    if (first) first.focus();
+  }
+
   /* ── The competency picker (redesign PR 4, 2026-11-02) ─────
      Codes: every competency a one-click chip in its Ministry group, with
      how many assessments have scored it; hovering or focusing one fills
@@ -2971,6 +3218,8 @@ window.PageAssignments = (function () {
       b.classList.toggle('active', on);
       b.setAttribute('aria-pressed', String(on));
     });
+    _renderRubricView();
+    _renderTagRubric();
   }
 
   function toggleCode(chip) {
@@ -5469,6 +5718,8 @@ window.PageAssignments = (function () {
         if (secId) updateSectionBadge(secId);
       });
     }
+    var pick = document.getElementById('af-rubric-pick');
+    if (pick) pick.hidden = true;
     _refreshUntaggedNote();
     _syncCodes();
   }
@@ -6410,6 +6661,7 @@ window.PageAssignments = (function () {
       setTimeout(function () {
         var dd = document.getElementById('af-rubric');
         if (!dd) return;
+        dd.setAttribute('data-keep', dd.value);
         var freshRubrics = result && Array.isArray(result.rubrics) ? result.rubrics : getRubrics(cid);
         dd.innerHTML =
           '<option value="">None</option>' +
@@ -6431,9 +6683,13 @@ window.PageAssignments = (function () {
           });
           if (fallback) finalId = fallback.id;
         }
+        var keep = dd.getAttribute('data-keep') || '';
         if (isNew && finalId) {
           dd.value = finalId;
           onRubricSelect(finalId);
+        } else {
+          if (keep) dd.value = keep;
+          _syncCodes();
         }
       }, 100);
     });
@@ -7524,6 +7780,21 @@ window.PageAssignments = (function () {
       },
       toggleActive: function () {
         el.classList.toggle('active');
+      },
+      chooseRubric: function () {
+        chooseRubric();
+      },
+      cancelRubricPick: function () {
+        cancelRubricPick();
+      },
+      editRubricFromForm: function () {
+        editRubricFromForm();
+      },
+      draftRubricFromComps: function () {
+        draftRubricFromComps();
+      },
+      editMyWording: function () {
+        editMyWording();
       },
       toggleChooseStudents: function () {
         AC.toggleChooseStudents();
