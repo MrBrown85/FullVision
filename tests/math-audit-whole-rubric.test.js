@@ -204,4 +204,18 @@ describe('never both', () => {
     expect(rubricCompetencyIds(CID, assessment())).toEqual([WHOLE]);
     expect(rubricWholeTagIds(CID, assessment())).toEqual([WHOLE]);
   });
+
+  it('a rubric lists its criteria competencies, then the whole rubric, each once', () => {
+    const r = rubric();
+    r.criteria[0].tagIds = [OWN];
+    r.criteria[1].tagIds = [OWN];
+    expect(rubricScoredTagIds(r)).toEqual([OWN, WHOLE]);
+    expect(rubricScoredTagIds(null)).toEqual([]);
+  });
+
+  it('the level is the same whether the entries are passed or read', () => {
+    seed(rubric(), [assessment()], scoresFor(AID, [4, 3, 3, 2]));
+    const all = getScores(CID)[SID];
+    expect(wholeRubricLevel(CID, SID, assessment(), all)).toEqual(wholeRubricLevel(CID, SID, assessment()));
+  });
 });

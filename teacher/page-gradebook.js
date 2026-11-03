@@ -1431,9 +1431,9 @@ window.PageGradebook = (function () {
                 : '\u2014';
           var rubricTitle =
             entry && entry.whole
-              ? 'Scored by the whole rubric: its criteria average ' +
-                (Math.round(entry.average * 10) / 10).toFixed(1) +
-                ' of 4. Click to grade it on the rubric.'
+              ? 'Scored by the whole rubric: its criteria come to ' +
+                formatPointsPercent(entry.average, 4) +
+                '. Click to grade it on the rubric.'
               : mixed
                 ? 'The criteria on this competency disagree, so the lowest is shown. Click to grade it on the rubric.'
                 : 'Click to grade it on the rubric.';

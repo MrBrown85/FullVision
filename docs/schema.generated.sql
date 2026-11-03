@@ -805,8 +805,10 @@ table public.rubric_tag (rls on)
   policy rubric_tag_via_parents for all to public using ((EXISTS ( SELECT 1
    FROM public.rubric r
   WHERE ((r.id = rubric_tag.rubric_id) AND public.fv_owns_course(r.course_id))))) with check ((EXISTS ( SELECT 1
-   FROM public.rubric r
-  WHERE ((r.id = rubric_tag.rubric_id) AND public.fv_owns_course(r.course_id)))))
+   FROM ((public.rubric r
+     JOIN public.tag t ON ((t.id = rubric_tag.tag_id)))
+     JOIN public.section s ON ((s.id = t.section_id)))
+  WHERE ((r.id = rubric_tag.rubric_id) AND (s.course_id = r.course_id) AND public.fv_owns_course(r.course_id)))))
 table public.score (rls on)
   id uuid not null default gen_random_uuid()
   enrollment_id uuid not null
