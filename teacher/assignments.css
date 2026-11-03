@@ -541,8 +541,9 @@
   font-weight: 500;
   color: var(--text);
   text-align: left;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  /* Grey until chosen, then solid blue (redesign PR 14). */
+  background: var(--divider-subtle);
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition:
@@ -550,13 +551,13 @@
     background-color var(--duration-micro) ease;
 }
 .af-mode-card:hover {
-  border-color: var(--border-2);
+  background: var(--overlay-pressed);
 }
-.af-mode-card[aria-checked='true'] {
+.af-mode-card[aria-checked='true'],
+.af-mode-card[aria-checked='true']:hover {
   font-weight: 600;
-  background: var(--active-light);
-  border-color: var(--active);
-  box-shadow: inset 0 0 0 1px var(--active);
+  background: var(--active);
+  color: #fff;
 }
 .af-mode-card:focus-visible {
   outline: 2px solid var(--active);
@@ -567,7 +568,7 @@
   color: var(--text-2);
 }
 .af-mode-card[aria-checked='true'] svg {
-  color: var(--active);
+  color: #fff;
 }
 /* Each card's tooltip: a picture and a sentence, below the card on hover
    (after a short pause) or keyboard focus. */
@@ -2384,9 +2385,9 @@
   font-family: var(--font-base);
   font-size: var(--text-base);
   font-weight: 500;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--divider-subtle);
   color: var(--text-2);
   cursor: pointer;
   transition: all 0.12s;
@@ -2401,13 +2402,15 @@
   }
 }
 .af-cc-chip:hover {
-  border-color: var(--cc-color);
+  background: var(--overlay-pressed);
   color: var(--text);
 }
-.af-cc-chip.active {
-  border-color: var(--cc-color);
-  background: var(--overlay-hover);
-  color: var(--text);
+/* Chosen: solid blue, the dot white (redesign PR 14). */
+.af-cc-chip.active,
+.af-cc-chip.active:hover {
+  border-color: var(--active);
+  background: var(--active);
+  color: #fff;
   font-weight: 600;
 }
 .af-cc-dot {
@@ -2417,9 +2420,8 @@
   flex-shrink: 0;
 }
 .af-cc-chip.active .af-cc-dot {
-  box-shadow:
-    0 0 0 2px #fff,
-    0 0 0 3.5px var(--cc-color);
+  /* The dot's colour is set inline. */
+  background: #fff !important;
 }
 
 /* ── Rubric Bank ────────────────────────────────────────────── */
@@ -4912,9 +4914,9 @@
   font-family: var(--font-base);
   font-size: var(--text-base);
   font-weight: 500;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--divider-subtle);
   color: var(--text-2);
   cursor: pointer;
   transition: all 0.12s;
@@ -4930,19 +4932,21 @@
   transition: all 0.12s;
 }
 .af-copy-chip:hover:not(:disabled) {
-  border-color: var(--active);
+  background: var(--overlay-pressed);
   color: var(--text);
 }
+/* Chosen: solid blue with a white tick (redesign PR 14). */
 .af-copy-chip.active,
-.af-copy-chip.af-copy-this {
+.af-copy-chip.af-copy-this,
+.af-copy-chip.active:hover:not(:disabled) {
   border-color: var(--active);
-  background: rgba(0, 122, 255, 0.08);
-  color: var(--text);
+  background: var(--active);
+  color: #fff;
 }
 .af-copy-chip.active .af-copy-chip-mark,
 .af-copy-chip.af-copy-this .af-copy-chip-mark {
-  background: var(--active);
-  border-color: var(--active);
+  background: transparent;
+  border-color: transparent;
 }
 .af-copy-chip.active .af-copy-chip-mark::after,
 .af-copy-chip.af-copy-this .af-copy-chip-mark::after {
