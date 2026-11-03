@@ -6782,6 +6782,9 @@ window.CommentBank = (function () {
         if (p[k] != null) out.pronouns[k] = p[k];
       });
     }
+    // The name it calls the student by, so a later change (a preferred
+    // name set in Edit Student) is found the same way.
+    if (f && f.name) out.name = String(f.name);
     var prev = opts.prev || {};
     var seen = {};
     Object.keys(prev.class_seen || {}).forEach(function (k) {

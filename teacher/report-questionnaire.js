@@ -508,7 +508,9 @@ window.ReportQuestionnaire = (function () {
     var marks = Array.isArray(meta.sentences) && meta.sentences.length > 0;
     // The pronouns changed since the approval (draft_meta.pronouns).
     var pron = !!r.approvedAt && !!meta.pronouns && !_samePronouns(meta.pronouns, ReportBlocks.getPronouns(student));
-    if (!marks && !pron) return null;
+    // The name changed since the approval (draft_meta.name).
+    var renamed = r.approvedAt ? nameWas(r, student) : null;
+    if (!marks && !pron && !renamed) return null;
     var text = plainComment(r.narrative || '');
     var key = cid + '|' + student.id + '|' + termId;
     var sig =
@@ -518,7 +520,9 @@ window.ReportQuestionnaire = (function () {
       '\u0000' +
       (r.approvedAt || '') +
       '\u0000' +
-      String(student.pronouns || '');
+      String(student.pronouns || '') +
+      '\u0000' +
+      displayNameFirst(student);
     var hit = _staleCache[key];
     if (hit && hit.sig === sig) return hit.v;
     var cur = _current();
@@ -527,7 +531,7 @@ window.ReportQuestionnaire = (function () {
         ? _facts(student)
         : CommentBank.facts(cid, student, termId);
     var v = marks ? CommentBank.staleness(meta, f, _picksFor(cid, student, f, termId), { text: text }) : null;
-    var p = pron ? pronounChanges(cid, student, r, f) : [];
+    var p = pron ? pronounChanges(cid, student, r, f, renamed) : [];
     if (p.length) {
       // A sentence shows once: as a pronoun change when that is all that
       // changed in it, else as out of date for its marks.
@@ -547,6 +551,18 @@ window.ReportQuestionnaire = (function () {
       });
       v = v ? Object.assign({}, v, { changes: marksNow.concat(p) }) : { changes: p, pieces: [] };
       if (!v.changes.length) v = null;
+    }
+    if (renamed) {
+      // A sentence shows once: the old name in one already on the card is
+      // put right there (the marks and pronoun sentences are filled now).
+      var shown = ((v && v.changes) || []).map(function (c) {
+        return c.before;
+      });
+      var n = nameChanges(r, student, renamed).filter(function (c) {
+        return !c.keptAsApproved && shown.indexOf(c.before) < 0;
+      });
+      if (n.length) v = v ? Object.assign({}, v, { changes: v.changes.concat(n) }) : { changes: n, pieces: [] };
+      if (v) v.renamed = renamed;
     }
     _staleCache[key] = { sig: sig, v: v };
     return v;
@@ -652,7 +668,13 @@ window.ReportQuestionnaire = (function () {
     var pron = stale.changes.filter(function (c) {
       return c.kind === 'pronouns';
     }).length;
-    if (pron) out.push('The pronouns changed after ' + day + ', so ' + _sentenceCount(pron) + ' them.');
+    var named = stale.changes.filter(function (c) {
+      return c.kind === 'name';
+    }).length;
+    if (pron || named) {
+      var whose = pron && stale.renamed ? 'The name and pronouns' : pron ? 'The pronouns' : 'The name';
+      out.push(whose + ' changed after ' + day + ', so ' + _sentenceCount(pron + named) + (pron ? ' them.' : ' it.'));
+    }
     out.push('Approved text is never changed for you.');
     return out.join(' ');
   }
@@ -708,6 +730,11 @@ window.ReportQuestionnaire = (function () {
       upsertTermRating(_activeCourse, st.id, termId, {
         draftMeta: Object.assign({}, r.draftMeta, { pronoun_kept: kept }),
       });
+    } else if (what === 'keep' && c.kind === 'name') {
+      var keptName = (Array.isArray(r.draftMeta.name_kept) ? r.draftMeta.name_kept : []).concat(c.before);
+      upsertTermRating(_activeCourse, st.id, termId, {
+        draftMeta: Object.assign({}, r.draftMeta, { name_kept: keptName }),
+      });
     } else if (what === 'keep') {
       upsertTermRating(_activeCourse, st.id, termId, {
         draftMeta: CommentBank.keepApproved(r.draftMeta, c, stale, _facts(st, true)),
@@ -717,15 +744,13 @@ window.ReportQuestionnaire = (function () {
       var key = _rowKey(st);
       var f = _facts(st, true);
       var rows = _rowsFor(st, f).slice();
-      // The approval goes with the first new sentence, so a pronoun change
-      // puts in every sentence the pronouns changed (as for a comment not
-      // yet approved); one kept as approved stays.
-      var todo =
-        c.kind === 'pronouns'
-          ? stale.changes.filter(function (x) {
-              return x.kind === 'pronouns';
-            })
-          : [c];
+      // The approval goes with the first new sentence, so a pronoun or name
+      // change puts in every sentence the pronouns or name changed (as for
+      // a comment not yet approved); one kept as approved stays.
+      var who = function (x) {
+        return x.kind === 'pronouns' || x.kind === 'name';
+      };
+      var todo = who(c) ? stale.changes.filter(who) : [c];
       var next = text;
       todo.forEach(function (x) {
         var swapped = _swapSentence(next, x.before, x.after);
@@ -744,7 +769,8 @@ window.ReportQuestionnaire = (function () {
         else {
           var s = x.id ? _bankById(x.id) : null;
           var row = s ? rowFromSentence(s, _bankContext(_activeCourse, st, f), step, at === 0) : null;
-          rows[at] = row || Object.assign({}, rows[at], { edited: false });
+          // A sentence the teacher wrote stays theirs with the name now.
+          rows[at] = row || Object.assign({}, rows[at], x.kind === 'name' ? {} : { edited: false });
           rows[at].text = rows[at].drafted = x.after;
         }
       });
@@ -2070,7 +2096,7 @@ window.ReportQuestionnaire = (function () {
     var meta = CommentBank.draftMeta(rows, f, { prev: r.draftMeta || null });
     var key = _rowKey(st);
     var picks = _picksFor(_activeCourse, st, f, termId);
-    var sig = JSON.stringify([meta.sentences, picks]) + '\u0000' + meta.facts_hash;
+    var sig = JSON.stringify([meta.sentences, picks]) + '\u0000' + meta.facts_hash + '\u0000' + displayNameFirst(st);
     var hit = _claimCache[key];
     if (hit && hit.sig === sig) return hit.v;
     var stale = CommentBank.staleness(meta, f, picks, {});
@@ -2081,6 +2107,23 @@ window.ReportQuestionnaire = (function () {
       .map(function (c) {
         return { row: at[c.i], before: c.before, after: c.after, id: c.id || null };
       });
+    // A sentence that still calls the student by the name before an Edit
+    // Student change, typed and edited ones too: a name is a word, not
+    // the teacher's wording. One kept as written is theirs.
+    var was = nameWas(r, st, rows);
+    if (was) {
+      var now = displayNameFirst(st);
+      rows.forEach(function (x, i) {
+        var shown = v.some(function (c) {
+          return c.row === i;
+        });
+        if (shown || x.kept || x.classLine || !_holdsName(x.text, was)) return;
+        v.push({ row: i, before: x.text, after: _renamed(x.text, was, now), id: null, kind: 'name' });
+      });
+      v.sort(function (a, b) {
+        return a.row - b.row;
+      });
+    }
     _claimCache[key] = { sig: sig, v: v };
     return v;
   }
@@ -2092,7 +2135,7 @@ window.ReportQuestionnaire = (function () {
     return (
       !!stale &&
       stale.changes.some(function (c) {
-        return c.kind === 'marks' || c.kind === 'pronouns';
+        return c.kind === 'marks' || c.kind === 'pronouns' || c.kind === 'name';
       })
     );
   }
@@ -2107,7 +2150,7 @@ window.ReportQuestionnaire = (function () {
         <div class="qn-stale-change">
           <div class="qn-stale-line"><span class="qn-stale-label">Written</span><span class="qn-stale-was">${esc(c.before)}</span></div>
           <div class="qn-stale-line"><span class="qn-stale-label">Now true</span>${now}</div>
-          <div class="qn-stale-foot"><span class="qn-stale-grade">This sentence no longer matches the gradebook.</span><button type="button" class="qn-stale-keep" data-action="tqClaim" data-do="keep" data-row="${c.row}" title="Keeps the sentence as it is written. It is yours, and it is not checked again.">Keep as Written</button><button type="button" class="qn-stale-use" data-action="tqClaim" data-do="use" data-row="${c.row}" title="Puts the sentence that is true now in the comment.">Use the New Sentence</button></div>
+          <div class="qn-stale-foot"><span class="qn-stale-grade">${c.kind === 'name' ? 'The student’s name changed after this sentence was written.' : 'This sentence no longer matches the gradebook.'}</span><button type="button" class="qn-stale-keep" data-action="tqClaim" data-do="keep" data-row="${c.row}" title="Keeps the sentence as it is written. It is yours, and it is not checked again.">Keep as Written</button><button type="button" class="qn-stale-use" data-action="tqClaim" data-do="use" data-row="${c.row}" title="Puts the sentence that is true now in the comment.">Use the New Sentence</button></div>
         </div>
       </div>`;
   }
@@ -2138,7 +2181,15 @@ window.ReportQuestionnaire = (function () {
       return;
     }
     if (what !== 'use') return;
-    if (!c.after) rows.splice(i, 1);
+    if (c.kind === 'name') {
+      // The row's own words with the name now; a bank sentence is named by
+      // the realiser with the student as they are now.
+      var renamed = Object.assign({}, pronounsChanged([rows[i]], _bankContext(_activeCourse, st, f))[0], {
+        text: c.after,
+      });
+      if (!renamed.edited) renamed.drafted = c.after;
+      rows[i] = renamed;
+    } else if (!c.after) rows.splice(i, 1);
     else {
       var s = c.id ? _bankById(c.id) : null;
       var row = s ? rowFromSentence(s, _bankContext(_activeCourse, st, f), rows[i].step, i === 0) : null;
@@ -3204,9 +3255,11 @@ window.ReportQuestionnaire = (function () {
   function _samePronouns(a, b) {
     return JSON.stringify(pronounSet(a)) === JSON.stringify(pronounSet(b));
   }
-  /* A context for the student with other pronouns. */
-  function _pronounContext(student, f, p) {
+  /* A context for the student with other pronouns (and another name, the
+     one the comment was written with). */
+  function _pronounContext(student, f, p, name) {
     var g = Object.assign({}, f, { pronouns: Object.assign({}, p, { onFile: true }), pronounsOnFile: true });
+    if (name) g.name = name;
     return CommentBank.context(g, _picksFor(_activeCourse, student, f));
   }
   /* The bank sentences, not edited, that a comment's text holds word for
@@ -3305,15 +3358,17 @@ window.ReportQuestionnaire = (function () {
      marks-changed pattern): { kind: 'pronouns', i, id, before, after,
      keptAsApproved }. Only bank sentences the teacher did not edit; one
      kept as approved (draft_meta.pronoun_kept) is marked so staleFor leaves
-     it off the card. [] when the pronouns are the same. */
-  function pronounChanges(cid, student, rating, f) {
+     it off the card. [] when the pronouns are the same. nameWas: the name
+     it was written with when that changed too, so a sentence that names
+     the student is read back and filled with both. */
+  function pronounChanges(cid, student, rating, f, nameWas) {
     var meta = (rating && rating.draftMeta) || null;
     var was = meta && meta.pronouns;
     if (!rating || !rating.approvedAt || !was || !was.subj || !f || _samePronouns(was, f.pronouns)) return [];
     var text = plainComment(rating.narrative || '').trim();
     if (!text) return [];
     var keep = Array.isArray(meta.pronoun_kept) ? meta.pronoun_kept : [];
-    var ctxWas = _pronounContext(student, f, was);
+    var ctxWas = _pronounContext(student, f, was, nameWas);
     var old = recoverRows(text, ctxWas, meta);
     var before = old.map(function (r) {
       return r.text;
@@ -3336,6 +3391,67 @@ window.ReportQuestionnaire = (function () {
       });
     });
     return out;
+  }
+
+  /* ── Name changed (Edit Student) ────────────────────────── */
+
+  /* The name a comment was written with, when the student goes by another
+     now: the one kept with its record (draft_meta.name), else the one the
+     rows on screen were drawn with. null when it is the same. A sentence
+     still holding it shows what it says and the same sentence with the
+     name now, as a pronoun change does: on the row before approval
+     (claimChanges), on the Teacher Comment card after (staleFor). */
+  function nameWas(rating, student, rows) {
+    var now = displayNameFirst(student);
+    var kept = rating && rating.draftMeta && rating.draftMeta.name;
+    if (kept) return kept !== now ? kept : null;
+    var drawn = (rows || [])
+      .map(function (r) {
+        return r && r.raw && r.raw.who && r.raw.who.name;
+      })
+      .find(function (n) {
+        return !!n && n !== now;
+      });
+    return drawn || null;
+  }
+  function _nameRe(name) {
+    return new RegExp('(^|[^\\p{L}])' + String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}])', 'gu');
+  }
+  function _holdsName(text, name) {
+    return !!name && _nameRe(name).test(String(text || ''));
+  }
+  function _renamed(text, was, now) {
+    return String(text || '').replace(_nameRe(was), function (m, lead) {
+      return lead + now;
+    });
+  }
+  /* An approved comment's sentences that hold the name it was written
+     with, as changes for the card: { kind: 'name', i, id, before, after,
+     keptAsApproved }. One kept as approved (draft_meta.name_kept) is
+     marked so staleFor leaves it off the card. */
+  function nameChanges(rating, student, was) {
+    var meta = rating.draftMeta || {};
+    var mine = Array.isArray(meta.sentences) ? meta.sentences : [];
+    var keep = Array.isArray(meta.name_kept) ? meta.name_kept : [];
+    var now = displayNameFirst(student);
+    return sentencesOf(plainComment(rating.narrative || '').trim())
+      .filter(function (t) {
+        return _holdsName(t, was);
+      })
+      .map(function (t) {
+        var i = mine.findIndex(function (x) {
+          return x && x.text === t;
+        });
+        var x = mine[i] || {};
+        return {
+          kind: 'name',
+          keptAsApproved: keep.indexOf(t) >= 0,
+          id: !x.edited && !x.class_line && x.id && _bankById(x.id) ? x.id : null,
+          i: i,
+          before: t,
+          after: _renamed(t, was, now),
+        };
+      });
   }
 
   /* Rows read with the pronouns `was` filled again with the student's
