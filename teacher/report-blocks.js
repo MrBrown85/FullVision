@@ -718,7 +718,10 @@ window.ReportBlocks = (function () {
       .map(w => ({ t: Math.round(parseLocalDate(w.d).getTime() / 86400000), v: w.score }));
     const sn = startAndNow(points);
     const startV = sn ? sn.start : work.length ? work[0].score : 0;
-    const nowV = sn ? sn.now : work.length ? work[work.length - 1].score : area.now;
+    // Now is the competency's level as calc.js grades it (override
+    // included), the figure the Proficiency block prints; the start is the
+    // first weeks' mean (startAndNow).
+    const nowV = area.now;
     const top = work.length ? Math.max(...work.map(w => w.score)) : 0;
     const bests = work.filter(w => Math.round(w.score * 10) === Math.round(top * 10)).slice(0, 2);
     const latest = work[work.length - 1];
