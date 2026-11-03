@@ -205,6 +205,78 @@ describe('Competencies tab', () => {
     expect(getScores(CID).st1).toHaveLength(3);
   });
 
+  describe('Re-link asks first when Put Back or Remove would move grades', () => {
+    var held;
+    function scored() {
+      saveStudents(CID, [{ id: 'st1', firstName: 'Amara', lastName: 'Osei', enrolledDate: '2026-09-01' }]);
+      _cache.assessments[CID] = ['a1', 'a2'].map((id, i) => ({
+        id: id,
+        title: 'Task ' + (i + 1),
+        scoreMode: 'proficiency',
+        tagIds: ['QAP', 'LS'],
+        type: 'summative',
+        date: '2026-10-0' + (i + 1),
+      }));
+      clearProfCache();
+    }
+    function relinkHeld() {
+      DashClassManager.handleAction('cmStartRelink', { dataset: { cid: CID } });
+      DashClassManager.handleAction('cmRelinkNext', { dataset: {} });
+      held = [];
+      globalThis.showConfirm = function (title, message, okLabel, okStyle, onConfirm) {
+        held.push({ title: title, message: message, run: onConfirm });
+      };
+    }
+    function untickNewAdds(from) {
+      var adds = (main.innerHTML.match(/data-action-change="cmCompReviewToggle"/g) || []).length;
+      for (var i = from; i < adds; i++)
+        DashClassManager.handleChange({
+          dataset: { actionChange: 'cmCompReviewToggle', idx: String(i) },
+          checked: false,
+        });
+    }
+
+    it('counts a competency put back with its scores', () => {
+      scored();
+      DashClassManager.handleAction('cmCompSelectStart', { dataset: {} });
+      DashClassManager.handleChange({ dataset: { actionChange: 'cmCompToggle', secid: 'QAP' }, checked: true });
+      DashClassManager.handleAction('cmCompRemoveSelected', { dataset: {} });
+      DashClassManager.handleAction('cmCompSelectDone', { dataset: {} });
+      var before = getOverallProficiency(CID, 'st1');
+      relinkHeld();
+      // Only the put-back stays ticked.
+      untickNewAdds(1);
+      DashClassManager.handleAction('cmCompReviewApply', { dataset: {} });
+      expect(held).toHaveLength(1);
+      expect(held[0].title).toBe('Change Grades?');
+      expect(held[0].message).toContain('1 of your 1 students');
+      expect(codes()).not.toContain('QAP');
+      expect(getOverallProficiency(CID, 'st1')).toBeCloseTo(before, 10);
+      held[0].run();
+      expect(codes()).toContain('QAP');
+      expect(getOverallProficiency(CID, 'st1')).not.toBeCloseTo(before, 5);
+    });
+
+    it('counts a competency removed through the review', () => {
+      scored();
+      var before = getOverallProficiency(CID, 'st1');
+      relinkHeld();
+      untickNewAdds(0);
+      DashClassManager.handleChange({
+        dataset: { actionChange: 'cmCompReviewPick', group: 'onlyMine', idx: '0', pick: 'remove' },
+      });
+      DashClassManager.handleAction('cmCompReviewApply', { dataset: {} });
+      expect(held).toHaveLength(1);
+      expect(held[0].title).toBe('Change Grades?');
+      expect(held[0].message).toContain('1 of your 1 students');
+      expect(codes()).toContain('LS');
+      expect(getOverallProficiency(CID, 'st1')).toBeCloseTo(before, 10);
+      held[0].run();
+      expect(codes()).not.toContain('LS');
+      expect(getOverallProficiency(CID, 'st1')).not.toBeCloseTo(before, 5);
+    });
+  });
+
   it('round-trips the CSV export through the import review without duplicates', () => {
     var csv =
       'Code,Title,Curricular Competency,I Can Statements,Folder\n' +
