@@ -7,6 +7,11 @@ import { test, expect } from '@playwright/test';
    competencies, read only. Demo Mode, Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
+// These tests use the Codes chips; List is the default since Nov 2.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fv-assess-comp-view', 'codes'));
+});
+
 // Choose a Rubric opens the picker; '' uses no rubric; a number picks that row.
 async function pickRubric(page, rid) {
   await page.locator('[data-action="chooseRubric"]').first().click();
@@ -122,4 +127,16 @@ test('a rubric decides the competencies, read only while it is chosen', async ({
   await expect(page.locator('#af-comp-rubric-note')).toBeHidden();
   await page.locator('.af-code[data-tag="CM2"]').click();
   expect(await ticked(page)).toContain('CM2');
+});
+
+test('List is the default for a teacher who hasn’t chosen, with no hover-overs', async ({ page }) => {
+  await page.addInitScript(() => localStorage.removeItem('fv-assess-comp-view'));
+  await openForm(page);
+  await expect(page.locator('.af-card-competencies')).toHaveAttribute('data-view', 'list');
+  const row = page.locator('.af-tag-row', { has: page.locator('.af-tag-cb[value="QP3"]') });
+  await expect(row.locator('.af-tag-name')).toBeVisible();
+  await row.hover();
+  await page.locator('.af-list-group-name').first().hover();
+  await page.waitForTimeout(800);
+  await expect(page.locator('#gb-tooltip')).toBeHidden();
 });

@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 
+// These tests use the Codes chips; List is the default since Nov 2.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fv-assess-comp-view', 'codes'));
+});
+
 /* The assessment form as cards (redesign PR 1, 2026-11-02): inside the blue
    ring, a heading and white cards for What It Is, Scoring, Competencies,
    Students and More Options. Every control keeps its id, so saving is as
@@ -23,7 +28,8 @@ for (const [width, height] of [
     await page.setViewportSize({ width, height });
     await openForm(page);
     const form = page.locator('#new-assess-form');
-    await expect(form.locator('.af-heading-title')).toHaveText('New Assessment');
+    // No heading on a new assessment (Nov 2): the form is plainly that.
+    await expect(form.locator('.af-heading')).toHaveCount(0);
     const titles = await form.locator('.af-card .af-card-title').allTextContents();
     expect(titles).toEqual(['Scoring', 'Competencies', 'Students', 'More Options']);
     await expect(form.locator('.af-card-what #af-title')).toBeVisible();

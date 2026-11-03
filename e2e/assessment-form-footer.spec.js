@@ -5,6 +5,11 @@ import { test, expect } from '@playwright/test';
    toward, and Ctrl/⌘+Enter creates. Demo Mode, Science 8. */
 test.use({ viewport: { width: 1366, height: 640 } });
 
+// These tests use the Codes chips; List is the default since Nov 2.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fv-assess-comp-view', 'codes'));
+});
+
 async function openForm(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });

@@ -1,11 +1,16 @@
 import { test, expect } from '@playwright/test';
 
 /* The assessment form's hover-overs (redesign PR 13, 2026-11-02): a
-   competency, a folder, the rubric, the category, Date Assigned's term, the
-   Factor and a Core Competency, in the shared #gb-tooltip, on hover and on
-   keyboard focus (over the field then, so the next one stays in view).
-   Demo Mode, Science 8. */
+   chosen competency, a Codes folder, the rubric, the Factor and a Core
+   Competency, in the shared #gb-tooltip, on hover and on keyboard focus
+   (over the field then, so the next one stays in view). Category, Date
+   Assigned and List rows have none since Nov 2. Demo Mode, Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
+
+// These tests use the Codes chips; List is the default since Nov 2.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fv-assess-comp-view', 'codes'));
+});
 
 async function openForm(page) {
   await page.goto('/login.html?demo=1');
@@ -43,40 +48,17 @@ test('a folder lists each competency with its count', async ({ page }) => {
   await expect(tip(page)).toContainText('How many assessments have scored each one so far this year.');
 });
 
-test('the category says its weight and how many assessments are in it', async ({ page }) => {
+test('Category and Date Assigned have no hover-over', async ({ page }) => {
   await openForm(page);
   await page.selectOption('#af-category', 'sci8-cat-labs');
-  const want = await page.evaluate(() => {
-    const c = getCategoryById('sci8', 'sci8-cat-labs');
-    const n = getAssessments('sci8').filter(a => (a.categoryId || a.category_id) === 'sci8-cat-labs').length;
-    return { name: c.name, weight: c.weight, n };
-  });
   await page.locator('#af-category').hover();
-  await expect(tip(page)).toContainText(want.name);
-  await expect(tip(page)).toContainText(`Category worth ${want.weight}% of the course grade. ${want.n} assessment`);
-  // The hint the field already had stays with it.
-  await expect(page.locator('#af-category')).toHaveAttribute('aria-describedby', 'af-category-hint gb-tooltip');
-  await page.mouse.move(5, 5);
+  await page.waitForTimeout(800);
+  await expect(tip(page)).toBeHidden();
+  await page.locator('#af-date-assigned').hover();
+  await page.waitForTimeout(800);
+  await expect(tip(page)).toBeHidden();
+  // The category's hint stays as it was.
   await expect(page.locator('#af-category')).toHaveAttribute('aria-describedby', 'af-category-hint');
-});
-
-test('Date Assigned names its term; keyboard focus puts the tip over the field', async ({ page }) => {
-  await openForm(page);
-  const term = await page.evaluate(() => {
-    const d = document.getElementById('af-date-assigned').value;
-    const t = getReportingTerms('sci8').find(x => d >= x.starts_on && d <= x.ends_on);
-    return t ? t.label : null;
-  });
-  // Reached with the keyboard, so it shows at once.
-  await page.locator('#af-module').focus();
-  await page.keyboard.press('Tab');
-  await expect(page.locator('#af-date-assigned')).toBeFocused();
-  await expect(tip(page)).toContainText(term ? 'In ' + term : 'Its scores count in All Time only.');
-  const [t, f] = await Promise.all([tip(page).boundingBox(), page.locator('#af-date-assigned').boundingBox()]);
-  expect(t.y + t.height).toBeLessThanOrEqual(f.y);
-  await page.fill('#af-date-assigned', '1999-01-01');
-  await page.locator('#af-date-assigned').dispatchEvent('change');
-  await expect(tip(page)).toContainText('Its scores count in All Time only.');
 });
 
 test('Factor says what the multiplier does', async ({ page }) => {

@@ -7,6 +7,11 @@ import { test, expect } from '@playwright/test';
    Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
+// These tests use the Codes chips; List is the default since Nov 2.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fv-assess-comp-view', 'codes'));
+});
+
 // Choose a Rubric opens the picker; '' uses no rubric; a number picks that row.
 async function pickRubric(page, rid) {
   await page.locator('[data-action="chooseRubric"]').first().click();
