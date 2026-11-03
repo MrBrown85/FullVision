@@ -76,11 +76,12 @@ test('level cards score, fine-tune and take keys', async ({ page }) => {
   expect(saved).toBe('Spots the trend in each graph.');
 });
 
-test('points field saves on Enter and shows the percentage', async ({ page }) => {
+// Enter saves too and moves to the next student (grader-points-keys.spec.js).
+test('points field saves on leaving it and shows the percentage', async ({ page }) => {
   const dialog = await openGrader(page, 'assess-gp');
   const input = dialog.locator('.grdp-input');
   await input.fill('7');
-  await input.press('Enter');
+  await input.press('Tab');
   await expect(dialog.locator('.grdp-pct')).toHaveText('70%');
   await expect(dialog.locator('.grader-grade')).toHaveText('7 of 10');
   const stored = await page.evaluate(({ cid }) => getPointsScore(cid, 'stu-001', 'assess-gp'), {

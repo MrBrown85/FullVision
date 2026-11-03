@@ -221,6 +221,9 @@ window.PageAssignments = (function () {
     }
     _syncSidebarSelection();
     render();
+    // One points card open: its box is ready to type in.
+    var boxes = focusStudentId ? document.querySelectorAll('.assess-card.open .grdp-input') : [];
+    if (boxes.length === 1) _focusGraderPoints(_graderAid(boxes[0]));
   }
 
   function clearFocusStudent() {
@@ -261,7 +264,11 @@ window.PageAssignments = (function () {
      assessments. A focused rubric row moves to the new student's first row. */
   function stepFocusStudent(dir) {
     if (!focusStudentId) return;
-    if (_grader && _graderStepGroup(dir)) return;
+    var memo = _graderFocusMemo();
+    if (_grader && _graderStepGroup(dir)) {
+      _restoreGraderFocus(memo);
+      return;
+    }
     var ids = _grader
       ? _grader.studentIds
       : Array.prototype.filter
@@ -286,6 +293,41 @@ window.PageAssignments = (function () {
     var card = document.querySelector('.assess-card.open');
     if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
     if (hadKbFocus && card) kbFocusCell(card.querySelector('.rsg-criterion-row'));
+    else _restoreGraderFocus(memo);
+  }
+
+  /* The grading control that has focus (a criterion or competency card, a
+     points box), so the next student's view can focus the same one. */
+  function _graderFocusMemo() {
+    var el = document.activeElement;
+    var cls = el && el.classList;
+    if (!cls) return null;
+    var aid = _graderAid(el);
+    if (!aid) return null;
+    if (cls.contains('grdt-crit')) return { aid: aid, sel: '.grdt-crit[data-critid="' + el.dataset.critid + '"]' };
+    if (cls.contains('grdl-card')) return { aid: aid, sel: '.grdl-card[data-tag="' + el.dataset.tag + '"]' };
+    if (cls.contains('grdp-input')) return { aid: aid, points: true };
+    return null;
+  }
+  // Focus the same control for the new student. In the dialog, points work
+  // focuses the box even when the step came from a button.
+  function _restoreGraderFocus(memo) {
+    if (memo && memo.points) return _focusGraderPoints(memo.aid);
+    if (memo) {
+      var root = _graderRoot(memo.aid);
+      var el = root && root.querySelector(memo.sel);
+      if (el) el.focus({ preventScroll: true });
+      return;
+    }
+    if (_grader) _focusGraderPoints(_grader.aid);
+  }
+  // The student's points box for `aid`, focused with its text selected.
+  function _focusGraderPoints(aid) {
+    var root = aid && _graderRoot(aid);
+    var box = root && root.querySelector('.grdp-input');
+    if (!box || box.disabled) return;
+    box.focus({ preventScroll: true });
+    box.select();
   }
 
   /* ── Assessment Filters ────────────────────────────────── */
@@ -6308,9 +6350,7 @@ window.PageAssignments = (function () {
       html +=
         ledgerRowOpen('pts', a.id, st, stStatus) +
         '<div class="pts-input-cell">' +
-        '<input type="number" class="gb-pts-input ldg-pts-input" min="0" step="any" max="' +
-        max * POINTS_EXTRA_CREDIT_FACTOR +
-        '" inputmode="decimal" aria-label="Score for ' +
+        '<input type="text" class="gb-pts-input ldg-pts-input" inputmode="decimal" autocomplete="off" aria-label="Score for ' +
         esc(displayNameWithLast(st)) +
         '" value="' +
         (raw != null ? formatPoints(raw) : '') +
@@ -6415,7 +6455,9 @@ window.PageAssignments = (function () {
     var sid = inp.dataset.sid;
     var aid = inp.dataset.aid;
     var max = parseFloat(inp.dataset.max) || 100;
-    var raw = parsePointsInput(inp.value, max);
+    // A typo that isn't a number puts the saved score back; only a blank
+    // box clears.
+    var raw = parsePointsInput(inp.value, max, getPointsScore(cid, sid, aid));
     inp.value = raw != null ? formatPoints(raw) : '';
     // Leaving a field without changing it saves nothing; an untouched blank
     // field used to write a 0. A typed 0 is a score; blank clears.
@@ -10963,11 +11005,13 @@ window.PageAssignments = (function () {
     _addDocListener('scroll', _hideChipTip, true);
     render();
     overlay.querySelector('.grader-dialog').focus();
+    // Points work: the box is ready to type in.
+    _focusGraderPoints(aid);
   }
 
   /* Escape closes the dialog once nothing inside it (a comment box, the
      rubric window, a confirm) is using the key. In a points box it first
-     puts back the saved points, as on this page; a second Escape closes. */
+     puts back the saved points (_graderCardKey); a second Escape closes. */
   function _graderKeydown(e) {
     if (!_grader || e.defaultPrevented) return;
     if (_graderCardKey(e)) return;
@@ -10989,14 +11033,34 @@ window.PageAssignments = (function () {
   }
 
   /* Keys on a grader card, in the dialog or on the page: Enter in a points
-     box saves it; 1–4 picks a level and + / − fine-tunes it on a focused
-     criterion or competency card. True when the key was used. */
+     box saves it and moves to the next student's box; Escape puts back the
+     saved points and leaves the box (a second Escape, or one with nothing
+     typed, closes the dialog);
+     1–4 picks a level and + / − fine-tunes it on a focused criterion or
+     competency card. True when the key was used. */
   function _graderCardKey(e) {
     var t = e.target;
     var cls = t && t.classList;
     if (!cls) return false;
     if (e.key === 'Enter' && cls.contains('grdp-input')) {
       e.preventDefault();
+      var enterAid = _graderAid(t);
+      t.blur();
+      stepFocusStudent(1);
+      _focusGraderPoints(enterAid);
+      return true;
+    }
+    if (e.key === 'Escape' && cls.contains('grdp-input')) {
+      e.preventDefault();
+      var escAid = _graderAid(t);
+      var saved = escAid && focusStudentId ? getPointsScore(activeCourse, focusStudentId, escAid) : null;
+      var savedText = saved != null ? formatPoints(saved) : '';
+      // Nothing typed: nothing to put back, so the dialog closes at once.
+      if (_grader && t.value.trim() === savedText) {
+        closeGrader();
+        return true;
+      }
+      t.value = savedText;
       t.blur();
       return true;
     }
@@ -11709,13 +11773,14 @@ window.PageAssignments = (function () {
     _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');
   }
   // Saves typed points the way the Assignments ledger does: blank clears, a
-  // typed 0 is a score, leaving an unchanged box saves nothing.
+  // typed 0 is a score, a typo puts the saved score back, leaving an
+  // unchanged box saves nothing.
   function _graderCommitPoints(inp) {
     var aid = _graderAid(inp);
     if (!aid || !focusStudentId) return;
     var cid = activeCourse;
     var max = parseFloat(inp.dataset.max) || 100;
-    var raw = parsePointsInput(inp.value, max);
+    var raw = parsePointsInput(inp.value, max, getPointsScore(cid, focusStudentId, aid));
     if (raw === getPointsScore(cid, focusStudentId, aid)) {
       inp.value = raw != null ? formatPoints(raw) : '';
       return;

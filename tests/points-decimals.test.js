@@ -32,11 +32,20 @@ describe('parsePointsInput', () => {
     expect(parsePointsInput('-2', 40)).toBe(0);
   });
 
-  it('reads blank or unreadable input as no score, and a typed 0 as 0', () => {
+  it('reads blank input as no score, and a typed 0 as 0', () => {
     expect(parsePointsInput('', 40)).toBeNull();
     expect(parsePointsInput('  ', 40)).toBeNull();
     expect(parsePointsInput('abc', 40)).toBeNull();
     expect(parsePointsInput('0', 40)).toBe(0);
+  });
+
+  it('gives back the saved score for a typo; only a blank box clears', () => {
+    expect(parsePointsInput('abc', 40, 33.5)).toBe(33.5);
+    expect(parsePointsInput('-', 40, 12)).toBe(12);
+    expect(parsePointsInput('abc', 40, null)).toBeNull();
+    expect(parsePointsInput('', 40, 33.5)).toBeNull();
+    expect(parsePointsInput('  ', 40, 33.5)).toBeNull();
+    expect(parsePointsInput('20', 40, 33.5)).toBe(20);
   });
 });
 
