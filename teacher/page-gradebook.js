@@ -2228,6 +2228,12 @@ window.PageGradebook = (function () {
     function commit() {
       if (done) return;
       done = true;
+      // A number box reads a typo ("8..5", "7-", any letter in Safari) as
+      // blank. It isn't one: the saved score stays.
+      if (inp.validity && inp.validity.badInput) {
+        _redrawCompetencyCell(td);
+        return;
+      }
       var raw = parsePointsInput(inp.value, max);
       // Snapshot for undo
       var tagIds = isPtsCol ? scoreTagIds(assess, cid) : [td.dataset.tid];
@@ -3025,6 +3031,9 @@ window.PageGradebook = (function () {
     var openedValue = inp.value;
 
     function save() {
+      // A number box reads a typo ("8..5", "7-", any letter in Safari) as
+      // blank. It isn't one: the saved score stays.
+      if (inp.validity && inp.validity.badInput) return;
       var typed = String(inp.value).trim();
       var val = isPts ? parsePointsInput(typed, maxPts) : Number(typed);
       // Only a blank box clears: null for points (where 0 is a score), 0 for
