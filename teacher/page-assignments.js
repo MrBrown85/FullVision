@@ -30,6 +30,9 @@ window.PageAssignments = (function () {
   var _showingNewForm = false;
   var _editingAssessId = null;
   var collapsedModules = {};
+  // While a search or filter is on, every module with matches shows open;
+  // a module the teacher closes during it is kept here, not saved.
+  var _filterClosedModules = {};
   // Closed modules stay closed per class, saved with the teacher's
   // preferences so they survive signing out. This key is the old
   // browser-only copy, read once when a class has nothing saved yet.
@@ -392,8 +395,9 @@ window.PageAssignments = (function () {
       _filterMenuOpen +
       '">' +
       _FILTER_ICON +
-      'Filter' +
+      '<span class="assess-filter-label"><span>Filter' +
       (n ? ' · ' + n : '') +
+      '</span></span>' +
       '</button>' +
       '<div class="assess-filter-menu" role="menu" aria-label="Filter assessments">' +
       (cats.length
@@ -1711,6 +1715,23 @@ window.PageAssignments = (function () {
     });
 
     var filtersActive = filterCategories.length > 0 || showUngraded || !!assessSearch;
+    if (!filtersActive) _filterClosedModules = {};
+
+    // Nothing to show: say so first, above any modules.
+    if (assessments.length === 0 && allAssessments.length > 0) {
+      html +=
+        '<div class="assess-list-empty" style="text-align:center;color:var(--text-3);padding:40px 0">' +
+        '<div style="font-size:0.9375rem;margin-bottom:4px">No matching assessments.</div>' +
+        '<div style="font-size:0.8125rem">Try adjusting your filters or <button type="button" data-action="clearAssessFilters" style="font:inherit;color:var(--link);text-decoration:underline;background:none;border:0;padding:0;cursor:pointer">clear all filters</button>.</div>' +
+        '</div>';
+    } else if (allAssessments.length === 0) {
+      html +=
+        '<div class="empty-state assess-list-empty">' +
+        '<div class="empty-state-title">No assessments yet</div>' +
+        '<div class="empty-state-text">Create your first assessment to start grading.</div>' +
+        '<button class="tb-action-btn" data-action="showNewForm" style="margin-top:16px">+ New Assessment</button>' +
+        '</div>';
+    }
 
     // Render module folders with drop zones
     modules.forEach(function (u, idx) {
@@ -1722,7 +1743,8 @@ window.PageAssignments = (function () {
         items.some(function (a) {
           return openAssessIds.has(a.id);
         });
-      var folderOpen = isOpen || containsOpen;
+      // Searching or filtering shows every module with matches open.
+      var folderOpen = filtersActive ? !_filterClosedModules[u.id] : isOpen || containsOpen;
       html += '<div class="mod-drop-zone" data-drop-index="' + idx + '" data-mod-drop-zone="true"></div>';
       html +=
         '<div class="mod-folder' +
@@ -1804,7 +1826,9 @@ window.PageAssignments = (function () {
         ungrouped.some(function (a) {
           return openAssessIds.has(a.id);
         });
-      var folderOpen = (ungrouped.length > 0 && noModOpen) || containsOpenNoMod;
+      var folderOpen = filtersActive
+        ? !_filterClosedModules['__none__']
+        : (ungrouped.length > 0 && noModOpen) || containsOpenNoMod;
       html +=
         '<div class="mod-folder no-module' +
         (folderOpen ? ' open' : '') +
@@ -1833,21 +1857,7 @@ window.PageAssignments = (function () {
         '</div>';
     }
 
-    html += '<button class="add-module-btn" data-action="addModuleInline">+ Add Module</button>';
-
-    if (assessments.length === 0 && allAssessments.length > 0) {
-      html +=
-        '<div style="text-align:center;color:var(--text-3);padding:40px 0">' +
-        '<div style="font-size:0.9375rem;margin-bottom:4px">No matching assignments.</div>' +
-        '<div style="font-size:0.8125rem">Try adjusting your filters or <button type="button" data-action="clearAssessFilters" style="font:inherit;color:var(--link);text-decoration:underline;background:none;border:0;padding:0;cursor:pointer">clear all filters</button>.</div>' +
-        '</div>';
-    } else if (assessments.length === 0 && allAssessments.length === 0) {
-      html +=
-        '<div class="empty-state">' +
-        '<div class="empty-state-title">No assignments yet</div>' +
-        '<div class="empty-state-text">Create your first assignment to start grading.</div>' +
-        '</div>';
-    }
+    if (!filtersActive) html += '<button class="add-module-btn" data-action="addModuleInline">+ Add Module</button>';
     html += '</div>';
     html += '</div>';
     return html;
@@ -9452,10 +9462,28 @@ window.PageAssignments = (function () {
     });
   }
   function toggleModuleFolder(moduleId) {
-    collapsedModules[moduleId] = !collapsedModules[moduleId];
-    _saveClosedModules();
     var folder = document.querySelector('.mod-folder[data-module-id="' + moduleId + '"]');
-    if (folder) folder.classList.toggle('open', !collapsedModules[moduleId]);
+    // The header acts on what the teacher sees: a module shown open closes,
+    // even one open only because it holds an open card or a search is on.
+    var shownOpen = folder ? folder.classList.contains('open') : !collapsedModules[moduleId];
+    if (filterCategories.length > 0 || showUngraded || !!assessSearch) {
+      // A search or filter's open/closed is for now; the saved state stays.
+      _filterClosedModules[moduleId] = shownOpen;
+      if (folder) folder.classList.toggle('open', !shownOpen);
+      return;
+    }
+    collapsedModules[moduleId] = shownOpen;
+    _saveClosedModules();
+    // Closing a module closes the cards in it, so the next redraw doesn't
+    // open it again to show them.
+    var closedCards = false;
+    if (shownOpen && folder) {
+      folder.querySelectorAll('.assess-card.open').forEach(function (card) {
+        if (openAssessIds.delete(card.id.replace(/^ac-/, ''))) closedCards = true;
+      });
+    }
+    if (closedCards) render();
+    else if (folder) folder.classList.toggle('open', !shownOpen);
   }
   function addModuleInline() {
     var cid = activeCourse;
