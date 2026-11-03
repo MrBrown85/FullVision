@@ -183,11 +183,11 @@ describe('student-submit handler', () => {
     expect(good.headers.get('access-control-allow-headers')).toContain('content-type');
   });
 
-  it('hashes the first forwarded address with the key, never passing the address on', async () => {
-    const a = await ipHash(post({}, { 'x-forwarded-for': '203.0.113.7, 10.0.0.1' }), 'k1');
-    const b = await ipHash(post({}, { 'x-forwarded-for': '203.0.113.7' }), 'k1');
-    const c = await ipHash(post({}, { 'x-forwarded-for': '203.0.113.8' }), 'k1');
-    const d = await ipHash(post({}, { 'x-forwarded-for': '203.0.113.7' }), 'k2');
+  it('hashes the address the platform sets with the key, never passing the address on', async () => {
+    const a = await ipHash(post({}, { 'cf-connecting-ip': '203.0.113.7' }), 'k1');
+    const b = await ipHash(post({}, { 'cf-connecting-ip': '203.0.113.7', 'x-forwarded-for': '203.0.113.7' }), 'k1');
+    const c = await ipHash(post({}, { 'cf-connecting-ip': '203.0.113.8' }), 'k1');
+    const d = await ipHash(post({}, { 'cf-connecting-ip': '203.0.113.7' }), 'k2');
     expect(a).toMatch(/^[0-9a-f]{64}$/);
     expect(a).toBe(b);
     expect(a).not.toBe(c);
@@ -196,6 +196,28 @@ describe('student-submit handler', () => {
     await handle(post({ route: 'open', code: 'K7M-4QX' }));
     expect(calls[0].hash).toMatch(/^[0-9a-f]{64}$/);
     expect(JSON.stringify(calls)).not.toContain('203.0.113.7');
+  });
+
+  it('ignores an X-Forwarded-For the caller made up', async () => {
+    const real = await ipHash(post({}, { 'cf-connecting-ip': '203.0.113.7' }), 'k1');
+    const forged = await ipHash(
+      post({}, { 'cf-connecting-ip': '203.0.113.7', 'x-forwarded-for': '198.51.100.9, 203.0.113.7' }),
+      'k1',
+    );
+    const other = await ipHash(
+      post({}, { 'cf-connecting-ip': '203.0.113.7', 'x-forwarded-for': '198.51.100.10, 203.0.113.7' }),
+      'k1',
+    );
+    expect(forged).toBe(real);
+    expect(other).toBe(real);
+  });
+
+  it('takes the last forwarded address, which the nearest proxy added, when there is no cf-connecting-ip', async () => {
+    const a = await ipHash(post({}, { 'x-forwarded-for': '198.51.100.9, 203.0.113.7' }), 'k1');
+    const b = await ipHash(post({}, { 'x-forwarded-for': '198.51.100.10, 203.0.113.7' }), 'k1');
+    const c = await ipHash(post({}, { 'cf-connecting-ip': '203.0.113.7' }), 'k1');
+    expect(a).toBe(b);
+    expect(a).toBe(c);
   });
 
   it('logs route, outcome and time only', async () => {
