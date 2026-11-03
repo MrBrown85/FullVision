@@ -820,6 +820,10 @@
           .sort(function (a, b) {
             return (b.date || '').localeCompare(a.date || '');
           })[0];
+        // The Grade tab opens on its list. A grading screen left open there
+        // would come back under this one with the same ids, and the handlers
+        // would bind to the hidden copy.
+        _tabState.grade = null;
         _switchTab('grade');
         if (!newest) return;
         _gradeReturnSid = gradeSid;
