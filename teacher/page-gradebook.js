@@ -2656,8 +2656,9 @@ window.PageGradebook = (function () {
           return a.id === aid;
         });
         if (assess && scores[sid]) {
-          // ⌘Z puts it back, as it does for Edit Score.
+          // ⌘Z puts it back, as it does for Edit Score, ticks included.
           var clearIds = scoreTagIds(assess, cid);
+          var checkIds = getRubricCheckIds(cid, sid, aid);
           _undoStack.push({
             cid: cid,
             sid: sid,
@@ -2669,11 +2670,12 @@ window.PageGradebook = (function () {
               });
               return prev ? structuredClone(prev) : null;
             }),
+            checkIds: checkIds,
           });
           while (_undoStack.length > 50) _undoStack.shift();
           // An Advanced Rubric's ticks go with the score, so reopening it
           // doesn't suggest a level for work that has none.
-          getRubricCheckIds(cid, sid, aid).forEach(function (id) {
+          checkIds.forEach(function (id) {
             setRubricCheck(cid, sid, aid, id, false);
           });
           clearScoreEntries(cid, scores, sid, assess, clearIds);
@@ -3186,6 +3188,10 @@ window.PageGradebook = (function () {
       });
       saveScores(undo.cid, scores);
       persistScoreDiffToCanonical(undo.cid, beforeScores, scores);
+      // The Advanced Rubric ticks Clear Score took off.
+      (undo.checkIds || []).forEach(function (id) {
+        setRubricCheck(undo.cid, undo.sid, undo.aid, id, true);
+      });
       clearProfCache();
       render();
       return;
