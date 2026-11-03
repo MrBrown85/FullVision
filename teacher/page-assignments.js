@@ -6641,7 +6641,6 @@ window.PageAssignments = (function () {
         getStudents(cid).forEach(function (st) {
           // Same rule as Set Unmarked to Complete: any status, Late included, is left alone.
           if (statuses[st.id + ':' + aid] || getPointsScore(cid, st.id, aid) != null) return;
-          setScore(cid, st.id, aid, aid, max);
           setPointsScore(cid, st.id, aid, max);
         });
         render();
@@ -12024,7 +12023,10 @@ window.PageAssignments = (function () {
       inp.value = raw != null ? formatPoints(raw) : '';
       return;
     }
-    if (raw != null) setScore(cid, focusStudentId, aid, aid, raw);
+    // One save, through setPointsScore, as the ledger, gradebook and phone
+    // do. A second write under the assessment's own id left an entry later
+    // edits elsewhere never updated, so the cell and course % kept the old
+    // points.
     setPointsScore(cid, focusStudentId, aid, raw);
     refreshSidebarGrades(focusStudentId);
     render();

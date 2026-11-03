@@ -94,4 +94,33 @@ describe('No score writer works out the type on its own', () => {
     expect(fn).toContain('setPointsScore(cid, sid, aid, raw)');
     expect(fn).not.toContain('setScore(cid, sid, aid, aid');
   });
+
+  it('the grader dialog and Set Unmarked to max save points once, through setPointsScore', () => {
+    const src = readFileSync(new URL('../teacher/page-assignments.js', import.meta.url), 'utf-8');
+    const grader = src.slice(src.indexOf('function _graderCommitPoints('), src.indexOf('function _focusGraderCard('));
+    expect(grader).toContain('setPointsScore(cid, focusStudentId, aid, raw)');
+    expect(grader).not.toMatch(/\bsetScore\(/);
+    const fill = src.slice(src.indexOf('function confirmFillPoints('), src.indexOf('function livePointsUpdate('));
+    expect(fill).toContain('setPointsScore(cid, st.id, aid, max)');
+    expect(fill).not.toMatch(/\bsetScore\(/);
+    // No points writer anywhere keys a score by the assessment's own id.
+    expect(src).not.toMatch(/setScore\([^)]*\baid, aid\b/);
+  });
+});
+
+// setPointsScore keeps one entry per points cell, so an edit after the
+// grader replaces its score. The source check above keeps the grader on it.
+describe('a points score saved twice through setPointsScore', () => {
+  it('shows the new points in the cell and the course %', () => {
+    // A student no earlier test marked Missing.
+    COURSES[CID] = { id: CID, name: 'T', gradingSystem: 'letter', gradeLevel: '11' };
+    saveAssessments(CID, [{ id: 'a1', title: 'Quiz', scoreMode: 'points', maxPoints: 10, tagIds: ['t1'] }]);
+    saveScores(CID, {});
+    setPointsScore(CID, 'stu9', 'a1', 5); // the grader
+    setPointsScore(CID, 'stu9', 'a1', 9); // later, the gradebook, ledger or phone
+    expect(getScores(CID).stu9.filter(e => e.assessmentId === 'a1')).toHaveLength(1);
+    expect(getPointsScore(CID, 'stu9', 'a1')).toBe(9);
+    expect(getCourseLetterData(CID, 'stu9').R).toBe(90);
+    delete COURSES[CID];
+  });
 });
