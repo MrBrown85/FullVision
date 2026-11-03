@@ -1829,11 +1829,11 @@ window.PageGradebook = (function () {
       '">' +
       (grade.text ? (word ? word + ' (' + esc(grade.text) + ')' : esc(grade.text)) : 'No Evidence') +
       '</div>';
-    // NS lowers only a percentage; a Proficiency class shows none. Only the
-    // term on screen, as the grade above counts.
+    // NS lowers only a percentage; a Proficiency class shows none. Only work
+    // the grade above counts: the term on screen, outside 0% categories.
     if (courseGradeMode(cid) !== 'proficiency') {
       var ns = _scopedAssessments(cid).filter(function (a) {
-        return getAssignmentStatus(cid, student.id, a.id) === 'NS';
+        return getAssignmentStatus(cid, student.id, a.id) === 'NS' && countsTowardGrades(cid, a);
       }).length;
       if (ns > 0)
         tip +=
