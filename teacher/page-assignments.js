@@ -1961,9 +1961,11 @@ window.PageAssignments = (function () {
     tip.innerHTML =
       '<div class="gb-code-tip"><strong>' +
       esc(chip.dataset.chipTipName) +
-      '</strong><div class="gb-code-tip-group">' +
-      esc(chip.dataset.chipTip) +
-      '</div></div>';
+      '</strong>' +
+      (chip.dataset.chipTip || chip.dataset.nameTipText
+        ? '<div class="gb-code-tip-group">' + esc(chip.dataset.chipTip || chip.dataset.nameTipText) + '</div>'
+        : '') +
+      '</div>';
     tip.style.display = 'block';
     _chipTipSource = chip;
     chip.setAttribute('aria-describedby', 'gb-tooltip');
@@ -1977,7 +1979,25 @@ window.PageAssignments = (function () {
     tip.style.top = top + 'px';
   }
 
+  /* A criterion name cut off in the score grid shows in full in the same
+     tip (a competency row adds its wording): after a short hover, so it
+     doesn't flash up while grading, or at once on a tap. */
+  var NAME_TIP_MS = 600;
+  var _nameTipTimer = null;
+  function _hasNameTip(label) {
+    var name = label.querySelector('.rsg-criterion-name');
+    return !!label.dataset.nameTipText || (!!name && name.scrollWidth > name.clientWidth);
+  }
+  function _queueNameTip(label) {
+    clearTimeout(_nameTipTimer);
+    if (!_hasNameTip(label)) return;
+    _nameTipTimer = setTimeout(function () {
+      if (label.isConnected) _showChipTip(label);
+    }, NAME_TIP_MS);
+  }
+
   function _hideChipTip() {
+    clearTimeout(_nameTipTimer);
     if (!_chipTipSource) return;
     _chipTipSource.removeAttribute('aria-describedby');
     _chipTipSource = null;
@@ -7661,8 +7681,9 @@ window.PageAssignments = (function () {
           tag.id +
           '">' +
           '<div class="rsg-criterion-side">' +
-          '<div class="rsg-criterion-label" title="' +
-          esc(tag.text || tag.label) +
+          '<div class="rsg-criterion-label" data-chip-tip-name="' +
+          esc(tag.label) +
+          (tag.text && tag.text !== tag.label ? '" data-name-tip-text="' + esc(tag.text) : '') +
           '"><svg class="rsg-tag-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 9.5V2.5a1 1 0 0 1 1-1h7l5 5v3"/><path d="M14.5 9.5l-5 5-4-4 5-5"/><circle cx="5" cy="5" r="1" fill="currentColor" stroke="none"/></svg>' +
           '<span class="rsg-criterion-name">' +
           esc(tag.label) +
@@ -8009,7 +8030,7 @@ window.PageAssignments = (function () {
       crit.id +
       '">' +
       '<div class="rsg-criterion-side">' +
-      '<div class="rsg-criterion-label" title="' +
+      '<div class="rsg-criterion-label" data-chip-tip-name="' +
       esc(crit.name) +
       '"><span class="rsg-criterion-name">' +
       esc(crit.name) +
@@ -11109,6 +11130,8 @@ window.PageAssignments = (function () {
   function _handleMouseOver(e) {
     var chip = e.target.closest('[data-chip-tip]');
     if (chip && chip !== _chipTipSource) _showChipTip(chip);
+    var nameLabel = e.target.closest('.rsg-criterion-label');
+    if (nameLabel && nameLabel !== _chipTipSource && Date.now() - _lastTouch > 800) _queueNameTip(nameLabel);
     var lvl = e.target.closest('.rsg-level[data-action="selectRubricScore"]');
     if (lvl) {
       var aid = lvl.dataset.aid;
@@ -11123,6 +11146,11 @@ window.PageAssignments = (function () {
   function _handleMouseOut(e) {
     var chip = e.target.closest('[data-chip-tip]');
     if (chip && chip === _chipTipSource && !(e.relatedTarget && chip.contains(e.relatedTarget))) _hideChipTip();
+    var nameLabel = e.target.closest('.rsg-criterion-label');
+    if (nameLabel && !(e.relatedTarget && nameLabel.contains(e.relatedTarget))) {
+      clearTimeout(_nameTipTimer);
+      if (nameLabel === _chipTipSource) _hideChipTip();
+    }
     var lvl = e.target.closest('.rsg-level[data-action="selectRubricScore"]');
     if (lvl) resetDescriptorBar();
     var tagLvl = e.target.closest(TAG_LEVEL_SEL);
@@ -11147,6 +11175,9 @@ window.PageAssignments = (function () {
   var _hold = null;
   var _lastTouch = 0;
   function _handlePointerDown(e) {
+    var nameLabel = e.target.closest && e.target.closest('.rsg-criterion-label');
+    if (_chipTipSource && _chipTipSource.classList.contains('rsg-criterion-label')) _hideChipTip();
+    else if (nameLabel && e.pointerType === 'touch' && _hasNameTip(nameLabel)) _showChipTip(nameLabel);
     if (e.pointerType !== 'touch') return;
     _lastTouch = Date.now();
     var lvl = e.target.closest && e.target.closest(TAG_LEVEL_SEL);
