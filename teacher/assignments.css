@@ -7580,13 +7580,11 @@ button.grader-member-name {
     opacity: 1;
   }
 }
-#gb-tooltip.af-tip,
-.af-codes-focus > * {
+#gb-tooltip.af-tip {
   animation: af-ease-in 160ms ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
-  #gb-tooltip.af-tip,
-  .af-codes-focus > * {
+  #gb-tooltip.af-tip {
     animation: none;
   }
 }

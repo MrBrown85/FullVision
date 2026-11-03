@@ -72,17 +72,15 @@ test('type to narrow; Enter ticks the first match; arrows move between chips', a
   expect(await ticked(page)).toEqual(['QP2', 'PC2']);
 });
 
-test('no Same As row and no counts on the chips; the focus box waits for a pause', async ({ page }) => {
+test('no Same As row and no counts on the chips; the focus box follows the pointer at once', async ({ page }) => {
   await openForm(page);
   // Removed Nov 2 (Colin): both distracted from the competencies.
   await expect(page.locator('.af-same-as')).toHaveCount(0);
   expect(await page.locator('.af-code').first().innerText()).not.toMatch(/\d+$/);
   await page.locator('.af-code[data-tag="EV4"]').hover();
   const code = page.locator('#af-codes-focus .af-codes-focus-code');
-  // Not at once: a teacher who is only clicking never sees it change.
-  await page.waitForTimeout(150);
-  await expect(code).toHaveCount(0);
-  await expect(code).toHaveText('EV4');
+  // At once, with no pause (it isn't a hover-over).
+  await expect(code).toHaveText('EV4', { timeout: 200 });
   // The count lives in the focus box.
   await expect(page.locator('#af-codes-focus .af-codes-focus-count')).toContainText('this year');
 });
