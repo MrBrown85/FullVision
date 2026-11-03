@@ -1717,6 +1717,10 @@
   padding: 0 14px;
   background: var(--surface);
 }
+.af-rubric-card-head .btn-primary {
+  background: var(--active);
+  color: #fff;
+}
 .af-rubric-card .rb-grid {
   margin: 0;
   padding: 0 6px 8px;
@@ -1747,12 +1751,12 @@
 }
 .af-rubric-starts {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
-@media (max-width: 900px) {
+@media (max-width: 600px) {
   .af-rubric-starts {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 .af-rubric-start {

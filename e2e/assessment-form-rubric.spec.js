@@ -37,21 +37,13 @@ async function openForm(page) {
   await expect(page.locator('#af-title')).toBeVisible();
 }
 
-test('with no rubric, Blank first; the scoring card reads Rubric; Draft waits for competencies', async ({ page }) => {
+test('with no rubric, three starts, Blank first; the scoring card reads Rubric', async ({ page }) => {
   await openForm(page);
   await expect(page.locator('.af-scoremode-btn[data-mode="proficiency"]')).toHaveText('Rubric');
   // No "Rubric (optional)" on screen; the label is for screen readers.
   await expect(page.locator('#af-rubric-label')).toHaveClass(/af-visually-hidden/);
   const starts = page.locator('.af-rubric-start b');
-  await expect(starts).toHaveText([
-    'Blank Rubric',
-    'Choose a Rubric',
-    'Copy From Another Class',
-    'Draft From Competencies',
-  ]);
-  await expect(page.locator('[data-action="draftRubricFromComps"]')).toBeDisabled();
-  await page.locator('.af-code[data-tag="QP3"]').click();
-  await expect(page.locator('[data-action="draftRubricFromComps"]')).toBeEnabled();
+  await expect(starts).toHaveText(['Blank Rubric', 'Choose a Rubric', 'Copy From Another Class']);
 });
 
 test('a chosen rubric is a card with its wording; Pick Another Rubric changes it', async ({ page }) => {
@@ -65,7 +57,7 @@ test('a chosen rubric is a card with its wording; Pick Another Rubric changes it
   await expect(card.locator('.af-rubric-card-name')).toHaveText(r.name);
   await expect(card.locator('.rb-grid')).toContainText(r.first);
   await pickRubric(page, '');
-  await expect(page.locator('.af-rubric-start')).toHaveCount(4);
+  await expect(page.locator('.af-rubric-start')).toHaveCount(3);
 });
 
 test('the Competency Rubric shows the wording of each level for the chosen ones', async ({ page }) => {
@@ -94,18 +86,31 @@ test('Edit My Wording keeps the teacher’s own words for a level', async ({ pag
   );
 });
 
-test('Draft From Competencies opens the editor with their wording', async ({ page }) => {
+test('Use This Rubric makes the Competency Rubric this assessment’s rubric, saved on Create', async ({ page }) => {
   await openForm(page);
   await page.fill('#af-title', 'Density Lab');
+  await page.selectOption('#af-category', 'sci8-cat-labs');
   await page.locator('.af-code[data-tag="QP3"]').click();
   await page.locator('.af-code[data-tag="PA4"]').click();
-  await page.locator('[data-action="draftRubricFromComps"]').click();
-  await expect(page.locator('#rubric-modal')).toBeVisible();
-  const draft = await page.evaluate(() => {
-    const m = document.getElementById('rubric-modal');
-    return m ? m.textContent : '';
-  });
-  expect(draft).toContain('Inquiry Questions');
+  const card = page.locator('#af-tag-rubric .af-tag-rubric-card');
+  await expect(card.locator('.af-tag-rubric-note')).toContainText('Use This Rubric makes it a rubric');
+  const n = await page.evaluate(() => getRubrics('sci8').length);
+  await card.locator('[data-action="useCompetencyRubric"]').click();
+  const chosen = page.locator('#af-rubric-view .af-rubric-card');
+  await expect(chosen.locator('.af-rubric-card-name')).toHaveText('Density Lab Rubric');
+  await expect(chosen.locator('.rb-grid tbody tr')).toHaveCount(2);
+  // Held, not saved, until the assessment is created.
+  expect(await page.evaluate(() => getRubrics('sci8').length)).toBe(n);
+  await page.locator('[data-action="saveNewAssess"]').click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const a = getAssessments('sci8').find(x => x.title === 'Density Lab');
+        const r = a && getRubricById('sci8', a.rubricId);
+        return r ? r.criteria.map(c => c.tagIds[0]) : null;
+      }),
+    )
+    .toEqual(['QP3', 'PA4']);
 });
 
 test('Last used names the rubric on the latest assessment; Use It Again chooses it', async ({ page }) => {

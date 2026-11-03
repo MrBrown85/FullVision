@@ -3204,7 +3204,6 @@ window.PageAssignments = (function () {
       view.innerHTML = '';
       return;
     }
-    var hasComps = !!document.querySelector('.af-tag-cb:checked');
     var count = rubricsListCount(cid);
     var last = _lastUsedRubric(cid);
     // Blank first (Colin, Nov 2), then Choose and Copy.
@@ -3221,11 +3220,6 @@ window.PageAssignments = (function () {
       ) +
       '</span></button>' +
       '<button type="button" class="af-rubric-start" data-action="rubricFromClass"><b>Copy From Another Class</b><span>Any of your classes.</span></button>' +
-      '<button type="button" class="af-rubric-start" data-action="draftRubricFromComps"' +
-      (hasComps ? '' : ' disabled') +
-      '><b>Draft From Competencies</b><span>' +
-      esc(hasComps ? 'Starts from the Competency Rubric below, wording and all.' : 'Choose competencies below first.') +
-      '</span></button>' +
       '</div>' +
       (last
         ? '<p class="af-rubric-last">Last used <b>' +
@@ -3464,10 +3458,12 @@ window.PageAssignments = (function () {
     renderRubricEditor();
   }
 
-  /* Draft From Competencies: a criterion for each competency chosen, with
-     the Competency Rubric's wording (the teacher's own, else the bank's,
-     else the BC scale's), opened in the editor to name and save. */
-  function draftRubricFromComps() {
+  /* Use This Rubric (rubric starts PR 2, replacing Draft From
+     Competencies): the Competency Rubric becomes this assessment's rubric,
+     a criterion per competency with the wording shown (the teacher's own,
+     else the bank's, else the BC scale's). It's held like any rubric made
+     on the form and saved when the assessment is; Edit Rubric changes it. */
+  function useCompetencyRubric() {
     var cid = activeCourse;
     var tags = Array.from(document.querySelectorAll('.af-tag-cb:checked'))
       .map(function (cb) {
@@ -3477,27 +3473,26 @@ window.PageAssignments = (function () {
     if (!tags.length || !window.CompetencyWording) return;
     var title = ((document.getElementById('af-title') || {}).value || '').trim();
     CompetencyWording.loadBank().then(function () {
-      newRubricUI();
-      if (!_editingRubric) return;
-      _editingRubric.name = title ? title + ' Rubric' : 'New Rubric';
-      _editingRubric.criteria = tags.map(function (tag) {
-        var levels = {};
-        [1, 2, 3, 4].forEach(function (l) {
-          levels[l] = CompetencyWording.levelWording(tag, l).text;
-        });
-        return {
-          id: uid(),
-          name: tag.label || tag.shortName || tag.code || 'Criterion',
-          tagIds: [tag.id],
-          levels: levels,
-          weight: 1,
-          levelValues: null,
-          checks: [],
-        };
-      });
-      _editingRubric._forForm = true;
-      _rubricDirty = true;
-      renderRubricEditor();
+      var held = {
+        id: uid(),
+        name: title ? title + ' Rubric' : 'Competency Rubric',
+        criteria: tags.map(function (tag) {
+          var levels = {};
+          [1, 2, 3, 4].forEach(function (l) {
+            levels[l] = CompetencyWording.levelWording(tag, l).text;
+          });
+          return {
+            id: uid(),
+            name: tag.label || tag.shortName || tag.code || 'Criterion',
+            tagIds: [tag.id],
+            levels: levels,
+            weight: 1,
+            levelValues: null,
+            checks: [],
+          };
+        }),
+      };
+      _holdFormRubric(held);
     });
   }
 
@@ -3533,10 +3528,11 @@ window.PageAssignments = (function () {
       '<div class="af-rubric-card-head"><span class="af-rubric-card-name">Competency Rubric</span>' +
       '<span class="af-rubric-card-meta">How each competency will be scored. The same words print on the handout.</span>' +
       '<span class="af-gap"></span>' +
-      '<button type="button" class="btn btn-ghost" data-action="editMyWording">Edit My Wording</button></div>' +
+      '<button type="button" class="btn btn-ghost" data-action="editMyWording">Edit My Wording</button>' +
+      '<button type="button" class="btn btn-primary" data-action="useCompetencyRubric">Use This Rubric</button></div>' +
       // html-safe: RubricBank.gridHtml escapes every name and descriptor
       RubricBank.gridHtml(cid, { criteria: criteria }) +
-      '<div class="af-tag-rubric-note">Your wording is used wherever these competencies appear, in every class.</div>' +
+      '<div class="af-tag-rubric-note">Your wording is used wherever these competencies appear, in every class. Use This Rubric makes it a rubric you can rename, reword just for this work, and reuse.</div>' +
       '</div>';
     if (!ready) {
       CompetencyWording.loadBank().then(function (ok) {
@@ -8855,8 +8851,8 @@ window.PageAssignments = (function () {
       editRubricFromForm: function () {
         editRubricFromForm();
       },
-      draftRubricFromComps: function () {
-        draftRubricFromComps();
+      useCompetencyRubric: function () {
+        useCompetencyRubric();
       },
       editMyWording: function () {
         editMyWording();
