@@ -91,7 +91,9 @@ test('List shows one line each, and the choice is remembered', async ({ page }) 
   expect(await ticked(page)).toEqual(['QP3']);
   // The page doesn't scroll sideways with one-line rows.
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
-  await page.locator('[data-action="hideNewForm"]').click();
+  // A ticked competency counts as filled in, so Cancel asks first.
+  await page.locator('[data-action="cancelAssessForm"]').click();
+  await page.locator('.af-dialog-card button', { hasText: 'Discard' }).click();
   await page.locator('button', { hasText: 'New Assessment' }).first().click();
   await expect(page.locator('.af-card-competencies')).toHaveAttribute('data-view', 'list');
 });

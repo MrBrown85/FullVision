@@ -108,6 +108,9 @@ window.PageAssignments = (function () {
 
   // Rubric editor state
   var _editingRubric = null;
+  // A rubric made from the assessment form (blank, drafted or a copy) waits
+  // here, unsaved, until the assessment is created (redesign PR 8).
+  var _pendingFormRubric = null;
   // An Advanced Rubric checkbox being dragged to a new place in its level.
   var _dragCheck = null;
   var _rubricDirty = false;
@@ -2497,7 +2500,7 @@ window.PageAssignments = (function () {
     html +=
       '<div class="af-actions">' +
       '<p class="af-counts-toward" id="af-counts-toward" aria-live="polite"></p>' +
-      '<button class="btn btn-ghost" data-action="hideNewForm">Cancel</button>' +
+      '<button class="btn btn-ghost" data-action="cancelAssessForm">Cancel</button>' +
       '<button class="btn btn-primary" data-action="' +
       (isEdit ? 'saveEditAssess' : 'saveNewAssess') +
       '" data-aid="' +
@@ -2789,7 +2792,8 @@ window.PageAssignments = (function () {
     var sel = document.getElementById('af-rubric');
     if (!view || !sel) return;
     var cid = activeCourse;
-    var rubric = sel.value ? getRubricById(cid, sel.value) : null;
+    var pending = _pendingFormRubric && sel.value === _pendingFormRubric.id ? _pendingFormRubric : null;
+    var rubric = pending || (sel.value ? getRubricById(cid, sel.value) : null);
     var label = document.getElementById('af-rubric-label');
     if (label) label.textContent = rubric ? 'Rubric' : 'Rubric (optional)';
     var picking = !document.getElementById('af-rubric-pick').hidden;
@@ -2808,9 +2812,11 @@ window.PageAssignments = (function () {
           n +
             (n === 1 ? ' criterion' : ' criteria') +
             ' · ' +
-            (others
-              ? 'also on ' + others + (others === 1 ? ' other assessment' : ' other assessments')
-              : 'used only here'),
+            (pending
+              ? 'new, saved when the assessment is created'
+              : others
+                ? 'also on ' + others + (others === 1 ? ' other assessment' : ' other assessments')
+                : 'used only here'),
         ) +
         '</span><span class="af-gap"></span>' +
         '<button type="button" class="btn btn-ghost" data-action="editRubricFromForm">Edit Rubric</button>' +
@@ -2911,9 +2917,106 @@ window.PageAssignments = (function () {
     _renderRubricView();
   }
 
+  /* Edit Rubric from the form. A rubric made for this assessment edits in
+     place; one used only here opens in the editor. One other assessments
+     also use asks first: Edit a Copy for this assessment (the default,
+     Colin 2026-11-02) or edit it for all of them. */
   function editRubricFromForm() {
     var sel = document.getElementById('af-rubric');
-    if (sel && sel.value) editRubricUI(sel.value);
+    if (!sel || !sel.value) return;
+    var cid = activeCourse;
+    if (_pendingFormRubric && _pendingFormRubric.id === sel.value) {
+      _openFormRubricEditor(structuredClone(_pendingFormRubric));
+      return;
+    }
+    var rubric = getRubricById(cid, sel.value);
+    if (!rubric) return;
+    var editingId = _editingAssessId;
+    var others = getAssessments(cid).filter(function (a) {
+      return a.rubricId === rubric.id && a.id !== editingId;
+    }).length;
+    if (!others) {
+      editRubricUI(rubric.id);
+      return;
+    }
+    var scored = editingId ? _scoredStudentCount(cid, editingId) : 0;
+    var title = ((document.getElementById('af-title') || {}).value || '').trim() || 'This Assessment';
+    _formDialog(
+      'Edit ' + rubric.name,
+      'It is also on ' +
+        others +
+        (others === 1 ? ' other assessment' : ' other assessments') +
+        '. Changing it changes the rubric on ' +
+        (others === 1 ? 'both.' : 'all ' + (others + 1) + '.') +
+        (scored
+          ? ' This one has scores for ' +
+            scored +
+            (scored === 1 ? ' student' : ' students') +
+            ', so a copy for it isn’t offered.'
+          : ''),
+      [
+        { label: 'Cancel', style: 'cancel' },
+        {
+          label: 'Edit All ' + (others + 1) + ' Assessments',
+          style: 'secondary',
+          run: function () {
+            editRubricUI(rubric.id);
+          },
+        },
+        {
+          label: 'Edit a Copy for ' + title,
+          style: 'primary',
+          disabled: !!scored,
+          run: function () {
+            editRubricCopyForForm(rubric.id);
+          },
+        },
+      ],
+    );
+  }
+
+  // How many students have a score or feedback on an assessment.
+  function _scoredStudentCount(cid, aid) {
+    return getStudents(cid).filter(function (st) {
+      return typeof hasScoreOrFeedback === 'function' && hasScoreOrFeedback(cid, st.id, aid);
+    }).length;
+  }
+
+  /* Edit a Copy: the rubric with new ids, named after the assessment, opened
+     in the editor; it's saved only when the assessment is created. */
+  function editRubricCopyForForm(rid) {
+    var cid = activeCourse;
+    var src = getRubricById(cid, rid);
+    if (!src) return;
+    var copy = structuredClone(src);
+    copy.id = uid();
+    delete copy.copyGroup;
+    copy.criteria = (copy.criteria || []).map(function (c) {
+      var next = Object.assign({}, c, { id: uid() });
+      if (c.checks)
+        next.checks = window.RubricLibrary
+          ? RubricLibrary.freshChecks(c.checks)
+          : c.checks.map(function (k) {
+              return Object.assign({}, k, { id: uid() });
+            });
+      return next;
+    });
+    var title = ((document.getElementById('af-title') || {}).value || '').trim();
+    copy.name = src.name + (title ? ' · ' + title : ' (Copy)');
+    copy.title = copy.name;
+    _openFormRubricEditor(copy);
+  }
+
+  function _openFormRubricEditor(rubric) {
+    _closeRubricsPanel();
+    _whenWordingLoaded();
+    _rubricBefore = null;
+    _rubricScored = {};
+    _editingRubric = rubric;
+    _editingRubric._isNew = true;
+    _editingRubric._forForm = true;
+    _rubricDirty = false;
+    renderRubricEditor();
   }
 
   /* Draft From Competencies: a criterion for each competency chosen, with
@@ -2947,6 +3050,7 @@ window.PageAssignments = (function () {
           checks: [],
         };
       });
+      _editingRubric._forForm = true;
       _rubricDirty = true;
       renderRubricEditor();
     });
@@ -3412,8 +3516,120 @@ window.PageAssignments = (function () {
   function hideNewForm() {
     _showingNewForm = false;
     _editingAssessId = null;
+    _pendingFormRubric = null;
     var form = document.getElementById('new-assess-form');
     if (form) form.style.display = 'none';
+  }
+
+  /* Saves the rubric made for this assessment, if it's the one chosen, then
+     calls `then` again; true while that's under way. The teacher's own
+     wording in it starts their next drafts, as a saved rubric's does. */
+  function _persistPendingFormRubric(then) {
+    var held = _pendingFormRubric;
+    var dd = document.getElementById('af-rubric');
+    var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    if (!held || !dd || dd.value !== held.id || mode !== 'proficiency') return false;
+    var cid = activeCourse;
+    _pendingFormRubric = null;
+    var list = structuredClone(getRubrics(cid)).concat([held]);
+    if (window.RubricDraft && typeof saveCompetencyDescriptors === 'function') {
+      saveCompetencyDescriptors(
+        RubricDraft.savedEntries(
+          held,
+          function (id) {
+            return getTagById(cid, id);
+          },
+          getCompetencyDescriptor,
+        ),
+      );
+    }
+    Promise.resolve(saveRubrics(cid, list)).then(function (result) {
+      var finalId = result && result.idMap && result.idMap[held.id] ? result.idMap[held.id] : held.id;
+      var box = document.getElementById('af-rubric');
+      if (box) {
+        var opt = box.querySelector('option[value="' + held.id + '"]');
+        if (opt) opt.value = finalId;
+        box.value = finalId;
+      }
+      then();
+    });
+    return true;
+  }
+
+  /* Cancel on a new assessment that has something in it asks first: a
+     rubric made for it is kept only when the assessment is created. */
+  function cancelAssessForm() {
+    var title = ((document.getElementById('af-title') || {}).value || '').trim();
+    var filled =
+      !_editingAssessId && (!!title || !!_pendingFormRubric || !!document.querySelector('.af-tag-cb:checked'));
+    if (!filled) {
+      hideNewForm();
+      return;
+    }
+    _formDialog(
+      'Discard This Assessment?',
+      (title || 'This assessment') +
+        ' hasn’t been created.' +
+        (_pendingFormRubric ? ' The rubric you made for it isn’t kept either.' : ''),
+      [
+        { label: 'Keep Editing', style: 'cancel' },
+        { label: 'Discard', style: 'danger', run: hideNewForm },
+      ],
+    );
+  }
+
+  /* A small dialog: a title, a message and buttons, the last the default. */
+  function _formDialog(title, message, buttons) {
+    var trigger = document.activeElement;
+    var overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'af-dialog-title');
+    // html-safe: the title, message and labels go through esc()
+    overlay.innerHTML =
+      '<div class="confirm-card af-dialog-card"><div class="confirm-title" id="af-dialog-title">' +
+      esc(title) +
+      '</div><div class="confirm-message">' +
+      esc(message) +
+      '</div><div class="confirm-actions">' +
+      buttons
+        .map(function (b, i) {
+          return (
+            '<button type="button" class="' +
+            (b.style === 'cancel' || b.style === 'secondary' ? 'confirm-cancel' : 'confirm-ok ' + esc(b.style)) +
+            '" data-i="' +
+            i +
+            '"' +
+            (b.disabled ? ' disabled' : '') +
+            '>' +
+            esc(b.label) +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div></div>';
+    var close = function () {
+      overlay.remove();
+      if (trigger && document.body.contains(trigger) && trigger.focus) trigger.focus();
+    };
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) return close();
+      var b = e.target.closest('[data-i]');
+      if (!b) return;
+      var def = buttons[Number(b.dataset.i)];
+      close();
+      if (def && def.run) def.run();
+    });
+    overlay.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    });
+    document.body.appendChild(overlay);
+    var last = overlay.querySelector('.confirm-actions button:last-child:not([disabled])');
+    if (last) last.focus();
   }
 
   function toggleSectionTags(secId) {
@@ -3474,6 +3690,9 @@ window.PageAssignments = (function () {
       return;
     }
     if (!_formCategoryChosen()) return;
+    // A rubric made for this assessment is saved now, then the assessment
+    // with the rubric's saved id (redesign PR 8).
+    if (_persistPendingFormRubric(saveNewAssess)) return;
     var dateAssigned = (document.getElementById('af-date-assigned') || {}).value || courseToday(activeCourse);
     var date = dateAssigned;
     var description = (document.getElementById('af-desc') ? document.getElementById('af-desc').value : '').trim();
@@ -3590,6 +3809,12 @@ window.PageAssignments = (function () {
       return;
     }
     if (!_formCategoryChosen()) return;
+    if (
+      _persistPendingFormRubric(function () {
+        saveEditAssess(aid);
+      })
+    )
+      return;
     var dateAssigned = (document.getElementById('af-date-assigned') || {}).value || courseToday(activeCourse);
     var date = dateAssigned;
     var description = (document.getElementById('af-desc') ? document.getElementById('af-desc').value : '').trim();
@@ -5744,7 +5969,12 @@ window.PageAssignments = (function () {
      one ticks exactly the competencies its criteria feed, read only while
      it's chosen. Picking None leaves the ticks to edit by hand. */
   function onRubricSelect(rubricId) {
-    var rubric = rubricId ? getRubricById(activeCourse, rubricId) : null;
+    var rubric =
+      _pendingFormRubric && rubricId === _pendingFormRubric.id
+        ? _pendingFormRubric
+        : rubricId
+          ? getRubricById(activeCourse, rubricId)
+          : null;
     _rubricAutoTags = [];
     if (rubric) {
       var rubricTagIds = new Set();
@@ -6654,6 +6884,34 @@ window.PageAssignments = (function () {
     // A criterion with no competency is allowed: it counts toward the
     // overall grade only.
     var cid = activeCourse;
+    // Made from the assessment form: held, unsaved, until the assessment is
+    // created (redesign PR 8).
+    if (_editingRubric._forForm && _showingNewForm) {
+      var held = structuredClone(_editingRubric);
+      delete held._forForm;
+      delete held._isNew;
+      _pendingFormRubric = held;
+      _editingRubric = null;
+      _rubricBefore = null;
+      _rubricScored = {};
+      _rubricDirty = false;
+      var heldModal = document.getElementById('rubric-modal');
+      if (heldModal) heldModal.remove();
+      var dd = document.getElementById('af-rubric');
+      if (dd) {
+        var opt = dd.querySelector('option[value="' + held.id + '"]');
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = held.id;
+          dd.appendChild(opt);
+        }
+        opt.textContent = held.name + ' (' + held.criteria.length + ' criteria)';
+        dd.value = held.id;
+      }
+      onRubricSelect(held.id);
+      return;
+    }
+    delete _editingRubric._forForm;
     var rubrics = structuredClone(getRubrics(cid));
     var isNew = _editingRubric._isNew;
     delete _editingRubric._isNew;
@@ -6741,6 +6999,7 @@ window.PageAssignments = (function () {
   }
   function newRubricFromForm() {
     newRubricUI();
+    if (_editingRubric) _editingRubric._forForm = true;
   }
   /* Copy a rubric from another class into this one and select it on the form. */
   function rubricFromClass() {
@@ -7574,6 +7833,9 @@ window.PageAssignments = (function () {
       },
       hideNewForm: function () {
         hideNewForm();
+      },
+      cancelAssessForm: function () {
+        cancelAssessForm();
       },
       toggleAssess: function () {
         toggleAssess(el.dataset.aid);
