@@ -37,15 +37,17 @@ async function openForm(page) {
   await expect(page.locator('#af-title')).toBeVisible();
 }
 
-test('with no rubric, four ways to start; Draft waits for competencies', async ({ page }) => {
+test('with no rubric, Blank first; the scoring card reads Rubric; Draft waits for competencies', async ({ page }) => {
   await openForm(page);
-  await expect(page.locator('#af-rubric-label')).toHaveText('Rubric (optional)');
+  await expect(page.locator('.af-scoremode-btn[data-mode="proficiency"]')).toHaveText('Rubric');
+  // No "Rubric (optional)" on screen; the label is for screen readers.
+  await expect(page.locator('#af-rubric-label')).toHaveClass(/af-visually-hidden/);
   const starts = page.locator('.af-rubric-start b');
   await expect(starts).toHaveText([
-    'Choose a Rubric',
-    'Draft From Competencies',
-    'Copy From Another Class',
     'Blank Rubric',
+    'Choose a Rubric',
+    'Copy From Another Class',
+    'Draft From Competencies',
   ]);
   await expect(page.locator('[data-action="draftRubricFromComps"]')).toBeDisabled();
   await page.locator('.af-code[data-tag="QP3"]').click();
@@ -62,7 +64,6 @@ test('a chosen rubric is a card with its wording; Pick Another Rubric changes it
   const card = page.locator('#af-rubric-view .af-rubric-card');
   await expect(card.locator('.af-rubric-card-name')).toHaveText(r.name);
   await expect(card.locator('.rb-grid')).toContainText(r.first);
-  await expect(page.locator('#af-rubric-label')).toHaveText('Rubric');
   await pickRubric(page, '');
   await expect(page.locator('.af-rubric-start')).toHaveCount(4);
 });
@@ -105,4 +106,19 @@ test('Draft From Competencies opens the editor with their wording', async ({ pag
     return m ? m.textContent : '';
   });
   expect(draft).toContain('Inquiry Questions');
+});
+
+test('Last used names the rubric on the latest assessment; Use It Again chooses it', async ({ page }) => {
+  await openForm(page);
+  const want = await page.evaluate(() => {
+    const a = getAssessments('sci8')
+      .filter(x => x.rubricId && getRubricById('sci8', x.rubricId))
+      .sort((p, q) => String(q.dateAssigned || q.date || '').localeCompare(String(p.dateAssigned || p.date || '')))[0];
+    return { id: a.rubricId, name: getRubricById('sci8', a.rubricId).name };
+  });
+  const line = page.locator('.af-rubric-last');
+  await expect(line).toContainText('Last used ' + want.name);
+  await line.locator('[data-action="useLastRubric"]').click();
+  await expect(page.locator('#af-rubric')).toHaveValue(want.id);
+  await expect(page.locator('#af-rubric-view .af-rubric-card-name')).toHaveText(want.name);
 });

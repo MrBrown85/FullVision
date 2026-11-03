@@ -1653,8 +1653,26 @@
 .af-rubric-field[hidden] {
   display: none;
 }
-.af-rubric-field > .af-label {
-  margin-bottom: 8px;
+/* Named for screen readers; the Rubric scoring card says it on screen. */
+.af-visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.af-rubric-last {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 10px 2px 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-rubric-last b {
+  color: var(--text);
+  font-weight: 600;
 }
 .af-rubric-pick {
   display: flex;

@@ -818,10 +818,10 @@ window.AssessmentCopy = (function () {
     if ('dateAssigned' in patch) out.push('Date assigned → ' + _fmtDate(patch.dateAssigned));
     if ('dueDate' in patch) out.push('Due date → ' + _fmtDate(patch.dueDate));
     if ('scoreMode' in patch) {
-      var modeWords = { points: 'Points', complete: 'Complete/Incomplete', proficiency: 'Proficiency' };
+      var modeWords = { points: 'Points', complete: 'Complete/Incomplete', proficiency: 'Rubric' };
       out.push(
         'Scoring → ' +
-          (modeWords[patch.scoreMode] || patch.scoreMode || 'Proficiency') +
+          (modeWords[patch.scoreMode] || patch.scoreMode || 'Rubric') +
           (patch.scoreMode === 'points' && patch.maxPoints != null ? ' out of ' + patch.maxPoints : ''),
       );
     }
