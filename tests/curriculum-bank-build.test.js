@@ -6,7 +6,7 @@
  */
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
-import { buildBank, buildComment, buildProficiency } from '../scripts/build-curriculum-bank.mjs';
+import { buildBank, buildComment, buildCore, buildProficiency } from '../scripts/build-curriculum-bank.mjs';
 
 describe('the app bank', () => {
   it('is a fresh build of data/bc-curriculum-*.json', () => {
@@ -20,6 +20,17 @@ describe('the app bank', () => {
     const shipped = JSON.parse(js.slice(js.indexOf('{'), js.lastIndexOf(';')));
     expect(shipped).toEqual(buildComment());
     expect(Object.keys(shipped.ids)).toHaveLength(5029);
+  });
+
+  it('ships the Core Competencies as a fresh build of data/bc-core-competencies.json', () => {
+    const js = readFileSync('shared/bank-core-competencies.js', 'utf-8');
+    const shipped = JSON.parse(js.slice(js.indexOf('{'), js.lastIndexOf(';')));
+    expect(shipped).toEqual(buildCore());
+    expect(Object.keys(shipped).sort()).toEqual(['COL', 'COM', 'CRT', 'CT', 'PAR', 'PPI', 'SAR']);
+    // The first sentence, word for word.
+    const core = JSON.parse(readFileSync('data/bc-core-competencies.json', 'utf-8'));
+    expect(core.COL.description[0].startsWith(shipped.COL.description)).toBe(true);
+    expect(shipped.COL.description.endsWith('.')).toBe(true);
   });
 
   it('ships the level descriptors as a fresh build of data/bc-curriculum-proficiency.json', () => {

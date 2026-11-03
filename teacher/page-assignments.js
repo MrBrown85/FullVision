@@ -1910,8 +1910,367 @@ window.PageAssignments = (function () {
     }
   }
 
+  /* ── The assessment form's hover-overs (redesign PR 13) ──────────
+     Each answers the question a teacher has at that field, from data the
+     class already holds, in the shared #gb-tooltip: a competency, a folder,
+     the rubric, the category, Date Assigned's term, the Factor and a Core
+     Competency. On hover (under the field) and keyboard focus (over it when
+     there's room, so the next field stays in view). */
+  var _afTipSource = null;
+
+  function _afSecTagIds(secs) {
+    return (secs || [])
+      .map(function (sec) {
+        return sec.tags && sec.tags[0] ? sec.tags[0].id : '';
+      })
+      .filter(Boolean)
+      .join(',');
+  }
+
+  // The class's other assessments (not the one being edited), newest first.
+  function _afOtherAssessments(cid) {
+    return getAssessments(cid)
+      .filter(function (a) {
+        return a && a.id !== _editingAssessId;
+      })
+      .sort(function (a, b) {
+        return String(b.dateAssigned || b.date || '').localeCompare(String(a.dateAssigned || a.date || ''));
+      });
+  }
+
+  function _afPlural(n, one, many) {
+    return n + ' ' + (n === 1 ? one : many);
+  }
+
+  function _afLatest(list) {
+    var a = list[0];
+    if (!a) return '';
+    var d = a.dateAssigned || a.date;
+    return 'last ' + a.title + (d ? ', ' + formatDate(d) : '');
+  }
+
+  // { html, dark } for one hover target, or null.
+  function _afTipContent(el) {
+    var cid = activeCourse;
+    var kind = el.dataset.afTip;
+    var all = _afOtherAssessments(cid);
+    if (kind === 'comp') {
+      var tag = getTagById(cid, el.dataset.tag);
+      if (!tag) return null;
+      var sec = (getSections(cid) || []).find(function (x) {
+        return (x.tags || []).some(function (t) {
+          return t.id === tag.id;
+        });
+      });
+      var used = all.filter(function (a) {
+        return (a.tagIds || []).indexOf(tag.id) >= 0;
+      });
+      var icans = (tag.i_can_statements || []).filter(Boolean);
+      // Where it comes from: the curriculum, the course and its folder.
+      var folder = sec && sec.groupId ? getCompetencyGroupById(cid, sec.groupId) : null;
+      var source = [
+        tag.bank_id ? 'BC Curriculum' : '',
+        (COURSES[cid] || {}).name,
+        folder ? folder.name : sec ? sec.name : '',
+      ]
+        .filter(Boolean)
+        .join(' \u00b7 ');
+      return {
+        dark: true,
+        html:
+          '<div class="gb-code-tip"><strong>' +
+          esc([tag.code, tag.label || tag.shortName].filter(Boolean).join(' \u00b7 ')) +
+          '</strong>' +
+          (tag.text ? '<div>' + esc(tag.text) + '</div>' : '') +
+          (icans.length
+            ? '<ul class="gb-code-tip-icans">' +
+              icans
+                .map(function (x) {
+                  return '<li>' + esc(x) + '</li>';
+                })
+                .join('') +
+              '</ul>'
+            : '') +
+          '<div class="gb-code-tip-group">' +
+          esc(source) +
+          '</div><div class="af-tip-strong">' +
+          esc(
+            used.length
+              ? 'Scored on ' + _afPlural(used.length, 'assessment', 'assessments') + ' so far \u00b7 ' + _afLatest(used)
+              : 'Not scored on any assessment yet.',
+          ) +
+          '</div></div>',
+      };
+    }
+    if (kind === 'folder') {
+      var ids = String(el.dataset.tags || '')
+        .split(',')
+        .filter(Boolean);
+      if (!ids.length) return null;
+      var counts = _compCounts(cid, _editingAssessId);
+      return {
+        dark: false,
+        html:
+          '<div class="gb-tip-head">' +
+          esc(el.dataset.name + ' \u00b7 ' + _afPlural(ids.length, 'competency', 'competencies')) +
+          '</div>' +
+          ids
+            .map(function (id) {
+              var t = getTagById(cid, id);
+              var n = counts[id] || 0;
+              return (
+                '<div class="gb-tip-row"><span class="gb-tip-label">' +
+                esc([t && t.code, t && (t.label || t.shortName)].filter(Boolean).join(' ')) +
+                '</span><span class="gb-tip-val">' +
+                esc(_afPlural(n, 'assessment', 'assessments')) +
+                '</span></div>'
+              );
+            })
+            .join('') +
+          '<div class="gb-tip-note gb-tip-foot">How many assessments have scored each one so far this year.</div>',
+      };
+    }
+    if (kind === 'rubric') {
+      var rid = (document.getElementById('af-rubric') || {}).value;
+      var rubric =
+        _pendingFormRubric && _pendingFormRubric.id === rid ? _pendingFormRubric : rid ? getRubricById(cid, rid) : null;
+      if (!rubric) return null;
+      var on = all.filter(function (a) {
+        return a.rubricId === rubric.id;
+      });
+      return {
+        dark: false,
+        html:
+          '<div class="gb-tip-head">' +
+          esc(rubric.name + ' \u00b7 ' + _afPlural((rubric.criteria || []).length, 'criterion', 'criteria')) +
+          '</div>' +
+          (rubric.criteria || [])
+            .map(function (c) {
+              return (
+                '<div class="gb-tip-row"><span class="gb-tip-label">' +
+                esc(c.name || '') +
+                '</span><span class="gb-tip-val">' +
+                esc(
+                  (c.tagIds || [])
+                    .map(function (id) {
+                      var t = getTagById(cid, id);
+                      return (t && t.code) || id;
+                    })
+                    .join(' '),
+                ) +
+                '</span></div>'
+              );
+            })
+            .join('') +
+          '<div class="gb-tip-note gb-tip-foot">' +
+          esc(
+            on.length
+              ? 'Used on ' + _afPlural(on.length, 'assessment', 'assessments') + ' \u00b7 ' + _afLatest(on)
+              : 'Not used on any other assessment yet.',
+          ) +
+          '</div>',
+      };
+    }
+    if (kind === 'category') {
+      var catId = el.value;
+      var cat = catId ? getCategoryById(cid, catId) : null;
+      if (!cat) return null;
+      var inIt = all.filter(function (a) {
+        return (a.categoryId || a.category_id) === catId;
+      }).length;
+      return {
+        dark: true,
+        html:
+          '<div class="gb-code-tip"><strong>' +
+          esc(cat.name) +
+          '</strong><div class="gb-code-tip-group">' +
+          esc(_categoryChipTip(cid, catId) + ' ' + _afPlural(inIt, 'assessment', 'assessments') + ' in it so far.') +
+          '</div></div>',
+      };
+    }
+    if (kind === 'date') {
+      var d = el.value;
+      var term = d
+        ? (getReportingTerms(cid) || []).find(function (t) {
+            return t.starts_on && t.ends_on && d >= t.starts_on && d <= t.ends_on;
+          })
+        : null;
+      return {
+        dark: true,
+        html: term
+          ? '<div class="gb-code-tip"><strong>' +
+            esc('In ' + term.label) +
+            '</strong><div class="gb-code-tip-group">' +
+            esc(
+              formatDate(term.starts_on) +
+                ' to ' +
+                formatDate(term.ends_on) +
+                '. Its scores count in ' +
+                term.label +
+                ' and on its report.',
+            ) +
+            '</div></div>'
+          : '<div class="gb-code-tip"><strong>' +
+            esc(d ? 'In No Reporting Term' : 'No Date') +
+            '</strong><div class="gb-code-tip-group">Its scores count in All Time only.</div></div>',
+      };
+    }
+    if (kind === 'factor') {
+      var w = parseFloat(el.value) || 1;
+      var pct = courseShowsLetterGrades(COURSES[cid]) ? ' and the course %' : '';
+      var how =
+        w === 1
+          ? 'Counts once toward each competency it scores' + pct + '. 2x counts it twice; 0.5x counts it half.'
+          : w === 2
+            ? 'Counts twice toward each competency it scores' + pct + '.'
+            : w === 0.5
+              ? 'Counts half toward each competency it scores' + pct + '.'
+              : 'Counts ' + w + 'x toward each competency it scores' + pct + '.';
+      return {
+        dark: true,
+        html:
+          '<div class="gb-code-tip"><strong>' +
+          esc('Factor ' + _factorLabel(w)) +
+          '</strong><div class="gb-code-tip-group">' +
+          esc(how) +
+          '</div></div>',
+      };
+    }
+    if (kind === 'core') {
+      var cc = getCoreCompetency(el.dataset.cc);
+      if (!cc) return null;
+      var bank = window.BANK_CORE_COMPETENCIES && window.BANK_CORE_COMPETENCIES[cc.id];
+      var tagged = all.filter(function (a) {
+        return (a.coreCompetencyIds || []).indexOf(cc.id) >= 0;
+      });
+      return {
+        dark: true,
+        html:
+          '<div class="gb-code-tip"><strong>' +
+          esc(cc.label) +
+          '</strong>' +
+          (bank ? '<div>' + esc(bank.description) + '</div>' : '') +
+          '<div class="gb-code-tip-group">' +
+          esc(
+            cc.group +
+              ' \u00b7 tagged on ' +
+              tagged.length +
+              ' of ' +
+              _afPlural(all.length, 'assessment', 'assessments') +
+              (tagged.length ? ' \u00b7 last ' + tagged[0].title : ''),
+          ) +
+          '</div></div>',
+      };
+    }
+    return null;
+  }
+
+  // The Ministry's Core Competency descriptions load the first time they're needed.
+  var _afCoreLoading = null;
+  function _afLoadCore() {
+    if (window.BANK_CORE_COMPETENCIES || _afCoreLoading || typeof document === 'undefined') return _afCoreLoading;
+    _afCoreLoading = new Promise(function (resolve) {
+      var s = document.createElement('script');
+      s.src = '/shared/bank-core-competencies.js';
+      s.onload = s.onerror = function () {
+        resolve();
+      };
+      document.head.appendChild(s);
+    });
+    return _afCoreLoading;
+  }
+
+  function _showAfTip(el, byKeyboard) {
+    var tip = document.getElementById('gb-tooltip');
+    if (!tip) return;
+    if (el.dataset.afTip === 'core' && !window.BANK_CORE_COMPETENCIES) {
+      var load = _afLoadCore();
+      if (load)
+        load.then(function () {
+          if (_afTipSource === el) _showAfTip(el, byKeyboard);
+        });
+    }
+    var content = _afTipContent(el);
+    if (!content) return _hideAfTip();
+    _hideChipTip();
+    tip.className = (content.dark ? 'dark ' : '') + 'af-tip';
+    tip.setAttribute('role', 'tooltip');
+    // html-safe: _afTipContent escapes every value
+    tip.innerHTML = content.html;
+    tip.style.display = 'block';
+    if (_afTipSource && _afTipSource !== el) _afUndescribe(_afTipSource);
+    if (_afTipSource !== el) {
+      // Keep what the field was already described by (the category's hint).
+      el.dataset.afDescribedBy = el.getAttribute('aria-describedby') || '';
+      el.setAttribute('aria-describedby', (el.dataset.afDescribedBy + ' gb-tooltip').trim());
+    }
+    _afTipSource = el;
+    var rect = el.getBoundingClientRect();
+    var left = rect.left + rect.width / 2 - tip.offsetWidth / 2;
+    if (left < 8) left = 8;
+    if (left + tip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - tip.offsetWidth - 8;
+    var above = rect.top - tip.offsetHeight - 6;
+    var below = rect.bottom + 6;
+    var top = byKeyboard && above >= 8 ? above : below;
+    if (top + tip.offsetHeight > window.innerHeight - 8) top = above >= 8 ? above : 8;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+
+  function _afUndescribe(el) {
+    var before = el.dataset.afDescribedBy;
+    if (before) el.setAttribute('aria-describedby', before);
+    else el.removeAttribute('aria-describedby');
+    delete el.dataset.afDescribedBy;
+  }
+
+  function _hideAfTip() {
+    if (!_afTipSource) return;
+    _afUndescribe(_afTipSource);
+    _afTipSource = null;
+    var tip = document.getElementById('gb-tooltip');
+    if (tip) {
+      tip.style.display = 'none';
+      tip.className = '';
+      tip.removeAttribute('role');
+    }
+  }
+
+  function _afTipTarget(e) {
+    var el = e.target && e.target.closest ? e.target.closest('[data-af-tip]') : null;
+    return el && el.closest('#new-assess-form') ? el : null;
+  }
+  function _afTipOver(e) {
+    var el = _afTipTarget(e);
+    if (el && el !== _afTipSource) _showAfTip(el, false);
+  }
+  function _afTipOut(e) {
+    var el = _afTipTarget(e);
+    if (
+      el &&
+      el === _afTipSource &&
+      !(e.relatedTarget && el.contains(e.relatedTarget)) &&
+      el !== document.activeElement
+    )
+      _hideAfTip();
+  }
+  function _afTipFocus(e) {
+    var el = _afTipTarget(e);
+    if (el) _showAfTip(el, true);
+  }
+  function _afTipBlur(e) {
+    var el = _afTipTarget(e);
+    if (el && el === _afTipSource) _hideAfTip();
+  }
+  // A changed category, date or Factor updates its open tip.
+  function _afTipChange(e) {
+    var el = _afTipTarget(e);
+    if (el && el === _afTipSource) _showAfTip(el, el === document.activeElement);
+  }
+
   function render() {
     _hideChipTip();
+    _hideAfTip();
     if (_grader) return _renderGrader();
     var cid = activeCourse;
     var course = COURSES[cid];
@@ -2030,6 +2389,8 @@ window.PageAssignments = (function () {
       '<div class="af-tag-row">' +
       '<label class="af-tag-item' +
       (checked ? ' checked' : '') +
+      '" data-af-tip="comp" data-tag="' +
+      esc(tag.id) +
       '" data-section="' +
       sec.id +
       '" style="border-left:3px solid ' +
@@ -2163,7 +2524,7 @@ window.PageAssignments = (function () {
       '<div class="af-row af-row-what">' +
       '<div class="af-field">' +
       '<label class="af-label">Category</label>' +
-      '<select class="af-input" id="af-category" aria-describedby="af-category-hint">' +
+      '<select class="af-input" id="af-category" aria-describedby="af-category-hint" data-af-tip="category">' +
       // A class with categories needs one on every scored assessment, as
       // Teams does; the teacher picks it, nothing is chosen for them.
       (categories.length === 0
@@ -2208,7 +2569,7 @@ window.PageAssignments = (function () {
       '</div>' +
       '<div class="af-field">' +
       '<label class="af-label">Date Assigned</label>' +
-      '<input class="af-input" id="af-date-assigned" type="date" value="' +
+      '<input class="af-input" id="af-date-assigned" data-af-tip="date" type="date" value="' +
       esc(dateAssigned) +
       '" data-action-change="autoSetDueDate">' +
       '</div>' +
@@ -2269,7 +2630,7 @@ window.PageAssignments = (function () {
       (scoreMode === 'dibels' ? ' hidden' : '') +
       '>' +
       '<label class="af-label" for="af-weight">Factor</label>' +
-      '<select class="af-input" id="af-weight">' +
+      '<select class="af-input" id="af-weight" data-af-tip="factor">' +
       _factorChoices(weight)
         .map(function (w) {
           return '<option value="' + w + '"' + (w === weight ? ' selected' : '') + '>' + _factorLabel(w) + '</option>';
@@ -2399,7 +2760,11 @@ window.PageAssignments = (function () {
           '<span style="width:8px;height:8px;border-radius:50%;background:' +
           cssColor(g.color) +
           ';flex-shrink:0"></span>' +
-          '<span style="font-size:var(--text-xs);font-weight:600;color:var(--text-2);">' +
+          '<span class="af-list-group-name" tabindex="0" data-af-tip="folder" data-tags="' +
+          esc(_afSecTagIds(gi.secs)) +
+          '" data-name="' +
+          esc(g.name) +
+          '" style="font-size:var(--text-xs);font-weight:600;color:var(--text-2);">' +
           esc(g.name) +
           '</span></div>';
         gi.secs.forEach(function (sec) {
@@ -2433,7 +2798,7 @@ window.PageAssignments = (function () {
         '"' +
         ' style="--cc-color:' +
         cc.color +
-        '" data-action="toggleActive">' +
+        '" data-af-tip="core" data-action="toggleActive">' +
         '<span class="af-cc-dot" style="background:' +
         cc.color +
         '"></span>' +
@@ -2833,7 +3198,7 @@ window.PageAssignments = (function () {
       var n = (rubric.criteria || []).length;
       view.innerHTML =
         '<div class="af-rubric-card">' +
-        '<div class="af-rubric-card-head"><span class="af-rubric-card-name">' +
+        '<div class="af-rubric-card-head"><span class="af-rubric-card-name" tabindex="0" data-af-tip="rubric">' +
         esc(rubric.name) +
         '</span><span class="af-rubric-card-meta">' +
         esc(
@@ -3364,7 +3729,11 @@ window.PageAssignments = (function () {
         html += '<div class="af-codes-course">' + esc(subjectName[row.subject] || row.subject) + '</div>';
       }
       html +=
-        '<div class="af-codes-group"><span class="af-codes-group-name">' +
+        '<div class="af-codes-group"><span class="af-codes-group-name" tabindex="0" data-af-tip="folder" data-tags="' +
+        esc(_afSecTagIds(row.secs)) +
+        '" data-name="' +
+        esc(row.name) +
+        '">' +
         (row.color ? '<span class="af-codes-dot" style="background:' + cssColor(row.color) + '"></span>' : '') +
         esc(row.name) +
         '</span><span class="af-codes-chips">';
@@ -3429,7 +3798,9 @@ window.PageAssignments = (function () {
         .map(function (t) {
           var tag = getTagById(cid, t);
           return (
-            '<span class="af-comp-chip"><b>' +
+            '<span class="af-comp-chip" tabindex="0" data-af-tip="comp" data-tag="' +
+            esc(t) +
+            '"><b>' +
             esc((tag && tag.code) || t) +
             '</b>' +
             esc((tag && (tag.label || tag.shortName)) || '') +
@@ -3590,6 +3961,7 @@ window.PageAssignments = (function () {
     }
   }
   function hideNewForm() {
+    _hideAfTip();
     _showingNewForm = false;
     _editingAssessId = null;
     _pendingFormRubric = null;
@@ -10199,6 +10571,12 @@ window.PageAssignments = (function () {
     _addDocListener('input', _compInput);
     _addDocListener('mouseover', _codeHover);
     _addDocListener('focusin', _codeHover);
+    _addDocListener('mouseover', _afTipOver);
+    _addDocListener('mouseout', _afTipOut);
+    _addDocListener('focusin', _afTipFocus);
+    _addDocListener('focusout', _afTipBlur);
+    _addDocListener('change', _afTipChange);
+    _addDocListener('scroll', _hideAfTip, true);
     ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
       _addDocListener(type, _statusLocksAfterEvent);
     });

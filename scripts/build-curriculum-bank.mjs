@@ -31,6 +31,12 @@
  * id: set index }, levels: [[Emerging, Developing, Proficient, Extending],
  * ...] }, each distinct set stored once.
  *
+ * And shared/bank-core-competencies.js, each Core Competency's name, group
+ * and the first sentence of the Ministry's description
+ * (data/bc-core-competencies.json), loaded the first time the assessment
+ * form's Core Competency hover shows: window.BANK_CORE_COMPETENCIES = { id:
+ * { name, group, description } }.
+ *
  * Usage: node scripts/build-curriculum-bank.mjs [--check]
  *   --check  fail if the committed files differ from a fresh build. */
 import { readFileSync, writeFileSync } from 'fs';
@@ -124,6 +130,23 @@ export function buildProficiency() {
   return { ids, levels };
 }
 
+export function buildCore() {
+  const core = read('data/bc-core-competencies.json');
+  const out = {};
+  Object.keys(core)
+    .filter(k => k[0] !== '_')
+    .forEach(id => {
+      const c = core[id];
+      const para = (c.description || [])[0] || '';
+      // The first sentence, word for word.
+      const m = para.match(/^.*?[.!?](?=\s|$)/);
+      const description = m ? m[0] : para;
+      if (!c.name || !description) throw new Error(id + ' is missing its name or description');
+      out[id] = { name: c.name, group: c.group || '', description };
+    });
+  return out;
+}
+
 function main() {
   const check = process.argv.includes('--check');
   const { bank, missing } = buildBank();
@@ -139,14 +162,20 @@ function main() {
     'window.BANK_PROFICIENCY = ' +
     JSON.stringify(buildProficiency()) +
     ';\n';
+  const coreJs =
+    '/* Built by scripts/build-curriculum-bank.mjs from data/bc-core-competencies.json; do not edit. */\n' +
+    'window.BANK_CORE_COMPETENCIES = ' +
+    JSON.stringify(buildCore()) +
+    ';\n';
   if (check) {
     const sameJson = readFileSync(resolve(root, 'curriculum_by_course.json'), 'utf-8') === json;
     const sameJs = readFileSync(resolve(root, 'curriculum_data.js'), 'utf-8') === js;
     const sameComment = readFileSync(resolve(root, 'shared/bank-comment.js'), 'utf-8') === commentJs;
     const sameProf = readFileSync(resolve(root, 'shared/bank-proficiency.js'), 'utf-8') === profJs;
-    if (!sameJson || !sameJs || !sameComment || !sameProf) {
+    const sameCore = readFileSync(resolve(root, 'shared/bank-core-competencies.js'), 'utf-8') === coreJs;
+    if (!sameJson || !sameJs || !sameComment || !sameProf || !sameCore) {
       console.error(
-        'curriculum_by_course.json, curriculum_data.js, shared/bank-comment.js or shared/bank-proficiency.js is not a fresh build; run node scripts/build-curriculum-bank.mjs',
+        'curriculum_by_course.json, curriculum_data.js or a shared/bank-*.js file is not a fresh build; run node scripts/build-curriculum-bank.mjs',
       );
       process.exit(1);
     }
@@ -157,6 +186,7 @@ function main() {
   writeFileSync(resolve(root, 'curriculum_data.js'), js);
   writeFileSync(resolve(root, 'shared/bank-comment.js'), commentJs);
   writeFileSync(resolve(root, 'shared/bank-proficiency.js'), profJs);
+  writeFileSync(resolve(root, 'shared/bank-core-competencies.js'), coreJs);
   const comps = Object.values(bank).reduce(
     (n, c) => n + c.categories.reduce((m, cat) => m + cat.competencies.length, 0),
     0,
