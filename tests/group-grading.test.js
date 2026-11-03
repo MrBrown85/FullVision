@@ -307,3 +307,56 @@ describe('review fixes (Nov 1 2026)', () => {
     ).toBe(null);
   });
 });
+
+describe('a status sets the group grade aside (Nov 3 2026 sweep)', () => {
+  it('marking every member Missing keeps the grade and comment, and taking a status off brings them back', () => {
+    upsertScore(CID, 'd', 'grp', 't1', 3, '', 'summative', '');
+    saveScoreComment(CID, 'd', 'grp', 'Great lab');
+    applyAssignmentStatus(CID, 'd', 'grp', 'NS');
+    expect(canSetAssignmentStatus(CID, 'e', 'grp', 'EXC')).toBe(true);
+    applyAssignmentStatus(CID, 'e', 'grp', 'EXC');
+    expect(levels('e', 'grp')).toEqual([]);
+    expect(getAssessments(CID).find(x => x.id === 'grp').groupGradeAside).toBeTruthy();
+    expect(_collabConfigFromAssessment(getAssessments(CID).find(x => x.id === 'grp')).groupGradeAside).toBeTruthy();
+    setAssignmentStatus(CID, 'd', 'grp', null);
+    expect(levels('d', 'grp')).toEqual([['t1', 3, 0]]);
+    expect(getScoreComment(CID, 'd', 'grp')).toBe('Great lab');
+    expect(getAssessments(CID).find(x => x.id === 'grp').groupGradeAside).toBeUndefined();
+    setAssignmentStatus(CID, 'e', 'grp', null);
+    expect(levels('e', 'grp')).toEqual([['t1', 3, 0]]);
+    expect(getScoreComment(CID, 'e', 'grp')).toBe('Great lab');
+  });
+
+  it('a points pair keeps its points when both are Excused and both come off at once', () => {
+    setPointsScore(CID, 'a', 'pr', 8);
+    setAssignmentStatus(CID, 'a', 'pr', 'EXC');
+    setAssignmentStatus(CID, 'b', 'pr', 'EXC');
+    expect(getPointsScore(CID, 'b', 'pr')).toBe(null);
+    var st = getAssignmentStatuses(CID);
+    delete st['a:pr'];
+    delete st['b:pr'];
+    saveAssignmentStatuses(CID, st);
+    expect(getPointsScore(CID, 'a', 'pr')).toBe(8);
+    expect(getPointsScore(CID, 'b', 'pr')).toBe(8);
+  });
+
+  it('a member whose grade is their own is not marked Missing, and keeps it', () => {
+    // Graded one by one, then made Group work: e is still linked.
+    var list = getAssessments(CID);
+    list.find(x => x.id === 'grp').collaboration = 'individual';
+    saveAssessments(CID, list);
+    saveScores(CID, {
+      d: [{ assessmentId: 'grp', tagId: 't1', score: 3, type: 'summative', date: '2026-10-31' }],
+      e: [{ assessmentId: 'grp', tagId: 't1', score: 2, type: 'summative', date: '2026-10-31', note: 'Own comment' }],
+    });
+    list = getAssessments(CID);
+    list.find(x => x.id === 'grp').collaboration = 'group';
+    saveAssessments(CID, list);
+    expect(isLinkedGroupMember(CID, 'grp', 'e')).toBe(true);
+    expect(canSetAssignmentStatus(CID, 'e', 'grp', 'NS')).toBe(false);
+    expect(applyAssignmentStatus(CID, 'e', 'grp', 'NS')).toBe(false);
+    expect(levels('e', 'grp')).toEqual([['t1', 2, 0]]);
+    expect(getScoreComment(CID, 'e', 'grp')).toBe('Own comment');
+    expect(canSetAssignmentStatus(CID, 'd', 'grp', 'NS')).toBe(false);
+  });
+});

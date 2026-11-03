@@ -71,10 +71,15 @@ function reply(status: number, body: unknown, origin: string | null): Response {
 
 /* The caller's address as a keyed hash: the same phone on the same network
    hashes the same way for the rate limits, and the address itself is never
-   stored or logged. */
+   stored or logged. The address comes from cf-connecting-ip, which Supabase's
+   Cloudflare edge sets to the connecting address and overwrites when a caller
+   sends one. The first X-Forwarded-For entry is whatever the caller sent, so
+   a made-up one per request got around the per-address limit (Nov 3 bug
+   sweep). Without cf-connecting-ip, as when served locally, the last entry is
+   the one the nearest proxy added. */
 export async function ipHash(req: Request, key: string): Promise<string> {
-  const fwd = req.headers.get('x-forwarded-for') || '';
-  const ip = (fwd.split(',')[0] || req.headers.get('cf-connecting-ip') || 'unknown').trim();
+  const fwd = (req.headers.get('x-forwarded-for') || '').split(',');
+  const ip = (req.headers.get('cf-connecting-ip') || fwd[fwd.length - 1] || '').trim() || 'unknown';
   const k = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(key),
