@@ -2067,13 +2067,15 @@ window.ReportBlocks = (function () {
      The totals the teacher copied from MyEd into the Term Questionnaire:
      classes absent and times late, this term or the year to date. One
      line at Row width, two figures at Side by Side. Nothing to print when
-     neither number is entered. */
+     neither number is entered. When an earlier report's attendance is
+     blank, this term's share is unknown, so the block prints the year to
+     date (Colin, 2026-11-03). */
   function renderBlockAttendance(cid, student, ctx, options) {
     options = options || {};
     const half = options.size === 'half';
     const att = getTermAttendance(cid, student.id, ctx.termId);
     if (att.absences == null && att.lates == null) return '';
-    const year = options.period === 'year';
+    const year = options.period === 'year' || !!att.termUnknown;
     const absent = year ? att.absences : att.absencesThisTerm;
     const late = year ? att.lates : att.latesThisTerm;
     const n = v => (v == null ? '—' : String(v));

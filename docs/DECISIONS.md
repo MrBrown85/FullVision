@@ -396,6 +396,10 @@ Context: a review of the report printer (three passes; its screenshots of real r
 
 17. **No length limit on a comment** (Colin, 2026-11-02: "i don't care about comment maximum length for myedbc - don't restrict users"). The class's character limit is information only: past it the count turns orange and says "over the limit", and a sentence over 20 words is counted the same way, but Approve and Next stays on and Generate never cuts a draft to fit. Supersedes the character limit's blocking from plan PR 8.
 
+## Attendance when an earlier report is blank (2026-11-03)
+
+Colin: "Year total, no 'this term'." Attendance is entered as totals to date, and this term's share is the total less the last earlier report’s (Report forms, 12). When there is an earlier report (a reporting term before this one, or with no terms set, Report 2 or later) but its attendance is blank, this term's share is unknown; the total is no longer called "this term" (the Nov 3 bug sweep found Generate writing "This term, she has been absent for 14 classes" from a year total of 14). In that case Generate states the year total, using only the attendance sentences that don't say "this term" (h63 and h69 say "so far"; h74 and h75 give no time), and a teacher's own attendance sentence that says "this term" is not offered. The printed Attendance block prints the totals under "Year to date" instead of "This term" (the fix agent's call to match; Colin can reverse it). When the earlier report has its totals, or there is no earlier report, nothing changes.
+
 ## Printed class grade sheet (2026-10-20)
 
 Context: Colin asked for a class grading spreadsheet that prints like MasterGrade did: student names down the left, assignment titles and dates across the top, a class header, narrow margins, and options when Print Grades opens. The layout follows what MasterGrade, Easy Grade Pro, Gradekeeper, MyEd's Blank Grading Sheet and paper class record books share. `teacher/grades-print.js`.

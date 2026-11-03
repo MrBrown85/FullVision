@@ -89,6 +89,68 @@ describe('term attendance', () => {
   });
 });
 
+describe('Report 2 with Report 1’s attendance blank (Colin, 2026-11-03: “Year total, no ‘this term’”)', () => {
+  // The teacher left Report 1's attendance blank and entered Max's year
+  // total of 14 at Report 2: nobody knows how many of the 14 were this term.
+  beforeEach(() => {
+    localStorage.clear();
+    delete _cache.termRatings[CID];
+    _cache.students[CID] = [MAX];
+    COURSES[CID] = { id: CID, name: 'Science 8', gradingSystem: 'proficiency' };
+    saveTermAttendance(CID, MAX.id, 'term-2', 14, '');
+  });
+
+  it('knows this term’s share is unknown, not the whole total', () => {
+    const att = getTermAttendance(CID, MAX.id, 'term-2');
+    expect(att).toMatchObject({ absences: 14, absencesThisTerm: null, termUnknown: true });
+    // Report 1 has its totals: the share is known again.
+    saveTermAttendance(CID, MAX.id, 'term-1', 5, '');
+    expect(getTermAttendance(CID, MAX.id, 'term-2')).toMatchObject({ absencesThisTerm: 9, termUnknown: false });
+    // Report 1 itself has no earlier report.
+    expect(getTermAttendance(CID, MAX.id, 'term-1')).toMatchObject({ absencesThisTerm: 5, termUnknown: false });
+  });
+
+  it('prints the total under Year to date, not This term', () => {
+    const html = ReportBlocks.renderBlockAttendance(CID, MAX, { termId: 'term-2' }, {});
+    expect(html).toContain('Classes Absent</span> <b>14</b>');
+    expect(html).toContain('Year to date');
+    expect(html).not.toContain('This term');
+    const half = ReportBlocks.renderBlockAttendance(CID, MAX, { termId: 'term-2' }, { size: 'half' });
+    expect(half).toContain('Year to date');
+    expect(half).not.toContain('This term');
+  });
+
+  it('Generate states the year total with no “this term” sentence', () => {
+    const ctx = CommentBank.context(CommentBank.facts(CID, MAX, 'term-2'), {});
+    const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
+    const att = habits.rows.filter(r => r.group === 'Attendance').map(r => r.text);
+    // h63 only: the other absences-only frames (h62, h64-h66) say "this term".
+    expect(att).toEqual(['In attendance, he has missed 14 classes so far.']);
+    for (let seed = 1; seed <= 20; seed++) {
+      const d = CommentBank.draft(ctx, { seed });
+      const said = d.sentences.filter(x => x.step === 'attendance').map(x => x.text);
+      expect(said).toHaveLength(1);
+      expect(said[0]).toMatch(/^In attendance, (he|Max) has missed 14 classes so far\.$/);
+    }
+  });
+
+  it('offers no teacher-written attendance sentence that says “this term”', () => {
+    const ctx = CommentBank.context(CommentBank.facts(CID, MAX, 'term-2'), {});
+    const mine = text => ({
+      id: 'mine:t',
+      part: 'habits',
+      group: 'Attendance',
+      text,
+      needs: ['absentCount'],
+      claims: ['attendance'],
+      mine: true,
+      src: 'yours',
+    });
+    expect(CommentBank.fits(mine('This term, {he} has missed {absentCount} classes.'), ctx)).toBe(false);
+    expect(CommentBank.fits(mine('{He} has missed {absentCount} classes so far this year.'), ctx)).toBe(true);
+  });
+});
+
 describe('the Attendance card’s boxes (live run: 99999999 and 1e+21 printed, 2.7 became “two”)', () => {
   const RQ = ReportQuestionnaire;
   let hadDoc, oldDoc, els;
