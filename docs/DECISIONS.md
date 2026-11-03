@@ -174,6 +174,13 @@ Context: `STUDENT-VOICE-PLAN.md`.
 8. **Backend:** no anon-callable database functions. One Supabase Edge Function in `ca-central-1` fronts the student form, calling `student_submit` schema functions granted to the service role only; short-lived tokens, rate limiting, append-only responses.
 9. **UI:** the student page reuses the teacher mobile app's stylesheets and components; reuse is one-way.
 
+## Phone-report birthday tries (2026-11-03)
+
+The Nov 3 bug sweep found that a phone-report slip has no lifetime limit on wrong birthdays: five in a session or ten on one code in 15 minutes lock it for now (`student_submit.check`, `migrations/20261025_phone_reports.sql`), and scanning the code again starts a new session. Questionnaire slips lock for good after five wrong tries (Student voice 2).
+
+1. **Phone reports keep the session and 15-minute limits, with no lifetime lock** (Colin: "keep as is"). Students reopen a phone report as often as they like.
+2. `privacy.html` says so.
+
 ## Reporting periods (2026-10-17)
 
 Context: `ROADMAP.md` 1.2; `migrations/20261017_course_reporting_terms.sql`; [`plans/myed-integration.md`](plans/myed-integration.md) §4.2 (MyEd terms will use the same ordinals).
