@@ -7840,6 +7840,11 @@ window.PageAssignments = (function () {
       checkId = el.dataset.checkid;
     var crit = getRubricCriterion(aid, critId);
     if (!crit) return;
+    // Missing and Excused work takes no score (isScoreLocked): the box goes back.
+    if (el.checked && isScoreLocked(cid, sid, aid)) {
+      el.checked = false;
+      return;
+    }
     var before = getRubricCheckIds(cid, sid, aid);
     var after = setRubricCheck(cid, sid, aid, checkId, el.checked);
     var current = _criterionLevelNow(cid, aid, sid, crit);
@@ -11981,6 +11986,11 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var crit = _graderCriterion(aid, critId);
     if (!crit) return;
+    // Missing and Excused work takes no score (isScoreLocked): redraw the box as saved.
+    if (on && isScoreLocked(cid, focusStudentId, aid)) {
+      render();
+      return;
+    }
     var before = getRubricCheckIds(cid, focusStudentId, aid);
     var after = setRubricCheck(cid, focusStudentId, aid, checkId, on);
     var current = _criterionLevelNow(cid, aid, focusStudentId, crit);
