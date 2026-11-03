@@ -7610,15 +7610,17 @@ function getAssignmentStatus(cid, sid, aid) {
 }
 /* Missing and Excused are for work that wasn't handed in. Neither is ever
    set on work that has a score or feedback: a level, points, a Complete or
-   Incomplete mark, a DIBELS number, a criterion note or a comment. Late is
-   for work that was handed in, so it is always allowed, and a status already
-   on a cell can always be taken off. */
+   Incomplete mark, a DIBELS number, a criterion note or the Overall
+   Comment. An observation linked to the work is not feedback on it
+   (Assignment feedback, DECISIONS). Late is for work that was handed in, so
+   it is always allowed, and a status already on a cell can always be taken
+   off. */
 function hasScoreOrFeedback(cid, sid, aid) {
   var assess = _assessmentById(cid, aid);
   var entered = (getScores(cid)[sid] || []).some(function (e) {
-    return e && e.assessmentId === aid && (isScoreEntered(assess, e) || !!e.critNote || !!e.critBeyond);
+    return e && e.assessmentId === aid && (isScoreEntered(assess, e) || !!e.note || !!e.critNote || !!e.critBeyond);
   });
-  if (entered || hasAssignmentFeedback(cid, sid, aid)) return true;
+  if (entered) return true;
   var dibels = getDibelsScores(cid)[sid + ':' + aid];
   return !!dibels && Object.keys(dibels).length > 0;
 }
