@@ -90,6 +90,30 @@ describe('points work prints its own % on the report blocks', () => {
     expect(prog).not.toContain('Quiz A, Oct 1 · Quiz B');
   });
 
+  it('ranks a 17/20 (85%) above a 3+ (83%) by the % it prints', () => {
+    const lab = { id: 'L', title: 'Lab', date: '2026-10-05', tagIds: ['t1'] };
+    const pieces = [quiz('Q', '2026-10-01'), lab];
+    const scores = [sc('Q', 17), { ...sc('L', 3), mod: 1 }];
+    seed('letter', pieces, scores);
+    const home = text(ReportBlocks.renderBlockSupportHome(CID, STUDENT, {}, {}));
+    expect(home).toContain('Ask to see Quiz Q, Oct 1 · 85%');
+    expect(home).toContain('Ask about Lab, Oct 5 · 83%');
+    const prog = text(ReportBlocks.renderBlockProgress(CID, STUDENT, {}, {}));
+    expect(prog).toContain('Best Quiz Q, Oct 1 · 85%');
+    const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
+    expect(prof).toContain('Best work: Quiz Q (Oct 1), 85%.');
+    // A Both class prints the % too, so it ranks the same way.
+    seed('both', pieces, scores);
+    expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toContain(
+      'Best work: Quiz Q (Oct 1), 3.0 / 4 · 85%.',
+    );
+    // A Proficiency class ranks by level: the 3+ is the best work.
+    seed('proficiency', pieces, scores);
+    expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toContain(
+      'Best work: Lab (Oct 5), 3.3 / 4.',
+    );
+  });
+
   it('leaves a Proficiency class as it was', () => {
     seed('proficiency', [quiz('A', '2026-10-01'), quiz('B', '2026-10-05')], [sc('A', 16), sc('B', 17)]);
     const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));

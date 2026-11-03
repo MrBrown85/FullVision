@@ -673,21 +673,27 @@ window.ReportBlocks = (function () {
   function _workMark(cid, sid, w, word) {
     return _mark(cid, w.score, word, _ownPercent(cid, sid, w.a));
   }
-  /* The pieces a Best or Lowest line names: at the highest (or lowest)
-     mark, at most two, sharing the mark the line prints. In a class that
-     shows a %, pieces at one level are ordered by the % printed for them,
-     since points work prints its own. Returns { list, mark } or null. */
-  function _namedWork(cid, sid, items, best) {
-    if (!items.length) return null;
+  /* Orders pieces { a, score } best first (or lowest first, best false).
+     A Letter or Both class ranks them by the % it prints for them (points
+     work's own %, else the % the level counts as), level as tie-break, so
+     a 17/20 (85%) is above a 3+ (83%); a Proficiency class by level. */
+  function _byMark(cid, sid, best) {
     const pctOn = courseGradeMode(cid) !== 'proficiency';
     const shown = w => {
       const own = _ownPct(cid, sid, w.a);
       return own != null ? own : levelToPercent(cid, w.score);
     };
-    const sorted = items.slice().sort((x, y) => {
+    return (x, y) => {
       const [p, q] = best ? [y, x] : [x, y];
-      return p.score - q.score || (pctOn ? shown(p) - shown(q) : 0);
-    });
+      return (pctOn ? shown(p) - shown(q) : 0) || p.score - q.score;
+    };
+  }
+  /* The pieces a Best or Lowest line names: at the highest (or lowest)
+     mark (_byMark), at most two, sharing the mark the line prints.
+     Returns { list, mark } or null. */
+  function _namedWork(cid, sid, items, best) {
+    if (!items.length) return null;
+    const sorted = items.slice().sort(_byMark(cid, sid, best));
     const mark = _workMark(cid, sid, sorted[0], false);
     return { list: sorted.filter(w => _workMark(cid, sid, w, false) === mark).slice(0, 2), mark };
   }
@@ -1888,8 +1894,10 @@ window.ReportBlocks = (function () {
     if (focus) {
       const work = _sectionWork(cid, student.id, focus.sec).filter(w => assessmentInActiveTerm(cid, w.a));
       if (work.length) {
-        const best = work.slice().sort((a, b) => b.score - a.score || (b.d || '').localeCompare(a.d || ''))[0];
-        const low = work.slice().sort((a, b) => a.score - b.score || (b.d || '').localeCompare(a.d || ''))[0];
+        const hi = _byMark(cid, student.id, true);
+        const lo = _byMark(cid, student.id, false);
+        const best = work.slice().sort((a, b) => hi(a, b) || (b.d || '').localeCompare(a.d || ''))[0];
+        const low = work.slice().sort((a, b) => lo(a, b) || (b.d || '').localeCompare(a.d || ''))[0];
         if (options.see !== false && best) lines.push(['Ask to see', _workLine(cid, student.id, best)]);
         if (options.about !== false && low && (work.length > 1 || options.see === false)) {
           lines.push([
