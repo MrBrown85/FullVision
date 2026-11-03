@@ -2379,8 +2379,12 @@ window.CommentBank = (function () {
       },
       defaultFocusId: (focus && focus.sec && focus.sec.id) || null,
       focusId: rating.focusSectionId || (focus && focus.sec && focus.sec.id) || null,
-      absent: att.absencesThisTerm,
-      late: att.latesThisTerm,
+      // This term's absences and lates; the year's totals when an earlier
+      // report's attendance is blank (attendanceYear: no "this term"
+      // sentence is offered then; Colin, 2026-11-03).
+      absent: att.termUnknown ? att.absences : att.absencesThisTerm,
+      late: att.termUnknown ? att.lates : att.latesThisTerm,
+      attendanceYear: !!att.termUnknown,
       habits: rating.habits || {},
       enrolled: day(student.enrolledDate),
       classStart: classStart || '',
@@ -3973,6 +3977,11 @@ window.CommentBank = (function () {
       if (!story && STORY_SLOTS.indexOf(needs[i]) >= 0) continue;
       if (!ctx[needs[i]]) return false;
     }
+    // The year's attendance (an earlier report's is blank): no attendance
+    // sentence that says "this term", the bank's or the teacher's own
+    // (Colin, 2026-11-03).
+    if (ctx._f && ctx._f.attendanceYear && (s.claims || []).indexOf('attendance') >= 0 && /\bthis term\b/i.test(s.text))
+      return false;
     if (!_fitsMine(s, ctx)) return false;
     var when = s.when || {};
     return Object.keys(when).every(function (k) {

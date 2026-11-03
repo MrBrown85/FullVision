@@ -12635,10 +12635,20 @@ function saveTermAttendance(cid, sid, termId, absences, lates) {
 /* A report's attendance: its totals to date, the last earlier report's
    totals (each number from the latest earlier report that has it), and
    the change since then. With no earlier report, this term's change is
-   the total itself. Nulls where nothing is entered. */
+   the total itself. When there is an earlier report (a reporting term
+   before this one, or with none set, Report 2 or later) but its number is
+   blank, this term's share is unknown: that ThisTerm is null and
+   termUnknown is true, so the report states the year total (Colin,
+   2026-11-03). Nulls where nothing is entered. */
 function getTermAttendance(cid, sid, termId) {
   var mine = (getTermRatings(cid) || {})[sid] || {};
   var n = _termNumber(termId);
+  var terms = getReportingTerms(cid);
+  var hadReport = terms.length
+    ? terms.some(function (t) {
+        return t.ordinal < n;
+      })
+    : n > 1;
   var cur = mine[termId] || {};
   var earlier = Object.keys(mine)
     .filter(function (k) {
@@ -12647,15 +12657,17 @@ function getTermAttendance(cid, sid, termId) {
     .sort(function (x, y) {
       return _termNumber(y) - _termNumber(x);
     });
-  var out = { absences: _attendanceCount(cur.absences), lates: _attendanceCount(cur.lates) };
+  var out = { absences: _attendanceCount(cur.absences), lates: _attendanceCount(cur.lates), termUnknown: false };
   ['absences', 'lates'].forEach(function (f) {
     var prevKey = earlier.find(function (k) {
       return _attendanceCount(mine[k][f]) != null;
     });
     var prev = prevKey ? _attendanceCount(mine[prevKey][f]) : null;
+    var unknown = out[f] != null && prev == null && hadReport;
+    if (unknown) out.termUnknown = true;
     out['prev' + f[0].toUpperCase() + f.slice(1)] = prev;
     out[f + 'PrevTerm'] = prevKey || null;
-    out[f + 'ThisTerm'] = out[f] == null ? null : prev == null ? out[f] : out[f] - prev;
+    out[f + 'ThisTerm'] = out[f] == null || unknown ? null : prev == null ? out[f] : out[f] - prev;
   });
   return out;
 }

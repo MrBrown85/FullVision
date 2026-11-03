@@ -677,7 +677,7 @@ describe('stage 3 blocks', () => {
   it('Attendance prints the questionnaire’s totals for this term or the year, and nothing when none are entered', () => {
     stub('getTermAttendance', () => ({ absences: 5, lates: 2, absencesThisTerm: 3, latesThisTerm: 1 }));
     expect(text(ReportBlocks.renderReportBlock('term-attendance', CID, CECE, { termId: 'term-2' }, {}))).toBe(
-      'Attendance Classes Absent 3 Times Late 1 This term',
+      'Attendance Classes Absent 3 Times Late 1 This Term',
     );
     expect(
       text(
@@ -689,10 +689,10 @@ describe('stage 3 blocks', () => {
           { period: 'year', late: false },
         ),
       ),
-    ).toBe('Attendance Classes Absent 5 Year to date');
+    ).toBe('Attendance Classes Absent 5 Year to Date');
     expect(
       text(ReportBlocks.renderReportBlock('term-attendance', CID, CECE, { termId: 'term-2' }, { size: 'half' })),
-    ).toBe('Attendance This term 3 Classes Absent 1 Times Late');
+    ).toBe('Attendance This Term 3 Classes Absent 1 Times Late');
     stub('getTermAttendance', () => ({ absences: null, lates: null }));
     expect(ReportBlocks.renderReportBlock('term-attendance', CID, CECE, { termId: 'term-2' }, {})).toBe('');
   });

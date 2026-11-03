@@ -690,6 +690,8 @@ describe('Demo Mode (Science 8, Report 2)', () => {
 
   it('offers the attendance sentences once totals are entered', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
+    // Report 1's totals too, so this term's share is known.
+    saveTermAttendance(cid, st.id, 'term-1', 0, 0);
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
@@ -703,6 +705,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       expect(r.text).toMatch(/four classes/);
       expect(r.text).toMatch(/twice/);
     });
+    saveTermAttendance(cid, st.id, 'term-1', null, null);
     saveTermAttendance(cid, st.id, 'term-2', null, null);
   });
 
