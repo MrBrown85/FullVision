@@ -56,9 +56,18 @@ describe('canSetAssignmentStatus', () => {
     expect(canSetAssignmentStatus(CID, SID, 'prof', 'NS')).toBe(false);
   });
 
-  it('counts a comment on the assignment as feedback', () => {
-    addQuickOb(CID, SID, 'Good start.', [], 'neutral', null, { assessmentId: 'prof' });
+  it('counts the Overall Comment as feedback', () => {
+    saveScoreComment(CID, SID, 'prof', 'Well argued.');
+    expect(canSetAssignmentStatus(CID, SID, 'prof', 'NS')).toBe(false);
     expect(canSetAssignmentStatus(CID, SID, 'prof', 'EXC')).toBe(false);
+    saveScoreComment(CID, SID, 'pts', 'Show your work.');
+    expect(canSetAssignmentStatus(CID, SID, 'pts', 'NS')).toBe(false);
+  });
+
+  it('does not count an observation linked to the work as feedback', () => {
+    addQuickOb(CID, SID, 'Talked about the missing lab.', [], 'neutral', null, { assessmentId: 'prof' });
+    expect(canSetAssignmentStatus(CID, SID, 'prof', 'NS')).toBe(true);
+    expect(canSetAssignmentStatus(CID, SID, 'prof', 'EXC')).toBe(true);
   });
 
   it('counts DIBELS numbers as a score', () => {
@@ -68,7 +77,7 @@ describe('canSetAssignmentStatus', () => {
 
   it('always lets a status already on the cell come off', () => {
     setAssignmentStatus(CID, SID, 'prof', 'NS');
-    addQuickOb(CID, SID, 'Please hand this in.', [], 'neutral', null, { assessmentId: 'prof' });
+    saveScoreComment(CID, SID, 'prof', 'Please hand this in.');
     expect(canSetAssignmentStatus(CID, SID, 'prof', 'NS')).toBe(true);
     expect(canSetAssignmentStatus(CID, SID, 'prof', null)).toBe(true);
     setAssignmentStatus(CID, SID, 'prof', null);
