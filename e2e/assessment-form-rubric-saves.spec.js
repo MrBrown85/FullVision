@@ -62,8 +62,8 @@ test('Edit Rubric on a shared rubric asks; Edit a Copy is the default and leaves
     return { id: r.id, name: r.name, n: getAssessments('sci8').filter(a => a.rubricId === r.id).length };
   });
   await page.locator('[data-action="chooseRubric"]').click();
-  await page.locator(`#rubric-bank-overlay .rb-row[data-rid="${lab.id}"]`).click();
-  await page.locator('#rubric-bank-overlay [data-rb="pick-use"]').click();
+  await page.locator(`#af-rubric-view .af-start-row[data-rid="${lab.id}"]`).click();
+  await page.locator('#af-rubric-view [data-action="startPickUse"]').click();
   await page.locator('[data-action="editRubricFromForm"]').click();
   await expect(page.locator('#af-dialog-title')).toHaveText('Edit ' + lab.name);
   await expect(page.locator('.af-dialog-card button', { hasText: `Edit All ${lab.n + 1} Assessments` })).toBeVisible();

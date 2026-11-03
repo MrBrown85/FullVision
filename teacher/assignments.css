@@ -7666,3 +7666,156 @@ button.grader-member-name {
     animation: none;
   }
 }
+
+/* ── Rubric starts in place (rubric starts plan, PR 3) ──────────
+   The open start runs into its card's grey head; the others step back.
+   The card is the Competency Rubric's card with a deeper shadow. */
+.af-rubric-starts.has-open .af-rubric-start {
+  background: #f8f8fa;
+}
+.af-rubric-starts.has-open .af-rubric-start b {
+  color: var(--text-2);
+}
+.af-rubric-starts.has-open .af-rubric-start span {
+  color: var(--text-3);
+}
+.af-rubric-starts.has-open .af-rubric-start.is-open {
+  position: relative;
+  z-index: 3;
+  margin-bottom: -10px;
+  padding-bottom: 22px;
+  border-radius: 10px 10px 0 0;
+  background: #f2f2f4;
+}
+.af-rubric-starts.has-open .af-rubric-start.is-open b {
+  color: var(--active);
+}
+.af-rubric-starts.has-open .af-rubric-start.is-open span {
+  color: var(--text-2);
+}
+.af-start-card.af-rubric-card {
+  position: relative;
+  z-index: 2;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.1),
+    0 4px 8px rgba(0, 0, 0, 0.06),
+    0 16px 36px rgba(0, 0, 0, 0.14);
+}
+.af-start-card.joins-left {
+  border-top-left-radius: 0;
+}
+.af-start-card.joins-right {
+  border-top-right-radius: 0;
+}
+.af-start-codes {
+  font-weight: 700;
+  color: #0e7490;
+  letter-spacing: 0.01em;
+}
+.af-start-pick {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 18px;
+  height: 470px;
+  padding: 12px 12px 10px;
+}
+.af-start-side {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.af-start-search {
+  flex: none;
+}
+.af-start-list {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  margin-top: 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.af-start-group {
+  padding: 8px 8px 2px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.af-start-row {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-family: var(--font-base);
+  text-align: left;
+  cursor: pointer;
+}
+.af-start-row:hover {
+  background: var(--overlay-hover);
+}
+.af-start-row b {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.af-start-row .af-start-codes {
+  font-size: var(--text-xs);
+}
+.af-start-row small {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.af-start-row.is-on,
+.af-start-row.is-on:hover {
+  background: var(--active);
+}
+.af-start-row.is-on b,
+.af-start-row.is-on small,
+.af-start-row.is-on .af-start-codes {
+  color: #fff;
+}
+.af-start-row:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.af-start-empty {
+  margin: 12px 8px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-start-preview {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: scroll;
+  padding-right: 8px;
+}
+/* Always visible, so it's plain the grid scrolls (macOS hides plain ones). */
+.af-start-preview::-webkit-scrollbar {
+  width: 8px;
+}
+.af-start-preview::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+  background: #c7c7cc;
+}
+.af-start-preview::-webkit-scrollbar-track {
+  border-radius: 4px;
+  background: var(--divider-subtle);
+}
+.af-start-preview .rb-grid {
+  margin: 0;
+  padding: 0;
+}
+@media (max-width: 760px) {
+  .af-start-pick {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+  .af-start-list {
+    max-height: 240px;
+  }
+  .af-start-preview {
+    max-height: 360px;
+  }
+}

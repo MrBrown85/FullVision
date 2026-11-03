@@ -10,17 +10,17 @@ test.use({ viewport: { width: 1440, height: 900 } });
 // Choose a Rubric opens the picker; '' uses no rubric; a number picks that row.
 async function pickRubric(page, rid) {
   await page.locator('[data-action="chooseRubric"]').first().click();
-  const bank = page.locator('#rubric-bank-overlay');
-  if (rid === '') return bank.locator('[data-rb="pick-none"]').click();
+  const bank = page.locator('#af-rubric-view');
+  if (rid === '') return bank.locator('[data-action="startPickNone"]').click();
   if (typeof rid === 'object') {
     await bank
-      .locator('.rb-row')
+      .locator('.af-start-row')
       .nth(rid.index - 1)
       .click();
   } else {
-    await bank.locator('.rb-row[data-rid="' + rid + '"]').click();
+    await bank.locator('.af-start-row[data-rid="' + rid + '"]').click();
   }
-  await bank.locator('[data-rb="pick-use"]').click();
+  await bank.locator('[data-action="startPickUse"]').click();
 }
 
 async function openForm(page) {

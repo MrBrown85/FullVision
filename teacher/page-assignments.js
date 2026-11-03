@@ -2431,6 +2431,7 @@ window.PageAssignments = (function () {
 
   // html-safe: titles, descriptions, names and dates through esc; colours through cssColor or constants; ids are ours
   function renderAssessForm(cid, assess) {
+    _startOpen = null;
     var sections = getSections(cid);
     var isEdit = !!assess;
     var title = assess ? assess.title : '';
@@ -3170,6 +3171,13 @@ window.PageAssignments = (function () {
     var pending = _pendingFormRubric && sel.value === _pendingFormRubric.id ? _pendingFormRubric : null;
     var rubric = pending || (sel.value ? getRubricById(cid, sel.value) : null);
     var picking = !document.getElementById('af-rubric-pick').hidden;
+    // Pick Another Rubric opens Choose in the chosen rubric's place.
+    if (rubric && _startOpen === 'choose') {
+      // html-safe: _startCardHtml escapes every name, code and title; the grid is RubricBank.gridHtml
+      view.innerHTML = _startCardHtml(cid, 'choose', true);
+      _afterStartRender();
+      return;
+    }
     if (rubric) {
       var editingId = _editingAssessId;
       var others = getAssessments(cid).filter(function (a) {
@@ -3207,10 +3215,15 @@ window.PageAssignments = (function () {
     var count = rubricsListCount(cid);
     var last = _lastUsedRubric(cid);
     // Blank first (Colin, Nov 2), then Choose and Copy.
+    // html-safe: fixed labels, counts, _startCardHtml (escapes its values) and esc() on the last-used name and id
     view.innerHTML =
       '<div class="af-rubric-starts">' +
       '<button type="button" class="af-rubric-start" data-action="newRubricFromForm"><b>Blank Rubric</b><span>Start from nothing.</span></button>' +
-      '<button type="button" class="af-rubric-start" data-action="chooseRubric"' +
+      '<button type="button" class="af-rubric-start' +
+      (_startOpen === 'choose' ? ' is-open' : '') +
+      '" data-action="chooseRubric" aria-expanded="' +
+      (_startOpen === 'choose') +
+      '"' +
       (count ? '' : ' disabled') +
       '><b>Choose a Rubric</b><span>' +
       esc(
@@ -3221,13 +3234,286 @@ window.PageAssignments = (function () {
       '</span></button>' +
       '<button type="button" class="af-rubric-start" data-action="rubricFromClass"><b>Copy From Another Class</b><span>Any of your classes.</span></button>' +
       '</div>' +
-      (last
+      (_startOpen ? _startCardHtml(cid, _startOpen, false) : '') +
+      (last && !_startOpen
         ? '<p class="af-rubric-last">Last used <b>' +
           esc(last.name) +
           '</b><button type="button" class="af-link-btn" data-action="useLastRubric" data-rid="' +
           esc(last.id) +
           '">Use It Again</button></p>'
         : '');
+    var starts = view.querySelector('.af-rubric-starts');
+    if (starts) starts.classList.toggle('has-open', !!_startOpen);
+    _afterStartRender();
+  }
+
+  /* ── Rubric starts in place (rubric starts plan, PR 3) ──────────
+     A start opens under its button, joined to it, as a card in the
+     Competency Rubric's look: grey head with the title and buttons, the
+     body, a grey footer line. One is open at a time; Close, Esc, another
+     start, or a scoring mode without a rubric closes it. */
+  var _startOpen = null;
+  var _choose = { query: '', selected: null };
+
+  function openStart(name) {
+    if (_startOpen === name) return closeStart();
+    _startOpen = name;
+    if (name === 'choose') {
+      var sel = document.getElementById('af-rubric');
+      var current = sel && sel.value ? sel.value : null;
+      var g = _chooseGroups('');
+      var top = g.suggested[0] || g.recent[0] || g.rest[0];
+      _choose = { query: '', selected: current || (top ? top.id : null), focusSearch: true };
+    }
+    _renderRubricView();
+  }
+  function closeStart() {
+    if (!_startOpen) return;
+    var was = _startOpen;
+    _startOpen = null;
+    _renderRubricView();
+    var back = document.querySelector(
+      was === 'choose' ? '[data-action="chooseRubric"]' : '.af-rubric-start[data-start="' + was + '"]',
+    );
+    if (back) back.focus();
+  }
+
+  function _chooseGroups(query) {
+    var ticked = Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
+      return cb.value;
+    });
+    return window.RubricBank && RubricBank.pickGroups
+      ? RubricBank.pickGroups(activeCourse, query, ticked)
+      : { suggested: [], recent: [], rest: getRubrics(activeCourse) };
+  }
+
+  // The codes of the competencies a rubric's criteria score, in order.
+  function _rubricCodes(cid, r) {
+    var seen = {};
+    var out = [];
+    (r.criteria || []).forEach(function (c) {
+      (c.tagIds || []).forEach(function (t) {
+        if (seen[t]) return;
+        seen[t] = true;
+        var tag = getTagById(cid, t);
+        out.push((tag && tag.code) || t);
+      });
+    });
+    return out;
+  }
+
+  function _startCardHtml(cid, name, inPlace) {
+    if (name !== 'choose') return '';
+    var r = _choose.selected ? getRubricById(cid, _choose.selected) : null;
+    var sel = document.getElementById('af-rubric');
+    var current = sel && sel.value ? sel.value : '';
+    var codes = r ? _rubricCodes(cid, r) : [];
+    var uses = r && window.RubricBank ? RubricBank.usesOf(cid, r.id) : [];
+    var head =
+      '<div class="af-rubric-card-head">' +
+      (r
+        ? '<span class="af-rubric-card-name">' +
+          esc(r.name) +
+          '</span><span class="af-rubric-card-meta">' +
+          esc((r.criteria || []).length + ((r.criteria || []).length === 1 ? ' criterion' : ' criteria')) +
+          (codes.length ? ' · <span class="af-start-codes">' + esc(codes.join(' ')) + '</span>' : '') +
+          '</span>'
+        : '<span class="af-rubric-card-name">Choose a Rubric</span>') +
+      '<span class="af-gap"></span>' +
+      (inPlace && current
+        ? '<button type="button" class="btn btn-ghost" data-action="startPickNone">Use No Rubric</button>'
+        : '') +
+      '<button type="button" class="btn btn-ghost" data-action="closeStart">Close</button>' +
+      '<button type="button" class="btn btn-primary" data-action="startPickUse"' +
+      (r ? '' : ' disabled') +
+      '>Use This Rubric</button></div>';
+    var body =
+      '<div class="af-start-pick">' +
+      '<div class="af-start-side">' +
+      '<input class="af-input af-start-search" id="af-start-search" type="search" autocomplete="off" placeholder="Search this class’s rubrics" aria-label="Search this class’s rubrics" value="' +
+      esc(_choose.query) +
+      '">' +
+      '<div class="af-start-list" id="af-start-list" role="listbox" aria-label="Rubrics">' +
+      _chooseListHtml(cid) +
+      '</div></div>' +
+      '<div class="af-start-preview" tabindex="0" aria-label="Preview">' +
+      // html-safe: RubricBank.gridHtml escapes every name and descriptor
+      (r && window.RubricBank ? RubricBank.gridHtml(cid, r) : '') +
+      '</div></div>';
+    var foot =
+      '<div class="af-tag-rubric-note">' +
+      esc(
+        (uses.length
+          ? 'Used in ' +
+            uses
+              .slice(0, 3)
+              .map(function (a) {
+                return a.title;
+              })
+              .join(', ') +
+            (uses.length > 3 ? ' and ' + (uses.length - 3) + ' more.' : '.')
+          : r
+            ? 'Not used yet.'
+            : '') + ' ↑ ↓ to move, Enter to use, Esc to close.',
+      ) +
+      '</div>';
+    return (
+      '<div class="af-rubric-card af-start-card" data-start="' +
+      name +
+      '"' +
+      (inPlace ? ' data-in-place="true"' : '') +
+      ' role="region" aria-label="Choose a Rubric">' +
+      head +
+      body +
+      foot +
+      '</div>'
+    );
+  }
+
+  function _chooseListHtml(cid) {
+    var g = _chooseGroups(_choose.query);
+    if (!g.suggested.length && !g.recent.length && !g.rest.length) {
+      return (
+        '<p class="af-start-empty">' + (getRubrics(cid).length ? 'No rubric matches.' : 'No rubrics yet.') + '</p>'
+      );
+    }
+    var row = function (r) {
+      var codes = _rubricCodes(cid, r);
+      var use = window.RubricBank ? RubricBank.usesOf(cid, r.id)[0] : null;
+      var meta = [
+        window.RubricBank && RubricBank.isAdvanced(r) ? 'Advanced' : '',
+        use ? use.title + (use.date ? ', ' + formatShortDate(use.dateAssigned || use.date) : '') : 'not used yet',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      return (
+        '<button type="button" class="af-start-row' +
+        (r.id === _choose.selected ? ' is-on' : '') +
+        '" role="option" aria-selected="' +
+        (r.id === _choose.selected) +
+        '" data-action="startPickRow" data-rid="' +
+        esc(r.id) +
+        '"><b>' +
+        esc(r.name) +
+        '</b>' +
+        (codes.length ? '<span class="af-start-codes">' + esc(codes.join(' ')) + '</span>' : '') +
+        '<small>' +
+        esc(meta) +
+        '</small></button>'
+      );
+    };
+    var html = '';
+    [
+      ['Suggested · they score what you ticked', g.suggested],
+      ['Recently Used', g.recent],
+      ['Everything Else', g.rest],
+    ].forEach(function (grp) {
+      if (!grp[1].length) return;
+      html += '<div class="af-start-group">' + esc(grp[0]) + '</div>' + grp[1].map(row).join('');
+    });
+    return html;
+  }
+
+  // After the view is drawn: the open start's card joins its button.
+  function _afterStartRender() {
+    var card = document.querySelector('#af-rubric-view .af-start-card');
+    if (!card) return;
+    var btn = document.querySelector('#af-rubric-view .af-rubric-start.is-open');
+    if (btn) {
+      var b = btn.getBoundingClientRect();
+      var c = card.getBoundingClientRect();
+      card.classList.toggle('joins-left', Math.abs(b.left - c.left) < 2);
+      card.classList.toggle('joins-right', Math.abs(b.right - c.right) < 2);
+    }
+    var on = card.querySelector('.af-start-row.is-on');
+    if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+    if (_choose.focusSearch) {
+      _choose.focusSearch = false;
+      var search = document.getElementById('af-start-search');
+      if (search) search.focus({ preventScroll: true });
+    }
+  }
+
+  function _startPickRow(rid, focusRow) {
+    _choose.selected = rid;
+    _renderRubricView();
+    if (focusRow) {
+      var row = document.querySelector('.af-start-row[data-rid="' + CSS.escape(rid) + '"]');
+      if (row) row.focus();
+    }
+  }
+  function _startPickUse() {
+    var rid = _choose.selected;
+    if (!rid) return;
+    _startOpen = null;
+    var sel = document.getElementById('af-rubric');
+    if (sel && sel.value === rid) {
+      _renderRubricView();
+      return;
+    }
+    _useRubricInForm(rid);
+    _renderRubricView();
+  }
+  function _startPickNone() {
+    _startOpen = null;
+    _useRubricInForm('');
+    _renderRubricView();
+  }
+  // Typing in the search narrows the list; the selection stays when it can.
+  function _startSearch(e) {
+    var t = e.target;
+    if (!t || t.id !== 'af-start-search') return;
+    _choose.query = t.value;
+    var g = _chooseGroups(_choose.query);
+    var all = g.suggested.concat(g.recent, g.rest);
+    if (
+      !all.some(function (r) {
+        return r.id === _choose.selected;
+      })
+    )
+      _choose.selected = all[0] ? all[0].id : null;
+    var pos = t.selectionStart;
+    _renderRubricView();
+    var again = document.getElementById('af-start-search');
+    if (again) {
+      again.focus({ preventScroll: true });
+      try {
+        again.setSelectionRange(pos, pos);
+      } catch (err) {}
+    }
+  }
+  // ↑ ↓ move, Enter uses, Esc closes.
+  function _startKeydown(e) {
+    var card = e.target && e.target.closest ? e.target.closest('.af-start-card') : null;
+    if (!card) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeStart();
+      return;
+    }
+    if (card.dataset.start !== 'choose') return;
+    var rows = Array.from(card.querySelectorAll('.af-start-row'));
+    var at = rows.findIndex(function (r) {
+      return r.dataset.rid === _choose.selected;
+    });
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!rows.length) return;
+      e.preventDefault();
+      var next = rows[Math.max(0, Math.min(rows.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))];
+      var inSearch = e.target.id === 'af-start-search';
+      _startPickRow(next.dataset.rid, !inSearch);
+      if (inSearch) {
+        var s2 = document.getElementById('af-start-search');
+        if (s2) s2.focus({ preventScroll: true });
+      }
+    } else if (
+      e.key === 'Enter' &&
+      (e.target.id === 'af-start-search' || e.target.classList.contains('af-start-row'))
+    ) {
+      e.preventDefault();
+      _startPickUse();
+    }
   }
 
   // The rubric on this class's most recent assessment (by date), for Use It Again.
@@ -3249,29 +3535,7 @@ window.PageAssignments = (function () {
   /* Choose a Rubric (redesign PR 7): the Rubric Bank's window in pick mode,
      suggestions from the competencies chosen. Without it, the select. */
   function chooseRubric() {
-    if (window.RubricBank) {
-      var sel0 = document.getElementById('af-rubric');
-      RubricBank.open(activeCourse, {
-        pick: {
-          title: ((document.getElementById('af-title') || {}).value || '').trim(),
-          tagIds: Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
-            return cb.value;
-          }),
-          current: sel0 && sel0.value ? sel0.value : null,
-          use: _useRubricInForm,
-        },
-        changed: function () {
-          _refreshRubricOptions();
-        },
-      });
-      return;
-    }
-    var pick = document.getElementById('af-rubric-pick');
-    if (!pick) return;
-    pick.hidden = false;
-    _renderRubricView();
-    var sel = document.getElementById('af-rubric');
-    if (sel) sel.focus();
+    openStart('choose');
   }
   // The form's rubric list, rebuilt when a rubric is copied in from the picker.
   function _refreshRubricOptions() {
@@ -8588,6 +8852,18 @@ window.PageAssignments = (function () {
       deleteAssess: function () {
         deleteAssess(el.dataset.aid);
       },
+      closeStart: function () {
+        closeStart();
+      },
+      startPickRow: function () {
+        _startPickRow(el.dataset.rid, true);
+      },
+      startPickUse: function () {
+        _startPickUse();
+      },
+      startPickNone: function () {
+        _startPickNone();
+      },
       useLastRubric: function () {
         _useRubricInForm(el.dataset.rid);
       },
@@ -10592,6 +10868,8 @@ window.PageAssignments = (function () {
     _addDocListener('input', _compInput);
     _addDocListener('mouseover', _codeHover);
     _addDocListener('focusin', _codeHover);
+    _addDocListener('keydown', _startKeydown, true);
+    _addDocListener('input', _startSearch);
     _addDocListener('mouseover', _afTipOver);
     _addDocListener('mouseout', _afTipOut);
     _addDocListener('focusin', _afTipFocus);
