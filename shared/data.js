@@ -1679,6 +1679,12 @@ var _baselineUndo = {}; // outbox entry id → { field, cid, match?, prev }
    dismisses the rejected write. */
 var _rejectedScoreWrites = {}; // dead-letter entry id → { cid, row: its payload }
 
+/* Every field a score write sets: the diff's fields and the Note for the
+   Report, which save_score_report_note sends on its own. */
+function _sameOnServer(a, b) {
+  return !_scoreEntryRemoteChanged(a, b) && (a.reportNote || '') === (b.reportNote || '');
+}
+
 function _dismissOverriddenScoreWrites(cid, baseline, next) {
   var q = window.v2Queue;
   if (!q || typeof q.dismissDeadLetter !== 'function') return;
@@ -1700,7 +1706,7 @@ function _dismissOverriddenScoreWrites(cid, baseline, next) {
     var same =
       keys.length === Object.keys(now).length &&
       keys.every(function (k) {
-        return now[k] && !_scoreEntryRemoteChanged(was[k], now[k]);
+        return now[k] && _sameOnServer(was[k], now[k]);
       });
     if (!same) return;
     delete _rejectedScoreWrites[id];

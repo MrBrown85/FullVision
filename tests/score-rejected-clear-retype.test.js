@@ -4,7 +4,8 @@
  * rejected the clear, so it went to the dead letter and the baseline went
  * back to 17. The teacher typed 17 again: the cell now matched the server,
  * so nothing was sent and the rejected clear stayed. The next page load sent
- * it once more, and the 17 was gone.
+ * it once more, and the 17 was gone. A rejected Note for the Report is
+ * only dismissed when the note, too, is back to the server's.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -135,5 +136,30 @@ describe('a points score cleared, the clear rejected, then typed again', () => {
     expect(getPointsScore(CID, ENR, AID)).toBe(null);
     expect(upsertValues().filter(v => v === null).length).toBeGreaterThanOrEqual(1);
     expect(server).toBe(null);
+  });
+
+  it('still sends a rejected Note for the Report again on the next load', async () => {
+    fake.on('upsert_score', p => {
+      server = p.p_value;
+      return { data: 'score-id', error: null };
+    });
+    let notes = 0;
+    fake.on('save_score_report_note', () => {
+      notes += 1;
+      return notes === 1 ? { data: null, error: { code: 'P0001', message: 'rejected' } } : { data: null, error: null };
+    });
+    saveScoreReportNote(CID, ENR, AID, 'Showed every step.');
+    await sendAll();
+    expect(window.v2Queue.deadLetter()).toHaveLength(1);
+
+    // A later score save in the class leaves Mateo's score as the server has
+    // it, but not his note.
+    setPointsScore(CID, '33333333-3333-4333-8333-333333333333', AID, 5);
+    await sendAll();
+    expect(window.v2Queue.deadLetter()).toHaveLength(1);
+
+    await reload();
+    const sent = fake.calls.filter(c => c.name === 'save_score_report_note').map(c => c.params.p_note);
+    expect(sent).toEqual(['Showed every step.', 'Showed every step.']);
   });
 });
