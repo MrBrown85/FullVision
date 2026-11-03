@@ -159,6 +159,19 @@ describe('rows', () => {
     expect(G.rows(CID, ST, { ungraded: false }).map(r => r.n)).toEqual([1, 2, 3, 4, 5]);
   });
 
+  it('counts in Category Summary only the rows above it', () => {
+    seed();
+    stub('assessmentGroupGrade', () => ({ text: '80%' }));
+    stub('categoryCalcMode', () => 'average');
+    const counts = opts => G.categorySummary(CID, ST, opts).map(c => c.name + ' ' + c.count);
+    stub('courseToday', () => '2026-10-29');
+    expect(counts()).toEqual(['Labs 4', 'Quizzes 2']);
+    // Unmarked work with Ungraded Assignments off, and work not yet due.
+    expect(counts({ ungraded: false })).toEqual(['Labs 3', 'Quizzes 2']);
+    stub('courseToday', () => '2026-10-18');
+    expect(counts()).toEqual(['Labs 3', 'Quizzes 2']);
+  });
+
   it('shows the percent in a Letter or Both class, and never a proficiency word', () => {
     seed('letter');
     expect(G.columnsFor(CID)).toEqual({ percent: true });
