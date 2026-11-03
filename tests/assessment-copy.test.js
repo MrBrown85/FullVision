@@ -7,6 +7,7 @@
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
 
 const A = 'cls-eng9-a';
 const B = 'cls-eng9-b';
@@ -336,6 +337,17 @@ describe('the Classes row, card chips and sibling toggle', () => {
     expect(toggle).toMatch(/Block A/);
     expect(toggle).toMatch(/data-cid="cls-eng9-b"/);
     expect(AssessmentCopy.renderSiblingToggle(H)).toBe('');
+  });
+
+  it('says a linked copy stays in the Gradebook delete dialog too', () => {
+    // DECISIONS "One assessment in several classes" 9: every delete confirmation.
+    const src = readFileSync('teacher/page-gradebook.js', 'utf-8');
+    const branch = src.slice(
+      src.indexOf("action === 'deleteAssess'"),
+      src.indexOf('_deleteAssessWithUndo(activeCourse'),
+    );
+    expect(branch).toContain('AssessmentCopy.deleteNote(activeCourse, assess)');
+    expect(branch).toMatch(/will be removed\.' \+\s+copyNote \+\s+' You can undo/);
   });
 
   it('describes a linked edit in plain words', () => {

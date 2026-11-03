@@ -1422,3 +1422,26 @@ export async function getText(page, selector) {
 export async function clickAction(page, action) {
   await page.locator(`[data-action="${action}"]`).first().click();
 }
+
+/* Signed in, saveRubrics re-keys the rubrics it was given in place: a new
+   rubric and its criteria take the server's ids before it resolves, and
+   through the outbox idMap comes back empty
+   (tests/rubric-save-rekeys-in-place.test.js). Demo Mode keeps local ids,
+   so this stands in for the server. */
+export function serverRekeysRubrics() {
+  const save = window.saveRubrics;
+  const known = new Set(getRubrics('sci8').map(r => r.id));
+  let n = 0;
+  const uuid = () => 'aaaaaaaa-aaaa-4aaa-8aaa-' + String(++n).padStart(12, '0');
+  window.saveRubrics = function (cid, arr) {
+    return Promise.resolve(save(cid, arr)).then(() => {
+      (arr || []).forEach(r => {
+        if (known.has(r.id)) return;
+        r.id = uuid();
+        known.add(r.id);
+        (r.criteria || []).forEach(c => (c.id = uuid()));
+      });
+      return { rubrics: arr, idMap: {} };
+    });
+  };
+}

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { serverRekeysRubrics } from './helpers.js';
 
 /* Blank Rubric, the compact editor in place (rubric starts PR 5,
    2026-11-02): open on a new assessment; a row per criterion with its level
@@ -74,6 +75,14 @@ test('write a rubric in the grid; Save Rubric holds it; Create saves it', async 
 
 test('Create keeps a touched blank without Save Rubric, named after the assessment', async ({ page }) => {
   await openForm(page);
+  await editor(page).locator('[data-ge="level"][data-i="0"][data-level="4"]').fill('Goes beyond.');
+  await page.locator('[data-action="saveNewAssess"]').click();
+  await expect.poll(async () => ((await savedRubric(page)) || {}).name).toBe('Density Lab Rubric');
+});
+
+test('signed in, Create keeps the rubric on the new assessment', async ({ page }) => {
+  await openForm(page);
+  await page.evaluate(serverRekeysRubrics);
   await editor(page).locator('[data-ge="level"][data-i="0"][data-level="4"]').fill('Goes beyond.');
   await page.locator('[data-action="saveNewAssess"]').click();
   await expect.poll(async () => ((await savedRubric(page)) || {}).name).toBe('Density Lab Rubric');

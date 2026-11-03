@@ -39,6 +39,23 @@ window.MStudents = (function () {
     return MCardWidgets.assembleCard(st, cid, data);
   }
 
+  /* The term whose questionnaire answers the cards show: the one the desktop
+     Reports page opens on. The term holding today, else the last one begun,
+     else the first; Report 1 for a class with no terms. */
+  function _cardTermId(cid) {
+    var terms = getReportingTerms(cid);
+    var today = courseToday(cid);
+    var pick =
+      reportingTermOn(cid, today) ||
+      terms
+        .filter(function (t) {
+          return t.starts_on <= today;
+        })
+        .pop() ||
+      terms[0];
+    return 'term-' + (pick ? pick.ordinal : 1);
+  }
+
   /* ── Init card stack after DOM render ─────────────────────── */
   var _stackInstance = null;
 
@@ -59,7 +76,7 @@ window.MStudents = (function () {
       sections: sections,
       statuses: allStatuses,
       assessments: allAssessments,
-      termId: 'term-1',
+      termId: _cardTermId(cid),
       widgetConfig: getCardWidgetConfig(),
     };
 

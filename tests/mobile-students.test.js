@@ -698,3 +698,53 @@ describe('evidenceChange (the phone’s Improving / Dropped line)', () => {
     expect(evidenceChange([e(3, '2026-09-01'), e(0, '2026-09-08')])).toBeNull();
   });
 });
+
+/* ── Card stack term (questionnaire answers) ────────────────── */
+describe('MStudents.initCardStack term', () => {
+  const terms = [
+    { ordinal: 1, label: 'Term 1', starts_on: '2026-09-02', ends_on: '2026-11-27' },
+    { ordinal: 2, label: 'Term 2', starts_on: '2026-11-28', ends_on: '2027-01-29' },
+    { ordinal: 3, label: 'Term 3', starts_on: '2027-02-08', ends_on: '2027-04-16' },
+  ];
+
+  // The term the first card asks getStudentTermRating for.
+  function cardTerm(today, reportingTerms) {
+    const asked = [];
+    const realStack = globalThis.MCardStack;
+    globalThis.MCardStack = {
+      create: (el, students, opts) => {
+        opts.renderCard(students[0]);
+        return { destroy() {}, getCurrentIndex: () => 0, goTo() {} };
+      },
+    };
+    mockDataLayer({
+      courseToday: () => today,
+      getReportingTerms: () => reportingTerms,
+      getStudentTermRating: (cid, sid, termId) => {
+        asked.push(termId);
+        return null;
+      },
+    });
+    try {
+      MStudents.initCardStack(CID);
+    } finally {
+      MStudents.destroyCardStack();
+      globalThis.MCardStack = realStack;
+    }
+    return asked[0];
+  }
+
+  it('shows the term that holds today', () => {
+    expect(cardTerm('2026-12-10', terms)).toBe('term-2');
+    expect(cardTerm('2026-10-01', terms)).toBe('term-1');
+  });
+
+  it('between terms, shows the last one begun; before the first, the first', () => {
+    expect(cardTerm('2027-02-02', terms)).toBe('term-2');
+    expect(cardTerm('2026-08-20', terms)).toBe('term-1');
+  });
+
+  it('shows Report 1 in a class with no terms', () => {
+    expect(cardTerm('2026-12-10', [])).toBe('term-1');
+  });
+});
