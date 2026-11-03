@@ -131,8 +131,24 @@ window.ReportQuestionnaire = (function () {
     var text = el.value.replace(/\s+$/, '');
     tqNarrativeDirty = false;
     if (text === plainComment(before.narrative || '').replace(/\s+$/, '')) return;
-    upsertTermRating(cid, sid, termId, { narrative: text });
+    upsertTermRating(cid, sid, termId, _withName(cid, sid, termId, { narrative: text }));
     _syncStatus();
+  }
+  /* A draft's save with the name it was written with (draft_meta.name),
+     when its record has none yet, so a name changed later is found after
+     a reload (nameWas), as an approval's record finds it. A name already
+     kept stays: it is the one the comment was written with. */
+  function _withName(cid, sid, termId, data) {
+    var r = getStudentTermRating(cid, sid, termId) || {};
+    var meta = r.draftMeta || null;
+    if (meta && meta.name) return data;
+    var st = (getStudents(cid) || []).find(function (s) {
+      return String(s.id) === String(sid);
+    });
+    // The rows on screen may have been drawn before a rename (nameWas).
+    var name = st ? nameWas(r, st, cid === _activeCourse ? _rows[_rowKey(st)] : null) || displayNameFirst(st) : '';
+    if (!name || !String(data.narrative || '').trim()) return data;
+    return Object.assign({}, data, { draftMeta: Object.assign({}, meta || { v: 1, sentences: [] }, { name: name }) });
   }
   /* Before anything replaces the page: the class, the report, the tab, the
      student. */
@@ -2096,7 +2112,12 @@ window.ReportQuestionnaire = (function () {
     var meta = CommentBank.draftMeta(rows, f, { prev: r.draftMeta || null });
     var key = _rowKey(st);
     var picks = _picksFor(_activeCourse, st, f, termId);
-    var sig = JSON.stringify([meta.sentences, picks]) + '\u0000' + meta.facts_hash + '\u0000' + displayNameFirst(st);
+    var sig =
+      JSON.stringify([meta.sentences, picks, (r.draftMeta || {}).name || '', (r.draftMeta || {}).name_kept || []]) +
+      '\u0000' +
+      meta.facts_hash +
+      '\u0000' +
+      displayNameFirst(st);
     var hit = _claimCache[key];
     if (hit && hit.sig === sig) return hit.v;
     var stale = CommentBank.staleness(meta, f, picks, {});
@@ -2113,11 +2134,13 @@ window.ReportQuestionnaire = (function () {
     var was = nameWas(r, st, rows);
     if (was) {
       var now = displayNameFirst(st);
+      // Kept with Keep as Approved or Keep as Written (draft_meta.name_kept).
+      var nameKept = r.draftMeta && Array.isArray(r.draftMeta.name_kept) ? r.draftMeta.name_kept : [];
       rows.forEach(function (x, i) {
         var shown = v.some(function (c) {
           return c.row === i;
         });
-        if (shown || x.kept || x.classLine || !_holdsName(x.text, was)) return;
+        if (shown || x.kept || x.classLine || nameKept.indexOf(x.text) >= 0 || !_holdsName(x.text, was)) return;
         v.push({ row: i, before: x.text, after: _renamed(x.text, was, now), id: null, kind: 'name' });
       });
       v.sort(function (a, b) {
@@ -2172,6 +2195,14 @@ window.ReportQuestionnaire = (function () {
     if (what === 'keep') {
       rows[i] = Object.assign({}, rows[i], { kept: true });
       _rows[key] = rows;
+      // A sentence kept with the old name stays kept after a reload.
+      var r0 = getStudentTermRating(_activeCourse, st.id, getTermId()) || {};
+      if (c.kind === 'name' && r0.draftMeta)
+        upsertTermRating(_activeCourse, st.id, getTermId(), {
+          draftMeta: Object.assign({}, r0.draftMeta, {
+            name_kept: (Array.isArray(r0.draftMeta.name_kept) ? r0.draftMeta.name_kept : []).concat(c.before),
+          }),
+        });
       _syncRequired();
       syncApprove();
       _focusAny([
@@ -2464,7 +2495,12 @@ window.ReportQuestionnaire = (function () {
     var key = _rowKey(st);
     _rows[key] = rows;
     var text = composeRows(rows);
-    upsertTermRating(_activeCourse, st.id, getTermId(), { narrative: text });
+    upsertTermRating(
+      _activeCourse,
+      st.id,
+      getTermId(),
+      _withName(_activeCourse, st.id, getTermId(), { narrative: text }),
+    );
     _syncLast(key, rows, text);
   }
 
@@ -3610,7 +3646,12 @@ window.ReportQuestionnaire = (function () {
       _syncNote();
       _syncMarks();
     } else {
-      upsertTermRating(_activeCourse, st.id, getTermId(), { narrative: text });
+      upsertTermRating(
+        _activeCourse,
+        st.id,
+        getTermId(),
+        _withName(_activeCourse, st.id, getTermId(), { narrative: text }),
+      );
     }
     _syncLast(key, rows, text);
     _syncRequired();
@@ -6613,7 +6654,7 @@ window.ReportQuestionnaire = (function () {
     _lastSeed[key] = d.seed;
     _adoptDraft(key, d);
     var text = composeRows(_rows[key]);
-    upsertTermRating(_activeCourse, st.id, termId, { narrative: text });
+    upsertTermRating(_activeCourse, st.id, termId, _withName(_activeCourse, st.id, termId, { narrative: text }));
     _syncLast(key, _rows[key], text);
   }
 

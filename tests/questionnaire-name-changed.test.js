@@ -181,4 +181,69 @@ describe('preferred name changed after the comment was written (Demo Mode, Scien
       st.preferred = '';
     }
   });
+
+  it('a draft saved, the page reloaded, then renamed: still flagged (draft_meta.name from the save)', () => {
+    const st = ethan();
+    const f = CommentBank.facts(cid, st, 'term-2');
+    const d = CommentBank.draft(CommentBank.context(f, {}), { seed: CommentBank.seedFor(st.id) + 3 });
+    upsertTermRating(cid, st.id, 'term-2', { narrative: '', approvedAt: null, draftMeta: null });
+    reload();
+    // The teacher's box autosaves the draft (tqSaveNarrative).
+    const box = { value: d.text + ' ' + mine, dataset: { sid: st.id, cid, term: 'term-2' } };
+    const getById = globalThis.document.getElementById;
+    globalThis.document.getElementById = id => (id === 'tq-narrative' ? box : getById(id));
+    globalThis.document.body = { classList: { add: () => {}, remove: () => {}, toggle: () => {} } };
+    try {
+      RQ.tqSaveNarrative();
+    } finally {
+      globalThis.document.getElementById = getById;
+      delete globalThis.document.body;
+    }
+    expect(getStudentTermRating(cid, st.id, 'term-2').draftMeta).toMatchObject({ name: 'Ethan' });
+    expect(getStudentTermRating(cid, st.id, 'term-2').approvedAt).toBeFalsy();
+    reload();
+    st.preferred = 'Zed';
+    try {
+      reload();
+      open(st);
+      const claims = RQ.claimChanges(st);
+      expect(claims.length).toBeGreaterThan(0);
+      expect(claims.every(c => c.kind === 'name' && ETHAN.test(c.before) && ZED.test(c.after))).toBe(true);
+      expect(claims.map(c => c.before)).toContain(mine);
+      // Keep as Written on one: it stays kept after a reload.
+      const kept = claims[0].before;
+      RQ.tqClaim('keep', claims[0].row);
+      reload();
+      open(st);
+      expect(RQ.claimChanges(st).map(c => c.before)).not.toContain(kept);
+    } finally {
+      st.preferred = '';
+    }
+  });
+
+  it('a sentence kept as approved is not flagged again on its row once the approval clears', () => {
+    const st = ethan();
+    approvedFor(st);
+    st.preferred = 'Zed';
+    try {
+      reload();
+      open(st);
+      const kept = RQ.staleFor(cid, st).changes.find(c => c.kind === 'name').before;
+      RQ.tqStale(
+        'keep',
+        RQ.staleFor(cid, st).changes.findIndex(c => c.before === kept),
+      );
+      // An edit clears the approval: the comment is a draft again.
+      const r = getStudentTermRating(cid, st.id, 'term-2');
+      upsertTermRating(cid, st.id, 'term-2', { narrative: RQ.plainComment(r.narrative) + ' The lab went well.' });
+      expect(getStudentTermRating(cid, st.id, 'term-2').approvedAt).toBeFalsy();
+      reload();
+      open(st);
+      const claims = RQ.claimChanges(st).map(c => c.before);
+      expect(claims.length).toBeGreaterThan(0);
+      expect(claims).not.toContain(kept);
+    } finally {
+      st.preferred = '';
+    }
+  });
 });
