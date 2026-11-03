@@ -143,11 +143,16 @@ window.GradeReport = (function () {
     return out;
   }
 
-  /* The categories this term: weight, how many assessments and the
-     student's grade in each, as the gradebook works it out. */
-  function categorySummary(cid, student) {
+  /* The categories this term: weight, how many of the rows above are in
+     each (rows(), with opts), and the student's grade in each, as the
+     gradebook works it out. */
+  function categorySummary(cid, student, opts) {
     var termWork = getAssessments(cid).filter(function (a) {
       return a && assessmentInActiveTerm(cid, a);
+    });
+    var shown = {};
+    rows(cid, student, opts).forEach(function (r) {
+      shown[r.id] = true;
     });
     return (getCategories(cid) || [])
       .map(function (c) {
@@ -156,7 +161,10 @@ window.GradeReport = (function () {
         });
         if (!work.length) return null;
         var g = assessmentGroupGrade(cid, student.id, work, categoryCalcMode(c));
-        return { name: c.name, weight: Number(c.weight || 0), count: work.length, grade: (g && g.text) || '—' };
+        var count = work.filter(function (a) {
+          return shown[a.id];
+        }).length;
+        return { name: c.name, weight: Number(c.weight || 0), count: count, grade: (g && g.text) || '—' };
       })
       .filter(Boolean);
   }
@@ -301,7 +309,7 @@ window.GradeReport = (function () {
     var html = '';
     var term = studentGradeSummary(cid, student.id, ctx && ctx.termId).text;
     if (opts.summary) {
-      var cats = categorySummary(cid, student);
+      var cats = categorySummary(cid, student, opts);
       if (cats.length) {
         html +=
           '<div class="gr-summary"><div class="gr-row gr-head" style="--gr-cols:minmax(0,1fr) 70px 90px 110px"><span class="gr-c">Category</span><span class="gr-c gr-r">Weight</span><span class="gr-c gr-r">Assessments</span><span class="gr-c gr-r">Grade</span></div>' +
