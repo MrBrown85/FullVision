@@ -664,17 +664,21 @@ window.GradingSetupCopy = (function () {
     return i < 0 ? 0 : i;
   }
 
+  /* With allowNone (work with no category), the select starts on "Choose a
+     Category" and Copy waits for a choice; leaving the work is one of them
+     (Colin, 2026-11-03: "Make me choose"). */
   function _moveSelect(attr, rows, selected, allowNone) {
     return (
       '<select class="af-input" ' +
       attr +
       '>' +
+      (allowNone ? '<option value="" selected>Choose a Category</option>' : '') +
       rows
         .map(function (r, i) {
           return '<option value="' + i + '"' + (i === selected ? ' selected' : '') + '>' + esc(r.name) + '</option>';
         })
         .join('') +
-      (allowNone ? '<option value="">Leave them with no category</option>' : '') +
+      (allowNone ? '<option value="none">Leave them with no category</option>' : '') +
       '</select>'
     );
   }
@@ -738,7 +742,7 @@ window.GradingSetupCopy = (function () {
                 '<label class="copy-review-field">Put the ' +
                 _plural(cats.uncategorized, 'assessment', 'assessments') +
                 ' with no category in ' +
-                _moveSelect('data-gsc-move="' + pi + '" data-gsc-cat="uncategorized"', cats.rows, 0, true) +
+                _moveSelect('data-gsc-move="' + pi + '" data-gsc-cat="uncategorized"', cats.rows, -1, true) +
                 '</label>';
           });
           if (p.same.length && p.changes.length)
@@ -756,12 +760,33 @@ window.GradingSetupCopy = (function () {
       html: html,
       okLabel: n === 1 ? 'Copy setup' : 'Copy to ' + _plural(n, 'class', 'classes'),
       cancelLabel: 'Don’t copy',
+      onOpen: function (root) {
+        // A choice clears the outline a stopped Copy left.
+        root.addEventListener('change', function (e) {
+          var sel = e.target.closest('[data-gsc-move]');
+          if (!sel) return;
+          sel.style.border = '';
+          sel.removeAttribute('aria-invalid');
+        });
+      },
       onOk: function (root) {
+        var unchosen = Array.prototype.filter.call(root.querySelectorAll('[data-gsc-move]'), function (sel) {
+          return sel.value === '';
+        });
+        if (unchosen.length) {
+          unchosen.forEach(function (sel) {
+            sel.style.border = '2px solid var(--score-1)';
+            sel.setAttribute('aria-invalid', 'true');
+          });
+          unchosen[0].focus();
+          return false;
+        }
         var movesByPlan = plans.map(function () {
           return {};
         });
         root.querySelectorAll('[data-gsc-move]').forEach(function (sel) {
-          movesByPlan[Number(sel.dataset.gscMove)][sel.dataset.gscCat] = sel.value === '' ? null : Number(sel.value);
+          movesByPlan[Number(sel.dataset.gscMove)][sel.dataset.gscCat] =
+            sel.value === 'none' ? null : Number(sel.value);
         });
         Promise.all(
           plans.map(function (p, i) {
