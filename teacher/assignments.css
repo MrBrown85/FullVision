@@ -1970,6 +1970,15 @@
   min-height: 40px;
   padding: 0 18px;
 }
+/* "Created …" after Create and Add Another, until the next edit. */
+.af-saved-note {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--text-2);
+}
+.af-saved-note[hidden] {
+  display: none;
+}
 .af-counts-toward {
   flex: 1;
   margin: 0;
@@ -3959,7 +3968,7 @@
 .af-untagged-note {
   font-size: var(--text-sm);
   color: var(--text-2);
-  margin: 6px 0 0;
+  margin: 6px 0 12px;
 }
 /* Why scored work in a class with categories needs one (shown while
    none is chosen in the form or the copy dialog). */
