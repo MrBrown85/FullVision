@@ -2058,32 +2058,12 @@ window.PageGradebook = (function () {
     var cid = activeCourse;
     var sid = td.dataset.sid;
     var aid = td.dataset.aid;
-    var prevEntries = (getScores(cid)[sid] || [])
-      .filter(function (e) {
-        return e.assessmentId === aid;
-      })
-      .map(function (e) {
-        return structuredClone(e);
-      });
     var assess = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
-    var tagIds = assess ? scoreTagIds(assess, cid) : [];
-    _undoStack.push({
-      cid: cid,
-      sid: sid,
-      aid: aid,
-      tagIds: tagIds,
-      prevEntries: tagIds.map(function (tid) {
-        return (
-          prevEntries.find(function (e) {
-            return e.tagId === tid;
-          }) || null
-        );
-      }),
-    });
-    while (_undoStack.length > 50) _undoStack.shift();
+    var undo = _pushUndo(cid, sid, aid, assess ? scoreTagIds(assess, cid) : []);
     setCompletionMark(cid, sid, aid, mark);
+    _undoSaved(undo);
     return _redrawCompetencyCell(td);
   }
 
@@ -2106,10 +2086,11 @@ window.PageGradebook = (function () {
     return cell;
   }
 
-  /* Remember the entries `keys` hold now, for Cmd+Z. */
+  /* Remember the entries `keys` hold now, for Cmd+Z. Call _undoSaved with
+     what this returns once the edit is saved. */
   function _pushUndo(cid, sid, aid, keys) {
     var entries = getScores(cid)[sid] || [];
-    _undoStack.push({
+    var undo = {
       cid: cid,
       sid: sid,
       aid: aid,
@@ -2120,8 +2101,50 @@ window.PageGradebook = (function () {
         });
         return e ? structuredClone(e) : null;
       }),
-    });
+    };
+    _undoStack.push(undo);
     while (_undoStack.length > 50) _undoStack.shift();
+    return undo;
+  }
+
+  /* What a cell's `keys` hold now: its scores, + / − and comments. */
+  function _undoCellState(cid, sid, aid, keys) {
+    var entries = getScores(cid)[sid] || [];
+    return JSON.stringify(
+      keys.map(function (key) {
+        var e = entries.find(function (x) {
+          return x.assessmentId === aid && x.tagId === key;
+        });
+        if (!e) return null;
+        return [
+          e.score == null || e.score === '' ? null : Number(e.score),
+          e.mod || 0,
+          e.note || '',
+          e.reportNote || '',
+          e.critNote || '',
+          e.critBeyond || '',
+        ];
+      }),
+    );
+  }
+
+  /* After the edit an undo entry was pushed for: what it left, so Cmd+Z can
+     tell when something else (the grader, the Assignments page, another
+     device) has changed the cell since. */
+  function _undoSaved(undo) {
+    undo.after = _undoCellState(undo.cid, undo.sid, undo.aid, undo.tagIds);
+  }
+
+  /* The edit Cmd+Z undoes: the newest one made in the class on screen.
+     Null when there is none, or when the cell has changed since; the newer
+     work stays and that edit can no longer be undone. */
+  function _takeUndo() {
+    for (var i = _undoStack.length - 1; i >= 0; i--) {
+      if (_undoStack[i].cid !== activeCourse) continue;
+      var undo = _undoStack.splice(i, 1)[0];
+      return _undoCellState(undo.cid, undo.sid, undo.aid, undo.tagIds) === undo.after ? undo : null;
+    }
+    return null;
   }
 
   /* The score keys a Competencies-view cell writes: its one key, or every
@@ -2149,20 +2172,7 @@ window.PageGradebook = (function () {
       return a.id === aid;
     });
     var tids = _cellScoreKeys(td);
-    var entries = getScores(cid)[sid] || [];
-    _undoStack.push({
-      cid: cid,
-      sid: sid,
-      aid: aid,
-      tagIds: tids,
-      prevEntries: tids.map(function (key) {
-        var e = entries.find(function (x) {
-          return x.assessmentId === aid && x.tagId === key;
-        });
-        return e ? structuredClone(e) : null;
-      }),
-    });
-    while (_undoStack.length > 50) _undoStack.shift();
+    var undo = _pushUndo(cid, sid, aid, tids);
     var level = entry.score;
     tids.forEach(function (key) {
       upsertScore(
@@ -2177,6 +2187,7 @@ window.PageGradebook = (function () {
         next,
       );
     });
+    _undoSaved(undo);
     _redrawCompetencyCell(td);
   }
 
@@ -2229,22 +2240,14 @@ window.PageGradebook = (function () {
       if (done) return;
       done = true;
       var raw = parsePointsInput(inp.value, max);
-      // Snapshot for undo
-      var tagIds = isPtsCol ? scoreTagIds(assess, cid) : [td.dataset.tid];
-      var prevEntries = tagIds.map(function (tid) {
-        var e = (getScores(cid)[sid] || []).find(function (e) {
-          return e.assessmentId === aid && e.tagId === tid;
-        });
-        return e ? structuredClone(e) : null;
-      });
-      _undoStack.push({ cid: cid, sid: sid, aid: aid, tagIds: tagIds, prevEntries: prevEntries });
-      while (_undoStack.length > 50) _undoStack.shift();
+      var undo = _pushUndo(cid, sid, aid, isPtsCol ? scoreTagIds(assess, cid) : [td.dataset.tid]);
       if (isPtsCol) {
         setPointsScore(cid, sid, aid, raw);
       } else {
         var tidVal = td.dataset.tid;
         upsertScore(cid, sid, aid, tidVal, raw || 0, assess.date || courseToday(cid), scoreTypeFor(assess));
       }
+      _undoSaved(undo);
       _redrawCompetencyCell(td);
     }
     inp.addEventListener('blur', commit);
@@ -2658,19 +2661,7 @@ window.PageGradebook = (function () {
         if (assess && scores[sid]) {
           // ⌘Z puts it back, as it does for Edit Score.
           var clearIds = scoreTagIds(assess, cid);
-          _undoStack.push({
-            cid: cid,
-            sid: sid,
-            aid: aid,
-            tagIds: clearIds,
-            prevEntries: clearIds.map(function (tid) {
-              var prev = scores[sid].find(function (e) {
-                return e.assessmentId === aid && e.tagId === tid;
-              });
-              return prev ? structuredClone(prev) : null;
-            }),
-          });
-          while (_undoStack.length > 50) _undoStack.shift();
+          var undo = _pushUndo(cid, sid, aid, clearIds);
           // An Advanced Rubric's ticks go with the score, so reopening it
           // doesn't suggest a level for work that has none.
           getRubricCheckIds(cid, sid, aid).forEach(function (id) {
@@ -2678,6 +2669,7 @@ window.PageGradebook = (function () {
           });
           clearScoreEntries(cid, scores, sid, assess, clearIds);
           saveScores(cid, scores);
+          _undoSaved(undo);
           clearProfCache();
           render();
           window.clearScore(sid, aid);
@@ -3032,16 +3024,7 @@ window.PageGradebook = (function () {
       // proficiency) leaves the saved score alone.
       if (typed === '') val = isPts ? null : 0;
       else if (isPts ? val == null || isNaN(val) : !(val >= 1 && val <= 4 && val === Math.round(val))) return;
-      // Save undo
-      // Save full entries for undo (deep copy)
-      var prevEntries = tagIds.map(function (tid) {
-        var e = (getScores(cid)[sid] || []).find(function (e) {
-          return e.assessmentId === aid && e.tagId === tid;
-        });
-        return e ? structuredClone(e) : null;
-      });
-      _undoStack.push({ cid: cid, sid: sid, aid: aid, tagIds: tagIds, prevEntries: prevEntries });
-      while (_undoStack.length > 50) _undoStack.shift();
+      var undo = _pushUndo(cid, sid, aid, tagIds);
       // Apply score to all tags in this assessment. A save this device
       // couldn't keep shows on the sync dot (data.js), not here.
       if (isPts) {
@@ -3052,6 +3035,7 @@ window.PageGradebook = (function () {
           upsertScore(cid, sid, aid, tid, val, assess.date || courseToday(cid), scoreTypeFor(assess), '');
         });
       }
+      _undoSaved(undo);
     }
 
     function commit(navDir) {
@@ -3169,7 +3153,8 @@ window.PageGradebook = (function () {
     }
     if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey && !inTextField && _undoStack.length > 0) {
       e.preventDefault();
-      var undo = _undoStack.pop();
+      var undo = _takeUndo();
+      if (!undo) return;
       var scores = getScores(undo.cid);
       if (!scores[undo.sid]) scores[undo.sid] = [];
       var beforeScores = structuredClone(scores);
@@ -3316,7 +3301,7 @@ window.PageGradebook = (function () {
         // Every key the cell writes, as a click does (a criterion's
         // competencies in Criteria mode).
         var keys = _cellScoreKeys(focused);
-        _pushUndo(activeCourse, sid, aid, keys);
+        var undo = _pushUndo(activeCourse, sid, aid, keys);
         keys.forEach(function (key) {
           upsertScore(
             activeCourse,
@@ -3329,6 +3314,7 @@ window.PageGradebook = (function () {
             '',
           );
         });
+        _undoSaved(undo);
         focused = _redrawCompetencyCell(focused);
         table = document.querySelector('.gb-table');
       }
@@ -3348,11 +3334,12 @@ window.PageGradebook = (function () {
           return a.id === aid;
         });
         if (focused.dataset.pts === '1') {
-          _pushUndo(activeCourse, sid, aid, assess ? scoreTagIds(assess, activeCourse) : []);
+          var undo = _pushUndo(activeCourse, sid, aid, assess ? scoreTagIds(assess, activeCourse) : []);
           setPointsScore(activeCourse, sid, aid, null);
+          _undoSaved(undo);
         } else if (tid) {
           var clearKeys = _cellScoreKeys(focused);
-          _pushUndo(activeCourse, sid, aid, clearKeys);
+          var undo = _pushUndo(activeCourse, sid, aid, clearKeys);
           clearKeys.forEach(function (key) {
             upsertScore(
               activeCourse,
@@ -3365,6 +3352,7 @@ window.PageGradebook = (function () {
               '',
             );
           });
+          _undoSaved(undo);
         }
         _redrawCompetencyCell(focused);
       }
