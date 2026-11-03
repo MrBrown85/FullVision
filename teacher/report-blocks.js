@@ -702,8 +702,11 @@ window.ReportBlocks = (function () {
   function _namedWork(cid, sid, items, best) {
     if (!items.length) return null;
     const sorted = items.slice().sort(_byMark(cid, sid, best));
-    const mark = _workMark(cid, sid, sorted[0], false);
-    return { list: sorted.filter(w => _workMark(cid, sid, w, false) === mark).slice(0, 2), mark };
+    // A piece that scored two of the tied competencies is named once, at
+    // its best (or lowest) mark among them.
+    const once = sorted.filter((w, i) => sorted.findIndex(x => x.a === w.a) === i);
+    const mark = _workMark(cid, sid, once[0], false);
+    return { list: once.filter(w => _workMark(cid, sid, w, false) === mark).slice(0, 2), mark };
   }
   /* "Chemical Reactions Lab, Oct 12 · 3.3 / 4 Proficient" */
   function _workLine(cid, sid, w) {
