@@ -408,6 +408,8 @@ test.describe('Rubric Bank, Print Rubrics window', () => {
     const title = page.locator('text=Rubric Lab Report').first();
     await expect(title).toBeVisible();
     if (!(await page.locator('[data-action="printRubrics"]').first().isVisible())) await title.click();
+    // A closed card shows its buttons on hover.
+    await page.locator('.assess-header').first().hover();
     await page.locator('[data-action="printRubrics"]').first().click();
     const dialog = page.getByRole('dialog', { name: 'Print Rubrics' });
     await expect(dialog.getByRole('radio', { name: /Completed Rubrics/ })).toBeChecked();

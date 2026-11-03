@@ -103,6 +103,8 @@ test.describe('A category on every assessment', () => {
     await expect(chip).toHaveText('Needs a Category');
     await expect(chip).toHaveClass(/type-badge-needs/);
 
+    // A closed card shows its buttons on hover.
+    await page.locator('#ac-assess-001 .assess-header').hover();
     await page.locator('#ac-assess-001 [data-action="editAssess"]').click();
     const category = page.locator('#af-category');
     await expect(category).toHaveValue('');

@@ -11839,7 +11839,9 @@ window.PageAssignments = (function () {
       requestAnimationFrame(function () {
         requestAnimationFrame(function () {
           var openCard = document.querySelector('.assess-card.open');
-          if (openCard) openCard.scrollIntoView({ block: 'center' });
+          // The card's top, not its middle: an open card is often taller than
+          // the window, and centring it hides its header.
+          if (openCard) openCard.scrollIntoView({ block: 'start' });
         });
       });
     }
