@@ -1829,9 +1829,10 @@ window.PageGradebook = (function () {
       '">' +
       (grade.text ? (word ? word + ' (' + esc(grade.text) + ')' : esc(grade.text)) : 'No Evidence') +
       '</div>';
-    // NS lowers only a percentage; a Proficiency class shows none.
+    // NS lowers only a percentage; a Proficiency class shows none. Only the
+    // term on screen, as the grade above counts.
     if (courseGradeMode(cid) !== 'proficiency') {
-      var ns = getAssessments(cid).filter(function (a) {
+      var ns = _scopedAssessments(cid).filter(function (a) {
         return getAssignmentStatus(cid, student.id, a.id) === 'NS';
       }).length;
       if (ns > 0)
