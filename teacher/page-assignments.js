@@ -5380,6 +5380,9 @@ window.PageAssignments = (function () {
     var editing = _editingAssessId;
     held = structuredClone(held);
     delete held._copiedFrom;
+    // Signed in, saving gives `held` and its criteria the server's ids in
+    // place; the form's option and copiedFrom still use the ids it was sent with.
+    var sent = structuredClone(held);
     var list = structuredClone(getRubrics(cid)).concat([held]);
     if (window.RubricDraft && typeof saveCompetencyDescriptors === 'function') {
       saveCompetencyDescriptors(
@@ -5393,11 +5396,11 @@ window.PageAssignments = (function () {
       );
     }
     Promise.resolve(saveRubrics(cid, list)).then(function (result) {
-      var finalId = result && result.idMap && result.idMap[held.id] ? result.idMap[held.id] : held.id;
-      if (copiedFrom && editing) _scoreMoveAfterSave = _scoreMoveMaps(cid, editing, finalId, copiedFrom, held, result);
+      var finalId = result && result.idMap && result.idMap[sent.id] ? result.idMap[sent.id] : held.id;
+      if (copiedFrom && editing) _scoreMoveAfterSave = _scoreMoveMaps(cid, editing, finalId, copiedFrom, sent, result);
       var box = document.getElementById('af-rubric');
       if (box) {
-        var opt = box.querySelector('option[value="' + held.id + '"]');
+        var opt = box.querySelector('option[value="' + sent.id + '"]');
         if (opt) opt.value = finalId;
         box.value = finalId;
       }
