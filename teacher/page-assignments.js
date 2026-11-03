@@ -2516,6 +2516,11 @@ window.PageAssignments = (function () {
       '<div class="af-actions">' +
       '<p class="af-counts-toward" id="af-counts-toward" aria-live="polite"></p>' +
       '<button class="btn btn-ghost" data-action="cancelAssessForm">Cancel</button>' +
+      // Create and Add Another (redesign PR 11): saves, then a fresh form
+      // keeping the settings a run of similar work shares.
+      (isEdit
+        ? ''
+        : '<button class="btn btn-ghost" data-action="saveAndAddAnother" aria-keyshortcuts="Control+Shift+Enter Meta+Shift+Enter" title="Ctrl/⌘+Shift+Enter">Create and Add Another</button>') +
       '<button class="btn btn-primary" data-action="' +
       (isEdit ? 'saveEditAssess' : 'saveNewAssess') +
       '" data-aid="' +
@@ -2765,10 +2770,13 @@ window.PageAssignments = (function () {
 
   /* Ctrl/⌘+Enter in the form creates the assessment (or saves the edit). */
   function _formKeydown(e) {
-    if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+    if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.altKey) return;
     var form = document.getElementById('new-assess-form');
     if (!form || !form.contains(e.target) || form.style.display === 'none') return;
-    var save = form.querySelector('[data-action="saveNewAssess"], [data-action="saveEditAssess"]');
+    // Shift adds another (new assessments only).
+    var save = e.shiftKey
+      ? form.querySelector('[data-action="saveAndAddAnother"]')
+      : form.querySelector('[data-action="saveNewAssess"], [data-action="saveEditAssess"]');
     if (!save) return;
     e.preventDefault();
     save.click();
@@ -3768,7 +3776,8 @@ window.PageAssignments = (function () {
     }
   }
 
-  function saveNewAssess() {
+  function saveNewAssess(addAnother) {
+    addAnother = addAnother === true;
     var titleEl = document.getElementById('af-title');
     var title = (titleEl ? titleEl.value : '').trim();
     if (!title) {
@@ -3782,7 +3791,12 @@ window.PageAssignments = (function () {
     if (!_formCategoryChosen()) return;
     // A rubric made for this assessment is saved now, then the assessment
     // with the rubric's saved id (redesign PR 8).
-    if (_persistPendingFormRubric(saveNewAssess)) return;
+    if (
+      _persistPendingFormRubric(function () {
+        saveNewAssess(addAnother);
+      })
+    )
+      return;
     var dateAssigned = (document.getElementById('af-date-assigned') || {}).value || courseToday(activeCourse);
     var date = dateAssigned;
     var description = (document.getElementById('af-desc') ? document.getElementById('af-desc').value : '').trim();
@@ -3856,13 +3870,66 @@ window.PageAssignments = (function () {
     var srcCid = activeCourse;
     assessments.push(newAssess);
     saveAssessments(activeCourse, assessments);
+    var keep = addAnother ? _formKeepForNext() : null;
     openAssessIds.clear();
     openAssessIds.add(id);
     _showingNewForm = false;
     _editingAssessId = null;
     render();
-    // Once the copies exist, the card can show "Also in …".
-    if (copyTargets.length) AssessmentCopy.copyToClasses(srcCid, newAssess, copyTargets).then(render);
+    if (keep) _reopenWith(keep);
+    // Once the copies exist, the card can show "Also in …". A form reopened
+    // for the next one stays open through that render.
+    if (copyTargets.length)
+      AssessmentCopy.copyToClasses(srcCid, newAssess, copyTargets).then(function () {
+        var held = keep && _showingNewForm && !_editingAssessId ? _formKeepForNext() : null;
+        var typed = held ? (document.getElementById('af-title') || {}).value || '' : '';
+        render();
+        if (held) {
+          _reopenWith(held);
+          var t = document.getElementById('af-title');
+          if (t) t.value = typed;
+        }
+      });
+  }
+
+  /* Create and Add Another keeps what a run of similar work shares: Classes
+     (remembered as always), Module, Scoring, Max Points, Factor and dates.
+     Not the Category, title, competencies or rubric. */
+  function _formKeepForNext() {
+    var val = function (id) {
+      return (document.getElementById(id) || {}).value || '';
+    };
+    return {
+      module: val('af-module'),
+      mode: val('af-scoremode') || 'proficiency',
+      maxPoints: val('af-maxpoints'),
+      weight: val('af-weight'),
+      assigned: val('af-date-assigned'),
+      due: val('af-due'),
+    };
+  }
+  function _reopenWith(keep) {
+    showNewForm();
+    var set = function (id, v) {
+      var el = document.getElementById(id);
+      if (!el || !v) return;
+      if (el.tagName === 'SELECT' && !el.querySelector('option[value="' + CSS.escape(v) + '"]')) return;
+      el.value = v;
+    };
+    set('af-module', keep.module);
+    set('af-maxpoints', keep.maxPoints);
+    set('af-weight', keep.weight);
+    set('af-date-assigned', keep.assigned);
+    set('af-due', keep.due);
+    if (
+      keep.mode &&
+      keep.mode !== 'proficiency' &&
+      document.querySelector('.af-scoremode-btn[data-mode="' + keep.mode + '"]')
+    )
+      setScoreMode(keep.mode);
+    _refreshCountsToward();
+    var title = document.getElementById('af-title');
+    if (title) title.focus({ preventScroll: true });
   }
 
   function editAssess(aid) {
@@ -7941,6 +8008,9 @@ window.PageAssignments = (function () {
       },
       deleteAssess: function () {
         deleteAssess(el.dataset.aid);
+      },
+      saveAndAddAnother: function () {
+        saveNewAssess(true);
       },
       saveNewAssess: function () {
         saveNewAssess();
