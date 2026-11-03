@@ -511,9 +511,14 @@
     return Math.min(MAX_COPIES, n);
   }
 
-  /* The students to print, in roster order. */
+  /* The class by last name, as the roster and gradebook list it. */
+  function _rosterOrder(cid) {
+    return sortStudents(getStudents(cid), 'lastName');
+  }
+
+  /* The students to print, by last name. */
   function selectStudents(cid, aid, opts) {
-    var students = getStudents(cid);
+    var students = _rosterOrder(cid);
     if (opts.students === 'all') return students;
     if (opts.students === 'unprinted' || opts.students === 'changed') {
       var want = opts.students === 'unprinted' ? 'unprinted' : 'changed';
@@ -1177,7 +1182,7 @@
     var opts = _state.opts;
     var blank = opts.mode === 'blank';
     var rubric = _jobRubric(cid, aid, opts);
-    var students = getStudents(cid);
+    var students = _rosterOrder(cid);
     if (_state.scoreOnly) return _scoreDialogHtml(cid, aid, opts, students);
     var html = '<div class="confirm-card rubric-print-card">';
     html += '<div class="confirm-title" id="rp-title">Print Rubrics</div>';
@@ -1323,7 +1328,7 @@
         '"' +
         (opts.picked.indexOf(s.id) >= 0 ? ' checked' : '') +
         '><span>' +
-        esc(displayName(s)) +
+        esc(displayNameWithLast(s)) +
         (tag ? ' ' + tag : '') +
         '</span></label>' +
         (canUnmark
@@ -1343,10 +1348,10 @@
     if (!hasPrints(cid, aid)) return null;
     var printed = [];
     var changed = [];
-    getStudents(cid).forEach(function (s) {
+    _rosterOrder(cid).forEach(function (s) {
       var state = printState(cid, aid, s.id);
       if (state.kind === 'printed' || state.kind === 'changed') printed.push(state.at);
-      if (state.kind === 'changed') changed.push(displayName(s));
+      if (state.kind === 'changed') changed.push(displayNameWithLast(s));
     });
     if (!printed.length) return null;
     var days = {};

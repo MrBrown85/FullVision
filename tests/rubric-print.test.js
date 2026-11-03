@@ -90,6 +90,22 @@ describe('selectStudents and pageCount', () => {
     expect(RubricPrint.selectStudents(CID, AID, { students: 'pick', picked: [SID2] }).map(s => s.id)).toEqual([SID2]);
   });
 
+  it('lists and prints students by last name', () => {
+    saveStudents(CID, [
+      { id: SID2, firstName: 'Alan', lastName: 'Turing' },
+      { id: SID, firstName: 'Ada', lastName: 'Lovelace', preferred: 'Ada' },
+      { id: 's-b', firstName: 'Zed', lastName: 'Byron' },
+    ]);
+    expect(RubricPrint.selectStudents(CID, AID, { students: 'all' }).map(s => s.lastName)).toEqual([
+      'Byron',
+      'Lovelace',
+      'Turing',
+    ]);
+    expect(
+      RubricPrint.selectStudents(CID, AID, { students: 'pick', picked: [SID2, 's-b'] }).map(s => s.lastName),
+    ).toEqual(['Byron', 'Turing']);
+  });
+
   it('27 students take 27 full pages, 14 half-sheet pages and 7 quarter-sheet pages', () => {
     expect(RubricPrint.pageCount(27, 'full')).toBe(27);
     expect(RubricPrint.pageCount(27, 'half')).toBe(14);
