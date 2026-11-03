@@ -104,6 +104,9 @@
   font-size: var(--text-base);
   opacity: 0.6;
 }
+.gb-filter-trigger .filter-count.is-empty {
+  visibility: hidden;
+}
 .gb-filter-trigger .filter-count {
   display: inline-flex;
   align-items: center;
@@ -742,6 +745,26 @@ th.gb-group-alt {
 }
 .gb-tip-head:first-child {
   margin-top: 0;
+}
+.gb-tip-name {
+  margin-bottom: 6px;
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text);
+}
+.gb-tip-name + .gb-tip-head {
+  margin-top: 0;
+}
+/* A long competency list: two columns, and never taller than the window. */
+#gb-tooltip.gb-tip-wide {
+  max-width: min(640px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: hidden;
+}
+#gb-tooltip.gb-tip-wide .gb-tip-rows {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 20px;
 }
 .gb-tip-grade {
   font-size: var(--text-lg);
