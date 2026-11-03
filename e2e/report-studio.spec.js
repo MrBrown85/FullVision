@@ -669,6 +669,29 @@ test.describe('Page Studio', () => {
     await expect(page.getByRole('button', { name: 'Print Reports' })).toBeVisible();
   });
 
+  test('Print This Copy in One Student view prints every student in the copy', async ({ page }) => {
+    await openStudio(page);
+    await page.getByRole('button', { name: 'Print Reports' }).click();
+    await page.locator('#issue-overlay [data-issue="go"]').click();
+    await expect(page.locator('#issue-overlay')).toHaveCount(0);
+    await page.locator('#report-copy').selectOption({ index: 1 });
+    await expect(page.locator('.report-sheet')).toHaveCount(2);
+    // What is in the preview when the print dialog opens.
+    await page.evaluate(() => {
+      window.__printed = [];
+      window.print = () => {
+        const sids = [...document.querySelectorAll('#rb-preview .sheet-student')].map(el => el.dataset.sid);
+        window.__printed.push(sids);
+      };
+    });
+    await page.getByRole('button', { name: 'Print This Copy' }).click();
+    const printed = await page.evaluate(() => window.__printed);
+    expect(printed).toHaveLength(1);
+    expect(new Set(printed[0]).size).toBe(STUDENTS);
+    // The canvas goes back to the one student afterwards.
+    await expect(page.locator('.report-sheet')).toHaveCount(2);
+  });
+
   test('Enter it now opens the Term Questionnaire on a student with no attendance; with totals entered the note names the rest', async ({
     page,
   }) => {
