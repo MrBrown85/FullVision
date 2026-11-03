@@ -617,11 +617,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(CommentBank.fitCount(ctx)).toBe(78);
   });
 
-  it('offers Jasper 73 (9, 34, 5, 25), by the name he goes by', () => {
+  it('offers Jasper 79 (9, 40, 5, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    // Overall: 28, and six frames for his own highest-marked skill (Nov 2).
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 34, 5, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(73);
+    // Overall: every competency is Proficient as the report grades it
+    // (2.9 to 3.3), so the even-results frames fit (Nov 3).
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 5, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(79);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });

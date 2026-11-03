@@ -564,7 +564,8 @@ describe('stage 3 blocks', () => {
         'Ask to see Lab Report, Sep 10 · 75% Ask about Poster, Oct 20 · 67%, her lowest this term',
       );
       const prog = text(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {}));
-      expect(prog).toContain('Start of term 75% Now 67% (−8% this term)');
+      // Now is the level the Proficiency block prints (2.7 is 68%).
+      expect(prog).toContain('Start of term 75% Now 68% (−7% this term)');
       expect(prog).toContain('Best Lab Report, Sep 10 · 75%');
       expect(prog).not.toMatch(/Proficient|\/ 4/);
       const prof = text(
@@ -594,7 +595,7 @@ describe('stage 3 blocks', () => {
       );
       expect(both).toMatch(/Plan [\d.]+ · \d+% Proficient 3\.3 · 83% Proficient [+−]?\d\.\d 3/);
       expect(text(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {}))).toContain(
-        'Now 2.7 · 67% Proficient (−0.3 this term)',
+        'Now 2.7 · 68% Proficient (−0.3 this term)',
       );
     } finally {
       COURSES[CID].gradingSystem = 'proficiency';

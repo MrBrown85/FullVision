@@ -131,3 +131,52 @@ describe('rollUpSectionLevels', () => {
     expect(rollUpSectionLevels(CID, () => 0)).toBe(0);
   });
 });
+
+/* Progress in One Area and Generate named a competency's level "now" as the
+   mean of its last four weeks of scores (startAndNow), so a report could
+   print Evidence at 3.0 Proficient in the Proficiency block and 4.0
+   Extending beside it, and a teacher's override never reached either
+   (Nov 3 bug sweep). Now is the level calc.js grades. */
+describe('the level now is the graded level on every block and the comment', () => {
+  afterEach(() => delete COURSES[CID]);
+  const run = overrides => {
+    seed({
+      assessments: [
+        cc('a', { date: '2026-09-01' }),
+        cc('b', { date: '2026-09-15' }),
+        cc('c', { date: '2026-10-15' }),
+        cc('d', { date: '2026-10-30' }),
+      ],
+      scores: [sc('a', 2), sc('b', 2), sc('c', 4), sc('d', 4)],
+      overrides,
+    });
+    _cache.observations[CID] = {};
+    _cache.reflections[CID] = {};
+    _cache.termRatings[CID] = {};
+    const t = html => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+    return {
+      level: getSectionProficiency(CID, SID, 'sec-1'),
+      prog: t(ReportBlocks.renderBlockProgress(CID, STUDENT, {}, {})),
+      prof: t(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {})),
+      comp: CommentBank.facts(CID, STUDENT, null).comps[0],
+    };
+  };
+
+  it('prints the Mean level, not the last weeks’ mean', () => {
+    const r = run();
+    expect(r.level).toBe(3);
+    expect(r.prof).toContain('3.0 Proficient');
+    expect(r.prog).toContain('Now 3.0 Proficient (+1.0 this term)');
+    expect(r.prog).not.toContain('Extending');
+    // The comment works from the same level; its trend stays the trend.
+    expect(r.comp.level).toBe(3);
+    expect(r.comp.now).toBe(4);
+  });
+
+  it('prints the teacher’s override', () => {
+    const r = run({ [SID]: { 'sec-1': { level: 2, reason: 'Conference' } } });
+    expect(r.level).toBe(2);
+    expect(r.prog).toContain('Now 2.0 Developing');
+    expect(r.comp.level).toBe(2);
+  });
+});
