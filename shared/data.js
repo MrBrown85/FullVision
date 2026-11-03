@@ -4128,7 +4128,6 @@ function _bundleToCache(cid, bundle) {
   var observationsLoaded = (observationPayload.observations || []).length;
   if (Number(observationPayload.total) > observationsLoaded) _loadOlderObservations(cid, observationsLoaded);
   _applyStudentProfileSummaries(cid, bundle.profiles || []);
-  _fillOverrideCalculated(cid);
   _applyBundleTermRatings(cid, bundle.term_ratings || []);
   // A course's report_config row exists from creation with no blocks; only
   // a saved layout replaces the default one the Reports page builds.
@@ -4151,6 +4150,9 @@ function _bundleToCache(cid, bundle) {
   }
   _applyBundleCourseConfig(cid, bundle.course_config, bundle.gradebook && bundle.gradebook.course);
   _applyBundleCurriculumTags(cid, bundle.gradebook && bundle.gradebook.course);
+  // After the class settings: it works out and caches levels, and on a first
+  // load this device has none of the settings yet.
+  _fillOverrideCalculated(cid);
 
   // A field skipped because the teacher edited it mid-load is fetched again;
   // until then the cache isn't the server's version, so don't claim it is.

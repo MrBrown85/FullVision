@@ -496,6 +496,47 @@ describe('get_class_bundle', () => {
     expect(typeof getOverrides(CID)[E1][SEC].calculated).toBe('number');
   });
 
+  it("works out an override's section with the class's settings on a first load", async () => {
+    // A new device: no saved settings. The class counts only the most recent
+    // score; Ada (overridden) and Alan both scored Q1 a 2, then a 4.
+    resetClass();
+    saveCourses({ [CID]: { id: CID, name: 'Science 8', gradingSystem: 'proficiency', calcMethod: 'average' } });
+    var A3 = 'c0000000-0000-4000-8000-000000000033';
+    var later = Object.assign({}, assessmentRow[A1], { id: A3, date_assigned: '2026-10-10', tag_ids: [T1] });
+    var earlier = Object.assign({}, assessmentRow[A1], { tag_ids: [T1] });
+    globalThis.__FV_CLASS_BUNDLE = true;
+    globalThis.getSupabase = function () {
+      var server = bundleServer();
+      return {
+        rpc(name, payload) {
+          return server.rpc(name, payload).then(function (res) {
+            var gb = res.data.gradebook;
+            gb.course = { id: CID, recent_score_limit: 1 };
+            gb.assessments = [earlier, later];
+            gb.tag_index = [T1];
+            gb.criterion_index = [];
+            gb.score_rows = [];
+            gb.criterion_rows = [];
+            gb.tag_rows = [
+              [0, 0, 0, 2, 0],
+              [0, 1, 0, 4, 0],
+              [1, 0, 0, 2, 0],
+              [1, 1, 0, 4, 0],
+            ];
+            res.data.course_config = {};
+            return res;
+          });
+        },
+      };
+    };
+    await initData(CID);
+
+    expect(getCourseConfig(CID).recentScoreLimit).toBe(1);
+    expect(getTagProficiency(CID, E1, T1)).toBe(4);
+    expect(getTagProficiency(CID, E2, T1)).toBe(4);
+    expect(getOverrides(CID)[E1][SEC].calculated).toBe(4);
+  });
+
   it('sends a rating this device has and the server lacks', async () => {
     resetClass();
     saveTermRatings(CID, { [E1]: { 'term-1': { narrative: '<p>Curious and kind.</p>', dims: {} } } });
