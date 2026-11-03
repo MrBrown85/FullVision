@@ -2124,6 +2124,16 @@ window.PageGradebook = (function () {
     while (_undoStack.length > 50) _undoStack.shift();
   }
 
+  /* The points assessment a Competencies-view cell is on, or null. */
+  function _cellPointsAssess(td) {
+    var a = td.dataset.aid
+      ? getAssessments(activeCourse).find(function (x) {
+          return x.id === td.dataset.aid;
+        })
+      : null;
+    return a && a.scoreMode === 'points' ? a : null;
+  }
+
   /* The score keys a Competencies-view cell writes: its one key, or every
      key of its rubric criterion (data-tids) in Criteria mode. */
   function _cellScoreKeys(td) {
@@ -3287,13 +3297,14 @@ window.PageGradebook = (function () {
       var marked = setCellCompletion(focused, ['c', 'C', '1'].includes(e.key) ? 'complete' : 'incomplete');
       if (marked) kbAdvanceDown(document.querySelector('.gb-table'), marked);
       return;
-    } else if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) {
-      var ptsAssess = focused.dataset.aid
-        ? getAssessments(activeCourse).find(function (a) {
-            return a.id === focused.dataset.aid;
-          })
-        : null;
-      if (ptsAssess && ptsAssess.scoreMode === 'points') {
+    } else if (
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key) ||
+      // On points work 0 is a score, typed like any other digit; on a level
+      // it clears (below).
+      (e.key === '0' && _cellPointsAssess(focused))
+    ) {
+      var ptsAssess = _cellPointsAssess(focused);
+      if (ptsAssess) {
         e.preventDefault();
         showPointsInput(focused, ptsAssess);
         var pi = focused.querySelector('.gb-pts-input');
