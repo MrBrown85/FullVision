@@ -93,3 +93,55 @@ describe('applyAssignmentStatus', () => {
     expect(getScores(CID)[SID].map(e => e.score)).toEqual([3, 2]);
   });
 });
+
+/* The other half: Missing or Excused work takes no score, whichever view or
+   key writes it (Nov 3 bug sweep). The lock is in the shared score writers. */
+describe('score writers on Missing and Excused work', () => {
+  it('refuse a level on Missing work, so the competency grade has no hidden score', () => {
+    setAssignmentStatus(CID, SID, 'prof', 'NS');
+    expect(upsertScore(CID, SID, 'prof', 't1', 3, '2026-03-20', 'summative', '')).toBe(false);
+    expect((getScores(CID)[SID] || []).filter(e => e.score > 0)).toEqual([]);
+    clearProfCache();
+    expect(getTagScores(CID, SID, 't1')).toEqual([]);
+    expect(hasScoreOrFeedback(CID, SID, 'prof')).toBe(false);
+  });
+
+  it('refuse points and Complete/Incomplete marks on Missing or Excused work', () => {
+    saveAssessments(CID, [
+      {
+        id: 'pts',
+        title: 'Quiz',
+        date: '2026-03-20',
+        type: 'summative',
+        tagIds: [],
+        scoreMode: 'points',
+        maxPoints: 10,
+      },
+      { id: 'cmp', title: 'Check', date: '2026-03-20', type: 'summative', tagIds: [], scoreMode: 'complete' },
+    ]);
+    setAssignmentStatus(CID, SID, 'pts', 'NS');
+    setAssignmentStatus(CID, SID, 'cmp', 'EXC');
+    expect(setPointsScore(CID, SID, 'pts', 8)).toBe(false);
+    expect(setPointsScore(CID, SID, 'pts', 0)).toBe(false);
+    expect(setCompletionMark(CID, SID, 'cmp', 'complete')).toBe(false);
+    expect(setCompletionMark(CID, SID, 'cmp', 'incomplete')).toBe(false);
+    expect(getPointsScore(CID, SID, 'pts')).toBe(null);
+    expect(getCompletionMark(CID, SID, 'cmp')).toBe(null);
+  });
+
+  it('still clear a score, and score Late work', () => {
+    setAssignmentStatus(CID, SID, 'prof', 'LATE');
+    upsertScore(CID, SID, 'prof', 't1', 3, '2026-03-20', 'summative', '');
+    expect(getScores(CID)[SID].find(e => e.tagId === 't1').score).toBe(3);
+    saveAssignmentStatuses(CID, { [SID + ':prof']: 'NS' });
+    upsertScore(CID, SID, 'prof', 't1', 0, '2026-03-20', 'summative', '');
+    expect(getScores(CID)[SID].find(e => e.tagId === 't1').score).toBe(0);
+  });
+
+  it('score the work again once Missing comes off', () => {
+    setAssignmentStatus(CID, SID, 'prof', 'NS');
+    setAssignmentStatus(CID, SID, 'prof', null);
+    upsertScore(CID, SID, 'prof', 't1', 2, '2026-03-20', 'summative', '');
+    expect(getScores(CID)[SID].find(e => e.tagId === 't1').score).toBe(2);
+  });
+});

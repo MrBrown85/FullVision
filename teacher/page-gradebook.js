@@ -3188,9 +3188,16 @@ window.PageGradebook = (function () {
       var scores = getScores(undo.cid);
       if (!scores[undo.sid]) scores[undo.sid] = [];
       var beforeScores = structuredClone(scores);
+      // Missing or Excused work takes no score (isScoreLocked): an undo
+      // puts back no level or points under the status.
+      var undoAssess = getAssessments(undo.cid).find(function (a) {
+        return a.id === undo.aid;
+      });
+      var undoLocked = isScoreLocked(undo.cid, undo.sid, undo.aid);
       // Restore previous entries (full objects)
       (undo.tagIds || []).forEach(function (tid, i) {
         var prevEntry = undo.prevEntries[i];
+        if (prevEntry && undoLocked && isScoreEntered(undoAssess, prevEntry)) prevEntry = null;
         // Remove current entry for this tag
         var idx = scores[undo.sid].findIndex(function (e) {
           return e.assessmentId === undo.aid && e.tagId === tid;

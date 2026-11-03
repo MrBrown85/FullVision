@@ -6535,6 +6535,8 @@ window.PageAssignments = (function () {
     var aid = el.dataset.aid;
     var sid = el.dataset.sid;
     var next = getCompletionMark(cid, sid, aid) === el.dataset.mark ? null : el.dataset.mark;
+    // Missing and Excused work takes no mark (isScoreLocked); C and I reach here by key.
+    if (next && isScoreLocked(cid, sid, aid)) return;
     setCompletionMark(cid, sid, aid, next);
     var cell = el.closest('.cmp-cell');
     var grid = el.closest('.ldg-grid');
@@ -7126,6 +7128,8 @@ window.PageAssignments = (function () {
     if (!crit) return;
     var wasActive = el.classList.contains('active');
     var next = wasActive ? 0 : value;
+    // Missing and Excused work takes no level (isScoreLocked); 1–4 reach here by key.
+    if (next && isScoreLocked(activeCourse, sid, aid)) return;
     rubricCriterionScoreKeys(crit).forEach(function (tagId) {
       setScore(activeCourse, sid, aid, tagId, next);
     });
@@ -7867,6 +7871,11 @@ window.PageAssignments = (function () {
       checkId = el.dataset.checkid;
     var crit = getRubricCriterion(aid, critId);
     if (!crit) return;
+    // Missing and Excused work takes no score (isScoreLocked): the box goes back.
+    if (el.checked && isScoreLocked(cid, sid, aid)) {
+      el.checked = false;
+      return;
+    }
     var before = getRubricCheckIds(cid, sid, aid);
     var after = setRubricCheck(cid, sid, aid, checkId, el.checked);
     var current = _criterionLevelNow(cid, aid, sid, crit);
@@ -12008,6 +12017,11 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var crit = _graderCriterion(aid, critId);
     if (!crit) return;
+    // Missing and Excused work takes no score (isScoreLocked): redraw the box as saved.
+    if (on && isScoreLocked(cid, focusStudentId, aid)) {
+      render();
+      return;
+    }
     var before = getRubricCheckIds(cid, focusStudentId, aid);
     var after = setRubricCheck(cid, focusStudentId, aid, checkId, on);
     var current = _criterionLevelNow(cid, aid, focusStudentId, crit);
