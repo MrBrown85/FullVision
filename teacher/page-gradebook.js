@@ -2676,12 +2676,7 @@ window.PageGradebook = (function () {
           getRubricCheckIds(cid, sid, aid).forEach(function (id) {
             setRubricCheck(cid, sid, aid, id, false);
           });
-          scoreTagIds(assess, cid).forEach(function (tid) {
-            var idx = scores[sid].findIndex(function (e) {
-              return e.assessmentId === aid && e.tagId === tid;
-            });
-            if (idx >= 0) scores[sid].splice(idx, 1);
-          });
+          clearScoreEntries(cid, scores, sid, assess, clearIds);
           saveScores(cid, scores);
           clearProfCache();
           render();

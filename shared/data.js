@@ -5524,6 +5524,37 @@ function saveScoreReportNote(cid, sid, aid, text) {
   return lsOk;
 }
 
+/* Clear Score: take `sid`'s entries under `keys` off `scores` (not saved).
+   The Overall Comment and Note for the Report aren't the score, so they
+   stay, on an entry with no score under the first key, as the server's
+   clear_score keeps them on the score row. */
+function clearScoreEntries(cid, scores, sid, assessment, keys) {
+  var aid = assessment.id;
+  var note = getScoreComment(cid, sid, aid);
+  var reportNote = getScoreReportNote(cid, sid, aid);
+  scores[sid] = (scores[sid] || []).filter(function (e) {
+    return !(e && e.assessmentId === aid && keys.indexOf(e.tagId) >= 0);
+  });
+  var left = scores[sid].some(function (e) {
+    return e && e.assessmentId === aid;
+  });
+  if ((note || reportNote) && !left) {
+    var entry = {
+      id: sid + ':' + aid + ':' + keys[0],
+      assessmentId: aid,
+      tagId: keys[0],
+      score: isPointsScored(assessment) ? null : 0,
+      date: assessment.date || courseToday(cid),
+      type: scoreTypeFor(assessment),
+      note: note,
+      created: new Date().toISOString(),
+    };
+    if (reportNote) entry.reportNote = reportNote;
+    scores[sid].push(entry);
+  }
+  return scores;
+}
+
 function _scoreEntryKey(sid, entry) {
   if (!sid || !entry || !entry.assessmentId) return null;
   return [sid, entry.assessmentId, entry.tagId || ''].join(':');
@@ -5636,9 +5667,10 @@ window.fillRubric = function (enrollmentId, assessmentId, value) {
   );
 };
 
-/* Clear a single cell — removes Score, RubricScore, and TagScore rows for
-   the (enrollment, assessment) tuple.  Final value/status are captured as a
-   deletion audit row before the delete cascades. */
+/* Clear a single cell's score: the server clears score.value and removes
+   the RubricScore and TagScore rows. The score row stays while it holds a
+   status, an Overall Comment or a Note for the Report
+   (migrations/20261103_clear_score_keeps_comment.sql). */
 window.clearScore = function (enrollmentId, assessmentId) {
   if (!_isUuid(enrollmentId) || !_isUuid(assessmentId)) return Promise.resolve();
   var sb = getSupabase();
@@ -13099,6 +13131,7 @@ window.GB = {
   saveScoreComment,
   getScoreReportNote,
   saveScoreReportNote,
+  clearScoreEntries,
   getStudentAssignmentFeedback,
   hasAssignmentFeedback,
   getCustomTags,
