@@ -46,6 +46,11 @@ window.PersonalBank = (function () {
   function _storeKey() {
     return 'gb-comment-templates' + (_demo() ? '-demo' : '');
   }
+  /* Texts removed before their save reached the server (no server id yet):
+     the row is deleted once the server has it. */
+  function _removedKey() {
+    return 'gb-comment-templates-removed' + (_demo() ? '-demo' : '');
+  }
   function _suggestKey(cid, termId) {
     return 'gb-bank-suggest' + (_demo() ? '-demo' : '') + ':' + cid + ':' + termId;
   }
@@ -1289,9 +1294,13 @@ window.PersonalBank = (function () {
       function (res) {
         if (!res || !Array.isArray(res.data)) return false;
         var before = JSON.stringify(list());
-        var rows = res.data.map(function (r) {
-          return { id: r.id, text: r.text, slots: r.slots || [], condition: r.condition || {}, uses: r.uses || 0 };
-        });
+        var rows = res.data
+          .filter(function (r) {
+            return !_deleteIfRemoved(r);
+          })
+          .map(function (r) {
+            return { id: r.id, text: r.text, slots: r.slots || [], condition: r.condition || {}, uses: r.uses || 0 };
+          });
         var pending = list().filter(function (t) {
           return (
             !_isUuid(t.id) &&
@@ -1315,6 +1324,7 @@ window.PersonalBank = (function () {
      server does. Returns the entry. */
   function keep(t) {
     if (!t || !t.text) return null;
+    _unmarkRemoved(t.text);
     var existing = list().find(function (x) {
       return _same(x.text, t.text);
     });
@@ -1342,6 +1352,7 @@ window.PersonalBank = (function () {
         function (res) {
           var row = res && res.data && res.data.id ? res.data : null;
           if (!row || _isUuid(localId)) return;
+          if (_deleteIfRemoved({ id: row.id, text: entry.text })) return;
           _save(
             list().map(function (x) {
               return x.id === localId ? Object.assign({}, x, { id: row.id }) : x;
@@ -1384,10 +1395,35 @@ window.PersonalBank = (function () {
     );
     return true;
   }
-  /* Delete a forgotten entry on the server (through the outbox). */
+  /* Delete a forgotten entry on the server (through the outbox). One whose
+     save has not reached the server yet is deleted when it does. */
   function purge(entry) {
     var del = _v2('deleteCommentTemplate');
     if (entry && del && _isUuid(entry.id)) del(entry.id);
+    else if (entry && entry.text) _write(_removedKey(), _read(_removedKey(), []).concat([String(entry.text).trim()]));
+  }
+  function _unmarkRemoved(text) {
+    var removed = _read(_removedKey(), []);
+    var keepTexts = removed.filter(function (x) {
+      return !_same(x, text);
+    });
+    if (keepTexts.length !== removed.length) _write(_removedKey(), keepTexts);
+  }
+  /* A server row the teacher removed before it was saved: delete it.
+     Returns true when it was one. */
+  function _deleteIfRemoved(row) {
+    var del = _v2('deleteCommentTemplate');
+    if (!del || !row || !_isUuid(row.id)) return false;
+    var removed = _read(_removedKey(), []);
+    if (
+      !removed.some(function (x) {
+        return _same(x, row.text);
+      })
+    )
+      return false;
+    _unmarkRemoved(row.text);
+    del(row.id);
+    return true;
   }
   /* Remove a kept template, here and on the server. */
   function remove(id) {

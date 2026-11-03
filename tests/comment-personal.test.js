@@ -588,6 +588,69 @@ describe('the bank on the device and the server', () => {
     expect(COMMENT_BANK.sentences.filter(s => s.mine).length).toBe(2);
   });
 
+  describe('a sentence removed before its save reached the server', () => {
+    const TEXT = 'Next, {he} can say how two people saw the same event in different ways.';
+    const COND = { part: 'go', group: 'Next Step', needs: ['nextSkill'], claims: ['nextStep'] };
+    const SERVER_ID = '44444444-4444-4444-8444-444444444444';
+
+    it('is deleted on the server once the save lands', async () => {
+      const del = [];
+      let land;
+      window.v2 = Object.assign({}, originalV2, {
+        saveCommentTemplate: () => new Promise(resolve => (land = resolve)),
+        deleteCommentTemplate: id => del.push(id),
+      });
+      const e = PB.keep({ text: TEXT, slots: ['he'], condition: COND });
+      expect(PB.remove('mine:' + e.id)).toBe(true);
+      expect(del).toEqual([]);
+      land({ data: { id: SERVER_ID }, error: null });
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(del).toEqual([SERVER_ID]);
+      expect(PB.list()).toEqual([]);
+    });
+
+    it('is deleted, not brought back, when a later load finds it on the server', async () => {
+      const del = [];
+      window.v2 = Object.assign({}, originalV2, {
+        saveCommentTemplate: () => new Promise(() => {}),
+        deleteCommentTemplate: id => del.push(id),
+      });
+      const e = PB.keep({ text: TEXT, slots: ['he'], condition: COND });
+      PB.remove('mine:' + e.id);
+      // A reload: the save landed from the outbox, with nothing here to see it.
+      PB._reset();
+      window.v2.listCommentTemplates = () =>
+        Promise.resolve({
+          data: [{ id: SERVER_ID, text: TEXT, slots: ['he'], condition: COND, uses: 0 }],
+          error: null,
+        });
+      await PB.load(true);
+      expect(del).toEqual([SERVER_ID]);
+      expect(PB.list()).toEqual([]);
+      expect(COMMENT_BANK.sentences.some(s => s.mine)).toBe(false);
+    });
+
+    it('stays when the teacher keeps it again', async () => {
+      const del = [];
+      window.v2 = Object.assign({}, originalV2, {
+        saveCommentTemplate: () => new Promise(() => {}),
+        deleteCommentTemplate: id => del.push(id),
+      });
+      PB.remove('mine:' + PB.keep({ text: TEXT, slots: ['he'], condition: COND }).id);
+      PB.keep({ text: TEXT, slots: ['he'], condition: COND });
+      PB._reset();
+      window.v2.listCommentTemplates = () =>
+        Promise.resolve({
+          data: [{ id: SERVER_ID, text: TEXT, slots: ['he'], condition: COND, uses: 0 }],
+          error: null,
+        });
+      await PB.load(true);
+      expect(del).toEqual([]);
+      expect(PB.list().map(x => x.id)).toEqual([SERVER_ID]);
+    });
+  });
+
   it('removes a kept sentence here and on the server', () => {
     const del = [];
     window.v2 = Object.assign({}, originalV2, { deleteCommentTemplate: id => del.push(id) });
