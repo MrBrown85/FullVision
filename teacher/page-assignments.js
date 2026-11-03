@@ -785,9 +785,13 @@ window.PageAssignments = (function () {
         tiles +
         '</div>' +
         '<div class="grdt-note-row"><label class="grdt-note-label" for="grdt-note-' +
+        a.id +
+        '-' +
         crit.id +
         '">Comment (Optional)</label>' +
         '<textarea id="grdt-note-' +
+        a.id +
+        '-' +
         crit.id +
         '" class="grdt-note' +
         (note ? ' has-text' : '') +
@@ -817,9 +821,11 @@ window.PageAssignments = (function () {
       })
       .join('');
   }
-  function _singlePointNoteHtml(kind, crit, text) {
+  // Ids carry the assessment: one student's view can show several cards
+  // on the same rubric.
+  function _singlePointNoteHtml(kind, aid, crit, text) {
     var work = kind === 'work';
-    var id = (work ? 'grsp-work-' : 'grsp-beyond-') + crit.id;
+    var id = (work ? 'grsp-work-' : 'grsp-beyond-') + aid + '-' + crit.id;
     return (
       '<div class="grsp-note ' +
       (work ? 'is-work' : 'is-beyond') +
@@ -876,7 +882,7 @@ window.PageAssignments = (function () {
         '" aria-label="' +
         esc(crit.name || '') +
         '">' +
-        _singlePointNoteHtml('work', crit, getRubricCriterionComment(cid, st.id, a.id, crit)) +
+        _singlePointNoteHtml('work', a.id, crit, getRubricCriterionComment(cid, st.id, a.id, crit)) +
         '<div class="grsp-standard">' +
         '<h3 class="grdt-crit-name">' +
         esc(crit.name || '') +
@@ -892,7 +898,7 @@ window.PageAssignments = (function () {
         '</div>' +
         (state.level ? '' : '<span class="grdt-not-scored">' + _NOT_SCORED_ICON + 'Not Scored</span>') +
         '</div>' +
-        _singlePointNoteHtml('beyond', crit, getRubricCriterionBeyond(cid, st.id, a.id, crit)) +
+        _singlePointNoteHtml('beyond', a.id, crit, getRubricCriterionBeyond(cid, st.id, a.id, crit)) +
         '</section>';
     });
     return '<div class="grdt-tiles grsp-tiles">' + html + '</div>';
@@ -1432,7 +1438,7 @@ window.PageAssignments = (function () {
   // or text, as under a rubric criterion.
   function _tagNoteHtml(cid, aid, sid, tagId) {
     var note = getTagComment(cid, sid, aid, tagId);
-    var id = 'grdl-note-' + esc(tagId);
+    var id = 'grdl-note-' + esc(aid) + '-' + esc(tagId);
     return (
       '<label class="grdt-note-label grdl-note-label" for="' +
       id +
@@ -1455,9 +1461,13 @@ window.PageAssignments = (function () {
     var locked = status === 'NS' || status === 'EXC';
     return (
       '<section class="grdp-card">' +
-      '<div class="grdl-side"><label class="grdl-name" for="grdp-input">Score</label>' +
+      '<div class="grdl-side"><label class="grdl-name" for="grdp-input-' +
+      esc(a.id) +
+      '">Score</label>' +
       '<span class="grdl-text">Type the points earned. Up to twice the total counts as extra credit.</span></div>' +
-      '<div class="grdp-entry"><input id="grdp-input" class="grdp-input" type="text" inputmode="decimal" autocomplete="off"' +
+      '<div class="grdp-entry"><input id="grdp-input-' +
+      esc(a.id) +
+      '" class="grdp-input" type="text" inputmode="decimal" autocomplete="off"' +
       ' data-action-blur="graderPoints" data-max="' +
       max +
       '" value="' +
@@ -10398,7 +10408,11 @@ window.PageAssignments = (function () {
       },
     };
     if (handlers[action]) {
-      if (action !== 'rubricModalBackdrop' && el.tagName !== 'SELECT') e.preventDefault();
+      // A label inside the control (a checklist line on an Advanced tile)
+      // keeps its own click, which ticks its box.
+      var innerLabel = e.target.closest('label');
+      var ownLabel = innerLabel && innerLabel !== el && el.contains(innerLabel);
+      if (action !== 'rubricModalBackdrop' && el.tagName !== 'SELECT' && !ownLabel) e.preventDefault();
       handlers[action]();
     }
   }
