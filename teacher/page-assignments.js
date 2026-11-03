@@ -3581,6 +3581,12 @@ window.PageAssignments = (function () {
   }
 
   function _startKeydown(e) {
+    if (e.key === 'Enter' && e.target && e.target.classList && e.target.classList.contains('af-ge-crit-name')) {
+      e.preventDefault();
+      var cell = e.target.closest('tr') && e.target.closest('tr').querySelector('.af-ge-text');
+      if (cell) cell.focus();
+      return;
+    }
     var tab = e.target && e.target.closest ? e.target.closest('.af-rubric-start[role="tab"]') : null;
     if (tab) return _startTabKey(e, tab);
     var card = e.target && e.target.closest ? e.target.closest('.af-start-card') : null;
@@ -3999,11 +4005,11 @@ window.PageAssignments = (function () {
       .join('');
     return (
       '<tr><th scope="row" class="rb-crit af-ge-crit">' +
-      '<input class="af-ge-crit-name" type="text" data-ge="name" data-i="' +
+      '<textarea class="af-ge-crit-name" rows="1" data-ge="name" data-i="' +
       i +
-      '" value="' +
+      '" placeholder="Name this criterion" aria-label="Criterion name">' +
       esc(c.name || '') +
-      '" aria-label="Criterion name">' +
+      '</textarea>' +
       (chips ? '<div class="af-ge-chips">' + chips + '</div>' : '') +
       '<div class="af-ge-tools"><button type="button" class="af-link-btn" data-action="gePicker" data-i="' +
       i +
@@ -4088,11 +4094,27 @@ window.PageAssignments = (function () {
     if (back) back.focus({ preventScroll: true });
     _blankSizeCells();
   }
-  // Each cell grows with its text; the row takes the tallest.
+  // Each row's level cells take the height of its longest one, so the
+  // row reads as one band; the criterion name grows with its words.
   function _blankSizeCells() {
-    document.querySelectorAll('.af-ge-text').forEach(function (t) {
+    document.querySelectorAll('.af-ge-grid tbody tr').forEach(_blankSizeRow);
+  }
+  function _blankSizeRow(tr) {
+    if (!tr) return;
+    var name = tr.querySelector('.af-ge-crit-name');
+    if (name) {
+      name.style.height = 'auto';
+      name.style.height = name.scrollHeight + 'px';
+    }
+    var cells = Array.from(tr.querySelectorAll('.af-ge-text'));
+    cells.forEach(function (t) {
       t.style.height = 'auto';
-      t.style.height = Math.max(64, t.scrollHeight + 2) + 'px';
+    });
+    var tallest = cells.reduce(function (h, t) {
+      return Math.max(h, t.scrollHeight);
+    }, 88);
+    cells.forEach(function (t) {
+      t.style.height = tallest + 'px';
     });
   }
 
@@ -4119,12 +4141,13 @@ window.PageAssignments = (function () {
     if (!c) return;
     _blank.touched = true;
     var lv = Number(t.dataset.level);
-    if (kind === 'name') c.name = t.value;
-    else if (kind === 'level') {
+    if (kind === 'name') {
+      c.name = t.value.replace(/\n/g, ' ');
+      _blankSizeRow(t.closest('tr'));
+    } else if (kind === 'level') {
       c.levels = Object.assign({}, c.levels);
       c.levels[lv] = t.value;
-      t.style.height = 'auto';
-      t.style.height = Math.max(64, t.scrollHeight + 2) + 'px';
+      _blankSizeRow(t.closest('tr'));
     } else if (kind === 'weight') {
       var w = parseFloat(t.value);
       c.weight = isNaN(w) || w < 0 ? 1 : w;

@@ -7927,19 +7927,28 @@ button.grader-member-name {
   vertical-align: top;
 }
 .af-ge-crit-name {
-  width: 100%;
+  display: block;
+  width: calc(100% + 12px);
+  margin: -5px -6px 0;
+  padding: 5px 6px;
   border: 0;
-  border-bottom: 1px dashed var(--af-line);
-  border-radius: 0;
-  padding: 2px 0;
+  border-radius: 6px;
+  resize: none;
+  overflow: hidden;
   background: transparent;
   font: inherit;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.35;
   color: var(--text);
+}
+.af-ge-crit-name:hover {
+  background: var(--overlay-hover);
 }
 .af-ge-crit-name:focus {
   outline: none;
-  border-bottom: 2px solid var(--active);
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--active);
 }
 .af-ge-chips {
   display: flex;
@@ -8101,29 +8110,45 @@ button.grader-member-name {
 }
 .af-ge-cell {
   vertical-align: top;
+  padding: 6px 0;
 }
+/* A level cell reads like the Competency Rubric card's: the words sit in
+   the cell. Empty, it is a soft field with its question; pointed at, a
+   little darker; while typing, white with a blue ring. */
 .af-ge-text {
   display: block;
   width: 100%;
-  min-height: 64px;
+  min-height: 88px;
   resize: none;
   overflow: hidden;
   border: 0;
-  border-radius: 6px;
-  padding: 6px 8px;
+  border-radius: 8px;
+  padding: 6px 10px;
   background: transparent;
-  box-shadow: inset 0 0 0 1px var(--af-cell-edge);
   font: inherit;
   font-size: var(--text-sm);
   line-height: 1.45;
   color: var(--text);
+  transition: background-color 120ms ease;
+}
+.af-ge-text:placeholder-shown {
+  background: var(--af-grey-quiet);
+}
+.af-ge-text:hover {
+  background: var(--af-grey);
 }
 .af-ge-text::placeholder {
   color: var(--text-3);
 }
 .af-ge-text:focus {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--active);
+  background: var(--surface);
+  box-shadow: 0 0 0 2px var(--active);
+}
+@media (prefers-reduced-motion: reduce) {
+  .af-ge-text {
+    transition: none;
+  }
 }
 .af-ge-checks {
   display: grid;
