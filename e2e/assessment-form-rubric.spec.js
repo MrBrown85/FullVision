@@ -7,6 +7,22 @@ import { test, expect } from '@playwright/test';
    Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
+// Choose a Rubric opens the picker; '' uses no rubric; a number picks that row.
+async function pickRubric(page, rid) {
+  await page.locator('[data-action="chooseRubric"]').first().click();
+  const bank = page.locator('#rubric-bank-overlay');
+  if (rid === '') return bank.locator('[data-rb="pick-none"]').click();
+  if (typeof rid === 'object') {
+    await bank
+      .locator('.rb-row')
+      .nth(rid.index - 1)
+      .click();
+  } else {
+    await bank.locator('.rb-row[data-rid="' + rid + '"]').click();
+  }
+  await bank.locator('[data-rb="pick-use"]').click();
+}
+
 async function openForm(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
@@ -37,14 +53,12 @@ test('a chosen rubric is a card with its wording; Pick Another Rubric changes it
     const x = getRubrics('sci8')[0];
     return { id: x.id, name: x.name, first: x.criteria[0].levels[3] };
   });
-  await page.locator('[data-action="chooseRubric"]').first().click();
-  await page.selectOption('#af-rubric', r.id);
+  await pickRubric(page, r.id);
   const card = page.locator('#af-rubric-view .af-rubric-card');
   await expect(card.locator('.af-rubric-card-name')).toHaveText(r.name);
   await expect(card.locator('.rb-grid')).toContainText(r.first);
   await expect(page.locator('#af-rubric-label')).toHaveText('Rubric');
-  await card.locator('[data-action="chooseRubric"]').click();
-  await page.selectOption('#af-rubric', '');
+  await pickRubric(page, '');
   await expect(page.locator('.af-rubric-start')).toHaveCount(4);
 });
 
@@ -58,8 +72,7 @@ test('the Competency Rubric shows the wording of each level for the chosen ones'
   const grid = page.locator('#af-tag-rubric .rb-grid');
   await expect(grid).toContainText(want);
   // A rubric replaces it.
-  await page.locator('[data-action="chooseRubric"]').first().click();
-  await page.selectOption('#af-rubric', { index: 1 });
+  await pickRubric(page, { index: 1 });
   await expect(page.locator('#af-tag-rubric .rb-grid')).toHaveCount(0);
 });
 

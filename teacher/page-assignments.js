@@ -2851,8 +2851,26 @@ window.PageAssignments = (function () {
     return getRubrics(cid).length;
   }
 
-  // Choose a Rubric: the class's rubrics in a menu, until the picker window.
+  /* Choose a Rubric (redesign PR 7): the Rubric Bank's window in pick mode,
+     suggestions from the competencies chosen. Without it, the select. */
   function chooseRubric() {
+    if (window.RubricBank) {
+      var sel0 = document.getElementById('af-rubric');
+      RubricBank.open(activeCourse, {
+        pick: {
+          title: ((document.getElementById('af-title') || {}).value || '').trim(),
+          tagIds: Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
+            return cb.value;
+          }),
+          current: sel0 && sel0.value ? sel0.value : null,
+          use: _useRubricInForm,
+        },
+        changed: function () {
+          _refreshRubricOptions();
+        },
+      });
+      return;
+    }
     var pick = document.getElementById('af-rubric-pick');
     if (!pick) return;
     pick.hidden = false;
@@ -2860,6 +2878,33 @@ window.PageAssignments = (function () {
     var sel = document.getElementById('af-rubric');
     if (sel) sel.focus();
   }
+  // The form's rubric list, rebuilt when a rubric is copied in from the picker.
+  function _refreshRubricOptions() {
+    var dd = document.getElementById('af-rubric');
+    if (!dd) return;
+    var keep = dd.value;
+    dd.innerHTML =
+      '<option value="">None</option>' +
+      getRubrics(activeCourse)
+        .map(function (r) {
+          return '<option value="' + esc(r.id) + '">' + esc(r.name) + ' (' + r.criteria.length + ' criteria)</option>';
+        })
+        .join('');
+    dd.value = keep;
+  }
+  function _useRubricInForm(rid) {
+    var dd = document.getElementById('af-rubric');
+    if (!dd) return;
+    if (!rid) {
+      dd.value = '';
+      onRubricSelect('');
+      return;
+    }
+    if (!dd.querySelector('option[value="' + rid + '"]')) _refreshRubricOptions();
+    dd.value = rid;
+    onRubricSelect(rid);
+  }
+
   function cancelRubricPick() {
     var pick = document.getElementById('af-rubric-pick');
     if (pick) pick.hidden = true;

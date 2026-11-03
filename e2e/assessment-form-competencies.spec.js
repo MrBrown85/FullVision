@@ -7,6 +7,22 @@ import { test, expect } from '@playwright/test';
    competencies, read only. Demo Mode, Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
+// Choose a Rubric opens the picker; '' uses no rubric; a number picks that row.
+async function pickRubric(page, rid) {
+  await page.locator('[data-action="chooseRubric"]').first().click();
+  const bank = page.locator('#rubric-bank-overlay');
+  if (rid === '') return bank.locator('[data-rb="pick-none"]').click();
+  if (typeof rid === 'object') {
+    await bank
+      .locator('.rb-row')
+      .nth(rid.index - 1)
+      .click();
+  } else {
+    await bank.locator('.rb-row[data-rid="' + rid + '"]').click();
+  }
+  await bank.locator('[data-rb="pick-use"]').click();
+}
+
 async function openForm(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
@@ -87,16 +103,14 @@ test('a rubric decides the competencies, read only while it is chosen', async ({
     const r = getRubrics('sci8')[0];
     return { id: r.id, tags: [...new Set(r.criteria.flatMap(c => c.tagIds || []))] };
   });
-  await page.locator('[data-action="chooseRubric"]').first().click();
-  await page.selectOption('#af-rubric', rubric.id);
+  await pickRubric(page, rubric.id);
   expect((await ticked(page)).sort()).toEqual(rubric.tags.slice().sort());
   await expect(page.locator('#af-comp-rubric-note')).toBeVisible();
   await expect(page.locator('.af-code[data-tag="CM2"]')).toHaveAttribute('aria-disabled', 'true');
   await page.locator('.af-code[data-tag="CM2"]').click({ force: true });
   expect((await ticked(page)).sort()).toEqual(rubric.tags.slice().sort());
   // None hands them back.
-  await page.locator('[data-action="chooseRubric"]').first().click();
-  await page.selectOption('#af-rubric', '');
+  await pickRubric(page, '');
   await expect(page.locator('#af-comp-rubric-note')).toBeHidden();
   await page.locator('.af-code[data-tag="CM2"]').click();
   expect(await ticked(page)).toContain('CM2');
