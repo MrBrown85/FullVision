@@ -1787,13 +1787,14 @@ window.MGrade = (function () {
   }
 
   /* Typed points save like the desktop points box: the same clamp
-     (parsePointsInput), blank clears, a typed 0 is a score, and leaving the
-     field unchanged saves nothing. */
+     (parsePointsInput), blank clears, a typed 0 is a score, a typo ("abc")
+     puts back the saved score, and leaving the field unchanged saves
+     nothing. */
   function commitPointsInput(cid, inp) {
     var sid = inp.dataset.sid;
     var aid = inp.dataset.aid;
     var max = parseFloat(inp.dataset.max) || 100;
-    var raw = parsePointsInput(inp.value, max);
+    var raw = parsePointsInput(inp.value, max, getPointsScore(cid, sid, aid));
     inp.value = raw != null ? formatPoints(raw) : '';
     _updatePointsPct(sid, aid, raw, max);
     if (raw === getPointsScore(cid, sid, aid)) return;
