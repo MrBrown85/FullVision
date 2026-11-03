@@ -50,6 +50,7 @@ const PRECACHE_URLS = [
   '/teacher/comment-realiser.js',
   '/teacher/comment-lint.js',
   '/shared/bank-comment.js',
+  '/shared/bank-core-competencies.js',
   '/teacher/comment-bank.js',
   '/teacher/comment-personal.js',
   '/teacher/report-questionnaire.js',

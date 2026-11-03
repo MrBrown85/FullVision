@@ -7571,3 +7571,29 @@ button.grader-member-name {
   font-size: var(--text-sm);
   color: var(--text-2);
 }
+
+/* The assessment form's hover-overs (redesign PR 13): the shared tooltip,
+   a little wider, wrapping. */
+#gb-tooltip.af-tip,
+#gb-tooltip.af-tip.dark {
+  max-width: 360px;
+  white-space: normal;
+}
+#gb-tooltip.af-tip:not(.dark) {
+  min-width: 300px;
+}
+#gb-tooltip.af-tip .gb-code-tip {
+  max-width: none;
+}
+#gb-tooltip.af-tip .af-tip-strong {
+  margin-top: 4px;
+  font-weight: 600;
+}
+.af-codes-group-name:focus-visible,
+.af-list-group-name:focus-visible,
+.af-comp-chip:focus-visible,
+.af-rubric-card-name:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
