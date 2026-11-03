@@ -214,6 +214,24 @@
     }
   }
 
+  // Resolves once the database is gone, or after 2 s if another tab still
+  // has it open (the delete then finishes when that tab lets go).
+  function _deleteReportCopies() {
+    return new Promise(function (resolve) {
+      try {
+        if (typeof indexedDB === 'undefined') return resolve();
+        const req = indexedDB.deleteDatabase('fv-report-issues');
+        req.onsuccess = req.onerror = function () {
+          resolve();
+        };
+        setTimeout(resolve, 2000);
+      } catch (e) {
+        console.warn('Could not clear printed report copies:', e);
+        resolve();
+      }
+    });
+  }
+
   window.signOut = async function (opts) {
     opts = opts || {};
     const sb = getSupabase();
@@ -263,6 +281,9 @@
     if ('caches' in window) {
       caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
+    // Printed report copies (teacher/report-issues.js) hold every student's
+    // full report and live in IndexedDB, not localStorage.
+    await _deleteReportCopies();
     // All portals share the same login page — it routes to the right interface after sign-in
     window.location.href = '/login.html';
   };
