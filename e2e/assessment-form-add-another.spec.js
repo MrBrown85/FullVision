@@ -6,6 +6,11 @@ import { test, expect } from '@playwright/test';
    does the same. Demo Mode, Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
+// These tests use the Codes chips; List is the default since Nov 2.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('fv-assess-comp-view', 'codes'));
+});
+
 async function openForm(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
@@ -39,7 +44,7 @@ test('saves, then reopens keeping the shared settings', async ({ page }) => {
 
   await expect(page.locator('#af-title')).toBeFocused();
   await expect(page.locator('#af-title')).toHaveValue('');
-  await expect(page.locator('.af-heading-title')).toHaveText('New Assessment');
+  await expect(page.locator('.af-heading')).toHaveCount(0);
   await expect(page.locator('#af-scoremode')).toHaveValue('points');
   await expect(page.locator('#af-maxpoints')).toHaveValue('20');
   await expect(page.locator('#af-weight')).toHaveValue('2');

@@ -7614,7 +7614,6 @@ button.grader-member-name {
   font-weight: 600;
 }
 .af-codes-group-name:focus-visible,
-.af-list-group-name:focus-visible,
 .af-comp-chip:focus-visible,
 .af-rubric-card-name:focus-visible {
   outline: 2px solid var(--active);

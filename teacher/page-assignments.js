@@ -1912,9 +1912,9 @@ window.PageAssignments = (function () {
 
   /* ── The assessment form's hover-overs (redesign PR 13) ──────────
      Each answers the question a teacher has at that field, from data the
-     class already holds, in the shared #gb-tooltip: a competency, a folder,
-     the rubric, the category, Date Assigned's term, the Factor and a Core
-     Competency. On hover (under the field) and keyboard focus (over it when
+     class already holds, in the shared #gb-tooltip: a chosen competency, a
+     Codes folder, the rubric, the Factor and a Core Competency. Category,
+     Date Assigned and List rows have none (Colin, Nov 2). On hover (under the field) and keyboard focus (over it when
      there's room, so the next field stays in view). */
   var _afTipSource = null;
 
@@ -2069,50 +2069,6 @@ window.PageAssignments = (function () {
               : 'Not used on any other assessment yet.',
           ) +
           '</div>',
-      };
-    }
-    if (kind === 'category') {
-      var catId = el.value;
-      var cat = catId ? getCategoryById(cid, catId) : null;
-      if (!cat) return null;
-      var inIt = all.filter(function (a) {
-        return (a.categoryId || a.category_id) === catId;
-      }).length;
-      return {
-        dark: true,
-        html:
-          '<div class="gb-code-tip"><strong>' +
-          esc(cat.name) +
-          '</strong><div class="gb-code-tip-group">' +
-          esc(_categoryChipTip(cid, catId) + ' ' + _afPlural(inIt, 'assessment', 'assessments') + ' in it so far.') +
-          '</div></div>',
-      };
-    }
-    if (kind === 'date') {
-      var d = el.value;
-      var term = d
-        ? (getReportingTerms(cid) || []).find(function (t) {
-            return t.starts_on && t.ends_on && d >= t.starts_on && d <= t.ends_on;
-          })
-        : null;
-      return {
-        dark: true,
-        html: term
-          ? '<div class="gb-code-tip"><strong>' +
-            esc('In ' + term.label) +
-            '</strong><div class="gb-code-tip-group">' +
-            esc(
-              formatDate(term.starts_on) +
-                ' to ' +
-                formatDate(term.ends_on) +
-                '. Its scores count in ' +
-                term.label +
-                ' and on its report.',
-            ) +
-            '</div></div>'
-          : '<div class="gb-code-tip"><strong>' +
-            esc(d ? 'In No Reporting Term' : 'No Date') +
-            '</strong><div class="gb-code-tip-group">Its scores count in All Time only.</div></div>',
       };
     }
     if (kind === 'factor') {
@@ -2399,8 +2355,6 @@ window.PageAssignments = (function () {
       '<div class="af-tag-row">' +
       '<label class="af-tag-item' +
       (checked ? ' checked' : '') +
-      '" data-af-tip="comp" data-tag="' +
-      esc(tag.id) +
       '" data-section="' +
       sec.id +
       '" style="border-left:3px solid ' +
@@ -2477,21 +2431,21 @@ window.PageAssignments = (function () {
     var scoredCount = isEdit ? _scoredStudentCount(cid, assess.id) : 0;
     var html = '';
 
-    // The form's heading, inside its blue ring (kept, Colin, 2026-11-02).
-    html +=
-      '<div class="af-heading"><h3 class="af-heading-title">' +
-      (isEdit ? 'Edit Assessment' : 'New Assessment') +
-      '</h3>' +
-      (scoredCount
-        ? '<span class="af-heading-note">' +
-          esc(
-            scoredCount +
-              (scoredCount === 1 ? ' student scored.' : ' students scored.') +
-              ' Changing the scoring or the rubric asks first.',
-          ) +
-          '</span>'
-        : '') +
-      '</div>';
+    // A heading only when editing, where it carries the scored note; a new
+    // assessment needs none (Colin, Nov 2). The blue ring stays either way.
+    if (isEdit)
+      html +=
+        '<div class="af-heading"><h3 class="af-heading-title">Edit Assessment</h3>' +
+        (scoredCount
+          ? '<span class="af-heading-note">' +
+            esc(
+              scoredCount +
+                (scoredCount === 1 ? ' student scored.' : ' students scored.') +
+                ' Changing the scoring or the rubric asks first.',
+            ) +
+            '</span>'
+          : '') +
+        '</div>';
 
     // What it is: title, classes, category, module and dates.
     html += '<section class="af-card af-card-what">';
@@ -2527,7 +2481,7 @@ window.PageAssignments = (function () {
       '<div class="af-row af-row-what">' +
       '<div class="af-field">' +
       '<label class="af-label">Category</label>' +
-      '<select class="af-input" id="af-category" aria-describedby="af-category-hint" data-af-tip="category">' +
+      '<select class="af-input" id="af-category" aria-describedby="af-category-hint">' +
       // A class with categories needs one on every scored assessment, as
       // Teams does; the teacher picks it, nothing is chosen for them.
       (categories.length === 0
@@ -2572,7 +2526,7 @@ window.PageAssignments = (function () {
       '</div>' +
       '<div class="af-field">' +
       '<label class="af-label">Date Assigned</label>' +
-      '<input class="af-input" id="af-date-assigned" data-af-tip="date" type="date" value="' +
+      '<input class="af-input" id="af-date-assigned" type="date" value="' +
       esc(dateAssigned) +
       '" data-action-change="autoSetDueDate">' +
       '</div>' +
@@ -2762,11 +2716,7 @@ window.PageAssignments = (function () {
           '<span class="af-list-group-dot" style="background:' +
           cssColor(g.color) +
           '"></span>' +
-          '<span class="af-list-group-name" tabindex="0" data-af-tip="folder" data-tags="' +
-          esc(_afSecTagIds(gi.secs)) +
-          '" data-name="' +
-          esc(g.name) +
-          '">' +
+          '<span class="af-list-group-name">' +
           esc(g.name) +
           '</span></div>';
         gi.secs.forEach(function (sec) {
@@ -3617,10 +3567,11 @@ window.PageAssignments = (function () {
   }
 
   /* ── The competency picker (redesign PR 4, 2026-11-02) ─────
-     Codes: every competency a one-click chip in its Ministry group, with
-     how many assessments have scored it; hovering or focusing one fills
-     the focus box with its wording and I Can statements. List: the rows
-     below, one line each. The checkboxes in the list are the form's
+     List (the default, Colin, Nov 2): one row per competency with its whole
+     wording, under its folder; no hover-overs, since everything shows.
+     Codes: every competency a one-click chip in its Ministry group;
+     hovering or focusing one fills the focus box with its wording and I
+     Can statements. The checkboxes in the list are the form's
      record either way: a chip ticks its checkbox, so saving, a rubric's
      own ticks and the I Can toggles are unchanged. With a rubric they're
      the rubric's, shown read only. (Same As was removed, Colin, Nov 2: it
@@ -3628,9 +3579,9 @@ window.PageAssignments = (function () {
   var COMP_VIEW_KEY = 'fv-assess-comp-view';
   function _compView() {
     try {
-      return localStorage.getItem(COMP_VIEW_KEY) === 'list' ? 'list' : 'codes';
+      return localStorage.getItem(COMP_VIEW_KEY) === 'codes' ? 'codes' : 'list';
     } catch (e) {
-      return 'codes';
+      return 'list';
     }
   }
   function setCompView(view) {
