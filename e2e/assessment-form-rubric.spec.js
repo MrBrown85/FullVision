@@ -42,7 +42,7 @@ test('with no rubric, three starts, Blank first; the scoring card reads Rubric',
   await expect(page.locator('.af-scoremode-btn[data-mode="proficiency"]')).toHaveText('Rubric');
   // No "Rubric (optional)" on screen; the label is for screen readers.
   await expect(page.locator('#af-rubric-label')).toHaveClass(/af-visually-hidden/);
-  const starts = page.locator('.af-rubric-start b');
+  const starts = page.locator('.af-rubric-start .af-start-name');
   await expect(starts).toHaveText(['Blank Rubric', 'Choose a Rubric', 'Copy From Another Class']);
 });
 
