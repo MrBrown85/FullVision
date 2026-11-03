@@ -140,3 +140,31 @@ test('List is the default for a teacher who hasn’t chosen, with no hover-overs
   await page.waitForTimeout(800);
   await expect(page.locator('#gb-tooltip')).toBeHidden();
 });
+
+test('a folder’s checkbox ticks the whole folder, shows a dash for some, and unticks it', async ({ page }) => {
+  await page.addInitScript(() => localStorage.removeItem('fv-assess-comp-view'));
+  await openForm(page);
+  const ids = await page.evaluate(() => {
+    const g = getCompetencyGroups('sci8')[0];
+    return getSections('sci8')
+      .filter(s => s.groupId === g.id)
+      .map(s => s.tags[0].id);
+  });
+  const box = page.locator('.af-comp-list .af-group-cb').first();
+  await box.click();
+  expect((await ticked(page)).sort()).toEqual(ids.slice().sort());
+  await expect(box).toBeChecked();
+  // Untick one: the folder shows a dash.
+  await page.locator(`.af-tag-cb[value="${ids[0]}"]`).evaluate(e => e.closest('label').click());
+  expect(await box.evaluate(e => e.indeterminate)).toBe(true);
+  // A dash ticks the rest; ticked unticks them all.
+  await box.click();
+  expect((await ticked(page)).sort()).toEqual(ids.slice().sort());
+  await box.click();
+  expect(await ticked(page)).toEqual([]);
+  // Codes has the same box.
+  await page.locator('.af-comp-view [data-view="codes"]').click();
+  await page.locator('.af-codes .af-group-cb').first().click();
+  expect((await ticked(page)).sort()).toEqual(ids.slice().sort());
+  await expect(page.locator('.af-comp-list .af-group-cb').first()).toBeChecked();
+});
