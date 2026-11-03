@@ -7991,6 +7991,28 @@ button.grader-member-name {
   top: auto;
   bottom: calc(100% + 4px);
 }
+/* On a phone the editor fits the card: the grid scrolls sideways inside
+   it (contain keeps its width out of the form's), and the name and the
+   Style switch take the head's width. */
+@media (max-width: 600px) {
+  .af-ge-body {
+    overflow-x: auto;
+    contain: inline-size;
+  }
+  .af-ge-grid {
+    min-width: 560px;
+  }
+  .af-ge-name,
+  .af-ge-style {
+    width: 100%;
+  }
+  .af-ge-style .seg-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+}
 .af-ge-pick-list {
   display: grid;
   gap: 1px;
