@@ -106,6 +106,15 @@ describe('Cmd+Z in the gradebook', () => {
     expect(getScoreComment('cA', 's1', 'a1')).toBe('Clear labels.');
   });
 
+  it('still undoes after a refresh brings back a cleared cell as an empty row', () => {
+    open('cA');
+    clearScore();
+    // A class refresh gives the cleared cell back as a level row with no score.
+    _cache.scores.cA.s1 = [level(0)];
+    cmdZ();
+    expect(scoreIn('cA')).toEqual([3]);
+  });
+
   it('still undoes an older edit to another cell', () => {
     _cache.students.cA.push({ id: 's2', firstName: 'Ben', lastName: 'Test' });
     _cache.scores.cA.s2 = [level(2)];

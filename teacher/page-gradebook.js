@@ -2107,15 +2107,21 @@ window.PageGradebook = (function () {
     return undo;
   }
 
-  /* What a cell's `keys` hold now: its scores, + / − and comments. */
+  /* What a cell's `keys` hold now: its scores, + / − and comments. An
+     entry with no score and no text is the same as none, so a cleared cell
+     still matches after a refresh drops or keeps its empty row. */
   function _undoCellState(cid, sid, aid, keys) {
     var entries = getScores(cid)[sid] || [];
+    var assess = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
     return JSON.stringify(
       keys.map(function (key) {
         var e = entries.find(function (x) {
           return x.assessmentId === aid && x.tagId === key;
         });
         if (!e) return null;
+        if (!isScoreEntered(assess, e) && !e.note && !e.reportNote && !e.critNote && !e.critBeyond) return null;
         return [
           e.score == null || e.score === '' ? null : Number(e.score),
           e.mod || 0,
