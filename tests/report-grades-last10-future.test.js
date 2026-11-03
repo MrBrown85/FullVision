@@ -4,7 +4,8 @@
  * date filter, so three December pieces made ahead of time printed at the
  * top as dashes and pushed three graded October pieces off. Side by Side
  * always uses Last 10. Year to Date and the Quick Report already left work
- * dated after today out; Last 10 now does too.
+ * dated after today out; Last 10 now does too, and so does This Term
+ * (Colin, 2026-11-03).
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -65,5 +66,21 @@ describe('Assignment Grades on Last 10', () => {
       for (let d = 3; d <= 12; d++) expect(out).toContain('October ' + pad(d));
       expect(out).not.toContain('October 02');
     });
+  });
+
+  it('This Term leaves out work dated after today too', () => {
+    seed();
+    _cache.courseConfigs[CID].reportingTerms = [
+      { ordinal: 1, label: 'Term 1', starts_on: '2026-09-01', ends_on: '2026-12-20' },
+    ];
+    setActiveTerm(CID, 1);
+    try {
+      const out = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { range: 'term' }));
+      expect(out).toContain('This term');
+      expect(out).not.toContain('December');
+      for (let d = 1; d <= 12; d++) expect(out).toContain('October ' + pad(d));
+    } finally {
+      setActiveTerm(CID, null);
+    }
   });
 });
