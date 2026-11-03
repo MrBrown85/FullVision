@@ -3403,8 +3403,16 @@ window.PageAssignments = (function () {
       var top = g.suggested[0] || g.recent[0] || g.rest[0];
       _choose = { query: '', selected: current || (top ? top.id : null), focusSearch: true };
     }
-    if (name === 'blank') _blank = { draft: _newBlankDraft(), touched: false, focusName: true };
-    else _blank = null;
+    // A Blank draft the teacher has written in is kept while another start
+    // is open, and shows again when Blank reopens; Cancel on it asks first.
+    if (name === 'blank') {
+      if (_blankWritten()) {
+        _blank.focusName = true;
+        _blank.picker = null;
+        _blank.menu = null;
+      } else _blank = _blankState(_newBlankDraft(), false);
+      _blank.focusName = true;
+    } else if (!_blankWritten()) _blank = null;
     if (name === 'copy') {
       var first = _copySources(activeCourse)[0];
       _copy = { from: first ? first.id : null, selected: null, focusFrom: true };
@@ -3412,11 +3420,17 @@ window.PageAssignments = (function () {
     }
     _renderRubricView();
   }
-  function closeStart() {
+  /* Closes the open start. A written Blank draft is kept (the Blank tab
+     opens it again) unless `discard`. */
+  function closeStart(discard) {
     if (!_startOpen) return;
     var was = _startOpen;
     _startOpen = null;
-    if (was === 'blank') _blank = null;
+    if (was === 'blank' && (discard === true || !_blankWritten())) _blank = null;
+    if (_blank) {
+      _blank.picker = null;
+      _blank.menu = null;
+    }
     _renderRubricView();
     var back = document.querySelector('.af-rubric-start[data-start="' + was + '"]');
     if (back) back.focus();
@@ -3909,6 +3923,32 @@ window.PageAssignments = (function () {
      never saved. Edit Rubric on a held rubric opens it here. */
   var _blank = null;
 
+  // The editor's state: the draft, whether it was typed in, and the draft
+  // as it opened (to tell a real edit from a click).
+  function _blankState(draft, touched) {
+    return { draft: draft, touched: touched, orig: JSON.stringify(draft) };
+  }
+  // True when the open or kept Blank draft differs from how it opened.
+  function _blankWritten() {
+    return !!(_blank && _blank.touched && JSON.stringify(_blank.draft) !== _blank.orig);
+  }
+  /* The editor's Cancel: a draft with writing in it asks first. Editing a
+     rubric made on the form leaves that rubric as it was. */
+  function _cancelBlank() {
+    if (!_blankWritten()) return closeStart(true);
+    var name = String((_blank && _blank.draft.name) || '').trim();
+    _formDialog('Discard This Rubric?', (name || 'This rubric') + ' isn\u2019t saved. What you wrote in it is lost.', [
+      { label: 'Keep Editing', style: 'cancel' },
+      {
+        label: 'Discard',
+        style: 'danger',
+        run: function () {
+          closeStart(true);
+        },
+      },
+    ]);
+  }
+
   function _newBlankDraft() {
     return {
       id: uid(),
@@ -3933,7 +3973,7 @@ window.PageAssignments = (function () {
   }
 
   function _blankCardHtml(cid, inPlace) {
-    if (!_blank) _blank = { draft: _newBlankDraft(), touched: false };
+    if (!_blank) _blank = _blankState(_newBlankDraft(), false);
     var d = _blank.draft;
     var style = rubricStyle(d);
     var levels = _blankLevels(cid, d);
@@ -4461,7 +4501,8 @@ window.PageAssignments = (function () {
     if (_pendingFormRubric && _pendingFormRubric.id === sel.value) {
       // A rubric made on this form is edited in place (rubric starts PR 5).
       _startOpen = 'blank';
-      _blank = { draft: structuredClone(_pendingFormRubric), touched: true, focusName: true };
+      _blank = _blankState(structuredClone(_pendingFormRubric), true);
+      _blank.focusName = true;
       _renderRubricView();
       return;
     }
@@ -5176,25 +5217,24 @@ window.PageAssignments = (function () {
     return Object.keys(maps.criteria).length ? maps : null;
   }
 
-  /* Cancel on a new assessment that has something in it asks first: a
-     rubric made for it is kept only when the assessment is created. */
+  /* Cancel asks first when the form differs from how it opened: a new
+     assessment from the blank form, an edit from the stored values. A
+     rubric made for it is kept only when the assessment is saved. */
   function cancelAssessForm() {
     var title = ((document.getElementById('af-title') || {}).value || '').trim();
-    var filled =
-      !_editingAssessId &&
-      (!!title ||
-        !!_pendingFormRubric ||
-        !!(_blank && _blank.touched) ||
-        !!document.querySelector('.af-tag-cb:checked'));
-    if (!filled) {
+    var editing = !!_editingAssessId;
+    var dirty = _formChanges().length > 0 || !!_pendingFormRubric || _blankWritten();
+    if (!dirty) {
       hideNewForm();
       return;
     }
     _formDialog(
-      'Discard This Assessment?',
-      (title || 'This assessment') +
-        ' hasn’t been created.' +
-        (_pendingFormRubric ? ' The rubric you made for it isn’t kept either.' : ''),
+      editing ? 'Discard Your Changes?' : 'Discard This Assessment?',
+      editing
+        ? 'Your changes to ' + (title || 'this assessment') + ' aren\u2019t saved.'
+        : (title || 'This assessment') +
+            ' hasn\u2019t been created.' +
+            (_pendingFormRubric ? ' The rubric you made for it isn\u2019t kept either.' : ''),
       [
         { label: 'Keep Editing', style: 'cancel' },
         { label: 'Discard', style: 'danger', run: hideNewForm },
@@ -5252,8 +5292,14 @@ window.PageAssignments = (function () {
       }
     });
     document.body.appendChild(overlay);
-    var last = overlay.querySelector('.confirm-actions button:last-child:not([disabled])');
-    if (last) last.focus();
+    // A dialog that can throw work away starts on the safe button.
+    var danger = buttons.some(function (b) {
+      return b.style === 'danger';
+    });
+    var first = danger
+      ? overlay.querySelector('.confirm-actions .confirm-cancel')
+      : overlay.querySelector('.confirm-actions button:last-child:not([disabled])');
+    if (first) first.focus();
   }
 
   function toggleSectionTags(secId) {
@@ -9758,7 +9804,9 @@ window.PageAssignments = (function () {
         deleteAssess(el.dataset.aid);
       },
       closeStart: function () {
-        closeStart();
+        // The Blank editor's Cancel asks first when it has writing in it.
+        if (el.closest('.af-ge-card')) _cancelBlank();
+        else closeStart();
       },
       startPickRow: function () {
         _startPickRow(el.dataset.rid, true);
