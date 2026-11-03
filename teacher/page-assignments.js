@@ -2231,12 +2231,30 @@ window.PageAssignments = (function () {
         })
         .join('') +
       '</div>' +
-      '</div>';
+      // Factor at the end of the row; DIBELS counts toward no grade, so none.
+      '<div class="af-field af-weight-field" id="af-weight-wrap"' +
+      (scoreMode === 'dibels' ? ' hidden' : '') +
+      '>' +
+      '<label class="af-label" for="af-weight">Factor</label>' +
+      '<select class="af-input" id="af-weight">' +
+      _factorChoices(weight)
+        .map(function (w) {
+          return '<option value="' + w + '"' + (w === weight ? ' selected' : '') + '>' + _factorLabel(w) + '</option>';
+        })
+        .join('') +
+      '</select>' +
+      '</div>' +
+      '</div>' +
+      '<p class="af-dibels-note" id="af-dibels-note"' +
+      (scoreMode === 'dibels' ? '' : ' hidden') +
+      '>Words Correct, Errors and Maze are entered at the Beginning, Middle and End of Year, and their levels are worked out on the Grade 8 goals. It counts toward no grade and needs no category.</p>';
     // Rubric selector
     var rubricsList = getRubrics(cid);
     var selRubricId = assess ? assess.rubricId || '' : '';
     html +=
-      '<div class="af-field af-rubric-field">' +
+      '<div class="af-field af-rubric-field" id="af-rubric-wrap"' +
+      (scoreMode === 'proficiency' ? '' : ' hidden') +
+      '>' +
       '<label class="af-label">Rubric</label>' +
       '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
       '<select class="af-rubric-select" id="af-rubric" data-action-change="onRubricSelect" style="flex:1 1 140px;min-width:0">' +
@@ -2267,14 +2285,14 @@ window.PageAssignments = (function () {
 
     html +=
       '<div class="af-row af-score-settings">' +
-      '<div class="af-field" id="af-maxpoints-wrap" style="flex:0 0 auto;' +
-      (scoreMode === 'points' ? '' : 'display:none') +
-      '">' +
+      '<div class="af-field af-maxpoints-field" id="af-maxpoints-wrap"' +
+      (scoreMode === 'points' ? '' : ' hidden') +
+      '>' +
       '<label class="af-label" for="af-maxpoints">Max Points</label>' +
-      '<div style="display:flex;gap:8px;align-items:center">' +
+      '<div class="af-maxpoints-controls">' +
       '<input class="af-input" id="af-maxpoints" type="number" min="1" max="9999" value="' +
       esc(maxPoints) +
-      '" style="width:72px;text-align:center">' +
+      '">' +
       '<div class="seg" id="af-maxpoints-picks" role="group" aria-label="Common maximums">' +
       [10, 25, 50, 100]
         .map(function (v) {
@@ -2291,16 +2309,6 @@ window.PageAssignments = (function () {
         .join('') +
       '</div>' +
       '</div>' +
-      '</div>' +
-      '<div class="af-field" id="af-weight-wrap" style="flex:0 0 auto">' +
-      '<label class="af-label" for="af-weight">Factor</label>' +
-      '<select class="af-input" id="af-weight" style="width:76px">' +
-      _factorChoices(weight)
-        .map(function (w) {
-          return '<option value="' + w + '"' + (w === weight ? ' selected' : '') + '>' + w + 'x</option>';
-        })
-        .join('') +
-      '</select>' +
       '</div>' +
       '</div>' +
       '<div class="af-counts-as" id="af-counts-as" aria-live="polite">' +
@@ -2489,8 +2497,23 @@ window.PageAssignments = (function () {
     });
     var el = document.getElementById('af-scoremode');
     if (el) el.value = mode;
-    var wrap = document.getElementById('af-maxpoints-wrap');
-    if (wrap) wrap.style.display = mode === 'points' ? '' : 'none';
+    // Each mode shows only what it needs; what's hidden keeps its value
+    // until save, so switching back finds it as it was.
+    var show = { 'af-maxpoints-wrap': mode === 'points', 'af-rubric-wrap': mode === 'proficiency' };
+    show['af-dibels-note'] = mode === 'dibels';
+    show['af-weight-wrap'] = mode !== 'dibels';
+    Object.keys(show).forEach(function (id) {
+      var node = document.getElementById(id);
+      if (node) node.hidden = !show[id];
+    });
+  }
+
+  // The Factor menu's words: the multiplier, and what the common ones mean.
+  function _factorLabel(w) {
+    if (w === 1) return '1x (Normal)';
+    if (w === 2) return '2x (Counts Double)';
+    if (w === 0.5) return '0.5x (Counts Half)';
+    return w + 'x';
   }
 
   // The three ways to score an assessment, as cards with an icon each. On
@@ -2778,7 +2801,10 @@ window.PageAssignments = (function () {
     }
     if (dueDate) newAssess.dueDate = dueDate;
     if (moduleId) newAssess.moduleId = moduleId;
-    if (rubricId) newAssess.rubricId = rubricId;
+    // Only proficiency work is scored on a rubric; a rubric picked before
+    // switching to Points or Complete/Incomplete isn't saved with it.
+    var formMode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    if (rubricId && formMode === 'proficiency') newAssess.rubricId = rubricId;
     if (coreCompetencyIds.length > 0) newAssess.coreCompetencyIds = coreCompetencyIds;
     if (newCollaboration !== 'individual') newAssess.collaboration = newCollaboration;
     if (collabExcluded.size > 0) newAssess.excludedStudents = Array.from(collabExcluded);
@@ -2879,7 +2905,10 @@ window.PageAssignments = (function () {
     assessments[idx].category_id = categoryId || undefined;
     assessments[idx].dueDate = (document.getElementById('af-due') || {}).value || undefined;
     assessments[idx].moduleId = (document.getElementById('af-module') || {}).value || undefined;
-    assessments[idx].rubricId = (document.getElementById('af-rubric') || {}).value || undefined;
+    assessments[idx].rubricId =
+      ((document.getElementById('af-scoremode') || {}).value || 'proficiency') === 'proficiency'
+        ? (document.getElementById('af-rubric') || {}).value || undefined
+        : undefined;
     var ccIds = Array.from(document.querySelectorAll('.af-cc-chip.active')).map(function (el) {
       return el.dataset.cc;
     });
