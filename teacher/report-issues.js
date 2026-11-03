@@ -20,10 +20,12 @@ window.ReportIssues = (function () {
     return 'gb-report-issues-' + cid;
   }
 
-  /* djb2, hex. Enough to tell "this student's sheets changed". */
+  /* djb2, hex. Enough to tell "this student's sheets changed". The text of
+     an element marked data-print-date (Missing Work's "As of" date) is left
+     out, so a report is not changed just because it is printed another day. */
   function hash(str) {
     var h = 5381;
-    str = String(str || '');
+    str = String(str || '').replace(/(<[^>]*\sdata-print-date\b[^>]*>)[^<]*/g, '$1');
     for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
     return (h >>> 0).toString(16);
   }
@@ -170,6 +172,19 @@ window.ReportIssues = (function () {
 
   function latest(cid, termId) {
     return list(cid, termId)[0] || null;
+  }
+
+  /** Each student's hash in their own newest copy this term: { sid: hash }.
+   *  A "Changed since the last print" copy holds only some students; the
+   *  others are compared with the copy they were last printed in. */
+  function printedHashes(cid, termId) {
+    var out = {};
+    list(cid, termId).forEach(function (e) {
+      Object.keys(e.hashes || {}).forEach(function (sid) {
+        if (!(sid in out)) out[sid] = e.hashes[sid];
+      });
+    });
+    return out;
   }
 
   /** Students whose sheets differ from an issue: ids whose hash changed or
@@ -348,6 +363,7 @@ window.ReportIssues = (function () {
     list: list,
     latest: latest,
     changedSince: changedSince,
+    printedHashes: printedHashes,
     issue: issue,
     load: load,
     remove: remove,
