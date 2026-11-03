@@ -654,19 +654,61 @@ window.ReportBlocks = (function () {
   /* "Chemical Reactions Lab, Oct 12 · 3.3 / 4 Proficient" */
   /* A mark as the class reads it: "3.3 / 4 Proficient", "83%" for a
      letter class, "3.3 / 4 · 83% Proficient" for Both. `word` false drops
-     the proficiency word. */
-  function _mark(cid, v, word) {
+     the proficiency word. `own`: the piece's own % (_ownPercent), printed
+     in place of the % its level counts as. */
+  function _mark(cid, v, word, own) {
     if (!(v > 0)) return '\u2014';
     const mode = courseGradeMode(cid);
-    const pct = formatLevelAs(cid, v, 'percent');
+    const pct = own || formatLevelAs(cid, v, 'percent');
     if (mode === 'letter') return pct;
     const fig = levelFigure(v) + ' / 4' + (mode === 'both' ? ' \u00B7 ' + pct : '');
     return word === false ? fig : fig + ' ' + _profWord(v);
   }
+  /* Points and Complete/Incomplete work's own %, points earned out of
+     possible (calc.js), as Generate prints it (#565): its level is only a
+     band of that %, so the % its level counts as is not what it earned.
+     null for other work. */
+  function _ownPct(cid, sid, a) {
+    if (!a || !isPointsScored(a)) return null;
+    const pc = getAssessmentGroupPercentage(cid, sid, [a]);
+    return pc && pc.pct != null ? pc.pct : null;
+  }
+  function _ownPercent(cid, sid, a) {
+    const pct = _ownPct(cid, sid, a);
+    return pct == null ? null : formatPointsPercent(pct, 100);
+  }
+  /* One piece's mark: w is { a, score }. */
+  function _workMark(cid, sid, w, word) {
+    return _mark(cid, w.score, word, _ownPercent(cid, sid, w.a));
+  }
+  /* Orders pieces { a, score } best first (or lowest first, best false).
+     A Letter or Both class ranks them by the % it prints for them (points
+     work's own %, else the % the level counts as), level as tie-break, so
+     a 17/20 (85%) is above a 3+ (83%); a Proficiency class by level. */
+  function _byMark(cid, sid, best) {
+    const pctOn = courseGradeMode(cid) !== 'proficiency';
+    const shown = w => {
+      const own = _ownPct(cid, sid, w.a);
+      return own != null ? own : levelToPercent(cid, w.score);
+    };
+    return (x, y) => {
+      const [p, q] = best ? [y, x] : [x, y];
+      return (pctOn ? shown(p) - shown(q) : 0) || p.score - q.score;
+    };
+  }
+  /* The pieces a Best or Lowest line names: at the highest (or lowest)
+     mark (_byMark), at most two, sharing the mark the line prints.
+     Returns { list, mark } or null. */
+  function _namedWork(cid, sid, items, best) {
+    if (!items.length) return null;
+    const sorted = items.slice().sort(_byMark(cid, sid, best));
+    const mark = _workMark(cid, sid, sorted[0], false);
+    return { list: sorted.filter(w => _workMark(cid, sid, w, false) === mark).slice(0, 2), mark };
+  }
   /* "Chemical Reactions Lab, Oct 12 · 3.3 / 4 Proficient" */
-  function _workLine(cid, w) {
+  function _workLine(cid, sid, w) {
     const when = _assessmentWhen(w.a);
-    return esc(w.a.title || '') + (when ? ', ' + when : '') + ' \u00B7 ' + esc(_mark(cid, w.score));
+    return esc(w.a.title || '') + (when ? ', ' + when : '') + ' \u00B7 ' + esc(_workMark(cid, sid, w));
   }
   function _firstICan(sec) {
     const tag = (sec.tags || []).find(t => (t.i_can_statements || []).length);
@@ -697,7 +739,7 @@ window.ReportBlocks = (function () {
         return (
           `<div class="report-steps-k">${esc(r.name)}</div><div class="report-steps-v">${ican ? '“' + esc(ican) + '”' : 'Keep building on this competency.'}</div>` +
           (options.latest !== false && latest
-            ? `<div></div><div class="report-steps-latest">Latest: ${_workLine(cid, latest)}</div>`
+            ? `<div></div><div class="report-steps-latest">Latest: ${_workLine(cid, student.id, latest)}</div>`
             : '')
         );
       })
@@ -730,8 +772,7 @@ window.ReportBlocks = (function () {
     // included), the figure the Proficiency block prints; the start is the
     // first weeks' mean (startAndNow).
     const nowV = area.now;
-    const top = work.length ? Math.max(...work.map(w => w.score)) : 0;
-    const bests = work.filter(w => Math.round(w.score * 10) === Math.round(top * 10)).slice(0, 2);
+    const bests = _namedWork(cid, student.id, work, true);
     const latest = work[work.length - 1];
     const sub = (area.sec.tags || [])[0] && area.sec.tags[0].label !== area.sec.name ? area.sec.name : '';
     const why =
@@ -755,14 +796,14 @@ window.ReportBlocks = (function () {
         `<b>${esc(plain(nowV))}</b> <span class="report-progress-chg">(${esc(levelChangeAs(cid, startV, nowV))} this term)</span>`,
       ]);
     }
-    if (options.best !== false && bests.length) {
-      facts.push([
-        'Best',
-        bests.map(w => esc(w.a.title || '') + when(w.a)).join(' · ') + ' · ' + esc(_mark(cid, top, false)),
-      ]);
+    if (options.best !== false && bests) {
+      facts.push(['Best', bests.list.map(w => esc(w.a.title || '') + when(w.a)).join(' · ') + ' · ' + esc(bests.mark)]);
     }
     if (options.latest !== false && latest) {
-      facts.push(['Latest', esc(latest.a.title || '') + when(latest.a) + ' · ' + esc(_mark(cid, latest.score, false))]);
+      facts.push([
+        'Latest',
+        esc(latest.a.title || '') + when(latest.a) + ' · ' + esc(_workMark(cid, student.id, latest, false)),
+      ]);
     }
     const ican = _firstICan(area.sec);
     if (options.toward !== false && ican) facts.push(['Working toward', '“' + esc(ican) + '”']);
@@ -774,7 +815,7 @@ window.ReportBlocks = (function () {
         work
           .map(
             w =>
-              `<div class="report-progress-li"><span class="report-progress-date">${esc(_assessmentWhen(w.a))}</span><span class="report-progress-title">${esc(w.a.title || '')}</span><span class="report-progress-n">${esc(courseGradeMode(cid) === 'letter' ? formatLevelAs(cid, w.score, 'percent') : levelFigure(w.score))}</span></div>`,
+              `<div class="report-progress-li"><span class="report-progress-date">${esc(_assessmentWhen(w.a))}</span><span class="report-progress-title">${esc(w.a.title || '')}</span><span class="report-progress-n">${esc(courseGradeMode(cid) === 'letter' ? _workMark(cid, student.id, w) : levelFigure(w.score))}</span></div>`,
           )
           .join('') +
         '</div>';
@@ -1079,13 +1120,12 @@ window.ReportBlocks = (function () {
         const work = (list, best) => {
           const items = [];
           list.forEach(r => r.ev.list.forEach(w => w.a && items.push(w)));
-          if (!items.length) return '';
-          items.sort((a, b) => (best ? b.score - a.score : a.score - b.score));
-          const top = items.filter(w => Math.round(w.score * 10) === Math.round(items[0].score * 10)).slice(0, 2);
-          const named = top
+          const top = _namedWork(cid, sid, items, best);
+          if (!top) return '';
+          const named = top.list
             .map(w => esc(w.a.title) + (_assessmentWhen(w.a) ? ' (' + _assessmentWhen(w.a) + ')' : ''))
             .join(' and ');
-          return ` ${best ? 'Best' : 'Lowest'} work: ${named}, ${esc(_mark(cid, top[0].score, false))}.`;
+          return ` ${best ? 'Best' : 'Lowest'} work: ${named}, ${esc(top.mark)}.`;
         };
         const hi = ties(ranked, ranked[0]);
         const lo = ties(ranked.slice().reverse(), ranked[ranked.length - 1]);
@@ -1571,13 +1611,14 @@ window.ReportBlocks = (function () {
   }
   /* The marks for one row: { score, percent, word } as strings ('' when
      there is none). cv: calc.js assessmentCellValue. level: the mark on
-     one competency instead of the whole assessment. */
-  function _rowMarks(cid, a, cv, level) {
+     one competency instead of the whole assessment, for student sid;
+     points work keeps its own % (_ownPercent). */
+  function _rowMarks(cid, a, cv, level, sid) {
     if (level != null) {
       if (!(level > 0)) return { score: '—', percent: '', word: '' };
       return {
         score: levelFigure(level) + ' / 4',
-        percent: formatLevelAs(cid, level, 'percent'),
+        percent: _ownPercent(cid, sid, a) || formatLevelAs(cid, level, 'percent'),
         word: _profWord(level),
       };
     }
@@ -1659,7 +1700,7 @@ window.ReportBlocks = (function () {
         if (rows.length) {
           groups.push({
             name: _competencyLabel(sec),
-            rows: rows.map(x => rowHtml(x, _rowMarks(cid, x.a, null, byAssessment[x.a.id]))),
+            rows: rows.map(x => rowHtml(x, _rowMarks(cid, x.a, null, byAssessment[x.a.id], sid))),
           });
         }
       });
@@ -1864,13 +1905,15 @@ window.ReportBlocks = (function () {
     if (focus) {
       const work = _sectionWork(cid, student.id, focus.sec).filter(w => assessmentInActiveTerm(cid, w.a));
       if (work.length) {
-        const best = work.slice().sort((a, b) => b.score - a.score || (b.d || '').localeCompare(a.d || ''))[0];
-        const low = work.slice().sort((a, b) => a.score - b.score || (b.d || '').localeCompare(a.d || ''))[0];
-        if (options.see !== false && best) lines.push(['Ask to see', _workLine(cid, best)]);
+        const hi = _byMark(cid, student.id, true);
+        const lo = _byMark(cid, student.id, false);
+        const best = work.slice().sort((a, b) => hi(a, b) || (b.d || '').localeCompare(a.d || ''))[0];
+        const low = work.slice().sort((a, b) => lo(a, b) || (b.d || '').localeCompare(a.d || ''))[0];
+        if (options.see !== false && best) lines.push(['Ask to see', _workLine(cid, student.id, best)]);
         if (options.about !== false && low && (work.length > 1 || options.see === false)) {
           lines.push([
             'Ask about',
-            _workLine(cid, low) + (low !== best ? ', ' + esc(p.poss) + ' lowest this term' : ''),
+            _workLine(cid, student.id, low) + (low !== best ? ', ' + esc(p.poss) + ' lowest this term' : ''),
           ]);
         }
       }
