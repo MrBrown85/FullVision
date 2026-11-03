@@ -1091,6 +1091,14 @@
    white card, 12px apart; card titles sit in one 136px column. */
 .af-heading {
   margin: 0 2px 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.af-heading-note {
+  font-size: var(--text-sm);
+  color: var(--text-2);
 }
 .af-heading-title {
   margin: 0;
