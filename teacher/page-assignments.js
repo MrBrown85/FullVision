@@ -2841,6 +2841,8 @@ window.PageAssignments = (function () {
         (sel ? ' active' : '') +
         '" data-cc="' +
         cc.id +
+        '" aria-pressed="' +
+        sel +
         '"' +
         ' style="--cc-color:' +
         cc.color +
@@ -2927,6 +2929,8 @@ window.PageAssignments = (function () {
     // form is in view, with what the work counts toward beside them.
     html +=
       '<div class="af-actions">' +
+      // Create and Add Another says what it saved, until the next edit.
+      '<p class="af-saved-note" id="af-saved-note" role="status" hidden></p>' +
       '<p class="af-counts-toward" id="af-counts-toward" aria-live="polite"></p>' +
       '<button class="btn btn-ghost" data-action="cancelAssessForm">Cancel</button>' +
       // Create and Add Another (redesign PR 11): saves, then a fresh form
@@ -2947,13 +2951,23 @@ window.PageAssignments = (function () {
   }
 
   /* ── Assessment Form Helpers ────────────────────────────── */
+  /* A new Date Assigned moves Due Date with it only while Due is still the
+     week-later date it was given (or empty); a due date the teacher set
+     stays. */
+  function _weekAfter(day) {
+    var d = new Date(day + 'T12:00:00');
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  }
   function autoSetDueDate() {
     var assigned = document.getElementById('af-date-assigned');
     if (!assigned || !assigned.value) return;
-    var d = new Date(assigned.value + 'T12:00:00');
-    d.setDate(d.getDate() + 7);
+    var was = assigned.dataset.was || assigned.defaultValue || '';
+    assigned.dataset.was = assigned.value;
     var dueEl = document.getElementById('af-due');
-    if (dueEl) dueEl.value = d.toISOString().slice(0, 10);
+    if (!dueEl) return;
+    if (dueEl.value && !(was && dueEl.value === _weekAfter(was))) return;
+    dueEl.value = _weekAfter(assigned.value);
   }
 
   function setScoreMode(mode) {
@@ -3260,7 +3274,14 @@ window.PageAssignments = (function () {
   // Typing in Max Points: the quick picks follow the box, and an error clears.
   function _formInput(e) {
     var t = e.target;
-    if (!t || !t.id) return;
+    if (!t) return;
+    // The next edit clears "Created …" from Create and Add Another.
+    var saved = document.getElementById('af-saved-note');
+    if (saved && !saved.hidden && t.closest && t.closest('#new-assess-form')) {
+      saved.hidden = true;
+      saved.textContent = '';
+    }
+    if (!t.id) return;
     // A title clears the "Title is required" state as soon as it's typed.
     if (t.id === 'af-title' && t.value.trim()) t.removeAttribute('aria-invalid');
     if (t.id === 'af-maxpoints') {
@@ -4539,7 +4560,7 @@ window.PageAssignments = (function () {
         return false;
       }
       var title = ((document.getElementById('af-title') || {}).value || '').trim();
-      name = title ? title + ' Rubric' : 'New Rubric';
+      name = _rubricNameFrom(title, 'New Rubric');
     }
     var held = structuredClone(d);
     held.name = name;
@@ -4553,6 +4574,12 @@ window.PageAssignments = (function () {
     _holdFormRubric(held);
     _renderRubricView();
     return true;
+  }
+  // A rubric named after its assessment; a title that already ends in
+  // "Rubric" isn't given a second one.
+  function _rubricNameFrom(title, fallback) {
+    if (!title) return fallback;
+    return /\brubric$/i.test(title) ? title : title + ' Rubric';
   }
   // Create / Save Changes with a blank the teacher has written in: keep it.
   function _commitOpenBlank() {
@@ -4792,7 +4819,7 @@ window.PageAssignments = (function () {
     CompetencyWording.loadBank().then(function () {
       var held = {
         id: uid(),
-        name: title ? title + ' Rubric' : 'Competency Rubric',
+        name: _rubricNameFrom(title, 'Competency Rubric'),
         criteria: tags.map(function (tag) {
           var levels = {};
           [1, 2, 3, 4].forEach(function (l) {
@@ -5579,7 +5606,14 @@ window.PageAssignments = (function () {
     _showingNewForm = false;
     _editingAssessId = null;
     render();
-    if (keep) _reopenWith(keep);
+    if (keep) {
+      _reopenWith(keep);
+      var saved = document.getElementById('af-saved-note');
+      if (saved) {
+        saved.textContent = 'Created ' + title + '.';
+        saved.hidden = false;
+      }
+    }
     // Once the copies exist, the card can show "Also in …". A form reopened
     // for the next one stays open through that render.
     if (copyTargets.length)
@@ -5780,8 +5814,23 @@ window.PageAssignments = (function () {
     }
     var cc = a.coreCompetencyIds || [];
     document.querySelectorAll('.af-cc-chip').forEach(function (chip) {
-      chip.classList.toggle('active', cc.indexOf(chip.dataset.cc) >= 0);
+      var on = cc.indexOf(chip.dataset.cc) >= 0;
+      chip.classList.toggle('active', on);
+      chip.setAttribute('aria-pressed', String(on));
     });
+    // From this class, its Category, Module and Description too (their ids
+    // mean nothing in another class).
+    if (srcCid === cid) {
+      var pick = function (id, v) {
+        var el = document.getElementById(id);
+        if (el && v && el.querySelector('option[value="' + CSS.escape(v) + '"]')) el.value = v;
+      };
+      pick('af-category', _getAssessmentCategoryId(a));
+      pick('af-module', a.moduleId || '');
+      var desc = document.getElementById('af-desc');
+      if (desc && a.description) desc.value = a.description;
+      _refreshCategoryHint();
+    }
     var assigned = document.getElementById('af-date-assigned');
     if (assigned) assigned.value = courseToday(cid);
     autoSetDueDate();
@@ -5840,6 +5889,8 @@ window.PageAssignments = (function () {
     set('af-weight', keep.weight);
     set('af-date-assigned', keep.assigned);
     set('af-due', keep.due);
+    var assignedEl = document.getElementById('af-date-assigned');
+    if (assignedEl) assignedEl.dataset.was = assignedEl.value;
     if (
       keep.mode &&
       keep.mode !== 'proficiency' &&
@@ -10255,7 +10306,8 @@ window.PageAssignments = (function () {
         el.parentElement.classList.toggle('af-section-open');
       },
       toggleActive: function () {
-        el.classList.toggle('active');
+        var on = el.classList.toggle('active');
+        if (el.hasAttribute('aria-pressed')) el.setAttribute('aria-pressed', String(on));
       },
       chooseRubric: function () {
         chooseRubric();
@@ -12033,6 +12085,7 @@ window.PageAssignments = (function () {
     });
     _addDocListener('keydown', _formKeydown);
     _addDocListener('input', _formInput);
+    _addDocListener('change', _formInput);
     _addDocListener('keydown', _compKeydown);
     _addDocListener('input', _compInput);
     _addDocListener('mouseover', _codeHover);
