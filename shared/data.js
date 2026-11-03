@@ -5284,7 +5284,10 @@ function getRubricCriterionBeyond(cid, sid, aid, criterion) {
 /* Save (or clear, with '') one note on one criterion. The cache changes at
    once and the server row follows; with no level yet the row holds only
    its notes (rubric_score.value null, migrations/20261027_score_comments.sql).
-   The other note is sent as null, which keeps it. */
+   The other note goes too, from the cache, as a level change sends both: the
+   outbox keeps only the newest write to a criterion, so a Work On sent alone
+   was lost behind a Went Beyond saved before it went. With none cached it is
+   sent as null, which keeps the server's. */
 function _saveRubricCriterionNote(cid, sid, aid, criterionId, text, field) {
   var assessment = _assessmentById(cid, aid);
   var criterion = _rubricCriterionById(cid, assessment, criterionId);
@@ -5333,7 +5336,10 @@ function _saveRubricCriterionNote(cid, sid, aid, criterionId, text, field) {
       p_value: level || null,
       p_modifier: mod,
     };
-    params[_CRITERION_NOTE_PARAMS[field]] = note;
+    Object.keys(_CRITERION_NOTE_PARAMS).forEach(function (f) {
+      params[_CRITERION_NOTE_PARAMS[f]] =
+        f === field ? note : _getRubricCriterionNote(cid, sid, aid, criterion, f) || null;
+    });
     _trackPendingSync(
       _writeRpc('upsert_rubric_score', params).then(function (res) {
         if (res.error) _reportScoreWriteFailure('upsert_rubric_score', res.error);
