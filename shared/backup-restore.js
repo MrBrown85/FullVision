@@ -780,53 +780,6 @@
     return out;
   }
 
-  /* The server keeps one record per student (DECISIONS "Class backups" 3):
-     a matched student keeps the record they had, not the fresh id this
-     device gave them. student_ids maps each sent id to the one used; point
-     the cached students, and queued writes still naming a fresh id, at it. */
-  function applyStudentIds(cid, studentIds) {
-    var map = {};
-    Object.keys(obj(studentIds)).forEach(function (sent) {
-      var used = studentIds[sent];
-      if (UUID_RE.test(str(used)) && used !== sent) map[sent] = used;
-    });
-    if (!Object.keys(map).length) return;
-    _rekeyField('students', cid, function (rows) {
-      var changed = false;
-      arr(rows).forEach(function (s) {
-        if (s && map[s.personId]) {
-          s.personId = map[s.personId];
-          changed = true;
-        }
-      });
-      return changed;
-    });
-    var q = window.v2Queue;
-    if (!q || typeof q.rewrite !== 'function') return;
-    q.rewrite(function (entry) {
-      var changed = false;
-      var payload = Object.assign({}, entry.payload);
-      Object.keys(payload).forEach(function (name) {
-        var value = payload[name];
-        if (typeof value === 'string' && map[value]) {
-          payload[name] = map[value];
-          changed = true;
-        } else if (
-          Array.isArray(value) &&
-          value.some(function (v) {
-            return map[v];
-          })
-        ) {
-          payload[name] = value.map(function (v) {
-            return map[v] || v;
-          });
-          changed = true;
-        }
-      });
-      return changed ? { payload: payload, blockedOn: entry.blocked_on } : null;
-    });
-  }
-
   /* Write the restored class to this device and send it to the server.
      Returns { cid, course, sent } at once; `sent` resolves with the
      server's counts when the restore lands (null in Demo Mode) and rejects
@@ -851,7 +804,6 @@
             _clearCourseLocalState(cid);
             throw res.error;
           }
-          if (res && res.data) applyStudentIds(cid, res.data.student_ids);
           return res ? res.data : null;
         });
     return { cid: cid, course: plan.course, sent: sent };

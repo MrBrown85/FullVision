@@ -2680,6 +2680,7 @@ function _onOutboxEvent(evt) {
   if (evt.kind === 'flush:success') {
     delete _baselineUndo[meta.id];
     _onCreateLanded(meta.id, meta.data);
+    if (meta.endpoint === 'import_json_restore') _onRestoreLanded(meta.payload, meta.data);
   } else if (evt.kind === 'flush:dead-letter') {
     _revertBaselineRow(_baselineUndo[meta.id], meta.endpoint, meta.payload);
     delete _baselineUndo[meta.id];
@@ -2688,6 +2689,58 @@ function _onOutboxEvent(evt) {
     delete _baselineUndo[meta.id];
     _onCreateAbandoned(meta.id, false);
   }
+}
+
+/* A class restore landed (shared/backup-restore.js). The server keeps one
+   record per student (DECISIONS "Class backups" 3): a matched student keeps
+   the record they had, not the fresh id this device gave them, and
+   student_ids maps each sent id to the one used. Point the cached students,
+   and queued writes still naming a fresh id, at it. Runs from the outbox's
+   own event, so in every tab and after a reload, before the next entry goes. */
+function _onRestoreLanded(payload, data) {
+  var studentIds = (data && data.student_ids) || {};
+  var courses = payload && payload.p_payload && payload.p_payload.courses;
+  var cid = Array.isArray(courses) && courses[0] ? courses[0].id : null;
+  var map = {};
+  Object.keys(studentIds).forEach(function (sent) {
+    var used = studentIds[sent];
+    if (_isUuid(used) && used !== sent) map[sent] = used;
+  });
+  if (!cid || !Object.keys(map).length) return;
+  _rekeyField('students', cid, function (rows) {
+    var changed = false;
+    (Array.isArray(rows) ? rows : []).forEach(function (s) {
+      if (s && map[s.personId]) {
+        s.personId = map[s.personId];
+        changed = true;
+      }
+    });
+    return changed;
+  });
+  var q = window.v2Queue;
+  if (!q || typeof q.rewrite !== 'function') return;
+  q.rewrite(function (entry) {
+    var changed = false;
+    var next = Object.assign({}, entry.payload);
+    Object.keys(next).forEach(function (name) {
+      var value = next[name];
+      if (typeof value === 'string' && map[value]) {
+        next[name] = map[value];
+        changed = true;
+      } else if (
+        Array.isArray(value) &&
+        value.some(function (v) {
+          return map[v];
+        })
+      ) {
+        next[name] = value.map(function (v) {
+          return map[v] || v;
+        });
+        changed = true;
+      }
+    });
+    return changed ? { payload: next, blockedOn: entry.blocked_on } : null;
+  });
 }
 
 /* Once per page: forget records whose entry is gone (sent, dead-lettered or

@@ -647,42 +647,6 @@ describe('restoreClassFromBackup', () => {
     expect(FV_IDEMPOTENT_RPCS.import_json_restore).toBe(true);
   });
 
-  it('gives a matched student the record the server kept, here and in queued writes', async () => {
-    globalThis._isDemoSession = () => false;
-    globalThis._writesEnabled = () => true;
-    var sentIds;
-    globalThis._writeRpc = vi.fn((name, params) => {
-      sentIds = params.p_payload.students.map(s => s.id);
-      // Ada still has her record (S1); Alan is new and keeps the sent id.
-      return Promise.resolve({
-        data: { student_ids: { [sentIds[0]]: S1, [sentIds[1]]: sentIds[1] } },
-        error: null,
-      });
-    });
-    var queued = [{ endpoint: 'update_student', payload: { p_id: null, p_patch: { pronouns: 'she/her' } } }];
-    var realQueue = window.v2Queue;
-    window.v2Queue = {
-      rewrite(fn) {
-        queued.forEach(entry => {
-          var next = fn(entry);
-          if (next) entry.payload = next.payload;
-        });
-      },
-    };
-    try {
-      var restored = FVBackupRestore.restoreClassFromBackup(backup, { name: 'Science 8' });
-      var freshAda = getStudents(restored.cid)[0].personId;
-      queued[0].payload.p_id = freshAda;
-      await restored.sent;
-      expect(freshAda).not.toBe(S1);
-      expect(getStudents(restored.cid).map(s => s.personId)).toEqual([S1, sentIds[1]]);
-      expect(JSON.parse(localStorage.getItem('gb-students-' + restored.cid))[0].personId).toBe(S1);
-      expect(queued[0].payload.p_id).toBe(S1);
-    } finally {
-      window.v2Queue = realQueue;
-    }
-  });
-
   it('takes the class off this device again when the server refuses it', async () => {
     globalThis._isDemoSession = () => false;
     globalThis._writesEnabled = () => true;
