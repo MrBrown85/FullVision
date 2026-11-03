@@ -214,6 +214,67 @@
     }
   }
 
+  /* Sign Out in one tab signs the whole device out: the other open tabs clear
+     what they would save back and go to sign-in. Their wipe runs again on
+     pagehide, after the pages' own pagehide saves (a delete still in its Undo
+     window), so nothing those write stays. supabase-js's own SIGNED_OUT is
+     not used: a failed token refresh raises it too, and that must keep the
+     outbox. */
+  let _authChannel = null;
+
+  function _postSignedOut() {
+    try {
+      if (_authChannel) _authChannel.postMessage({ type: 'signed-out' });
+    } catch (e) {
+      /* channel closed */
+    }
+  }
+
+  function _onSignedOutElsewhere() {
+    if (/\/login\.html$/.test(window.location.pathname || '')) return;
+    _clearDeviceData();
+    window.addEventListener('pagehide', _clearDeviceData);
+    window.location.href = '/login.html';
+  }
+
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      _authChannel = new BroadcastChannel('fv-auth');
+      _authChannel.onmessage = function (e) {
+        if (e && e.data && e.data.type === 'signed-out') _onSignedOutElsewhere();
+      };
+    }
+  } catch (e) {
+    _authChannel = null;
+  }
+
+  function _clearDeviceData() {
+    // Clear all application + auth data from localStorage (FOIPPA: no data left on shared computers)
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      // gb- and gb_ prefixes (data layer uses dashes, some UI prefs use underscores)
+      // sb- prefix (Supabase auth tokens)
+      // td- prefix (cross-portal prefs like td-mobile-pref)
+      // fv- prefix (offline write queue + dead letters, which hold student data)
+      if (!key) continue;
+      if (
+        key.startsWith('gb-') ||
+        key.startsWith('gb_') ||
+        key.startsWith('sb-') ||
+        key.startsWith('td-') ||
+        key.startsWith('fv-')
+      )
+        keysToRemove.push(key);
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    // Clear session storage and cookies
+    sessionStorage.clear();
+    document.cookie.split(';').forEach(c => {
+      document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
+    });
+  }
+
   window.signOut = async function (opts) {
     opts = opts || {};
     const sb = getSupabase();
@@ -242,30 +303,9 @@
     } catch (err) {
       console.warn('Sign-out exception (proceeding anyway):', err);
     }
-    // Clear all application + auth data from localStorage (FOIPPA: no data left on shared computers)
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      // gb- and gb_ prefixes (data layer uses dashes, some UI prefs use underscores)
-      // sb- prefix (Supabase auth tokens)
-      // td- prefix (cross-portal prefs like td-mobile-pref)
-      // fv- prefix (offline write queue + dead letters, which hold student data)
-      if (!key) continue;
-      if (
-        key.startsWith('gb-') ||
-        key.startsWith('gb_') ||
-        key.startsWith('sb-') ||
-        key.startsWith('td-') ||
-        key.startsWith('fv-')
-      )
-        keysToRemove.push(key);
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-    // Clear session storage and cookies
-    sessionStorage.clear();
-    document.cookie.split(';').forEach(c => {
-      document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
-    });
+    _clearDeviceData();
+    // The other open tabs leave too, so they do not save the class back.
+    _postSignedOut();
     // Clear service worker caches
     if ('caches' in window) {
       caches.keys().then(names => names.forEach(name => caches.delete(name)));

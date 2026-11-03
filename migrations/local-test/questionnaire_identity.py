@@ -8,7 +8,8 @@ PGPORT=54331 PGDATABASE=fv_ss python3 run.py harness.sql student-submit-prelude.
   ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql \\
   ../20261025_student_submit.sql ../20261025_student_submit_phone.sql \\
   ../20261025_student_submit_token_80.sql ../20261025_phone_reports.sql \\
-  ../20261101_questionnaire_identity_check.sql ../20261101_questionnaire_slip_fixes.sql
+  ../20261101_questionnaire_identity_check.sql ../20261101_questionnaire_slip_fixes.sql \\
+  ../20261103_slip_password_kept_for_live_slips.sql
 PGPORT=54331 PGDATABASE=fv_ss python3 questionnaire_identity.py
 """
 import os, sys, json, uuid
@@ -180,6 +181,23 @@ ok('a reprint for a student who now has a number prints no password', re.get('pa
 ok('and clears the stored one', one('select slip_password from student where id = :s', s=STU2) is None)
 r = open_(re['code'])
 ok('so the new slip is asked for identity only', r.get('check') == 'identity' and r.get('also_password') is False, r)
+back()
+
+# ── Printing another questionnaire's slip keeps a live slip's password ──
+sp()
+as_owner(); c.run("update student set student_number = '7654321' where id = :s", s=STU2)
+# The Reflection slip was printed in an earlier request.
+c.run("update student_access_code set created_at = now() - interval '1 day'")
+as_teacher(A)
+other = c.run("select upsert_questionnaire(:c, 'core_reflection', 'January Reflection', 'core-8-1', p_report_period => 2, p_opens_on => (:d::date - 1), p_closes_on => (:d::date + 7), p_idempotency_key => :k)",
+              c=COURSE_A, d=today, k=key())[0][0]
+re = c.run('select issue_access_codes(:q, :ids::uuid[], :k)', q=other['id'], ids='{%s}' % ENR2, k=key())[0][0][0]
+ok("another questionnaire's slip prints no password", re.get('password') is None, re)
+ok('and keeps the stored one while the older slip is live', one('select slip_password from student where id = :s', s=STU2) == pw)
+r = open_(code2)
+ok('so the older slip still offers its password', r.get('check') == 'identity' and r.get('also_password') is True, r)
+r = verify(r['token'], number=pw, password=pw)
+ok('and accepts it', r.get('ok') is True, r)
 back()
 r = open_(c1['code'])
 ok('a student who never had a password is not offered one', r.get('also_password') is False, r)

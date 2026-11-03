@@ -319,9 +319,12 @@ window.PageStudent = (function () {
     overlay._guardianEmails = ['', ''];
     if (window.DashClassManager && DashClassManager.guardianEmails) {
       DashClassManager.guardianEmails(cid, st.id).then(function (emails) {
+        // A dialog closed before the load came back must not fill the
+        // next student's boxes (they share the same ids).
+        if (!overlay.isConnected) return;
         overlay._guardianEmails = emails;
         ['edit-g0', 'edit-g1'].forEach(function (id, i) {
-          var inp = document.getElementById(id);
+          var inp = overlay.querySelector('#' + id);
           if (inp && !inp.value && document.activeElement !== inp) inp.value = emails[i];
         });
       });

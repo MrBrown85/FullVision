@@ -9,6 +9,7 @@
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'fs';
 
 const CID = 'b1000000-0000-4000-8000-000000000001';
 const S1 = 'b1000000-0000-4000-8000-000000000011';
@@ -571,6 +572,56 @@ describe('restore class from backup', () => {
         mention_observation_ids: [id(OB1)],
       }),
     ]);
+  });
+
+  it("has the server check every record the payload links to is the teacher's own", () => {
+    // migrations/20261103_import_json_restore_owned_links.sql: RLS on a
+    // restored row checks only the parent below, so every other id it names
+    // is checked by the restore itself. Not record ids: a tag's bank id, the
+    // BC Core Competency codes, the student match hint, and the sentence
+    // starter, which the restore looks up among the teacher's own.
+    const sql = readFileSync('migrations/20261103_import_json_restore_owned_links.sql', 'utf-8');
+    const rlsParent = {
+      report_configs: 'course_id',
+      categories: 'course_id',
+      subjects: 'course_id',
+      competency_groups: 'course_id',
+      sections: 'course_id',
+      tags: 'section_id',
+      modules: 'course_id',
+      rubrics: 'course_id',
+      criteria: 'rubric_id',
+      criterion_tags: 'criterion_id',
+      criterion_checks: 'criterion_id',
+      rubric_tags: 'rubric_id',
+      enrollments: 'course_id',
+      assessments: 'course_id',
+      assessment_tags: 'assessment_id',
+      custom_tags: 'course_id',
+      observations: 'course_id',
+    };
+    const notRecords = ['bank_id', 'core_competency_ids', 'match_id', 'template_id'];
+    const links = [];
+    Object.keys(plan.payload).forEach(arr => {
+      const rows = plan.payload[arr];
+      if (!Array.isArray(rows)) return;
+      const fields = new Set();
+      rows.forEach(r => Object.keys(r || {}).forEach(f => /_ids?$/.test(f) && fields.add(f)));
+      fields.forEach(f => {
+        if (f === (rlsParent[arr] || 'enrollment_id') || notRecords.includes(f)) return;
+        links.push(arr + '.' + f);
+      });
+    });
+    expect(links).toContain('enrollments.student_id');
+    links.forEach(link => {
+      const [arr, field] = link.split('.');
+      expect(sql, link).toContain("('" + arr + "', '" + field + "', '");
+    });
+    // A student is the teacher's own by teacher id, not by RLS alone.
+    expect(sql).toContain(
+      "when 'student' then exists (select 1 from student x where x.id = l.id::uuid and x.teacher_id = _uid)",
+    );
+    expect(sql).toContain("raise exception 'import_json_restore: % not found', _bad using errcode = 'P0002';");
   });
 
   it('leaves out rows that point at something the backup lacks', () => {
