@@ -105,3 +105,13 @@ test('the rubric lists its criteria and how often it is used', async ({ page }) 
   await expect(tip(page).locator('.gb-tip-head')).toContainText(r.name);
   await expect(tip(page).locator('.gb-tip-row')).toHaveCount(r.n);
 });
+
+test('a field focused below the fold keeps its tip as the page scrolls to it', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 560 });
+  await openForm(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator('#af-weight').focus();
+  await page.waitForTimeout(300);
+  await expect(tip(page)).toBeVisible();
+  await expect(tip(page)).toContainText('Factor 1x (Normal)');
+});

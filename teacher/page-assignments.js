@@ -2262,6 +2262,15 @@ window.PageAssignments = (function () {
     var el = _afTipTarget(e);
     if (el && el === _afTipSource) _hideAfTip();
   }
+  // Scrolling closes a hovered tip; a focused field's tip (the browser
+  // scrolls a field into view as it's focused) moves with it.
+  function _afTipScroll() {
+    var el = _afTipSource;
+    if (!el) return;
+    var a = document.activeElement;
+    if (a && (a === el || el.contains(a)) && document.body.contains(el)) _showAfTip(el, true);
+    else _hideAfTip();
+  }
   // A changed category, date or Factor updates its open tip.
   function _afTipChange(e) {
     var el = _afTipTarget(e);
@@ -3291,14 +3300,12 @@ window.PageAssignments = (function () {
         .join('');
     dd.value = keep;
   }
-  function _useRubricInForm(rid) {
+  function _useRubricInForm(rid, confirmed) {
     var dd = document.getElementById('af-rubric');
     if (!dd) return;
-    if ((dd.value || '') !== (rid || '') && !_scoredChangeConfirmed) {
+    if ((dd.value || '') !== (rid || '') && confirmed !== true) {
       _askBeforeScoredChange('rubric', function () {
-        _scoredChangeConfirmed = true;
-        _useRubricInForm(rid);
-        _scoredChangeConfirmed = false;
+        _useRubricInForm(rid, true);
       });
       return;
     }
@@ -3378,7 +3385,6 @@ window.PageAssignments = (function () {
   /* Editing scored work (redesign PR 9): changing its scoring or its rubric
      asks first and names how many students it touches. Scores are kept
      under the rubric's criteria and the scoring they were given in. */
-  var _scoredChangeConfirmed = false;
   function _askBeforeScoredChange(what, go, nextMode) {
     var aid = _editingAssessId;
     var scored = aid ? _scoredStudentCount(activeCourse, aid) : 0;
@@ -3430,17 +3436,22 @@ window.PageAssignments = (function () {
             });
       return next;
     });
-    // Where each criterion and checkbox came from, by position, so this
-    // assessment's scores can move to the copy when it's saved (PR 10).
+    // Where each criterion and checkbox came from (copy id → original id),
+    // so this assessment's scores can move to the copy when it's saved
+    // (PR 10). Criteria added, removed or reordered in the editor keep or
+    // lose their entry by id, never by position.
     if (_editingAssessId && _scoredStudentCount(cid, _editingAssessId)) {
-      copy._copiedFrom = (src.criteria || []).map(function (c) {
-        return {
-          id: c.id,
-          checks: (c.checks || []).map(function (k) {
-            return k.id;
-          }),
-        };
+      var from = { criteria: {}, checks: {} };
+      (src.criteria || []).forEach(function (c, i) {
+        var made = copy.criteria[i];
+        if (!made) return;
+        from.criteria[made.id] = c.id;
+        (c.checks || []).forEach(function (k, j) {
+          var mk = (made.checks || [])[j];
+          if (mk) from.checks[mk.id] = k.id;
+        });
       });
+      copy._copiedFrom = from;
     }
     var title = ((document.getElementById('af-title') || {}).value || '').trim();
     copy.name = src.name + (title ? ' · ' + title : ' (Copy)');
@@ -3998,7 +4009,7 @@ window.PageAssignments = (function () {
     }
     Promise.resolve(saveRubrics(cid, list)).then(function (result) {
       var finalId = result && result.idMap && result.idMap[held.id] ? result.idMap[held.id] : held.id;
-      if (copiedFrom && editing) _scoreMoveAfterSave = _scoreMoveMaps(cid, editing, finalId, copiedFrom, result);
+      if (copiedFrom && editing) _scoreMoveAfterSave = _scoreMoveMaps(cid, editing, finalId, copiedFrom, held, result);
       var box = document.getElementById('af-rubric');
       if (box) {
         var opt = box.querySelector('option[value="' + held.id + '"]');
@@ -4010,25 +4021,45 @@ window.PageAssignments = (function () {
     return true;
   }
 
-  /* Old → new criterion and checkbox ids for a saved copy, matched by
-     position (the copy keeps the original's order). */
-  function _scoreMoveMaps(cid, aid, rid, copiedFrom, result) {
+  /* Original → saved criterion and checkbox ids for a copy. `held` is the
+     copy as sent and `saved` the same rubric as stored, criteria in the same
+     order; each held id leads back to its original through copiedFrom, so
+     edits in the copy editor never move a score onto the wrong criterion.
+     Nothing moves unless the copy reached the server with server ids: a
+     failed save leaves the scores where the server has them. */
+  function _scoreMoveMaps(cid, aid, rid, copiedFrom, held, result) {
     var saved =
       ((result && result.rubrics) || []).find(function (r) {
         return r.id === rid;
       }) || getRubricById(cid, rid);
-    if (!saved) return null;
+    var sent = (held && held.criteria) || [];
+    if (!saved || (saved.criteria || []).length !== sent.length) return null;
+    var online = typeof _writesEnabled === 'function' && _writesEnabled();
+    if (
+      online &&
+      !(
+        _isUuid(rid) &&
+        saved.criteria.every(function (c) {
+          return _isUuid(c.id);
+        })
+      )
+    )
+      return null;
     var maps = { aid: aid, rubricId: rid, criteria: {}, checks: {} };
-    copiedFrom.forEach(function (from, i) {
-      var to = (saved.criteria || [])[i];
-      if (!to) return;
-      maps.criteria[from.id] = to.id;
-      from.checks.forEach(function (kid, j) {
-        var tk = (to.checks || [])[j];
-        if (tk) maps.checks[kid] = tk.id;
+    sent.forEach(function (c, i) {
+      var to = saved.criteria[i];
+      var orig = copiedFrom.criteria[c.id];
+      if (!to || !orig) return;
+      maps.criteria[orig] = to.id;
+      (c.checks || []).forEach(function (k) {
+        var origCheck = copiedFrom.checks[k.id];
+        var match = (to.checks || []).find(function (tk) {
+          return tk.level === k.level && tk.label === k.label;
+        });
+        if (origCheck && match) maps.checks[origCheck] = match.id;
       });
     });
-    return maps;
+    return Object.keys(maps.criteria).length ? maps : null;
   }
 
   /* Cancel on a new assessment that has something in it asks first: a
@@ -4258,14 +4289,10 @@ window.PageAssignments = (function () {
     // for the next one stays open through that render.
     if (copyTargets.length)
       AssessmentCopy.copyToClasses(srcCid, newAssess, copyTargets).then(function () {
-        var held = keep && _showingNewForm && !_editingAssessId ? _formKeepForNext() : null;
-        var typed = held ? (document.getElementById('af-title') || {}).value || '' : '';
+        // A form reopened for the next one is left as the teacher has it;
+        // the "Also in …" chips show at the next render.
+        if (keep && _showingNewForm && !_editingAssessId) return;
         render();
-        if (held) {
-          _reopenWith(held);
-          var t = document.getElementById('af-title');
-          if (t) t.value = typed;
-        }
       });
   }
 
@@ -4323,7 +4350,9 @@ window.PageAssignments = (function () {
           return (
             head +
             '<button type="button" class="af-past-row" role="option" aria-selected="false" data-past-i="' +
-            rows.indexOf(r) +
+            r.i +
+            '" data-past-key="' +
+            esc(r.cid + ':' + r.a.id) +
             '"' +
             (i === 0 ? ' tabindex="0"' : ' tabindex="-1"') +
             '><span class="af-past-name">' +
@@ -4382,6 +4411,7 @@ window.PageAssignments = (function () {
           .forEach(function (a) {
             if (!a || !a.title) return;
             rows.push({
+              i: rows.length,
               cid: id,
               a: a,
               className: _pastClassName(id),
@@ -4389,16 +4419,33 @@ window.PageAssignments = (function () {
             });
           });
       });
-      var focused = overlay.contains(document.activeElement) && document.activeElement.id === 'af-past-find';
+      var active = overlay.contains(document.activeElement) ? document.activeElement : null;
+      var key = active && active.dataset ? active.dataset.pastKey : null;
       draw();
-      if (focused) overlay.querySelector('#af-past-find').focus();
+      if (!active) return;
+      // Back to the same row if it's still listed, else the search box, so
+      // Enter and Escape keep working.
+      var row = key ? overlay.querySelector('[data-past-key="' + CSS.escape(key) + '"]') : null;
+      (row || overlay.querySelector('#af-past-find')).focus();
     };
     collect();
+    // Other classes load once per session, one at a time.
     if (window.AssessmentCopy)
-      others.forEach(function (id) {
-        AssessmentCopy.loadClass(id).then(collect);
-      });
+      others
+        .filter(function (id) {
+          return !_pastLoaded[id];
+        })
+        .reduce(function (chain, id) {
+          return chain.then(function () {
+            if (!document.body.contains(overlay)) return;
+            return AssessmentCopy.loadClass(id).then(function () {
+              _pastLoaded[id] = true;
+              collect();
+            });
+          });
+        }, Promise.resolve());
   }
+  var _pastLoaded = {};
   function _pastClassName(id) {
     return (COURSES[id] && courseDisplayName(COURSES[id])) || 'Another Class';
   }
@@ -4431,7 +4478,7 @@ window.PageAssignments = (function () {
       _useRubricInForm(rubric.id);
     } else if (rubric && window.RubricLibrary) {
       _holdFormRubric(RubricLibrary.cloneRubric(srcCid, cid, rubric));
-    }
+    } else rubric = null;
     if (!rubric) {
       var ids = srcCid === cid ? a.tagIds || [] : AssessmentCopy.mapTags(srcCid, cid, a.tagIds).ids;
       sameAsTags(ids.join(','));
@@ -10576,7 +10623,7 @@ window.PageAssignments = (function () {
     _addDocListener('focusin', _afTipFocus);
     _addDocListener('focusout', _afTipBlur);
     _addDocListener('change', _afTipChange);
-    _addDocListener('scroll', _hideAfTip, true);
+    _addDocListener('scroll', _afTipScroll, true);
     ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
       _addDocListener(type, _statusLocksAfterEvent);
     });

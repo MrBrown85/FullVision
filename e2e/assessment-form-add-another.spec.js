@@ -69,3 +69,29 @@ test('editing has no Create and Add Another', async ({ page }) => {
   await expect(page.locator('.af-heading-title')).toHaveText('Edit Assessment');
   await expect(page.locator('[data-action="saveAndAddAnother"]')).toHaveCount(0);
 });
+
+test('the reopened form keeps what was typed when the other class’s copy lands', async ({ page }) => {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => {
+    COURSES.sci8b = Object.assign(structuredClone(COURSES.sci8), { id: 'sci8b', name: 'Science 8', block: 'B' });
+    saveCourses(COURSES);
+    window.Router.navigate('/assignments?course=sci8');
+  });
+  await page.locator('button', { hasText: 'New Assessment' }).first().click();
+  await page.fill('#af-title', 'Lab 1');
+  await page.selectOption('#af-category', 'sci8-cat-labs');
+  const b = page.locator('.af-copy-chip[data-cid="sci8b"]');
+  if (!(await b.count())) test.skip(true, 'No second class chip in Demo');
+  await b.click();
+  await page.locator('[data-action="saveAndAddAnother"]').click();
+  await page.fill('#af-title', 'Lab 2');
+  await page.selectOption('#af-category', 'sci8-cat-labs');
+  // Finish the copy (its review dialog, if any).
+  const ok = page.locator('.copy-review-ok, [data-copy-ok], .confirm-ok').first();
+  if (await ok.isVisible().catch(() => false)) await ok.click();
+  await page.waitForTimeout(500);
+  await expect(page.locator('#af-title')).toHaveValue('Lab 2');
+  await expect(page.locator('#af-category')).toHaveValue('sci8-cat-labs');
+});
