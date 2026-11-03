@@ -78,3 +78,55 @@ test('a copy of a shared rubric takes this assessment’s scores with it', async
   // The other assessment on the original rubric keeps its scores.
   expect(after.theirs).toEqual(before.theirs);
 });
+
+test('a criterion removed from the copy keeps its scores off the others', async ({ page }) => {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => window.Router.navigate('/assignments?course=sci8'));
+  await expect(page.locator('[data-action="editAssess"]').first()).toBeAttached();
+  const before = await page.evaluate(() => {
+    const all = getAssessments('sci8');
+    const scored = a => getStudents('sci8').some(s => hasScoreOrFeedback('sci8', s.id, a.id));
+    const a = all.find(
+      x =>
+        x.rubricId &&
+        scored(x) &&
+        getRubricById('sci8', x.rubricId).criteria.length > 1 &&
+        all.some(y => y.id !== x.id && y.rubricId === x.rubricId),
+    );
+    const crits = getRubricById('sci8', a.rubricId).criteria.map(c => c.id);
+    const on = id =>
+      Object.values(getScores('sci8'))
+        .flat()
+        .filter(e => e && e.assessmentId === a.id && e.tagId === id)
+        .map(e => e.score)
+        .sort();
+    return { aid: a.id, crits, first: on(crits[0]), second: on(crits[1]) };
+  });
+  await page.evaluate(id => document.querySelector(`[data-action="editAssess"][data-aid="${id}"]`).click(), before.aid);
+  await page.locator('[data-action="editRubricFromForm"]').click();
+  await page.locator('.af-dialog-card button', { hasText: 'Edit a Copy for' }).click();
+  await page.locator('[data-action="removeCriterion"][data-index="0"]').click();
+  await page.locator('[data-action="saveRubricEdit"]').click();
+  await page.locator('[data-action="saveEditAssess"]').click();
+  await expect
+    .poll(() => page.evaluate(aid => getAssessments('sci8').find(a => a.id === aid).rubricId, before.aid))
+    .not.toBe(before.crits[0]);
+  const after = await page.evaluate(
+    ({ aid, crits }) => {
+      const r = getRubricById('sci8', getAssessments('sci8').find(a => a.id === aid).rubricId);
+      const on = id =>
+        Object.values(getScores('sci8'))
+          .flat()
+          .filter(e => e && e.assessmentId === aid && e.tagId === id)
+          .map(e => e.score)
+          .sort();
+      // The copy's first criterion is the original's second.
+      return { copyFirst: on(r.criteria[0].id), origFirst: on(crits[0]) };
+    },
+    { aid: before.aid, crits: before.crits },
+  );
+  expect(after.copyFirst).toEqual(before.second);
+  expect(after.origFirst).toEqual(before.first);
+});
