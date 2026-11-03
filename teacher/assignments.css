@@ -1351,8 +1351,9 @@
     flex: 1 1 100%;
   }
   .af-comp-find {
+    /* Grows to fill; no width of its own to widen the form. */
     flex: 1 1 auto;
-    width: auto;
+    width: 0;
   }
   .af-weight-field {
     margin-left: 0;
@@ -1836,6 +1837,27 @@
   font-size: var(--text-base);
   color: var(--text);
   line-height: 1.4;
+}
+/* Phone width: the mode cards share the row and the footer wraps, so
+   neither widens the form past the window. */
+@media (max-width: 600px) {
+  .af-card-scoring .af-mode-item {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+  .af-card-scoring .af-mode-card {
+    min-width: 0;
+    padding: 0 12px;
+  }
+  #new-assess-form > .af-actions {
+    flex-wrap: wrap;
+  }
+  #new-assess-form > .af-actions .af-counts-toward {
+    flex: 1 1 100%;
+  }
+  #new-assess-form > .af-actions .btn {
+    flex: 1 1 auto;
+  }
 }
 
 /* ── Assignment toolbar ─────────────────────────────────────── */
