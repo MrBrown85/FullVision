@@ -8,7 +8,7 @@
  * nothing signs a teacher out for being idle (teachers use their own
  * devices).
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -123,6 +123,62 @@ describe('signOut and unsent offline changes', () => {
     loadSupabase({ queued: 0, deadLettered: 0 });
     await window.signOut();
     expect(globalThis.__signOutOpts).toEqual({ scope: 'local' });
+  });
+
+  describe('other open tabs', () => {
+    const RealChannel = globalThis.BroadcastChannel;
+    let channels;
+    beforeEach(() => {
+      channels = [];
+      globalThis.BroadcastChannel = class {
+        constructor(name) {
+          this.name = name;
+          this.onmessage = null;
+          channels.push(this);
+        }
+        postMessage(data) {
+          channels.filter(c => c !== this && c.name === this.name && c.onmessage).forEach(c => c.onmessage({ data }));
+        }
+        close() {}
+      };
+    });
+    afterEach(() => {
+      globalThis.BroadcastChannel = RealChannel;
+    });
+
+    it('tells the other tabs when this tab signs out', async () => {
+      loadSupabase({ queued: 0, deadLettered: 0 });
+      const heard = [];
+      const otherTab = new BroadcastChannel('fv-auth');
+      otherTab.onmessage = e => heard.push(e.data);
+      await window.signOut();
+      expect(heard).toEqual([{ type: 'signed-out' }]);
+    });
+
+    it('leaves for sign-in and clears what the page saves on its way out', () => {
+      loadSupabase({ queued: 0, deadLettered: 0 });
+      const pagehide = [];
+      globalThis.addEventListener = (evt, fn) => evt === 'pagehide' && pagehide.push(fn);
+      new BroadcastChannel('fv-auth').postMessage({ type: 'signed-out' });
+      expect(localStorage.getItem('gb-students-c1')).toBeNull();
+      expect(localStorage.getItem('fv-sync-queue-v1')).toBeNull();
+      expect(localStorage.getItem('unrelated')).toBe('kept');
+      expect(window.location.href).toBe('/login.html');
+      // A delete still in its Undo window commits on pagehide and saves the class.
+      localStorage.setItem('gb-scores-c1', '{"s1":[]}');
+      localStorage.setItem('fv-sync-queue-v1', '{"entries":[{"id":"q2"}]}');
+      pagehide.forEach(fn => fn());
+      expect(localStorage.getItem('gb-scores-c1')).toBeNull();
+      expect(localStorage.getItem('fv-sync-queue-v1')).toBeNull();
+    });
+
+    it('does nothing on the sign-in page', () => {
+      loadSupabase({ queued: 0, deadLettered: 0 });
+      window.location.pathname = '/login.html';
+      new BroadcastChannel('fv-auth').postMessage({ type: 'signed-out' });
+      expect(localStorage.getItem('gb-students-c1')).not.toBeNull();
+      expect(window.location.href).toBe('');
+    });
   });
 
   it('never signs a teacher out for being idle', () => {
