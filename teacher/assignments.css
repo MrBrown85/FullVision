@@ -3005,6 +3005,10 @@
   font-weight: 600;
   color: var(--text-2);
 }
+.rb-use-chip.is-static,
+.rb-use-more.is-static {
+  cursor: default;
+}
 .rb-use-chip {
   height: 26px;
   padding: 0 10px;

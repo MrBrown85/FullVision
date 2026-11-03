@@ -8,6 +8,12 @@
 
    Hooks: edit(rid), newRubric(style), remove(rid), print(rid, cid),
    useInNew(rid), goToAssessment(aid), changed().
+
+   Pick mode (hooks.pick = { title, tagIds, use(rid) }, redesign PR 7): the
+   assessment form's Choose a Rubric. The list is Suggested (rubrics
+   sharing the assessment's competencies), Recently Used and Everything
+   Else; search also finds a rubric by an assessment it was on or a
+   competency code; the pane's action is Use This Rubric.
    ─────────────────────────────────────────────────────────────── */
 window.RubricBank = (function () {
   'use strict';
@@ -63,6 +69,19 @@ window.RubricBank = (function () {
     var q = _norm(query);
     if (!q) return true;
     if (_norm(rubric.name).indexOf(q) >= 0) return true;
+    if (_s && _s.pick) {
+      var onAssessment = usesOf(cid, rubric.id).some(function (a) {
+        return _norm(a.title).indexOf(q) >= 0;
+      });
+      if (onAssessment) return true;
+      var byCode = (rubric.criteria || []).some(function (c) {
+        return (c.tagIds || []).some(function (tid) {
+          var tag = typeof getTagById === 'function' ? getTagById(cid, tid) : null;
+          return !!tag && _norm(tag.code || '').indexOf(q) >= 0;
+        });
+      });
+      if (byCode) return true;
+    }
     return (rubric.criteria || []).some(function (c) {
       return (c.tagIds || []).some(function (tid) {
         return _norm(_tagLabel(cid, tid)).indexOf(q) >= 0;
@@ -502,8 +521,109 @@ window.RubricBank = (function () {
     );
   }
 
+  function _fmtDay(iso) {
+    if (!iso) return '';
+    var d = new Date(String(iso).slice(0, 10) + 'T12:00:00');
+    return isNaN(d) ? '' : d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  }
+
+  /* Pick mode's rows: the last assessment a rubric was on, and when. */
+  function _pickRowHtml(cid, r) {
+    var selected = r.id === _s.selected && cid === _s.selCid;
+    var last = usesOf(cid, r.id)[0];
+    var meta =
+      _plural((r.criteria || []).length, 'Criterion', 'Criteria') +
+      ' · ' +
+      (last
+        ? (last.title || 'Untitled') + (last.date ? ', ' + _fmtDay(last.dateAssigned || last.date) : '')
+        : 'Not Used');
+    return (
+      '<button type="button" class="rb-row' +
+      (selected ? ' is-selected' : '') +
+      '" data-rb="select" data-cid="' +
+      esc(cid) +
+      '" data-rid="' +
+      esc(r.id) +
+      '" aria-current="' +
+      (selected ? 'true' : 'false') +
+      '"><span class="rb-row-top"><span class="rb-row-name">' +
+      esc(r.name) +
+      '</span>' +
+      _advTagHtml(r) +
+      '</span><span class="rb-row-meta">' +
+      esc(meta) +
+      '</span></button>'
+    );
+  }
+
+  /* Suggested: rubrics sharing the assessment's competencies, most in
+     common first. Recently Used: the four last used. Everything Else. */
+  function pickGroups(cid, query, tagIds) {
+    var want = tagIds || [];
+    var list = _rubrics(cid).filter(function (r) {
+      return matches(cid, r, query);
+    });
+    var shared = function (r) {
+      var codes = {};
+      (r.criteria || []).forEach(function (c) {
+        (c.tagIds || []).forEach(function (t) {
+          codes[t] = true;
+        });
+      });
+      return want.filter(function (t) {
+        return codes[t];
+      }).length;
+    };
+    var suggested = list
+      .filter(function (r) {
+        return shared(r) > 0;
+      })
+      .sort(function (a, b) {
+        return shared(b) - shared(a);
+      })
+      .slice(0, 3);
+    var lastDate = function (r) {
+      var u = usesOf(cid, r.id)[0];
+      return u ? String(u.dateAssigned || u.date || '') : '';
+    };
+    var recent = list
+      .filter(function (r) {
+        return suggested.indexOf(r) < 0 && lastDate(r);
+      })
+      .sort(function (a, b) {
+        return lastDate(b).localeCompare(lastDate(a));
+      })
+      .slice(0, 4);
+    var rest = list.filter(function (r) {
+      return suggested.indexOf(r) < 0 && recent.indexOf(r) < 0;
+    });
+    return { suggested: suggested, recent: recent, rest: rest };
+  }
+
+  function _pickListHtml() {
+    var cid = _s.cid;
+    if (!_rubrics(cid).length) return '<div class="rb-empty-list">No rubrics yet.</div>';
+    var g = pickGroups(cid, _s.query, _s.pick.tagIds);
+    if (!g.suggested.length && !g.recent.length && !g.rest.length)
+      return '<div class="rb-empty-list">No rubrics match.</div>';
+    var html = '';
+    [
+      ['Suggested', g.suggested],
+      ['Recently Used', g.recent],
+      ['Everything Else', g.rest],
+    ].forEach(function (part) {
+      if (!part[1].length) return;
+      html += '<div class="rb-group">' + esc(part[0]) + ' · ' + part[1].length + '</div>';
+      part[1].forEach(function (r) {
+        html += _pickRowHtml(cid, r);
+      });
+    });
+    return html;
+  }
+
   function _classListHtml() {
     var cid = _s.cid;
+    if (_s.pick) return _pickListHtml();
     var g = groups(cid, _s.query);
     if (!_rubrics(cid).length) return '<div class="rb-empty-list">No rubrics yet.</div>';
     if (!g.used.length && !g.unused.length) return '<div class="rb-empty-list">No rubrics match.</div>';
@@ -879,6 +999,7 @@ window.RubricBank = (function () {
       '</span>' +
       (linked ? '<span class="rb-linked">' + esc(linked) + '</span>' : '') +
       '</div></div>';
+    if (_s.pick) return _pickPaneHtml(cid, r, html, uses);
     html += '<div class="rb-actions">';
     html += '<button type="button" class="rb-btn rb-btn-primary" data-rb="edit">Edit Rubric</button>';
     html += '<button type="button" class="rb-btn" data-rb="print">Print</button>';
@@ -919,6 +1040,32 @@ window.RubricBank = (function () {
     return html;
   }
 
+  /* Pick mode's pane: the rubric read only, and Use This Rubric. */
+  function _pickPaneHtml(cid, r, head, uses) {
+    var html = head;
+    html +=
+      '<div class="rb-actions">' +
+      (_s.pick.current ? '<button type="button" class="rb-btn" data-rb="pick-none">Use No Rubric</button>' : '') +
+      '<button type="button" class="rb-btn rb-btn-primary" data-rb="pick-use">Use This Rubric</button></div></div>';
+    if (isAdvanced(r)) html += '<div class="rb-rule">' + esc(LEVEL_RULE) + '</div>';
+    html += '<div class="rb-grid-wrap">' + gridHtml(cid, r) + '</div>';
+    if (uses.length) {
+      html +=
+        '<div class="rb-foot"><div class="rb-used"><span class="rb-used-label">Used In</span>' +
+        uses
+          .slice(0, USES_SHOWN)
+          .map(function (a) {
+            return '<span class="rb-use-chip is-static">' + esc(a.title || 'Untitled') + '</span>';
+          })
+          .join('') +
+        (uses.length > USES_SHOWN
+          ? '<span class="rb-use-more is-static">+ ' + (uses.length - USES_SHOWN) + ' More</span>'
+          : '') +
+        '</div></div>';
+    }
+    return html;
+  }
+
   function _scopeHtml() {
     if (!otherClasses(_s.cid).length) return '';
     var all = _s.scope === 'all';
@@ -941,14 +1088,14 @@ window.RubricBank = (function () {
   function _overlayHtml() {
     return (
       '<div class="rb-card" role="dialog" aria-modal="true" aria-labelledby="rb-heading">' +
-      '<div class="rb-head"><h2 class="rb-heading" id="rb-heading">Rubric Bank</h2>' +
+      '<div class="rb-head"><h2 class="rb-heading" id="rb-heading">' +
+      esc(_s.pick ? (_s.pick.title ? 'Choose a Rubric for ' + _s.pick.title : 'Choose a Rubric') : 'Rubric Bank') +
+      '</h2>' +
       '<div id="rb-scope">' +
       _scopeHtml() +
       '</div>' +
       '<div class="rb-head-gap"></div>' +
-      '<div class="rb-new-wrap" id="rb-new">' +
-      _newHtml() +
-      '</div>' +
+      (_s.pick ? '' : '<div class="rb-new-wrap" id="rb-new">' + _newHtml() + '</div>') +
       '<button type="button" class="rb-close" data-rb="close" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
       '</div>' +
       '<div class="rb-body"><div class="rb-side">' +
@@ -959,7 +1106,11 @@ window.RubricBank = (function () {
       '<div class="rb-list" id="rb-list">' +
       listHtml() +
       '</div>' +
-      '<div class="rb-hint">↑ ↓ to move through the list. Enter opens the editor.</div>' +
+      '<div class="rb-hint">' +
+      (_s.pick
+        ? '↑ ↓ to move through the list. Enter uses the rubric.'
+        : '↑ ↓ to move through the list. Enter opens the editor.') +
+      '</div>' +
       '</div><div class="rb-pane" id="rb-pane">' +
       paneHtml() +
       '</div></div></div>'
@@ -1177,6 +1328,18 @@ window.RubricBank = (function () {
         close();
         if (hooks.useInNew) hooks.useInNew(rid);
         break;
+      case 'pick-none': {
+        var pickNone = _s.pick;
+        close();
+        if (pickNone && pickNone.use) pickNone.use('');
+        break;
+      }
+      case 'pick-use': {
+        var pick = _s.pick;
+        close();
+        if (pick && pick.use) pick.use(rid);
+        break;
+      }
     }
   }
 
@@ -1220,7 +1383,7 @@ window.RubricBank = (function () {
       _step(e.key === 'ArrowDown' ? 1 : -1);
     } else if (e.key === 'Enter' && _s.selected && !(target.dataset && target.dataset.rb === 'group')) {
       e.preventDefault();
-      _act('edit');
+      _act(_s.pick && !_isForeign() ? 'pick-use' : 'edit');
     }
   }
 
@@ -1243,7 +1406,13 @@ window.RubricBank = (function () {
       allUses: false,
       statsAid: '',
       trigger: document.activeElement,
+      pick: (hooks && hooks.pick) || null,
     };
+    if (_s.pick) {
+      var first = pickGroups(cid, '', _s.pick.tagIds);
+      var top = first.suggested[0] || first.recent[0] || first.rest[0];
+      _s.selected = _s.pick.current || (top ? top.id : null);
+    }
     _s.openClasses[cid] = true;
     _current();
     var overlay = document.createElement('div');

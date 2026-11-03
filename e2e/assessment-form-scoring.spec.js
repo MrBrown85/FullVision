@@ -7,6 +7,22 @@ import { test, expect } from '@playwright/test';
    Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
+// Choose a Rubric opens the picker; '' uses no rubric; a number picks that row.
+async function pickRubric(page, rid) {
+  await page.locator('[data-action="chooseRubric"]').first().click();
+  const bank = page.locator('#rubric-bank-overlay');
+  if (rid === '') return bank.locator('[data-rb="pick-none"]').click();
+  if (typeof rid === 'object') {
+    await bank
+      .locator('.rb-row')
+      .nth(rid.index - 1)
+      .click();
+  } else {
+    await bank.locator('.rb-row[data-rid="' + rid + '"]').click();
+  }
+  await bank.locator('[data-rb="pick-use"]').click();
+}
+
 async function openForm(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
@@ -40,8 +56,7 @@ test('each mode shows only what it needs', async ({ page }) => {
 test('a rubric survives a trip through Points, and Points saves none', async ({ page }) => {
   await openForm(page);
   const rid = await page.evaluate(() => getRubrics('sci8')[0].id);
-  await page.locator('[data-action="chooseRubric"]').first().click();
-  await page.selectOption('#af-rubric', rid);
+  await pickRubric(page, rid);
   await page.locator('.af-scoremode-btn[data-mode="points"]').click();
   await page.locator('#af-maxpoints-picks [data-value="25"]').click();
   await page.locator('.af-scoremode-btn[data-mode="proficiency"]').click();
