@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
 
 // The whole-class rubric grid: "Set Everyone To" capsules, then per student
-// the name with Late | Excused | Missing and Comment, and each criterion's
+// the name with Missing | Excused | Late and Comment, and each criterion's
 // − | + and comment under its name with the level control beside it.
 const RUBRIC = {
   id: 'rubric-grid',
@@ -46,7 +46,7 @@ test('the whole-class rubric grid scores, fine-tunes and sets a status', async (
 
   const alice = card.locator('.rsg-student[data-status-student="stu-001"]');
   await expect(alice.locator('.rsg-student-name')).toContainText('Alice');
-  await expect(alice.locator('.rsg-status .grader-status-btn')).toHaveText(['Late', 'Excused', 'Missing']);
+  await expect(alice.locator('.rsg-status .grader-status-btn')).toHaveText(['Missing', 'Excused', 'Late']);
   // The overall comment is a field under the criteria, not a button.
   await expect(alice.locator('.rsg-student-head .comment-btn')).toHaveCount(0);
   await expect(alice.locator('.rsg-overall-comment')).toHaveAttribute(

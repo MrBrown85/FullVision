@@ -2709,6 +2709,26 @@ body.offline-active #app-dock {
   #gb-sidebar {
     display: none;
   }
+  /* Toggle Sidebar opens the student list over the page (ui.js). */
+  .page-layout {
+    position: relative;
+  }
+  .page-layout.sidebar-overlay #sidebar-mount {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--z-fab);
+    width: auto;
+    height: auto;
+    overflow: visible;
+  }
+  .page-layout.sidebar-overlay #sidebar-mount #gb-sidebar {
+    display: flex;
+    width: 280px;
+    max-width: calc(100vw - 48px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+  }
   .sidebar-toggle {
     display: flex !important;
   }

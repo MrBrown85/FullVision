@@ -194,10 +194,8 @@ test.describe('Mobile: Sidebar Toggle', () => {
     await expect(toggle).toBeVisible();
   });
 
-  // BUG: at 1024px and below styles.css sets #gb-sidebar to display:none
-  // whatever the toggle says, so the toggle shows but opens nothing.
+  // At 1024px and below the toggle opens the student list over the page.
   test('clicking toggle should show and hide sidebar', async ({ page }) => {
-    test.fail(); // known bug: the student list never shows below 1025px
     await page.setViewportSize(SMALL_TABLET);
     await gotoApp(page, '/dashboard');
     const toggle = page.locator('[data-action="toggleSidebar"]');

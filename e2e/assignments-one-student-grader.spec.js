@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
 
 // Picking a student on the Assignments page grades them with the same
-// grader as the gradebook's dialog: their name, Late | Excused | Missing,
+// grader as the gradebook's dialog: their name, Missing | Excused | Late,
 // Comment and the grade above the rubric tiles, inside each open card.
 const RUBRIC = {
   id: 'rubric-os',
@@ -56,7 +56,7 @@ test('one student is graded with the grader inside the card', async ({ page }) =
   const card = page.locator('#ac-assess-os');
   const grader = card.locator('.grader-inline');
   await expect(grader.locator('.grader-inline-name')).toHaveText(/Alice/);
-  await expect(grader.locator('.grader-status .grader-status-btn')).toHaveText(['Late', 'Excused', 'Missing']);
+  await expect(grader.locator('.grader-status .grader-status-btn')).toHaveText(['Missing', 'Excused', 'Late']);
   // One feedback box, the Overall Comment field; no Comment button.
   await expect(grader.locator('.grader-add-comment')).toHaveCount(0);
   await expect(grader.locator('.grdt-overall .grdt-note')).toBeVisible();

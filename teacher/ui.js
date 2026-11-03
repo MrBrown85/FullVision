@@ -1350,10 +1350,60 @@ try {
   console.warn('Sidebar state read error:', e);
 }
 
+/* At 1024px and below there is no room for the student list beside the
+   page, so Toggle Sidebar opens it over the page instead (styles.css,
+   .sidebar-overlay). Picking a student, Escape or a click outside closes
+   it. The saved wide-screen choice is left alone. */
+const SIDEBAR_OVERLAY_QUERY = '(max-width: 1024px)';
+function _sidebarIsOverlay() {
+  return !!(window.matchMedia && window.matchMedia(SIDEBAR_OVERLAY_QUERY).matches);
+}
+
 function toggleSidebar() {
+  if (_sidebarIsOverlay()) {
+    const layout = document.getElementById('page-layout');
+    setSidebarOverlay(!(layout && layout.classList.contains('sidebar-overlay')));
+    return;
+  }
   _sidebarVisible = !_sidebarVisible;
   localStorage.setItem('gb-sidebar-vis', _sidebarVisible);
   applySidebarState();
+}
+
+function _onSidebarOverlayKey(e) {
+  if (e.key !== 'Escape') return;
+  e.preventDefault();
+  e.stopPropagation();
+  setSidebarOverlay(false);
+}
+function _onSidebarOverlayPointer(e) {
+  if (e.target.closest('#sidebar-mount, [data-action="toggleSidebar"]')) return;
+  setSidebarOverlay(false);
+}
+// A student picked: close once the page has handled the click.
+function _onSidebarOverlayClick(e) {
+  if (e.target.closest('#sidebar-mount .student-row')) setTimeout(() => setSidebarOverlay(false), 0);
+}
+function setSidebarOverlay(open) {
+  const layout = document.getElementById('page-layout');
+  if (!layout) return;
+  open = !!open;
+  layout.classList.toggle('sidebar-overlay', open);
+  document.querySelectorAll('[data-action="toggleSidebar"]').forEach(btn => {
+    if (_sidebarIsOverlay()) btn.setAttribute('aria-expanded', String(open));
+    else btn.removeAttribute('aria-expanded');
+  });
+  const method = open ? 'addEventListener' : 'removeEventListener';
+  document[method]('keydown', _onSidebarOverlayKey, true);
+  document[method]('pointerdown', _onSidebarOverlayPointer, true);
+  document[method]('click', _onSidebarOverlayClick, true);
+}
+if (window.matchMedia) {
+  const mq = window.matchMedia(SIDEBAR_OVERLAY_QUERY);
+  const closeWhenWide = () => {
+    if (!mq.matches) setSidebarOverlay(false);
+  };
+  if (mq.addEventListener) mq.addEventListener('change', closeWhenWide);
 }
 
 function applySidebarState() {
@@ -1363,6 +1413,7 @@ function applySidebarState() {
 }
 
 function initSidebarToggle() {
+  setSidebarOverlay(false);
   applySidebarState();
 }
 
