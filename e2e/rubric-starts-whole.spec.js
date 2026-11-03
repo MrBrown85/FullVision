@@ -96,5 +96,5 @@ test('Create saves the whole rubric’s competencies; the gradebook shows one le
   await page.locator('[data-action="setView"][data-mode="detailed"]').click();
   const cell = page.locator('td.gb-score[data-aid="' + ids.aid + '"][data-sid="' + sid + '"][data-tid="PA4"]');
   await expect(cell).toHaveText(/3/);
-  await expect(cell).toHaveAttribute('title', /whole rubric: its criteria average 3\.0 of 4/);
+  await expect(cell).toHaveAttribute('title', /whole rubric: its criteria come to 75%/);
 });

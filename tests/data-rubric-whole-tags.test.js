@@ -69,8 +69,13 @@ describe('saving', () => {
   });
 
   it('sends [] for a rubric with none, so removing the last one saves', async () => {
-    await window.v2.upsertRubric({ id: R1, courseId: CID, name: 'Lab', criteria: [] });
+    await window.v2.upsertRubric({ id: R1, courseId: CID, name: 'Lab', criteria: [], linkedTagIds: [] });
     expect(upserts()[0].payload.p_linked_tag_ids).toEqual([]);
+  });
+
+  it('sends null when the rubric never loaded them, so the server keeps its own', async () => {
+    await window.v2.upsertRubric({ id: R1, courseId: CID, name: 'Lab', criteria: [] });
+    expect(upserts()[0].payload.p_linked_tag_ids).toBeNull();
   });
 
   it('re-keys a landed competency on the whole rubric and sends it again', async () => {

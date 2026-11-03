@@ -551,23 +551,28 @@ window.PageAssignments = (function () {
   /* ── Assessment List ────────────────────────────────────── */
   // Competencies, rubric criteria with none, or one overall score. Rubric
   // work lists the competencies its criteria feed, scored through them
-  // (_tagState, _setTagScore), then any criterion that feeds none. Every
-  // criterion feeds a whole-rubric competency.
+  // (_tagState, _setTagScore), then any criterion that feeds none. A
+  // whole-rubric competency has no row: its level is worked out from the
+  // criteria, so setting it would overwrite them.
   function _scoreTagObjs(cid, a) {
     var keys = scoreTagIds(a, cid);
     var comps = rubricCompetencyIds(cid, a);
     if (comps.length) {
       var rubric = getRubricById(cid, a.rubricId);
-      var whole = rubricWholeTagIds(cid, a).length > 0;
-      keys = comps.concat(
-        ((rubric && rubric.criteria) || [])
-          .filter(function (c) {
-            return c && c.id && !whole && !(c.tagIds || []).length;
-          })
-          .map(function (c) {
-            return c.id;
-          }),
-      );
+      var whole = rubricWholeTagIds(cid, a);
+      keys = comps
+        .filter(function (t) {
+          return whole.indexOf(t) < 0;
+        })
+        .concat(
+          ((rubric && rubric.criteria) || [])
+            .filter(function (c) {
+              return c && c.id && !(c.tagIds || []).length;
+            })
+            .map(function (c) {
+              return c.id;
+            }),
+        );
     }
     var tagObjs = keys
       .map(function (key) {
@@ -1322,7 +1327,13 @@ window.PageAssignments = (function () {
     });
     return a ? rubricCriteriaForTag(cid, a, tagId) : [];
   }
+  // A whole-rubric competency has no keys of its own: its criteria are
+  // scored one by one.
   function _tagScoreKeys(cid, aid, tagId) {
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === aid;
+    });
+    if (a && rubricWholeTagIds(cid, a).indexOf(tagId) >= 0) return [];
     var crits = _tagCriteria(cid, aid, tagId);
     return crits.length
       ? crits.map(function (c) {
@@ -2160,6 +2171,18 @@ window.PageAssignments = (function () {
               );
             })
             .join('') +
+          ((rubric.tagIds || []).length
+            ? '<div class="gb-tip-row"><span class="gb-tip-label">Whole Rubric</span><span class="gb-tip-val">' +
+              esc(
+                rubric.tagIds
+                  .map(function (id) {
+                    var t = getTagById(cid, id);
+                    return (t && t.code) || id;
+                  })
+                  .join(' '),
+              ) +
+              '</span></div>'
+            : '') +
           '<div class="gb-tip-note gb-tip-foot">' +
           esc(
             on.length
@@ -3538,19 +3561,12 @@ window.PageAssignments = (function () {
       : { suggested: [], recent: [], rest: getRubrics(activeCourse) };
   }
 
-  // The codes of the competencies a rubric's criteria score, in order.
+  // The codes of the competencies a rubric scores, in order.
   function _rubricCodes(cid, r) {
-    var seen = {};
-    var out = [];
-    (r.criteria || []).forEach(function (c) {
-      (c.tagIds || []).forEach(function (t) {
-        if (seen[t]) return;
-        seen[t] = true;
-        var tag = getTagById(cid, t);
-        out.push((tag && tag.code) || t);
-      });
+    return rubricScoredTagIds(r).map(function (t) {
+      var tag = getTagById(cid, t);
+      return (tag && tag.code) || t;
     });
-    return out;
   }
 
   function _startCardHtml(cid, name, inPlace) {
@@ -7847,12 +7863,7 @@ window.PageAssignments = (function () {
     var rubric = getRubricById(cid, a.rubricId);
     if (!rubric) return '';
     var criteria = rubric.criteria || [];
-    var rubricTagIds = new Set();
-    criteria.forEach(function (c) {
-      (c.tagIds || []).forEach(function (t) {
-        rubricTagIds.add(t);
-      });
-    });
+    var rubricTagIds = new Set(rubricScoredTagIds(rubric));
     var extraTagIds = (a.tagIds || []).filter(function (tid) {
       return !rubricTagIds.has(tid);
     });
@@ -8176,15 +8187,9 @@ window.PageAssignments = (function () {
   /* A rubric decides the assessment's competencies (redesign PR 4): picking
      one ticks exactly the competencies its criteria feed, read only while
      it's chosen. Picking None leaves the ticks to edit by hand. */
-  // The competencies a rubric's criteria score, each once.
+  // The competencies a rubric scores, its criteria's and the whole rubric's, each once.
   function _rubricTagIds(rubric) {
-    var out = [];
-    ((rubric && rubric.criteria) || []).forEach(function (c) {
-      (c.tagIds || []).forEach(function (t) {
-        if (out.indexOf(t) < 0) out.push(t);
-      });
-    });
-    return out;
+    return rubricScoredTagIds(rubric);
   }
   // The rubric chosen on the form: one made for it, else a saved one.
   function _formChosenRubric() {
@@ -8570,6 +8575,13 @@ window.PageAssignments = (function () {
   // A tag's teacher-facing name. Never the id: real tag ids are UUIDs.
   /* How a chip names the criterion that already uses its competency: by
      number when the criterion is named after the competency. */
+  // A competency the whole rubric scores can't go on a criterion too.
+  function _markWholeRubricTags(used) {
+    ((_editingRubric && _editingRubric.tagIds) || []).forEach(function (t) {
+      used[t] = 'the whole rubric';
+    });
+    return used;
+  }
   function _usedByLabel(crit, idx, tagId) {
     var tag = getTagById(activeCourse, tagId);
     var tagName = _rubricTagName(tag, getSectionForTag(activeCourse, tagId));
@@ -8605,6 +8617,7 @@ window.PageAssignments = (function () {
           otherUsed[t] = _usedByLabel(c, i, t);
         });
     });
+    _markWholeRubricTags(otherUsed);
     var selectedTagIds = new Set(crit.tagIds || []);
     var isCollapsed = ci !== _expandedCriterion;
     // Collapsed summary: the competency names this criterion assesses.
@@ -8868,6 +8881,7 @@ window.PageAssignments = (function () {
         used[t] = _usedByLabel(c, _editingRubric.criteria.indexOf(c), t);
       });
     });
+    _markWholeRubricTags(used);
     var chips = '';
     var any = false;
     _rubricTagGroups(getSections(activeCourse)).forEach(function (g) {
@@ -8942,6 +8956,7 @@ window.PageAssignments = (function () {
         used[t] = true;
       });
     });
+    _markWholeRubricTags(used);
     var added = [];
     (tagIds || []).forEach(function (id) {
       if (used[id]) return;

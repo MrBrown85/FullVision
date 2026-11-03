@@ -7989,7 +7989,8 @@ function _persistRubricsToCanonical(cid, prev, arr) {
                 style: rubricStyle(rubric),
                 criteria: _rubricCriteriaPayload(rubric),
                 copyGroup: rubric.copyGroup || null,
-                linkedTagIds: _rubricWholeTagIds(rubric),
+                // null when this copy never loaded them: the server keeps its own.
+                linkedTagIds: rubric && Array.isArray(rubric.tagIds) ? _rubricWholeTagIds(rubric) : null,
               },
               { entryId: rec ? rec.entryId : undefined },
             )
@@ -11451,8 +11452,8 @@ window.v2.upsertRubric = function (params, options) {
       p_criteria: criteria,
       p_copy_group: _isUuid(params.copyGroup) ? params.copyGroup : null,
       p_style: rubricStyle({ style: params.style }),
-      // The competencies the whole rubric scores; [] clears them.
-      p_linked_tag_ids: (params.linkedTagIds || []).filter(_isUuid),
+      // The competencies the whole rubric scores; [] clears them, null keeps them.
+      p_linked_tag_ids: Array.isArray(params.linkedTagIds) ? params.linkedTagIds.filter(_isUuid) : null,
     },
     options,
   );

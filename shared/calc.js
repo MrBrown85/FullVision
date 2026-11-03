@@ -1274,16 +1274,30 @@ function rubricWholeTagIds(cid, assessment) {
   return ((rubric && rubric.tagIds) || []).slice();
 }
 
+/* The competencies a rubric scores, each once: its criteria's in criterion
+   order, then the whole rubric's (rubric.tagIds). Every view that lists a
+   rubric's competencies reads them here. */
+function rubricScoredTagIds(rubric) {
+  var out = [];
+  ((rubric && rubric.criteria) || []).forEach(function (c) {
+    ((c && c.tagIds) || []).forEach(function (t) {
+      if (out.indexOf(t) < 0) out.push(t);
+    });
+  });
+  ((rubric && rubric.tagIds) || []).forEach(function (t) {
+    if (out.indexOf(t) < 0) out.push(t);
+  });
+  return out;
+}
+
 /* A student's combined level on a rubric assessment, for a whole-rubric
    competency: the rubric's weighted 0-4 average (getRubricAssessmentScore)
    as a percent of 4, read through the class's Points to Proficiency table,
    as a points score is. { score, mod: 0, mixed: false, whole: true,
-   average }, or null when no criterion is scored. */
-function wholeRubricLevel(cid, sid, assessment) {
-  var entries = (getScores(cid)[sid] || []).filter(function (e) {
-    return e.assessmentId === assessment.id;
-  });
-  var average = getRubricAssessmentScore(cid, assessment, entries);
+   average }, or null when no criterion is scored. `entries` may hold the
+   student's other scores too. */
+function wholeRubricLevel(cid, sid, assessment, entries) {
+  var average = getRubricAssessmentScore(cid, assessment, entries || getScores(cid)[sid] || []);
   if (average == null) return null;
   return {
     score: pointsToProf(average, 4, getGradingScale(cid)),
@@ -1310,17 +1324,7 @@ function rubricCriteriaForTag(cid, assessment, tagId) {
    criterion order, then the whole rubric's, without repeats; [] for work
    with no rubric. */
 function rubricCompetencyIds(cid, assessment) {
-  var rubric = _assessmentRubric(cid, assessment);
-  var out = [];
-  ((rubric && rubric.criteria) || []).forEach(function (c) {
-    ((c && c.tagIds) || []).forEach(function (t) {
-      if (out.indexOf(t) < 0) out.push(t);
-    });
-  });
-  ((rubric && rubric.tagIds) || []).forEach(function (t) {
-    if (out.indexOf(t) < 0) out.push(t);
-  });
-  return out;
+  return rubricScoredTagIds(_assessmentRubric(cid, assessment));
 }
 
 /* A student's level on one competency of a rubric assessment, from the
@@ -1405,7 +1409,7 @@ function getTagScores(cid, studentId, tagId) {
         // first of them.
         if (!a || wholeSeen[s.assessmentId]) return;
         wholeSeen[s.assessmentId] = true;
-        const whole = wholeRubricLevel(cid, studentId, a);
+        const whole = wholeRubricLevel(cid, studentId, a, studentScores);
         if (!whole) return;
         entry = { ...s, tagId: tagId, score: whole.score, wholeRubric: true, rubricAverage: whole.average };
         delete entry.mod;
@@ -2751,6 +2755,7 @@ window.Calc = {
   rubricCompetencyIds,
   rubricCriteriaForTag,
   rubricWholeTagIds,
+  rubricScoredTagIds,
   wholeRubricLevel,
   competencyLevelFromCriteria,
   tagScoresByAssessment,
