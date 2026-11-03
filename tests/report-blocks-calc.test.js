@@ -3,6 +3,8 @@
  * - Core Competencies averaged raw scores, so points work counted as its
  *   points (18 of 20 as level 18, a bar past 100%), Excused work counted,
  *   and the Factor and the report's term were ignored.
+ * - Core Competencies let 0% category work lower a level, and counted
+ *   Excused and unscored work in "Based on N assessments" (Nov 3 sweep).
  * - The override note rounded the calculated level twice, so 3.46 read
  *   "3.5 Extending".
  * - The Proficiency block's Overall "then" was a flat mean of competencies
@@ -15,7 +17,7 @@ const CID = 'report-calc';
 const SID = 'stu-1';
 const STUDENT = { id: SID, firstName: 'Noor', lastName: 'Khan' };
 
-function seed({ assessments, scores, statuses = {}, overrides = {}, sections, groups }) {
+function seed({ assessments, scores, statuses = {}, overrides = {}, sections, groups, categories = [] }) {
   COURSES[CID] = { id: CID, name: 'Socials 10', gradingSystem: 'proficiency' };
   _cache.students[CID] = [STUDENT];
   _cache.learningMaps[CID] = {
@@ -25,7 +27,7 @@ function seed({ assessments, scores, statuses = {}, overrides = {}, sections, gr
     _customized: true,
     _version: 1,
   };
-  _cache.categories[CID] = [];
+  _cache.categories[CID] = categories;
   _cache.assessments[CID] = assessments;
   _cache.scores[CID] = { [SID]: scores };
   _cache.statuses[CID] = statuses;
@@ -61,6 +63,35 @@ describe('Core Competencies block', () => {
     });
     // (2 × 3 + 4) / 4 = 2.5: a 62.5% bar
     expect(ctRow(ReportBlocks.renderBlockCoreCompetencies(CID, STUDENT))).toContain('width:62.5%');
+  });
+
+  it('leaves 0% category work out and counts only work with a level', () => {
+    seed({
+      categories: [
+        { id: 'tests', name: 'Tests', weight: 100 },
+        { id: 'practice', name: 'Practice', weight: 0 },
+      ],
+      assessments: [
+        cc('lab', { categoryId: 'tests' }),
+        cc('quiz', { categoryId: 'tests' }),
+        cc('project', { categoryId: 'tests' }),
+        cc('practice', { categoryId: 'practice' }),
+      ],
+      scores: [sc('lab', 4), sc('practice', 1)],
+      statuses: { [SID + ':quiz']: 'EXC' },
+    });
+    const row = ctRow(ReportBlocks.renderBlockCoreCompetencies(CID, STUDENT));
+    // Only the Lab counts, as for the curricular competency: Extending
+    expect(row).toContain('Extending');
+    expect(row).toContain('width:100%');
+    expect(row).toContain('Based on 1 assessment<');
+  });
+
+  it('still shows the block when tagged work has no level yet', () => {
+    seed({ assessments: [cc('a')], scores: [] });
+    const row = ctRow(ReportBlocks.renderBlockCoreCompetencies(CID, STUDENT));
+    expect(row).toContain('Not yet assessed');
+    expect(row).toContain('Based on 0 assessments');
   });
 });
 
