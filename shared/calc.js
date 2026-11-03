@@ -2351,6 +2351,18 @@ function studentGradeSummary(cid, sid, termId) {
   };
 }
 
+/* The figure a student's overall grade sorts by, so a sorted list follows
+   the grade shown: the course % in a Letter class, else the overall
+   proficiency. null when the student has none yet. */
+function studentOverallSortValue(cid, sid) {
+  if (courseGradeMode(cid) === 'letter') {
+    var lg = getCourseLetterData(cid, sid);
+    return lg && lg.R != null ? lg.R : null;
+  }
+  var overall = getOverallProficiency(cid, sid);
+  return overall > 0 ? overall : null;
+}
+
 /* The class average of the students' overall grades, as the class shows
    them. */
 function classGradeSummary(cid, studentIds) {

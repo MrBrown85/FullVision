@@ -201,6 +201,25 @@
     set_rubric_printed: true,
   };
 
+  /* Params a cell write may leave null to mean "keep the saved one": the
+     server keeps the comment or Went Beyond when it is null and clears it
+     when it is ''. A replacement takes these from the write it replaces when
+     it leaves them null, so a comment cleared offline isn't kept again by a
+     level change queued after it. */
+  var KEEP_WHEN_NULL = {
+    upsert_tag_score: ['p_comment'],
+    upsert_rubric_score: ['p_comment', 'p_beyond'],
+  };
+  function _carryKept(entry, replaced) {
+    var kept = KEEP_WHEN_NULL[entry.endpoint];
+    if (!kept) return entry.payload;
+    var payload = Object.assign({}, entry.payload);
+    kept.forEach(function (k) {
+      if (payload[k] == null && replaced.payload && replaced.payload[k] != null) payload[k] = replaced.payload[k];
+    });
+    return payload;
+  }
+
   /* The record and field a write sets: endpoint plus every id param. Two
      writes with the same target set the same thing, so the later one
      replaces the earlier. Writes that add rows (create, duplicate, import,
@@ -744,6 +763,7 @@
       // The replacement keeps its own id: the old one may already have
       // reached the server on an attempt whose answer was lost, and an
       // idempotency key can't carry a new value.
+      entry.payload = _carryKept(entry, replaced);
       q.entries[at] = entry;
     } else {
       _unapproveQueued(q.entries, entry);

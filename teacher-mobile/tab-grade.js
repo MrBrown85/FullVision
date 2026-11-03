@@ -173,7 +173,9 @@ window.MGrade = (function () {
     } else {
       cells = '<div class="m-list" id="m-grade-list">';
       sorted.forEach(function (a) {
-        var dateStr = parseLocalDate(a.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+        var dateStr = a.date
+          ? parseLocalDate(a.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
+          : 'No Date';
         var badge = _assessmentBadgeData(cid, a);
         var tagCount = (a.tagIds || []).length;
 
@@ -260,8 +262,9 @@ window.MGrade = (function () {
    * we're not rebuilding dates/counts in a hot loop. */
   function _matchesAllFilters(a, ctx) {
     // Segment: 'recent' narrows to last 30 days regardless of sheet state.
+    // An undated assessment is in no date range, as in no term.
     if (_segmentMode === 'recent') {
-      if (ctx.recentCutoff && parseLocalDate(a.date) < ctx.recentCutoff) return false;
+      if (ctx.recentCutoff && (!a.date || parseLocalDate(a.date) < ctx.recentCutoff)) return false;
     }
     // Category: '__none' sentinel matches assessments with no categoryId.
     if (_filters.category.length > 0) {
@@ -284,7 +287,7 @@ window.MGrade = (function () {
         if (day < parseLocalDate(ctx.term.starts_on) || day > parseLocalDate(ctx.term.ends_on)) return false;
       } else {
         var cutoff = ctx.dateCutoffs[_filters.dateRange];
-        if (cutoff && parseLocalDate(a.date) < cutoff) return false;
+        if (cutoff && (!a.date || parseLocalDate(a.date) < cutoff)) return false;
       }
     }
     // Graded status.

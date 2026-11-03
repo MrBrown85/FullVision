@@ -4033,10 +4033,9 @@ window.PageAssignments = (function () {
       _holdFormRubric(held);
       _renderRubricView();
     };
-    // Scored work asks first, as any rubric change does.
-    var sel = document.getElementById('af-rubric');
-    if (sel && sel.value) _askBeforeScoredChange('rubric', go);
-    else go();
+    // Scored work asks first, as any rubric change does, with or without a
+    // rubric chosen now.
+    _askBeforeScoredChange('rubric', go);
   }
 
   /* ── Blank Rubric: the compact editor, in place (rubric starts PR 5) ─
@@ -4609,8 +4608,9 @@ window.PageAssignments = (function () {
 
   /* Save Rubric (or Create with a touched blank open): hold the rubric on
      the form. Without a name, Save asks for one; Create names it after the
-     assessment. */
-  function _blankSave(auto) {
+     assessment. On scored work a new rubric asks first, as any rubric change
+     does; `then` runs once it is held. */
+  function _blankSave(auto, then) {
     if (!_blank) return false;
     var d = _blank.draft;
     var name = String(d.name || '').trim();
@@ -4634,10 +4634,18 @@ window.PageAssignments = (function () {
       return Object.assign(c, { name: String(c.name || '').trim() || 'Criterion ' + (n + 1) });
     });
     _dropBlankChecks(held);
-    _startOpen = null;
-    _blank = null;
-    _holdFormRubric(held);
-    _renderRubricView();
+    var hold = function () {
+      _startOpen = null;
+      _blank = null;
+      _holdFormRubric(held);
+      _renderRubricView();
+      if (then) then();
+    };
+    // A rubric made on this form, opened again from Edit Rubric, is already
+    // this assessment's rubric.
+    var sel = document.getElementById('af-rubric');
+    if (sel && sel.value === held.id) hold();
+    else _askBeforeScoredChange('rubric', hold);
     return true;
   }
   // A rubric named after its assessment; a title that already ends in
@@ -4646,10 +4654,20 @@ window.PageAssignments = (function () {
     if (!title) return fallback;
     return /\brubric$/i.test(title) ? title : title + ' Rubric';
   }
-  // Create / Save Changes with a blank the teacher has written in: keep it.
-  function _commitOpenBlank() {
+  /* Create / Save Changes with a blank the teacher has written in: keep it.
+     True while scored work asks first; `resume` runs the save again once the
+     teacher changes the rubric. */
+  function _commitOpenBlank(resume) {
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
-    if (_startOpen === 'blank' && _blank && _blank.touched && mode === 'proficiency') _blankSave(true);
+    if (!(_startOpen === 'blank' && _blank && _blank.touched && mode === 'proficiency')) return false;
+    var asking = true;
+    var held = false;
+    _blankSave(true, function () {
+      held = true;
+      if (!asking) resume();
+    });
+    asking = false;
+    return !held;
   }
 
   // The rubric on this class's most recent assessment (by date), for Use It Again.
@@ -5380,6 +5398,9 @@ window.PageAssignments = (function () {
     var editing = _editingAssessId;
     held = structuredClone(held);
     delete held._copiedFrom;
+    // Signed in, saving gives `held` and its criteria the server's ids in
+    // place; the form's option and copiedFrom still use the ids it was sent with.
+    var sent = structuredClone(held);
     var list = structuredClone(getRubrics(cid)).concat([held]);
     if (window.RubricDraft && typeof saveCompetencyDescriptors === 'function') {
       saveCompetencyDescriptors(
@@ -5393,11 +5414,11 @@ window.PageAssignments = (function () {
       );
     }
     Promise.resolve(saveRubrics(cid, list)).then(function (result) {
-      var finalId = result && result.idMap && result.idMap[held.id] ? result.idMap[held.id] : held.id;
-      if (copiedFrom && editing) _scoreMoveAfterSave = _scoreMoveMaps(cid, editing, finalId, copiedFrom, held, result);
+      var finalId = result && result.idMap && result.idMap[sent.id] ? result.idMap[sent.id] : held.id;
+      if (copiedFrom && editing) _scoreMoveAfterSave = _scoreMoveMaps(cid, editing, finalId, copiedFrom, sent, result);
       var box = document.getElementById('af-rubric');
       if (box) {
-        var opt = box.querySelector('option[value="' + held.id + '"]');
+        var opt = box.querySelector('option[value="' + sent.id + '"]');
         if (opt) opt.value = finalId;
         box.value = finalId;
       }
@@ -5410,6 +5431,8 @@ window.PageAssignments = (function () {
      copy as sent and `saved` the same rubric as stored, criteria in the same
      order; each held id leads back to its original through copiedFrom, so
      edits in the copy editor never move a score onto the wrong criterion.
+     A checkbox takes the first saved one at its level with its wording that
+     no earlier checkbox took, so two with the same wording keep two ids.
      Nothing moves unless the copy reached the server with server ids: a
      failed save leaves the scores where the server has them. */
   function _scoreMoveMaps(cid, aid, rid, copiedFrom, held, result) {
@@ -5436,11 +5459,13 @@ window.PageAssignments = (function () {
       var orig = copiedFrom.criteria[c.id];
       if (!to || !orig) return;
       maps.criteria[orig] = to.id;
+      var taken = {};
       (c.checks || []).forEach(function (k) {
         var origCheck = copiedFrom.checks[k.id];
         var match = (to.checks || []).find(function (tk) {
-          return tk.level === k.level && tk.label === k.label;
+          return !taken[tk.id] && tk.level === k.level && tk.label === k.label;
         });
+        if (match) taken[match.id] = true;
         if (origCheck && match) maps.checks[origCheck] = match.id;
       });
     });
@@ -5592,7 +5617,12 @@ window.PageAssignments = (function () {
     }
     if (!_formCategoryChosen()) return;
     if (!_formMaxPointsOk()) return;
-    _commitOpenBlank();
+    if (
+      _commitOpenBlank(function () {
+        saveNewAssess(addAnother);
+      })
+    )
+      return;
     // A rubric made for this assessment is saved now, then the assessment
     // with the rubric's saved id (redesign PR 8).
     if (
@@ -6006,7 +6036,12 @@ window.PageAssignments = (function () {
     // Everything is checked before anything is written: a stopped save
     // leaves the stored assessment as it was.
     if (!_formMaxPointsOk()) return;
-    _commitOpenBlank();
+    if (
+      _commitOpenBlank(function () {
+        saveEditAssess(aid);
+      })
+    )
+      return;
     if (
       _persistPendingFormRubric(function () {
         saveEditAssess(aid);
@@ -6524,10 +6559,9 @@ window.PageAssignments = (function () {
         });
         render();
         refreshSidebarGrades();
+        var filled = structuredClone(getScores(cid));
         showUndoToast('Unmarked students set to Complete', function () {
-          var beforeScores = getScores(cid);
-          saveScores(cid, prevScores);
-          if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
+          restoreScoreCells(cid, prevScores, filled);
           render();
           refreshSidebarGrades();
         });
@@ -6645,10 +6679,9 @@ window.PageAssignments = (function () {
         });
         render();
         refreshSidebarGrades();
+        var filled = structuredClone(getScores(cid));
         showUndoToast('Unmarked students set to ' + label, function () {
-          var beforeScores = getScores(cid);
-          saveScores(cid, prevScores);
-          if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
+          restoreScoreCells(cid, prevScores, filled);
           render();
           refreshSidebarGrades();
         });
@@ -7068,10 +7101,9 @@ window.PageAssignments = (function () {
       _syncTagRows(aid, st.id);
     });
     refreshSidebarGrades();
+    var filled = structuredClone(getScores(cid));
     showUndoToast(toastMsg, function () {
-      var beforeScores = getScores(cid);
-      saveScores(cid, prevScores);
-      if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
+      restoreScoreCells(cid, prevScores, filled);
       render();
       refreshSidebarGrades();
     });
@@ -7170,10 +7202,9 @@ window.PageAssignments = (function () {
     });
     syncModRows('.rsg-criterion-row[data-assess="' + aid + '"]');
     refreshSidebarGrades();
+    var filled = structuredClone(getScores(cid));
     showUndoToast(toastMsg, function () {
-      var beforeScores = getScores(cid);
-      saveScores(cid, prevScores);
-      if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
+      restoreScoreCells(cid, prevScores, filled);
       render();
       refreshSidebarGrades();
     });

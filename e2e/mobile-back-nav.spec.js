@@ -101,3 +101,28 @@ test('the screen under a pushed one dims, and Back from grading slides back to t
   await expect(page.locator('.m-tab-item[data-tab="students"]')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#m-screen-student-detail .m-hero-name')).toBeVisible();
 });
+
+// A class switch used to leave each tab's open screens saved, so the Grade
+// tab reopened the old class's grading screen as a bare "Assessment not
+// found" with no Back button.
+test('after a class switch the Grade tab opens on its list, not the old class’s grading screen', async ({ page }) => {
+  await enterDemo(page);
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  const other = await page.evaluate(() => createCourse({ name: 'Second Class' }).id);
+
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('#m-grade-list .m-cell').first().click();
+  await expect(page.locator('#m-swiper')).toBeVisible();
+  await page.waitForTimeout(500);
+
+  await page.locator('.m-tab-item[data-tab="students"]').click();
+  await page.locator('#m-nav-stack [data-action="m-settings"]').first().click();
+  await page.locator('#m-course-select').selectOption(other);
+  await expect.poll(() => page.evaluate(() => getActiveCourse())).toBe(other);
+  await expect(page.locator('#m-course-select')).toHaveCount(0);
+
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await expect(page.locator('#m-nav-stack')).not.toContainText('Assessment not found');
+  await expect(page.locator('#m-screen-grade-swiper')).toHaveCount(0);
+  await expect(page.locator('#m-nav-stack .m-screen')).toHaveCount(1);
+});

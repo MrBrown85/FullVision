@@ -109,3 +109,55 @@ test('Grade on a student page on Group work opens their group card, or their own
   await expect(bar).toHaveText(/ · 5 of 18$/);
   expect(await currentCardName(page)).toBe(name);
 });
+
+// A grading screen already open on the Grade tab used to come back under the
+// new one with the same ids. The field's handlers bound to the hidden copy, so
+// typed points never saved and the screen opened on the first student.
+test('Grade on a student page with a grading screen open on the Grade tab opens one screen that saves typed points', async ({
+  page,
+}) => {
+  await page.goto('/login.html');
+  await page.locator('#demo-mode-btn').click();
+  await page.waitForURL(/teacher-mobile\//);
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  // The points exam becomes the newest assessment, so Grade opens it.
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const list = getAssessments(cid).map(a =>
+      a.title === 'Mid-Year Comprehensive Exam' ? { ...a, date: '2099-06-30' } : a,
+    );
+    saveAssessments(cid, list);
+  });
+
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
+  await page.locator('#m-grade-list .m-cell', { hasText: 'Mid-Year Comprehensive Exam' }).click();
+  await expect(page.locator('#m-swiper')).toBeVisible();
+  await page.waitForTimeout(500);
+
+  await page.locator('.m-tab-item[data-tab="students"]').click();
+  await page.locator('[data-action="m-all-students"]').click();
+  await page.locator('[data-action="m-jump-student"]').nth(3).click();
+  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+  const detail = page.locator('#m-screen-student-detail');
+  const name = (await detail.locator('.m-hero-name').textContent()).trim();
+  const sid = await detail.locator('[data-action="m-student-grade"]').getAttribute('data-sid');
+  await detail.locator('[data-action="m-student-grade"]').click();
+
+  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('Mid-Year Comprehensive Exam');
+  await expect(page.locator('#m-screen-grade-swiper')).toHaveCount(1);
+  await expect(page.locator('#m-swiper')).toHaveCount(1);
+  expect(await currentCardName(page)).toBe(name);
+
+  const field = page.locator(`.m-swiper-card[data-sid="${sid}"] .m-pts-input`);
+  await field.tap();
+  await page.keyboard.type('41');
+  await page.keyboard.press('Enter');
+  await expect(field).toHaveValue('41');
+  const stored = await page.evaluate(sid => {
+    const cid = getActiveCourse();
+    const a = getAssessments(cid).find(x => x.title === 'Mid-Year Comprehensive Exam');
+    return getPointsScore(cid, sid, a.id);
+  }, sid);
+  expect(stored).toBe(41);
+});

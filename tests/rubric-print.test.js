@@ -334,8 +334,8 @@ describe('criterion comments in the data layer', () => {
     const calls = rubricCalls();
     expect(calls).toHaveLength(1);
     expect(calls[0].payload.p_beyond).toBe('Added a trend line');
-    // The comment isn't sent, so the server keeps it.
-    expect('p_comment' in calls[0].payload).toBe(false);
+    // No comment is cached, so it goes as null and the server keeps its own.
+    expect(calls[0].payload.p_comment).toBeNull();
     // A level change sends the saved Went Beyond along.
     upsertScore(CID, SID, AID, CRIT_A, 4, '2026-10-03', 'summative', '');
     expect(rubricCalls()[1].payload.p_beyond).toBe('Added a trend line');
