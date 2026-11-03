@@ -72,10 +72,12 @@ describe('the best piece in a Letter class', () => {
     const right = one(s.id, ctx);
     expect(CommentBank.verify(right, f, {}).replaced).toEqual([]);
     const treaty = f.work.find(w => w.title === 'Lesson 4: Treaty Debate');
-    const wrongCtx = { ...ctx, assignment: CommentRealiser.quoteTitle(treaty.title) };
+    // The same sentence with only the piece changed: its title and its source.
+    const wrongCtx = { ...ctx, assignment: treaty.title };
     const wrong = one(s.id, wrongCtx);
-    wrong.provenance[0].sources = { ...wrong.provenance[0].sources, assignment: ['work.' + treaty.id] };
+    wrong.provenance[0].sources = { ...wrong.provenance[0].sources, assignment: ['work:' + treaty.id] };
     expect(wrong.text).toContain('Treaty Debate');
+    expect(right.provenance[0].sources.assignment).toEqual(['work:' + f.work.find(w => w.title === ctx.assignment).id]);
     const v = CommentBank.verify(wrong, f, {});
     expect(v.replaced[0]).toMatchObject({ sentenceId: s.id });
     expect(v.replaced[0].failed).toContain('bestPiece');
