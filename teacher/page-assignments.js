@@ -2512,13 +2512,15 @@ window.PageAssignments = (function () {
     // Dates. Today is the class's calendar day: toISOString() is UTC, which
     // is already tomorrow after 4 pm in BC.
     var today = courseToday(cid);
-    var defaultDue =
-      dueDate ||
-      (function () {
-        var d = new Date((dateAssigned || today) + 'T12:00:00');
-        d.setDate(d.getDate() + 7);
-        return d.toISOString().slice(0, 10);
-      })();
+    // A new assessment is due a week after it's assigned; editing shows the
+    // due date it has, blank when none.
+    var defaultDue = isEdit
+      ? dueDate
+      : (function () {
+          var d = new Date((dateAssigned || today) + 'T12:00:00');
+          d.setDate(d.getDate() + 7);
+          return d.toISOString().slice(0, 10);
+        })();
     html +=
       '<div class="af-row af-row-what">' +
       '<div class="af-field">' +
@@ -2683,7 +2685,7 @@ window.PageAssignments = (function () {
       '>' +
       '<label class="af-label" for="af-maxpoints">Max Points</label>' +
       '<div class="af-maxpoints-controls">' +
-      '<input class="af-input" id="af-maxpoints" type="number" min="1" max="9999" value="' +
+      '<input class="af-input" id="af-maxpoints" type="number" min="0" max="9999" step="any" value="' +
       esc(maxPoints) +
       '">' +
       '<div class="seg" id="af-maxpoints-picks" role="group" aria-label="Common maximums">' +
@@ -2845,16 +2847,22 @@ window.PageAssignments = (function () {
       '<div class="af-field">' +
       '<label class="af-label">Evidence Type</label>' +
       '<select class="af-input" id="af-evidence">' +
+      // An evidence type from elsewhere (a quiz, lab or project) keeps its
+      // own option, so editing never changes it.
       ['written', 'observation', 'audio', 'video', 'photo', 'conversation']
+        .concat(
+          evidence && ['written', 'observation', 'audio', 'video', 'photo', 'conversation'].indexOf(evidence) < 0
+            ? [evidence]
+            : [],
+        )
         .map(function (t) {
           return (
             '<option value="' +
-            t +
+            esc(t) +
             '"' +
             (t === evidence ? ' selected' : '') +
             '>' +
-            t[0].toUpperCase() +
-            t.slice(1) +
+            esc(t[0].toUpperCase() + t.slice(1)) +
             '</option>'
           );
         })
@@ -3124,6 +3132,95 @@ window.PageAssignments = (function () {
   }
 
   /* Ctrl/⌘+Enter in the form creates the assessment (or saves the edit). */
+  /* What the form holds, field by field, to tell what the teacher changed:
+     taken when the form opens, compared on Save Changes (fields left alone
+     keep their stored value) and on Cancel (asks only when something
+     changed). Classes to copy to are not part of it. */
+  var _formStart = null;
+  function _formSnapshot() {
+    var val = function (id) {
+      return (document.getElementById(id) || {}).value || '';
+    };
+    var on = function (sel, key) {
+      return Array.from(document.querySelectorAll(sel))
+        .map(function (el) {
+          return key(el);
+        })
+        .sort();
+    };
+    return {
+      title: val('af-title'),
+      desc: val('af-desc'),
+      category: val('af-category'),
+      module: val('af-module'),
+      assigned: val('af-date-assigned'),
+      due: val('af-due'),
+      mode: val('af-scoremode') || 'proficiency',
+      maxPoints: val('af-maxpoints'),
+      weight: val('af-weight'),
+      evidence: val('af-evidence'),
+      rubric: val('af-rubric'),
+      tags: on('.af-tag-cb:checked', function (cb) {
+        return cb.value;
+      }),
+      cc: on('.af-cc-chip.active', function (el) {
+        return el.dataset.cc;
+      }),
+      collab: JSON.stringify([
+        newCollaboration || 'individual',
+        Array.from(collabExcluded || []).sort(),
+        collabPairs || [],
+        collabGroups || [],
+        collabGroupCount || 0,
+      ]),
+    };
+  }
+  function _markFormStart() {
+    _formStart = _formSnapshot();
+  }
+  // The fields that differ from when the form opened.
+  function _formChanges() {
+    var now = _formSnapshot();
+    var start = _formStart || {};
+    return Object.keys(now).filter(function (k) {
+      return JSON.stringify(now[k]) !== JSON.stringify(start[k]);
+    });
+  }
+
+  /* Max Points: more than 0 and up to 9999; decimals are kept (the server
+     column is numeric). A bad value stops the save at the box. */
+  function _formMaxPoints() {
+    var el = document.getElementById('af-maxpoints');
+    var v = Number(String(el ? el.value : '').trim() || NaN);
+    return isFinite(v) && v > 0 && v <= 9999 ? v : null;
+  }
+  function _formMaxPointsOk() {
+    var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    if (mode !== 'points' || _formMaxPoints() != null) return true;
+    var el = document.getElementById('af-maxpoints');
+    if (el) {
+      el.style.border = '2px solid var(--score-1)';
+      el.setAttribute('aria-invalid', 'true');
+      el.focus();
+    }
+    return false;
+  }
+  // Typing in Max Points: the quick picks follow the box, and an error clears.
+  function _formInput(e) {
+    var t = e.target;
+    if (!t || !t.id) return;
+    if (t.id === 'af-maxpoints') {
+      t.style.border = '';
+      t.removeAttribute('aria-invalid');
+      var v = Number(t.value);
+      document.querySelectorAll('#af-maxpoints-picks .seg-btn').forEach(function (b) {
+        var hit = String(t.value).trim() !== '' && Number(b.dataset.value) === v;
+        b.classList.toggle('active', hit);
+        b.setAttribute('aria-pressed', hit ? 'true' : 'false');
+      });
+    }
+  }
+
   function _formKeydown(e) {
     if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.altKey) return;
     var form = document.getElementById('new-assess-form');
@@ -4774,8 +4871,9 @@ window.PageAssignments = (function () {
     if (!card) return;
     var cid = activeCourse;
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
-    var rubricId = mode === 'proficiency' ? (document.getElementById('af-rubric') || {}).value || '' : '';
-    var fromRubric = !!rubricId;
+    // The list follows the rubric only when its criteria score competencies;
+    // with a rubric that scores none, the teacher ticks them.
+    var fromRubric = mode === 'proficiency' && _rubricTagIds(_formChosenRubric()).length > 0;
     card.classList.toggle('is-rubric', fromRubric);
     var note = document.getElementById('af-comp-rubric-note');
     if (note) note.hidden = !fromRubric;
@@ -4983,6 +5081,7 @@ window.PageAssignments = (function () {
       renderCollabPanel();
       _refreshCountsToward();
       _syncCodes();
+      _markFormStart();
     }
   }
   function hideNewForm() {
@@ -4991,6 +5090,7 @@ window.PageAssignments = (function () {
     _editingAssessId = null;
     _pendingFormRubric = null;
     _scoreMoveAfterSave = null;
+    _formStart = null;
     var form = document.getElementById('new-assess-form');
     if (form) form.style.display = 'none';
   }
@@ -5215,6 +5315,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (!_formCategoryChosen()) return;
+    if (!_formMaxPointsOk()) return;
     _commitOpenBlank();
     // A rubric made for this assessment is saved now, then the assessment
     // with the rubric's saved id (redesign PR 8).
@@ -5272,17 +5373,8 @@ window.PageAssignments = (function () {
     }
     var scoreModeVal = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     if (scoreModeVal === 'points') {
-      var mpEl = document.getElementById('af-maxpoints');
-      var mp = parseInt(mpEl ? mpEl.value : 0, 10);
-      if (!mp || mp <= 0 || isNaN(mp)) {
-        if (mpEl) {
-          mpEl.style.border = '2px solid var(--score-1)';
-          mpEl.focus();
-        }
-        return;
-      }
       newAssess.scoreMode = 'points';
-      newAssess.maxPoints = mp;
+      newAssess.maxPoints = _formMaxPoints();
     } else if (scoreModeVal === 'complete') {
       newAssess.scoreMode = 'complete';
       newAssess.maxPoints = COMPLETE_MAX_POINTS;
@@ -5571,6 +5663,7 @@ window.PageAssignments = (function () {
     )
       setScoreMode(keep.mode);
     _refreshCountsToward();
+    _markFormStart();
     var title = document.getElementById('af-title');
     if (title) title.focus({ preventScroll: true });
   }
@@ -5593,6 +5686,7 @@ window.PageAssignments = (function () {
       renderCollabPanel();
       _refreshCountsToward();
       _syncCodes();
+      _markFormStart();
       if (window.AssessmentCopy) AssessmentCopy.markExistingCopies(cid, assess);
     }
   }
@@ -5609,6 +5703,9 @@ window.PageAssignments = (function () {
       return;
     }
     if (!_formCategoryChosen()) return;
+    // Everything is checked before anything is written: a stopped save
+    // leaves the stored assessment as it was.
+    if (!_formMaxPointsOk()) return;
     _commitOpenBlank();
     if (
       _persistPendingFormRubric(function () {
@@ -5616,73 +5713,92 @@ window.PageAssignments = (function () {
       })
     )
       return;
-    var dateAssigned = (document.getElementById('af-date-assigned') || {}).value || courseToday(activeCourse);
-    var date = dateAssigned;
-    var description = (document.getElementById('af-desc') ? document.getElementById('af-desc').value : '').trim();
-    var tagIds = Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
-      return cb.value;
-    });
-    var evidence = (document.getElementById('af-evidence') || {}).value;
-    var categoryId = (document.getElementById('af-category') || {}).value || '';
     var assessments = getAssessments(activeCourse);
     var idx = assessments.findIndex(function (a) {
       return a.id === aid;
     });
     if (idx < 0) return;
     var before = structuredClone(assessments[idx]);
-    assessments[idx].title = title;
-    assessments[idx].date = date;
-    assessments[idx].dateAssigned = dateAssigned;
-    assessments[idx].tagIds = tagIds;
-    assessments[idx].evidenceType = evidence;
-    assessments[idx].description = description;
-    assessments[idx].categoryId = categoryId || undefined;
-    assessments[idx].category_id = categoryId || undefined;
-    assessments[idx].dueDate = (document.getElementById('af-due') || {}).value || undefined;
-    assessments[idx].moduleId = (document.getElementById('af-module') || {}).value || undefined;
-    assessments[idx].rubricId =
-      ((document.getElementById('af-scoremode') || {}).value || 'proficiency') === 'proficiency'
-        ? (document.getElementById('af-rubric') || {}).value || undefined
-        : undefined;
-    var ccIds = Array.from(document.querySelectorAll('.af-cc-chip.active')).map(function (el) {
-      return el.dataset.cc;
-    });
-    assessments[idx].coreCompetencyIds = ccIds.length > 0 ? ccIds : undefined;
-    assessments[idx].collaboration = newCollaboration !== 'individual' ? newCollaboration : undefined;
-    assessments[idx].excludedStudents = collabExcluded.size > 0 ? Array.from(collabExcluded) : undefined;
-    assessments[idx].pairs = newCollaboration === 'pair' && collabPairs.length > 0 ? collabPairs : undefined;
-    assessments[idx].groups = newCollaboration === 'group' && collabGroups.length > 0 ? collabGroups : undefined;
-    assessments[idx].groupCount = newCollaboration === 'group' ? collabGroupCount : undefined;
-    assessments[idx].successCriteria = undefined;
-    var scoreModeVal = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
-    if (scoreModeVal === 'points') {
-      var mpEl = document.getElementById('af-maxpoints');
-      var mp = parseInt(mpEl ? mpEl.value : 0, 10);
-      if (!mp || mp <= 0 || isNaN(mp)) {
-        if (mpEl) {
-          mpEl.style.border = '2px solid var(--score-1)';
-          mpEl.focus();
-        }
-        return;
-      }
-      assessments[idx].scoreMode = 'points';
-      assessments[idx].maxPoints = mp;
-    } else if (scoreModeVal === 'complete') {
-      assessments[idx].scoreMode = 'complete';
-      assessments[idx].maxPoints = COMPLETE_MAX_POINTS;
-    } else if (scoreModeVal === 'dibels') {
-      assessments[idx].scoreMode = 'dibels';
-      assessments[idx].maxPoints = undefined;
-    } else {
-      assessments[idx].scoreMode = undefined;
-      assessments[idx].maxPoints = undefined;
+    // Only the fields the teacher changed are written; the rest keep their
+    // stored value, so Save Changes with no edits changes nothing.
+    var changes = _formChanges();
+    var changed = function (k) {
+      return !_formStart || changes.indexOf(k) >= 0;
+    };
+    var val = function (id) {
+      return (document.getElementById(id) || {}).value || '';
+    };
+    var next = structuredClone(before);
+    if (changed('title')) next.title = title;
+    if (changed('assigned')) {
+      var dateAssigned = val('af-date-assigned') || courseToday(activeCourse);
+      next.date = dateAssigned;
+      next.dateAssigned = dateAssigned;
     }
-    var assessWeight = _formAssessWeight();
-    assessments[idx].weight = assessWeight !== 1 ? assessWeight : undefined;
+    if (changed('desc')) next.description = val('af-desc').trim();
+    if (changed('tags'))
+      next.tagIds = Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
+        return cb.value;
+      });
+    if (changed('evidence')) next.evidenceType = val('af-evidence');
+    if (changed('category')) {
+      next.categoryId = val('af-category') || undefined;
+      next.category_id = val('af-category') || undefined;
+    }
+    if (changed('due')) next.dueDate = val('af-due') || undefined;
+    if (changed('module')) next.moduleId = val('af-module') || undefined;
+    var scoreModeVal = val('af-scoremode') || 'proficiency';
+    if (changed('rubric') || changed('mode'))
+      next.rubricId = scoreModeVal === 'proficiency' ? val('af-rubric') || undefined : undefined;
+    if (changed('cc')) {
+      var ccIds = Array.from(document.querySelectorAll('.af-cc-chip.active')).map(function (el) {
+        return el.dataset.cc;
+      });
+      next.coreCompetencyIds = ccIds.length > 0 ? ccIds : undefined;
+    }
+    if (changed('collab')) {
+      next.collaboration = newCollaboration !== 'individual' ? newCollaboration : undefined;
+      next.excludedStudents = collabExcluded.size > 0 ? Array.from(collabExcluded) : undefined;
+      next.pairs = newCollaboration === 'pair' && collabPairs.length > 0 ? collabPairs : undefined;
+      next.groups = newCollaboration === 'group' && collabGroups.length > 0 ? collabGroups : undefined;
+      next.groupCount = newCollaboration === 'group' ? collabGroupCount : undefined;
+    }
+    if (changed('mode') || changed('maxPoints')) {
+      if (scoreModeVal === 'points') {
+        next.scoreMode = 'points';
+        next.maxPoints = _formMaxPoints();
+      } else if (scoreModeVal === 'complete') {
+        next.scoreMode = 'complete';
+        next.maxPoints = COMPLETE_MAX_POINTS;
+      } else if (scoreModeVal === 'dibels') {
+        next.scoreMode = 'dibels';
+        next.maxPoints = undefined;
+      } else {
+        next.scoreMode = undefined;
+        next.maxPoints = undefined;
+      }
+    }
+    if (changed('weight')) {
+      var assessWeight = _formAssessWeight();
+      next.weight = assessWeight !== 1 ? assessWeight : undefined;
+    }
+    var edited = JSON.stringify(next) !== JSON.stringify(before);
+    if (edited) next.successCriteria = undefined;
     // Read before hideNewForm()/render() replace the form.
     var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
-    if (copyTargets.length && !assessments[idx].copyGroup) assessments[idx].copyGroup = AssessmentCopy.newCopyGroup();
-    var after = structuredClone(assessments[idx]);
+    if (copyTargets.length && !next.copyGroup) next.copyGroup = AssessmentCopy.newCopyGroup();
+    if (!edited && !copyTargets.length) {
+      hideNewForm();
+      render();
+      return;
+    }
+    // Written back in place now that the save goes ahead.
+    var cur = assessments[idx];
+    Object.keys(cur).forEach(function (k) {
+      if (!(k in next)) delete cur[k];
+    });
+    Object.assign(cur, next);
+    var after = structuredClone(cur);
     var srcCid = activeCourse;
     saveAssessments(activeCourse, assessments);
     var move = _scoreMoveAfterSave;
@@ -7772,6 +7888,25 @@ window.PageAssignments = (function () {
   /* A rubric decides the assessment's competencies (redesign PR 4): picking
      one ticks exactly the competencies its criteria feed, read only while
      it's chosen. Picking None leaves the ticks to edit by hand. */
+  // The competencies a rubric's criteria score, each once.
+  function _rubricTagIds(rubric) {
+    var out = [];
+    ((rubric && rubric.criteria) || []).forEach(function (c) {
+      (c.tagIds || []).forEach(function (t) {
+        if (out.indexOf(t) < 0) out.push(t);
+      });
+    });
+    return out;
+  }
+  // The rubric chosen on the form: one made for it, else a saved one.
+  function _formChosenRubric() {
+    var sel = document.getElementById('af-rubric');
+    var rid = sel ? sel.value : '';
+    if (!rid) return null;
+    if (_pendingFormRubric && _pendingFormRubric.id === rid) return _pendingFormRubric;
+    return getRubricById(activeCourse, rid);
+  }
+
   function onRubricSelect(rubricId) {
     var rubric =
       _pendingFormRubric && rubricId === _pendingFormRubric.id
@@ -7780,13 +7915,10 @@ window.PageAssignments = (function () {
           ? getRubricById(activeCourse, rubricId)
           : null;
     _rubricAutoTags = [];
-    if (rubric) {
-      var rubricTagIds = new Set();
-      rubric.criteria.forEach(function (c) {
-        (c.tagIds || []).forEach(function (t) {
-          rubricTagIds.add(t);
-        });
-      });
+    var rubricTagIds = new Set(_rubricTagIds(rubric));
+    // A rubric whose criteria score no competency (a Blank draft) leaves
+    // the teacher's ticks as they are; one that does ticks exactly its own.
+    if (rubricTagIds.size) {
       document.querySelectorAll('.af-tag-cb').forEach(function (cb) {
         var on = rubricTagIds.has(cb.value);
         if (cb.checked === on) return;
@@ -10003,8 +10135,10 @@ window.PageAssignments = (function () {
       },
       setMaxPoints: function () {
         var mp = document.getElementById('af-maxpoints');
-        if (mp) mp.value = el.dataset.value;
-        segSelect(el);
+        if (mp) {
+          mp.value = el.dataset.value;
+          _formInput({ target: mp });
+        } else segSelect(el);
       },
     };
     if (handlers[action]) {
@@ -11671,6 +11805,7 @@ window.PageAssignments = (function () {
       _addDocListener(type, _countsAsAfterEvent);
     });
     _addDocListener('keydown', _formKeydown);
+    _addDocListener('input', _formInput);
     _addDocListener('keydown', _compKeydown);
     _addDocListener('input', _compInput);
     _addDocListener('mouseover', _codeHover);
