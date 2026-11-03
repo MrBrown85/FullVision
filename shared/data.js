@@ -9648,6 +9648,31 @@ function saveScores(cid, obj) {
   return refused ? false : lsOk;
 }
 
+/* Undo for a fill: put back only the cells it changed (`before` against
+   `after`, both copies of the class's scores) that still hold what it
+   wrote. Anything scored since, on this work or any other, stays. */
+function restoreScoreCells(cid, before, after) {
+  var now = getScores(cid);
+  var next = structuredClone(now);
+  var was = _scoreEntriesByKey(before);
+  var made = _scoreEntriesByKey(after);
+  var cur = _scoreEntriesByKey(next);
+  var same = function (x, y) {
+    return x && y ? JSON.stringify(x.entry) === JSON.stringify(y.entry) : !x && !y;
+  };
+  Object.keys(Object.assign({}, was, made)).forEach(function (key) {
+    if (same(was[key], made[key]) || !same(cur[key], made[key])) return;
+    var sid = (was[key] || made[key]).sid;
+    var list = next[sid] || (next[sid] = []);
+    var at = cur[key] ? list.indexOf(cur[key].entry) : -1;
+    if (!was[key]) list.splice(at, 1);
+    else if (at >= 0) list[at] = structuredClone(was[key].entry);
+    else list.push(structuredClone(was[key].entry));
+  });
+  saveScores(cid, next);
+  if (getScores(cid) === next) persistScoreDiffToCanonical(cid, now, next);
+}
+
 /* ── Points-mode helpers: one score → all tags ──────────────── */
 // A cell's points, or null when it has no score. A 0 is a score.
 function getPointsScore(cid, sid, aid) {
