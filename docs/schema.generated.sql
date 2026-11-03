@@ -793,6 +793,20 @@ table public.rubric_score (rls on)
   CREATE UNIQUE INDEX rubric_score_pkey ON public.rubric_score USING btree (id)
   CREATE TRIGGER course_sync_cursor_rubric_score_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.rubric_score FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'enrollment')
   policy rubric_score_via_enrollment for all to public using (public.fv_owns_enrollment(enrollment_id)) with check (public.fv_owns_enrollment(enrollment_id))
+table public.rubric_tag (rls on)
+  rubric_id uuid not null
+  tag_id uuid not null
+  constraint rubric_tag_pkey PRIMARY KEY (rubric_id, tag_id)
+  constraint rubric_tag_rubric_id_fkey FOREIGN KEY (rubric_id) REFERENCES public.rubric(id) ON DELETE CASCADE
+  constraint rubric_tag_tag_id_fkey FOREIGN KEY (tag_id) REFERENCES public.tag(id) ON DELETE CASCADE
+  CREATE UNIQUE INDEX rubric_tag_pkey ON public.rubric_tag USING btree (rubric_id, tag_id)
+  CREATE INDEX rubric_tag_tag_idx ON public.rubric_tag USING btree (tag_id)
+  CREATE TRIGGER course_sync_cursor_rubric_tag_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.rubric_tag FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'rubric')
+  policy rubric_tag_via_parents for all to public using ((EXISTS ( SELECT 1
+   FROM public.rubric r
+  WHERE ((r.id = rubric_tag.rubric_id) AND public.fv_owns_course(r.course_id))))) with check ((EXISTS ( SELECT 1
+   FROM public.rubric r
+  WHERE ((r.id = rubric_tag.rubric_id) AND public.fv_owns_course(r.course_id)))))
 table public.score (rls on)
   id uuid not null default gen_random_uuid()
   enrollment_id uuid not null
@@ -1295,7 +1309,7 @@ function public.upsert_note(p_enrollment_id uuid, p_body text, p_idempotency_key
 function public.upsert_observation_template(p_id uuid, p_course_id uuid, p_body text, p_default_sentiment text, p_default_context_type text, p_display_order integer, p_idempotency_key uuid, p_default_dims text[]) returns uuid
 function public.upsert_questionnaire(p_course_id uuid, p_kind text, p_title text, p_template_id text, p_theme text, p_report_period integer, p_parent_id uuid, p_opens_on date, p_closes_on date, p_is_on boolean, p_myed_comment text, p_questions jsonb, p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.upsert_reflection(p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence integer) returns uuid
-function public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text) returns uuid
+function public.upsert_rubric(p_id uuid, p_course_id uuid, p_name text, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid, p_style text, p_linked_tag_ids jsonb) returns uuid
 function public.upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value integer, p_modifier smallint, p_comment text, p_beyond text) returns uuid
 function public.upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value numeric, p_modifier smallint) returns uuid
 function public.upsert_section(p_id uuid, p_subject_id uuid, p_name text, p_color text, p_competency_group_id uuid, p_display_order integer, p_idempotency_key uuid) returns uuid
