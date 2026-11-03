@@ -3232,7 +3232,15 @@ window.PageAssignments = (function () {
           : 'This class has no rubrics yet.',
       ) +
       '</span></button>' +
-      '<button type="button" class="af-rubric-start" data-action="rubricFromClass"><b>Copy From Another Class</b><span>Any of your classes.</span></button>' +
+      '<button type="button" class="af-rubric-start' +
+      (_startOpen === 'copy' ? ' is-open' : '') +
+      '" data-action="rubricFromClass" data-start="copy" aria-expanded="' +
+      (_startOpen === 'copy') +
+      '"' +
+      (_copySources(cid).length ? '' : ' disabled') +
+      '><b>Copy From Another Class</b><span>' +
+      esc(_copySources(cid).length ? 'Any of your classes.' : 'You have no other classes.') +
+      '</span></button>' +
       '</div>' +
       (_startOpen ? _startCardHtml(cid, _startOpen, false) : '') +
       (last && !_startOpen
@@ -3264,6 +3272,11 @@ window.PageAssignments = (function () {
       var g = _chooseGroups('');
       var top = g.suggested[0] || g.recent[0] || g.rest[0];
       _choose = { query: '', selected: current || (top ? top.id : null), focusSearch: true };
+    }
+    if (name === 'copy') {
+      var first = _copySources(activeCourse)[0];
+      _copy = { from: first ? first.id : null, selected: null, focusFrom: true };
+      _copyLoad();
     }
     _renderRubricView();
   }
@@ -3303,6 +3316,7 @@ window.PageAssignments = (function () {
   }
 
   function _startCardHtml(cid, name, inPlace) {
+    if (name === 'copy') return _copyCardHtml(cid);
     if (name !== 'choose') return '';
     var r = _choose.selected ? getRubricById(cid, _choose.selected) : null;
     var sel = document.getElementById('af-rubric');
@@ -3427,6 +3441,11 @@ window.PageAssignments = (function () {
     }
     var on = card.querySelector('.af-start-row.is-on');
     if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+    if (_copy.focusFrom && _startOpen === 'copy') {
+      _copy.focusFrom = false;
+      var from = document.getElementById('af-copy-from');
+      if (from) from.focus({ preventScroll: true });
+    }
     if (_choose.focusSearch) {
       _choose.focusSearch = false;
       var search = document.getElementById('af-start-search');
@@ -3435,7 +3454,8 @@ window.PageAssignments = (function () {
   }
 
   function _startPickRow(rid, focusRow) {
-    _choose.selected = rid;
+    if (_startOpen === 'copy') _copy.selected = rid;
+    else _choose.selected = rid;
     _renderRubricView();
     if (focusRow) {
       var row = document.querySelector('.af-start-row[data-rid="' + CSS.escape(rid) + '"]');
@@ -3443,6 +3463,7 @@ window.PageAssignments = (function () {
     }
   }
   function _startPickUse() {
+    if (_startOpen === 'copy') return _copyUse();
     var rid = _choose.selected;
     if (!rid) return;
     _startOpen = null;
@@ -3492,10 +3513,11 @@ window.PageAssignments = (function () {
       closeStart();
       return;
     }
-    if (card.dataset.start !== 'choose') return;
+    if (card.dataset.start !== 'choose' && card.dataset.start !== 'copy') return;
+    var picked = card.dataset.start === 'copy' ? _copy.selected : _choose.selected;
     var rows = Array.from(card.querySelectorAll('.af-start-row'));
     var at = rows.findIndex(function (r) {
-      return r.dataset.rid === _choose.selected;
+      return r.dataset.rid === picked;
     });
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       if (!rows.length) return;
@@ -3514,6 +3536,175 @@ window.PageAssignments = (function () {
       e.preventDefault();
       _startPickUse();
     }
+  }
+
+  /* ── Copy From Another Class, in place (rubric starts PR 4) ──────
+     Any of the teacher's other live classes. A class linked to the same
+     curriculum brings its competencies with the copy (matched as
+     Copy Grading Setup and assessment copies match them); from any other,
+     the copy brings its criteria and wording only (Colin, Nov 2). The copy
+     is held like any rubric made on the form, saved when the assessment is. */
+  var _copy = { from: null, selected: null };
+
+  function _copySources(cid) {
+    if (!window.AssessmentCopy) return [];
+    var t = AssessmentCopy.copyTargets(cid);
+    return t.sameCourse.concat(t.other);
+  }
+
+  // Linked to the same curriculum: the same set of BC course codes, not empty.
+  function _sameCurriculum(a, b) {
+    var x = ((COURSES[a] || {}).curriculumTags || []).slice().sort().join(' ');
+    var y = ((COURSES[b] || {}).curriculumTags || []).slice().sort().join(' ');
+    return !!x && x === y;
+  }
+
+  function _copyLoad() {
+    var from = _copy.from;
+    if (!from || !window.RubricLibrary) return;
+    _copy.loading = true;
+    RubricLibrary.loadClass(from).then(function () {
+      if (_startOpen !== 'copy' || _copy.from !== from) return;
+      _copy.loading = false;
+      var list = getRubrics(from) || [];
+      if (
+        !list.some(function (r) {
+          return r.id === _copy.selected;
+        })
+      )
+        _copy.selected = list[0] ? list[0].id : null;
+      // Keep the teacher's place: the From menu (or a row) stays focused.
+      var had = document.activeElement;
+      var hadId = had && had.id;
+      var inCard = had && had.closest && had.closest('.af-start-card');
+      _renderRubricView();
+      var back = hadId ? document.getElementById(hadId) : null;
+      if (!back && inCard) back = document.getElementById('af-copy-from');
+      if (back) back.focus({ preventScroll: true });
+    });
+  }
+
+  function _copyFromChanged(cidFrom) {
+    _copy = { from: cidFrom, selected: null };
+    _copyLoad();
+    _renderRubricView();
+    var sel = document.getElementById('af-copy-from');
+    if (sel) sel.focus();
+  }
+
+  // The rubric as it would arrive: without the other class's competencies
+  // when the curricula differ.
+  function _copyPreviewRubric(from, r) {
+    if (_sameCurriculum(activeCourse, from)) return r;
+    var bare = structuredClone(r);
+    bare.criteria = (bare.criteria || []).map(function (c) {
+      return Object.assign({}, c, { tagIds: [] });
+    });
+    return bare;
+  }
+
+  function _copyCardHtml(cid) {
+    var from = _copy.from;
+    var sources = _copySources(cid);
+    var same = from && _sameCurriculum(cid, from);
+    var list = from && !_copy.loading ? getRubrics(from) || [] : [];
+    var r = _copy.selected && from ? getRubricById(from, _copy.selected) : null;
+    var fromName = from ? _pastClassName(from) : '';
+    var head =
+      '<div class="af-rubric-card-head">' +
+      '<span class="af-rubric-card-name">' +
+      esc(r ? r.name : 'Copy From Another Class') +
+      '</span><span class="af-gap"></span>' +
+      '<button type="button" class="btn btn-ghost" data-action="closeStart">Close</button>' +
+      '<button type="button" class="btn btn-primary" data-action="startPickUse"' +
+      (r ? '' : ' disabled') +
+      '>Copy and Use</button></div>';
+    var rows = _copy.loading
+      ? '<p class="af-start-empty">Loading…</p>'
+      : list.length
+        ? '<div class="af-start-group">' +
+          esc(list.length + (list.length === 1 ? ' rubric' : ' rubrics')) +
+          '</div>' +
+          list
+            .map(function (x) {
+              var codes = same ? _rubricCodes(from, x) : [];
+              return (
+                '<button type="button" class="af-start-row' +
+                (x.id === _copy.selected ? ' is-on' : '') +
+                '" role="option" aria-selected="' +
+                (x.id === _copy.selected) +
+                '" data-action="startPickRow" data-rid="' +
+                esc(x.id) +
+                '"><b>' +
+                esc(x.name) +
+                '</b>' +
+                (codes.length ? '<span class="af-start-codes">' + esc(codes.join(' ')) + '</span>' : '') +
+                '</button>'
+              );
+            })
+            .join('')
+        : '<p class="af-start-empty">' + esc(fromName + ' has no rubrics.') + '</p>';
+    var body =
+      '<div class="af-start-pick">' +
+      '<div class="af-start-side">' +
+      '<label class="af-copy-from"><span>From</span><select class="af-input" id="af-copy-from" data-action-change="copyFrom">' +
+      sources
+        .map(function (c) {
+          return (
+            '<option value="' + esc(c.id) + '"' + (c.id === from ? ' selected' : '') + '>' + esc(c.name) + '</option>'
+          );
+        })
+        .join('') +
+      '</select></label>' +
+      '<div class="af-start-list" role="listbox" aria-label="Rubrics">' +
+      rows +
+      '</div></div>' +
+      '<div class="af-start-preview" tabindex="0" aria-label="Preview">' +
+      // html-safe: RubricBank.gridHtml escapes every name and descriptor
+      (r && window.RubricBank ? RubricBank.gridHtml(from, _copyPreviewRubric(from, r)) : '') +
+      '</div></div>';
+    var foot =
+      '<div class="af-tag-rubric-note">' +
+      esc(
+        !from
+          ? ''
+          : same
+            ? fromName + ' is linked to the same curriculum, so its competencies come with the copy.'
+            : fromName +
+              ' is linked to a different curriculum, so the copy brings its criteria and wording. Connect this class’s competencies with Edit Rubric after.',
+      ) +
+      '</div>';
+    return (
+      '<div class="af-rubric-card af-start-card" data-start="copy" role="region" aria-label="Copy From Another Class">' +
+      head +
+      body +
+      foot +
+      '</div>'
+    );
+  }
+
+  function _copyUse() {
+    var from = _copy.from;
+    var r = from && _copy.selected ? getRubricById(from, _copy.selected) : null;
+    if (!r || !window.RubricLibrary) return;
+    var cid = activeCourse;
+    var go = function () {
+      var held = RubricLibrary.cloneRubric(from, cid, r);
+      if (!_sameCurriculum(cid, from)) {
+        held.criteria = held.criteria.map(function (c) {
+          return Object.assign({}, c, { tagIds: [] });
+        });
+      }
+      delete held.copyGroup;
+      held.name = RubricLibrary.uniqueName(r.name, getRubrics(cid) || []);
+      _startOpen = null;
+      _holdFormRubric(held);
+      _renderRubricView();
+    };
+    // Scored work asks first, as any rubric change does.
+    var sel = document.getElementById('af-rubric');
+    if (sel && sel.value) _askBeforeScoredChange('rubric', go);
+    else go();
   }
 
   // The rubric on this class's most recent assessment (by date), for Use It Again.
@@ -8006,22 +8197,7 @@ window.PageAssignments = (function () {
   }
   /* Copy a rubric from another class into this one and select it on the form. */
   function rubricFromClass() {
-    if (!window.RubricLibrary) return;
-    RubricLibrary.openPickDialog(activeCourse, function (rubric) {
-      var dd = document.getElementById('af-rubric');
-      if (!dd) return;
-      dd.innerHTML =
-        '<option value="">None</option>' +
-        getRubrics(activeCourse)
-          .map(function (r) {
-            return (
-              '<option value="' + esc(r.id) + '">' + esc(r.name) + ' (' + r.criteria.length + ' criteria)</option>'
-            );
-          })
-          .join('');
-      dd.value = rubric.id;
-      onRubricSelect(rubric.id);
-    });
+    openStart('copy');
   }
 
   /* ── Comment Popover ────────────────────────────────────── */
@@ -9251,6 +9427,10 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionChange === 'autoSetDueDate') {
       autoSetDueDate();
+      return;
+    }
+    if (el.dataset.actionChange === 'copyFrom') {
+      _copyFromChanged(el.value);
       return;
     }
     if (el.dataset.actionChange === 'tickGroup') {
