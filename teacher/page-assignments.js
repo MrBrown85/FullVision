@@ -2758,15 +2758,15 @@ window.PageAssignments = (function () {
         var gi = _afGroupMap[g.id];
         if (gi.secs.length === 0) return;
         html +=
-          '<div style="margin-bottom:8px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
-          '<span style="width:8px;height:8px;border-radius:50%;background:' +
+          '<div class="af-list-group"><div class="af-list-group-head">' +
+          '<span class="af-list-group-dot" style="background:' +
           cssColor(g.color) +
-          ';flex-shrink:0"></span>' +
+          '"></span>' +
           '<span class="af-list-group-name" tabindex="0" data-af-tip="folder" data-tags="' +
           esc(_afSecTagIds(gi.secs)) +
           '" data-name="' +
           esc(g.name) +
-          '" style="font-size:var(--text-xs);font-weight:600;color:var(--text-2);">' +
+          '">' +
           esc(g.name) +
           '</span></div>';
         gi.secs.forEach(function (sec) {

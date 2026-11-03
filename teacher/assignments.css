@@ -1542,18 +1542,34 @@
   display: none;
 }
 .af-card-competencies[data-view='list'] .af-tags-container {
+  /* One row per competency, the whole wording on it (Colin, Nov 2), under
+     its folder's name when the course has folders. The list takes the
+     card's width and never widens the form. */
   display: block;
-  columns: 2;
-  column-gap: 28px;
-  /* One-line rows mustn't widen the form: the list takes the card's width. */
   contain: inline-size;
 }
 .af-card-competencies[data-view='list'] .af-tag-row,
 .af-card-competencies[data-view='list'] .af-tag-item {
   min-width: 0;
 }
+.af-card-competencies[data-view='list'] .af-tag-row {
+  align-items: flex-start;
+}
 .af-card-competencies[data-view='list'] .af-tag-item {
-  overflow: hidden;
+  /* Code, name and wording share their first line's baseline. */
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  margin-bottom: 0 !important;
+  font-size: var(--text-base);
+  line-height: 1.4;
+}
+.af-card-competencies[data-view='list'] .af-tag-item input[type='checkbox'] {
+  align-self: flex-start;
+  margin: 3px 0 0;
+}
+.af-card-competencies[data-view='list'] .af-tag-id {
+  min-width: 40px;
 }
 .af-tag-short {
   flex: 0 0 auto;
@@ -1564,27 +1580,62 @@
   font-weight: 600;
   color: var(--text);
 }
+.af-card-competencies[data-view='list'] .af-tag-short {
+  flex: 0 0 180px;
+  max-width: none;
+  white-space: normal;
+  overflow: visible;
+}
 .af-card-competencies[data-view='list'] .af-tag-name {
+  flex: 1 1 0;
+  min-width: 0;
   color: var(--text-2);
 }
-.af-card-competencies[data-view='list'] .af-tags-container > div {
-  break-inside: avoid;
+.af-card-competencies[data-view='list'] .af-tag-ican-toggle {
+  margin-top: 4px;
 }
 .af-card-competencies[data-view='list'] .af-tag-row[hidden] {
   display: none;
 }
-.af-card-competencies[data-view='list'] .af-tag-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.af-list-group + .af-list-group,
+.af-tag-row + .af-list-group {
+  margin-top: 10px;
+}
+.af-list-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px 4px;
+}
+.af-list-group-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.af-list-group-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+@media (max-width: 600px) {
+  /* Narrow: code and name on one line, the wording under them. */
+  .af-card-competencies[data-view='list'] .af-tag-item {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .af-card-competencies[data-view='list'] .af-tag-short {
+    flex: 1 1 auto;
+  }
+  .af-card-competencies[data-view='list'] .af-tag-name {
+    flex-basis: 100%;
+    padding-left: 26px;
+  }
 }
 .af-card-competencies.is-rubric .af-comp-tools {
   display: none;
 }
 @media (max-width: 900px) {
-  .af-card-competencies[data-view='list'] .af-tags-container {
-    columns: 1;
-  }
   .af-codes-group {
     grid-template-columns: 1fr;
     gap: 6px;
