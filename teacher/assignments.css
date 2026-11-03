@@ -7053,6 +7053,19 @@ button.grader-member-name {
   gap: 6px;
   cursor: pointer;
 }
+/* The label keeps room for "Filter · 8", so turning a filter on or off
+   doesn't move the search box beside it. */
+.assess-filter-label {
+  display: inline-grid;
+}
+.assess-filter-label > span,
+.assess-filter-label::after {
+  grid-area: 1 / 1;
+}
+.assess-filter-label::after {
+  content: 'Filter · 8';
+  visibility: hidden;
+}
 .assess-filter-btn.has-filters {
   background: var(--active-light);
   color: var(--link);
