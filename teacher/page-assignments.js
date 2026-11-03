@@ -7058,7 +7058,24 @@ window.PageAssignments = (function () {
       menu.classList.add('open');
     }
   }
-  function fillScores(aid, tagId, value, scope) {
+  /* A fill's Undo toast. While it is up, Cmd+Z (Ctrl+Z) outside a text
+     field takes the same Undo (_handleKeydown). */
+  var _fillUndoOpen = false;
+  function _showFillUndo(message, undo) {
+    showUndoToast(
+      message,
+      function () {
+        _fillUndoOpen = false;
+        undo();
+      },
+      function () {
+        _fillUndoOpen = false;
+      },
+    );
+    _fillUndoOpen = true;
+  }
+  // label: the level's name, for Set Everyone To's toast (scope 'all').
+  function fillScores(aid, tagId, value, scope, label) {
     var cid = activeCourse;
     var prevScores = structuredClone(getScores(cid));
     var students = getStudents(cid);
@@ -7085,14 +7102,14 @@ window.PageAssignments = (function () {
       toastMsg = 'Row filled';
     } else {
       if (!assess) return;
-      students.forEach(function (st) {
-        if (statuses[st.id + ':' + aid]) return;
-        scoreTagIds(assess, cid).forEach(function (tid) {
-          setScore(cid, st.id, aid, tid, value);
+      var plan = _setEveryonePlan(cid, aid);
+      plan.cells.forEach(function (cell) {
+        cell.keys.forEach(function (tid) {
+          setScore(cid, cell.sid, aid, tid, value);
         });
       });
       selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"]';
-      toastMsg = 'All scores filled';
+      toastMsg = _setEveryoneCount(plan, plan.cells.length) + ' set to ' + label;
     }
     // Each filled row shows its new level at once, drawn from the saved
     // scores, so a student with a status (skipped) keeps what it had.
@@ -7106,7 +7123,7 @@ window.PageAssignments = (function () {
     });
     refreshSidebarGrades();
     var filled = structuredClone(getScores(cid));
-    showUndoToast(toastMsg, function () {
+    _showFillUndo(toastMsg, function () {
       restoreScoreCells(cid, prevScores, filled);
       render();
       refreshSidebarGrades();
@@ -7155,7 +7172,7 @@ window.PageAssignments = (function () {
       if (lvl) lvl.classList.add('active');
     }
   }
-  function fillRubricScores(aid, critId, value, scope) {
+  function fillRubricScores(aid, critId, value, scope, label) {
     var cid = activeCourse;
     var prevScores = structuredClone(getScores(cid));
     var students = getStudents(cid);
@@ -7190,46 +7207,141 @@ window.PageAssignments = (function () {
       toastMsg = 'Row filled';
     } else {
       if (!assess || !assess.rubricId) return;
-      var rubric = getRubricById(cid, assess.rubricId);
-      if (!rubric) return;
-      students.forEach(function (st) {
-        if (statuses[st.id + ':' + aid]) return;
-        rubric.criteria.forEach(function (crit) {
-          rubricCriterionScoreKeys(crit).forEach(function (tagId) {
-            setScore(cid, st.id, aid, tagId, value);
-          });
+      var plan = _setEveryonePlan(cid, aid);
+      plan.cells.forEach(function (cell) {
+        cell.keys.forEach(function (tagId) {
+          setScore(cid, cell.sid, aid, tagId, value);
         });
       });
       selector = '.rsg-criterion-row[data-assess="' + aid + '"]';
-      toastMsg = 'All rubric scores filled';
+      toastMsg = _setEveryoneCount(plan, plan.cells.length) + ' set to ' + label;
     }
+    // Each row shows what it now holds, drawn from the saved scores, so a
+    // skipped student or a criterion already scored keeps what it had.
     document.querySelectorAll(selector).forEach(function (row) {
-      updateRubricRowUI(row, value);
+      var st = rowScoreState(row);
+      updateRubricRowUI(row, st.mixed ? 0 : st.level);
     });
     syncModRows('.rsg-criterion-row[data-assess="' + aid + '"]');
+    students.forEach(function (st) {
+      _syncTagRows(aid, st.id);
+    });
     refreshSidebarGrades();
     var filled = structuredClone(getScores(cid));
-    showUndoToast(toastMsg, function () {
+    _showFillUndo(toastMsg, function () {
       restoreScoreCells(cid, prevScores, filled);
       render();
       refreshSidebarGrades();
     });
   }
+  /* Set Everyone To (Colin, 2026-11-03, DECISIONS): only cells with no
+     score yet are set, a rubric criterion at a time, and students marked
+     Missing or Excused are skipped. The cells to set, and the counts the
+     dialog and the toast name. */
+  function _setEveryonePlan(cid, aid) {
+    var plan = { cells: [], students: 0, scored: 0, locked: 0, perStudent: 0, rubric: false };
+    var assess = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    if (!assess) return plan;
+    var groups;
+    if (assess.rubricId) {
+      var rubric = getRubricById(cid, assess.rubricId);
+      if (!rubric) return plan;
+      plan.rubric = true;
+      groups = (rubric.criteria || []).map(rubricCriterionScoreKeys);
+    } else {
+      groups = scoreTagIds(assess, cid).map(function (tid) {
+        return [tid];
+      });
+    }
+    plan.perStudent = groups.length;
+    var scores = getScores(cid);
+    getStudents(cid).forEach(function (st) {
+      if (isScoreLocked(cid, st.id, aid)) {
+        plan.locked++;
+        return;
+      }
+      var entries = scores[st.id] || [];
+      var open = 0;
+      groups.forEach(function (keys) {
+        var scored = keys.some(function (k) {
+          return isScoreEntered(
+            assess,
+            entries.find(function (e) {
+              return e.assessmentId === aid && e.tagId === k;
+            }),
+          );
+        });
+        if (scored) plan.scored++;
+        else {
+          plan.cells.push({ sid: st.id, keys: keys });
+          open++;
+        }
+      });
+      if (open) plan.students++;
+    });
+    return plan;
+  }
+  // "5 students" when each student has one score to set, else "13 criteria"
+  // or "13 competencies".
+  function _setEveryoneCount(plan, n) {
+    var words =
+      plan.perStudent === 1
+        ? ['student', 'students']
+        : plan.rubric
+          ? ['criterion', 'criteria']
+          : ['competency', 'competencies'];
+    return n + ' ' + words[n === 1 ? 0 : 1];
+  }
+  function _confirmSetEveryone(aid, value, label, fill) {
+    var plan = _setEveryonePlan(activeCourse, aid);
+    var n = plan.cells.length;
+    var title = 'Set Everyone To ' + label;
+    var skipped = plan.locked
+      ? ' ' +
+        (plan.locked === 1 ? '1 student is' : plan.locked + ' students are') +
+        ' marked Missing or Excused and left out.'
+      : '';
+    if (!n) {
+      showConfirm(
+        title,
+        'Every student already has a score or is marked Missing or Excused.',
+        'OK',
+        'primary',
+        function () {},
+      );
+      return;
+    }
+    var what = _setEveryoneCount(plan, n);
+    var message =
+      plan.perStudent === 1
+        ? 'Set ' + what + ' with no score yet to ' + label + '? Students already scored stay as they are.'
+        : 'Set ' +
+          what +
+          ' with no score yet, for ' +
+          (plan.students === 1 ? '1 student' : plan.students + ' students') +
+          ', to ' +
+          label +
+          '? ' +
+          (plan.rubric ? 'Criteria' : 'Competencies') +
+          ' already scored stay as they are.';
+    var button =
+      'Set ' +
+      what.replace(/ (\w)/, function (m, c) {
+        return ' ' + c.toUpperCase();
+      });
+    showConfirm(title, message + skipped, button, 'primary', fill);
+  }
   function confirmFillAll(aid, value, label) {
-    showConfirm('Fill All Scores', 'Set all students to "' + label + '"?', 'Fill All', 'primary', function () {
-      fillScores(aid, null, value, 'all');
+    _confirmSetEveryone(aid, value, label, function () {
+      fillScores(aid, null, value, 'all', label);
     });
   }
   function confirmFillRubricAll(aid, value, label) {
-    showConfirm(
-      'Fill All Scores',
-      'Set all students to "' + label + '" for every criterion?',
-      'Fill All',
-      'primary',
-      function () {
-        fillRubricScores(aid, null, value, 'all');
-      },
-    );
+    _confirmSetEveryone(aid, value, label, function () {
+      fillRubricScores(aid, null, value, 'all', label);
+    });
   }
 
   /* The four levels of a scoring card, in the class's Rubric Levels order
@@ -10695,6 +10807,17 @@ window.PageAssignments = (function () {
   }
 
   function _handleKeydown(e) {
+    if (
+      _fillUndoOpen &&
+      (e.metaKey || e.ctrlKey) &&
+      !e.shiftKey &&
+      (e.key === 'z' || e.key === 'Z') &&
+      !(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable))
+    ) {
+      e.preventDefault();
+      executeUndo();
+      return;
+    }
     // One student's grader open on the page (the dialog runs its own).
     if (!_grader && _graderCardKey(e)) return;
     if (e.key === 'Escape' && document.querySelector('.rsg-group-members .grader-member-menu:not([hidden])')) {

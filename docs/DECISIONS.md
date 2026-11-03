@@ -425,6 +425,16 @@ Context: Colin asked for a class grading spreadsheet that prints like MasterGrad
 2. **Observations are a separate record.** A teacher's observation log; an observation may be linked to an assignment, but it is not the comment on the work. The Assignments Comment button and the grader dialog's Overall Feedback list, which wrote and showed only observations, leave the grading views; observations are added from the Observations page. The report's Observations card is unchanged.
 3. **Nothing printed changes.** The observations that had been printing as feedback on work (45 on 2026-11-01) are copied into the empty Overall Comments of that work by `migrations/20261101_observations_to_overall_comment.sql`; the observations themselves stay. Printing reads the Overall Comment and, until the migration has run, falls back to the linked observations when it is empty; the fallback is removed after.
 
+## Set Everyone To (2026-11-03)
+
+Context: the Nov 3 bug sweep found Set Everyone To overwrote scores already entered with no warning, and its Undo didn't always put them back. Colin: "should only set unscored and ignore those who are scored and should have an easy undo", then "and maybe an 'are you sure' before it takes effect".
+
+1. **It sets only cells with no score yet.** A score already entered is never replaced. On a rubric each criterion is its own cell: a student with one criterion scored gets the rest set. Students marked Missing or Excused are left out (Late students are set like anyone).
+2. **It asks first, with the count.** The dialog says how many it will set and that scored ones stay ("Set 13 criteria with no score yet, for 7 students, to Proficient? Criteria already scored stay as they are."), and how many Missing or Excused students are left out; the button names the count ("Set 13 Criteria"). This is an exception to the Undo-toast-over-confirm-box preference, at Colin's request.
+3. **An easy Undo.** The toast names what was set ("13 criteria set to Proficient") and has Undo; while it is up, Cmd+Z (Ctrl+Z) does the same. Undo puts back exactly the cells the fill set, and a cell scored again since keeps its new score.
+
+The row fills and Set Unmarked to Complete / points keep their own rules.
+
 ## Gradebook sweep (2026-11-01)
 
 Context: Colin's UX sweep of the gradebook for new and experienced teachers; plan in [`plans/gradebook-sweep-plan.md`](plans/gradebook-sweep-plan.md).
