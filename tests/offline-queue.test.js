@@ -274,6 +274,45 @@ describe('v2Queue (offline write queue)', () => {
       expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 1 });
     });
 
+    it('holds writes to a restored class until its restore lands', async () => {
+      setOnline(false);
+      var release = null;
+      globalThis.getSupabase = () => ({
+        rpc(name, payload) {
+          calls.push({ name: name, payload: payload });
+          if (name !== 'import_json_restore') return Promise.resolve({ data: 'ok', error: null });
+          return new Promise(function (resolve) {
+            release = function () {
+              resolve({ data: { courses: 1 }, error: null });
+            };
+          });
+        },
+      });
+      var restore = Q.push('import_json_restore', {
+        p_payload: { courses: [{ id: 'c-new' }], enrollments: [{ id: 'e-new' }], assessments: [{ id: 'a-new' }] },
+      });
+      // What the restore dialog suggests next, made before reconnecting.
+      var grade = Q.push('update_course', { p_course_id: 'c-new', p_patch: { grade_level: '8' } });
+      var score = Q.push('upsert_tag_score', { p_enrollment_id: 'e-new', p_assessment_id: 'a-new', p_value: 3 });
+      var other = Q.push('update_course', { p_course_id: 'c-other', p_patch: {} });
+      setOnline(true);
+      Q.flush();
+      await Promise.resolve();
+      await Promise.resolve();
+      var beforeLanding = calls.map(c => c.name + ':' + (c.payload.p_course_id || ''));
+      release();
+      await restore;
+      await Promise.all([grade, score, other]);
+      expect(beforeLanding).toEqual(['import_json_restore:', 'update_course:c-other']);
+      expect(calls.map(c => c.name)).toEqual([
+        'import_json_restore',
+        'update_course',
+        'update_course',
+        'upsert_tag_score',
+      ]);
+      expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
+    });
+
     it('sends writes to the same record in order, one at a time', async () => {
       setOnline(true);
       var release = [];

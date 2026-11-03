@@ -557,6 +557,18 @@ window.MGrade = (function () {
     });
   }
 
+  // Which card a student is graded on: their own, or their group's.
+  function studentCardIndex(cid, aid, sid) {
+    var a = (getAssessments(cid) || []).find(function (x) {
+      return x.id === aid;
+    });
+    if (!a) return -1;
+    return _swiperUnits(cid, a).findIndex(function (u) {
+      if (u.view) return u.view.members.indexOf(sid) !== -1 && !isGradedSeparately(a, sid);
+      return u.st.id === sid;
+    });
+  }
+
   // "3 of 27"; on group work the card's name first: "Group 2 · 2 of 9".
   function _subtitleText(idx, total) {
     var label = _swiperLabels && _swiperLabels[idx];
@@ -1538,17 +1550,30 @@ window.MGrade = (function () {
     if (groupGradingUnits(cid, a, [])) _redrawSwiper(cid, aid);
   }
 
+  /* The entries an undo puts back. Missing or Excused work takes no score
+     (isScoreLocked), so none with a level or points goes back under it. */
+  function _undoEntries(entry, prev) {
+    if (!isScoreLocked(entry.cid, entry.sid, entry.aid)) return prev;
+    var a = getAssessments(entry.cid).find(function (x) {
+      return x.id === entry.aid;
+    });
+    return prev.filter(function (p) {
+      return !isScoreEntered(a, p);
+    });
+  }
+
   function undoLastScore() {
     var entry = _undoStack.pop();
     if (!entry) return;
     if (entry.multi) return _undoCriterion(entry);
+    var prev = _undoEntries(entry, entry.prev);
     var allScores = getScores(entry.cid);
     var beforeScores = structuredClone(allScores);
     var stScores = (allScores[entry.sid] || []).filter(function (s) {
       return !(s.assessmentId === entry.aid && s.tagId === entry.tid);
     });
     // Restore previous entries
-    entry.prev.forEach(function (p) {
+    prev.forEach(function (p) {
       stScores.push(p);
     });
     allScores[entry.sid] = stScores;
@@ -1560,7 +1585,7 @@ window.MGrade = (function () {
     var card = document.querySelector('.m-swiper-card[data-sid="' + entry.sid + '"]');
     if (card) {
       var btns = card.querySelectorAll('.m-score-btn[data-tid="' + entry.tid + '"]');
-      var lastScore = entry.prev.length ? entry.prev[entry.prev.length - 1].score : null;
+      var lastScore = prev.length ? prev[prev.length - 1].score : null;
       btns.forEach(function (btn) {
         var lvl = parseInt(btn.getAttribute('data-score'));
         btn.classList.toggle('m-score-active', lastScore !== null && Math.round(lastScore) === lvl);
@@ -1582,7 +1607,7 @@ window.MGrade = (function () {
       return !(s.assessmentId === entry.aid && tids.indexOf(s.tagId) >= 0);
     });
     entry.multi.forEach(function (m) {
-      m.prev.forEach(function (p) {
+      _undoEntries(entry, m.prev).forEach(function (p) {
         stScores.push(p);
       });
     });
@@ -1899,6 +1924,7 @@ window.MGrade = (function () {
     undoLastScore: undoLastScore,
     setupSwiper: setupSwiper,
     jumpToStudent: jumpToStudent,
+    studentCardIndex: studentCardIndex,
     openMemberSheet: openMemberSheet,
     gradeSeparately: gradeSeparately,
     confirmBackToGroup: confirmBackToGroup,

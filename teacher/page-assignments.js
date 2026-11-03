@@ -4654,12 +4654,14 @@ window.PageAssignments = (function () {
     if (!title) return fallback;
     return /\brubric$/i.test(title) ? title : title + ' Rubric';
   }
-  /* Create / Save Changes with a blank the teacher has written in: keep it.
+  /* Create / Save Changes with a blank the teacher has written in: keep it,
+     open or folded away (its tab clicked again, or another start opened).
      True while scored work asks first; `resume` runs the save again once the
      teacher changes the rubric. */
   function _commitOpenBlank(resume) {
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
-    if (!(_startOpen === 'blank' && _blank && _blank.touched && mode === 'proficiency')) return false;
+    var written = _blank && (_startOpen === 'blank' ? _blank.touched : _blankWritten());
+    if (!(written && mode === 'proficiency')) return false;
     var asking = true;
     var held = false;
     _blankSave(true, function () {
@@ -6535,6 +6537,8 @@ window.PageAssignments = (function () {
     var aid = el.dataset.aid;
     var sid = el.dataset.sid;
     var next = getCompletionMark(cid, sid, aid) === el.dataset.mark ? null : el.dataset.mark;
+    // Missing and Excused work takes no mark (isScoreLocked); C and I reach here by key.
+    if (next && isScoreLocked(cid, sid, aid)) return;
     setCompletionMark(cid, sid, aid, next);
     var cell = el.closest('.cmp-cell');
     var grid = el.closest('.ldg-grid');
@@ -7126,6 +7130,8 @@ window.PageAssignments = (function () {
     if (!crit) return;
     var wasActive = el.classList.contains('active');
     var next = wasActive ? 0 : value;
+    // Missing and Excused work takes no level (isScoreLocked); 1–4 reach here by key.
+    if (next && isScoreLocked(activeCourse, sid, aid)) return;
     rubricCriterionScoreKeys(crit).forEach(function (tagId) {
       setScore(activeCourse, sid, aid, tagId, next);
     });
@@ -7867,6 +7873,11 @@ window.PageAssignments = (function () {
       checkId = el.dataset.checkid;
     var crit = getRubricCriterion(aid, critId);
     if (!crit) return;
+    // Missing and Excused work takes no score (isScoreLocked): the box goes back.
+    if (el.checked && isScoreLocked(cid, sid, aid)) {
+      el.checked = false;
+      return;
+    }
     var before = getRubricCheckIds(cid, sid, aid);
     var after = setRubricCheck(cid, sid, aid, checkId, el.checked);
     var current = _criterionLevelNow(cid, aid, sid, crit);
@@ -12008,6 +12019,11 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var crit = _graderCriterion(aid, critId);
     if (!crit) return;
+    // Missing and Excused work takes no score (isScoreLocked): redraw the box as saved.
+    if (on && isScoreLocked(cid, focusStudentId, aid)) {
+      render();
+      return;
+    }
     var before = getRubricCheckIds(cid, focusStudentId, aid);
     var after = setRubricCheck(cid, focusStudentId, aid, checkId, on);
     var current = _criterionLevelNow(cid, aid, focusStudentId, crit);

@@ -297,6 +297,13 @@
     opts = opts || {};
     const sb = getSupabase();
     if (!sb) return;
+    // A delete still in its Undo window commits now, so it is sent below
+    // instead of being saved back onto the device by pagehide after the wipe.
+    try {
+      if (typeof dismissUndoToast === 'function') dismissUndoToast();
+    } catch (e) {
+      console.warn('Could not commit the pending Undo:', e);
+    }
     // Give in-flight writes a moment to land. Anything still unsent after
     // that sits in the outbox, which the check below reports.
     if (typeof waitForPendingSyncs === 'function') {

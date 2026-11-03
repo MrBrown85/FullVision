@@ -2682,12 +2682,14 @@ window.PageGradebook = (function () {
           return a.id === aid;
         });
         if (assess && scores[sid]) {
-          // ⌘Z puts it back, as it does for Edit Score.
+          // ⌘Z puts it back, as it does for Edit Score, ticks included.
           var clearIds = scoreTagIds(assess, cid);
+          var checkIds = getRubricCheckIds(cid, sid, aid);
           var undo = _pushUndo(cid, sid, aid, clearIds);
+          undo.checkIds = checkIds;
           // An Advanced Rubric's ticks go with the score, so reopening it
           // doesn't suggest a level for work that has none.
-          getRubricCheckIds(cid, sid, aid).forEach(function (id) {
+          checkIds.forEach(function (id) {
             setRubricCheck(cid, sid, aid, id, false);
           });
           clearScoreEntries(cid, scores, sid, assess, clearIds);
@@ -3188,9 +3190,16 @@ window.PageGradebook = (function () {
       var scores = getScores(undo.cid);
       if (!scores[undo.sid]) scores[undo.sid] = [];
       var beforeScores = structuredClone(scores);
+      // Missing or Excused work takes no score (isScoreLocked): an undo
+      // puts back no level or points under the status.
+      var undoAssess = getAssessments(undo.cid).find(function (a) {
+        return a.id === undo.aid;
+      });
+      var undoLocked = isScoreLocked(undo.cid, undo.sid, undo.aid);
       // Restore previous entries (full objects)
       (undo.tagIds || []).forEach(function (tid, i) {
         var prevEntry = undo.prevEntries[i];
+        if (prevEntry && undoLocked && isScoreEntered(undoAssess, prevEntry)) prevEntry = null;
         // Remove current entry for this tag
         var idx = scores[undo.sid].findIndex(function (e) {
           return e.assessmentId === undo.aid && e.tagId === tid;
@@ -3201,6 +3210,10 @@ window.PageGradebook = (function () {
       });
       saveScores(undo.cid, scores);
       persistScoreDiffToCanonical(undo.cid, beforeScores, scores);
+      // The Advanced Rubric ticks Clear Score took off.
+      (undo.checkIds || []).forEach(function (id) {
+        setRubricCheck(undo.cid, undo.sid, undo.aid, id, true);
+      });
       clearProfCache();
       render();
       return;
