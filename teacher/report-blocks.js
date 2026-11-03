@@ -1615,7 +1615,8 @@ window.ReportBlocks = (function () {
   /* The marks for one row: { score, percent, word } as strings ('' when
      there is none). cv: calc.js assessmentCellValue. level: the mark on
      one competency instead of the whole assessment, for student sid;
-     points work keeps its own % (_ownPercent). */
+     points work keeps its own % (_ownPercent). A whole piece prints the %
+     its category counts it as (cv.percentText). */
   function _rowMarks(cid, a, cv, level, sid) {
     if (level != null) {
       if (!(level > 0)) return { score: '—', percent: '', word: '' };
@@ -1641,7 +1642,7 @@ window.ReportBlocks = (function () {
     if (cv.kind === 'level' && cv.value > 0) {
       return {
         score: levelFigure(cv.value) + ' / 4',
-        percent: formatLevelAs(cid, cv.value, 'percent'),
+        percent: cv.percentText,
         word: _profWord(cv.value),
       };
     }

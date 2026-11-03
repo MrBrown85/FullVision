@@ -1009,7 +1009,7 @@ describe('stage 3 blocks', () => {
     ];
     const cells = {
       a1: { kind: 'points', value: 12, level: 3 },
-      a2: { kind: 'level', value: 3.33, level: 3 },
+      a2: { kind: 'level', value: 3.33, level: 3, percentText: '83%' },
       a3: { kind: 'status', status: 'NS', value: 0, level: 0 },
     };
     stub('getAssessments', () => work);

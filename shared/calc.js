@@ -2061,9 +2061,14 @@ function _percentLevel(pct) {
    there is none. */
 function formatLevel(cid, value, empty) {
   if (!(value > 0)) return empty === undefined ? '\u2014' : empty;
+  return _levelAtPercent(cid, value, levelToPercent(cid, value));
+}
+
+/* A level as the class shows it, with the percent it is shown as. */
+function _levelAtPercent(cid, value, percent) {
   var mode = courseGradeMode(cid);
   var num = Number(value).toFixed(1);
-  var pct = Math.round(levelToPercent(cid, value)) + '%';
+  var pct = Math.round(percent) + '%';
   if (mode === 'letter') return pct;
   if (mode === 'both') return num + ' \u00B7 ' + pct;
   return num;
@@ -2134,7 +2139,11 @@ function formatPointsPercent(points, maxPoints) {
      'incomplete', value 1 or 0, text ✓ or ✗).
    - kind 'points' or 'level': a score; value is the points or the level
      (with its ±), level the 1-4 band the cell's colour comes from, text
-     through formatPoints or formatLevel.
+     through formatPoints or formatLevel. A level also has percent and
+     percentText ("87%"), the % the piece counts as in its category, so a
+     piece alone in its category shows the category's %: rubric work its
+     criteria's percents by weight (Colin, 2026-11-03), other work the % its
+     level counts as. text uses that %.
    - kind 'none': no score yet, text '—'.
    `late` is true when the cell is marked Late (it keeps its score). */
 function assessmentCellValue(cid, sid, assessment) {
@@ -2210,8 +2219,15 @@ function assessmentCellValue(cid, sid, assessment) {
     out.kind = isPoints ? 'points' : 'level';
     out.value = val;
     out.level = pointsVal != null ? pointsToProf(val, a.maxPoints || 100, getGradingScale(cid)) : Math.round(val);
-    out.text = isPoints ? formatPoints(val) : formatLevel(cid, val);
     out.outOfRange = isScoreOutOfRange(a, val);
+    if (isPoints) {
+      out.text = formatPoints(val);
+      return out;
+    }
+    var own = rubricVal !== undefined ? getAssessmentGroupPercentage(cid, sid, [a]) : null;
+    out.percent = own && own.pct != null ? own.pct : levelToPercent(cid, val);
+    out.percentText = Math.round(out.percent) + '%';
+    out.text = _levelAtPercent(cid, val, out.percent);
     return out;
   }
   return out;

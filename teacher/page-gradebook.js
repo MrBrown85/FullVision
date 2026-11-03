@@ -1693,7 +1693,7 @@ window.PageGradebook = (function () {
           var r = cell.level;
           cellStyle = 'background:' + PROF_TINT[r] + ';color:' + PROF_COLORS[r];
           display =
-            (cell.kind === 'level' ? _levelCellHtml(cid, cell.value) : esc(cell.text)) +
+            (cell.kind === 'level' ? _levelCellHtml(cid, cell.value, cell) : esc(cell.text)) +
             (cell.late ? lateMarkHtml() : '') +
             (isGradedSeparately(a, s.id) ? separateMarkHtml() : '');
           // Warning for out-of-range: above 4 on proficiency work, above the
@@ -2014,14 +2014,16 @@ window.PageGradebook = (function () {
   }
 
   /* A level in a Scores cell. A Both class shows the proficiency over its
-     percent, so "3.0 · 75%" fits the 48px column its title leans over. */
-  function _levelCellHtml(cid, value) {
-    if (courseGradeMode(cid) !== 'both') return esc(formatLevel(cid, value));
+     percent, so "3.0 · 75%" fits the 48px column its title leans over.
+     cell: a student's cell (assessmentCellValue), whose % is the piece's
+     own; none for a Class Average. */
+  function _levelCellHtml(cid, value, cell) {
+    if (courseGradeMode(cid) !== 'both') return esc(cell ? cell.text : formatLevel(cid, value));
     return (
       '<span class="gb-cell-both"><span>' +
       esc(formatLevelAs(cid, value, 'proficiency')) +
       '</span><small>' +
-      esc(formatLevelAs(cid, value, 'percent')) +
+      esc(cell ? cell.percentText : formatLevelAs(cid, value, 'percent')) +
       '</small></span>'
     );
   }
