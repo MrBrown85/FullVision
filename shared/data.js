@@ -3268,6 +3268,8 @@ function _assessmentFromDetail(existing, detail) {
     if (a.collab_config.excludedStudents) next.excludedStudents = a.collab_config.excludedStudents;
     if (a.collab_config.groupCount) next.groupCount = a.collab_config.groupCount;
     if (a.collab_config.gradedSeparately) next.gradedSeparately = a.collab_config.gradedSeparately;
+    if (a.collab_config.groupGradeAside) next.groupGradeAside = a.collab_config.groupGradeAside;
+    else delete next.groupGradeAside;
   }
   // The server's list is the truth, empty included: an assessment whose last
   // competency was unlinked has none.
@@ -3830,6 +3832,7 @@ function _v2GradebookToCache(cid, payload) {
     if (collabConfig.excludedStudents) assessment.excludedStudents = collabConfig.excludedStudents;
     if (collabConfig.groupCount) assessment.groupCount = collabConfig.groupCount;
     if (collabConfig.gradedSeparately) assessment.gradedSeparately = collabConfig.gradedSeparately;
+    if (collabConfig.groupGradeAside) assessment.groupGradeAside = collabConfig.groupGradeAside;
     return assessment;
   });
 
@@ -7628,8 +7631,9 @@ function canSetAssignmentStatus(cid, sid, aid, status) {
   if (status !== 'NS' && status !== 'EXC') return true;
   if (getAssignmentStatus(cid, sid, aid) === status) return true;
   // A linked group member's score is the group's copy; Missing or Excused
-  // clears it (setAssignmentStatus, Group grading).
-  if (isLinkedGroupMember(cid, aid, sid)) return true;
+  // sets it aside (setAssignmentStatus, Group grading). A grade of their own
+  // is held to the rule like anyone's.
+  if (isLinkedGroupMember(cid, aid, sid) && _holdsGroupCopy(cid, aid, sid)) return true;
   return !hasScoreOrFeedback(cid, sid, aid);
 }
 function setAssignmentStatus(cid, sid, aid, status) {
@@ -9092,6 +9096,7 @@ function _assessmentChanged(a, b) {
     JSON.stringify(a.excludedStudents || []) !== JSON.stringify(b.excludedStudents || []) ||
     (a.groupCount || 0) !== (b.groupCount || 0) ||
     JSON.stringify(a.gradedSeparately || []) !== JSON.stringify(b.gradedSeparately || []) ||
+    JSON.stringify(a.groupGradeAside || {}) !== JSON.stringify(b.groupGradeAside || {}) ||
     (a.maxPoints || 0) !== (b.maxPoints || 0) ||
     (a.weight || 1) !== (b.weight || 1) ||
     (a.evidenceType || '') !== (b.evidenceType || '') ||
@@ -9131,6 +9136,8 @@ function _collabConfigFromAssessment(a) {
   if (a && Array.isArray(a.gradedSeparately) && a.gradedSeparately.length) {
     config.gradedSeparately = a.gradedSeparately;
   }
+  // The group's grade, kept while every member is Missing or Excused.
+  if (a && a.groupGradeAside && Object.keys(a.groupGradeAside).length) config.groupGradeAside = a.groupGradeAside;
   return Object.keys(config).length ? config : null;
 }
 
@@ -9728,7 +9735,10 @@ function _setPointsScoreOne(cid, sid, aid, rawScore) {
      over: the first group edit moves them to Graded Separately instead.
    - Missing, Excused and Late stay per student. A member who is Missing or
      Excused gets no group grade, and marking them clears their copy; taking
-     the status off copies the group's grade back.
+     the status off copies the group's grade back. When the last member
+     holding the grade is marked, it is set aside on the assessment
+     (groupGradeAside, in collab_config) and comes back with the first status
+     taken off. A member whose grade is their own can't be marked.
    - The Note for the Report and DIBELS stay per student; DIBELS work is
      never graded by group. */
 
@@ -9827,12 +9837,31 @@ function groupGradingUnits(cid, a, order) {
    group who isn't Missing or Excused, or `sid` is Missing or Excused). */
 function backToGroupGradeSource(cid, aid, sid) {
   if (isGroupWithheld(cid, sid, aid)) return null;
+  return _groupGradeHolder(cid, aid, sid);
+}
+/* The other linked member who isn't Missing or Excused that `sid`'s group
+   grade is drawn from: one with a grade first. Null when there is none. */
+function _groupGradeHolder(cid, aid, sid) {
   var a = _assessmentById(cid, aid);
+  var scores = getScores(cid);
+  var peers = _linkedGroupPeers(cid, a, sid).filter(function (m) {
+    return !isGroupWithheld(cid, m, aid);
+  });
   return (
-    _linkedGroupPeers(cid, a, sid).find(function (m) {
-      return !isGroupWithheld(cid, m, aid);
-    }) || null
+    peers.find(function (m) {
+      return !_groupGradeEmpty(scores, a, m);
+    }) ||
+    peers[0] ||
+    null
   );
+}
+/* True when `sid`'s grade on `aid` is the group's copy: the same as the
+   member it is drawn from, or there is nobody else to draw it from. */
+function _holdsGroupCopy(cid, aid, sid) {
+  var from = _groupGradeHolder(cid, aid, sid);
+  if (!from) return true;
+  var scores = getScores(cid);
+  return _groupGradeKey(scores, sid, aid) === _groupGradeKey(scores, from, aid);
 }
 
 var _groupWriteDepth = 0;
@@ -9935,11 +9964,67 @@ function _syncGroupFrom(cid, aid, sid, prior, onlyTo) {
   }
 }
 
-/* Copy the group's grade onto `sid` alone. With nobody to copy from, `sid`
-   keeps what they have. */
+/* Copy the group's grade onto `sid` alone: from a member holding it, else
+   the grade set aside when every member was Missing or Excused. With
+   nothing to copy, `sid` keeps what they have. */
 function _copyGroupGradeTo(cid, aid, sid) {
   var from = backToGroupGradeSource(cid, aid, sid);
+  var a = _assessmentById(cid, aid);
+  if ((!from || _groupGradeEmpty(getScores(cid), a, from)) && _restoreGroupGradeAside(cid, aid, sid)) return;
   if (from) _syncGroupFrom(cid, aid, from, null, sid);
+}
+
+/* The stored assessment and its group's linked members, for the grade set
+   aside. */
+function _groupAsideOf(cid, aid, sid) {
+  var assessments = getAssessments(cid);
+  var stored = assessments.find(function (x) {
+    return x.id === aid;
+  });
+  if (!stored || !isLinkedGroupMember(cid, aid, sid)) return null;
+  return { assessments: assessments, stored: stored, members: [sid].concat(_linkedGroupPeers(cid, stored, sid)) };
+}
+/* Keep `saved` ({ entries, checks }) as the group's grade under `sid`, or
+   with null drop what the group has set aside. */
+function _setGroupGradeAside(cid, aid, sid, saved) {
+  var at = _groupAsideOf(cid, aid, sid);
+  if (!at) return;
+  var aside = Object.assign({}, at.stored.groupGradeAside);
+  var before = JSON.stringify(aside);
+  at.members.forEach(function (m) {
+    delete aside[m];
+  });
+  if (saved) aside[sid] = saved;
+  if (JSON.stringify(aside) === before) return;
+  if (Object.keys(aside).length) at.stored.groupGradeAside = aside;
+  else delete at.stored.groupGradeAside;
+  saveAssessments(cid, at.assessments);
+}
+/* Put the group's grade set aside back on `sid`, when they have none and
+   aren't Missing or Excused. True when it was put back. */
+function _restoreGroupGradeAside(cid, aid, sid) {
+  var at = _groupAsideOf(cid, aid, sid);
+  if (!at || !at.stored.groupGradeAside || isGroupWithheld(cid, sid, aid)) return false;
+  var holder = at.members.find(function (m) {
+    return at.stored.groupGradeAside[m];
+  });
+  var a = _assessmentById(cid, aid);
+  var scores = getScores(cid);
+  if (!holder || !_groupGradeEmpty(scores, a, sid)) return false;
+  var saved = at.stored.groupGradeAside[holder];
+  _groupWriteDepth++;
+  try {
+    _replaceGroupEntries(cid, scores, a, sid, saved.entries || []);
+    saveScores(cid, scores);
+    (saved.checks || []).forEach(function (id) {
+      setRubricCheck(cid, sid, aid, id, true);
+    });
+  } finally {
+    _groupWriteDepth--;
+  }
+  _setGroupGradeAside(cid, aid, sid, null);
+  _broadcastChange(cid, 'scores');
+  return true;
 }
 
 /* `m`'s entries for `aid` become `entries`. A Note for the Report stays on
@@ -9975,10 +10060,27 @@ function _replaceGroupEntries(cid, scores, a, m, entries) {
     .concat(next);
 }
 
-/* Remove `sid`'s copy of the group grade on `aid`. */
+/* Remove `sid`'s copy of the group grade on `aid`. When nobody else holds
+   it, it is set aside first. */
 function _clearGroupCopy(cid, aid, sid) {
   var a = _assessmentById(cid, aid);
   if (!a) return;
+  var checks = getRubricCheckIds(cid, sid, aid);
+  var from = _groupGradeHolder(cid, aid, sid);
+  var held = getScores(cid);
+  if ((!from || _groupGradeEmpty(held, a, from)) && (!_groupGradeEmpty(held, a, sid) || checks.length)) {
+    var entries = (held[sid] || [])
+      .filter(function (e) {
+        return e && e.assessmentId === aid;
+      })
+      .map(function (e) {
+        var copy = _cloneValue(e);
+        delete copy.id;
+        delete copy.reportNote;
+        return copy;
+      });
+    _setGroupGradeAside(cid, aid, sid, { entries: entries, checks: checks });
+  }
   _groupWriteDepth++;
   try {
     if (getScoreComment(cid, sid, aid)) saveScoreComment(cid, sid, aid, '');
