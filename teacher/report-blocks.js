@@ -809,7 +809,8 @@ window.ReportBlocks = (function () {
     getAssessments(cid).forEach(a => (titles[a.id] = a));
     const byId = {};
     (sec.tags || []).forEach(tag => {
-      getTagScores(cid, sid, tag.id).forEach(sc => {
+      // The competency's mark on each piece, as the gradebook shows it.
+      tagMarksByAssessment(cid, sid, tag.id).forEach(sc => {
         if (!(sc.score > 0)) return;
         const prev = byId[sc.assessmentId];
         if (!prev || sc.score > prev.score) byId[sc.assessmentId] = { score: sc.score, a: titles[sc.assessmentId] };
@@ -1647,7 +1648,8 @@ window.ReportBlocks = (function () {
       sections.forEach(sec => {
         const byAssessment = {};
         (sec.tags || []).forEach(tag => {
-          getTagScores(cid, sid, tag.id).forEach(sc => {
+          // The competency's mark on each piece, as the gradebook shows it.
+          tagMarksByAssessment(cid, sid, tag.id).forEach(sc => {
             if (sc.score > 0 && (byAssessment[sc.assessmentId] == null || sc.score > byAssessment[sc.assessmentId])) {
               byAssessment[sc.assessmentId] = sc.score;
             }

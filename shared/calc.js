@@ -1478,6 +1478,36 @@ function tagScoresByAssessment(cid, studentId, tagId) {
   return out;
 }
 
+/* A competency's mark on each piece of work, one entry per assessment, as
+   the gradebook's competency cell shows it: rubric criteria that feed the
+   competency give their one level, or the lowest when they disagree
+   (competencyLevelFromCriteria), its ± counted in score. Other entries pass
+   through as getTagScores gives them. */
+function tagMarksByAssessment(cid, studentId, tagId) {
+  var out = [];
+  var seen = {};
+  var assessMap = _getAssessMap(cid);
+  getTagScores(cid, studentId, tagId).forEach(function (s) {
+    if (!s.criterionId) {
+      out.push(s);
+      return;
+    }
+    if (seen[s.assessmentId]) return;
+    seen[s.assessmentId] = true;
+    var a = assessMap.get(s.assessmentId);
+    var lv = a ? competencyLevelFromCriteria(cid, studentId, a, tagId) : null;
+    if (!lv) return;
+    var mark = Object.assign({}, s, { score: scoreModValue(lv), mixed: lv.mixed });
+    delete mark.criterionId;
+    delete mark.criterionName;
+    delete mark.level;
+    delete mark.mod;
+    if (lv.mod) Object.assign(mark, { level: lv.score, mod: lv.mod });
+    out.push(mark);
+  });
+  return out;
+}
+
 /* Whether an assessment counts toward a student's grades. Work in a 0%
    category counts toward nothing: not the course % and not competency
    proficiency. It still shows as evidence. */
@@ -2759,6 +2789,7 @@ window.Calc = {
   wholeRubricLevel,
   competencyLevelFromCriteria,
   tagScoresByAssessment,
+  tagMarksByAssessment,
   assessmentCourseWorth,
   assessmentGroupGrade,
   classAssessmentGroupGrade,
