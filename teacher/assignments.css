@@ -7830,3 +7830,242 @@ button.grader-member-name {
   font-weight: 600;
   color: var(--text-2);
 }
+
+/* ── Blank Rubric: the compact editor (rubric starts PR 5) ─────────
+   The Competency Rubric's grid with cells to type in. */
+.af-ge-name {
+  width: 320px;
+  max-width: 100%;
+  height: 34px;
+  font-weight: 700;
+}
+.af-ge-name.is-invalid {
+  border-color: var(--score-1);
+}
+.af-ge-style {
+  flex: none;
+}
+/* Menus and the picker reach past the card's edge, so it doesn't clip;
+   the head and footer keep its rounded corners. */
+.af-ge-card.af-rubric-card {
+  overflow: visible;
+}
+.af-ge-card > .af-rubric-card-head {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.af-ge-card > .af-tag-rubric-note {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
+.af-ge-body {
+  padding: 0 6px 8px;
+}
+.af-ge-grid {
+  margin: 0;
+}
+.af-ge-crit {
+  position: relative;
+  vertical-align: top;
+}
+.af-ge-crit-name {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px dashed #c7c7cc;
+  border-radius: 0;
+  padding: 2px 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: var(--text);
+}
+.af-ge-crit-name:focus {
+  outline: none;
+  border-bottom: 2px solid var(--active);
+}
+.af-ge-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.af-ge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 4px 0 8px;
+  border-radius: 4px;
+  background: #f2f2f4;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.af-ge-chip b {
+  color: #0e7490;
+}
+.af-ge-x {
+  border: 0;
+  background: none;
+  padding: 0 4px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.af-ge-x:hover {
+  color: var(--text);
+}
+.af-ge-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: var(--text-sm);
+}
+.af-ge-more {
+  border: 0;
+  background: none;
+  padding: 0 4px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.af-ge-more[aria-expanded='true'] {
+  color: var(--active);
+}
+.af-ge-menu,
+.af-ge-picker {
+  position: absolute;
+  z-index: 6;
+  left: 8px;
+  top: calc(100% - 6px);
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.1),
+    0 12px 28px rgba(0, 0, 0, 0.16);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--text);
+}
+.af-ge-menu {
+  width: 240px;
+}
+.af-ge-menu label,
+.af-ge-points label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.af-card .af-ge-menu .af-input {
+  width: 70px;
+  height: 30px;
+}
+.af-ge-points {
+  display: grid;
+  gap: 6px;
+}
+.af-ge-points > span {
+  font-weight: 600;
+  color: var(--text-2);
+}
+.af-ge-remove {
+  justify-self: start;
+  color: var(--score-1);
+}
+.af-ge-picker {
+  width: 320px;
+}
+.af-ge-foot {
+  position: relative;
+  display: flex;
+  gap: 16px;
+}
+.af-ge-foot .af-ge-picker {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+.af-ge-pick-list {
+  display: grid;
+  gap: 1px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.af-ge-pick {
+  display: flex;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.af-ge-pick:hover,
+.af-ge-pick:focus-visible {
+  background: var(--active-light);
+  outline: none;
+}
+.af-ge-pick b {
+  color: #0e7490;
+  min-width: 36px;
+}
+.af-ge-cell {
+  vertical-align: top;
+}
+.af-ge-text {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  resize: none;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: transparent;
+  box-shadow: inset 0 0 0 1px #e0e0e5;
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text);
+}
+.af-ge-text::placeholder {
+  color: var(--text-3);
+}
+.af-ge-text:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--active);
+}
+.af-ge-checks {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: var(--text-sm);
+}
+.af-ge-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.af-ge-check-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px dashed #c7c7cc;
+  background: transparent;
+  font: inherit;
+  color: var(--text);
+}
+.af-ge-check-input:focus {
+  outline: none;
+  border-bottom-color: var(--active);
+}
