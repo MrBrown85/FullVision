@@ -139,6 +139,8 @@ test.describe('who is offered DIBELS', () => {
       { assessment: ASSESSMENT, cid: TEST_COURSE.id },
     );
     await gotoApp(page, '/assignments');
+    // A closed card shows its buttons on hover.
+    await page.locator('#ac-assess-dibels .assess-header').first().hover();
     await page.locator('#ac-assess-dibels [data-action="editAssess"]').first().click();
     await expect(dibelsCard(page)).toHaveAttribute('aria-checked', 'true');
   });

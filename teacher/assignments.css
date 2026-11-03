@@ -15,6 +15,9 @@
     0 0 0 0.5px var(--divider-medium);
   margin-bottom: 12px;
   overflow: visible;
+  /* Scrolled to (from the Gradebook), the card stops just below the
+     toolbar. */
+  scroll-margin-top: 12px;
 }
 /* The header is a grid: grip | title, chips | actions | chevron. The
    actions stand beside both rows, centred on the card. */
@@ -54,6 +57,7 @@
 }
 .assess-title {
   grid-area: title;
+  justify-self: start;
   font-size: var(--text-lg);
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -100,6 +104,64 @@
 .assess-card.open .assess-header-actions,
 .assess-header-actions:focus-within {
   opacity: 1;
+}
+/* A closed card keeps no room for its hidden actions: they sit over the
+   right end of the header, beside the chevron, so the title and chips use
+   the full width and hovering moves nothing. */
+.assess-card:not(.open) .assess-header {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'grip title chevron'
+    'grip meta chevron';
+}
+.assess-card:not(.open) .assess-header-actions {
+  grid-area: auto;
+  position: absolute;
+  top: 50%;
+  right: 42px;
+  z-index: 1;
+  transform: translateY(-50%);
+  padding: 4px 0 4px 24px;
+  background: linear-gradient(to right, transparent, var(--surface) 20px);
+  /* Hidden, they take no clicks: a click there opens the card. */
+  pointer-events: none;
+}
+.assess-header:hover .assess-header-actions > *,
+.assess-header-actions:focus-within > * {
+  pointer-events: auto;
+}
+/* Grade By and Checklists change the open grader only, so a closed card
+   leaves them out. */
+.assess-card:not(.open) .assess-header-actions .rubric-view-toggle,
+.assess-card:not(.open) .assess-header-actions .rsg-checklist-mode-label,
+.assess-card:not(.open) .assess-header-actions .rsg-checklist-mode {
+  display: none;
+}
+/* A touch screen has no hover to show them: open the card for them. */
+@media (hover: none) {
+  .assess-card:not(.open) .assess-header-actions {
+    display: none;
+  }
+}
+/* A narrow window: a closed card shows no actions (open it for them), and an
+   open card gives them their own row under the chips. */
+@media (max-width: 900px) {
+  .assess-card:not(.open) .assess-header-actions {
+    display: none;
+  }
+}
+@media (max-width: 1200px) {
+  .assess-card.open .assess-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'grip title chevron'
+      'grip meta chevron'
+      'grip actions chevron';
+  }
+  .assess-card.open .assess-header-actions {
+    flex-wrap: wrap;
+    padding-top: 4px;
+  }
 }
 .assess-chevron {
   grid-area: chevron;
