@@ -1749,26 +1749,29 @@ window.ReportBlocks = (function () {
     CORE_COMPETENCIES.forEach(c => {
       compData[c.id] = { count: 0, totalScore: 0, scored: 0 };
     });
+    let hasAny = false;
     assessments.forEach(a => {
       const ccIds = a.coreCompetencyIds || [];
       if (ccIds.length === 0) return;
       if (!assessmentInActiveTerm(cid, a)) return;
+      if (ccIds.some(ccId => compData[ccId])) hasAny = true;
+      // Work in a 0% category counts toward nothing, as for competencies.
+      if (!countsTowardGrades(cid, a)) return;
       // The assessment's level as calc.js gives it: points as a share of 4
       // (18/20 is 3.6, not level 18), rubric criteria by weight, Excused left
-      // out, Missing no evidence. Each counts its Factor times.
+      // out, Missing no evidence. Each counts its Factor times, and only
+      // work with a level counts toward "Based on N assessments".
       const avg = getAssessmentOverallScore(cid, student.id, a.id) || 0;
+      if (!(avg > 0)) return;
       const factor = getAssessmentWeight(a);
       ccIds.forEach(ccId => {
         if (compData[ccId]) {
           compData[ccId].count++;
-          if (avg > 0) {
-            compData[ccId].totalScore += factor * avg;
-            compData[ccId].scored += factor;
-          }
+          compData[ccId].totalScore += factor * avg;
+          compData[ccId].scored += factor;
         }
       });
     });
-    const hasAny = Object.values(compData).some(d => d.count > 0);
     if (!hasAny) return '';
     // Group by competency group
     const groups = {};
