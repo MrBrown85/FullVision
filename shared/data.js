@@ -1671,6 +1671,49 @@ function _forgetServerState(cid) {
    only: after a reload the baseline comes from the server again. */
 var _baselineUndo = {}; // outbox entry id → { field, cid, match?, prev }
 
+/* A score write this page sent that the server rejected stays in the dead
+   letter, and the next page load sends it once more. If the teacher then
+   puts the cell back to what the server holds (a clear rejected, the same 17
+   typed again), the save sends nothing for it, and that retry would undo the
+   retyped score. A save that leaves such a cell as the server has it
+   dismisses the rejected write. */
+var _rejectedScoreWrites = {}; // dead-letter entry id → { cid, row: its payload }
+
+/* Every field a score write sets: the diff's fields and the Note for the
+   Report, which save_score_report_note sends on its own. */
+function _sameOnServer(a, b) {
+  return !_scoreEntryRemoteChanged(a, b) && (a.reportNote || '') === (b.reportNote || '');
+}
+
+function _dismissOverriddenScoreWrites(cid, baseline, next) {
+  var q = window.v2Queue;
+  if (!q || typeof q.dismissDeadLetter !== 'function') return;
+  Object.keys(_rejectedScoreWrites).forEach(function (id) {
+    var w = _rejectedScoreWrites[id];
+    if (w.cid !== cid) return;
+    var sid = w.row.p_enrollment_id;
+    var aid = w.row.p_assessment_id;
+    var cell = function (blob) {
+      var out = {};
+      ((blob && blob[sid]) || []).forEach(function (e) {
+        if (e && e.assessmentId === aid) out[_scoreEntryKey(sid, e)] = e;
+      });
+      return out;
+    };
+    var was = cell(baseline);
+    var now = cell(next);
+    var keys = Object.keys(was);
+    var same =
+      keys.length === Object.keys(now).length &&
+      keys.every(function (k) {
+        return now[k] && _sameOnServer(was[k], now[k]);
+      });
+    if (!same) return;
+    delete _rejectedScoreWrites[id];
+    q.dismissDeadLetter(id);
+  });
+}
+
 /* Which baseline row a write sets, from its RPC name and params. */
 function _baselineRowOf(name, params) {
   params = params || {};
@@ -2682,9 +2725,13 @@ function _onOutboxEvent(evt) {
     _onCreateLanded(meta.id, meta.data);
     if (meta.endpoint === 'import_json_restore') _onRestoreLanded(meta.payload, meta.data);
   } else if (evt.kind === 'flush:dead-letter') {
-    _revertBaselineRow(_baselineUndo[meta.id], meta.endpoint, meta.payload);
+    var undo = _baselineUndo[meta.id];
+    _revertBaselineRow(undo, meta.endpoint, meta.payload);
     delete _baselineUndo[meta.id];
+    if (undo && undo.field === 'scores') _rejectedScoreWrites[meta.id] = { cid: undo.cid, row: meta.payload };
     _onCreateAbandoned(meta.id, true, meta.error);
+  } else if (evt.kind === 'dead-letter:dismiss') {
+    delete _rejectedScoreWrites[meta.id];
   } else if (evt.kind === 'remove') {
     delete _baselineUndo[meta.id];
     _onCreateAbandoned(meta.id, false);
@@ -9718,7 +9765,9 @@ function saveScores(cid, obj, fillUndone) {
   var refused = false;
   if (_writesEnabled()) {
     var refusals = _writeRefusals;
-    persistScoreDiffToCanonical(cid, _migrateRubricScoreKeys(cid, _serverStateOr('scores', cid, prev)), obj || {});
+    var baseline = _migrateRubricScoreKeys(cid, _serverStateOr('scores', cid, prev));
+    persistScoreDiffToCanonical(cid, baseline, obj || {});
+    _dismissOverriddenScoreWrites(cid, baseline, obj || {});
     _rememberServerState('scores', cid, obj || {});
     // A refused write's cell goes back in the baseline (_onWriteRefused).
     refused = _writeRefusals !== refusals;
