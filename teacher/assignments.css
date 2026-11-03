@@ -539,6 +539,13 @@
   border-color: var(--active);
   box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
 }
+/* A field a stopped save points at stays red while focused: the global
+   focus ring (styles.css, !important) would otherwise hide it. */
+.af-input[aria-invalid='true'],
+.af-input[aria-invalid='true']:focus {
+  border-color: var(--score-1) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--score-1) 18%, transparent) !important;
+}
 .af-textarea {
   width: 100%;
   font-family: var(--font-base);
@@ -3963,6 +3970,10 @@
 }
 .af-category-hint[hidden] {
   display: none;
+}
+/* Red once a save has stopped at the field. */
+.af-input[aria-invalid='true'] + .af-category-hint {
+  color: var(--score-1);
 }
 .grader-needs-category {
   margin-top: 2px;

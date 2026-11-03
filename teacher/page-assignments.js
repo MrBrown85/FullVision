@@ -3219,6 +3219,8 @@ window.PageAssignments = (function () {
   function _formInput(e) {
     var t = e.target;
     if (!t || !t.id) return;
+    // A title clears the "Title is required" state as soon as it's typed.
+    if (t.id === 'af-title' && t.value.trim()) t.removeAttribute('aria-invalid');
     if (t.id === 'af-maxpoints') {
       t.style.border = '';
       t.removeAttribute('aria-invalid');
@@ -3444,6 +3446,8 @@ window.PageAssignments = (function () {
     _renderRubricView();
     var back = document.querySelector('.af-rubric-start[data-start="' + was + '"]');
     if (back) back.focus();
+    // Opened in the chosen rubric's place: back to Pick Another Rubric.
+    else _focusRubricCard(was === 'blank' ? 'editRubricFromForm' : 'chooseRubric');
   }
 
   function _chooseGroups(query) {
@@ -3624,6 +3628,15 @@ window.PageAssignments = (function () {
     }
   }
 
+  /* Focus a control on the rubric card when the control that had focus
+     was drawn away (Use This Rubric, Esc from Pick Another Rubric). */
+  function _focusRubricCard(action) {
+    var a = document.activeElement;
+    if (a && a !== document.body && document.body.contains(a)) return;
+    var el = document.querySelector('#af-rubric-view [data-action="' + action + '"]');
+    if (el) el.focus({ preventScroll: true });
+  }
+
   function _startPickRow(rid, focusRow) {
     if (_startOpen === 'copy') _copy.selected = rid;
     else _choose.selected = rid;
@@ -3641,10 +3654,12 @@ window.PageAssignments = (function () {
     var sel = document.getElementById('af-rubric');
     if (sel && sel.value === rid) {
       _renderRubricView();
+      _focusRubricCard('chooseRubric');
       return;
     }
     _useRubricInForm(rid);
     _renderRubricView();
+    _focusRubricCard('chooseRubric');
   }
   function _startPickNone() {
     _startOpen = null;
@@ -3719,15 +3734,20 @@ window.PageAssignments = (function () {
       // what the teacher wrote (Cancel does that).
       if (card.dataset.start === 'blank') {
         if (_blank && (_blank.picker || _blank.menu != null)) {
+          // Back to the button that opened it.
+          var back = _blank.picker
+            ? '[data-action="gePicker"][data-i="' + _blank.picker.i + '"]'
+            : '[data-action="geMenu"][data-i="' + _blank.menu + '"]';
           _blank.picker = null;
           _blank.menu = null;
-          _blankRender();
+          _blankRender(back);
         }
         return;
       }
       closeStart();
       return;
     }
+    if (card.dataset.start === 'blank' && e.target.closest('.af-ge-picker')) return _blankPickerKey(e);
     if (card.dataset.start !== 'choose' && card.dataset.start !== 'copy') return;
     var picked = card.dataset.start === 'copy' ? _copy.selected : _choose.selected;
     var rows = Array.from(card.querySelectorAll('.af-start-row'));
@@ -4084,7 +4104,8 @@ window.PageAssignments = (function () {
         (style === 'single_point'
           ? ''
           : '<div class="af-ge-points"><span>Points</span>' +
-            [4, 3, 2, 1]
+            // In the grid's order (Emerging first unless the class says otherwise).
+            levelOrderFor(cid)
               .map(function (lv) {
                 var v = c.levelValues && c.levelValues[lv] != null ? c.levelValues[lv] : lv;
                 return (
@@ -4220,6 +4241,60 @@ window.PageAssignments = (function () {
     return html || '<p class="af-start-empty">No competency matches.</p>';
   }
 
+  /* An open ··· menu or competency picker is scrolled clear of the form's
+     sticky footer, which would otherwise sit over its lower part. */
+  function _blankClearFooter() {
+    var pop = document.querySelector('.af-ge-card .af-ge-menu, .af-ge-card .af-ge-picker');
+    var foot = document.querySelector('#new-assess-form > .af-actions');
+    if (!pop || !foot) return;
+    var over = pop.getBoundingClientRect().bottom - (foot.getBoundingClientRect().top - 8);
+    if (over <= 0) return;
+    for (var el = pop.parentElement; el && el !== document.body; el = el.parentElement) {
+      var oy = getComputedStyle(el).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) {
+        el.scrollTop += over;
+        return;
+      }
+    }
+    window.scrollBy(0, over);
+  }
+  // A click outside an open ··· menu or picker closes it, as Esc does.
+  function _blankOutside(e) {
+    if (!_blank || (_blank.menu == null && !_blank.picker)) return;
+    var t = e.target;
+    if (!t || !t.closest) return;
+    if (t.closest('.af-ge-menu, .af-ge-picker, [data-action="geMenu"], [data-action="gePicker"]')) return;
+    _blank.menu = null;
+    _blank.picker = null;
+    document.querySelectorAll('.af-ge-card .af-ge-menu, .af-ge-card .af-ge-picker').forEach(function (el) {
+      el.remove();
+    });
+    document.querySelectorAll('.af-ge-card .af-ge-more[aria-expanded="true"]').forEach(function (b) {
+      b.setAttribute('aria-expanded', 'false');
+    });
+  }
+  /* In the competency picker: ↓ ↑ move between the search and the
+     matches, Enter in the search picks the first match. */
+  function _blankPickerKey(e) {
+    var picker = e.target.closest('.af-ge-picker');
+    var picks = Array.from(picker.querySelectorAll('.af-ge-pick'));
+    var search = picker.querySelector('#af-ge-pick-search');
+    var at = picks.indexOf(e.target);
+    if (e.key === 'Enter' && e.target === search) {
+      e.preventDefault();
+      if (picks[0]) _blankAct('gePick', picks[0]);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      var down = picks[Math.min(picks.length - 1, at + 1)];
+      if (down) down.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (at <= 0) {
+        if (search) search.focus();
+      } else picks[at - 1].focus();
+    }
+  }
+
   // Redraw the editor and put the cursor back where it was.
   function _blankRender(focusSel) {
     var a = document.activeElement;
@@ -4329,10 +4404,17 @@ window.PageAssignments = (function () {
     } else if (action === 'geMenu') {
       _blank.menu = _blank.menu === i ? null : i;
       _blank.picker = null;
+      // Open: the cursor goes to its Weight; closed: back to the ··· button.
+      _blankRender(
+        _blank.menu != null ? '[data-ge="weight"][data-i="' + i + '"]' : '[data-action="geMenu"][data-i="' + i + '"]',
+      );
+      _blankClearFooter();
+      return;
     } else if (action === 'gePicker') {
       _blank.picker = _blank.picker && _blank.picker.i === i ? null : { i: i, query: '' };
       _blank.menu = null;
       _blankRender(_blank.picker ? '#af-ge-pick-search' : null);
+      _blankClearFooter();
       return;
     } else if (action === 'geRemoveTag') {
       var c = d.criteria[i];
@@ -4492,6 +4574,7 @@ window.PageAssignments = (function () {
     if (!dd.querySelector('option[value="' + rid + '"]')) _refreshRubricOptions();
     dd.value = rid;
     onRubricSelect(rid);
+    _focusRubricCard('chooseRubric');
   }
 
   function cancelRubricPick() {
@@ -4685,6 +4768,7 @@ window.PageAssignments = (function () {
         }),
       };
       _holdFormRubric(held);
+      _focusRubricCard('editRubricFromForm');
     });
   }
 
@@ -5133,6 +5217,8 @@ window.PageAssignments = (function () {
       _refreshCountsToward();
       _syncCodes();
       _markFormStart();
+      var title = document.getElementById('af-title');
+      if (title) title.focus({ preventScroll: true });
     }
   }
   function hideNewForm() {
@@ -5364,7 +5450,7 @@ window.PageAssignments = (function () {
     var title = (titleEl ? titleEl.value : '').trim();
     if (!title) {
       if (titleEl) {
-        titleEl.style.border = '2px solid var(--score-1)';
+        titleEl.setAttribute('aria-invalid', 'true');
         titleEl.placeholder = 'Title is required';
         titleEl.focus();
       }
@@ -5629,7 +5715,7 @@ window.PageAssignments = (function () {
     var title = document.getElementById('af-title');
     if (!title) return;
     title.value = a.title || '';
-    title.style.border = '';
+    title.removeAttribute('aria-invalid');
     var mode = a.scoreMode || 'proficiency';
     if (!document.querySelector('.af-scoremode-btn[data-mode="' + mode + '"]')) mode = 'proficiency';
     setScoreMode(mode);
@@ -5752,7 +5838,7 @@ window.PageAssignments = (function () {
     var title = (titleEl ? titleEl.value : '').trim();
     if (!title) {
       if (titleEl) {
-        titleEl.style.border = '2px solid var(--score-1)';
+        titleEl.setAttribute('aria-invalid', 'true');
         titleEl.placeholder = 'Title is required';
         titleEl.focus();
       }
@@ -11889,6 +11975,7 @@ window.PageAssignments = (function () {
     _addDocListener('keydown', _startKeydown, true);
     _addDocListener('input', _startSearch);
     _addDocListener('input', _blankInput);
+    _addDocListener('pointerdown', _blankOutside, true);
     _addDocListener('mouseover', _afTipOver);
     _addDocListener('mouseout', _afTipOut);
     _addDocListener('focusin', _afTipFocus);
