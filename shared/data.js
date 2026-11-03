@@ -9727,24 +9727,44 @@ function saveScores(cid, obj) {
 
 /* Undo for a fill: put back only the cells it changed (`before` against
    `after`, both copies of the class's scores) that still hold what it
-   wrote. Anything scored since, on this work or any other, stays. */
+   wrote. Anything scored since, on this work or any other, stays.
+   A cell is compared by its score and +/− only: a refresh from the server
+   a few seconds after the fill rebuilds every entry with the server's id
+   and dates, and the cell still holds what the fill wrote. */
 function restoreScoreCells(cid, before, after) {
   var now = getScores(cid);
   var next = structuredClone(now);
   var was = _scoreEntriesByKey(before);
   var made = _scoreEntriesByKey(after);
   var cur = _scoreEntriesByKey(next);
+  var value = function (x) {
+    var s = x && x.entry.score;
+    return s == null || s === '' ? '' : String(Number(s)) + ':' + (x.entry.mod || 0);
+  };
   var same = function (x, y) {
-    return x && y ? JSON.stringify(x.entry) === JSON.stringify(y.entry) : !x && !y;
+    return value(x) === value(y);
   };
   Object.keys(Object.assign({}, was, made)).forEach(function (key) {
     if (same(was[key], made[key]) || !same(cur[key], made[key])) return;
     var sid = (was[key] || made[key]).sid;
     var list = next[sid] || (next[sid] = []);
     var at = cur[key] ? list.indexOf(cur[key].entry) : -1;
-    if (!was[key]) list.splice(at, 1);
-    else if (at >= 0) list[at] = structuredClone(was[key].entry);
-    else list.push(structuredClone(was[key].entry));
+    if (at < 0) {
+      if (was[key]) list.push(structuredClone(was[key].entry));
+      return;
+    }
+    var entry = list[at];
+    // Proficiency work the fill scored goes back to 0, unscored, as a click
+    // that clears a level leaves it. Removing the entries would trip
+    // saveScores' data-loss guard when the fill was most of the class's
+    // scores, and the Undo would be refused. On points and
+    // Complete/Incomplete work 0 is a score, so the entry goes.
+    if (!was[key] && isPointsScored(_assessmentById(cid, entry.assessmentId))) list.splice(at, 1);
+    else {
+      entry.score = was[key] ? was[key].entry.score : 0;
+      if (was[key] && was[key].entry.mod) entry.mod = was[key].entry.mod;
+      else delete entry.mod;
+    }
   });
   saveScores(cid, next);
   if (getScores(cid) === next) persistScoreDiffToCanonical(cid, now, next);
