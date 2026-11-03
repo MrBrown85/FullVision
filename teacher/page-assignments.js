@@ -6527,10 +6527,9 @@ window.PageAssignments = (function () {
         });
         render();
         refreshSidebarGrades();
+        var filled = structuredClone(getScores(cid));
         showUndoToast('Unmarked students set to Complete', function () {
-          var beforeScores = getScores(cid);
-          saveScores(cid, prevScores);
-          if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
+          restoreScoreCells(cid, prevScores, filled);
           render();
           refreshSidebarGrades();
         });
@@ -6648,10 +6647,9 @@ window.PageAssignments = (function () {
         });
         render();
         refreshSidebarGrades();
+        var filled = structuredClone(getScores(cid));
         showUndoToast('Unmarked students set to ' + label, function () {
-          var beforeScores = getScores(cid);
-          saveScores(cid, prevScores);
-          if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
+          restoreScoreCells(cid, prevScores, filled);
           render();
           refreshSidebarGrades();
         });
@@ -7071,10 +7069,9 @@ window.PageAssignments = (function () {
       _syncTagRows(aid, st.id);
     });
     refreshSidebarGrades();
+    var filled = structuredClone(getScores(cid));
     showUndoToast(toastMsg, function () {
-      var beforeScores = getScores(cid);
-      saveScores(cid, prevScores);
-      if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
+      restoreScoreCells(cid, prevScores, filled);
       render();
       refreshSidebarGrades();
     });
@@ -7173,10 +7170,9 @@ window.PageAssignments = (function () {
     });
     syncModRows('.rsg-criterion-row[data-assess="' + aid + '"]');
     refreshSidebarGrades();
+    var filled = structuredClone(getScores(cid));
     showUndoToast(toastMsg, function () {
-      var beforeScores = getScores(cid);
-      saveScores(cid, prevScores);
-      if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
+      restoreScoreCells(cid, prevScores, filled);
       render();
       refreshSidebarGrades();
     });
