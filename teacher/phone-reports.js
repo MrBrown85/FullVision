@@ -153,6 +153,8 @@ var PhoneReports = (function () {
     var overallV = getOverallProficiency(cid, st.id);
     // With the report's reporting basis: IE, or No Letter Grade for goals.
     var summary = studentGradeSummary(cid, st.id, ctx.termId);
+    // The comment as the report card prints it: no [date], no passed deadline.
+    var rating = getStudentTermRating(cid, st.id, ctx.termId) || {};
     var term = termNumber(ctx.termId);
     var data = {
       v: 1,
@@ -179,7 +181,7 @@ var PhoneReports = (function () {
           level: sp > 0 ? Math.round(sp) : 0,
         };
       }),
-      comment: _paragraphs((getStudentTermRating(cid, st.id, ctx.termId) || {}).narrative),
+      comment: _paragraphs(ReportBlocks.printableComment(cid, rating, rating.narrative)),
       goal: null,
       self: null,
       attendance: null,
