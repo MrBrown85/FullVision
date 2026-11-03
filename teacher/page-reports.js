@@ -691,27 +691,57 @@ window.PageReports = (function () {
         return;
       }
       viewingIssue = rec;
-      var shown = rec.students;
-      if (studioView !== 'all') {
-        var one = rec.students.find(function (st) {
-          return st.sid === previewSid;
-        });
-        shown = one ? [one] : rec.students.slice(0, 1);
-      }
-      // html-safe: an issued copy's HTML, saved at Issue from the sheet engine's own render (ReportSheets/GradeReport layoutStudent over ReportBlocks)
-      preview.innerHTML = shown
-        .map(function (st) {
-          return st.html;
-        })
-        .join('');
-      preview.classList.add('report-sheets-on');
-      preview.classList.toggle('report-fitmap', studioView === 'all');
-      preview.classList.toggle('studio-all', studioView === 'all');
-      preview.classList.toggle('report-photocopy', reportView === 'photocopy');
-      ReportSheets.setPageStyle(rec.paper || 'letter');
-      _applyStudioZoom(preview);
-      _syncPrintButton();
+      _paintIssue(rec, preview);
     });
+  }
+
+  /* A loaded copy on the canvas: every student in it in Everyone view, one
+     in One Student view. */
+  function _paintIssue(rec, preview) {
+    var shown = rec.students;
+    if (studioView !== 'all') {
+      var one = rec.students.find(function (st) {
+        return st.sid === previewSid;
+      });
+      shown = one ? [one] : rec.students.slice(0, 1);
+    }
+    // html-safe: an issued copy's HTML, saved at Issue from the sheet engine's own render (ReportSheets/GradeReport layoutStudent over ReportBlocks)
+    preview.innerHTML = shown
+      .map(function (st) {
+        return st.html;
+      })
+      .join('');
+    preview.classList.add('report-sheets-on');
+    preview.classList.toggle('report-fitmap', studioView === 'all');
+    preview.classList.toggle('studio-all', studioView === 'all');
+    preview.classList.toggle('report-photocopy', reportView === 'photocopy');
+    ReportSheets.setPageStyle(rec.paper || 'letter');
+    _applyStudioZoom(preview);
+    _syncPrintButton();
+  }
+
+  /* Print This Copy prints the whole copy, every student in it, whatever
+     the canvas shows: like _printNow, the canvas shows Everyone for the
+     print and goes back afterwards. */
+  function _printIssue() {
+    var rec = viewingIssue;
+    var preview = document.getElementById('rb-preview');
+    if (!rec || !preview) return;
+    var wasOne = studioView === 'one';
+    if (wasOne) {
+      studioView = 'all';
+      _paintIssue(rec, preview);
+    }
+    var restore = function () {
+      window.removeEventListener('afterprint', restore);
+      if (!wasOne) return;
+      wasOne = false;
+      studioView = 'one';
+      if (viewingIssue === rec) _paintIssue(rec, preview);
+    };
+    window.addEventListener('afterprint', restore);
+    window.print();
+    setTimeout(restore, 0);
   }
 
   function _syncPrintButton() {
@@ -1818,7 +1848,7 @@ window.PageReports = (function () {
       },
       printReports: function () {
         // A chosen copy prints as it is; the live reports save a copy, then print.
-        if (viewingIssue) window.print();
+        if (viewingIssue) _printIssue();
         else if (activeTab === 'progress') openIssueDialog();
         else _printNow();
       },
