@@ -7819,3 +7819,14 @@ button.grader-member-name {
     max-height: 360px;
   }
 }
+
+.af-copy-from {
+  display: grid;
+  gap: 4px;
+  flex: none;
+}
+.af-copy-from span {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
