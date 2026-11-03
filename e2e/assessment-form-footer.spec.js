@@ -26,8 +26,8 @@ test('the footer says what the work counts toward, as the form changes', async (
   await expect(line).toHaveText('Needs a category to count toward the grade.');
   await page.selectOption('#af-category', 'sci8-cat-labs');
   await expect(line).toContainText('No competency is chosen, so it counts toward no proficiency.');
-  await page.locator('.af-tag-cb[value="QP3"]').check();
-  await page.locator('.af-tag-cb[value="PA4"]').check();
+  await page.locator('.af-code[data-tag=\"QP3\"]').click();
+  await page.locator('.af-code[data-tag=\"PA4\"]').click();
   const term = await page.evaluate(() => {
     const d = document.getElementById('af-date-assigned').value;
     const t = getReportingTerms('sci8').find(x => d >= x.starts_on && d <= x.ends_on);

@@ -58,7 +58,7 @@ test('a new assessment saves its fields from the cards as before', async ({ page
   await openForm(page);
   await page.fill('#af-title', 'Card Layout Check');
   await page.selectOption('#af-category', 'sci8-cat-labs');
-  await page.locator('.af-tag-cb[value="QP3"]').check();
+  await page.locator('.af-code[data-tag=\"QP3\"]').click();
   await page.locator('.af-more-toggle').click();
   await page.fill('#af-desc', 'A short description.');
   await page.selectOption('#af-evidence', 'video');
