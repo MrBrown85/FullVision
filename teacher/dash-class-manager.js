@@ -5609,7 +5609,11 @@ window.DashClassManager = (function () {
       ' no category, so ' +
       (n === 1 ? 'it doesn\u2019t' : 'they don\u2019t') +
       ' count toward the letter grade. Move to</span>' +
+      // Nothing is chosen for the teacher (docs/DECISIONS.md, "A category on
+      // every assessment"). This row appears where Save Categories was, so a
+      // second click on Save would otherwise move the work to the first one.
       '<select class="cm-input" id="cm-cat-uncat-target" aria-label="Move to category">' +
+      '<option value="" selected>Choose a Category</option>' +
       _cmCategoryOptions(cid, null) +
       '</select>' +
       '<button class="btn btn-primary" data-action="cmCatAssignUncategorized">Move</button>' +
@@ -5686,8 +5690,12 @@ window.DashClassManager = (function () {
   function cmCatAssignUncategorized() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
-    var target = (document.getElementById('cm-cat-uncat-target') || {}).value;
-    if (!target) return;
+    var sel = document.getElementById('cm-cat-uncat-target');
+    var target = (sel || {}).value;
+    if (!target) {
+      if (sel && typeof sel.focus === 'function') sel.focus();
+      return;
+    }
     _cmMoveAssessments(cid, _cmUncategorizedAssessments(cid), target);
     renderClassManager();
   }
