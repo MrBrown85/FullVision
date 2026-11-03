@@ -6,6 +6,7 @@
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { parseHTML } from 'linkedom';
 
 const A = 'cls-sci8-a';
 const B = 'cls-sci8-b';
@@ -188,6 +189,39 @@ describe('grading setup copies across classes', () => {
     await GradingSetupCopy.applySetup(plan, { uncategorized: 1 });
     const tests = getCategories(C).find(c => c.name === 'Tests');
     expect(getAssessments(C)[0].categoryId).toBe(tests.id);
+  });
+
+  // Colin, 2026-11-03: "Make me choose". The select used to start on the
+  // first category, so one click on Copy put the work there.
+  it('waits for the teacher to choose where work with no category goes', async () => {
+    const stub = globalThis.document;
+    const doc = parseHTML('<!DOCTYPE html><html><body></body></html>').document;
+    globalThis.document = doc;
+    try {
+      let finished;
+      const done = new Promise(r => (finished = r));
+      GradingSetupCopy.review([GradingSetupCopy.planSetup(A, C, { categories: true })], finished);
+      const sel = doc.querySelector('[data-gsc-cat="uncategorized"]');
+      expect(sel.value).toBe('');
+      expect(sel.options[0].textContent).toBe('Choose a Category');
+
+      doc.querySelector('[data-copy-ok]').click();
+      // Still open, nothing copied or moved.
+      expect(doc.querySelector('.copy-dialog')).toBeTruthy();
+      expect(sel.getAttribute('aria-invalid')).toBe('true');
+      expect(getCategories(C)).toEqual([]);
+      expect(getAssessments(C)[0].categoryId).toBeUndefined();
+
+      // linkedom's select has no value setter; choose the option.
+      sel.options[0].removeAttribute('selected');
+      sel.querySelector('option[value="1"]').setAttribute('selected', '');
+      doc.querySelector('[data-copy-ok]').click();
+      await done;
+      const tests = getCategories(C).find(c => c.name === 'Tests');
+      expect(getAssessments(C)[0].categoryId).toBe(tests.id);
+    } finally {
+      globalThis.document = stub;
+    }
   });
 
   it('finds nothing to change once the classes match', async () => {

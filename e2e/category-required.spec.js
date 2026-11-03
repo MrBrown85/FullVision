@@ -158,3 +158,58 @@ test.describe('A category on every assessment', () => {
     await expect(page.locator('.type-badge-needs')).toHaveCount(0);
   });
 });
+
+// Sweep Nov 3: once categories were saved, the row offering to move work
+// with no category took Save Categories' place with the first category
+// already chosen, so a second click on Save moved older work into it
+// without a word. Demo Mode, Science 8, with its categories cleared.
+test('adding categories leaves older work with no category until the teacher picks one', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => {
+    saveCategories('sci8', []);
+    saveAssessments(
+      'sci8',
+      getAssessments('sci8').map(a => {
+        const b = { ...a };
+        delete b.categoryId;
+        delete b.category_id;
+        return b;
+      }),
+    );
+  });
+  await page.locator('button', { hasText: 'Class Management' }).first().click();
+  await page
+    .locator('button', { hasText: /^Grading/ })
+    .first()
+    .click();
+  for (const [name, weight] of [
+    ['Assignments', 50],
+    ['Quizzes', 30],
+    ['Projects', 20],
+  ]) {
+    await page.locator('[data-action="cmCatAdd"]').click();
+    await page.locator('.cm-cat-name').last().fill(name);
+    await page.locator('.cm-cat-weight').last().fill(String(weight));
+  }
+  const save = page.locator('[data-action="cmCatSave"]');
+  const at = await save.boundingBox();
+  await save.click();
+  const target = page.locator('#cm-cat-uncat-target');
+  await expect(target).toHaveValue('');
+  await expect(target.locator('option').first()).toHaveText('Choose a Category');
+
+  const uncategorized = () => page.evaluate(() => getAssessments('sci8').filter(a => !a.categoryId).length);
+  const before = await uncategorized();
+  expect(before).toBeGreaterThan(0);
+  // A second click where Save was lands on Move, which now waits for a choice.
+  await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+  expect(await uncategorized()).toBe(before);
+  await expect(target).toBeFocused();
+
+  await target.selectOption({ label: 'Quizzes' });
+  await page.locator('[data-action="cmCatAssignUncategorized"]').click();
+  expect(await uncategorized()).toBe(0);
+});

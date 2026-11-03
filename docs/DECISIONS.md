@@ -138,7 +138,7 @@ Colin chose option A on Kanban card t4. Microsoft Teams Assignments requires a c
 1. **In a class with at least one category, scored work can't be saved without one** (`categoryRequired`, `shared/data.js`). The assignment form (create and edit) opens on "Choose a Category" when the work has none and says why under the field; Save stops there. Copying to other classes (the form's Classes field and Add From Another Class) asks the same way when the other class has no category of the same name, and Add waits for a choice. Nothing is chosen for the teacher.
 2. **DIBELS work needs no category:** it counts toward no grade.
 3. **A class with no categories is unchanged.** Its only choice is No Category.
-4. **Work saved before the rule is marked "Needs a Category"** (`assessmentNeedsCategory`) on its assignment card, its gradebook header (Scores and Competencies) and in the grader, so the teacher can fix it. How it counts is unchanged.
+4. **Work saved before the rule is marked "Needs a Category"** (`assessmentNeedsCategory`) on its assignment card, its gradebook header (Scores and Competencies) and in the grader, so the teacher can fix it. How it counts is unchanged. Class Management's "Move to" row for this work starts on "Choose a Category" and moves nothing until the teacher picks one (2026-11-03), as Copy Grading Setup does ("Copying a class's grading setup" 3).
 5. The phone can't create or edit assignments, so it has nothing to require.
 
 ## New class defaults (2026-10-25)
@@ -215,7 +215,7 @@ Context: a teacher asked for Teams' "Import settings": set up grading once and u
 
 1. **One dialog, two directions.** "Copy grading setup…" in Class Management copies this class's setup to other classes (several at once, same course first) or imports it from one. "Copy from another class" beside the categories opens the same dialog with only categories ticked.
 2. **What copies:** grading system, categories and weights, calculation method (with decay weight), course % rounding and late work policy, each its own checkbox, all ticked. Reporting terms are listed unticked: dates belong to one school year, as with Duplicate Class.
-3. **Categories match by name** (case and spacing ignored). A matched category keeps its id, so its assessments stay in it, and takes the source's name, weight and order. Unmatched source categories are added. A target category the source lacks is removed; if it has assessments the teacher picks where they move first (defaulting to a category sharing its first word). Work with no category is offered a category too, or can be left.
+3. **Categories match by name** (case and spacing ignored). A matched category keeps its id, so its assessments stay in it, and takes the source's name, weight and order. Unmatched source categories are added. A target category the source lacks is removed; if it has assessments the teacher picks where they move first (defaulting to a category sharing its first word). Work with no category is offered a category too, or can be left: its select starts on "Choose a Category" and Copy waits until the teacher picks a category or "Leave them with no category" (Colin, 2026-11-03: "Make me choose").
 4. **A source with no categories never clears the target's.** The option is greyed out.
 5. **A review step lists every change per class** before anything is saved, and what is already the same. Unsaved category or term edits in Class Management block the dialog until saved or undone.
 6. **Copies are not linked** and scores are never touched. Grades in the target classes follow the new setup.
@@ -424,6 +424,16 @@ Context: Colin asked for a class grading spreadsheet that prints like MasterGrad
 1. **One comment on a piece of work: the Overall Comment** (Colin, 2026-11-01, on seeing a comment field and an Observations button on each points row: "why are there two places to enter feedback for one assignment?"; "the comment that goes at the bottom of the assignment is the overall comment"). The Overall Comment (`score.comment`) is the feedback on the work. It is the one feedback box in every grading view (whole-class grid, one-student tiles, grader dialog, points and Complete/Incomplete rows), saves before or after any level, and is what prints at the bottom of the rubric handout and under the assignment on the Quick Report. Per-criterion rubric comments stay.
 2. **Observations are a separate record.** A teacher's observation log; an observation may be linked to an assignment, but it is not the comment on the work. The Assignments Comment button and the grader dialog's Overall Feedback list, which wrote and showed only observations, leave the grading views; observations are added from the Observations page. The report's Observations card is unchanged.
 3. **Nothing printed changes.** The observations that had been printing as feedback on work (45 on 2026-11-01) are copied into the empty Overall Comments of that work by `migrations/20261101_observations_to_overall_comment.sql`; the observations themselves stay. Printing reads the Overall Comment and, until the migration has run, falls back to the linked observations when it is empty; the fallback is removed after.
+
+## Set Everyone To (2026-11-03)
+
+Context: the Nov 3 bug sweep found Set Everyone To overwrote scores already entered with no warning, and its Undo didn't always put them back. Colin: "should only set unscored and ignore those who are scored and should have an easy undo", then "and maybe an 'are you sure' before it takes effect".
+
+1. **It sets only cells with no score yet.** A score already entered is never replaced. On a rubric each criterion is its own cell: a student with one criterion scored gets the rest set. Students marked Missing or Excused are left out. Late students are set like anyone (Colin, 2026-11-03: "Fill Late students").
+2. **It asks first, with the count.** The dialog says how many it will set and that scored ones stay ("Set 13 criteria with no score yet, for 7 students, to Proficient? Criteria already scored stay as they are."), and how many Missing or Excused students are left out; the button names the count ("Set 13 Criteria"). This is an exception to the Undo-toast-over-confirm-box preference, at Colin's request.
+3. **An easy Undo.** The toast names what was set ("13 criteria set to Proficient") and has Undo; while it is up, Cmd+Z (Ctrl+Z) does the same. Undo puts back exactly the cells the fill set, and a cell scored again since keeps its new score.
+
+The row fills and Set Unmarked to Complete / points keep their own rules.
 
 ## Gradebook sweep (2026-11-01)
 

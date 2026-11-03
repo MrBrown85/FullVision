@@ -1671,6 +1671,49 @@ function _forgetServerState(cid) {
    only: after a reload the baseline comes from the server again. */
 var _baselineUndo = {}; // outbox entry id → { field, cid, match?, prev }
 
+/* A score write this page sent that the server rejected stays in the dead
+   letter, and the next page load sends it once more. If the teacher then
+   puts the cell back to what the server holds (a clear rejected, the same 17
+   typed again), the save sends nothing for it, and that retry would undo the
+   retyped score. A save that leaves such a cell as the server has it
+   dismisses the rejected write. */
+var _rejectedScoreWrites = {}; // dead-letter entry id → { cid, row: its payload }
+
+/* Every field a score write sets: the diff's fields and the Note for the
+   Report, which save_score_report_note sends on its own. */
+function _sameOnServer(a, b) {
+  return !_scoreEntryRemoteChanged(a, b) && (a.reportNote || '') === (b.reportNote || '');
+}
+
+function _dismissOverriddenScoreWrites(cid, baseline, next) {
+  var q = window.v2Queue;
+  if (!q || typeof q.dismissDeadLetter !== 'function') return;
+  Object.keys(_rejectedScoreWrites).forEach(function (id) {
+    var w = _rejectedScoreWrites[id];
+    if (w.cid !== cid) return;
+    var sid = w.row.p_enrollment_id;
+    var aid = w.row.p_assessment_id;
+    var cell = function (blob) {
+      var out = {};
+      ((blob && blob[sid]) || []).forEach(function (e) {
+        if (e && e.assessmentId === aid) out[_scoreEntryKey(sid, e)] = e;
+      });
+      return out;
+    };
+    var was = cell(baseline);
+    var now = cell(next);
+    var keys = Object.keys(was);
+    var same =
+      keys.length === Object.keys(now).length &&
+      keys.every(function (k) {
+        return now[k] && _sameOnServer(was[k], now[k]);
+      });
+    if (!same) return;
+    delete _rejectedScoreWrites[id];
+    q.dismissDeadLetter(id);
+  });
+}
+
 /* A Missing, Excused or Late mark this page sent that the server rejected
    stays in the dead letter, and the next page load sends it once more. If
    the teacher then puts the cell back to what the server holds (Missing
@@ -2706,9 +2749,11 @@ function _onOutboxEvent(evt) {
     var undo = _baselineUndo[meta.id];
     _revertBaselineRow(undo, meta.endpoint, meta.payload);
     delete _baselineUndo[meta.id];
+    if (undo && undo.field === 'scores') _rejectedScoreWrites[meta.id] = { cid: undo.cid, row: meta.payload };
     if (undo && undo.field === 'statuses') _rejectedStatusWrites[meta.id] = { cid: undo.cid, row: meta.payload };
     _onCreateAbandoned(meta.id, true, meta.error);
   } else if (evt.kind === 'dead-letter:dismiss') {
+    delete _rejectedScoreWrites[meta.id];
     delete _rejectedStatusWrites[meta.id];
   } else if (evt.kind === 'remove') {
     delete _baselineUndo[meta.id];
@@ -9695,7 +9740,9 @@ function getScores(cid) {
     return {};
   }
 }
-function saveScores(cid, obj) {
+// fillUndone: how many entries restoreScoreCells took out because the fill
+// it undoes added them. Only those may take the entry count past the guard.
+function saveScores(cid, obj, fillUndone) {
   _applyIdRekeysToScores(cid, obj);
   // The baseline is read in the same key space as the scores, or a copy
   // saved with rubric scores under competencies would make every criterion
@@ -9727,7 +9774,7 @@ function saveScores(cid, obj) {
     newEntries = 0;
   if (prev) for (var _ps in prev) prevEntries += (prev[_ps] || []).length;
   if (obj) for (var _ns in obj) newEntries += (obj[_ns] || []).length;
-  if (prevEntries > 10 && newEntries < prevEntries * 0.3) {
+  if (prevEntries > 10 && newEntries + (fillUndone || 0) < prevEntries * 0.3) {
     console.error(
       '[GUARD] BLOCKED scores save — entry-count dropped from',
       prevEntries,
@@ -9743,7 +9790,9 @@ function saveScores(cid, obj) {
   var refused = false;
   if (_writesEnabled()) {
     var refusals = _writeRefusals;
-    persistScoreDiffToCanonical(cid, _migrateRubricScoreKeys(cid, _serverStateOr('scores', cid, prev)), obj || {});
+    var baseline = _migrateRubricScoreKeys(cid, _serverStateOr('scores', cid, prev));
+    persistScoreDiffToCanonical(cid, baseline, obj || {});
+    _dismissOverriddenScoreWrites(cid, baseline, obj || {});
     _rememberServerState('scores', cid, obj || {});
     // A refused write's cell goes back in the baseline (_onWriteRefused).
     refused = _writeRefusals !== refusals;
@@ -9754,26 +9803,49 @@ function saveScores(cid, obj) {
 
 /* Undo for a fill: put back only the cells it changed (`before` against
    `after`, both copies of the class's scores) that still hold what it
-   wrote. Anything scored since, on this work or any other, stays. */
+   wrote. Anything scored since, on this work or any other, stays.
+   A cell is compared by its score and +/− only: a refresh from the server
+   a few seconds after the fill rebuilds every entry with the server's id
+   and dates, and the cell still holds what the fill wrote. A proficiency 0
+   and no entry are the same unscored cell (the server deletes a 0). */
 function restoreScoreCells(cid, before, after) {
   var now = getScores(cid);
   var next = structuredClone(now);
   var was = _scoreEntriesByKey(before);
   var made = _scoreEntriesByKey(after);
   var cur = _scoreEntriesByKey(next);
+  var value = function (x) {
+    if (!x || !isScoreEntered(_assessmentById(cid, x.entry.assessmentId), x.entry)) return '';
+    return String(Number(x.entry.score)) + ':' + (x.entry.mod || 0);
+  };
+  var removed = 0;
   var same = function (x, y) {
-    return x && y ? JSON.stringify(x.entry) === JSON.stringify(y.entry) : !x && !y;
+    return value(x) === value(y);
   };
   Object.keys(Object.assign({}, was, made)).forEach(function (key) {
     if (same(was[key], made[key]) || !same(cur[key], made[key])) return;
     var sid = (was[key] || made[key]).sid;
     var list = next[sid] || (next[sid] = []);
     var at = cur[key] ? list.indexOf(cur[key].entry) : -1;
-    if (!was[key]) list.splice(at, 1);
-    else if (at >= 0) list[at] = structuredClone(was[key].entry);
-    else list.push(structuredClone(was[key].entry));
+    if (at < 0) {
+      if (was[key]) list.push(structuredClone(was[key].entry));
+      return;
+    }
+    var entry = list[at];
+    // Proficiency work the fill scored goes back to 0, unscored, as a click
+    // that clears a level leaves it. On points and Complete/Incomplete work
+    // 0 is a score, so an entry the fill added goes, and saveScores is told
+    // how many so its data-loss guard allows that drop and no more.
+    if (!was[key] && isPointsScored(_assessmentById(cid, entry.assessmentId))) {
+      list.splice(at, 1);
+      removed++;
+    } else {
+      entry.score = was[key] ? was[key].entry.score : 0;
+      if (was[key] && was[key].entry.mod) entry.mod = was[key].entry.mod;
+      else delete entry.mod;
+    }
   });
-  saveScores(cid, next);
+  saveScores(cid, next, removed);
   if (getScores(cid) === next) persistScoreDiffToCanonical(cid, now, next);
 }
 

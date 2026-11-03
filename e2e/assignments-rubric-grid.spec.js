@@ -97,7 +97,11 @@ test('Undo on Set Everyone To puts back only the fill', async ({ page }) => {
   await hyp.locator('.rsg-level.l2').click();
   await card.locator('[data-action="confirmFillRubricAll"][data-score="4"]').click();
   await page.locator('#confirm-ok-btn').click();
-  await expect(hyp.locator('.rsg-level.l4')).toHaveClass(/active/);
+  // Alice's scored criterion is left alone; her other one is set.
+  await expect(hyp.locator('.rsg-level.l2')).toHaveClass(/active/);
+  await expect(
+    card.locator('.rsg-student[data-status-student="stu-001"] [data-criterion="crit-data"] .rsg-level.l4'),
+  ).toHaveClass(/active/);
   // While the toast is up, a score goes in on other work.
   await page.evaluate(c => upsertScore(c, 'stu-001', 'assess-quiz', 'QAP', 3, '2026-03-21', 'summative'), cid);
   await page.locator('#undo-toast [data-action="executeUndo"]').click();
@@ -105,11 +109,69 @@ test('Undo on Set Everyone To puts back only the fill', async ({ page }) => {
     page.evaluate(
       ([c, a, t]) => {
         const e = (getScores(c)['stu-001'] || []).find(x => x.assessmentId === a && x.tagId === t);
-        return e ? e.score : null;
+        // 0 is unscored on proficiency work.
+        return e && e.score ? e.score : null;
       },
       [cid, aid, tid],
     );
   expect(await level('assess-grid', 'crit-hyp')).toBe(2);
   expect(await level('assess-grid', 'crit-data')).toBe(null);
   expect(await level('assess-quiz', 'QAP')).toBe(3);
+});
+
+test('Set Everyone To sets only unscored criteria, skips Missing, and Cmd+Z undoes it', async ({ page }) => {
+  await mockAuth(page);
+  await seedCourse(page);
+  await seedStudents(page);
+  await page.addInitScript(
+    ({ rubric, assessment, cid }) => {
+      localStorage.setItem('gb-rubrics-' + cid, JSON.stringify([rubric]));
+      localStorage.setItem('gb-assessments-' + cid, JSON.stringify([assessment]));
+      localStorage.setItem('gb-statuses-' + cid, JSON.stringify({ 'stu-002:assess-grid': 'NS' }));
+    },
+    { rubric: RUBRIC, assessment: ASSESSMENT, cid: TEST_COURSE.id },
+  );
+  await gotoApp(page, '/assignments');
+  const card = page.locator('#ac-assess-grid');
+  if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
+  const cid = TEST_COURSE.id;
+  const row = (sid, crit) =>
+    card.locator('.rsg-student[data-status-student="' + sid + '"] .rsg-criterion-row[data-criterion="' + crit + '"]');
+  const level = (sid, tid) =>
+    page.evaluate(
+      ([c, s, t]) => {
+        const e = (getScores(c)[s] || []).find(x => x.assessmentId === 'assess-grid' && x.tagId === t);
+        return e && e.score ? e.score : null;
+      },
+      [cid, sid, tid],
+    );
+  // Alice has Developing on Hypothesis; Bob is Missing; Carol has nothing.
+  await row('stu-001', 'crit-hyp').locator('.rsg-level.l2').click();
+
+  await card.locator('[data-action="confirmFillRubricAll"][data-score="4"]').click();
+  await expect(page.locator('#confirm-title')).toHaveText('Set Everyone To Extending');
+  await expect(page.locator('.confirm-message')).toHaveText(
+    'Set 3 criteria with no score yet, for 2 students, to Extending? Criteria already scored stay as they are. 1 student is marked Missing or Excused and left out.',
+  );
+  await expect(page.locator('#confirm-ok-btn')).toHaveText('Set 3 Criteria');
+  await page.locator('#confirm-ok-btn').click();
+  await expect(page.locator('#undo-toast')).toContainText('3 criteria set to Extending');
+
+  expect(await level('stu-001', 'crit-hyp')).toBe(2);
+  expect(await level('stu-001', 'crit-data')).toBe(4);
+  expect(await level('stu-003', 'crit-hyp')).toBe(4);
+  expect(await level('stu-003', 'crit-data')).toBe(4);
+  // Bob stays Missing with no level, in the data and on screen.
+  expect(await level('stu-002', 'crit-hyp')).toBe(null);
+  expect(await level('stu-002', 'crit-data')).toBe(null);
+  await expect(card.locator('.rsg-student[data-status-student="stu-002"] .rsg-level.active')).toHaveCount(0);
+  await expect(row('stu-001', 'crit-hyp').locator('.rsg-level.l2')).toHaveClass(/active/);
+
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect(page.locator('#undo-toast')).toHaveCount(0);
+  expect(await level('stu-001', 'crit-hyp')).toBe(2);
+  expect(await level('stu-001', 'crit-data')).toBe(null);
+  expect(await level('stu-003', 'crit-hyp')).toBe(null);
+  expect(await level('stu-003', 'crit-data')).toBe(null);
 });
