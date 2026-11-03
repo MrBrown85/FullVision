@@ -2106,13 +2106,26 @@ window.PageAssignments = (function () {
     var maxPoints = assess ? assess.maxPoints || 100 : 100;
     var weight = getAssessmentWeight(assess);
 
+    // Students with a score or feedback here: editing the scoring or rubric
+    // of scored work asks first (redesign PR 9).
+    var scoredCount = isEdit ? _scoredStudentCount(cid, assess.id) : 0;
     var html = '';
 
     // The form's heading, inside its blue ring (kept, Colin, 2026-11-02).
     html +=
       '<div class="af-heading"><h3 class="af-heading-title">' +
       (isEdit ? 'Edit Assessment' : 'New Assessment') +
-      '</h3></div>';
+      '</h3>' +
+      (scoredCount
+        ? '<span class="af-heading-note">' +
+          esc(
+            scoredCount +
+              (scoredCount === 1 ? ' student scored.' : ' students scored.') +
+              ' Changing the scoring or the rubric asks first.',
+          ) +
+          '</span>'
+        : '') +
+      '</div>';
 
     // What it is: title, classes, category, module and dates.
     html += '<section class="af-card af-card-what">';
@@ -2901,6 +2914,14 @@ window.PageAssignments = (function () {
   function _useRubricInForm(rid) {
     var dd = document.getElementById('af-rubric');
     if (!dd) return;
+    if ((dd.value || '') !== (rid || '') && !_scoredChangeConfirmed) {
+      _askBeforeScoredChange('rubric', function () {
+        _scoredChangeConfirmed = true;
+        _useRubricInForm(rid);
+        _scoredChangeConfirmed = false;
+      });
+      return;
+    }
     if (!rid) {
       dd.value = '';
       onRubricSelect('');
@@ -2971,6 +2992,35 @@ window.PageAssignments = (function () {
             editRubricCopyForForm(rubric.id);
           },
         },
+      ],
+    );
+  }
+
+  /* Editing scored work (redesign PR 9): changing its scoring or its rubric
+     asks first and names how many students it touches. Scores are kept
+     under the rubric's criteria and the scoring they were given in. */
+  var _scoredChangeConfirmed = false;
+  function _askBeforeScoredChange(what, go, nextMode) {
+    var aid = _editingAssessId;
+    var scored = aid ? _scoredStudentCount(activeCourse, aid) : 0;
+    var current = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    if (!scored || (what === 'scoring' && nextMode === current)) return go();
+    var title = ((document.getElementById('af-title') || {}).value || '').trim() || 'This assessment';
+    var who = scored + (scored === 1 ? ' student' : ' students');
+    _formDialog(
+      what === 'scoring' ? 'Change the Scoring?' : 'Change the Rubric?',
+      what === 'scoring'
+        ? title +
+            ' has scores for ' +
+            who +
+            '. They were given in the current scoring and count differently once you save a new one.'
+        : title +
+            ' has scores for ' +
+            who +
+            ' on its current rubric\u2019s criteria. A different rubric starts unscored.',
+      [
+        { label: 'Cancel', style: 'cancel' },
+        { label: what === 'scoring' ? 'Change the Scoring' : 'Change the Rubric', style: 'danger', run: go },
       ],
     );
   }
@@ -7901,7 +7951,13 @@ window.PageAssignments = (function () {
         setCollaboration(el.dataset.collab);
       },
       setScoreMode: function () {
-        setScoreMode(el.dataset.mode);
+        _askBeforeScoredChange(
+          'scoring',
+          function () {
+            setScoreMode(el.dataset.mode);
+          },
+          el.dataset.mode,
+        );
       },
       toggleCategoryFilter: function () {
         toggleCategoryFilter(el.dataset.catid);
