@@ -7630,6 +7630,15 @@ function canSetAssignmentStatus(cid, sid, aid, status) {
   if (isLinkedGroupMember(cid, aid, sid)) return true;
   return !hasScoreOrFeedback(cid, sid, aid);
 }
+/* The other half of the rule: Missing or Excused work takes no score. A
+   level, points or a Complete/Incomplete mark on it is refused by the score
+   writers (upsertScore, setPointsScore, setCompletionMark), so a key, a
+   typed number and a click all obey it; clearing a score always works.
+   Taking the status off is how the work is scored. */
+function isScoreLocked(cid, sid, aid) {
+  var status = getAssignmentStatus(cid, sid, aid);
+  return status === 'NS' || status === 'EXC';
+}
 function setAssignmentStatus(cid, sid, aid, status) {
   if (!canSetAssignmentStatus(cid, sid, aid, status)) return false;
   const st = getAssignmentStatuses(cid);
@@ -10026,13 +10035,17 @@ function _groupWrite(cid, sid, aid, write, args) {
   if (prior != null) _syncGroupFrom(cid, aid, sid, prior);
   return out;
 }
+// Missing and Excused work takes no score (isScoreLocked): refused (false).
 function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
+  if (isScoreLocked(cid, sid, aid) && isScoreEntered(_assessmentById(cid, aid), { score: scoreVal })) return false;
   return _groupWrite(cid, sid, aid, _upsertScoreOne, arguments);
 }
 function setPointsScore(cid, sid, aid, rawScore) {
+  if (isScoreLocked(cid, sid, aid) && rawScore != null && rawScore !== '') return false;
   return _groupWrite(cid, sid, aid, _setPointsScoreOne, arguments);
 }
 function setCompletionMark(cid, sid, aid, mark) {
+  if (isScoreLocked(cid, sid, aid) && mark) return false;
   return _groupWrite(cid, sid, aid, _setCompletionMarkOne, arguments);
 }
 function saveScoreComment(cid, sid, aid, text) {
@@ -13077,6 +13090,7 @@ window.GB = {
   setAssignmentStatus,
   hasScoreOrFeedback,
   canSetAssignmentStatus,
+  isScoreLocked,
   applyAssignmentStatus,
   getRubrics,
   saveRubrics,

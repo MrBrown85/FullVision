@@ -6500,6 +6500,8 @@ window.PageAssignments = (function () {
     var aid = el.dataset.aid;
     var sid = el.dataset.sid;
     var next = getCompletionMark(cid, sid, aid) === el.dataset.mark ? null : el.dataset.mark;
+    // Missing and Excused work takes no mark (isScoreLocked); C and I reach here by key.
+    if (next && isScoreLocked(cid, sid, aid)) return;
     setCompletionMark(cid, sid, aid, next);
     var cell = el.closest('.cmp-cell');
     var grid = el.closest('.ldg-grid');
@@ -7094,6 +7096,8 @@ window.PageAssignments = (function () {
     if (!crit) return;
     var wasActive = el.classList.contains('active');
     var next = wasActive ? 0 : value;
+    // Missing and Excused work takes no level (isScoreLocked); 1–4 reach here by key.
+    if (next && isScoreLocked(activeCourse, sid, aid)) return;
     rubricCriterionScoreKeys(crit).forEach(function (tagId) {
       setScore(activeCourse, sid, aid, tagId, next);
     });

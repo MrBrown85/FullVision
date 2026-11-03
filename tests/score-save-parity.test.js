@@ -10,6 +10,7 @@ const CID = 'test';
 beforeEach(() => {
   _cache.scores[CID] = undefined;
   _cache.assessments[CID] = undefined;
+  _cache.statuses[CID] = undefined;
   localStorage.clear();
 });
 
