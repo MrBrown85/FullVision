@@ -557,6 +557,18 @@ window.MGrade = (function () {
     });
   }
 
+  // Which card a student is graded on: their own, or their group's.
+  function studentCardIndex(cid, aid, sid) {
+    var a = (getAssessments(cid) || []).find(function (x) {
+      return x.id === aid;
+    });
+    if (!a) return -1;
+    return _swiperUnits(cid, a).findIndex(function (u) {
+      if (u.view) return u.view.members.indexOf(sid) !== -1 && !isGradedSeparately(a, sid);
+      return u.st.id === sid;
+    });
+  }
+
   // "3 of 27"; on group work the card's name first: "Group 2 · 2 of 9".
   function _subtitleText(idx, total) {
     var label = _swiperLabels && _swiperLabels[idx];
@@ -1912,6 +1924,7 @@ window.MGrade = (function () {
     undoLastScore: undoLastScore,
     setupSwiper: setupSwiper,
     jumpToStudent: jumpToStudent,
+    studentCardIndex: studentCardIndex,
     openMemberSheet: openMemberSheet,
     gradeSeparately: gradeSeparately,
     confirmBackToGroup: confirmBackToGroup,

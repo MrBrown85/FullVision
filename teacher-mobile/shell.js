@@ -828,9 +828,8 @@
         if (!newest) return;
         _gradeReturnSid = gradeSid;
         _pushScreen(MGrade.renderSwiper(_cid, newest.id), { kind: 'swiper', aid: newest.id });
-        var gradeIdx = sortStudents(getStudents(_cid).slice(), 'alpha').findIndex(function (st) {
-          return st.id === gradeSid;
-        });
+        // On group work the student's group card.
+        var gradeIdx = MGrade.studentCardIndex(_cid, newest.id, gradeSid);
         MGrade.setupSwiper(_cid, newest.id);
         if (gradeIdx > 0) MGrade.jumpToStudent(gradeIdx, true);
         return;

@@ -978,3 +978,33 @@ describe('Multiple undo operations', () => {
     expect(remaining).toHaveLength(0);
   });
 });
+
+/* ── studentCardIndex (Grade on a student page) ─────────────── */
+describe('MGrade.studentCardIndex', () => {
+  const groupWork = {
+    id: 'a1',
+    title: 'Science Fair Proposal',
+    date: '2025-03-20',
+    tagIds: ['t1'],
+    collaboration: 'group',
+    groups: [['stu2', 'stu3']],
+  };
+
+  it('is the roster place on individual work', () => {
+    mockDataLayer({});
+    expect(MGrade.studentCardIndex(CID, 'a1', 'stu2')).toBe(1);
+  });
+
+  it("is the student's group card on group work, and their own card after the groups when in none", () => {
+    mockDataLayer({ getAssessments: () => [groupWork] });
+    // Cards: the group (stu2, stu3), then stu1, who is in no group.
+    expect(MGrade.studentCardIndex(CID, 'a1', 'stu3')).toBe(0);
+    expect(MGrade.studentCardIndex(CID, 'a1', 'stu2')).toBe(0);
+    expect(MGrade.studentCardIndex(CID, 'a1', 'stu1')).toBe(1);
+  });
+
+  it('is the own card of a member graded separately', () => {
+    mockDataLayer({ getAssessments: () => [{ ...groupWork, gradedSeparately: ['stu3'] }] });
+    expect(MGrade.studentCardIndex(CID, 'a1', 'stu3')).toBe(1);
+  });
+});
