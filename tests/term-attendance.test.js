@@ -69,11 +69,11 @@ describe('term attendance', () => {
     // This term by default (the totals less the last report's), the year on request.
     expect(html).toContain('Classes Absent</span> <b>6</b>');
     expect(html).toContain('Times Late</span> <b>2</b>');
-    expect(html).toContain('This term');
+    expect(html).toContain('This Term');
     const year = ReportBlocks.renderBlockAttendance(CID, MAX, ctx, { period: 'year' });
     expect(year).toContain('Classes Absent</span> <b>10</b>');
     expect(year).toContain('Times Late</span> <b>5</b>');
-    expect(year).toContain('Year to date');
+    expect(year).toContain('Year to Date');
     expect(ReportBlocks.renderBlockAttendance(CID, MAX, ctx, { late: false })).not.toContain('Times Late');
   });
 
@@ -110,14 +110,14 @@ describe('Report 2 with Report 1’s attendance blank (Colin, 2026-11-03: “Yea
     expect(getTermAttendance(CID, MAX.id, 'term-1')).toMatchObject({ absencesThisTerm: 5, termUnknown: false });
   });
 
-  it('prints the total under Year to date, not This term', () => {
+  it('prints the total under Year to Date, not This Term', () => {
     const html = ReportBlocks.renderBlockAttendance(CID, MAX, { termId: 'term-2' }, {});
     expect(html).toContain('Classes Absent</span> <b>14</b>');
-    expect(html).toContain('Year to date');
-    expect(html).not.toContain('This term');
+    expect(html).toContain('Year to Date');
+    expect(html).not.toContain('This Term');
     const half = ReportBlocks.renderBlockAttendance(CID, MAX, { termId: 'term-2' }, { size: 'half' });
-    expect(half).toContain('Year to date');
-    expect(half).not.toContain('This term');
+    expect(half).toContain('Year to Date');
+    expect(half).not.toContain('This Term');
   });
 
   it('Generate states the year total with no “this term” sentence', () => {

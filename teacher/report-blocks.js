@@ -2079,7 +2079,7 @@ window.ReportBlocks = (function () {
     const absent = year ? att.absences : att.absencesThisTerm;
     const late = year ? att.lates : att.latesThisTerm;
     const n = v => (v == null ? '—' : String(v));
-    const when = year ? 'Year to date' : 'This term';
+    const when = year ? 'Year to Date' : 'This Term';
     const cells = [['Classes Absent', absent]].concat(options.late !== false ? [['Times Late', late]] : []);
     if (half) {
       return `<div class="report-block-box report-attendance report-strip-half">
