@@ -1247,6 +1247,7 @@ function public.list_report_issues(p_course_id uuid, p_term integer) returns jso
 function public.list_report_templates() returns jsonb
 function public.list_rubric_copies(p_copy_group uuid) returns TABLE(rubric_id uuid, course_id uuid, course_name text, name text)
 function public.list_teacher_courses() returns TABLE(id uuid, name text, grade_level text, description text, color text, is_archived boolean, display_order integer, grading_system text, calc_method text, decay_weight numeric, timezone text, late_work_policy text, created_at timestamp with time zone, updated_at timestamp with time zone, block text, curriculum_tags text[])
+function public.move_rubric_scores(p_assessment_id uuid, p_rubric_id uuid, p_criterion_map jsonb, p_check_map jsonb, p_idempotency_key uuid) returns jsonb
 function public.reenrol_student(p_enrollment_id uuid, p_idempotency_key uuid) returns jsonb
 function public.relink_student(p_ghost_student_id uuid, p_canonical_student_id uuid) returns jsonb
 function public.remove_section(p_id uuid, p_idempotency_key uuid) returns jsonb

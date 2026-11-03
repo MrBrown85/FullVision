@@ -1032,6 +1032,7 @@ const TB_PAGES = [
    Read by shared/data.js (direct online writes) and shared/offline-queue.js
    (queued writes replayed on reconnect). */
 const FV_IDEMPOTENT_RPCS = {
+  move_rubric_scores: true,
   close_phone_report: true,
   create_assessment: true,
   create_course: true,
