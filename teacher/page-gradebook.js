@@ -2812,9 +2812,13 @@ window.PageGradebook = (function () {
         // The dialog names the assignment so a click on the wrong column is
         // caught before anything happens.
         var title = assess && assess.title ? assess.title : 'this assessment';
+        // A linked copy in another class stays; say so, as Assignments does.
+        var copyNote = window.AssessmentCopy && assess ? AssessmentCopy.deleteNote(activeCourse, assess) : '';
         showConfirm(
           'Delete “' + title + '”?',
-          'All scores, statuses, and observations linked to this assessment will be removed. You can undo this for a few seconds.',
+          'All scores, statuses, and observations linked to this assessment will be removed.' +
+            copyNote +
+            ' You can undo this for a few seconds.',
           'Delete',
           'danger',
           function () {
