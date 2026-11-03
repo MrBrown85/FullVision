@@ -1135,6 +1135,19 @@
   margin-left: auto;
   width: 300px;
 }
+.af-students-summary {
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.af-card-students #af-choose-students {
+  min-height: 40px;
+}
+.af-card-students #af-choose-students[hidden] {
+  display: none;
+}
+.af-card-students .collab-panel {
+  margin-top: 12px;
+}
 .af-row-what {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
