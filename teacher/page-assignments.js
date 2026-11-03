@@ -5410,6 +5410,8 @@ window.PageAssignments = (function () {
      copy as sent and `saved` the same rubric as stored, criteria in the same
      order; each held id leads back to its original through copiedFrom, so
      edits in the copy editor never move a score onto the wrong criterion.
+     A checkbox takes the first saved one at its level with its wording that
+     no earlier checkbox took, so two with the same wording keep two ids.
      Nothing moves unless the copy reached the server with server ids: a
      failed save leaves the scores where the server has them. */
   function _scoreMoveMaps(cid, aid, rid, copiedFrom, held, result) {
@@ -5436,11 +5438,13 @@ window.PageAssignments = (function () {
       var orig = copiedFrom.criteria[c.id];
       if (!to || !orig) return;
       maps.criteria[orig] = to.id;
+      var taken = {};
       (c.checks || []).forEach(function (k) {
         var origCheck = copiedFrom.checks[k.id];
         var match = (to.checks || []).find(function (tk) {
-          return tk.level === k.level && tk.label === k.label;
+          return !taken[tk.id] && tk.level === k.level && tk.label === k.label;
         });
+        if (match) taken[match.id] = true;
         if (origCheck && match) maps.checks[origCheck] = match.id;
       });
     });
