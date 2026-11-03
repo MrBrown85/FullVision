@@ -155,7 +155,7 @@ window.Router = (function () {
     document.getElementById('page-toolbar-mount').innerHTML = '';
     document.getElementById('sidebar-mount').innerHTML = '';
     document.getElementById('sidebar-mount').style.display = '';
-    document.getElementById('page-layout').classList.remove('sidebar-hidden');
+    document.getElementById('page-layout').classList.remove('sidebar-hidden', 'sidebar-overlay');
 
     // Re-render dock on every route change
     _renderDock(dockPage);

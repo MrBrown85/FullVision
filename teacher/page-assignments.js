@@ -739,7 +739,11 @@ window.PageAssignments = (function () {
               '" title="Pick ' +
               PROF_LABELS[lv] +
               '">' +
+              // Every tile keeps the chosen tile's head row, so picking a
+              // level moves nothing: here it holds the suggestion, if any.
+              '<div class="grdt-tile-head">' +
               (isSuggested ? '<span class="grdt-suggested-tag">' + _SUGGESTED_ICON + 'Suggested</span>' : '') +
+              '</div>' +
               body +
               '</div>'
             );
@@ -753,7 +757,7 @@ window.PageAssignments = (function () {
             PROF_LABELS[lv] +
             ': ' +
             esc(words) +
-            '"><span class="grdt-words">' +
+            '"><span class="grdt-tile-head" aria-hidden="true"></span><span class="grdt-words">' +
             esc(words) +
             '</span></button>'
           );
@@ -850,9 +854,9 @@ window.PageAssignments = (function () {
     var order = levelOrderFor(cid);
     var html =
       '<div class="grsp-legend">' +
-      '<span class="is-work"><span class="grsp-dot" aria-hidden="true"></span>Areas for Growth</span>' +
+      '<span class="is-work"><span class="grsp-dot" aria-hidden="true"></span>Work On</span>' +
       '<span class="is-standard"><span class="grsp-dot" aria-hidden="true"></span>Proficient Standard</span>' +
-      '<span class="is-beyond"><span class="grsp-dot" aria-hidden="true"></span>Going Beyond</span>' +
+      '<span class="is-beyond"><span class="grsp-dot" aria-hidden="true"></span>Went Beyond</span>' +
       '</div>';
     (rubric.criteria || []).forEach(function (crit) {
       if (!crit) return;
@@ -6241,12 +6245,12 @@ window.PageAssignments = (function () {
      One line per student: Name · Mark · Status · Comment. The rubric and
      proficiency grids keep their own layout (renderStatusToggles). */
   var LEDGER_STATUSES = [
-    ['LATE', 'Late', 'active-late'],
-    ['EXC', 'Excused', 'active-excused'],
     ['NS', 'Missing', 'active-ns'],
+    ['EXC', 'Excused', 'active-excused'],
+    ['LATE', 'Late', 'active-late'],
   ];
 
-  // Late | Excused | Missing as one segmented control, like the grader's.
+  // Missing | Excused | Late as one segmented control, like the grader's.
   function ledgerStatusHtml(aid, sid, current) {
     return (
       '<div class="ldg-status grader-status" role="group" aria-label="Status">' +
@@ -6748,7 +6752,7 @@ window.PageAssignments = (function () {
         if (btn.classList.contains('ldg-chip'))
           btn.setAttribute('aria-pressed', String(btn.dataset.status === newStatus));
       });
-      // The grid's Late | Excused | Missing control.
+      // The grid's Missing | Excused | Late control.
       row.querySelectorAll('.grader-status-btn').forEach(function (btn) {
         var on = btn.dataset.status === newStatus;
         btn.classList.remove('is-on', 'is-ns', 'is-exc', 'is-late');
@@ -7235,7 +7239,7 @@ window.PageAssignments = (function () {
   /* ── Group work on the page (Group grading, shared/data.js) ──
      The list grades Pair and Group work one group at a time, as the dialog
      does: a block named for the group, a strip of its members (each with
-     Late | Excused | Missing and a ⋯ menu with Grade Separately), and the
+     Missing | Excused | Late and a ⋯ menu with Grade Separately), and the
      grading rows of the member the group's grade is copied from. A member
      graded separately follows their group as their own block, with Graded
      Separately From and Back to Group Grade. DIBELS stays per student. */
@@ -7308,7 +7312,7 @@ window.PageAssignments = (function () {
             '</span><div class="grader-status rsg-status" role="group" aria-label="Status for ' +
             name +
             '">' +
-            _graderStatusButtons(aid, m, getAssignmentStatus(cid, m, aid), ['LATE', 'EXC', 'NS']) +
+            _graderStatusButtons(aid, m, getAssignmentStatus(cid, m, aid), ['NS', 'EXC', 'LATE']) +
             '</div><button type="button" class="grader-member-more" data-action="groupMemberMenu" data-aid="' +
             aid +
             '" data-sid="' +
@@ -7388,8 +7392,8 @@ window.PageAssignments = (function () {
     setTimeout(_refreshPrintMarks, 0);
   }
 
-  /* A student's row in the whole-class grid: the name, Late | Excused |
-     Missing, and the row's fill menu. */
+  /* A student's row in the whole-class grid: the name, Missing | Excused |
+     Late, and the row's fill menu. */
   function _rsgStudentHeadHtml(cid, aid, st, status, fillAction) {
     var row = _groupRowFor(aid, st.id);
     return (
@@ -7401,7 +7405,7 @@ window.PageAssignments = (function () {
       (row && row.view
         ? ''
         : '<div class="grader-status rsg-status" role="group" aria-label="Status" data-stop-prop="true">' +
-          _graderStatusButtons(aid, st.id, status, ['LATE', 'EXC', 'NS']) +
+          _graderStatusButtons(aid, st.id, status, ['NS', 'EXC', 'LATE']) +
           '</div>' +
           (row && row.separateFrom ? _groupSeparateNoteHtml(aid, st.id, row.separateFrom) : '')) +
       '<div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Set this student\'s levels" aria-label="Set this student\'s levels">' +
@@ -7984,11 +7988,13 @@ window.PageAssignments = (function () {
     }
     return bar;
   }
+  // Idle, the bar is empty and out of sight: the card's own hint ("Hover a
+  // level to see its wording") is the prompt.
   function _resetDescriptorBarContent(bar) {
     bar.querySelector('.rsg-descriptor-label').innerHTML = '';
     bar.querySelector('.rsg-descriptor-tags').innerHTML = '';
-    bar.querySelector('.rsg-descriptor-text').innerHTML =
-      '<span class="rsg-descriptor-idle">Hover a rubric level to see its descriptor</span>';
+    bar.querySelector('.rsg-descriptor-text').innerHTML = '';
+    bar.classList.add('is-idle');
   }
   function showDescriptorBar() {
     var bar = _ensureDescriptorBar();
@@ -8054,6 +8060,7 @@ window.PageAssignments = (function () {
   function _showGridLevelBar(el, tag, lines) {
     var bar = _ensureDescriptorBar();
     bar.classList.add('is-lines');
+    bar.classList.remove('is-idle');
     if (bar.style.display !== 'flex') {
       bar.style.display = 'flex';
       _tagBarShown = true;
@@ -8127,6 +8134,7 @@ window.PageAssignments = (function () {
     if (!tagsHtml) tagsHtml = '<span class="rsg-descriptor-tag rsg-descriptor-tag-overall">Overall grade only</span>';
     bar.querySelector('.rsg-descriptor-tags').innerHTML = tagsHtml;
     bar.querySelector('.rsg-descriptor-text').textContent = crit.levels[level];
+    bar.classList.remove('is-idle');
   }
 
   /* ── Rubric Select in Assessment Form ───────────────────── */
@@ -11366,13 +11374,14 @@ window.PageAssignments = (function () {
   var _GRADER_PRINTER =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>';
 
-  /* Print Rubric on rubric work, Print on everything else but DIBELS: on
-     competency-level work it prints the levels and feedback, on points and
-     Complete/Incomplete work the score or mark and feedback. */
+  /* The card's label for the same print: Print Rubrics on rubric and
+     competency-level work (a graded rubric), Print Scores on points and
+     Complete/Incomplete work (the score or mark and feedback); none on DIBELS. */
   // html-safe: fixed labels and icon; a.id is our id
   function _graderPrintButton(cid, a) {
     if (isDibelsScored(a)) return '';
-    var label = a.rubricId && getRubricById(cid, a.rubricId) ? 'Print Rubric' : 'Print';
+    var hasRubric = a.rubricId && getRubricById(cid, a.rubricId);
+    var label = !hasRubric && isPointsScored(a) ? 'Print Scores' : 'Print Rubrics';
     return (
       '<button type="button" class="grader-print" data-action="printRubrics" data-aid="' +
       a.id +
@@ -11436,8 +11445,8 @@ window.PageAssignments = (function () {
   }
 
   /* One student open on the Assignments page: the dialog's grader inside
-     the card, under a row with the student's name, the Late | Excused |
-     Missing control, the arrow-key hint and the grade. */
+     the card, under a row with the student's name, the Missing | Excused |
+     Late control, the arrow-key hint and the grade. */
   function _inlineGraderHtml(cid, a, tagObjs, st, scores) {
     var status = getAssignmentStatus(cid, st.id, a.id);
     var grade = _graderGrade(cid, a, st.id);
@@ -11451,7 +11460,7 @@ window.PageAssignments = (function () {
       '</h4>' +
       _printMarkHtml(cid, a.id, st.id) +
       '<div class="grader-status" role="group" aria-label="Status">' +
-      _graderStatusButtons(a.id, st.id, status, isDibelsScored(a) ? ['EXC', 'NS'] : ['LATE', 'EXC', 'NS']) +
+      _graderStatusButtons(a.id, st.id, status, isDibelsScored(a) ? ['NS', 'EXC'] : ['NS', 'EXC', 'LATE']) +
       '</div>' +
       '<span class="grader-spacer"></span>' +
       '<span class="grader-hint">← → change student</span>' +

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
 
 // Points and Complete / Incomplete ledgers: one row per student with the
-// score or mark, Late | Excused | Missing, and the Overall Comment field.
+// score or mark, Missing | Excused | Late, and the Overall Comment field.
 function assessment(id, title, extra) {
   return Object.assign(
     {
@@ -39,7 +39,7 @@ async function open(page, list, aid) {
 test('the points ledger takes a score and a status', async ({ page }) => {
   const card = await open(page, [assessment('a-pts', 'Unit Quiz', { scoreMode: 'points', maxPoints: 10 })], 'a-pts');
   const row = card.locator('.ldg-row[data-status-student="stu-001"]');
-  await expect(row.locator('.ldg-status .grader-status-btn')).toHaveText(['Late', 'Excused', 'Missing']);
+  await expect(row.locator('.ldg-status .grader-status-btn')).toHaveText(['Missing', 'Excused', 'Late']);
   await expect(row.locator('.ldg-overall .rsg-overall-comment')).toHaveAttribute(
     'placeholder',
     'Add an overall comment for Alice',

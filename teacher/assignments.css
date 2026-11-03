@@ -4641,20 +4641,23 @@
   opacity: 0.35;
   cursor: default;
 }
-/* Narrow levels: − | + move under the name, as a narrow tile's do. */
+/* Narrow levels: − | + stay beside the name, closer and slimmer, so the
+   chosen level is the same height as the others and nothing moves. */
 @container (max-width: 720px) {
   .rsg-level.has-mods {
-    flex-direction: column;
-    justify-content: center;
-    height: auto;
-    min-height: 32px;
     gap: 2px;
   }
   .rsg-level.has-mods .rsg-level-name {
-    margin: 4px 0 0;
+    margin-left: 6px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .rsg-level.has-mods .rsg-mods {
-    margin: 0 0 4px;
+    margin-right: 1px;
+  }
+  .rsg-level.has-mods .rsg-mod {
+    width: 20px;
   }
 }
 
@@ -4940,11 +4943,12 @@
 .rsg-descriptor-bar {
   position: fixed;
   bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Over the page beside the student list, never over the list. */
+  left: calc(var(--sidebar-w) + 16px);
+  right: 16px;
+  margin: 0 auto;
   z-index: 10000;
   max-width: 1400px;
-  width: calc(100% - 32px);
   background: var(--surface-glass);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -5025,10 +5029,20 @@
 .cw-line b {
   font-weight: 600;
 }
-.rsg-descriptor-bar .rsg-descriptor-idle {
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  font-style: italic;
+.rsg-descriptor-bar.is-idle {
+  visibility: hidden;
+}
+body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
+  left: 16px;
+}
+@media (max-width: 1024px) {
+  .rsg-descriptor-bar {
+    left: 16px;
+  }
+  /* The student list open over the page covers the bar's place. */
+  body:has(#page-layout.sidebar-overlay) .rsg-descriptor-bar {
+    display: none !important;
+  }
 }
 
 /* ── Keyboard Navigation Focus ──────────────────────────── */
@@ -6431,8 +6445,11 @@ button.grader-member-name {
   }
 }
 .grdt-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   text-align: left;
-  padding: 12px;
+  padding: 10px 12px 12px;
   border: none;
   border-radius: 12px;
   background: rgba(118, 118, 128, 0.08);
@@ -6469,16 +6486,21 @@ button.grader-member-name {
 .grdt-tile.is-chosen .grdt-words {
   font-weight: 500;
 }
+/* Every tile has this row, the chosen tile's level name and − | +, so
+   picking a level moves nothing below it. One line at any width: a narrow
+   tile shortens the name rather than moving − | + under it. */
 .grdt-tile-head {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
+  min-height: 26px;
 }
-/* The level name stays on one line; a narrow tile moves the − | + under
-   it, on the right. */
 .grdt-chosen-label {
-  flex: 1 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   display: flex;
   align-items: center;
@@ -6497,6 +6519,7 @@ button.grader-member-name {
    lighter track behind them). */
 .grdt-stepper {
   margin-left: auto;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   padding: 1px;
@@ -7317,10 +7340,15 @@ button.grader-member-name {
   line-height: 1.5;
   color: var(--text);
 }
+/* A narrow column (the dialog at 1024px) puts − | + under the levels
+   rather than over Work On and Went Beyond. */
 .grsp-controls {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
 }
 .grsp-controls .grdl-seg {
   flex: none;
