@@ -2149,6 +2149,7 @@ window.PageGradebook = (function () {
     for (var i = _undoStack.length - 1; i >= 0; i--) {
       if (_undoStack[i].cid !== activeCourse) continue;
       var undo = _undoStack.splice(i, 1)[0];
+      if (undo.statuses) return _bulkStatusStillSet(undo) ? undo : null;
       return _undoCellState(undo.cid, undo.sid, undo.aid, undo.tagIds) === undo.after ? undo : null;
     }
     return null;
@@ -2734,8 +2735,8 @@ window.PageGradebook = (function () {
     });
   }
 
-  /* The cells Count Missing as Zero / as Excused set in one column, kept on
-     this device so Undo Count Missing can take them off again. */
+  /* The cells Mark Blank Cells Missing / Excused set in one column, kept on
+     this device so Undo Marking Blank Cells can take them off again. */
   function _bulkStatusUndo(cid, aid) {
     try {
       return JSON.parse(localStorage.getItem('gb_bulkStatus_' + cid + '_' + aid)) || [];
@@ -2750,6 +2751,44 @@ window.PageGradebook = (function () {
     } catch (e) {}
   }
 
+  /* One use of Mark Blank Cells Missing / Excused, for its Undo toast and
+     Cmd+Z: true while every cell it marked still holds that status. */
+  function _bulkStatusStillSet(undo) {
+    var st = getAssignmentStatuses(undo.cid);
+    return undo.statuses.every(function (u) {
+      return st[u.sid + ':' + undo.aid] === u.status;
+    });
+  }
+
+  /* Takes off the statuses one use set, where a cell still holds it, and
+     drops them from Undo Marking Blank Cells' list. */
+  function _undoBulkStatus(undo) {
+    var i = _undoStack.indexOf(undo);
+    if (i >= 0) _undoStack.splice(i, 1);
+    var st = getAssignmentStatuses(undo.cid);
+    undo.statuses.forEach(function (u) {
+      var key = u.sid + ':' + undo.aid;
+      if (st[key] === u.status) delete st[key];
+    });
+    saveAssignmentStatuses(undo.cid, st);
+    _saveBulkStatusUndo(
+      undo.cid,
+      undo.aid,
+      _bulkStatusUndo(undo.cid, undo.aid).filter(function (u) {
+        return !undo.statuses.some(function (x) {
+          return x.sid === u.sid && x.status === u.status;
+        });
+      }),
+    );
+    if (_bulkToast === undo) {
+      _bulkToast = null;
+      if (typeof dismissUndoToast === 'function') dismissUndoToast();
+    }
+    clearProfCache();
+    if (_mounted && activeCourse === undo.cid) render();
+  }
+  var _bulkToast = null; // the use the Undo toast on screen is for
+
   function showHeaderContextMenu(e, header) {
     _dismissContextMenu();
     var aid = header.dataset.aid;
@@ -2762,10 +2801,10 @@ window.PageGradebook = (function () {
       '<div class="gb-ctx-item" data-ctx="scoreMode">Grade This Assessment</div>' +
       '<div class="gb-ctx-item" data-ctx="editAssess">Edit Assessment Details</div>' +
       '<div class="gb-ctx-divider"></div>' +
-      '<div class="gb-ctx-item" data-ctx="markUngradedNS">Count Missing as Zero</div>' +
-      '<div class="gb-ctx-item" data-ctx="markUngradedEXC">Count Missing as Excused</div>' +
+      '<div class="gb-ctx-item" data-ctx="markUngradedNS">Mark Blank Cells Missing</div>' +
+      '<div class="gb-ctx-item" data-ctx="markUngradedEXC">Mark Blank Cells Excused</div>' +
       (_bulkStatusUndo(activeCourse, aid).length
-        ? '<div class="gb-ctx-item" data-ctx="undoBulkStatus">Undo Count Missing</div>'
+        ? '<div class="gb-ctx-item" data-ctx="undoBulkStatus">Undo Marking Blank Cells</div>'
         : '') +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item gb-ctx-danger" data-ctx="deleteAssess">Delete Assessment</div>';
@@ -2793,21 +2832,39 @@ window.PageGradebook = (function () {
           var next = action === 'markUngradedNS' ? 'NS' : 'EXC';
           var statuses = getAssignmentStatuses(activeCourse);
           var undo = _bulkStatusUndo(activeCourse, aid);
-          var changed = false;
+          var marked = [];
           document.querySelectorAll('.gb-scores-row[data-sid]').forEach(function (row) {
             var sid = row.dataset.sid;
             var cell = assessmentCellValue(activeCourse, sid, assess);
             if (cell.kind === 'none' && !cell.status && canSetAssignmentStatus(activeCourse, sid, aid, next)) {
               statuses[sid + ':' + aid] = next;
               undo.push({ sid: sid, status: next });
-              changed = true;
+              marked.push({ sid: sid, status: next });
             }
           });
-          if (changed) {
+          if (marked.length) {
             saveAssignmentStatuses(activeCourse, statuses);
             _saveBulkStatusUndo(activeCourse, aid, undo);
             clearProfCache();
             render();
+            // Undo from the toast or Cmd+Z takes off just these.
+            var use = { cid: activeCourse, aid: aid, statuses: marked };
+            _undoStack.push(use);
+            while (_undoStack.length > 50) _undoStack.shift();
+            _bulkToast = use;
+            showUndoToast(
+              marked.length +
+                (marked.length === 1 ? ' blank cell' : ' blank cells') +
+                ' marked ' +
+                (next === 'NS' ? 'Missing' : 'Excused'),
+              function () {
+                _undoBulkStatus(use);
+              },
+              function () {
+                if (_bulkToast === use) _bulkToast = null;
+              },
+              10000,
+            );
           }
         }
       } else if (action === 'undoBulkStatus') {
@@ -3187,6 +3244,10 @@ window.PageGradebook = (function () {
       e.preventDefault();
       var undo = _takeUndo();
       if (!undo) return;
+      if (undo.statuses) {
+        _undoBulkStatus(undo);
+        return;
+      }
       var scores = getScores(undo.cid);
       if (!scores[undo.sid]) scores[undo.sid] = [];
       var beforeScores = structuredClone(scores);
