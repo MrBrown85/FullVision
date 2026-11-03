@@ -2431,7 +2431,9 @@ window.PageAssignments = (function () {
 
   // html-safe: titles, descriptions, names and dates through esc; colours through cssColor or constants; ids are ours
   function renderAssessForm(cid, assess) {
-    _startOpen = null;
+    // Blank Rubric is open on a new assessment (Colin, Nov 2).
+    _startOpen = assess ? null : 'blank';
+    _blank = null;
     var sections = getSections(cid);
     var isEdit = !!assess;
     var title = assess ? assess.title : '';
@@ -3172,9 +3174,9 @@ window.PageAssignments = (function () {
     var rubric = pending || (sel.value ? getRubricById(cid, sel.value) : null);
     var picking = !document.getElementById('af-rubric-pick').hidden;
     // Pick Another Rubric opens Choose in the chosen rubric's place.
-    if (rubric && _startOpen === 'choose') {
+    if (rubric && (_startOpen === 'choose' || _startOpen === 'blank')) {
       // html-safe: _startCardHtml escapes every name, code and title; the grid is RubricBank.gridHtml
-      view.innerHTML = _startCardHtml(cid, 'choose', true);
+      view.innerHTML = _startCardHtml(cid, _startOpen, true);
       _afterStartRender();
       return;
     }
@@ -3218,7 +3220,11 @@ window.PageAssignments = (function () {
     // html-safe: fixed labels, counts, _startCardHtml (escapes its values) and esc() on the last-used name and id
     view.innerHTML =
       '<div class="af-rubric-starts">' +
-      '<button type="button" class="af-rubric-start" data-action="newRubricFromForm"><b>Blank Rubric</b><span>Start from nothing.</span></button>' +
+      '<button type="button" class="af-rubric-start' +
+      (_startOpen === 'blank' ? ' is-open' : '') +
+      '" data-action="newRubricFromForm" data-start="blank" aria-expanded="' +
+      (_startOpen === 'blank') +
+      '"><b>Blank Rubric</b><span>Start from nothing.</span></button>' +
       '<button type="button" class="af-rubric-start' +
       (_startOpen === 'choose' ? ' is-open' : '') +
       '" data-action="chooseRubric" aria-expanded="' +
@@ -3243,7 +3249,7 @@ window.PageAssignments = (function () {
       '</span></button>' +
       '</div>' +
       (_startOpen ? _startCardHtml(cid, _startOpen, false) : '') +
-      (last && !_startOpen
+      (last && (!_startOpen || _startOpen === 'blank')
         ? '<p class="af-rubric-last">Last used <b>' +
           esc(last.name) +
           '</b><button type="button" class="af-link-btn" data-action="useLastRubric" data-rid="' +
@@ -3273,6 +3279,8 @@ window.PageAssignments = (function () {
       var top = g.suggested[0] || g.recent[0] || g.rest[0];
       _choose = { query: '', selected: current || (top ? top.id : null), focusSearch: true };
     }
+    if (name === 'blank') _blank = { draft: _newBlankDraft(), touched: false, focusName: true };
+    else _blank = null;
     if (name === 'copy') {
       var first = _copySources(activeCourse)[0];
       _copy = { from: first ? first.id : null, selected: null, focusFrom: true };
@@ -3284,6 +3292,7 @@ window.PageAssignments = (function () {
     if (!_startOpen) return;
     var was = _startOpen;
     _startOpen = null;
+    if (was === 'blank') _blank = null;
     _renderRubricView();
     var back = document.querySelector(
       was === 'choose' ? '[data-action="chooseRubric"]' : '.af-rubric-start[data-start="' + was + '"]',
@@ -3317,6 +3326,7 @@ window.PageAssignments = (function () {
 
   function _startCardHtml(cid, name, inPlace) {
     if (name === 'copy') return _copyCardHtml(cid);
+    if (name === 'blank') return _blankCardHtml(cid, inPlace);
     if (name !== 'choose') return '';
     var r = _choose.selected ? getRubricById(cid, _choose.selected) : null;
     var sel = document.getElementById('af-rubric');
@@ -3432,6 +3442,14 @@ window.PageAssignments = (function () {
   function _afterStartRender() {
     var card = document.querySelector('#af-rubric-view .af-start-card');
     if (!card) return;
+    if (card.dataset.start === 'blank') {
+      _blankSizeCells();
+      if (_blank && _blank.focusName) {
+        _blank.focusName = false;
+        var nm = document.getElementById('af-ge-name');
+        if (nm) nm.focus({ preventScroll: true });
+      }
+    }
     var btn = document.querySelector('#af-rubric-view .af-rubric-start.is-open');
     if (btn) {
       var b = btn.getBoundingClientRect();
@@ -3510,6 +3528,16 @@ window.PageAssignments = (function () {
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
+      // In the editor, Esc closes its picker or menu; it never throws away
+      // what the teacher wrote (Cancel does that).
+      if (card.dataset.start === 'blank') {
+        if (_blank && (_blank.picker || _blank.menu != null)) {
+          _blank.picker = null;
+          _blank.menu = null;
+          _blankRender();
+        }
+        return;
+      }
       closeStart();
       return;
     }
@@ -3707,6 +3735,477 @@ window.PageAssignments = (function () {
     else go();
   }
 
+  /* ── Blank Rubric: the compact editor, in place (rubric starts PR 5) ─
+     The rubric editor's parts laid out as the Competency Rubric's grid: the
+     name and Standard / Advanced / Single-Point in the head; a row per
+     criterion with its level cells typed straight into; + Competency and a
+     ··· menu (weight, points per level, remove) under each name; + Add
+     Criterion and + From Competency on the footer line. Open by default on
+     a new assessment. Save Rubric holds the rubric like any made on the
+     form; Create holds a touched blank on its own, and an untouched one is
+     never saved. Edit Rubric on a held rubric opens it here. */
+  var _blank = null;
+
+  function _newBlankDraft() {
+    return {
+      id: uid(),
+      name: '',
+      style: 'standard',
+      criteria: [_newBlankCriterion(1)],
+    };
+  }
+  function _newBlankCriterion(n) {
+    return {
+      id: uid(),
+      name: 'Criterion ' + n,
+      tagIds: [],
+      levels: { 4: '', 3: '', 2: '', 1: '' },
+      weight: 1,
+      levelValues: null,
+      checks: [],
+    };
+  }
+  function _blankLevels(cid, draft) {
+    return rubricStyle(draft) === 'single_point' ? [3] : levelOrderFor(cid);
+  }
+
+  function _blankCardHtml(cid, inPlace) {
+    if (!_blank) _blank = { draft: _newBlankDraft(), touched: false };
+    var d = _blank.draft;
+    var style = rubricStyle(d);
+    var levels = _blankLevels(cid, d);
+    var head =
+      '<div class="af-rubric-card-head">' +
+      '<input class="af-input af-ge-name" id="af-ge-name" type="text" autocomplete="off" placeholder="Name This Rubric" aria-label="Rubric name" value="' +
+      esc(d.name || '') +
+      '">' +
+      '<span class="seg af-ge-style" role="radiogroup" aria-label="Rubric Style">' +
+      RUBRIC_STYLES.map(function (st) {
+        return (
+          '<button type="button" class="seg-btn' +
+          (st === style ? ' active' : '') +
+          '" role="radio" aria-checked="' +
+          (st === style) +
+          '" data-action="geStyle" data-style="' +
+          st +
+          '">' +
+          _RUBRIC_STYLE_NAMES[st] +
+          '</button>'
+        );
+      }).join('') +
+      '</span><span class="af-gap"></span>' +
+      '<button type="button" class="btn btn-ghost" data-action="closeStart">Cancel</button>' +
+      '<button type="button" class="btn btn-primary" data-action="geSave">Save Rubric</button></div>';
+    var grid =
+      '<table class="rb-grid af-ge-grid' +
+      (style === 'single_point' ? ' is-single-point' : '') +
+      '"><thead><tr><th class="rb-crit-head" scope="col">Criterion</th>' +
+      levels
+        .map(function (lv) {
+          return (
+            '<th scope="col" class="rb-level-head l' +
+            lv +
+            '"><span>' +
+            (style === 'single_point' ? 'Proficient Standard' : PROF_LABELS[lv]) +
+            '</span>' +
+            (style === 'single_point' ? '' : '<span class="rb-level-value">' + lv + '</span>') +
+            '</th>'
+          );
+        })
+        .join('') +
+      '</tr></thead><tbody>' +
+      d.criteria
+        .map(function (c, i) {
+          return _blankRowHtml(cid, d, c, i, levels, style);
+        })
+        .join('') +
+      '</tbody></table>';
+    var foot =
+      '<div class="af-tag-rubric-note af-ge-foot">' +
+      '<button type="button" class="af-link-btn" data-action="geAddCrit">+ Add Criterion</button>' +
+      '<button type="button" class="af-link-btn" data-action="gePicker" data-i="-1">+ From Competency</button>' +
+      (_blank.picker && _blank.picker.i === -1 ? _blankPickerHtml(cid, -1) : '') +
+      '</div>';
+    return (
+      '<div class="af-rubric-card af-start-card af-ge-card" data-start="blank"' +
+      (inPlace ? ' data-in-place="true"' : '') +
+      ' role="region" aria-label="' +
+      (inPlace ? 'Edit Rubric' : 'Blank Rubric') +
+      '">' +
+      head +
+      '<div class="af-ge-body">' +
+      grid +
+      '</div>' +
+      foot +
+      '</div>'
+    );
+  }
+
+  function _blankRowHtml(cid, d, c, i, levels, style) {
+    var chips = (c.tagIds || [])
+      .map(function (t) {
+        var tag = getTagById(cid, t);
+        return (
+          '<span class="af-ge-chip"><b>' +
+          esc((tag && tag.code) || t) +
+          '</b>' +
+          esc((tag && (tag.label || tag.shortName)) || '') +
+          '<button type="button" class="af-ge-x" data-action="geRemoveTag" data-i="' +
+          i +
+          '" data-tag="' +
+          esc(t) +
+          '" aria-label="' +
+          esc('Remove ' + ((tag && tag.code) || t)) +
+          '">×</button></span>'
+        );
+      })
+      .join('');
+    var menuOpen = _blank.menu === i;
+    var menu = menuOpen
+      ? '<div class="af-ge-menu" role="group" aria-label="Criterion settings">' +
+        '<label>Weight <input class="af-input" type="number" min="0" step="0.5" data-ge="weight" data-i="' +
+        i +
+        '" value="' +
+        esc(String(c.weight != null ? c.weight : 1)) +
+        '"></label>' +
+        (style === 'single_point'
+          ? ''
+          : '<div class="af-ge-points"><span>Points</span>' +
+            [4, 3, 2, 1]
+              .map(function (lv) {
+                var v = c.levelValues && c.levelValues[lv] != null ? c.levelValues[lv] : lv;
+                return (
+                  '<label>' +
+                  esc(PROF_LABELS[lv]) +
+                  ' <input class="af-input" type="number" min="0" step="0.5" data-ge="value" data-i="' +
+                  i +
+                  '" data-level="' +
+                  lv +
+                  '" value="' +
+                  esc(String(v)) +
+                  '"></label>'
+                );
+              })
+              .join('') +
+            '</div>') +
+        '<button type="button" class="af-link-btn af-ge-remove" data-action="geRemoveCrit" data-i="' +
+        i +
+        '"' +
+        (d.criteria.length > 1 ? '' : ' disabled') +
+        '>Remove Criterion</button></div>'
+      : '';
+    var cells = levels
+      .map(function (lv) {
+        var checks =
+          style === 'advanced' && window.RubricChecks
+            ? '<div class="af-ge-checks">' +
+              RubricChecks.checksAt(c, lv)
+                .map(function (k, ki) {
+                  return (
+                    '<label class="af-ge-check"><span class="rb-box" aria-hidden="true"></span><input type="text" class="af-ge-check-input" data-ge="check" data-i="' +
+                    i +
+                    '" data-level="' +
+                    lv +
+                    '" data-k="' +
+                    ki +
+                    '" value="' +
+                    esc(k.label || '') +
+                    '" placeholder="Something to look for" aria-label="Checkbox"></label>'
+                  );
+                })
+                .join('') +
+              '<button type="button" class="af-link-btn" data-action="geAddCheck" data-i="' +
+              i +
+              '" data-level="' +
+              lv +
+              '">+ Checkbox</button></div>'
+            : '';
+        return (
+          '<td class="rb-cell af-ge-cell"><textarea class="af-ge-text" rows="2" data-ge="level" data-i="' +
+          i +
+          '" data-level="' +
+          lv +
+          '" placeholder="' +
+          esc('What does ' + String(PROF_LABELS[lv]).toLowerCase() + ' look like?') +
+          '" aria-label="' +
+          esc((c.name || 'Criterion') + ', ' + PROF_LABELS[lv]) +
+          '">' +
+          esc((c.levels && c.levels[lv]) || '') +
+          '</textarea>' +
+          checks +
+          '</td>'
+        );
+      })
+      .join('');
+    return (
+      '<tr><th scope="row" class="rb-crit af-ge-crit">' +
+      '<input class="af-ge-crit-name" type="text" data-ge="name" data-i="' +
+      i +
+      '" value="' +
+      esc(c.name || '') +
+      '" aria-label="Criterion name">' +
+      (chips ? '<div class="af-ge-chips">' + chips + '</div>' : '') +
+      '<div class="af-ge-tools"><button type="button" class="af-link-btn" data-action="gePicker" data-i="' +
+      i +
+      '">+ Competency</button><button type="button" class="af-ge-more" data-action="geMenu" data-i="' +
+      i +
+      '" aria-expanded="' +
+      menuOpen +
+      '" aria-label="Weight and points">···</button></div>' +
+      menu +
+      (_blank.picker && _blank.picker.i === i ? _blankPickerHtml(cid, i) : '') +
+      '</th>' +
+      cells +
+      '</tr>'
+    );
+  }
+
+  // A competency picker: the class's competencies by folder, typed to narrow.
+  function _blankPickerHtml(cid, i) {
+    return (
+      '<div class="af-ge-picker" role="dialog" aria-label="' +
+      (i === -1 ? 'Add a criterion from a competency' : 'Add a competency') +
+      '"><input class="af-input" id="af-ge-pick-search" type="search" autocomplete="off" placeholder="Type a code or words" aria-label="Find a competency" value="' +
+      esc((_blank.picker && _blank.picker.query) || '') +
+      '"><div class="af-ge-pick-list" id="af-ge-pick-list">' +
+      _blankPickListHtml(cid, i) +
+      '</div></div>'
+    );
+  }
+  function _blankPickListHtml(cid, i) {
+    var q = String((_blank.picker && _blank.picker.query) || '')
+      .trim()
+      .toLowerCase();
+    var have = i >= 0 ? (_blank.draft.criteria[i] || {}).tagIds || [] : [];
+    var groups = {};
+    (getCompetencyGroups(cid) || []).forEach(function (g) {
+      groups[g.id] = g.name;
+    });
+    var lastGroup = null;
+    var html = '';
+    (getSections(cid) || []).forEach(function (sec) {
+      var tag = sec.tags && sec.tags[0];
+      if (!tag || have.indexOf(tag.id) >= 0) return;
+      var hay = [tag.code, tag.label, tag.shortName, tag.text].join(' ').toLowerCase();
+      if (q && hay.indexOf(q) < 0) return;
+      var g = groups[sec.groupId] || '';
+      if (g !== lastGroup) {
+        lastGroup = g;
+        if (g) html += '<div class="af-start-group">' + esc(g) + '</div>';
+      }
+      html +=
+        '<button type="button" class="af-ge-pick" data-action="gePick" data-i="' +
+        i +
+        '" data-tag="' +
+        esc(tag.id) +
+        '"><b>' +
+        esc(tag.code || tag.id) +
+        '</b>' +
+        esc(tag.label || tag.shortName || sec.name || '') +
+        '</button>';
+    });
+    return html || '<p class="af-start-empty">No competency matches.</p>';
+  }
+
+  // Redraw the editor and put the cursor back where it was.
+  function _blankRender(focusSel) {
+    var a = document.activeElement;
+    var keep =
+      focusSel ||
+      (a && a.dataset && a.dataset.ge
+        ? '[data-ge="' +
+          a.dataset.ge +
+          '"][data-i="' +
+          a.dataset.i +
+          '"]' +
+          (a.dataset.level ? '[data-level="' + a.dataset.level + '"]' : '') +
+          (a.dataset.k ? '[data-k="' + a.dataset.k + '"]' : '')
+        : a && a.id
+          ? '#' + a.id
+          : null);
+    _renderRubricView();
+    var back = keep ? document.querySelector('.af-ge-card ' + keep) : null;
+    if (back) back.focus({ preventScroll: true });
+    _blankSizeCells();
+  }
+  // Each cell grows with its text; the row takes the tallest.
+  function _blankSizeCells() {
+    document.querySelectorAll('.af-ge-text').forEach(function (t) {
+      t.style.height = 'auto';
+      t.style.height = Math.max(64, t.scrollHeight + 2) + 'px';
+    });
+  }
+
+  // Typing: the draft follows each field; nothing redraws.
+  function _blankInput(e) {
+    var t = e.target;
+    if (!_blank || !t || !t.closest || !t.closest('.af-ge-card')) return;
+    var d = _blank.draft;
+    if (t.id === 'af-ge-name') {
+      d.name = t.value;
+      _blank.touched = true;
+      return;
+    }
+    if (t.id === 'af-ge-pick-search') {
+      _blank.picker.query = t.value;
+      var list = document.getElementById('af-ge-pick-list');
+      // html-safe: _blankPickListHtml escapes every code and name
+      if (list) list.innerHTML = _blankPickListHtml(activeCourse, _blank.picker.i);
+      return;
+    }
+    var kind = t.dataset && t.dataset.ge;
+    if (!kind) return;
+    var c = d.criteria[Number(t.dataset.i)];
+    if (!c) return;
+    _blank.touched = true;
+    var lv = Number(t.dataset.level);
+    if (kind === 'name') c.name = t.value;
+    else if (kind === 'level') {
+      c.levels = Object.assign({}, c.levels);
+      c.levels[lv] = t.value;
+      t.style.height = 'auto';
+      t.style.height = Math.max(64, t.scrollHeight + 2) + 'px';
+    } else if (kind === 'weight') {
+      var w = parseFloat(t.value);
+      c.weight = isNaN(w) || w < 0 ? 1 : w;
+    } else if (kind === 'value') {
+      var v = parseFloat(t.value);
+      c.levelValues = Object.assign({ 4: 4, 3: 3, 2: 2, 1: 1 }, c.levelValues || {});
+      c.levelValues[lv] = isNaN(v) ? lv : v;
+    } else if (kind === 'check') {
+      var list2 = RubricChecks.checksAt(c, lv);
+      var k = list2[Number(t.dataset.k)];
+      if (k) k.label = t.value;
+    }
+  }
+
+  function _blankAct(action, el) {
+    if (!_blank) return;
+    var d = _blank.draft;
+    var i = Number(el.dataset.i);
+    var cid = activeCourse;
+    if (action === 'geStyle') {
+      d.style = el.dataset.style;
+      _blank.touched = true;
+    } else if (action === 'geAddCrit') {
+      d.criteria.push(_newBlankCriterion(d.criteria.length + 1));
+      _blank.touched = true;
+      _blankRender('[data-ge="name"][data-i="' + (d.criteria.length - 1) + '"]');
+      return;
+    } else if (action === 'geRemoveCrit') {
+      if (d.criteria.length > 1) d.criteria.splice(i, 1);
+      _blank.menu = null;
+      _blank.touched = true;
+    } else if (action === 'geMenu') {
+      _blank.menu = _blank.menu === i ? null : i;
+      _blank.picker = null;
+    } else if (action === 'gePicker') {
+      _blank.picker = _blank.picker && _blank.picker.i === i ? null : { i: i, query: '' };
+      _blank.menu = null;
+      _blankRender(_blank.picker ? '#af-ge-pick-search' : null);
+      return;
+    } else if (action === 'geRemoveTag') {
+      var c = d.criteria[i];
+      if (c)
+        c.tagIds = (c.tagIds || []).filter(function (t) {
+          return t !== el.dataset.tag;
+        });
+      _blank.touched = true;
+    } else if (action === 'gePick') {
+      var tag = getTagById(cid, el.dataset.tag);
+      _blank.picker = null;
+      _blank.touched = true;
+      if (!tag) return _blankRender();
+      if (i >= 0) {
+        var crit = d.criteria[i];
+        if (crit && crit.tagIds.indexOf(tag.id) < 0) crit.tagIds = crit.tagIds.concat([tag.id]);
+        return _blankRender();
+      }
+      // + From Competency: a criterion with the competency's wording, in
+      // place of an untouched first row.
+      var make = function () {
+        var levels = {};
+        [1, 2, 3, 4].forEach(function (l) {
+          levels[l] = window.CompetencyWording ? CompetencyWording.levelWording(tag, l).text : '';
+        });
+        var row = Object.assign(_newBlankCriterion(d.criteria.length + 1), {
+          name: tag.label || tag.shortName || tag.code || 'Criterion',
+          tagIds: [tag.id],
+          levels: levels,
+        });
+        var first = d.criteria[0];
+        var untouched =
+          d.criteria.length === 1 &&
+          !first.tagIds.length &&
+          /^Criterion 1$/.test(first.name || '') &&
+          ![1, 2, 3, 4].some(function (l) {
+            return String((first.levels || {})[l] || '').trim();
+          });
+        if (untouched) d.criteria = [row];
+        else d.criteria.push(row);
+        _blankRender();
+      };
+      if (window.CompetencyWording) CompetencyWording.loadBank().then(make);
+      else make();
+      return;
+    } else if (action === 'geAddCheck') {
+      var cc = d.criteria[i];
+      var lv = Number(el.dataset.level);
+      if (cc) {
+        cc.checks = (cc.checks || []).concat([
+          { id: uid(), level: lv, label: '', displayOrder: RubricChecks.checksAt(cc, lv).length },
+        ]);
+        _blank.touched = true;
+        var k = RubricChecks.checksAt(cc, lv).length - 1;
+        _blankRender('[data-ge="check"][data-i="' + i + '"][data-level="' + lv + '"][data-k="' + k + '"]');
+        return;
+      }
+    } else if (action === 'geSave') {
+      _blankSave(false);
+      return;
+    }
+    _blankRender();
+  }
+
+  /* Save Rubric (or Create with a touched blank open): hold the rubric on
+     the form. Without a name, Save asks for one; Create names it after the
+     assessment. */
+  function _blankSave(auto) {
+    if (!_blank) return false;
+    var d = _blank.draft;
+    var name = String(d.name || '').trim();
+    if (!name) {
+      if (!auto) {
+        var input = document.getElementById('af-ge-name');
+        if (input) {
+          input.classList.add('is-invalid');
+          input.placeholder = 'Name this rubric to save it';
+          input.focus();
+        }
+        return false;
+      }
+      var title = ((document.getElementById('af-title') || {}).value || '').trim();
+      name = title ? title + ' Rubric' : 'New Rubric';
+    }
+    var held = structuredClone(d);
+    held.name = name;
+    held.style = rubricStyle(held);
+    held.criteria = held.criteria.map(function (c, n) {
+      return Object.assign(c, { name: String(c.name || '').trim() || 'Criterion ' + (n + 1) });
+    });
+    _dropBlankChecks(held);
+    _startOpen = null;
+    _blank = null;
+    _holdFormRubric(held);
+    _renderRubricView();
+    return true;
+  }
+  // Create / Save Changes with a blank the teacher has written in: keep it.
+  function _commitOpenBlank() {
+    var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    if (_startOpen === 'blank' && _blank && _blank.touched && mode === 'proficiency') _blankSave(true);
+  }
+
   // The rubric on this class's most recent assessment (by date), for Use It Again.
   function _lastUsedRubric(cid) {
     var editingId = _editingAssessId;
@@ -3751,6 +4250,10 @@ window.PageAssignments = (function () {
       });
       return;
     }
+    if (rid) {
+      _startOpen = null;
+      _blank = null;
+    }
     if (!rid) {
       dd.value = '';
       onRubricSelect('');
@@ -3776,7 +4279,10 @@ window.PageAssignments = (function () {
     if (!sel || !sel.value) return;
     var cid = activeCourse;
     if (_pendingFormRubric && _pendingFormRubric.id === sel.value) {
-      _openFormRubricEditor(structuredClone(_pendingFormRubric));
+      // A rubric made on this form is edited in place (rubric starts PR 5).
+      _startOpen = 'blank';
+      _blank = { draft: structuredClone(_pendingFormRubric), touched: true, focusName: true };
+      _renderRubricView();
       return;
     }
     var rubric = getRubricById(cid, sel.value);
@@ -4492,7 +4998,11 @@ window.PageAssignments = (function () {
   function cancelAssessForm() {
     var title = ((document.getElementById('af-title') || {}).value || '').trim();
     var filled =
-      !_editingAssessId && (!!title || !!_pendingFormRubric || !!document.querySelector('.af-tag-cb:checked'));
+      !_editingAssessId &&
+      (!!title ||
+        !!_pendingFormRubric ||
+        !!(_blank && _blank.touched) ||
+        !!document.querySelector('.af-tag-cb:checked'));
     if (!filled) {
       hideNewForm();
       return;
@@ -4622,6 +5132,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (!_formCategoryChosen()) return;
+    _commitOpenBlank();
     // A rubric made for this assessment is saved now, then the assessment
     // with the rubric's saved id (redesign PR 8).
     if (
@@ -4923,6 +5434,9 @@ window.PageAssignments = (function () {
   /* Hold a rubric made for this form (saved only on Create, PR 8) and
      choose it. */
   function _holdFormRubric(held) {
+    // A chosen rubric closes whichever start was open.
+    _startOpen = null;
+    _blank = null;
     _pendingFormRubric = held;
     var dd = document.getElementById('af-rubric');
     if (dd) {
@@ -5012,6 +5526,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (!_formCategoryChosen()) return;
+    _commitOpenBlank();
     if (
       _persistPendingFormRubric(function () {
         saveEditAssess(aid);
@@ -8192,8 +8707,7 @@ window.PageAssignments = (function () {
     });
   }
   function newRubricFromForm() {
-    newRubricUI();
-    if (_editingRubric) _editingRubric._forForm = true;
+    openStart('blank');
   }
   /* Copy a rubric from another class into this one and select it on the form. */
   function rubricFromClass() {
@@ -9041,7 +9555,37 @@ window.PageAssignments = (function () {
         _startPickNone();
       },
       useLastRubric: function () {
+        _startOpen = null;
+        _blank = null;
         _useRubricInForm(el.dataset.rid);
+        _renderRubricView();
+      },
+      geStyle: function () {
+        _blankAct('geStyle', el);
+      },
+      geAddCrit: function () {
+        _blankAct('geAddCrit', el);
+      },
+      geRemoveCrit: function () {
+        _blankAct('geRemoveCrit', el);
+      },
+      geMenu: function () {
+        _blankAct('geMenu', el);
+      },
+      gePicker: function () {
+        _blankAct('gePicker', el);
+      },
+      geRemoveTag: function () {
+        _blankAct('geRemoveTag', el);
+      },
+      gePick: function () {
+        _blankAct('gePick', el);
+      },
+      geAddCheck: function () {
+        _blankAct('geAddCheck', el);
+      },
+      geSave: function () {
+        _blankAct('geSave', el);
       },
       startFromPast: function () {
         startFromPast();
@@ -11050,6 +11594,7 @@ window.PageAssignments = (function () {
     _addDocListener('focusin', _codeHover);
     _addDocListener('keydown', _startKeydown, true);
     _addDocListener('input', _startSearch);
+    _addDocListener('input', _blankInput);
     _addDocListener('mouseover', _afTipOver);
     _addDocListener('mouseout', _afTipOut);
     _addDocListener('focusin', _afTipFocus);

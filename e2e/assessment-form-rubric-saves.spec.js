@@ -22,9 +22,9 @@ test('a blank rubric from the form waits; Discard keeps neither', async ({ page 
   await openForm(page);
   const before = await rubricNames(page);
   await page.fill('#af-title', 'Held Rubric Check');
-  await page.locator('[data-action="newRubricFromForm"]').click();
-  await page.fill('#re-name', 'Held Rubric');
-  await page.locator('[data-action="saveRubricEdit"]').click();
+  // Blank Rubric is open on a new assessment.
+  await page.fill('#af-ge-name', 'Held Rubric');
+  await page.locator('[data-action="geSave"]').click();
   await expect(page.locator('.af-rubric-card-meta')).toContainText('new, saved when the assessment is created');
   expect(await rubricNames(page)).toEqual(before);
   await page.locator('[data-action="cancelAssessForm"]').click();
@@ -38,9 +38,8 @@ test('Create saves the held rubric, then the assessment with it', async ({ page 
   await openForm(page);
   await page.fill('#af-title', 'Made With a New Rubric');
   await page.selectOption('#af-category', 'sci8-cat-labs');
-  await page.locator('[data-action="newRubricFromForm"]').click();
-  await page.fill('#re-name', 'Brand New Rubric');
-  await page.locator('[data-action="saveRubricEdit"]').click();
+  await page.fill('#af-ge-name', 'Brand New Rubric');
+  await page.locator('[data-action="geSave"]').click();
   await page.locator('[data-action="saveNewAssess"]').click();
   await expect
     .poll(() =>
