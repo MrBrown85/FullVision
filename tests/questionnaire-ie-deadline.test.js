@@ -162,6 +162,32 @@ describe('withDeadline: the old [date] placeholder', () => {
     rate({ reportingBasis: 'ie', ieDeadline: null, approvedAt: '2026-10-30T10:00:00Z' });
     expect(ReportBlocks.renderReportBlock('teacher-narrative', CID, student(), { termId: TERM })).toContain(B);
   });
+
+  it('the Term Comment card and the phone copy print what the report card prints', () => {
+    seed();
+    const card = () => ReportFeedback.termComment(CID, student(), TERM);
+    const phone = () => PhoneReports.snapshot(CID, student(), { termId: TERM }).comment.join(' ');
+    rate({ reportingBasis: 'ie', narrative: [A, B, C].join(' ') });
+    expect(card()).toBe(A + ' ' + C);
+    expect(phone()).toBe(A + ' ' + C);
+    // A deadline that has passed is left out the same way.
+    const passed = 'The deadline to replace this IE with a grade is October 20.';
+    rate({ reportingBasis: 'ie', ieDeadline: '2026-10-20', narrative: [A, passed, C].join(' ') });
+    expect(ReportBlocks.renderReportBlock('teacher-narrative', CID, student(), { termId: TERM })).not.toContain(
+      'October 20',
+    );
+    expect(card()).toBe(A + ' ' + C);
+    expect(phone()).toBe(A + ' ' + C);
+    // An approved comment prints as approved.
+    rate({
+      reportingBasis: 'ie',
+      ieDeadline: null,
+      approvedAt: '2026-10-30T10:00:00Z',
+      narrative: [A, B, C].join(' '),
+    });
+    expect(card()).toBe([A, B, C].join(' '));
+    expect(phone()).toBe([A, B, C].join(' '));
+  });
 });
 
 describe('the Deadline row and the calendar (teacher/report-questionnaire.js)', () => {

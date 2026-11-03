@@ -266,6 +266,8 @@ window.ReportFeedback = (function () {
     var rating = getStudentTermRating(cid, student.id, termId);
     var narrative = rating && rating.narrative ? String(rating.narrative) : '';
     if (!narrative.trim()) return '';
+    // [date] and a passed deadline never print (the report card's rule).
+    narrative = ReportBlocks.printableComment(cid, rating, narrative);
     if (/<\/?(p|div|br|ul|ol|li|b|i|u|strong|em|span)\b[^>]*>/i.test(narrative)) {
       narrative = narrative
         .replace(/<br\s*\/?>/gi, '\n')

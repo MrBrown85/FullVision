@@ -344,6 +344,25 @@ window.ReportBlocks = (function () {
     return html;
   }
 
+  // A comment saved by the old editor is HTML until it is next edited; the
+  // questionnaire saves plain text, a paragraph per line.
+  const HTML_COMMENT = /<\/?(p|div|br|ul|ol|li|b|i|u|strong|em|span)\b[^>]*>/i;
+
+  /* A term comment as it goes home: the report card, the Quick Report's
+     Term Comment card and phone reports all print it through this. A
+     comment saved before Nov 2 may say [date] in its Deadline sentence: it
+     never prints. The sentence is left out until a deadline is picked, then
+     says the date; a saved date that has passed or falls after the school
+     year counts as none. An approved comment is printed as approved. */
+  function printableComment(cid, rating, narrative) {
+    narrative = String(narrative == null ? '' : narrative);
+    if (HTML_COMMENT.test(narrative) || (rating && rating.approvedAt)) return narrative;
+    if (typeof CommentBank === 'undefined' || !CommentBank.withDeadline) return narrative;
+    const iso = rating && rating.ieDeadline;
+    const ok = !iso || !CommentBank.deadlineOk || CommentBank.deadlineOk(cid, iso);
+    return CommentBank.withDeadline(narrative, iso, ok);
+  }
+
   function renderBlockTeacherNarrative(cid, student, ctx) {
     const termId = ctx && ctx.termId;
     // ctx.narrativeOverride is the questionnaire's unsaved draft, so the
@@ -353,19 +372,8 @@ window.ReportBlocks = (function () {
     if (ctx && ctx.narrativeOverride != null) narrative = ctx.narrativeOverride;
     else narrative = rating && rating.narrative;
     if (!narrative || !String(narrative).trim()) return '';
-    narrative = String(narrative);
-    // A comment saved by the old editor is HTML until it is next edited; the
-    // questionnaire saves plain text, a paragraph per line.
-    const isHtml = /<\/?(p|div|br|ul|ol|li|b|i|u|strong|em|span)\b[^>]*>/i.test(narrative);
-    // A comment saved before Nov 2 may say [date] in its Deadline sentence:
-    // it never prints. The sentence is left out until a deadline is picked,
-    // then says the date; a saved date that has passed or falls after the
-    // school year counts as none. An approved comment is printed as approved.
-    if (!isHtml && !(rating && rating.approvedAt) && typeof CommentBank !== 'undefined' && CommentBank.withDeadline) {
-      const iso = rating && rating.ieDeadline;
-      const ok = !iso || !CommentBank.deadlineOk || CommentBank.deadlineOk(cid, iso);
-      narrative = CommentBank.withDeadline(narrative, iso, ok);
-    }
+    const isHtml = HTML_COMMENT.test(String(narrative));
+    narrative = printableComment(cid, rating, narrative);
     const content = isHtml
       ? sanitizeNarrativeHtml(narrative.trim())
       : narrative
@@ -2176,6 +2184,7 @@ window.ReportBlocks = (function () {
     renderBlockLearnerDimensions: renderBlockLearnerDimensions,
     renderBlockTeacherNarrative: renderBlockTeacherNarrative,
     renderCommentBox: renderCommentBox,
+    printableComment: printableComment,
     renderBlockCompetencyTable: renderBlockCompetencyTable,
     renderBlockObservations: renderBlockObservations,
     renderBlockSectionOutcomes: renderBlockSectionOutcomes,
