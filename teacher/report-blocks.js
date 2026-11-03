@@ -1558,9 +1558,9 @@ window.ReportBlocks = (function () {
      competency over its latest few pieces of work, each row the mark on
      that competency). Newest or oldest first; one column or two, a
      heading never split across columns. Range: the last 10, this term or
-     the year to date (all, leaving out work dated after today). It starts
-     in one column, by date, year to date. Side by Side is one column of the
-     last 10 (never by competency). No dots (DECISIONS "Report forms" 13). */
+     the year to date (all); the last 10 and the year to date leave out
+     work dated after today. It starts in one column, by date, year to
+     date. Side by Side is one column of the last 10 (never by competency). No dots (DECISIONS "Report forms" 13). */
   function showDefaults(cid) {
     const mode = courseGradeMode(cid);
     return { percent: mode !== 'proficiency', word: mode !== 'letter' };
@@ -1626,10 +1626,11 @@ window.ReportBlocks = (function () {
       .sort((x, y) => (y.d || '').localeCompare(x.d || ''));
     let pool = dated;
     if (range === 'term') pool = dated.filter(x => assessmentInActiveTerm(cid, x.a));
-    else if (range === 'last10') pool = dated.slice(0, 10);
     else {
+      // Year to Date and Last 10 leave out work dated after today.
       const today = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
       pool = dated.filter(x => !x.d || x.d <= today);
+      if (range === 'last10') pool = pool.slice(0, 10);
     }
     if (oldest) pool = pool.slice().reverse();
     if (!pool.length) return '';
