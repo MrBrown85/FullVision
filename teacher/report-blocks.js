@@ -230,14 +230,14 @@ window.ReportBlocks = (function () {
   </div>`;
   }
 
-  /* The line at the top of a Continued side, so a loose sheet names its
+  /* The line at the top of every side after the Front, so a loose sheet names its
      student: the name as the letterhead prints it, the class and block.
      options: the letterhead's ({ name }). */
   function renderContinuedLine(cid, student, options) {
     const course = COURSES[cid] || {};
     const block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
     const parts = [printedStudentName(student, (options || {}).name), course.name, block].filter(Boolean);
-    return `<div class="sheet-continued">${esc(parts.join(' \u00B7 '))} (continued)</div>`;
+    return `<div class="sheet-name-line">${esc(parts.join(' \u00B7 '))} (continued)</div>`;
   }
 
   /* ctx: the report ({ termId }); its reporting basis can print IE, or No

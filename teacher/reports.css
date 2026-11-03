@@ -1236,8 +1236,8 @@
   flex: 0 0 auto;
   margin-top: auto;
 }
-/* The line naming the student at the top of a Continued side. */
-.sheet-continued {
+/* The line naming the student at the top of every side after the Front. */
+.sheet-name-line {
   flex: 0 0 auto;
   font-family: var(--font-base);
   font-size: var(--text-xs);
