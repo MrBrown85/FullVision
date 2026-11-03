@@ -48,6 +48,8 @@ function loadSupabase(queueStats) {
     },
   };
   globalThis.addEventListener = () => {};
+  // teacher/ui.js (loaded by the test setup) closes the Undo toast; no toast here.
+  globalThis.dismissUndoToast = () => {};
   try {
     globalThis.location = { pathname: '/teacher/app.html', hostname: 'fullvision.ca', href: '' };
   } catch {
@@ -123,6 +125,34 @@ describe('signOut and unsent offline changes', () => {
     loadSupabase({ queued: 0, deadLettered: 0 });
     await window.signOut();
     expect(globalThis.__signOutOpts).toEqual({ scope: 'local' });
+  });
+
+  describe('a delete still in its Undo window', () => {
+    it('commits before the wipe, so nothing it saves stays on the device', async () => {
+      loadSupabase({ queued: 0, deadLettered: 0 });
+      let pending = true;
+      globalThis.dismissUndoToast = () => {
+        if (!pending) return;
+        pending = false;
+        localStorage.setItem('gb-scores-c1', '{"s1":[]}');
+      };
+      await window.signOut();
+      // The Gradebook's pagehide listener closes the toast as the page goes.
+      globalThis.dismissUndoToast();
+      expect(localStorage.getItem('gb-scores-c1')).toBeNull();
+      expect(window.location.href).toBe('/login.html');
+    });
+
+    it('counts as unsent when the delete has not reached the server', async () => {
+      const stats = { queued: 0, deadLettered: 0 };
+      loadSupabase(stats);
+      globalThis.dismissUndoToast = () => {
+        stats.queued = 1;
+      };
+      const res = await window.signOut();
+      expect(res).toEqual({ unsent: 1 });
+      expect(window.location.href).toBe('');
+    });
   });
 
   it('never signs a teacher out for being idle', () => {
