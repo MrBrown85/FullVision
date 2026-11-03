@@ -2242,7 +2242,10 @@ window.PageAssignments = (function () {
   }
   function _afTipOver(e) {
     var el = _afTipTarget(e);
-    if (el && el !== _afTipSource) _showAfTip(el, false);
+    if (!el || el === _afTipSource) return;
+    _afAfterPause(el, function () {
+      _showAfTip(el, false);
+    });
   }
   function _afTipOut(e) {
     var el = _afTipTarget(e);
@@ -2256,7 +2259,7 @@ window.PageAssignments = (function () {
   }
   function _afTipFocus(e) {
     var el = _afTipTarget(e);
-    if (el) _showAfTip(el, true);
+    if (el && _byKeyboard(e)) _showAfTip(el, true);
   }
   function _afTipBlur(e) {
     var el = _afTipTarget(e);
@@ -2380,8 +2383,6 @@ window.PageAssignments = (function () {
   // One row of the competency checklist. The row reads the competency's own
   // wording; the section name (often just the category) is the last fallback.
   var _afIcanSeq = 0;
-  // Each competency's scored count, set while the form's rows are drawn.
-  var _afTagCounts = null;
   function _afTagRow(sec, selTags) {
     var tag = sec.tags[0];
     if (!tag) return '';
@@ -2421,13 +2422,6 @@ window.PageAssignments = (function () {
       '<span class="af-tag-name">' +
       esc(wording) +
       '</span>' +
-      (_afTagCounts
-        ? '<span class="af-tag-n' +
-          ((_afTagCounts[tag.id] || 0) <= 1 ? ' is-thin' : '') +
-          '">' +
-          (_afTagCounts[tag.id] || 0) +
-          '</span>'
-        : '') +
       '</label>' +
       (icans.length
         ? '<button type="button" class="af-tag-ican-toggle" data-action="afToggleIcans" aria-expanded="false" aria-controls="' +
@@ -2729,7 +2723,6 @@ window.PageAssignments = (function () {
     // Tags — grouped by competency group
     var lm = getLearningMap(cid);
     var compGroups = (lm && lm.competencyGroups) || [];
-    _afTagCounts = _compCounts(cid, assess ? assess.id : null);
     html +=
       '<section class="af-card af-card-competencies" data-view="' +
       _compView() +
@@ -2791,7 +2784,6 @@ window.PageAssignments = (function () {
       });
     }
     html += '</div></div>' + _untaggedNote(cid, selTags.length > 0) + '<div id="af-tag-rubric"></div>';
-    _afTagCounts = null;
 
     // Core Competencies
     var selCC = assess ? assess.coreCompetencyIds || [] : [];
@@ -3630,9 +3622,9 @@ window.PageAssignments = (function () {
      the focus box with its wording and I Can statements. List: the rows
      below, one line each. The checkboxes in the list are the form's
      record either way: a chip ticks its checkbox, so saving, a rubric's
-     own ticks and the I Can toggles are unchanged. Same As repeats a
-     recent assessment's competencies. With a rubric they're the rubric's,
-     shown read only. */
+     own ticks and the I Can toggles are unchanged. With a rubric they're
+     the rubric's, shown read only. (Same As was removed, Colin, Nov 2: it
+     looked like a row of competencies.) */
   var COMP_VIEW_KEY = 'fv-assess-comp-view';
   function _compView() {
     try {
@@ -3663,25 +3655,6 @@ window.PageAssignments = (function () {
     return counts;
   }
 
-  // The three most recent distinct sets of competencies, for Same As.
-  function _recentTagSets(cid, exceptId) {
-    var seen = {};
-    return getAssessments(cid)
-      .filter(function (a) {
-        return a && a.id !== exceptId && (a.tagIds || []).length > 0;
-      })
-      .sort(function (a, b) {
-        return String(b.dateAssigned || b.date || '').localeCompare(String(a.dateAssigned || a.date || ''));
-      })
-      .filter(function (a) {
-        var key = a.tagIds.slice().sort().join(' ');
-        if (seen[key]) return false;
-        seen[key] = true;
-        return true;
-      })
-      .slice(0, 3);
-  }
-
   function _compPickerHtml(cid, assess, sections, compGroups) {
     if (!sections.length) return '';
     var counts = _compCounts(cid, assess ? assess.id : null);
@@ -3710,29 +3683,6 @@ window.PageAssignments = (function () {
     var twoCourses = subjects.length > 1;
     var lastSubject = null;
     var html = '';
-    var sets = _recentTagSets(cid, assess ? assess.id : null);
-    if (sets.length) {
-      html +=
-        '<div class="af-same-as" id="af-same-as"><span class="af-same-as-label">Same As</span>' +
-        sets
-          .map(function (a) {
-            var codes = a.tagIds.map(function (t) {
-              var tag = getTagById(cid, t);
-              return (tag && tag.code) || t;
-            });
-            return (
-              '<button type="button" class="af-same-as-btn" data-action="sameAsTags" data-tags="' +
-              esc(a.tagIds.join(',')) +
-              '">' +
-              esc(a.title) +
-              ' <span class="af-same-as-codes">' +
-              esc(codes.join(' ')) +
-              '</span></button>'
-            );
-          })
-          .join('') +
-        '</div>';
-    }
     html += '<div class="af-codes" id="af-codes">';
     rows.forEach(function (row) {
       if (twoCourses && row.subject && row.subject !== lastSubject) {
@@ -3753,9 +3703,9 @@ window.PageAssignments = (function () {
         if (!tag) return;
         var n = counts[tag.id] || 0;
         html +=
-          '<button type="button" class="af-code' +
-          (n <= 1 ? ' is-thin' : '') +
-          '" data-action="toggleCode" data-tag="' +
+          // How often it's been scored shows in the focus box, not on the
+          // chip (Colin, Nov 2: the numbers were a distraction).
+          '<button type="button" class="af-code" data-action="toggleCode" data-tag="' +
           esc(tag.id) +
           '" data-group="' +
           esc(row.name) +
@@ -3765,12 +3715,7 @@ window.PageAssignments = (function () {
           esc(tag.code || tag.id) +
           '</b>' +
           esc(tag.label || tag.shortName || sec.name || '') +
-          '<span class="af-code-n" aria-label="scored ' +
-          n +
-          (n === 1 ? ' time' : ' times') +
-          '">' +
-          n +
-          '</span></button>';
+          '</button>';
       });
       html += '</span></div>';
     });
@@ -3781,7 +3726,7 @@ window.PageAssignments = (function () {
     return html;
   }
 
-  // Chips, header chips, the rubric note and Same As follow the checkboxes.
+  // Chips, header chips and the rubric note follow the checkboxes.
   function _syncCodes() {
     var card = document.querySelector('.af-card-competencies');
     if (!card) return;
@@ -3836,8 +3781,8 @@ window.PageAssignments = (function () {
     _syncCodes();
   }
 
-  // Same As: exactly that assessment's competencies.
-  function sameAsTags(tagIds) {
+  // Ticks exactly these competencies (Start From a Past Assessment).
+  function _tickExactly(tagIds) {
     var want = String(tagIds || '')
       .split(',')
       .filter(Boolean);
@@ -3890,9 +3835,31 @@ window.PageAssignments = (function () {
     var r = chip.getBoundingClientRect();
     box.style.setProperty('--af-point', Math.max(16, Math.round(r.left + r.width / 2 - boxRect.left - 8)) + 'px');
   }
+  /* Hover-overs wait for a pause (Colin, Nov 2: teachers are clicking and
+     only need them when they linger). A chip or field reached with the
+     keyboard shows at once; a click's focus waits like a hover. */
+  var AF_HOVER_DELAY = 500;
+  var _afHoverTimer = null;
+  function _afAfterPause(el, show) {
+    clearTimeout(_afHoverTimer);
+    _afHoverTimer = setTimeout(function () {
+      _afHoverTimer = null;
+      if (document.body.contains(el) && el.matches(':hover')) show();
+    }, AF_HOVER_DELAY);
+  }
+  function _byKeyboard(e) {
+    return !!(e.target && e.target.matches && e.target.matches(':focus-visible'));
+  }
   function _codeHover(e) {
     var chip = e.target && e.target.closest ? e.target.closest('.af-code') : null;
-    if (chip) _showCodeFocus(chip);
+    if (!chip) return;
+    if (e.type === 'focusin') {
+      if (_byKeyboard(e)) _showCodeFocus(chip);
+      return;
+    }
+    _afAfterPause(chip, function () {
+      _showCodeFocus(chip);
+    });
   }
 
   // Type to narrow the chips and the list; Enter ticks the first match.
@@ -4481,7 +4448,7 @@ window.PageAssignments = (function () {
     } else rubric = null;
     if (!rubric) {
       var ids = srcCid === cid ? a.tagIds || [] : AssessmentCopy.mapTags(srcCid, cid, a.tagIds).ids;
-      sameAsTags(ids.join(','));
+      _tickExactly(ids.join(','));
     }
     var cc = a.coreCompetencyIds || [];
     document.querySelectorAll('.af-cc-chip').forEach(function (chip) {
@@ -8889,9 +8856,6 @@ window.PageAssignments = (function () {
       },
       toggleCode: function () {
         toggleCode(el);
-      },
-      sameAsTags: function () {
-        sameAsTags(el.dataset.tags);
       },
       setCompView: function () {
         setCompView(el.dataset.view);
