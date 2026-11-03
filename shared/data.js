@@ -9668,7 +9668,9 @@ function getScores(cid) {
     return {};
   }
 }
-function saveScores(cid, obj) {
+// fillUndone: how many entries restoreScoreCells took out because the fill
+// it undoes added them. Only those may take the entry count past the guard.
+function saveScores(cid, obj, fillUndone) {
   _applyIdRekeysToScores(cid, obj);
   // The baseline is read in the same key space as the scores, or a copy
   // saved with rubric scores under competencies would make every criterion
@@ -9700,7 +9702,7 @@ function saveScores(cid, obj) {
     newEntries = 0;
   if (prev) for (var _ps in prev) prevEntries += (prev[_ps] || []).length;
   if (obj) for (var _ns in obj) newEntries += (obj[_ns] || []).length;
-  if (prevEntries > 10 && newEntries < prevEntries * 0.3) {
+  if (prevEntries > 10 && newEntries + (fillUndone || 0) < prevEntries * 0.3) {
     console.error(
       '[GUARD] BLOCKED scores save — entry-count dropped from',
       prevEntries,
@@ -9727,26 +9729,49 @@ function saveScores(cid, obj) {
 
 /* Undo for a fill: put back only the cells it changed (`before` against
    `after`, both copies of the class's scores) that still hold what it
-   wrote. Anything scored since, on this work or any other, stays. */
+   wrote. Anything scored since, on this work or any other, stays.
+   A cell is compared by its score and +/− only: a refresh from the server
+   a few seconds after the fill rebuilds every entry with the server's id
+   and dates, and the cell still holds what the fill wrote. A proficiency 0
+   and no entry are the same unscored cell (the server deletes a 0). */
 function restoreScoreCells(cid, before, after) {
   var now = getScores(cid);
   var next = structuredClone(now);
   var was = _scoreEntriesByKey(before);
   var made = _scoreEntriesByKey(after);
   var cur = _scoreEntriesByKey(next);
+  var value = function (x) {
+    if (!x || !isScoreEntered(_assessmentById(cid, x.entry.assessmentId), x.entry)) return '';
+    return String(Number(x.entry.score)) + ':' + (x.entry.mod || 0);
+  };
+  var removed = 0;
   var same = function (x, y) {
-    return x && y ? JSON.stringify(x.entry) === JSON.stringify(y.entry) : !x && !y;
+    return value(x) === value(y);
   };
   Object.keys(Object.assign({}, was, made)).forEach(function (key) {
     if (same(was[key], made[key]) || !same(cur[key], made[key])) return;
     var sid = (was[key] || made[key]).sid;
     var list = next[sid] || (next[sid] = []);
     var at = cur[key] ? list.indexOf(cur[key].entry) : -1;
-    if (!was[key]) list.splice(at, 1);
-    else if (at >= 0) list[at] = structuredClone(was[key].entry);
-    else list.push(structuredClone(was[key].entry));
+    if (at < 0) {
+      if (was[key]) list.push(structuredClone(was[key].entry));
+      return;
+    }
+    var entry = list[at];
+    // Proficiency work the fill scored goes back to 0, unscored, as a click
+    // that clears a level leaves it. On points and Complete/Incomplete work
+    // 0 is a score, so an entry the fill added goes, and saveScores is told
+    // how many so its data-loss guard allows that drop and no more.
+    if (!was[key] && isPointsScored(_assessmentById(cid, entry.assessmentId))) {
+      list.splice(at, 1);
+      removed++;
+    } else {
+      entry.score = was[key] ? was[key].entry.score : 0;
+      if (was[key] && was[key].entry.mod) entry.mod = was[key].entry.mod;
+      else delete entry.mod;
+    }
   });
-  saveScores(cid, next);
+  saveScores(cid, next, removed);
   if (getScores(cid) === next) persistScoreDiffToCanonical(cid, now, next);
 }
 

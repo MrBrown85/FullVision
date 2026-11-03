@@ -105,7 +105,8 @@ test('Undo on Set Everyone To puts back only the fill', async ({ page }) => {
     page.evaluate(
       ([c, a, t]) => {
         const e = (getScores(c)['stu-001'] || []).find(x => x.assessmentId === a && x.tagId === t);
-        return e ? e.score : null;
+        // 0 is unscored on proficiency work.
+        return e && e.score ? e.score : null;
       },
       [cid, aid, tid],
     );
