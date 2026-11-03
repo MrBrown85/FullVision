@@ -3216,37 +3216,64 @@ window.PageAssignments = (function () {
     }
     var count = rubricsListCount(cid);
     var last = _lastUsedRubric(cid);
-    // Blank first (Colin, Nov 2), then Choose and Copy.
-    // html-safe: fixed labels, counts, _startCardHtml (escapes its values) and esc() on the last-used name and id
-    view.innerHTML =
-      '<div class="af-rubric-starts">' +
-      '<button type="button" class="af-rubric-start' +
-      (_startOpen === 'blank' ? ' is-open' : '') +
-      '" data-action="newRubricFromForm" data-start="blank" aria-expanded="' +
-      (_startOpen === 'blank') +
-      '"><b>Blank Rubric</b><span>Start from nothing.</span></button>' +
-      '<button type="button" class="af-rubric-start' +
-      (_startOpen === 'choose' ? ' is-open' : '') +
-      '" data-action="chooseRubric" aria-expanded="' +
-      (_startOpen === 'choose') +
-      '"' +
-      (count ? '' : ' disabled') +
-      '><b>Choose a Rubric</b><span>' +
-      esc(
-        count
+    var canCopy = _copySources(cid).length > 0;
+    // Blank first (Colin, Nov 2), then Choose and Copy. A tab list (PR 7):
+    // one Tab stop, ← → Home End between the starts, Enter or Space opens.
+    var starts = [
+      { name: 'blank', action: 'newRubricFromForm', label: 'Blank Rubric', short: 'Blank', sub: 'Start from nothing.' },
+      {
+        name: 'choose',
+        action: 'chooseRubric',
+        label: 'Choose a Rubric',
+        short: 'Choose',
+        sub: count
           ? 'From this class’s ' + count + (count === 1 ? ' rubric.' : ' rubrics.')
           : 'This class has no rubrics yet.',
-      ) +
-      '</span></button>' +
-      '<button type="button" class="af-rubric-start' +
-      (_startOpen === 'copy' ? ' is-open' : '') +
-      '" data-action="rubricFromClass" data-start="copy" aria-expanded="' +
-      (_startOpen === 'copy') +
-      '"' +
-      (_copySources(cid).length ? '' : ' disabled') +
-      '><b>Copy From Another Class</b><span>' +
-      esc(_copySources(cid).length ? 'Any of your classes.' : 'You have no other classes.') +
-      '</span></button>' +
+        off: !count,
+      },
+      {
+        name: 'copy',
+        action: 'rubricFromClass',
+        label: 'Copy From Another Class',
+        short: 'Copy',
+        sub: canCopy ? 'Any of your classes.' : 'You have no other classes.',
+        off: !canCopy,
+      },
+    ];
+    var stop = _startOpen || 'blank';
+    // html-safe: fixed labels, counts, _startCardHtml (escapes its values) and esc() on the last-used name and id
+    view.innerHTML =
+      '<div class="af-rubric-starts" role="tablist" aria-label="Start a Rubric">' +
+      starts
+        .map(function (st) {
+          var open = _startOpen === st.name;
+          return (
+            '<button type="button" class="af-rubric-start' +
+            (open ? ' is-open' : '') +
+            '" role="tab" id="af-start-tab-' +
+            st.name +
+            '" aria-selected="' +
+            open +
+            '"' +
+            (open ? ' aria-controls="af-start-panel"' : '') +
+            ' tabindex="' +
+            (st.name === stop ? '0' : '-1') +
+            '" data-action="' +
+            st.action +
+            '" data-start="' +
+            st.name +
+            '"' +
+            (st.off ? ' disabled' : '') +
+            '><b class="af-start-name">' +
+            st.label +
+            '</b><b class="af-start-short">' +
+            st.short +
+            '</b><span>' +
+            esc(st.sub) +
+            '</span></button>'
+          );
+        })
+        .join('') +
       '</div>' +
       (_startOpen ? _startCardHtml(cid, _startOpen, false) : '') +
       (last && (!_startOpen || _startOpen === 'blank')
@@ -3256,8 +3283,8 @@ window.PageAssignments = (function () {
           esc(last.id) +
           '">Use It Again</button></p>'
         : '');
-    var starts = view.querySelector('.af-rubric-starts');
-    if (starts) starts.classList.toggle('has-open', !!_startOpen);
+    var row = view.querySelector('.af-rubric-starts');
+    if (row) row.classList.toggle('has-open', !!_startOpen);
     _afterStartRender();
   }
 
@@ -3294,9 +3321,7 @@ window.PageAssignments = (function () {
     _startOpen = null;
     if (was === 'blank') _blank = null;
     _renderRubricView();
-    var back = document.querySelector(
-      was === 'choose' ? '[data-action="chooseRubric"]' : '.af-rubric-start[data-start="' + was + '"]',
-    );
+    var back = document.querySelector('.af-rubric-start[data-start="' + was + '"]');
     if (back) back.focus();
   }
 
@@ -3442,6 +3467,13 @@ window.PageAssignments = (function () {
   function _afterStartRender() {
     var card = document.querySelector('#af-rubric-view .af-start-card');
     if (!card) return;
+    // Under the starts, the open card is the tab's panel.
+    if (card.dataset.inPlace !== 'true' && document.getElementById('af-start-tab-' + card.dataset.start)) {
+      card.id = 'af-start-panel';
+      card.setAttribute('role', 'tabpanel');
+      card.removeAttribute('aria-label');
+      card.setAttribute('aria-labelledby', 'af-start-tab-' + card.dataset.start);
+    }
     if (card.dataset.start === 'blank') {
       _blankSizeCells();
       if (_blank && _blank.focusName) {
@@ -3522,7 +3554,35 @@ window.PageAssignments = (function () {
     }
   }
   // ↑ ↓ move, Enter uses, Esc closes.
+  // ← → Home End move between the starts that can open (a tab list).
+  function _startTabKey(e, tab) {
+    var keys = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' };
+    if (!(e.key in keys)) return;
+    var tabs = Array.from(document.querySelectorAll('#af-rubric-view .af-rubric-start[role="tab"]')).filter(
+      function (t) {
+        return !t.disabled;
+      },
+    );
+    if (!tabs.length) return;
+    e.preventDefault();
+    var at = tabs.indexOf(tab);
+    var step = keys[e.key];
+    var next =
+      step === 'first'
+        ? tabs[0]
+        : step === 'last'
+          ? tabs[tabs.length - 1]
+          : tabs[(at + step + tabs.length) % tabs.length];
+    tabs.forEach(function (t) {
+      t.tabIndex = t === next ? 0 : -1;
+    });
+    next.focus();
+    if (next.scrollIntoView) next.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
   function _startKeydown(e) {
+    var tab = e.target && e.target.closest ? e.target.closest('.af-rubric-start[role="tab"]') : null;
+    if (tab) return _startTabKey(e, tab);
     var card = e.target && e.target.closest ? e.target.closest('.af-start-card') : null;
     if (!card) return;
     if (e.key === 'Escape') {

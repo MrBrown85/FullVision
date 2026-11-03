@@ -1687,10 +1687,30 @@
   min-width: 0;
   height: 40px;
 }
+/* The rubric cards' and starts' greys (rubric starts PR 7): the light
+   values are the Competency Rubric card's own; dark mode gets its own. */
+:root {
+  --af-grey: #f2f2f4;
+  --af-grey-quiet: #f8f8fa;
+  --af-line: #c7c7cc;
+  --af-code: #0e7490;
+  --af-cell-edge: #e0e0e5;
+  --af-card-edge: rgba(0, 0, 0, 0.1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --af-grey: #3a3a3c;
+    --af-grey-quiet: #242426;
+    --af-line: #636366;
+    --af-code: #5ec4d8;
+    --af-cell-edge: #48484a;
+    --af-card-edge: rgba(255, 255, 255, 0.12);
+  }
+}
 .af-rubric-card {
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0 0 1px var(--af-card-edge);
   background: var(--surface);
 }
 .af-rubric-card-head {
@@ -1699,7 +1719,7 @@
   gap: 10px;
   flex-wrap: wrap;
   padding: 10px 12px;
-  background: #f2f2f4;
+  background: var(--af-grey);
 }
 .af-rubric-card-name {
   font-weight: 700;
@@ -1754,9 +1774,32 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
-@media (max-width: 600px) {
+/* Under 900px the starts are one row of short names that scrolls
+   sideways (rubric starts PR 7). */
+.af-rubric-start .af-start-short {
+  display: none;
+}
+@media (max-width: 900px) {
   .af-rubric-starts {
-    grid-template-columns: minmax(0, 1fr);
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .af-rubric-starts::-webkit-scrollbar {
+    display: none;
+  }
+  .af-rubric-start {
+    flex: 0 0 auto;
+    padding: 10px 16px;
+  }
+  .af-rubric-start .af-start-name,
+  .af-rubric-start span {
+    display: none;
+  }
+  .af-rubric-start .af-start-short {
+    display: block;
+    white-space: nowrap;
   }
 }
 .af-rubric-start {
@@ -1766,7 +1809,7 @@
   padding: 12px 14px;
   border: 0;
   border-radius: 10px;
-  background: #f2f2f4;
+  background: var(--af-grey);
   font-family: var(--font-base);
   color: var(--text);
   text-align: left;
@@ -1796,7 +1839,7 @@
 }
 .af-tag-rubric-note {
   padding: 8px 12px;
-  background: #f2f2f4;
+  background: var(--af-grey);
   font-size: var(--text-sm);
   color: var(--text-2);
 }
@@ -7671,7 +7714,7 @@ button.grader-member-name {
    The open start runs into its card's grey head; the others step back.
    The card is the Competency Rubric's card with a deeper shadow. */
 .af-rubric-starts.has-open .af-rubric-start {
-  background: #f8f8fa;
+  background: var(--af-grey-quiet);
 }
 .af-rubric-starts.has-open .af-rubric-start b {
   color: var(--text-2);
@@ -7685,7 +7728,7 @@ button.grader-member-name {
   margin-bottom: -10px;
   padding-bottom: 22px;
   border-radius: 10px 10px 0 0;
-  background: #f2f2f4;
+  background: var(--af-grey);
 }
 .af-rubric-starts.has-open .af-rubric-start.is-open b {
   color: var(--active);
@@ -7697,7 +7740,7 @@ button.grader-member-name {
   position: relative;
   z-index: 2;
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.1),
+    0 0 0 1px var(--af-card-edge),
     0 4px 8px rgba(0, 0, 0, 0.06),
     0 16px 36px rgba(0, 0, 0, 0.14);
 }
@@ -7707,9 +7750,24 @@ button.grader-member-name {
 .af-start-card.joins-right {
   border-top-right-radius: 0;
 }
+/* In the narrow scrolling row the open start can't reach down into its
+   card, so it is marked by its colour and the card sits under the row. */
+@media (max-width: 900px) {
+  .af-rubric-starts.has-open .af-rubric-start.is-open {
+    margin-bottom: 0;
+    padding-bottom: 10px;
+    border-radius: 10px;
+  }
+  .af-start-card.af-rubric-card,
+  .af-start-card.joins-left,
+  .af-start-card.joins-right {
+    margin-top: 8px;
+    border-radius: 10px;
+  }
+}
 .af-start-codes {
   font-weight: 700;
-  color: #0e7490;
+  color: var(--af-code);
   letter-spacing: 0.01em;
 }
 .af-start-pick {
@@ -7797,7 +7855,7 @@ button.grader-member-name {
 }
 .af-start-preview::-webkit-scrollbar-thumb {
   border-radius: 4px;
-  background: #c7c7cc;
+  background: var(--af-line);
 }
 .af-start-preview::-webkit-scrollbar-track {
   border-radius: 4px;
@@ -7871,7 +7929,7 @@ button.grader-member-name {
 .af-ge-crit-name {
   width: 100%;
   border: 0;
-  border-bottom: 1px dashed #c7c7cc;
+  border-bottom: 1px dashed var(--af-line);
   border-radius: 0;
   padding: 2px 0;
   background: transparent;
@@ -7896,13 +7954,13 @@ button.grader-member-name {
   height: 26px;
   padding: 0 4px 0 8px;
   border-radius: 4px;
-  background: #f2f2f4;
+  background: var(--af-grey);
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
 }
 .af-ge-chip b {
-  color: #0e7490;
+  color: var(--af-code);
 }
 .af-ge-x {
   border: 0;
@@ -7947,7 +8005,7 @@ button.grader-member-name {
   border-radius: 10px;
   background: var(--surface);
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.1),
+    0 0 0 1px var(--af-card-edge),
     0 12px 28px rgba(0, 0, 0, 0.16);
   font-size: var(--text-sm);
   font-weight: 400;
@@ -8038,7 +8096,7 @@ button.grader-member-name {
   outline: none;
 }
 .af-ge-pick b {
-  color: #0e7490;
+  color: var(--af-code);
   min-width: 36px;
 }
 .af-ge-cell {
@@ -8054,7 +8112,7 @@ button.grader-member-name {
   border-radius: 6px;
   padding: 6px 8px;
   background: transparent;
-  box-shadow: inset 0 0 0 1px #e0e0e5;
+  box-shadow: inset 0 0 0 1px var(--af-cell-edge);
   font: inherit;
   font-size: var(--text-sm);
   line-height: 1.45;
@@ -8082,7 +8140,7 @@ button.grader-member-name {
   flex: 1;
   min-width: 0;
   border: 0;
-  border-bottom: 1px dashed #c7c7cc;
+  border-bottom: 1px dashed var(--af-line);
   background: transparent;
   font: inherit;
   color: var(--text);
