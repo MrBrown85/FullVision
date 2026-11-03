@@ -20,6 +20,8 @@ const ASSESSMENTS = [
   { id: 'month', title: 'Twenty-nine days ago', type: 'formative', date: '2026-09-30', tagIds: ['t1'] },
   { id: 'start', title: 'First day of term 1', type: 'summative', date: '2026-09-02', tagIds: ['t1'] },
   { id: 'old', title: 'Before term 1', type: 'summative', date: '2026-09-01', tagIds: ['t1'] },
+  // Bulk-added work can have no date.
+  { id: 'undated', title: 'Bulk added', type: 'formative', date: '', tagIds: ['t1'] },
 ];
 
 function mockDataLayer() {
@@ -117,5 +119,24 @@ describe('grade list dates in Vancouver', () => {
     saveDateRange('term:1');
     MGrade.renderPicker(CID);
     expect(visibleAfter('all').sort()).toEqual(['fair', 'month', 'start', 'week']);
+  });
+});
+
+describe('an undated assessment in the grade list', () => {
+  it('says No Date, not Invalid Date', () => {
+    const html = MGrade.renderPicker(CID);
+    expect(html).not.toContain('Invalid Date');
+    expect(html).toMatch(/<span>No Date<\/span><span>1 tag/);
+  });
+
+  it('is in no date range: not in Recent, This Week or Last 30 Days, only in All', () => {
+    MGrade.renderPicker(CID);
+    expect(visibleAfter('recent')).not.toContain('undated');
+    expect(visibleAfter('all')).toContain('undated');
+    for (const range of ['week', '30d']) {
+      saveDateRange(range);
+      MGrade.renderPicker(CID);
+      expect(visibleAfter('all')).not.toContain('undated');
+    }
   });
 });

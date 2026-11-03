@@ -221,18 +221,17 @@ window.PageDashboard = (function () {
         students = sortStudents(students, 'firstName').reverse();
         break;
       case 'overall-desc':
-        students = students.slice().sort(function (a, b) {
-          return getOverallProficiency(cid, b.id) - getOverallProficiency(cid, a.id);
-        });
-        break;
       case 'overall-asc':
+        // By the grade Overall shows (the course % in a Letter class);
+        // students with none go last either way.
+        var dir = sortMode === 'overall-asc' ? 1 : -1;
         students = students.slice().sort(function (a, b) {
-          var pa = getOverallProficiency(cid, a.id);
-          var pb = getOverallProficiency(cid, b.id);
-          if (pa === 0 && pb === 0) return 0;
-          if (pa === 0) return 1;
-          if (pb === 0) return -1;
-          return pa - pb;
+          var pa = studentOverallSortValue(cid, a.id);
+          var pb = studentOverallSortValue(cid, b.id);
+          if (pa == null && pb == null) return 0;
+          if (pa == null) return 1;
+          if (pb == null) return -1;
+          return (pa - pb) * dir;
         });
         break;
       case 'flagged':

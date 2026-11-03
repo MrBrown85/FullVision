@@ -137,3 +137,43 @@ test('+ and − step within the bonus limit, and the % shows beside the field', 
   await expect(pct).toHaveText('90%');
   await expect(pct.locator('.gb-pts-bonus')).toHaveCount(0);
 });
+
+// + and − used to read the maximum as a whole number: out of 12.5 the %
+// came out of 12 and + stopped at 24, short of the typing limit of 25.
+test('+ and − use a decimal maximum for the % and the bonus limit', async ({ page }) => {
+  await page.goto('/login.html');
+  await page.locator('#demo-mode-btn').click();
+  await page.waitForURL(/teacher-mobile\//);
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const list = getAssessments(cid).map(a =>
+      a.title === 'Mid-Year Comprehensive Exam' ? { ...a, maxPoints: 12.5 } : a,
+    );
+    saveAssessments(cid, list);
+  });
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('.m-seg-btn[data-action="m-grade-seg"][data-val="all"]').click();
+  await page.locator('#m-grade-list .m-cell', { hasText: 'Mid-Year Comprehensive Exam' }).click();
+  await expect(page.locator('#m-swiper')).toBeVisible();
+  await page.waitForTimeout(500);
+  const card = page.locator('.m-swiper-card').first();
+  const sid = await card.getAttribute('data-sid');
+  const field = card.locator('.m-pts-input');
+  const pct = card.locator('.m-pts-pct');
+
+  await field.tap();
+  await page.keyboard.type('9');
+  await page.keyboard.press('Enter');
+  await card.locator('[data-action="m-grade-points-inc"]').click();
+  await expect(field).toHaveValue('10');
+  await expect(pct).toHaveText('80%');
+
+  await field.tap();
+  await page.keyboard.type('24.5');
+  await page.keyboard.press('Enter');
+  await card.locator('[data-action="m-grade-points-inc"]').click();
+  await expect(field).toHaveValue('25');
+  await expect(pct).toHaveText('200%bonus');
+  expect(await stored(page, sid)).toBe(25);
+});

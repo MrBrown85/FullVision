@@ -232,27 +232,41 @@
     });
   }
 
-  window.signOut = async function (opts) {
-    opts = opts || {};
-    const sb = getSupabase();
-    if (!sb) return;
-    // Give in-flight writes a moment to land. Anything still unsent after
-    // that sits in the outbox, which the check below reports.
-    if (typeof waitForPendingSyncs === 'function') {
-      await waitForPendingSyncs(5000);
-    }
-    if (!opts.force) {
-      const unsent = await _unsentQueueCount();
-      if (unsent > 0) return { unsent: unsent };
-    }
+  /* Sign Out in one tab signs the whole device out: the other open tabs clear
+     what they would save back and go to sign-in. Their wipe runs again on
+     pagehide, after the pages' own pagehide saves (a delete still in its Undo
+     window), so nothing those write stays. supabase-js's own SIGNED_OUT is
+     not used: a failed token refresh raises it too, and that must keep the
+     outbox. */
+  let _authChannel = null;
+
+  function _postSignedOut() {
     try {
-      // This device only: signing out of the laptop leaves the phone and other
-      // computers signed in (Supabase's default ends every session).
-      const { error } = await sb.auth.signOut({ scope: 'local' });
-      if (error) console.warn('Sign-out error (proceeding anyway):', error.message);
-    } catch (err) {
-      console.warn('Sign-out exception (proceeding anyway):', err);
+      if (_authChannel) _authChannel.postMessage({ type: 'signed-out' });
+    } catch (e) {
+      /* channel closed */
     }
+  }
+
+  function _onSignedOutElsewhere() {
+    if (/\/login\.html$/.test(window.location.pathname || '')) return;
+    _clearDeviceData();
+    window.addEventListener('pagehide', _clearDeviceData);
+    window.location.href = '/login.html';
+  }
+
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      _authChannel = new BroadcastChannel('fv-auth');
+      _authChannel.onmessage = function (e) {
+        if (e && e.data && e.data.type === 'signed-out') _onSignedOutElsewhere();
+      };
+    }
+  } catch (e) {
+    _authChannel = null;
+  }
+
+  function _clearDeviceData() {
     // Clear all application + auth data from localStorage (FOIPPA: no data left on shared computers)
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -277,6 +291,32 @@
     document.cookie.split(';').forEach(c => {
       document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/';
     });
+  }
+
+  window.signOut = async function (opts) {
+    opts = opts || {};
+    const sb = getSupabase();
+    if (!sb) return;
+    // Give in-flight writes a moment to land. Anything still unsent after
+    // that sits in the outbox, which the check below reports.
+    if (typeof waitForPendingSyncs === 'function') {
+      await waitForPendingSyncs(5000);
+    }
+    if (!opts.force) {
+      const unsent = await _unsentQueueCount();
+      if (unsent > 0) return { unsent: unsent };
+    }
+    try {
+      // This device only: signing out of the laptop leaves the phone and other
+      // computers signed in (Supabase's default ends every session).
+      const { error } = await sb.auth.signOut({ scope: 'local' });
+      if (error) console.warn('Sign-out error (proceeding anyway):', error.message);
+    } catch (err) {
+      console.warn('Sign-out exception (proceeding anyway):', err);
+    }
+    _clearDeviceData();
+    // The other open tabs leave too, so they do not save the class back.
+    _postSignedOut();
     // Clear service worker caches
     if ('caches' in window) {
       caches.keys().then(names => names.forEach(name => caches.delete(name)));

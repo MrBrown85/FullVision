@@ -819,8 +819,9 @@ window.DashInsights = (function () {
      with a count of students at each proficiency over it, and the class
      average under it. */
   /* The grid's column headings sort the list (the dashboard's sortMode):
-     Student by last name, Overall and each competency by proficiency, Last
-     Observed by days since. A second click turns the order round. */
+     Student by last name, Overall by the grade it shows (the course % in a
+     Letter class), each competency by proficiency, Last Observed by days
+     since. A second click turns the order round. */
   function gridSortOf(sortMode) {
     var m = /^(?:col:(.+)|obs):(asc|desc)$/.exec(sortMode || '');
     if (m) return { key: m[1] ? 'col:' + m[1] : 'obs', dir: m[2] };
