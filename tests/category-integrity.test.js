@@ -92,6 +92,23 @@ describe('category integrity', () => {
     expect(saved).toEqual([['k2']]);
   });
 
+  // Sweep Nov 3: after Save Categories this row took Save's place with the
+  // first category already chosen, so a second click on Save put older work
+  // in it without a word. Nothing is chosen for the teacher.
+  it('offers work with no category a move without choosing one', () => {
+    var main = { innerHTML: '' };
+    var mocked = document.getElementById;
+    document.getElementById = id => (id === 'main' ? main : mocked(id));
+    DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
+    var select = main.innerHTML.match(/<select[^>]*id="cm-cat-uncat-target"[^>]*>(.*?)<\/select>/);
+    expect(select).not.toBeNull();
+    expect(select[1]).toMatch(/^<option value="" selected>Choose a Category<\/option>/);
+
+    moveTarget = '';
+    DashClassManager.handleAction('cmCatAssignUncategorized', { dataset: {} });
+    expect(categoryOf('x3')).toBeUndefined();
+  });
+
   it('gives work with no category the one the teacher picks', () => {
     DashClassManager.handleAction('cmCatAssignUncategorized', { dataset: {} });
     expect(categoryOf('x3')).toBe('k2');
