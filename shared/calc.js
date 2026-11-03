@@ -1245,29 +1245,80 @@ function _criterionIndex(cid) {
   return index;
 }
 
-/* The criteria of an assessment's rubric that feed a competency; [] for
-   work with no rubric. A view can look them up once per column and pass
-   them to competencyLevelFromCriteria. */
-function rubricCriteriaForTag(cid, assessment, tagId) {
+/* The course's rubrics' whole-rubric competencies by rubric id. */
+function _rubricWholeIndex(cid) {
+  var key = _ck(cid) + ':whole';
+  if (_criterionIndexCache[key]) return _criterionIndexCache[key];
+  var index = {};
+  var rubrics = typeof getRubrics === 'function' ? getRubrics(cid) || [] : [];
+  rubrics.forEach(function (rubric) {
+    if (rubric && rubric.id && (rubric.tagIds || []).length) index[rubric.id] = rubric.tagIds.slice();
+  });
+  _criterionIndexCache[key] = index;
+  return index;
+}
+
+// The rubric an assessment is scored with, or null.
+function _assessmentRubric(cid, assessment) {
   var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
-  if (!rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return [];
-  var rubric = getRubricById(cid, rubricId);
+  if (!rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return null;
+  return getRubricById(cid, rubricId) || null;
+}
+
+/* The competencies an assessment's rubric scores as a whole (rubric.tagIds):
+   each gets one combined level per student (wholeRubricLevel), not one per
+   criterion. A competency is on the whole rubric or on criteria, never both;
+   where both, the whole rubric wins. [] for work with no rubric. */
+function rubricWholeTagIds(cid, assessment) {
+  var rubric = _assessmentRubric(cid, assessment);
+  return ((rubric && rubric.tagIds) || []).slice();
+}
+
+/* A student's combined level on a rubric assessment, for a whole-rubric
+   competency: the rubric's weighted 0-4 average (getRubricAssessmentScore)
+   as a percent of 4, read through the class's Points to Proficiency table,
+   as a points score is. { score, mod: 0, mixed: false, whole: true,
+   average }, or null when no criterion is scored. */
+function wholeRubricLevel(cid, sid, assessment) {
+  var entries = (getScores(cid)[sid] || []).filter(function (e) {
+    return e.assessmentId === assessment.id;
+  });
+  var average = getRubricAssessmentScore(cid, assessment, entries);
+  if (average == null) return null;
+  return {
+    score: pointsToProf(average, 4, getGradingScale(cid)),
+    mod: 0,
+    mixed: false,
+    whole: true,
+    average: average,
+  };
+}
+
+/* The criteria of an assessment's rubric that feed a competency (every
+   criterion, for a whole-rubric competency); [] for work with no rubric. A
+   view can look them up once per column and pass them to
+   competencyLevelFromCriteria. */
+function rubricCriteriaForTag(cid, assessment, tagId) {
+  var rubric = _assessmentRubric(cid, assessment);
+  var whole = ((rubric && rubric.tagIds) || []).indexOf(tagId) >= 0;
   return ((rubric && rubric.criteria) || []).filter(function (c) {
-    return c && c.id && (c.tagIds || []).indexOf(tagId) >= 0;
+    return c && c.id && (whole || (c.tagIds || []).indexOf(tagId) >= 0);
   });
 }
 
-/* The competencies a rubric assessment scores, through its criteria, in
-   criterion order without repeats; [] for work with no rubric. */
+/* The competencies a rubric assessment scores, through its criteria in
+   criterion order, then the whole rubric's, without repeats; [] for work
+   with no rubric. */
 function rubricCompetencyIds(cid, assessment) {
-  var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
-  if (!rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return [];
-  var rubric = getRubricById(cid, rubricId);
+  var rubric = _assessmentRubric(cid, assessment);
   var out = [];
   ((rubric && rubric.criteria) || []).forEach(function (c) {
     ((c && c.tagIds) || []).forEach(function (t) {
       if (out.indexOf(t) < 0) out.push(t);
     });
+  });
+  ((rubric && rubric.tagIds) || []).forEach(function (t) {
+    if (out.indexOf(t) < 0) out.push(t);
   });
   return out;
 }
@@ -1277,8 +1328,10 @@ function rubricCompetencyIds(cid, assessment) {
    several that agree give that; several that disagree give the lowest,
    ± counted (3− is below 3), with its ±, marked mixed. Null when none is scored or
    the work has no rubric. Competency proficiency itself counts each
-   criterion as its own evidence (getTagScores). */
+   criterion as its own evidence (getTagScores). A whole-rubric competency
+   gets its one combined level (wholeRubricLevel). */
 function competencyLevelFromCriteria(cid, sid, assessment, tagId, criteria) {
+  if (rubricWholeTagIds(cid, assessment).indexOf(tagId) >= 0) return wholeRubricLevel(cid, sid, assessment);
   if (!criteria) criteria = rubricCriteriaForTag(cid, assessment, tagId);
   if (!criteria.length) return null;
   var entries = getScores(cid)[sid] || [];
@@ -1333,6 +1386,8 @@ function getTagScores(cid, studentId, tagId) {
   // Use Map for O(1) lookup instead of O(n) find() per score entry
   const assessMap = _getAssessMap(cid);
   const criteria = _criterionIndex(cid);
+  const wholeByRubric = _rubricWholeIndex(cid);
+  const wholeSeen = {};
   // In a term, a score only counts when its assessment is dated inside it.
   // All time keeps every score, including one whose assessment is gone.
   const termActive = !!_activeTerm[cid];
@@ -1340,13 +1395,26 @@ function getTagScores(cid, studentId, tagId) {
   studentScores.forEach(s => {
     let entry = s;
     if (s.tagId !== tagId) {
-      // A rubric criterion's score, under the criterion's id, is evidence
-      // for each competency the criterion feeds.
       const crit = criteria[s.tagId];
-      if (!crit || crit.tagIds.indexOf(tagId) < 0) return;
+      if (!crit) return;
       const a = assessMap.get(s.assessmentId);
       if (a && (a.rubricId || a.rubric_id) !== crit.rubricId) return;
-      entry = { ...s, tagId: tagId, criterionId: s.tagId, criterionName: crit.name };
+      if ((wholeByRubric[crit.rubricId] || []).indexOf(tagId) >= 0) {
+        // A whole-rubric competency: the rubric's criteria give one
+        // combined entry per assessment (wholeRubricLevel), made at the
+        // first of them.
+        if (!a || wholeSeen[s.assessmentId]) return;
+        wholeSeen[s.assessmentId] = true;
+        const whole = wholeRubricLevel(cid, studentId, a);
+        if (!whole) return;
+        entry = { ...s, tagId: tagId, score: whole.score, wholeRubric: true, rubricAverage: whole.average };
+        delete entry.mod;
+      } else {
+        // A rubric criterion's score, under the criterion's id, is evidence
+        // for each competency the criterion feeds.
+        if (crit.tagIds.indexOf(tagId) < 0) return;
+        entry = { ...s, tagId: tagId, criterionId: s.tagId, criterionName: crit.name };
+      }
     }
     if (termActive && !assessMap.has(entry.assessmentId)) return;
     const status = statuses[studentId + ':' + entry.assessmentId];
@@ -2682,6 +2750,8 @@ window.Calc = {
   getAssessmentGroupPercentage,
   rubricCompetencyIds,
   rubricCriteriaForTag,
+  rubricWholeTagIds,
+  wholeRubricLevel,
   competencyLevelFromCriteria,
   tagScoresByAssessment,
   assessmentCourseWorth,

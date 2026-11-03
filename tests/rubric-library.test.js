@@ -129,6 +129,14 @@ describe('rubric library', () => {
     expect(getRubrics(A)[0].criteria[0].tagIds).toEqual(['a-t1', 'a-t2']);
   });
 
+  it('maps the whole rubric’s competencies too', () => {
+    const src = Object.assign(labRubric(), { tagIds: ['a-t2'] });
+    src.criteria[0].tagIds = ['a-t1'];
+    expect(RubricLibrary.cloneRubric(A, B, src).tagIds).toEqual(['b-t2']);
+    expect(RubricLibrary.cloneRubric(A, H, src).tagIds).toEqual([]);
+    expect(RubricLibrary.cloneRubric(A, B, labRubric()).tagIds).toEqual([]);
+  });
+
   it('links the source and its copies with one copy group', async () => {
     const done = await RubricLibrary.copyTo(A, labRubric(), [B]);
     const src = getRubrics(A)[0];

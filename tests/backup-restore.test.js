@@ -192,6 +192,7 @@ function bundle() {
         { id: C2, rubric_id: R1, name: 'Build', weight: 1, display_order: 1 },
       ],
       criterion_tags: [{ criterion_id: C1, tag_id: T1 }],
+      rubric_tags: [{ rubric_id: R1, tag_id: T2 }],
       criterion_checks: [{ id: K1, criterion_id: C1, level: 3, label: 'Labels parts', display_order: 0 }],
     },
     observations: {
@@ -457,6 +458,8 @@ describe('restore class from backup', () => {
       weight: 2,
     });
     expect(plan.payload.criterion_tags).toEqual([{ criterion_id: id(C1), tag_id: id(T1) }]);
+    // The competencies the whole rubric scores (rubric starts PR 6).
+    expect(plan.payload.rubric_tags).toEqual([{ rubric_id: id(R1), tag_id: id(T2) }]);
     expect(plan.payload.criterion_checks).toEqual([
       { id: id(K1), criterion_id: id(C1), level: 3, label: 'Labels parts', display_order: 0 },
     ]);
