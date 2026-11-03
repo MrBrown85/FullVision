@@ -895,6 +895,9 @@
             var newCid = this.value;
             if (newCid && newCid !== _cid) {
               _cid = newCid;
+              // Screens left open on each tab belong to the old class.
+              _tabState = { students: null, observe: null, grade: null };
+              _gradeReturnSid = null;
               document.body.setAttribute('aria-busy', 'true');
               switchActiveCourse(newCid).then(
                 function (current) {
@@ -1270,7 +1273,7 @@
           pBtn.getAttribute('data-sid'),
           pBtn.getAttribute('data-aid'),
           delta,
-          parseInt(pBtn.getAttribute('data-max'), 10),
+          parseFloat(pBtn.getAttribute('data-max')) || 100,
         );
         return;
       }
