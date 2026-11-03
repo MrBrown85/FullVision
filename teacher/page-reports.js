@@ -791,7 +791,10 @@ window.PageReports = (function () {
     });
     var ctx = ReportBlocks.reportContext();
     var last = ReportIssues.latest(activeCourse, ctx.termId);
-    var changed = last ? ReportIssues.changedSince(last, hashes) : ids;
+    // Each student against their own last printed copy, not only the newest.
+    var changed = last
+      ? ReportIssues.changedSince({ hashes: ReportIssues.printedHashes(activeCourse, ctx.termId) }, hashes)
+      : ids;
     return { ids: ids, sheets: sheets, hashes: hashes, last: last, changed: changed, ctx: ctx, summary: s };
   }
 

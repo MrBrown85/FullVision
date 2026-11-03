@@ -3,11 +3,12 @@
  * issuing still records the index when IndexedDB is not there.
  */
 import './setup.js';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const CID = 'course-issues';
 
 beforeEach(() => localStorage.clear());
+afterEach(() => vi.useRealTimers());
 
 describe('ReportIssues', () => {
   it('hashes stably and differently', () => {
@@ -56,6 +57,56 @@ describe('ReportIssues', () => {
     };
     expect(ReportIssues.changedSince(res.entry, now)).toEqual(['s2', 's3']);
     expect(ReportIssues.changedSince(null, now)).toEqual(['s1', 's2', 's3']);
+  });
+
+  it('a report printed another day is not changed: the Missing Work "As of" date is left out of the hash', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const MW = 'course-issues-asof';
+    const st = { id: 's1', firstName: 'Noor', lastName: 'Khan' };
+    COURSES[MW] = { id: MW, name: 'Socials 9', gradingSystem: 'proficiency' };
+    _cache.students[MW] = [st];
+    _cache.assessments[MW] = [];
+    _cache.scores[MW] = {};
+    _cache.statuses[MW] = {};
+    const on = (day, options) => {
+      vi.setSystemTime(new Date(day + 'T19:00:00Z'));
+      return ReportBlocks.renderReportBlock('missing-work', MW, st, {}, options);
+    };
+    ['row', 'half'].forEach(size => {
+      const nov20 = on('2026-11-20', { size });
+      const nov21 = on('2026-11-21', { size });
+      expect(nov20).toContain('As of Nov 20, 2026');
+      expect(nov21).toContain('As of Nov 21, 2026');
+      expect(ReportIssues.hash(nov21)).toBe(ReportIssues.hash(nov20));
+    });
+    // Anything else in the report still counts.
+    expect(ReportIssues.hash(on('2026-11-21', {}) + '<p>a</p>')).not.toBe(ReportIssues.hash(on('2026-11-20', {})));
+    delete COURSES[MW];
+  });
+
+  it('after a partial print each student is compared with their own last printed copy', async () => {
+    const s = (sid, html) => ({ sid, name: sid, sheets: 1, html });
+    const issue = students =>
+      ReportIssues.issue({ cid: CID, termId: 'term-1', termLabel: 'Nov Report Card', paper: 'letter', students });
+    await issue([s('s1', '<p>a</p>'), s('s2', '<p>b</p>'), s('s3', '<p>c</p>')]);
+    // s2 changed and was printed alone ("Changed since the last print").
+    await issue([s('s2', '<p>b2</p>')]);
+    const printed = ReportIssues.printedHashes(CID, 'term-1');
+    const now = h => ReportIssues.hash(h);
+    expect(
+      ReportIssues.changedSince(
+        { hashes: printed },
+        { s1: now('<p>a</p>'), s2: now('<p>b2</p>'), s3: now('<p>c</p>') },
+      ),
+    ).toEqual([]);
+    expect(
+      ReportIssues.changedSince(
+        { hashes: printed },
+        { s1: now('<p>a2</p>'), s2: now('<p>b</p>'), s3: now('<p>c</p>'), s4: now('<p>d</p>') },
+      ),
+    ).toEqual(['s1', 's2', 's4']);
+    // Another term's copies are not used.
+    expect(ReportIssues.printedHashes(CID, 'term-2')).toEqual({});
   });
 
   it('labels an issue by when it went home', () => {

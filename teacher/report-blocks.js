@@ -1962,7 +1962,8 @@ window.ReportBlocks = (function () {
   /* ── Missing Work ────────────────────────────────────────────────
      This term's work labelled Missing, as of today: one line at
      Row width ("None this term", or the titles), a count over its words at
-     Side by Side. When there is none it says so, or stays off. */
+     Side by Side. When there is none it says so, or stays off. The As Of
+     date is marked data-print-date: "changed since the last print" skips it. */
   function _asOf(cid) {
     const d = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
     return (
@@ -1983,12 +1984,12 @@ window.ReportBlocks = (function () {
       : 'None this term';
     if (half) {
       return `<div class="report-block-box report-missing-work report-strip-half">
-    <div class="report-strip-head"><b>Missing Work</b><span class="report-prof-meta">${esc(_asOf(cid))}</span></div>
+    <div class="report-strip-head"><b>Missing Work</b><span class="report-prof-meta" data-print-date>${esc(_asOf(cid))}</span></div>
     <div class="report-strip-fig"><b>${n}</b><span>${words}</span></div>
   </div>`;
     }
     return `<div class="report-block-box report-missing-work report-strip">
-    <b class="report-strip-title">Missing Work</b><span>${words}</span><span class="report-strip-meta">${esc(_asOf(cid))}</span>
+    <b class="report-strip-title">Missing Work</b><span>${words}</span><span class="report-strip-meta" data-print-date>${esc(_asOf(cid))}</span>
   </div>`;
   }
 
