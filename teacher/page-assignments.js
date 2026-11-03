@@ -1918,6 +1918,36 @@ window.PageAssignments = (function () {
      there's room, so the next field stays in view). */
   var _afTipSource = null;
 
+  /* A folder's checkbox ticks or unticks every competency in it; it shows a
+     dash when only some are ticked (Colin, Nov 2). _syncCodes keeps it in
+     step with the competencies. */
+  function _afGroupBox(secs, name) {
+    return (
+      '<input type="checkbox" class="af-group-cb" data-tags="' +
+      esc(_afSecTagIds(secs)) +
+      '" data-action-change="tickGroup" aria-label="' +
+      esc('All of ' + name) +
+      '">'
+    );
+  }
+  function _tickGroup(box) {
+    var ids = String(box.dataset.tags || '')
+      .split(',')
+      .filter(Boolean);
+    var boxes = ids
+      .map(function (id) {
+        return document.querySelector('.af-tag-cb[value="' + CSS.escape(id) + '"]');
+      })
+      .filter(Boolean);
+    var allOn = boxes.every(function (cb) {
+      return cb.checked;
+    });
+    boxes.forEach(function (cb) {
+      if (cb.checked === allOn && !cb.disabled) cb.click();
+    });
+    _syncCodes();
+  }
+
   function _afSecTagIds(secs) {
     return (secs || [])
       .map(function (sec) {
@@ -2712,13 +2742,11 @@ window.PageAssignments = (function () {
         var gi = _afGroupMap[g.id];
         if (gi.secs.length === 0) return;
         html +=
-          '<div class="af-list-group"><div class="af-list-group-head">' +
-          '<span class="af-list-group-dot" style="background:' +
-          cssColor(g.color) +
-          '"></span>' +
+          '<div class="af-list-group"><label class="af-list-group-head">' +
+          _afGroupBox(gi.secs, g.name) +
           '<span class="af-list-group-name">' +
           esc(g.name) +
-          '</span></div>';
+          '</span></label>';
         gi.secs.forEach(function (sec) {
           html += _afTagRow(sec, selTags);
         });
@@ -3641,14 +3669,14 @@ window.PageAssignments = (function () {
         html += '<div class="af-codes-course">' + esc(subjectName[row.subject] || row.subject) + '</div>';
       }
       html +=
-        '<div class="af-codes-group"><span class="af-codes-group-name" tabindex="0" data-af-tip="folder" data-tags="' +
+        '<div class="af-codes-group"><label class="af-codes-group-name" data-af-tip="folder" data-tags="' +
         esc(_afSecTagIds(row.secs)) +
         '" data-name="' +
         esc(row.name) +
         '">' +
-        (row.color ? '<span class="af-codes-dot" style="background:' + cssColor(row.color) + '"></span>' : '') +
+        _afGroupBox(row.secs, row.name) +
         esc(row.name) +
-        '</span><span class="af-codes-chips">';
+        '</label><span class="af-codes-chips">';
       row.secs.forEach(function (sec) {
         var tag = sec.tags[0];
         if (!tag) return;
@@ -3692,6 +3720,17 @@ window.PageAssignments = (function () {
     document.querySelectorAll('.af-tag-cb').forEach(function (cb) {
       if (cb.checked) chosen.push(cb.value);
       cb.disabled = fromRubric;
+    });
+    card.querySelectorAll('.af-group-cb').forEach(function (box) {
+      var ids = String(box.dataset.tags || '')
+        .split(',')
+        .filter(Boolean);
+      var n = ids.filter(function (id) {
+        return chosen.indexOf(id) >= 0;
+      }).length;
+      box.checked = !!ids.length && n === ids.length;
+      box.indeterminate = n > 0 && n < ids.length;
+      box.disabled = fromRubric;
     });
     card.querySelectorAll('.af-code').forEach(function (chip) {
       var on = chosen.indexOf(chip.dataset.tag) >= 0;
@@ -8914,6 +8953,10 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionChange === 'autoSetDueDate') {
       autoSetDueDate();
+      return;
+    }
+    if (el.dataset.actionChange === 'tickGroup') {
+      _tickGroup(el);
       return;
     }
     if (el.dataset.actionChange === 'tagCheckbox') {

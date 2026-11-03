@@ -1399,11 +1399,22 @@
   color: var(--text);
   line-height: 1.25;
 }
-.af-codes-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.af-codes-group-name,
+.af-list-group-head {
+  cursor: pointer;
+}
+/* A folder's checkbox: all, none, or a dash for some. */
+.af-group-cb {
+  width: 16px;
+  height: 16px;
+  margin: 0;
   flex-shrink: 0;
+  accent-color: var(--text);
+  cursor: pointer;
+}
+.af-group-cb:disabled,
+.af-group-cb:disabled + * {
+  cursor: default;
 }
 .af-codes-chips {
   display: flex;
@@ -1604,14 +1615,9 @@
 .af-list-group-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 2px 4px;
-}
-.af-list-group-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+  gap: 10px;
+  /* The folder's box lines up with its competencies' boxes. */
+  padding: 0 0 4px 11px;
 }
 .af-list-group-name {
   font-size: var(--text-sm);
