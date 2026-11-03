@@ -2465,9 +2465,11 @@ window.PageAssignments = (function () {
       '</div>';
     html += '</div></section>';
 
-    // Actions
+    // Actions, in a footer that stays at the bottom of the window while the
+    // form is in view, with what the work counts toward beside them.
     html +=
       '<div class="af-actions">' +
+      '<p class="af-counts-toward" id="af-counts-toward" aria-live="polite"></p>' +
       '<button class="btn btn-ghost" data-action="hideNewForm">Cancel</button>' +
       '<button class="btn btn-primary" data-action="' +
       (isEdit ? 'saveEditAssess' : 'saveNewAssess') +
@@ -2619,6 +2621,7 @@ window.PageAssignments = (function () {
 
   // The form's Counts As line, from what the form says now.
   function _refreshFormCountsAs() {
+    _refreshCountsToward();
     var line = document.getElementById('af-counts-as');
     if (!line) return;
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
@@ -2664,7 +2667,65 @@ window.PageAssignments = (function () {
   }
 
   function _countsAsAfterEvent() {
-    if (document.getElementById('af-counts-as')) setTimeout(_refreshFormCountsAs, 0);
+    if (document.getElementById('af-counts-as') || document.getElementById('af-counts-toward'))
+      setTimeout(_refreshFormCountsAs, 0);
+  }
+
+  /* The footer's line: what the work counts toward, from the form as it
+     stands: the category and its weight, the competencies ticked, and the
+     reporting term its date falls in. DIBELS counts toward no grade. */
+  function _countsTowardText(cid) {
+    var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    if (mode === 'dibels') return { strong: 'Counts toward no grade.', rest: '' };
+    var catSel = document.getElementById('af-category');
+    var catId = catSel ? catSel.value : '';
+    var cat = catId ? getCategoryById(cid, catId) : null;
+    var codes = Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
+      var tag = typeof getTagById === 'function' ? getTagById(cid, cb.value) : null;
+      return (tag && (tag.code || tag.id)) || cb.value;
+    });
+    var parts = [];
+    if (cat) parts.push(cat.name + ' (' + Number(cat.weight || 0) + '%)');
+    if (codes.length) parts.push(codes.join(', '));
+    var date = (document.getElementById('af-date-assigned') || {}).value || '';
+    var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+    if (terms.length && date) {
+      var term = terms.find(function (t) {
+        return date >= t.starts_on && date <= t.ends_on;
+      });
+      parts.push(term ? term.label : 'In no reporting term');
+    }
+    if (!catId && categoryRequired(cid, { scoreMode: mode }))
+      return { strong: 'Needs a category', rest: 'to count toward the grade.' };
+    if (!codes.length && courseGradeMode(cid) !== 'letter' && getSections(cid).length)
+      return {
+        strong: 'No competency is chosen,',
+        rest: 'so it counts toward no proficiency.' + (parts.length ? ' ' + parts.join(' · ') : ''),
+      };
+    return parts.length ? { strong: 'Counts toward', rest: parts.join(' · ') } : { strong: '', rest: '' };
+  }
+  function _refreshCountsToward() {
+    var line = document.getElementById('af-counts-toward');
+    if (!line) return;
+    var t = _countsTowardText(activeCourse);
+    line.textContent = '';
+    if (t.strong) {
+      var b = document.createElement('strong');
+      b.textContent = t.strong;
+      line.appendChild(b);
+    }
+    if (t.rest) line.appendChild(document.createTextNode((t.strong ? ' ' : '') + t.rest));
+  }
+
+  /* Ctrl/⌘+Enter in the form creates the assessment (or saves the edit). */
+  function _formKeydown(e) {
+    if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+    var form = document.getElementById('new-assess-form');
+    if (!form || !form.contains(e.target) || form.style.display === 'none') return;
+    var save = form.querySelector('[data-action="saveNewAssess"], [data-action="saveEditAssess"]');
+    if (!save) return;
+    e.preventDefault();
+    save.click();
   }
 
   // The Factor applies to every kind of scoring; blank, 0 or less is 1.
@@ -2700,6 +2761,7 @@ window.PageAssignments = (function () {
       form.innerHTML = renderAssessForm(activeCourse, null);
       form.scrollIntoView({ behavior: 'smooth' });
       renderCollabPanel();
+      _refreshCountsToward();
     }
   }
   function hideNewForm() {
@@ -2865,6 +2927,7 @@ window.PageAssignments = (function () {
       form.innerHTML = renderAssessForm(cid, assess);
       form.scrollIntoView({ behavior: 'smooth' });
       renderCollabPanel();
+      _refreshCountsToward();
       if (window.AssessmentCopy) AssessmentCopy.markExistingCopies(cid, assess);
     }
   }
@@ -8832,6 +8895,7 @@ window.PageAssignments = (function () {
     ['change', 'input', 'click'].forEach(function (type) {
       _addDocListener(type, _countsAsAfterEvent);
     });
+    _addDocListener('keydown', _formKeydown);
     ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
       _addDocListener(type, _statusLocksAfterEvent);
     });
