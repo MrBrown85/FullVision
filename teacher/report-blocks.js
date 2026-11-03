@@ -1686,11 +1686,24 @@ window.ReportBlocks = (function () {
     const groups = [];
     if (organize === 'competency') {
       const sections = _reportSections(cid);
+      // Year to Date and Last 10 reach past the report's term, so their
+      // marks are read all time, with the term put back after (as
+      // _lastReportLevels does); This Term reads the term's.
+      const term = range !== 'term' && typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+      const marks = {};
+      try {
+        if (term) setActiveTerm(cid, null);
+        // The competency's mark on each piece, as the gradebook shows it.
+        sections.forEach(sec =>
+          (sec.tags || []).forEach(tag => (marks[tag.id] = tagMarksByAssessment(cid, sid, tag.id))),
+        );
+      } finally {
+        if (term) setActiveTerm(cid, term.ordinal);
+      }
       sections.forEach(sec => {
         const byAssessment = {};
         (sec.tags || []).forEach(tag => {
-          // The competency's mark on each piece, as the gradebook shows it.
-          tagMarksByAssessment(cid, sid, tag.id).forEach(sc => {
+          marks[tag.id].forEach(sc => {
             if (sc.score > 0 && (byAssessment[sc.assessmentId] == null || sc.score > byAssessment[sc.assessmentId])) {
               byAssessment[sc.assessmentId] = sc.score;
             }
