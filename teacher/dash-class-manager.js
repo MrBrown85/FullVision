@@ -8726,10 +8726,31 @@ window.DashClassManager = (function () {
     var cid = r.cid;
     var p = _cmCompReviewParts(r);
     var touchesMap = p.add.length || p.theirs.length || p.replaced.length || p.fill.length;
+    var removeIds = p.remove.map(function (o) {
+      return _currentId('section', o.sec.id);
+    });
 
-    if (touchesMap && confirmed !== true) {
+    if ((touchesMap || p.back.length || p.remove.length) && confirmed !== true) {
+      // The copy gets the whole Apply, in its order: put back, map edits, removals.
       var preview = previewLearningMapChange(cid, function (copy) {
-        _cmApplyReviewToMap(cid, copy, p);
+        if (!copy.sections) copy.sections = [];
+        p.back.forEach(function (a) {
+          var id = a.removed.id;
+          if (
+            !copy.sections.some(function (s) {
+              return s.id === id;
+            })
+          )
+            copy.sections.push(structuredClone(a.removed));
+        });
+        if (touchesMap) _cmApplyReviewToMap(cid, copy, p);
+        var drop = {};
+        removeIds.forEach(function (id) {
+          drop[resolveLearningMapId(cid, 'section', id)] = true;
+        });
+        copy.sections = copy.sections.filter(function (s) {
+          return !drop[s.id];
+        });
       });
       if (preview.changed) {
         showConfirm(
@@ -8756,14 +8777,7 @@ window.DashClassManager = (function () {
       saveLearningMap(cid, map);
     }
 
-    if (p.remove.length) {
-      removeCompetencies(
-        cid,
-        p.remove.map(function (o) {
-          return _currentId('section', o.sec.id);
-        }),
-      );
-    }
+    if (p.remove.length) removeCompetencies(cid, removeIds);
 
     if (r.kind !== 'file' && _cmCompReviewLinkChanges(r)) updateCourse(cid, { curriculumTags: r.tags.slice() });
 
