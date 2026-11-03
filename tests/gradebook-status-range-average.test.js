@@ -179,9 +179,10 @@ describe('scoreStatusMarker tooltip', () => {
   const prof = { id: 'lv', title: 'lv', scoreMode: 'proficiency', tagIds: ['T1'], type: 'summative' };
   it('says how Not Submitted counts for the work', () => {
     COURSES[CID] = { id: CID, gradingSystem: 'proficiency' };
-    expect(scoreStatusMarker('NS', CID, pts)).toContain('counts as 0');
+    expect(scoreStatusMarker('NS', CID, pts)).toContain('0 in the Class Average, not counted in proficiency');
     expect(scoreStatusMarker('NS', CID, prof)).toContain('not counted, no evidence yet');
     COURSES[CID].gradingSystem = 'letter';
+    expect(scoreStatusMarker('NS', CID, pts)).toContain('counts as 0');
     expect(scoreStatusMarker('NS', CID, prof)).toContain('0 in the course %, not counted in proficiency');
     delete COURSES[CID];
   });
