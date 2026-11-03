@@ -181,7 +181,7 @@ describe('scores saved under competencies before', () => {
   });
 
   it('is reused from schema 3 only when it keeps no rubric score under a competency', () => {
-    expect(_BUNDLE_SCHEMA).toBe(4);
+    expect(_BUNDLE_SCHEMA).toBe(5);
     seed([entry(CRIT_Q1, 3)]);
     _teacherId = 'teacher-uuid';
     _saveClassMeta(CID, { schema: 3, owner: _teacherId, version: 9, lastOpenedAt: Date.now(), savedAt: Date.now() });
@@ -191,7 +191,10 @@ describe('scores saved under competencies before', () => {
     localStorage.setItem('gb-scores-' + CID, JSON.stringify({ [SID]: [entry(CI, 3)] }));
     expect(_savedCopyHasLegacyRubricKeys(CID)).toBe(true);
     expect(_savedCopyUsable(CID)).toBe(false);
+    // Schema 4 differs only in having no whole-rubric competencies (PR 6).
     _saveClassMeta(CID, { schema: 4 });
+    expect(_savedCopyUsable(CID)).toBe(true);
+    _saveClassMeta(CID, { schema: 5 });
     expect(_savedCopyUsable(CID)).toBe(true);
   });
 

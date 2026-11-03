@@ -8203,6 +8203,24 @@ button.grader-member-name {
     padding-right: 4px;
   }
 }
+/* Whole Rubric Scores (PR 6): the competencies the whole rubric scores,
+   one line under the head. */
+.af-ge-whole {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 14px;
+  font-size: var(--text-sm);
+}
+.af-ge-whole-label {
+  font-weight: 600;
+  color: var(--text-2);
+}
+.af-ge-whole .af-ge-picker {
+  top: calc(100% - 2px);
+}
 .af-ge-pick-list {
   display: grid;
   gap: 1px;

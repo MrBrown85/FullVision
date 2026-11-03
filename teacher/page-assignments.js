@@ -551,16 +551,18 @@ window.PageAssignments = (function () {
   /* ── Assessment List ────────────────────────────────────── */
   // Competencies, rubric criteria with none, or one overall score. Rubric
   // work lists the competencies its criteria feed, scored through them
-  // (_tagState, _setTagScore), then any criterion that feeds none.
+  // (_tagState, _setTagScore), then any criterion that feeds none. Every
+  // criterion feeds a whole-rubric competency.
   function _scoreTagObjs(cid, a) {
     var keys = scoreTagIds(a, cid);
     var comps = rubricCompetencyIds(cid, a);
     if (comps.length) {
       var rubric = getRubricById(cid, a.rubricId);
+      var whole = rubricWholeTagIds(cid, a).length > 0;
       keys = comps.concat(
         ((rubric && rubric.criteria) || [])
           .filter(function (c) {
-            return c && c.id && !(c.tagIds || []).length;
+            return c && c.id && !whole && !(c.tagIds || []).length;
           })
           .map(function (c) {
             return c.id;
@@ -3909,6 +3911,7 @@ window.PageAssignments = (function () {
   function _copyPreviewRubric(from, r) {
     if (_sameCurriculum(activeCourse, from)) return r;
     var bare = structuredClone(r);
+    bare.tagIds = [];
     bare.criteria = (bare.criteria || []).map(function (c) {
       return Object.assign({}, c, { tagIds: [] });
     });
@@ -4003,6 +4006,7 @@ window.PageAssignments = (function () {
     var go = function () {
       var held = RubricLibrary.cloneRubric(from, cid, r);
       if (!_sameCurriculum(cid, from)) {
+        held.tagIds = [];
         held.criteria = held.criteria.map(function (c) {
           return Object.assign({}, c, { tagIds: [] });
         });
@@ -4061,6 +4065,7 @@ window.PageAssignments = (function () {
       id: uid(),
       name: '',
       style: 'standard',
+      tagIds: [],
       criteria: [_newBlankCriterion(1)],
     };
   }
@@ -4106,6 +4111,13 @@ window.PageAssignments = (function () {
       '</span><span class="af-gap"></span>' +
       '<button type="button" class="btn btn-ghost" data-action="closeStart">Cancel</button>' +
       '<button type="button" class="btn btn-primary" data-action="geSave">Save Rubric</button></div>';
+    // Competencies scored by the whole rubric: one combined score each.
+    var whole =
+      '<div class="af-ge-whole"><span class="af-ge-whole-label">Whole Rubric Scores</span>' +
+      _blankChipsHtml(cid, d.tagIds || [], -2) +
+      '<button type="button" class="af-link-btn" data-action="gePicker" data-i="-2">+ Competency</button>' +
+      (_blank.picker && _blank.picker.i === -2 ? _blankPickerHtml(cid, -2) : '') +
+      '</div>';
     var grid =
       '<table class="rb-grid af-ge-grid' +
       (style === 'single_point' ? ' is-single-point' : '') +
@@ -4143,6 +4155,7 @@ window.PageAssignments = (function () {
       (inPlace ? 'Edit Rubric' : 'Blank Rubric') +
       '">' +
       head +
+      whole +
       '<div class="af-ge-body">' +
       grid +
       '</div>' +
@@ -4151,8 +4164,9 @@ window.PageAssignments = (function () {
     );
   }
 
-  function _blankRowHtml(cid, d, c, i, levels, style) {
-    var chips = (c.tagIds || [])
+  // Competency chips with ×; i is the criterion, or -2 for the whole rubric.
+  function _blankChipsHtml(cid, tagIds, i) {
+    return tagIds
       .map(function (t) {
         var tag = getTagById(cid, t);
         return (
@@ -4170,6 +4184,10 @@ window.PageAssignments = (function () {
         );
       })
       .join('');
+  }
+
+  function _blankRowHtml(cid, d, c, i, levels, style) {
+    var chips = _blankChipsHtml(cid, c.tagIds || [], i);
     var menuOpen = _blank.menu === i;
     var menu = menuOpen
       ? '<div class="af-ge-menu" role="group" aria-label="Criterion settings">' +
@@ -4275,7 +4293,11 @@ window.PageAssignments = (function () {
   function _blankPickerHtml(cid, i) {
     return (
       '<div class="af-ge-picker" role="dialog" aria-label="' +
-      (i === -1 ? 'Add a criterion from a competency' : 'Add a competency') +
+      (i === -1
+        ? 'Add a criterion from a competency'
+        : i === -2
+          ? 'Add a competency the whole rubric scores'
+          : 'Add a competency') +
       '"><input class="af-input" id="af-ge-pick-search" type="search" autocomplete="off" placeholder="Type a code or words" aria-label="Find a competency" value="' +
       esc((_blank.picker && _blank.picker.query) || '') +
       '"><div class="af-ge-pick-list" id="af-ge-pick-list">' +
@@ -4287,7 +4309,16 @@ window.PageAssignments = (function () {
     var q = String((_blank.picker && _blank.picker.query) || '')
       .trim()
       .toLowerCase();
-    var have = i >= 0 ? (_blank.draft.criteria[i] || {}).tagIds || [] : [];
+    // A competency is on the whole rubric or on criteria, never both: the
+    // whole rubric's picker leaves out every criterion's, and a criterion's
+    // leaves out the whole rubric's.
+    var d = _blank.draft;
+    var have = (d.tagIds || []).slice();
+    if (i >= 0) have = have.concat((d.criteria[i] || {}).tagIds || []);
+    if (i === -2)
+      d.criteria.forEach(function (c) {
+        have = have.concat((c && c.tagIds) || []);
+      });
     var groups = {};
     (getCompetencyGroups(cid) || []).forEach(function (g) {
       groups[g.id] = g.name;
@@ -4494,7 +4525,7 @@ window.PageAssignments = (function () {
       _blankClearFooter();
       return;
     } else if (action === 'geRemoveTag') {
-      var c = d.criteria[i];
+      var c = i === -2 ? d : d.criteria[i];
       if (c)
         c.tagIds = (c.tagIds || []).filter(function (t) {
           return t !== el.dataset.tag;
@@ -4505,6 +4536,10 @@ window.PageAssignments = (function () {
       _blank.picker = null;
       _blank.touched = true;
       if (!tag) return _blankRender();
+      if (i === -2) {
+        if ((d.tagIds || []).indexOf(tag.id) < 0) d.tagIds = (d.tagIds || []).concat([tag.id]);
+        return _blankRender();
+      }
       if (i >= 0) {
         var crit = d.criteria[i];
         if (crit && crit.tagIds.indexOf(tag.id) < 0) crit.tagIds = crit.tagIds.concat([tag.id]);

@@ -224,6 +224,7 @@
       criteria: [],
       criterion_tags: [],
       criterion_checks: [],
+      rubric_tags: [],
       students: [],
       enrollments: [],
       assessments: [],
@@ -384,6 +385,9 @@
         course_id: cid,
         name: str(r.name || r.title),
         style: ['advanced', 'single_point'].indexOf(r.style) >= 0 ? r.style : 'standard',
+      });
+      arr(r.tagIds).forEach(function (tid) {
+        if (tagIds[tid]) p.rubric_tags.push({ rubric_id: r.id, tag_id: tid });
       });
       arr(r.criteria).forEach(function (c, i) {
         if (!c || !c.id) return;

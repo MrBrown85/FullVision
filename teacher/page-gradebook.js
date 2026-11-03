@@ -1046,7 +1046,12 @@ window.PageGradebook = (function () {
         });
       })
       .map(function (c) {
-        var tags = c.criterion.tagIds || [];
+        // Its own competencies, then the whole rubric's, which every
+        // criterion feeds.
+        var tags = (c.criterion.tagIds || []).slice();
+        rubricWholeTagIds(cid, a).forEach(function (t) {
+          if (tags.indexOf(t) < 0) tags.push(t);
+        });
         var codes = tags
           .map(function (tid) {
             var tag = getTagById(cid, tid);
@@ -1069,8 +1074,9 @@ window.PageGradebook = (function () {
       });
   }
 
-  /* The competencies a criterion key stands for: a criterion's competencies,
-     or the key itself for a competency or a criterion with none. */
+  /* The competencies a criterion key stands for: a criterion's competencies
+     and the whole rubric's, or the key itself for a competency or a
+     criterion with neither. */
   function _keyCompetencyIds(cid, a, key) {
     var rubric =
       a && (a.rubricId || a.rubric_id) && !isPointsScored(a) ? getRubricById(cid, a.rubricId || a.rubric_id) : null;
@@ -1079,7 +1085,12 @@ window.PageGradebook = (function () {
       (rubric.criteria || []).find(function (c) {
         return c && c.id === key;
       });
-    return crit && crit.tagIds && crit.tagIds.length ? crit.tagIds : [key];
+    if (!crit) return [key];
+    var ids = (crit.tagIds || []).slice();
+    (rubric.tagIds || []).forEach(function (t) {
+      if (ids.indexOf(t) < 0) ids.push(t);
+    });
+    return ids.length ? ids : [key];
   }
 
   /* Rubric work in the Competencies columns: a column per competency the
@@ -1418,9 +1429,14 @@ window.PageGradebook = (function () {
               : assigned
                 ? '<span class="gb-unscored">\u00B7</span>'
                 : '\u2014';
-          var rubricTitle = mixed
-            ? 'The criteria on this competency disagree, so the lowest is shown. Click to grade it on the rubric.'
-            : 'Click to grade it on the rubric.';
+          var rubricTitle =
+            entry && entry.whole
+              ? 'Scored by the whole rubric: its criteria average ' +
+                (Math.round(entry.average * 10) / 10).toFixed(1) +
+                ' of 4. Click to grade it on the rubric.'
+              : mixed
+                ? 'The criteria on this competency disagree, so the lowest is shown. Click to grade it on the rubric.'
+                : 'Click to grade it on the rubric.';
           html +=
             '<td class="gb-score' +
             startClass +

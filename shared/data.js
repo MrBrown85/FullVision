@@ -2412,6 +2412,13 @@ function _rekey(cid, kind, localId, serverId, extra) {
       _rekeyField('rubrics', cid, function (rubrics) {
         var changed = false;
         (rubrics || []).forEach(function (r) {
+          // The whole rubric's competencies, then each criterion's.
+          if (r && Array.isArray(r.tagIds) && r.tagIds.indexOf(localId) >= 0) {
+            r.tagIds = r.tagIds.map(function (id) {
+              return id === localId ? serverId : id;
+            });
+            changed = true;
+          }
           ((r && r.criteria) || []).forEach(function (c) {
             if (c && Array.isArray(c.tagIds) && c.tagIds.indexOf(localId) >= 0) {
               c.tagIds = c.tagIds.map(function (id) {
@@ -4077,7 +4084,7 @@ function _bundleToCache(cid, bundle) {
   _persistLoadedField(
     cid,
     'rubrics',
-    _canonicalRubricRowsToCache(rb.rubrics, rb.criteria, rb.criterion_tags, rb.criterion_checks),
+    _canonicalRubricRowsToCache(rb.rubrics, rb.criteria, rb.criterion_tags, rb.criterion_checks, rb.rubric_tags),
   );
   // Ticked Advanced Rubric checkboxes: [student, assessment, check] rows
   // pointing into the roster, assessment and check lists. A bundle from
@@ -4173,7 +4180,9 @@ function _bundleToCache(cid, bundle) {
 // 4 (2026-10-29): rubric scores are keyed by criterion. A schema 3 copy is
 // still used unless it keeps rubric scores under competencies
 // (_savedCopyUsable), so only those classes are downloaded again in full.
-var _BUNDLE_SCHEMA = 4;
+// 5 (2026-11-03): rubrics carry tagIds, the competencies the whole rubric
+// scores. A schema 4 copy is still used: none existed before.
+var _BUNDLE_SCHEMA = 5;
 var _SAVED_COPY_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 var _classFresh = {}; // cid → the server confirmed or replaced this copy since it was shown
 var _dirtyMarked = {}; // cid → the saved copy has been flagged as holding local edits
@@ -4198,9 +4207,15 @@ function _saveClassMeta(cid, patch) {
 function _savedCopyUsable(cid) {
   var meta = _classMeta(cid);
   if (!meta || !meta.owner || meta.owner !== _teacherId) return false;
-  // A copy from schema 3 differs only in keeping rubric scores under
-  // competencies; one with none of those is used as it is.
-  if (meta.schema !== _BUNDLE_SCHEMA && !(meta.schema === 3 && !_savedCopyHasLegacyRubricKeys(cid))) return false;
+  // A copy from schema 4 differs only in having no whole-rubric competencies,
+  // which none had. One from schema 3 differs only in keeping rubric scores
+  // under competencies; one with none of those is used as it is.
+  if (
+    meta.schema !== _BUNDLE_SCHEMA &&
+    meta.schema !== 4 &&
+    !(meta.schema === 3 && !_savedCopyHasLegacyRubricKeys(cid))
+  )
+    return false;
   if (Date.now() - (meta.lastOpenedAt || meta.savedAt || 0) > _SAVED_COPY_MAX_AGE_MS) return false;
   return _hasLocalCopy(cid);
 }
@@ -7727,14 +7742,27 @@ async function _loadCanonicalRubrics(cid) {
     criterionCheckRows = checksRes.data || [];
   }
 
-  return _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows, criterionCheckRows);
+  // Competencies the whole rubric scores.
+  var rubricTagQuery = sb.from('rubric_tag').select('rubric_id,tag_id');
+  if (typeof rubricTagQuery.in === 'function') rubricTagQuery = rubricTagQuery.in('rubric_id', rubricIds);
+  var rubricTagRes = await rubricTagQuery;
+  if (rubricTagRes.error) throw rubricTagRes.error;
+
+  return _canonicalRubricRowsToCache(
+    rubricRows,
+    criterionRows,
+    criterionTagRows,
+    criterionCheckRows,
+    rubricTagRes.data || [],
+  );
 }
 
-/* rubric, criterion, criterion_tag and criterion_check rows → the client's
-   rubric list. Used by the table reads above and by get_class_bundle. A
-   rubric row without `style` (a bundle from before Advanced Rubrics) is
-   Standard. */
-function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows, criterionCheckRows) {
+/* rubric, criterion, criterion_tag, criterion_check and rubric_tag rows →
+   the client's rubric list. Used by the table reads above and by
+   get_class_bundle. A rubric row without `style` (a bundle from before
+   Advanced Rubrics) is Standard. rubric_tag rows are the competencies the
+   whole rubric scores (`tagIds`); a bundle from before them has none. */
+function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows, criterionCheckRows, rubricTagRows) {
   rubricRows = (rubricRows || []).slice().sort(function (a, b) {
     var aKey = a.created_at || a.id || '';
     var bKey = b.created_at || b.id || '';
@@ -7775,6 +7803,13 @@ function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows
       });
     });
 
+  var tagsByRubric = {};
+  (rubricTagRows || []).forEach(function (row) {
+    if (!row || !row.rubric_id || !row.tag_id) return;
+    if (!tagsByRubric[row.rubric_id]) tagsByRubric[row.rubric_id] = [];
+    tagsByRubric[row.rubric_id].push(row.tag_id);
+  });
+
   var criteriaByRubric = {};
   criterionRows.forEach(function (row) {
     if (!row || !row.rubric_id) return;
@@ -7812,6 +7847,7 @@ function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows
       name: row.name || '',
       title: row.name || '',
       style: rubricStyle(row),
+      tagIds: (tagsByRubric[row.id] || []).slice(),
       criteria: criteriaByRubric[row.id] || [],
     };
     if (row.copy_group) rubric.copyGroup = row.copy_group;
@@ -7865,7 +7901,12 @@ function _rubricSignature(rubric) {
     _rubricCriteriaPayload(rubric),
     (rubric && rubric.copyGroup) || null,
     rubricStyle(rubric),
+    _rubricWholeTagIds(rubric),
   ]);
+}
+/* The competencies a whole rubric scores, as saved: server ids only. */
+function _rubricWholeTagIds(rubric) {
+  return ((rubric && rubric.tagIds) || []).filter(_isUuid);
 }
 /* What the teacher typed, ids left out: a save in progress re-keys ids. */
 function _rubricsContentSignature(rubrics) {
@@ -7948,6 +7989,7 @@ function _persistRubricsToCanonical(cid, prev, arr) {
                 style: rubricStyle(rubric),
                 criteria: _rubricCriteriaPayload(rubric),
                 copyGroup: rubric.copyGroup || null,
+                linkedTagIds: _rubricWholeTagIds(rubric),
               },
               { entryId: rec ? rec.entryId : undefined },
             )
@@ -11409,6 +11451,8 @@ window.v2.upsertRubric = function (params, options) {
       p_criteria: criteria,
       p_copy_group: _isUuid(params.copyGroup) ? params.copyGroup : null,
       p_style: rubricStyle({ style: params.style }),
+      // The competencies the whole rubric scores; [] clears them.
+      p_linked_tag_ids: (params.linkedTagIds || []).filter(_isUuid),
     },
     options,
   );

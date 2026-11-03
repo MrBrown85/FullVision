@@ -59,6 +59,7 @@ window.RubricLibrary = (function () {
   function cloneRubric(srcCid, dstCid, rubric) {
     var clone = structuredClone(rubric);
     clone.id = uid();
+    clone.tagIds = AssessmentCopy.mapTags(srcCid, dstCid, rubric.tagIds || []).ids;
     clone.criteria = (clone.criteria || []).map(function (c) {
       var next = Object.assign({}, c, { id: uid() });
       next.tagIds = AssessmentCopy.mapTags(srcCid, dstCid, c.tagIds || []).ids;
