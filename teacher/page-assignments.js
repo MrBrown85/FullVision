@@ -2647,7 +2647,8 @@ window.PageAssignments = (function () {
       '<div class="af-field af-rubric-field" id="af-rubric-wrap"' +
       (scoreMode === 'proficiency' ? '' : ' hidden') +
       '>' +
-      '<div class="af-label" id="af-rubric-label">Rubric</div>' +
+      // Named for screen readers only: the Rubric card above says it.
+      '<div class="af-label af-visually-hidden" id="af-rubric-label">Rubric</div>' +
       '<div class="af-rubric-view" id="af-rubric-view"></div>' +
       '<div class="af-rubric-pick" id="af-rubric-pick" hidden>' +
       '<select class="af-rubric-select af-input" id="af-rubric" data-action-change="onRubricSelect" aria-labelledby="af-rubric-label">' +
@@ -2924,8 +2925,10 @@ window.PageAssignments = (function () {
   var SCORE_MODE_CARDS = [
     {
       mode: 'proficiency',
-      label: 'Proficiency',
-      tip: 'Score each competency from Emerging to Extending.',
+      // Every proficiency assessment is scored on a rubric, its own or the
+      // Competency Rubric (Colin, Nov 2); the 1–4 scale is still proficiency.
+      label: 'Rubric',
+      tip: 'Score with a rubric, Emerging to Extending.',
       picture: function () {
         return [1, 2, 3, 4]
           .map(function (level) {
@@ -3166,8 +3169,6 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var pending = _pendingFormRubric && sel.value === _pendingFormRubric.id ? _pendingFormRubric : null;
     var rubric = pending || (sel.value ? getRubricById(cid, sel.value) : null);
-    var label = document.getElementById('af-rubric-label');
-    if (label) label.textContent = rubric ? 'Rubric' : 'Rubric (optional)';
     var picking = !document.getElementById('af-rubric-pick').hidden;
     if (rubric) {
       var editingId = _editingAssessId;
@@ -3205,8 +3206,11 @@ window.PageAssignments = (function () {
     }
     var hasComps = !!document.querySelector('.af-tag-cb:checked');
     var count = rubricsListCount(cid);
+    var last = _lastUsedRubric(cid);
+    // Blank first (Colin, Nov 2), then Choose and Copy.
     view.innerHTML =
       '<div class="af-rubric-starts">' +
+      '<button type="button" class="af-rubric-start" data-action="newRubricFromForm"><b>Blank Rubric</b><span>Start from nothing.</span></button>' +
       '<button type="button" class="af-rubric-start" data-action="chooseRubric"' +
       (count ? '' : ' disabled') +
       '><b>Choose a Rubric</b><span>' +
@@ -3216,14 +3220,33 @@ window.PageAssignments = (function () {
           : 'This class has no rubrics yet.',
       ) +
       '</span></button>' +
+      '<button type="button" class="af-rubric-start" data-action="rubricFromClass"><b>Copy From Another Class</b><span>Any of your classes.</span></button>' +
       '<button type="button" class="af-rubric-start" data-action="draftRubricFromComps"' +
       (hasComps ? '' : ' disabled') +
       '><b>Draft From Competencies</b><span>' +
       esc(hasComps ? 'Starts from the Competency Rubric below, wording and all.' : 'Choose competencies below first.') +
       '</span></button>' +
-      '<button type="button" class="af-rubric-start" data-action="rubricFromClass"><b>Copy From Another Class</b><span>Matched to this class’s competencies.</span></button>' +
-      '<button type="button" class="af-rubric-start" data-action="newRubricFromForm"><b>Blank Rubric</b><span>Start from nothing.</span></button>' +
-      '</div>';
+      '</div>' +
+      (last
+        ? '<p class="af-rubric-last">Last used <b>' +
+          esc(last.name) +
+          '</b><button type="button" class="af-link-btn" data-action="useLastRubric" data-rid="' +
+          esc(last.id) +
+          '">Use It Again</button></p>'
+        : '');
+  }
+
+  // The rubric on this class's most recent assessment (by date), for Use It Again.
+  function _lastUsedRubric(cid) {
+    var editingId = _editingAssessId;
+    var latest = getAssessments(cid)
+      .filter(function (a) {
+        return a && a.id !== editingId && a.rubricId && getRubricById(cid, a.rubricId);
+      })
+      .sort(function (a, b) {
+        return String(b.dateAssigned || b.date || '').localeCompare(String(a.dateAssigned || a.date || ''));
+      })[0];
+    return latest ? getRubricById(cid, latest.rubricId) : null;
   }
   function rubricsListCount(cid) {
     return getRubrics(cid).length;
@@ -4405,7 +4428,7 @@ window.PageAssignments = (function () {
     if (m === 'points') return (a.maxPoints || 100) + ' Points';
     if (m === 'complete') return 'Complete/Incomplete';
     if (m === 'dibels') return 'DIBELS';
-    return 'Proficiency';
+    return 'Rubric';
   }
 
   function _fillFromPast(srcCid, a) {
@@ -8568,6 +8591,9 @@ window.PageAssignments = (function () {
       },
       deleteAssess: function () {
         deleteAssess(el.dataset.aid);
+      },
+      useLastRubric: function () {
+        _useRubricInForm(el.dataset.rid);
       },
       startFromPast: function () {
         startFromPast();
