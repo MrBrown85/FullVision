@@ -1470,7 +1470,7 @@ window.PageAssignments = (function () {
     html +=
       '<div id="new-assess-form" style="display:' +
       (_showingNewForm ? 'block' : 'none') +
-      ';background:var(--surface);border:2px solid var(--active);border-radius:var(--radius);padding:24px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,122,255,0.12)">' +
+      ';background:var(--bg);border:2px solid var(--active);border-radius:var(--radius);padding:16px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,122,255,0.12)">' +
       (_showingNewForm
         ? renderAssessForm(
             cid,
@@ -2095,6 +2095,14 @@ window.PageAssignments = (function () {
 
     var html = '';
 
+    // The form's heading, inside its blue ring (kept, Colin, 2026-11-02).
+    html +=
+      '<div class="af-heading"><h3 class="af-heading-title">' +
+      (isEdit ? 'Edit Assessment' : 'New Assessment') +
+      '</h3></div>';
+
+    // What it is: title, classes, category, module and dates.
+    html += '<section class="af-card af-card-what">';
     // Title
     html +=
       '<div class="af-field">' +
@@ -2104,51 +2112,9 @@ window.PageAssignments = (function () {
       '" placeholder="e.g. Persuasive Essay \u2014 Rights & Freedoms">' +
       '</div>';
 
-    // Description
-    html +=
-      '<div class="af-field">' +
-      '<label class="af-label">Description</label>' +
-      '<textarea class="af-textarea" id="af-desc" rows="1" placeholder="Describe the assignment, expectations, and criteria\u2026">' +
-      esc(description) +
-      '</textarea>' +
-      '</div>';
-
     // Which classes this assessment goes to (Teams' "Assign to"), right
     // under the title so it is seen before the details are filled in.
     if (window.AssessmentCopy) html += AssessmentCopy.renderClassesField(cid, assess);
-
-    // Rubric selector
-    var rubricsList = getRubrics(cid);
-    var selRubricId = assess ? assess.rubricId || '' : '';
-    html +=
-      '<div class="af-field">' +
-      '<label class="af-label">Rubric</label>' +
-      '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
-      '<select class="af-rubric-select" id="af-rubric" data-action-change="onRubricSelect" style="flex:1 1 140px;min-width:0">' +
-      '<option value="">None</option>' +
-      rubricsList
-        .map(function (r) {
-          return (
-            '<option value="' +
-            r.id +
-            '"' +
-            (r.id === selRubricId ? ' selected' : '') +
-            '>' +
-            esc(r.name) +
-            ' (' +
-            r.criteria.length +
-            ' criteria)</option>'
-          );
-        })
-        .join('') +
-      '</select>' +
-      '<button type="button" class="btn btn-ghost" data-action="newRubricFromForm" style="white-space:nowrap;font-size:0.8125rem;padding:7px 12px">+ New Rubric</button>' +
-      '<button type="button" class="btn btn-ghost" data-action="rubricFromClass" style="white-space:nowrap;font-size:0.8125rem;padding:7px 12px">From another class</button>' +
-      '</div>' +
-      (selRubricId
-        ? '<div class="af-rubric-info">Rubric tags are auto-selected below. You can add additional tags.</div>'
-        : '') +
-      '</div>';
 
     // Dates. Today is the class's calendar day: toISOString() is UTC, which
     // is already tomorrow after 4 pm in BC.
@@ -2160,38 +2126,9 @@ window.PageAssignments = (function () {
         d.setDate(d.getDate() + 7);
         return d.toISOString().slice(0, 10);
       })();
-    var todayFormatted = new Date(today + 'T12:00:00').toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
     html +=
-      '<div class="af-row" style="align-items:end">' +
-      '<div class="af-field" style="flex:0 0 auto">' +
-      '<label class="af-label">Today\'s Date</label>' +
-      '<div style="font-family:var(--font-base);font-size:0.9375rem;font-weight:500;color:var(--text);padding:8px 0;white-space:nowrap">' +
-      todayFormatted +
-      '</div>' +
-      '</div>' +
-      '<div class="af-field" style="flex:1;max-width:200px">' +
-      '<label class="af-label">Date Assigned</label>' +
-      '<input class="af-input" id="af-date-assigned" type="date" value="' +
-      esc(dateAssigned) +
-      '" data-action-change="autoSetDueDate">' +
-      '</div>' +
-      '<div class="af-field" style="flex:1;max-width:200px">' +
-      '<label class="af-label">Due Date (optional)</label>' +
-      '<input class="af-input" id="af-due" type="date" value="' +
-      esc(defaultDue) +
-      '">' +
-      '</div>' +
-      '</div>';
-
-    // Category, Evidence, Collaboration, Module
-    html +=
-      '<div class="af-row">' +
-      '<div class="af-field" style="flex:1">' +
+      '<div class="af-row af-row-what">' +
+      '<div class="af-field">' +
       '<label class="af-label">Category</label>' +
       '<select class="af-input" id="af-category" aria-describedby="af-category-hint">' +
       // A class with categories needs one on every scored assessment, as
@@ -2223,46 +2160,7 @@ window.PageAssignments = (function () {
           esc(CATEGORY_REQUIRED_HINT) +
           '</p>') +
       '</div>' +
-      '<div class="af-field" style="flex:1">' +
-      '<label class="af-label">Evidence Type</label>' +
-      '<select class="af-input" id="af-evidence">' +
-      ['written', 'observation', 'audio', 'video', 'photo', 'conversation']
-        .map(function (t) {
-          return (
-            '<option value="' +
-            t +
-            '"' +
-            (t === evidence ? ' selected' : '') +
-            '>' +
-            t[0].toUpperCase() +
-            t.slice(1) +
-            '</option>'
-          );
-        })
-        .join('') +
-      '</select>' +
-      '</div>' +
-      '<div class="af-field" style="flex:1.3;min-width:210px">' +
-      '<label class="af-label">Collaboration</label>' +
-      '<div class="seg af-type-toggle" role="group" aria-label="Collaboration">' +
-      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
-      (collaboration === 'individual' ? ' active' : '') +
-      '"' +
-      segAttr(collaboration === 'individual') +
-      ' data-collab="individual" data-action="setCollaboration">Individual</button>' +
-      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
-      (collaboration === 'pair' ? ' active' : '') +
-      '"' +
-      segAttr(collaboration === 'pair') +
-      ' data-collab="pair" data-action="setCollaboration">Pair</button>' +
-      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
-      (collaboration === 'group' ? ' active' : '') +
-      '"' +
-      segAttr(collaboration === 'group') +
-      ' data-collab="group" data-action="setCollaboration">Group</button>' +
-      '</div>' +
-      '</div>' +
-      '<div class="af-field" style="flex:1">' +
+      '<div class="af-field">' +
       '<label class="af-label">Module</label>' +
       '<select class="af-input" id="af-module">' +
       '<option value="">No Module</option>' +
@@ -2275,13 +2173,26 @@ window.PageAssignments = (function () {
         .join('') +
       '</select>' +
       '</div>' +
+      '<div class="af-field">' +
+      '<label class="af-label">Date Assigned</label>' +
+      '<input class="af-input" id="af-date-assigned" type="date" value="' +
+      esc(dateAssigned) +
+      '" data-action-change="autoSetDueDate">' +
       '</div>' +
-      '<div id="collab-panel-mount"></div>';
+      '<div class="af-field">' +
+      '<label class="af-label">Due Date (optional)</label>' +
+      '<input class="af-input" id="af-due" type="date" value="' +
+      esc(defaultDue) +
+      '">' +
+      '</div>' +
+      '</div>';
+    html += '</section>';
 
     // Scoring mode, then its settings
     html +=
-      '<div class="af-field">' +
-      '<span class="af-label" id="af-scoremode-label">Scoring Mode</span>' +
+      '<section class="af-card af-card-scoring">' +
+      '<div class="af-card-head">' +
+      '<span class="af-card-title" id="af-scoremode-label">Scoring</span>' +
       '<input type="hidden" id="af-scoremode" value="' +
       esc(scoreMode) +
       '">' +
@@ -2320,7 +2231,41 @@ window.PageAssignments = (function () {
         })
         .join('') +
       '</div>' +
+      '</div>';
+    // Rubric selector
+    var rubricsList = getRubrics(cid);
+    var selRubricId = assess ? assess.rubricId || '' : '';
+    html +=
+      '<div class="af-field af-rubric-field">' +
+      '<label class="af-label">Rubric</label>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
+      '<select class="af-rubric-select" id="af-rubric" data-action-change="onRubricSelect" style="flex:1 1 140px;min-width:0">' +
+      '<option value="">None</option>' +
+      rubricsList
+        .map(function (r) {
+          return (
+            '<option value="' +
+            r.id +
+            '"' +
+            (r.id === selRubricId ? ' selected' : '') +
+            '>' +
+            esc(r.name) +
+            ' (' +
+            r.criteria.length +
+            ' criteria)</option>'
+          );
+        })
+        .join('') +
+      '</select>' +
+      '<button type="button" class="btn btn-ghost" data-action="newRubricFromForm" style="white-space:nowrap;font-size:0.8125rem;padding:7px 12px">+ New Rubric</button>' +
+      '<button type="button" class="btn btn-ghost" data-action="rubricFromClass" style="white-space:nowrap;font-size:0.8125rem;padding:7px 12px">From another class</button>' +
       '</div>' +
+      (selRubricId
+        ? '<div class="af-rubric-info">Rubric tags are auto-selected below. You can add additional tags.</div>'
+        : '') +
+      '</div>';
+
+    html +=
       '<div class="af-row af-score-settings">' +
       '<div class="af-field" id="af-maxpoints-wrap" style="flex:0 0 auto;' +
       (scoreMode === 'points' ? '' : 'display:none') +
@@ -2368,10 +2313,13 @@ window.PageAssignments = (function () {
           weight: weight,
         }),
       ) +
-      '</div>';
+      '</div>' +
+      '</section>';
 
     // Tags — grouped by competency group
     html +=
+      '<section class="af-card af-card-competencies">' +
+      '<div class="af-card-head"><span class="af-card-title">Competencies</span></div>' +
       '<div class="af-field">' +
       '<label class="af-label">Curricular Competencies</label>' +
       '<div class="af-tags-container">';
@@ -2436,7 +2384,78 @@ window.PageAssignments = (function () {
         esc(cc.label) +
         '</button>';
     });
-    html += '</div></div>';
+    html += '</div></div></section>';
+
+    // Students: individual, pair or group, and who it's assigned to.
+    html +=
+      '<section class="af-card af-card-students">' +
+      '<div class="af-card-head">' +
+      '<span class="af-card-title">Students</span>' +
+      '<div class="seg af-type-toggle" role="group" aria-label="Collaboration">' +
+      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
+      (collaboration === 'individual' ? ' active' : '') +
+      '"' +
+      segAttr(collaboration === 'individual') +
+      ' data-collab="individual" data-action="setCollaboration">Individual</button>' +
+      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
+      (collaboration === 'pair' ? ' active' : '') +
+      '"' +
+      segAttr(collaboration === 'pair') +
+      ' data-collab="pair" data-action="setCollaboration">Pair</button>' +
+      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
+      (collaboration === 'group' ? ' active' : '') +
+      '"' +
+      segAttr(collaboration === 'group') +
+      ' data-collab="group" data-action="setCollaboration">Group</button>' +
+      '</div>' +
+      '</div>' +
+      '<div id="collab-panel-mount"></div>' +
+      '</section>';
+
+    // More Options: Description and Evidence Type, open when either is set.
+    var moreOpen = !!description || (evidence && evidence !== 'written');
+    html +=
+      '<section class="af-card af-card-more">' +
+      '<button type="button" class="af-more-toggle" data-action="toggleMoreOptions" aria-expanded="' +
+      moreOpen +
+      '" aria-controls="af-more-body">' +
+      '<span class="af-card-title">More Options</span>' +
+      '<span class="af-more-hint">Description, Evidence Type</span>' +
+      '<svg class="af-more-chev" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>' +
+      '</button>' +
+      '<div class="af-more-body" id="af-more-body"' +
+      (moreOpen ? '' : ' hidden') +
+      '>';
+    // Description
+    html +=
+      '<div class="af-field">' +
+      '<label class="af-label">Description</label>' +
+      '<textarea class="af-textarea" id="af-desc" rows="1" placeholder="Describe the assignment, expectations, and criteria\u2026">' +
+      esc(description) +
+      '</textarea>' +
+      '</div>';
+
+    html +=
+      '<div class="af-field">' +
+      '<label class="af-label">Evidence Type</label>' +
+      '<select class="af-input" id="af-evidence">' +
+      ['written', 'observation', 'audio', 'video', 'photo', 'conversation']
+        .map(function (t) {
+          return (
+            '<option value="' +
+            t +
+            '"' +
+            (t === evidence ? ' selected' : '') +
+            '>' +
+            t[0].toUpperCase() +
+            t.slice(1) +
+            '</option>'
+          );
+        })
+        .join('') +
+      '</select>' +
+      '</div>';
+    html += '</div></section>';
 
     // Actions
     html +=
@@ -7067,6 +7086,12 @@ window.PageAssignments = (function () {
       },
       toggleActive: function () {
         el.classList.toggle('active');
+      },
+      toggleMoreOptions: function () {
+        var body = document.getElementById('af-more-body');
+        if (!body) return;
+        body.hidden = !body.hidden;
+        el.setAttribute('aria-expanded', String(!body.hidden));
       },
       collabCheckAll: function () {
         collabCheckAll();

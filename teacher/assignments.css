@@ -1086,6 +1086,134 @@
   margin-top: 4px;
 }
 
+/* ── The assessment form as cards (redesign PR 1, 2026-11-02) ──
+   Grey ground inside the form's blue ring; each part of the form is a
+   white card, 12px apart; card titles sit in one 136px column. */
+.af-heading {
+  margin: 0 2px 12px;
+}
+.af-heading-title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text);
+}
+.af-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.1),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.af-card > .af-field:last-child,
+.af-card > .af-row:last-child,
+.af-card > :last-child > .af-field:last-child {
+  margin-bottom: 0;
+}
+.af-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.af-card-head:last-child {
+  margin-bottom: 0;
+}
+.af-card-title {
+  flex: 0 0 136px;
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text);
+}
+.af-card-head .af-mode-cards {
+  flex: 1 1 auto;
+}
+.af-card-students .af-card-head .seg {
+  margin-left: auto;
+  width: 300px;
+}
+.af-row-what {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.af-row-what > .af-field {
+  min-width: 0;
+  margin-bottom: 0;
+}
+@media (max-width: 900px) {
+  .af-row-what {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.af-card .af-input:not(textarea) {
+  height: 40px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.af-card-what .af-copy-field {
+  margin-bottom: 14px;
+}
+.af-card-scoring .af-rubric-field {
+  margin-top: 4px;
+}
+.af-more-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: -16px;
+  padding: 16px;
+  width: calc(100% + 32px);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  font-family: var(--font-base);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.af-more-toggle:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.af-more-hint {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-more-chev {
+  color: var(--text-2);
+  transition: transform var(--duration-fast, 0.15s) ease;
+}
+.af-more-toggle[aria-expanded='true'] .af-more-chev {
+  transform: rotate(90deg);
+}
+.af-more-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 28px;
+}
+.af-more-body[hidden] {
+  display: none;
+}
+.af-more-body > .af-field {
+  margin-bottom: 0;
+}
+@media (max-width: 760px) {
+  .af-more-body {
+    grid-template-columns: 1fr;
+  }
+}
+#new-assess-form > .af-actions {
+  border-top: 0;
+  padding-top: 4px;
+}
+
 /* ── Assignment toolbar ─────────────────────────────────────── */
 .assess-toolbar-count {
   font-family: var(--font-base);
