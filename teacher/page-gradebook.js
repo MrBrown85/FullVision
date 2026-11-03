@@ -2640,6 +2640,26 @@ window.PageGradebook = (function () {
           return a.id === aid;
         });
         if (assess && scores[sid]) {
+          // ⌘Z puts it back, as it does for Edit Score.
+          var clearIds = scoreTagIds(assess, cid);
+          _undoStack.push({
+            cid: cid,
+            sid: sid,
+            aid: aid,
+            tagIds: clearIds,
+            prevEntries: clearIds.map(function (tid) {
+              var prev = scores[sid].find(function (e) {
+                return e.assessmentId === aid && e.tagId === tid;
+              });
+              return prev ? structuredClone(prev) : null;
+            }),
+          });
+          while (_undoStack.length > 50) _undoStack.shift();
+          // An Advanced Rubric's ticks go with the score, so reopening it
+          // doesn't suggest a level for work that has none.
+          getRubricCheckIds(cid, sid, aid).forEach(function (id) {
+            setRubricCheck(cid, sid, aid, id, false);
+          });
           scoreTagIds(assess, cid).forEach(function (tid) {
             var idx = scores[sid].findIndex(function (e) {
               return e.assessmentId === aid && e.tagId === tid;
@@ -2944,10 +2964,10 @@ window.PageGradebook = (function () {
       return a.id === aid;
     });
     if (!assess) return;
-    if (isCompletionScored(assess)) {
-      setCompletionMark(cid, sid, aid, nextCompletionMark(getCompletionMark(cid, sid, aid)));
-      clearProfCache();
-      render();
+    // Rubric work is scored criterion by criterion, and Complete/Incomplete
+    // has two marks, so neither takes a typed number: they open the grader.
+    if (isCompletionScored(assess) || (!isPointsScored(assess) && (assess.rubricId || assess.rubric_id))) {
+      openGrader(sid, aid, td);
       return;
     }
     var tagIds = scoreTagIds(assess, cid);
@@ -2977,14 +2997,14 @@ window.PageGradebook = (function () {
     if (span) span.style.display = 'none';
     var inp = document.createElement('input');
     inp.type = 'number';
-    inp.step = isPts ? 'any' : '0.1';
-    inp.min = '0';
+    inp.step = isPts ? 'any' : '1';
+    inp.min = isPts ? '0' : '1';
     inp.max = isPts ? String(maxPts * POINTS_EXTRA_CREDIT_FACTOR) : '4';
     if (isPts) inp.inputMode = 'decimal';
     inp.className = 'gb-scores-input';
     var currentPts = isPts ? getPointsScore(cid, sid, aid) : null;
     if (isPts) inp.value = currentPts != null ? formatPoints(currentPts) : '';
-    else inp.value = currentVal > 0 ? currentVal.toFixed(1) : '';
+    else inp.value = currentVal > 0 ? String(Math.round(currentVal)) : '';
     td.appendChild(inp);
     inp.focus();
     inp.select();
@@ -2994,9 +3014,13 @@ window.PageGradebook = (function () {
     var openedValue = inp.value;
 
     function save() {
-      var val = isPts ? parsePointsInput(inp.value, maxPts) : parseFloat(inp.value);
-      // Blank clears: null for points (where 0 is a score), 0 for levels.
-      if (!isPts && (inp.value === '' || isNaN(val))) val = 0;
+      var typed = String(inp.value).trim();
+      var val = isPts ? parsePointsInput(typed, maxPts) : Number(typed);
+      // Only a blank box clears: null for points (where 0 is a score), 0 for
+      // levels. Anything else that isn't a score (a typo, 3.5 or 9 as a
+      // proficiency) leaves the saved score alone.
+      if (typed === '') val = isPts ? null : 0;
+      else if (isPts ? val == null || isNaN(val) : !(val >= 1 && val <= 4 && val === Math.round(val))) return;
       // Save undo
       // Save full entries for undo (deep copy)
       var prevEntries = tagIds.map(function (tid) {
