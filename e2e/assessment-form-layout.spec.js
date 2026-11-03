@@ -7,7 +7,8 @@ test.beforeEach(async ({ page }) => {
 
 /* The assessment form as cards (redesign PR 1, 2026-11-02): inside the blue
    ring, a heading and white cards for What It Is, Scoring, Competencies,
-   Students and More Options. Every control keeps its id, so saving is as
+   Students and More Options (Evidence Type; Description sits under the
+   title since Nov 2). Every control keeps its id, so saving is as
    before. Demo Mode, Science 8. */
 
 async function openForm(page) {
@@ -46,16 +47,18 @@ for (const [width, height] of [
   });
 }
 
-test('More Options holds Description and Evidence Type, closed until opened', async ({ page }) => {
+test('Description sits under the title; More Options holds Evidence Type', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openForm(page);
+  // Under the title, in What It Is (teachers preferred it there, Nov 2).
+  await expect(page.locator('.af-card-what #af-desc')).toBeVisible();
+  const [t, d] = await Promise.all([page.locator('#af-title').boundingBox(), page.locator('#af-desc').boundingBox()]);
+  expect(d.y).toBeGreaterThan(t.y);
+  expect(d.y - (t.y + t.height)).toBeLessThan(60);
   const toggle = page.locator('.af-more-toggle');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.locator('#af-desc')).toBeHidden();
   await expect(page.locator('#af-evidence')).toBeHidden();
   await toggle.click();
-  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.locator('#af-desc')).toBeVisible();
   await expect(page.locator('#af-evidence')).toBeVisible();
 });
 
@@ -65,8 +68,8 @@ test('a new assessment saves its fields from the cards as before', async ({ page
   await page.fill('#af-title', 'Card Layout Check');
   await page.selectOption('#af-category', 'sci8-cat-labs');
   await page.locator('.af-code[data-tag=\"QP3\"]').click();
-  await page.locator('.af-more-toggle').click();
   await page.fill('#af-desc', 'A short description.');
+  await page.locator('.af-more-toggle').click();
   await page.selectOption('#af-evidence', 'video');
   await page.locator('[data-action="saveNewAssess"]').click();
   const saved = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Card Layout Check'));
@@ -77,12 +80,11 @@ test('a new assessment saves its fields from the cards as before', async ({ page
   expect(saved.evidenceType).toBe('video');
 });
 
-test('editing opens More Options when the work has a description', async ({ page }) => {
+test('editing shows the description under the title', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openForm(page);
   await page.fill('#af-title', 'Has a Description');
   await page.selectOption('#af-category', 'sci8-cat-labs');
-  await page.locator('.af-more-toggle').click();
   await page.fill('#af-desc', 'Read me.');
   await page.locator('[data-action="saveNewAssess"]').click();
   const aid = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Has a Description').id);
