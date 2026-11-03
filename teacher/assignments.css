@@ -1634,6 +1634,173 @@
   }
 }
 
+/* Rubric in the form (redesign PR 6): the chosen rubric as a card with its
+   wording, the four starts, and the Competency Rubric. */
+.af-rubric-field[hidden] {
+  display: none;
+}
+.af-rubric-field > .af-label {
+  margin-bottom: 8px;
+}
+.af-rubric-pick {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.af-rubric-pick[hidden] {
+  display: none;
+}
+.af-rubric-pick .af-rubric-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+}
+.af-rubric-card {
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+  background: var(--surface);
+}
+.af-rubric-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: #f2f2f4;
+}
+.af-rubric-card-name {
+  font-weight: 700;
+  color: var(--text);
+}
+.af-rubric-card-meta {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-gap {
+  flex: 1;
+}
+.af-rubric-card-head .btn {
+  min-height: 32px;
+  padding: 0 14px;
+  background: var(--surface);
+}
+.af-rubric-card .rb-grid {
+  margin: 0;
+  padding: 0 6px 8px;
+}
+.af-rubric-card .rb-weight,
+.af-rubric-card .rb-pie {
+  display: none;
+}
+.af-rubric-card .rb-level-head.l1 {
+  background: var(--score-1);
+  color: #fff;
+}
+.af-rubric-card .rb-level-head.l2 {
+  background: var(--score-2);
+  color: #fff;
+}
+.af-rubric-card .rb-level-head.l3 {
+  background: var(--score-3);
+  color: #fff;
+}
+.af-rubric-card .rb-level-head.l4 {
+  background: var(--score-4);
+  color: #fff;
+}
+.af-rubric-card .rb-level-head .rb-level-value {
+  color: #fff;
+  opacity: 0.9;
+}
+.af-rubric-starts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 900px) {
+  .af-rubric-starts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.af-rubric-start {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: #f2f2f4;
+  font-family: var(--font-base);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.af-rubric-start:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.af-rubric-start:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.af-rubric-start:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.af-rubric-start b {
+  font-size: var(--text-base);
+}
+.af-rubric-start span {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.35;
+}
+#af-tag-rubric:not(:empty) {
+  margin-top: 14px;
+}
+.af-tag-rubric-note {
+  padding: 8px 12px;
+  background: #f2f2f4;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.af-wording-card {
+  max-width: 760px;
+  max-height: 86vh;
+  overflow: auto;
+}
+.af-wording-list {
+  display: grid;
+  gap: 14px;
+  margin: 12px 0;
+}
+.af-wording-set {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.af-wording-set legend {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.af-wording-level {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.af-wording-level textarea {
+  height: auto;
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+
 /* The footer (redesign PR 3): stays at the bottom of the window while the
    form is in view, with what the work counts toward beside the buttons. */
 #new-assess-form > .af-actions {

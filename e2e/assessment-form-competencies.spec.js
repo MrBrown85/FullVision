@@ -87,6 +87,7 @@ test('a rubric decides the competencies, read only while it is chosen', async ({
     const r = getRubrics('sci8')[0];
     return { id: r.id, tags: [...new Set(r.criteria.flatMap(c => c.tagIds || []))] };
   });
+  await page.locator('[data-action="chooseRubric"]').first().click();
   await page.selectOption('#af-rubric', rubric.id);
   expect((await ticked(page)).sort()).toEqual(rubric.tags.slice().sort());
   await expect(page.locator('#af-comp-rubric-note')).toBeVisible();
@@ -94,6 +95,7 @@ test('a rubric decides the competencies, read only while it is chosen', async ({
   await page.locator('.af-code[data-tag="CM2"]').click({ force: true });
   expect((await ticked(page)).sort()).toEqual(rubric.tags.slice().sort());
   // None hands them back.
+  await page.locator('[data-action="chooseRubric"]').first().click();
   await page.selectOption('#af-rubric', '');
   await expect(page.locator('#af-comp-rubric-note')).toBeHidden();
   await page.locator('.af-code[data-tag="CM2"]').click();
