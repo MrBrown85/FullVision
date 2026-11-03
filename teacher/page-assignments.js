@@ -2422,6 +2422,7 @@ window.PageAssignments = (function () {
       '<section class="af-card af-card-students">' +
       '<div class="af-card-head">' +
       '<span class="af-card-title">Students</span>' +
+      '<span class="af-students-summary" id="af-students-summary"></span>' +
       '<div class="seg af-type-toggle" role="group" aria-label="Collaboration">' +
       '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
       (collaboration === 'individual' ? ' active' : '') +
@@ -2439,6 +2440,7 @@ window.PageAssignments = (function () {
       segAttr(collaboration === 'group') +
       ' data-collab="group" data-action="setCollaboration">Group</button>' +
       '</div>' +
+      '<button type="button" class="btn btn-ghost" id="af-choose-students" data-action="toggleChooseStudents" aria-controls="collab-panel-mount" aria-expanded="false">Choose Students</button>' +
       '</div>' +
       '<div id="collab-panel-mount"></div>' +
       '</section>';
@@ -7522,6 +7524,9 @@ window.PageAssignments = (function () {
       },
       toggleActive: function () {
         el.classList.toggle('active');
+      },
+      toggleChooseStudents: function () {
+        AC.toggleChooseStudents();
       },
       toggleCode: function () {
         toggleCode(el);

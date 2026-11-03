@@ -18,7 +18,11 @@ window.AssignCollab = (function () {
     _activeCourse = cid;
   }
 
+  // Whether the Students card's checkbox list is open (Choose Students).
+  var _chooseOpen = false;
+
   function resetState() {
+    _chooseOpen = false;
     newCollaboration = 'individual';
     collabExcluded = new Set();
     collabPairs = [];
@@ -38,16 +42,50 @@ window.AssignCollab = (function () {
     renderCollabPanel();
   }
 
+  function _plural(n, one, many) {
+    return n + ' ' + (n === 1 ? one : many);
+  }
+
+  /* The Students card's line: who it's assigned to, and Choose Students to
+     open the list (individual work only; pairs and groups show their
+     builder). */
+  function _renderStudentsSummary(students) {
+    var line = document.getElementById('af-students-summary');
+    var assigned = students.length - collabExcluded.size;
+    if (line) {
+      line.textContent =
+        assigned === students.length
+          ? 'All ' + _plural(students.length, 'student', 'students')
+          : assigned + ' of ' + _plural(students.length, 'student', 'students');
+    }
+    var btn = document.getElementById('af-choose-students');
+    if (btn) {
+      btn.hidden = newCollaboration !== 'individual';
+      btn.textContent = _chooseOpen ? 'Done' : 'Choose Students';
+      btn.setAttribute('aria-expanded', String(_chooseOpen));
+    }
+  }
+
+  function toggleChooseStudents() {
+    _chooseOpen = !_chooseOpen;
+    renderCollabPanel();
+  }
+
   function renderCollabPanel() {
     var mount = document.getElementById('collab-panel-mount');
     if (!mount) return;
     var students = getCollabStudents();
+    _renderStudentsSummary(students);
 
+    if (newCollaboration === 'individual' && !_chooseOpen) {
+      mount.innerHTML = '';
+      return;
+    }
     if (newCollaboration === 'individual') {
       var html =
         '<div class="collab-panel">' +
         '<div class="collab-panel-header">' +
-        '<span class="collab-panel-title">Assign to Students</span>' +
+        '<span class="collab-panel-title">Choose Students</span>' +
         '<div class="collab-panel-actions">' +
         '<button class="collab-panel-btn" data-action="collabCheckAll">Check All</button>' +
         '<button class="collab-panel-btn" data-action="collabCheckNone">Check None</button>' +
@@ -110,8 +148,14 @@ window.AssignCollab = (function () {
       var remainder = total % collabGroupCount;
       var sizeDesc =
         remainder > 0
-          ? collabGroupCount - remainder + ' groups of ' + perGroup + ', ' + remainder + ' of ' + (perGroup + 1)
-          : collabGroupCount + ' groups of ' + perGroup;
+          ? _plural(collabGroupCount - remainder, 'group', 'groups') +
+            ' of ' +
+            perGroup +
+            ', ' +
+            remainder +
+            ' of ' +
+            (perGroup + 1)
+          : _plural(collabGroupCount, 'group', 'groups') + ' of ' + perGroup;
       var html =
         '<div class="collab-panel">' +
         '<div class="collab-panel-header">' +
@@ -126,7 +170,7 @@ window.AssignCollab = (function () {
         '</div>' +
         '</div>' +
         '<div class="collab-stepper">' +
-        '<span class="collab-stepper-label">Number of groups</span>' +
+        '<span class="collab-stepper-label">Number of Groups</span>' +
         '<div class="collab-stepper-controls">' +
         '<button class="collab-stepper-btn" data-action="collabSetGroupCount" data-delta="-1">\u2212</button>' +
         '<div class="collab-stepper-val">' +
@@ -327,6 +371,7 @@ window.AssignCollab = (function () {
     renderCollabPanel();
   }
   function loadCollabData(assess) {
+    _chooseOpen = false;
     collabExcluded = new Set(assess && assess.excludedStudents ? assess.excludedStudents : []);
     collabPairs = assess && assess.pairs ? structuredClone(assess.pairs) : [];
     collabGroups = assess && assess.groups ? structuredClone(assess.groups) : [];
@@ -343,6 +388,7 @@ window.AssignCollab = (function () {
     resetState: resetState,
     setCollaboration: setCollaboration,
     renderCollabPanel: renderCollabPanel,
+    toggleChooseStudents: toggleChooseStudents,
     collabToggleStudent: collabToggleStudent,
     collabCheckAll: collabCheckAll,
     collabCheckNone: collabCheckNone,
