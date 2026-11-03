@@ -1209,6 +1209,75 @@
     grid-template-columns: 1fr;
   }
 }
+/* Scoring card (redesign PR 2): mode cards sized to their labels, Factor at
+   the row's end, then only what the mode needs. */
+.af-card-scoring .af-card-head .af-mode-cards {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: none;
+  gap: 8px;
+}
+.af-card-scoring .af-mode-item {
+  flex: 0 0 auto;
+}
+.af-card-scoring .af-mode-card {
+  min-width: 168px;
+  white-space: nowrap;
+  padding: 0 18px;
+}
+.af-weight-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 0 auto;
+}
+.af-weight-field[hidden],
+.af-rubric-field[hidden],
+.af-maxpoints-field[hidden],
+.af-dibels-note[hidden] {
+  display: none;
+}
+.af-weight-field .af-label {
+  margin: 0;
+}
+.af-weight-field .af-input {
+  width: auto;
+  min-width: 150px;
+}
+.af-maxpoints-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 0;
+}
+.af-maxpoints-field .af-label {
+  flex: 0 0 136px;
+  margin: 0;
+}
+.af-maxpoints-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.af-maxpoints-controls .af-input {
+  width: 80px;
+  text-align: center;
+}
+.af-maxpoints-controls .seg {
+  height: 40px;
+}
+.af-maxpoints-controls .seg-btn {
+  min-width: 52px;
+}
+.af-dibels-note {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+  line-height: 1.45;
+}
+.af-card-scoring .af-score-settings:empty {
+  display: none;
+}
 #new-assess-form > .af-actions {
   border-top: 0;
   padding-top: 4px;
