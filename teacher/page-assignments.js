@@ -2007,6 +2007,8 @@ window.PageAssignments = (function () {
   // One row of the competency checklist. The row reads the competency's own
   // wording; the section name (often just the category) is the last fallback.
   var _afIcanSeq = 0;
+  // Each competency's scored count, set while the form's rows are drawn.
+  var _afTagCounts = null;
   function _afTagRow(sec, selTags) {
     var tag = sec.tags[0];
     if (!tag) return '';
@@ -2040,9 +2042,17 @@ window.PageAssignments = (function () {
       '">' +
       esc(tag.code || tag.shortName || '') +
       '</span>' +
+      (tag.label ? '<span class="af-tag-short">' + esc(tag.label) + '</span>' : '') +
       '<span class="af-tag-name">' +
       esc(wording) +
       '</span>' +
+      (_afTagCounts
+        ? '<span class="af-tag-n' +
+          ((_afTagCounts[tag.id] || 0) <= 1 ? ' is-thin' : '') +
+          '">' +
+          (_afTagCounts[tag.id] || 0) +
+          '</span>'
+        : '') +
       '</label>' +
       (icans.length
         ? '<button type="button" class="af-tag-ican-toggle" data-action="afToggleIcans" aria-expanded="false" aria-controls="' +
@@ -2278,9 +2288,6 @@ window.PageAssignments = (function () {
       '<button type="button" class="btn btn-ghost" data-action="newRubricFromForm" style="white-space:nowrap;font-size:0.8125rem;padding:7px 12px">+ New Rubric</button>' +
       '<button type="button" class="btn btn-ghost" data-action="rubricFromClass" style="white-space:nowrap;font-size:0.8125rem;padding:7px 12px">From another class</button>' +
       '</div>' +
-      (selRubricId
-        ? '<div class="af-rubric-info">Rubric tags are auto-selected below. You can add additional tags.</div>'
-        : '') +
       '</div>';
 
     html +=
@@ -2325,14 +2332,29 @@ window.PageAssignments = (function () {
       '</section>';
 
     // Tags — grouped by competency group
-    html +=
-      '<section class="af-card af-card-competencies">' +
-      '<div class="af-card-head"><span class="af-card-title">Competencies</span></div>' +
-      '<div class="af-field">' +
-      '<label class="af-label">Curricular Competencies</label>' +
-      '<div class="af-tags-container">';
     var lm = getLearningMap(cid);
     var compGroups = (lm && lm.competencyGroups) || [];
+    _afTagCounts = _compCounts(cid, assess ? assess.id : null);
+    html +=
+      '<section class="af-card af-card-competencies" data-view="' +
+      _compView() +
+      '">' +
+      '<div class="af-card-head">' +
+      '<span class="af-card-title">Competencies</span>' +
+      '<span class="af-comp-chosen" id="af-comp-chosen"></span>' +
+      (sections.length
+        ? '<span class="af-comp-tools">' +
+          '<input class="af-input af-comp-find" id="af-comp-find" type="search" autocomplete="off" placeholder="Type a code or words" aria-label="Find a competency">' +
+          '<span class="seg af-comp-view" role="group" aria-label="Show competencies as">' +
+          '<button type="button" class="seg-btn" data-action="setCompView" data-view="codes">Codes</button>' +
+          '<button type="button" class="seg-btn" data-action="setCompView" data-view="list">List</button>' +
+          '</span></span>'
+        : '') +
+      '</div>' +
+      '<p class="af-comp-rubric-note" id="af-comp-rubric-note" hidden>From the rubric\u2019s criteria. To change them, edit the rubric.</p>' +
+      _compPickerHtml(cid, assess, sections, compGroups) +
+      '<div class="af-field af-comp-list">' +
+      '<div class="af-tags-container">';
     if (compGroups.length > 0) {
       // Build grouped + ungrouped lists
       var _afGroupMap = {};
@@ -2369,7 +2391,8 @@ window.PageAssignments = (function () {
         html += _afTagRow(sec, selTags);
       });
     }
-    html += '</div>' + _untaggedNote(cid, selTags.length > 0) + '</div>';
+    html += '</div></div>' + _untaggedNote(cid, selTags.length > 0);
+    _afTagCounts = null;
 
     // Core Competencies
     var selCC = assess ? assess.coreCompetencyIds || [] : [];
@@ -2508,6 +2531,7 @@ window.PageAssignments = (function () {
       var node = document.getElementById(id);
       if (node) node.hidden = !show[id];
     });
+    _syncCodes();
   }
 
   // The Factor menu's words: the multiplier, and what the common ones mean.
@@ -2750,6 +2774,330 @@ window.PageAssignments = (function () {
     if (note) note.hidden = !!document.querySelector('.af-tag-cb:checked');
   }
 
+  /* ── The competency picker (redesign PR 4, 2026-11-02) ─────
+     Codes: every competency a one-click chip in its Ministry group, with
+     how many assessments have scored it; hovering or focusing one fills
+     the focus box with its wording and I Can statements. List: the rows
+     below, one line each. The checkboxes in the list are the form's
+     record either way: a chip ticks its checkbox, so saving, a rubric's
+     own ticks and the I Can toggles are unchanged. Same As repeats a
+     recent assessment's competencies. With a rubric they're the rubric's,
+     shown read only. */
+  var COMP_VIEW_KEY = 'fv-assess-comp-view';
+  function _compView() {
+    try {
+      return localStorage.getItem(COMP_VIEW_KEY) === 'list' ? 'list' : 'codes';
+    } catch (e) {
+      return 'codes';
+    }
+  }
+  function setCompView(view) {
+    var card = document.querySelector('.af-card-competencies');
+    if (!card) return;
+    card.dataset.view = view === 'list' ? 'list' : 'codes';
+    try {
+      localStorage.setItem(COMP_VIEW_KEY, card.dataset.view);
+    } catch (e) {}
+    _syncCodes();
+  }
+
+  // How many of the class's other assessments scored each competency.
+  function _compCounts(cid, exceptId) {
+    var counts = {};
+    getAssessments(cid).forEach(function (a) {
+      if (!a || a.id === exceptId) return;
+      (a.tagIds || []).forEach(function (t) {
+        counts[t] = (counts[t] || 0) + 1;
+      });
+    });
+    return counts;
+  }
+
+  // The three most recent distinct sets of competencies, for Same As.
+  function _recentTagSets(cid, exceptId) {
+    var seen = {};
+    return getAssessments(cid)
+      .filter(function (a) {
+        return a && a.id !== exceptId && (a.tagIds || []).length > 0;
+      })
+      .sort(function (a, b) {
+        return String(b.dateAssigned || b.date || '').localeCompare(String(a.dateAssigned || a.date || ''));
+      })
+      .filter(function (a) {
+        var key = a.tagIds.slice().sort().join(' ');
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      })
+      .slice(0, 3);
+  }
+
+  function _compPickerHtml(cid, assess, sections, compGroups) {
+    if (!sections.length) return '';
+    var counts = _compCounts(cid, assess ? assess.id : null);
+    var lm = getLearningMap(cid) || {};
+    var subjects = lm.subjects || [];
+    var subjectName = {};
+    subjects.forEach(function (sub) {
+      subjectName[sub.id] = sub.name || sub.id;
+    });
+    // Rows: each Ministry group with its competencies, in the class's order.
+    var rows = [];
+    var byGroup = {};
+    compGroups.forEach(function (g) {
+      byGroup[g.id] = { name: g.name, color: g.color, subject: null, secs: [] };
+    });
+    var loose = { name: 'Other Competencies', color: null, subject: null, secs: [] };
+    sections.forEach(function (sec) {
+      var row = (sec.groupId && byGroup[sec.groupId]) || loose;
+      if (!row.subject) row.subject = sec.subject;
+      row.secs.push(sec);
+    });
+    compGroups.forEach(function (g) {
+      if (byGroup[g.id].secs.length) rows.push(byGroup[g.id]);
+    });
+    if (loose.secs.length) rows.push(loose);
+    var twoCourses = subjects.length > 1;
+    var lastSubject = null;
+    var html = '';
+    var sets = _recentTagSets(cid, assess ? assess.id : null);
+    if (sets.length) {
+      html +=
+        '<div class="af-same-as" id="af-same-as"><span class="af-same-as-label">Same As</span>' +
+        sets
+          .map(function (a) {
+            var codes = a.tagIds.map(function (t) {
+              var tag = getTagById(cid, t);
+              return (tag && tag.code) || t;
+            });
+            return (
+              '<button type="button" class="af-same-as-btn" data-action="sameAsTags" data-tags="' +
+              esc(a.tagIds.join(',')) +
+              '">' +
+              esc(a.title) +
+              ' <span class="af-same-as-codes">' +
+              esc(codes.join(' ')) +
+              '</span></button>'
+            );
+          })
+          .join('') +
+        '</div>';
+    }
+    html += '<div class="af-codes" id="af-codes">';
+    rows.forEach(function (row) {
+      if (twoCourses && row.subject && row.subject !== lastSubject) {
+        lastSubject = row.subject;
+        html += '<div class="af-codes-course">' + esc(subjectName[row.subject] || row.subject) + '</div>';
+      }
+      html +=
+        '<div class="af-codes-group"><span class="af-codes-group-name">' +
+        (row.color ? '<span class="af-codes-dot" style="background:' + cssColor(row.color) + '"></span>' : '') +
+        esc(row.name) +
+        '</span><span class="af-codes-chips">';
+      row.secs.forEach(function (sec) {
+        var tag = sec.tags[0];
+        if (!tag) return;
+        var n = counts[tag.id] || 0;
+        html +=
+          '<button type="button" class="af-code' +
+          (n <= 1 ? ' is-thin' : '') +
+          '" data-action="toggleCode" data-tag="' +
+          esc(tag.id) +
+          '" data-group="' +
+          esc(row.name) +
+          '" data-count="' +
+          n +
+          '" aria-pressed="false"><b>' +
+          esc(tag.code || tag.id) +
+          '</b>' +
+          esc(tag.label || tag.shortName || sec.name || '') +
+          '<span class="af-code-n" aria-label="scored ' +
+          n +
+          (n === 1 ? ' time' : ' times') +
+          '">' +
+          n +
+          '</span></button>';
+      });
+      html += '</span></div>';
+    });
+    html += '</div>';
+    html +=
+      '<div class="af-codes-focus" id="af-codes-focus" aria-live="polite">' +
+      '<p class="af-codes-focus-hint">Point at a competency, or tab to it, to read its wording here.</p></div>';
+    return html;
+  }
+
+  // Chips, header chips, the rubric note and Same As follow the checkboxes.
+  function _syncCodes() {
+    var card = document.querySelector('.af-card-competencies');
+    if (!card) return;
+    var cid = activeCourse;
+    var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    var rubricId = mode === 'proficiency' ? (document.getElementById('af-rubric') || {}).value || '' : '';
+    var fromRubric = !!rubricId;
+    card.classList.toggle('is-rubric', fromRubric);
+    var note = document.getElementById('af-comp-rubric-note');
+    if (note) note.hidden = !fromRubric;
+    var chosen = [];
+    document.querySelectorAll('.af-tag-cb').forEach(function (cb) {
+      if (cb.checked) chosen.push(cb.value);
+      cb.disabled = fromRubric;
+    });
+    card.querySelectorAll('.af-code').forEach(function (chip) {
+      var on = chosen.indexOf(chip.dataset.tag) >= 0;
+      chip.classList.toggle('on', on);
+      chip.setAttribute('aria-pressed', String(on));
+      chip.setAttribute('aria-disabled', String(fromRubric));
+    });
+    var head = document.getElementById('af-comp-chosen');
+    if (head) {
+      head.innerHTML = chosen
+        .map(function (t) {
+          var tag = getTagById(cid, t);
+          return (
+            '<span class="af-comp-chip"><b>' +
+            esc((tag && tag.code) || t) +
+            '</b>' +
+            esc((tag && (tag.label || tag.shortName)) || '') +
+            '</span>'
+          );
+        })
+        .join('');
+    }
+    card.querySelectorAll('.af-comp-view .seg-btn').forEach(function (b) {
+      var on = b.dataset.view === card.dataset.view;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+
+  function toggleCode(chip) {
+    if (!chip || chip.getAttribute('aria-disabled') === 'true') return;
+    var cb = document.querySelector('.af-tag-cb[value="' + chip.dataset.tag + '"]');
+    if (cb) cb.click();
+    _syncCodes();
+  }
+
+  // Same As: exactly that assessment's competencies.
+  function sameAsTags(tagIds) {
+    var want = String(tagIds || '')
+      .split(',')
+      .filter(Boolean);
+    document.querySelectorAll('.af-tag-cb').forEach(function (cb) {
+      var on = want.indexOf(cb.value) >= 0;
+      if (cb.checked !== on && !cb.disabled) cb.click();
+    });
+    _syncCodes();
+  }
+
+  // The focus box: the competency pointed at or focused, in full.
+  function _showCodeFocus(chip) {
+    var box = document.getElementById('af-codes-focus');
+    if (!box || !chip) return;
+    var tag = getTagById(activeCourse, chip.dataset.tag);
+    if (!tag) return;
+    document.querySelectorAll('.af-code.is-focus').forEach(function (c) {
+      c.classList.remove('is-focus');
+    });
+    chip.classList.add('is-focus');
+    var n = Number(chip.dataset.count) || 0;
+    var icans = (tag.i_can_statements || []).filter(function (x) {
+      return String(x || '').trim();
+    });
+    box.innerHTML =
+      '<div class="af-codes-focus-head"><span class="af-codes-focus-code">' +
+      esc(tag.code || tag.id) +
+      '</span><span class="af-codes-focus-name">' +
+      esc(tag.label || tag.shortName || '') +
+      '</span><span class="af-codes-focus-group">' +
+      esc(chip.dataset.group || '') +
+      '</span><span class="af-codes-focus-count' +
+      (n <= 1 ? ' is-thin' : '') +
+      '">Scored ' +
+      n +
+      '× this year</span></div>' +
+      '<p class="af-codes-focus-text">' +
+      esc(tag.text || tag.source_text || '') +
+      '</p>' +
+      (icans.length
+        ? '<div class="af-codes-focus-label">I Can</div><ul class="af-codes-focus-icans">' +
+          icans
+            .map(function (x) {
+              return '<li>' + esc(x) + '</li>';
+            })
+            .join('') +
+          '</ul>'
+        : '');
+    var boxRect = box.getBoundingClientRect();
+    var r = chip.getBoundingClientRect();
+    box.style.setProperty('--af-point', Math.max(16, Math.round(r.left + r.width / 2 - boxRect.left - 8)) + 'px');
+  }
+  function _codeHover(e) {
+    var chip = e.target && e.target.closest ? e.target.closest('.af-code') : null;
+    if (chip) _showCodeFocus(chip);
+  }
+
+  // Type to narrow the chips and the list; Enter ticks the first match.
+  function _filterComps(q) {
+    var query = String(q || '')
+      .trim()
+      .toLowerCase();
+    var cid = activeCourse;
+    var match = function (id) {
+      if (!query) return true;
+      var tag = getTagById(cid, id) || {};
+      return [tag.code, tag.id, tag.label, tag.shortName, tag.text].some(function (x) {
+        return (
+          String(x || '')
+            .toLowerCase()
+            .indexOf(query) >= 0
+        );
+      });
+    };
+    document.querySelectorAll('.af-code').forEach(function (chip) {
+      chip.hidden = !match(chip.dataset.tag);
+    });
+    document.querySelectorAll('.af-codes-group').forEach(function (g) {
+      g.hidden = !g.querySelector('.af-code:not([hidden])');
+    });
+    document.querySelectorAll('.af-comp-list .af-tag-row').forEach(function (row) {
+      var cb = row.querySelector('.af-tag-cb');
+      var hide = cb ? !match(cb.value) : false;
+      row.hidden = hide;
+      var list = row.nextElementSibling;
+      if (hide && list && list.classList.contains('af-tag-icans')) list.hidden = true;
+    });
+  }
+  function _compKeydown(e) {
+    var t = e.target;
+    if (!t || !t.closest) return;
+    if (t.id === 'af-comp-find') {
+      if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        var first = document.querySelector('.af-code:not([hidden])');
+        if (first) toggleCode(first);
+      } else if (e.key === 'Escape' && t.value) {
+        e.preventDefault();
+        t.value = '';
+        _filterComps('');
+      }
+      return;
+    }
+    if (!t.classList.contains('af-code')) return;
+    var keys = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+    if (!keys[e.key]) return;
+    var chips = Array.from(document.querySelectorAll('.af-code:not([hidden])'));
+    var i = chips.indexOf(t);
+    var next = chips[i + keys[e.key]];
+    if (next) {
+      e.preventDefault();
+      next.focus();
+    }
+  }
+  function _compInput(e) {
+    if (e.target && e.target.id === 'af-comp-find') _filterComps(e.target.value);
+  }
+
   /* ── Assessment CRUD ────────────────────────────────────── */
   function showNewForm() {
     _resetCollabState();
@@ -2762,6 +3110,7 @@ window.PageAssignments = (function () {
       form.scrollIntoView({ behavior: 'smooth' });
       renderCollabPanel();
       _refreshCountsToward();
+      _syncCodes();
     }
   }
   function hideNewForm() {
@@ -2928,6 +3277,7 @@ window.PageAssignments = (function () {
       form.scrollIntoView({ behavior: 'smooth' });
       renderCollabPanel();
       _refreshCountsToward();
+      _syncCodes();
       if (window.AssessmentCopy) AssessmentCopy.markExistingCopies(cid, assess);
     }
   }
@@ -5094,37 +5444,31 @@ window.PageAssignments = (function () {
   }
 
   /* ── Rubric Select in Assessment Form ───────────────────── */
+  /* A rubric decides the assessment's competencies (redesign PR 4): picking
+     one ticks exactly the competencies its criteria feed, read only while
+     it's chosen. Picking None leaves the ticks to edit by hand. */
   function onRubricSelect(rubricId) {
-    if (!rubricId) return;
-    var rubric = getRubricById(activeCourse, rubricId);
-    if (!rubric) return;
-    _rubricAutoTags.forEach(function (tagId) {
-      var cb = document.querySelector('.af-tag-cb[value="' + tagId + '"]');
-      if (cb && cb.checked) {
-        cb.checked = false;
-        cb.parentElement.classList.remove('checked');
-        var secId = cb.dataset.section;
-        if (secId) updateSectionBadge(secId);
-      }
-    });
+    var rubric = rubricId ? getRubricById(activeCourse, rubricId) : null;
     _rubricAutoTags = [];
-    var rubricTagIds = new Set();
-    rubric.criteria.forEach(function (c) {
-      (c.tagIds || []).forEach(function (t) {
-        rubricTagIds.add(t);
+    if (rubric) {
+      var rubricTagIds = new Set();
+      rubric.criteria.forEach(function (c) {
+        (c.tagIds || []).forEach(function (t) {
+          rubricTagIds.add(t);
+        });
       });
-    });
-    document.querySelectorAll('.af-tag-cb').forEach(function (cb) {
-      if (rubricTagIds.has(cb.value) && !cb.checked) {
-        cb.checked = true;
-        cb.parentElement.classList.add('checked');
-        _rubricAutoTags.push(cb.value);
+      document.querySelectorAll('.af-tag-cb').forEach(function (cb) {
+        var on = rubricTagIds.has(cb.value);
+        if (cb.checked === on) return;
+        cb.checked = on;
+        cb.parentElement.classList.toggle('checked', on);
+        if (on) _rubricAutoTags.push(cb.value);
         var secId = cb.dataset.section;
         if (secId) updateSectionBadge(secId);
-        var group = cb.closest('.af-section-group');
-        if (group && !group.classList.contains('af-section-open')) group.classList.add('af-section-open');
-      }
-    });
+      });
+    }
+    _refreshUntaggedNote();
+    _syncCodes();
   }
 
   /* ── Rubric Builder UI ──────────────────────────────────── */
@@ -7179,6 +7523,15 @@ window.PageAssignments = (function () {
       toggleActive: function () {
         el.classList.toggle('active');
       },
+      toggleCode: function () {
+        toggleCode(el);
+      },
+      sameAsTags: function () {
+        sameAsTags(el.dataset.tags);
+      },
+      setCompView: function () {
+        setCompView(el.dataset.view);
+      },
       toggleMoreOptions: function () {
         var body = document.getElementById('af-more-body');
         if (!body) return;
@@ -7292,6 +7645,7 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionChange === 'tagCheckbox') {
       onTagChange(el, el.dataset.section);
+      _syncCodes();
       return;
     }
     if (el.dataset.actionChange === 'collabToggleStudent') {
@@ -8896,6 +9250,10 @@ window.PageAssignments = (function () {
       _addDocListener(type, _countsAsAfterEvent);
     });
     _addDocListener('keydown', _formKeydown);
+    _addDocListener('keydown', _compKeydown);
+    _addDocListener('input', _compInput);
+    _addDocListener('mouseover', _codeHover);
+    _addDocListener('focusin', _codeHover);
     ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
       _addDocListener(type, _statusLocksAfterEvent);
     });
