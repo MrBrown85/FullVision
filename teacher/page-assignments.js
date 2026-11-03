@@ -3836,8 +3836,9 @@ window.PageAssignments = (function () {
     box.style.setProperty('--af-point', Math.max(16, Math.round(r.left + r.width / 2 - boxRect.left - 8)) + 'px');
   }
   /* Hover-overs wait for a pause (Colin, Nov 2: teachers are clicking and
-     only need them when they linger). A chip or field reached with the
-     keyboard shows at once; a click's focus waits like a hover. */
+     only need them when they linger). A field reached with the keyboard
+     shows at once; a click's focus waits like a hover. The Codes focus box
+     is not a hover-over: it follows the pointer at once. */
   var AF_HOVER_DELAY = 500;
   var _afHoverTimer = null;
   function _afAfterPause(el, show) {
@@ -3852,14 +3853,7 @@ window.PageAssignments = (function () {
   }
   function _codeHover(e) {
     var chip = e.target && e.target.closest ? e.target.closest('.af-code') : null;
-    if (!chip) return;
-    if (e.type === 'focusin') {
-      if (_byKeyboard(e)) _showCodeFocus(chip);
-      return;
-    }
-    _afAfterPause(chip, function () {
-      _showCodeFocus(chip);
-    });
+    if (chip) _showCodeFocus(chip);
   }
 
   // Type to narrow the chips and the list; Enter ticks the first match.
