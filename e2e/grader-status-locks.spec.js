@@ -100,3 +100,28 @@ test('a locked Missing looks off and says to clear the score; Clear Score is off
     /Clear it first to mark Missing or Excused/,
   );
 });
+
+// Nov 3 sweep (step 4 group 3 #20): the grader greyed the Overall Comment
+// for a Missing student while the Assignments row kept it open.
+test('the grader keeps the Overall Comment open for a Missing student, as the rows do', async ({ page }) => {
+  await mockAuth(page);
+  await seedCourse(page);
+  await seedStudents(page);
+  await seedAssessments(page, [{ ...TEST_ASSESSMENT, rubricId: '' }]);
+  await page.addInitScript(cid => {
+    localStorage.setItem('gb-statuses-' + cid, JSON.stringify({ 'stu-001:assess-001': 'NS' }));
+  }, TEST_COURSE.id);
+  await gotoApp(page, '/gradebook');
+  await page.evaluate(cid => PageAssignments.openGrader(cid, 'assess-001', 'stu-001'), TEST_COURSE.id);
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog.locator('.grader-body')).toHaveClass(/is-locked/);
+  const box = dialog.locator('.grdt-overall .grdt-note');
+  expect(await box.evaluate(el => Number(getComputedStyle(el.closest('.grdt-overall')).opacity))).toBe(1);
+  expect(await dialog.locator('.grdl-cards').evaluate(el => Number(getComputedStyle(el).opacity))).toBeLessThan(1);
+  await box.click();
+  await box.fill('Please hand this in by Friday.');
+  await dialog.locator('.grader-student').click();
+  expect(await page.evaluate(cid => getScoreComment(cid, 'stu-001', 'assess-001'), TEST_COURSE.id)).toBe(
+    'Please hand this in by Friday.',
+  );
+});

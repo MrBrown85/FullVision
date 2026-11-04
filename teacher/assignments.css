@@ -6962,8 +6962,10 @@ button.grader-member-name {
   opacity: 0.45;
   cursor: default;
 }
-/* Missing or Excused: the work isn't graded, so the controls step back. */
-.grader-body.is-locked .grdt-tiles,
+/* Missing or Excused: the work isn't graded, so the controls step back.
+   The Overall Comment stays open, as on the Assignments rows (Nov 3
+   sweep): a note on missing work is still feedback a teacher may write. */
+.grader-body.is-locked .grdt-tiles:not(.grdt-overall),
 .grader-body.is-locked .grdl-cards,
 .grader-body.is-locked .grdp-card {
   opacity: 0.45;
@@ -7036,7 +7038,7 @@ button.grader-member-name {
   border-radius: 12px;
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.35);
 }
-.grader-inline.is-locked .grdt-tiles,
+.grader-inline.is-locked .grdt-tiles:not(.grdt-overall),
 .grader-inline.is-locked .grdl-cards,
 .grader-inline.is-locked .grdp-card {
   opacity: 0.45;
