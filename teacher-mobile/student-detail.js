@@ -607,7 +607,7 @@ window.MStudentDetail = (function () {
     // Everything below follows the class's chosen reporting term.
     var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
     var inTerm = function (a) {
-      return typeof assessmentInActiveTerm !== 'function' || assessmentInActiveTerm(cid, a);
+      return typeof assessmentInYearToDate !== 'function' || assessmentInYearToDate(cid, a);
     };
     var sections = getSections(cid);
     var statuses = getAssignmentStatuses(cid);

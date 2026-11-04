@@ -342,7 +342,7 @@ window.MComponents = (function () {
      "N Scored" and the card's growth line read this one count. */
   function scoredAssessmentCount(cid, sid) {
     return getAssessments(cid).filter(function (a) {
-      if (typeof assessmentInActiveTerm === 'function' && !assessmentInActiveTerm(cid, a)) return false;
+      if (typeof assessmentInYearToDate === 'function' && !assessmentInYearToDate(cid, a)) return false;
       var kind = assessmentCellValue(cid, sid, a).kind;
       return kind === 'points' || kind === 'level' || kind === 'complete';
     }).length;

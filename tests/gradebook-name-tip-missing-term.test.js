@@ -1,10 +1,10 @@
 /**
- * The name tip's missing count counted every term (Nov 3 bug sweep,
- * Gradebook group 3). In a Letter class viewed in Term 2, the tip showed
- * the Term 2 grade and, under it, "2 assessments missing" for Term 1 work
- * that doesn't count toward that grade. It also counted Missing work in a
- * 0% category, which counts toward nothing. It now counts only work the
- * grade counts: the term on screen, outside 0% categories.
+ * The name tip's missing count follows the grade beside it (Nov 3 bug
+ * sweep, Gradebook group 3). It counted Missing work in a 0% category,
+ * which counts toward nothing; it now counts only work the grade counts,
+ * outside 0% categories. The gradebook always shows the year so far
+ * (Colin, 2026-11-03), so Missing work from every term counts, as it does
+ * in the grade.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -57,7 +57,6 @@ beforeEach(() => {
 
 afterEach(() => {
   PageGradebook.destroy();
-  setSelectedTermOrdinal(CID, null);
   delete COURSES[CID];
   delete _cache.categories[CID];
   globalThis.document = stubDocument;
@@ -70,13 +69,7 @@ function nameTip() {
 }
 
 describe('the name tip missing count', () => {
-  it('leaves out Missing work from another term', () => {
-    setSelectedTermOrdinal(CID, 2);
-    expect(nameTip()).not.toContain('missing');
-  });
-
-  it('counts Missing work in the term on screen', () => {
-    setSelectedTermOrdinal(CID, 1);
+  it('counts Missing work from every term, as the year-so-far grade does', () => {
     expect(nameTip()).toContain('2 assessments missing (count as 0)');
   });
 
@@ -87,7 +80,6 @@ describe('the name tip missing count', () => {
     ];
     _cache.assessments[CID].forEach(a => (a.categoryId = 'cat-tests'));
     _cache.assessments[CID][1].categoryId = 'cat-practice';
-    setSelectedTermOrdinal(CID, 1);
     expect(nameTip()).toContain('1 assessment missing (counts as 0)');
   });
 });

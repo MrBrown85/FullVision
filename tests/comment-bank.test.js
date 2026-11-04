@@ -630,14 +630,15 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   it('reads Completes Work from the record, and a pick overrides it', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
     const f = CommentBank.facts(cid, st, 'term-2');
-    expect(f.record).toEqual({ total: 22, handed: 22, late: 0, missing: 0 });
+    // The record is the year to date as of Report 2's end (Colin, 2026-11-03).
+    expect(f.record).toEqual({ total: 37, handed: 37, late: 0, missing: 0 });
     expect(CommentBank.context(f, {})._habits).toEqual({ completes: 4 });
     expect(CommentBank.context(f, { habits: { completes: 2 } })._habits).toEqual({ completes: 2 });
   });
 
   it('counts only work labelled Missing, whatever its due date', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
-    const term = getAssessments(cid).filter(a => assessmentInActiveTerm(cid, a));
+    const term = getAssessments(cid).filter(a => assessmentInYearToDate(cid, a));
     const empty = Object.assign({}, term[0], { id: 'past-due-empty', title: 'Past Due', dueDate: '2026-01-05' });
     const savedWork = _cache.assessments[cid];
     const savedStatuses = _cache.statuses[cid];
@@ -672,13 +673,16 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       .forEach(k => expect(ctx[k], k).not.toMatch(/grandma/));
   });
 
-  it('gives Cece every score this term per competency, with the canvas’s Start and Now', () => {
+  it('gives Cece every score in the year to date per competency, with the term’s Start and Now', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
     const comps = CommentBank.facts(cid, st, 'term-2').comps;
     // One point per piece of work, the competency's mark on it as the
-    // gradebook shows it (tagMarksByAssessment). Start and Now are on the
-    // level's footing, each rubric criterion its own score (getTagScores).
-    expect(comps.map(c => c.scores.length)).toEqual([13, 9, 16, 13, 9, 8]);
+    // gradebook shows it (tagMarksByAssessment): every piece up to Report
+    // 2's end (scores), and the ones dated in Term 2 (termScores). Start
+    // and Now are this term's trend, on the level's footing, each rubric
+    // criterion its own score (getTagScores).
+    expect(comps.map(c => c.scores.length)).toEqual([19, 13, 27, 20, 15, 16]);
+    expect(comps.map(c => c.termScores.length)).toEqual([13, 9, 16, 13, 9, 8]);
     expect(comps.map(c => levelFigure(c.start) + ' → ' + levelFigure(c.now))).toEqual([
       '2.9 → 2.9',
       '3.2 → 2.9',

@@ -365,7 +365,7 @@ test('the circled question mark opens Where This Information Comes From', async 
     'Teacher Comment',
   ]);
   await expect(cards.nth(0).locator('.qn-info-row').nth(2)).toContainText(
-    'The highest-marked assignment this term, and your note for the report on it.',
+    'The highest-marked assignment so far this year, and your note for the report on it.',
   );
   const blocks = await page.evaluate(() =>
     ReportSheets.onForm(ReportSheets.formFor(getReportConfig('sci8') || {})).map(id => ReportSheets.BLOCKS[id].label),
@@ -632,7 +632,7 @@ test.describe('the Sentences card', () => {
     const rowCount = perRow.length;
     await expect(rows(page)).toHaveCount(rowCount);
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
-    await expect(rows(page).first().locator('.qn-req-source')).toContainText('from this term’s scores');
+    await expect(rows(page).first().locator('.qn-req-source')).toContainText('from the year’s scores to this report');
     await expect(rows(page).first().locator('[data-do="wording"]')).toHaveText('Other Wording ▾');
     await expect(page.locator('#tq-sentences .qn-sub')).toHaveText(
       'Reword, edit or drag to reorder. The comment above follows.',

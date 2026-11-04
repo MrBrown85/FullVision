@@ -87,7 +87,7 @@ describe('Generate with no marks or one mark (Demo Mode, Science 8, Report 2)', 
     expect(RQ.noMarkedWork(f)).toBe(true);
     const before = open(st);
     const line =
-      'No marked work for Olivia this term yet, so there is nothing to draft from. You can write the comment yourself.';
+      'No marked work for Olivia yet, so there is nothing to draft from. You can write the comment yourself.';
     // Not shown until Generate is pressed.
     expect(before).toContain(`id="tq-nodraft" role="status" hidden>${line}</div>`);
     const blockers = RQ.approveBlockers(st);

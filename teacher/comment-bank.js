@@ -2131,27 +2131,39 @@ window.CommentBank = (function () {
     return { count: titles.length, titles: titles, groups: groups };
   }
 
-  /* Whether an assessment is in the active term, and its date: the term's
-     work and its competencies' scores read the same rule. */
+  /* Whether an assessment counts toward the report: the year to date as of
+     the report's end (calc.js assessmentInYearToDate; Colin, 2026-11-03).
+     The work, the record and each competency's scores read this rule. */
+  function _inYtd(cid, a) {
+    return !!a && assessmentInYearToDate(cid, a);
+  }
+  /* Whether an assessment is dated inside the report's own term: the trend
+     (start and now, rises, climbs and slides) describes this term's
+     movement only. */
   function _inTerm(cid, a) {
-    return !!a && assessmentInActiveTerm(cid, a);
+    return !!a && assessmentInTermWindow(cid, a);
   }
   function _dateOf(a) {
     return (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date) || '';
   }
 
-  /* One student's competencies this term: every score per competency,
-     oldest to newest, its trend from the start of the term to now (calc.js
-     startAndNow) and its level (calc.js getSectionProficiency). The
-     comment's gates (strongestOf, nextStepOf) and the printed This Term at
-     a Glance read the same list, so they name the same competencies. Reads
-     no DOM. */
+  /* One student's competencies: every score per competency in the year to
+     date (undated work first, then oldest to newest), the dated scores in
+     this term (termScores), its trend from the start of the term to now
+     (calc.js startAndNow, inside the term) and its level (calc.js
+     getSectionProficiency, the year to date). The comment's gates
+     (strongestOf, nextStepOf) count the year to date's scores; its rises
+     read the term's. The printed This Term at a Glance reads the same
+     list, so they name the same competencies. Reads no DOM. */
   function compsOf(cid, student) {
     var sid = student.id;
     var byId = {};
     (getAssessments(cid) || []).forEach(function (a) {
       byId[a.id] = a;
     });
+    var inYtd = function (a) {
+      return _inYtd(cid, a);
+    };
     var inTerm = function (a) {
       return _inTerm(cid, a);
     };
@@ -2166,12 +2178,15 @@ window.CommentBank = (function () {
           // lowest (calc.js tagMarksByAssessment; Colin, 2026-11-03).
           tagMarksByAssessment(cid, sid, tag.id).forEach(function (sc) {
             var a = byId[sc.assessmentId];
-            if (!(sc.score > 0) || !inTerm(a) || !dateOf(a)) return;
+            if (!(sc.score > 0) || !inYtd(a)) return;
             scores.push({ id: a.id, v: Number(sc.score), d: dateOf(a), title: a.title || '' });
           });
         });
         scores.sort(function (x, y) {
           return x.d.localeCompare(y.d);
+        });
+        var termScores = scores.filter(function (x) {
+          return !!x.d && inTerm(byId[x.id]);
         });
         // Start and now are on the level's footing, each rubric criterion
         // its own score (calc.js getTagScores), as the report's Start of
@@ -2207,6 +2222,7 @@ window.CommentBank = (function () {
               }) || {}
             ).bank_id || null,
           scores: scores,
+          termScores: termScores,
           start: sn ? sn.start : 0,
           now: sn ? sn.now : 0,
           // The level now as the report prints it: calc.js
@@ -2221,11 +2237,16 @@ window.CommentBank = (function () {
       });
   }
 
-  /* One student's term, from the data layer. Reads no DOM. */
+  /* One student's report, from the data layer: the year to date as of the
+     report's end (Colin, 2026-11-03), with the term's own movement for the
+     trend. Reads no DOM. */
   function facts(cid, student, termId) {
     var sid = student.id;
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
     var assessments = getAssessments(cid) || [];
+    var inYtd = function (a) {
+      return _inYtd(cid, a);
+    };
     var inTerm = function (a) {
       return _inTerm(cid, a);
     };
@@ -2234,10 +2255,10 @@ window.CommentBank = (function () {
     var sections = ReportBlocks.reportSections(cid);
     var comps = compsOf(cid, student);
 
-    // The assessed work this term, one level per assessment.
+    // The assessed work in the year to date, one level per assessment.
     var work = assessments
       .filter(function (a) {
-        return inTerm(a) && !(typeof isCompletionScored === 'function' && isCompletionScored(a));
+        return inYtd(a) && !(typeof isCompletionScored === 'function' && isCompletionScored(a));
       })
       .map(function (a) {
         var v = getAssessmentOverallScore(cid, sid, a.id);
@@ -2262,11 +2283,13 @@ window.CommentBank = (function () {
     // missing only when it is labelled Missing, whatever its due date.
     var rec = { total: 0, handed: 0, late: 0, missing: 0 };
     var notIn = [];
-    // The scored pieces this term with their % (calc.js), oldest first, for
-    // the grade sentence's "close to" (gradeOf). Work labelled Missing is
-    // not a scored piece.
+    // The scored pieces in the year to date with their % (calc.js), oldest
+    // first, for the grade sentence's "close to" (gradeOf); termPieces, the
+    // ones dated in this term, for the climb and slide stories (the term's
+    // movement). Work labelled Missing is not a scored piece.
     var pieces = [];
-    assessments.filter(inTerm).forEach(function (a) {
+    var termPieces = [];
+    assessments.filter(inYtd).forEach(function (a) {
       var cell = assessmentCellValue(cid, sid, a);
       var missing = cell.status === 'NS';
       if (missing) notIn.push(a);
@@ -2278,9 +2301,15 @@ window.CommentBank = (function () {
       if (cell.late) rec.late++;
       if (missing || !dateOf(a)) return;
       var pc = getAssessmentGroupPercentage(cid, sid, [a]);
-      if (pc && pc.pct != null) pieces.push({ id: a.id, d: dateOf(a), pct: pc.pct });
+      if (pc && pc.pct != null) {
+        pieces.push({ id: a.id, d: dateOf(a), pct: pc.pct });
+        if (inTerm(a)) termPieces.push({ id: a.id, d: dateOf(a), pct: pc.pct });
+      }
     });
     pieces.sort(function (x, y) {
+      return String(x.d).localeCompare(String(y.d));
+    });
+    termPieces.sort(function (x, y) {
       return String(x.d).localeCompare(String(y.d));
     });
 
@@ -2332,7 +2361,7 @@ window.CommentBank = (function () {
     // IE's deadline; the student's marks against the class's marked work,
     // for the teacher's IE choice; the designations that offer language or
     // IEP goals.
-    var marked = markedCounts(cid, sid, assessments.filter(inTerm));
+    var marked = markedCounts(cid, sid, assessments.filter(inYtd));
     var des = student.designations || [];
     // When the student joined the class (enrollment.enrolled_at), and the
     // class's first enrolment, for the new-to-the-class story (angle()).
@@ -2378,6 +2407,7 @@ window.CommentBank = (function () {
         pct: letter && letter.R != null ? letter.R : null,
         next: letter && letter.R != null ? nextLetterBand(letter.R) : null,
         pieces: pieces,
+        termPieces: termPieces,
         basis: typeof reportingBasis === 'function' ? reportingBasis(cid, sid, termId) : 'grade',
         ieDeadline: String(rating.ieDeadline || '').slice(0, 10),
         // false once the saved date has passed or falls after the school
@@ -2845,7 +2875,7 @@ window.CommentBank = (function () {
 
   /* A competency's scores as points: { d, v } with v its proficiency. */
   function improvedComp(c) {
-    return !!c && improvedGate(c.scores, IMPROVED_LEVEL);
+    return !!c && improvedGate(c.termScores || c.scores, IMPROVED_LEVEL);
   }
 
   /* The scored pieces' % as points, for the climb and slide stories. */
@@ -3449,7 +3479,7 @@ window.CommentBank = (function () {
     // What rose: only competencies past the "improved" gate (improvedComp),
     // the biggest change first.
     var rises = f.comps.filter(improvedComp).sort(function (a, b) {
-      return trendOf(b.scores) - trendOf(a.scores);
+      return trendOf(b.termScores || b.scores) - trendOf(a.termScores || a.scores);
     });
     var drops = withLevels.filter(function (c) {
       return tenths(c.now) < tenths(c.start);
@@ -3536,7 +3566,7 @@ window.CommentBank = (function () {
     var aboutId = null;
     if (focus) {
       var fw = {};
-      focus.scores.forEach(function (s) {
+      (focus.termScores || focus.scores).forEach(function (s) {
         if (!fw[s.title] || s.v > fw[s.title].v) fw[s.title] = s;
       });
       var fl = Object.keys(fw).map(function (k) {
@@ -4745,8 +4775,9 @@ window.CommentBank = (function () {
       missing: _missingCount(f),
       total: rec.total || 0,
       strongWork: strongWork,
-      climb: climbed(pieces),
-      slide: slid(pieces),
+      // The climb and slide are this term's movement (g.termPieces).
+      climb: climbed(g.termPieces || pieces),
+      slide: slid(g.termPieces || pieces),
       split: split,
       growing: Object.keys(habits).filter(function (k) {
         return habits[k] === 1 || habits[k] === 2;
@@ -6150,7 +6181,7 @@ window.CommentBank = (function () {
         );
       // The marks climbed over the term (the climb story): the scored
       // pieces' % past the "improved" gate (climbed).
-      if (_has(pv, 'climb')) checks.push(climbed((f.grade && f.grade.pieces) || []));
+      if (_has(pv, 'climb')) checks.push(climbed((f.grade && (f.grade.termPieces || f.grade.pieces)) || []));
       // Progress in levels: the same competency, climb and phrase (progressOf).
       if (_has(pv, 'progressSkill')) {
         var pg = progressOf(f);
@@ -6264,7 +6295,7 @@ window.CommentBank = (function () {
       if (!c) return false;
       var marks = function (slot) {
         var id = _ids(pv, slot, 'work')[0];
-        return c.scores
+        return (c.termScores || c.scores)
           .filter(function (sc) {
             return id != null && String(sc.id) === id && sc.title === pv.values[slot];
           })
@@ -6717,7 +6748,7 @@ window.CommentBank = (function () {
     return JSON.stringify(v === undefined ? null : v);
   }
 
-  /* Each piece's mark this term, by piece: 'work:<id>' { t: title, m: its
+  /* Each piece's mark in the report, by piece: 'work:<id>' { t: title, m: its
      level and % }, and 'missing:<title>' for work labelled Missing. What
      names the pieces that changed ("“Lab 3” was marked …"). */
   function marksOf(f) {

@@ -1146,7 +1146,7 @@ window.ReportQuestionnaire = (function () {
     });
   }
 
-  /* The best piece this term, by the comment's rule (CommentBank.bestPieceOf),
+  /* The best piece in the year to date, by the comment's rule (CommentBank.bestPieceOf),
      so At a Glance and the comment name the same piece. f: the facts. */
   function bestPiece(f) {
     return CommentBank.bestPieceOf(f);
@@ -1158,13 +1158,14 @@ window.ReportQuestionnaire = (function () {
     return courseGradeMode(cid) === 'letter' ? CommentBank.workMark(f, w) : f.levelText(w.v);
   }
 
-  /* Work labelled Missing this term (status NS), whatever its due date:
+  /* Work labelled Missing (status NS), whatever its due date, up to the
+     report's end, whatever term it was assigned in (Colin, 2026-11-03):
      the one rule everywhere (Decision 4; facts().notHandedIn counts the
      same work). */
   function notHandedIn(cid, sid) {
     return (getAssessments(cid) || [])
       .filter(function (a) {
-        return assessmentInActiveTerm(cid, a) && assessmentCellValue(cid, sid, a).status === 'NS';
+        return assessmentInYearToDate(cid, a) && assessmentCellValue(cid, sid, a).status === 'NS';
       })
       .map(function (a) {
         return a.title || '';
@@ -1216,7 +1217,7 @@ window.ReportQuestionnaire = (function () {
       <div class="qn-band">Work</div>
       <div class="qn-fact qn-best">
         <span class="qn-fact-label">Best piece</span>
-        <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(bestMark)}</span>${_reportNoteNudge(best)}` : '<span class="qn-muted">No marked work this term yet</span>'}</div>
+        <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(bestMark)}</span>${_reportNoteNudge(best)}` : '<span class="qn-muted">No marked work yet</span>'}</div>
       </div>
       <div class="qn-fact">
         <span class="qn-fact-label">Not handed in</span>
@@ -1227,12 +1228,12 @@ window.ReportQuestionnaire = (function () {
                   return `<span>${esc(t)}</span>`;
                 })
                 .join('')
-            : '<span class="qn-muted">None this term</span>'
+            : '<span class="qn-muted">None</span>'
         }</div>
         ${missing.length ? `<span class="qn-count">${missing.length}</span>` : ''}
       </div>
       <div class="qn-band">Skills</div>
-      ${skills || '<div class="qn-fact"><span class="qn-muted">No scores this term yet</span></div>'}
+      ${skills || '<div class="qn-fact"><span class="qn-muted">No scores yet</span></div>'}
     </div>`;
   }
 
@@ -1425,11 +1426,11 @@ window.ReportQuestionnaire = (function () {
   /* ── Where This Information Comes From ───────────────────── */
 
   var SCREEN_SOURCES = [
-    ['Grade', 'Your gradebook: this term’s marks, with your category weights.', 'FullVision'],
+    ['Grade', 'Your gradebook: the year to date to this report’s end, with your category weights.', 'FullVision'],
     ['Work Habits', 'Your six ratings, Rarely to Consistently.', 'You'],
-    ['Best Piece', 'The highest-marked assignment this term, and your note for the report on it.', 'FullVision'],
+    ['Best Piece', 'The highest-marked assignment so far this year, and your note for the report on it.', 'FullVision'],
     ['Not Handed In', 'Assignments labelled Missing.', 'FullVision'],
-    ['Skills', 'This term’s competency scores.', 'FullVision'],
+    ['Skills', 'Competency scores so far this year.', 'FullVision'],
     ['Goal and Voice', 'Answers to About Me and the goal check-in, sent from the student’s phone.', 'Student'],
     [
       'Attendance',
@@ -1468,10 +1469,10 @@ window.ReportQuestionnaire = (function () {
       'teacher-narrative': [SCREEN_SOURCES[7][1], 'You'],
       'term-attendance': [SCREEN_SOURCES[6][1], 'You'],
       'learner-dimensions': [SCREEN_SOURCES[1][1], 'You'],
-      'next-steps': ['The Focus Area: the competency that changed most this term.', 'FullVision'],
-      progress: ['The Focus Area: the competency that changed most this term.', 'FullVision'],
+      'next-steps': ['The Focus Area: the competency that changed most since the last report.', 'FullVision'],
+      progress: ['The Focus Area: the competency that changed most since the last report.', 'FullVision'],
       'support-home': [
-        'The Focus Area: the competency that changed most this term. The work comes from scores.',
+        'The Focus Area: the competency that changed most since the last report. The work comes from this term’s scores.',
         'FullVision',
       ],
       'self-assessment': [
@@ -1872,7 +1873,7 @@ window.ReportQuestionnaire = (function () {
       );
   }
 
-  /* Whether the student has no marked work this term (a mark on none of
+  /* Whether the student has no marked work yet (a mark on none of
      the class's marked work), so Generate has nothing true to draft from.
      The IE comment, which is about the missing marks, still drafts. */
   var _noDraft = {}; // key: Generate was pressed with no marked work
@@ -1886,7 +1887,7 @@ window.ReportQuestionnaire = (function () {
     var shown = !!_noDraft[_rowKey(student)];
     return `<div class="qn-hint qn-nodraft" id="tq-nodraft" role="status"${shown ? '' : ' hidden'}>No marked work for ${esc(
       _first(student),
-    )} this term yet, so there is nothing to draft from. You can write the comment yourself.</div>`;
+    )} yet, so there is nothing to draft from. You can write the comment yourself.</div>`;
   }
 
   /* Earlier reports with a comment, newest first, as tabs beside This Report. */
@@ -4366,8 +4367,8 @@ window.ReportQuestionnaire = (function () {
     var g = f.grade || {};
     if (g.mode === 'proficiency' || g.letter == null) {
       return f.overall > 0
-        ? levelWord(cid, f.overall) + ' overall, from this term’s scores'
-        : 'No scores this term yet';
+        ? levelWord(cid, f.overall) + ' overall, from the year’s scores to this report'
+        : 'No scores yet';
     }
     var head = g.letter + ' · ' + g.pct + '%';
     var nx = g.next;
@@ -4469,7 +4470,7 @@ window.ReportQuestionnaire = (function () {
     if (k === 'grade.letter') return g.letter != null ? g.letter + ' · ' + g.pct + '%' : '';
     if (k === 'grade.marked') return g.marked ? g.marked.mine + ' of ' + g.marked.all + ' assignments marked' : '';
     if (k === 'overall' || k === 'letter') return f.overall > 0 ? 'Overall ' + f.levelText(f.overall) : '';
-    if (k === 'work') return 'This term’s marks';
+    if (k === 'work') return 'The year’s marks to this report';
     if (k === 'picture') return ctx.picture ? 'The term’s picture: ' + ctx.picture : '';
     if ((m = k.match(/^comp:(.+)$/))) {
       var c = find(f.comps, m[1]);

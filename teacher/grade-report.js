@@ -1,9 +1,9 @@
 /* grade-report.js — the Grade Report: a ready-made progress report that
    reads like the student printout from the old gradebook programs. The
-   letterhead, one row per assessment this term (date, title, category,
-   score, out of, percent in a Letter or Both class, and Missing, Late or
-   Excused),
-   then a summary by category, the term grade and the missing work. Grades
+   letterhead, one row per assessment in the year to date as of the
+   report's end (date, title, category, score, out of, percent in a Letter
+   or Both class, and Missing, Late or Excused), then a summary by
+   category, the course grade and the missing work. Grades
    only: no comment, attendance or other feedback.
 
    Every student gets one sheet: the front, and the back when the front is
@@ -26,7 +26,7 @@ window.GradeReport = (function () {
   var PX_PER_IN = 96;
   var GAP = 12;
   var ROW_W = 720;
-  // ungraded: list this term's work with no mark yet, a dash for its score
+  // ungraded: list the year's work with no mark yet, a dash for its score
   // (Colin, Oct 29: leaving it off can mislead), up to today.
   // numbers: a "#" column numbering the rows in the order they print, off
   // until the teacher ticks Assignment Numbers.
@@ -79,7 +79,8 @@ window.GradeReport = (function () {
     return parseLocalDate(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
   }
 
-  /* One student's rows: this term's assessments that have a mark or are
+  /* One student's rows: the assessments in the year to date as of the
+     report's end (Colin, 2026-11-03) that have a mark or are
      Missing or Excused, and with Ungraded Assignments on, the work dated up
      to today with no mark yet, its score a dash. Work not yet due is left
      off. { n, date, title, category, score, outOf, percent, note }, n the
@@ -92,7 +93,7 @@ window.GradeReport = (function () {
     });
     var list = getAssessments(cid)
       .filter(function (a) {
-        return a && !(typeof isDibelsScored === 'function' && isDibelsScored(a)) && assessmentInActiveTerm(cid, a);
+        return a && !(typeof isDibelsScored === 'function' && isDibelsScored(a)) && assessmentInYearToDate(cid, a);
       })
       .map(function (a) {
         return { a: a, d: _assessmentDate(a) || '' };
@@ -143,12 +144,12 @@ window.GradeReport = (function () {
     return out;
   }
 
-  /* The categories this term: weight, how many of the rows above are in
+  /* The categories in the year to date: weight, how many of the rows above are in
      each (rows(), with opts), and the student's grade in each, as the
      gradebook works it out. */
   function categorySummary(cid, student, opts) {
     var termWork = getAssessments(cid).filter(function (a) {
-      return a && assessmentInActiveTerm(cid, a);
+      return a && assessmentInYearToDate(cid, a);
     });
     var shown = {};
     rows(cid, student, opts).forEach(function (r) {
@@ -346,7 +347,7 @@ window.GradeReport = (function () {
     );
   }
 
-  /* Everything after the table: the summary by category, the term grade
+  /* Everything after the table: the summary by category, the course grade
      (with the report's reporting basis: IE, or No Letter Grade for goals)
      and the missing work count. */
   function _tailHtml(cid, student, opts, ctx) {
@@ -376,7 +377,7 @@ window.GradeReport = (function () {
       }
     }
     html +=
-      '<div class="gr-term"><span>Term Grade</span><span class="gr-term-grade">' + esc(term || '—') + '</span></div>';
+      '<div class="gr-term"><span>Course Grade</span><span class="gr-term-grade">' + esc(term || '—') + '</span></div>';
     var missing = rows(cid, student, opts).filter(function (r) {
       return r.note === 'Missing';
     }).length;

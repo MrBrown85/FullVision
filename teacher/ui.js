@@ -729,9 +729,9 @@ function renderStudentHeader(cid, sid, opts) {
   const student = students.find(s => s.id === sid);
   if (!student) return '';
 
-  // In a reporting term the header's work counts cover that term, like its grades.
-  const inTerm = typeof assessmentInActiveTerm === 'function';
-  const assessments = getAssessments(cid).filter(a => !inTerm || assessmentInActiveTerm(cid, a));
+  // The header's work counts cover the work its grade counts (the year so far, or a report's year to date).
+  const inTerm = typeof assessmentInYearToDate === 'function';
+  const assessments = getAssessments(cid).filter(a => !inTerm || assessmentInYearToDate(cid, a));
   const overall = getOverallProficiency(cid, sid);
   const overallRounded = Math.round(overall);
   const profColor = PROF_COLORS[overallRounded] || PROF_COLORS[0];
@@ -895,17 +895,21 @@ function _rosterShowShort(cid, mode) {
   return mode === 'percent' ? '%' : _rosterShowLabel(cid, mode);
 }
 
-/* The grades beside the names follow the class's reporting term, picked on
-   the Gradebook, Dashboard and student page. Assignments, Observations and
-   Reports have no term picker, so with a term picked every name there could
-   read IC with nothing to say why. The roster names the term instead. */
-// html-safe: the term label goes through esc.
+/* The grades beside the names are the year so far, except on the Reports
+   page, where they are the year to date as of the report's end (calc.js,
+   Colin 2026-11-03). The roster says so while a report is in view. */
+// html-safe: the term label and date go through esc.
 function _sidebarTermNote(cid) {
   var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
-  if (!term || !term.label) return '';
+  if (!term || !term.endsOn) return '';
+  var end = typeof formatShortDate === 'function' ? formatShortDate(term.endsOn) : formatDate(term.endsOn);
   var tip =
-    'The grades count only work dated in ' + term.label + '. The term is picked on the Gradebook and Dashboard.';
-  return `<div class="sb-term-note" id="sb-term-note" title="${esc(tip)}">Grades for ${esc(term.label)}</div>`;
+    'The grades are the year to date as of ' +
+    (term.label || 'the report') +
+    '’s end: all work dated on or before ' +
+    end +
+    ', and undated work.';
+  return `<div class="sb-term-note" id="sb-term-note" title="${esc(tip)}">Grades to ${esc(end)}</div>`;
 }
 
 // html-safe: names and initials go through esc; ids, the avatar colour and the flag mark are ours.

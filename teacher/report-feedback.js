@@ -6,8 +6,9 @@
    the cards and pages are drawn elsewhere. Pure: data in, plain objects
    out, nothing touches the DOM.
 
-   forStudent(cid, student, opts): one item per assessment in the active
-   term that has something to show, oldest first (opts.order 'newest'
+   forStudent(cid, student, opts): one item per assessment in the year to
+   date as of the report's end (GradeReport.rows' rule) that has something
+   to show, oldest first (opts.order 'newest'
    flips it), in GradeReport.rows' order:
      { id, title, date ("Oct 6"), dateIso, category, kind, grade, status,
        feedback, rubric }
@@ -169,8 +170,8 @@ window.ReportFeedback = (function () {
     return item;
   }
 
-  /* One student's feedback items this term. opts.order: 'oldest'
-     (default) or 'newest'. */
+  /* One student's feedback items, the year to date as of the report's end
+     (Colin, 2026-11-03). opts.order: 'oldest' (default) or 'newest'. */
   function forStudent(cid, student, opts) {
     if (!student) return [];
     var cats = {};
@@ -179,7 +180,7 @@ window.ReportFeedback = (function () {
     });
     var list = getAssessments(cid)
       .filter(function (a) {
-        return a && !isDibelsScored(a) && assessmentInActiveTerm(cid, a);
+        return a && !isDibelsScored(a) && assessmentInYearToDate(cid, a);
       })
       .map(function (a) {
         return { a: a, d: _assessmentDate(a) || '' };

@@ -737,7 +737,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const { d, f, ctx } = draftFor(st);
     const rows = RQ.rowsFromDraft(d);
     const src = r => RQ.rowSource(r, cid, st, f, ctx);
-    expect(src(rows[0])).toMatch(/overall, from this term’s scores$/);
+    expect(src(rows[0])).toMatch(/overall, from the year’s scores to this report$/);
     expect(src({ step: 'habits', edited: false, prov: null })).toMatch(
       /rated|From the record: |From your Work Habits ratings/,
     );

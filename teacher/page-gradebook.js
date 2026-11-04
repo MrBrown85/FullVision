@@ -273,13 +273,12 @@ window.PageGradebook = (function () {
     var everyAssessment = getAssessments(cid);
     var allAssessments = everyAssessment
       .filter(function (a) {
-        return !_pendingDeleteAids[a.id] && (!term || assessmentInActiveTerm(cid, a));
+        return !_pendingDeleteAids[a.id] && (!term || assessmentInYearToDate(cid, a));
       })
       .sort(function (a, b) {
         return (a.date || '').localeCompare(b.date || '');
       });
     if (_newestFirst) allAssessments.reverse();
-    var undatedCount = term ? undatedAssessmentCount(cid) : 0;
     var sections = getSections(cid);
     var course = COURSES[cid];
     var isLetter = courseShowsLetterGrades(course);
@@ -416,11 +415,6 @@ window.PageGradebook = (function () {
 
     html +=
       '<div style="margin-left:auto;display:flex;align-items:center;gap:12px">' +
-      (undatedCount > 0
-        ? '<span class="gb-toolbar-label" title="These assessments have no date, so no term can include them. Give them a date on the Assessments page.">' +
-          undatedCount +
-          ' Undated Not Shown</span>'
-        : '') +
       '<button class="tb-toggle-btn" data-action="exportScoresCSV" title="Export CSV" aria-label="Export">\u2913<span class="gb-tb-text"> Export</span></button>' +
       '<button class="tb-action-btn tb-action-secondary" data-action="printGrades" aria-label="Print Grades" title="Print Grades"><span class="gb-tb-icon" aria-hidden="true">' +
       LINE_ICONS.print +
@@ -2729,7 +2723,7 @@ window.PageGradebook = (function () {
     var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
     var assessments = getAssessments(cid)
       .filter(function (a) {
-        return !term || assessmentInActiveTerm(cid, a);
+        return !term || assessmentInYearToDate(cid, a);
       })
       .sort(function (a, b) {
         return (b.date || '').localeCompare(a.date || '');

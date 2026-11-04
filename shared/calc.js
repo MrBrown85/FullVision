@@ -22,14 +22,20 @@ var _categoryAvgCache = {};
 var _courseLetterCache = {};
 
 /* ── Reporting term scope ──────────────────────────────────────
-   A class can be viewed in one reporting term (docs/DECISIONS.md,
-   "Reporting periods"). While a term is active for a class, every grade
-   counts only the assessments whose assigned date falls inside it. With no
-   term active (the default, "All time") nothing here changes a result.
-   Cache keys carry the term, so switching terms never needs a cache clear. */
+   Teachers grade cumulatively; a reporting term is a checkpoint
+   (docs/DECISIONS.md, "Reporting periods" 2; Colin, 2026-11-03). While a
+   term is active for a class (the Reports page makes the report's term
+   active), every grade is the year to date as of that term's end date:
+   every assessment dated on or before it, and undated work. Work dated
+   after it doesn't count. With no term active (the gradebook, dashboard
+   and student page, which always show the year so far) nothing here
+   changes a result. The term's own window (assessmentInTermWindow) is for
+   what describes this term only: Start of Term, Generate's trend, the This
+   Term lists. Cache keys carry the term, so switching terms never needs a
+   cache clear. */
 var _activeTerm = {}; // cid → { ordinal, label, startsOn, endsOn } | undefined
 
-/** Make one reporting term (by ordinal) the scope for a class, or null for all time. */
+/** Make one reporting term (by ordinal) the report in view for a class, or null for the year so far. */
 function setActiveTerm(cid, ordinal) {
   if (ordinal == null || ordinal === '' || ordinal === 'all') {
     delete _activeTerm[cid];
@@ -52,7 +58,7 @@ function setActiveTerm(cid, ordinal) {
   return _activeTerm[cid];
 }
 
-/** The reporting term a class is being viewed in, or null for all time. */
+/** The reporting term a class's grades are read as of, or null for the year so far. */
 function getActiveTerm(cid) {
   return _activeTerm[cid] || null;
 }
@@ -77,8 +83,20 @@ function _assessmentDate(a) {
   return (a && (a.date || a.dateAssigned || a.assigned_at || a.date_assigned)) || '';
 }
 
-/** Whether an assessment is dated inside the active term (true when no term is active). */
-function assessmentInActiveTerm(cid, a) {
+/** Whether an assessment counts in the grade in view: the year to date as of
+ * the active term's end (undated, or dated on or before it); true when no
+ * term is active. */
+function assessmentInYearToDate(cid, a) {
+  var t = _activeTerm[cid];
+  if (!t) return true;
+  var d = _assessmentDate(a);
+  if (!d) return true;
+  return !t.endsOn || d <= t.endsOn;
+}
+
+/** Whether an assessment is dated inside the active term's own dates (true
+ * when no term is active). For what describes this term only, never a grade. */
+function assessmentInTermWindow(cid, a) {
   var t = _activeTerm[cid];
   if (!t) return true;
   var d = _assessmentDate(a);
@@ -86,21 +104,47 @@ function assessmentInActiveTerm(cid, a) {
   return d >= t.startsOn && d <= t.endsOn;
 }
 
-/* The class's assessments inside the active term; all of them when none is active. */
+/* The class's assessments in the year to date as of the active term's end; all of them when none is active. */
 function _scopedAssessments(cid) {
   var all = getAssessments(cid);
   if (!_activeTerm[cid]) return all;
   return all.filter(function (a) {
-    return assessmentInActiveTerm(cid, a);
+    return assessmentInYearToDate(cid, a);
   });
 }
 
-/** Assessments the active term leaves out because they have no date. */
-function undatedAssessmentCount(cid) {
-  if (!_activeTerm[cid]) return 0;
-  return getAssessments(cid).filter(function (a) {
-    return !_assessmentDate(a);
-  }).length;
+/* The reporting term before a report: the one before the active term, or
+   with none active (the year so far) the last term that ended before
+   today. null when there is none. */
+function previousReportTerm(cid) {
+  var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+  var active = _activeTerm[cid];
+  var prev = null;
+  if (active) {
+    terms.forEach(function (t) {
+      if (Number(t.ordinal) < active.ordinal && (!prev || Number(t.ordinal) > Number(prev.ordinal))) prev = t;
+    });
+    return prev;
+  }
+  var today = typeof courseToday === 'function' ? courseToday(cid) : '';
+  if (!today) return null;
+  terms.forEach(function (t) {
+    var end = t.ends_on || t.endsOn;
+    if (end && end < today && (!prev || Number(t.ordinal) > Number(prev.ordinal))) prev = t;
+  });
+  return prev;
+}
+
+/* Read something with the class's grades as of another report (an ordinal,
+   or null for the year so far), and put the report in view back after. */
+function readAsOfTerm(cid, ordinal, read) {
+  var was = _activeTerm[cid] ? _activeTerm[cid].ordinal : null;
+  try {
+    setActiveTerm(cid, ordinal);
+    return read();
+  } finally {
+    setActiveTerm(cid, was);
+  }
 }
 
 /** Clear all proficiency caches. Call when scores, assessments, overrides, or statuses change. */
@@ -130,7 +174,7 @@ function _getAW(cid) {
 }
 
 /** Get or build a Map<assessmentId, assessment> for O(1) lookups instead of O(n) find().
- * Holds only the assessments in the active term, so an id missing here is out of scope. */
+ * Holds only the assessments in scope (the year to date as of the active term), so an id missing here is out of scope. */
 function _getAssessMap(cid) {
   var key = _ck(cid);
   if (_assessMapCache[key]) return _assessMapCache[key];
@@ -1473,8 +1517,9 @@ function getTagScores(cid, studentId, tagId) {
   const criteria = _criterionIndex(cid);
   const wholeByRubric = _rubricWholeIndex(cid);
   const wholeSeen = {};
-  // In a term, a score only counts when its assessment is dated inside it.
-  // All time keeps every score, including one whose assessment is gone.
+  // As of a report, a score only counts when its assessment is in the year
+  // to date (dated on or before the report's end, or undated). The year so
+  // far keeps every score, including one whose assessment is gone.
   const termActive = !!_activeTerm[cid];
   const filtered = [];
   studentScores.forEach(s => {
@@ -2869,8 +2914,10 @@ window.Calc = {
   setActiveTerm,
   getActiveTerm,
   activateSavedTerm,
-  assessmentInActiveTerm,
-  undatedAssessmentCount,
+  assessmentInYearToDate,
+  assessmentInTermWindow,
+  previousReportTerm,
+  readAsOfTerm,
   getClassPointsAverage,
   classColumnAverage,
   columnCountedValue,

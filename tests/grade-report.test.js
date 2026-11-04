@@ -40,7 +40,7 @@ function seed(mode) {
     a6: { kind: 'none', late: false },
   };
   stub('getAssessments', () => work);
-  stub('assessmentInActiveTerm', () => true);
+  stub('assessmentInYearToDate', () => true);
   stub('assessmentCellValue', (cid, sid, a) => cells[a.id]);
   stub('getCategories', () => [
     { id: 'c1', name: 'Labs', weight: 40 },

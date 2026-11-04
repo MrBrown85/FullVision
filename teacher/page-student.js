@@ -3019,7 +3019,7 @@ window.PageStudent = (function () {
     // Every count and list below follows the class's chosen reporting term.
     var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
     var termAssessments = assessments.filter(function (a) {
-      return assessmentInActiveTerm(cid, a);
+      return assessmentInYearToDate(cid, a);
     });
     var classStudents = getStudents(cid);
     var ctx = {

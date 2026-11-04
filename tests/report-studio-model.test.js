@@ -537,7 +537,8 @@ describe('stage 3 blocks', () => {
       },
     ];
     stub('getAssessments', () => work);
-    stub('assessmentInActiveTerm', () => true);
+    stub('assessmentInYearToDate', () => true);
+    stub('assessmentInTermWindow', () => true);
     stub('getActiveTerm', () => null);
     stub('getGroupedSections', () => ({ groups: [], ungrouped: [] }));
     stub('getSections', () => secs);
@@ -681,7 +682,8 @@ describe('stage 3 blocks', () => {
       { id: 'a4', title: 'Essay', date: '2026-10-08' },
     ];
     stub('getAssessments', () => work);
-    stub('assessmentInActiveTerm', () => true);
+    stub('assessmentInYearToDate', () => true);
+    stub('assessmentInTermWindow', () => true);
     stub('courseToday', () => '2026-10-10');
     // The Lab Report is past due with nothing in it: not missing.
     stub('assessmentCellValue', (cid, sid, a) =>
@@ -829,7 +831,8 @@ describe('stage 3 blocks', () => {
       a4: { kind: 'status', status: 'NS' },
     };
     stub('getAssessments', () => work);
-    stub('assessmentInActiveTerm', () => true);
+    stub('assessmentInYearToDate', () => true);
+    stub('assessmentInTermWindow', () => true);
     stub('assessmentCellValue', (cid, sid, a) => cells[a.id]);
     stub('getActiveTerm', () => ({ ordinal: 2, startsOn: '2026-09-01', endsOn: '2026-11-30' }));
     stub('getStudentQuickObs', () => [
@@ -1054,7 +1057,8 @@ describe('stage 3 blocks', () => {
       a3: { kind: 'status', status: 'NS', value: 0, level: 0 },
     };
     stub('getAssessments', () => work);
-    stub('assessmentInActiveTerm', () => true);
+    stub('assessmentInYearToDate', () => true);
+    stub('assessmentInTermWindow', () => true);
     stub('assessmentCellValue', (cid, sid, a) => cells[a.id]);
     stub('getCategories', () => [
       { id: 'c1', name: 'Labs', weight: 40 },
