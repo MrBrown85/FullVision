@@ -185,6 +185,32 @@ var CmQuestionnaires = (function () {
     });
   }
 
+  /* One student's slip, for a lost or locked one: only that student's old
+     slip stops working. Not Answered students come first. */
+  // html-safe: names are escaped; ids are the class's student ids.
+  function _printOneHtml(cid, q) {
+    var left = _notAnswered(cid, q);
+    var leftIds = {};
+    left.forEach(function (s) {
+      leftIds[s.id] = true;
+    });
+    var rest = getStudents(cid).filter(function (s) {
+      return !leftIds[s.id];
+    });
+    var opt = function (s) {
+      return '<option value="' + esc(s.id) + '">' + esc(fullName(s)) + '</option>';
+    };
+    return (
+      '<select class="cm-input sq-print-one" data-action-change="sqPrintOne" data-qid="' +
+      q.id +
+      '" aria-label="Print one student’s slip">' +
+      '<option value="">Print One Slip…</option>' +
+      (left.length ? '<optgroup label="Not Answered">' + left.map(opt).join('') + '</optgroup>' : '') +
+      (rest.length ? '<optgroup label="Answered">' + rest.map(opt).join('') + '</optgroup>' : '') +
+      '</select>'
+    );
+  }
+
   function _actions(cid, q) {
     var shown = !!_open[q.id];
     var left = _notAnswered(cid, q).length;
@@ -201,6 +227,7 @@ var CmQuestionnaires = (function () {
           left +
           ' Not Answered</button>'
         : '') +
+      _printOneHtml(cid, q) +
       '<button type="button" class="cm-action-btn" data-action="sqToggleQuestions" data-qid="' +
       q.id +
       '" aria-expanded="' +
@@ -213,7 +240,8 @@ var CmQuestionnaires = (function () {
       '" aria-expanded="' +
       !!_dates[q.id] +
       '">Change Dates</button>' +
-      '</div>';
+      '</div>' +
+      '<div class="cm-hint sq-print-hint">A new slip replaces the one that student already has; the old code stops working.</div>';
     var d = _dates[q.id];
     if (d) {
       html +=
@@ -625,14 +653,16 @@ var CmQuestionnaires = (function () {
     });
   }
 
-  function _print(cid, qid, missingOnly) {
+  function _print(cid, qid, missingOnly, onlyIds) {
     var q = _find(cid, qid);
     if (!q) return;
-    var ids = missingOnly
-      ? _notAnswered(cid, q).map(function (s) {
-          return s.id;
-        })
-      : null;
+    var ids = onlyIds
+      ? onlyIds
+      : missingOnly
+        ? _notAnswered(cid, q).map(function (s) {
+            return s.id;
+          })
+        : null;
     _msg[qid] = 'Making slips…';
     _rerender();
     return Questionnaires.issueCodes(cid, qid, ids).then(function (res) {
@@ -777,6 +807,12 @@ var CmQuestionnaires = (function () {
     if (el.dataset.actionChange === 'sqGrade') {
       _grade[cid] = el.value ? Number(el.value) : null;
       _rerender();
+      return true;
+    }
+    if (el.dataset.actionChange === 'sqPrintOne') {
+      var sid = el.value;
+      el.selectedIndex = 0;
+      if (sid) _print(cid, el.dataset.qid, false, [sid]);
       return true;
     }
     if (el.dataset.actionChange === 'sqCoreAdd') {

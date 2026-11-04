@@ -48,7 +48,8 @@ var StudentPage = (function () {
   var CODE_RE = /^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{6}$/;
 
   var MESSAGES = {
-    not_found: "That code didn't work. Check the letters and numbers on your slip, or ask your teacher for a new slip.",
+    not_found:
+      "That code didn't work. Check the letters and numbers on your slip. If you have a newer slip, use that one. If not, ask your teacher for a new slip.",
     used: 'This slip has already been used. Ask your teacher for a new slip if you need to change something.',
     closed: 'These questions are closed now. Ask your teacher if you still need to answer.',
     not_open_yet: 'These questions are not open yet.',

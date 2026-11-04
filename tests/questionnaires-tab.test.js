@@ -355,6 +355,38 @@ describe('Questionnaires tab', () => {
     }
   });
 
+  it('prints one student’s slip alone, Not Answered first, and says a new slip replaces the old one', async () => {
+    var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
+    q.answered = ['e1'];
+    var asked = [];
+    var stubIssue = Questionnaires.issueCodes;
+    var stubPrint = QrSlips.print;
+    Questionnaires.issueCodes = (cid, qid, ids) => {
+      asked.push(ids);
+      return Promise.resolve({ data: ids.map(id => ({ enrollment_id: id, code: 'ABC-DEF' })) });
+    };
+    var printed = [];
+    QrSlips.print = (cid, qq, codes) => printed.push(codes);
+    try {
+      mount();
+      var card = root.querySelector('[data-card="about-me"]');
+      var pick = card.querySelector('select[data-action-change="sqPrintOne"]');
+      expect(Array.from(pick.querySelectorAll('optgroup')).map(g => g.getAttribute('label'))).toEqual([
+        'Not Answered',
+        'Answered',
+      ]);
+      expect(card.textContent).toContain('A new slip replaces the one that student already has');
+      pick.querySelector('option[value="e3"]').selected = true;
+      DashClassManager.handleChange(pick);
+      await tick();
+      expect(asked).toEqual([['e3']]);
+      expect(printed[0]).toEqual([{ enrollment_id: 'e3', code: 'ABC-DEF' }]);
+    } finally {
+      Questionnaires.issueCodes = stubIssue;
+      QrSlips.print = stubPrint;
+    }
+  });
+
   it('refuses dates that close before they open', async () => {
     var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
     mount();

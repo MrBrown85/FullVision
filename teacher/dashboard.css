@@ -5876,6 +5876,16 @@ label.cm-cr-row {
   flex-wrap: wrap;
   gap: 8px;
 }
+.sq-print-one {
+  width: auto;
+  max-width: 220px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-2);
+}
+.sq-print-hint {
+  margin-top: 6px;
+}
 .sq-dates {
   display: flex;
   flex-wrap: wrap;
