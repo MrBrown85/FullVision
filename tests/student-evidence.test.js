@@ -313,7 +313,10 @@ describe('Evidence panel in the page', () => {
     store = [];
     StudentEvidence.refresh();
     expect($('#ev-list').textContent).toBe('No observations yet. Add one above.');
-    expect($('#ev-timeline').innerHTML).toBe('');
+    // An empty strip keeps its height, so the capture box below it stays put.
+    expect($('#ev-timeline').hidden).toBe(false);
+    expect($('.ev-tl-range').textContent).toBe('All time · No observations yet');
+    expect($$('.ev-tl-mark')).toHaveLength(0);
     $('[data-ev-tab="concerns"]').click();
     expect($('#ev-list').textContent).toBe('No concerns recorded.');
   });

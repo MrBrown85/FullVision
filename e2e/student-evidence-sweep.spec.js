@@ -53,3 +53,21 @@ test('Flag after a Concern shows on the roster at once, with an Undo', async ({ 
   await expect(row).not.toContainText('⚑');
   expect(await page.evaluate(() => !!getFlags('sci8').st23)).toBe(false);
 });
+
+test('the capture box stays where it is when the first observation is added', async ({ page }) => {
+  const panel = await openObservations(page);
+  // Mei with no observations yet.
+  await page.evaluate(() => {
+    getStudentQuickObs('sci8', 'st23').forEach(o => deleteQuickOb('sci8', 'st23', o.id));
+    window.PageStudent.render();
+  });
+  await expect(panel.locator('#ev-list .obs-card')).toHaveCount(0);
+  const input = panel.locator('#note-capture-input');
+  const before = await input.boundingBox();
+  await input.click();
+  await input.fill('First observation of the term');
+  await page.keyboard.press('Enter');
+  await expect(panel.locator('#ev-list .obs-card')).toHaveCount(1);
+  const after = await input.boundingBox();
+  expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(2);
+});

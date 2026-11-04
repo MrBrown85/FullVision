@@ -393,7 +393,16 @@ window.StudentEvidence = (function () {
     var term = typeof getActiveTerm === 'function' ? getActiveTerm(_cid) : null;
     var obs = studentObs();
     var layout = timelineLayout(obs, { today: today, term: term });
-    if (!layout) return '';
+    // With nothing to show, an empty strip of the same height holds the
+    // capture box in place, so it doesn't jump down after the first add.
+    if (!layout) {
+      return (
+        '<div class="ev-tl-head"><span class="ev-tl-range">' +
+        (term ? esc(term.label || 'This term') : 'All time') +
+        ' · No observations yet</span></div>' +
+        '<div class="ev-tl-scroll"><div class="ev-tl-track ev-tl-empty" aria-hidden="true"><div class="ev-tl-axis"></div></div></div>'
+      );
+    }
     var byId = {};
     obs.forEach(function (o) {
       byId[o.id] = o;
