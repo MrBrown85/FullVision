@@ -324,26 +324,36 @@ function _withTimeout(promise, ms, label) {
 }
 
 function _updateSyncIndicator() {
-  const dot = document.getElementById('sync-indicator-dot');
-  if (!dot) return;
+  // The phone keeps one dot per open screen (the Grade list stays mounted,
+  // hidden, under the grading screen), so every copy is kept current.
+  const first = document.getElementById('sync-indicator-dot');
+  if (!first) return;
+  const dots = Array.from(document.querySelectorAll('[id="sync-indicator-dot"]'));
+  if (dots.indexOf(first) < 0) dots.unshift(first);
   const problem = getSaveProblem();
+  let visual;
+  let title;
   if (problem) {
-    dot.className = 'tb-sync-dot error';
-    dot.title = problem;
-    return;
+    visual = 'error';
+    title = problem;
+  } else {
+    const s = getSyncStatus();
+    // Degraded mode reuses the 'error' visual but conveys a different message.
+    visual = s.status === 'degraded' ? 'error' : s.status;
+    title =
+      s.status === 'idle'
+        ? 'All changes saved'
+        : s.status === 'syncing'
+          ? 'Syncing...'
+          : s.status === 'degraded'
+            ? 'Cloud sync paused — saving locally'
+            : 'Sync error — changes saved locally';
   }
-  const s = getSyncStatus();
-  // Degraded mode reuses the 'error' visual but conveys a different message.
-  var visual = s.status === 'degraded' ? 'error' : s.status;
-  dot.className = 'tb-sync-dot ' + visual;
-  dot.title =
-    s.status === 'idle'
-      ? 'All changes saved'
-      : s.status === 'syncing'
-        ? 'Syncing...'
-        : s.status === 'degraded'
-          ? 'Cloud sync paused — saving locally'
-          : 'Sync error — changes saved locally';
+  dots.forEach(function (dot) {
+    dot.className = 'tb-sync-dot ' + visual;
+    dot.title = title;
+    if (dot.hasAttribute && dot.hasAttribute('aria-label')) dot.setAttribute('aria-label', title);
+  });
 }
 
 function isSupabaseDegraded() {

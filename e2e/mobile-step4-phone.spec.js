@@ -25,3 +25,20 @@ test('All Students search finds a student by last name', async ({ page }) => {
   await expect(shown.first()).toContainText('Cece');
   await expect(page.locator('#m-student-search-empty')).toHaveCount(0);
 });
+
+async function openGrading(page) {
+  await openPhone(page);
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('[data-action="m-grade-assess"]').first().click();
+  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
+}
+
+// Group 2 #32: the grading screen shows the sync dot, kept current.
+test('grading screen shows a visible sync dot', async ({ page }) => {
+  await openGrading(page);
+  const dot = page.locator('#m-screen-grade-swiper .tb-sync-dot');
+  await expect(dot).toBeVisible();
+  const box = await dot.boundingBox();
+  expect(box.width).toBeGreaterThan(4);
+  await expect(dot).toHaveAttribute('title', /.+/);
+});

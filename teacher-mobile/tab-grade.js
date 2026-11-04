@@ -762,6 +762,10 @@ window.MGrade = (function () {
       title: assessment.title,
       subtitle: _subtitleText(0, students.length),
       backLabel: 'Grade',
+      // The sync dot is the only place sync problems show, so the grading
+      // screen carries it too.
+      rightHTML:
+        '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>',
     });
 
     // Student thumbnail strip: a group's circle says G1, G2 … (P1 … for pairs).

@@ -575,6 +575,8 @@
     if (restore) newScreen.setAttribute('data-restore', JSON.stringify(restore));
     newScreen.classList.add('m-push-enter');
     stack.appendChild(newScreen);
+    // A pushed screen with its own sync dot shows the current state.
+    if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
 
     _navStacks[_activeTab].push('detail');
     history.pushState({ m: _navStacks[_activeTab].length - 1 }, '');
