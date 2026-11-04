@@ -64,12 +64,16 @@ test('Generate Comment again offers Undo, which brings the last version back', a
 
 /* Step 4 group 3 #67: a bank sentence's row can be removed, and an edited
    one can go back to the bank's wording. */
-test('Other Wording has Remove From Comment, and an edited sentence can go back to the bank wording', async ({ page }) => {
+test('Other Wording has Remove From Comment, and an edited sentence can go back to the bank wording', async ({
+  page,
+}) => {
   await open(page);
   const box = page.locator('#tq-narrative');
   await page.locator('#tq-generate').click();
   // Edit a bank sentence in the box.
-  const last = rows(page).filter({ has: page.locator('[data-do="wording"]') }).nth(1);
+  const last = rows(page)
+    .filter({ has: page.locator('[data-do="wording"]') })
+    .nth(1);
   const bankText = (await last.locator('.qn-req-text').textContent()).trim();
   await box.evaluate((el, t) => {
     const i = el.value.indexOf(t) + t.length - 1;

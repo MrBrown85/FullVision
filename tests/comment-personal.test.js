@@ -579,9 +579,16 @@ describe('the bank on the device and the server', () => {
       saveCommentTemplate: () => Promise.resolve({ data: { id: '22222222-2222-4222-8222-222222222222' }, error: null }),
     });
     const f = facts();
-    const out = PB.compose('Gabriel checks each graph twice before he hands it in.', { step: 'habits' }, CommentBank.context(f, {}), f, GABRIEL, {
-      others: [],
-    });
+    const out = PB.compose(
+      'Gabriel checks each graph twice before he hands it in.',
+      { step: 'habits' },
+      CommentBank.context(f, {}),
+      f,
+      GABRIEL,
+      {
+        others: [],
+      },
+    );
     const e = PB.keep(out.template);
     const drawn = 'mine:' + e.id;
     expect(COMMENT_BANK.sentences.some(x => x.id === drawn)).toBe(true);
@@ -591,7 +598,10 @@ describe('the bank on the device and the server', () => {
     expect(PB.currentId(drawn)).toBe('mine:22222222-2222-4222-8222-222222222222');
     expect(COMMENT_BANK.sentences.some(x => x.id === PB.currentId(drawn))).toBe(true);
     // Browse Sentences' Use looks the row's id up this way.
-    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../teacher/report-questionnaire.js'), 'utf8');
+    const src = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '../teacher/report-questionnaire.js'),
+      'utf8',
+    );
     expect(src).toMatch(/PersonalBank\.currentId\(id\)/);
   });
 
@@ -962,7 +972,11 @@ describe('a sentence of the teacher’s own', () => {
   });
 
   it('keeps a sentence written in a class of no known kind out of Socials and Science classes (Step 4 group 2 #49)', () => {
-    const general = composeFor('Gabriel asks careful questions when a step is unclear.', { step: 'habits' }, { family: '' });
+    const general = composeFor(
+      'Gabriel asks careful questions when a step is unclear.',
+      { step: 'habits' },
+      { family: '' },
+    );
     expect(general.offered).toBe('Generate uses it for any student when nothing more specific fits');
     const e = PB.keep(general.template);
     const s = COMMENT_BANK.sentences.find(x => x.id === 'mine:' + e.id);

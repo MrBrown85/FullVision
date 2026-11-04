@@ -485,14 +485,18 @@ describe('the class settings (report_config) and the review screen', () => {
     let html = open();
     expect(html).toContain('Completes Work<span class="qn-habit-src">From the Record</span>');
     expect(html).toContain(
-      'aria-checked="true" tabindex="0" class="qn-radio on from-record" data-action="tqRate" data-habit="completes" data-value="' + auto + '"',
+      'aria-checked="true" tabindex="0" class="qn-radio on from-record" data-action="tqRate" data-habit="completes" data-value="' +
+        auto +
+        '"',
     );
     expect(html).toContain('aria-label="Completes Work: ' + label + ', from the record"');
     // Rated by the teacher: the grid shows their rating, not the record.
     upsertTermRating(CID, GAB.id, TERM, { habits: { completes: 4 } });
     html = open();
     expect(html).not.toContain('From the Record');
-    expect(html).toContain('aria-checked="true" tabindex="0" class="qn-radio on" data-action="tqRate" data-habit="completes" data-value="4"');
+    expect(html).toContain(
+      'aria-checked="true" tabindex="0" class="qn-radio on" data-action="tqRate" data-habit="completes" data-value="4"',
+    );
   });
 
   it('saves the closing sentence for the class; approved comments keep the old one', () => {
@@ -610,7 +614,10 @@ describe('the class settings (report_config) and the review screen', () => {
     seed();
     // A line of the teacher's own fits no skill: ticked, it is picked only by hand.
     saveReportConfig(CID, {
-      commentSettings: { supportOwn: [{ id: 'own-1', text: 'In class, I will meet with the group each Friday.' }], supportChosen: ['own-1'] },
+      commentSettings: {
+        supportOwn: [{ id: 'own-1', text: 'In class, I will meet with the group each Friday.' }],
+        supportChosen: ['own-1'],
+      },
     });
     const html = open();
     expect(html).toContain('None of the ticked lines fits Gabriel, so the comment leaves this sentence out.');

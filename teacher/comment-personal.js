@@ -632,15 +632,17 @@ window.PersonalBank = (function () {
     });
     var sub = CLAUSE_WORDS.exec(rest.slice(0, end));
     if (sub) end = sub.index;
-    var seg = rest.slice(0, end).replace(
-      /((?:,\s*|\s+)(?:(?:and|or|but)\s+)?)((?:(?:[a-z]+ly|also|then|always|often|still|sometimes)\s+)*)([A-Za-z]+)(?=\s+[A-Za-z\u0001“"])/g,
-      function (m, lead, adv, w) {
-        if (!/,|\b(?:and|or|but)\s+$/.test(lead)) return m;
-        var pair = verbPair(w, they);
-        if (!pair || COORD_VERBS.indexOf(pair[1].toLowerCase()) < 0) return m;
-        return lead + adv + '[' + pair[0] + '|' + pair[1] + ']';
-      },
-    );
+    var seg = rest
+      .slice(0, end)
+      .replace(
+        /((?:,\s*|\s+)(?:(?:and|or|but)\s+)?)((?:(?:[a-z]+ly|also|then|always|often|still|sometimes)\s+)*)([A-Za-z]+)(?=\s+[A-Za-z\u0001“"])/g,
+        function (m, lead, adv, w) {
+          if (!/,|\b(?:and|or|but)\s+$/.test(lead)) return m;
+          var pair = verbPair(w, they);
+          if (!pair || COORD_VERBS.indexOf(pair[1].toLowerCase()) < 0) return m;
+          return lead + adv + '[' + pair[0] + '|' + pair[1] + ']';
+        },
+      );
     return seg + rest.slice(end);
   }
 
@@ -1266,7 +1268,9 @@ window.PersonalBank = (function () {
     // A part with no case: Generate puts it in a draft whenever nothing
     // more specific fits, so the preview says so (Nov 3 sweep).
     if (c.general)
-      return 'Generate uses it for any student' + (fam ? ' in ' + fam + ' classes' : '') + ' when nothing more specific fits';
+      return (
+        'Generate uses it for any student' + (fam ? ' in ' + fam + ' classes' : '') + ' when nothing more specific fits'
+      );
     return fam ? 'Offered in ' + fam + ' classes' : 'Offered for every student';
   }
 
