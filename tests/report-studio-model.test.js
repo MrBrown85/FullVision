@@ -322,10 +322,43 @@ describe('editing', () => {
       'parent-response',
     ]);
     expect(one.pinned).toBe('parent-response');
+    // Front and Back puts the folded blocks back where they were (step 4
+    // group 2 #4), the Response docked last on the Back again.
     const two = S.setSides(one, 2);
     expect(two.sides).toHaveLength(2);
-    expect(two.sides[1].rows).toEqual([]);
+    expect(two).toEqual(S.form());
+    expect(two.folded).toBeUndefined();
     expect(S.setSides(S.form(), 2).sides).toHaveLength(2);
+  });
+
+  it('Front Only, an edit, then Front and Back: folded blocks go back, a block added meanwhile stays on the Front', () => {
+    let f = S.insert(S.addSide(S.form()), 'observations', { side: 2 });
+    f = S.setSides(f, 1);
+    expect(f.sides).toHaveLength(1);
+    expect(f.folded).toEqual({ 'self-assessment': 1, 'grade-table': 1, 'parent-response': 1, observations: 2 });
+    // The folded note survives a save and a reload.
+    f = S.normalizeForm(JSON.parse(JSON.stringify(f)));
+    f = S.removeCell(f, 'self-assessment');
+    f = S.insert(f, 'next-steps', { side: 0 });
+    const back = S.setSides(f, 2);
+    expect(back.sides).toHaveLength(3);
+    expect(rowsOf(back, 0)).toEqual([
+      'header',
+      'proficiency',
+      'legend',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
+      'next-steps',
+    ]);
+    expect(rowsOf(back, 1)).toEqual(['grade-table', 'parent-response']);
+    expect(rowsOf(back, 2)).toEqual(['observations']);
+  });
+
+  it('a one-sided form saved before Front Only noted the sides opens Front and Back on an empty Back', () => {
+    const one = S.setSides(S.form(), 1);
+    delete one.folded;
+    const two = S.setSides(one, 2);
+    expect(two.sides[1].rows).toEqual([]);
   });
 
   it('setOption, setNoEvidence, setPinned, setType', () => {

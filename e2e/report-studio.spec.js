@@ -553,6 +553,14 @@ test.describe('Page Studio', () => {
     await undo(page).click();
     await expect(page.getByRole('radio', { name: 'Front and Back' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
+    // Front Only, then Front and Back, puts the Back's blocks back on the
+    // Back (step 4 group 2 #4).
+    const before = [await rowsOf(page, 0), await rowsOf(page, 1)];
+    await page.getByRole('radio', { name: 'Front Only' }).click();
+    await expect(page.locator('#studio-fit .studio-fit-link')).toHaveText('Continues on the back for 27 students');
+    await page.getByRole('radio', { name: 'Front and Back' }).click();
+    await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
+    expect([await rowsOf(page, 0), await rowsOf(page, 1)]).toEqual(before);
     // Interim Update is one side: the fit line says so.
     await applyTemplate(page, 'interim-update');
     await expect(page.locator('#studio-fit')).toHaveText('Front only · 1 page for all 27 students');
