@@ -949,6 +949,30 @@ window.ReportBlocks = (function () {
     if (!before.some(v => v > 0)) return null;
     return { label: prev.label || 'Last Report', levels: before };
   }
+  /* The course % (calc.js getCourseLetterData), null without one. */
+  function _coursePct(cid, sid) {
+    const lg = getCourseLetterData(cid, sid);
+    return lg && lg.R != null ? lg.R : null;
+  }
+  /* The course grade at the last report, read as _lastReportLevels reads
+     levels: { text, pct, level }, or null without a previous term. */
+  function _lastReportCourse(cid, sid) {
+    const now = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    if (!now) return null;
+    const prev = (typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [])
+      .filter(t => t.ordinal < now.ordinal)
+      .pop();
+    if (!prev) return null;
+    return _pass('course|' + cid + '|' + sid + '|' + now.ordinal, () => {
+      try {
+        setActiveTerm(cid, prev.ordinal);
+        const g = studentGradeSummary(cid, sid);
+        return g.text ? { text: g.text, pct: _coursePct(cid, sid), level: getOverallProficiency(cid, sid) } : null;
+      } finally {
+        setActiveTerm(cid, now.ordinal);
+      }
+    });
+  }
   function _profWord(v) {
     return v > 0 ? PROF_LABELS[Math.min(4, Math.max(1, Math.round(v)))] : '';
   }
@@ -1028,10 +1052,29 @@ window.ReportBlocks = (function () {
       rs.forEach(r => r.ev.list.forEach(w => ids.add(w.a || w)));
       return ids.size;
     };
-    const overallRow =
-      options.overall !== false
-        ? tr('Overall', overallThen, overallNow, assessedOnce(live), 'report-prof-overall')
-        : '';
+    // A Letter or Both class's Overall is the course grade, as the Back's
+    // Course Grade prints it (studentGradeSummary), so a report has one
+    // overall figure; then is the course grade at the last report (step 4
+    // group 2 #2). A Proficiency class rolls its competencies up.
+    let overallRow = '';
+    if (options.overall !== false && mode === 'proficiency') {
+      overallRow = tr('Overall', overallThen, overallNow, assessedOnce(live), 'report-prof-overall');
+    } else if (options.overall !== false) {
+      const termId = ctx && ctx.termId;
+      const nowG = { text: studentGradeSummary(cid, sid, termId).text, pct: _coursePct(cid, sid), level: overallNow };
+      const thenG = last ? _lastReportCourse(cid, sid) : null;
+      const cell = (g, lvl) =>
+        g && g.text
+          ? esc(g.text) + (showWord && mode === 'both' && lvl > 0 ? ' ' + esc(_profWord(lvl)) : '')
+          : '<span class="report-ct-none">—</span>';
+      let ch = '\u2014';
+      if (thenG && mode === 'both') ch = levelChange(thenG.level, nowG.level);
+      else if (thenG && thenG.pct != null && nowG.pct != null) {
+        const d = Math.round((nowG.pct - thenG.pct) * 10) / 10;
+        ch = (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d) + '%';
+      }
+      overallRow = `<tr class="report-prof-overall"><td class="report-ct-name">Overall</td><td class="report-prof-n">${cell(thenG, thenG && thenG.level)}</td><td class="report-prof-n">${cell(nowG, overallNow)}</td>${showChange ? `<td class="report-prof-n">${esc(ch)}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${assessedOnce(live)}</td>` : ''}</tr>`;
+    }
 
     // The rows: blocks that never split across columns. A folder prints as
     // one row (its competencies averaged, as calc.js does) or as its
@@ -1144,11 +1187,16 @@ window.ReportBlocks = (function () {
             .map(r => r.name)
             .join(', ')
             .replace(/, ([^,]*)$/, list.length > 2 ? ', and $1' : ' and $1');
+        // A piece named as best work is not named again as lowest work
+        // (step 4 group 2 #2): a rubric can put one piece at the top of one
+        // competency and the bottom of another.
+        const namedBest = new Set();
         const work = (list, best) => {
           const items = [];
-          list.forEach(r => r.ev.list.forEach(w => w.a && items.push(w)));
+          list.forEach(r => r.ev.list.forEach(w => w.a && (best || !namedBest.has(w.a)) && items.push(w)));
           const top = _namedWork(cid, sid, items, best);
           if (!top) return '';
+          if (best) top.list.forEach(w => namedBest.add(w.a));
           const named = top.list
             .map(w => esc(w.a.title) + (_assessmentWhen(w.a) ? ' (' + _assessmentWhen(w.a) + ')' : ''))
             .join(' and ');
@@ -1179,14 +1227,18 @@ window.ReportBlocks = (function () {
     [3, PROF_LABELS[3], 'Complete understanding'],
     [4, PROF_LABELS[4], 'Sophisticated understanding'],
   ];
-  function renderBlockLegend(options) {
+  /* A Letter class prints its levels as percents, so its legend gives
+     the % each level counts as (formatLevel) and no "out of 4" (step 4
+     group 2 #2). */
+  function renderBlockLegend(options, cid) {
     const half = options && options.size === 'half';
+    const asPct = cid != null && courseGradeMode(cid) === 'letter';
     const items = LEGEND_LEVELS.map(
       ([n, word, what]) =>
-        `<div class="report-legend-item"><div class="report-legend-word">${n} \u00B7 ${word}</div><div class="report-legend-desc">${what}</div></div>`,
+        `<div class="report-legend-item"><div class="report-legend-word">${asPct ? esc(formatLevel(cid, n)) : n} \u00B7 ${word}</div><div class="report-legend-desc">${what}</div></div>`,
     ).join('');
     return `<div class="report-block-box report-legend${half ? ' report-legend-half' : ''}">
-    <div class="report-legend-title">BC Proficiency Scale, out of 4</div>
+    <div class="report-legend-title">${asPct ? 'BC Proficiency Scale' : 'BC Proficiency Scale, out of 4'}</div>
     <div class="report-legend-items">${items}</div>
   </div>`;
   }
@@ -2233,7 +2285,7 @@ window.ReportBlocks = (function () {
       case 'proficiency':
         return renderBlockProficiency(cid, student, ctx, options);
       case 'legend':
-        return renderBlockLegend(options);
+        return renderBlockLegend(options, cid);
       case 'parent-response':
         return renderBlockParentResponse(cid, student, options);
       case 'student-reflection-learning':
