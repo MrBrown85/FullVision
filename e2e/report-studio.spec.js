@@ -947,6 +947,42 @@ test.describe('Page Studio', () => {
     await expect(bar(page).getByLabel('Assessed Count')).not.toBeChecked();
   });
 
+  /* Rows (As Graded, Each Folder, Each Competency) is too long for one line
+     of the inspector; its options once squeezed onto it and overlapped. */
+  for (const [width, height] of [
+    [1440, 900],
+    [1280, 800],
+    [1024, 768],
+  ]) {
+    test(`the Proficiency inspector's choices do not overlap at ${width} wide`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await openStudio(page);
+      const insp = await openOptions(page, 'proficiency');
+      await expect(insp.getByRole('radiogroup', { name: 'Rows' }).getByRole('radio')).toHaveCount(3);
+      const problems = await insp.locator('.seg').evaluateAll(segs =>
+        segs.flatMap(seg => {
+          const track = seg.getBoundingClientRect();
+          const btns = [...seg.querySelectorAll('.seg-btn')];
+          return btns.flatMap((btn, i) => {
+            const box = btn.getBoundingClientRect();
+            const name = seg.getAttribute('aria-label') + ' ' + btn.textContent;
+            const out = [];
+            if (btn.scrollWidth > btn.clientWidth + 1) out.push(name + ' is cut off');
+            if (box.left < track.left - 0.5 || box.right > track.right + 0.5) out.push(name + ' leaves the track');
+            btns.slice(i + 1).forEach(other => {
+              const o = other.getBoundingClientRect();
+              const overlap = box.left < o.right - 0.5 && o.left < box.right - 0.5;
+              const sameLine = box.top < o.bottom - 0.5 && o.top < box.bottom - 0.5;
+              if (overlap && sameLine) out.push(name + ' overlaps ' + other.textContent);
+            });
+            return out;
+          });
+        }),
+      );
+      expect(problems).toEqual([]);
+    });
+  }
+
   test('Leave Off hides a block for the previewed student only, and keeps its place as a dashed box', async ({
     page,
   }) => {
