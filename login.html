@@ -124,6 +124,36 @@
         <button class="auth-submit" type="submit" id="su-submit">Create Account</button>
       </form>
 
+      <!-- Choose a New Password: shown when a password reset link opens this page -->
+      <form class="auth-form" id="form-reset" hidden aria-labelledby="reset-title">
+        <h2 class="auth-reset-title" id="reset-title">Choose a New Password</h2>
+        <div class="auth-field">
+          <label class="auth-label" for="rs-password">New Password</label>
+          <input
+            class="auth-input"
+            id="rs-password"
+            type="password"
+            placeholder="At least 6 characters"
+            required
+            minlength="6"
+            autocomplete="new-password"
+          />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="rs-confirm">Confirm New Password</label>
+          <input
+            class="auth-input"
+            id="rs-confirm"
+            type="password"
+            placeholder="Confirm new password"
+            required
+            minlength="6"
+            autocomplete="new-password"
+          />
+        </div>
+        <button class="auth-submit" type="submit" id="rs-submit">Save New Password</button>
+      </form>
+
       <!-- Demo mode — no auth, seeded sample data, local-only -->
       <div class="auth-demo">
         <div class="auth-demo-divider"><span>or</span></div>
