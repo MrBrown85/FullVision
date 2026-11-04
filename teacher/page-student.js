@@ -390,7 +390,13 @@ window.PageStudent = (function () {
         return _dismissEditStudent();
       }
       // Enter in a box saves, as in any form.
-      if (e.key === 'Enter' && !e.isComposing && e.target && e.target.tagName === 'INPUT' && overlay.contains(e.target)) {
+      if (
+        e.key === 'Enter' &&
+        !e.isComposing &&
+        e.target &&
+        e.target.tagName === 'INPUT' &&
+        overlay.contains(e.target)
+      ) {
         e.preventDefault();
         return saveEditStudent();
       }
@@ -2813,7 +2819,11 @@ window.PageStudent = (function () {
           '</span>' +
           (e.text ? '<span class="stu-core-words">' + esc(e.text) + '</span>' : '') +
           (e.fromStudent
-            ? '<span class="stu-core-from">' + LearnerProfile.src('them', first) + ' ' + esc(_shortDay(e.at)) + '</span>'
+            ? '<span class="stu-core-from">' +
+              LearnerProfile.src('them', first) +
+              ' ' +
+              esc(_shortDay(e.at)) +
+              '</span>'
             : '') +
           '</span><span class="stu-core-goal">' +
           (e.goal ? esc(e.goal) : '<span class="stu-muted">—</span>') +

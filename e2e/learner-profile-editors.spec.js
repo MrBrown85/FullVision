@@ -126,7 +126,9 @@ test('the Core Competencies table fits inside its card at 1440 px', async ({ pag
     const rows = [...document.querySelectorAll('#lp-core .stu-core-trow')];
     return {
       over: rows.filter(r => r.scrollWidth > r.clientWidth + 1).length,
-      right: Math.max(...[...document.querySelectorAll('#lp-core .stu-core-work')].map(w => w.getBoundingClientRect().right)),
+      right: Math.max(
+        ...[...document.querySelectorAll('#lp-core .stu-core-work')].map(w => w.getBoundingClientRect().right),
+      ),
       panelRight: panel.right,
     };
   });

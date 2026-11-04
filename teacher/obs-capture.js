@@ -1235,7 +1235,8 @@ window.ObsCapture = (function () {
           });
         // A #word that names no tag says so and offers to make it. Nothing
         // is highlighted, so Enter still adds the observation.
-        if (!items.length && tok.query) items = [{ label: '+ New Tag “' + tok.query + '”', value: tok.query, create: true }];
+        if (!items.length && tok.query)
+          items = [{ label: '+ New Tag “' + tok.query + '”', value: tok.query, create: true }];
       } else if (tok.kind === '!') {
         items = matchTypes(tok.query).map(function (k) {
           return { label: OBS_SENTIMENTS[k] ? OBS_SENTIMENTS[k].label : k, value: k };

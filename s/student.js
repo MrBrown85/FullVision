@@ -1277,7 +1277,8 @@ var StudentPage = (function () {
   /* "2 tries left." and, before the last, what happens after it. */
   function triesLeftText(n) {
     if (n == null) return '';
-    if (n === 1) return ' 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.';
+    if (n === 1)
+      return ' 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.';
     return ' ' + n + ' tries left.';
   }
 
