@@ -214,6 +214,71 @@ describe('plan', () => {
     expect(p.fits).toBe(true);
     expect(p.front % 2).toBe(0);
   });
+
+  it('counts a two-line row at its height (step 4 group 3 #91)', () => {
+    const tall = Array.from({ length: 60 }, (_, i) => i < 10);
+    const p = G.plan(60, Object.assign({ tall }, sizes), Object.assign({ row2Px: 33 }, regular), H);
+    // 904px under the letterhead and header: ten rows of 33, then 30 of 19.
+    expect(p.front).toBe(40);
+    expect(p.front + p.back).toBe(60);
+    // In two columns the taller column decides.
+    const q = G.plan(
+      4,
+      Object.assign({ tall: [true, true, false, false] }, sizes),
+      Object.assign({ row2Px: 30 }, two),
+      200,
+    );
+    expect(q.front).toBe(4);
+    const r = G.plan(
+      4,
+      Object.assign({ tall: [true, true, false, false] }, sizes),
+      Object.assign({ row2Px: 30 }, two),
+      132,
+    );
+    // 132 - 72 = 60 under the letterhead: header 20 leaves 40, one tall row
+    // a column.
+    expect(r.front).toBe(2);
+  });
+});
+
+describe('long titles and categories (step 4 group 3 #91)', () => {
+  const LONG = "5.1 Mapping Germany's Conquest of Europe, 1939-1941, With Sources and a Written Response";
+  const layout = () => {
+    seed();
+    const work = getAssessments().map(a => (a.id === 'a2' ? Object.assign({}, a, { title: LONG }) : a));
+    stub('getAssessments', () => work);
+    stub('courseToday', () => '2026-10-29');
+    stub('ReportBlocks', {
+      renderBlockHeader: () => '<div class="gr-letterhead">Letterhead</div>',
+      renderContinuedLine: () => '<div class="sheet-name-line">Ada Lovelace (continued)</div>',
+      reportContext: () => ({}),
+    });
+    stub('ReportSheets', { sideHeight: () => 996 });
+    stub('studentGradeSummary', () => ({ text: '80%' }));
+    stub('assessmentGroupGrade', () => ({ text: '80%' }));
+    stub('categoryCalcMode', () => 'average');
+    stub('fullName', s => s.firstName + ' ' + s.lastName);
+    // No DOM here: every block 50px tall, every text 7px a character.
+    const stage = {
+      innerHTML: '',
+      firstChild: { offsetHeight: 50 },
+      querySelectorAll() {
+        return [...this.innerHTML.matchAll(/class="gr-measure"[^>]*>([^<]*)</g)].map(m => ({
+          offsetWidth: m[1].replace(/&#39;|&amp;/g, 'x').length * 7,
+        }));
+      },
+    };
+    return G.layoutStudent(CID, ST, {}, { paper: 'letter', stage, grade: {} }).html;
+  };
+
+  it('prints a title too long for its cell on two lines, and only that row', () => {
+    const html = layout();
+    const rows = [...html.matchAll(/<div class="gr-row([^"]*)">((?:(?!<div class="gr-row).)*)/g)];
+    const wrapped = rows.filter(m => m[1].includes('gr-wrap')).map(m => m[2]);
+    expect(wrapped).toHaveLength(1);
+    expect(wrapped[0]).toContain('Mapping Germany');
+    expect(html).toMatch(/--gr-row2:\d+px/);
+  });
 });
 
 describe('Assignment Numbers column', () => {
