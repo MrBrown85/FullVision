@@ -1040,6 +1040,27 @@ window.MGrade = (function () {
     // A group's members each have their own status, in the list above.
     if (unit && unit.view) statusRow = '';
 
+    // The Overall Comment: the one feedback box on the work, as on the
+    // desktop (score.comment; it prints on the rubric handout).
+    var commentText = getScoreComment(cid, st.id, assessment.id);
+    var commentId = 'm-overall-' + st.id + '-' + assessment.id;
+    var commentRow =
+      '<div class="m-overall">' +
+      '<label class="m-overall-label" for="' +
+      commentId +
+      '">Overall Comment</label>' +
+      '<textarea class="m-overall-comment" id="' +
+      commentId +
+      '" rows="2" placeholder="Add an overall comment for ' +
+      MC.esc(unit && unit.view ? unit.view.label : displayNameFirst(st)) +
+      '" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      assessment.id +
+      '">' +
+      MC.esc(commentText) +
+      '</textarea></div>';
+
     return (
       '<div class="m-swiper-card" data-sid="' +
       st.id +
@@ -1050,6 +1071,7 @@ window.MGrade = (function () {
       header +
       tagGroups +
       statusRow +
+      commentRow +
       '</div></div>'
     );
   }
@@ -1663,9 +1685,20 @@ window.MGrade = (function () {
       _updatePointsPct(inp.dataset.sid, inp.dataset.aid, parsePointsInput(inp.value, max), max);
     });
     swiper.addEventListener('focusout', function (e) {
+      if (e.target.classList.contains('m-overall-comment')) return _saveOverallComment(cid, e.target);
       if (!e.target.classList.contains('m-pts-input')) return;
       selectOnUp = null;
       commitPointsInput(cid, e.target);
+    });
+    // The Overall Comment saves as the teacher types and when they leave it.
+    swiper.addEventListener('input', function (e) {
+      if (!e.target.classList.contains('m-overall-comment')) return;
+      var el = e.target;
+      var key = el.dataset.sid + ':' + el.dataset.aid;
+      clearTimeout(_commentTimers[key]);
+      _commentTimers[key] = setTimeout(function () {
+        _saveOverallComment(cid, el);
+      }, 800);
     });
 
     swiper.addEventListener(
@@ -1685,6 +1718,16 @@ window.MGrade = (function () {
       },
       { passive: true },
     );
+  }
+
+  var _commentTimers = {};
+  function _saveOverallComment(cid, el) {
+    var key = el.dataset.sid + ':' + el.dataset.aid;
+    clearTimeout(_commentTimers[key]);
+    delete _commentTimers[key];
+    var text = el.value.trim();
+    if (text === getScoreComment(cid, el.dataset.sid, el.dataset.aid)) return;
+    saveScoreComment(cid, el.dataset.sid, el.dataset.aid, text);
   }
 
   // `instant` lands on the student with no scroll animation.

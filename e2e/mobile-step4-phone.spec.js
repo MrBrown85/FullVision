@@ -31,6 +31,8 @@ async function openGrading(page) {
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await page.locator('[data-action="m-grade-assess"]').first().click();
   await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
+  // The grading screen wires its fields 400 ms after it opens.
+  await page.waitForTimeout(500);
 }
 
 // Group 2 #32: the grading screen shows the sync dot, kept current.
@@ -52,4 +54,27 @@ test('every tab names the open class', async ({ page }) => {
   await expect(page.locator('#m-nav-bar-grade-picker .m-nav-bar-class')).toHaveText('Science 8');
   await page.locator('.m-tab-item[data-tab="observe"]').click();
   await expect(page.locator('#m-nav-bar-obs-feed .m-nav-bar-class')).toHaveText('Science 8');
+});
+
+// Group 2 #34: the grading card has the Overall Comment, shows a saved one,
+// and saves what is typed.
+test('grading card has the Overall Comment', async ({ page }) => {
+  await openGrading(page);
+  const card = page.locator('.m-swiper-card').first();
+  const box = card.locator('.m-overall-comment');
+  await expect(card.locator('.m-overall-label')).toHaveText('Overall Comment');
+  await box.scrollIntoViewIfNeeded();
+  await box.fill('Clear labels on every graph.');
+  await box.blur();
+  const saved = await page.evaluate(() => {
+    const el = document.querySelector('.m-swiper-card .m-overall-comment');
+    return getScoreComment(getActiveCourse(), el.dataset.sid, el.dataset.aid);
+  });
+  expect(saved).toBe('Clear labels on every graph.');
+  // Drawn again, the card shows the comment already saved.
+  await page.locator('[data-action="m-back"]').click();
+  await page.locator('[data-action="m-grade-assess"]').first().click();
+  await expect(page.locator('#m-screen-grade-swiper .m-swiper-card').first().locator('.m-overall-comment')).toHaveValue(
+    'Clear labels on every graph.',
+  );
 });
