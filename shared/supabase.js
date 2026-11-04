@@ -201,6 +201,20 @@
     return /fetch|network|offline/i.test(error.message || '');
   }
 
+  /* An auth error that says nothing about the session: the network, the
+     Auth server's own trouble (5xx, 429, a reply that isn't JSON). The
+     session may be fine; ask again. Any other error is the server saying
+     the session is gone. */
+  function _isPassingAuthError(error) {
+    if (_isNetworkAuthError(error)) return true;
+    if (error.name === 'AuthUnknownError') return true;
+    return error.status === 429 || error.status >= 500;
+  }
+
+  /* requireAuth's waits between session checks that could not tell (another
+     tab holding the auth lock, a network blip). */
+  const _AUTH_RETRY_WAITS_MS = [500, 1000, 2000];
+
   function _removeSavedClassData() {
     try {
       const keys = [];
@@ -412,22 +426,49 @@
     // cannot fake a live session. getSession() (the old fast path) reads
     // straight from storage and is editable; getUser() re-validates the
     // JWT signature server-side.
+    //
+    // Only a real signed-out state goes to Sign In: the server saying the
+    // session is gone, or no session saved at all. A check that throws or
+    // can't reach the server (another tab holding the auth lock, a network
+    // blip) waits and asks again; if it still can't tell, the page stays
+    // and nothing is signed out. Sync trouble shows on the sync dot.
     if (!_authCheckPromise) {
       _authCheckPromise = (async function () {
+        const waits = _AUTH_RETRY_WAITS_MS;
+        for (let attempt = 0; ; attempt++) {
+          let passing = null;
+          try {
+            const { data, error } = await sb.auth.getUser();
+            if (!error && data && data.user) return;
+            if (!error || !_isPassingAuthError(error)) {
+              // The session is gone (expired or revoked), not just unreachable:
+              // remove saved class data so it isn't left on a shared computer.
+              // The outbox (fv-*) always stays.
+              _removeSavedClassData();
+              window.location.href = '/login.html';
+              return new Promise(function () {});
+            }
+            passing = error;
+          } catch (e) {
+            passing = e;
+          }
+          if (attempt >= waits.length) {
+            console.warn('Session check could not tell after retries:', passing);
+            break;
+          }
+          await new Promise(function (resolve) {
+            setTimeout(resolve, waits[attempt]);
+          });
+        }
+        // Still unsure. A browser with no saved session is signed out.
         try {
-          const { data, error } = await sb.auth.getUser();
-          if (error || !data || !data.user) {
-            // The session is gone (expired or revoked), not just unreachable:
-            // remove saved class data so it isn't left on a shared computer.
-            // A network failure keeps it, and the outbox (fv-*) always stays.
-            if (!_isNetworkAuthError(error)) _removeSavedClassData();
+          const { data } = await sb.auth.getSession();
+          if (data && !data.session) {
             window.location.href = '/login.html';
             return new Promise(function () {});
           }
         } catch (e) {
-          console.warn('Session check failed:', e);
-          window.location.href = '/login.html';
-          return new Promise(function () {});
+          /* can't read it either: stay */
         }
       })();
     }
