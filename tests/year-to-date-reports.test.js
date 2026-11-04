@@ -271,3 +271,54 @@ describe("Generate's next step needs 2 scored pieces, counted year to date (deci
     expect(CommentBank.nextStepOf(f.comps)).toBeNull();
   });
 });
+
+/* Review follow-ups (2026-11-03). */
+
+describe('review follow-ups', () => {
+  const was = globalThis.courseToday;
+  const lab = (id, date) => ({ id, title: id, date, tagIds: ['t1'], categoryId: 'cat', type: 'summative' });
+  const sc = (id, v, date) => ({ assessmentId: id, tagId: 't1', score: v, date, type: 'summative' });
+  beforeEach(() => {
+    localStorage.clear();
+    globalThis.courseToday = () => '2027-02-10';
+    seed('proficiency');
+  });
+  afterEach(() => {
+    setActiveTerm(CID, null);
+    globalThis.courseToday = was;
+    delete COURSES[CID];
+  });
+
+  it("1. Generate's growth agrees with Growth Since Last Report: 4,4,4,4 then 1,1,2,2 is a fall", () => {
+    const dates = [
+      '2026-09-10',
+      '2026-09-30',
+      '2026-10-20',
+      '2026-11-10',
+      '2026-12-01',
+      '2026-12-15',
+      '2027-01-05',
+      '2027-01-25',
+    ];
+    const vals = [4, 4, 4, 4, 1, 1, 2, 2];
+    _cache.assessments[CID] = dates.map((d, i) => lab('a' + i, d));
+    _cache.scores[CID] = { [SID]: dates.map((d, i) => sc('a' + i, vals[i], d)) };
+    clearProfCache();
+    setActiveTerm(CID, 2);
+    expect(ReportBlocks.renderBlockGrowth(CID, STUDENT)).toContain('aria-label="Down"');
+    const f = CommentBank.facts(CID, STUDENT, 'term-2');
+    const c = f.comps[0];
+    expect(c.since).toBe('Report 1');
+    expect(c.start).toBe(4);
+    expect(c.now).toBe(c.level);
+    expect(c.now).toBeLessThan(c.start);
+    expect(CommentBank.improvedComp(c)).toBe(false);
+    expect(CommentBank.context(f, {}).rise).toBe('');
+  });
+
+  it('1. on the first report Generate keeps the term window', () => {
+    setActiveTerm(CID, 1);
+    const c = CommentBank.facts(CID, STUDENT, 'term-1').comps[0];
+    expect(c.since).toBe('');
+  });
+});

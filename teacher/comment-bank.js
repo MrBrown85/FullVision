@@ -2169,8 +2169,20 @@ window.CommentBank = (function () {
     };
     var dateOf = _dateOf;
     var sections = ReportBlocks.reportSections(cid);
+    // After the first report, growth is measured from the last report: each
+    // competency's year-to-date level at its end (calc.js readAsOfTerm), as
+    // Growth Since Last Report and Progress in One Area print it.
+    var active = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    var prev = active && typeof previousReportTerm === 'function' ? previousReportTerm(cid) : null;
+    var thenLevels = prev
+      ? readAsOfTerm(cid, prev.ordinal, function () {
+          return sections.map(function (sec) {
+            return getSectionProficiency(cid, sid, sec.id);
+          });
+        })
+      : null;
     return sections
-      .map(function (sec) {
+      .map(function (sec, i) {
         var scores = [];
         (sec.tags || []).forEach(function (tag) {
           // One point per piece of work, the competency's mark on it as the
@@ -2208,6 +2220,8 @@ window.CommentBank = (function () {
             if (String(s || '').trim()) iCans.push(String(s).trim());
           });
         });
+        var level = getSectionProficiency(cid, sid, sec.id);
+        var then = thenLevels && thenLevels[i] > 0 ? thenLevels[i] : 0;
         return {
           id: sec.id,
           // The competency's own label, as the printed report names it; the
@@ -2223,12 +2237,16 @@ window.CommentBank = (function () {
             ).bank_id || null,
           scores: scores,
           termScores: termScores,
-          start: sn ? sn.start : 0,
-          now: sn ? sn.now : 0,
+          // Start and now, for rises and falls only: with a last report that
+          // had a level for the competency, its year-to-date level then and
+          // the level now (since: "Report 1"); on the first report, or a
+          // competency first assessed this term, the trend inside the term.
+          start: then ? then : sn ? sn.start : 0,
+          now: then ? level : sn ? sn.now : 0,
+          since: then ? reportName(prev) : '',
           // The level now as the report prints it: calc.js
-          // getSectionProficiency, the teacher's override included. start and
-          // now above are the trend, for rises and falls only.
-          level: getSectionProficiency(cid, sid, sec.id),
+          // getSectionProficiency, the teacher's override included.
+          level: level,
           iCans: iCans,
         };
       })
@@ -2878,7 +2896,14 @@ window.CommentBank = (function () {
 
   /* A competency's scores as points: { d, v } with v its proficiency. */
   function improvedComp(c) {
-    return !!c && improvedGate(c.termScores || c.scores, IMPROVED_LEVEL);
+    if (!c) return false;
+    // Since the last report: the year-to-date level then and now.
+    if (c.since) return c.start > 0 && c.now > 0 && _atLeast(c.now - c.start, IMPROVED_LEVEL);
+    return improvedGate(c.termScores || c.scores, IMPROVED_LEVEL);
+  }
+  /* How far a competency rose, on improvedComp's footing. */
+  function riseOf(c) {
+    return c.since ? c.now - c.start : trendOf(c.termScores || c.scores);
   }
 
   /* The scored pieces' % as points, for the climb and slide stories. */
@@ -3025,13 +3050,15 @@ window.CommentBank = (function () {
     (f.comps || []).forEach(function (c) {
       var e = c.bankId ? bankEntry(c.bankId) : null;
       if (!e || (next && next.key === e.key)) return;
-      // The level reached is the competency's level as the report shows it
-      // (c.level: a teacher's override where there is one).
+      // Start and now on one footing (the last report's level and the level
+      // now, or the term's trend), and the level reached must be the one
+      // the report prints (c.level: a teacher's override where there is one).
       var from = word(c.start);
-      var to = word(c.level);
-      if (!from || !to || !(Math.round(c.level) > Math.round(c.start)) || !improvedComp(c)) return;
+      var to = word(c.now);
+      if (!from || !to || to !== word(c.level) || !(Math.round(c.now) > Math.round(c.start)) || !improvedComp(c))
+        return;
       if (R.wordCount(e.phrase) > 9) return;
-      var gain = Math.round(c.level) - Math.round(c.start);
+      var gain = Math.round(c.now) - Math.round(c.start);
       if (!pick || gain > pick.gain) pick = { comp: c, key: e.key, from: from, to: to, skill: e.phrase, gain: gain };
     });
     return pick;
@@ -3482,7 +3509,7 @@ window.CommentBank = (function () {
     // What rose: only competencies past the "improved" gate (improvedComp),
     // the biggest change first.
     var rises = f.comps.filter(improvedComp).sort(function (a, b) {
-      return trendOf(b.termScores || b.scores) - trendOf(a.termScores || a.scores);
+      return riseOf(b) - riseOf(a);
     });
     var drops = withLevels.filter(function (c) {
       return tenths(c.now) < tenths(c.start);

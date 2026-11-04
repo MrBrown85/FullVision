@@ -88,7 +88,10 @@ describe('the best piece, Strongest and Growing agree everywhere', () => {
     try {
       const after = CommentBank.compsOf(cid, st).find(x => x.id === c.id);
       expect(after.level).toBe(4);
-      expect(after.now).toBe(c.now);
+      // With a last report, now is the level the report prints, override
+      // included; an undated override applies to Report 1 too.
+      expect(after.now).toBe(after.since ? 4 : c.now);
+      expect(after.start).toBe(after.since ? 4 : c.start);
     } finally {
       globalThis.getOverrides = was;
     }
