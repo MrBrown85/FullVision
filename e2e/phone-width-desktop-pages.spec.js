@@ -100,3 +100,27 @@ test('Assignments rubric grid fits a phone', async ({ page }) => {
   expect(r.overlapping).toBe(0);
   expect(r.newRight).toBeLessThanOrEqual(375);
 });
+
+// Group 2 #43: the gradebook grader fits a phone: the score box, Missing,
+// Excused and Late are on screen, and the Overall Comment is full width.
+test('gradebook grader fits a phone', async ({ page }) => {
+  await openDesktop(page, '/gradebook');
+  const aid = await page.evaluate(() => getAssessments(getActiveCourse()).find(a => a.title === 'Data Reading Quiz').id);
+  await page.locator(`.gb-scores-cell[data-aid="${aid}"]`).first().click();
+  const dialog = page.locator('#grader-overlay .grader-dialog');
+  await expect(dialog).toBeVisible();
+  const r = await dialog.evaluate(d => {
+    const inView = e => {
+      const b = e.getBoundingClientRect();
+      return b.width > 0 && b.left >= -0.5 && b.right <= innerWidth + 0.5;
+    };
+    return {
+      statuses: [...d.querySelectorAll('.grader-status-btn')].map(inView),
+      score: inView(d.querySelector('input')),
+      commentWidth: d.querySelector('.grdt-note').getBoundingClientRect().width,
+    };
+  });
+  expect(r.statuses).toEqual([true, true, true]);
+  expect(r.score).toBe(true);
+  expect(r.commentWidth).toBeGreaterThan(250);
+});

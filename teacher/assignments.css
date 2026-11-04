@@ -8363,3 +8363,98 @@ button.grader-member-name {
     text-overflow: ellipsis;
   }
 }
+
+/* ── The grader on a phone (Nov 3 sweep) ──────────────────────
+   At 375 px the dialog kept its desktop columns: the score box ran off
+   the edge, Excused and Late were cut off, and the Overall Comment was
+   26 px wide beside a 200 px label column. Under 600 px the dialog fills
+   the screen, the student row wraps, a criterion's or competency's name
+   goes above its levels (two to a row for rubric tiles), and the
+   keyboard hint, which a phone has no use for, is left out. */
+@media (max-width: 600px) {
+  .grader-overlay {
+    padding: 8px;
+  }
+  .grader-dialog {
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 14px;
+  }
+  .grader-toolbar {
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .grader-scroll {
+    padding: 12px;
+  }
+  .grader-student-row {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+  .grader-student {
+    font-size: 1.375rem;
+  }
+  .grader-spacer {
+    display: none;
+  }
+  .grader-status {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+  .grader-status-btn {
+    flex: 1;
+  }
+  .grdt-legend {
+    display: none;
+  }
+  .grdt-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grdt-row > .grdt-crit-side {
+    grid-column: 1 / -1;
+  }
+  /* With the column legend gone, each tile names its own level. */
+  .grdt-tile:not(.is-chosen) .grdt-tile-head::before {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text);
+  }
+  .grdt-tile[data-level='1']:not(.is-chosen) .grdt-tile-head::before {
+    content: 'Emerging';
+  }
+  .grdt-tile[data-level='2']:not(.is-chosen) .grdt-tile-head::before {
+    content: 'Developing';
+  }
+  .grdt-tile[data-level='3']:not(.is-chosen) .grdt-tile-head::before {
+    content: 'Proficient';
+  }
+  .grdt-tile[data-level='4']:not(.is-chosen) .grdt-tile-head::before {
+    content: 'Extending';
+  }
+  .grdt-note-row,
+  .grdl-card,
+  .grdp-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .grdp-card {
+    padding: 14px 16px;
+  }
+  .grdl-controls {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .grdl-level {
+    padding: 0 4px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+  }
+  .grader-foot {
+    padding: 0 12px;
+  }
+  .grader-hint {
+    visibility: hidden;
+  }
+}
