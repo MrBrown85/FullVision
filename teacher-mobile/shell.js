@@ -846,12 +846,13 @@
           })
           .join('');
         var hasCourses = pickerCourses.length > 1;
+        // getLastSyncedAt() is an ISO string (data.js). Calling .toISOString()
+        // on it threw, so the gear did nothing after the first sync.
         var lastSyncedAt = window.GB ? window.GB.getLastSyncedAt() : null;
+        if (lastSyncedAt instanceof Date) lastSyncedAt = lastSyncedAt.toISOString();
         var syncLine =
           '<div style="font-size:13px;color:var(--text-3);text-align:center;margin-bottom:16px">' +
-          (lastSyncedAt
-            ? 'Last synced: ' + MC.relativeTime(lastSyncedAt.toISOString())
-            : 'Not yet synced this session') +
+          (lastSyncedAt ? 'Last synced: ' + MC.relativeTime(String(lastSyncedAt)) : 'Not yet synced this session') +
           '</div>';
         var userBlock =
           '<div style="padding:4px 16px 12px;text-align:center">' +
