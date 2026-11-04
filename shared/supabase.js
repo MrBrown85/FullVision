@@ -212,8 +212,23 @@
   }
 
   /* requireAuth's waits between session checks that could not tell (another
-     tab holding the auth lock, a network blip). */
+     tab holding the auth lock, a network blip), and the most any one check
+     or the whole series may take: supabase-js retries a token refresh on its
+     own for up to about 25 s with no network, and the page waits on this. */
   const _AUTH_RETRY_WAITS_MS = [500, 1000, 2000];
+  const _AUTH_CHECK_MS = 4000;
+  const _AUTH_TOTAL_MS = 8000;
+  // Resolves with the call's result, or { timedOut: true } after ms.
+  function _within(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve({ timedOut: true });
+        }, ms);
+      }),
+    ]);
+  }
 
   function _removeSavedClassData() {
     try {
@@ -431,14 +446,20 @@
     // session is gone, or no session saved at all. A check that throws or
     // can't reach the server (another tab holding the auth lock, a network
     // blip) waits and asks again; if it still can't tell, the page stays
-    // and nothing is signed out. Sync trouble shows on the sync dot.
+    // and nothing is signed out. Sync trouble shows on the sync dot. (A
+    // token refresh the Auth server refuses, even with a 429 or 5xx, is a
+    // sign-out supabase-js makes itself: the next check then finds no
+    // session and goes to Sign In, as before.)
     if (!_authCheckPromise) {
       _authCheckPromise = (async function () {
         const waits = _AUTH_RETRY_WAITS_MS;
+        const started = Date.now();
         for (let attempt = 0; ; attempt++) {
           let passing = null;
           try {
-            const { data, error } = await sb.auth.getUser();
+            const res = await _within(sb.auth.getUser(), _AUTH_CHECK_MS);
+            if (res.timedOut) throw new Error('The session check timed out');
+            const { data, error } = res;
             if (!error && data && data.user) return;
             if (!error || !_isPassingAuthError(error)) {
               // The session is gone (expired or revoked), not just unreachable:
@@ -452,7 +473,9 @@
           } catch (e) {
             passing = e;
           }
-          if (attempt >= waits.length) {
+          // Offline, or out of time: asking again can't tell either.
+          const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+          if (attempt >= waits.length || offline || Date.now() - started > _AUTH_TOTAL_MS) {
             console.warn('Session check could not tell after retries:', passing);
             break;
           }
@@ -460,10 +483,13 @@
             setTimeout(resolve, waits[attempt]);
           });
         }
-        // Still unsure. A browser with no saved session is signed out.
+        // Still unsure. A browser with no saved session is signed out. A
+        // session that is saved but can't be refreshed right now (offline the
+        // next morning: getSession returns no session with an error) stays,
+        // as does a read that times out.
         try {
-          const { data } = await sb.auth.getSession();
-          if (data && !data.session) {
+          const res = await _within(sb.auth.getSession(), _AUTH_CHECK_MS);
+          if (!res.timedOut && res.data && !res.data.session && !res.error) {
             window.location.href = '/login.html';
             return new Promise(function () {});
           }

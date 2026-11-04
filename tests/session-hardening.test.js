@@ -196,6 +196,63 @@ describe('requireAuth — server-side session validation', () => {
       await vi.advanceTimersByTimeAsync(10000);
       expect(window.location.href).toBe('/login.html');
     });
+
+    // Review of #25: the usual offline case is an access token that expired
+    // overnight. getSession then can't refresh it and returns no session
+    // with an error; that is not a sign-out.
+    it('stays when the saved session has expired and cannot be refreshed offline', async () => {
+      vi.useFakeTimers();
+      const offline = { name: 'AuthRetryableFetchError', status: 0, message: 'Failed to fetch' };
+      const { getUserSpy } = loadSupabaseProd({
+        getUserResult: { data: { user: null }, error: offline },
+        getSessionResult: { data: { session: null }, error: offline },
+      });
+      localStorage.setItem('gb-courses', '{}');
+      const done = window.requireAuth();
+      await vi.advanceTimersByTimeAsync(10000);
+      await done;
+      expect(getUserSpy).toHaveBeenCalled();
+      expect(window.location.href).toBe('');
+      expect(localStorage.getItem('gb-courses')).toBe('{}');
+    });
+
+    it('is done within about 13 s even when every call hangs', async () => {
+      vi.useFakeTimers();
+      const { getUserSpy, getSessionSpy } = loadSupabaseProd({
+        getUserResult: { data: { user: null }, error: null },
+        getSessionResult: { data: { session: null }, error: null },
+      });
+      getUserSpy.mockImplementation(() => new Promise(() => {}));
+      getSessionSpy.mockImplementation(() => new Promise(() => {}));
+      let settled = false;
+      window.requireAuth().then(() => (settled = true));
+      await vi.advanceTimersByTimeAsync(13000);
+      expect(settled).toBe(true);
+      expect(window.location.href).toBe('');
+    });
+
+    it('asks once, not four times, when the browser is offline', async () => {
+      vi.useFakeTimers();
+      const { getUserSpy } = loadSupabaseProd({
+        getUserResult: { data: { user: null }, error: null },
+        getSessionResult: { data: { session: { access_token: 't' } }, error: null },
+      });
+      getUserSpy.mockImplementation(async () => {
+        throw new Error('network');
+      });
+      const had = Object.getOwnPropertyDescriptor(navigator, 'onLine');
+      Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+      try {
+        const done = window.requireAuth();
+        await vi.advanceTimersByTimeAsync(5000);
+        await done;
+        expect(getUserSpy).toHaveBeenCalledTimes(1);
+        expect(window.location.href).toBe('');
+      } finally {
+        if (had) Object.defineProperty(navigator, 'onLine', had);
+        else delete navigator.onLine;
+      }
+    });
   });
 
   it('caches the auth check across repeated calls (one server round-trip per page load)', async () => {
