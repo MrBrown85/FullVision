@@ -988,6 +988,13 @@
       </footer>
     </div>
     <script>
+      // A password reset link that lands here (the site's default address)
+      // goes on to the sign-in page, which shows Choose a New Password.
+      if (/(^|[#&])(type=recovery|error_code=)/.test(location.hash)) {
+        location.replace('/login.html?reset=1' + location.hash);
+      }
+    </script>
+    <script>
       // A teacher who is signed in, or already in Demo Mode, goes straight to the
       // gradebook; Try Demo Mode then goes through the sign-in page, which asks
       // before it wipes the data on this device.
