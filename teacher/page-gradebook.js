@@ -1284,6 +1284,9 @@ window.PageGradebook = (function () {
             sectionColor: cssColor(sec ? sec.color : 'var(--text-3)'),
             tagText: key ? key.text || key.label : 'No longer in the learning map',
             groupName: sec ? sec.name || sec.shortName || '' : '',
+            // A rubric criterion that feeds no competency keeps its own
+            // column, headed by its name: written as named, not as a code.
+            isNameCol: !!(key && !key.tag),
           });
         });
       }
@@ -1401,9 +1404,9 @@ window.PageGradebook = (function () {
       html +=
         '<div class="gb-grid-tag-header' +
         altClass +
-        (col.isCriterionCol ? ' gb-grid-tag-header-crit' : '') +
-        // A code longer than five characters drops a size so it still fits.
-        (!col.isCriterionCol && String(col.tagCode || '').length > 5 ? ' gb-code-long' : '') +
+        (col.isCriterionCol || col.isNameCol ? ' gb-grid-tag-header-crit' : '') +
+        // A code longer than five characters drops its spacing so it still fits.
+        (!col.isCriterionCol && !col.isNameCol && String(col.tagCode || '').length > 5 ? ' gb-code-long' : '') +
         '" style="flex:0 0 ' +
         tagW +
         'px;width:' +
@@ -1413,7 +1416,7 @@ window.PageGradebook = (function () {
         ';color:' +
         col.sectionColor +
         '" data-tip-code="' +
-        esc(col.isCriterionCol ? '' : col.tagCode) +
+        esc(col.isCriterionCol || col.isNameCol ? '' : col.tagCode) +
         '" data-tip-text="' +
         esc(col.tagText || col.tagCode) +
         '" data-tip-group="' +

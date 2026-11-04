@@ -80,9 +80,11 @@ function trackFocus(doc, proto) {
 }
 
 export function unmount() {
+  if (!stubDocument) return;
   if (typeof dismissUndoToast === 'function') dismissUndoToast();
   PageGradebook.destroy();
   globalThis.document = stubDocument;
+  stubDocument = null;
 }
 
 export function key(target, k, opts = {}) {
