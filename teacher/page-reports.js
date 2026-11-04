@@ -1928,6 +1928,13 @@ window.PageReports = (function () {
       tqAddReportNote: function () {
         RQ.tqAddReportNote(el.dataset.aid);
       },
+      // At a Glance's View All Skills, and the drawer's ✕.
+      tqOpenSkills: function () {
+        RQ.tqOpenSkills(el);
+      },
+      tqCloseDrawer: function () {
+        RQ.tqCloseDrawer();
+      },
       // The class's lines on the Sentences card and the character limit.
       tqLine: function () {
         RQ.tqLine(el.dataset.do, el);

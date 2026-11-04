@@ -3744,7 +3744,8 @@ textarea.studio-text {
   color: var(--text-2);
 }
 .qn,
-.qn-info {
+.qn-info,
+.qno-panel {
   --qn-hairline: #f0f0f3;
   --qn-dim: var(--text-3);
   --qn-best-bg: #e8f1fe;
@@ -3755,7 +3756,8 @@ textarea.studio-text {
 }
 @media (prefers-color-scheme: dark) {
   .qn,
-  .qn-info {
+  .qn-info,
+  .qno-panel {
     --qn-hairline: var(--surface-2);
     --qn-dim: var(--text-2);
     --qn-best-bg: var(--active-light);
@@ -4078,6 +4080,116 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-family: var(--font-base);
   font-size: var(--text-sm);
   font-weight: 600;
+}
+
+/* The drawer (Questionnaire glance plan, step 3): over the left column,
+   edge to edge, stopping where the left column ends (662 px right column
+   + 20 px gap + 24 px padding; _fitDrawer measures it), with its own
+   scroll. The Teacher Comment stays in view beside it. */
+#report-output.qn-output {
+  position: relative;
+}
+.qno-panel {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 706px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-base);
+  box-shadow:
+    6px 0 24px rgba(0, 0, 0, 0.12),
+    1px 0 0 var(--border);
+  overflow: hidden;
+}
+@media (max-width: 1280px) {
+  .qno-panel {
+    right: 0;
+  }
+}
+.qno-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 18px 12px 24px;
+}
+.qno-panel-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.qno-panel-title {
+  font-size: 17px;
+  font-weight: 650;
+}
+.qno-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg);
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.qno-close:hover {
+  color: var(--text);
+}
+.qno-close:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.qno-panel-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 0 14px;
+  background: var(--bg);
+}
+/* A month or folder heading stays in view while its rows scroll. */
+.qno-month {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  padding: 10px 14px 6px;
+}
+.qno-panel .qno-month {
+  padding: 10px 18px 6px 24px;
+}
+.qno-empty {
+  padding: 14px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.qno-skill-card {
+  margin: 0 18px 0 24px;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.qno-skill-card .qn-skill:first-child {
+  border-top: 0;
+}
+.qno-skill-fig {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  margin-top: 1px;
+}
+.qno-skill-change {
+  flex: none;
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  white-space: nowrap;
 }
 
 /* The student's Voice */

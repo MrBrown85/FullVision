@@ -59,6 +59,7 @@ window.ReportQuestionnaire = (function () {
     var students = getTqStudents();
     tqStudentIndex = Math.max(0, Math.min(students.length - 1, idx));
     _commentTab = 'this';
+    _drawer = null;
     rerender();
   }
   function tqPrevStudent() {
@@ -7614,6 +7615,145 @@ window.ReportQuestionnaire = (function () {
     tqLine(which === 'own' ? 'saveOwn' : which === 'closing' ? 'saveClosing' : 'saveLate');
   }
 
+  /* ── The drawer (Questionnaire glance plan, steps 3 and 5) ───
+     One drawer over the left column, edge to edge, with its own scroll:
+     every skill (kind 'skills') or every observation (kind 'obs'). The
+     Teacher Comment stays in view beside it. Opening and closing redraw
+     only the drawer, so the page under it does not move. */
+  var DRAWER_ID = 'tq-drawer';
+  var _drawer = null; // null | { kind: 'obs' | 'skills', filter, q, expanded: { obId: true } }
+  var _drawerFrom = null; // the control that opened it, for the focus on close
+
+  function drawerOpen() {
+    return !!_drawer;
+  }
+
+  /* The skills in groups by curriculum folder (Questioning and Predicting,
+     …) in report order, [{ label, items }]; a class without folders has
+     one group. */
+  function skillGroups(cid, comps) {
+    var names = {};
+    (typeof getCompetencyGroups === 'function' ? getCompetencyGroups(cid) || [] : []).forEach(function (g) {
+      names[g.id] = g.name;
+    });
+    var secs = {};
+    ReportBlocks.reportSections(cid).forEach(function (s) {
+      secs[s.id] = s;
+    });
+    var foldered = (comps || []).some(function (c) {
+      return secs[c.id] && names[secs[c.id].groupId];
+    });
+    var groups = [];
+    (comps || []).forEach(function (c) {
+      var g = secs[c.id] && names[secs[c.id].groupId];
+      var label = foldered ? g || 'Other Skills' : 'All Skills';
+      var last = groups[groups.length - 1];
+      if (!last || last.label !== label) groups.push((last = { label: label, items: [] }));
+      last.items.push(c);
+    });
+    return groups;
+  }
+
+  // html-safe: folder and competency names, figures, changes and words esc()'d; counts are numbers
+  function _skillsDrawerHtml(cid, student, f) {
+    var first = student.firstName || displayNameFirst(student);
+    var comps = glanceRows(f).comps;
+    var sub = _plural(comps.length, 'skill', 'skills') + ' · so far this year';
+    if (f.lastReport) sub += ' · change since the ' + f.lastReport.label + ' report';
+    var groups = skillGroups(cid, comps)
+      .map(function (g) {
+        var rows = g.items
+          .map(function (c) {
+            var change = glanceChange(cid, f, c);
+            return `<div class="qn-skill">
+              <span class="qn-skill-name">${esc(c.name)}<span class="qno-skill-fig">${esc(formatLevel(cid, c.level) + ' · ' + _pieces(c))}</span></span>
+              ${change ? `<span class="qno-skill-change">${esc(change)}</span>` : ''}
+              <span class="qn-level" data-level="${_levelStep(c.level)}">${esc(f.levelText(c.level))}</span>
+            </div>`;
+          })
+          .join('');
+        return `<div class="qno-group">
+          <div class="obs-feed-date-label qno-month"><span>${esc(g.label)}</span><span class="obs-feed-date-count">${_plural(g.items.length, 'skill', 'skills')}</span></div>
+          <div class="qno-skill-card">${rows}</div>
+        </div>`;
+      })
+      .join('');
+    return `<div class="qno-panel" id="${DRAWER_ID}" data-kind="skills" role="dialog" aria-labelledby="tq-drawer-title">
+      <div class="qno-panel-head">
+        <div class="qno-panel-titles">
+          <span class="qno-panel-title" id="tq-drawer-title">${esc(first)}’s Skills</span>
+          <span class="qn-sub">${esc(sub)}</span>
+        </div>
+        <button type="button" class="qno-close" data-action="tqCloseDrawer" title="Close (Esc)" aria-label="Close skills">✕</button>
+      </div>
+      <div class="qno-panel-list qno-skill-list">${groups || '<div class="qno-empty">No scores so far this year.</div>'}</div>
+    </div>`;
+  }
+
+  // html-safe: the drawer's own builders, which escape every value
+  function _drawerHtml(cid, student, f) {
+    if (!_drawer) return '';
+    return _skillsDrawerHtml(cid, student, f);
+  }
+
+  /* Draws the drawer in place, or takes it away, and fits it to the left
+     column. */
+  function _redrawDrawer(focusSel) {
+    var out = document.getElementById('report-output');
+    var el = document.getElementById(DRAWER_ID);
+    var st = _current();
+    if (!_drawer || !st || !out) {
+      if (el) el.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      out.appendChild(el);
+    }
+    el.outerHTML = _drawerHtml(_activeCourse, st, _facts(st));
+    _fitDrawer();
+    var target = focusSel ? document.querySelector('#' + DRAWER_ID + ' ' + focusSel) : null;
+    if (target && target.focus) target.focus();
+  }
+
+  /* The drawer stops where the left column ends, however wide the student
+     list leaves it; stacked columns (1280 px and under) take the width. */
+  function _fitDrawer() {
+    var el = document.getElementById(DRAWER_ID);
+    var out = document.getElementById('report-output');
+    var left = document.querySelector('.qn-left');
+    var right = document.querySelector('.qn-right');
+    if (!el || !out || !left || !right || !el.getBoundingClientRect) return;
+    var l = left.getBoundingClientRect();
+    var r = right.getBoundingClientRect();
+    if (r.left <= l.right) {
+      el.style.right = '';
+      return;
+    }
+    el.style.right = Math.max(0, Math.round(out.getBoundingClientRect().right - l.right)) + 'px';
+  }
+
+  function _openDrawer(state, from) {
+    _drawerFrom = from || (document.activeElement !== document.body ? document.activeElement : null);
+    _drawer = Object.assign({ kind: 'skills', filter: 'all', q: '', expanded: {} }, state);
+    _redrawDrawer('.qno-close');
+  }
+  function tqOpenSkills(from) {
+    _openDrawer({ kind: 'skills' }, from);
+  }
+  if (typeof window.addEventListener === 'function')
+    window.addEventListener('resize', function () {
+      if (_drawer) _fitDrawer();
+    });
+  function tqCloseDrawer() {
+    if (!_drawer) return;
+    _drawer = null;
+    _redrawDrawer();
+    var from = _drawerFrom;
+    _drawerFrom = null;
+    if (from && from.isConnected && from.focus) from.focus();
+  }
+
   /* ── The page ────────────────────────────────────────────── */
 
   /* A new student, report or class on screen: nothing left open from the
@@ -7625,6 +7765,7 @@ window.ReportQuestionnaire = (function () {
     var key = cid + '|' + student.id + '|' + getTermId();
     if (_screen === key) return;
     _screen = key;
+    _drawer = null;
     _own = null;
     _wording = null;
     _addAt = null;
@@ -7666,7 +7807,7 @@ window.ReportQuestionnaire = (function () {
         ${_commentTab === 'this' ? _sentencesHtml(cid, student, f) : ''}
         <!-- The rest of the Sentences card (PR 11b) goes here. -->
       </div>
-    </div>`;
+    </div>${_drawerHtml(cid, student, f)}`;
   }
 
   /* After the page is drawn: the roster, the box's height, and drag and
@@ -7674,6 +7815,7 @@ window.ReportQuestionnaire = (function () {
   function afterRender() {
     syncRoster();
     _fitBox();
+    _fitDrawer();
     syncApprove();
     _wireDrag();
     _wireSelAdd();
@@ -7698,7 +7840,9 @@ window.ReportQuestionnaire = (function () {
       return;
     }
     if (e.key === 'Escape') {
-      if (document.getElementById(BOTH_ID)) tqCloseBoth();
+      // The drawer closes first, then a sheet.
+      if (_drawer) tqCloseDrawer();
+      else if (document.getElementById(BOTH_ID)) tqCloseBoth();
       else if (document.getElementById(INFO_ID)) tqCloseInfo();
       else if (browseOpen()) {
         if (!closeLines()) _closeBrowse();
@@ -7952,6 +8096,10 @@ window.ReportQuestionnaire = (function () {
     basisChoices: basisChoices,
     renderTermQuestionnaire: renderTermQuestionnaire,
     afterRender: afterRender,
+    tqOpenSkills: tqOpenSkills,
+    tqCloseDrawer: tqCloseDrawer,
+    drawerOpen: drawerOpen,
+    skillGroups: skillGroups,
     fitBox: _fitBox,
     syncRoster: syncRoster,
     restoreRoster: restoreRoster,
