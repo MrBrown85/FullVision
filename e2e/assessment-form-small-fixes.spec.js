@@ -103,3 +103,25 @@ test('Core Competency chips say whether they are on', async ({ page }) => {
   await chip.click();
   await expect(chip).toHaveAttribute('aria-pressed', 'false');
 });
+
+// Nov 3 sweep (step 4 group 2 #18): a due date before the date assigned
+// saved with no word ("Nov 3, 2026 → Nov 2, 2026"). The form says so under
+// the field; Save still saves (information only).
+test('a due date before the date assigned is said under the field', async ({ page }) => {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+  await page.evaluate(() => window.Router.navigate('/assignments?course=sci8'));
+  await page.locator('button', { hasText: 'New Assessment' }).first().click();
+  const hint = page.locator('#af-due-hint');
+  await expect(hint).toBeHidden();
+  await page.fill('#af-date-assigned', '2026-11-03');
+  await page.fill('#af-due', '2026-11-02');
+  await expect(hint).toBeVisible();
+  await expect(hint).toHaveText('The due date is before the date assigned.');
+  await expect(page.locator('#af-due')).toHaveAttribute('aria-describedby', 'af-due-hint');
+  await page.fill('#af-due', '2026-11-04');
+  await expect(hint).toBeHidden();
+  await page.fill('#af-due', '');
+  await expect(hint).toBeHidden();
+});

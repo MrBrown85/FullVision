@@ -2726,9 +2726,14 @@ window.PageAssignments = (function () {
       '</div>' +
       '<div class="af-field">' +
       '<label class="af-label">Due Date (optional)</label>' +
-      '<input class="af-input" id="af-due" type="date" value="' +
+      '<input class="af-input" id="af-due" type="date" aria-describedby="af-due-hint" value="' +
       esc(defaultDue) +
       '">' +
+      '<p class="af-category-hint" id="af-due-hint"' +
+      (_dueBeforeAssigned(dateAssigned, defaultDue) ? '' : ' hidden') +
+      '>' +
+      DUE_BEFORE_ASSIGNED_HINT +
+      '</p>' +
       '</div>' +
       '</div>';
     html += '</section>';
@@ -3052,6 +3057,21 @@ window.PageAssignments = (function () {
   /* A new Date Assigned moves Due Date with it only while Due is still the
      week-later date it was given (or empty); a due date the teacher set
      stays. */
+  /* A due date before the date assigned is said under the field as it is
+     picked; the card read "Nov 3, 2026 → Nov 2, 2026" with no word (Nov 3
+     sweep). Information only: Save still saves. */
+  var DUE_BEFORE_ASSIGNED_HINT = 'The due date is before the date assigned.';
+  function _dueBeforeAssigned(assigned, due) {
+    return !!(assigned && due && due < assigned);
+  }
+  function _refreshDueHint() {
+    var hint = document.getElementById('af-due-hint');
+    if (!hint) return;
+    hint.hidden = !_dueBeforeAssigned(
+      (document.getElementById('af-date-assigned') || {}).value,
+      (document.getElementById('af-due') || {}).value,
+    );
+  }
   function _weekAfter(day) {
     var d = new Date(day + 'T12:00:00');
     d.setDate(d.getDate() + 7);
@@ -3064,8 +3084,8 @@ window.PageAssignments = (function () {
     assigned.dataset.was = assigned.value;
     var dueEl = document.getElementById('af-due');
     if (!dueEl) return;
-    if (dueEl.value && !(was && dueEl.value === _weekAfter(was))) return;
-    dueEl.value = _weekAfter(assigned.value);
+    if (!(dueEl.value && !(was && dueEl.value === _weekAfter(was)))) dueEl.value = _weekAfter(assigned.value);
+    _refreshDueHint();
   }
 
   function setScoreMode(mode) {
@@ -3380,6 +3400,7 @@ window.PageAssignments = (function () {
       saved.textContent = '';
     }
     if (!t.id) return;
+    if (t.id === 'af-due' || t.id === 'af-date-assigned') _refreshDueHint();
     // A title clears the "Title is required" state as soon as it's typed.
     if (t.id === 'af-title' && t.value.trim()) t.removeAttribute('aria-invalid');
     if (t.id === 'af-maxpoints') {
@@ -6047,6 +6068,7 @@ window.PageAssignments = (function () {
     set('af-due', keep.due);
     var assignedEl = document.getElementById('af-date-assigned');
     if (assignedEl) assignedEl.dataset.was = assignedEl.value;
+    _refreshDueHint();
     if (
       keep.mode &&
       keep.mode !== 'proficiency' &&
