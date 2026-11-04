@@ -4317,7 +4317,9 @@ window.CommentBank = (function () {
     put('levelUp', prof && /^(Proficient|Extending)$/.test(standing) ? ['yes'] : [], ['overall']);
     var both = !!(f.grade && f.grade.mode === 'both' && standing && x.gr && /^(letter|cminus)/.test(x.gr.kind));
     put('gradeLevel', both ? [aOrAn(standing) + ' level'] : [], ['overall']);
-    put('ieReason', ctx._path === 'ie' && ctx._ieProblem ? [P.ieReason[ctx._ieProblem]] : [], ['grade']);
+    // With no problem named (an IE the teacher chose with the work in and
+    // marked), the scale's own reason: not yet enough evidence.
+    put('ieReason', ctx._path === 'ie' ? [P.ieReason[ctx._ieProblem || 'none']] : [], ['grade']);
     // The strength at its level now.
     var routes = strengthRoutes(f, x.nowSk, x.hiSk);
     var r = routes[0] || null;

@@ -2028,13 +2028,20 @@ window.ReportQuestionnaire = (function () {
     // The teacher's own meeting sentence stands for the Meeting part.
     var meet = meetingRowAt(rows, CommentBank.reportPath(f));
     if (meet >= 0 && !kept.ieMeeting) kept.ieMeeting = rows[meet].text;
-    var order = _ordered[key]
-      ? rows
-          .map(function (r) {
-            return r.step;
-          })
-          .filter(Boolean)
-      : undefined;
+    // The rows' order when the teacher moved one, or kept a sentence they
+    // edited or typed: Generate redraws the rest around them in place (the
+    // pipeline would otherwise lead with another fact on this press).
+    var keeps = rows.some(function (r) {
+      return r.edited || isTyped(r);
+    });
+    var order =
+      _ordered[key] || keeps
+        ? rows
+            .map(function (r) {
+              return r.step;
+            })
+            .filter(Boolean)
+        : undefined;
     var d = CommentBank.draft(_bankContext(_activeCourse, st, f), {
       seed: CommentBank.seedFor(st.id + '|' + termId) + n,
       comments: _classmateComments(_activeCourse, st.id, termId),
@@ -3307,8 +3314,10 @@ window.ReportQuestionnaire = (function () {
   /* The teacher's typed sentences (old rows with no step) put back among
      the new rows at their place in the order: after the row they followed,
      found by its text or its step; else before the row that followed them;
-     else where they were, after the grade sentence when Generate put it
-     first (the grade leads unless the teacher moved it). */
+     else where they were, after Generate's first sentence when they were
+     first (the comment opens on the sentence that names the student: the
+     grade, or since Nov 4 2026 whichever fact the comment's shape leads
+     with). */
   function keepTyped(old, rows) {
     var out = rows.slice();
     var find = function (r) {
@@ -3325,7 +3334,7 @@ window.ReportQuestionnaire = (function () {
         var next = -1;
         for (var k = i + 1; k < old.length && next < 0; k++) next = find(old[k]);
         at = next >= 0 ? next : Math.min(i, out.length);
-        if (next < 0 && at === 0 && out[0] && out[0].step === 'grade') at = 1;
+        if (next < 0 && at === 0 && out[0] && out[0].step && !isTyped(out[0])) at = 1;
       }
       out.splice(at, 0, r);
     });

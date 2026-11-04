@@ -18858,6 +18858,7 @@ var COMMENT_BANK = {
       marks: 'there is not yet enough marked work for a letter grade',
       noMarks: 'none of the work has a mark yet',
       low: 'the marks to date average under 50 percent',
+      none: 'there is not yet enough evidence for a letter grade',
     },
     at: {
       Emerging: ['is beginning to {base}', 'is beginning to {base} in {his} work', 'is beginning to {base} in class'],
