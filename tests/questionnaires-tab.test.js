@@ -272,6 +272,40 @@ describe('Questionnaires tab', () => {
     }
   });
 
+  it('the switch shows On as soon as it is clicked, while the save is still going', async () => {
+    var stubV2 = window.v2;
+    var finish;
+    try {
+      globalThis.isDemoMode = () => false;
+      Questionnaires._reset();
+      window.v2 = Object.assign({}, stubV2, {
+        listCourseQuestionnaires: () => Promise.resolve({ data: [] }),
+        listQuestionnaireTemplates: () => Promise.resolve({ data: null }),
+        upsertQuestionnaire: () => new Promise(r => (finish = r)),
+      });
+      await Questionnaires.load(CID);
+      var draws = 0;
+      DashClassManager.renderClassManager = () => {
+        draws++;
+        mount();
+      };
+      mount();
+      click('[data-card="about-me"] .seg-btn[data-on="1"]');
+      expect(draws).toBe(1);
+      expect(root.querySelector('[data-card="about-me"] .seg-btn[data-on="1"]').getAttribute('aria-checked')).toBe(
+        'true',
+      );
+      finish({ data: null });
+      await tick();
+      // A save that failed goes back to Off and says so.
+      var card = root.querySelector('[data-card="about-me"]');
+      expect(card.querySelector('.seg-btn[data-on="0"]').getAttribute('aria-checked')).toBe('true');
+      expect(card.querySelector('.sq-msg').textContent).toContain('Could not turn this on');
+    } finally {
+      window.v2 = stubV2;
+    }
+  });
+
   it('refuses dates that close before they open', async () => {
     var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
     mount();

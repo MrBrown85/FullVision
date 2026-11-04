@@ -19,6 +19,7 @@ var CmQuestionnaires = (function () {
   var _msg = {}; // qid or card key -> a line under the card's buttons
   var _saving = {}; // qid -> the save in flight, so saves go one at a time
   var _draft = {}; // qid -> a new question shown but not saved until it has words
+  var _turning = {}; // card key -> true while a first turn-on saves, so the switch shows On at once
 
   function _rerender() {
     if (typeof DashClassManager !== 'undefined' && DashClassManager.renderClassManager) {
@@ -421,7 +422,7 @@ var CmQuestionnaires = (function () {
 
   function _card(opts) {
     var q = opts.q;
-    var on = !!(q && q.is_on);
+    var on = !!(q && q.is_on) || (!q && !!_turning[opts.key]);
     var html =
       '<article class="sq-card' +
       (on ? '' : ' sq-off') +
@@ -584,7 +585,12 @@ var CmQuestionnaires = (function () {
     };
     if (!spec.template_id && !spec.id) return;
     delete _msg[key];
-    return Questionnaires.turnOn(cid, spec).then(function (q) {
+    // The switch shows On while it saves (the sync dot shows the save).
+    _turning[key] = true;
+    var saving = Questionnaires.turnOn(cid, spec);
+    _rerender();
+    return saving.then(function (q) {
+      delete _turning[key];
       if (!q) {
         _msg[key] = 'Could not turn this on. Check the connection and try again.';
         _rerender();
@@ -642,7 +648,9 @@ var CmQuestionnaires = (function () {
         if (el.dataset.on === '1') {
           if (!q || !q.is_on) _turnOn(cid, el);
         } else if (q && q.is_on) {
+          // setOn changes the copy at once; draw it now, not after the save.
           Questionnaires.setOn(cid, q.id, false).then(_rerender);
+          _rerender();
         }
         return true;
       case 'sqGoalOn': {
@@ -816,6 +824,7 @@ var CmQuestionnaires = (function () {
     _msg = {};
     _saving = {};
     _draft = {};
+    _turning = {};
   }
 
   return {
