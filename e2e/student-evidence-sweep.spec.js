@@ -34,3 +34,22 @@ test('the Observations tile counts an add, a delete and an Undo at once', async 
   await page.locator('#undo-toast').getByRole('button', { name: 'Undo' }).click();
   await expect.poll(() => tileCount(page)).toBe(start + 1);
 });
+
+test('Flag after a Concern shows on the roster at once, with an Undo', async ({ page }) => {
+  const panel = await openObservations(page);
+  await page.evaluate(() => {
+    const f = getFlags('sci8');
+    delete f.st23;
+    saveFlags('sci8', f);
+  });
+  const row = page.locator('#gb-roster-list .student-row[data-sid="st23"]');
+  await panel.locator('[data-obsc="type"][data-value="concern"]').click();
+  await panel.locator('#note-capture-input').fill('Did not start the lab');
+  await page.keyboard.press('Enter');
+  await panel.locator('[data-obsc="flag"]').click();
+  await expect(row).toContainText('⚑');
+  await expect(page.locator('#undo-toast')).toContainText('flagged');
+  await page.locator('#undo-toast').getByRole('button', { name: 'Undo' }).click();
+  await expect(row).not.toContainText('⚑');
+  expect(await page.evaluate(() => !!getFlags('sci8').st23)).toBe(false);
+});

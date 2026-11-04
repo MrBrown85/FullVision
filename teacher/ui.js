@@ -1311,6 +1311,12 @@ if (typeof document !== 'undefined' && document.addEventListener) {
   else _keepRosterScroll();
 }
 
+// Redraw the roster rows (a flag set or cleared), keeping the sort, the
+// selected student and the search.
+function refreshRosterRows() {
+  if (_sidebarCid && document.getElementById('gb-roster-list')) _applyRosterSort(_rosterSortMode(_sidebarCid));
+}
+
 // Refresh sidebar in place (call after score changes)
 function refreshSidebar() {
   const mount = document.getElementById('sidebar-mount');

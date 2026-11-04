@@ -640,6 +640,20 @@ window.ObsCapture = (function () {
       return out;
     }
 
+    /* The flag shows on the roster at once, and Undo takes it off. */
+    function _flagShown(fcid, sid) {
+      if (typeof refreshRosterRows === 'function') refreshRosterRows();
+      if (typeof showUndoToast !== 'function') return;
+      var s = studentList(fcid).find(function (x) {
+        return x.id === sid;
+      });
+      showUndoToast((s ? s.first || s.name : 'Student') + ' flagged', function () {
+        if (typeof isStudentFlagged === 'function' && isStudentFlagged(fcid, sid)) toggleFlag(fcid, sid);
+        if (typeof refreshRosterRows === 'function') refreshRosterRows();
+        if (typeof opts.onFlag === 'function') opts.onFlag(sid);
+      });
+    }
+
     function renderFlag() {
       if (state.error) return '<span class="obsc-error" role="alert">' + esc(state.error) + '</span>';
       if (!state.flagOffer.length) return '';
@@ -1485,13 +1499,14 @@ window.ObsCapture = (function () {
       else if (act === 'editStarters') editStarters();
       else if (act === 'add') submit();
       else if (act === 'flag') {
-        if (typeof isStudentFlagged === 'function' && !isStudentFlagged(cid, val) && typeof toggleFlag === 'function') {
-          toggleFlag(cid, val);
-        }
+        var flaggedNow =
+          typeof isStudentFlagged === 'function' && !isStudentFlagged(cid, val) && typeof toggleFlag === 'function';
+        if (flaggedNow) toggleFlag(cid, val);
         state.flagOffer = state.flagOffer.filter(function (s) {
           return s !== val;
         });
         render();
+        if (flaggedNow) _flagShown(cid, val);
         if (typeof opts.onFlag === 'function') opts.onFlag(val);
       } else if (act === 'notNow') {
         state.flagOffer = [];

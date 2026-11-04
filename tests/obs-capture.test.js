@@ -596,6 +596,24 @@ describe('capture strip', () => {
     expect(cap.el.querySelector('[data-part="flag"]').textContent).toBe('');
   });
 
+  it('Flag redraws the roster and offers an Undo that takes the flag off', () => {
+    const toasts = [];
+    let rosterDraws = 0;
+    setGlobal('showUndoToast', (msg, undo) => toasts.push({ msg, undo }));
+    setGlobal('refreshRosterRows', () => rosterDraws++);
+    const cap = mount({ students: ['s1'] });
+    click(cap.el.querySelector('[data-obsc="type"][data-value="concern"]'));
+    type(cap, 'Did not start the task');
+    cap.submit();
+    click(cap.el.querySelector('[data-part="flag"] [data-obsc="flag"]'));
+    expect(flagged.s1).toBe(true);
+    expect(rosterDraws).toBe(1);
+    expect(toasts.map(t => t.msg)).toEqual(['Mei flagged']);
+    toasts[0].undo();
+    expect(flagged.s1).toBe(false);
+    expect(rosterDraws).toBe(2);
+  });
+
   it('Not Now dismisses the flag offer without flagging', () => {
     const cap = mount({ students: ['s1'] });
     click(cap.el.querySelector('[data-obsc="type"][data-value="concern"]'));
