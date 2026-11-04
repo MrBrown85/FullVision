@@ -1090,15 +1090,49 @@ window.CommentBank = (function () {
      (data/bc-curriculum-comment.json, shipped as shared/bank-comment.js).
      A cluster with no SKILLS key gets its own key, so no line written for a
      table skill is bound to it. null when the id is not in the bank. */
+  /* Version 2 cards (Nov 4 2026) add the wording the pipeline says a skill
+     in: forms { base, does, doing, did, at: { Developing, Proficient,
+     Extending } }, area, evidence, home and the Extending next step. A
+     version 1 card reads as forms.base = [phrase] with the rest empty, so
+     the engine falls back to its version 1 wording (v2: false). does and
+     doing are derived from each base form (CommentForms). */
   function bankEntry(bankId) {
     var b = typeof window !== 'undefined' ? window.BANK_COMMENT : null;
     var i = b && b.ids ? b.ids[bankId] : null;
     var row = i != null && b.clusters ? b.clusters[i] : null;
     if (!row) return null;
+    var v = row[5] || null;
+    var at = (v && v.at) || {};
+    var base = v && v.b && v.b.length ? v.b.slice() : [row[0]];
+    var F = typeof window !== 'undefined' ? window.CommentForms : null;
+    var o = (v && v.o) || {};
     return {
       key: row[1] || 'bank.' + i,
       phrase: row[0],
-      steps: { Emerging: row[2], Developing: row[3], Proficient: row[4] },
+      steps: { Emerging: row[2], Developing: row[3], Proficient: row[4], Extending: (v && v.x) || '' },
+      v2: !!v,
+      area: (v && v.a) || '',
+      evidence: (v && v.ev) || '',
+      home: ((v && v.h) || []).slice(),
+      forms: {
+        base: base,
+        does: F
+          ? base.map(function (t) {
+              return F.does(t, o);
+            })
+          : [],
+        doing: F
+          ? base.map(function (t) {
+              return F.doing(t, o);
+            })
+          : [],
+        did: ((v && v.d) || []).slice(),
+        at: {
+          Developing: (at.developing || []).slice(),
+          Proficient: (at.proficient || []).slice(),
+          Extending: (at.extending || []).slice(),
+        },
+      },
     };
   }
 
@@ -1110,7 +1144,7 @@ window.CommentBank = (function () {
   function skillFor(f, c) {
     if (!c) return null;
     var e = c.bankId ? bankEntry(c.bankId) : null;
-    if (e) return { key: e.key, name: c.name, skill: e.phrase, steps: e.steps };
+    if (e) return { key: e.key, name: c.name, skill: e.phrase, steps: e.steps, entry: e };
     return skillOf(f.family, c.name);
   }
 
@@ -2996,7 +3030,20 @@ window.CommentBank = (function () {
   function levelStepOf(f) {
     var n = nextSkillOf(f);
     if (!n || !n.steps) return null;
-    return { comp: n.comp, text: n.steps[word(n.comp.level)] || n.skill };
+    // At Extending, a version 2 card's own step (next_steps.extending), said
+    // for this student; a version 1 card has none, and the step is the phrase.
+    return { comp: n.comp, text: forStudent(n.steps[word(n.comp.level)] || n.skill, f) };
+  }
+
+  /* A card string said for one student: its {he} {his} {him} slots and
+     [a|b] verbs filled from the facts' pronouns (they/them with none on
+     file), its first letter as written. A string with no slot comes back
+     as it is. */
+  function forStudent(text, f) {
+    var t = String(text || '');
+    if (!/[{[]/.test(t)) return t;
+    var said = R.render(R.tokens(t), { name: (f && f.name) || '', p: f && f.pronouns }, { named: true });
+    return /^[a-z]/.test(t) ? said.charAt(0).toLowerCase() + said.slice(1) : said;
   }
 
   /* The next step most of the class shares (Colin, 2026-11-02), for the

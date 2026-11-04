@@ -23,7 +23,13 @@
  * It also builds shared/bank-comment.js, what Generate names a bank
  * competency by (data/bc-curriculum-comment.json): window.BANK_COMMENT =
  * { ids: { competency id: cluster index }, clusters: [[phrase, skill key or
- * null, next step at Emerging, at Developing, at Proficient], ...] }.
+ * null, next step at Emerging, at Developing, at Proficient, version 2 or
+ * 0], ...] }. Every card is read as version 2 (cardV2): a version 1 card
+ * becomes forms.base = [phrase] with the rest empty, and its slot 5 is 0 so
+ * the engine falls back to the version 1 wording; a card with version 2
+ * wording ships it in slot 5 as { a: area, b: base forms, d: did forms,
+ * at: { developing, proficient, extending }, o: overrides, x: the
+ * Extending next step, ev: evidence, h: home invitations }.
  *
  * And shared/bank-proficiency.js, each competency's four level descriptors
  * for printed Tag Rubrics (data/bc-curriculum-proficiency.json), loaded only
@@ -85,6 +91,48 @@ export function buildBank() {
   return { bank, missing };
 }
 
+/* A card as version 2 (plan v1 section 2, "The Schema"): every field
+   present, a version 1 card's empty. */
+export function cardV2(c) {
+  const forms = c.forms || {};
+  const at = forms.at || {};
+  return {
+    phrase: c.phrase,
+    area: c.area || '',
+    forms: {
+      base: forms.base && forms.base.length ? forms.base.slice() : [c.phrase],
+      did: (forms.did || []).slice(),
+      at: {
+        developing: (at.developing || []).slice(),
+        proficient: (at.proficient || []).slice(),
+        extending: (at.extending || []).slice(),
+      },
+      override: Object.assign({}, forms.override || {}),
+    },
+    skill_key: c.skill_key,
+    next_steps: Object.assign({ extending: '' }, c.next_steps),
+    evidence: c.evidence || '',
+    home: (c.home || []).slice(),
+    exemplar: c.exemplar,
+    version: c.forms ? 2 : 1,
+  };
+}
+/* Whether a version 2 card has wording beyond the version 1 phrase. */
+function v2Slot(v) {
+  if (v.version !== 2) return 0;
+  const out = {
+    a: v.area,
+    b: v.forms.base,
+    d: v.forms.did,
+    at: v.forms.at,
+    x: v.next_steps.extending,
+    ev: v.evidence,
+    h: v.home,
+  };
+  if (Object.keys(v.forms.override).length) out.o = v.forms.override;
+  return out;
+}
+
 export function buildComment() {
   const comment = read('data/bc-curriculum-comment.json');
   const ican = read('data/bc-curriculum-ican.json');
@@ -94,8 +142,8 @@ export function buildComment() {
   const index = {};
   const clusters = keys.map((k, i) => {
     index[k] = i;
-    const c = comment[k];
-    return [c.phrase, c.skill_key, c.next_steps.emerging, c.next_steps.developing, c.next_steps.proficient];
+    const c = cardV2(comment[k]);
+    return [c.phrase, c.skill_key, c.next_steps.emerging, c.next_steps.developing, c.next_steps.proficient, v2Slot(c)];
   });
   const ids = {};
   Object.keys(ican)

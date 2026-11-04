@@ -3,7 +3,8 @@
     "description": "How each competency cluster is named in a report comment. phrase finishes '{He} can …' and 'Next, {he} can …': plain family words, a bare verb phrase, no competency label, code or Ministry wording. skill_key is the teacher/comment-bank.js SKILLS key whose For the Family and support lines fit it, or null. next_steps are the step toward the level above, by the student's level now (an Extending student's next step is the phrase). Keyed by the cluster in data/bc-curriculum-ican.json. The app doesn't read this file yet.",
     "method": "One card per cluster written from the exemplar competency’s Ministry wording and approved I Can set, scripted lint, one independent yes/no checklist review (fidelity, whole cluster, plain grammar, ladder, acceptability), one fix round, and a check that cluster-level text names no art form, trade or subject area that some member course lacks.",
     "approval": "Delegated: Colin Brown asked on Nov 2 2026 for the cards to be treated as approved after one checklist review and one fix round, since he would not see the approval page that night. Not read by Colin card by card.",
-    "plan": "~/reports/Competencies in report comments plan.md"
+    "plan": "~/reports/Competencies in report comments plan.md",
+    "schema": "Version 2 (Nov 4 2026): a card may add area (the family-facing name of the skill area), forms { base: [the phrase first, then alternatives], did: [past tense, tied to a piece], at: { developing, proficient, extending: [the strength at that level, after {he}] }, override: { base: { does, doing } } }, next_steps.extending, evidence (the kind of work that shows the skill), home ([invitations that start with a verb]) and prov. A card without them is version 1; scripts/build-curriculum-bank.mjs migrates it (forms.base = [phrase], the rest empty) and the engine falls back to the version 1 wording. does and doing are derived from each base form by teacher/comment-forms.js."
   },
   "adst-artistic-application": {
     "phrase": "use artistic elements to present dishes",
@@ -136,11 +137,11 @@
     "exemplar": "bc.bca12.cc.10"
   },
   "adst-concept-extensions": {
-    "phrase": "explain how others could build on a design",
+    "phrase": "explain how others could extend or reuse a design",
     "skill_key": "sharing",
     "next_steps": {
-      "emerging": "describe one way others could build on a design",
-      "developing": "point to parts of a design others could change or reuse",
+      "emerging": "describe one way others could extend a design",
+      "developing": "name parts of a design others could change or reuse",
       "proficient": "explain how a design concept could grow through others' work"
     },
     "exemplar": "bc.cprog11.cc.22"
@@ -170,7 +171,7 @@
     "skill_key": "designing",
     "next_steps": {
       "emerging": "decide on the limits a design must work within",
-      "developing": "decide on the starting ideas a design builds on",
+      "developing": "choose the starting ideas for a design",
       "proficient": "explain how premises and constraints set the range of possible designs"
     },
     "exemplar": "bc.cisys12.cc.4"
@@ -241,15 +242,15 @@
     "next_steps": {
       "emerging": "try one idea that is new",
       "developing": "pursue an unusual idea without knowing it works",
-      "proficient": "take creative risks across a whole project"
+      "proficient": "try new and risky ideas across a whole project"
     },
     "exemplar": "bc.rob11.cc.6"
   },
   "adst-critical-feedback": {
-    "phrase": "gather honest feedback from several sources over time",
+    "phrase": "gather truthful feedback from several sources over time",
     "skill_key": "testing",
     "next_steps": {
-      "emerging": "ask one source for honest feedback on work",
+      "emerging": "ask one source for truthful feedback on work",
       "developing": "evaluate feedback to decide what is useful",
       "proficient": "gather feedback at the start and throughout a project"
     },
@@ -296,11 +297,11 @@
     "exemplar": "bc.cprog11.cc.30"
   },
   "adst-data-efficiencies": {
-    "phrase": "set up accounting records that save time",
+    "phrase": "arrange accounting records that save time",
     "skill_key": "business",
     "next_steps": {
-      "emerging": "find where the data for an accounting task comes from",
-      "developing": "set up accounting records that save time and effort",
+      "emerging": "find the source of the data for an accounting task",
+      "developing": "organize accounting records that save time and effort",
       "proficient": "find faster ways to process accounting records each day"
     },
     "exemplar": "bc.acct11.cc.8"
@@ -321,7 +322,7 @@
     "next_steps": {
       "emerging": "use personal reflections to improve a design",
       "developing": "use feedback from others to revise a design",
-      "proficient": "create a design that builds on prototype test results"
+      "proficient": "create a design that uses prototype test results"
     },
     "exemplar": "bc.elec11.cc.17"
   },
@@ -426,11 +427,11 @@
     "exemplar": "bc.acct11.cc.7"
   },
   "adst-economic-decisions": {
-    "phrase": "make responsible economic decisions",
+    "phrase": "make economic decisions that weigh costs and effects",
     "skill_key": "business",
     "next_steps": {
-      "emerging": "explain what makes an economic decision responsible",
-      "developing": "make a responsible economic decision and explain it",
+      "emerging": "explain what to weigh in an economic decision",
+      "developing": "make an economic decision that weighs costs and effects and explain it",
       "proficient": "make an economic decision that considers its effects on others"
     },
     "exemplar": "bc.econbus12.cc.19"
@@ -506,11 +507,11 @@
     "exemplar": "bc.cis11.cc.14"
   },
   "adst-feedback-gathering": {
-    "phrase": "gather feedback from peers, users or experts",
+    "phrase": "gather feedback from partners, users or experts",
     "skill_key": "testing",
     "next_steps": {
-      "emerging": "ask a classmate for feedback on a design",
-      "developing": "gather feedback from peers, users or experts",
+      "emerging": "ask a partner for feedback on a design",
+      "developing": "gather feedback from partners, users and experts on a design",
       "proficient": "collect ideas from several people to inspire a design"
     },
     "exemplar": "bc.adst8.cc.15"
@@ -630,7 +631,7 @@
     "skill_key": "collaborating",
     "next_steps": {
       "emerging": "share an idea with a group during brainstorming",
-      "developing": "build on other people's ideas during brainstorming",
+      "developing": "add to other people's ideas during brainstorming",
       "proficient": "consider whether an idea might work before setting it aside"
     },
     "exemplar": "bc.wdev10.cc.6"
@@ -661,7 +662,7 @@
     "next_steps": {
       "emerging": "share one new idea for a design",
       "developing": "try an unusual idea during brainstorming",
-      "proficient": "add to a classmate's idea in a way that improves it"
+      "proficient": "add to a partner's idea in a way that improves it"
     },
     "exemplar": "bc.adst9.cc.5"
   },
@@ -701,7 +702,7 @@
     "next_steps": {
       "emerging": "describe how a design affects the people who use it",
       "developing": "evaluate how a design affects the environment",
-      "proficient": "explain whether design choices are fair and responsible"
+      "proficient": "explain whether design choices are fair and do no harm"
     },
     "exemplar": "bc.adst8.cc.7"
   },
@@ -749,7 +750,7 @@
     "phrase": "judge ingredients for use and reuse",
     "skill_key": "materials",
     "next_steps": {
-      "emerging": "decide how to use an ingredient effectively",
+      "emerging": "decide how to use an ingredient in a recipe",
       "developing": "identify ingredients and materials that can be reused or recycled",
       "proficient": "assess ingredients on use, reuse and biodegradability together"
     },
@@ -761,7 +762,7 @@
     "next_steps": {
       "emerging": "identify sources of inspiration for a design",
       "developing": "judge how useful and reliable a source is",
-      "proficient": "use ideas from several sources in original work"
+      "proficient": "combine ideas from several sources into new work"
     },
     "exemplar": "bc.cul11.cc.10"
   },
@@ -779,7 +780,7 @@
     "phrase": "use safe, supportive communication in person and online",
     "skill_key": "safety",
     "next_steps": {
-      "emerging": "use respectful words in face-to-face and online talk",
+      "emerging": "use words that show respect in face-to-face and online talk",
       "developing": "use safe and supportive communication in digital spaces",
       "proficient": "take steps in advance to keep everyone safe"
     },
@@ -796,10 +797,10 @@
     "exemplar": "bc.auto11.cc.1"
   },
   "adst-interview-etiquette": {
-    "phrase": "use polite, suitable etiquette in interviews",
+    "phrase": "use suitable manners and etiquette in interviews",
     "skill_key": null,
     "next_steps": {
-      "emerging": "use polite etiquette when interviewing someone",
+      "emerging": "use suitable greetings and manners when interviewing someone",
       "developing": "apply etiquette in interviews and consultations",
       "proficient": "adjust etiquette to suit each person or group"
     },
@@ -840,7 +841,7 @@
     "skill_key": "designing",
     "next_steps": {
       "emerging": "keep a record of other ideas that might work",
-      "developing": "return to another idea when it might work better",
+      "developing": "return to another idea when it might suit the problem",
       "proficient": "compare a set-aside idea with the chosen one before deciding"
     },
     "exemplar": "bc.cstu10.cc.6"
@@ -859,7 +860,7 @@
     "phrase": "contribute to the kitchen through shared tasks",
     "skill_key": "foodPrep",
     "next_steps": {
-      "emerging": "take on one task in the kitchen",
+      "emerging": "handle one task in the kitchen",
       "developing": "contribute to the kitchen through several tasks",
       "proficient": "explain how each task supports the kitchen environment"
     },
@@ -869,7 +870,7 @@
     "phrase": "explain how land and culture shape tools and technology",
     "skill_key": null,
     "next_steps": {
-      "emerging": "describe how a natural resource shaped a tool",
+      "emerging": "describe how a resource from the land shaped a tool",
       "developing": "evaluate how culture influences the use of a tool",
       "proficient": "evaluate how land, resources and culture together shape a technology"
     },
@@ -921,7 +922,7 @@
     "next_steps": {
       "emerging": "identify new possibilities for a design",
       "developing": "analyze the strengths and limits of each new possibility",
-      "proficient": "explain how others might build on a design concept"
+      "proficient": "explain how others might extend a design concept"
     },
     "exemplar": "bc.draft11.cc.22"
   },
@@ -929,7 +930,7 @@
     "phrase": "choose a design opportunity and explain why",
     "skill_key": "designing",
     "next_steps": {
-      "emerging": "choose a design opportunity to work on",
+      "emerging": "choose a design opportunity to pursue",
       "developing": "give a reason for the opportunity chosen",
       "proficient": "compare opportunities and give reasons for the choice"
     },
@@ -946,7 +947,7 @@
     "exemplar": "bc.bca12.cc.14"
   },
   "adst-outcome-format": {
-    "phrase": "share results in a clear, brief format",
+    "phrase": "share results in a clear, short format",
     "skill_key": "sharing",
     "next_steps": {
       "emerging": "choose a format that suits the results",
@@ -1157,13 +1158,56 @@
   },
   "adst-prototype-testing": {
     "phrase": "test a prototype to see if it works",
+    "area": "testing a design",
+    "forms": {
+      "base": [
+        "test a prototype to see if it works",
+        "try a first version and say what the test showed",
+        "test a design before changing it"
+      ],
+      "did": [
+        "tested {his} first version and said what the test showed",
+        "tried {his} prototype and recorded what worked and what did not",
+        "used a test to decide what to change in {his} design"
+      ],
+      "at": {
+        "developing": [
+          "is starting to test a first version before changing it",
+          "can test a prototype with growing consistency",
+          "is learning to say what a test showed about a design"
+        ],
+        "proficient": [
+          "tests a first version and says clearly what the test showed",
+          "tests a prototype and uses the results to decide what to change",
+          "describes what each test showed about {his} design"
+        ],
+        "extending": [
+          "tests a first version against each thing it was meant to do and explains the results",
+          "plans tests that check each part of a design",
+          "uses test results to explain why a design works or does not"
+        ]
+      }
+    },
     "skill_key": "testing",
     "next_steps": {
       "emerging": "test a prototype once to see if it works",
       "developing": "describe what a test showed about a prototype",
-      "proficient": "test a prototype against each success criterion"
+      "proficient": "test a prototype against each success criterion",
+      "extending": "plan a second test that checks what the first one could not"
     },
-    "exemplar": "bc.adst8.cc.14"
+    "evidence": "a design project with a tested first version",
+    "home": [
+      "ask {him} how {he} would test a fix for something at home before trusting it",
+      "ask {him} what {his} current project is meant to do and how {he} can tell it works",
+      "invite {him} to tell you what {his} last test showed and what {he} changed"
+    ],
+    "exemplar": "bc.adst8.cc.14",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "adst-recipe-comprehension": {
     "phrase": "read a recipe and spot the parts to clarify",
@@ -1340,8 +1384,8 @@
     "skill_key": "collaborating",
     "next_steps": {
       "emerging": "describe how a project was managed",
-      "developing": "assess how effectively work went alone on a project",
-      "proficient": "assess how effectively work went in a group, with examples"
+      "developing": "assess how work went alone on a project",
+      "proficient": "assess how work went in a group, with examples"
     },
     "exemplar": "bc.cis11.cc.20"
   },
@@ -1390,7 +1434,7 @@
     "skill_key": "drafting",
     "next_steps": {
       "emerging": "control tools with care in a simple hands-on task",
-      "developing": "use drafting techniques to make accurate drawings",
+      "developing": "use drafting techniques to make drawings with correct measurements",
       "proficient": "apply hand and drafting skills to harder tasks"
     },
     "exemplar": "bc.draft10.cc.23"
@@ -1406,7 +1450,7 @@
     "exemplar": "bc.cul10.cc.3"
   },
   "adst-step-sequencing": {
-    "phrase": "plan the steps to set up a workspace safely",
+    "phrase": "plan the steps to prepare a workspace safely",
     "skill_key": "safety",
     "next_steps": {
       "emerging": "choose the right tools for each step",
@@ -1766,7 +1810,7 @@
     "exemplar": "bc.arts9.cc.8"
   },
   "arts-adapting-technique": {
-    "phrase": "adapt performance skills in new and creative ways",
+    "phrase": "adapt performance skills in new and inventive ways",
     "skill_key": "technique",
     "next_steps": {
       "emerging": "adapt one performance technique for a new use",
@@ -1847,13 +1891,56 @@
   },
   "arts-artistic-choices": {
     "phrase": "choose elements to show a mood or meaning",
+    "area": "making artistic choices",
+    "forms": {
+      "base": [
+        "choose elements to show a mood or meaning",
+        "pick the elements that give a piece its mood",
+        "combine elements to show what a piece means"
+      ],
+      "did": [
+        "chose elements that gave the piece a clear mood",
+        "combined elements so the piece showed what {he} intended",
+        "explained the choices behind {his} piece"
+      ],
+      "at": {
+        "developing": [
+          "is starting to choose elements that show a mood on purpose",
+          "can combine elements to show a purpose with growing consistency",
+          "is learning to explain why {he} chose an element"
+        ],
+        "proficient": [
+          "chooses and combines elements to show a clear mood or meaning",
+          "explains how {his} choices of elements show what {he} [intends|intend]",
+          "picks elements on purpose to give a piece its mood"
+        ],
+        "extending": [
+          "chooses and combines elements with a clear intent and can explain each choice",
+          "changes elements on purpose to shift a piece's meaning",
+          "explains how each element in a piece adds to its meaning"
+        ]
+      }
+    },
     "skill_key": "elements",
     "next_steps": {
       "emerging": "choose an element that shows a mood",
       "developing": "combine elements to show a clear purpose",
-      "proficient": "explain how element choices express intent"
+      "proficient": "explain how element choices express intent",
+      "extending": "change one element in a finished piece and explain how the meaning shifts"
     },
-    "exemplar": "bc.dfound11.cc.7"
+    "evidence": "a finished piece with a short note on the choices in it",
+    "home": [
+      "ask {him} what mood a song or picture {he} [likes|like] gives, and what creates it",
+      "ask {him} which choice in {his} current piece {he} [is|are] most sure about, and why",
+      "invite {him} to show you a piece and explain one choice in it"
+    ],
+    "exemplar": "bc.dfound11.cc.7",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "arts-artistic-creation": {
     "phrase": "create art alone and with others from new ideas",
@@ -2006,10 +2093,10 @@
     "exemplar": "bc.dcomp11.cc.1"
   },
   "arts-collaboration": {
-    "phrase": "build on partners' ideas during creative work",
+    "phrase": "add to partners' ideas while making art",
     "skill_key": null,
     "next_steps": {
-      "emerging": "work with a partner during a creative process",
+      "emerging": "work with a partner while making a piece",
       "developing": "add ideas to a partner's work in return",
       "proficient": "build a two-way exchange of ideas across a whole project"
     },
@@ -2036,11 +2123,11 @@
     "exemplar": "bc.cmusic12.cc.2"
   },
   "arts-communicating-ideas": {
-    "phrase": "express ideas and emotions through creative work",
+    "phrase": "express ideas and emotions through art",
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "interpret the emotion in a work being viewed",
-      "developing": "communicate an idea or emotion through a creative work",
+      "developing": "communicate an idea or emotion through a piece of art",
       "proficient": "explain how specific choices communicate an idea"
     },
     "exemplar": "bc.dance11.cc.18"
@@ -2059,9 +2146,9 @@
     "phrase": "use the arts to connect with communities and issues",
     "skill_key": "connecting",
     "next_steps": {
-      "emerging": "use creative work to connect with an issue in the community",
-      "developing": "explain how a creative work connects to a national issue",
-      "proficient": "use creative work to connect with communities beyond the local area"
+      "emerging": "use art to connect with an issue in the community",
+      "developing": "explain how a piece of art connects to a national issue",
+      "proficient": "use art to connect with communities beyond the local area"
     },
     "exemplar": "bc.dtep10.cc.23"
   },
@@ -2146,12 +2233,12 @@
     "exemplar": "bc.instmus12.cc.3"
   },
   "arts-content-application": {
-    "phrase": "build on learned arts skills in new work",
+    "phrase": "use learned arts skills in new work",
     "skill_key": "technique",
     "next_steps": {
       "emerging": "use one learned skill in a new piece",
       "developing": "add detail when explaining arts ideas",
-      "proficient": "build on several learned skills in a new work"
+      "proficient": "combine several learned skills in a new work"
     },
     "exemplar": "bc.arts8.cc.16"
   },
@@ -2186,22 +2273,22 @@
     "exemplar": "bc.dcond11.cc.4"
   },
   "arts-creative-choices": {
-    "phrase": "recognize and judge creative choices in media art",
+    "phrase": "recognize and judge artistic choices in media art",
     "skill_key": "reflecting",
     "next_steps": {
-      "emerging": "point out creative choices in a media artwork",
-      "developing": "recognize creative choices while planning a media artwork",
-      "proficient": "evaluate the creative choices in a media artwork"
+      "emerging": "name artistic choices in a media artwork",
+      "developing": "recognize artistic choices while planning a media artwork",
+      "proficient": "evaluate the artistic choices in a media artwork"
     },
     "exemplar": "bc.media10.cc.9"
   },
   "arts-creative-innovation": {
-    "phrase": "create original work and solve creative problems",
+    "phrase": "create new work and solve problems in making art",
     "skill_key": "creating",
     "next_steps": {
-      "emerging": "create a piece that shows an original idea",
-      "developing": "solve a creative problem by trying a new approach",
-      "proficient": "bring original approaches to several creative challenges"
+      "emerging": "create a piece that shows a new idea",
+      "developing": "solve a problem in a piece by trying a new approach",
+      "proficient": "bring new approaches to several art-making challenges"
     },
     "exemplar": "bc.artstudio12.cc.6"
   },
@@ -2216,22 +2303,22 @@
     "exemplar": "bc.artstudio10.cc.1"
   },
   "arts-creative-process": {
-    "phrase": "use the steps of a creative process",
+    "phrase": "use the steps of making a piece of art",
     "skill_key": "creating",
     "next_steps": {
-      "emerging": "use one stage of a creative process",
-      "developing": "use the steps of a creative process to develop a work",
-      "proficient": "explain how each stage of a creative process shaped a work"
+      "emerging": "use one stage of the art-making process",
+      "developing": "use the steps of the art-making process to develop a work",
+      "proficient": "explain how each stage of the art-making process shaped a work"
     },
     "exemplar": "bc.chor11.cc.21"
   },
   "arts-creative-risk-taking": {
-    "phrase": "explore new options and take creative risks",
+    "phrase": "explore new options and take risks in art",
     "skill_key": "creating",
     "next_steps": {
       "emerging": "explore different ideas for a piece",
-      "developing": "take a creative risk by trying something new",
-      "proficient": "take creative risks that change the direction of a piece"
+      "developing": "take a risk in art by trying something new",
+      "proficient": "take risks that change the direction of a piece"
     },
     "exemplar": "bc.artstudio10.cc.2"
   },
@@ -2271,7 +2358,7 @@
     "next_steps": {
       "emerging": "try a new artistic possibility in a piece",
       "developing": "explore how artworks from different cultures show points of view",
-      "proficient": "draw on cross-cultural perspectives in original work"
+      "proficient": "use ideas from several cultures in new work"
     },
     "exemplar": "bc.garts11.cc.4"
   },
@@ -2280,8 +2367,8 @@
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "use movement to express an emotion",
-      "developing": "use creative work to express a perspective or value",
-      "proficient": "express cultural perspectives and emotions through creative work"
+      "developing": "use art to express a perspective or value",
+      "proficient": "express cultural perspectives and emotions through art"
     },
     "exemplar": "bc.dtep10.cc.19"
   },
@@ -2289,9 +2376,9 @@
     "phrase": "explain how culture and society influence the arts",
     "skill_key": "connecting",
     "next_steps": {
-      "emerging": "point out a cultural influence in a creative work",
-      "developing": "explain how culture and society affect a creative work",
-      "proficient": "describe how society shapes the way creative works are made"
+      "emerging": "name a cultural influence in a piece of art",
+      "developing": "explain how culture and society affect a piece of art",
+      "proficient": "describe how society shapes the way art is made"
     },
     "exemplar": "bc.ftvt11.cc.23"
   },
@@ -2330,7 +2417,7 @@
     "skill_key": "creating",
     "next_steps": {
       "emerging": "explore movement ideas for a composition",
-      "developing": "create an original dance composition",
+      "developing": "create a new dance composition",
       "proficient": "design how the parts of a composition fit together"
     },
     "exemplar": "bc.dchore10.cc.1"
@@ -2361,7 +2448,7 @@
     "next_steps": {
       "emerging": "use movement choices that show a dance's context",
       "developing": "explain how a context shaped choices in a dance",
-      "proficient": "create original dance works that draw on several contexts"
+      "proficient": "create new dance works that use several contexts"
     },
     "exemplar": "bc.dchore11.cc.21"
   },
@@ -2411,7 +2498,7 @@
     "next_steps": {
       "emerging": "describe rehearsals using dance vocabulary",
       "developing": "document a rehearsal or performance using dance terms",
-      "proficient": "use precise dance vocabulary to respond critically to a performance"
+      "proficient": "use exact dance words to respond critically to a performance"
     },
     "exemplar": "bc.dcomp12.cc.17"
   },
@@ -2446,11 +2533,11 @@
     "exemplar": "bc.thprod11.cc.15"
   },
   "arts-design-innovation": {
-    "phrase": "bring original ideas to production design",
+    "phrase": "bring new ideas to production design",
     "skill_key": "creating",
     "next_steps": {
       "emerging": "suggest one new idea for a production design",
-      "developing": "bring original ideas to a production design",
+      "developing": "bring new ideas to a production design",
       "proficient": "try an unexpected approach to a design challenge"
     },
     "exemplar": "bc.thprod10.cc.5"
@@ -2460,7 +2547,7 @@
     "skill_key": "planning",
     "next_steps": {
       "emerging": "plan the parts of a graphic artwork",
-      "developing": "create a graphic artwork from an original design",
+      "developing": "create a graphic artwork from a new design",
       "proficient": "refine a graphic artwork after reviewing it"
     },
     "exemplar": "bc.garts11.cc.2"
@@ -2506,11 +2593,11 @@
     "exemplar": "bc.sa2d10.cc.13"
   },
   "arts-documentation": {
-    "phrase": "record and share creative work",
+    "phrase": "record and share artwork",
     "skill_key": "documenting",
     "next_steps": {
-      "emerging": "document a creative work or experience",
-      "developing": "share creative works in a variety of contexts",
+      "emerging": "document an artwork or art experience",
+      "developing": "share artworks in a variety of contexts",
       "proficient": "choose a way of sharing that suits each context"
     },
     "exemplar": "bc.instmus10.cc.12"
@@ -2561,7 +2648,7 @@
     "next_steps": {
       "emerging": "use one drama technique in a performance",
       "developing": "try new drama techniques in a performance",
-      "proficient": "build on drama skills from one performance to the next"
+      "proficient": "carry drama skills from one performance to the next"
     },
     "exemplar": "bc.drama10.cc.3"
   },
@@ -2630,7 +2717,7 @@
     "skill_key": null,
     "next_steps": {
       "emerging": "work co-operatively with an ensemble in rehearsal",
-      "developing": "share and build on ideas with an ensemble",
+      "developing": "share ideas with an ensemble and extend them",
       "proficient": "support ensemble members during a performance"
     },
     "exemplar": "bc.dcomp10.cc.14"
@@ -2661,7 +2748,7 @@
     "next_steps": {
       "emerging": "try one element in a new piece of work",
       "developing": "try different principles and techniques in a piece",
-      "proficient": "explain what makes a piece of work original"
+      "proficient": "explain what makes a piece of work new and unique"
     },
     "exemplar": "bc.dfound11.cc.5"
   },
@@ -2686,12 +2773,12 @@
     "exemplar": "bc.chorus10.cc.13"
   },
   "arts-feedback-dialogue": {
-    "phrase": "discuss feedback with peers",
+    "phrase": "discuss feedback with others",
     "skill_key": "revising",
     "next_steps": {
-      "emerging": "discuss feedback received with a peer",
-      "developing": "ask peers questions to clarify feedback",
-      "proficient": "use dialogue with peers to decide how to act on feedback"
+      "emerging": "discuss feedback received with a partner",
+      "developing": "ask others questions to clarify feedback",
+      "proficient": "use dialogue with others to decide how to use feedback"
     },
     "exemplar": "bc.chor12.cc.13"
   },
@@ -2731,7 +2818,7 @@
     "next_steps": {
       "emerging": "demonstrate one safe flexibility exercise",
       "developing": "demonstrate ways to increase flexibility safely",
-      "proficient": "choose flexibility methods that work effectively"
+      "proficient": "choose flexibility methods that suit the goal"
     },
     "exemplar": "bc.dcond11.cc.6"
   },
@@ -2739,17 +2826,17 @@
     "phrase": "explain the qualities that define a music genre",
     "skill_key": "reflecting",
     "next_steps": {
-      "emerging": "name one quality of a composition's genre",
+      "emerging": "name one feature of a composition's genre",
       "developing": "examine a composition for the qualities of its genre",
       "proficient": "explain how specific qualities place a composition in a genre"
     },
     "exemplar": "bc.chor12.cc.2"
   },
   "arts-gestural-vocabulary": {
-    "phrase": "use clear gestures to show how music should sound",
+    "phrase": "use clear gestures to show how to play music",
     "skill_key": "communicating",
     "next_steps": {
-      "emerging": "use a gesture that shows how music should sound",
+      "emerging": "use a gesture that shows how music should be played",
       "developing": "use gestures other musicians can read and follow",
       "proficient": "adjust gestures to show musical intention more clearly"
     },
@@ -2940,7 +3027,7 @@
     "skill_key": "connecting",
     "next_steps": {
       "emerging": "describe what a 3D work shows about the land",
-      "developing": "describe how a 3D work shows First Peoples' relationship with natural resources",
+      "developing": "describe how a 3D work shows First Peoples' relationship with land resources",
       "proficient": "explain what several 3D works show about First Peoples and the land"
     },
     "exemplar": "bc.sa3d11.cc.20"
@@ -3026,12 +3113,12 @@
     "exemplar": "bc.arts8.cc.1"
   },
   "arts-meaning-emotion": {
-    "phrase": "express meaning and emotion in creative work",
+    "phrase": "express meaning and emotion in art",
     "skill_key": "performing",
     "next_steps": {
-      "emerging": "express a feeling through a creative work",
-      "developing": "make creative choices that show intent",
-      "proficient": "explain how creative choices express an emotion"
+      "emerging": "express a feeling through a piece of art",
+      "developing": "make artistic choices that show intent",
+      "proficient": "explain how artistic choices express an emotion"
     },
     "exemplar": "bc.chorus10.cc.2"
   },
@@ -3091,7 +3178,7 @@
     "next_steps": {
       "emerging": "create and perform a short piece of movement",
       "developing": "create a dance composition and perform it",
-      "proficient": "perform original work in groups and as a soloist"
+      "proficient": "perform self-composed work in groups and as a soloist"
     },
     "exemplar": "bc.dchore10.cc.7"
   },
@@ -3106,10 +3193,10 @@
     "exemplar": "bc.dtep10.cc.1"
   },
   "arts-movement-interplay": {
-    "phrase": "combine movement, sound and image to show meaning",
+    "phrase": "combine movement, sounds and images to show meaning",
     "skill_key": "elements",
     "next_steps": {
-      "emerging": "combine movement and sound in a short dance",
+      "emerging": "combine movement and sounds in a short dance",
       "developing": "add images that support a dance's meaning",
       "proficient": "choose a structure that fits a dance's meaning"
     },
@@ -3211,7 +3298,7 @@
     "next_steps": {
       "emerging": "explore one emerging trend in music making",
       "developing": "describe how a music-making trend has changed over time",
-      "proficient": "try a new music-making trend in original work"
+      "proficient": "try a new music-making trend in a composition"
     },
     "exemplar": "bc.cp12.cc.8"
   },
@@ -3290,7 +3377,7 @@
     "skill_key": "creating",
     "next_steps": {
       "emerging": "contribute one idea when creating music",
-      "developing": "build on others' ideas when creating music together",
+      "developing": "add to others' ideas when creating music together",
       "proficient": "develop a musical idea alone to share with a group"
     },
     "exemplar": "bc.music9.cc.6"
@@ -3331,7 +3418,7 @@
     "next_steps": {
       "emerging": "try different instruments for a piece",
       "developing": "select instruments that suit a piece",
-      "proficient": "explore orchestration and sound samples to shape a composition"
+      "proficient": "explore orchestration and audio samples to shape a composition"
     },
     "exemplar": "bc.cp12.cc.7"
   },
@@ -3386,12 +3473,12 @@
     "exemplar": "bc.dance10.cc.20"
   },
   "arts-performing-sharing": {
-    "phrase": "perform, record and share creative work",
+    "phrase": "perform, record and share work",
     "skill_key": "performing",
     "next_steps": {
-      "emerging": "share a creative work in one way",
-      "developing": "document a creative work while making it",
-      "proficient": "share creative work in several different ways"
+      "emerging": "share a piece of work in one way",
+      "developing": "document a piece of work while making it",
+      "proficient": "share work in several different ways"
     },
     "exemplar": "bc.arts8.cc.14"
   },
@@ -3400,7 +3487,7 @@
     "skill_key": "reflecting",
     "next_steps": {
       "emerging": "connect an artwork to a personal experience",
-      "developing": "describe what was learned from a creative process",
+      "developing": "describe what was learned from the process of making art",
       "proficient": "explain how an artwork connects to other learning"
     },
     "exemplar": "bc.arts9.cc.11"
@@ -3449,7 +3536,7 @@
     "phrase": "create art that shows a point of view",
     "skill_key": "creating",
     "next_steps": {
-      "emerging": "create a piece that shows an original idea",
+      "emerging": "create a piece that shows a new idea",
       "developing": "include part of a personal story in a piece",
       "proficient": "explain how a piece shows a point of view"
     },
@@ -3566,7 +3653,7 @@
     "exemplar": "bc.thco11.cc.1"
   },
   "arts-production-elements": {
-    "phrase": "explain how lights, sound and costume support a dance",
+    "phrase": "explain how lights, sounds and costume support a dance",
     "skill_key": "elements",
     "next_steps": {
       "emerging": "explain how one production element supports a dance",
@@ -3609,7 +3696,7 @@
     "phrase": "test how useful props and technologies are",
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "try out different props and technologies",
+      "emerging": "test different props and technologies",
       "developing": "judge which ways of working help a production",
       "proficient": "explain what makes a prop or technology useful"
     },
@@ -3686,12 +3773,12 @@
     "exemplar": "bc.chor12.cc.11"
   },
   "arts-resolving-challenges": {
-    "phrase": "solve creative challenges while making art",
+    "phrase": "solve challenges while making art",
     "skill_key": "creating",
     "next_steps": {
-      "emerging": "make a creative choice while developing a piece",
-      "developing": "try different solutions to a creative challenge",
-      "proficient": "explain how a creative challenge was solved"
+      "emerging": "make an artistic choice while developing a piece",
+      "developing": "try different solutions to a challenge in a piece",
+      "proficient": "explain how a challenge in a piece was solved"
     },
     "exemplar": "bc.artstudio11.cc.6"
   },
@@ -3746,12 +3833,12 @@
     "exemplar": "bc.dance11.cc.19"
   },
   "arts-responsible-practice": {
-    "phrase": "make respectful choices when creating and performing",
+    "phrase": "make choices that respect others when creating and performing",
     "skill_key": null,
     "next_steps": {
-      "emerging": "choose content that is respectful of others",
+      "emerging": "choose content that respects others",
       "developing": "act responsibly toward others when creating work",
-      "proficient": "explain why theme choices are respectful"
+      "proficient": "explain why theme choices respect others"
     },
     "exemplar": "bc.dance10.cc.19"
   },
@@ -3761,7 +3848,7 @@
     "next_steps": {
       "emerging": "find one thing to improve in a piece",
       "developing": "revise a piece to improve its presentation",
-      "proficient": "document creative work and experiences in different ways"
+      "proficient": "document art work and experiences in different ways"
     },
     "exemplar": "bc.arts9.cc.10"
   },
@@ -3786,10 +3873,10 @@
     "exemplar": "bc.ftvt11.cc.25"
   },
   "arts-script-innovation": {
-    "phrase": "bring creative ideas to writing and directing",
+    "phrase": "bring new ideas to writing and directing",
     "skill_key": "creating",
     "next_steps": {
-      "emerging": "bring an original idea to a script",
+      "emerging": "bring a new idea to a script",
       "developing": "try a new way of writing a script",
       "proficient": "try a new way of directing a scene"
     },
@@ -3846,11 +3933,11 @@
     "exemplar": "bc.drama12.cc.11"
   },
   "arts-sharing-responding": {
-    "phrase": "share creative work and respond to others' work",
+    "phrase": "share work and respond to others' work",
     "skill_key": "communicating",
     "next_steps": {
-      "emerging": "share a creative work with an audience",
-      "developing": "respond to the creative work of others",
+      "emerging": "share a piece of work with an audience",
+      "developing": "respond to the work of others",
       "proficient": "respond to others' work with specific comments"
     },
     "exemplar": "bc.thco10.cc.11"
@@ -3936,10 +4023,10 @@
     "exemplar": "bc.cmusic10.cc.7"
   },
   "arts-structure-form": {
-    "phrase": "analyze how sound, image and form convey meaning",
+    "phrase": "analyze how sounds, images and form convey meaning",
     "skill_key": "reflecting",
     "next_steps": {
-      "emerging": "analyze how sound conveys meaning in a scene",
+      "emerging": "analyze how sounds convey meaning in a scene",
       "developing": "analyze how movement in a shot conveys meaning",
       "proficient": "analyze how structure and form shape a moving image's meaning"
     },
@@ -4120,7 +4207,7 @@
     "skill_key": "camera",
     "next_steps": {
       "emerging": "view a variety of moving images",
-      "developing": "create original moving images",
+      "developing": "create new moving images",
       "proficient": "explore new ways to make moving images"
     },
     "exemplar": "bc.ftvt11.cc.1"
@@ -4159,9 +4246,9 @@
     "phrase": "explore First Peoples and local knowledge through the arts",
     "skill_key": "connecting",
     "next_steps": {
-      "emerging": "connect local cultural knowledge to a creative work",
-      "developing": "explore First Peoples perspectives through creative work",
-      "proficient": "use creative work to explore a different way of knowing"
+      "emerging": "connect local cultural knowledge to a piece of art",
+      "developing": "explore First Peoples perspectives through art",
+      "proficient": "use art to explore a different way of knowing"
     },
     "exemplar": "bc.dance10.cc.21"
   },
@@ -4169,9 +4256,9 @@
     "phrase": "connect with people through the arts",
     "skill_key": "connecting",
     "next_steps": {
-      "emerging": "use creative work to connect with people in the community",
-      "developing": "use creative work to connect with people across the region",
-      "proficient": "use creative work to connect with people around the world"
+      "emerging": "use art to connect with people in the community",
+      "developing": "use art to connect with people across the region",
+      "proficient": "use art to connect with people around the world"
     },
     "exemplar": "bc.chorus10.cc.19"
   },
@@ -4311,7 +4398,7 @@
     "next_steps": {
       "emerging": "set one realistic learning goal with a clear step",
       "developing": "keep working toward a goal when it gets hard",
-      "proficient": "adjust a plan after a setback and keep going"
+      "proficient": "adjust a plan after a setback and continue"
     },
     "exemplar": "bc.caree8.cc.7"
   },
@@ -4326,11 +4413,11 @@
     "exemplar": "bc.clc12.cc.2"
   },
   "car-hours-documentation": {
-    "phrase": "keep an accurate record of work experience hours",
+    "phrase": "keep a correct record of work experience hours",
     "skill_key": null,
     "next_steps": {
       "emerging": "record work hours after each shift",
-      "developing": "keep an ongoing, accurate record of work hours",
+      "developing": "keep an ongoing, correct record of work hours",
       "proficient": "organize records to show all required hours clearly"
     },
     "exemplar": "bc.wex12a.cc.12"
@@ -4346,12 +4433,12 @@
     "exemplar": "bc.wex12a.cc.3"
   },
   "car-learning-approaches": {
-    "phrase": "use preferred ways of learning and ask for support",
+    "phrase": "use preferred ways of learning and request support",
     "skill_key": "self",
     "next_steps": {
       "emerging": "name a way of learning that works well",
       "developing": "apply a preferred learning approach to a new task",
-      "proficient": "use knowledge of learning approaches to ask for needed support"
+      "proficient": "use knowledge of learning approaches to request needed support"
     },
     "exemplar": "bc.clc12.cc.10"
   },
@@ -4419,7 +4506,7 @@
     "phrase": "explain how different kinds of work help a community",
     "skill_key": "exploring",
     "next_steps": {
-      "emerging": "describe how one kind of work helps the community",
+      "emerging": "describe how one type of work helps the community",
       "developing": "explain a view on work with reasons and examples",
       "proficient": "compare different views on how work contributes to society"
     },
@@ -4436,12 +4523,12 @@
     "exemplar": "bc.ywt12.cc.12"
   },
   "car-preferred-futures": {
-    "phrase": "explore possible futures with creative thinking",
+    "phrase": "explore possible futures with imagination",
     "skill_key": "planning",
     "next_steps": {
       "emerging": "describe one possible future in education or work",
       "developing": "explore education and work options that fit a preferred future",
-      "proficient": "use creative thinking to map several possible futures"
+      "proficient": "use imagination to map several possible futures"
     },
     "exemplar": "bc.clc12.cc.9"
   },
@@ -4509,7 +4596,7 @@
     "phrase": "interact respectfully, safely and inclusively in many settings",
     "skill_key": null,
     "next_steps": {
-      "emerging": "use respectful language in a career-life setting",
+      "emerging": "use language that shows respect in a career-life setting",
       "developing": "include others in interactions across career-life settings",
       "proficient": "reflect on interactions and adjust them for new settings"
     },
@@ -4527,13 +4614,56 @@
   },
   "car-self-assessment": {
     "phrase": "name personal strengths and skills, with examples",
+    "area": "describing strengths and skills",
+    "forms": {
+      "base": [
+        "name personal strengths and skills, with examples",
+        "describe a strength and give an example of it",
+        "use a self-assessment to describe {his} skills"
+      ],
+      "did": [
+        "named a strength and gave a clear example of it",
+        "described {his} skills with examples from school and outside it",
+        "used a self-assessment to describe {his} strengths"
+      ],
+      "at": {
+        "developing": [
+          "is starting to name a strength and give an example of it",
+          "can describe {his} strengths with growing consistency",
+          "is learning to use a self-assessment to describe {his} skills"
+        ],
+        "proficient": [
+          "names {his} strengths and skills and gives an example of each",
+          "uses a self-assessment to describe {his} strengths",
+          "describes {his} skills with examples from school and outside it"
+        ],
+        "extending": [
+          "explains what {his} interests show about {his} strengths and skills",
+          "connects {his} strengths to the things {he} [likes|like] to do",
+          "describes {his} strengths with examples from several settings"
+        ]
+      }
+    },
     "skill_key": "self",
     "next_steps": {
       "emerging": "name one strength and give an example of it",
       "developing": "use a self-assessment to describe strengths and skills",
-      "proficient": "reflect on what likes and preferences show about strengths and skills"
+      "proficient": "reflect on what likes and preferences show about strengths and skills",
+      "extending": "explain how a strength shows in two different parts of {his} life"
     },
-    "exemplar": "bc.caree8.cc.1"
+    "evidence": "a self-assessment with examples",
+    "home": [
+      "ask {him} to name one thing {he} did well this week and what skill it took",
+      "tell {him} one strength you see at home and ask whether {he} [sees|see] it too",
+      "ask {him} which school task {he} [enjoys|enjoy] most and what that says about {his} skills"
+    ],
+    "exemplar": "bc.caree8.cc.1",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "car-skill-development": {
     "phrase": "make a plan to build work skills",
@@ -4561,7 +4691,7 @@
     "next_steps": {
       "emerging": "name transferable skills, with an example of each",
       "developing": "use evidence from experience to assess transferable skills",
-      "proficient": "explain why each skill is a strength or needs refining"
+      "proficient": "explain why a skill is a strength or needs refining"
     },
     "exemplar": "bc.clc12.cc.3"
   },
@@ -4601,7 +4731,7 @@
     "next_steps": {
       "emerging": "name a strength and one way to use it at work",
       "developing": "try an approach someone suggests for using a strength",
-      "proficient": "find original ways to use strengths in a work setting"
+      "proficient": "find new ways to use strengths in a work setting"
     },
     "exemplar": "bc.wex12a.cc.1"
   },
@@ -4709,7 +4839,7 @@
     "phrase": "reflect on roles, growth and early career-life plans",
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "describe roles taken on at school or in the community",
+      "emerging": "describe roles held at school or in the community",
       "developing": "reflect on growth in career-life learning",
       "proficient": "connect reflections on growth to a preferred pathway"
     },
@@ -4769,7 +4899,7 @@
     "phrase": "interact respectfully, safely and inclusively with others",
     "skill_key": null,
     "next_steps": {
-      "emerging": "use respectful language with others in group settings",
+      "emerging": "use language that shows respect in group settings",
       "developing": "include others in interactions in career-life settings",
       "proficient": "interact safely and respectfully in new or unfamiliar settings"
     },
@@ -4789,8 +4919,8 @@
     "phrase": "spot bias and contradictions in a text",
     "skill_key": "information",
     "next_steps": {
-      "emerging": "point out one statement in a text that shows bias",
-      "developing": "point out contradictions between parts of a text",
+      "emerging": "find one statement in a text that shows bias",
+      "developing": "identify contradictions between parts of a text",
       "proficient": "explain how a distortion changes what readers believe"
     },
     "exemplar": "bc.comp10.cc.10"
@@ -4890,7 +5020,7 @@
     "skill_key": "writing",
     "next_steps": {
       "emerging": "write a short piece in a new form",
-      "developing": "use the features of a genre in an original piece",
+      "developing": "use the features of a genre in a new piece",
       "proficient": "experiment with style and explain what the choice adds"
     },
     "exemplar": "bc.efp12.cc.24"
@@ -4906,24 +5036,67 @@
     "exemplar": "bc.comp12.cc.9"
   },
   "ela-idea-exchange": {
-    "phrase": "share ideas in discussion and build on others' ideas",
+    "phrase": "share ideas in discussion and extend others' ideas",
     "skill_key": "speaking",
     "next_steps": {
       "emerging": "share one idea in a discussion and listen to others",
       "developing": "respond to another person's viewpoint in a discussion",
-      "proficient": "build on others' ideas to take a discussion further"
+      "proficient": "extend others' ideas to take a discussion further"
     },
     "exemplar": "bc.ela9.cc.15"
   },
   "ela-idea-exploration": {
     "phrase": "explore a text's ideas and take them further",
+    "area": "thinking about what a text says",
+    "forms": {
+      "base": [
+        "explore a text's ideas and take them further",
+        "take an idea from a text and ask where it leads",
+        "connect the ideas in one text to another"
+      ],
+      "did": [
+        "took an idea from the text and asked where it leads",
+        "connected an idea in the text to one from another piece",
+        "carried an idea from the text into a question of {his} own"
+      ],
+      "at": {
+        "developing": [
+          "is starting to connect an idea in one text to an idea in another",
+          "can explain a text's main idea with growing consistency",
+          "is learning to ask where a text's idea leads"
+        ],
+        "proficient": [
+          "takes an idea from a text and asks what it means beyond the page",
+          "connects ideas within and between texts",
+          "explains a text's ideas and adds an example of {his} own"
+        ],
+        "extending": [
+          "takes a text's idea further with an example or question the text does not give",
+          "connects ideas across several texts and explains what they share",
+          "questions a text's idea and tests it against other texts"
+        ]
+      }
+    },
     "skill_key": "thinking",
     "next_steps": {
       "emerging": "explain one idea from a text in plain words",
       "developing": "connect an idea in one text to an idea in another",
-      "proficient": "take a text's idea further, with a new example or question"
+      "proficient": "take a text's idea further, with a new example or question",
+      "extending": "explain how {his} own thinking about a text's idea changed and why"
     },
-    "exemplar": "bc.ela9.cc.5"
+    "evidence": "a written response to a story or article",
+    "home": [
+      "ask {him} what idea a show or story was about and where else it appears",
+      "ask {him} which idea from something {he} read this week {he} [disagrees|disagree] with, and why",
+      "invite {him} to tell you about a character's choice and what {he} would have done"
+    ],
+    "exemplar": "bc.ela9.cc.5",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "ela-idea-synthesis": {
     "phrase": "combine ideas from several sources to explain a topic",
@@ -4936,12 +5109,12 @@
     "exemplar": "bc.ela9.cc.3"
   },
   "ela-idea-transformation": {
-    "phrase": "transform ideas and information into an original text",
+    "phrase": "transform ideas and information into a new text",
     "skill_key": "writing",
     "next_steps": {
       "emerging": "use one gathered idea in a new piece of writing",
       "developing": "present gathered information in a new form",
-      "proficient": "create an original text that shows a clear point of view"
+      "proficient": "create a new text that shows a clear point of view"
     },
     "exemplar": "bc.ela9.cc.21"
   },
@@ -4970,7 +5143,7 @@
     "skill_key": "information",
     "next_steps": {
       "emerging": "find information on a topic in two different sources",
-      "developing": "check whether a source's information is accurate and reliable",
+      "developing": "check whether a source's information is correct and reliable",
       "proficient": "compare sources and explain which suits a purpose and why"
     },
     "exemplar": "bc.ela9.cc.1"
@@ -5039,8 +5212,8 @@
     "phrase": "use digital media to work and communicate with others",
     "skill_key": "speaking",
     "next_steps": {
-      "emerging": "use a shared digital tool to work on a group task",
-      "developing": "use digital media to share work with classmates",
+      "emerging": "use a shared digital tool for a group task",
+      "developing": "use digital media to share work with others",
       "proficient": "use digital media to communicate with audiences beyond the classroom"
     },
     "exemplar": "bc.nm10.cc.18"
@@ -5171,7 +5344,7 @@
     "next_steps": {
       "emerging": "share a personal response to a text with one reason",
       "developing": "respond to a text's ideas and choices critically",
-      "proficient": "respond to a text in a creative form that adds meaning"
+      "proficient": "respond to a text in a new form that adds meaning"
     },
     "exemplar": "bc.ela9.cc.9"
   },
@@ -5190,7 +5363,7 @@
     "skill_key": "writing",
     "next_steps": {
       "emerging": "change a word or sentence to suit the purpose of a piece",
-      "developing": "explain why language was shaped in a particular way",
+      "developing": "explain why language was shaped in a certain way",
       "proficient": "vary sentences and word choice to create a deliberate effect"
     },
     "exemplar": "bc.cw12.cc.23"
@@ -5219,7 +5392,7 @@
     "phrase": "credit sources with clear citations",
     "skill_key": "information",
     "next_steps": {
-      "emerging": "note where each idea or quotation came from",
+      "emerging": "note the source of each idea or quotation",
       "developing": "cite each source in the format the class uses",
       "proficient": "decide when an idea needs a citation and cite it fully"
     },
@@ -5270,8 +5443,8 @@
     "skill_key": "reading",
     "next_steps": {
       "emerging": "use one strategy, such as rereading, when a text is hard",
-      "developing": "choose a strategy that suits each kind of text",
-      "proficient": "use strategies to ask deeper questions about a text"
+      "developing": "choose a strategy that suits each type of text",
+      "proficient": "use strategies to ask probing questions about a text"
     },
     "exemplar": "bc.ela9.cc.2"
   },
@@ -5316,7 +5489,7 @@
     "exemplar": "bc.ela9.cc.17"
   },
   "ela-text-reliability": {
-    "phrase": "check how reliable and accurate a text is",
+    "phrase": "check how reliable and correct a text is",
     "skill_key": "information",
     "next_steps": {
       "emerging": "check one fact in a text against another source",
@@ -5430,7 +5603,7 @@
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "use one geometry term correctly in a discussion",
-      "developing": "explain thinking to others with precise geometry language",
+      "developing": "explain thinking to others with exact geometry language",
       "proficient": "use geometry language to question or extend others' ideas"
     },
     "exemplar": "bc.geom12.cc.14"
@@ -5447,13 +5620,56 @@
   },
   "math-justification": {
     "phrase": "explain and justify math ideas and decisions",
+    "area": "explaining math reasoning",
+    "forms": {
+      "base": [
+        "explain and justify math ideas and decisions",
+        "give the reasons behind a math decision",
+        "show why a math method works"
+      ],
+      "did": [
+        "explained each step and why it worked",
+        "gave a clear reason for the method {he} chose",
+        "showed the same idea in a second way"
+      ],
+      "at": {
+        "developing": [
+          "is starting to give a reason for the method {he} [chooses|choose]",
+          "can justify a math decision with growing consistency",
+          "is learning to explain each step of a solution"
+        ],
+        "proficient": [
+          "gives clear reasons for a math decision and can show it a second way",
+          "explains each step of a solution and why it works",
+          "justifies {his} math decisions with reasons"
+        ],
+        "extending": [
+          "justifies a math idea in more than one way and explains which way holds",
+          "explains why a method works and when it would not",
+          "shows a math idea several ways and links them"
+        ]
+      }
+    },
     "skill_key": "reasoning",
     "next_steps": {
       "emerging": "explain a math decision with one reason",
       "developing": "justify a math decision with clear reasons",
-      "proficient": "justify a math idea in more than one way"
+      "proficient": "justify a math idea in more than one way",
+      "extending": "explain why one justification holds where another does not"
     },
-    "exemplar": "bc.fpc10.cc.11"
+    "evidence": "a solved problem with the reasoning written beside it",
+    "home": [
+      "ask {him} to explain one problem from this week to you as if you had never seen it",
+      "ask {him} how {he} [knows|know] an answer is right",
+      "invite {him} to show you two ways to find a total price or a travel time"
+    ],
+    "exemplar": "bc.fpc10.cc.11",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "math-logical-reasoning": {
     "phrase": "use reasoning and tools to explore math ideas",
@@ -5490,8 +5706,8 @@
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "use one math term correctly in a discussion",
-      "developing": "respond to classmates' ideas using math language",
-      "proficient": "explain thinking to others with precise math language"
+      "developing": "respond to others' ideas using math language",
+      "proficient": "explain thinking to others with exact math language"
     },
     "exemplar": "bc.fpc10.cc.13"
   },
@@ -5521,17 +5737,17 @@
     "next_steps": {
       "emerging": "share thinking in class when unsure of the answer",
       "developing": "offer a new or untested idea in a discussion",
-      "proficient": "build on a classmate's idea with a new one"
+      "proficient": "add a new idea to a partner's idea"
     },
     "exemplar": "bc.fpc10.cc.14"
   },
   "math-persistent-solving": {
-    "phrase": "keep working on a hard problem",
+    "phrase": "persist with a hard problem",
     "skill_key": "solving",
     "next_steps": {
       "emerging": "try a second approach when a first one does not work",
-      "developing": "keep working on a problem through several attempts",
-      "proficient": "work on a challenging problem until it is solved"
+      "developing": "persist with a problem through several attempts",
+      "proficient": "stay with a challenging problem until it is solved"
     },
     "exemplar": "bc.fpc10.cc.9"
   },
@@ -5556,12 +5772,12 @@
     "exemplar": "bc.stat12.cc.10"
   },
   "math-problem-exploration": {
-    "phrase": "explore problems with curiosity and creative approaches",
+    "phrase": "explore problems with curiosity and new approaches",
     "skill_key": "solving",
     "next_steps": {
       "emerging": "ask a curious question about a problem",
-      "developing": "try a creative approach to a problem",
-      "proficient": "pursue a question that comes up while exploring a problem"
+      "developing": "try a new approach to a problem",
+      "proficient": "pursue a question that arises while exploring a problem"
     },
     "exemplar": "bc.fpc10.cc.5"
   },
@@ -5611,7 +5827,7 @@
     "next_steps": {
       "emerging": "keep exploring a research question after a first try",
       "developing": "keep exploring a research question when the answer is unclear",
-      "proficient": "take on a challenging research question with several approaches"
+      "proficient": "tackle a challenging research question with several approaches"
     },
     "exemplar": "bc.stat12.cc.9"
   },
@@ -5640,7 +5856,7 @@
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "use one statistics term correctly in a discussion",
-      "developing": "explain thinking to others with precise statistics language",
+      "developing": "explain thinking to others with exact statistics language",
       "proficient": "use statistics language to question others' claims about data"
     },
     "exemplar": "bc.stat12.cc.13"
@@ -5681,7 +5897,7 @@
     "next_steps": {
       "emerging": "find where a mistake happened in a solution",
       "developing": "correct a mistake and explain what went wrong",
-      "proficient": "use a mistake to choose a better approach next time"
+      "proficient": "use a mistake to choose a more suitable approach next time"
     },
     "exemplar": "bc.fpc10.cc.17"
   },
@@ -5840,7 +6056,7 @@
     "skill_key": "safety",
     "next_steps": {
       "emerging": "identify when an outdoor situation is an emergency",
-      "developing": "describe the steps to take in an outdoor emergency",
+      "developing": "describe the steps for an outdoor emergency",
       "proficient": "practise emergency responses for several outdoor situations"
     },
     "exemplar": "bc.oded11.cc.12"
@@ -6040,7 +6256,7 @@
     "skill_key": "fitness",
     "next_steps": {
       "emerging": "describe how skill in an activity has grown",
-      "developing": "explain how getting better at an activity builds confidence",
+      "developing": "explain how improving at an activity builds confidence",
       "proficient": "explain how skill and confidence encourage lifelong participation"
     },
     "exemplar": "bc.al11.cc.1"
@@ -6077,13 +6293,56 @@
   },
   "phe-movement-concepts": {
     "phrase": "use movement concepts and strategies in games",
+    "area": "using strategy in games",
+    "forms": {
+      "base": [
+        "use movement concepts and strategies in games",
+        "use a strategy during a game",
+        "plan a strategy and use it in play"
+      ],
+      "did": [
+        "used a planned strategy during the game",
+        "moved to open space and used it during play",
+        "changed {his} strategy as the game changed"
+      ],
+      "at": {
+        "developing": [
+          "is starting to use a planned strategy during a game",
+          "can use a strategy in play with growing consistency",
+          "is learning to move to open space during a game"
+        ],
+        "proficient": [
+          "uses a planned strategy during a game and adjusts it as play changes",
+          "applies a movement concept in different activities",
+          "plans a strategy and uses it during play"
+        ],
+        "extending": [
+          "carries a movement concept from one activity into a different one",
+          "explains why a strategy suits one game and not another",
+          "changes {his} strategy during play to suit what is happening"
+        ]
+      }
+    },
     "skill_key": "strategy",
     "next_steps": {
       "emerging": "use one strategy, such as moving to open space",
       "developing": "use a planned strategy during a game",
-      "proficient": "apply a movement concept in a different activity"
+      "proficient": "apply a movement concept in a different activity",
+      "extending": "explain which strategy suits a new activity and why"
     },
-    "exemplar": "bc.phe8.cc.2"
+    "evidence": "game play and a short strategy reflection",
+    "home": [
+      "ask {him} what a team should do next, and why, when you watch a game together",
+      "ask {him} which strategy from class {he} would use in a game {he} [plays|play] outside school",
+      "invite {him} to explain the plan behind a move in a sport {he} [enjoys|enjoy]"
+    ],
+    "exemplar": "bc.phe8.cc.2",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "phe-movement-skills": {
     "phrase": "use movement skills in different activities",
@@ -6240,7 +6499,7 @@
     "skill_key": null,
     "next_steps": {
       "emerging": "name one strength and give an example",
-      "developing": "explain an area for growth to work on",
+      "developing": "explain an area for growth to focus on",
       "proficient": "explain how a strength can help with an area for growth"
     },
     "exemplar": "bc.oded11.cc.7"
@@ -6291,7 +6550,7 @@
     "next_steps": {
       "emerging": "record measurements with the correct significant figures",
       "developing": "state the uncertainty in a measurement or result",
-      "proficient": "explain what makes a result accurate and precise"
+      "proficient": "explain what accuracy and precision mean for a result"
     },
     "exemplar": "bc.chem11.cc.7"
   },
@@ -6299,7 +6558,7 @@
     "phrase": "question information and spot bias in sources",
     "skill_key": "evaluating",
     "next_steps": {
-      "emerging": "ask where a piece of information came from",
+      "emerging": "ask about the source of a piece of information",
       "developing": "name the assumptions in a source or piece of work",
       "proficient": "identify bias in sources and in a personal investigation"
     },
@@ -6336,7 +6595,7 @@
     "exemplar": "bc.sci9.cc.23"
   },
   "sci-data-collection": {
-    "phrase": "collect and record accurate data with the right units",
+    "phrase": "collect and record correct data with the right units",
     "skill_key": "planning",
     "next_steps": {
       "emerging": "record data in an organized table",
@@ -6347,20 +6606,63 @@
   },
   "sci-data-patterns": {
     "phrase": "find patterns and trends in data",
+    "area": "reading data",
+    "forms": {
+      "base": [
+        "find patterns and trends in data",
+        "find the pattern in a set of results",
+        "read a graph or table for what it shows"
+      ],
+      "did": [
+        "found a clear pattern in {his} data",
+        "named the trend in {his} results",
+        "showed what the pattern in {his} data meant"
+      ],
+      "at": {
+        "developing": [
+          "is starting to find the pattern in a set of results",
+          "can find a pattern in data with growing consistency",
+          "is learning to say what a graph or table shows"
+        ],
+        "proficient": [
+          "finds the pattern in a set of results and says what it means",
+          "reads a graph or table and explains the trend in it",
+          "can find the trend in data and the results that do not fit"
+        ],
+        "extending": [
+          "finds the pattern in a set of results and explains the ones that do not fit",
+          "explains a trend in data and why some results do not follow it",
+          "uses calculations to show what a trend in data means"
+        ]
+      }
+    },
     "skill_key": "processing",
     "next_steps": {
       "emerging": "describe one pattern in a data table or graph",
       "developing": "describe the relationship between two variables",
-      "proficient": "use calculations to analyze data and point out results that don't fit"
+      "proficient": "use calculations to analyze data and find results that don't fit",
+      "extending": "explain why a result that does not fit the pattern might have happened"
     },
-    "exemplar": "bc.chem11.cc.10"
+    "evidence": "a lab with a results table and a conclusion",
+    "home": [
+      "ask {him} what a chart in the news is showing and whether anything in it looks odd",
+      "ask {him} what is rising and what is falling in a graph you see together",
+      "ask {him} to explain one graph from a recent lab to you"
+    ],
+    "exemplar": "bc.chem11.cc.10",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "sci-data-recording": {
-    "phrase": "measure and record data accurately with equipment",
+    "phrase": "measure and record data correctly with equipment",
     "skill_key": "planning",
     "next_steps": {
       "emerging": "record measurements in a table as they are taken",
-      "developing": "measure accurately and record units each time",
+      "developing": "measure correctly and record units each time",
       "proficient": "record both observations and measurements with precision"
     },
     "exemplar": "bc.sci8.cc.8"
@@ -6449,7 +6751,7 @@
     "phrase": "check claims in sources against scientific evidence",
     "skill_key": "evaluating",
     "next_steps": {
-      "emerging": "ask for evidence before accepting a science claim",
+      "emerging": "request evidence before accepting a science claim",
       "developing": "evaluate a claim in a source using science knowledge",
       "proficient": "plan a simple investigation to test a claim"
     },
@@ -6501,7 +6803,7 @@
     "next_steps": {
       "emerging": "name one part of a method that could be improved",
       "developing": "describe a specific change that would improve a method",
-      "proficient": "explain how each change would improve the quality of the data"
+      "proficient": "explain how each change would improve the data"
     },
     "exemplar": "bc.chem11.cc.15"
   },
@@ -6511,7 +6813,7 @@
     "next_steps": {
       "emerging": "describe the steps of an investigation in order",
       "developing": "check whether the variables were controlled",
-      "proficient": "judge the quality of the data and what affected it"
+      "proficient": "judge how trustworthy the data are and what affected them"
     },
     "exemplar": "bc.sci8.cc.16"
   },
@@ -6536,7 +6838,7 @@
     "exemplar": "bc.sci9.cc.16"
   },
   "sci-observation": {
-    "phrase": "observe the natural world and ask questions about it",
+    "phrase": "observe nature and ask questions about it",
     "skill_key": "questioning",
     "next_steps": {
       "emerging": "describe what is noticed during an observation",
@@ -6570,7 +6872,7 @@
     "skill_key": "planning",
     "next_steps": {
       "emerging": "share an idea while a group plans a project",
-      "developing": "build on others' ideas to design a project together",
+      "developing": "add to others' ideas to design a project together",
       "proficient": "explain how a project applies to the community or the world"
     },
     "exemplar": "bc.earth11.cc.25"
@@ -6640,7 +6942,7 @@
     "skill_key": "applying",
     "next_steps": {
       "emerging": "use one strategy to solve a real-life problem",
-      "developing": "choose a strategy that suits each kind of problem",
+      "developing": "choose a strategy that suits each type of problem",
       "proficient": "use more than one strategy to solve a conceptual problem"
     },
     "exemplar": "bc.chem11.cc.27"
@@ -6649,7 +6951,7 @@
     "phrase": "judge whether science information in a source is valid",
     "skill_key": "evaluating",
     "next_steps": {
-      "emerging": "name where a piece of science information came from",
+      "emerging": "name the source of a piece of science information",
       "developing": "analyze whether information in a source is valid",
       "proficient": "compare the approaches people used to solve the same problem"
     },
@@ -6710,7 +7012,7 @@
     "skill_key": "planning",
     "next_steps": {
       "emerging": "name the variable being changed in a test",
-      "developing": "identify the independent and dependent variables in a test",
+      "developing": "identify which variable is changed and which is measured in a test",
       "proficient": "keep every other variable the same while changing one"
     },
     "exemplar": "bc.sci8.cc.7"
@@ -6759,7 +7061,7 @@
     "phrase": "explain how history shaped an economic theory",
     "skill_key": "cause",
     "next_steps": {
-      "emerging": "name the time and place an economic theory came from",
+      "emerging": "name the time and place an economic theory began",
       "developing": "explain how conditions at the time shaped an economic theory",
       "proficient": "compare how different conditions shaped two economic theories"
     },
@@ -6776,12 +7078,12 @@
     "exemplar": "bc.ss8.cc.5"
   },
   "ss-cml-media-literacy": {
-    "phrase": "judge how accurately media show a religion",
+    "phrase": "judge how truthfully media show a religion",
     "skill_key": "evidence",
     "next_steps": {
       "emerging": "describe how a film or show portrays a religion",
-      "developing": "use evidence to show where a portrayal is accurate or not",
-      "proficient": "compare how accurately two portrayals show a religion, using evidence"
+      "developing": "use evidence to show where a portrayal is correct or not",
+      "proficient": "compare how truthfully two portrayals show a religion, using evidence"
     },
     "exemplar": "bc.rel12.cc.7"
   },
@@ -6827,13 +7129,56 @@
   },
   "ss-evi": {
     "phrase": "judge how reliable a source and its evidence are",
+    "area": "judging sources",
+    "forms": {
+      "base": [
+        "judge how reliable a source and its evidence are",
+        "decide how far a source can be trusted",
+        "check whether the evidence behind a claim is enough"
+      ],
+      "did": [
+        "weighed how far each source could be trusted",
+        "checked whether the evidence behind a claim was enough",
+        "compared accounts that disagree and judged their evidence"
+      ],
+      "at": {
+        "developing": [
+          "is starting to ask who made a source and why before using it",
+          "can judge a source's reliability with growing consistency",
+          "is learning to check the evidence behind a claim"
+        ],
+        "proficient": [
+          "checks who made a source, why, and whether its evidence holds before using it",
+          "weighs whether the evidence behind a claim is enough",
+          "judges how far a source can be trusted and says why"
+        ],
+        "extending": [
+          "weighs sources that disagree and explains which one the evidence supports",
+          "names the points where accounts disagree and judges each one's evidence",
+          "explains why the evidence supports one account over another"
+        ]
+      }
+    },
     "skill_key": "evidence",
     "next_steps": {
       "emerging": "say who made a source and why it was made",
       "developing": "check whether each claim has enough evidence behind it",
-      "proficient": "weigh accounts that disagree and explain which is better supported"
+      "proficient": "weigh accounts that disagree and explain which has more support",
+      "extending": "explain what evidence would change {his} judgement of a source"
     },
-    "exemplar": "bc.ss10.cc.3"
+    "evidence": "a source analysis or a document-based question",
+    "home": [
+      "ask {him} who is making a claim you hear together and how you could check it",
+      "ask {him} which of two news stories on the same event {he} [trusts|trust] more, and why",
+      "invite {him} to show you how {he} [checks|check] whether a website can be trusted"
+    ],
+    "exemplar": "bc.ss10.cc.3",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "ss-evn-geographic-evidence": {
     "phrase": "judge how well geographic evidence supports an interpretation",
@@ -6891,7 +7236,7 @@
     "next_steps": {
       "emerging": "ask one clear question and find two sources about it",
       "developing": "analyze what each source says before writing an answer",
-      "proficient": "ask questions that lead to a deeper, more complete answer"
+      "proficient": "ask questions that lead to a fuller, more complete answer"
     },
     "exemplar": "bc.ss10.cc.1"
   },
@@ -6966,10 +7311,10 @@
     "exemplar": "bc.ss10.cc.2"
   },
   "ss-sig-significance-claims": {
-    "phrase": "point out what a source's creator saw as important",
+    "phrase": "identify what a source's creator saw as important",
     "skill_key": "significance",
     "next_steps": {
-      "emerging": "point to one detail that shows what a creator valued",
+      "emerging": "name one detail that shows what a creator valued",
       "developing": "explain what each source's creator chose to include",
       "proficient": "explain why a creator might have seen an event as significant"
     },

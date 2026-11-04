@@ -89,11 +89,17 @@ describe('a bank competency in a comment', () => {
     expect(CommentBank.levelStepOf(facts([4, 3.4, 2.9])).text).toBe(steps.proficient);
   });
 
-  it('takes the phrase as the next step at Extending', () => {
+  it('takes the card’s Extending step at Extending, else the phrase', () => {
     const f = facts([4, 4, 4]);
-    // Every competency at Extending: the next step, if any, is the phrase.
+    // Every competency at Extending: a version 2 card's own Extending step,
+    // said for the student; a version 1 card's phrase.
     const ls = CommentBank.levelStepOf(f);
-    if (ls) expect(ls.text).toBe(CommentBank.skillFor(f, ls.comp).skill);
+    if (!ls) return;
+    const sk = CommentBank.skillFor(f, ls.comp);
+    if (sk.steps.Extending) {
+      expect(ls.text).not.toMatch(/[{[]/);
+      expect(ls.text).toMatch(/^explain what evidence would change (his|her|their) judgement of a source$/);
+    } else expect(ls.text).toBe(sk.skill);
   });
 
   it('drafts the level step, and the draft verifies', () => {

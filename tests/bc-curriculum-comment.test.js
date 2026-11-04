@@ -2,9 +2,11 @@
  * data/bc-curriculum-comment.json (a comment phrase and three next steps per
  * competency cluster) and data/bc-curriculum-proficiency.json (four
  * proficiency descriptors per competency) are written ahead of time and
- * shipped as data; the app makes no AI calls. These checks are separate from
- * the lint the cards were written against.
+ * shipped as data; the app makes no AI calls. Every card string also passes
+ * the app's vocabulary lint (CommentLint), as every bank sentence does, and
+ * a version 2 card (Nov 4 2026) carries three phrasings of each form.
  */
+import './setup.js';
 import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
@@ -86,13 +88,105 @@ describe('BC curriculum comment phrases', () => {
         if (p.length) bad.push(`${k} ${L}: ${p.join(', ')}`);
       }
       if (new Set([n.emerging, n.developing, n.proficient]).size !== 3) bad.push(`${k}: next steps repeat`);
-      if (Object.keys(n).sort().join() !== 'developing,emerging,proficient') bad.push(`${k}: wrong next-step levels`);
+      // Version 2 adds the Extending step (plan v1 section 2); version 1 has three.
+      const levels = Object.keys(n).sort().join();
+      if (
+        levels !== 'developing,emerging,proficient' &&
+        !(c.forms && levels === 'developing,emerging,extending,proficient')
+      )
+        bad.push(`${k}: wrong next-step levels`);
     }
     expect(bad).toEqual([]);
   });
 
   it('ties each phrase to a skill key or to none', () => {
     for (const [k, c] of clusters) expect(c.skill_key === null || /^[a-z][A-Za-z]+$/.test(c.skill_key), k).toBe(true);
+  });
+});
+
+/* Every string a card holds, with where it goes in a comment: the frame
+   a string is said in, so the lint and the word cap read it as a family
+   would. */
+function cardStrings(k, c) {
+  const out = [['phrase', c.phrase, '{He} can ' + c.phrase + '.']];
+  for (const [L, t] of Object.entries(c.next_steps || {}))
+    out.push(['next ' + L, t, '{His} next step is to ' + t + '.']);
+  const f = c.forms || {};
+  (f.base || []).forEach((t, i) => out.push(['base ' + i, t, 'Next, {he} can ' + t + '.']));
+  (f.did || []).forEach((t, i) => out.push(['did ' + i, t, 'In {his} best piece, {he} ' + t + '.']));
+  for (const [L, xs] of Object.entries(f.at || {}))
+    xs.forEach((t, i) => out.push([`at ${L} ${i}`, t, 'In {his} work, {he} ' + t + '.']));
+  (c.home || []).forEach((t, i) => out.push(['home ' + i, t, 'At home, ' + t + '.']));
+  if (c.area) out.push(['area', c.area, '{His} strongest area is ' + c.area + '.']);
+  if (c.evidence) out.push(['evidence', c.evidence, '{He} shows it in ' + c.evidence + '.']);
+  return out;
+}
+
+describe('every card string passes the vocabulary lint', () => {
+  it('has no phrasal verb, evaluative word, comparison or praise word, in its frame', () => {
+    const bad = [];
+    for (const [k, c] of clusters)
+      for (const [where, , said] of cardStrings(k, c)) {
+        const found = CommentLint.findings(said);
+        if (found.length) bad.push(`${k} ${where}: ${found.join('; ')}`);
+      }
+    expect(bad).toEqual([]);
+  });
+});
+
+describe('version 2 cards', () => {
+  const v2 = clusters.filter(([, c]) => c.forms);
+  const PAST = t => CommentLint.startsPastTense(t);
+  it('includes the eight sample cards', () => {
+    expect(v2.map(([k]) => k).sort()).toEqual(
+      [
+        'adst-prototype-testing',
+        'arts-artistic-choices',
+        'car-self-assessment',
+        'ela-idea-exploration',
+        'math-justification',
+        'phe-movement-concepts',
+        'sci-data-patterns',
+        'ss-evi',
+      ].sort(),
+    );
+  });
+  it('gives three phrasings of every form, the phrase first, and the rest of the schema', () => {
+    const bad = [];
+    for (const [k, c] of v2) {
+      const f = c.forms;
+      if (f.base[0] !== c.phrase) bad.push(`${k}: base[0] is not the phrase`);
+      const three = {
+        base: f.base,
+        did: f.did,
+        home: c.home,
+        ...Object.fromEntries(Object.entries(f.at).map(([L, x]) => ['at ' + L, x])),
+      };
+      for (const [w, xs] of Object.entries(three)) {
+        if (!Array.isArray(xs) || xs.length !== 3 || new Set(xs).size !== 3)
+          bad.push(`${k} ${w}: not three different phrasings`);
+      }
+      if (Object.keys(f.at).sort().join() !== 'developing,extending,proficient') bad.push(`${k}: at levels`);
+      if (!c.area || !c.evidence || !c.next_steps.extending) bad.push(`${k}: area, evidence or Extending step missing`);
+      f.did.forEach(t => PAST(t) || bad.push(`${k} did: not past tense: ${t}`));
+      c.home.forEach(
+        t => /^(ask|invite|tell|show|talk|share|let)\b/.test(t) || bad.push(`${k} home: not an invitation verb: ${t}`),
+      );
+      for (const [where, t] of cardStrings(k, c)) {
+        if (!/^[a-z{]/.test(t)) bad.push(`${k} ${where}: not lowercase`);
+        if (/[.;!?]$/.test(t)) bad.push(`${k} ${where}: punctuation`);
+        if (/\b(he|she|his|her|him|hers)\b/.test(t.replace(/\{\w+\}|\[[^\]]*\]/g, '')))
+          bad.push(`${k} ${where}: a pronoun outside a slot`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+  it('fills every frame that takes a string within 24 words', () => {
+    const bad = [];
+    for (const [k, c] of clusters)
+      for (const [where, , said] of cardStrings(k, c))
+        if (CommentRealiser.wordCount(said) > 24) bad.push(`${k} ${where}: ${CommentRealiser.wordCount(said)} words`);
+    expect(bad).toEqual([]);
   });
 });
 
