@@ -4838,7 +4838,9 @@ window.DashClassManager = (function () {
       '</div></div>' +
       '<div class="cm-field"><label class="cm-label">Late Work Policy</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
       esc(cwStep2LatePolicy.trim() || '\u2014') +
-      '</div></div></div>';
+      '</div></div>' +
+      _cwReviewSetupRows(cwStep2Grade || gradeLevel) +
+      '</div>';
 
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
       var anyFolder = false;
@@ -4909,6 +4911,38 @@ window.DashClassManager = (function () {
     html +=
       '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate">Create Class</button></div>';
     html += '</div>';
+    return html;
+  }
+
+  /* What Create Class sets without asking, shown on the review so a teacher
+     at another school knows to change it: the reporting terms (the default
+     school's, for the chosen span) and, for a Letter class, Counts As. */
+  function _cwReviewSetupRows(gradeLevel) {
+    var val = function (text) {
+      return '<div style="font-size:var(--text-md);color:var(--text-2)">' + text + '</div>';
+    };
+    var terms = _cmDefaultReportingTerms(null, cwStep2Span);
+    var school = terms && typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(terms) : null;
+    var html =
+      '<div class="cm-field"><label class="cm-label">Reporting Terms</label>' +
+      (terms && terms.length
+        ? val(
+            esc(school ? school.school.name : '') +
+              (school ? ': ' : '') +
+              terms
+                .map(function (t) {
+                  return esc(t.label + ' ' + _cmTermDay(t.starts_on) + ' \u2013 ' + _cmTermDay(t.ends_on));
+                })
+                .join(' \u00B7 '),
+          ) + '<div class="cm-hint">Another school? Change the school or the dates later in Reporting Terms.</div>'
+        : val('None. You can add them later in Reporting Terms.')) +
+      '</div>';
+    if (_cmDefaultGradingScale(gradeLevel))
+      html +=
+        '<div class="cm-field"><label class="cm-label">Counts As</label>' +
+        val('BC Letter Bands') +
+        '<div class="cm-hint">Each proficiency counts as a percent in the course % from the BC letter bands. You can change this later in Grading.</div>' +
+        '</div>';
     return html;
   }
 
