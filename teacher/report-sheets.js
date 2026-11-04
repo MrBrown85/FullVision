@@ -14,8 +14,11 @@ window.ReportSheets = (function () {
 
   var PX_PER_IN = 96;
   var PAPER = {
-    letter: { w: 8.5, h: 11, size: '8.5in 11in' },
-    legal: { w: 8.5, h: 14, size: '8.5in 14in' },
+    // The paper by name and portrait, not inches, so the print dialog picks
+    // the Legal tray instead of shrinking the sheet onto Letter (DECISIONS
+    // "Printed class grade sheet" 11).
+    letter: { w: 8.5, h: 11, size: 'letter portrait' },
+    legal: { w: 8.5, h: 14, size: 'legal portrait' },
   };
   /* The sheet's padding: the letterhead sits near the top; the content
      column is 720px wide on both papers. */

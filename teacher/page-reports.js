@@ -36,7 +36,7 @@ window.PageReports = (function () {
      style element that overrides it, the way rubric-print.js does for its
      layouts. DECISIONS.md, "Report forms" 4. */
   var PAPER_STYLE_ID = 'report-paper-style';
-  var PAPER_SIZES = { letter: '8.5in 11in', legal: '8.5in 14in' };
+  var PAPER_SIZES = { letter: 'letter portrait', legal: 'legal portrait' };
   var reportPaper = 'letter';
 
   function _loadPaper(cid) {
