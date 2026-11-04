@@ -3665,10 +3665,49 @@ window.ReportQuestionnaire = (function () {
   }
 
   /* The rows written to the box, saved, and the card redrawn. */
-  function _writeRows(st) {
+  /* The comment as it is now, for an Undo toast: its text, rows (copied:
+     composeRows changes a row's text in place), last draft and seed. */
+  function _snapshot(st) {
+    var key = _rowKey(st);
+    var el = _box();
+    var r = getStudentTermRating(_activeCourse, st.id, getTermId()) || {};
+    return {
+      key: key,
+      termId: getTermId(),
+      text: el && String(el.dataset.sid) === String(st.id) ? el.value : plainComment(r.narrative || ''),
+      rows: (_rows[key] || []).map(function (x) {
+        return Object.assign({}, x);
+      }),
+      last: _lastDraft[key] ? Object.assign({}, _lastDraft[key]) : null,
+      seed: _lastSeed[key],
+    };
+  }
+  /* An Undo toast that puts the comment back as the snapshot had it, while
+     the same report is on screen (Undo toasts, not confirm boxes). */
+  function _undoToast(st, message, snap) {
+    if (typeof showUndoToast !== 'function' || !snap) return;
+    showUndoToast(
+      message,
+      function () {
+        if (getTermId() !== snap.termId) return;
+        _rows[snap.key] = snap.rows;
+        if (snap.last) _lastDraft[snap.key] = snap.last;
+        else delete _lastDraft[snap.key];
+        if (snap.seed != null) _lastSeed[snap.key] = snap.seed;
+        else delete _lastSeed[snap.key];
+        _wording = null;
+        _addAt = null;
+        _writeRows(st, snap.text);
+      },
+      null,
+      6000,
+    );
+  }
+
+  function _writeRows(st, given) {
     var key = _rowKey(st);
     var rows = _rows[key] || [];
-    var text = composeRows(rows);
+    var text = given != null ? given : composeRows(rows);
     var el = _box();
     if (el && String(el.dataset.sid) === String(st.id)) {
       _putText(el, text);
@@ -5711,11 +5750,14 @@ window.ReportQuestionnaire = (function () {
         tqSaveCurrentIfNeeded();
         var gone = (_rows[key] || [])[i];
         if (!gone) return;
+        var removed = _snapshot(st);
         _rows[key] = (_rows[key] || []).filter(function (r) {
           return r !== gone;
         });
         _wording = null;
         _writeRows(st);
+        // A typed sentence was never in a bank: Undo is the way back.
+        _undoToast(st, 'Removed from the comment.', removed);
         _focusAny([
           '#tq-sentences [data-row="' + Math.min(i, _rows[key].length - 1) + '"] .qn-srow-handle[tabindex]',
           '#tq-browse-btn',
