@@ -507,16 +507,6 @@ body.fv-switching-course::after {
   flex-shrink: 0;
   position: relative;
 }
-.m-cell-avatar .m-missing-dot {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 10px;
-  height: 10px;
-  background: var(--priority);
-  border-radius: 50%;
-  border: 2px solid var(--surface);
-}
 
 .m-cell-body {
   flex: 1;
@@ -4301,4 +4291,10 @@ body.fv-switching-course::after {
 .m-obs-student-name {
   padding: 13px 4px;
   margin: -13px -4px;
+}
+
+/* "2 missing" under a name in All Students. */
+.m-cell-missing {
+  color: var(--priority);
+  font-weight: 600;
 }

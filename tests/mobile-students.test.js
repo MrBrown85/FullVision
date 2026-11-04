@@ -128,13 +128,19 @@ describe('MStudents.renderAllStudents', () => {
     expect(html).not.toContain('>0.0<');
   });
 
-  it('shows missing dot when student has NS status', () => {
+  // Step 4 group 3 #83: missing work is said in words, not an
+  // unexplained red dot on the avatar.
+  it('says how much work is missing under the name', () => {
     mockDataLayer({
-      getAssignmentStatuses: () => ({ 'stu1:a1': 'NS' }),
-      getAssessments: () => [{ id: 'a1', type: 'summative', date: '2025-01-01', tagIds: ['t1'] }],
+      getAssignmentStatuses: () => ({ 'stu1:a1': 'NS', 'stu1:a2': 'NS' }),
+      getAssessments: () => [
+        { id: 'a1', type: 'summative', date: '2025-01-01', tagIds: ['t1'] },
+        { id: 'a2', type: 'summative', date: '2025-01-02', tagIds: ['t1'] },
+      ],
     });
     const html = MStudents.renderAllStudents(CID);
-    expect(html).toContain('m-missing-dot');
+    expect(html).toContain('>2 missing<');
+    expect(html).not.toContain('m-missing-dot');
   });
 
   it('does NOT repeat getAssessments/getAssignmentStatuses per student (N+1 fix)', () => {

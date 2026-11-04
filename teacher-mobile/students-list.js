@@ -43,15 +43,17 @@ window.MStudentsList = (function () {
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
-      var subtitle = '';
-      if (st.pronouns) subtitle += MC.esc(st.pronouns);
-
       var badges = renderBadges(st);
 
-      var hasMissing = allAssessments.some(function (a) {
+      // Missing work says so in words under the name; an unexplained red
+      // dot on the avatar told the teacher nothing.
+      var missingN = allAssessments.filter(function (a) {
         return allStatuses[st.id + ':' + a.id] === 'NS';
-      });
-      var missingDot = hasMissing ? '<div class="m-missing-dot"></div>' : '';
+      }).length;
+      var subtitle = [];
+      if (st.pronouns) subtitle.push(MC.esc(st.pronouns));
+      if (missingN) subtitle.push('<span class="m-cell-missing">' + missingN + ' missing</span>');
+      subtitle = subtitle.join(' \u00b7 ');
 
       html +=
         '<div class="m-cell" role="button" tabindex="0" data-action="' +
@@ -65,7 +67,6 @@ window.MStudentsList = (function () {
         color +
         '">' +
         MC.esc(initials) +
-        missingDot +
         '</div>' +
         '<div class="m-cell-body">' +
         // A long name is cut, never the IEP, MOD or ELL badge after it.
