@@ -990,7 +990,7 @@ window.MGrade = (function () {
         '" data-max="' +
         assessment.maxPoints +
         '" style="width:44px;height:44px;font-size:20px">−</button>' +
-        '<div style="display:flex;align-items:center;gap:6px"><input class="m-pts-input" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="\u2014" aria-label="Points out of ' +
+        '<div style="display:flex;align-items:center;gap:6px"><input class="m-pts-input" type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="\u2014" aria-label="Points out of ' +
         assessment.maxPoints +
         '" id="m-pts-' +
         st.id +
@@ -1724,10 +1724,23 @@ window.MGrade = (function () {
       if (e.target === selectOnUp) e.preventDefault();
       selectOnUp = null;
     });
+    var lastCard = swiper.querySelector('.m-swiper-card:last-child .m-pts-input');
+    if (lastCard) lastCard.setAttribute('enterkeyhint', 'done');
+    // Enter saves and moves to the next student's points, as Enter does in
+    // the desktop grader; on the last student it just saves. Escape puts
+    // the score back.
     swiper.addEventListener('keydown', function (e) {
       if (!e.target.classList.contains('m-pts-input')) return;
-      if (e.key === 'Escape') e.target.dataset.revert = '1';
-      if (e.key === 'Enter' || e.key === 'Escape') e.target.blur();
+      if (e.key === 'Escape') {
+        e.target.dataset.revert = '1';
+        e.target.blur();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var inp = e.target;
+        inp.blur();
+        _nextStudentPoints(swiper, inp);
+      }
     });
     // The % follows the typing, as on the desktop.
     swiper.addEventListener('input', function (e) {
@@ -1770,6 +1783,15 @@ window.MGrade = (function () {
       },
       { passive: true },
     );
+  }
+
+  function _nextStudentPoints(swiper, inp) {
+    var cards = Array.prototype.slice.call(swiper.querySelectorAll('.m-swiper-card'));
+    var idx = cards.indexOf(inp.closest('.m-swiper-card'));
+    if (idx < 0 || idx >= cards.length - 1) return;
+    jumpToStudent(idx + 1);
+    var next = cards[idx + 1].querySelector('.m-pts-input');
+    if (next) next.focus({ preventScroll: true });
   }
 
   var _commentTimers = {};

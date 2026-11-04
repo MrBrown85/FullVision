@@ -256,3 +256,25 @@ test('Grade tab uses the desktop words', async ({ page }) => {
   });
   expect(excBg).not.toBe(nsBg);
 });
+
+// Group 3 #33 (and the Enter half of #79): Enter in the points box saves
+// and moves to the next student, as Enter does in the desktop grader.
+test('Enter in the points box saves and moves to the next student', async ({ page }) => {
+  await openAssessment(page, 'Data Reading Quiz');
+  const first = page.locator('#m-screen-grade-swiper .m-pts-input').first();
+  const sid = await first.getAttribute('data-sid');
+  await first.fill('7');
+  await first.press('Enter');
+  const saved = await page.evaluate(
+    s => getPointsScore(getActiveCourse(), s, document.querySelector('.m-pts-input').dataset.aid),
+    sid,
+  );
+  expect(saved).toBe(7);
+  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('2 of');
+  const focused = await page.evaluate(() => {
+    const el = document.activeElement;
+    const cards = [...document.querySelectorAll('.m-swiper-card')];
+    return el && el.classList.contains('m-pts-input') ? cards.indexOf(el.closest('.m-swiper-card')) : -1;
+  });
+  expect(focused).toBe(1);
+});
