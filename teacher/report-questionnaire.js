@@ -667,7 +667,9 @@ window.ReportQuestionnaire = (function () {
             ? q[0] + ' and ' + q[1] + ' were marked'
             : p.length > 2
               ? _cap(CommentBank.numberWords(p.length)) + ' assignments were marked'
-              : 'Marks changed';
+              : // No piece was marked since: the grades worked out from the
+                // same marks changed.
+                'Grades changed';
       out.push(who + ' after ' + day + ', so ' + _sentenceCount(marks) + ' the gradebook.');
     }
     var cls = stale.changes.filter(function (c) {
