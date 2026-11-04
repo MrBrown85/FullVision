@@ -6329,7 +6329,7 @@ window.DashClassManager = (function () {
       preset = preset.replace(/<button[^>]*cm-term-school-btn[\s\S]*?<\/button>/, '');
     return (
       '<div class="cm-term-view">' +
-      '<div class="cm-hint">The gradebook, dashboard and student pages can show one term at a time. A term counts the assessments dated inside it.</div>' +
+      '<div class="cm-hint">Each term is a report date. Grades build all year: a report shows the year to date as of its term’s end.</div>' +
       '<div class="cm-term-view-top">' +
       preset +
       _cmRenderTermSpan(cid) +
@@ -6372,7 +6372,7 @@ window.DashClassManager = (function () {
     var html =
       '<div class="cm-field cm-cat-field">' +
       '<label class="cm-label">Reporting Terms</label>' +
-      '<div class="cm-hint" style="margin-bottom:8px">The gradebook, dashboard and student pages can show one term at a time. A term counts the assessments dated inside it. Up to six. Surrey secondary dates come from each school’s published calendar; a term ends on the day its report is published.</div>';
+      '<div class="cm-hint" style="margin-bottom:8px">Each term is a report date. Grades build all year: a report shows the year to date as of its term’s end. Up to six. Surrey secondary dates come from each school’s published calendar; a term ends on the day its report is published.</div>';
     html += _cmRenderTermSpan(cid);
     html += _cmRenderSchoolPreset(cid, rows.length > 0);
     if (rows.length === 0) {
