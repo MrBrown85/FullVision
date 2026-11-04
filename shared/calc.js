@@ -457,15 +457,19 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
 
 /* The mean of a student's overall levels on a group of assessments, each
    counted its Factor times. { mean, count }, or null when none is scored.
-   Missing proficiency work is no evidence here, as in competency
-   proficiency and Class Averages (the BC scale has no level 0); it still
-   counts 0 in the %. Missing points work is a 0 level, as its column is. */
+   Missing work follows the class's grading style (Colin, 2026-11-03): in a
+   Proficiency or Both class it is no evidence here, as in competency
+   proficiency (the BC scale has no level 0); in a Letter class all of it,
+   points, proficiency and rubric work, is a 0 level, so the level agrees
+   with the % beside it. Competency proficiency leaves it out in every
+   class; the % and the column Class Averages keep their rules. */
 function _factoredMeanLevel(cid, studentId, assessments) {
   var sum = 0;
   var factors = 0;
   var count = 0;
+  var noEvidence = courseGradeMode(cid) !== 'letter';
   (assessments || []).forEach(function (assessment) {
-    if (!isPointsScored(assessment) && getAssignmentStatus(cid, studentId, assessment.id) === 'NS') return;
+    if (noEvidence && getAssignmentStatus(cid, studentId, assessment.id) === 'NS') return;
     var value = getAssessmentOverallScore(cid, studentId, assessment.id);
     if (value == null) return;
     var factor = getAssessmentWeight(assessment);
@@ -609,13 +613,18 @@ function _assessmentPoints(cid, studentId, assessment) {
    - Points and Complete/Incomplete work, as in the course %: Excused is
      left out, Not Submitted counts as 0 (_assessmentPoints,
      getAssessmentOverallScore follow the same rule).
-   - Proficiency work, as in competency proficiency: Excused and Not
-     Submitted are both left out. Missing work is no evidence, not a level
-     of 0; the BC proficiency scale has none.
+   - Proficiency and rubric work, as in competency proficiency: Excused and
+     Not Submitted are both left out. Missing work is no evidence, not a
+     level of 0; the BC proficiency scale has none.
+   - Except in a Letter class, where the column follows the grading style
+     (Colin, 2026-11-03: "Follow the grading style"): Missing proficiency
+     and rubric work counts as 0 there, as it does in the % and the level
+     averages (letterProficiency).
    Students without a score are left out. */
 var COLUMN_STATUS_RULES = {
   points: { EXC: 'out', NS: 'zero' },
   proficiency: { EXC: 'out', NS: 'out' },
+  letterProficiency: { EXC: 'out', NS: 'zero' },
 };
 
 /* What one student counts for in one column, or null when they don't.
@@ -637,7 +646,11 @@ function columnCountedValue(cid, sid, col) {
     }
     return _assessmentPoints(cid, sid, a);
   }
-  if (COLUMN_STATUS_RULES.proficiency[status] === 'out') return null;
+  var rules =
+    courseGradeMode(cid) === 'letter' ? COLUMN_STATUS_RULES.letterProficiency : COLUMN_STATUS_RULES.proficiency;
+  var profRule = rules[status];
+  if (profRule === 'out') return null;
+  if (profRule === 'zero') return { value: 0 };
   if (col.tagIds && col.tagIds.length) {
     var entries = getScores(cid)[sid] || [];
     var vals = [];
