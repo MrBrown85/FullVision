@@ -2273,7 +2273,7 @@ window.ReportQuestionnaire = (function () {
     var gradeKept = r.draftMeta && Array.isArray(r.draftMeta.grade_kept) ? r.draftMeta.grade_kept : [];
     rows.forEach(function (x, i) {
       if (x.kept || !x.earlier) return;
-      if (gradeKept.indexOf(x.text) >= 0 || !gradeClaimWrong(x.text, g)) return;
+      if (gradeKept.indexOf(x.text) >= 0 || !gradeClaimWrong(x.text, g, (COURSES[_activeCourse] || {}).name)) return;
       if (
         v.some(function (c) {
           return c.row === i;
@@ -2298,12 +2298,16 @@ window.ReportQuestionnaire = (function () {
      "overall" or "average", never a piece's ("90% on the unit test"). */
   var GRADE_SAID_RE =
     /(?:^|[\s(])(?:[Aa]n?|earns?|earned|earning|has|had|have|got|gets|getting|of|is|at|with|receives?|received|receiving)\s+(?:an?\s+)?(A|B|C|F|IE)([+\u2212-]?)(?=$|[\s,;:!?()]|\.(?!\s*[A-Z]))/g;
-  var GRADE_CONTEXT_RE = /\b(overall|this term|so far|grade|standing|average|mark|in the course|in this course)\b/i;
-  var PIECE_AFTER_RE = /^\s*(?:\([^)]*\)\s*)?(?:on|in|for)\s+(?:the|her|his|their|a|an|this|that|my|each|every)\b/i;
-  function gradeClaimWrong(text, g) {
+  var GRADE_CONTEXT_RE =
+    /\b(overall|this term|so far|grade|standing|average|mark|in the course|in this course|for the term|for the year)\b/i;
+  var PIECE_AFTER_RE =
+    /^\s*(?:\([^)]*\)\s*)?(?:on|in|for)\s+(?:the|her|his|their|a|an|this|that|my|each|every)\b(?!\s+(?:course|class|term|year)\b)/i;
+  function gradeClaimWrong(text, g, course) {
     if (!g || g.letter == null || g.mode === 'proficiency') return false;
     var t = String(text || '');
-    if (!GRADE_CONTEXT_RE.test(t)) return false;
+    // "a C- in History 12" is about the course grade too.
+    var inCourse = !!course && t.toLowerCase().indexOf('in ' + String(course).toLowerCase()) >= 0;
+    if (!inCourse && !GRADE_CONTEXT_RE.test(t)) return false;
     var m;
     GRADE_SAID_RE.lastIndex = 0;
     while ((m = GRADE_SAID_RE.exec(t))) {
@@ -3169,6 +3173,17 @@ window.ReportQuestionnaire = (function () {
      rows they replaced, the last row taking the rest); a sentence with no
      row becomes the teacher's own row; a row whose sentence is gone goes.
      A row of several sentences (a teacher line) matches as a run. */
+  function _wasEarlier(earlierTexts, t) {
+    if (!earlierTexts) return false;
+    if (earlierTexts[t]) return true;
+    var ss = sentencesOf(t);
+    return (
+      ss.length > 1 &&
+      ss.every(function (x) {
+        return !!earlierTexts[x];
+      })
+    );
+  }
   function alignRows(rows, text, earlierTexts) {
     var ss = sentencesOf(text);
     var units = rows.map(function (r) {
@@ -3201,8 +3216,9 @@ window.ReportQuestionnaire = (function () {
       pendR.forEach(function (r, k) {
         if (k >= pendS.length) return;
         var t = k === pendR.length - 1 ? pendS.slice(k).join(' ') : pendS[k];
-        // An Earlier Comment sentence put back (⌘Z after Generate).
-        if (earlierTexts && earlierTexts[t]) return out.push(earlierRow(t, out.length));
+        // An Earlier Comment sentence put back (⌘Z after Generate), or a
+        // run of them taken by one row.
+        if (_wasEarlier(earlierTexts, t)) return out.push(earlierRow(t, out.length));
         var c = Object.assign({}, r, { text: t });
         c.edited = c.drafted == null || t !== c.drafted;
         // An Earlier Comment sentence the teacher changed is theirs now.
@@ -3214,7 +3230,7 @@ window.ReportQuestionnaire = (function () {
       });
       if (!pendR.length)
         pendS.forEach(function (t) {
-          if (earlierTexts && earlierTexts[t]) return out.push(earlierRow(t, out.length));
+          if (_wasEarlier(earlierTexts, t)) return out.push(earlierRow(t, out.length));
           out.push({
             id: 'text:' + out.length,
             step: null,

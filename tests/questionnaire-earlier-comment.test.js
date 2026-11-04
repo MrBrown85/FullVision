@@ -259,6 +259,10 @@ describe('an Earlier Comment sentence that gives a grade the gradebook does not 
     expect(RQ.gradeClaimWrong('Maya asks good questions.', g)).toBe(false);
     expect(RQ.gradeClaimWrong('Maya has a C- overall.', { mode: 'proficiency', letter: null })).toBe(false);
     expect(RQ.gradeClaimWrong('Maya has a C- overall.', b)).toBe(true);
+    expect(RQ.gradeClaimWrong('Maya has a C- in the course.', b)).toBe(true);
+    expect(RQ.gradeClaimWrong('Maya has a C- for the term.', b)).toBe(true);
+    expect(RQ.gradeClaimWrong('Maya currently has a C- in History 12.', b, 'History 12')).toBe(true);
+    expect(RQ.gradeClaimWrong('Maya currently has a B in History 12.', b, 'History 12')).toBe(false);
   });
 
   it('is flagged before Approve; Remove It takes it out with Undo', () => {
