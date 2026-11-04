@@ -74,10 +74,30 @@ describe('Missing proficiency work in level averages', () => {
     expect(getAssessmentGroupPercentage(CID, SID, [x, quiz]).pct).toBeCloseTo(75 / 3.5, 9);
   });
 
-  it('Missing work is a 0 level in a Letter class, points and proficiency alike', () => {
+  it('Missing work is a 0 level in a Letter class, points, proficiency and rubric alike', () => {
     seed('letter', [x, quiz], [three], { [SID + ':q']: 'NS' });
     expect(assessmentGroupGrade(CID, SID, [x, quiz]).prof).toBe(1.5);
     seed('letter', [x, y], [three], { [SID + ':y']: 'NS' });
     expect(assessmentGroupGrade(CID, SID, [x, y]).prof).toBe(1.5);
+    const essay = { id: 'r', title: 'Essay', tagIds: ['t1'], rubricId: 'rub' };
+    seed('letter', [x, essay], [three], { [SID + ':r']: 'NS' });
+    _cache.rubrics[CID] = [{ id: 'rub', name: 'Essay', criteria: [{ id: 'crit', name: 'Thesis', tagIds: ['t1'] }] }];
+    clearProfCache();
+    expect(assessmentGroupGrade(CID, SID, [x, essay]).prof).toBe(1.5);
+  });
+
+  it('a Letter class counts it 0 in the category level, while the competency leaves it out', () => {
+    const cx = { ...x, categoryId: 'cat' };
+    const cy = { ...y, categoryId: 'cat' };
+    seed('letter', [cx, cy], [three], { [SID + ':y']: 'NS' });
+    _cache.categories[CID] = [{ id: 'cat', name: 'Labs', weight: 100 }];
+    clearProfCache();
+    expect(getCategoryAverage(CID, SID, 'cat')).toBe(1.5);
+    expect(getTagProficiency(CID, SID, 't1')).toBe(3);
+    ['proficiency', 'both'].forEach(mode => {
+      COURSES[CID].gradingSystem = mode;
+      clearProfCache();
+      expect(getCategoryAverage(CID, SID, 'cat')).toBe(3);
+    });
   });
 });

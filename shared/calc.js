@@ -459,10 +459,10 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
    counted its Factor times. { mean, count }, or null when none is scored.
    Missing work follows the class's grading style (Colin, 2026-11-03): in a
    Proficiency or Both class it is no evidence here, as in competency
-   proficiency (the BC scale has no level 0); in a Letter class it is a 0
-   level, as it is 0 in the %. The % counts it as 0 in a Letter or Both
-   class, and a points column's Class Average counts it as 0 in every
-   class. */
+   proficiency (the BC scale has no level 0); in a Letter class all of it,
+   points, proficiency and rubric work, is a 0 level, so the level agrees
+   with the % beside it. Competency proficiency leaves it out in every
+   class; the % and the column Class Averages keep their rules. */
 function _factoredMeanLevel(cid, studentId, assessments) {
   var sum = 0;
   var factors = 0;
