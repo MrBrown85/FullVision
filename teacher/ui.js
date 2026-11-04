@@ -614,59 +614,6 @@ function getUpcomingBirthdays(cid) {
 }
 
 /* ── Shared HTML: Student Header ────────────────────────────── */
-/* ── Reporting term picker ──────────────────────────────────────
-   One control, shared by the gradebook, dashboard and student pages, that
-   picks the reporting term the class is viewed in. The choice is kept per
-   class on this device (setSelectedTermOrdinal) and every grade on these
-   pages follows it through calc.js. Hidden when the class has no terms. */
-// html-safe: cid and term labels/dates are escaped; ordinals are numbers.
-function renderTermPicker(cid) {
-  var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
-  if (!terms.length) return '';
-  var active = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
-  var chosen = active ? active.ordinal : null;
-  var today = typeof courseToday === 'function' ? courseToday(cid) : '';
-  var html =
-    '<select class="term-select" data-action="setTerm" data-cid="' +
-    esc(cid) +
-    '" aria-label="Reporting term" title="Reporting term: grades count only the assessments dated inside it">' +
-    '<option value="all"' +
-    (chosen == null ? ' selected' : '') +
-    '>All Time</option>';
-  terms.forEach(function (t) {
-    var now = today && today >= t.starts_on && today <= t.ends_on ? ' (now)' : '';
-    html +=
-      '<option value="' +
-      t.ordinal +
-      '"' +
-      (chosen === t.ordinal ? ' selected' : '') +
-      '>' +
-      esc(t.label) +
-      ' · ' +
-      esc(formatDate(t.starts_on)) +
-      ' – ' +
-      esc(formatDate(t.ends_on)) +
-      now +
-      '</option>';
-  });
-  html += '</select>';
-  return html;
-}
-
-/* A term picker on any page changes the class's term and redraws the page. */
-if (typeof document !== 'undefined' && !window._termPickerWired) {
-  window._termPickerWired = true;
-  document.addEventListener('change', function (e) {
-    var el = e.target;
-    if (!el || !el.matches || !el.matches('select[data-action="setTerm"]')) return;
-    var cid = el.dataset.cid;
-    if (!cid || typeof setSelectedTermOrdinal !== 'function') return;
-    setSelectedTermOrdinal(cid, el.value === 'all' ? null : Number(el.value));
-    var page = typeof Router !== 'undefined' && Router.getCurrentPage ? Router.getCurrentPage() : null;
-    if (page && typeof page.render === 'function') page.render();
-  });
-}
-
 /* ── Segmented control (.seg in styles.css) ─────────────────── */
 /* The chosen segment carries the ARIA state its role calls for:
    aria-selected on a tab, aria-checked on a radio, aria-pressed on a plain
@@ -729,9 +676,9 @@ function renderStudentHeader(cid, sid, opts) {
   const student = students.find(s => s.id === sid);
   if (!student) return '';
 
-  // In a reporting term the header's work counts cover that term, like its grades.
-  const inTerm = typeof assessmentInActiveTerm === 'function';
-  const assessments = getAssessments(cid).filter(a => !inTerm || assessmentInActiveTerm(cid, a));
+  // The header's work counts cover the work its grade counts (the year so far, or a report's year to date).
+  const inTerm = typeof assessmentInYearToDate === 'function';
+  const assessments = getAssessments(cid).filter(a => !inTerm || assessmentInYearToDate(cid, a));
   const overall = getOverallProficiency(cid, sid);
   const overallRounded = Math.round(overall);
   const profColor = PROF_COLORS[overallRounded] || PROF_COLORS[0];
@@ -895,17 +842,21 @@ function _rosterShowShort(cid, mode) {
   return mode === 'percent' ? '%' : _rosterShowLabel(cid, mode);
 }
 
-/* The grades beside the names follow the class's reporting term, picked on
-   the Gradebook, Dashboard and student page. Assignments, Observations and
-   Reports have no term picker, so with a term picked every name there could
-   read IC with nothing to say why. The roster names the term instead. */
-// html-safe: the term label goes through esc.
+/* The grades beside the names are the year so far, except on the Reports
+   page, where they are the year to date as of the report's end (calc.js,
+   Colin 2026-11-03). The roster says so while a report is in view. */
+// html-safe: the term label and date go through esc.
 function _sidebarTermNote(cid) {
   var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
-  if (!term || !term.label) return '';
+  if (!term || !term.endsOn) return '';
+  var end = typeof formatShortDate === 'function' ? formatShortDate(term.endsOn) : formatDate(term.endsOn);
   var tip =
-    'The grades count only work dated in ' + term.label + '. The term is picked on the Gradebook and Dashboard.';
-  return `<div class="sb-term-note" id="sb-term-note" title="${esc(tip)}">Grades for ${esc(term.label)}</div>`;
+    'The grades are the year to date as of ' +
+    (term.label || 'the report') +
+    '’s end: all work dated on or before ' +
+    end +
+    ', and undated work.';
+  return `<div class="sb-term-note" id="sb-term-note" title="${esc(tip)}">Grades to ${esc(end)}</div>`;
 }
 
 // html-safe: names and initials go through esc; ids, the avatar colour and the flag mark are ours.

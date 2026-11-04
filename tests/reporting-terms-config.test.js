@@ -102,14 +102,6 @@ describe('saveReportingTerms', () => {
     expect(server.patches).toHaveLength(0);
   });
 
-  it('drops a chosen term that no longer exists', () => {
-    expect(saveReportingTerms(CID, QUARTERS)).toBeNull();
-    setSelectedTermOrdinal(CID, 2);
-    expect(getActiveTerm(CID).ordinal).toBe(2);
-    expect(saveReportingTerms(CID, [QUARTERS[0]])).toBeNull();
-    expect(getSelectedTermOrdinal(CID)).toBeNull();
-  });
-
   it('finds the term containing a date', () => {
     saveReportingTerms(CID, QUARTERS);
     expect(reportingTermOn(CID, '2026-12-25').ordinal).toBe(2);

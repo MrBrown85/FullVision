@@ -103,13 +103,14 @@ window.ObsCard = (function () {
     return _date(ob).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
   }
 
-  /* "Fri, Oct 16 · 12:00 p.m." for lists without day headers. */
-  function cardWhen(ob) {
+  /* "Fri, Oct 16 · 12:00 p.m." for lists without day headers; "Fri, Oct 16"
+     with dayOnly. */
+  function cardWhen(ob, dayOnly) {
     var d = _date(ob);
     var opts = { weekday: 'short', month: 'short', day: 'numeric' };
     if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
     var day = d.toLocaleDateString('en-CA', opts);
-    var t = cardTime(ob);
+    var t = dayOnly ? '' : cardTime(ob);
     return t ? day + ' · ' + t : day;
   }
 
@@ -316,17 +317,29 @@ window.ObsCard = (function () {
   /* opts:
        showStudent   the student's name leads the card (default true)
        action        data-action on the card ('openFocus' by default; null for none)
-       when          'time' (default; under a day header) or 'date' (date and time) */
+       when          'time' (default; under a day header), 'date' (date and
+                     time) or 'day' (the date alone)
+       readOnly      no delete button (the Term Questionnaire's lists)
+       tabindex      the card's tabindex instead of 0 (with an action) or -1
+       className     more classes on the card
+       title         the card's tooltip */
   function html(ob, ctx, opts) {
     opts = opts || {};
     var showStudent = opts.showStudent !== false;
     var action = opts.action === undefined ? 'openFocus' : opts.action;
     var p = parts(ob, ctx);
-    var when = opts.when === 'date' ? cardWhen(ob) : cardTime(ob);
+    var when = opts.when === 'date' || opts.when === 'day' ? cardWhen(ob, opts.when === 'day') : cardTime(ob);
+    var tab = opts.tabindex != null ? Number(opts.tabindex) : action ? 0 : -1;
 
     return (
-      '<div class="obs-card"' +
-      (action ? ' data-action="' + action + '" tabindex="0"' : ' tabindex="-1"') +
+      '<div class="obs-card' +
+      (opts.className ? ' ' + esc(opts.className) : '') +
+      '"' +
+      (action ? ' data-action="' + action + '"' : '') +
+      ' tabindex="' +
+      tab +
+      '"' +
+      (opts.title ? ' title="' + esc(opts.title) + '"' : '') +
       ' data-sid="' +
       ob.studentId +
       '" data-obid="' +
@@ -345,13 +358,16 @@ window.ObsCard = (function () {
       '</div>' +
       metaHtml(ob, ctx, p) +
       '</div>' +
-      '<button type="button" class="obs-card-delete" data-action="deleteOb" data-sid="' +
-      ob.studentId +
-      '" data-obid="' +
-      ob.id +
-      '" data-stop-prop="true" title="Delete" aria-label="Delete observation">' +
-      TRASH_SVG +
-      '</button></div>'
+      (opts.readOnly
+        ? ''
+        : '<button type="button" class="obs-card-delete" data-action="deleteOb" data-sid="' +
+          ob.studentId +
+          '" data-obid="' +
+          ob.id +
+          '" data-stop-prop="true" title="Delete" aria-label="Delete observation">' +
+          TRASH_SVG +
+          '</button>') +
+      '</div>'
     );
   }
 

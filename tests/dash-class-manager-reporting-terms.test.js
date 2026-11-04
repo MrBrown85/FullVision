@@ -115,15 +115,11 @@ describe('reporting terms editor', () => {
     expect(draft().rows).toHaveLength(6);
   });
 
-  it('a removed term falls back to all time on every page', async () => {
+  it('removing a term leaves one', async () => {
     act('cmTermPreset', { value: 'semesters' });
     await save();
-    setSelectedTermOrdinal(CID, 2);
-    expect(getActiveTerm(CID).ordinal).toBe(2);
     act('cmTermDelete', { idx: '1' });
     await save();
     expect(getReportingTerms(CID)).toHaveLength(1);
-    expect(getSelectedTermOrdinal(CID)).toBeNull();
-    expect(activateSavedTerm(CID)).toBeNull();
   });
 });

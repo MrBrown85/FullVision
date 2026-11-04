@@ -53,8 +53,10 @@ describe('Growth Since Last Report arrow', () => {
   it('is up in a Letter class when the % beside it rises', () => {
     seed('letter');
     const html = ReportBlocks.renderBlockGrowth(CID, STUDENT);
+    // Report 1: the 3− alone (67%). Report 2: the year to date, the 3− and
+    // the 3+ (Mean 3.0, 75%; Colin, 2026-11-03).
     expect(html).toContain('67%');
-    expect(html).toContain('83%');
+    expect(html).toContain('75%');
     expect(arrowOf(html)).toBe('Up');
   });
 

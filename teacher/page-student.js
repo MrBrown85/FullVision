@@ -2983,8 +2983,8 @@ window.PageStudent = (function () {
       return;
     }
 
-    // Every grade on this page follows the class's chosen reporting term.
-    if (typeof activateSavedTerm === 'function') activateSavedTerm(cid);
+    // Every grade on this page is the year so far (Colin, 2026-11-03).
+    if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var sections = getSections(cid);
     var assessments = getAssessments(cid);
     var assessMap = {};
@@ -3003,7 +3003,6 @@ window.PageStudent = (function () {
       _stepButtonHtml('next', _neighbours().next) +
       '</span>' +
       '<button class="tb-edit-btn" data-action="openEditStudent">Edit Student</button>' +
-      (typeof renderTermPicker === 'function' ? renderTermPicker(cid) : '') +
       '</div>';
 
     // 12px from the page's edges and between boxes, 20px at the foot.
@@ -3016,10 +3015,11 @@ window.PageStudent = (function () {
     });
 
     // ── Tabs ──
-    // Every count and list below follows the class's chosen reporting term.
+    // Every count and list below is the year so far: no report is in view
+    // on this page, so term is null.
     var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
     var termAssessments = assessments.filter(function (a) {
-      return assessmentInActiveTerm(cid, a);
+      return assessmentInYearToDate(cid, a);
     });
     var classStudents = getStudents(cid);
     var ctx = {

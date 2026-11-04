@@ -130,6 +130,30 @@ describe('switching the calculation method', () => {
     expect(COURSES[CID].calcMethod).toBe('highest');
   });
 
+  it('Class Management shows the year so far, even when opened over a report in view (Colin, 2026-11-03)', () => {
+    // Most Recent: Amara's last score is the 4 on Oct 3. As of a report
+    // ending Oct 2 it would be her 2.
+    _cache.courseConfigs[CID] = {
+      reportingTerms: [{ ordinal: 1, label: 'Term 1', starts_on: '2026-09-01', ends_on: '2026-10-02' }],
+    };
+    clearProfCache();
+    setActiveTerm(CID, 1);
+    expect(studentGradeSummary(CID, 's1').text).toBe('2.0');
+    try {
+      DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
+      expect(main.innerHTML).toContain('cm-check-value">4.0<');
+      // The report's term is cleared, so the method preview counts the year so far.
+      expect(getActiveTerm(CID)).toBeNull();
+      expect(previewCalcMethodChange(CID, 'average').example).toEqual({
+        name: 'Amara Osei',
+        before: '4.0',
+        after: '2.3',
+      });
+    } finally {
+      setActiveTerm(CID, null);
+    }
+  });
+
   it('draws the tab with the method rule and the student check', () => {
     DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
     expect(main.innerHTML).toContain('Exactly How Most Recent Score Works');

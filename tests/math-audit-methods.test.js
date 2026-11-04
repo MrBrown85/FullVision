@@ -4,7 +4,8 @@
  *     method (Most Recent, Highest, Mean, Median, Mode, Decaying Average),
  *     with Count Only the Most Recent N and a reporting term in view.
  *  2. Invariants across screens: a competency's growth line ends at its
- *     level; a term's grades count only the term's work.
+ *     level; a report's grades count the year to date as of its term's end
+ *     (Colin, 2026-11-03).
  *  3. Grades follow every kind of edit made through the app's own save
  *     functions (no stale cached grade).
  */
@@ -159,7 +160,8 @@ function refEvidence(cls, tagId, term) {
   cls.scores[cls.sid].forEach(e => {
     const a = cls.assessments.find(x => x.id === e.assessmentId);
     if (cls.statuses[cls.sid + ':' + a.id] === 'EXC') return;
-    if (term && !(a.date >= term.starts_on && a.date <= term.ends_on)) return;
+    // A report counts the year to date as of its term's end.
+    if (term && a.date && !(a.date <= term.ends_on)) return;
     const cat = cls.categories.find(c => c.id === a.categoryId);
     if (cat && !(cat.weight > 0)) return;
     let v;
@@ -264,15 +266,15 @@ describe('competency levels match the reference model under every method', () =>
     expect(misses.slice(0, 5)).toEqual([]);
   });
 
-  it('a term counts only the work dated inside it', () => {
+  it("a report counts the work up to its term's end", () => {
     const bad = [];
     SEEDS.slice(0, 200).forEach(k => {
       const cls = randomClass(k);
-      cls.term = 2;
+      cls.term = 1;
       load(cls);
-      const inTerm = cls.assessments.filter(a => a.date >= TERMS[1].starts_on);
+      const inTerm = cls.assessments.filter(a => !a.date || a.date <= TERMS[0].ends_on);
       const viaTerm = getCourseLetterData(CID, cls.sid).R;
-      // The same class with only the term's work, all time.
+      // The same class with only the work up to Report 1's end, the year so far.
       const only = { ...cls, term: null, assessments: inTerm };
       only.scores = { [cls.sid]: cls.scores[cls.sid].filter(e => inTerm.some(a => a.id === e.assessmentId)) };
       load(only);

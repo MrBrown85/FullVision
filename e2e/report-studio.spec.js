@@ -1352,7 +1352,7 @@ test.describe('Grade Report', () => {
     await expect(sheet.locator('.report-student-name')).toHaveText(/\w+ \w+/);
     await expect(sheet.locator('.gr-head').first()).toContainText('Assignment');
     await expect(sheet.locator('.gr-head').first()).toContainText('Out Of');
-    await expect(page.locator('.gr-term')).toContainText('Term Grade');
+    await expect(page.locator('.gr-term')).toContainText('Course Grade');
     // Grades only: no comment, attendance or other feedback on the sheet.
     await expect(page.locator('.gr-sheet .report-comment-box, .gr-sheet .report-attendance')).toHaveCount(0);
     // Three Grade Sheet choices and the four Feedback Pages choices (greyed while the switch is off).

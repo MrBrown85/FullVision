@@ -294,7 +294,7 @@ window.DashInsights = (function () {
   function missingItems(cid, allStudents) {
     var assessments = getAssessments(cid)
       .filter(function (a) {
-        return assessmentInActiveTerm(cid, a);
+        return assessmentInYearToDate(cid, a);
       })
       .sort(function (a, b) {
         return (b.dueDate || b.date || '').localeCompare(a.dueDate || a.date || '');

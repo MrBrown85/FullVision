@@ -496,8 +496,7 @@ body.offline-active #app-dock {
 }
 
 /* Toolbar accent button — blue CTA used across pages */
-/* Reporting term picker (renderTermPicker in ui.js), shared by the
-   gradebook, dashboard and student toolbars. */
+/* A toolbar select (the dashboard's sort). */
 .term-select {
   font-family: var(--font-base);
   font-size: var(--text-base);
@@ -789,15 +788,12 @@ body.offline-active #app-dock {
 #sb-show-label:empty {
   display: none;
 }
-/* Which reporting term the grades beside the names cover (ui.js), on a
-   page with no term picker of its own. */
+/* Which report's year to date the grades beside the names cover (ui.js),
+   while a report is in view. */
 .sb-term-note {
   margin-top: 8px;
   font-size: var(--text-xs);
   color: var(--text-2);
-}
-body:has(.term-select) .sb-term-note {
-  display: none;
 }
 /* A menu in the flex row would sit at the row's start; put it under the
    buttons, the Show menu at the right. */

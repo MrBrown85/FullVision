@@ -537,7 +537,8 @@ describe('stage 3 blocks', () => {
       },
     ];
     stub('getAssessments', () => work);
-    stub('assessmentInActiveTerm', () => true);
+    stub('assessmentInYearToDate', () => true);
+    stub('assessmentInTermWindow', () => true);
     stub('getActiveTerm', () => null);
     stub('getGroupedSections', () => ({ groups: [], ungrouped: [] }));
     stub('getSections', () => secs);
@@ -673,7 +674,7 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {})).toBe('');
   });
 
-  it('Missing Work names this term’s work labelled Missing on one line, says None this term, or stays off', () => {
+  it('Missing Work names the work labelled Missing on one line, says None, or stays off', () => {
     const work = [
       { id: 'a1', title: 'Lab Report', dueDate: '2026-10-02' },
       { id: 'a2', title: 'Quiz', date: '2026-10-05' },
@@ -681,7 +682,8 @@ describe('stage 3 blocks', () => {
       { id: 'a4', title: 'Essay', date: '2026-10-08' },
     ];
     stub('getAssessments', () => work);
-    stub('assessmentInActiveTerm', () => true);
+    stub('assessmentInYearToDate', () => true);
+    stub('assessmentInTermWindow', () => true);
     stub('courseToday', () => '2026-10-10');
     // The Lab Report is past due with nothing in it: not missing.
     stub('assessmentCellValue', (cid, sid, a) =>
@@ -702,7 +704,7 @@ describe('stage 3 blocks', () => {
     );
     stub('assessmentCellValue', () => ({ kind: 'level' }));
     expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}))).toBe(
-      'Missing Work None this term As of Oct 10, 2026',
+      'Missing Work None As of Oct 10, 2026',
     );
     expect(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, { none: 'off' })).toBe('');
   });
@@ -829,7 +831,8 @@ describe('stage 3 blocks', () => {
       a4: { kind: 'status', status: 'NS' },
     };
     stub('getAssessments', () => work);
-    stub('assessmentInActiveTerm', () => true);
+    stub('assessmentInYearToDate', () => true);
+    stub('assessmentInTermWindow', () => true);
     stub('assessmentCellValue', (cid, sid, a) => cells[a.id]);
     stub('getActiveTerm', () => ({ ordinal: 2, startsOn: '2026-09-01', endsOn: '2026-11-30' }));
     stub('getStudentQuickObs', () => [
@@ -844,7 +847,8 @@ describe('stage 3 blocks', () => {
       { id: 'c', name: 'Communicating', shortName: 'Comm.' },
     ]);
     // The competencies as the comment reads them (CommentBank.compsOf):
-    // Strongest and Growing pass its gates, 3+ pieces this term.
+    // Strongest and Growing pass its gates: 3+ pieces for Strongest, 2+
+    // for Growing (the next step), in the year to date.
     const pieces = n => Array.from({ length: n }, (_, i) => ({ id: 'w' + i, v: 3, d: '2026-09-1' + i }));
     const comps = [
       { id: 'q', level: 3, scores: pieces(3) },
@@ -857,10 +861,10 @@ describe('stage 3 blocks', () => {
       expect(text(ReportBlocks.renderReportBlock('term-glance', CID, CECE, {}, {}))).toBe(
         'This Term at a Glance 2 Assessed 1 Late 1 Missing 2 Observations Comm. Strongest Planning Growing',
       );
-      // On two pieces Communicating is not Strongest, and Planning is not
-      // Growing: the box names only what the comment can.
+      // On two pieces Communicating is not Strongest, and on one Planning
+      // is not Growing: the box names only what the comment can.
       comps[2].scores = pieces(2);
-      comps[1].scores = pieces(2);
+      comps[1].scores = pieces(1);
       expect(text(ReportBlocks.renderReportBlock('term-glance', CID, CECE, {}, {}))).toBe(
         'This Term at a Glance 2 Assessed 1 Late 1 Missing 2 Observations — Strongest Questioning Growing',
       );
@@ -871,13 +875,22 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('term-glance', CID, CECE, {}, {})).toBe('');
   });
 
-  it('Growth Since Last Report reads the previous term through calc.js and puts the term back', () => {
+  it('Growth Since Last Report reads the last report through calc.js and puts the report back', () => {
     let term = 2;
     const set = [];
     stub('getActiveTerm', () => ({ ordinal: term, label: 'Term ' + term }));
-    stub('setActiveTerm', (cid, n) => {
+    stub('previousReportTerm', () => (term > 1 ? { ordinal: term - 1, label: 'Term ' + (term - 1) } : null));
+    // The last report is read as of its end (the year to date) and this one put back.
+    stub('readAsOfTerm', (cid, n, read) => {
+      const was = term;
       set.push(n);
       term = n;
+      try {
+        return read();
+      } finally {
+        term = was;
+        set.push(was);
+      }
     });
     stub('getReportingTerms', () => [
       { ordinal: 1, label: 'Term 1' },
@@ -893,7 +906,7 @@ describe('stage 3 blocks', () => {
     expect(set).toEqual([1, 2]);
     expect(term).toBe(2);
     expect(text(html)).toBe(
-      'Growth Since Last Report Competency Term 1 Term 2 Questioning ●●○○ Developing ●●●○ Proficient ↑ Planning ●●●○ Proficient ●●●○ Proficient →',
+      'Growth Since Last Report Competency Report 1 Report 2 Questioning ●●○○ Developing ●●●○ Proficient ↑ Planning ●●●○ Proficient ●●●○ Proficient →',
     );
     // No earlier term, or nothing in it: nothing prints.
     term = 1;
@@ -1054,7 +1067,8 @@ describe('stage 3 blocks', () => {
       a3: { kind: 'status', status: 'NS', value: 0, level: 0 },
     };
     stub('getAssessments', () => work);
-    stub('assessmentInActiveTerm', () => true);
+    stub('assessmentInYearToDate', () => true);
+    stub('assessmentInTermWindow', () => true);
     stub('assessmentCellValue', (cid, sid, a) => cells[a.id]);
     stub('getCategories', () => [
       { id: 'c1', name: 'Labs', weight: 40 },

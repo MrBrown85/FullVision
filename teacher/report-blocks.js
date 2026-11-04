@@ -523,7 +523,8 @@ window.ReportBlocks = (function () {
     sections.forEach(sec => {
       const secProf = getSectionProficiency(cid, student.id, sec.id);
       const sr = Math.round(secProf);
-      const secOverride = getSectionOverride(cid, student.id, sec.id);
+      // Only an override that applies to this report (dated by its end).
+      const secOverride = sectionOverrideInView(cid, student.id, sec.id);
       html += `<div class="report-outcome-section" style="page-break-inside:avoid">
       <div class="report-outcome-section-header" style="display:flex;align-items:center;justify-content:space-between">
         <span>${esc(sec.shortName || sec.name)}</span>`;
@@ -612,13 +613,16 @@ window.ReportBlocks = (function () {
     return sections
       .map((sec, i) => {
         const now = getSectionProficiency(cid, sid, sec.id);
-        const then = last ? last.levels[i] : _startLevel(cid, sid, sec);
+        // The last report's level when it had one for this competency, else
+        // the start of this term (a competency first assessed this term).
+        const fromLast = !!last && last.levels[i] > 0;
+        const then = fromLast ? last.levels[i] : _startLevel(cid, sid, sec);
         return {
           sec,
           name: _competencyLabel(sec),
           then: then > 0 ? then : 0,
           now,
-          thenLabel: last ? last.label : 'Start of Term',
+          thenLabel: fromLast ? last.label : 'Start of Term',
         };
       })
       .filter(r => r.now > 0);
@@ -801,14 +805,19 @@ window.ReportBlocks = (function () {
     const which = options.area === 'lowest' || options.area === 'highest' ? options.area : 'focus';
     const area = focusArea(cid, student, ctx, which);
     if (!area) return '';
-    const work = _sectionWork(cid, student.id, area.sec).filter(w => assessmentInActiveTerm(cid, w.a));
+    const work = _sectionWork(cid, student.id, area.sec).filter(w => assessmentInTermWindow(cid, w.a));
     // Now is the competency's level as calc.js grades it (override
-    // included), the figure the Proficiency block prints. The start is on
-    // the same footing, each rubric criterion its own score, as the
-    // Proficiency block's Start of Term (_sectionStart): the first weeks'
-    // mean, or with too few dated scores the first piece's. The pieces
-    // below show the gradebook's mark on each (_sectionWork).
-    const startV = _startLevel(cid, student.id, area.sec);
+    // included), the year to date as of the report's end, the figure the
+    // Proficiency block prints. Then is the same competency at the last
+    // report, the year to date as of its end, as the Proficiency block's
+    // column (_lastReportLevels); on the first report, the start of the
+    // term on the same footing, each rubric criterion its own score
+    // (_sectionStart): the first weeks' mean, or with too few dated scores
+    // the first piece's. A start inside a later term beside a year-to-date
+    // Now would compare two different spans of work. The pieces below show
+    // the gradebook's mark on each (_sectionWork).
+    const sinceLast = area.thenLabel && area.thenLabel !== 'Start of Term';
+    const startV = sinceLast ? area.then : _startLevel(cid, student.id, area.sec);
     const nowV = area.now;
     const bests = _namedWork(cid, student.id, work, true);
     const latest = work[work.length - 1];
@@ -830,10 +839,10 @@ window.ReportBlocks = (function () {
       const letter = courseGradeMode(cid) === 'letter';
       const plain = v => formatLevel(cid, v) + (letter ? '' : ' ' + _profWord(v));
 
-      facts.push(['Start of term', esc(plain(startV))]);
+      facts.push([sinceLast ? esc(area.thenLabel) : 'Start of term', esc(plain(startV))]);
       facts.push([
         'Now',
-        `<b>${esc(plain(nowV))}</b> <span class="report-progress-chg">(${esc(levelChangeAs(cid, startV, nowV))} this term)</span>`,
+        `<b>${esc(plain(nowV))}</b> <span class="report-progress-chg">(${esc(levelChangeAs(cid, startV, nowV))} ${sinceLast ? 'since ' + esc(area.thenLabel) : 'this term'})</span>`,
       ]);
     }
     if (options.best !== false && bests) {
@@ -926,14 +935,16 @@ window.ReportBlocks = (function () {
   function _startLevel(cid, sid, sec) {
     const start = _sectionStart(cid, sid, sec);
     if (start != null) return start;
-    const work = _sectionWork(cid, sid, sec).filter(w => assessmentInActiveTerm(cid, w.a));
+    const work = _sectionWork(cid, sid, sec).filter(w => assessmentInTermWindow(cid, w.a));
     return work.length ? _pieceLevel(cid, sid, sec, work[0].a) : 0;
   }
   function _sectionStartNow(cid, sid, sec) {
+    // The start is measured inside the report's own term (the scores read
+    // are the year to date as of its end; Colin, 2026-11-03).
     const dates = {};
     getAssessments(cid).forEach(a => {
       const d = typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date || a.dueDate || null;
-      if (d) dates[a.id] = d;
+      if (d && assessmentInTermWindow(cid, a)) dates[a.id] = d;
     });
     const points = [];
     (sec.tags || []).forEach(tag => {
@@ -946,8 +957,10 @@ window.ReportBlocks = (function () {
     const r = startAndNow(points);
     return r ? r.start : null;
   }
-  /* Every section's level in the previous reporting term, read through
-     calc.js with the term switched and put back; null without one. */
+  /* Every section's level at the last report: the year to date as of the
+     previous reporting term's end, read through calc.js with that term in
+     view and put back (Colin, 2026-11-03); null without one. Labelled by
+     its report ("Report 1"). */
   /* The previous term's levels and the start-of-term levels are read by
      Proficiency and by every Focus Area block for the same student in one
      render; they are kept until the current task ends (scores can't change
@@ -969,43 +982,31 @@ window.ReportBlocks = (function () {
   function _lastReportLevelsNow(cid, sid, sections) {
     const now = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
     if (!now) return null;
-    const prev = (typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [])
-      .filter(t => t.ordinal < now.ordinal)
-      .pop();
+    const prev = previousReportTerm(cid);
     if (!prev) return null;
-    let before;
-    try {
-      setActiveTerm(cid, prev.ordinal);
-      before = sections.map(sec => getSectionProficiency(cid, sid, sec.id));
-    } finally {
-      setActiveTerm(cid, now.ordinal);
-    }
+    const before = readAsOfTerm(cid, prev.ordinal, () => sections.map(sec => getSectionProficiency(cid, sid, sec.id)));
     if (!before.some(v => v > 0)) return null;
-    return { label: prev.label || 'Last Report', levels: before };
+    return { label: reportName(prev), levels: before };
   }
   /* The course % (calc.js getCourseLetterData), null without one. */
   function _coursePct(cid, sid) {
     const lg = getCourseLetterData(cid, sid);
     return lg && lg.R != null ? lg.R : null;
   }
-  /* The course grade at the last report, read as _lastReportLevels reads
-     levels: { text, pct, level }, or null without a previous term. */
+  /* The course grade at the last report (the year to date as of its end),
+     read as _lastReportLevels reads levels: { text, pct, level }, or null
+     without a previous term. */
   function _lastReportCourse(cid, sid) {
     const now = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
     if (!now) return null;
-    const prev = (typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [])
-      .filter(t => t.ordinal < now.ordinal)
-      .pop();
+    const prev = previousReportTerm(cid);
     if (!prev) return null;
-    return _pass('course|' + cid + '|' + sid + '|' + now.ordinal, () => {
-      try {
-        setActiveTerm(cid, prev.ordinal);
+    return _pass('course|' + cid + '|' + sid + '|' + now.ordinal, () =>
+      readAsOfTerm(cid, prev.ordinal, () => {
         const g = studentGradeSummary(cid, sid);
         return g.text ? { text: g.text, pct: _coursePct(cid, sid), level: getOverallProficiency(cid, sid) } : null;
-      } finally {
-        setActiveTerm(cid, now.ordinal);
-      }
-    });
+      }),
+    );
   }
   function _profWord(v) {
     return v > 0 ? PROF_LABELS[Math.min(4, Math.max(1, Math.round(v)))] : '';
@@ -1034,8 +1035,11 @@ window.ReportBlocks = (function () {
     const sections = _reportSections(cid);
     if (!sections.length) return '';
 
-    // Then and now, per section.
-    const last = options.compare !== 'start' ? _lastReportLevels(cid, sid, sections) : null;
+    // Then and now, per section. After the first report the comparison is
+    // always the last report's year-to-date level, Start of Term or not: a
+    // start inside this term beside a year-to-date Now would compare two
+    // spans of work (2026-11-03). Start of Term is the first report's.
+    const last = _lastReportLevels(cid, sid, sections);
     const thenLabel = last ? last.label : 'Start of Term';
     const nowLabel = 'Now';
     const rowsBySection = {};
@@ -1795,8 +1799,12 @@ window.ReportBlocks = (function () {
     // Every range leaves out work dated after today (This Term too:
     // Colin, 2026-11-03).
     const today = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
-    let pool = dated.filter(x => !x.d || x.d <= today);
-    if (range === 'term') pool = pool.filter(x => assessmentInActiveTerm(cid, x.a));
+    // A report reads the year to date as of its end, so work dated after
+    // the report's end is left out too (Colin, 2026-11-03).
+    const report = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    const until = report && report.endsOn && report.endsOn < today ? report.endsOn : today;
+    let pool = dated.filter(x => !x.d || x.d <= until);
+    if (range === 'term') pool = pool.filter(x => assessmentInTermWindow(cid, x.a));
     else if (range === 'last10') pool = pool.slice(0, 10);
     if (oldest) pool = pool.slice().reverse();
     if (!pool.length) return '';
@@ -1810,20 +1818,13 @@ window.ReportBlocks = (function () {
     const groups = [];
     if (organize === 'competency') {
       const sections = _reportSections(cid);
-      // Year to Date and Last 10 reach past the report's term, so their
-      // marks are read all time, with the term put back after (as
-      // _lastReportLevels does); This Term reads the term's.
-      const term = range !== 'term' && typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+      // The marks are read as of the report (the year to date to its end),
+      // which holds every range's pieces.
       const marks = {};
-      try {
-        if (term) setActiveTerm(cid, null);
-        // The competency's mark on each piece, as the gradebook shows it.
-        sections.forEach(sec =>
-          (sec.tags || []).forEach(tag => (marks[tag.id] = tagMarksByAssessment(cid, sid, tag.id))),
-        );
-      } finally {
-        if (term) setActiveTerm(cid, term.ordinal);
-      }
+      // The competency's mark on each piece, as the gradebook shows it.
+      sections.forEach(sec =>
+        (sec.tags || []).forEach(tag => (marks[tag.id] = tagMarksByAssessment(cid, sid, tag.id))),
+      );
       sections.forEach(sec => {
         const byAssessment = {};
         (sec.tags || []).forEach(tag => {
@@ -1855,8 +1856,9 @@ window.ReportBlocks = (function () {
         months.forEach(m => groups.push({ name: m.name, rows: m.rows }));
       } else {
         // Each category heading carries its weight and the student's grade
-        // in it this term, worked out as the gradebook does.
-        const termWork = getAssessments(cid).filter(a => assessmentInActiveTerm(cid, a));
+        // in it, the year to date as of the report's end, worked out as the
+        // gradebook does (the Course Grade's footing; Colin, 2026-11-03).
+        const termWork = getAssessments(cid).filter(a => assessmentInYearToDate(cid, a));
         const catGrade = c => {
           if (!showCatGrade) return '';
           const g = assessmentGroupGrade(
@@ -1912,8 +1914,9 @@ window.ReportBlocks = (function () {
         (organize === 'competency'
           ? ` · latest ${per} for each competency`
           : ` · ${n} assessment${n === 1 ? '' : 's'}`);
-    // The course grade for the term, as the gradebook shows it, with the
-    // report's reporting basis (IE, or No Letter Grade for goals).
+    // The course grade, the year to date as of the report's end, as the
+    // gradebook shows it, with the report's reporting basis (IE, or No
+    // Letter Grade for goals).
     const course = showCourse ? studentGradeSummary(cid, sid, ctx && ctx.termId).text : '';
     const courseHtml = course
       ? `<div class="report-grades-course">Course Grade <strong>${esc(course)}</strong></div>`
@@ -1945,7 +1948,7 @@ window.ReportBlocks = (function () {
     assessments.forEach(a => {
       const ccIds = a.coreCompetencyIds || [];
       if (ccIds.length === 0) return;
-      if (!assessmentInActiveTerm(cid, a)) return;
+      if (!assessmentInYearToDate(cid, a)) return;
       if (ccIds.some(ccId => compData[ccId])) hasAny = true;
       // Work in a 0% category counts toward nothing, as for competencies.
       if (!countsTowardGrades(cid, a)) return;
@@ -2040,7 +2043,7 @@ window.ReportBlocks = (function () {
     const lines = [];
     const focus = focusArea(cid, student, ctx, 'focus');
     if (focus) {
-      const work = _sectionWork(cid, student.id, focus.sec).filter(w => assessmentInActiveTerm(cid, w.a));
+      const work = _sectionWork(cid, student.id, focus.sec).filter(w => assessmentInTermWindow(cid, w.a));
       if (work.length) {
         const hi = _byMark(cid, student.id, true);
         const lo = _byMark(cid, student.id, false);
@@ -2068,8 +2071,17 @@ window.ReportBlocks = (function () {
      active), each with its cell as the Scores view shows it. */
   function _termCells(cid, student) {
     return getAssessments(cid)
-      .filter(a => assessmentInActiveTerm(cid, a))
+      .filter(a => assessmentInTermWindow(cid, a))
       .map(a => ({ a: a, cell: assessmentCellValue(cid, student.id, a) }));
+  }
+  /* Work labelled Missing up to the report's end, whatever term it was
+     assigned in, undated work included (Colin, 2026-11-03): the year to
+     date the grade counts. */
+  function _missingCells(cid, student) {
+    return getAssessments(cid)
+      .filter(a => assessmentInYearToDate(cid, a))
+      .map(a => ({ a: a, cell: assessmentCellValue(cid, student.id, a) }))
+      .filter(c => c.cell.status === 'NS');
   }
   function _inActiveTerm(cid, day) {
     const t = getActiveTerm(cid);
@@ -2083,13 +2095,16 @@ window.ReportBlocks = (function () {
     if (!cells.length) return '';
     const assessed = cells.filter(c => ['level', 'points', 'complete'].includes(c.cell.kind)).length;
     const late = cells.filter(c => c.cell.late).length;
-    const missing = cells.filter(c => c.cell.status === 'NS').length;
+    // Missing is everything still Missing up to the report's end, as the
+    // Missing Work block lists it; the rest are this term's.
+    const missing = _missingCells(cid, student).length;
     const obs = getStudentQuickObs(cid, student.id).filter(o =>
       _inActiveTerm(cid, String(o.date || o.created || '').slice(0, 10)),
     ).length;
     // Strongest and Growing by the comment's evidence gates (CommentBank
-    // strongestOf, nextStepOf: 3+ pieces this term), so the box, At a Glance
-    // and the comment name the same competencies; a dash when none passes.
+    // strongestOf: 3+ pieces; nextStepOf: 2+ pieces; both counted in the
+    // year to date), so the box, At a Glance and the comment name the same
+    // competencies; a dash when none passes.
     const secs = _reportSections(cid);
     const bank = typeof CommentBank !== 'undefined' ? CommentBank : null;
     const comps = bank ? bank.compsOf(cid, student) : [];
@@ -2106,26 +2121,21 @@ window.ReportBlocks = (function () {
   }
 
   /* ── Growth Since Last Report ──
-     Each competency's level in the previous reporting term beside this
-     one. calc.js is scoped to the previous term for the reading and put
-     back after (as Print Grades does). Nothing when there is no previous
-     term or no evidence in it. */
+     Each competency's year-to-date level at the last report's end beside
+     its year-to-date level at this report's end (Colin, 2026-11-03), headed
+     by the reports ("Report 1", "Report 2"). calc.js reads the last report
+     with its term in view and puts this one back (readAsOfTerm). Nothing
+     when there is no previous term or no evidence by its end. */
   function renderBlockGrowth(cid, student) {
     const now = getActiveTerm(cid);
     if (!now) return '';
-    const prev = getReportingTerms(cid)
-      .filter(t => t.ordinal < now.ordinal)
-      .pop();
+    const prev = previousReportTerm(cid);
     if (!prev) return '';
     const sections = _reportSections(cid);
     const current = sections.map(sec => getSectionProficiency(cid, student.id, sec.id));
-    let before;
-    try {
-      setActiveTerm(cid, prev.ordinal);
-      before = sections.map(sec => getSectionProficiency(cid, student.id, sec.id));
-    } finally {
-      setActiveTerm(cid, now.ordinal);
-    }
+    const before = readAsOfTerm(cid, prev.ordinal, () =>
+      sections.map(sec => getSectionProficiency(cid, student.id, sec.id)),
+    );
     if (!before.some(v => v > 0)) return '';
     // The arrow follows the figures beside it: the proficiency word in a
     // Proficiency class, the % in a Letter or Both class (_levelHtml), so
@@ -2146,14 +2156,14 @@ window.ReportBlocks = (function () {
       .join('');
     return `<div class="report-block-box report-growth">
     <div class="report-block-title">Growth Since Last Report</div>
-    <table class="report-ct"><thead><tr><th>Competency</th><th class="col-before">${esc(prev.label || 'Last Report')}</th><th>${esc(now.label || 'This Report')}</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="report-ct"><thead><tr><th>Competency</th><th class="col-before">${esc(reportName(prev))}</th><th>${esc(reportName(now))}</th><th></th></tr></thead><tbody>${rows}</tbody></table>
   </div>`;
   }
 
   /* ── Missing Work ────────────────────────────────────────────────
-     This term's work labelled Missing, as of today: one line at
-     Row width ("None this term", or the titles), a count over its words at
-     Side by Side. When there is none it says so, or stays off. The As Of
+     Work labelled Missing up to the report's end, whatever term it was
+     assigned in, as of today: one line at Row width ("None", or the
+     titles), a count over its words at Side by Side. When there is none it says so, or stays off. The As Of
      date is marked data-print-date: "changed since the last print" skips it. */
   function _asOf(cid) {
     const d = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
@@ -2164,15 +2174,11 @@ window.ReportBlocks = (function () {
   function renderBlockMissingWork(cid, student, ctx, options) {
     options = options || {};
     const half = options.size === 'half';
-    const missing = _termCells(cid, student).filter(c => c.cell.status === 'NS');
+    const missing = _missingCells(cid, student);
     if (!missing.length && options.none === 'off') return '';
     const n = missing.length;
     const titles = missing.map(c => esc(c.a.title || '')).join(', ');
-    const words = n
-      ? options.titles !== false
-        ? titles
-        : n + (n === 1 ? ' assignment' : ' assignments')
-      : 'None this term';
+    const words = n ? (options.titles !== false ? titles : n + (n === 1 ? ' assignment' : ' assignments')) : 'None';
     if (half) {
       return `<div class="report-block-box report-missing-work report-strip-half">
     <div class="report-strip-head"><b>Missing Work</b><span class="report-prof-meta" data-print-date>${esc(_asOf(cid))}</span></div>

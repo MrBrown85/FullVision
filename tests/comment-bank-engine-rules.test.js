@@ -300,7 +300,7 @@ describe('the support line', () => {
     });
     expect(CommentBank.supportChoice(f, f.habits)).toMatchObject({ line: { id: 'b' }, fit: 'significance' });
     const noNext = tomas({
-      comps: [comp('c1', 'Evidence', 3.6), comp('c2', 'Perspective', 3, 2), comp('c3', 'Significance', 2.5, 2)],
+      comps: [comp('c1', 'Evidence', 3.6), comp('c2', 'Perspective', 3, 1), comp('c3', 'Significance', 2.5, 1)],
       classLines: f.classLines,
     });
     expect(CommentBank.supportChoice(noNext, noNext.habits)).toMatchObject({ line: { id: 'a' }, fit: 'completes' });
@@ -362,7 +362,7 @@ describe('six to nine sentences', () => {
       family: 'science',
       pronouns: THEY,
       pronounsOnFile: true,
-      comps: [comp('q', 'Questioning and Predicting', 3, 2)],
+      comps: [comp('q', 'Questioning and Predicting', 3, 1)],
       work: [piece('p1', 'Energy Lab', '2026-10-01', 75)],
       voice: {},
       confidence: [],

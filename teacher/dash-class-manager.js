@@ -2835,6 +2835,14 @@ window.DashClassManager = (function () {
 
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
+    // Class Management reads the year so far for every class: its previews
+    // (calculation method, Folders Count as One) and Check With a Student
+    // never count as of a report left in view on the Reports page.
+    if (typeof setActiveTerm === 'function') {
+      courseIds.forEach(function (c) {
+        setActiveTerm(c, null);
+      });
+    }
     var html = '';
     _cmSyncUrl();
 
@@ -4147,8 +4155,14 @@ window.DashClassManager = (function () {
   }
 
   /* One student's grade with the settings on the left, from the class's own
-     scores. */
+     scores: the year so far, as the gradebook shows it, even when Class
+     Management opens over a report (Colin, 2026-11-03). */
   function _cmRenderCheckStudent(cid, gs, method) {
+    return readAsOfTerm(cid, null, function () {
+      return _cmRenderCheckStudentNow(cid, gs, method);
+    });
+  }
+  function _cmRenderCheckStudentNow(cid, gs, method) {
     var students = sortStudents(getStudents(cid), 'lastName');
     var head =
       '<aside class="cm-section cm-check" aria-label="Check with a student">' +

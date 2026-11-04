@@ -191,8 +191,8 @@ describe('Missing and Late', () => {
   });
 });
 
-describe('the class average since the term before', () => {
-  it('is null with no term active', () => {
+describe('the class average since the last report', () => {
+  it('is null before any report has ended', () => {
     expect(classGradeChange(CID, IDS)).toBeNull();
   });
 });

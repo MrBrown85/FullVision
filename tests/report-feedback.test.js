@@ -207,12 +207,13 @@ describe('forStudent: which assessments get a card', () => {
     expect(F.forStudent(CID, ST, { order: 'newest' }).map(i => i.id)[0]).toBe('advanced');
   });
 
-  it('keeps to the active term', () => {
+  it("keeps to the year to date as of the report's end", () => {
     saveCourseConfig(CID, {
       reportingTerms: [{ ordinal: 1, label: 'Term 1', starts_on: '2026-10-03', ends_on: '2026-10-06' }],
     });
     setActiveTerm(CID, 1);
-    expect(F.forStudent(CID, ST).map(i => i.id)).toEqual(['rubric', 'tags']);
+    // Work dated before the term counts (the year to date); work after its end doesn't.
+    expect(F.forStudent(CID, ST).map(i => i.id)).toEqual(['points', 'done', 'rubric', 'tags']);
   });
 });
 

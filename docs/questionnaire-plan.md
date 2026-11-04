@@ -1,5 +1,7 @@
 # Term Questionnaire, rebuilt around the comment: build plan
 
+At a Glance, the Observations card and drawer and the pinned right column were rebuilt on 2026-11-03 from `fullvision-questionnaire-glance-plan.md` (Colin's home folder; `DECISIONS.md`, Term Questionnaire 18–21); where this plan and that one differ, that one is current.
+
 Written 2026-10-28 from the design canvas "Term Questionnaire Mockup" (https://claude.ai/artifact/NY2EwwiZ8Ug6GiPqj4hHnV, version 19: the Cece, Jasper, No Observations and 1366 × 768 laptop artboards, and "Questions Come From the Report"). Decision in `DECISIONS.md`, Term Questionnaire 14. This is the working plan: what the page becomes, where its data lives, the PRs in order, and what each must prove. It finishes what `report-forms-plan.md` Phase 8 left out ("the Term Questionnaire's comment builder: its own canvas and plan").
 
 ## What the page becomes

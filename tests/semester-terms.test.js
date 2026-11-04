@@ -78,15 +78,13 @@ describe('term numbers', () => {
     ).toEqual([1, 2]);
   });
 
-  it('a saved Semester 2 class keeps its chosen term', () => {
+  it('a saved Semester 2 class keeps its term numbers', () => {
     const cid = 'e0000000-0000-4000-8000-0000000000s2';
     saveCourses({ [cid]: { id: cid, name: 'Philosophy 12' } });
     _cache.courseConfigs[cid] = {};
     expect(saveReportingTerms(cid, grandview().slice(2))).toBeNull();
     expect(getReportingTerms(cid).map(t => t.ordinal)).toEqual([3, 4]);
-    setSelectedTermOrdinal(cid, 4);
     expect(saveReportingTerms(cid, grandview().slice(2))).toBeNull();
-    expect(getSelectedTermOrdinal(cid)).toBe(4);
-    setSelectedTermOrdinal(cid, null);
+    expect(getReportingTerms(cid).map(t => t.ordinal)).toEqual([3, 4]);
   });
 });

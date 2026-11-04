@@ -624,20 +624,24 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 5, 25]);
     expect(CommentBank.fitCount(ctx)).toBe(79);
     expect(ctx.name).toBe('Jas');
-    expect(ctx.fellCount).toBe('four');
+    // Nothing fell from Extending since Report 1's year to date (it fell
+    // four times inside Term 2's own trend, which Generate no longer
+    // compares with a year-to-date level; 2026-11-03).
+    expect(ctx.fellCount).toBe('');
   });
 
   it('reads Completes Work from the record, and a pick overrides it', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
     const f = CommentBank.facts(cid, st, 'term-2');
-    expect(f.record).toEqual({ total: 22, handed: 22, late: 0, missing: 0 });
+    // The record is the year to date as of Report 2's end (Colin, 2026-11-03).
+    expect(f.record).toEqual({ total: 37, handed: 37, late: 0, missing: 0 });
     expect(CommentBank.context(f, {})._habits).toEqual({ completes: 4 });
     expect(CommentBank.context(f, { habits: { completes: 2 } })._habits).toEqual({ completes: 2 });
   });
 
   it('counts only work labelled Missing, whatever its due date', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
-    const term = getAssessments(cid).filter(a => assessmentInActiveTerm(cid, a));
+    const term = getAssessments(cid).filter(a => assessmentInYearToDate(cid, a));
     const empty = Object.assign({}, term[0], { id: 'past-due-empty', title: 'Past Due', dueDate: '2026-01-05' });
     const savedWork = _cache.assessments[cid];
     const savedStatuses = _cache.statuses[cid];
@@ -672,20 +676,24 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       .forEach(k => expect(ctx[k], k).not.toMatch(/grandma/));
   });
 
-  it('gives Cece every score this term per competency, with the canvas’s Start and Now', () => {
+  it('gives Cece every score in the year to date per competency, with the term’s Start and Now', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
     const comps = CommentBank.facts(cid, st, 'term-2').comps;
     // One point per piece of work, the competency's mark on it as the
-    // gradebook shows it (tagMarksByAssessment). Start and Now are on the
-    // level's footing, each rubric criterion its own score (getTagScores).
-    expect(comps.map(c => c.scores.length)).toEqual([13, 9, 16, 13, 9, 8]);
+    // gradebook shows it (tagMarksByAssessment): every piece up to Report
+    // 2's end (scores), and the ones dated in Term 2 (termScores). Start
+    // and Now compare Report 1's year-to-date level with the level now, as
+    // Growth Since Last Report prints them (2026-11-03).
+    expect(comps.map(c => c.scores.length)).toEqual([19, 13, 27, 20, 15, 16]);
+    expect(comps.map(c => c.termScores.length)).toEqual([13, 9, 16, 13, 9, 8]);
+    expect(comps.every(c => c.since === 'Report 1' && c.now === c.level)).toBe(true);
     expect(comps.map(c => levelFigure(c.start) + ' → ' + levelFigure(c.now))).toEqual([
-      '2.9 → 2.9',
-      '3.2 → 2.9',
-      '3.1 → 3.2',
-      '3.1 → 2.9',
-      '3.1 → 2.9',
-      '3.1 → 3.3',
+      '3.0 → 3.0',
+      '3.0 → 3.1',
+      '3.0 → 3.1',
+      '3.0 → 3.1',
+      '2.9 → 3.1',
+      '2.8 → 3.1',
     ]);
   });
 
@@ -822,11 +830,14 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       values: { bestPiece: ctx.bestPiece },
     });
     expect(ctx.bestPiece).toContain('“' + top.title);
-    // Cece has no competency past the "improved" gate; Mateo's Scientific
-    // Communication is.
+    // Cece has no competency past the "improved" gate (half a step since
+    // Report 1); Mateo's Scientific Communication is, once it rose from
+    // Developing at Report 1.
     expect(ctx.rise).toBe('');
     const mateo = getStudents(cid).find(s => s.firstName === 'Mateo');
-    const mctx = CommentBank.context(CommentBank.facts(cid, mateo, 'term-2'), {});
+    const mf = CommentBank.facts(cid, mateo, 'term-2');
+    mf.comps = mf.comps.map(c => (c.id === 'SC' ? { ...c, start: 2, now: 3, level: 3, since: 'Report 1' } : c));
+    const mctx = CommentBank.context(mf, {});
     const rose = {
       id: 'x-rose',
       part: 'now',
@@ -882,15 +893,16 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   it('puts the part’s no-claim sentence in place of one whose picture of the term is no longer true', () => {
     const f = cece();
     const ctx = CommentBank.context(f, {});
-    expect(ctx.picture).toBe('steady');
+    // Rises outnumber falls since Report 1, so the picture is strong.
+    expect(ctx.picture).toBe('strong');
     // A sentence in the family's part that claims the picture of the term;
     // f01 (For the Family) is the part's first no-claim sentence.
     const steadyS = {
       id: 'x-steady',
       part: 'how',
       group: 'For the Family',
-      text: 'At home, you can ask {him} about this steady term in {course}.',
-      when: { picture: 'steady' },
+      text: 'At home, you can ask {him} about this strong term in {course}.',
+      when: { picture: 'strong' },
       claims: ['picture'],
     };
     const bank = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([steadyS]) };

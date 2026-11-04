@@ -59,6 +59,7 @@ window.ReportQuestionnaire = (function () {
     var students = getTqStudents();
     tqStudentIndex = Math.max(0, Math.min(students.length - 1, idx));
     _commentTab = 'this';
+    _drawer = null;
     rerender();
   }
   function tqPrevStudent() {
@@ -1146,7 +1147,7 @@ window.ReportQuestionnaire = (function () {
     });
   }
 
-  /* The best piece this term, by the comment's rule (CommentBank.bestPieceOf),
+  /* The best piece in the year to date, by the comment's rule (CommentBank.bestPieceOf),
      so At a Glance and the comment name the same piece. f: the facts. */
   function bestPiece(f) {
     return CommentBank.bestPieceOf(f);
@@ -1158,13 +1159,14 @@ window.ReportQuestionnaire = (function () {
     return courseGradeMode(cid) === 'letter' ? CommentBank.workMark(f, w) : f.levelText(w.v);
   }
 
-  /* Work labelled Missing this term (status NS), whatever its due date:
+  /* Work labelled Missing (status NS), whatever its due date, up to the
+     report's end, whatever term it was assigned in (Colin, 2026-11-03):
      the one rule everywhere (Decision 4; facts().notHandedIn counts the
      same work). */
   function notHandedIn(cid, sid) {
     return (getAssessments(cid) || [])
       .filter(function (a) {
-        return assessmentInActiveTerm(cid, a) && assessmentCellValue(cid, sid, a).status === 'NS';
+        return assessmentInYearToDate(cid, a) && assessmentCellValue(cid, sid, a).status === 'NS';
       })
       .map(function (a) {
         return a.title || '';
@@ -1174,7 +1176,8 @@ window.ReportQuestionnaire = (function () {
   /* Strongest: the competencies past the comment's "strongest" evidence
      gate (CommentBank.strongestOf), so the tag and the comment agree; Next
      step: the competency the comment's next step names
-     (CommentBank.nextStepOf), the lowest with 3+ scored pieces. */
+     (CommentBank.nextStepOf), the lowest with 2+ scored pieces in the year
+     to date. */
   function skillTags(comps) {
     var list = (comps || []).filter(function (c) {
       return c.level > 0;
@@ -1188,38 +1191,132 @@ window.ReportQuestionnaire = (function () {
     return out;
   }
 
-  // html-safe: competency names, titles, notes, marks and missing work esc()'d; tags are fixed words
+  /* ── At a Glance (Questionnaire glance plan, step 2) ─────────
+     Sets up the comment: the year so far, and the change since the
+     earlier report. */
+
+  /* A competency's colour step for .qn-level, 1 to 4. */
+  function _levelStep(v) {
+    return Math.max(1, Math.min(4, Math.round(v)));
+  }
+  /* "5 pieces", "1 piece": a competency's scored pieces. */
+  function _pieces(c) {
+    var n = (c.scores || []).length;
+    return n + (n === 1 ? ' piece' : ' pieces');
+  }
+  /* A competency's year-to-date level at the earlier report's end, or 0:
+     facts() reads it as c.start when c.since is set (CommentBank.compsOf,
+     calc.js readAsOfTerm), the same level Growth Since Last Report prints. */
+  function _levelThen(f, c) {
+    return f.lastReport && c.since && c.start > 0 ? c.start : 0;
+  }
+  /* The change since the earlier report: "↑ from 3.0", "↓ from 3.0",
+     "No change", or "New since the report" for a competency with no level
+     then; '' with no earlier report. */
+  function glanceChange(cid, f, c) {
+    if (!f.lastReport) return '';
+    var then = _levelThen(f, c);
+    if (!then) return 'New since the report';
+    if (Math.abs(c.level - then) < 0.05) return 'No change';
+    return (c.level > then ? '↑ from ' : '↓ from ') + formatLevel(cid, then);
+  }
+  /* The rows' competencies, from the year to date as of the report's end
+     (f.comps, the comment's own list): Strongest is the comment's
+     strongest (CommentBank.strongestOf) or, when none clears its gate, the
+     highest with 3+ pieces, then the highest of any (Colin: "Show the
+     highest anyway"); Next step is the comment's (CommentBank.nextStepOf);
+     Biggest change is the one with 3+ pieces that moved most since the
+     earlier report, null when none moved by 0.05 or there is no report. */
+  function glanceRows(f) {
+    var comps = (f.comps || []).filter(function (c) {
+      return c.level > 0;
+    });
+    var enough = comps.filter(function (c) {
+      return (c.scores || []).length >= 3;
+    });
+    var top = function (list) {
+      return list.reduce(function (a, c) {
+        return !a || c.level > a.level ? c : a;
+      }, null);
+    };
+    var strongest = CommentBank.strongestOf(comps)[0] || top(enough) || top(comps);
+    var move = null;
+    var moved = 0;
+    if (f.lastReport)
+      enough.forEach(function (c) {
+        var then = _levelThen(f, c);
+        var d = then ? Math.abs(c.level - then) : 0;
+        if (d > moved) {
+          move = c;
+          moved = d;
+        }
+      });
+    return {
+      comps: comps,
+      strongest: strongest,
+      next: CommentBank.nextStepOf(comps),
+      change: moved >= 0.05 ? move : null,
+    };
+  }
+
+  // html-safe: competency names, figures and words esc()'d; labels are fixed words
+  function _glanceSkillHtml(cid, f, label, c, fig) {
+    return `<div class="qn-fact">
+        <span class="qn-fact-label">${label}</span>
+        <div class="qn-fact-body"><span>${esc(c.name)}</span><span class="qn-muted">${esc(fig)}</span></div>
+        <span class="qn-level" data-level="${_levelStep(c.level)}">${esc(f.levelText(c.level))}</span>
+      </div>`;
+  }
+
+  // html-safe: competency names, titles, notes, marks, figures and missing work esc()'d; labels are fixed words
   function _glanceHtml(cid, student, f) {
     var best = bestPiece(f);
     // The best piece's mark as the comment prints it: in a Letter class,
     // points work's own % (CommentBank.workMark, calc.js), never its level
-    // as a %.
+    // as a %. The best piece is the comment's, from the same work.
     var bestMark = best
       ? courseGradeMode(cid) === 'letter'
         ? CommentBank.workMark(f, best)
         : formatLevel(cid, best.v)
       : '';
-    var missing = notHandedIn(cid, student.id);
-    var tags = skillTags(f.comps);
-    var skills = f.comps
-      .map(function (c) {
-        var tag = tags[c.id];
-        return `<div class="qn-skill">
-          <span class="qn-skill-name">${esc(c.name)}</span>
-          ${tag ? `<span class="qn-tag${tag === 'Strongest' ? ' strongest' : ''}">${tag}</span>` : ''}
-          <span class="qn-level" data-level="${Math.max(1, Math.min(4, Math.round(c.level)))}">${esc(f.levelText(c.level))}</span>
-        </div>`;
-      })
-      .join('');
-    return `<div class="qn-card qn-glance">
-      <div class="qn-card-top"><span class="qn-card-title">At a Glance</span></div>
+    // Missing and Late: the comment's record, the year to date as of the
+    // report's end (facts().notHandedIn, the Missing Work block's rule).
+    var missing = (f.notHandedIn && f.notHandedIn.titles) || [];
+    var late = (f.record && f.record.late) || 0;
+    var rows = glanceRows(f);
+    var withChange = function (c) {
+      return [formatLevel(cid, c.level), _pieces(c), glanceChange(cid, f, c)].filter(Boolean).join(' · ');
+    };
+    var skills = '';
+    if (rows.strongest) skills += _glanceSkillHtml(cid, f, 'Strongest', rows.strongest, withChange(rows.strongest));
+    if (rows.next) skills += _glanceSkillHtml(cid, f, 'Next step', rows.next, withChange(rows.next));
+    if (rows.change)
+      skills += _glanceSkillHtml(
+        cid,
+        f,
+        'Biggest change',
+        rows.change,
+        formatLevel(cid, _levelThen(f, rows.change)) +
+          ' → ' +
+          formatLevel(cid, rows.change.level) +
+          ' · ' +
+          _pieces(rows.change),
+      );
+    var sub = f.lastReport
+      ? 'So far this year · change since the ' + f.lastReport.label + ' report'
+      : 'So far this year';
+    var n = rows.comps.length;
+    return `<div class="qn-card qn-glance qno-glance">
+      <div class="qn-card-top"><span class="qn-card-title">At a Glance</span><span class="qn-sub">${esc(sub)}</span></div>
+      <div class="qn-band">Skills</div>
+      ${skills || '<div class="qn-fact"><span class="qn-muted">No scores so far this year</span></div>'}
       <div class="qn-band">Work</div>
       <div class="qn-fact qn-best">
         <span class="qn-fact-label">Best piece</span>
-        <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(bestMark)}</span>${_reportNoteNudge(best)}` : '<span class="qn-muted">No marked work this term yet</span>'}</div>
+        <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(bestMark)}</span>${_reportNoteNudge(best)}` : '<span class="qn-muted">No marked work yet</span>'}</div>
       </div>
       <div class="qn-fact">
-        <span class="qn-fact-label">Not handed in</span>
+        <span class="qn-fact-label">Missing</span>
         <div class="qn-fact-body">${
           missing.length
             ? missing
@@ -1227,12 +1324,126 @@ window.ReportQuestionnaire = (function () {
                   return `<span>${esc(t)}</span>`;
                 })
                 .join('')
-            : '<span class="qn-muted">None this term</span>'
+            : '<span class="qn-muted">None so far this year</span>'
         }</div>
         ${missing.length ? `<span class="qn-count">${missing.length}</span>` : ''}
       </div>
-      <div class="qn-band">Skills</div>
-      ${skills || '<div class="qn-fact"><span class="qn-muted">No scores this term yet</span></div>'}
+      <div class="qn-fact">
+        <span class="qn-fact-label">Late</span>
+        <div class="qn-fact-body">${
+          late
+            ? `<span>${late === 1 ? '1 piece' : late + ' pieces'}</span>`
+            : '<span class="qn-muted">None so far this year</span>'
+        }</div>
+      </div>
+      ${
+        n
+          ? `<div class="qno-foot qno-glance-foot">
+        <button type="button" class="qn-card-link qno-view-all" data-action="tqOpenSkills" aria-haspopup="dialog">View All ${n} Skills</button>
+      </div>`
+          : ''
+      }
+    </div>`;
+  }
+
+  /* ── Observations (Questionnaire glance plan, step 4) ────────
+     For reading only: nothing here feeds Generate. */
+
+  /* The four types in order (OBS_SENTIMENTS), then All: [{ key, label, title }]. */
+  function _obsTypes() {
+    var plural = { strength: 'strengths', growth: 'growth', concern: 'concerns', note: 'notes' };
+    return Object.keys(OBS_SENTIMENTS)
+      .map(function (k) {
+        return { key: k, label: OBS_SENTIMENTS[k].label, title: 'Show ' + (plural[k] || k) };
+      })
+      .concat([{ key: 'all', label: 'All', title: 'Show all observations' }]);
+  }
+
+  /* The student's observations, newest first, each with its studentId (the
+     store keys them by student), as the student page lists them. */
+  function studentObs(cid, sid) {
+    return (getStudentQuickObs(cid, sid) || [])
+      .map(function (o) {
+        return Object.assign({}, o, { studentId: sid });
+      })
+      .sort(function (a, b) {
+        return (
+          String(ObsCard.obDay(b)).localeCompare(String(ObsCard.obDay(a))) ||
+          String(b.created || '').localeCompare(String(a.created || ''))
+        );
+      });
+  }
+
+  /* How many of each type, and all: { strength, growth, concern, note, all }. */
+  function obsCounts(list) {
+    var out = { all: list.length };
+    Object.keys(OBS_SENTIMENTS).forEach(function (k) {
+      out[k] = 0;
+    });
+    list.forEach(function (ob) {
+      if (out[ob.sentiment] != null) out[ob.sentiment]++;
+    });
+    return out;
+  }
+
+  /* The observations dated after the earlier report's last day, or null
+     with no earlier report. */
+  function obsSinceReport(list, f) {
+    if (!f.lastReport) return null;
+    return list.filter(function (ob) {
+      return ObsCard.obDay(ob) > f.lastReport.endsOn;
+    }).length;
+  }
+
+  /* The strip's five segments. On the card each opens the drawer on its
+     type; in the drawer (`on`, the chosen type) each filters the list. */
+  // html-safe: counts are numbers, type keys and labels are OBS_SENTIMENTS' own, labels esc()'d
+  function _obsStripHtml(counts, on) {
+    var inDrawer = on != null;
+    return _obsTypes()
+      .map(function (t) {
+        var chosen = on === t.key;
+        return `<button type="button" class="qno-seg${chosen ? ' on' : ''}" data-sentiment="${t.key}" data-action="${inDrawer ? 'tqObsFilter' : 'tqOpenObs'}" data-filter="${t.key}"${inDrawer ? ` aria-pressed="${chosen}"` : ` title="${esc(t.title)}"`}><span class="qno-seg-n">${counts[t.key] || 0}</span><span class="qno-seg-word">${esc(t.label)}</span></button>`;
+      })
+      .join('');
+  }
+
+  // html-safe: observation cards from ObsCard.html (escapes every value); names, pronouns and the sub-line esc()'d
+  function _obsHtml(cid, student, f) {
+    var first = student.firstName || displayNameFirst(student);
+    var list = studentObs(cid, student.id);
+    var since = obsSinceReport(list, f);
+    var sub =
+      list.length && since != null
+        ? 'So far this year · ' + since + ' since the ' + f.lastReport.label + ' report'
+        : 'So far this year';
+    var top = `<div class="qn-card-top"><span class="qn-card-title">Observations</span><span class="qn-sub">${esc(sub)}</span></div>`;
+    if (!list.length) {
+      var her = (f.pronouns && f.pronouns.obj) || 'them';
+      return `<div class="qn-card qn-obs">${top}
+        <div class="qno-empty">No observations for ${esc(first)} yet. Observations you record for ${esc(her)} this year show here.</div>
+      </div>`;
+    }
+    var ctx = ObsCard.context(cid);
+    var cards = list
+      .slice(0, 3)
+      .map(function (ob) {
+        return ObsCard.html(ob, ctx, {
+          showStudent: false,
+          when: 'day',
+          readOnly: true,
+          action: 'tqOpenObsAt',
+          title: 'Opens this observation in full',
+        });
+      })
+      .join('');
+    return `<div class="qn-card qn-obs">${top}
+      <div class="qno-strip" role="group" aria-label="Open observations by type">${_obsStripHtml(obsCounts(list))}</div>
+      <div class="qno-recent">${cards}</div>
+      <div class="qno-foot">
+        <button type="button" class="qn-card-link qno-view-all" data-action="tqOpenObs" data-filter="all" aria-haspopup="dialog">View All ${list.length}</button>
+        <span class="qno-foot-note">Newest first</span>
+      </div>
     </div>`;
   }
 
@@ -1425,11 +1636,11 @@ window.ReportQuestionnaire = (function () {
   /* ── Where This Information Comes From ───────────────────── */
 
   var SCREEN_SOURCES = [
-    ['Grade', 'Your gradebook: this term’s marks, with your category weights.', 'FullVision'],
+    ['Grade', 'Your gradebook: the year to date to this report’s end, with your category weights.', 'FullVision'],
     ['Work Habits', 'Your six ratings, Rarely to Consistently.', 'You'],
-    ['Best Piece', 'The highest-marked assignment this term, and your note for the report on it.', 'FullVision'],
+    ['Best Piece', 'The highest-marked assignment so far this year, and your note for the report on it.', 'FullVision'],
     ['Not Handed In', 'Assignments labelled Missing.', 'FullVision'],
-    ['Skills', 'This term’s competency scores.', 'FullVision'],
+    ['Skills', 'Competency scores so far this year.', 'FullVision'],
     ['Goal and Voice', 'Answers to About Me and the goal check-in, sent from the student’s phone.', 'Student'],
     [
       'Attendance',
@@ -1468,10 +1679,10 @@ window.ReportQuestionnaire = (function () {
       'teacher-narrative': [SCREEN_SOURCES[7][1], 'You'],
       'term-attendance': [SCREEN_SOURCES[6][1], 'You'],
       'learner-dimensions': [SCREEN_SOURCES[1][1], 'You'],
-      'next-steps': ['The Focus Area: the competency that changed most this term.', 'FullVision'],
-      progress: ['The Focus Area: the competency that changed most this term.', 'FullVision'],
+      'next-steps': ['The Focus Area: the competency that changed most since the last report.', 'FullVision'],
+      progress: ['The Focus Area: the competency that changed most since the last report.', 'FullVision'],
       'support-home': [
-        'The Focus Area: the competency that changed most this term. The work comes from scores.',
+        'The Focus Area: the competency that changed most since the last report. The work comes from this term’s scores.',
         'FullVision',
       ],
       'self-assessment': [
@@ -1872,7 +2083,7 @@ window.ReportQuestionnaire = (function () {
       );
   }
 
-  /* Whether the student has no marked work this term (a mark on none of
+  /* Whether the student has no marked work yet (a mark on none of
      the class's marked work), so Generate has nothing true to draft from.
      The IE comment, which is about the missing marks, still drafts. */
   var _noDraft = {}; // key: Generate was pressed with no marked work
@@ -1886,7 +2097,7 @@ window.ReportQuestionnaire = (function () {
     var shown = !!_noDraft[_rowKey(student)];
     return `<div class="qn-hint qn-nodraft" id="tq-nodraft" role="status"${shown ? '' : ' hidden'}>No marked work for ${esc(
       _first(student),
-    )} this term yet, so there is nothing to draft from. You can write the comment yourself.</div>`;
+    )} yet, so there is nothing to draft from. You can write the comment yourself.</div>`;
   }
 
   /* Earlier reports with a comment, newest first, as tabs beside This Report. */
@@ -4366,8 +4577,8 @@ window.ReportQuestionnaire = (function () {
     var g = f.grade || {};
     if (g.mode === 'proficiency' || g.letter == null) {
       return f.overall > 0
-        ? levelWord(cid, f.overall) + ' overall, from this term’s scores'
-        : 'No scores this term yet';
+        ? levelWord(cid, f.overall) + ' overall, from the year’s scores to this report'
+        : 'No scores yet';
     }
     var head = g.letter + ' · ' + g.pct + '%';
     var nx = g.next;
@@ -4469,7 +4680,7 @@ window.ReportQuestionnaire = (function () {
     if (k === 'grade.letter') return g.letter != null ? g.letter + ' · ' + g.pct + '%' : '';
     if (k === 'grade.marked') return g.marked ? g.marked.mine + ' of ' + g.marked.all + ' assignments marked' : '';
     if (k === 'overall' || k === 'letter') return f.overall > 0 ? 'Overall ' + f.levelText(f.overall) : '';
-    if (k === 'work') return 'This term’s marks';
+    if (k === 'work') return 'The year’s marks to this report';
     if (k === 'picture') return ctx.picture ? 'The term’s picture: ' + ctx.picture : '';
     if ((m = k.match(/^comp:(.+)$/))) {
       var c = find(f.comps, m[1]);
@@ -7505,6 +7716,403 @@ window.ReportQuestionnaire = (function () {
     tqLine(which === 'own' ? 'saveOwn' : which === 'closing' ? 'saveClosing' : 'saveLate');
   }
 
+  /* ── The drawer (Questionnaire glance plan, steps 3 and 5) ───
+     One drawer over the left column, edge to edge, with its own scroll:
+     every skill (kind 'skills') or every observation (kind 'obs'). The
+     Teacher Comment stays in view beside it. Opening and closing redraw
+     only the drawer, so the page under it does not move. */
+  var DRAWER_ID = 'tq-drawer';
+  var _drawer = null; // null | { kind: 'obs' | 'skills', filter, q, expanded: { obId: true } }
+  var _drawerFrom = null; // the control that opened it, for the focus on close
+
+  function drawerOpen() {
+    return !!_drawer;
+  }
+
+  /* The skills in groups by curriculum folder (Questioning and Predicting,
+     …) in report order, [{ label, items }]; a class without folders has
+     one group. */
+  function skillGroups(cid, comps) {
+    var names = {};
+    (typeof getCompetencyGroups === 'function' ? getCompetencyGroups(cid) || [] : []).forEach(function (g) {
+      names[g.id] = g.name;
+    });
+    var secs = {};
+    ReportBlocks.reportSections(cid).forEach(function (s) {
+      secs[s.id] = s;
+    });
+    var foldered = (comps || []).some(function (c) {
+      return secs[c.id] && names[secs[c.id].groupId];
+    });
+    var groups = [];
+    (comps || []).forEach(function (c) {
+      var g = secs[c.id] && names[secs[c.id].groupId];
+      var label = foldered ? g || 'Other Skills' : 'All Skills';
+      var last = groups[groups.length - 1];
+      if (!last || last.label !== label) groups.push((last = { label: label, items: [] }));
+      last.items.push(c);
+    });
+    return groups;
+  }
+
+  // html-safe: folder and competency names, figures, changes and words esc()'d; counts are numbers
+  function _skillsDrawerHtml(cid, student, f) {
+    var first = student.firstName || displayNameFirst(student);
+    var comps = glanceRows(f).comps;
+    var sub = _plural(comps.length, 'skill', 'skills') + ' · so far this year';
+    if (f.lastReport) sub += ' · change since the ' + f.lastReport.label + ' report';
+    var groups = skillGroups(cid, comps)
+      .map(function (g) {
+        var rows = g.items
+          .map(function (c) {
+            var change = glanceChange(cid, f, c);
+            return `<div class="qn-skill">
+              <span class="qn-skill-name">${esc(c.name)}<span class="qno-skill-fig">${esc(formatLevel(cid, c.level) + ' · ' + _pieces(c))}</span></span>
+              ${change ? `<span class="qno-skill-change">${esc(change)}</span>` : ''}
+              <span class="qn-level" data-level="${_levelStep(c.level)}">${esc(f.levelText(c.level))}</span>
+            </div>`;
+          })
+          .join('');
+        return `<div class="qno-group">
+          <div class="obs-feed-date-label qno-month"><span>${esc(g.label)}</span><span class="obs-feed-date-count">${_plural(g.items.length, 'skill', 'skills')}</span></div>
+          <div class="qno-skill-card">${rows}</div>
+        </div>`;
+      })
+      .join('');
+    return `<div class="qno-panel" id="${DRAWER_ID}" data-kind="skills" role="dialog" aria-labelledby="tq-drawer-title">
+      <div class="qno-panel-head">
+        <div class="qno-panel-titles">
+          <span class="qno-panel-title" id="tq-drawer-title">${esc(first)}’s Skills</span>
+          <span class="qn-sub">${esc(sub)}</span>
+        </div>
+        <button type="button" class="qno-close" data-action="tqCloseDrawer" title="Close (Esc)" aria-label="Close skills">✕</button>
+      </div>
+      <div class="qno-panel-list qno-skill-list">${groups || '<div class="qno-empty">No scores so far this year.</div>'}</div>
+    </div>`;
+  }
+
+  /* The Observations drawer (step 5): every observation so far this year
+     under month headings that stay in view, newest first, with the strip
+     as a type filter and a search box. Filtering hides rows in place
+     (_syncObsList), so the search box keeps its focus. _obsIndex holds the
+     drawn rows and what each one is searched by. */
+  var _obsIndex = null; // { list: [{ ob, day, month, hay }], endsOn }
+
+  /* What a row is searched by: its text, tags, linked work, context and type. */
+  function _obsHay(ob, ctx) {
+    var p = ObsCard.parts(ob, ctx);
+    var type = ob.sentiment && OBS_SENTIMENTS[ob.sentiment] ? OBS_SENTIMENTS[ob.sentiment].label : '';
+    return [ob.text || '', p.assessment, p.context, type]
+      .concat(
+        (ob.dims || []).map(function (t) {
+          return resolveTag(t).label;
+        }),
+      )
+      .join(' ')
+      .toLowerCase();
+  }
+
+  /* Which rows the type and the search show, where the report's line goes
+     (before the newest one shown dated on or before the report's last day),
+     and the counts. */
+  function _obsView() {
+    var d = _drawer || {};
+    var q = String(d.q || '')
+      .trim()
+      .toLowerCase();
+    var shown = {};
+    var n = 0;
+    var cp = null;
+    var months = {};
+    (_obsIndex ? _obsIndex.list : []).forEach(function (x) {
+      var ok = (!d.filter || d.filter === 'all' || x.ob.sentiment === d.filter) && (!q || x.hay.indexOf(q) >= 0);
+      if (!ok) return;
+      shown[x.ob.id] = true;
+      n++;
+      months[x.month] = (months[x.month] || 0) + 1;
+      if (!cp && _obsIndex.endsOn && x.day <= _obsIndex.endsOn) cp = x.ob.id;
+    });
+    return {
+      shown: shown,
+      n: n,
+      total: _obsIndex ? _obsIndex.list.length : 0,
+      months: months,
+      cp: cp,
+      filtering: (d.filter && d.filter !== 'all') || !!q,
+    };
+  }
+  function _obsCount(n) {
+    return _plural(n, 'observation', 'observations');
+  }
+  function _showingText(v) {
+    return v.filtering ? 'Showing ' + v.n + ' of ' + v.total : '';
+  }
+
+  var SEARCH_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
+
+  // html-safe: cards from ObsCard.html (escapes every value); names, month labels, the report's line and the search text esc()'d; counts are numbers
+  function _obsDrawerHtml(cid, student, f) {
+    var first = student.firstName || displayNameFirst(student);
+    var ctx = ObsCard.context(cid);
+    var list = studentObs(cid, student.id);
+    _obsIndex = {
+      endsOn: f.lastReport ? f.lastReport.endsOn : '',
+      list: list.map(function (ob) {
+        var day = ObsCard.obDay(ob);
+        return { ob: ob, day: day, month: String(day).slice(0, 7), hay: _obsHay(ob, ctx) };
+      }),
+    };
+    var v = _obsView();
+    var cpLine = f.lastReport
+      ? f.lastReport.label +
+        ' report · ' +
+        parseLocalDate(f.lastReport.endsOn).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
+      : '';
+    var groups = [];
+    _obsIndex.list.forEach(function (x) {
+      var g = groups[groups.length - 1];
+      if (!g || g.month !== x.month) groups.push((g = { month: x.month, items: [] }));
+      g.items.push(x);
+    });
+    var body = groups
+      .map(function (g) {
+        var label = parseLocalDate(g.month + '-01').toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+        var count = v.months[g.month] || 0;
+        var rows = g.items
+          .map(function (x) {
+            var id = x.ob.id;
+            var open = !!_drawer.expanded[id];
+            return `<div class="qno-item" data-obid="${esc(id)}" data-day="${esc(x.day)}"${v.shown[id] ? '' : ' hidden'}>${
+              v.cp === id ? `<div class="qno-checkpoint"><span>${esc(cpLine)}</span></div>` : ''
+            }${ObsCard.html(x.ob, ctx, {
+              showStudent: false,
+              when: 'day',
+              readOnly: true,
+              action: null,
+              className: open ? 'qno-open' : 'qno-clamp',
+            })}</div>`;
+          })
+          .join('');
+        return `<div class="qno-group" data-month="${esc(g.month)}"${count ? '' : ' hidden'}>
+          <div class="obs-feed-date-label qno-month"><span>${esc(label)}</span><span class="obs-feed-date-count">${_obsCount(count)}</span></div>
+          ${rows}
+        </div>`;
+      })
+      .join('');
+    // With nothing shown before it, the report's line waits hidden, to be
+    // moved in place when a filter shows a row it goes before.
+    if (cpLine && !v.cp) body += `<div class="qno-checkpoint" hidden><span>${esc(cpLine)}</span></div>`;
+    return `<div class="qno-panel" id="${DRAWER_ID}" data-kind="obs" role="dialog" aria-labelledby="tq-drawer-title">
+      <div class="qno-panel-head">
+        <div class="qno-panel-titles">
+          <span class="qno-panel-title" id="tq-drawer-title">${esc(first)}’s Observations</span>
+          <span class="qn-sub">${list.length} so far this year · newest first</span>
+        </div>
+        <button type="button" class="qno-close" data-action="tqCloseDrawer" title="Close (Esc)" aria-label="Close observations">✕</button>
+      </div>
+      <div class="qno-strip qno-strip-panel" role="group" aria-label="Show one type">${_obsStripHtml(obsCounts(list), _drawer.filter || 'all')}</div>
+      <div class="qno-search">
+        <div class="obs-search-wrap"><span class="obs-search-icon">${SEARCH_SVG}</span><input class="obs-search-input" id="tq-obs-search" type="text" placeholder="Search text, tags or work" aria-label="Search ${esc(first)}’s observations" value="${esc(_drawer.q || '')}" autocomplete="off"></div>
+        <span class="qno-showing" id="tq-obs-showing">${esc(_showingText(v))}</span>
+      </div>
+      <div class="qno-panel-list" id="tq-obs-list">
+        ${body}
+        <div class="qno-empty qno-nomatch"${v.n ? ' hidden' : ''}>No observations match. <button type="button" class="qn-card-link" data-action="tqObsShowAll">Show All</button></div>
+      </div>
+    </div>`;
+  }
+
+  /* The type and the search applied to the drawn rows, in place. */
+  function _syncObsList() {
+    var root = document.getElementById(DRAWER_ID);
+    if (!root || !_drawer || _drawer.kind !== 'obs' || !root.querySelectorAll) return;
+    var v = _obsView();
+    root.querySelectorAll('.qno-seg').forEach(function (b) {
+      var on = b.getAttribute('data-filter') === (_drawer.filter || 'all');
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    var cp = root.querySelector('.qno-checkpoint');
+    root.querySelectorAll('.qno-item').forEach(function (item) {
+      var id = item.getAttribute('data-obid');
+      item.hidden = !v.shown[id];
+      if (cp && v.cp === id) item.insertBefore(cp, item.firstChild);
+    });
+    if (cp) cp.hidden = !v.cp;
+    root.querySelectorAll('.qno-group').forEach(function (g) {
+      var n = v.months[g.getAttribute('data-month')] || 0;
+      g.hidden = !n;
+      var c = g.querySelector('.obs-feed-date-count');
+      if (c) c.textContent = _obsCount(n);
+    });
+    var showing = document.getElementById('tq-obs-showing');
+    if (showing) showing.textContent = _showingText(v);
+    var none = root.querySelector('.qno-nomatch');
+    if (none) none.hidden = v.n > 0;
+    _measureObs();
+  }
+
+  /* Show More on a row whose text runs past four lines, Show Less on an
+     opened one that would; nothing on a row that fits. Measured after the
+     rows are drawn or shown. */
+  function _measureObs() {
+    var root = document.getElementById(DRAWER_ID);
+    if (!root || !root.querySelectorAll || !_drawer || _drawer.kind !== 'obs') return;
+    root.querySelectorAll('.qno-item:not([hidden]) .obs-card').forEach(function (card) {
+      var text = card.querySelector('.obs-card-text');
+      if (!text) return;
+      var open = card.classList.contains('qno-open');
+      if (open) card.classList.add('qno-clamp');
+      var long = text.scrollHeight > text.clientHeight + 1;
+      if (open) card.classList.remove('qno-clamp');
+      var btn = card.querySelector('.qno-more');
+      if (!long) {
+        if (btn) btn.remove();
+        return;
+      }
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'qn-card-link qno-more';
+        btn.setAttribute('data-action', 'tqObsMore');
+        btn.setAttribute('data-obid', card.getAttribute('data-obid'));
+        text.insertAdjacentElement('afterend', btn);
+      }
+      btn.textContent = open ? 'Show Less' : 'Show More';
+      btn.setAttribute('aria-expanded', String(open));
+    });
+  }
+
+  /* A drawn row's card, by its observation's id. */
+  function _obRow(obid) {
+    var root = document.getElementById(DRAWER_ID);
+    var id = String(obid || '').replace(/["\\]/g, '\\$&');
+    return root && root.querySelector ? root.querySelector('.qno-item[data-obid="' + id + '"]') : null;
+  }
+  /* Brings a row into view under its month heading. */
+  function _scrollToOb(obid) {
+    var list = document.getElementById('tq-obs-list');
+    var el = _obRow(obid);
+    if (!el || !el.getBoundingClientRect) return;
+    list.scrollTop += el.getBoundingClientRect().top - list.getBoundingClientRect().top - 90;
+  }
+
+  // html-safe: the drawer's own builders, which escape every value
+  function _drawerHtml(cid, student, f) {
+    if (!_drawer) return '';
+    return _drawer.kind === 'obs' ? _obsDrawerHtml(cid, student, f) : _skillsDrawerHtml(cid, student, f);
+  }
+
+  /* Draws the drawer in place, or takes it away, and fits it to the left
+     column. */
+  function _redrawDrawer(focusSel) {
+    var out = document.getElementById('report-output');
+    var el = document.getElementById(DRAWER_ID);
+    var st = _current();
+    if (!_drawer || !st || !out) {
+      if (el) el.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      out.appendChild(el);
+    }
+    el.outerHTML = _drawerHtml(_activeCourse, st, _facts(st));
+    _fitDrawer();
+    _measureObs();
+    var target = focusSel ? document.querySelector('#' + DRAWER_ID + ' ' + focusSel) : null;
+    if (target && target.focus) target.focus();
+  }
+
+  /* The drawer stops where the left column ends, however wide the student
+     list leaves it; stacked columns (1280 px and under) take the width. */
+  function _fitDrawer() {
+    var el = document.getElementById(DRAWER_ID);
+    var out = document.getElementById('report-output');
+    var left = document.querySelector('.qn-left');
+    var right = document.querySelector('.qn-right');
+    if (!el || !out || !left || !right || !el.getBoundingClientRect) return;
+    var l = left.getBoundingClientRect();
+    var r = right.getBoundingClientRect();
+    if (r.left <= l.right) {
+      el.style.right = '';
+      return;
+    }
+    el.style.right = Math.max(0, Math.round(out.getBoundingClientRect().right - l.right)) + 'px';
+  }
+
+  function _openDrawer(state, from) {
+    _drawerFrom = from || (document.activeElement !== document.body ? document.activeElement : null);
+    _drawer = Object.assign({ kind: 'skills', filter: 'all', q: '', expanded: {} }, state);
+    _redrawDrawer('.qno-close');
+  }
+  function tqOpenSkills(from) {
+    _openDrawer({ kind: 'skills' }, from);
+  }
+  /* The card's strip or View All: the drawer on that type. */
+  function tqOpenObs(filter, from) {
+    _openDrawer({ kind: 'obs', filter: filter || 'all' }, from);
+  }
+  /* One of the card's observations: the drawer at that row, opened in full. */
+  function tqOpenObsAt(obid, from) {
+    var expanded = {};
+    expanded[obid] = true;
+    _drawerFrom = from || null;
+    _drawer = { kind: 'obs', filter: 'all', q: '', expanded: expanded };
+    _redrawDrawer();
+    _scrollToOb(obid);
+    var row = _obRow(obid);
+    var card = row && row.querySelector('.obs-card');
+    if (card && card.focus) card.focus({ preventScroll: true });
+  }
+  /* The drawer's strip: one type, or All. */
+  function tqObsFilter(filter) {
+    if (!_drawer || _drawer.kind !== 'obs') return;
+    _drawer.filter = filter || 'all';
+    _syncObsList();
+  }
+  /* Typing in the drawer's search box. */
+  function tqObsSearch(q) {
+    if (!_drawer || _drawer.kind !== 'obs') return;
+    _drawer.q = String(q || '');
+    _syncObsList();
+  }
+  /* "No observations match. Show All". */
+  function tqObsShowAll() {
+    if (!_drawer || _drawer.kind !== 'obs') return;
+    _drawer.filter = 'all';
+    _drawer.q = '';
+    var box = document.getElementById('tq-obs-search');
+    if (box) box.value = '';
+    _syncObsList();
+  }
+  /* Show More / Show Less on a row. */
+  function tqObsMore(obid) {
+    if (!_drawer || _drawer.kind !== 'obs') return;
+    var open = !_drawer.expanded[obid];
+    if (open) _drawer.expanded[obid] = true;
+    else delete _drawer.expanded[obid];
+    var row = _obRow(obid);
+    var card = row && row.querySelector('.obs-card');
+    if (!card) return;
+    card.classList.toggle('qno-open', open);
+    card.classList.toggle('qno-clamp', !open);
+    _measureObs();
+  }
+  if (typeof window.addEventListener === 'function')
+    window.addEventListener('resize', function () {
+      if (_drawer) _fitDrawer();
+    });
+  function tqCloseDrawer() {
+    if (!_drawer) return;
+    _drawer = null;
+    _redrawDrawer();
+    var from = _drawerFrom;
+    _drawerFrom = null;
+    if (from && from.isConnected && from.focus) from.focus();
+  }
+
   /* ── The page ────────────────────────────────────────────── */
 
   /* A new student, report or class on screen: nothing left open from the
@@ -7516,6 +8124,7 @@ window.ReportQuestionnaire = (function () {
     var key = cid + '|' + student.id + '|' + getTermId();
     if (_screen === key) return;
     _screen = key;
+    _drawer = null;
     _own = null;
     _wording = null;
     _addAt = null;
@@ -7549,6 +8158,7 @@ window.ReportQuestionnaire = (function () {
         ${_headerHtml(cid, student, f)}
         ${_habitsHtml(cid, f)}
         ${_glanceHtml(cid, student, f)}
+        ${_obsHtml(cid, student, f)}
         ${_voiceHtml(cid, student, f, comment)}
       </div>
       <div class="qn-right">
@@ -7557,7 +8167,7 @@ window.ReportQuestionnaire = (function () {
         ${_commentTab === 'this' ? _sentencesHtml(cid, student, f) : ''}
         <!-- The rest of the Sentences card (PR 11b) goes here. -->
       </div>
-    </div>`;
+    </div>${_drawerHtml(cid, student, f)}`;
   }
 
   /* After the page is drawn: the roster, the box's height, and drag and
@@ -7565,6 +8175,8 @@ window.ReportQuestionnaire = (function () {
   function afterRender() {
     syncRoster();
     _fitBox();
+    _fitDrawer();
+    _measureObs();
     syncApprove();
     _wireDrag();
     _wireSelAdd();
@@ -7588,8 +8200,21 @@ window.ReportQuestionnaire = (function () {
       if (e.key === 'Escape') PersonalBank.close('later');
       return;
     }
+    // Return or Space on one of the Observations card's rows opens it.
+    if (
+      (e.key === 'Enter' || e.key === ' ') &&
+      t &&
+      t.closest &&
+      t.closest('.qn-obs .obs-card[data-action="tqOpenObsAt"]')
+    ) {
+      e.preventDefault();
+      tqOpenObsAt(t.getAttribute('data-obid'), t);
+      return;
+    }
     if (e.key === 'Escape') {
-      if (document.getElementById(BOTH_ID)) tqCloseBoth();
+      // The drawer closes first, then a sheet.
+      if (_drawer) tqCloseDrawer();
+      else if (document.getElementById(BOTH_ID)) tqCloseBoth();
       else if (document.getElementById(INFO_ID)) tqCloseInfo();
       else if (browseOpen()) {
         if (!closeLines()) _closeBrowse();
@@ -7843,6 +8468,18 @@ window.ReportQuestionnaire = (function () {
     basisChoices: basisChoices,
     renderTermQuestionnaire: renderTermQuestionnaire,
     afterRender: afterRender,
+    studentObs: studentObs,
+    obsCounts: obsCounts,
+    tqOpenSkills: tqOpenSkills,
+    tqOpenObs: tqOpenObs,
+    tqOpenObsAt: tqOpenObsAt,
+    tqObsFilter: tqObsFilter,
+    tqObsSearch: tqObsSearch,
+    tqObsShowAll: tqObsShowAll,
+    tqObsMore: tqObsMore,
+    tqCloseDrawer: tqCloseDrawer,
+    drawerOpen: drawerOpen,
+    skillGroups: skillGroups,
     fitBox: _fitBox,
     syncRoster: syncRoster,
     restoreRoster: restoreRoster,
@@ -7853,6 +8490,8 @@ window.ReportQuestionnaire = (function () {
     bestPiece: bestPiece,
     notHandedIn: notHandedIn,
     skillTags: skillTags,
+    glanceRows: glanceRows,
+    glanceChange: glanceChange,
     voiceRows: voiceRows,
     SCREEN_SOURCES: SCREEN_SOURCES,
     get tqStudentIndex() {

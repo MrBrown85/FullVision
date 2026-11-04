@@ -53,7 +53,6 @@ window.PageGradebook = (function () {
   var _averageStudents = null; // the class's students, for Class Average
   var sortCol = null;
   var _filterStripOpen = false;
-  var _printTerm = 'all';
   var _printShownIds = null;
   var _scrollShadowCleanup = null;
   var _scrollKey = null; // class and view of the last render, so a redraw keeps the table's scroll
@@ -267,19 +266,18 @@ window.PageGradebook = (function () {
   function render() {
     var cid = activeCourse;
     var students = sortStudents(getStudents(cid), 'lastName');
-    // The class's chosen reporting term scopes the columns and every grade
-    // on this page (calc.js). All time shows everything.
-    var term = typeof activateSavedTerm === 'function' ? activateSavedTerm(cid) : null;
+    // The gradebook always shows the year so far (Colin, 2026-11-03): no
+    // report's term is in view here.
+    if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var everyAssessment = getAssessments(cid);
     var allAssessments = everyAssessment
       .filter(function (a) {
-        return !_pendingDeleteAids[a.id] && (!term || assessmentInActiveTerm(cid, a));
+        return !_pendingDeleteAids[a.id];
       })
       .sort(function (a, b) {
         return (a.date || '').localeCompare(b.date || '');
       });
     if (_newestFirst) allAssessments.reverse();
-    var undatedCount = term ? undatedAssessmentCount(cid) : 0;
     var sections = getSections(cid);
     var course = COURSES[cid];
     var isLetter = courseShowsLetterGrades(course);
@@ -329,7 +327,6 @@ window.PageGradebook = (function () {
 
     // What Print Grades offers as "Shown in the Gradebook": the columns the
     // filter chips leave, when any chip is on.
-    _printTerm = term ? term.ordinal : 'all';
     _printShownIds =
       filterCategories.length + filterSections.length + filterModules.length > 0
         ? assessments.map(function (a) {
@@ -376,8 +373,6 @@ window.PageGradebook = (function () {
       return rubricCriterionColumns(a, cid).length > 0;
     });
 
-    html += typeof renderTermPicker === 'function' ? renderTermPicker(cid) : '';
-
     html +=
       '<button class="gb-filter-trigger' +
       (activeFilterCount > 0 ? ' has-filters' : '') +
@@ -416,11 +411,6 @@ window.PageGradebook = (function () {
 
     html +=
       '<div style="margin-left:auto;display:flex;align-items:center;gap:12px">' +
-      (undatedCount > 0
-        ? '<span class="gb-toolbar-label" title="These assessments have no date, so no term can include them. Give them a date on the Assessments page.">' +
-          undatedCount +
-          ' Undated Not Shown</span>'
-        : '') +
       '<button class="tb-toggle-btn" data-action="exportScoresCSV" title="Export CSV" aria-label="Export">\u2913<span class="gb-tb-text"> Export</span></button>' +
       '<button class="tb-action-btn tb-action-secondary" data-action="printGrades" aria-label="Print Grades" title="Print Grades"><span class="gb-tb-icon" aria-hidden="true">' +
       LINE_ICONS.print +
@@ -792,8 +782,8 @@ window.PageGradebook = (function () {
   }
 
   /* What the page says when there is nothing to show, and the one step that
-     changes it: no students, no assessments, a term or filters that leave
-     none, or a search that finds no one. */
+     changes it: no students, no assessments, filters that leave none, or
+     a search that finds no one. */
   function _emptyState(cid, everyAssessment, termAssessments, shownAssessments, shownStudents) {
     var hasStudents = getStudents(cid).length > 0;
     var addStudents =
@@ -810,8 +800,7 @@ window.PageGradebook = (function () {
     } else if (!everyAssessment.length) {
       text = 'No assessments in this class yet. Add one with + New Assessment.';
     } else if (!termAssessments.length) {
-      text = 'No assessments in this term.';
-      action = '<button class="tb-action-btn tb-action-secondary" data-action="showAllTime">Show All Time</button>';
+      text = 'No assessments in this class yet. Add one with + New Assessment.';
     } else if (!shownAssessments.length) {
       text = 'No assessments match these filters.';
       action = '<button class="tb-action-btn tb-action-secondary" data-action="clearAllFilters">Clear Filters</button>';
@@ -2009,7 +1998,7 @@ window.PageGradebook = (function () {
       (grade.text ? (word ? word + ' (' + esc(grade.text) + ')' : esc(grade.text)) : 'No Evidence') +
       '</div>';
     // NS lowers only a percentage; a Proficiency class shows none. Only work
-    // the grade above counts: the term on screen, outside 0% categories.
+    // the grade above counts: the year so far, outside 0% categories.
     if (courseGradeMode(cid) !== 'proficiency') {
       var ns = _scopedAssessments(cid).filter(function (a) {
         return getAssignmentStatus(cid, student.id, a.id) === 'NS' && countsTowardGrades(cid, a);
@@ -2725,12 +2714,9 @@ window.PageGradebook = (function () {
   function exportScoresCSV() {
     var cid = activeCourse;
     var students = sortStudents(getStudents(cid), 'lastName');
-    // The export matches the page: the chosen reporting term's assessments and grades.
-    var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    // The export matches the page: the year so far.
     var assessments = getAssessments(cid)
-      .filter(function (a) {
-        return !term || assessmentInActiveTerm(cid, a);
-      })
+      .slice()
       .sort(function (a, b) {
         return (b.date || '').localeCompare(a.date || '');
       });
@@ -2808,10 +2794,7 @@ window.PageGradebook = (function () {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download =
-      (COURSES[cid] ? COURSES[cid].name : 'gradebook') +
-      (term ? '_' + String(term.label || 'term').replace(/[^\w-]+/g, '_') : '') +
-      '_scores.csv';
+    a.download = (COURSES[cid] ? COURSES[cid].name : 'gradebook') + '_scores.csv';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -4065,10 +4048,6 @@ window.PageGradebook = (function () {
       clearSearch: function () {
         onSearch('', 0);
       },
-      showAllTime: function () {
-        if (typeof setSelectedTermOrdinal === 'function') setSelectedTermOrdinal(activeCourse, null);
-        render();
-      },
       toggleSort: function () {
         toggleSort(el.dataset.sortkey);
       },
@@ -4091,7 +4070,7 @@ window.PageGradebook = (function () {
         exportScoresCSV();
       },
       printGrades: function () {
-        if (window.GradesPrint) GradesPrint.open(activeCourse, { term: _printTerm, shownIds: _printShownIds });
+        if (window.GradesPrint) GradesPrint.open(activeCourse, { shownIds: _printShownIds });
       },
       stopPropOnly: function () {
         /* just stop propagation */

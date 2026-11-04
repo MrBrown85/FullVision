@@ -294,23 +294,29 @@ test('Work Habits: a rating saves in place and the count follows; nothing redraw
   await expect(page.locator('.qn-habit-name').nth(1)).toHaveText('Comes Ready, Uses Class Time');
 });
 
-test('At a Glance: the best piece and the skills with Strongest and Next step', async ({ page }) => {
+test('At a Glance: the year so far, the best piece and View All Skills', async ({ page }) => {
   await open(page);
   const expected = await page.evaluate(() => {
     const st = getStudents('sci8').find(s => s.id === 'st1');
     const f = CommentBank.facts('sci8', st, 'term-2');
-    const best = ReportQuestionnaire.bestPiece(f);
-    const tags = ReportQuestionnaire.skillTags(f.comps);
+    const rows = ReportQuestionnaire.glanceRows(f);
     return {
-      best: best.title,
-      comps: f.comps.length,
-      strongest: Object.values(tags).filter(t => t === 'Strongest').length,
+      best: ReportQuestionnaire.bestPiece(f).title,
+      strongest: rows.strongest.name,
+      next: rows.next.name,
+      change: rows.change ? rows.change.name : null,
+      comps: rows.comps.length,
     };
   });
+  const labels = ['Strongest', 'Next step'].concat(expected.change ? ['Biggest change'] : []);
+  await expect(page.locator('.qno-glance .qn-fact-label')).toHaveText(labels.concat(['Best piece', 'Missing', 'Late']));
+  await expect(page.locator('.qno-glance .qn-fact').nth(0)).toContainText(expected.strongest);
+  await expect(page.locator('.qno-glance .qn-fact').nth(1)).toContainText(expected.next);
   await expect(page.locator('.qn-best .qn-fact-body')).toContainText(expected.best);
-  await expect(page.locator('.qn-skill')).toHaveCount(expected.comps);
-  await expect(page.locator('.qn-tag.strongest')).toHaveCount(expected.strongest);
-  await expect(page.locator('.qn-tag:not(.strongest)')).toHaveText(['Next step']);
+  await expect(page.locator('.qno-glance .qn-sub')).toHaveText('So far this year · change since the Term 1 report');
+  await expect(page.locator('.qno-glance [data-action="tqOpenSkills"]')).toHaveText(
+    'View All ' + expected.comps + ' Skills',
+  );
 });
 
 test('Cece’s Voice: the answers, the private one marked, a quoted answer says In the comment', async ({ page }) => {
@@ -365,7 +371,7 @@ test('the circled question mark opens Where This Information Comes From', async 
     'Teacher Comment',
   ]);
   await expect(cards.nth(0).locator('.qn-info-row').nth(2)).toContainText(
-    'The highest-marked assignment this term, and your note for the report on it.',
+    'The highest-marked assignment so far this year, and your note for the report on it.',
   );
   const blocks = await page.evaluate(() =>
     ReportSheets.onForm(ReportSheets.formFor(getReportConfig('sci8') || {})).map(id => ReportSheets.BLOCKS[id].label),
@@ -434,7 +440,8 @@ test.describe('checks and approval', () => {
     // The missing-work sentence is ringed inside the comment (the LayoutE mockup).
     await expect(page.locator('#tq-marks .qn-mark.missing')).toContainText(title);
     await expect(row.locator('.qn-req-source').last()).toHaveText(
-      '1 of 22 · check that it is really missing before you approve',
+      // Of the year's work to Report 2's end (Colin, 2026-11-03), not Term 2's alone.
+      '1 of 37 · check that it is really missing before you approve',
     );
     const approve = page.locator('#tq-approve-next');
     await expect(approve).toBeDisabled();
@@ -445,7 +452,7 @@ test.describe('checks and approval', () => {
     await row.locator('[data-tq-check="missing"]').check();
     await expect(row).not.toHaveClass(/flag/);
     await expect(row.locator('.qn-req-ctrl')).toHaveClass(/on/);
-    await expect(row.locator('.qn-req-source').last()).toHaveText('1 of 22 · checked');
+    await expect(row.locator('.qn-req-source').last()).toHaveText('1 of 37 · checked');
     await expect(approve).toBeEnabled();
     // A sentence over 20 words: the count turns orange and says so;
     // Approve and Next stays on.
@@ -632,7 +639,7 @@ test.describe('the Sentences card', () => {
     const rowCount = perRow.length;
     await expect(rows(page)).toHaveCount(rowCount);
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
-    await expect(rows(page).first().locator('.qn-req-source')).toContainText('from this term’s scores');
+    await expect(rows(page).first().locator('.qn-req-source')).toContainText('from the year’s scores to this report');
     await expect(rows(page).first().locator('[data-do="wording"]')).toHaveText('Other Wording ▾');
     await expect(page.locator('#tq-sentences .qn-sub')).toHaveText(
       'Reword, edit or drag to reorder. The comment above follows.',

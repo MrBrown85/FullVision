@@ -148,12 +148,18 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
       setLimit(350);
       const over = getStudents(cid).filter(st => draftOf(st).text.length > 350);
       expect(over.length).toBeGreaterThan(10);
-      over.slice(0, 3).forEach(st => {
+      const gen = st => {
         upsertTermRating(cid, st.id, term(), { narrative: '' });
         open(st);
         box.value = '';
         RQ.tqGenerate();
-        expect(box.value.length, st.firstName).toBeGreaterThan(350);
+        return box.value;
+      };
+      // The students whose Generate draft runs past the limit.
+      const long = over.filter(st => gen(st).length > 350).slice(0, 3);
+      expect(long.length).toBe(3);
+      long.forEach(st => {
+        expect(gen(st).length, st.firstName).toBeGreaterThan(350);
         expect(RQ.approveBlockers(st), st.firstName).not.toContain('limit');
       });
       setLimit(null);

@@ -231,15 +231,16 @@ describe('Evidence drawer in the page', () => {
     expect($('.ced-explain').textContent).toBe('Competency level: Most recent score.');
   });
 
-  it('follows the active term, like the level badge', () => {
+  it('follows the report in view, like the level badge: the year to date as of its end', () => {
     setActiveTerm(CID, 1);
     clearProfCache();
     draw();
-    expect($('.dash-tag-evidence').textContent).toBe('2 scores · 1 observation');
+    expect($('.dash-tag-evidence').textContent).toBe('3 scores · 1 observation');
     expect(rowIds().map(r => r.split(':')[0] + ':' + (r.startsWith('obs') ? r.slice(4) : r.slice(7, 12)))).toEqual([
       'score:Lab 2',
       'obs:o1',
       'score:Lab 1',
+      'score:Summe',
     ]);
   });
 

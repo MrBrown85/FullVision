@@ -22,14 +22,20 @@ var _categoryAvgCache = {};
 var _courseLetterCache = {};
 
 /* ── Reporting term scope ──────────────────────────────────────
-   A class can be viewed in one reporting term (docs/DECISIONS.md,
-   "Reporting periods"). While a term is active for a class, every grade
-   counts only the assessments whose assigned date falls inside it. With no
-   term active (the default, "All time") nothing here changes a result.
-   Cache keys carry the term, so switching terms never needs a cache clear. */
+   Teachers grade cumulatively; a reporting term is a checkpoint
+   (docs/DECISIONS.md, "Reporting periods" 2; Colin, 2026-11-03). While a
+   term is active for a class (the Reports page makes the report's term
+   active), every grade is the year to date as of that term's end date:
+   every assessment dated on or before it, and undated work. Work dated
+   after it doesn't count. With no term active (the gradebook, dashboard
+   and student page, which always show the year so far) nothing here
+   changes a result. The term's own window (assessmentInTermWindow) is for
+   what describes this term only: Start of Term, Generate's trend, the This
+   Term lists. Cache keys carry the term, so switching terms never needs a
+   cache clear. */
 var _activeTerm = {}; // cid → { ordinal, label, startsOn, endsOn } | undefined
 
-/** Make one reporting term (by ordinal) the scope for a class, or null for all time. */
+/** Make one reporting term (by ordinal) the report in view for a class, or null for the year so far. */
 function setActiveTerm(cid, ordinal) {
   if (ordinal == null || ordinal === '' || ordinal === 'all') {
     delete _activeTerm[cid];
@@ -52,15 +58,9 @@ function setActiveTerm(cid, ordinal) {
   return _activeTerm[cid];
 }
 
-/** The reporting term a class is being viewed in, or null for all time. */
+/** The reporting term a class's grades are read as of, or null for the year so far. */
 function getActiveTerm(cid) {
   return _activeTerm[cid] || null;
-}
-
-/** Apply the term the teacher last chose for this class on this device. */
-function activateSavedTerm(cid) {
-  var saved = typeof getSelectedTermOrdinal === 'function' ? getSelectedTermOrdinal(cid) : null;
-  return setActiveTerm(cid, saved);
 }
 
 function _termKey(cid) {
@@ -77,8 +77,20 @@ function _assessmentDate(a) {
   return (a && (a.date || a.dateAssigned || a.assigned_at || a.date_assigned)) || '';
 }
 
-/** Whether an assessment is dated inside the active term (true when no term is active). */
-function assessmentInActiveTerm(cid, a) {
+/** Whether an assessment counts in the grade in view: the year to date as of
+ * the active term's end (undated, or dated on or before it); true when no
+ * term is active. */
+function assessmentInYearToDate(cid, a) {
+  var t = _activeTerm[cid];
+  if (!t) return true;
+  var d = _assessmentDate(a);
+  if (!d) return true;
+  return !t.endsOn || d <= t.endsOn;
+}
+
+/** Whether an assessment is dated inside the active term's own dates (true
+ * when no term is active). For what describes this term only, never a grade. */
+function assessmentInTermWindow(cid, a) {
   var t = _activeTerm[cid];
   if (!t) return true;
   var d = _assessmentDate(a);
@@ -86,21 +98,56 @@ function assessmentInActiveTerm(cid, a) {
   return d >= t.startsOn && d <= t.endsOn;
 }
 
-/* The class's assessments inside the active term; all of them when none is active. */
+/* The class's assessments in the year to date as of the active term's end; all of them when none is active. */
 function _scopedAssessments(cid) {
   var all = getAssessments(cid);
   if (!_activeTerm[cid]) return all;
   return all.filter(function (a) {
-    return assessmentInActiveTerm(cid, a);
+    return assessmentInYearToDate(cid, a);
   });
 }
 
-/** Assessments the active term leaves out because they have no date. */
-function undatedAssessmentCount(cid) {
-  if (!_activeTerm[cid]) return 0;
-  return getAssessments(cid).filter(function (a) {
-    return !_assessmentDate(a);
-  }).length;
+/* Every assessment id the class has, whatever is in view. */
+function _everyAssessmentIds(cid) {
+  return new Set(
+    (getAssessments(cid) || []).map(function (a) {
+      return a.id;
+    }),
+  );
+}
+
+/* The reporting term before a report: the one before the active term, or
+   with none active (the year so far) the last term that ended before
+   today. null when there is none. */
+function previousReportTerm(cid) {
+  var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+  var active = _activeTerm[cid];
+  var prev = null;
+  if (active) {
+    terms.forEach(function (t) {
+      if (Number(t.ordinal) < active.ordinal && (!prev || Number(t.ordinal) > Number(prev.ordinal))) prev = t;
+    });
+    return prev;
+  }
+  var today = typeof courseToday === 'function' ? courseToday(cid) : '';
+  if (!today) return null;
+  terms.forEach(function (t) {
+    var end = t.ends_on || t.endsOn;
+    if (end && end < today && (!prev || Number(t.ordinal) > Number(prev.ordinal))) prev = t;
+  });
+  return prev;
+}
+
+/* Read something with the class's grades as of another report (an ordinal,
+   or null for the year so far), and put the report in view back after. */
+function readAsOfTerm(cid, ordinal, read) {
+  var was = _activeTerm[cid] ? _activeTerm[cid].ordinal : null;
+  try {
+    setActiveTerm(cid, ordinal);
+    return read();
+  } finally {
+    setActiveTerm(cid, was);
+  }
 }
 
 /** Clear all proficiency caches. Call when scores, assessments, overrides, or statuses change. */
@@ -130,7 +177,7 @@ function _getAW(cid) {
 }
 
 /** Get or build a Map<assessmentId, assessment> for O(1) lookups instead of O(n) find().
- * Holds only the assessments in the active term, so an id missing here is out of scope. */
+ * Holds only the assessments in scope (the year to date as of the active term), so an id missing here is out of scope. */
 function _getAssessMap(cid) {
   var key = _ck(cid);
   if (_assessMapCache[key]) return _assessMapCache[key];
@@ -1473,9 +1520,11 @@ function getTagScores(cid, studentId, tagId) {
   const criteria = _criterionIndex(cid);
   const wholeByRubric = _rubricWholeIndex(cid);
   const wholeSeen = {};
-  // In a term, a score only counts when its assessment is dated inside it.
-  // All time keeps every score, including one whose assessment is gone.
+  // As of a report, a score only counts when its assessment is in the year
+  // to date (dated on or before the report's end, or undated). Both keep a
+  // score whose assessment is gone.
   const termActive = !!_activeTerm[cid];
+  const everyIds = termActive ? _everyAssessmentIds(cid) : null;
   const filtered = [];
   studentScores.forEach(s => {
     let entry = s;
@@ -1501,7 +1550,10 @@ function getTagScores(cid, studentId, tagId) {
         entry = { ...s, tagId: tagId, criterionId: s.tagId, criterionName: crit.name };
       }
     }
-    if (termActive && !assessMap.has(entry.assessmentId)) return;
+    // As of a report, a score drops out only when its assessment is dated
+    // after the report's end. A score whose assessment is gone stays, as it
+    // does in the year so far, so the gradebook and the report agree.
+    if (termActive && !assessMap.has(entry.assessmentId) && everyIds.has(entry.assessmentId)) return;
     const status = statuses[studentId + ':' + entry.assessmentId];
     if (status === 'EXC') return;
     filtered.push(entry);
@@ -1669,10 +1721,22 @@ function getSectionProficiency(cid, studentId, sectionId) {
   if (profs.length === 0) return 0;
   const calculated = profs.reduce((a, b) => a + b, 0) / profs.length;
   // Check for teacher override
-  const overrides = getOverrides(cid);
-  const override = overrides[studentId]?.[sectionId];
-  if (override && override.level > 0) return override.level;
+  const override = sectionOverrideInView(cid, studentId, sectionId);
+  if (override) return override.level;
   return calculated;
+}
+
+/** The teacher's override for a section when it applies to the grade in
+ * view: always for the year so far; for a report, only when the override's
+ * date is on or before the report's end (an undated override applies
+ * everywhere). Null otherwise (DECISIONS, Reporting periods 4). */
+function sectionOverrideInView(cid, studentId, sectionId) {
+  const override = getSectionOverride(cid, studentId, sectionId);
+  if (!override || !(override.level > 0)) return null;
+  const t = _activeTerm[cid];
+  const d = override.date ? String(override.date).slice(0, 10) : '';
+  if (t && t.endsOn && d && d > t.endsOn) return null;
+  return override;
 }
 
 /** Calculate section proficiency ignoring any teacher overrides, for use in override UI display.
@@ -2505,25 +2569,26 @@ function _classGradeMeans(cid, studentIds) {
   return { prof: mean(profs), pct: mean(pcts) };
 }
 
-/* How the class average moved since the reporting term before the active
-   one, in the grade the class shows first (the % in a Letter class, else
-   the proficiency): { text: '\u25B2 0.1', dir: 1, since: 'Term 1' }, dir -1 for
-   down and 0 (text 'No Change') when it rounds to nothing. Null when no term
-   is active, the active term is the first, or either term has no grades. */
+/* "Report 2": a reporting term by the number the Reports page gives it. */
+function reportName(term) {
+  return term ? 'Report ' + Number(term.ordinal) : '';
+}
+
+/* How the class average moved since the last report, in the grade the
+   class shows first (the % in a Letter class, else the proficiency): the
+   year to date at the last report's end beside the year to date now (or,
+   with a report in view, at its end; Colin, 2026-11-03).
+   { text: '\u25B2 0.1', dir: 1, since: 'Report 1' }, dir -1 for down and
+   0 (text 'No Change') when it rounds to nothing. Null before the first
+   report has ended, or when either has no grades. */
 function classGradeChange(cid, studentIds) {
-  var active = getActiveTerm(cid);
-  if (!active) return null;
-  var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
-  var prev = null;
-  terms.forEach(function (t) {
-    if (t.ordinal < active.ordinal && (!prev || t.ordinal > prev.ordinal)) prev = t;
-  });
+  var prev = previousReportTerm(cid);
   if (!prev) return null;
   var key = courseGradeMode(cid) === 'letter' ? 'pct' : 'prof';
   var now = _classGradeMeans(cid, studentIds)[key];
-  setActiveTerm(cid, prev.ordinal);
-  var before = _classGradeMeans(cid, studentIds)[key];
-  setActiveTerm(cid, active.ordinal);
+  var before = readAsOfTerm(cid, prev.ordinal, function () {
+    return _classGradeMeans(cid, studentIds)[key];
+  });
   if (now == null || before == null) return null;
   var diff =
     key === 'pct'
@@ -2535,7 +2600,7 @@ function classGradeChange(cid, studentIds) {
   return {
     text: dir === 0 ? 'No Change' : (dir > 0 ? '\u25B2 ' : '\u25BC ') + amount,
     dir: dir,
-    since: prev.label || 'Term ' + prev.ordinal,
+    since: reportName(prev),
   };
 }
 
@@ -2869,9 +2934,10 @@ window.Calc = {
   clearProfCache,
   setActiveTerm,
   getActiveTerm,
-  activateSavedTerm,
-  assessmentInActiveTerm,
-  undatedAssessmentCount,
+  assessmentInYearToDate,
+  assessmentInTermWindow,
+  previousReportTerm,
+  readAsOfTerm,
   getClassPointsAverage,
   classColumnAverage,
   columnCountedValue,
@@ -2900,6 +2966,7 @@ window.Calc = {
   studentGradeSummary,
   classGradeSummary,
   classGradeChange,
+  reportName,
   classGradeDistribution,
   competencyDistribution,
   classColumnAverageText,
@@ -2932,6 +2999,7 @@ window.Calc = {
   getSectionProficiency,
   getSectionProficiencyRaw,
   getSectionOverride,
+  sectionOverrideInView,
   setSectionOverride,
   getGroupProficiency,
   getOverallProficiency,

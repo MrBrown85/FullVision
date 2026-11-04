@@ -182,6 +182,10 @@ window.PageDashboard = (function () {
 
   /* ── Main render ────────────────────────────────────────── */
   function render() {
+    // Every grade on this page, Class Management's included, is the year so
+    // far: a report's term from the Reports page never carries over (Colin,
+    // 2026-11-03).
+    if (activeCourse && typeof setActiveTerm === 'function') setActiveTerm(activeCourse, null);
     if (CM.classManagerOpen) {
       renderClassManager();
       return;
@@ -198,8 +202,7 @@ window.PageDashboard = (function () {
     }
     _syncSidebar();
     var cid = activeCourse;
-    // Every grade on this page follows the class's chosen reporting term.
-    if (typeof activateSavedTerm === 'function') activateSavedTerm(cid);
+    if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var sections = getSections(cid);
     var students = getStudents(cid);
     var flags = getFlags(cid);
@@ -489,7 +492,7 @@ window.PageDashboard = (function () {
     }
 
     /* -- Toolbar (rendered to separate mount) -- */
-    // html-safe: DashOverview.renderDashToolbar escapes class names; renderTermPicker is checked; the rest is a count.
+    // html-safe: DashOverview.renderDashToolbar escapes class names; the rest is a count.
     document.getElementById('page-toolbar-mount').innerHTML = Overview.renderDashToolbar({
       activeCourse: activeCourse,
       students: students,

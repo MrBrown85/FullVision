@@ -2131,34 +2131,58 @@ window.CommentBank = (function () {
     return { count: titles.length, titles: titles, groups: groups };
   }
 
-  /* Whether an assessment is in the active term, and its date: the term's
-     work and its competencies' scores read the same rule. */
+  /* Whether an assessment counts toward the report: the year to date as of
+     the report's end (calc.js assessmentInYearToDate; Colin, 2026-11-03).
+     The work, the record and each competency's scores read this rule. */
+  function _inYtd(cid, a) {
+    return !!a && assessmentInYearToDate(cid, a);
+  }
+  /* Whether an assessment is dated inside the report's own term: the trend
+     (start and now, rises, climbs and slides) describes this term's
+     movement only. */
   function _inTerm(cid, a) {
-    return !!a && assessmentInActiveTerm(cid, a);
+    return !!a && assessmentInTermWindow(cid, a);
   }
   function _dateOf(a) {
     return (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date) || '';
   }
 
-  /* One student's competencies this term: every score per competency,
-     oldest to newest, its trend from the start of the term to now (calc.js
-     startAndNow) and its level (calc.js getSectionProficiency). The
-     comment's gates (strongestOf, nextStepOf) and the printed This Term at
-     a Glance read the same list, so they name the same competencies. Reads
-     no DOM. */
+  /* One student's competencies: every score per competency in the year to
+     date (undated work first, then oldest to newest), the dated scores in
+     this term (termScores), its trend from the start of the term to now
+     (calc.js startAndNow, inside the term) and its level (calc.js
+     getSectionProficiency, the year to date). The comment's gates
+     (strongestOf, nextStepOf) count the year to date's scores; its rises
+     read the term's. The printed This Term at a Glance reads the same
+     list, so they name the same competencies. Reads no DOM. */
   function compsOf(cid, student) {
     var sid = student.id;
     var byId = {};
     (getAssessments(cid) || []).forEach(function (a) {
       byId[a.id] = a;
     });
+    var inYtd = function (a) {
+      return _inYtd(cid, a);
+    };
     var inTerm = function (a) {
       return _inTerm(cid, a);
     };
     var dateOf = _dateOf;
     var sections = ReportBlocks.reportSections(cid);
+    // After the first report, growth is measured from the last report: each
+    // competency's year-to-date level at its end (calc.js readAsOfTerm), as
+    // Growth Since Last Report and Progress in One Area print it.
+    var active = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    var prev = active && typeof previousReportTerm === 'function' ? previousReportTerm(cid) : null;
+    var thenLevels = prev
+      ? readAsOfTerm(cid, prev.ordinal, function () {
+          return sections.map(function (sec) {
+            return getSectionProficiency(cid, sid, sec.id);
+          });
+        })
+      : null;
     return sections
-      .map(function (sec) {
+      .map(function (sec, i) {
         var scores = [];
         (sec.tags || []).forEach(function (tag) {
           // One point per piece of work, the competency's mark on it as the
@@ -2166,12 +2190,15 @@ window.CommentBank = (function () {
           // lowest (calc.js tagMarksByAssessment; Colin, 2026-11-03).
           tagMarksByAssessment(cid, sid, tag.id).forEach(function (sc) {
             var a = byId[sc.assessmentId];
-            if (!(sc.score > 0) || !inTerm(a) || !dateOf(a)) return;
+            if (!(sc.score > 0) || !inYtd(a)) return;
             scores.push({ id: a.id, v: Number(sc.score), d: dateOf(a), title: a.title || '' });
           });
         });
         scores.sort(function (x, y) {
           return x.d.localeCompare(y.d);
+        });
+        var termScores = scores.filter(function (x) {
+          return !!x.d && inTerm(byId[x.id]);
         });
         // Start and now are on the level's footing, each rubric criterion
         // its own score (calc.js getTagScores), as the report's Start of
@@ -2193,6 +2220,8 @@ window.CommentBank = (function () {
             if (String(s || '').trim()) iCans.push(String(s).trim());
           });
         });
+        var level = getSectionProficiency(cid, sid, sec.id);
+        var then = thenLevels && thenLevels[i] > 0 ? thenLevels[i] : 0;
         return {
           id: sec.id,
           // The competency's own label, as the printed report names it; the
@@ -2207,12 +2236,17 @@ window.CommentBank = (function () {
               }) || {}
             ).bank_id || null,
           scores: scores,
-          start: sn ? sn.start : 0,
-          now: sn ? sn.now : 0,
+          termScores: termScores,
+          // Start and now, for rises and falls only: with a last report that
+          // had a level for the competency, its year-to-date level then and
+          // the level now (since: "Report 1"); on the first report, or a
+          // competency first assessed this term, the trend inside the term.
+          start: then ? then : sn ? sn.start : 0,
+          now: then ? level : sn ? sn.now : 0,
+          since: then ? reportName(prev) : '',
           // The level now as the report prints it: calc.js
-          // getSectionProficiency, the teacher's override included. start and
-          // now above are the trend, for rises and falls only.
-          level: getSectionProficiency(cid, sid, sec.id),
+          // getSectionProficiency, the teacher's override included.
+          level: level,
           iCans: iCans,
         };
       })
@@ -2221,11 +2255,16 @@ window.CommentBank = (function () {
       });
   }
 
-  /* One student's term, from the data layer. Reads no DOM. */
+  /* One student's report, from the data layer: the year to date as of the
+     report's end (Colin, 2026-11-03), with the term's own movement for the
+     trend. Reads no DOM. */
   function facts(cid, student, termId) {
     var sid = student.id;
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
     var assessments = getAssessments(cid) || [];
+    var inYtd = function (a) {
+      return _inYtd(cid, a);
+    };
     var inTerm = function (a) {
       return _inTerm(cid, a);
     };
@@ -2234,10 +2273,10 @@ window.CommentBank = (function () {
     var sections = ReportBlocks.reportSections(cid);
     var comps = compsOf(cid, student);
 
-    // The assessed work this term, one level per assessment.
+    // The assessed work in the year to date, one level per assessment.
     var work = assessments
       .filter(function (a) {
-        return inTerm(a) && !(typeof isCompletionScored === 'function' && isCompletionScored(a));
+        return inYtd(a) && !(typeof isCompletionScored === 'function' && isCompletionScored(a));
       })
       .map(function (a) {
         var v = getAssessmentOverallScore(cid, sid, a.id);
@@ -2262,11 +2301,13 @@ window.CommentBank = (function () {
     // missing only when it is labelled Missing, whatever its due date.
     var rec = { total: 0, handed: 0, late: 0, missing: 0 };
     var notIn = [];
-    // The scored pieces this term with their % (calc.js), oldest first, for
-    // the grade sentence's "close to" (gradeOf). Work labelled Missing is
-    // not a scored piece.
+    // The scored pieces in the year to date with their % (calc.js), oldest
+    // first, for the grade sentence's "close to" (gradeOf); termPieces, the
+    // ones dated in this term, for the climb and slide stories (the term's
+    // movement). Work labelled Missing is not a scored piece.
     var pieces = [];
-    assessments.filter(inTerm).forEach(function (a) {
+    var termPieces = [];
+    assessments.filter(inYtd).forEach(function (a) {
       var cell = assessmentCellValue(cid, sid, a);
       var missing = cell.status === 'NS';
       if (missing) notIn.push(a);
@@ -2278,11 +2319,36 @@ window.CommentBank = (function () {
       if (cell.late) rec.late++;
       if (missing || !dateOf(a)) return;
       var pc = getAssessmentGroupPercentage(cid, sid, [a]);
-      if (pc && pc.pct != null) pieces.push({ id: a.id, d: dateOf(a), pct: pc.pct });
+      if (pc && pc.pct != null) {
+        pieces.push({ id: a.id, d: dateOf(a), pct: pc.pct });
+        if (inTerm(a)) termPieces.push({ id: a.id, d: dateOf(a), pct: pc.pct });
+      }
     });
     pieces.sort(function (x, y) {
       return String(x.d).localeCompare(String(y.d));
     });
+    termPieces.sort(function (x, y) {
+      return String(x.d).localeCompare(String(y.d));
+    });
+
+    // Missing work labelled Missing outside the report's own term (an
+    // earlier term, or undated): the comment then says no "this term" about
+    // it (fits()). The pieces are in notHandedIn already, counted year to
+    // date as of the report's end.
+    var missingOutsideTerm = notIn.filter(function (a) {
+      return !inTerm(a);
+    }).length;
+    // The report before this one (calc.js previousReportTerm), its label and
+    // last day: At a Glance's marker ("change since the Term 1 report"),
+    // never a filter. Each competency's level then is c.start when c.since
+    // is set (compsOf). Null on the first report.
+    var lastRep =
+      typeof getActiveTerm === 'function' && getActiveTerm(cid) && typeof previousReportTerm === 'function'
+        ? previousReportTerm(cid)
+        : null;
+    var lastReport = lastRep
+      ? { label: lastRep.label || reportName(lastRep), endsOn: lastRep.ends_on || lastRep.endsOn || '' }
+      : null;
 
     var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
 
@@ -2332,7 +2398,7 @@ window.CommentBank = (function () {
     // IE's deadline; the student's marks against the class's marked work,
     // for the teacher's IE choice; the designations that offer language or
     // IEP goals.
-    var marked = markedCounts(cid, sid, assessments.filter(inTerm));
+    var marked = markedCounts(cid, sid, assessments.filter(inYtd));
     var des = student.designations || [];
     // When the student joined the class (enrollment.enrolled_at), and the
     // class's first enrolment, for the new-to-the-class story (angle()).
@@ -2364,6 +2430,10 @@ window.CommentBank = (function () {
       work: work,
       record: rec,
       notHandedIn: notHandedIn(notIn, dateOf),
+      // How many of the missing pieces fall outside the term: the comment
+      // then says no "this term" about them.
+      missingOutsideTerm: missingOutsideTerm,
+      lastReport: lastReport,
       voice: voice,
       confidence: conf,
       overall: overall,
@@ -2378,6 +2448,7 @@ window.CommentBank = (function () {
         pct: letter && letter.R != null ? letter.R : null,
         next: letter && letter.R != null ? nextLetterBand(letter.R) : null,
         pieces: pieces,
+        termPieces: termPieces,
         basis: typeof reportingBasis === 'function' ? reportingBasis(cid, sid, termId) : 'grade',
         ieDeadline: String(rating.ieDeadline || '').slice(0, 10),
         // false once the saved date has passed or falls after the school
@@ -2779,6 +2850,9 @@ window.CommentBank = (function () {
      the claiming sentence is not eligible, and verify() fails it. */
   // Strongest needs 3+ scored pieces: the 3-score minimum used in practice (report D6).
   var STRONGEST_PIECES = 3;
+  // The next step needs 2+ scored pieces in the year to date (Colin, 2026-11-03;
+  // was 3 inside the term): naming where to go next asks less than a strength.
+  var NEXT_STEP_PIECES = 2;
   // And half a proficiency step over the next competency, a gap larger than one mark's noise (report D6).
   var STRONGEST_GAP = 0.5;
   // Improved needs 4+ pieces, so the change is not one mark against another (report D6).
@@ -2845,7 +2919,14 @@ window.CommentBank = (function () {
 
   /* A competency's scores as points: { d, v } with v its proficiency. */
   function improvedComp(c) {
-    return !!c && improvedGate(c.scores, IMPROVED_LEVEL);
+    if (!c) return false;
+    // Since the last report: the year-to-date level then and now.
+    if (c.since) return c.start > 0 && c.now > 0 && _atLeast(c.now - c.start, IMPROVED_LEVEL);
+    return improvedGate(c.termScores || c.scores, IMPROVED_LEVEL);
+  }
+  /* How far a competency rose, on improvedComp's footing. */
+  function riseOf(c) {
+    return c.since ? c.now - c.start : trendOf(c.termScores || c.scores);
   }
 
   /* The scored pieces' % as points, for the climb and slide stories. */
@@ -2885,15 +2966,15 @@ window.CommentBank = (function () {
   }
 
   /* The next step (plan PR 8): the lowest competency with enough evidence,
-     3+ scored pieces this term (the "strongest" gate's minimum), and not
-     among the strongest; the first in report order on an exact tie. null when
+     2+ scored pieces in the year to date as of the report's end
+     (NEXT_STEP_PIECES; Colin, 2026-11-03), and not among the strongest; the first in report order on an exact tie. null when
      none has enough. The comment's next-step sentence and the At a Glance
      tag both read it. */
   function nextStepOf(comps) {
     var strong = strongestOf(comps);
     var low = null;
     (comps || []).forEach(function (c) {
-      if (!(c.level > 0) || (c.scores || []).length < STRONGEST_PIECES || strong.indexOf(c) >= 0) return;
+      if (!(c.level > 0) || (c.scores || []).length < NEXT_STEP_PIECES || strong.indexOf(c) >= 0) return;
       if (!low || c.level < low.level) low = c;
     });
     return low;
@@ -2992,13 +3073,15 @@ window.CommentBank = (function () {
     (f.comps || []).forEach(function (c) {
       var e = c.bankId ? bankEntry(c.bankId) : null;
       if (!e || (next && next.key === e.key)) return;
-      // The level reached is the competency's level as the report shows it
-      // (c.level: a teacher's override where there is one).
+      // Start and now on one footing (the last report's level and the level
+      // now, or the term's trend), and the level reached must be the one
+      // the report prints (c.level: a teacher's override where there is one).
       var from = word(c.start);
-      var to = word(c.level);
-      if (!from || !to || !(Math.round(c.level) > Math.round(c.start)) || !improvedComp(c)) return;
+      var to = word(c.now);
+      if (!from || !to || to !== word(c.level) || !(Math.round(c.now) > Math.round(c.start)) || !improvedComp(c))
+        return;
       if (R.wordCount(e.phrase) > 9) return;
-      var gain = Math.round(c.level) - Math.round(c.start);
+      var gain = Math.round(c.now) - Math.round(c.start);
       if (!pick || gain > pick.gain) pick = { comp: c, key: e.key, from: from, to: to, skill: e.phrase, gain: gain };
     });
     return pick;
@@ -3449,7 +3532,7 @@ window.CommentBank = (function () {
     // What rose: only competencies past the "improved" gate (improvedComp),
     // the biggest change first.
     var rises = f.comps.filter(improvedComp).sort(function (a, b) {
-      return trendOf(b.scores) - trendOf(a.scores);
+      return riseOf(b) - riseOf(a);
     });
     var drops = withLevels.filter(function (c) {
       return tenths(c.now) < tenths(c.start);
@@ -3536,7 +3619,7 @@ window.CommentBank = (function () {
     var aboutId = null;
     if (focus) {
       var fw = {};
-      focus.scores.forEach(function (s) {
+      (focus.termScores || focus.scores).forEach(function (s) {
         if (!fw[s.title] || s.v > fw[s.title].v) fw[s.title] = s;
       });
       var fl = Object.keys(fw).map(function (k) {
@@ -3997,6 +4080,15 @@ window.CommentBank = (function () {
     // sentence that says "this term", the bank's or the teacher's own
     // (Colin, 2026-11-03).
     if (ctx._f && ctx._f.attendanceYear && (s.claims || []).indexOf('attendance') >= 0 && /\bthis term\b/i.test(s.text))
+      return false;
+    // Missing work is counted so far this year: with a piece from outside
+    // the term, no missing-work sentence that says "this term".
+    if (
+      ctx._f &&
+      ctx._f.missingOutsideTerm > 0 &&
+      (s.claims || []).indexOf('notHandedIn') >= 0 &&
+      /\bthis term\b/i.test(s.text)
+    )
       return false;
     if (!_fitsMine(s, ctx)) return false;
     var when = s.when || {};
@@ -4745,8 +4837,9 @@ window.CommentBank = (function () {
       missing: _missingCount(f),
       total: rec.total || 0,
       strongWork: strongWork,
-      climb: climbed(pieces),
-      slide: slid(pieces),
+      // The climb and slide are this term's movement (g.termPieces).
+      climb: climbed(g.termPieces || pieces),
+      slide: slid(g.termPieces || pieces),
       split: split,
       growing: Object.keys(habits).filter(function (k) {
         return habits[k] === 1 || habits[k] === 2;
@@ -5936,8 +6029,8 @@ window.CommentBank = (function () {
     });
   }
   var _article = R.aOrAn;
-  /* Work labelled Missing this term (facts().notHandedIn; the record's
-     count for facts built without it). */
+  /* Work labelled Missing up to the report's end, whatever its term
+     (facts().notHandedIn; the record's count for facts built without it). */
   function _missingCount(f) {
     if (f.notHandedIn && f.notHandedIn.count != null) return Number(f.notHandedIn.count) || 0;
     return (f.record && f.record.missing) || 0;
@@ -6150,7 +6243,7 @@ window.CommentBank = (function () {
         );
       // The marks climbed over the term (the climb story): the scored
       // pieces' % past the "improved" gate (climbed).
-      if (_has(pv, 'climb')) checks.push(climbed((f.grade && f.grade.pieces) || []));
+      if (_has(pv, 'climb')) checks.push(climbed((f.grade && (f.grade.termPieces || f.grade.pieces)) || []));
       // Progress in levels: the same competency, climb and phrase (progressOf).
       if (_has(pv, 'progressSkill')) {
         var pg = progressOf(f);
@@ -6264,7 +6357,7 @@ window.CommentBank = (function () {
       if (!c) return false;
       var marks = function (slot) {
         var id = _ids(pv, slot, 'work')[0];
-        return c.scores
+        return (c.termScores || c.scores)
           .filter(function (sc) {
             return id != null && String(sc.id) === id && sc.title === pv.values[slot];
           })
@@ -6717,7 +6810,7 @@ window.CommentBank = (function () {
     return JSON.stringify(v === undefined ? null : v);
   }
 
-  /* Each piece's mark this term, by piece: 'work:<id>' { t: title, m: its
+  /* Each piece's mark in the report, by piece: 'work:<id>' { t: title, m: its
      level and % }, and 'missing:<title>' for work labelled Missing. What
      names the pieces that changed ("“Lab 3” was marked …"). */
   function marksOf(f) {

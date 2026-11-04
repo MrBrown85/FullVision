@@ -111,7 +111,7 @@
   ];
 
   var DEFAULT_OPTIONS = {
-    term: 'all', // 'all' | 'custom' | a term's ordinal as a string
+    term: 'all', // 'all' | 'custom' | a term's ordinal as a string: the year to date as of its end
     from: '',
     to: '',
     assessments: 'all', // all | shown | pick
@@ -130,7 +130,8 @@
     attendance: false, // school days across the top in place of assessments
   };
   /* The choices remembered on this device. Term, assessments and paper are
-     not: the first two follow the gradebook, paper is per class. */
+     not: Term opens on All Time (the gradebook's year so far), Assessments
+     follows the gradebook's filters, paper is per class. */
   var REMEMBERED = ['late', 'average', 'students', 'sortBy', 'finalGrade', 'size'];
 
   var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -163,6 +164,11 @@
   }
 
   /* "Sep 2 – Nov 14, 2026": one year when both dates share it. */
+  /* "Term 1 Year to Date": a term's choice, the year to date as of its end. */
+  function _toDateLabel(t) {
+    return (t.label || 'Term ' + t.ordinal) + ' Year to Date';
+  }
+
   function _dateRange(a, b) {
     if (!a && !b) return '';
     if (!a || !b) return formatDate(a || b);
@@ -210,7 +216,8 @@
     return courseGradeMode(cid) === 'letter' ? 'percent' : 'proficiency';
   }
 
-  /* The period the sheet covers: all time, a reporting term or two dates. */
+  /* The period the sheet covers: all time, the year to date as of a
+     reporting term's end (Colin, 2026-11-03), or two dates. */
   function periodFor(cid, opts) {
     if (opts.term === 'custom') {
       var from = opts.from || '';
@@ -230,18 +237,18 @@
         return {
           kind: 'term',
           ordinal: term.ordinal,
-          from: term.starts_on,
+          from: '',
           to: term.ends_on,
-          label: term.label,
-          dates: _dateRange(term.starts_on, term.ends_on),
+          label: _toDateLabel(term),
+          dates: 'Up to ' + formatDate(term.ends_on),
         };
       }
     }
     return { kind: 'all', ordinal: null, from: '', to: '', label: 'All Time', dates: '' };
   }
 
-  /* Runs fn with the class's grades scoped to the period's term, then puts
-     back whatever term the gradebook had. */
+  /* Runs fn with the class's grades read as of the period's term (the year
+     to date to its end), then puts back whatever term was in view. */
   function withPeriod(cid, period, fn) {
     var prev = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
     setActiveTerm(cid, period.kind === 'term' ? period.ordinal : null);
@@ -312,7 +319,8 @@
     period = period || periodFor(cid, opts);
     var list = getAssessments(cid).filter(function (a) {
       var d = _assessmentDate(a);
-      if (!d) return period.kind === 'all' || !!opts.undated;
+      // Undated work is part of every year to date; Custom Dates asks.
+      if (!d) return period.kind !== 'custom' || !!opts.undated;
       if (period.from && d < period.from) return false;
       if (period.to && d > period.to) return false;
       return true;
@@ -1168,7 +1176,7 @@
       term: [{ value: 'all', label: 'All Time' }]
         .concat(
           getReportingTerms(cid).map(function (t) {
-            return { value: String(t.ordinal), label: t.label, help: _dateRange(t.starts_on, t.ends_on) };
+            return { value: String(t.ordinal), label: _toDateLabel(t), help: 'Up to ' + formatDate(t.ends_on) };
           }),
         )
         .concat([{ value: 'custom', label: 'Custom Dates' }]),
@@ -1326,7 +1334,7 @@
     if (opts.term === 'custom' && !days) {
       content += _dateRow('from', 'From', opts.from) + _dateRow('to', 'To', opts.to);
     }
-    if (period.kind !== 'all' && !days && _undatedCount(cid) > 0) {
+    if (period.kind === 'custom' && !days && _undatedCount(cid) > 0) {
       content += _switchRow('undated', opts.undated, 'Undated Assessments', false, true);
     }
     content += _menuRow(menus, opts, 'assessments', 'Assessments', days);
