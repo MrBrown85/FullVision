@@ -955,10 +955,13 @@ window.ReportQuestionnaire = (function () {
     var rows = CommentBank.HABITS.map(function (h) {
       var v = stored[h.key];
       var name = HABIT_LABELS[h.key] || h.name;
+      // One Tab stop per habit: the picked rating, else the first; the
+      // arrow keys move between the ratings (_arrowRadio).
+      var stop = v >= 1 && v <= CommentBank.SCALE.length ? v : 1;
       var opts = CommentBank.SCALE.map(function (label, i) {
         var val = i + 1;
         var on = v === val;
-        return `<span class="qn-habit-cell"><button type="button" role="radio" aria-checked="${on}" class="qn-radio${on ? ' on' : ''}" data-action="tqRate" data-habit="${h.key}" data-value="${val}" aria-label="${esc(name + ': ' + label)}" title="${esc(SCALE_TIPS[label] || label)}"></button></span>`;
+        return `<span class="qn-habit-cell"><button type="button" role="radio" aria-checked="${on}" tabindex="${val === stop ? 0 : -1}" class="qn-radio${on ? ' on' : ''}" data-action="tqRate" data-habit="${h.key}" data-value="${val}" aria-label="${esc(name + ': ' + label)}" title="${esc(SCALE_TIPS[label] || label)}"></button></span>`;
       }).join('');
       return `<div class="qn-habit-row" role="radiogroup" aria-label="${esc(name)}">
         <span class="qn-habit-name" title="${esc(h.hint)}">${esc(name)}</span>${opts}
@@ -986,6 +989,7 @@ window.ReportQuestionnaire = (function () {
       var on = Number(b.dataset.value) === Number(value);
       b.classList.toggle('on', on);
       b.setAttribute('aria-checked', String(on));
+      b.tabIndex = on ? 0 : -1;
     });
     var rated = document.getElementById('tq-rated');
     if (rated) rated.textContent = _ratedCount(habits) + ' of 6 rated';
@@ -7210,6 +7214,26 @@ window.ReportQuestionnaire = (function () {
       tqCopyNarrative();
       return;
     }
+    // In a menu the arrow keys move between its items, and on a Work
+    // Habits rating between Rarely and Not Seen; neither changes the
+    // student (Nov 3 sweep: Down in Other Wording opened the next one).
+    if (t && t.closest && !e.altKey && !e.metaKey && !e.ctrlKey && /^(Arrow(Up|Down|Left|Right)|Home|End)$/.test(e.key)) {
+      if (t.getAttribute && t.getAttribute('role') === 'radio' && t.closest('[role="radiogroup"]')) {
+        if (t.classList && t.classList.contains('qn-radio')) {
+          e.preventDefault();
+          _arrowRadio(t.closest('[role="radiogroup"]'), t, e.key);
+        }
+        return;
+      }
+      var menu = t.closest('[role="menu"]');
+      if (menu && !t.closest('input[type="text"], textarea')) {
+        if (/^(Arrow(Up|Down)|Home|End)$/.test(e.key)) {
+          e.preventDefault();
+          _arrowMenu(menu, t, e.key);
+        }
+        return;
+      }
+    }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     // Arrow keys in the open calendar stay there (and with the focus lost
     // to the page while it is open): they never move to another student,
@@ -7223,6 +7247,39 @@ window.ReportQuestionnaire = (function () {
     e.preventDefault();
     if (e.key === 'ArrowDown') tqNextStudent();
     else tqPrevStudent();
+  }
+
+  /* The next item of a menu for an arrow key, Home or End, wrapping. */
+  function _arrowMenu(menu, t, key) {
+    var items = Array.prototype.slice
+      .call(menu.querySelectorAll('button, input:not([type="hidden"])'))
+      .filter(function (x) {
+        return !x.disabled && !x.hidden;
+      });
+    if (!items.length) return;
+    var at = items.indexOf(t.closest('button, input') || t);
+    var next =
+      key === 'Home'
+        ? 0
+        : key === 'End'
+          ? items.length - 1
+          : (at + (key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
+    if (at < 0) next = key === 'ArrowUp' || key === 'End' ? items.length - 1 : 0;
+    items[next].focus();
+  }
+  /* A Work Habits rating moved by an arrow key, Home or End: the next
+     rating is picked and takes the focus (a radio group's keys). */
+  function _arrowRadio(group, t, key) {
+    var radios = Array.prototype.slice.call(group.querySelectorAll('[role="radio"]'));
+    var at = radios.indexOf(t);
+    if (at < 0 || !radios.length) return;
+    var back = key === 'ArrowUp' || key === 'ArrowLeft';
+    var next =
+      key === 'Home' ? 0 : key === 'End' ? radios.length - 1 : (at + (back ? -1 : 1) + radios.length) % radios.length;
+    var b = radios[next];
+    tqRate(b.dataset.habit, b.dataset.value);
+    var now = document.querySelector('.qn-radio[data-habit="' + b.dataset.habit + '"][data-value="' + b.dataset.value + '"]');
+    if (now) now.focus();
   }
 
   /* ── Namespace ──────────────────────────────────────────── */
