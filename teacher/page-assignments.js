@@ -12492,7 +12492,7 @@ window.PageAssignments = (function () {
     // edits elsewhere never updated, so the cell and course % kept the old
     // points.
     var sid = focusStudentId;
-    setPointsScore(cid, sid, aid, raw);
+    setPointsScore(cid, focusStudentId, aid, raw);
     refreshSidebarGrades(sid);
     render();
     if (over != null) _sayPointsCapped(cid, sid, aid, over, raw, max, prev);
