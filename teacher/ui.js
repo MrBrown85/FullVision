@@ -585,6 +585,19 @@ document.addEventListener('click', function (e) {
     if (button) button.setAttribute('aria-expanded', 'false');
   }
 });
+// Escape closes it too, and puts the focus back on the account button.
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  const menu = document.querySelector('.tb-user-menu.open');
+  if (!menu) return;
+  menu.classList.remove('open');
+  const button = menu.querySelector('.tb-user-btn');
+  if (button) {
+    button.setAttribute('aria-expanded', 'false');
+    button.focus();
+  }
+  e.preventDefault();
+});
 
 /* ── Upcoming Birthdays ────────────────────────────────────── */
 function getUpcomingBirthdays(cid) {

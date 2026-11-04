@@ -2911,6 +2911,7 @@ window.DashClassManager = (function () {
       if (newDetail) newDetail.scrollTop = scrollTop;
     }
     _cmRosterScrollCue();
+    _cmRestoreKeptFocus();
   }
 
   /* The roster is wider than most windows (twelve columns). While columns
@@ -9568,6 +9569,7 @@ window.DashClassManager = (function () {
 
   /* ── Action dispatcher (called from parent's _handleClick) ── */
   function handleAction(action, el, e) {
+    _cmKeepFocusSel = null;
     // Any click other than on a card's More button closes its open menu.
     if (action !== 'cmStdMenu') _cmCloseStdMenus();
     if (action !== 'cmRosterDesigOpen') _cmCloseRosterPicker();
@@ -9937,7 +9939,43 @@ window.DashClassManager = (function () {
     return false;
   }
 
+  /* A switch, checkbox, radio or menu changed with the keyboard keeps the
+     focus: most changes redraw Class Management, which made the control a
+     new element and dropped the focus to the page. Until the next click or
+     change, a redraw that leaves the focus nowhere gives it back to the same
+     control (by id, else by its data attributes), including the redraws
+     around a "Change Grades?" question and its answer. */
+  var _cmKeepFocusSel = null;
+
   function handleChange(el) {
+    _cmKeepFocusSel = _cmControlSelector(el);
+    return _handleChange(el);
+  }
+
+  function _cmRestoreKeptFocus() {
+    if (!_cmKeepFocusSel) return;
+    var active = document.activeElement;
+    if (active && active !== document.body) return;
+    var again = document.querySelector(_cmKeepFocusSel);
+    if (again && typeof again.focus === 'function') again.focus({ preventScroll: true });
+  }
+
+  function _cmControlSelector(el) {
+    if (!el || !el.tagName || typeof CSS === 'undefined' || !CSS.escape) return null;
+    var keep = el.tagName === 'SELECT' || (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio'));
+    if (!keep) return null;
+    if (el.id) return '#' + CSS.escape(el.id);
+    var attrs = el.attributes || [];
+    var parts = [];
+    for (var i = 0; i < attrs.length; i++) {
+      var n = attrs[i].name;
+      if (n.indexOf('data-') === 0 || n === 'name' || (n === 'value' && el.type === 'radio'))
+        parts.push('[' + n + '="' + CSS.escape(attrs[i].value) + '"]');
+    }
+    return parts.length ? el.tagName.toLowerCase() + parts.join('') : null;
+  }
+
+  function _handleChange(el) {
     if (typeof CmQuestionnaires !== 'undefined' && CmQuestionnaires.handleChange(el)) return true;
     if (el.dataset.actionChange === 'cmCSV') {
       cmHandleCSV(el);
