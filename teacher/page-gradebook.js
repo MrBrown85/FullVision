@@ -1115,6 +1115,19 @@ window.PageGradebook = (function () {
     requestAnimationFrame(update);
   }
 
+  /* What a screen reader hears on a Competencies cell, as the Scores view
+     says it: "Mateo Alvarez, Density Worksheet, QAP1: 3, Proficient".
+     `value` is the score's text ('' for none); a status replaces it, and
+     Late follows it. Escaped for an attribute. */
+  function _compCellLabel(s, assess, col, status, value, hint) {
+    var what = status === 'NS' ? 'Missing' : status === 'EXC' ? 'Excused' : value ? value : 'No score';
+    if (status === 'LATE' && value) what += ', Late';
+    var code = col.isPointsCol ? '' : col.tagCode ? ', ' + col.tagCode : '';
+    return esc(
+      fullName(s) + ', ' + ((assess && assess.title) || 'Assessment') + code + ': ' + what + (hint ? '. ' + hint : ''),
+    );
+  }
+
   /* A student's name in the grid's left column: a link to their page. */
   /* Whether a student's grade shows a reporting basis (IE, or No Letter
      Grade for goals) for the term in view. That row keeps the name whole and
@@ -1478,7 +1491,9 @@ window.PageGradebook = (function () {
             altClass +
             '"' +
             cellStyle +
-            ' tabindex="-1" role="gridcell" data-aid="' +
+            ' tabindex="-1" role="gridcell" aria-label="' +
+            _compCellLabel(s, assess, col, cellStatus, mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '') +
+            '" data-aid="' +
             col.assessmentId +
             '" data-pts="1" data-cmp="1" data-sid="' +
             s.id +
@@ -1510,7 +1525,9 @@ window.PageGradebook = (function () {
             altClass +
             '"' +
             cellStyle +
-            ' tabindex="-1" role="gridcell" data-aid="' +
+            ' tabindex="-1" role="gridcell" aria-label="' +
+            _compCellLabel(s, assess, col, cellStatus, score != null ? formatPoints(score) + ' out of ' + max : '') +
+            '" data-aid="' +
             col.assessmentId +
             '" data-pts="1" data-sid="' +
             s.id +
@@ -1556,7 +1573,16 @@ window.PageGradebook = (function () {
             altClass +
             '"' +
             cellStyle +
-            ' tabindex="-1" role="gridcell" data-aid="' +
+            ' tabindex="-1" role="gridcell" aria-label="' +
+            _compCellLabel(
+              s,
+              assess,
+              col,
+              cellStatus,
+              score > 0 ? formatScoreLevel(score, entry.mod) + ', ' + scoreLevelText(score, entry.mod) : '',
+              rubricCol ? 'Scored on the rubric. Press Return to open it.' : '',
+            ) +
+            '" data-aid="' +
             col.assessmentId +
             '" data-tid="' +
             col.tagId +

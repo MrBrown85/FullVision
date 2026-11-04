@@ -1191,6 +1191,14 @@ th.gb-group-alt {
   flex-direction: column;
   justify-content: flex-end;
 }
+/* The Competencies view's names share their column with "3.3 Proficient",
+   so on a wide screen the column takes 240px: 15-letter names and the
+   Rubrics by Competency picker fit whole. */
+@media (min-width: 1200px) {
+  .gb-grid.gb-grid-comp {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+}
 /* Sort toggle sits in the empty top of the corner, above Student / Overall. */
 /* View options sit in the empty top of the corner, above Student / Overall. */
 .gb-corner-tools {
