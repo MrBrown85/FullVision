@@ -1725,6 +1725,22 @@ window.PageReports = (function () {
     if (JSON.stringify(next) === JSON.stringify(f)) return;
     _setForm(next, 'Moved ' + _label(id) + (dir < 0 ? ' up' : ' down'));
   }
+  /* Selects a placed block on the previewed student's page and brings it
+     into view, from the palette. Everyone view switches to One Student,
+     where a block can be selected. */
+  function _findBlock(id) {
+    if (studioView !== 'one') {
+      studioView = 'one';
+      studioSelected = id;
+      renderReports();
+    } else _selectBlock(id);
+    var cell = document.querySelector('#rb-preview .sheet-body .sheet-cell[data-block="' + id + '"]');
+    if (cell) {
+      cell.scrollIntoView({ block: 'nearest' });
+      cell.focus({ preventScroll: true });
+    }
+    _announce(ReportStudio.placeText(_formOf(), id) + '.');
+  }
   function _removeBlock(id) {
     if (studioSelected === id) studioSelected = null;
     _setForm(ReportSheets.removeCell(_formOf(), id), 'Removed ' + _label(id));
@@ -1906,13 +1922,15 @@ window.PageReports = (function () {
         if (studioTab === 'templates') _syncTemplates();
       },
       studioBlock: function () {
-        // A block already on the form comes off it (Undo puts it back). One
-        // that isn't lands in a row of its own: on the Front when it has room for
+        // A block already on the form is found on the page: selected, with
+        // its card, and scrolled to (DECISIONS "Report forms" 13; it was
+        // removed, step 4 group 2 #8). Remove is on its card. One that isn't
+        // lands in a row of its own: on the Front when it has room for
         // every student, else on the Back, with a toast that says so. A
         // block taller than a side prints after the report.
         var id = el.dataset.block;
         var f = _formOf();
-        if (ReportSheets.locate(f, id)) return _removeBlock(id);
+        if (ReportSheets.locate(f, id)) return _findBlock(id);
         if (el.getAttribute('aria-disabled') === 'true') return;
         var land = _landing(id);
         if (!land) return;

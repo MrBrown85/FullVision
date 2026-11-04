@@ -301,7 +301,7 @@ test.describe('Page Studio', () => {
     await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toHaveText('Noor Al-Rashid');
   });
 
-  test('a click selects a block and shows its inspector at the top right; Remove takes it off with Undo; the palette removes it or adds it', async ({
+  test('a click selects a block and shows its inspector at the top right; Remove takes it off with Undo; the palette finds it or adds it', async ({
     page,
   }) => {
     await openStudio(page);
@@ -347,12 +347,21 @@ test.describe('Page Studio', () => {
     await expect(page.locator('#undo-toast')).toContainText('Removed Proficiency Legend');
     await undo(page).click();
     expect(await rowsOf(page, 0)).toContain('legend');
-    // Clicking a placed block in the palette takes it off; Undo puts it back.
+    // Clicking a placed block in the palette finds it on the page: selected,
+    // with its card, and nothing removed (step 4 group 2 #8).
+    await cellOf(page, 'header').click();
     await page.locator('[data-action="studioBlock"][data-block="legend"]').click();
-    await expect(page.locator('.sheet-cell[data-block="legend"]')).toHaveCount(0);
-    await expect(page.locator('#undo-toast')).toContainText('Removed Proficiency Legend');
-    await undo(page).click();
+    await expect(cellOf(page, 'legend')).toHaveClass(/studio-sel/);
+    await expect(cellOf(page, 'legend')).toBeFocused();
+    await expect(bar(page).locator('.studio-bar-name')).toHaveText('Proficiency Legend');
     expect(await rowsOf(page, 0)).toContain('legend');
+    await expect(page.locator('[data-action="studioBlock"][data-block="legend"]')).toHaveClass(/placed/);
+    // From Everyone it opens One Student on the block.
+    await page.locator('.studio-view [data-view="all"]').click();
+    await page.locator('[data-action="studioBlock"][data-block="missing-work"]').click();
+    await expect(page.locator('.report-sheet')).toHaveCount(2);
+    await expect(page.locator('.studio-view [data-view="one"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(cellOf(page, 'missing-work')).toHaveClass(/studio-sel/);
     // A block from the palette lands in its own row at the end of the Front when it has room.
     await page.locator('[data-action="studioBlock"][data-block="support-home"]').click();
     expect((await rowsOf(page, 0)).slice(-1)).toEqual(['support-home']);

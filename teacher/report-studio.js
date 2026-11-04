@@ -213,7 +213,7 @@ window.ReportStudio = (function () {
           placed +
           '"' +
           (nofit ? ' aria-disabled="true"' : '') +
-          (placed ? ' title="On the report. Click to remove it."' : '') +
+          (placed ? ' title="On the report. Click to find it."' : '') +
           '>' +
           '<span class="studio-tick" aria-hidden="true">' +
           (placed ? '✓' : '') +
