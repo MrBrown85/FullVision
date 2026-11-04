@@ -28,7 +28,7 @@ const TO_FIXED_1 = {
   'teacher/ui.js': 1,
 };
 const PROF_LABELS_USES = {
-  'teacher-mobile/card-widgets.js': 4,
+  'teacher-mobile/card-widgets.js': 1,
   'teacher-mobile/student-detail.js': 7,
   'teacher-mobile/tab-grade.js': 4,
   'teacher/comment-bank.js': 1,

@@ -944,6 +944,70 @@ function startAndNow(points) {
   return { start: mean(first), now: mean(last), startCount: first.length, nowCount: last.length };
 }
 
+/* Where a student's work started and where it is now (the phone card's
+   growth line), in the grade the class shows first. A Letter class reads
+   each piece's % as the course % counts it (Missing is 0, Excused left
+   out); a Proficiency or Both class reads each competency score that counts
+   (tagIds; no 0% category work). Start and now are the means of the first
+   and last weeks (startAndNow), so one early or late score doesn't decide
+   it. Returns { startText, nowText, change, dir, count } (count:
+   assessments), with startText null when the work spans under two weeks;
+   null when there is no work. */
+function studentGrowthLine(cid, sid, tagIds) {
+  var letter = courseGradeMode(cid) === 'letter';
+  var points = [];
+  var ids = {};
+  var day = function (d) {
+    var t = d ? Math.floor(Date.parse(d) / 86400000) : NaN;
+    return isFinite(t) ? t : null;
+  };
+  if (letter) {
+    _scopedAssessments(cid).forEach(function (a) {
+      if (isDibelsScored(a) || !countsTowardGrades(cid, a)) return;
+      var g = getAssessmentGroupPercentage(cid, sid, [a]);
+      if (!g) return;
+      ids[a.id] = true;
+      points.push({ t: day(a.date), v: g.pct });
+    });
+  } else {
+    (tagIds || []).forEach(function (tid) {
+      getCountedTagScores(cid, sid, tid).forEach(function (e) {
+        if (!(e.score > 0)) return;
+        ids[e.assessmentId] = true;
+        points.push({ t: day(e.date), v: Number(e.score) });
+      });
+    });
+  }
+  if (!points.length) return null;
+  var digits = getRoundWholePercent(cid) ? 0 : 1;
+  var text = function (v) {
+    if (letter) return _roundPercent(v, digits) + '%';
+    var word = levelWord(cid, v);
+    return formatLevel(cid, v) + (word ? ' ' + word : '');
+  };
+  var count = Object.keys(ids).length;
+  var run = startAndNow(points);
+  if (!run) {
+    var mean =
+      points.reduce(function (t, p) {
+        return t + p.v;
+      }, 0) / points.length;
+    return { startText: null, nowText: text(mean), change: '', dir: 0, count: count };
+  }
+  var change;
+  var dir;
+  if (letter) {
+    var d = Math.round((_roundPercent(run.now, digits) - _roundPercent(run.start, digits)) * 10) / 10;
+    dir = d > 0 ? 1 : d < 0 ? -1 : 0;
+    change = dir ? (dir > 0 ? '+' : '\u2212') + Math.abs(d) + '%' : '';
+  } else {
+    change = levelChange(run.start, run.now);
+    dir = change.charAt(0) === '+' ? 1 : change.charAt(0) === '\u2212' ? -1 : 0;
+    if (!dir) change = '';
+  }
+  return { startText: text(run.start), nowText: text(run.now), change: change, dir: dir, count: count };
+}
+
 /* The mean of a student's score entries (getTagScores), each at the value
    the calculations use (3+ is 3.33). Null when there are none. */
 function averageLevels(entries) {
@@ -2838,6 +2902,7 @@ window.Calc = {
   groupGradeDiff,
   groupGradeValue,
   startAndNow,
+  studentGrowthLine,
   averageLevels,
   categoryCourseShares,
   rubricCriterionLevel,

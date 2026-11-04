@@ -252,73 +252,54 @@ window.MCardWidgets = (function () {
   };
 
   /* ── growth (journey pill) ────────────────────────────────────── */
+  // Where the student's work started and where it is now, in the grade the
+  // class shows first (studentGrowthLine): a % in a Letter class, the level
+  // and its word otherwise. The means of the first and last weeks, so one
+  // early or late score doesn't decide it.
   _renderers.growth = function (st, cid, data) {
-    var allEvidenceScores = [];
-    var sections = data.sections || [];
-    sections.forEach(function (sec) {
+    var tagIds = [];
+    (data.sections || []).forEach(function (sec) {
       (sec.tags || []).forEach(function (tag) {
-        // The evidence that counts toward the level (no 0% category work).
-        getCountedTagScores(cid, st.id, tag.id).forEach(function (s) {
-          if (s.score > 0) allEvidenceScores.push(s);
-        });
+        tagIds.push(tag.id);
       });
     });
+    var g = studentGrowthLine(cid, st.id, tagIds);
+    if (!g) return '';
+    var countText = g.count + (g.count === 1 ? ' assessment' : ' assessments');
 
-    if (!allEvidenceScores.length) return '';
-
-    allEvidenceScores.sort(function (a, b) {
-      return (a.date || '').localeCompare(b.date || '');
-    });
-
-    if (allEvidenceScores.length === 1) {
-      var onlyScore = allEvidenceScores[0].score;
+    if (!g.startText) {
+      // Under two weeks of work: where it is now.
       return (
         '<div class="m-wdg-growth">' +
         '<span class="m-wdg-growth-label">' +
-        (PROF_LABELS[Math.round(onlyScore)] || 'No Evidence') +
+        MC.esc(g.nowText) +
         '</span>' +
-        '<span class="m-wdg-growth-meta"> \u2014 1 assessment</span>' +
+        '<span class="m-wdg-growth-meta"> \u2014 ' +
+        countText +
+        '</span>' +
         '</div>'
       );
     }
 
-    // First and last compared by the level their words name (evidenceChange).
-    var change = evidenceChange(allEvidenceScores);
-    // One assessment scores several competencies; count each assessment once.
-    var assessmentIds = {};
-    allEvidenceScores.forEach(function (s) {
-      assessmentIds[s.assessmentId] = true;
-    });
-    var assessmentN = Object.keys(assessmentIds).length;
-    var arrowColor, arrowChar;
-    if (change.dir > 0) {
-      arrowColor = 'var(--score-3)';
-      arrowChar = '\u2191';
-    } else if (change.dir < 0) {
-      arrowColor = 'var(--score-1)';
-      arrowChar = '\u2193';
-    } else {
-      arrowColor = 'var(--text-3)';
-      arrowChar = '\u2192';
-    }
-
+    var arrowColor = g.dir > 0 ? 'var(--score-3)' : g.dir < 0 ? 'var(--score-1)' : 'var(--text-3)';
+    var arrowChar = g.dir > 0 ? '\u2191' : g.dir < 0 ? '\u2193' : '\u2192';
     return (
-      '<div class="m-wdg-growth">' +
-      '<span class="m-wdg-growth-label">' +
-      PROF_LABELS[change.first] +
+      '<div class="m-wdg-growth" title="Start is the first weeks of work; Now is the last weeks.">' +
+      '<span class="m-wdg-growth-label">Start ' +
+      MC.esc(g.startText) +
       '</span>' +
       '<span class="m-wdg-growth-arrow" style="color:' +
       arrowColor +
       '">' +
       arrowChar +
       '</span>' +
-      '<span class="m-wdg-growth-label">' +
-      PROF_LABELS[change.last] +
+      '<span class="m-wdg-growth-label">Now ' +
+      MC.esc(g.nowText) +
       '</span>' +
       '<span class="m-wdg-growth-meta"> (' +
-      assessmentN +
-      (assessmentN === 1 ? ' assessment)' : ' assessments)') +
-      '</span>' +
+      (g.change ? MC.esc(g.change) + ', ' : '') +
+      countText +
+      ')</span>' +
       '</div>'
     );
   };
