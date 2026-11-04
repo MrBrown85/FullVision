@@ -468,5 +468,5 @@ Total before the district layer: about 34 working days. Items 2 to 4 are the "th
 6. May your own past Learning Update comments be used as the voice sample, and would you paste a term's worth into the comments parser to seed it?
 7. Which family languages matter for translation at your school, so the first release covers the right three or four?
 8. Do you want the readiness check to also flag students with no evidence in a competency, or only missing comments and over-limit comments, for the first release?
-9. The reporting terms table also gives the gradebook its term filter. Is "all time" still the default view, or does the current term become the default once terms exist?
+9. The reporting terms table also gives the gradebook its term filter. Is "all time" still the default view, or does the current term become the default once terms exist? _Answered 2026-11-03 (DECISIONS, Reporting periods 3): the gradebook has no term filter and always shows the year so far; a report reads the year to date as of its term's end._
 10. Before any of this is built, the checkout needs to come up to main. Should that happen in a fresh session before item 1, and do you want the 26 uncommitted files stashed or discarded?
