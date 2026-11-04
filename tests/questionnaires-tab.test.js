@@ -247,6 +247,31 @@ describe('Questionnaires tab', () => {
     expect(Questionnaires.find(CID, x => x.id === q.id).questions).toHaveLength(8);
   });
 
+  it('Remove offers Undo, which puts the question back in its place with its id', async () => {
+    var toasts = [];
+    var stub = globalThis.showUndoToast;
+    globalThis.showUndoToast = (msg, undo) => toasts.push({ msg, undo });
+    try {
+      var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
+      var before = Questionnaires.find(CID, x => x.id === q.id).questions.map(x => x.id);
+      mount();
+      click('[data-action="sqToggleQuestions"]');
+      mount();
+      expect(root.querySelector('[data-action="sqRemoveQuestion"][data-idx="1"]').getAttribute('aria-label')).toBe(
+        'Remove question 2',
+      );
+      click('[data-action="sqRemoveQuestion"][data-idx="1"]');
+      await tick();
+      expect(Questionnaires.find(CID, x => x.id === q.id).questions).toHaveLength(7);
+      expect(toasts.map(t => t.msg)).toEqual(['Question 2 removed']);
+      toasts[0].undo();
+      await tick();
+      expect(Questionnaires.find(CID, x => x.id === q.id).questions.map(x => x.id)).toEqual(before);
+    } finally {
+      globalThis.showUndoToast = stub;
+    }
+  });
+
   it('refuses dates that close before they open', async () => {
     var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
     mount();

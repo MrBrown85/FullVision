@@ -316,6 +316,8 @@ var CmQuestionnaires = (function () {
       q.id +
       '" data-idx="' +
       idx +
+      '" aria-label="Remove question ' +
+      (idx + 1) +
       '">Remove</button></div>' +
       '<label class="sq-vh" for="' +
       id +
@@ -711,10 +713,23 @@ var CmQuestionnaires = (function () {
         return true;
       case 'sqRemoveQuestion': {
         if (!q || idx < 0) return true;
+        var gone = _questions(q)[idx];
+        if (!gone) return true;
         var rest = _questions(q).filter(function (x, i) {
           return i !== idx;
         });
         _save(cid, q, { questions: rest }).then(_rerender);
+        // Undo puts it back in its place, with its id, so any answers to it
+        // show under it again.
+        if (typeof showUndoToast === 'function') {
+          showUndoToast('Question ' + (idx + 1) + ' removed', function () {
+            var cur = _find(cid, q.id);
+            if (!cur) return;
+            var back = _questions(cur).slice();
+            back.splice(Math.min(idx, back.length), 0, gone);
+            _save(cid, cur, { questions: back }).then(_rerender);
+          });
+        }
         return true;
       }
       case 'sqCoreRemove': {
