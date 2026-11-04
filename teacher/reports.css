@@ -6409,3 +6409,80 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-shared-count {
   color: var(--text-2);
 }
+
+/* ── The Term Questionnaire on a phone (Nov 3 sweep) ───────────
+   At 375 px the student's name and "Student Dashboard" were squeezed into
+   58 px beside the grade and ran into it, the Work Habits labels ran
+   together left of their radios, Times Late was cut off, and each
+   sentence's text was squeezed between its label and Options. Under
+   600 px the grade goes under the name, a habit's name goes above its
+   five radios, Attendance wraps, and a sentence's label sits above its
+   text. */
+@media (max-width: 600px) {
+  .qn {
+    padding: 12px;
+  }
+  .qn-head {
+    flex-wrap: wrap;
+  }
+  .qn-who {
+    flex-basis: calc(100% - 52px);
+  }
+  .qn-head-sub {
+    white-space: normal;
+  }
+  .qn-grade {
+    align-items: flex-start;
+    margin-left: 52px;
+  }
+  .qn-grade-sub {
+    white-space: normal;
+  }
+  .qn-habit-head,
+  .qn-habit-row {
+    grid-template-columns: repeat(5, minmax(max-content, 1fr));
+    column-gap: 4px;
+  }
+  .qn-habit-head > span:first-child {
+    display: none;
+  }
+  .qn-habit-head > span {
+    white-space: nowrap;
+  }
+  .qn-habit-name {
+    grid-column: 1 / -1;
+    padding-bottom: 4px;
+  }
+  .qn-att {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+  .qn-att-title,
+  .qn-att-note {
+    flex-basis: 100%;
+    text-align: left;
+  }
+  .qn-req-top {
+    flex-wrap: wrap;
+  }
+  .qn-req-top .qn-sub {
+    flex-basis: 100%;
+    order: 3;
+  }
+  .qn-req-top .qn-card-link {
+    margin-left: auto;
+  }
+  .qn-sentences .qn-req-row {
+    flex-wrap: wrap;
+  }
+  .qn-sentences .qn-req-part {
+    width: auto;
+    flex: 1 1 auto;
+  }
+  .qn-sentences .qn-req-body,
+  .qn-sentences .qn-line-empty {
+    order: 3;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
