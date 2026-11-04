@@ -349,4 +349,12 @@ describe('review follow-ups', () => {
       '(+1.0 since Report 1)',
     );
   });
+
+  it('5. a score on a deleted assessment counts on a report as it does in the gradebook', () => {
+    _cache.scores[CID][SID].push(sc('gone', 1, '2026-10-20'));
+    clearProfCache();
+    const yearSoFar = getSectionProficiency(CID, SID, 'sec');
+    setActiveTerm(CID, 2);
+    expect(getSectionProficiency(CID, SID, 'sec')).toBe(yearSoFar);
+  });
 });

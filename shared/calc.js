@@ -107,6 +107,15 @@ function _scopedAssessments(cid) {
   });
 }
 
+/* Every assessment id the class has, whatever is in view. */
+function _everyAssessmentIds(cid) {
+  return new Set(
+    (getAssessments(cid) || []).map(function (a) {
+      return a.id;
+    }),
+  );
+}
+
 /* The reporting term before a report: the one before the active term, or
    with none active (the year so far) the last term that ended before
    today. null when there is none. */
@@ -1512,9 +1521,10 @@ function getTagScores(cid, studentId, tagId) {
   const wholeByRubric = _rubricWholeIndex(cid);
   const wholeSeen = {};
   // As of a report, a score only counts when its assessment is in the year
-  // to date (dated on or before the report's end, or undated). The year so
-  // far keeps every score, including one whose assessment is gone.
+  // to date (dated on or before the report's end, or undated). Both keep a
+  // score whose assessment is gone.
   const termActive = !!_activeTerm[cid];
+  const everyIds = termActive ? _everyAssessmentIds(cid) : null;
   const filtered = [];
   studentScores.forEach(s => {
     let entry = s;
@@ -1540,7 +1550,10 @@ function getTagScores(cid, studentId, tagId) {
         entry = { ...s, tagId: tagId, criterionId: s.tagId, criterionName: crit.name };
       }
     }
-    if (termActive && !assessMap.has(entry.assessmentId)) return;
+    // As of a report, a score drops out only when its assessment is dated
+    // after the report's end. A score whose assessment is gone stays, as it
+    // does in the year so far, so the gradebook and the report agree.
+    if (termActive && !assessMap.has(entry.assessmentId) && everyIds.has(entry.assessmentId)) return;
     const status = statuses[studentId + ':' + entry.assessmentId];
     if (status === 'EXC') return;
     filtered.push(entry);
