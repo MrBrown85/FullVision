@@ -595,6 +595,36 @@ window.PageStudent = (function () {
     return _entryText(last, a) + (a ? ' on ' + a.title : '') + ', ' + _shortDay(last.date);
   }
 
+  /* The Observations tile: the term's observations, less any deleted one
+     still waiting on its Undo. */
+  function _evidenceSummary(obs, scope) {
+    var shown = obs.filter(function (o) {
+      return !Evidence.isPending(o.id);
+    });
+    var lastOb = shown[0];
+    return {
+      stat: _plural(shown.length, 'Note', 'Notes'),
+      sub: scope + (lastOb ? ' · Latest ' + _daysAgo(_obDay(lastOb)) : ' · None yet'),
+    };
+  }
+
+  /* After an observation is added, deleted or put back on this page, the
+     tile counts it at once (not at the next full redraw). */
+  function _refreshEvidenceTile() {
+    var tile = document.getElementById('stu-tab-evidence');
+    if (!tile) return;
+    var cid = activeCourse;
+    var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    var obs = getStudentQuickObs(cid, studentId).filter(function (o) {
+      return CompetencyEvidence._helpers.obsInTerm(o, term);
+    });
+    var sm = _evidenceSummary(obs, term ? term.label || 'This term' : 'All time');
+    var stat = tile.querySelector('.stu-tab-stat');
+    var sub = tile.querySelector('.stu-tab-sub');
+    if (stat) stat.textContent = sm.stat;
+    if (sub) sub.textContent = sm.sub;
+  }
+
   function _tabSummaries(ctx) {
     var cid = ctx.cid;
     var out = {};
@@ -639,11 +669,7 @@ window.PageStudent = (function () {
       sub:
         scope + (latestA ? ' · Latest ' + _shortDay(latestA) : '') + (unscored ? ' · ' + unscored + ' not scored' : ''),
     };
-    var lastOb = ctx.obs[0];
-    out.evidence = {
-      stat: _plural(ctx.obs.length, 'Note', 'Notes'),
-      sub: scope + (lastOb ? ' · Latest ' + _daysAgo(_obDay(lastOb)) : ' · None yet'),
-    };
+    out.evidence = _evidenceSummary(ctx.obs, scope);
     out.breakdown = _breakdownSummary(ctx);
     // The Learner Profile: goals set (the student's own and the competency
     // goals) and when the student last answered.
@@ -2972,8 +2998,18 @@ window.PageStudent = (function () {
     _placeAfter(main, place);
     // The Evidence panel and the competency drawers show the same
     // observations; a change in one redraws the other.
-    Evidence.mount(activeCourse, studentId, { onChange: CompetencyEvidence.refresh });
-    CompetencyEvidence.mount(activeCourse, studentId, main, { onAdd: Evidence.refresh });
+    Evidence.mount(activeCourse, studentId, {
+      onChange: function () {
+        CompetencyEvidence.refresh();
+        _refreshEvidenceTile();
+      },
+    });
+    CompetencyEvidence.mount(activeCourse, studentId, main, {
+      onAdd: function () {
+        Evidence.refresh();
+        _refreshEvidenceTile();
+      },
+    });
   }
 
   var _drawnFor = ''; // student and tab the page was last drawn for
