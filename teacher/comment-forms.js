@@ -160,7 +160,7 @@ window.CommentForms = (function () {
     // "keep exploring a topic" is "exploring a topic" after "at".
     var keep = String(phrase || '')
       .trim()
-      .match(/^keep (\w+ing\b.*)$/);
+      .match(/^keep ((?!(?:every|some|no|any)thing\b)\w+ing\b.*)$/);
     return keep ? keep[1] : _apply(phrase, gerund);
   }
 
