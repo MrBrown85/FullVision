@@ -181,3 +181,81 @@ function exceptionEvent(value, extra = {}) {
     ...extra,
   };
 }
+
+describe('events', () => {
+  it('keeps the error type, the page path and the stack', () => {
+    const out = send(
+      exceptionEvent("Cannot read properties of undefined (reading 'preferred')", {
+        request: { url: 'https://fullvision.ca/student?id=' + SID + '&course=' + CID },
+      }),
+    );
+    const ex = out.exception.values[0];
+    expect(ex.type).toBe('Error');
+    expect(ex.value).toBe("Cannot read properties of undefined (reading 'preferred')");
+    expect(ex.mechanism).toEqual({ type: 'onunhandledrejection', handled: false });
+    expect(ex.stacktrace.frames[0]).toEqual({
+      filename: 'https://fullvision.ca/teacher/page-student.js',
+      abs_path: 'https://fullvision.ca/teacher/page-student.js',
+      function: 'renderStudent',
+      lineno: 812,
+      colno: 14,
+      in_app: true,
+    });
+    expect(ex.stacktrace.frames[1].filename).toBe('https://fullvision.ca/student');
+    expect(out.request.url).toBe('https://fullvision.ca/student');
+  });
+
+  it('removes the user, extras, tags, unknown contexts, headers and the query', () => {
+    const out = send(
+      exceptionEvent('boom', {
+        user: { id: SID, email: 'c.brown@surreyschools.ca', username: 'Maya Okafor', ip_address: '{{auto}}' },
+        extra: { __serialized__: { name: 'Maya Okafor', birthday: '2012-04-17', student_number: '1234567' } },
+        tags: { student: 'Maya Okafor', course: 'Science 8 Block B' },
+        contexts: {
+          trace: { trace_id: '0af7651916cd43dd8448eb211c80319c', span_id: 'b7ad6b7169203331' },
+          PostgrestError: { details: 'Key (email)=(maya.okafor@student.surreyschools.ca) already exists.' },
+          state: { state: { value: { comment: 'struggled with fractions' } } },
+        },
+        request: {
+          url: 'https://fullvision.ca/#access_token=' + JWT + '&refresh_token=rt_9f8e7d6c5b4a&type=recovery',
+          query_string: 'id=' + SID,
+          cookies: { sb: JWT },
+          data: { name: 'Maya Okafor' },
+          headers: {
+            'User-Agent': 'Mozilla/5.0',
+            Referer: 'https://fullvision.ca/student?id=' + SID,
+            Authorization: 'Bearer ' + JWT,
+          },
+        },
+        transaction: '/student?id=' + SID,
+        fingerprint: ['{{ default }}'],
+      }),
+    );
+    expect(leaks(out)).toEqual([]);
+    expect(out.user).toBeUndefined();
+    expect(out.extra).toBeUndefined();
+    expect(out.tags).toBeUndefined();
+    expect(Object.keys(out.contexts)).toEqual(['trace']);
+    expect(out.request).toEqual({ url: 'https://fullvision.ca/', headers: { 'User-Agent': 'Mozilla/5.0' } });
+    expect(out.transaction).toBe('/student');
+  });
+
+  it('scrubs breadcrumbs carried on the event too', () => {
+    const out = send({
+      message: 'x',
+      breadcrumbs: [
+        { category: 'console', message: 'Maya Okafor' },
+        { category: 'ui.click', message: 'button[title="Maya Okafor"]' },
+        { category: 'navigation', data: { from: '/student?id=' + SID, to: '/dashboard' } },
+        { category: 'fetch', data: { url: 'https://x.supabase.co/rest/v1/student?id=eq.' + SID } },
+      ],
+    });
+    expect(leaks(out)).toEqual([]);
+    expect(out.breadcrumbs.length).toBe(3);
+  });
+
+  it('asks Sentry not to store the IP address', () => {
+    const out = send({ message: 'x' });
+    expect(out.sdk.settings.infer_ip).toBe('never');
+  });
+});

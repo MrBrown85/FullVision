@@ -98,24 +98,69 @@
     }
     return crumb;
   }
+  // The trace context is two random ids. The browser, OS and device contexts
+  // come from the user agent. Any other context (an error's extra fields,
+  // say a Postgres error's details quoting a row) goes.
+  var CONTEXTS_KEPT = ['browser', 'os', 'device', 'runtime'];
+  var MECHANISM_KEPT = ['type', 'handled', 'synthetic', 'source', 'exception_id', 'parent_id', 'is_exception_group'];
+
+  function scrubFrame(frame) {
+    frame.filename = scrubUrl(frame.filename);
+    frame.abs_path = scrubUrl(frame.abs_path);
+    // Source lines of an inline script are read from the live page, which
+    // shows student names; the browser SDK has no local variables, but drop
+    // them in case one ever does.
+    delete frame.vars;
+    delete frame.context_line;
+    delete frame.pre_context;
+    delete frame.post_context;
+  }
+
   function scrubEvent(event) {
     if (!event) return event;
     delete event.user;
     delete event.extra;
-    if (event.request) {
-      delete event.request.data;
-      delete event.request.cookies;
-      delete event.request.headers;
-      // Keep the page; drop the query, including the student id in the hash.
-      if (event.request.url) event.request.url = mask(event.request.url.split('?')[0]);
-      delete event.request.query_string;
+    delete event.tags;
+    if (event.contexts) {
+      var contexts = {};
+      if (event.contexts.trace) {
+        contexts.trace = { trace_id: event.contexts.trace.trace_id, span_id: event.contexts.trace.span_id };
+      }
+      CONTEXTS_KEPT.forEach(function (k) {
+        if (event.contexts[k]) contexts[k] = event.contexts[k];
+      });
+      event.contexts = contexts;
     }
+    if (event.request) {
+      // The page address without its query or #fragment, and the browser.
+      // Cookies, the referrer and the request body go.
+      var headers = event.request.headers || {};
+      var ua = headers['User-Agent'] || headers['user-agent'];
+      event.request = { url: scrubUrl(event.request.url) };
+      if (ua) event.request.headers = { 'User-Agent': ua };
+    }
+    if (event.transaction) event.transaction = scrubUrl(event.transaction);
     event.message = mask(event.message);
+    if (event.logentry) event.logentry = { message: mask(event.logentry.message) };
     if (event.exception && event.exception.values) {
       event.exception.values.forEach(function (ex) {
         ex.value = mask(ex.value);
+        if (ex.mechanism) {
+          var mechanism = {};
+          MECHANISM_KEPT.forEach(function (k) {
+            if (ex.mechanism[k] !== undefined) mechanism[k] = ex.mechanism[k];
+          });
+          ex.mechanism = mechanism;
+        }
+        if (ex.stacktrace && ex.stacktrace.frames) ex.stacktrace.frames.forEach(scrubFrame);
       });
     }
+    if (Array.isArray(event.breadcrumbs)) {
+      event.breadcrumbs = event.breadcrumbs.map(scrubBreadcrumb).filter(Boolean);
+    }
+    // No IP address: Sentry would otherwise take it from the connection.
+    event.sdk = event.sdk || {};
+    event.sdk.settings = Object.assign({}, event.sdk.settings, { infer_ip: 'never' });
     return event;
   }
 })();
