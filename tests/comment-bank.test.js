@@ -676,11 +676,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
     const comps = CommentBank.facts(cid, st, 'term-2').comps;
     // One point per piece of work, the competency's mark on it as the
-    // gradebook shows it (tagMarksByAssessment).
+    // gradebook shows it (tagMarksByAssessment). Start and Now are on the
+    // level's footing, each rubric criterion its own score (getTagScores).
     expect(comps.map(c => c.scores.length)).toEqual([13, 9, 16, 13, 9, 8]);
     expect(comps.map(c => levelFigure(c.start) + ' → ' + levelFigure(c.now))).toEqual([
       '2.9 → 2.9',
-      '3.2 → 3.0',
+      '3.2 → 2.9',
       '3.1 → 3.2',
       '3.1 → 2.9',
       '3.1 → 2.9',

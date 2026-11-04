@@ -769,14 +769,14 @@ window.ReportBlocks = (function () {
     const area = focusArea(cid, student, ctx, which);
     if (!area) return '';
     const work = _sectionWork(cid, student.id, area.sec).filter(w => assessmentInActiveTerm(cid, w.a));
-    const points = work
-      .filter(w => w.d)
-      .map(w => ({ t: Math.round(parseLocalDate(w.d).getTime() / 86400000), v: w.score }));
-    const sn = startAndNow(points);
-    const startV = sn ? sn.start : work.length ? work[0].score : 0;
     // Now is the competency's level as calc.js grades it (override
-    // included), the figure the Proficiency block prints; the start is the
-    // first weeks' mean (startAndNow).
+    // included), the figure the Proficiency block prints. The start is on
+    // the same footing, each rubric criterion its own score, as the
+    // Proficiency block's Start of Term (_sectionStart): the first weeks'
+    // mean, or with too few dated scores the first piece's. The pieces
+    // below show the gradebook's mark on each (_sectionWork).
+    const start = _sectionStart(cid, student.id, area.sec);
+    const startV = start != null ? start : work.length ? _pieceLevel(cid, student.id, area.sec, work[0].a) : 0;
     const nowV = area.now;
     const bests = _namedWork(cid, student.id, work, true);
     const latest = work[work.length - 1];
@@ -865,6 +865,17 @@ window.ReportBlocks = (function () {
     });
     const list = Object.keys(byId).map(id => byId[id]);
     return { count: list.length, list };
+  }
+  /* A section's scores on one piece of work, each rubric criterion its own
+     (calc.js getTagScores), as one level (averageLevels); 0 without any. */
+  function _pieceLevel(cid, sid, sec, a) {
+    const entries = [];
+    (sec.tags || []).forEach(tag =>
+      getTagScores(cid, sid, tag.id).forEach(sc => {
+        if (sc.assessmentId === a.id) entries.push(sc);
+      }),
+    );
+    return averageLevels(entries) || 0;
   }
   /* A section's level at the start of this term, from its scores in date
      order (calc.js startAndNow); null without enough dated scores. */

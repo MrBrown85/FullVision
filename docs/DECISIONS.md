@@ -40,7 +40,8 @@ Colin: "when I click on Proficient for the first criterion, it automatically set
 
 Colin: "Mixed rubric criteria on one competency: Progress in One Area, Next Steps and Generate's trend follow the gradebook's lowest-when-mixed mark (tagMarksByAssessment), not the average." (Colin, 2026-11-03.) Assignment Grades by Competency and the Proficiency block's best and lowest work already read the gradebook's mark (#831); these read the criteria's average (`tagScoresByAssessment`), so Thesis 4 and Evidence Use 1 on one competency printed 2.5 there and 1 everywhere else.
 
-- **Every report block and Generate read a piece's mark on a competency through `tagMarksByAssessment`**: one level when its criteria agree, the lowest when they don't, as the gradebook cell shows it. That covers Progress in One Area (its scores, start of term, best and latest), Next Steps' Latest, Ways to Support at Home (it shares their list), and Generate's per-competency scores and their start and now.
+- **Every report block and Generate read a piece's mark on a competency through `tagMarksByAssessment`**: one level when its criteria agree, the lowest when they don't, as the gradebook cell shows it. That covers Progress in One Area's pieces (its list, Best and Latest), Next Steps' Latest, Ways to Support at Home (it shares their list), and Generate's per-competency scores.
+- **Start of Term stays on the level's footing**: Progress in One Area's Start of Term and Generate's start and now count each criterion as its own score (`getTagScores`, as the Proficiency block's Start of Term and Now do), so a change is never only a change of basis (Nov 3 review: steady essays at 4 and 1 read 1.0 → 2.5).
 - Competency proficiency itself is unchanged: each criterion still counts as its own evidence (`getTagScores`).
 
 ## Counts As by step (2026-10-29)

@@ -4,7 +4,9 @@
  * mark on the piece as the gradebook shows it, the lowest when the criteria
  * disagree (calc.js tagMarksByAssessment, #831), not the criteria's average
  * (tagScoresByAssessment). Thesis 4 and Evidence Use 1 on Significance: the
- * gradebook cell says 1, striped; these blocks said 2.5.
+ * gradebook cell says 1, striped; these blocks said 2.5. Start of Term (and
+ * Generate's start and now) stay on the level's footing, each criterion its
+ * own score, so they compare like with like with Now (Nov 3 review).
  */
 import './setup.js';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -73,6 +75,60 @@ describe('a competency fed by two rubric criteria that disagree', () => {
     expect(out).toContain('Causes of the War');
     expect(out).toContain('1.0 / 4');
     expect(out).not.toContain('2.5 / 4');
+  });
+
+  it('steady essays whose criteria disagree show no change from Start of Term', () => {
+    seed();
+    // Thesis 4 and Evidence Use 1 on four essays, two weeks apart.
+    const essays = [0, 1, 2, 3].map(i => ({
+      id: 'e' + i,
+      title: 'Essay ' + (i + 1),
+      date: '2026-09-' + String(7 + i * 7).padStart(2, '0'),
+      tagIds: ['t1'],
+      rubricId: 'rub-1',
+    }));
+    _cache.assessments[CID] = essays;
+    _cache.scores[CID] = {
+      [SID]: essays.flatMap(a => [sc(a.id, 'crit-thesis', 4, a.date), sc(a.id, 'crit-evidence', 1, a.date)]),
+    };
+    clearProfCache();
+    expect(getSectionProficiency(CID, SID, 'sec-1')).toBe(2.5);
+    const out = text(ReportBlocks.renderBlockProgress(CID, STUDENT, {}, {}));
+    expect(out).toContain('Start of term 2.5 Proficient Now 2.5 Proficient (0.0 this term)');
+    expect(out).toContain('Latest Essay 4, Sep 28 · 1.0 / 4');
+    // The Proficiency block's Start of Term agrees.
+    expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, { compare: 'start' }))).toContain(
+      'Significance 2.5 Proficient 2.5 Proficient 0.0',
+    );
+  });
+
+  it('Generate does not write up disagreeing criteria as growth', () => {
+    seed();
+    _cache.learningMaps[CID].sections[0].tags[0].bank_id = 'bc.ss10.cc.3';
+    // Early essays 4 and 1 (mark 1), later ones 3 and 2 (mark 2): the marks
+    // rise, the level holds at 2.5.
+    const essays = [0, 1, 2, 3, 4, 5].map(i => ({
+      id: 'e' + i,
+      title: 'Essay ' + (i + 1),
+      date: '2026-09-' + String(2 + i * 6).padStart(2, '0'),
+      tagIds: ['t1'],
+      rubricId: 'rub-1',
+    }));
+    _cache.assessments[CID] = essays;
+    _cache.scores[CID] = {
+      [SID]: essays.flatMap((a, i) =>
+        i < 3
+          ? [sc(a.id, 'crit-thesis', 4, a.date), sc(a.id, 'crit-evidence', 1, a.date)]
+          : [sc(a.id, 'crit-thesis', 3, a.date), sc(a.id, 'crit-evidence', 2, a.date)],
+      ),
+    };
+    clearProfCache();
+    const f = CommentBank.facts(CID, STUDENT, null);
+    const comp = f.comps.find(c => c.id === 'sec-1');
+    expect(comp.scores.map(s => s.v)).toEqual([1, 1, 1, 2, 2, 2]);
+    expect(comp.start).toBeCloseTo(2.5, 9);
+    expect(comp.level).toBe(2.5);
+    expect(CommentBank.progressOf(f)).toBeNull();
   });
 
   it('Generate’s trend reads the same mark', () => {
