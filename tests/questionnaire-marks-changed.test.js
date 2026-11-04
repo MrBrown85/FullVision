@@ -315,7 +315,7 @@ describe('the review screen', () => {
     const html = open();
     expect(rating().narrative).toBe(text);
     expect(rating().approvedAt).toBe(APPROVED_AT);
-    expect(html).toContain('<span class="qn-approved-chip">Approved Oct 28</span>');
+    expect(html).toMatch(/<span class="qn-approved-chip" id="tq-approved-chip"[^>]*>Approved Oct 28<\/span>/);
     expect(html).toContain(
       '“Task 4” was marked after Oct 28, so ' +
         (CommentBank.staleness(rating().draftMeta, facts(), {}).changes.length === 1
@@ -389,6 +389,25 @@ describe('the review screen', () => {
     expect(html).not.toContain(NH_BEFORE);
     RQ.syncRoster();
     expect(annotator(PRI.id).sub).toBe('Needs Approval');
+  });
+
+  it('an approved comment says Approved on its own screen; a student with no comment says No Comment (Step 4 group 3 #66)', () => {
+    const { text } = approved();
+    let html = open();
+    expect(html).toContain('id="tq-approved-chip"');
+    expect(html).toMatch(/>Approved [A-Z][a-z]{2} \d{1,2}<\/span>/);
+    RQ.syncRoster();
+    expect(annotator(PRI.id).sub).toBe('');
+    // Edited: needs approval again, and the chip is gone.
+    upsertTermRating(CID, PRI.id, TERM, { narrative: text + ' One more sentence.' });
+    html = open();
+    expect(html).not.toContain('tq-approved-chip');
+    RQ.syncRoster();
+    expect(annotator(PRI.id).sub).toBe('Needs Approval');
+    // No comment at all: nothing to approve yet.
+    upsertTermRating(CID, PRI.id, TERM, { narrative: '' });
+    RQ.syncRoster();
+    expect(annotator(PRI.id).sub).toBe('No Comment');
   });
 
   it('a sentence kept as approved stays kept when the comment is approved again', () => {
@@ -519,9 +538,14 @@ describe('the Sentences rows recover from the record (recoverRows)', () => {
     expect(exact.map(r => r.id)).toEqual(meta.sentences.map(x => x.id));
     expect(exact[at]).toMatchObject({ edited: true, step: 'overall', text: 'Her source work is careful.' });
     expect(exact.find(r => r.step === 'closer')).toMatchObject({ classLine: true, id: 'class:closer' });
-    // Without the record the edited sentence is the teacher's own.
+    // Without the record nothing says the teacher wrote it: the Earlier
+    // Comment's, which Generate replaces.
     const guessed = RQ.recoverRows(text, ctx);
-    expect(guessed[at]).toMatchObject({ step: null, edited: true });
+    expect(guessed[at]).toMatchObject({ step: null, edited: false, earlier: true });
+    // With the record of what they typed (draft_meta.teacher_text), theirs.
+    const theirs = RQ.recoverRows(text, ctx, { teacher_text: ['Her source work is careful.'] });
+    expect(theirs[at]).toMatchObject({ step: null, edited: true });
+    expect(theirs[at].earlier).toBeFalsy();
     // The approved values travel with the row, so a later approval keeps
     // the record of what was claimed.
     const nh = exact.find(r => r.step === 'notHandedIn');

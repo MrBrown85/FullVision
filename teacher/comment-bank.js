@@ -6798,6 +6798,8 @@ window.CommentBank = (function () {
         edited: !!r.edited,
       };
       if (!r.edited && (r.kept || keptBefore[x.id + '\u0000' + x.text])) x.kept = true;
+      // A sentence of the Earlier Comment stays one (not the teacher's).
+      if (r.earlier) x.earlier = true;
       if (r.classLine) {
         x.class_line = true;
         var k = STEP_CLASS_SENTENCE[r.step];

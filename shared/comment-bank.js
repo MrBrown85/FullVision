@@ -127,6 +127,18 @@
    nothing rejected is reproduced here. The school's ELL lines became the
    teacher-ticked Language Goals list (teacher/comment-bank.js).
 
+   Reworded 2026-11-03 (bug sweep step 4, group 3 #71: "read awkwardly"):
+   the proficiency frames that opened on the bare word ("Proficient, {his}
+   proficiency this term, means …"; "Proficient, on the BC proficiency
+   scale, means …; that is where …") now say "{His} proficiency this
+   term is Proficient, which means …" and "The BC proficiency scale calls
+   {his} work …"; gr55 no
+   longer dangles ("Proficient in {course} …, {his} work meets …"); the
+   six Habit Ratings frames at Sometimes that ended "… is the thing to do"
+   say "the goal is …"; hl013 says "make a plan to finish the others on
+   time". Same ids, cases and claims. Each was checked against the
+   acceptability checklist (Ministry, families, students, teachers).
+
    Cut from tqAutoNarrative, and why:
      572-577: Superlatives and teacher-centred praise ('outstanding', 'makes teaching rewarding', 'can't say enough good things').
      581, 585: Teacher's feelings ('I've been really pleased', 'made me proud').
@@ -782,7 +794,7 @@ var COMMENT_BANK = {
       id: 'hl013',
       part: 'habits',
       group: 'Habit Ratings',
-      text: '{He} [completes|complete] some tasks by the due date, and {he} can plan each one before that date.',
+      text: '{He} [completes|complete] some tasks by the due date, and {he} can make a plan to finish the others on time.',
       when: { completes: 2 },
       habit: 'completes',
       level: 2,
@@ -794,7 +806,7 @@ var COMMENT_BANK = {
       id: 'hl014',
       part: 'habits',
       group: 'Habit Ratings',
-      text: 'Finishing work on time has begun, and each task done by its due date is the thing to do.',
+      text: 'Finishing work on time has begun, and the goal is every task done by its due date.',
       when: { completes: 2 },
       habit: 'completes',
       level: 2,
@@ -1036,7 +1048,7 @@ var COMMENT_BANK = {
       id: 'hl035',
       part: 'habits',
       group: 'Habit Ratings',
-      text: 'Class time is beginning to go to the work, and a start without a reminder is the thing to do.',
+      text: 'Class time is beginning to go to the work, and the goal is a start without a reminder.',
       when: { ready: 2 },
       habit: 'ready',
       level: 2,
@@ -1254,7 +1266,7 @@ var COMMENT_BANK = {
       id: 'hl054',
       part: 'habits',
       group: 'Habit Ratings',
-      text: 'Some of the time {he} [helps|help] the group, and offering help before anyone asks is the thing to do.',
+      text: 'Some of the time {he} [helps|help] the group, and the goal is to offer help before anyone asks.',
       when: { others: 2 },
       habit: 'others',
       level: 2,
@@ -1448,7 +1460,7 @@ var COMMENT_BANK = {
       id: 'hl071',
       part: 'habits',
       group: 'Habit Ratings',
-      text: '{He} [is|are] beginning to take part in discussion, and one question or idea each class is the thing to do.',
+      text: '{He} [is|are] beginning to take part in discussion, and the goal is one question or idea each class.',
       when: { part: 2 },
       habit: 'part',
       level: 2,
@@ -1714,7 +1726,7 @@ var COMMENT_BANK = {
       id: 'hl094',
       part: 'habits',
       group: 'Habit Ratings',
-      text: 'In some pieces {his} revisions follow the feedback, and a revision after each comment is the thing to do.',
+      text: 'In some pieces {his} revisions follow the feedback, and the goal is to use it on every piece.',
       when: { feedback: 2 },
       habit: 'feedback',
       level: 2,
@@ -1950,7 +1962,7 @@ var COMMENT_BANK = {
       id: 'hl114',
       part: 'habits',
       group: 'Habit Ratings',
-      text: 'Using devices well has begun, and the phone out of sight for a whole lesson is the thing to do.',
+      text: 'Using devices well has begun, and the goal is a whole lesson with the phone out of sight.',
       when: { devices: 2 },
       habit: 'devices',
       level: 2,
@@ -2498,7 +2510,7 @@ var COMMENT_BANK = {
       id: 'gr47',
       part: 'now',
       group: 'Grade',
-      text: 'Extending, {his} proficiency this term, means a sophisticated understanding of the course’s learning.',
+      text: '{His} proficiency this term is Extending, which means a sophisticated understanding of the course.',
       when: { grade: 'proficiency', standing: 'Extending' },
       standing: 'Extending',
       claims: ['grade'],
@@ -2508,7 +2520,7 @@ var COMMENT_BANK = {
       id: 'gr48',
       part: 'now',
       group: 'Grade',
-      text: 'Extending, on the BC proficiency scale, means a sophisticated understanding; that is where {his} {course} work sits.',
+      text: 'The BC proficiency scale calls {his} work in {course} Extending, which means a sophisticated understanding.',
       when: { grade: 'proficiency', standing: 'Extending' },
       standing: 'Extending',
       claims: ['grade'],
@@ -2578,7 +2590,7 @@ var COMMENT_BANK = {
       id: 'gr55',
       part: 'now',
       group: 'Grade',
-      text: 'Proficient in {course} on the BC proficiency scale, {his} work meets what the course expects.',
+      text: '{His} work meets what {course} expects, which is Proficient on the BC proficiency scale.',
       when: { grade: 'proficiency', standing: 'Proficient' },
       standing: 'Proficient',
       claims: ['grade'],
@@ -2598,7 +2610,7 @@ var COMMENT_BANK = {
       id: 'gr57',
       part: 'now',
       group: 'Grade',
-      text: 'Proficient, {his} proficiency this term, means a complete understanding of the course’s learning.',
+      text: '{His} proficiency this term is Proficient, which means a complete understanding of the course.',
       when: { grade: 'proficiency', standing: 'Proficient' },
       standing: 'Proficient',
       claims: ['grade'],
@@ -2608,7 +2620,7 @@ var COMMENT_BANK = {
       id: 'gr58',
       part: 'now',
       group: 'Grade',
-      text: 'Proficient, on the BC proficiency scale, means a complete understanding; that is where {his} {course} work sits.',
+      text: 'The BC proficiency scale calls {his} work in {course} Proficient, which means a complete understanding.',
       when: { grade: 'proficiency', standing: 'Proficient' },
       standing: 'Proficient',
       claims: ['grade'],
@@ -2698,7 +2710,7 @@ var COMMENT_BANK = {
       id: 'gr67',
       part: 'now',
       group: 'Grade',
-      text: 'Developing, {his} proficiency this term, means a partial understanding of the course’s learning.',
+      text: '{His} proficiency this term is Developing, which means a partial understanding of the course.',
       when: { grade: 'proficiency', standing: 'Developing' },
       standing: 'Developing',
       claims: ['grade'],
@@ -2708,7 +2720,7 @@ var COMMENT_BANK = {
       id: 'gr68',
       part: 'now',
       group: 'Grade',
-      text: 'Developing, on the BC proficiency scale, means a partial understanding; that is where {his} {course} work sits.',
+      text: 'The BC proficiency scale calls {his} work in {course} Developing, which means a partial understanding.',
       when: { grade: 'proficiency', standing: 'Developing' },
       standing: 'Developing',
       claims: ['grade'],
@@ -2798,7 +2810,7 @@ var COMMENT_BANK = {
       id: 'gr77',
       part: 'now',
       group: 'Grade',
-      text: 'Emerging, {his} proficiency this term, means an initial understanding of the course’s learning.',
+      text: '{His} proficiency this term is Emerging, which means an initial understanding of the course.',
       when: { grade: 'proficiency', standing: 'Emerging' },
       standing: 'Emerging',
       claims: ['grade'],
@@ -2808,7 +2820,7 @@ var COMMENT_BANK = {
       id: 'gr78',
       part: 'now',
       group: 'Grade',
-      text: 'Emerging, on the BC proficiency scale, means an initial understanding; that is where {his} {course} work sits.',
+      text: 'The BC proficiency scale calls {his} work in {course} Emerging, which means an initial understanding.',
       when: { grade: 'proficiency', standing: 'Emerging' },
       standing: 'Emerging',
       claims: ['grade'],

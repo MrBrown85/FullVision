@@ -346,6 +346,31 @@ describe('the student’s details as slots', () => {
     );
   });
 
+  it('makes every verb of the subject agree, not only the first (Step 4 group 2 #50)', () => {
+    const f = facts({ name: 'Liam', first: 'Liam', pronouns: THEY });
+    const ctx = CommentBank.context(f, {});
+    const sl = t => PB.slotify(t, PB.entities(ctx, f, { firstName: 'Liam' }, t)).text;
+    expect(sl('Liam asks careful questions during labs and shares ideas with the group.')).toBe(
+      '{He} [asks|ask] careful questions during labs and [shares|share] ideas with the group.',
+    );
+    expect(sl('Liam reads each source, checks the dates and also explains their choices.')).toBe(
+      '{He} [reads|read] each source, [checks|check] the dates and also [explains|explain] {his} choices.',
+    );
+    // A list of nouns, and a clause of its own, are left alone.
+    expect(sl('Liam reads books and articles about science in class.')).toBe(
+      '{He} [reads|read] books and articles about science in class.',
+    );
+    expect(sl('Liam explains why the rules and plans matter in each lab.')).toBe(
+      '{He} [explains|explain] why the rules and plans matter in each lab.',
+    );
+    const realised = CommentRealiser.render(
+      CommentRealiser.tokens('{He} [asks|ask] careful questions during labs and [shares|share] ideas with the group.'),
+      { name: 'Liam', p: THEY },
+      { named: true },
+    );
+    expect(realised).toBe('They ask careful questions during labs and share ideas with the group.');
+  });
+
   it('slots the assignment, the competency, the proficiency word and the class name', () => {
     const out = suggestFor('In History 12, Gabriel used Evidence in “The Poster” at a Proficient standard.');
     expect(out.template.text).toBe('In {course}, {he} used {strengths} in {assignment} at a {standingWord} standard.');
@@ -547,6 +572,37 @@ describe('the bank on the device and the server', () => {
     await Promise.resolve();
     expect(PB.list()[0].id).toBe('11111111-1111-4111-8111-111111111111');
     expect(JSON.parse(localStorage.getItem('gb-comment-templates'))[0].id).toBe('11111111-1111-4111-8111-111111111111');
+  });
+
+  it('finds a sentence by the id it was kept under after the server’s id lands (Step 4 group 2 #54)', async () => {
+    window.v2 = Object.assign({}, originalV2, {
+      saveCommentTemplate: () => Promise.resolve({ data: { id: '22222222-2222-4222-8222-222222222222' }, error: null }),
+    });
+    const f = facts();
+    const out = PB.compose(
+      'Gabriel checks each graph twice before he hands it in.',
+      { step: 'habits' },
+      CommentBank.context(f, {}),
+      f,
+      GABRIEL,
+      {
+        others: [],
+      },
+    );
+    const e = PB.keep(out.template);
+    const drawn = 'mine:' + e.id;
+    expect(COMMENT_BANK.sentences.some(x => x.id === drawn)).toBe(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(COMMENT_BANK.sentences.some(x => x.id === drawn)).toBe(false);
+    expect(PB.currentId(drawn)).toBe('mine:22222222-2222-4222-8222-222222222222');
+    expect(COMMENT_BANK.sentences.some(x => x.id === PB.currentId(drawn))).toBe(true);
+    // Browse Sentences' Use looks the row's id up this way.
+    const src = require('node:fs').readFileSync(
+      require('node:path').join(__dirname, '../teacher/report-questionnaire.js'),
+      'utf8',
+    );
+    expect(src).toMatch(/PersonalBank\.currentId\(id\)/);
   });
 
   it('keeps the device copy when the list fails (no table yet, offline): an empty bank to start', async () => {
@@ -910,9 +966,25 @@ describe('a sentence of the teacher’s own', () => {
     expect(cased.offered).toBe('Offered when one habit is rated Sometimes or Rarely, in Socials classes');
     const general = composeFor('Gabriel asks a question when a step is unclear.', { step: 'habits' });
     expect(general.template.condition).toMatchObject({ step: 'habits', general: true, when: {}, claims: [] });
-    expect(general.offered).toBe('Offered in Socials classes');
+    expect(general.offered).toBe('Generate uses it for any student in Socials classes when nothing more specific fits');
     const e = PB.keep(general.template);
     expect(COMMENT_BANK.sentences.find(x => x.id === 'mine:' + e.id).general).toBe(true);
+  });
+
+  it('keeps a sentence written in a class of no known kind out of Socials and Science classes (Step 4 group 2 #49)', () => {
+    const general = composeFor(
+      'Gabriel asks careful questions when a step is unclear.',
+      { step: 'habits' },
+      { family: '' },
+    );
+    expect(general.offered).toBe('Generate uses it for any student when nothing more specific fits');
+    const e = PB.keep(general.template);
+    const s = COMMENT_BANK.sentences.find(x => x.id === 'mine:' + e.id);
+    expect(s.subjects).toEqual(['']);
+    const ctxIn = fam => Object.assign(CommentBank.context(facts({ family: fam }), {}), { _family: fam });
+    expect(CommentBank.fits(s, ctxIn(''))).toBe(true);
+    expect(CommentBank.fits(s, ctxIn('socials'))).toBe(false);
+    expect(CommentBank.fits(s, ctxIn('science'))).toBe(false);
   });
 
   it('Generate picks a general sentence only when nothing more specific fits; a cased one ranks first', () => {

@@ -342,10 +342,24 @@ window.PageReports = (function () {
     sel.value = pick ? 'Report ' + pick.ordinal : values[0];
   }
 
+  /* The address follows the class, the tab and the open student, so a
+     reload or a shared link reopens the same place (Nov 3 sweep: it kept
+     the first student and class). */
+  function _syncUrl() {
+    if (!window.Router || typeof Router.setUrl !== 'function' || !activeCourse) return;
+    var url = '/reports?course=' + encodeURIComponent(activeCourse) + '&tab=' + encodeURIComponent(activeTab);
+    if (activeTab === 'questionnaire') {
+      var st = RQ.getTqStudents()[RQ.tqStudentIndex];
+      if (st) url += '&student=' + encodeURIComponent(st.id);
+    }
+    Router.setUrl(url);
+  }
+
   function renderReports() {
     const cid = activeCourse;
     const output = document.getElementById('report-output');
     _applyReportTerm();
+    _syncUrl();
 
     if (activeTab === 'questionnaire') {
       // The sentence bank loads the first time Reports needs it.

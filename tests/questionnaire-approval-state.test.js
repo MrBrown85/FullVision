@@ -195,7 +195,13 @@ describe('1. approval checks every bank sentence against today’s marks', () =>
     const s = COMMENT_BANK.sentences.find(x => x.id === 'm01');
     expect(CommentBank.valuesIn(s, NH_BEFORE)).toEqual({ missingWork: NH_BEFORE });
     expect(CommentBank.valuesIn(s, 'Priya worked hard on Task 4.')).toBeNull();
-    const edited = rowOf('Two assignments are still missing, and I am worried.');
+    const edited = RQ.recoverRows(
+      'Two assignments are still missing, and I am worried.',
+      CommentBank.context(facts(), {}),
+      {
+        teacher_text: ['Two assignments are still missing, and I am worried.'],
+      },
+    );
     expect(edited[0].edited).toBe(true);
   });
 
