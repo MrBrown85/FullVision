@@ -166,6 +166,7 @@ test('About Me turned off links straight to Class Management › Questionnaires'
     window.PageStudent.render();
   });
   await page.locator('#lp-about').getByRole('link', { name: 'Class Management › Questionnaires' }).click();
-  await expect(page).toHaveURL(/\/dashboard\?course=sci8&manage=questionnaires/);
+  // Class Management keeps its own address (/dashboard?manage=…) once open.
+  await expect(page).toHaveURL(/\/dashboard\?manage=questionnaires$/);
   await expect(page.locator('[role=tab][aria-selected=true]')).toContainText('Questionnaires');
 });

@@ -375,7 +375,7 @@ window.MStudentDetail = (function () {
     if (typeof StudentVoice === 'undefined') return out;
     if (!StudentVoice.loaded(cid)) {
       StudentVoice.load(cid, function () {
-        refreshPanels(cid, ['goals', 'profile']);
+        refreshPanels(cid, ['profile']);
       });
       if (!StudentVoice.loaded(cid)) return out;
     }

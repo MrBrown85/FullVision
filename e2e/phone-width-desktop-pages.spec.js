@@ -66,8 +66,11 @@ test('Class Management class list works on a phone', async ({ page }) => {
   const list = page.locator('.cm-sidebar');
   await expect(list).toBeVisible();
   expect((await list.boundingBox()).width).toBeGreaterThan(300);
-  for (const name of ['New Class', 'Restore from Backup']) {
-    const btn = page.locator('.cm-new-btn', { hasText: name });
+  // New Class is a button at the top of the class list (group 3 #6);
+  // Restore from Backup stays at its foot.
+  const buttons = { 'New Class': '.cm-new-class-btn', 'Restore from Backup': '.cm-new-btn' };
+  for (const name of Object.keys(buttons)) {
+    const btn = page.locator(buttons[name], { hasText: name });
     await btn.scrollIntoViewIfNeeded();
     const hit = await btn.evaluate(b => {
       const r = b.getBoundingClientRect();
@@ -75,7 +78,7 @@ test('Class Management class list works on a phone', async ({ page }) => {
     });
     expect(hit, name).toBe(true);
   }
-  await page.locator('.cm-new-btn', { hasText: 'New Class' }).click();
+  await page.locator('.cm-new-class-btn', { hasText: 'New Class' }).click();
   await expect(page.locator('.cm-create-active, .cm-wizard, [class*="wizard"]').first()).toBeVisible();
 });
 
