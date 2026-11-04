@@ -882,6 +882,19 @@ function _rosterShowShort(cid, mode) {
   return mode === 'percent' ? '%' : _rosterShowLabel(cid, mode);
 }
 
+/* The grades beside the names follow the class's reporting term, picked on
+   the Gradebook, Dashboard and student page. Assignments, Observations and
+   Reports have no term picker, so with a term picked every name there could
+   read IC with nothing to say why. The roster names the term instead. */
+// html-safe: the term label goes through esc.
+function _sidebarTermNote(cid) {
+  var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+  if (!term || !term.label) return '';
+  var tip =
+    'The grades count only work dated in ' + term.label + '. The term is picked on the Gradebook and Dashboard.';
+  return `<div class="sb-term-note" id="sb-term-note" title="${esc(tip)}">Grades for ${esc(term.label)}</div>`;
+}
+
 // html-safe: names and initials go through esc; ids, the avatar colour and the flag mark are ours.
 function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
   const flags = getFlags(cid);
@@ -956,7 +969,7 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4l2.5 2.5L7.5 4"/></svg>
         </button>
         <div class="sb-sort-menu" id="sb-show-menu" role="menu" aria-label="Grades beside each name" hidden>${_rosterShowMenuHtml(cid, show)}</div>
-      </div>
+      </div>${_sidebarTermNote(cid)}
     </div>
     <div id="gb-roster-list" role="list">${_sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick)}</div>
   </aside>`;
