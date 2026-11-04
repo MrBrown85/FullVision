@@ -1006,7 +1006,8 @@ window.MObserve = (function () {
         typeBlock(tmpl.sentiment) +
         '<span class="m-quick-row-text">' +
         MC.esc(tmpl.text) +
-        '</span><span class="m-quick-row-car" aria-hidden="true">\u203a</span></button>';
+        // One tap posts it: the row says Post, not a › that opens something.
+        '</span><span class="m-quick-row-post" aria-hidden="true">Post</span></button>';
     });
     html +=
       '<button class="m-quick-row m-quick-own" data-action="m-obs-quick-compose" data-sid="' +
@@ -1043,10 +1044,20 @@ window.MObserve = (function () {
       MC.showToast('Failed to save \u2014 try again');
       return;
     }
+    var mine = getQuickObs(cid)[sid] || [];
+    var postedId = mine.length ? mine[mine.length - 1].id : null;
     MC.haptic();
     MC.dismissSheet();
     _refreshFeed(cid, true);
-    MC.showToast('Observation added');
+    // A misfired tap can be taken back.
+    MC.showToast('Observation added', {
+      duration: UNDO_MS,
+      onUndo: function () {
+        if (!postedId) return;
+        deleteQuickOb(cid, sid, resolveObservationId(cid, postedId));
+        _refreshFeed(cid, false);
+      },
+    });
   }
 
   /* Swipe a card left to delete it (with the same Undo toast). A short

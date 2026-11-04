@@ -3521,6 +3521,13 @@ body.fv-switching-course::after {
   font-size: 20px;
   line-height: 1;
 }
+/* A starter row posts on one tap; it ends in "Post", in link blue. */
+.m-quick-row-post {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--link);
+}
 .m-quick-own {
   grid-template-columns: minmax(0, 1fr) 14px;
   border-bottom: none;

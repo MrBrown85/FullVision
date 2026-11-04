@@ -367,3 +367,21 @@ test('phone controls are finger-sized', async ({ page }) => {
   await page.waitForTimeout(500);
   expect(await page.evaluate(small)).toEqual([]);
 });
+
+// Group 3 #75: a starter row posts on one tap, so it says Post instead of
+// a › that suggests it opens something, and the post can be undone.
+test('Observe starters say Post and can be undone', async ({ page }) => {
+  await openPhone(page);
+  const sid = await page
+    .locator('.m-card-stack-item[data-depth="0"] [data-action="m-obs-quick-menu"]')
+    .getAttribute('data-sid');
+  const before = await page.evaluate(s => (getQuickObs(getActiveCourse())[s] || []).length, sid);
+  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-obs-quick-menu"]').click();
+  const row = page.locator('.m-quick-row[data-action="m-obs-quick-post"]').first();
+  await expect(row.locator('.m-quick-row-post')).toHaveText('Post');
+  await expect(row.locator('.m-quick-row-car')).toHaveCount(0);
+  await row.click();
+  expect(await page.evaluate(s => (getQuickObs(getActiveCourse())[s] || []).length, sid)).toBe(before + 1);
+  await page.locator('#m-toast [data-action="m-toast-undo"]').click();
+  expect(await page.evaluate(s => (getQuickObs(getActiveCourse())[s] || []).length, sid)).toBe(before);
+});
