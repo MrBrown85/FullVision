@@ -2331,6 +2331,25 @@ window.CommentBank = (function () {
       return String(x.d).localeCompare(String(y.d));
     });
 
+    // Missing work labelled Missing outside the report's own term (an
+    // earlier term, or undated): the comment then says no "this term" about
+    // it (fits()). The pieces are in notHandedIn already, counted year to
+    // date as of the report's end.
+    var missingOutsideTerm = notIn.filter(function (a) {
+      return !inTerm(a);
+    }).length;
+    // The report before this one (calc.js previousReportTerm), its label and
+    // last day: At a Glance's marker ("change since the Term 1 report"),
+    // never a filter. Each competency's level then is c.start when c.since
+    // is set (compsOf). Null on the first report.
+    var lastRep =
+      typeof getActiveTerm === 'function' && getActiveTerm(cid) && typeof previousReportTerm === 'function'
+        ? previousReportTerm(cid)
+        : null;
+    var lastReport = lastRep
+      ? { label: lastRep.label || reportName(lastRep), endsOn: lastRep.ends_on || lastRep.endsOn || '' }
+      : null;
+
     var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
 
     // Student Voice.
@@ -2411,6 +2430,10 @@ window.CommentBank = (function () {
       work: work,
       record: rec,
       notHandedIn: notHandedIn(notIn, dateOf),
+      // How many of the missing pieces fall outside the term: the comment
+      // then says no "this term" about them.
+      missingOutsideTerm: missingOutsideTerm,
+      lastReport: lastReport,
       voice: voice,
       confidence: conf,
       overall: overall,
@@ -4057,6 +4080,15 @@ window.CommentBank = (function () {
     // sentence that says "this term", the bank's or the teacher's own
     // (Colin, 2026-11-03).
     if (ctx._f && ctx._f.attendanceYear && (s.claims || []).indexOf('attendance') >= 0 && /\bthis term\b/i.test(s.text))
+      return false;
+    // Missing work is counted so far this year: with a piece from outside
+    // the term, no missing-work sentence that says "this term".
+    if (
+      ctx._f &&
+      ctx._f.missingOutsideTerm > 0 &&
+      (s.claims || []).indexOf('notHandedIn') >= 0 &&
+      /\bthis term\b/i.test(s.text)
+    )
       return false;
     if (!_fitsMine(s, ctx)) return false;
     var when = s.when || {};
@@ -5997,8 +6029,8 @@ window.CommentBank = (function () {
     });
   }
   var _article = R.aOrAn;
-  /* Work labelled Missing this term (facts().notHandedIn; the record's
-     count for facts built without it). */
+  /* Work labelled Missing up to the report's end, whatever its term
+     (facts().notHandedIn; the record's count for facts built without it). */
   function _missingCount(f) {
     if (f.notHandedIn && f.notHandedIn.count != null) return Number(f.notHandedIn.count) || 0;
     return (f.record && f.record.missing) || 0;
