@@ -3418,6 +3418,9 @@ button.stu-bd-row:focus-visible {
   flex: 1;
   min-width: 0;
 }
+.stu-goal-remove {
+  margin-left: auto;
+}
 .gl-row .inline-edit-area textarea,
 .gl-pair .inline-edit-area textarea {
   min-height: 76px;

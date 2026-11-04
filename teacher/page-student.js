@@ -150,15 +150,33 @@ window.PageStudent = (function () {
   async function saveGoalField(secId) {
     var text = (document.getElementById('goal-input-' + secId).value || '').trim();
     var cid = activeCourse;
-    var goals = getGoals(cid);
-    if (!goals[studentId]) goals[studentId] = {};
-    goals[studentId][secId] = text;
-    saveGoals(cid, goals);
-    if (typeof setGoalDate === 'function') setGoalDate(cid, studentId, secId, text ? new Date().toISOString() : null);
-    if (window.v2 && _isUuid && _isUuid(studentId)) {
-      await window.v2.saveGoal(studentId, secId, text);
-    }
+    var sid = studentId;
+    var was = (getGoals(cid)[sid] || {})[secId] || '';
+    var wasDate = (typeof getGoalDates === 'function' ? (getGoalDates(cid)[sid] || {})[secId] : null) || null;
+    var saving = _writeGoal(cid, sid, secId, text, text ? new Date().toISOString() : null);
     render();
+    // A goal taken away (Remove Goal, or its text cleared) can be put back.
+    if (was && !text && typeof showUndoToast === 'function') {
+      showUndoToast('Goal removed', function () {
+        _writeGoal(cid, sid, secId, was, wasDate);
+        if (activeCourse === cid && studentId === sid) render();
+      });
+    }
+    await saving;
+  }
+  function _writeGoal(cid, sid, secId, text, date) {
+    var goals = getGoals(cid);
+    if (!goals[sid]) goals[sid] = {};
+    goals[sid][secId] = text;
+    saveGoals(cid, goals);
+    if (typeof setGoalDate === 'function') setGoalDate(cid, sid, secId, text ? date : null);
+    if (window.v2 && _isUuid && _isUuid(sid)) return window.v2.saveGoal(sid, secId, text);
+    return Promise.resolve();
+  }
+  function removeGoal(secId) {
+    var box = document.getElementById('goal-input-' + secId);
+    if (box) box.value = '';
+    return saveGoalField(secId);
   }
 
   /* ── Reflection editing ─────────────────────────────────── */
@@ -2269,7 +2287,13 @@ window.PageStudent = (function () {
       sec.id +
       '">Save</button><button class="btn" data-action="cancelGoalEdit" data-secid="' +
       sec.id +
-      '">Cancel</button></div></div>'
+      '">Cancel</button>' +
+      (goalText
+        ? '<button type="button" class="btn btn-danger stu-goal-remove" data-action="removeGoal" data-secid="' +
+          sec.id +
+          '">Remove Goal</button>'
+        : '') +
+      '</div></div>'
     );
   }
 
@@ -3055,6 +3079,9 @@ window.PageStudent = (function () {
       },
       cancelGoalEdit: function () {
         cancelGoalEdit(el.dataset.secid);
+      },
+      removeGoal: function () {
+        removeGoal(el.dataset.secid);
       },
       editReflection: function () {
         editReflection(el.dataset.secid);

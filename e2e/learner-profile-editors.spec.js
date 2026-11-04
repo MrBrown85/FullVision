@@ -64,3 +64,32 @@ test('the goal box spans the row; Enter saves, Shift+Enter adds a line, Escape l
     .poll(() => page.evaluate(a => (getGoals('sci8')[a[0]] || {})[a[1]], [sid, secId]))
     .toBe('Plan a fair test.\nChange one thing.');
 });
+
+test('Remove Goal takes a goal away with an Undo that puts it back', async ({ page }) => {
+  const sid = await openStudent(page, 'Liam');
+  const secId = await page.locator('.gl-row [data-action="editGoal"]').first().getAttribute('data-secid');
+  const goal = () => page.evaluate(a => (getGoals('sci8')[a[0]] || {})[a[1]] || '', [sid, secId]);
+  await page.locator('[data-action="editGoal"][data-secid="' + secId + '"]').click();
+  await page.keyboard.type('Use if-then sentences.');
+  await page.keyboard.press('Enter');
+  await expect.poll(goal).toBe('Use if-then sentences.');
+
+  // The editor of a set goal has Remove Goal; a new one doesn't.
+  await page.locator('[data-action="editGoal"][data-secid="' + secId + '"]').click();
+  const remove = page.locator('[data-action="removeGoal"][data-secid="' + secId + '"]');
+  await expect(remove).toHaveText('Remove Goal');
+  await remove.click();
+  await expect.poll(goal).toBe('');
+  const toast = page.locator('#undo-toast');
+  await expect(toast).toContainText('Goal removed');
+  await toast.getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(goal).toBe('Use if-then sentences.');
+  await expect(page.locator('#goal-text-' + secId)).toHaveText('Use if-then sentences.');
+
+  // Clearing the text and saving is a removal too, with the same Undo.
+  await page.locator('[data-action="editGoal"][data-secid="' + secId + '"]').click();
+  await page.locator('#goal-input-' + secId).fill('');
+  await page.keyboard.press('Enter');
+  await expect.poll(goal).toBe('');
+  await expect(page.locator('#undo-toast')).toContainText('Goal removed');
+});
