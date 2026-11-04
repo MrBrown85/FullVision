@@ -120,14 +120,32 @@ window.PageStudent = (function () {
   }
 
   /* ── Goal editing ───────────────────────────────────────── */
+  /* An open editor in a No Goal Yet row takes the row's whole width, so a
+     one-sentence goal fits without scrolling. */
+  function _markEditing(editId, on) {
+    var area = document.getElementById(editId);
+    if (!area) return;
+    var part = area.closest('.stu-goal-part');
+    var row = area.closest('.gl-row');
+    if (part) part.classList.toggle('is-editing', on);
+    if (row) row.classList.toggle('gl-editing', on || !!row.querySelector('.stu-goal-part.is-editing'));
+  }
   function editGoal(secId) {
     document.getElementById('goal-edit-' + secId).style.display = '';
     document.getElementById('goal-text-' + secId).style.display = 'none';
+    _markEditing('goal-edit-' + secId, true);
     document.getElementById('goal-input-' + secId).focus();
   }
   function cancelGoalEdit(secId) {
     document.getElementById('goal-edit-' + secId).style.display = 'none';
     document.getElementById('goal-text-' + secId).style.display = '';
+    _markEditing('goal-edit-' + secId, false);
+    _focusEditButton('editGoal', secId);
+  }
+  // Back on the + Goal / Edit button the editor came from.
+  function _focusEditButton(action, secId) {
+    var btn = document.querySelector('[data-action="' + action + '"][data-secid="' + secId + '"]');
+    if (btn) btn.focus();
   }
   async function saveGoalField(secId) {
     var text = (document.getElementById('goal-input-' + secId).value || '').trim();
@@ -147,12 +165,15 @@ window.PageStudent = (function () {
   function editReflection(secId) {
     document.getElementById('refl-edit-' + secId).style.display = '';
     document.getElementById('refl-text-' + secId).style.display = 'none';
+    _markEditing('refl-edit-' + secId, true);
     // Typing goes straight into the box, as it does for + Goal.
     document.getElementById('refl-input-' + secId).focus();
   }
   function cancelReflEdit(secId) {
     document.getElementById('refl-edit-' + secId).style.display = 'none';
     document.getElementById('refl-text-' + secId).style.display = '';
+    _markEditing('refl-edit-' + secId, false);
+    _focusEditButton('editReflection', secId);
   }
   async function saveReflField(secId) {
     var text = (document.getElementById('refl-input-' + secId).value || '').trim();
@@ -3071,8 +3092,31 @@ window.PageStudent = (function () {
     }
   }
 
+  /* In a goal or reflection box, Enter saves and Shift+Enter adds a line;
+     Escape leaves it as it was, as in the observation box. */
+  function _editorKeys(e) {
+    var box = e.target;
+    var m = box && box.tagName === 'TEXTAREA' && /^(goal|refl)-input-(.+)$/.exec(box.id || '');
+    if (!m || e.isComposing) return false;
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (m[1] === 'goal') saveGoalField(m[2]);
+      else saveReflField(m[2]);
+      return true;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      box.value = box.defaultValue;
+      if (m[1] === 'goal') cancelGoalEdit(m[2]);
+      else cancelReflEdit(m[2]);
+      return true;
+    }
+    return false;
+  }
+
   /* Arrow keys, Home and End move between the tabs. */
   function _handleKeydown(e) {
+    if (_editorKeys(e)) return;
     var tab = e.target && e.target.closest && e.target.closest('.stu-tab');
     if (!tab) return;
     var ids = TABS.map(function (t) {

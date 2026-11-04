@@ -3409,6 +3409,19 @@ button.stu-bd-row:focus-visible {
   display: flex;
   gap: 6px;
 }
+/* An open goal or reflection editor takes the row's whole width. */
+.gl-row.gl-editing .gl-adds {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+.gl-adds > .stu-goal-part.is-editing {
+  flex: 1;
+  min-width: 0;
+}
+.gl-row .inline-edit-area textarea,
+.gl-pair .inline-edit-area textarea {
+  min-height: 76px;
+}
 .sh-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

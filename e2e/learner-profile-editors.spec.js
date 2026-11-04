@@ -29,3 +29,38 @@ test("the reflection box's hint uses no pronoun, so it fits every student", asyn
   const box = page.locator('.gl-row').first().locator('textarea[id^="refl-input-"]');
   await expect(box).toHaveAttribute('placeholder', 'Liam’s own words about this competency…');
 });
+
+test('the goal box spans the row; Enter saves, Shift+Enter adds a line, Escape leaves it as it was', async ({
+  page,
+}) => {
+  const sid = await openStudent(page, 'Liam');
+  const row = page.locator('.gl-row').first();
+  const secId = await row.locator('[data-action="editGoal"]').getAttribute('data-secid');
+  await row.getByRole('button', { name: '+ Goal' }).click();
+  const box = page.locator('#goal-input-' + secId);
+  await expect(box).toBeFocused();
+  const size = await box.boundingBox();
+  const rowBox = await row.boundingBox();
+  expect(size.width).toBeGreaterThan(rowBox.width * 0.6);
+  expect(size.height).toBeGreaterThanOrEqual(70);
+  await page.keyboard.type('Try a hypothesis with an if-then sentence.');
+  const scroll = await box.evaluate(el => el.scrollHeight - el.clientHeight);
+  expect(scroll).toBeLessThanOrEqual(1);
+
+  // Escape closes it and nothing is saved.
+  await page.keyboard.press('Escape');
+  await expect(box).toBeHidden();
+  const none = await page.evaluate(a => (getGoals('sci8')[a[0]] || {})[a[1]] || '', [sid, secId]);
+  expect(none).toBe('');
+
+  // Shift+Enter adds a line; Enter saves.
+  await page.locator('[data-action="editGoal"][data-secid="' + secId + '"]').click();
+  await expect(box).toHaveValue('');
+  await page.keyboard.type('Plan a fair test.');
+  await page.keyboard.press('Shift+Enter');
+  await page.keyboard.type('Change one thing.');
+  await page.keyboard.press('Enter');
+  await expect
+    .poll(() => page.evaluate(a => (getGoals('sci8')[a[0]] || {})[a[1]], [sid, secId]))
+    .toBe('Plan a fair test.\nChange one thing.');
+});
