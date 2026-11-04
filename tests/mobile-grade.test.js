@@ -90,7 +90,8 @@ describe('MGrade.renderPicker', () => {
   });
 
   it('shows assessment type badges (S/F)', () => {
-    mockDataLayer({});
+    // Badges show in a class with categories (Step 4 group 3 #30).
+    mockDataLayer({ getCategories: () => [{ id: 'k1', name: 'Quizzes' }] });
     const html = MGrade.renderPicker(CID);
     expect(html).toContain('m-type-summative');
     expect(html).toContain('m-type-formative');
@@ -810,11 +811,16 @@ describe('Assessment picker edge cases', () => {
   });
 
   it('shows category badges for assessments', () => {
-    mockDataLayer({});
+    mockDataLayer({ getCategories: () => [{ id: 'k1', name: 'Quizzes' }] });
     const html = MGrade.renderPicker(CID);
     expect(html).toContain('No Category');
     expect(html).toContain('m-type-summative');
     expect(html).toContain('m-type-formative');
+  });
+
+  it('shows no No Category badge in a class with no categories', () => {
+    mockDataLayer({ getCategories: () => [] });
+    expect(MGrade.renderPicker(CID)).not.toContain('No Category');
   });
 
   it('shows dates in readable format', () => {

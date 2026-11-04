@@ -1364,17 +1364,19 @@ window.PageGradebook = (function () {
             '">' +
             esc(NEEDS_CATEGORY_LABEL) +
             '</span>'
-          : '<span class="gb-assess-type-pill ' +
-            categoryClass +
-            '" style="background:' +
-            catTint.bg +
-            ';color:' +
-            catTint.fg +
-            '" title="' +
-            esc(categoryName) +
-            '">' +
-            esc(categoryName) +
-            '</span>') +
+          : showsCategoryBadge(cid, a)
+            ? '<span class="gb-assess-type-pill ' +
+              categoryClass +
+              '" style="background:' +
+              catTint.bg +
+              ';color:' +
+              catTint.fg +
+              '" title="' +
+              esc(categoryName) +
+              '">' +
+              esc(categoryName) +
+              '</span>'
+            : '') +
         '<span class="gb-assess-date">' +
         formatShortDate(a.date) +
         '</span>' +

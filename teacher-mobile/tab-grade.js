@@ -199,11 +199,14 @@ window.MGrade = (function () {
           '>' +
           '<div class="m-cell-body">' +
           '<div class="m-cell-title">' +
-          '<span class="m-type-badge ' +
-          badge.className +
-          '" style="margin-right:6px">' +
-          MC.esc(badge.label) +
-          '</span>' +
+          // A class with no categories shows no "No Category" chip.
+          (showsCategoryBadge(cid, a)
+            ? '<span class="m-type-badge ' +
+              badge.className +
+              '" style="margin-right:6px">' +
+              MC.esc(badge.label) +
+              '</span>'
+            : '') +
           MC.esc(a.title) +
           '</div>' +
           '<div class="m-cell-subtitle">' +
@@ -432,15 +435,19 @@ window.MGrade = (function () {
       _sheetStaged.gradedStatus,
     );
 
+    // A class with no categories has nothing to filter by category.
+    var catSection = (categories || []).length
+      ? '<div class="m-filter-sheet-section">' +
+        '<div class="m-filter-sheet-title">Category</div>' +
+        '<div class="m-filter-strip m-filter-strip-wrap">' +
+        catPills +
+        '</div>' +
+        '</div>'
+      : '';
     return (
       '<div class="m-filter-sheet">' +
       '<div class="m-filter-sheet-heading">Filter assessments</div>' +
-      '<div class="m-filter-sheet-section">' +
-      '<div class="m-filter-sheet-title">Category</div>' +
-      '<div class="m-filter-strip m-filter-strip-wrap">' +
-      catPills +
-      '</div>' +
-      '</div>' +
+      catSection +
       modSection +
       '<div class="m-filter-sheet-section">' +
       '<div class="m-filter-sheet-title">Date Range</div>' +
