@@ -674,7 +674,7 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {})).toBe('');
   });
 
-  it('Missing Work names this term’s work labelled Missing on one line, says None this term, or stays off', () => {
+  it('Missing Work names the work labelled Missing on one line, says None, or stays off', () => {
     const work = [
       { id: 'a1', title: 'Lab Report', dueDate: '2026-10-02' },
       { id: 'a2', title: 'Quiz', date: '2026-10-05' },
@@ -704,7 +704,7 @@ describe('stage 3 blocks', () => {
     );
     stub('assessmentCellValue', () => ({ kind: 'level' }));
     expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}))).toBe(
-      'Missing Work None this term As of Oct 10, 2026',
+      'Missing Work None As of Oct 10, 2026',
     );
     expect(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, { none: 'off' })).toBe('');
   });

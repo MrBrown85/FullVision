@@ -2077,6 +2077,15 @@ window.ReportBlocks = (function () {
       .filter(a => assessmentInTermWindow(cid, a))
       .map(a => ({ a: a, cell: assessmentCellValue(cid, student.id, a) }));
   }
+  /* Work labelled Missing up to the report's end, whatever term it was
+     assigned in, undated work included (Colin, 2026-11-03): the year to
+     date the grade counts. */
+  function _missingCells(cid, student) {
+    return getAssessments(cid)
+      .filter(a => assessmentInYearToDate(cid, a))
+      .map(a => ({ a: a, cell: assessmentCellValue(cid, student.id, a) }))
+      .filter(c => c.cell.status === 'NS');
+  }
   function _inActiveTerm(cid, day) {
     const t = getActiveTerm(cid);
     if (!t) return true;
@@ -2089,7 +2098,9 @@ window.ReportBlocks = (function () {
     if (!cells.length) return '';
     const assessed = cells.filter(c => ['level', 'points', 'complete'].includes(c.cell.kind)).length;
     const late = cells.filter(c => c.cell.late).length;
-    const missing = cells.filter(c => c.cell.status === 'NS').length;
+    // Missing is everything still Missing up to the report's end, as the
+    // Missing Work block lists it; the rest are this term's.
+    const missing = _missingCells(cid, student).length;
     const obs = getStudentQuickObs(cid, student.id).filter(o =>
       _inActiveTerm(cid, String(o.date || o.created || '').slice(0, 10)),
     ).length;
@@ -2157,9 +2168,9 @@ window.ReportBlocks = (function () {
   }
 
   /* ── Missing Work ────────────────────────────────────────────────
-     This term's work labelled Missing, as of today: one line at
-     Row width ("None this term", or the titles), a count over its words at
-     Side by Side. When there is none it says so, or stays off. The As Of
+     Work labelled Missing up to the report's end, whatever term it was
+     assigned in, as of today: one line at Row width ("None", or the
+     titles), a count over its words at Side by Side. When there is none it says so, or stays off. The As Of
      date is marked data-print-date: "changed since the last print" skips it. */
   function _asOf(cid) {
     const d = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
@@ -2170,15 +2181,11 @@ window.ReportBlocks = (function () {
   function renderBlockMissingWork(cid, student, ctx, options) {
     options = options || {};
     const half = options.size === 'half';
-    const missing = _termCells(cid, student).filter(c => c.cell.status === 'NS');
+    const missing = _missingCells(cid, student);
     if (!missing.length && options.none === 'off') return '';
     const n = missing.length;
     const titles = missing.map(c => esc(c.a.title || '')).join(', ');
-    const words = n
-      ? options.titles !== false
-        ? titles
-        : n + (n === 1 ? ' assignment' : ' assignments')
-      : 'None this term';
+    const words = n ? (options.titles !== false ? titles : n + (n === 1 ? ' assignment' : ' assignments')) : 'None';
     if (half) {
       return `<div class="report-block-box report-missing-work report-strip-half">
     <div class="report-strip-head"><b>Missing Work</b><span class="report-prof-meta" data-print-date>${esc(_asOf(cid))}</span></div>

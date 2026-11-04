@@ -144,3 +144,51 @@ describe('a report reads the year to date as of its end (decision 15)', () => {
     expect(getSectionProficiency(CID, SID, 'sec')).toBe(3); // the 2 and the undated 4
   });
 });
+
+describe("Missing Work lists anything still Missing up to the report's end (decision 17)", () => {
+  const was = globalThis.courseToday;
+  beforeEach(() => {
+    localStorage.clear();
+    globalThis.courseToday = () => '2027-02-10';
+    seed('letter');
+    _cache.assessments[CID].push(
+      { id: 'sep', title: 'September Quiz', date: '2026-09-20', tagIds: ['t1'], categoryId: 'cat' },
+      { id: 'feb', title: 'February Quiz', date: '2027-02-05', tagIds: ['t1'], categoryId: 'cat' },
+      { id: 'und', title: 'Undated Poster', tagIds: ['t1'], categoryId: 'cat' },
+    );
+    _cache.statuses[CID] = { [SID + ':sep']: 'NS', [SID + ':feb']: 'NS', [SID + ':und']: 'NS' };
+    clearProfCache();
+  });
+  afterEach(() => {
+    setActiveTerm(CID, null);
+    globalThis.courseToday = was;
+    delete COURSES[CID];
+  });
+
+  it('the Missing Work block on Report 2 lists a Term 1 piece still Missing, not work after the end', () => {
+    setActiveTerm(CID, 2);
+    const t = text(ReportBlocks.renderReportBlock('missing-work', CID, STUDENT, { termId: 'term-2' }, {}));
+    expect(t).toContain('September Quiz');
+    expect(t).toContain('Undated Poster');
+    expect(t).not.toContain('February Quiz');
+    expect(t).not.toContain('None');
+  });
+
+  it('Report 1 lists only what was assigned up to its end', () => {
+    setActiveTerm(CID, 1);
+    const t = text(ReportBlocks.renderReportBlock('missing-work', CID, STUDENT, { termId: 'term-1' }, {}));
+    expect(t).toContain('September Quiz, Undated Poster');
+  });
+
+  it('This Term at a Glance, the questionnaire, Generate and the Quick Report count the same work', () => {
+    setActiveTerm(CID, 2);
+    const glance = text(ReportBlocks.renderBlockTermGlance(CID, STUDENT));
+    expect(glance).toMatch(/2 Missing/);
+    expect(ReportQuestionnaire.notHandedIn(CID, SID).sort()).toEqual(['September Quiz', 'Undated Poster']);
+    const f = CommentBank.facts(CID, STUDENT, 'term-2');
+    expect(f.record.missing).toBe(2);
+    expect(f.notHandedIn.count).toBe(2);
+    const quick = GradeReport.rows(CID, STUDENT).filter(r => r.note === 'Missing');
+    expect(quick.map(r => r.title).sort()).toEqual(['September Quiz', 'Undated Poster']);
+  });
+});
