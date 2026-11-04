@@ -5745,8 +5745,10 @@ label.cm-cr-row {
   width: 64px;
   text-align: center;
 }
+/* Wide enough for "100.0" and a one-decimal value beside the number
+   arrows ("83.3" was clipped to "83." at 64px). */
 .cm-pts-slot {
-  width: 64px;
+  width: 80px;
   flex-shrink: 0;
   text-align: center;
 }
