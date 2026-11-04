@@ -1714,6 +1714,27 @@ function _dismissOverriddenScoreWrites(cid, baseline, next) {
   });
 }
 
+/* A Missing, Excused or Late mark this page sent that the server rejected
+   stays in the dead letter, and the next page load sends it once more. If
+   the teacher then puts the cell back to what the server holds (Missing
+   rejected, then taken off again), the save sends nothing for it, and that
+   retry would put the mark back. A save that leaves such a cell as the
+   server has it dismisses the rejected write. */
+var _rejectedStatusWrites = {}; // dead-letter entry id → { cid, row: its payload }
+
+function _dismissOverriddenStatusWrites(cid, baseline, next) {
+  var q = window.v2Queue;
+  if (!q || typeof q.dismissDeadLetter !== 'function') return;
+  Object.keys(_rejectedStatusWrites).forEach(function (id) {
+    var w = _rejectedStatusWrites[id];
+    if (w.cid !== cid) return;
+    var key = w.row.p_enrollment_id + ':' + w.row.p_assessment_id;
+    if (((baseline || {})[key] || null) !== ((next || {})[key] || null)) return;
+    delete _rejectedStatusWrites[id];
+    q.dismissDeadLetter(id);
+  });
+}
+
 /* Which baseline row a write sets, from its RPC name and params. */
 function _baselineRowOf(name, params) {
   params = params || {};
@@ -2729,9 +2750,11 @@ function _onOutboxEvent(evt) {
     _revertBaselineRow(undo, meta.endpoint, meta.payload);
     delete _baselineUndo[meta.id];
     if (undo && undo.field === 'scores') _rejectedScoreWrites[meta.id] = { cid: undo.cid, row: meta.payload };
+    if (undo && undo.field === 'statuses') _rejectedStatusWrites[meta.id] = { cid: undo.cid, row: meta.payload };
     _onCreateAbandoned(meta.id, true, meta.error);
   } else if (evt.kind === 'dead-letter:dismiss') {
     delete _rejectedScoreWrites[meta.id];
+    delete _rejectedStatusWrites[meta.id];
   } else if (evt.kind === 'remove') {
     delete _baselineUndo[meta.id];
     _onCreateAbandoned(meta.id, false);
@@ -7709,7 +7732,9 @@ function saveAssignmentStatuses(cid, obj) {
   if (!_groupWriteDepth) _syncGroupStatuses(cid, prev, next);
   if (!_writesEnabled() || !_isUuid(cid)) return true;
   var refusals = _writeRefusals;
-  _persistStatusDiffToCanonical(_serverStateOr('statuses', cid, prev), next);
+  var baseline = _serverStateOr('statuses', cid, prev);
+  _persistStatusDiffToCanonical(baseline, next);
+  _dismissOverriddenStatusWrites(cid, baseline, next);
   _rememberServerState('statuses', cid, next);
   // A refused write's cell goes back in the baseline (_onWriteRefused).
   return _writeRefusals === refusals;
