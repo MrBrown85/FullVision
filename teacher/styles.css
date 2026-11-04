@@ -2800,6 +2800,47 @@ body.offline-active #app-dock {
   }
 }
 
+/* ── Top tabs on a phone ───────────────────────────────────
+   The five tabs don't fit beside the sidebar button, sync dot and account
+   button at phone width, and the centred row ran under both ends. Under
+   600 px the tabs sit between them and scroll sideways on their own (the
+   open tab is scrolled into view, router.js); the account button shows
+   its icon only. */
+@media (max-width: 600px) {
+  .tb-group.tb-center {
+    position: static;
+    transform: none;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0 4px;
+  }
+  .tb-seg {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tb-seg::-webkit-scrollbar {
+    display: none;
+  }
+  .tb-seg .seg-btn {
+    flex-shrink: 0;
+  }
+  .tb-group.tb-right {
+    margin-left: 0;
+    flex-shrink: 0;
+  }
+  .tb-sync {
+    margin-right: 2px;
+  }
+  .tb-user-menu {
+    margin-left: 0;
+  }
+  .tb-user-name {
+    display: none;
+  }
+}
+
 /* ── Responsive: Small Mobile (≤480px) ────────────────────── */
 @media (max-width: 480px) {
   .page-main {

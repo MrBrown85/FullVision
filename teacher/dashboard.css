@@ -6155,3 +6155,36 @@ label.cm-cr-row {
   color: var(--text);
   margin-bottom: 12px;
 }
+
+/* Needs Attention on a phone: the filter buttons wrap onto more lines and
+   each student's facts go under the name, so the card never runs past the
+   screen and the page never scrolls sideways (Nov 3 sweep). */
+@media (max-width: 600px) {
+  .dash-na-head,
+  .dash-na-filters {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .dash-na-seg {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .dash-na-row {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    padding: 6px 12px;
+  }
+  .dash-na-facts {
+    grid-column: 2 / -1;
+  }
+  .dash-na-fact {
+    white-space: normal;
+  }
+  .dash-ob2-flags {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .dash-ob2-flag {
+    white-space: normal;
+    text-align: left;
+  }
+}
