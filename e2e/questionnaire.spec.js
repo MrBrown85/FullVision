@@ -1055,6 +1055,23 @@ test.describe('the Sentences card', () => {
     await expect(gaps.last().locator('.qn-gap-add')).toBeFocused();
   });
 
+  test('Tab and Shift-Tab stay inside Browse Sentences (step 4 group 3 #64)', async ({ page }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    await page.locator('#tq-browse-btn').click();
+    const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+    await expect(sheet).toBeVisible();
+    const inside = () => sheet.evaluate(d => d.contains(document.activeElement));
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press('Tab');
+      expect(await inside()).toBe(true);
+    }
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await inside()).toBe(true);
+    }
+  });
+
   test('Browse Sentences: a sentence that does not fit, used for a classmate, goes in as written and Approve stays on', async ({
     page,
   }) => {

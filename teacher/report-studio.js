@@ -1014,6 +1014,13 @@ window.ReportStudio = (function () {
     document.addEventListener(
       'keydown',
       function (e) {
+        // Escape closes what is open on the screen (api.escape says whether
+        // it did).
+        // A drag let go by Escape has already used it.
+        if (e.key === 'Escape' && !e.defaultPrevented && api.escape && api.escape(e)) {
+          e.preventDefault();
+          return;
+        }
         var cell = e.target.closest ? e.target.closest('.studio-pages .sheet-body .sheet-cell[data-block]') : null;
         if (!cell) return;
         var id = cell.dataset.block;

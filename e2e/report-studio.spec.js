@@ -637,6 +637,41 @@ test.describe('Page Studio', () => {
     await page.emulateMedia({ colorScheme: 'light' });
   });
 
+  test('Escape closes the block card and the phone Blocks panel; Tab stays in the Print Reports dialog (step 4 group 3 #64)', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    const legend = cellOf(page, 'legend');
+    await legend.click();
+    await expect(bar(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.studio-bar')).toHaveCount(0);
+    await expect(legend).not.toHaveClass(/studio-sel/);
+    await expect(legend).toBeFocused();
+    // The print dialog keeps Tab and Shift-Tab inside it.
+    await page.getByRole('button', { name: 'Print Reports' }).click();
+    const dialog = page.locator('#issue-overlay');
+    await expect(dialog).toBeVisible();
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press('Tab');
+      expect(await dialog.evaluate(d => d.contains(document.activeElement))).toBe(true);
+    }
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await dialog.evaluate(d => d.contains(document.activeElement))).toBe(true);
+    }
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    // On a phone, Escape closes the Blocks panel.
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Blocks', exact: true }).click();
+    await expect(page.locator('#studio-palette')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#studio-palette')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Blocks', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  });
+
   test('every block, the letterhead too, is reached by Tab and selected with Enter', async ({ page }) => {
     await openStudio(page);
     const head = cellOf(page, 'header');

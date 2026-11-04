@@ -7097,6 +7097,11 @@ window.ReportQuestionnaire = (function () {
       _trapTab(e, document.getElementById(INFO_ID));
       return;
     }
+    // And inside Browse Sentences, a modal sheet too (step 4 group 3 #64).
+    if (e.key === 'Tab' && browseOpen()) {
+      _trapTab(e, document.getElementById(BROWSE_ID));
+      return;
+    }
     if (document.getElementById(INFO_ID) || document.getElementById(BOTH_ID)) return;
     // Return in the box for a sentence of the teacher's own saves it.
     if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && t && t.id === 'tq-own-input') {

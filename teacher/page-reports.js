@@ -1006,11 +1006,43 @@ window.PageReports = (function () {
     });
     _issueState.keyHandler = function (e) {
       if (e.key === 'Escape') closeIssueDialog();
+      // Tab and Shift-Tab stay inside the dialog, which is modal (step 4
+      // group 3 #64).
+      else if (e.key === 'Tab') _trapTab(e, overlay);
     };
     document.addEventListener('keydown', _issueState.keyHandler);
     document.body.appendChild(overlay);
     var first = overlay.querySelector('input');
     if (first && first.focus) first.focus();
+  }
+
+  /* Keeps Tab inside a modal dialog: past its last control it goes to the
+     first, before its first to the last. */
+  function _trapTab(e, box) {
+    var items = Array.prototype.slice
+      .call(
+        box.querySelectorAll(
+          'button:not([disabled]), a[href], input:not([disabled]), select, textarea, [tabindex="0"]',
+        ),
+      )
+      .filter(function (x) {
+        // A radio group is one stop: its checked radio.
+        return !x.hidden && x.offsetParent !== null && (x.type !== 'radio' || x.checked);
+      });
+    if (!items.length) return;
+    var first = items[0];
+    var last = items[items.length - 1];
+    var at = document.activeElement;
+    if (!box.contains(at)) {
+      e.preventDefault();
+      (e.shiftKey ? last : first).focus();
+    } else if (e.shiftKey && at === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && at === last) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 
   /* keepEveryone: the dialog closes to print, so the canvas stays on
@@ -1662,7 +1694,37 @@ window.PageReports = (function () {
         _selectBlock(id);
       },
       announce: _announce,
+      escape: _studioEscape,
     });
+  }
+
+  /* Escape on Progress Reports closes the Blocks panel on a narrow screen,
+     else the selected block's card, focus going back to the block (step 4
+     group 3 #64). A dialog over the page keeps Escape for itself. */
+  function _studioEscape(e) {
+    if (activeTab !== 'progress' || document.querySelector('.confirm-overlay, .studio-dragging')) return false;
+    // An Escape a dialog used to close itself (it is gone from the page) or
+    // pressed inside one is the dialog's.
+    var t = e && e.target;
+    if (t && t.nodeType === 1 && (!t.isConnected || (t.closest && t.closest('[role="dialog"]')))) return false;
+    var layout = document.getElementById('studio');
+    var rail = document.getElementById('tb-rail-btn');
+    if (layout && layout.classList.contains('rail-open')) {
+      layout.classList.remove('rail-open');
+      if (rail) {
+        rail.classList.remove('active');
+        rail.setAttribute('aria-pressed', 'false');
+        rail.focus();
+      }
+      return true;
+    }
+    if (studioSelected) {
+      var id = studioSelected;
+      _focusBlock = id;
+      _selectBlock(null);
+      return true;
+    }
+    return false;
   }
 
   function _label(id) {
