@@ -120,3 +120,28 @@ test('clearing a points score offers Undo; Escape and nonsense keep it', async (
   expect(await pointsNow(page)).toBe(before);
   await expect(box).toHaveValue(String(before));
 });
+
+// Group 2 #36: a filter from the sheet covers the whole list, not just Recent.
+test('sheet filters are not narrowed by Recent', async ({ page }) => {
+  await openPhone(page);
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await expect(page.locator('[data-action="m-grade-seg"][data-val="recent"]')).toHaveClass(/m-seg-active/);
+  await page.locator('[data-action="m-grade-filter-open"]').click();
+  await page.locator('[data-action="m-grade-filter-seg"][data-kind="gradedStatus"][data-val="all"]').waitFor();
+  await page.locator('[data-action="m-grade-filter-toggle"][data-kind="category"]').first().click();
+  await page.locator('[data-action="m-grade-filter-apply"]').click();
+  await expect(page.locator('[data-action="m-grade-seg"][data-val="all"]')).toHaveClass(/m-seg-active/);
+  // Every assessment in the chosen category shows, however old.
+  const counts = await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const cat = JSON.parse(localStorage.getItem('gb-grade-filters-' + cid)).category[0];
+    const want = getAssessments(cid).filter(a => (a.categoryId || '__none') === cat).length;
+    const shown = [...document.querySelectorAll('#m-grade-list .m-cell')].filter(c => c.style.display !== 'none').length;
+    return { want, shown };
+  });
+  expect(counts.shown).toBe(counts.want);
+  // Opened again, the list keeps the filter on the whole list.
+  await page.locator('.m-tab-item[data-tab="students"]').click();
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await expect(page.locator('[data-action="m-grade-seg"][data-val="all"]')).toHaveClass(/m-seg-active/);
+});

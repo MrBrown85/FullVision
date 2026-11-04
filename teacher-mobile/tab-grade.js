@@ -139,7 +139,8 @@ window.MGrade = (function () {
     // Load persisted filters for this course. Cells that don't match are
     // drawn hidden, so the list never flashes unfiltered.
     _filters = _loadFilters(cid);
-    _segmentMode = 'recent';
+    // Saved filters cover the whole list; with none, the list opens on Recent.
+    _segmentMode = _activeFilterCount() > 0 ? 'all' : 'recent';
     var ctx = _filterCtx(cid);
 
     // Sort by date, newest first
@@ -154,8 +155,12 @@ window.MGrade = (function () {
     var segmented =
       '<div class="m-grade-filter-bar">' +
       '<div class="m-segmented">' +
-      '<button class="m-seg-btn m-seg-active" data-action="m-grade-seg" data-val="recent">Recent</button>' +
-      '<button class="m-seg-btn" data-action="m-grade-seg" data-val="all">All</button>' +
+      '<button class="m-seg-btn' +
+      (_segmentMode === 'recent' ? ' m-seg-active' : '') +
+      '" data-action="m-grade-seg" data-val="recent">Recent</button>' +
+      '<button class="m-seg-btn' +
+      (_segmentMode === 'all' ? ' m-seg-active' : '') +
+      '" data-action="m-grade-seg" data-val="all">All</button>' +
       '</div>' +
       '<button class="m-grade-filter-btn" data-action="m-grade-filter-open" aria-label="Filter assessments">' +
       _FILTER_ICON_SVG +
@@ -318,6 +323,11 @@ window.MGrade = (function () {
 
   function filterAssessments(cid, mode) {
     if (mode) _segmentMode = mode;
+    // Recent is itself a date range, so it replaces the sheet's.
+    if (mode === 'recent' && _filters.dateRange !== 'all') {
+      _filters.dateRange = 'all';
+      _saveFilters(cid);
+    }
 
     var assessments = getAssessments(cid);
     var ctx = _filterCtx(cid);
@@ -500,7 +510,9 @@ window.MGrade = (function () {
     _sheetStaged = null;
     _saveFilters(cid);
     MC.dismissSheet();
-    filterAssessments(cid);
+    // The sheet's filters apply to the whole list: Recent would otherwise
+    // keep hiding older work under them without a word.
+    filterAssessments(cid, _activeFilterCount() > 0 ? 'all' : null);
   }
 
   function clearFilterSheet(cid) {
