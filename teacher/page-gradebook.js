@@ -1259,13 +1259,24 @@ window.PageGradebook = (function () {
         });
       } else if (isPointsScored(a)) {
         var sec = getSectionForTag(cid, tagIds[0]);
+        // The header names the competencies the work feeds, as proficiency
+        // columns do, or says it feeds none (its total is in the title
+        // above), so work that counts toward no proficiency stands out.
+        var fedCodes = [];
+        tagIds.forEach(function (tid) {
+          var code = getSectionForTag(cid, tid) ? _tagShortCode(getTagById(cid, tid)) : '';
+          if (code && fedCodes.indexOf(code) < 0) fedCodes.push(code);
+        });
         cols.push({
           assessmentId: a.id,
           tagId: '__pts__',
           isPointsCol: true,
-          tagCode: isCompletionScored(a) ? '\u2713/\u2717' : '/' + (a.maxPoints || 100),
+          isNameCol: !fedCodes.length,
+          tagCode: fedCodes.length ? fedCodes.join(' ') : 'No Competency',
           sectionColor: cssColor(sec ? sec.color : 'var(--text-3)'),
-          tagText: a.title,
+          tagText: fedCodes.length
+            ? a.title + ' counts toward ' + fedCodes.join(', ')
+            : a.title + ' counts toward no competency',
         });
       } else {
         tagIds.forEach(function (tagId) {
