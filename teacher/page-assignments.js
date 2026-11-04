@@ -9754,7 +9754,7 @@ window.PageAssignments = (function () {
       overlay.id = 'crit-comment-overlay';
       overlay.className = 'comment-popover-overlay';
       overlay.onclick = function (e) {
-        if (e.target === this) closeCriterionComment();
+        if (e.target === this) cancelCriterionComment();
       };
       document.body.appendChild(overlay);
     }
@@ -9768,7 +9768,7 @@ window.PageAssignments = (function () {
       esc(assess.title) +
       '</span>' +
       _critCommentLevelHtml(cid, sid, aid, crit) +
-      '</div></div><button class="comment-popover-close" data-action="closeCriterionComment" aria-label="Close">✕</button></div>' +
+      '</div></div><button class="comment-popover-close" data-action="cancelCriterionComment" aria-label="Close">✕</button></div>' +
       '<div class="crit-comment-body"><label class="crit-comment-label" for="crit-comment-input">Comment for ' +
       esc(name) +
       '</label><textarea class="crit-comment-input" id="crit-comment-input" rows="3" maxlength="' +
@@ -9782,7 +9782,7 @@ window.PageAssignments = (function () {
       (note
         ? '<button type="button" class="btn btn-danger crit-comment-remove" data-action="removeCriterionComment">Remove Comment</button>'
         : '') +
-      '<span class="crit-comment-spacer"></span><button type="button" class="btn btn-ghost" data-action="closeCriterionComment">Cancel</button>' +
+      '<span class="crit-comment-spacer"></span><button type="button" class="btn btn-ghost" data-action="cancelCriterionComment">Cancel</button>' +
       (next
         ? '<button type="button" class="btn btn-ghost crit-comment-next" data-action="saveCriterionCommentNext" aria-keyshortcuts="Meta+Enter Control+Enter">' +
           nextLabel +
@@ -9868,6 +9868,38 @@ window.PageAssignments = (function () {
       e.preventDefault();
       first.focus();
     }
+  }
+  /* Cancel, ✕, Escape and a click outside: a comment typed and not saved is
+     only thrown away after the teacher says so, as the assessment form's
+     Cancel asks (Nov 3 sweep: Escape lost 48 typed characters). */
+  function cancelCriterionComment() {
+    var st = _critCommentState;
+    var inp = document.getElementById('crit-comment-input');
+    if (!st || !inp || inp.value.trim() === (st.original || '').trim()) {
+      closeCriterionComment();
+      return;
+    }
+    var student = getStudents(st.cid).find(function (x) {
+      return x.id === st.sid;
+    });
+    var crit = getRubricCriterion(st.aid, st.critId);
+    _formDialog(
+      'Discard This Comment?',
+      'Your comment' +
+        (student ? ' for ' + displayName(student) : '') +
+        (crit && crit.name ? ' on ' + crit.name : '') +
+        ' isn\u2019t saved.',
+      [
+        { label: 'Keep Editing', style: 'cancel' },
+        {
+          label: 'Discard',
+          style: 'danger',
+          run: function () {
+            if (_critCommentState === st) closeCriterionComment();
+          },
+        },
+      ],
+    );
   }
   function closeCriterionComment() {
     _critCommentState = null;
@@ -10566,6 +10598,9 @@ window.PageAssignments = (function () {
       closeCriterionComment: function () {
         closeCriterionComment();
       },
+      cancelCriterionComment: function () {
+        cancelCriterionComment();
+      },
       printRubrics: function () {
         // Grading one student: their rubric. Every student showing: everyone's.
         if (window.RubricPrint) RubricPrint.open(activeCourse, el.dataset.aid, { studentId: focusStudentId });
@@ -10930,8 +10965,9 @@ window.PageAssignments = (function () {
     if (_critCommentState && document.activeElement.id !== 'crit-comment-input') {
       var critDialog = document.querySelector('#crit-comment-overlay .crit-comment-popover');
       if (e.key === 'Escape') {
+        // An Escape that closed the Discard question isn't a second one.
+        if (!e.defaultPrevented) cancelCriterionComment();
         e.preventDefault();
-        closeCriterionComment();
         return;
       }
       if (e.key === 'Tab' && critDialog) {
@@ -10956,9 +10992,9 @@ window.PageAssignments = (function () {
         if (e.metaKey || e.ctrlKey) saveCriterionCommentNext();
         else saveCriterionComment();
       }
-      if (e.key === 'Escape' && _critCommentState) {
+      if (e.key === 'Escape' && _critCommentState && !e.defaultPrevented) {
         e.preventDefault();
-        closeCriterionComment();
+        cancelCriterionComment();
       }
       // Handle points keyboard navigation
       if (document.activeElement.classList.contains('gb-pts-input')) {
