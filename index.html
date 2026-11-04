@@ -137,107 +137,14 @@
           0 30px 70px rgba(29, 29, 31, 0.25),
           0 0 0 7px #1d1d1f;
       }
-      .facts {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
-      }
-      .feat {
-        display: grid;
-        grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-        gap: 56px;
-        align-items: center;
-      }
-      .feat.flip {
-        grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-      }
-      .feat.flip .feat-text {
-        order: 2;
-      }
-      .feat.tall {
-        grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
-      }
-      .feat.tall.flip {
-        grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
-      }
-      .head2 {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: 24px 56px;
-        align-items: end;
-      }
       .phones {
         display: grid;
         grid-template-columns: minmax(0, 8fr) minmax(0, 3fr);
         gap: 56px;
         align-items: center;
       }
-      .extras {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 12px;
-      }
-      .ticks {
-        margin: 0;
-        padding: 0;
-        list-style: none;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .ticks li {
-        position: relative;
-        padding-left: 28px;
-        font-size: 16px;
-        line-height: 1.45;
-        color: #3a3a3f;
-      }
-      .ticks li::before {
-        content: '';
-        position: absolute;
-        left: 2px;
-        top: 4px;
-        width: 14px;
-        height: 8px;
-        border-left: 2.4px solid #0071e3;
-        border-bottom: 2.4px solid #0071e3;
-        transform: rotate(-45deg);
-      }
-      .cards2 {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-      }
-      .extra {
-        background: #f5f5f7;
-        border-radius: 16px;
-        padding: 22px 22px 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .extra h3 {
-        margin: 0;
-        font-size: 17px;
-      }
-      .extra p {
-        margin: 0;
-        font-size: 15px;
-        line-height: 1.5;
-        color: #48484d;
-      }
-      @media (max-width: 1080px) {
-        .extras {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-      }
       @media (max-width: 980px) {
-        .feat,
-        .feat.flip,
-        .feat.tall,
-        .feat.tall.flip,
         .phones,
-        .head2,
         .hero-a {
           grid-template-columns: minmax(0, 1fr);
           gap: 32px;
@@ -259,16 +166,9 @@
             0 20px 50px rgba(29, 29, 31, 0.25),
             0 0 0 5px #1d1d1f;
         }
-        .feat.flip .feat-text {
-          order: 0;
-        }
         .phones .phone-wrap,
         .phone-solo {
           max-width: 260px;
-        }
-        .facts,
-        .extras {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
         .navlinks {
           display: none;
@@ -277,11 +177,6 @@
       @media (max-width: 620px) {
         .wrap {
           padding: 0 16px;
-        }
-        .facts,
-        .extras,
-        .cards2 {
-          grid-template-columns: minmax(0, 1fr);
         }
         .h1 {
           font-size: 40px !important;
@@ -325,6 +220,14 @@
         border-bottom: 2px solid #0071e3;
         transform: rotate(-45deg);
       }
+      .lede {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        max-width: 720px;
+        text-align: center;
+      }
       .skip {
         position: absolute;
         left: 16px;
@@ -360,12 +263,11 @@
             <span style="font-size: 20px; font-weight: 700; letter-spacing: -0.02em">FullVision</span>
           </a>
           <nav class="navlinks" aria-label="Main">
-            <a class="navlink" href="#assignments">Gradebook</a>
+            <a class="navlink" href="#gradebook">Gradebook</a>
             <a class="navlink" href="#curriculum">Curriculum</a>
             <a class="navlink" href="#reports">Reports</a>
             <a class="navlink" href="#student-voice">Student Voice</a>
-            <a class="navlink" href="#observations">Observations</a>
-            <a class="navlink" href="#more">More</a>
+            <a class="navlink" href="#privacy">Privacy</a>
           </nav>
           <div style="display: flex; gap: 10px; align-items: center">
             <a
@@ -400,9 +302,7 @@
                 Make Every Student's Growth Visible
               </h1>
               <p style="margin: 0; font-size: 20px; line-height: 1.5; color: #48484d">
-                Make assignments, score them on the Provincial Proficiency Scale, and keep every mark in one gradebook
-                that builds all year. When Learning Updates are due, families get the year so far, clear feedback, next
-                steps, and their child's own self-assessment and goals.
+                A gradebook and report writer for BC teachers, built on the Provincial Proficiency Scale.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; padding-top: 4px">
                 <a class="btn btn-solid" href="/login.html?demo=1" data-link="demo" style="background: #0071e3"
@@ -412,8 +312,6 @@
               </div>
               <ul class="minis">
                 <li>BC curriculum built in</li>
-                <li>Grades build all year</li>
-                <li>Core Competency self-assessment</li>
                 <li>Stored in Canada</li>
                 <li>No AI</li>
               </ul>
@@ -433,649 +331,178 @@
           </div>
         </section>
 
-        <section aria-label="At a Glance" style="padding: 56px 0 40px">
-          <div class="wrap facts">
-            <div
-              style="
-                background: #ffffff;
-                border-radius: 14px;
-                padding: 20px 22px;
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-              "
-            >
-              <span style="font-size: 16px; font-weight: 700">BC Curriculum Built In</span>
-              <span style="font-size: 14px; line-height: 1.45; color: #48484d"
-                >Every competency for 226 BC courses, grades 8 to 12, in the Ministry's own words, with I Can
-                statements.</span
-              >
+        <section id="gradebook" style="background: #ffffff; padding: 88px 0">
+          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
+            <div class="lede">
+              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
+                Every Mark in One Gradebook
+              </h2>
+              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
+                Score on the proficiency scale with + and −, in points, or with a rubric. Grades build across the whole
+                year.
+              </p>
             </div>
-            <div
-              style="
-                background: #ffffff;
-                border-radius: 14px;
-                padding: 20px 22px;
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-              "
-            >
-              <span style="font-size: 16px; font-weight: 700">Stored in Canada</span>
-              <span style="font-size: 14px; line-height: 1.45; color: #48484d"
-                >Student records are kept on servers in Canada.</span
-              >
-            </div>
-            <div
-              style="
-                background: #ffffff;
-                border-radius: 14px;
-                padding: 20px 22px;
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-              "
-            >
-              <span style="font-size: 16px; font-weight: 700">Works Offline</span>
-              <span style="font-size: 14px; line-height: 1.45; color: #48484d"
-                >Keep grading when the Wi-Fi drops. Marks save when you reconnect.</span
-              >
-            </div>
-            <div
-              style="
-                background: #ffffff;
-                border-radius: 14px;
-                padding: 20px 22px;
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-              "
-            >
-              <span style="font-size: 16px; font-weight: 700">No AI</span>
-              <span style="font-size: 14px; line-height: 1.45; color: #48484d"
-                >Every comment comes from sentences a teacher wrote and can read.</span
-              >
-            </div>
+            <img
+              class="shot"
+              loading="lazy"
+              src="/assets/splash/gradebook.jpg"
+              alt="The gradebook for a Science 8 class."
+            />
           </div>
         </section>
 
-        <section id="assignments" style="background: #ffffff; padding: 96px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; gap: 48px">
-            <div class="head2" style="align-items: start">
-              <div style="display: flex; flex-direction: column; gap: 18px">
-                <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Assignments and Rubrics</p>
-                <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                  Score Every Criterion Against Clear Success Criteria
-                </h2>
-                <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
-                  Make an assignment, attach a rubric, and score each student criterion by criterion. On an Advanced
-                  Rubric, tick what the student showed and FullVision suggests the proficiency. You can always pick a
-                  different one.
-                </p>
-              </div>
-              <ul class="ticks">
-                <li>
-                  Create assignments with dates, a category, and the curricular and Core Competencies they assess.
-                </li>
-                <li>
-                  Score by proficiency with + and −, points, complete or incomplete, or DIBELS 8 in ELA and Social
-                  Studies 8 classes.
-                </li>
-                <li>Score by competency: each tagged competency on the proficiency scale, with no rubric needed.</li>
-                <li>
-                  Advanced Rubrics hold a checklist in each level. The suggested level is the highest one with every box
-                  ticked.
-                </li>
-                <li>Pair and Group work takes one grade per pair or group, or grade a student separately.</li>
-                <li>Set Everyone To a level for the students not yet scored, then change the few who differ.</li>
-                <li>Comment on any criterion, and add an overall comment for each student.</li>
-                <li>Mark work Late, Excused or Missing.</li>
-              </ul>
+        <section id="rubrics" style="background: #f5f5f7; padding: 88px 0">
+          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
+            <div class="lede">
+              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
+                Score Against Clear Criteria
+              </h2>
+              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
+                Attach a rubric, score each criterion, and print a graded copy for every student.
+              </p>
             </div>
             <img
               class="shot"
               loading="lazy"
               src="/assets/splash/advanced-rubric.jpg"
-              alt="Scoring a lab on an Advanced Rubric, with checklists under each level."
+              alt="Scoring a lab on a rubric, criterion by criterion."
             />
           </div>
         </section>
 
-        <section id="gradebook" style="padding: 96px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; gap: 48px">
-            <div class="feat flip">
-              <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
-                <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Gradebook</p>
-                <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                  Every Score in One Grid
-                </h2>
-                <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
-                  Grades build all year. A Learning Update is a checkpoint, not a fresh start: each report shows the
-                  year to date as of its date, and how each competency has changed since the last report.
-                </p>
-                <ul class="ticks">
-                  <li>Score on the four-point scale with + and −, or in points.</li>
-                  <li>Show proficiency, letter grades and percentages, or both, set per class.</li>
-                  <li>Switch between Scores and Competencies views.</li>
-                  <li>Categories with weights.</li>
-                  <li>
-                    Missing work counts the way the class grades: 0 in a percent grade, and no evidence, not a zero, on
-                    the proficiency scale.
-                  </li>
-                  <li>Mark Blank Cells Missing in one step, and undo any change with ⌘Z.</li>
-                </ul>
-              </div>
-              <img
-                class="shot"
-                loading="lazy"
-                src="/assets/splash/gradebook.jpg"
-                alt="The gradebook grid, each score shaded by proficiency."
-              />
-            </div>
-          </div>
-        </section>
-
-        <section id="curriculum" style="background: #ffffff; padding: 96px 0">
-          <div class="wrap feat">
-            <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
-              <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">BC Curriculum</p>
+        <section id="curriculum" style="background: #ffffff; padding: 88px 0">
+          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
+            <div class="lede">
               <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                The Curriculum in the Ministry's Own Words
+                The BC Curriculum, in the Ministry’s Words
               </h2>
-              <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
-                FullVision's curriculum is copied from the Ministry's course files: every grade 8 to 12 course except
-                second languages, 226 courses and 5,029 curricular competencies, word for word.
+              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
+                Every competency and I Can statement for 226 courses, grades 8 to 12, ready when you set up a class.
               </p>
-              <ul class="ticks">
-                <li>The New Class wizard loads each course's competencies in the Ministry's order and folders.</li>
-                <li>Every competency has a short name, a code and I Can statements for students.</li>
-                <li>Hover a level wherever you pick one to see what it means for that competency.</li>
-                <li>Tag the seven Core Competencies, with the Ministry's description of each.</li>
-                <li>
-                  Combine courses in one class, like Humanities 8. Each Course Counts Equally keeps one course from
-                  outweighing the other.
-                </li>
-                <li>Folders Count as One, or turn it off so each competency counts on its own.</li>
-              </ul>
             </div>
             <img
               class="shot"
               loading="lazy"
               src="/assets/splash/curriculum.jpg"
-              alt="The New Class wizard listing English Language Arts 8 competencies in the Ministry's wording."
+              alt="Choosing English Language Arts 8 competencies for a new class."
             />
           </div>
         </section>
 
-        <section id="setup" style="padding: 96px 0">
-          <div class="wrap feat flip">
-            <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
-              <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">New Assessment</p>
+        <section id="comments" style="background: #f5f5f7; padding: 88px 0">
+          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
+            <div class="lede">
               <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Set Up an Assessment in Fewer Steps
+                Comments Written From the Evidence
               </h2>
-              <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
-                Tick the competencies an assessment covers and FullVision shows how each will be scored, in the same
-                words that print on the student's rubric.
+              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
+                The student’s year, your observations and their own words sit beside the comment you are writing.
               </p>
-              <ul class="ticks">
-                <li>Start From a Past Assessment copies its scoring, competencies and rubric, from any class.</li>
-                <li>Create and Add Another saves this one and keeps the setup for the next.</li>
-                <li>
-                  Start a rubric from the Competency Rubric, from a rubric in this class, by copying one from another
-                  class, or from a blank rubric.
-                </li>
-                <li>Make Pair and Group work, with one grade for each pair or group.</li>
-                <li>Add one assessment to every block that teaches the course. Edits stay linked.</li>
-              </ul>
             </div>
             <img
               class="shot"
               loading="lazy"
-              src="/assets/splash/assessment-form.jpg"
-              alt="A new assessment scored by competency, with the Competency Rubric for the three ticked."
+              src="/assets/splash/questionnaire.jpg"
+              alt="The Term Questionnaire, with the student’s year and observations beside the comment."
             />
           </div>
         </section>
 
-        <section id="reports" style="background: #ffffff; padding: 96px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; gap: 112px">
-            <div class="feat">
-              <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
-                <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Term Questionnaire</p>
-                <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                  Write Each Comment From the Evidence
-                </h2>
-                <ul class="ticks">
-                  <li>
-                    At a Glance shows the year so far: each student's strongest skill, next step and biggest change
-                    since the last report, their best piece, and missing and late work.
-                  </li>
-                  <li>An Observations card beside the comment shows the newest notes and the counts by type.</li>
-                  <li>Generate Comment builds a draft from a subject-aware sentence bank you can browse and change.</li>
-                  <li>Add your own sentences to My Bank, for other students they fit.</li>
-                  <li>Generate keeps the sentences you wrote. An earlier draft is replaced, and Undo puts it back.</li>
-                  <li>Approve and Next moves through the class one student at a time.</li>
-                </ul>
-              </div>
-              <img
-                class="shot"
-                loading="lazy"
-                src="/assets/splash/questionnaire.jpg"
-                alt="At a Glance and Observations beside a student's Teacher Comment."
-              />
+        <section id="reports" style="background: #ffffff; padding: 88px 0">
+          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
+            <div class="lede">
+              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
+                Report Cards That Fill In for You
+              </h2>
+              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
+                Pick the blocks you want. Each one fills in from your gradebook for every student.
+              </p>
             </div>
-
-            <div style="display: flex; flex-direction: column; gap: 40px">
-              <div class="head2" style="align-items: start">
-                <div style="display: flex; flex-direction: column; gap: 18px">
-                  <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Custom Reports</p>
-                  <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                    Design Your Own Report Card
-                  </h2>
-                  <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
-                    Click or drag blocks onto the page. Each block fills itself from your gradebook for every student,
-                    so there is nothing to type.
-                  </p>
-                </div>
-                <ul class="ticks">
-                  <li>
-                    Grades: proficiency by competency, assignment grades, missing work, attendance and progress in one
-                    area.
-                  </li>
-                  <li>Every grade is the year to date as of the report, with the change since the last one.</li>
-                  <li>Comments and evidence: your teacher comment and next steps.</li>
-                  <li>Student voice: self-assessment and goal, and reflections on learning and habits.</li>
-                  <li>A proficiency legend and a parent or guardian response strip.</li>
-                  <li>Start from Report Card, Interim Update or Conference Pack, then Save as Template.</li>
-                  <li>Letter or Legal, front only or front and back, in black and white for the photocopier.</li>
-                </ul>
-              </div>
-              <img
-                class="shot"
-                loading="lazy"
-                src="/assets/splash/custom-report.jpg"
-                alt="The Custom report builder with a student's report card."
-              />
-            </div>
-
-            <div class="feat">
-              <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
-                <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Quick Report</p>
-                <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                  Print the Whole Class at Once
-                </h2>
-                <ul class="ticks">
-                  <li>
-                    A grade sheet for every student with each assignment, a category summary and the course grade, year
-                    to date.
-                  </li>
-                  <li>Add feedback pages for rubrics, assignment comments, observations and the term comment.</li>
-                  <li>One student or everyone, in one print job.</li>
-                  <li>Sent to Phones puts the report on each student's phone instead of paper.</li>
-                </ul>
-              </div>
-              <img
-                class="shot"
-                loading="lazy"
-                src="/assets/splash/quick-report.jpg"
-                alt="A printable grade sheet for one student."
-              />
-            </div>
-
-            <div class="feat tall flip">
-              <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
-                <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Rubric Feedback</p>
-                <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                  Hand Back a Graded Rubric to Every Student
-                </h2>
-                <ul class="ticks">
-                  <li>Completed rubrics, one per student, with their scores marked.</li>
-                  <li>Or a blank rubric with no names or scores, to hand out before the task.</li>
-                  <li>Print for all scored students, the whole class, or the students you pick.</li>
-                  <li>Not Yet Printed and Changed Since Printed pick up where your last print left off.</li>
-                  <li>One, two or four rubrics per page: full page, half sheets or quarter sheets.</li>
-                  <li>Black and white, ready for the photocopier.</li>
-                </ul>
-              </div>
-              <img
-                class="shot"
-                loading="lazy"
-                src="/assets/splash/print-rubrics.jpg"
-                alt="The Print Rubrics window with a preview of a graded rubric."
-              />
-            </div>
+            <img
+              class="shot"
+              loading="lazy"
+              src="/assets/splash/custom-report.jpg"
+              alt="Building a report card from blocks."
+            />
           </div>
         </section>
 
-        <section id="student-voice" style="padding: 96px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; gap: 48px">
-            <div class="head2">
-              <div style="display: flex; flex-direction: column; gap: 14px">
-                <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Student Voice</p>
-                <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                  Hear From Students Without Student Accounts
-                </h2>
-                <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
-                  Hand out printed QR slips. Students scan with their phones, or type the code on the slip, and answer
-                  the questions you wrote. Their answers go straight to their Learner Profile.
-                </p>
-              </div>
-              <ul class="ticks">
-                <li>About Me, goals and reflections in the student's own words.</li>
-                <li>Questionnaires you write, from templates or from scratch.</li>
-                <li>Name pronunciation, pronouns and home languages.</li>
-                <li>Private notes from the student to you.</li>
-                <li>Send progress reports to students' phones, and collect one reply from each.</li>
-              </ul>
+        <section id="student-voice" style="background: #f5f5f7; padding: 88px 0">
+          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
+            <div class="lede">
+              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
+                Hear From Students
+              </h2>
+              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
+                Students answer your questions from a printed QR slip. They don’t need accounts.
+              </p>
             </div>
             <div class="phones">
               <img
                 class="shot"
                 loading="lazy"
                 src="/assets/splash/learner-profile.jpg"
-                alt="A student's Learner Profile in her own words."
+                alt="A student’s Learner Profile in her own words."
               />
               <div class="phone-wrap" style="width: 100%; justify-self: center">
                 <img
                   class="phone"
                   loading="lazy"
                   src="/assets/splash/student-phone.jpg"
-                  alt="The student phone page inviting Cece to start a reflection."
+                  alt="The student page on a phone."
                 />
               </div>
             </div>
           </div>
         </section>
 
-        <section id="observations" style="background: #ffffff; padding: 96px 0">
-          <div class="wrap feat">
-            <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
-              <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Observations</p>
+        <section id="observations" style="background: #ffffff; padding: 88px 0">
+          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
+            <div class="lede">
               <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
                 Write Down What You See
               </h2>
-              <ul class="ticks">
-                <li>Mark each note as a Strength, Growth, Concern or Note.</li>
-                <li>Type @name to pick a student, and tag the note to a competency or disposition.</li>
-                <li>Add context, like Independent or Small Group, and save your own starters.</li>
-                <li>Keep private notes for yourself.</li>
-                <li>Filter by student, tag, type, date or assessment.</li>
-              </ul>
-            </div>
-            <img
-              class="shot"
-              loading="lazy"
-              src="/assets/splash/observations.jpg"
-              alt="The Observations page with Strength, Growth and Note entries."
-            />
-          </div>
-        </section>
-
-        <section id="dashboard" style="padding: 96px 0">
-          <div class="wrap feat">
-            <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
-              <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Class Dashboard</p>
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Know Who Needs You Today
-              </h2>
-              <ul class="ticks">
-                <li>
-                  Class average, its change since the last report, and how many students are Extending, Proficient and
-                  Developing.
-                </li>
-                <li>
-                  Needs Attention lists students below Proficient, not observed in 3+ weeks, with no strength recorded,
-                  or with missing work, with each student's next step. You set the rule.
-                </li>
-                <li>
-                  Proficiency for each curricular competency, and how many assessments cover each Core Competency.
-                </li>
-                <li>Missing and late work, and upcoming birthdays.</li>
-              </ul>
-            </div>
-            <img
-              class="shot"
-              loading="lazy"
-              src="/assets/splash/needs-attention.jpg"
-              alt="The Needs Attention list and proficiency by competency."
-            />
-          </div>
-        </section>
-
-        <section id="student" style="background: #ffffff; padding: 96px 0">
-          <div class="wrap feat flip">
-            <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
-              <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Student Page</p>
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                One Student, the Whole Picture
-              </h2>
-              <ul class="ticks">
-                <li>Proficiency for each competency, with every score from oldest to newest.</li>
-                <li>Select a competency to see where the student is now, the next step, and the work behind it.</li>
-                <li>Assessments, observations, a grade breakdown by category and the Learner Profile.</li>
-                <li>Ready for a parent meeting without extra prep.</li>
-              </ul>
-            </div>
-            <img
-              class="shot"
-              loading="lazy"
-              src="/assets/splash/student-page.jpg"
-              alt="A student page with every score for each competency."
-            />
-          </div>
-        </section>
-
-        <section id="phone" style="padding: 96px 0">
-          <div class="wrap feat tall">
-            <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
-              <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Phone App</p>
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Your Class in Your Pocket
-              </h2>
-              <ul class="ticks">
-                <li>Swipe through students to see each one's proficiency in every competency.</li>
-                <li>Observe adds a note in seconds while you walk the room.</li>
-                <li>Grade scores an assessment student by student, or Pair and Group work by group.</li>
-                <li>Works offline and syncs when you are back online.</li>
-              </ul>
-            </div>
-            <div style="display: flex; justify-content: center">
-              <div class="phone-solo" style="width: 100%; max-width: 280px">
-                <img
-                  class="phone"
-                  loading="lazy"
-                  src="/assets/splash/phone-app.jpg"
-                  alt="The phone app showing one student's proficiency in each competency."
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="more" style="background: #ffffff; padding: 96px 0">
-          <div class="wrap" style="display: flex; flex-direction: column; gap: 40px">
-            <div style="display: flex; flex-direction: column; gap: 14px; max-width: 720px">
-              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Also in FullVision
-              </h2>
-              <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
-                The setup and housekeeping that take time at the start of a year, a term or a unit.
+              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
+                Record a Strength, Growth, Concern or Note in seconds, tagged to a competency.
               </p>
             </div>
-            <div class="extras">
-              <div class="extra">
-                <h3>Roster Import</h3>
-                <p>Import a class list from a MyEd export or any spreadsheet. Columns are matched by their headers.</p>
-              </div>
-              <div class="extra">
-                <h3>Duplicate a Class</h3>
-                <p>Copy settings, categories and weights, the learning map and sentence starters to a new class.</p>
-              </div>
-              <div class="extra">
-                <h3>Copy Grading Setup</h3>
-                <p>Bring another block's categories and grading setup over in one step.</p>
-              </div>
-              <div class="extra">
-                <h3>Reporting Terms</h3>
-                <p>
-                  Up to six dated reporting periods per class, with presets for Surrey secondary schools. Each report
-                  shows the year to date.
-                </p>
-              </div>
-              <div class="extra">
-                <h3>Rubric Bank</h3>
-                <p>
-                  Keep your rubrics in one place and reuse them in other classes. Build criteria from your competencies.
-                </p>
-              </div>
-              <div class="extra">
-                <h3>Class Backup and Restore</h3>
-                <p>
-                  Download a class as a backup file, and restore it later as a new class with every score and comment.
-                </p>
-              </div>
-              <div class="extra">
-                <h3>Re-link Curriculum</h3>
-                <p>Move an older class onto the rebuilt curriculum. Nothing changes until you apply it.</p>
-              </div>
-              <div class="extra">
-                <h3>Counts As</h3>
-                <p>Choose what each proficiency counts as in percent, step by step, or start from BC letter bands.</p>
-              </div>
-              <div class="extra">
-                <h3>Late, Missing and Excused</h3>
-                <p>Mark work with a status, and see missing work on the dashboard and in reports.</p>
-              </div>
-              <div class="extra">
-                <h3>Withdraw and Re-Enrol</h3>
-                <p>Removing a student keeps their record on a Withdrawn list until you choose to delete it.</p>
-              </div>
-              <div class="extra">
-                <h3>Print Grades and Export</h3>
-                <p>Print a class grade sheet laid out like MyEd's class list, or export a CSV.</p>
-              </div>
-              <div class="extra">
-                <h3>Demo Mode</h3>
-                <p>Try every feature with a full sample class before you add your own students.</p>
-              </div>
+            <img class="shot" loading="lazy" src="/assets/splash/observations.jpg" alt="The Observations page." />
+          </div>
+        </section>
+
+        <section id="phone" style="background: #f5f5f7; padding: 88px 0">
+          <div class="wrap" style="display: flex; flex-direction: column; align-items: center; gap: 40px">
+            <div class="lede">
+              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
+                Your Class on Your Phone
+              </h2>
+              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
+                Grade and record observations from your phone, even offline.
+              </p>
+            </div>
+            <div class="phone-solo" style="width: 100%; max-width: 300px">
+              <img class="phone" loading="lazy" src="/assets/splash/phone-app.jpg" alt="FullVision on a phone." />
             </div>
           </div>
         </section>
 
-        <section id="privacy" style="padding: 96px 0">
-          <div class="wrap head2" style="align-items: start">
-            <div style="display: flex; flex-direction: column; gap: 18px">
-              <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">Privacy</p>
+        <section id="privacy" style="background: #ffffff; padding: 88px 0">
+          <div class="wrap" style="display: flex; flex-direction: column; align-items: center">
+            <div class="lede">
               <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
-                Student Records Stay With You
+                Student Records Stay in Canada
               </h2>
-              <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
-                Your class lists and marks are stored in Canada and are visible only to you. FullVision does not send
-                student work or names to an AI service.
+              <p style="margin: 0; font-size: 19px; line-height: 1.5; color: #48484d">
+                Class lists and marks are stored in Canada and seen only by you. Nothing is sent to an AI service.
               </p>
               <a href="/privacy.html" style="font-size: 17px; font-weight: 600; text-decoration: none"
                 >Read the Privacy Policy</a
               >
             </div>
-            <div class="cards2">
-              <div
-                style="
-                  background: #ffffff;
-                  border-radius: 14px;
-                  padding: 20px 22px;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 4px;
-                "
-              >
-                <span style="font-size: 16px; font-weight: 700">Hosted in Canada</span
-                ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
-                  >Data lives in a Canadian data centre, as BC's FOIPPA expects for student records.</span
-                >
-              </div>
-              <div
-                style="
-                  background: #ffffff;
-                  border-radius: 14px;
-                  padding: 20px 22px;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 4px;
-                "
-              >
-                <span style="font-size: 16px; font-weight: 700">Only You See Your Classes</span
-                ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
-                  >Each teacher's students and marks are private to their account.</span
-                >
-              </div>
-              <div
-                style="
-                  background: #ffffff;
-                  border-radius: 14px;
-                  padding: 20px 22px;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 4px;
-                "
-              >
-                <span style="font-size: 16px; font-weight: 700">No Student Logins</span
-                ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
-                  >Students answer with a code from a printed slip, not an account.</span
-                >
-              </div>
-              <div
-                style="
-                  background: #ffffff;
-                  border-radius: 14px;
-                  padding: 20px 22px;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 4px;
-                "
-              >
-                <span style="font-size: 16px; font-weight: 700">Private Error Reports</span
-                ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
-                  >When something breaks, the report FullVision sends leaves out names, emails, student numbers and
-                  anything typed.</span
-                >
-              </div>
-              <div
-                style="
-                  background: #ffffff;
-                  border-radius: 14px;
-                  padding: 20px 22px;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 4px;
-                "
-              >
-                <span style="font-size: 16px; font-weight: 700">Sign Out Clears the Device</span
-                ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
-                  >Sign Out signs out every open tab and deletes the class data and report copies saved on that
-                  computer.</span
-                >
-              </div>
-              <div
-                style="
-                  background: #ffffff;
-                  border-radius: 14px;
-                  padding: 20px 22px;
-                  display: flex;
-                  flex-direction: column;
-                  gap: 4px;
-                "
-              >
-                <span style="font-size: 16px; font-weight: 700">Password Reset</span
-                ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
-                  >A password reset email opens Choose a New Password on the sign-in page.</span
-                >
-              </div>
-            </div>
           </div>
         </section>
 
-        <section id="demo" style="padding: 0 0 96px">
+        <section id="demo" style="padding: 88px 0 96px">
           <div class="wrap">
             <div
               style="
@@ -1096,8 +523,7 @@
                 Try It With a Sample Class
               </h2>
               <p style="margin: 0; font-size: 18px; line-height: 1.5; color: #c7c7cc; max-width: 560px">
-                Demo Mode opens a Science 8 class with 27 sample students, assignments, observations and reports.
-                Nothing you change is saved.
+                A Science 8 class with 27 sample students. Nothing you change is saved.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; padding-top: 8px">
                 <a class="btn btn-solid" href="/login.html?demo=1" data-link="demo" style="background: #0071e3"

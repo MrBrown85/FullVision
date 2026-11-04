@@ -550,9 +550,19 @@
   min-width: 0;
   min-height: 26px;
 }
+/* Each column is half the list. A name and its note ("changed since Nov 2")
+   wider than that wrap the note, whole, onto a second line instead of
+   running into the next column. */
 .rp-pick-row .rp-pick-option {
   flex: 1;
   min-width: 0;
+}
+.rp-pick-option > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rp-pick-option .rp-help,
+.rp-pick-option .rp-tag {
   white-space: nowrap;
 }
 .rp-tag {

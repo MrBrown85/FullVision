@@ -2564,9 +2564,12 @@
   font-size: 12.5px;
   color: var(--text);
 }
-/* A choice fills the inspector's width, its options sharing it. */
+/* A choice fills the inspector's width, its options sharing it. Options too
+   long to share one line (Rows: As Graded, Each Folder, Each Competency)
+   wrap onto a second line inside the same track instead of overlapping. */
 .studio-bar .studio-field .seg {
   display: flex;
+  flex-wrap: wrap;
 }
 .studio-bar .studio-field .seg-btn {
   flex: 1 1 auto;
