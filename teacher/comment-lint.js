@@ -268,10 +268,28 @@ window.CommentLint = (function () {
     'marks are close',
     'this term',
     'keep going',
+    // A habit is a rating, not a count of days (the coordinator's review,
+    // Nov 4 2026): no frequency the gradebook does not hold. ("Each week"
+    // as a plan is fine: "I will check in each week"; as the opening of a
+    // sentence about the student it is banned below, FREQUENCY_OPENERS.)
+    'day after day',
+    'day to day',
+    'most days',
+    'every lesson',
+    'as a rule',
+    // The Ministry's descriptors, which read as pasted in.
+    'depth and complexity',
+    'consistently or most of the time',
+    'it is clear that',
+    'marks show that',
+    'top marks went to',
   ];
   var BANNED_RES = BANNED_PHRASES.map(function (w) {
     return { name: w, re: new RegExp('\\b' + w.replace(/ /g, '\\s+') + '\\b', 'i') };
-  });
+  }).concat([
+    { name: 'each class or week', re: /^(?:each|every) (?:week|day|class)\b/i },
+    { name: 'through the year', re: /^through the year,/i },
+  ]);
 
   // Words a student reads as shame (the acceptability checklist): one
   // appearing anywhere in a sentence about them.

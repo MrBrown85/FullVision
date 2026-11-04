@@ -177,9 +177,16 @@ describe('the languages Overall frames', () => {
         expect(pool, s.id).toContain(s.id);
         realised(s, ctx, f);
       });
-    const d = CommentBank.draft(ctx, { seed: 1 });
-    const ov = d.sentences.find(x => x.step === 'overall');
-    expect(ov && ov.text).toMatch(/in the language/i);
+    // The pipeline's climb frames that say the strength with it (vcl05,
+    // vcl06) fit, and say the skill in the language's words.
+    const both = COMMENT_BANK.sentences.filter(
+      x => x.v === 2 && /^vcl/.test(x.id) && (x.needs || []).includes('strengthAt'),
+    );
+    expect(both.length).toBeGreaterThan(0);
+    both.forEach(x => {
+      expect(CommentBank.fits(x, ctx), x.id).toBe(true);
+      expect(CommentBank.fill(x, ctx), x.id).toMatch(/in the language/i);
+    });
   });
 
   CommentBank.SKILLS.languages.forEach(row =>

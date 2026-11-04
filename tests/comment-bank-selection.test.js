@@ -270,7 +270,8 @@ describe('near-identical comments', () => {
 
   it('counts a sentence shared when any run of four words matches, each sentence once', () => {
     const a = 'Jack is earning a B this term. One. Two. Three. Four.';
-    const b = 'Ava is earning a B, which is very good work.';
+    // (Not a grade frame's wording, which nearIdentical sets aside.)
+    const b = 'Ava is earning a B and reads well in class.';
     expect(
       CommentBank.nearIdentical(
         [

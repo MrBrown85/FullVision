@@ -139,6 +139,31 @@ describe('the pipeline over the Demo class', () => {
     });
   });
 
+  // The coordinator's review of the twelve drafts (Nov 4 2026).
+  it('names the course once, and says what a level means at most once and not in every draft', () => {
+    let meant = 0;
+    drafts.forEach(({ d, f, name }) => {
+      expect(count(d.text, f.course), name + ': ' + d.text).toBeLessThanOrEqual(1);
+      const m = d.sentences.filter(s => /\bwhich means\b/.test(s.text)).length;
+      expect(m, name).toBeLessThanOrEqual(1);
+      if (m) meant++;
+    });
+    expect(meant).toBeGreaterThan(0);
+    expect(meant).toBeLessThan(drafts.length / 2);
+  });
+
+  it('never says the Ministry descriptor, a frequency, or a throat-clearing lead', () => {
+    const BAD =
+      /depth and complexity|consistently or most of the time|expected learning|it is clear that|marks show that|in class tasks|day after day|each week|most days|every lesson|as a rule|as a habit|in (his|her|their) work habits|top marks went to|on the lesson|task at hand/i;
+    drafts.forEach(({ d, name }) => expect(d.text, name).not.toMatch(BAD));
+  });
+
+  it('starts every grade frame with the student or the course', () => {
+    COMMENT_BANK.sentences
+      .filter(s => s.v === 2 && s.group === 'Grade')
+      .forEach(s => expect(s.text, s.id).toMatch(/^(\{He\}|\{His\}|\{course\}|In \{course\}|For \{course\})/));
+  });
+
   it('is repeatable: the same press gives the same draft', () => {
     const st = getStudents(cid)[1];
     const f = CommentBank.facts(cid, st, term);

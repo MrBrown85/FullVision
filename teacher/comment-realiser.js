@@ -207,7 +207,7 @@ window.CommentRealiser = (function () {
       else {
         var v = get ? get(k) : '';
         if (Array.isArray(v)) out.push.apply(out, v);
-        else out.push({ value: v == null ? '' : String(v), title: !!TITLE_SLOTS[k] });
+        else out.push({ value: v == null ? '' : String(v), title: !!TITLE_SLOTS[k], slot: k });
       }
     }
     if (from < src.length) out.push(src.slice(from));
@@ -229,7 +229,12 @@ window.CommentRealiser = (function () {
 
   /* One sentence's tokens as text. state.named: whether the comment has
      named the student yet; the first mention in the comment takes the name
-     and sets it. */
+     and sets it. state.course: whether the comment has named the course; a
+     comment names it once (the coordinator's review, Nov 4 2026), so a
+     later {course} goes with its "in" or "for" ("So far in Science 8,"
+     → "So far,"), after "his" or "the" alone ("his Science 8 grade" →
+     "his grade"), and at the start of a sentence becomes "His work" or
+     "The course". */
   function render(toks, who, state) {
     who = _who(who);
     state = state || { named: true };
@@ -240,10 +245,38 @@ window.CommentRealiser = (function () {
     var atStart = function () {
       return !/[A-Za-z0-9]/.test(out);
     };
-    (toks || []).forEach(function (tok) {
+    var skipComma = false;
+    (toks || []).forEach(function (tok, i) {
       if (typeof tok === 'string') {
+        if (skipComma) tok = tok.replace(/^,\s*/, '');
+        skipComma = false;
         out += tok;
         return;
+      }
+      skipComma = false;
+      if (tok.slot === 'course' && tok.value) {
+        if (state.course) {
+          var lead = out.match(/(^|\s)(in|In|for|For) $/);
+          if (lead) {
+            out = out.slice(0, out.length - lead[2].length - 1);
+            if (atStart()) skipComma = true;
+            return;
+          }
+          if (/(^|\s)(his|her|their|its|the|\S+’s) $/i.test(out)) return;
+          if (atStart()) {
+            var next = toks[i + 1];
+            if (typeof next === 'string' && /^ work\b/.test(next)) {
+              var useName = !state.named && who.name;
+              out += useName ? possessive(who.name) : cap(String(p.poss || THEY.poss));
+              if (useName) {
+                state.named = true;
+                state.since = -1;
+              }
+            } else out += 'The course';
+            return;
+          }
+        }
+        state.course = true;
       }
       if (tok.verb) {
         out += one ? tok.verb[0] : tok.verb[1];
@@ -292,6 +325,7 @@ window.CommentRealiser = (function () {
   function finish(text) {
     var t = String(text || '')
       .replace(/\s+/g, ' ')
+      .replace(/ ([,.;:])(?=\s|$)/g, '$1')
       .trim();
     t = t.replace(/^([“‘"(]*)([a-z])/, function (m, q, c) {
       return q + c.toUpperCase();

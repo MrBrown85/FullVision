@@ -147,8 +147,17 @@ describe('where the student is now', () => {
   });
 
   it('fails verify() once the level word changes', () => {
+    // A strength said at its level (strengthAt: "can consistently …");
+    // a frame that names only the skill ("One thing she does well is …")
+    // stays true when the level rises.
     const f = withWork([3.1, 2.4, 2]);
-    const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1, quiet: true });
+    let d = null;
+    for (let seed = 1; seed <= 24 && !d; seed++) {
+      const x = CommentBank.draft(CommentBank.context(f, {}), { seed, quiet: true });
+      const i = x.sentences.indexOf(overallOf(x));
+      if (i >= 0 && x.provenance[i].values.strengthAt) d = x;
+    }
+    expect(d).toBeTruthy();
     const o = overallOf(d);
     const r = CommentBank.verify(d, withWork([3.8, 2.4, 2]), {});
     expect(r.replaced.map(x => x.sentenceId)).toContain(o.id);

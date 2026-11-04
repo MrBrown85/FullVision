@@ -340,7 +340,9 @@ describe('Strong Habits frames (the IE comment)', () => {
     expect(ctxOf(named).habitDoes).toMatch(/^(come to class ready to work|start the task as soon as class begins)$/);
     const d = CommentBank.draft(ctxOf(named), { seed: 2 });
     const s = d.sentences.find(x => x.step === 'strongHabits');
-    expect(s.text).toMatch(/\bthey (come to class ready to work|start the task as soon as class begins)\.$/i);
+    expect(s.text).toMatch(
+      /\bthey (?:consistently |reliably )?(come to class ready to work|start the task as soon as class begins)\.$/i,
+    );
     expect(s.text).not.toMatch(/Gabriel|\bhe\b/);
   });
 

@@ -81,13 +81,16 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has its 1702 sentences in four parts, each with a unique id: live, or retired with its text', () => {
+  it('has its 1713 sentences in four parts, each with a unique id: live, or retired with its text', () => {
     // Nov 4 2026: the pipeline's frames (v: 2) were added, and the sentences
     // they replaced moved to COMMENT_BANK.retired with their text, so a
     // saved comment that holds one keeps it. None is lost.
     const old = COMMENT_BANK.sentences.filter(s => !s.v);
-    const nov4 = COMMENT_BANK.retired.filter(s => s.retired === '2026-11-04');
-    expect(old.length + nov4.length).toBe(1702);
+    // The older sentences live or retired on Nov 4, and the eleven Habit
+    // Ratings cells reworded without a frequency the same day (hl121-hl131,
+    // their first wordings retired): 1702 + 11.
+    const nov4 = COMMENT_BANK.retired.filter(s => s.retired === '2026-11-04' && !s.v);
+    expect(old.length + nov4.length).toBe(1713);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
     const ids = COMMENT_BANK.sentences.map(s => s.id).concat(COMMENT_BANK.retired.map(s => s.id));
     expect(new Set(ids).size).toBe(ids.length);
@@ -438,7 +441,8 @@ describe('fill takes values as written', () => {
 
   it('gives nothing for a slot the context does not own', () => {
     const s = { id: 'x', text: '{name} and {constructor}.' };
-    expect(CommentBank.fill(s, fullContext(P.he))).toBe('Noor and .');
+    // (The realiser closes the space before the period.)
+    expect(CommentBank.fill(s, fullContext(P.he))).toBe('Noor and.');
   });
 
   it('fills the pronoun in a habit phrase when the context is built', () => {
@@ -650,18 +654,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // five Habit Ratings frames for Completes Work at Consistently.
   // The counts since Nov 4 2026: the pipeline's frames fit beside the older
   // ones that stay in Browse.
-  it('knows the Demo class is Science from its name, and offers Cece 126 sentences (25, 42, 20, 39)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 124 sentences (21, 44, 20, 39)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([25, 42, 20, 39]);
-    expect(CommentBank.fitCount(ctx)).toBe(126);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 44, 20, 39]);
+    expect(CommentBank.fitCount(ctx)).toBe(124);
   });
 
-  it('offers Jasper 127 (25, 42, 21, 39), by the name he goes by', () => {
+  it('offers Jasper 125 (21, 44, 21, 39), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([25, 42, 21, 39]);
-    expect(CommentBank.fitCount(ctx)).toBe(127);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 44, 21, 39]);
+    expect(CommentBank.fitCount(ctx)).toBe(125);
     expect(ctx.name).toBe('Jas');
     // Nothing fell from Extending since Report 1's year to date (it fell
     // four times inside Term 2's own trend, which Generate no longer
