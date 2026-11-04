@@ -50,7 +50,7 @@ describe('the reworded frames', () => {
       'Liam’s work meets what Science 9 expects, which is Proficient on the BC proficiency scale.',
     );
     expect(fill('gr57')).toBe(
-      'This term Liam shows a complete understanding of the course, so their proficiency is Proficient.',
+      'Liam’s work this term earns Proficient on the proficiency scale for its complete understanding of the course.',
     );
     expect(fill('gr58')).toBe(
       'The BC proficiency scale calls Liam’s work in Science 9 Proficient, which means a complete understanding.',
