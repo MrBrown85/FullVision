@@ -58,7 +58,9 @@ describe('the year to date, with the last report as a marker', () => {
     const f = facts();
     expect(f.comps).toHaveLength(27);
     expect(f.comps.filter(c => c.since)).toHaveLength(17);
-    expect(f.lastReport).toEqual({ label: 'Term 1', endsOn: '2026-07-14' });
+    // Demo Mode's dates move with today, so Term 1's last day is read, not written in.
+    const term1 = getReportingTerms(CID).find(t => t.ordinal === 1);
+    expect(f.lastReport).toEqual({ label: 'Term 1', endsOn: term1.ends_on });
   });
 
   it('reads the year’s levels and pieces, the level at the last report, and the term’s own scores', () => {
@@ -75,7 +77,8 @@ describe('the year to date, with the last report as a marker', () => {
   it('is the facts’ one list of competencies', () => {
     const f = facts();
     expect(f.comps).toEqual(CommentBank.compsOf(CID, cece()));
-    expect(f.comps.every(c => c.termScores.every(s => s.d >= '2026-07-15'))).toBe(true);
+    const term2 = getReportingTerms(CID).find(t => t.ordinal === 2);
+    expect(f.comps.every(c => c.termScores.every(s => s.d >= term2.starts_on))).toBe(true);
   });
 
   it('counts the record over the year to date', () => {

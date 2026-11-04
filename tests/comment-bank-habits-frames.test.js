@@ -174,7 +174,8 @@ describe('Not Handed In frames', () => {
   });
 });
 
-describe('Attendance frames', () => {
+// Each case drafts the comment many times: slow on CI's machines.
+describe('Attendance frames', { timeout: 20000 }, () => {
   const att = (absent, late) => facts({ absent, late });
 
   it('absences only: h60 (its late half left out) and h62-h66, the classes missed, singular for one', () => {
@@ -221,7 +222,8 @@ describe('Attendance frames', () => {
   });
 });
 
-describe('Work Habits frames', () => {
+// Each case drafts the comment many times: slow on CI's machines.
+describe('Work Habits frames', { timeout: 20000 }, () => {
   const hab = habits => facts({ habits });
 
   it('excellent: hs01, hs02, hs17, hs18, hs20, hs21, never a habit name', () => {
