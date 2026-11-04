@@ -789,6 +789,16 @@ body.offline-active #app-dock {
 #sb-show-label:empty {
   display: none;
 }
+/* Which reporting term the grades beside the names cover (ui.js), on a
+   page with no term picker of its own. */
+.sb-term-note {
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+body:has(.term-select) .sb-term-note {
+  display: none;
+}
 /* A menu in the flex row would sit at the row's start; put it under the
    buttons, the Show menu at the right. */
 .sb-sort-menu {
@@ -2816,7 +2826,13 @@ body.offline-active #app-dock {
   display: flex;
   align-items: center;
   margin-left: auto;
-  margin-right: 8px;
+  /* The padding gives a red dot a target to click (try again); the margin
+     shrinks by the same amount, so the dot stays where it was. */
+  padding: 6px;
+  margin-right: 2px;
+}
+.tb-sync:has(.tb-sync-dot.error) {
+  cursor: pointer;
 }
 .tb-sync-dot {
   width: 8px;

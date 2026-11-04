@@ -129,6 +129,8 @@ window.PageObservations = (function () {
   async function switchCourse(cid) {
     activeCourse = cid;
     if (!(await switchActiveCourse(cid))) return;
+    // The roster's grades follow the class's saved term, as on the Gradebook.
+    if (typeof activateSavedTerm === 'function') activateSavedTerm(cid);
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid);
     refreshStudentCache();
     resetFilters();
@@ -1351,6 +1353,7 @@ window.PageObservations = (function () {
     // Show sidebar
     document.getElementById('sidebar-mount').style.display = '';
     document.getElementById('page-layout').classList.remove('sidebar-hidden');
+    if (typeof activateSavedTerm === 'function') activateSavedTerm(activeCourse);
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse);
     initSidebarToggle();
 
