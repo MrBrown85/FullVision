@@ -927,7 +927,7 @@ function obsTagColor(key) {
 const WIDGET_REGISTRY = [
   { key: 'hero', label: 'Name & Proficiency', defaultOn: true },
   { key: 'sectionBars', label: 'Section Progress', defaultOn: true },
-  { key: 'completion', label: 'Completion', defaultOn: true },
+  { key: 'completion', label: 'Evidence Coverage', defaultOn: true },
   { key: 'missingWork', label: 'Missing Work', defaultOn: false },
   { key: 'growth', label: 'Growth Journey', defaultOn: true },
   { key: 'obsSnippet', label: 'Latest Observation', defaultOn: true },

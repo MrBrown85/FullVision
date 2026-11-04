@@ -337,8 +337,10 @@ describe('MCardWidgets.render completion', () => {
     const html = MCardWidgets.render('completion', STUDENT, CID, DATA);
     expect(html).toContain('m-wdg-tile');
     expect(html).toContain('m-wdg-arc');
-    expect(html).toContain('85');
-    expect(html).toContain('Complete');
+    // Step 4 group 3 #37: a % named as desktop names it.
+    expect(html).toContain('>85%</text>');
+    expect(html).toContain('Evidence Coverage');
+    expect(html).not.toContain('>Complete<');
   });
 
   it('uses green color for >= 80%', () => {

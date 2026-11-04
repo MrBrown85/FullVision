@@ -185,16 +185,19 @@ window.MCardWidgets = (function () {
   };
 
   /* ── completion (arc ring metric tile) ───────────────────────── */
+  // Evidence coverage, as the desktop dashboard and student cards call it:
+  // a % with that name, not a bare number over "Complete".
   _renderers.completion = function (st, cid) {
     var pct = getCompletionPct(cid, st.id);
     var color = pct >= 80 ? 'var(--score-3)' : pct >= 50 ? 'var(--score-2)' : 'var(--score-1)';
-    var r = 16,
-      cx = 19,
-      cy = 19,
+    // Room inside the ring for "100%".
+    var r = 19,
+      cx = 22,
+      cy = 22,
       circ = 2 * Math.PI * r;
     var offset = circ * (1 - pct / 100);
     var svg =
-      '<svg class="m-wdg-arc" width="38" height="38" viewBox="0 0 38 38">' +
+      '<svg class="m-wdg-arc" width="44" height="44" viewBox="0 0 44 44">' +
       '<circle cx="' +
       cx +
       '" cy="' +
@@ -228,9 +231,9 @@ window.MCardWidgets = (function () {
       color +
       '">' +
       Math.round(pct) +
-      '</text>' +
+      '%</text>' +
       '</svg>';
-    return '<div class="m-wdg-tile">' + svg + '<div class="m-wdg-tile-label">Complete</div></div>';
+    return '<div class="m-wdg-tile">' + svg + '<div class="m-wdg-tile-label">Evidence Coverage</div></div>';
   };
 
   /* ── missingWork (alert metric tile) ─────────────────────────── */
