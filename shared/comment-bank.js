@@ -130,8 +130,9 @@
    Reworded 2026-11-03 (bug sweep step 4, group 3 #71: "read awkwardly"):
    the proficiency frames that opened on the bare word ("Proficient, {his}
    proficiency this term, means …"; "Proficient, on the BC proficiency
-   scale, means …; that is where …") now say "Proficient describes {his}
-   work …" and "The BC proficiency scale calls {his} work …"; gr55 no
+   scale, means …; that is where …") now say "{His} proficiency this
+   term is Proficient, which means …" and "The BC proficiency scale calls
+   {his} work …"; gr55 no
    longer dangles ("Proficient in {course} …, {his} work meets …"); the
    six Habit Ratings frames at Sometimes that ended "… is the thing to do"
    say "the goal is …"; hl013 says "make a plan to finish the others on
@@ -2509,7 +2510,7 @@ var COMMENT_BANK = {
       id: 'gr47',
       part: 'now',
       group: 'Grade',
-      text: 'Extending describes {his} work this term, which shows a sophisticated understanding of the course.',
+      text: '{His} proficiency this term is Extending, which means a sophisticated understanding of the course.',
       when: { grade: 'proficiency', standing: 'Extending' },
       standing: 'Extending',
       claims: ['grade'],
@@ -2609,7 +2610,7 @@ var COMMENT_BANK = {
       id: 'gr57',
       part: 'now',
       group: 'Grade',
-      text: 'Proficient describes {his} work this term, which shows a complete understanding of the course.',
+      text: '{His} proficiency this term is Proficient, which means a complete understanding of the course.',
       when: { grade: 'proficiency', standing: 'Proficient' },
       standing: 'Proficient',
       claims: ['grade'],
@@ -2709,7 +2710,7 @@ var COMMENT_BANK = {
       id: 'gr67',
       part: 'now',
       group: 'Grade',
-      text: 'Developing describes {his} work this term, which shows a partial understanding of the course.',
+      text: '{His} proficiency this term is Developing, which means a partial understanding of the course.',
       when: { grade: 'proficiency', standing: 'Developing' },
       standing: 'Developing',
       claims: ['grade'],
@@ -2809,7 +2810,7 @@ var COMMENT_BANK = {
       id: 'gr77',
       part: 'now',
       group: 'Grade',
-      text: 'Emerging describes {his} work this term, which shows an initial understanding of the course.',
+      text: '{His} proficiency this term is Emerging, which means an initial understanding of the course.',
       when: { grade: 'proficiency', standing: 'Emerging' },
       standing: 'Emerging',
       claims: ['grade'],
