@@ -306,6 +306,55 @@ describe('Questionnaires tab', () => {
     }
   });
 
+  it('answers sent since the last read show when the tab is opened again', async () => {
+    var stubV2 = window.v2;
+    var realNow = Date.now;
+    var answered = [];
+    try {
+      globalThis.isDemoMode = () => false;
+      Questionnaires._reset();
+      var row = {
+        id: '11111111-1111-1111-1111-111111111111',
+        course_id: CID,
+        kind: 'about_me',
+        title: 'About Me',
+        template_id: 'about-me',
+        is_on: true,
+        opens_on: '2000-01-01',
+        closes_on: '2999-01-01',
+        questions: [],
+      };
+      var reads = 0;
+      window.v2 = Object.assign({}, stubV2, {
+        listCourseQuestionnaires: () => {
+          reads++;
+          return Promise.resolve({ data: [Object.assign({}, row, { answered: answered.slice() })] });
+        },
+        listQuestionnaireTemplates: () => Promise.resolve({ data: null }),
+      });
+      await Questionnaires.load(CID);
+      DashClassManager.renderClassManager = () => mount();
+      mount();
+      expect(root.querySelector('[data-card="about-me"] .sq-facts').textContent).toContain('0 of 3');
+      expect(reads).toBe(1);
+
+      // Maya answers; a teacher opening the tab again within 15 s reads nothing new.
+      answered = ['e1'];
+      mount();
+      expect(reads).toBe(1);
+      // Later, opening it reads again and shows her answer.
+      var t = realNow() + 20000;
+      Date.now = () => t;
+      mount();
+      await tick();
+      expect(reads).toBe(2);
+      expect(root.querySelector('[data-card="about-me"] .sq-facts').textContent).toContain('1 of 3');
+    } finally {
+      Date.now = realNow;
+      window.v2 = stubV2;
+    }
+  });
+
   it('refuses dates that close before they open', async () => {
     var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
     mount();

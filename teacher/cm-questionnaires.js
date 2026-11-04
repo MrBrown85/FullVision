@@ -13,6 +13,7 @@ var CmQuestionnaires = (function () {
   'use strict';
 
   var PERIOD_NAMES = { 1: 'November', 2: 'March', 3: 'June' };
+  var FRESH_MS = 15000;
   var _open = {}; // qid -> questions shown
   var _dates = {}; // qid -> the date editor's { opens, closes } while it is open
   var _grade = {}; // cid -> grade picked for a class with no single grade
@@ -520,6 +521,19 @@ var CmQuestionnaires = (function () {
       });
       return '<div class="cm-section"><div class="cm-hint">Loading questionnaires…</div></div>';
     }
+    // Answers sent since the last read show when the tab opens again,
+    // redrawn only when who has answered changed.
+    var answeredSig = function () {
+      return Questionnaires.list(cid)
+        .map(function (x) {
+          return x.id + ':' + (x.answered || []).length + ':' + !!x.is_on;
+        })
+        .join('|');
+    };
+    var was = answeredSig();
+    Questionnaires.refreshIfStale(cid, FRESH_MS, function (loadedCid) {
+      if (loadedCid === cid && answeredSig() !== was) _rerender();
+    });
     var current = Questionnaires.periodFor(new Date());
     var reflections = Questionnaires.list(cid).filter(function (x) {
       return x.kind === 'core_reflection';

@@ -15,6 +15,7 @@ var StudentVoice = (function () {
 
   var _resp = {}; // cid -> {questionnaire id: {enrollment id: [response]}}
   var _loading = {};
+  var _at = {}; // cid -> when the answers were last read
 
   function _demo() {
     return typeof isDemoMode === 'function' && isDemoMode();
@@ -59,10 +60,21 @@ var StudentVoice = (function () {
         : Promise.resolve(),
     ]).then(function () {
       delete _loading[cid];
+      _at[cid] = Date.now();
       if (!Object.prototype.hasOwnProperty.call(_resp, cid)) _resp[cid] = {};
       if (onChange) onChange(cid);
     });
     return _loading[cid];
+  }
+
+  /* Reads the answers again when they are older than `ms`, so a student's
+     answer sent since shows when the teacher opens the page again. */
+  function refreshIfStale(cid, ms, onChange) {
+    if (!cid || _demo() || _loading[cid] || !loaded(cid)) return false;
+    if (_at[cid] && Date.now() - _at[cid] < ms) return false;
+    // load() reads the questionnaires again too, with their answered lists.
+    load(cid, onChange);
+    return true;
   }
 
   function _has(v) {
@@ -273,8 +285,17 @@ var StudentVoice = (function () {
   function _reset() {
     _resp = {};
     _loading = {};
+    _at = {};
   }
 
-  return { load: load, loaded: loaded, entries: entries, profile: profile, coreSelf: coreSelf, _reset: _reset };
+  return {
+    load: load,
+    loaded: loaded,
+    refreshIfStale: refreshIfStale,
+    entries: entries,
+    profile: profile,
+    coreSelf: coreSelf,
+    _reset: _reset,
+  };
 })();
 if (typeof window !== 'undefined') window.StudentVoice = StudentVoice;

@@ -2318,13 +2318,34 @@ window.PageStudent = (function () {
   /* The student's answers as the Learner Profile reads them, once the class's
      questionnaires and responses are in (a redraw follows when they arrive). */
   var _EMPTY_VOICE = { about: null, checkin: null, reflections: [], last: null };
+  var VOICE_FRESH_MS = 15000;
   function _voiceModel(cid) {
     if (typeof StudentVoice === 'undefined') return _EMPTY_VOICE;
+    var redraw = function (loadedCid) {
+      if (loadedCid === activeCourse) render();
+    };
     if (!StudentVoice.loaded(cid)) {
-      StudentVoice.load(cid, function (loadedCid) {
-        if (loadedCid === activeCourse) render();
-      });
+      StudentVoice.load(cid, redraw);
       if (!StudentVoice.loaded(cid)) return _EMPTY_VOICE;
+    } else if (StudentVoice.refreshIfStale) {
+      // Answers sent since the last read show when the page opens again:
+      // redrawn only when this student's answers changed, and never under
+      // a box being typed in.
+      var sid = studentId;
+      var sig = function () {
+        return StudentVoice.entries(cid, sid)
+          .map(function (e) {
+            return e.rid + '@' + e.at;
+          })
+          .join('|');
+      };
+      var was = sig();
+      StudentVoice.refreshIfStale(cid, VOICE_FRESH_MS, function (loadedCid) {
+        if (loadedCid !== activeCourse || sid !== studentId || sig() === was) return;
+        var a = document.activeElement;
+        if (a && /^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName)) return;
+        render();
+      });
     }
     return StudentVoice.profile(StudentVoice.entries(cid, studentId));
   }

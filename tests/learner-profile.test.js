@@ -157,6 +157,44 @@ describe('StudentVoice', () => {
   });
 });
 
+describe('StudentVoice reads answers again', () => {
+  it('when the copy is over the age given, and calls back once it has them', async () => {
+    const stubV2 = window.v2;
+    const stubDemo = globalThis.isDemoMode;
+    const realNow = Date.now;
+    let reads = 0;
+    try {
+      globalThis.isDemoMode = () => false;
+      Questionnaires._reset();
+      StudentVoice._reset();
+      window.v2 = Object.assign({}, stubV2, {
+        listCourseQuestionnaires: () => Promise.resolve({ data: [] }),
+        listQuestionnaireTemplates: () => Promise.resolve({ data: null }),
+        listCourseResponses: () => {
+          reads++;
+          return Promise.resolve({ data: {} });
+        },
+      });
+      await StudentVoice.load(CID);
+      expect(reads).toBe(1);
+      expect(StudentVoice.refreshIfStale(CID, 15000, () => {})).toBe(false);
+      const t = realNow() + 20000;
+      Date.now = () => t;
+      let called = 0;
+      expect(StudentVoice.refreshIfStale(CID, 15000, () => called++)).toBe(true);
+      await new Promise(r => setTimeout(r, 10));
+      expect(reads).toBe(2);
+      expect(called).toBe(1);
+    } finally {
+      Date.now = realNow;
+      window.v2 = stubV2;
+      globalThis.isDemoMode = stubDemo;
+      Questionnaires._reset();
+      StudentVoice._reset();
+    }
+  });
+});
+
 describe('LearnerProfile', () => {
   let originals;
   let doc;
