@@ -2690,12 +2690,34 @@ window.ReportQuestionnaire = (function () {
   function _requiredRows(cid, student, f) {
     var path = CommentBank.reportPath(f);
     if (!path) return '';
+    var next = _previewSteps(cid, student, f);
     return CommentBank.requiredParts(_bankContext(cid, student, f))
       .map(function (p) {
+        // The sentence Generate Comment will write for the part, so the row
+        // and the comment agree once it is pressed (Nov 3 sweep).
+        if (p.text && next[p.key]) p = Object.assign({}, p, { text: next[p.key] });
         var html = _requiredRowHtml(cid, student, f, p, path);
         return p.key === 'ieDeadline' ? html + _supportRowHtml(cid, student, f) : html;
       })
       .join('');
+  }
+
+  /* The sentence per step of the draft the next Generate Comment press
+     writes (its seed, classmates and last term, as tqGenerate drafts):
+     what a row shows before the comment has that sentence. */
+  function _previewSteps(cid, student, f) {
+    var termId = getTermId();
+    var d = CommentBank.draft(_bankContext(cid, student, f), {
+      seed: CommentBank.seedFor(student.id + '|' + termId) + ((_generated[student.id] || 0) + 1),
+      comments: _classmateComments(cid, student.id, termId),
+      exclude: lastTermIds(cid, student.id, termId),
+      quiet: true,
+    });
+    var out = {};
+    ((d && d.sentences) || []).forEach(function (x) {
+      if (x.step && !out[x.step]) out[x.step] = x.text;
+    });
+    return out;
   }
 
   /* ── The Sentences card (plan PR 11b) ────────────────────── */
@@ -4278,7 +4300,7 @@ window.ReportQuestionnaire = (function () {
         i,
         handle,
       );
-    if (row.step === 'notHandedIn') return _missingRowHtml(cid, f, handle, i);
+    if (row.step === 'notHandedIn') return _missingRowHtml(cid, f, handle, i, row.text);
     if (row.step === 'support') return _supportRowHtml(cid, student, f, handle, i);
     if (row.step === 'languageGoals') return _langRowHtml(cid, student, f, handle, i);
     if (row.step === 'closer') return _closingRowHtml(cid, handle, i);
@@ -6318,10 +6340,12 @@ window.ReportQuestionnaire = (function () {
     return n + ' of ' + total + ' · check that ' + which + ' really missing before you approve';
   }
 
-  function _missingRowHtml(cid, f, handle, i) {
+  function _missingRowHtml(cid, f, handle, i, text) {
     var course = _courseName(cid);
     var late = String((COURSES[cid] && COURSES[cid].lateWorkPolicy) || '').trim();
-    var sentence = CommentBank.notHandedInSentence(f.notHandedIn);
+    // The sentence in the comment (or the one Generate will write), never a
+    // second wording of the same fact.
+    var sentence = text || CommentBank.notHandedInSentence(f.notHandedIn);
     var line;
     if (_lineEdit === 'late') {
       line = `<div class="qn-line-edit">
@@ -6570,7 +6594,8 @@ window.ReportQuestionnaire = (function () {
   function _classRowsHtml(cid, student, f) {
     var ie = CommentBank.reportPath(f) === 'ie';
     var rows = '';
-    if (!ie && f.notHandedIn && f.notHandedIn.count > 0) rows += _missingRowHtml(cid, f);
+    if (!ie && f.notHandedIn && f.notHandedIn.count > 0)
+      rows += _missingRowHtml(cid, f, '', undefined, _previewSteps(cid, student, f).notHandedIn);
     if (CommentBank.reportPath(f) === 'language_goals') rows += _langRowHtml(cid, student, f);
     if (!ie) rows += _supportRowHtml(cid, student, f);
     return rows + _closingRowHtml(cid);

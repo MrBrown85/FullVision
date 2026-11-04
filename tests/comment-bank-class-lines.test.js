@@ -449,10 +449,31 @@ describe('the class settings (report_config) and the review screen', () => {
     COURSES[CID].lateWorkPolicy = 'Late work is accepted until December 4.';
     const html = open();
     expect(html).toContain('<span class="qn-req-label">Not Handed In</span>');
-    expect(html).toContain('Two assignments are not handed in: “Task 9” and “Task 10.”');
+    expect(html).toMatch(/<span class="qn-req-text">[^<]*“Task 9”[^<]*“Task 10\.?”/);
     expect(html).toContain('>Late work is accepted until December 4.</button>');
     expect(html).toContain('2 of 10 · check that both are really missing before you approve');
     expect(open(AVA.id)).not.toContain('Not Handed In');
+  });
+
+  it('shows the Not Handed In sentence the comment has, and before Generate the one it will write (Step 4 group 2 #52)', () => {
+    seed(['a9', 'a8']);
+    const st = getStudents(CID).find(s => s.id === GAB.id);
+    const f = CommentBank.facts(CID, st, TERM);
+    const fixed = CommentBank.notHandedInSentence(f.notHandedIn);
+    // Every frame of the step, until one words the fact differently.
+    let d;
+    for (let seedN = 1; seedN < 60; seedN++) {
+      d = CommentBank.draft(CommentBank.context(f, {}), { seed: seedN, quiet: true });
+      const x = d.sentences.find(y => y.step === 'notHandedIn');
+      if (x && x.text !== fixed) break;
+    }
+    const said = d.sentences.find(y => y.step === 'notHandedIn').text;
+    expect(said).not.toBe(fixed);
+    upsertTermRating(CID, GAB.id, TERM, { narrative: d.text });
+    const html = open();
+    const row = html.slice(html.indexOf('id="tq-row-missing"'));
+    expect(row.slice(0, row.indexOf('</div>\n    </div>'))).toContain(said);
+    expect(row.slice(0, 600)).not.toContain(fixed);
   });
 
   it('saves the closing sentence for the class; approved comments keep the old one', () => {
