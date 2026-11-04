@@ -83,16 +83,6 @@ window.PageReports = (function () {
     if (activeTab === 'progress') renderReportPreview();
   }
 
-  /* ── View: Screen or Photocopy ──────────────────────────────────
-     Photocopy shows the sheets as the copier prints them: black levels,
-     no tints. A view, not a setting; it is not remembered. */
-  function _syncInkButtons() {
-    document.querySelectorAll('#report-ink .seg-btn').forEach(function (b) {
-      var on = (b.dataset.ink === 'black') === (reportView === 'photocopy');
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-checked', on ? 'true' : 'false');
-    });
-  }
   function _syncSidesButtons() {
     var n = _formOf().sides.length > 1 ? '2' : '1';
     document.querySelectorAll('#report-sides .seg-btn').forEach(function (b) {
@@ -100,14 +90,6 @@ window.PageReports = (function () {
       b.classList.toggle('active', on);
       b.setAttribute('aria-checked', on ? 'true' : 'false');
     });
-  }
-
-  var reportView = 'screen';
-  function setView(view) {
-    reportView = view === 'photocopy' ? 'photocopy' : 'screen';
-    var preview = document.getElementById('rb-preview');
-    if (preview) preview.classList.toggle('report-photocopy', reportView === 'photocopy');
-    _syncInkButtons();
   }
 
   /* ── Tab switching ───────────────────────────────────────────── */
@@ -132,10 +114,7 @@ window.PageReports = (function () {
     if (tbSave) tbSave.style.display = tab === 'progress' ? '' : 'none';
     const copySel = document.getElementById('report-copy');
     if (copySel && tab !== 'progress') copySel.style.display = 'none';
-    if (tab === 'progress') {
-      _syncInkButtons();
-      _syncSidesButtons();
-    }
+    if (tab === 'progress') _syncSidesButtons();
     _syncProgressToolbar();
     const tbRail = document.getElementById('tb-rail-btn');
     if (tbRail) tbRail.style.display = tab === 'progress' ? '' : 'none';
@@ -481,7 +460,6 @@ window.PageReports = (function () {
     _syncPrintButton();
     var preview = document.getElementById('rb-preview');
     if (preview) {
-      preview.classList.toggle('report-photocopy', reportView === 'photocopy');
       preview.classList.toggle('report-fitmap', studioView === 'all');
       preview.classList.toggle('studio-all', studioView === 'all');
       _applyStudioZoom(preview);
@@ -736,7 +714,6 @@ window.PageReports = (function () {
     preview.classList.add('report-sheets-on');
     preview.classList.toggle('report-fitmap', studioView === 'all');
     preview.classList.toggle('studio-all', studioView === 'all');
-    preview.classList.toggle('report-photocopy', reportView === 'photocopy');
     ReportSheets.setPageStyle(rec.paper || 'letter');
     _applyStudioZoom(preview);
     _syncPrintButton();
@@ -870,7 +847,7 @@ window.PageReports = (function () {
       ' \u00B7 ' +
       (reportPaper === 'legal' ? 'Legal' : 'Letter') +
       ' \u00B7 ' +
-      (grade ? 'Black' : reportView === 'photocopy' ? 'Black' : 'Colour') +
+      'Black' +
       '</span>';
     html += '<span class="issue-k">Sheets</span><span>' + studentsLine + '</span>';
     html +=
@@ -1218,7 +1195,7 @@ window.PageReports = (function () {
     renderStudioPanels();
     renderReportPreview();
   }
-  /* Save as Template belongs to Build Your Own (so do Sides and Ink:
+  /* Save as Template belongs to Build Your Own (so does Sides:
      _printSettingsHtml). */
   function _syncProgressToolbar() {
     var build = activeTab === 'progress' && !_isGrade();
@@ -1227,7 +1204,7 @@ window.PageReports = (function () {
     var rail = document.getElementById('tb-rail-btn');
     if (rail) rail.textContent = _isGrade() ? 'Options' : 'Blocks';
   }
-  /* Paper, and for Build Your Own Sides and Ink, over the canvas beside
+  /* Paper, and for Build Your Own Sides, over the canvas beside
      One Student and Everyone. */
   // html-safe: literal labels, ids and option values only
   function _printSettingsHtml() {
@@ -1275,29 +1252,17 @@ window.PageReports = (function () {
       reportPaper,
     );
     if (!_isGrade()) {
-      html +=
-        seg(
-          'Sides',
-          'report-sides',
-          'setSides',
-          'sides',
-          [
-            ['1', 'Front Only'],
-            ['2', 'Front and Back'],
-          ],
-          _formOf().sides.length > 1 ? '2' : '1',
-        ) +
-        seg(
-          'Ink',
-          'report-ink',
-          'setInk',
-          'ink',
-          [
-            ['black', 'Black'],
-            ['colour', 'Colour'],
-          ],
-          reportView === 'photocopy' ? 'black' : 'colour',
-        );
+      html += seg(
+        'Sides',
+        'report-sides',
+        'setSides',
+        'sides',
+        [
+          ['1', 'Front Only'],
+          ['2', 'Front and Back'],
+        ],
+        _formOf().sides.length > 1 ? '2' : '1',
+      );
     }
     return html + '<span class="tb-divider" aria-hidden="true">\u2502</span>';
   }
@@ -1997,10 +1962,6 @@ window.PageReports = (function () {
         setPaper(el.dataset.paper);
         _blockSizes = null;
         renderStudioPanels();
-      },
-      setInk: function () {
-        setView(el.dataset.ink === 'black' ? 'photocopy' : 'screen');
-        _syncInkButtons();
       },
       setSides: function () {
         var n = el.dataset.sides === '1' ? 1 : 2;

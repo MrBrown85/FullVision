@@ -235,7 +235,7 @@ test.describe('Page Studio', () => {
     await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toHaveText(/\w+ \w+/);
     await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
     await expect(page.locator('.studio-head')).toHaveText(
-      /^1 sheet for all 27 studentsPaperLetterLegalSidesFront OnlyFront and BackInkBlackColour│One StudentEveryone$/,
+      /^1 sheet for all 27 studentsPaperLetterLegalSidesFront OnlyFront and Back│One StudentEveryone$/,
     );
     await expect(page.locator('.studio-page-add')).toHaveText('+ Page');
     // Sides, not Pages, over the canvas.
@@ -707,15 +707,14 @@ test.describe('Page Studio', () => {
     expect(Math.abs(measured - shown)).toBeLessThanOrEqual(2);
   });
 
-  test('Black ink turns the levels black', async ({ page }) => {
+  // Group 3 #62: reports print black and white, so the screen shows the
+  // levels black as they print, and there is no Ink choice.
+  test('the levels on screen are black, as they print', async ({ page }) => {
     await openStudio(page);
     const level = page.locator('#rb-preview .report-prof td.report-prof-n').first();
-    const before = await level.evaluate(el => getComputedStyle(el).color);
-    await page.getByRole('radio', { name: 'Black' }).click();
-    await expect(page.locator('#rb-preview')).toHaveClass(/report-photocopy/);
     expect(await level.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
-    await page.getByRole('radio', { name: 'Colour' }).click();
-    expect(await level.evaluate(el => getComputedStyle(el).color)).toBe(before);
+    await expect(page.locator('#report-ink')).toHaveCount(0);
+    await expect(page.locator('.studio-head')).not.toContainText('Ink');
   });
 
   test('Print Reports saves a copy of every report and lists it as Printed', async ({ page }) => {

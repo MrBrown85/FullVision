@@ -198,7 +198,7 @@ test('Term Questionnaire fits a phone', async ({ page }) => {
 });
 
 // Group 2 #46: Progress Reports fits a phone: the sheet starts inside the
-// canvas, and Paper, Sides, Black / Colour and One Student / Everyone are
+// canvas, and Paper, Sides and One Student / Everyone are
 // all on screen.
 test('Progress Reports fits a phone', async ({ page }) => {
   await openDesktop(page, '/reports?tab=progress');
@@ -213,7 +213,7 @@ test('Progress Reports fits a phone', async ({ page }) => {
   // On a narrow screen the Report switch is in the Options panel.
   await page.locator('#tb-rail-btn').click();
   await page.locator('[data-action="progressMode"][data-mode="build"]').click();
-  await expect(page.locator('.studio-tools [data-action="setInk"]').first()).toBeVisible();
+  await expect(page.locator('.studio-tools [data-action="setSides"]').first()).toBeVisible();
   const off = await page.evaluate(() =>
     [...document.querySelectorAll('.studio-tools button')]
       .filter(b => {

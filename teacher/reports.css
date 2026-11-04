@@ -1676,60 +1676,61 @@
   page-break-inside: avoid !important;
 }
 
-/* The photocopy view: the print block's black-and-white rules applied on
-   screen when the teacher chooses Photocopy. */
-.report-photocopy [data-prof],
-.report-photocopy .report-section-chip-name,
-.report-photocopy .report-outcome-ev,
-.report-photocopy .report-legend-word {
+/* Reports always print black and white (they are photocopied), so the
+   sheets on screen carry the print block's black-and-white rules too: the
+   preview shows what prints. */
+.report-sheet [data-prof],
+.report-sheet .report-section-chip-name,
+.report-sheet .report-outcome-ev,
+.report-sheet .report-legend-word {
   color: #000 !important;
 }
-.report-photocopy [data-prof-bg] {
+.report-sheet [data-prof-bg] {
   background: transparent !important;
 }
-.report-photocopy .report-level-pill {
+.report-sheet .report-level-pill {
   border: 1px solid #000 !important;
   border-radius: 4px !important;
 }
-.report-photocopy .report-overall-main,
-.report-photocopy .class-summary-table th {
+.report-sheet .report-overall-main,
+.report-sheet .class-summary-table th {
   background: #000 !important;
   color: #fff !important;
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
 }
-.report-photocopy .report-overall-label {
+.report-sheet .report-overall-label {
   color: #ddd !important;
 }
-.report-photocopy .report-outcome-bar-fill,
-.report-photocopy .report-next-step-bullet,
-.report-photocopy [data-prof-bg][style*='height:100%'] {
+.report-sheet .report-outcome-bar-fill,
+.report-sheet .report-next-step-bullet,
+.report-sheet [data-prof-bg][style*='height:100%'] {
   background: #000 !important;
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
 }
-.report-photocopy .report-outcome-bar {
+.report-sheet .report-outcome-bar {
   background: #e2e2e2 !important;
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
 }
-.report-photocopy .report-next-steps {
+.report-sheet .report-next-steps {
   background: #fff !important;
   border-color: #bbb !important;
 }
-.report-photocopy .report-next-steps-title {
+.report-sheet .report-next-steps-title {
   color: #000 !important;
 }
-.report-photocopy [data-prof-stroke='1'] {
+.report-sheet [data-prof-stroke='1'] {
   stroke: #1a1a1a !important;
 }
-.report-photocopy [data-prof-stroke='2'] {
+.report-sheet [data-prof-stroke='2'] {
   stroke: #595959 !important;
 }
-.report-photocopy [data-prof-stroke='3'] {
+.report-sheet [data-prof-stroke='3'] {
   stroke: #8f8f8f !important;
 }
-.report-photocopy [data-prof-stroke='4'] {
+.report-sheet [data-prof-stroke='4'] {
   stroke: #c8c8c8 !important;
 }
 

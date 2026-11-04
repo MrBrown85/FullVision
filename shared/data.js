@@ -4784,7 +4784,8 @@ function _courseLoadFailed(cid, error) {
   var message = (error && (error.message || error.details)) || String(error || 'unknown error');
   // A class deleted on another device is removed when the class list loads,
   // not here: an unauthenticated call also reads as "not found".
-  console.warn('get_gradebook failed for ' + cid + '; keeping the saved copy:', error);
+  // The class bundle (get_class_bundle) or, where it is missing, get_gradebook.
+  console.warn('The class load failed for ' + cid + '; keeping the saved copy:', error);
   _loadError[cid] = { at: Date.now(), message: message };
   if (_cache.students[cid] === undefined) _loadCourseFromLS(cid);
   // The dot must never be what breaks a load. A class loaded in the

@@ -201,6 +201,35 @@
     return /fetch|network|offline/i.test(error.message || '');
   }
 
+  /* An auth error that says nothing about the session: the network, the
+     Auth server's own trouble (5xx, 429, a reply that isn't JSON). The
+     session may be fine; ask again. Any other error is the server saying
+     the session is gone. */
+  function _isPassingAuthError(error) {
+    if (_isNetworkAuthError(error)) return true;
+    if (error.name === 'AuthUnknownError') return true;
+    return error.status === 429 || error.status >= 500;
+  }
+
+  /* requireAuth's waits between session checks that could not tell (another
+     tab holding the auth lock, a network blip), and the most any one check
+     or the whole series may take: supabase-js retries a token refresh on its
+     own for up to about 25 s with no network, and the page waits on this. */
+  const _AUTH_RETRY_WAITS_MS = [500, 1000, 2000];
+  const _AUTH_CHECK_MS = 4000;
+  const _AUTH_TOTAL_MS = 8000;
+  // Resolves with the call's result, or { timedOut: true } after ms.
+  function _within(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve({ timedOut: true });
+        }, ms);
+      }),
+    ]);
+  }
+
   function _removeSavedClassData() {
     try {
       const keys = [];
@@ -412,22 +441,60 @@
     // cannot fake a live session. getSession() (the old fast path) reads
     // straight from storage and is editable; getUser() re-validates the
     // JWT signature server-side.
+    //
+    // Only a real signed-out state goes to Sign In: the server saying the
+    // session is gone, or no session saved at all. A check that throws or
+    // can't reach the server (another tab holding the auth lock, a network
+    // blip) waits and asks again; if it still can't tell, the page stays
+    // and nothing is signed out. Sync trouble shows on the sync dot. (A
+    // token refresh the Auth server refuses, even with a 429 or 5xx, is a
+    // sign-out supabase-js makes itself: the next check then finds no
+    // session and goes to Sign In, as before.)
     if (!_authCheckPromise) {
       _authCheckPromise = (async function () {
+        const waits = _AUTH_RETRY_WAITS_MS;
+        const started = Date.now();
+        for (let attempt = 0; ; attempt++) {
+          let passing = null;
+          try {
+            const res = await _within(sb.auth.getUser(), _AUTH_CHECK_MS);
+            if (res.timedOut) throw new Error('The session check timed out');
+            const { data, error } = res;
+            if (!error && data && data.user) return;
+            if (!error || !_isPassingAuthError(error)) {
+              // The session is gone (expired or revoked), not just unreachable:
+              // remove saved class data so it isn't left on a shared computer.
+              // The outbox (fv-*) always stays.
+              _removeSavedClassData();
+              window.location.href = '/login.html';
+              return new Promise(function () {});
+            }
+            passing = error;
+          } catch (e) {
+            passing = e;
+          }
+          // Offline, or out of time: asking again can't tell either.
+          const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+          if (attempt >= waits.length || offline || Date.now() - started > _AUTH_TOTAL_MS) {
+            console.warn('Session check could not tell after retries:', passing);
+            break;
+          }
+          await new Promise(function (resolve) {
+            setTimeout(resolve, waits[attempt]);
+          });
+        }
+        // Still unsure. A browser with no saved session is signed out. A
+        // session that is saved but can't be refreshed right now (offline the
+        // next morning: getSession returns no session with an error) stays,
+        // as does a read that times out.
         try {
-          const { data, error } = await sb.auth.getUser();
-          if (error || !data || !data.user) {
-            // The session is gone (expired or revoked), not just unreachable:
-            // remove saved class data so it isn't left on a shared computer.
-            // A network failure keeps it, and the outbox (fv-*) always stays.
-            if (!_isNetworkAuthError(error)) _removeSavedClassData();
+          const res = await _within(sb.auth.getSession(), _AUTH_CHECK_MS);
+          if (!res.timedOut && res.data && !res.data.session && !res.error) {
             window.location.href = '/login.html';
             return new Promise(function () {});
           }
         } catch (e) {
-          console.warn('Session check failed:', e);
-          window.location.href = '/login.html';
-          return new Promise(function () {});
+          /* can't read it either: stay */
         }
       })();
     }
