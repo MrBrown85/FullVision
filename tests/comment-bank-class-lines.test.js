@@ -476,6 +476,25 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(row.slice(0, 600)).not.toContain(fixed);
   });
 
+  it('shows Completes Work from the record on the grid until the teacher rates it (Step 4 group 3 #65)', () => {
+    seed(['a9', 'a8']);
+    const st = getStudents(CID).find(s => s.id === GAB.id);
+    const auto = CommentBank.effectiveHabits({}, CommentBank.facts(CID, st, TERM).record).completes;
+    expect(auto).toBeGreaterThan(0);
+    const label = CommentBank.SCALE[auto - 1];
+    let html = open();
+    expect(html).toContain('Completes Work<span class="qn-habit-src">From the Record</span>');
+    expect(html).toContain(
+      'aria-checked="true" tabindex="0" class="qn-radio on from-record" data-action="tqRate" data-habit="completes" data-value="' + auto + '"',
+    );
+    expect(html).toContain('aria-label="Completes Work: ' + label + ', from the record"');
+    // Rated by the teacher: the grid shows their rating, not the record.
+    upsertTermRating(CID, GAB.id, TERM, { habits: { completes: 4 } });
+    html = open();
+    expect(html).not.toContain('From the Record');
+    expect(html).toContain('aria-checked="true" tabindex="0" class="qn-radio on" data-action="tqRate" data-habit="completes" data-value="4"');
+  });
+
   it('saves the closing sentence for the class; approved comments keep the old one', () => {
     seed();
     saveReportConfig(CID, { commentSettings: { closing: 'Extra help is at lunch on Tuesdays in [Room].' } });

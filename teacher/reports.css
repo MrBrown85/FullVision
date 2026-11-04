@@ -3923,6 +3923,12 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-habit-name {
   font-size: var(--text-sm);
 }
+/* Completes Work as the assignment record has it, until the teacher picks. */
+.qn-habit-src {
+  display: block;
+  font-size: 12px;
+  color: var(--text-2);
+}
 .qn-habit-cell {
   display: flex;
   justify-content: center;

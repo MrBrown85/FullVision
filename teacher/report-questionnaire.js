@@ -952,8 +952,13 @@ window.ReportQuestionnaire = (function () {
     var head = CommentBank.SCALE.map(function (label) {
       return `<span title="${esc(SCALE_TIPS[label] || label)}">${esc(label)}</span>`;
     }).join('');
+    // Completes Work starts from the assignment record (Term Questionnaire
+    // 14) until the teacher picks a rating: the grid shows that rating, as
+    // the comment uses it, marked From the Record.
+    var auto = CommentBank.effectiveHabits(stored, f.record, f);
     var rows = CommentBank.HABITS.map(function (h) {
-      var v = stored[h.key];
+      var fromRecord = stored[h.key] == null && auto[h.key] != null;
+      var v = fromRecord ? auto[h.key] : stored[h.key];
       var name = HABIT_LABELS[h.key] || h.name;
       // One Tab stop per habit: the picked rating, else the first; the
       // arrow keys move between the ratings (_arrowRadio).
@@ -961,10 +966,11 @@ window.ReportQuestionnaire = (function () {
       var opts = CommentBank.SCALE.map(function (label, i) {
         var val = i + 1;
         var on = v === val;
-        return `<span class="qn-habit-cell"><button type="button" role="radio" aria-checked="${on}" tabindex="${val === stop ? 0 : -1}" class="qn-radio${on ? ' on' : ''}" data-action="tqRate" data-habit="${h.key}" data-value="${val}" aria-label="${esc(name + ': ' + label)}" title="${esc(SCALE_TIPS[label] || label)}"></button></span>`;
+        var tip = (SCALE_TIPS[label] || label) + (on && fromRecord ? ' From the assignment record; pick a rating to change it.' : '');
+        return `<span class="qn-habit-cell"><button type="button" role="radio" aria-checked="${on}" tabindex="${val === stop ? 0 : -1}" class="qn-radio${on ? ' on' : ''}${on && fromRecord ? ' from-record' : ''}" data-action="tqRate" data-habit="${h.key}" data-value="${val}" aria-label="${esc(name + ': ' + label + (on && fromRecord ? ', from the record' : ''))}" title="${esc(tip)}"></button></span>`;
       }).join('');
       return `<div class="qn-habit-row" role="radiogroup" aria-label="${esc(name)}">
-        <span class="qn-habit-name" title="${esc(h.hint)}">${esc(name)}</span>${opts}
+        <span class="qn-habit-name" title="${esc(h.hint)}">${esc(name)}${fromRecord ? '<span class="qn-habit-src">From the Record</span>' : ''}</span>${opts}
       </div>`;
     }).join('');
     return `<div class="qn-card qn-habits">
@@ -988,9 +994,15 @@ window.ReportQuestionnaire = (function () {
     document.querySelectorAll('.qn-radio[data-habit="' + key + '"]').forEach(function (b) {
       var on = Number(b.dataset.value) === Number(value);
       b.classList.toggle('on', on);
+      b.classList.remove('from-record');
       b.setAttribute('aria-checked', String(on));
+      b.setAttribute('aria-label', String(b.getAttribute('aria-label') || '').replace(/, from the record$/, ''));
       b.tabIndex = on ? 0 : -1;
     });
+    var src = document.querySelector('.qn-habit-row [data-habit="' + key + '"]');
+    var nameCell = src && src.closest && src.closest('.qn-habit-row');
+    var tag = nameCell && nameCell.querySelector('.qn-habit-src');
+    if (tag) tag.remove();
     var rated = document.getElementById('tq-rated');
     if (rated) rated.textContent = _ratedCount(habits) + ' of 6 rated';
     var chip = document.getElementById('tq-empty-rated');
