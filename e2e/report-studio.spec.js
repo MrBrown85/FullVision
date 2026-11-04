@@ -731,10 +731,20 @@ test.describe('Page Studio', () => {
     await expect(dialog.getByRole('radio', { name: /Preferred Name/ })).toBeChecked();
     await dialog.getByRole('radio', { name: 'First Name', exact: true }).check();
     await expect(jas.first()).toHaveText('Jasper Gill');
+    // Cancel and Escape change nothing: the class keeps the name it had
+    // (step 4 group 2 #6).
     await dialog.locator('[data-issue="cancel"]').click();
     await expect(dialog).toHaveCount(0);
+    await expect(jas.first()).toHaveText('Jas Gill');
     await page.getByRole('button', { name: 'Print Reports' }).click();
-    await expect(dialog.getByRole('radio', { name: 'First Name', exact: true })).toBeChecked();
+    await expect(dialog.getByRole('radio', { name: /Preferred Name/ })).toBeChecked();
+    await dialog.getByRole('radio', { name: 'First Name', exact: true }).check();
+    await expect(jas.first()).toHaveText('Jasper Gill');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(jas.first()).toHaveText('Jas Gill');
+    await page.getByRole('button', { name: 'Print Reports' }).click();
+    await expect(dialog.getByRole('radio', { name: /Preferred Name/ })).toBeChecked();
   });
 
   test('a long comment typed on the questionnaire continues on the printed report, nothing is cut', async ({

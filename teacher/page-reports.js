@@ -954,7 +954,15 @@ window.PageReports = (function () {
     }
     if (!_lastSummary || !Object.keys(_lastSummary.perStudent || {}).length) return;
     var c = _issueCounts();
-    _issueState = { counts: c, trigger: document.activeElement };
+    // The Name choice redraws the reports while the dialog is open; Cancel
+    // and Escape put back what the class had (step 4 group 2 #6).
+    _issueState = {
+      counts: c,
+      trigger: document.activeElement,
+      nameChanged: false,
+      gradeBefore: reportConfig.gradeReport ? JSON.parse(JSON.stringify(reportConfig.gradeReport)) : null,
+      formBefore: reportConfig.form ? JSON.parse(JSON.stringify(reportConfig.form)) : null,
+    };
     var overlay = document.createElement('div');
     overlay.id = ISSUE_OVERLAY_ID;
     overlay.className = 'confirm-overlay issue-overlay';
@@ -991,7 +999,10 @@ window.PageReports = (function () {
       if (!t || t.name !== 'issue-name') return;
       if (_isGrade()) _setGradeOption('name', t.value === 'first' ? 'first' : 'preferred');
       else _setForm(ReportSheets.setOption(_formOf(), 'header', 'name', t.value));
-      if (_issueState) _issueState.counts = _issueCounts();
+      if (_issueState) {
+        _issueState.nameChanged = true;
+        _issueState.counts = _issueCounts();
+      }
     });
     _issueState.keyHandler = function (e) {
       if (e.key === 'Escape') closeIssueDialog();
@@ -1002,9 +1013,23 @@ window.PageReports = (function () {
     if (first && first.focus) first.focus();
   }
 
+  /* keepEveryone: the dialog closes to print, so the canvas stays on
+     Everyone and the Name chosen in it stays. Any other close is a cancel. */
   function closeIssueDialog(keepEveryone) {
     var overlay = document.getElementById(ISSUE_OVERLAY_ID);
     if (overlay && overlay.remove) overlay.remove();
+    if (_issueState && _issueState.nameChanged && !keepEveryone) {
+      _issueState.nameChanged = false;
+      if (_isGrade()) {
+        reportConfig.gradeReport = _issueState.gradeBefore;
+        _saveReportConfig();
+        _classFitKey = '';
+        renderStudioPanels();
+        renderReportPreview();
+      } else {
+        _setForm(_issueState.formBefore || ReportSheets.formFor(null));
+      }
+    }
     if (_restoreOneAfterPrint && !keepEveryone) {
       _restoreOneAfterPrint = false;
       studioView = 'one';
