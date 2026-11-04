@@ -139,6 +139,11 @@ body.fv-switching-course::after {
   fill: var(--active);
   stroke: var(--active);
 }
+/* The marks inside a filled icon (Grade's check, Observe's lines) stay
+   visible on the fill. */
+.m-tab-item.m-tab-active .m-tab-icon .m-tab-mark {
+  stroke: var(--surface);
+}
 .m-tab-label {
   font-size: 12px;
   font-weight: 500;

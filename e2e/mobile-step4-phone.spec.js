@@ -136,7 +136,9 @@ test('sheet filters are not narrowed by Recent', async ({ page }) => {
     const cid = getActiveCourse();
     const cat = JSON.parse(localStorage.getItem('gb-grade-filters-' + cid)).category[0];
     const want = getAssessments(cid).filter(a => (a.categoryId || '__none') === cat).length;
-    const shown = [...document.querySelectorAll('#m-grade-list .m-cell')].filter(c => c.style.display !== 'none').length;
+    const shown = [...document.querySelectorAll('#m-grade-list .m-cell')].filter(
+      c => c.style.display !== 'none',
+    ).length;
     return { want, shown };
   });
   expect(counts.shown).toBe(counts.want);
@@ -183,4 +185,21 @@ test('All Students keeps the IEP badge in view on a long name', async ({ page })
   await expect(badge).toBeVisible();
   const [b, c] = await Promise.all([badge.boundingBox(), cell.locator('.m-cell-body').boundingBox()]);
   expect(b.x + b.width).toBeLessThanOrEqual(c.x + c.width + 0.5);
+});
+
+// Group 3 #81: the open tab's icon keeps its marks (Grade's check, Observe's
+// lines) instead of turning into a plain blue shape.
+test('the open tab icon keeps its check mark', async ({ page }) => {
+  await openPhone(page);
+  for (const tab of ['grade', 'observe']) {
+    await page.locator('.m-tab-item[data-tab="' + tab + '"]').click();
+    const colours = await page.evaluate(t => {
+      const icon = document.querySelector('.m-tab-item[data-tab="' + t + '"] .m-tab-icon');
+      const shape = icon.querySelector('circle, rect');
+      const mark = icon.querySelector('.m-tab-mark');
+      return { fill: getComputedStyle(shape).fill, mark: mark && getComputedStyle(mark).stroke };
+    }, tab);
+    expect(colours.mark).toBeTruthy();
+    expect(colours.mark).not.toBe(colours.fill);
+  }
 });
