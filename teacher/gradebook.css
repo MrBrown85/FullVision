@@ -1030,6 +1030,38 @@ th.gb-group-alt {
 .gb-grid-colhead .gb-scores-assess-meta {
   font-size: 11px;
 }
+/* The title and a ⋯ that shows the title opens the column's menu. */
+.gb-colhead-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+.gb-colhead-name-row .gb-scores-assess-name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.gb-colhead-menu-mark {
+  flex: none;
+  display: inline-block;
+  color: var(--text-3);
+  line-height: 1;
+  /* Turned back upright against the title's slant, so it points down like
+     any menu's arrow and doesn't read as a cut-off title's "…". */
+  transform: rotate(45deg);
+}
+.gb-grid-colhead-label:hover .gb-colhead-menu-mark,
+.gb-grid-colhead.gb-col-menu .gb-colhead-menu-mark {
+  color: var(--active);
+}
+.gb-grid-colhead-label:focus {
+  outline: none;
+}
+.gb-grid-colhead-label:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 /* Subtle color fill behind angled header — inherits section color via inline style */
 .gb-grid-colhead-stripe {
   height: 4px;

@@ -464,6 +464,11 @@ window.PageGradebook = (function () {
     _scrollKey = scrollKey;
 
     var refocus = _cellKey(document.activeElement);
+    var refocusHead =
+      document.activeElement && document.activeElement.closest
+        ? document.activeElement.closest('#gb-colheads .gb-grid-colhead[data-aid]')
+        : null;
+    var refocusHeadAid = refocusHead ? refocusHead.dataset.aid : null;
     // html-safe: names, titles and category/section/module names are escaped; colours go through cssColor; grades come from calc.js.
     document.getElementById('main').innerHTML = html;
     applyStickyLeft();
@@ -476,6 +481,12 @@ window.PageGradebook = (function () {
     var again = refocus && _findCell(refocus);
     if (again) _selectCell(again);
     else _initRovingCell();
+    var headAgain =
+      refocusHeadAid &&
+      document.querySelector(
+        '#gb-colheads .gb-grid-colhead[data-aid="' + CSS.escape(refocusHeadAid) + '"] .gb-grid-colhead-label',
+      );
+    if (headAgain) _focusColhead(headAgain);
   }
 
   /* ── Selecting a cell ──────────────────────────────────────
@@ -1597,6 +1608,13 @@ window.PageGradebook = (function () {
 
     // Q2: Column headers (top-right, scrolls horizontally)
     html += '<div class="gb-grid-colheads" id="gb-colheads"><div class="gb-grid-colheads-inner">';
+    // The titles are one Tab stop: ← → move along them, and Return, Space
+    // or Shift+F10 opens the column's menu (_colheadKeys).
+    var headStop = sortedAssess.some(function (a) {
+      return a.id === _colheadStopAid;
+    })
+      ? _colheadStopAid
+      : sortedAssess[0] && sortedAssess[0].id;
     sortedAssess.forEach(function (a) {
       var categoryId = _getAssessmentCategoryId(a);
       var categoryName = _getCategoryName(cid, categoryId);
@@ -1625,12 +1643,16 @@ window.PageGradebook = (function () {
         '<div class="gb-grid-colhead-fill" style="background:' +
         fillColor +
         '"></div>' +
-        '<div class="gb-grid-colhead-label" title="' +
+        '<div class="gb-grid-colhead-label" role="button" aria-haspopup="menu" tabindex="' +
+        (a.id === headStop ? '0' : '-1') +
+        '" aria-label="' +
+        esc(a.title) +
+        ', column menu" title="' +
         esc(a.title) +
         '">' +
-        '<span class="gb-scores-assess-name">' +
+        '<span class="gb-colhead-name-row"><span class="gb-scores-assess-name">' +
         esc(a.title) +
-        '</span>' +
+        '</span><span class="gb-colhead-menu-mark" aria-hidden="true">\u25BE</span></span>' +
         '<span class="gb-scores-assess-meta">' +
         shortDate +
         maxPts +
@@ -2954,7 +2976,7 @@ window.PageGradebook = (function () {
       cell.classList.add('gb-col-menu');
     });
     _placeContextMenu(menu, e.clientX, e.clientY);
-    _wireMenu(menu, header);
+    _wireMenu(menu, header.querySelector('.gb-grid-colhead-label') || header);
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-ctx]');
       if (!item) return;
@@ -3421,6 +3443,7 @@ window.PageGradebook = (function () {
       _restoreUndo(undo);
       return;
     }
+    if (_colheadKeys(e)) return;
     // Keys on a competency header move along the headers (_handleHeaderKeys), not the grid.
     if (e.target.closest && e.target.closest('.gb-grid-tag-header')) return;
     // → on a student's name goes to their first score; ← on a first score
@@ -3740,6 +3763,49 @@ window.PageGradebook = (function () {
   /* ← and → move between the competency headers, carrying the one Tab stop
      with the focus, so Tab reaches the score grid after a single header. */
   // The header that holds the Tab stop, kept across redraws.
+  /* Keys on a Scores column title: ← → Home End move along the titles,
+     Return, Space, Shift+F10 or the Menu key open the column's menu. True
+     when the key was used. */
+  var _colheadStopAid = null;
+  function _colheadKeys(e) {
+    var label = e.target.closest && e.target.closest('#gb-colheads .gb-grid-colhead-label');
+    if (!label) return false;
+    var head = label.closest('.gb-grid-colhead');
+    if (e.key === 'Enter' || e.key === ' ' || (e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
+      e.preventDefault();
+      var r = label.getBoundingClientRect();
+      showHeaderContextMenu({ clientX: r.left + r.width / 2, clientY: r.bottom }, head);
+      return true;
+    }
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) < 0) return false;
+    var labels = Array.prototype.slice.call(document.querySelectorAll('#gb-colheads .gb-grid-colhead-label'));
+    var at = labels.indexOf(label);
+    var to = e.key === 'Home' ? 0 : e.key === 'End' ? labels.length - 1 : e.key === 'ArrowRight' ? at + 1 : at - 1;
+    e.preventDefault();
+    var next = labels[to];
+    if (!next || next === label) return true;
+    _focusColhead(next);
+    return true;
+  }
+  function _focusColhead(label) {
+    document.querySelectorAll('#gb-colheads .gb-grid-colhead-label[tabindex="0"]').forEach(function (el) {
+      if (el !== label) el.tabIndex = -1;
+    });
+    label.tabIndex = 0;
+    var head = label.closest('.gb-grid-colhead');
+    _colheadStopAid = head ? head.dataset.aid : null;
+    label.focus({ preventScroll: true });
+    // The header row follows the grid's scroll, so the grid scrolls to it.
+    var data = document.getElementById('gb-data');
+    var colheads = document.getElementById('gb-colheads');
+    if (data && colheads && head) {
+      var box = colheads.getBoundingClientRect();
+      var r = head.getBoundingClientRect();
+      if (r.right > box.right) data.scrollLeft += r.right - box.right + 8;
+      else if (r.left < box.left) data.scrollLeft -= box.left - r.left + 8;
+    }
+  }
+
   var _headerStop = 0;
   function _handleHeaderKeys(e) {
     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) < 0) return;
@@ -3825,6 +3891,9 @@ window.PageGradebook = (function () {
     // double-click time so a double-click (Score Mode) doesn't also open it.
     if (_inSlantedHeads(e.target)) {
       var hit = _slantedColAt(e.clientX, e.clientY);
+      // A click on a title is that title's column.
+      var onLabel = e.target.closest('.gb-grid-colhead-label');
+      if (onLabel) hit = { el: onLabel.closest('.gb-grid-colhead') };
       clearTimeout(_headClickTimer);
       if (hit && e.detail <= 1) {
         var at = { clientX: e.clientX, clientY: e.clientY };
@@ -3985,7 +4054,8 @@ window.PageGradebook = (function () {
       // A slanted title acts on the column it leans along, not the box under the pointer.
       if (_inSlantedHeads(e.target)) {
         var hit = _slantedColAt(e.clientX, e.clientY);
-        header = hit ? hit.el : null;
+        var onLabel = e.target.closest('.gb-grid-colhead-label');
+        header = onLabel ? onLabel.closest('.gb-grid-colhead') : hit ? hit.el : null;
         if (!header) e.preventDefault();
       }
       if (header) {
@@ -4000,7 +4070,8 @@ window.PageGradebook = (function () {
       var el = e.target.closest('[data-action-dblclick]');
       if (_inSlantedHeads(e.target)) {
         var hit = _slantedColAt(e.clientX, e.clientY);
-        el = hit ? hit.el : null;
+        var onLabel = e.target.closest('.gb-grid-colhead-label');
+        el = onLabel ? onLabel.closest('.gb-grid-colhead') : hit ? hit.el : null;
       }
       if (!el) return;
       e.preventDefault();
