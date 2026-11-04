@@ -50,7 +50,7 @@ describe('the reworded frames', () => {
       'Liam’s work meets what Science 9 expects, which is Proficient on the BC proficiency scale.',
     );
     expect(fill('gr57')).toBe(
-      'Liam’s proficiency this term is Proficient, which means a complete understanding of the course.',
+      'This term Liam shows a complete understanding of the course, so their proficiency is Proficient.',
     );
     expect(fill('gr58')).toBe(
       'The BC proficiency scale calls Liam’s work in Science 9 Proficient, which means a complete understanding.',
@@ -59,7 +59,7 @@ describe('the reworded frames', () => {
       'Liam completes some tasks by the due date, and they can make a plan to finish the others on time.',
     );
     expect(byId('hl094').text).toBe(
-      'In some pieces {his} revisions follow the feedback, and the goal is to use it on every piece.',
+      'In some pieces {his} revisions follow the feedback; next comes using feedback on every piece.',
     );
     ['gr47', 'gr48', 'gr55', 'gr57', 'gr58', 'gr67', 'gr68', 'gr77', 'gr78'].forEach(id =>
       expect(byId(id), id).toMatchObject({ group: 'Grade', claims: ['grade'], when: { grade: 'proficiency' } }),
