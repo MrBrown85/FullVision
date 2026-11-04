@@ -654,6 +654,7 @@ window.PageStudent = (function () {
       ctx.sections.filter(function (sec) {
         return !!(goals[sec.id] || '').trim();
       }).length;
+    var lastWords = _latest(voice.last, _compReflections(cid, ctx.sections).last);
     out.profile = _newReply(voice)
       ? {
           stat: 'New Reply',
@@ -661,7 +662,7 @@ window.PageStudent = (function () {
         }
       : {
           stat: _plural(goalCount, 'Goal', 'Goals'),
-          sub: voice.last ? 'Last answer ' + LearnerProfile.day(voice.last) : 'No answers yet',
+          sub: lastWords ? 'Last answer ' + LearnerProfile.day(lastWords) : 'No answers yet',
         };
     return out;
   }
@@ -2233,6 +2234,26 @@ window.PageStudent = (function () {
     );
   }
 
+  /* The competency reflections in the student's words (+ Reflection): how
+     many, and when the newest was saved. They count as reflections and
+     answers wherever the Learner Profile counts them. */
+  function _compReflections(cid, sections) {
+    var mine = getReflections(cid)[studentId] || {};
+    var out = { count: 0, last: null };
+    (sections || []).forEach(function (sec) {
+      var r = mine[sec.id];
+      if (!r || !(r.text || r.confidence)) return;
+      out.count++;
+      out.last = _latest(out.last, r.date);
+    });
+    return out;
+  }
+  function _latest(a, b) {
+    if (!a) return b || null;
+    if (!b) return a;
+    return String(a) > String(b) ? a : b;
+  }
+
   /* The student's answers as the Learner Profile reads them, once the class's
      questionnaires and responses are in (a redraw follows when they arrive). */
   var _EMPTY_VOICE = { about: null, checkin: null, reflections: [], last: null };
@@ -2549,6 +2570,7 @@ window.PageStudent = (function () {
       pronouns: ctx.student.pronouns || '',
       courseName: course.name || 'Course',
       newReply: _newReply(model),
+      compRefl: _compReflections(cid, ctx.sections),
       aboutOn:
         typeof Questionnaires !== 'undefined' &&
         Questionnaires.list(cid).some(function (q) {

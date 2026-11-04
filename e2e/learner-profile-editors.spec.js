@@ -93,3 +93,17 @@ test('Remove Goal takes a goal away with an Undo that puts it back', async ({ pa
   await expect.poll(goal).toBe('');
   await expect(page.locator('#undo-toast')).toContainText('Goal removed');
 });
+
+test('a saved reflection counts on the ID card, in Reflections and on the tab', async ({ page }) => {
+  await openStudent(page, 'Liam');
+  await expect(page.locator('#stu-tab-profile .stu-tab-sub')).toHaveText('No answers yet');
+  const row = page.locator('.gl-row').first();
+  await row.getByRole('button', { name: '+ Reflection' }).click();
+  await page.keyboard.type('I can plan a fair test now.');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.id-jump a').nth(2)).not.toContainText('Not yet');
+  await expect(page.locator('#lp-refl .lp-none')).toHaveText(
+    'No questionnaire reflections from Liam yet. 1 competency reflection is under Competency Goals.',
+  );
+  await expect(page.locator('#stu-tab-profile .stu-tab-sub')).toContainText('Last answer');
+});

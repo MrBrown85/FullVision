@@ -199,6 +199,25 @@ describe('LearnerProfile', () => {
     expect(box.querySelector('.id-private-foot').textContent).toContain('Only you see this.');
   });
 
+  it('a competency reflection the teacher saved counts as a reflection on the ID card and in Reflections', () => {
+    const o = opts();
+    o.model = { about: null, checkin: null, reflections: [], last: null };
+    o.compRefl = { count: 1, last: '2026-11-03T15:00:00.000Z' };
+    const card = mount(LearnerProfile.idCardHtml(o));
+    expect([...card.querySelectorAll('.id-jump a')][2].textContent).toBe('Reflections Nov 3');
+    const refl = mount(LearnerProfile.reflectionsHtml(o));
+    expect(refl.querySelector('.lp-none').textContent).toBe(
+      'No questionnaire reflections from Harjot yet. 1 competency reflection is under Competency Goals.',
+    );
+    o.compRefl = { count: 0, last: null };
+    expect([...mount(LearnerProfile.idCardHtml(o)).querySelectorAll('.id-jump a')][2].textContent).toBe(
+      'Reflections Not yet',
+    );
+    expect(mount(LearnerProfile.reflectionsHtml(o)).querySelector('.lp-none').textContent).toBe(
+      'No reflections from Harjot yet.',
+    );
+  });
+
   it('About Me: each answer in a bubble under its question, escaped, repeated questions tagged', () => {
     const box = mount(LearnerProfile.aboutHtml(opts()));
     expect([...box.querySelectorAll('h3')].map(h => h.textContent)).toEqual(['As a Learner', 'Outside School']);
