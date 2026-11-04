@@ -405,3 +405,52 @@ test('student card says when more rows are below', async ({ page }) => {
   });
   await expect(box).not.toHaveClass(/m-more-below/);
 });
+
+// Group 3 #86: titles and chips are whole on a phone: a long assessment
+// title in the grading bar, students who share initials told apart,
+// assessment rows and timeline names on the student screen, and the
+// competency sparklines.
+test('phone titles, chips and sparklines are not cut', async ({ page }) => {
+  await openPhone(page);
+  const long = '5.1 Mapping Germany’s Conquest of Europe, 1939-1941 and Its Effects';
+  await page.evaluate(t => {
+    const cid = getActiveCourse();
+    getAssessments(cid).find(x => x.title === 'Data Reading Quiz').title = t;
+    const st = getStudents(cid);
+    st[1].firstName = 'Cecily';
+    st[1].preferred = '';
+    st[1].lastName = st[0].lastName;
+  }, long);
+
+  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+  await page.locator('[data-action="m-student-tab"][data-tab="assess"]').click();
+  const cutRows = await page.evaluate(() =>
+    [...document.querySelectorAll('#m-screen-student-detail .m-assess-title, #m-screen-student-detail .m-sec-tl-name')]
+      .filter(e => e.getClientRects().length && e.scrollWidth > e.clientWidth + 1)
+      .map(e => e.textContent),
+  );
+  expect(cutRows).toEqual([]);
+  await page.locator('[data-action="m-student-tab"][data-tab="comps"]').click();
+  const clipped = await page.evaluate(
+    () =>
+      [...document.querySelectorAll('#m-screen-student-detail .m-section-header .growth-sparkline')].filter(
+        e => e.scrollWidth > e.clientWidth + 1,
+      ).length,
+  );
+  expect(clipped).toBe(0);
+  await page.locator('[data-action="m-back"]').first().click();
+
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('[data-action="m-grade-seg"][data-val="all"]').click();
+  await page.locator('[data-action="m-grade-assess"]', { hasText: '5.1 Mapping' }).first().click();
+  const title = page.locator('#m-nav-bar-grade-swiper .m-nav-bar-title-inline');
+  await expect(title).toContainText('Its Effects');
+  const fits = await title.evaluate(el => {
+    const bar = el.closest('.m-nav-bar').getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return el.scrollHeight <= el.clientHeight + 1 && r.top >= bar.top - 0.5 && r.bottom <= bar.bottom + 0.5;
+  });
+  expect(fits).toBe(true);
+  const chips = await page.locator('#m-thumb-strip .m-thumb').allTextContents();
+  expect(new Set(chips).size).toBe(chips.length);
+});

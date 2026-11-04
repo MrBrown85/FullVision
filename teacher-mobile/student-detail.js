@@ -22,8 +22,10 @@ window.MStudentDetail = (function () {
     var trend = change && change.dir > 0 ? 'up' : change && change.dir < 0 ? 'down' : 'flat';
     var trendIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : '—';
     var trendColor = trend === 'up' ? 'var(--score-3)' : trend === 'down' ? 'var(--score-1)' : 'var(--text-3)';
+    // The last five points, as the timeline below lists the last five
+    // scores: a whole sparkline fits the header at phone width.
     var growthData = getSectionGrowthData(cid, sid, sec.id);
-    var sparkline = renderGrowthSparkline(growthData);
+    var sparkline = renderGrowthSparkline((growthData || []).slice(-5));
     var allAssessments = getAssessments(cid);
     var allEvidenceScores = [];
     sec.tags.forEach(function (tag) {

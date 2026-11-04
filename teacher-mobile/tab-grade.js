@@ -783,11 +783,12 @@ window.MGrade = (function () {
     });
 
     // Student thumbnail strip: a group's circle says G1, G2 … (P1 … for pairs).
+    var chipText = _thumbTexts(students, units);
     var thumbs = '<div class="m-thumb-strip" id="m-thumb-strip">';
     students.forEach(function (st, idx) {
       var unit = units[idx];
       var color = unit.view ? _GROUP_THUMB_COLOR : MC.avatarColor(st.id);
-      var initials = unit.view ? unit.thumb : MC.avatarInitials(st);
+      var initials = chipText[idx];
       var stScores = allScores[st.id] || [];
       var isGraded = stScores.some(function (s) {
         return s.assessmentId === aid && isScoreEntered(assessment, s);
@@ -799,6 +800,7 @@ window.MGrade = (function () {
       var thumbName = unit.view ? unit.view.label : displayNameWithLast(st);
       thumbs +=
         '<button type="button" class="m-thumb' +
+        (initials.length > 3 ? ' m-thumb-long' : '') +
         currentClass +
         gradedClass +
         '" style="background:' +
@@ -1835,6 +1837,66 @@ window.MGrade = (function () {
       e.preventDefault();
       jumpToStudent(next);
     });
+  }
+
+  /* Each chip's letters: the initials, or, where students share them (two
+     JC), the shortest start of the first name, with the last initial, that
+     tells them apart ("JaC" and "JoC"; "JasC" and "JaqC"), else of the last
+     name ("JCha" and "JChe"). A group's chip keeps its G1 / P1. */
+  function _thumbTexts(students, units) {
+    var first = function (st) {
+      return String(st.preferred || st.firstName || '');
+    };
+    var last = function (st) {
+      return String(st.lastName || '');
+    };
+    var cap = function (s) {
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+    var out = students.map(function (st, i) {
+      return units[i] && units[i].view ? units[i].thumb : MC.avatarInitials(st);
+    });
+    var groups = {};
+    out.forEach(function (txt, i) {
+      if (units[i] && units[i].view) return;
+      (groups[txt] = groups[txt] || []).push(i);
+    });
+    Object.keys(groups).forEach(function (key) {
+      var idxs = groups[key];
+      if (idxs.length < 2) return;
+      var ways = [];
+      for (var k = 2; k <= 5; k++) {
+        ways.push(
+          (function (n) {
+            return function (st) {
+              return cap(first(st).slice(0, n)) + last(st).charAt(0).toUpperCase();
+            };
+          })(k),
+        );
+      }
+      for (var m = 2; m <= 5; m++) {
+        ways.push(
+          (function (n) {
+            return function (st) {
+              return first(st).charAt(0).toUpperCase() + cap(last(st).slice(0, n));
+            };
+          })(m),
+        );
+      }
+      idxs.forEach(function (i) {
+        var st = students[i];
+        var mine = null;
+        for (var w = 0; w < ways.length && !mine; w++) {
+          var t = ways[w](st);
+          var clash = idxs.some(function (j) {
+            return j !== i && ways[w](students[j]) === t;
+          });
+          if (!clash) mine = t;
+        }
+        out[i] = mine || key;
+      });
+    });
+    return out;
   }
 
   function _nextStudentPoints(swiper, inp) {
