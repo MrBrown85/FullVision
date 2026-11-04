@@ -1654,6 +1654,7 @@ window.PageAssignments = (function () {
                 : '';
             })()
           : '') +
+        _cardScoringBadges(a) +
         (a.coreCompetencyIds || [])
           .map(function (ccId) {
             var cc = getCoreCompetency(ccId);
@@ -1954,6 +1955,39 @@ window.PageAssignments = (function () {
 
   function _chipTipAttrs(name, text) {
     return ' tabindex="0" data-chip-tip="' + esc(text) + '" data-chip-tip-name="' + esc(name) + '"';
+  }
+
+  /* The card's scoring and Factor (Nov 3 sweep): how the work is scored,
+     unless its rubric chip already says so, and its Factor when it isn't
+     1x, so a teacher needn't open the form or the gradebook to see them. */
+  function _cardScoringBadges(a) {
+    var mode = a.scoreMode || 'proficiency';
+    var kind = '';
+    var tip = '';
+    if (mode === 'points') {
+      kind = formatPoints(Number(a.maxPoints) || 100) + ' Points';
+      tip = 'Scored in points.';
+    } else if (mode === 'complete') {
+      kind = 'Complete/Incomplete';
+      tip = 'Scored Complete or Incomplete.';
+    } else if (mode === 'dibels') {
+      kind = 'DIBELS';
+      tip = 'A DIBELS 8 benchmark. It counts toward no grade.';
+    } else if (!a.rubricId || !getRubricById(activeCourse, a.rubricId)) {
+      kind = 'Competencies';
+      tip = 'Scored on each competency, with no rubric.';
+    }
+    var factor = getAssessmentWeight(a);
+    return (
+      (kind ? '<span class="score-badge"' + _chipTipAttrs(kind, tip) + '>' + esc(kind) + '</span>' : '') +
+      (factor !== 1 && mode !== 'dibels'
+        ? '<span class="score-badge"' +
+          _chipTipAttrs('Factor ' + factor + 'x', 'Counts ' + factor + ' times as much as work at Factor 1x.') +
+          '>' +
+          esc('Factor ' + factor + 'x') +
+          '</span>'
+        : '')
+    );
   }
 
   function _categoryChipTip(cid, categoryId) {
