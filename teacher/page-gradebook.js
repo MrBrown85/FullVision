@@ -2799,6 +2799,9 @@ window.PageGradebook = (function () {
       var item = ev.target.closest('[data-ctx]');
       if (!item || item.classList.contains('is-disabled')) return;
       var action = item.dataset.ctx;
+      // The cell takes the focus back first, so it keeps it through the
+      // redraw the item makes (Gradebook sweep 4).
+      _dismissContextMenu(true);
       if (action === 'editCell') startCellEdit(cell);
       else if (action === 'addObservation') openObservationDialog(sid, aid);
       else if (action === 'clearCell') {
@@ -2947,6 +2950,7 @@ window.PageGradebook = (function () {
       var item = ev.target.closest('[data-ctx]');
       if (!item) return;
       var action = item.dataset.ctx;
+      _dismissContextMenu(true);
       if (action === 'scoreMode') {
         // The grader opens on the top student in the order shown.
         var firstRow = document.querySelector('.gb-scores-row[data-sid]');
@@ -3159,10 +3163,23 @@ window.PageGradebook = (function () {
     _hideTip();
     PageAssignments.openGrader(activeCourse, aid, sid, {
       studentIds: ids,
-      onClose: function () {
+      // Closing selects the cell of the student the grader ended on.
+      onClose: function (lastSid) {
         clearProfCache();
         render();
-        var back = key && _findCell(key);
+        var at = key ? Object.assign({}, key) : { scores: viewMode === 'scores', aid: aid, sid: sid, tid: '' };
+        if (lastSid) at.sid = lastSid;
+        var back =
+          _findCell(at) ||
+          document.querySelector(
+            '#gb-data tr[data-sid="' +
+              CSS.escape(at.sid) +
+              '"] td[data-aid="' +
+              CSS.escape(aid) +
+              '"][data-sid="' +
+              CSS.escape(at.sid) +
+              '"]',
+          );
         if (back) _selectCell(back);
       },
     });
@@ -3297,13 +3314,20 @@ window.PageGradebook = (function () {
           return;
         }
       }
+      var commitKey = _refocusAfterCommit ? _cellKey(td) : null;
       render();
+      var commitBack = commitKey && _findCell(commitKey);
+      if (commitBack) _selectCell(commitBack);
     }
 
+    var _refocusAfterCommit = false;
     var _navDir = null; // 'down' | 'right' | null
     var _cancelled = false; // Escape: removing the input blurs it, and blur saves
-    inp.addEventListener('blur', function () {
+    inp.addEventListener('blur', function (ev) {
       if (_cancelled) return;
+      // Focus going nowhere (Return or Tab at a row's end, a click on the
+      // page) comes back to the cell; a click on another control keeps it.
+      _refocusAfterCommit = !ev || !ev.relatedTarget;
       commit(_navDir);
     });
     inp.addEventListener('keydown', function (ev) {
@@ -3317,9 +3341,13 @@ window.PageGradebook = (function () {
         inp.blur();
       } else if (ev.key === 'Escape') {
         _cancelled = true;
+        var escKey = _cellKey(td);
         inp.remove();
         if (span) span.style.display = '';
         exitScoreMode();
+        // The cell keeps the keyboard, as after the grader.
+        var escBack = escKey && _findCell(escKey);
+        if (escBack) _selectCell(escBack);
       }
     });
   }

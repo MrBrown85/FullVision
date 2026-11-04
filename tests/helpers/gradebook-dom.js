@@ -28,6 +28,7 @@ export function mount(seed, params = {}) {
   // linkedom draws no layout: scrolling into view does nothing.
   const proto = Object.getPrototypeOf(Object.getPrototypeOf(doc.createElement('div')));
   if (!proto.scrollIntoView) proto.scrollIntoView = function () {};
+  trackFocus(doc, proto);
   globalThis.document = doc;
   globalThis.CSS = { escape: s => String(s) };
   globalThis.getComputedStyle = () => ({});
@@ -37,6 +38,34 @@ export function mount(seed, params = {}) {
   clearProfCache();
   PageGradebook.init({ course: params.course, ...params });
   return doc;
+}
+
+/* linkedom keeps no focus: focus() and blur() set document.activeElement
+   (the body when nothing, or a removed element, has it) and send blur with
+   its relatedTarget, as a browser does. */
+function trackFocus(doc, proto) {
+  let active = null;
+  const sendBlur = (el, related) => {
+    const e = new doc.defaultView.Event('blur', { bubbles: false, cancelable: false });
+    e.relatedTarget = related;
+    el.dispatchEvent(e);
+  };
+  Object.defineProperty(doc, 'activeElement', {
+    configurable: true,
+    get: () => (active && active.isConnected ? active : doc.body),
+  });
+  proto.focus = function () {
+    if (active === this) return;
+    const prev = active;
+    active = null;
+    if (prev && prev.isConnected) sendBlur(prev, this);
+    active = this;
+  };
+  proto.blur = function () {
+    if (active !== this) return;
+    active = null;
+    sendBlur(this, null);
+  };
 }
 
 export function unmount() {
