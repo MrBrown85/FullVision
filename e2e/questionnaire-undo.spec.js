@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 /* Undo toasts on the Term Questionnaire (Nov 3 sweep, step 4 group 2 #56
-  ): Remove From Comment on a typed sentence. Demo Mode, Science 8, Report 2. */
+   and #57): Remove From Comment on a typed sentence, and Generate Comment
+   replacing a draft. Demo Mode, Science 8, Report 2. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function open(page, student = 'st1') {
@@ -41,4 +42,22 @@ test('Remove From Comment on a typed sentence offers Undo, which puts it back in
   await expect(box).toHaveValue(with_);
   await expect(rows(page).filter({ hasText: 'led her lab group' })).toHaveCount(1);
   await expect.poll(() => saved(page)).toBe(with_);
+});
+
+test('Generate Comment again offers Undo, which brings the last version back', async ({ page }) => {
+  await open(page);
+  const box = page.locator('#tq-narrative');
+  await page.locator('#tq-generate').click();
+  const first = await box.inputValue();
+  await page.locator('#tq-generate').click();
+  const second = await box.inputValue();
+  expect(second).not.toBe(first);
+  const toast = page.locator('#undo-toast');
+  await expect(toast).toContainText('Replaced with a new version.');
+  await toast.locator('button', { hasText: 'Undo' }).click();
+  await expect(box).toHaveValue(first);
+  await expect.poll(() => saved(page)).toBe(first);
+  // The rows follow the comment that came back.
+  const shown = await rows(page).locator('.qn-req-text').allTextContents();
+  for (const t of shown) expect(first).toContain(t.trim().slice(0, 20));
 });

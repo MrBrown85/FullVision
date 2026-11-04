@@ -1726,6 +1726,8 @@ window.ReportQuestionnaire = (function () {
     clearTimeout(_alignTimer);
     _alignNow();
     var rows = _rowsFor(st, f);
+    // The comment being replaced, for the Undo toast.
+    var before = String(el.value || '').trim() ? _snapshot(st) : null;
     var kept = {};
     rows.forEach(function (r) {
       if (r.edited && r.step && !kept[r.step]) kept[r.step] = r.text;
@@ -1763,6 +1765,9 @@ window.ReportQuestionnaire = (function () {
     _wording = null;
     _addAt = null;
     _writeRows(st);
+    // Each press replaces the draft: Undo brings the last one back (⌘ Z
+    // still works in the box too).
+    if (before && before.text !== el.value) _undoToast(st, 'Replaced with a new version.', before);
   }
 
   /* Whether the student has no marked work this term (a mark on none of
