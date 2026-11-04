@@ -542,6 +542,41 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(CommentBank.context(f, {}).supportLine).toBe('In class, I will give feedback on source work each week.');
   });
 
+  it('puts a support line picked or ticked into a comment that had none, the rest as it was (Step 4 group 2 #51)', () => {
+    seed();
+    upsertTermRating(CID, GAB.id, TERM, { narrative: 'Gabriel is earning a B. Thank you for a good term.' });
+    open();
+    RQ.tqLineChange({ dataset: { tqSupport: 'sl-sources' }, checked: true });
+    expect(getStudentTermRating(CID, GAB.id, TERM).narrative).toBe(
+      'Gabriel is earning a B. Thank you for a good term. In class, I will give feedback on source work each week.',
+    );
+    // Swapped for another line in place, not added twice.
+    RQ.tqLine('writeOwn');
+    inputs['tq-line-own'] = { value: 'In class, I will meet with the group each Friday.', focus() {} };
+    RQ.tqLine('saveOwn');
+    delete inputs['tq-line-own'];
+    RQ.tqLine('pickSupport', { dataset: { line: settings().supportOwn[0].id } });
+    expect(getStudentTermRating(CID, GAB.id, TERM).narrative).toBe(
+      'Gabriel is earning a B. Thank you for a good term. In class, I will meet with the group each Friday.',
+    );
+    // An approved comment is never rewritten.
+    RQ.tqLine('pickSupport', { dataset: { line: 'none' } });
+    upsertTermRating(CID, GAB.id, TERM, { narrative: 'Gabriel is earning a B.', approvedAt: '2026-10-30T10:00:00Z' });
+    RQ.tqLine('pickSupport', { dataset: { line: 'sl-sources' } });
+    expect(getStudentTermRating(CID, GAB.id, TERM).narrative).toBe('Gabriel is earning a B.');
+  });
+
+  it('says why the Support row is empty when no ticked line fits, not that it was left out', () => {
+    seed();
+    // A line of the teacher's own fits no skill: ticked, it is picked only by hand.
+    saveReportConfig(CID, {
+      commentSettings: { supportOwn: [{ id: 'own-1', text: 'In class, I will meet with the group each Friday.' }], supportChosen: ['own-1'] },
+    });
+    const html = open();
+    expect(html).toContain('None of the ticked lines fits Gabriel, so the comment leaves this sentence out.');
+    expect(html).not.toContain('Left out of this comment.');
+  });
+
   it('sets the character limit from the count; past it the count turns orange and Approve stays on', () => {
     seed();
     upsertTermRating(CID, GAB.id, TERM, { narrative: 'x'.repeat(120) });

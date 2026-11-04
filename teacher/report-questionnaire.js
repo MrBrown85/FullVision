@@ -6434,7 +6434,9 @@ window.ReportQuestionnaire = (function () {
       </div>`;
     var body = choice
       ? `<span class="qn-req-text">${esc(choice.line.text)}</span><span class="qn-req-source">One of your support lines for ${esc(course)}</span>`
-      : `<span class="qn-req-text qn-line-off">Left out of this comment.</span><span class="qn-req-source">For ${esc(first)} only</span>`;
+      : f.classLines && f.classLines.pick === 'none'
+        ? `<span class="qn-req-text qn-line-off">Left out of this comment.</span><span class="qn-req-source">For ${esc(first)} only</span>`
+        : `<span class="qn-req-text qn-line-off">None of the ticked lines fits ${esc(first)}, so the comment leaves this sentence out.</span><span class="qn-req-source">Pick one for ${esc(first)} under Support Line</span>`;
     return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-support"${_rowAttr(i)}>
       ${handle}<div class="qn-req-part"><span class="qn-req-label">Support</span></div>
       <div class="qn-req-body">${body}</div>
@@ -6817,7 +6819,45 @@ window.ReportQuestionnaire = (function () {
     var st = _current();
     if (!st || !before) return;
     var after = _bankContext(_activeCourse, st, _facts(st, true));
-    if (before[slot] !== after[slot]) _swapLine(before[slot], after[slot], everyone);
+    if (before[slot] === after[slot]) return;
+    // A line the comment had none of goes in where its part falls, the
+    // rest of the comment as it is (Nov 3 sweep: a support line picked
+    // for one student showed only after Generate rewrote everything).
+    if (!before[slot] && after[slot] && !everyone && _putLine(st, LINE_STEP[slot], after[slot])) return;
+    _swapLine(before[slot], after[slot], everyone);
+  }
+
+  /* The step a student's own class line fills: the support line, used
+     exactly as typed. */
+  var LINE_STEP = { supportLine: 'support' };
+
+  /* A class line put into the student's comment, which had none, at the
+     place its step falls (on the IE path, Support before Meeting). Only a
+     comment with sentences that is not approved; true when it went in. */
+  function _putLine(st, step, text) {
+    if (!step || !_stepDef(step)) return false;
+    var r = getStudentTermRating(_activeCourse, st.id, getTermId()) || {};
+    if (r.approvedAt) return false;
+    var key = _rowKey(st);
+    var rows = _rowsFor(st, _facts(st));
+    if (!rows.length) return false;
+    if (
+      rows.some(function (x) {
+        return x.step === step || x.text === text;
+      })
+    )
+      return false;
+    // Before the first row of a later step (For the Family, Closing), else
+    // last; on the IE path before Meeting or Closing.
+    var ie = step === 'support' && CommentBank.reportPath(_facts(st)) === 'ie';
+    var si = _stepAt(step);
+    var at = rows.findIndex(function (x) {
+      return ie ? x.step === 'ieMeeting' || x.step === 'closer' : !!x.step && _stepAt(x.step) > si;
+    });
+    if (at < 0) at = rows.length;
+    _rows[key] = insertRow(rows, _classRow(step, text), at);
+    _writeRows(st);
+    return true;
   }
 
   /* A checkbox in the support list, or the character limit, changed. */
