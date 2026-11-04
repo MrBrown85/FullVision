@@ -113,21 +113,36 @@ window.CommentPipeline = (function () {
     'grade>example': 'and',
     'example>overall': 'and',
     'overall>example': 'and',
-    'overall>nextStep': 'and',
-    'example>nextStep': 'and',
+    // The grade after what shows it (the blind sort, Nov 4 2026: comments
+    // read as a list of items when nothing joined).
+    'overall>grade': 'and',
+    'example>grade': 'and',
   };
   /* The connective two adjacent bank frames join with, or '' when they may
      not: one claim each and different ones; the first a plain sentence
      ending in a period (no clause of its own after a colon or semicolon);
      the second about the student from its first word ({He} or {His}). */
+  var NO_SECOND =
+    /^(In |\{course\}|So far|Over |Since |This year|Right now|By now|At this point|For now|Recent|While |Of |Among |On |When |If |What |Where |Looking |It is |Top |Here |Families |Some |At home|You )/;
   function joinable(a, b) {
     if (!a || !b || a.v !== 2 || b.v !== 2) return '';
+    // How the student is assessed (IE, language or IEP goals) stands alone.
+    var alone = function (x) {
+      return [].concat((x.when || {}).grade || []).some(function (g) {
+        return g === 'ie' || g === 'languageGoals' || g === 'iepGoals';
+      });
+    };
+    if (alone(a) || alone(b)) return '';
     var conn = JOINS[(a.step || '') + '>' + (b.step || '')];
     if (!conn) return '';
     if ((a.claims || []).length !== 1 || (b.claims || []).length !== 1 || a.claims[0] === b.claims[0]) return '';
     var at = String(a.text);
     if (!/[^.]\.$/.test(at) || /[;:]/.test(at) || /, (and|where|which)\b/.test(at)) return '';
-    if (!/^\{(He|His)\} /.test(String(b.text)) || /[;:]/.test(String(b.text))) return '';
+    // The second opens on the student, an article or the skill ("…, and the
+    // habit to build is …", "…, and finding patterns is a strength"), never
+    // on a time, a place or the course.
+    var bt = String(b.text);
+    if (/[;:]/.test(bt) || NO_SECOND.test(bt)) return '';
     return conn;
   }
   /* The id a joined sentence goes by: both frames' ids and the connective. */
@@ -146,7 +161,10 @@ window.CommentPipeline = (function () {
   function joined(a, b, conn) {
     var second = String(b.text)
       .replace(/^\{He\}/, '{he}')
-      .replace(/^\{His\}/, '{his}');
+      .replace(/^\{His\}/, '{his}')
+      .replace(/^(?!I\b)([A-Z][a-z]*)\b/, function (m) {
+        return m.toLowerCase();
+      });
     var uniq = function (xs) {
       return xs.filter(function (x, i) {
         return xs.indexOf(x) === i;

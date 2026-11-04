@@ -3557,6 +3557,44 @@ window.ReportQuestionnaire = (function () {
      holds, else to a class line; the rest are the teacher's own when the
      record says they wrote them (draft_meta.teacher_text), else the
      Earlier Comment's. */
+  /* A sentence read as two bank sentences joined with ", and " (or " and "):
+     the row for the joined sentence, or null. */
+  function _joinedRowFor(t, ctx, used, i) {
+    var CP = window.CommentPipeline;
+    var at = t.indexOf(', and ') >= 0 ? t.indexOf(', and ') : t.indexOf(' and ');
+    for (; at > 0; at = t.indexOf(' and ', at + 1)) {
+      var head = t.slice(0, at).replace(/,$/, '') + '.';
+      var tail = t.slice(t.indexOf('and ', at) + 4);
+      tail = tail.charAt(0).toUpperCase() + tail.slice(1);
+      var find = function (text) {
+        var hit = null;
+        COMMENT_BANK.sentences.some(function (s) {
+          if (used[s.id] || s.v !== 2 || !CommentBank.fits(s, ctx)) return false;
+          var c = CommentBank.filledAs ? CommentBank.filledAs(s, ctx, text) : null;
+          if (c) hit = { s: s, c: c };
+          return !!hit;
+        });
+        return hit;
+      };
+      var a = find(head);
+      var b = a && find(tail);
+      var as = a && Object.assign({}, a.s, { step: CommentBank.stepOf(a.s) });
+      var bs = b && Object.assign({}, b.s, { step: CommentBank.stepOf(b.s) });
+      var conn = as && bs ? CP.joinable(as, bs) : '';
+      if (conn) {
+        var js = CP.joined(as, bs, conn);
+        var c2 = Object.assign({}, a.c, b.c);
+        if (CommentBank.filledAs(js, c2, t)) {
+          used[a.s.id] = used[b.s.id] = true;
+          var r = rowFromSentence(js, c2, null, i === 0);
+          r.text = r.drafted = t;
+          return r;
+        }
+      }
+      if (t.charAt(at) === ',') at = at + 1;
+    }
+    return null;
+  }
   function recoverRows(text, ctx, meta) {
     var ss = sentencesOf(text);
     var used = {};
@@ -3592,6 +3630,12 @@ window.ReportQuestionnaire = (function () {
         exactCtx = CommentBank.filledAs ? CommentBank.filledAs(s, ctx, t) : null;
         return !!exactCtx;
       });
+      // Two bank sentences Generate joined with "and" (the pipeline's
+      // aggregation): each half read back on its own, then joined again.
+      if (!exact && window.CommentPipeline && / and /.test(t)) {
+        var joinedRow = _joinedRowFor(t, ctx, used, i);
+        if (joinedRow) return joinedRow;
+      }
       if (exact) {
         used[exact.id] = true;
         var r = rowFromSentence(exact, exactCtx || ctx, null, i === 0);
@@ -3763,10 +3807,13 @@ window.ReportQuestionnaire = (function () {
      one too short to read back keeps its tokens, filled again from today's
      facts only when they still give the same sentence (a slot filled whole
      with the pronouns, like the best piece). */
-  function _writtenToks(r, whoWas) {
+  function _writtenToks(r, whoWas, course, courseSaid) {
     if (!r.s) return null;
-    var v = CommentBank.valuesIn(r.s, r.text);
+    var v = CommentBank.valuesIn(r.s, r.text, { courseSaid: !!courseSaid });
     if (!v) return null;
+    // Read from the wording without the course (named once a comment): the
+    // course is the class's, said or not as the realiser places it.
+    if (v.course == null && course && /\{course\}/.test(r.s.text)) v = Object.assign({ course: course }, v);
     var toks = CommentRealiser.tokens(r.s.text, function (k) {
       var x = v[k] == null ? '' : String(v[k]);
       // A said value (the Generate pipeline: a card's wording, a habit as
@@ -3776,17 +3823,23 @@ window.ReportQuestionnaire = (function () {
       // A title is read with its quotes; the realiser puts them back.
       return CommentRealiser.TITLE_SLOTS[k] ? x.replace(/^[“"]/, '').replace(/[”"]$/, '') : x;
     });
-    var back = function (named) {
-      return CommentRealiser.render(toks, whoWas, { named: named }) === r.text;
+    var back = function (named, courseSaid) {
+      return CommentRealiser.render(toks, whoWas, { named: named, course: courseSaid }) === r.text;
     };
-    return back(true) || back(false) ? toks : null;
+    return back(true) || back(false) || back(true, true) || back(false, true) ? toks : null;
   }
   function pronounsChanged(rows, ctx, ctxWas) {
     var who = _whoOf(ctx);
     var whoWas = ctxWas ? _whoOf(ctxWas) : null;
-    return rows.map(function (r) {
+    var course = ctxWas && ctxWas.course;
+    return rows.map(function (r, i) {
       if (r.edited || r.kept || r.classLine) return r;
-      var toks = whoWas ? _writtenToks(r, whoWas) : null;
+      var said =
+        !!course &&
+        rows.slice(0, i).some(function (x) {
+          return String(x.text || '').indexOf(course) >= 0;
+        });
+      var toks = whoWas ? _writtenToks(r, whoWas, course, said) : null;
       if (!toks && r.raw && r.raw.toks) {
         toks = r.raw.toks;
         if (ctxWas && r.s && JSON.stringify(CommentBank.sentenceTokens(r.s, ctxWas)) === JSON.stringify(toks))

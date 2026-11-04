@@ -81,16 +81,17 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has its 1713 sentences in four parts, each with a unique id: live, or retired with its text', () => {
+  it('has its 1717 sentences in four parts, each with a unique id: live, or retired with its text', () => {
     // Nov 4 2026: the pipeline's frames (v: 2) were added, and the sentences
     // they replaced moved to COMMENT_BANK.retired with their text, so a
     // saved comment that holds one keeps it. None is lost.
     const old = COMMENT_BANK.sentences.filter(s => !s.v);
-    // The older sentences live or retired on Nov 4, and the eleven Habit
+    // The older sentences live or retired on Nov 4, the four IE meeting
+    // lines rewritten to name a call or email (iem1-iem4), and the eleven Habit
     // Ratings cells reworded without a frequency the same day (hl121-hl131,
     // their first wordings retired): 1702 + 11.
     const nov4 = COMMENT_BANK.retired.filter(s => s.retired === '2026-11-04' && !s.v);
-    expect(old.length + nov4.length).toBe(1713);
+    expect(old.length + nov4.length).toBe(1717);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
     const ids = COMMENT_BANK.sentences.map(s => s.id).concat(COMMENT_BANK.retired.map(s => s.id));
     expect(new Set(ids).size).toBe(ids.length);
@@ -284,6 +285,7 @@ describe('the bank', () => {
       pieceOwned: 'bestPiece',
       pieceScored: 'bestPiece',
       pieceDid: 'bestPiece',
+      pieceTie: 'bestPiece',
       progressDoing: 'improved',
       habitDoes: 'habitBehaviour',
       habitDoes2: 'habitBehaviour',
@@ -654,18 +656,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // five Habit Ratings frames for Completes Work at Consistently.
   // The counts since Nov 4 2026: the pipeline's frames fit beside the older
   // ones that stay in Browse.
-  it('knows the Demo class is Science from its name, and offers Cece 124 sentences (21, 44, 20, 39)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 135 sentences (21, 54, 18, 42)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 44, 20, 39]);
-    expect(CommentBank.fitCount(ctx)).toBe(124);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 54, 18, 42]);
+    expect(CommentBank.fitCount(ctx)).toBe(135);
   });
 
-  it('offers Jasper 125 (21, 44, 21, 39), by the name he goes by', () => {
+  it('offers Jasper 136 (21, 54, 19, 42), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 44, 21, 39]);
-    expect(CommentBank.fitCount(ctx)).toBe(125);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 54, 19, 42]);
+    expect(CommentBank.fitCount(ctx)).toBe(136);
     expect(ctx.name).toBe('Jas');
     // Nothing fell from Extending since Report 1's year to date (it fell
     // four times inside Term 2's own trend, which Generate no longer
@@ -827,7 +829,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       // The Demo class has no closing sentence or support lines (plan PR 8).
       // Titles are quoted (the realiser), so a piece already named is never
       // named again: Liv's revisit sentence would repeat one, and is left out.
-      expect(d.ids.length, st.firstName).toBeGreaterThanOrEqual(4);
+      // Facts said: a sentence that joins two counts as two.
+      // (One fewer when no strength holds: the top skill falling, the four-
+      // audience review's truth rule, Nov 4 2026.)
+      expect(d.ids.length + d.ids.filter(id => /^j:/.test(id)).length, st.firstName).toBeGreaterThanOrEqual(
+        ctx.strengthAt ? 4 : 3,
+      );
       expect(d.text, st.firstName).not.toMatch(/[{}[\]]|  /);
       const quotes = d.text.match(/“[^”]+”/g) || [];
       expect(new Set(quotes).size, st.firstName).toBe(quotes.length);

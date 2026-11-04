@@ -120,24 +120,29 @@ window.CommentForms = (function () {
     if ((ws[i] === 'and' || ws[i] === 'or') && ws[i + 1] && !NOT_VERB.test(ws[i + 1]) && /^[a-z]+$/.test(ws[i + 1]))
       form(i + 1);
     // A second predicate later in the phrase ("plan a fair test and record
-    // measurements"): the first verb's object opens on a determiner, no
-    // "to" or "that" clause comes before the "and", and the word after it is
-    // a known verb in base form.
-    var det = /^(a|an|the|his|her|their|its|one|each|every|\{his\})$/;
-    // Or a one-word object ("observe nature and ask questions about it").
-    // Not when that word describes the next noun ("personal and work
-    // networks") or the second word is a noun in a compound ("test results").
-    if (ws[2] === 'and' && /^[a-z]+$/.test(ws[1] || '') && ws[3] && /^[a-z]+$/.test(ws[3])) {
-      var compound = ADJ.test(ws[1]) || COMPOUND.test(ws[3] + ' ' + (ws[4] || ''));
-      if (!compound && !/s$/.test(ws[3]) && VERBS.indexOf(ws[3]) >= 0 && !NOT_VERB.test(ws[3])) form(3);
-    } else if (det.test(ws[1] || ''))
-      for (var j = 2; j + 1 < ws.length; j++) {
-        if (ws[j] === 'to' || ws[j] === 'that' || ws[j] === 'who' || ws[j] === 'which') break;
-        if (ws[j] !== 'and') continue;
-        var w = ws[j + 1];
-        if (/^[a-z]+$/.test(w) && !/s$/.test(w) && VERBS.indexOf(w) >= 0 && !NOT_VERB.test(w)) form(j + 1);
-        break;
-      }
+    // measurements", "observe nature and ask questions", "choose units
+    // that suit each measurement and check conversions"): every "and" or
+    // "or" followed by a known verb in base form takes the form, unless it
+    // ends a list of nouns ("a model, key or graph"), the word before it
+    // describes the next noun ("personal and work networks"), the pair is
+    // a compound noun ("test results"), or a "to" came first ("use
+    // evidence to explain and justify": the infinitive stays).
+    for (var j = Math.max(i + 1, 2); j + 1 < ws.length; j++) {
+      if (ws[j] === 'to') break;
+      if (ws[j] !== 'and' && ws[j] !== 'or') continue;
+      var w = ws[j + 1];
+      if (!/^[a-z]+$/.test(w) || /s$/.test(w) || VERBS.indexOf(w) < 0 || NOT_VERB.test(w)) continue;
+      if (ADJ.test(ws[j - 1]) || COMPOUND.test(w + ' ' + (ws[j + 2] || ''))) continue;
+      if (j >= 2 && /,$/.test(ws[j - 2])) continue;
+      // "how reliable and correct", "a past or present action": adjectives.
+      if (j >= 2 && /^(how|a|an|the|more|most|very|so)$/.test(ws[j - 2])) continue;
+      form(j + 1);
+      // A list of predicates before it ("make changes, fix problems and
+      // retest"): each verb after a comma too.
+      for (var k = j - 1; k >= 2; k--)
+        if (/,$/.test(ws[k - 1]) && /^[a-z]+$/.test(ws[k]) && VERBS.indexOf(ws[k]) >= 0 && !NOT_VERB.test(ws[k]))
+          form(k);
+    }
     return ws.join(' ');
   }
   function _override(phrase, overrides, key) {
@@ -239,6 +244,7 @@ window.CommentForms = (function () {
     'express',
     'extend',
     'find',
+    'fix',
     'finish',
     'follow',
     'form',
@@ -425,5 +431,6 @@ window.CommentForms = (function () {
     plural: plural,
     forThey: forThey,
     agreeable: agreeable,
+    VERBS: VERBS,
   };
 })();

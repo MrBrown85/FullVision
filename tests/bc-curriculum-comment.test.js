@@ -137,9 +137,52 @@ describe('every card string passes the vocabulary lint', () => {
 describe('version 2 cards', () => {
   const v2 = clusters.filter(([, c]) => c.forms);
   const PAST = t => CommentLint.startsPastTense(t);
-  it('includes the eight sample cards', () => {
+  // The eight sample cards, and every Science 8 cluster Demo Mode uses
+  // (written Nov 4 2026 so the showcase class reads well; each marked for
+  // Colin's five-card read).
+  const SCIENCE8 = [
+    'sci-assumptions-bias',
+    'sci-contributing-to-care',
+    'sci-data-recording',
+    'sci-data-representation',
+    'sci-drawing-conclusions',
+    'sci-evidence',
+    'sci-hypotheses',
+    'sci-idea-generation',
+    'sci-implications',
+    'sci-informed-skepticism',
+    'sci-inquiry-questions',
+    'sci-investigation-plans',
+    'sci-local-environment',
+    'sci-method-reflection',
+    'sci-observation',
+    'sci-place-perspectives',
+    'sci-predictions',
+    'sci-project-design',
+    'sci-safety-ethics',
+    'sci-sharing-findings',
+    'sci-sources-of-error',
+    'sci-sustained-inquiry',
+    'sci-transfer-of-learning',
+    'sci-unit-conversions',
+    'sci-variable-control',
+    'sci-ways-of-knowing',
+  ];
+  it('marks every Science 8 card for the five-card read, and gives each level three other ways to say its step', () => {
+    SCIENCE8.forEach(k => {
+      const c = comment[k];
+      expect(c.prov && c.prov.review, k).toMatch(/five-card read/);
+      expect(c.prov.approved_by_owner, k).toBe(false);
+      ['emerging', 'developing', 'proficient', 'extending'].forEach(L => {
+        const xs = c.forms.next[L];
+        expect(xs, k + ' ' + L).toHaveLength(3);
+        expect(new Set(xs.concat(c.next_steps[L])).size, k + ' ' + L).toBe(4);
+      });
+    });
+  });
+  it('includes the eight sample cards and the Science 8 cards', () => {
     expect(v2.map(([k]) => k).sort()).toEqual(
-      [
+      SCIENCE8.concat([
         'adst-prototype-testing',
         'arts-artistic-choices',
         'car-self-assessment',
@@ -148,7 +191,7 @@ describe('version 2 cards', () => {
         'phe-movement-concepts',
         'sci-data-patterns',
         'ss-evi',
-      ].sort(),
+      ]).sort(),
     );
   });
   it('gives three phrasings of every form, the phrase first, and the rest of the schema', () => {

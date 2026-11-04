@@ -1110,6 +1110,13 @@ window.CommentBank = (function () {
       key: row[1] || 'bank.' + i,
       phrase: row[0],
       steps: { Emerging: row[2], Developing: row[3], Proficient: row[4], Extending: (v && v.x) || '' },
+      // Other ways to say each step, by level (a version 2 card's forms.next).
+      stepsAlt: {
+        Emerging: ((v && v.n && v.n.emerging) || []).slice(),
+        Developing: ((v && v.n && v.n.developing) || []).slice(),
+        Proficient: ((v && v.n && v.n.proficient) || []).slice(),
+        Extending: ((v && v.n && v.n.extending) || []).slice(),
+      },
       v2: !!v,
       area: (v && v.a) || '',
       evidence: (v && v.ev) || '',
@@ -2941,6 +2948,34 @@ window.CommentBank = (function () {
   function improvedGate(points, step) {
     if (!_atLeast(trendOf(points), step)) return false;
     var xs = _byDate(points);
+    // And no fall at the end (the four-audience review, Nov 4 2026: Tyler's
+    // marks passed end-minus-start while his second half fell): the latest
+    // third at or above the middle pieces, and the second half's marks at or
+    // above the first half's.
+    var val = function (p) {
+      return Number(p.v);
+    };
+    var third = Math.floor(xs.length / 3);
+    var middle = xs.slice(third, xs.length - third).map(val);
+    if (middle.length && _median(xs.slice(-third).map(val)) < _median(middle)) return false;
+    var half = Math.floor(xs.length / 2);
+    var avg = function (ys) {
+      return (
+        ys.reduce(function (a, b) {
+          return a + b;
+        }, 0) / (ys.length || 1)
+      );
+    };
+    var h1 = xs.slice(0, half).map(val);
+    var h2 = xs.slice(xs.length - half).map(val);
+    if (avg(h2) < avg(h1)) return false;
+    var lastHalf = xs.slice(half);
+    if (
+      lastHalf.length >= 2 &&
+      avg(lastHalf.slice(-Math.ceil(lastHalf.length / 2)).map(val)) <
+        avg(lastHalf.slice(0, Math.floor(lastHalf.length / 2)).map(val))
+    )
+      return false;
     var early = xs.slice(0, Math.floor(xs.length / 3));
     var low = early.reduce(function (m, p) {
       return Number(p.v) < Number(m.v) ? p : m;
@@ -3011,11 +3046,27 @@ window.CommentBank = (function () {
   function nextStepOf(comps) {
     var strong = strongestOf(comps);
     var low = null;
+    var ok = [];
     (comps || []).forEach(function (c) {
       if (!(c.level > 0) || (c.scores || []).length < NEXT_STEP_PIECES || strong.indexOf(c) >= 0) return;
+      ok.push(c);
       if (!low || c.level < low.level) low = c;
     });
+    // A safety or ethics competency tied for lowest (as the level prints, in
+    // tenths) is never the one chosen: it reads to a family as a safety
+    // problem (the four-audience review, Nov 4 2026). Alone at the bottom it
+    // is the next step, said as a procedure on its card.
+    if (low && _isSafety(low)) {
+      var other = ok.find(function (c) {
+        return c !== low && !_isSafety(c) && tenths(c.level) === tenths(low.level);
+      });
+      if (other) low = other;
+    }
     return low;
+  }
+  function _isSafety(c) {
+    var e = c && c.bankId ? bankEntry(c.bankId) : null;
+    return /\b(safe|safely|safety|ethical|ethics)\b/i.test(((e && e.phrase) || '') + ' ' + ((c && c.name) || ''));
   }
 
   /* The skill the next step names, from the table: { comp, key, name,
@@ -3075,16 +3126,22 @@ window.CommentBank = (function () {
   function _say(text, f, agree) {
     var F = typeof window !== 'undefined' ? window.CommentForms : null;
     var t = agree && F ? F.agreeable(String(text || '')) : String(text || '');
+    // A predicate after "she" (agree) is kept apart from other strings: said
+    // with "they", "[plans|plan] a test" reads as the base phrase "plan a
+    // test", which a next step holds ("to plan a test", never "to plans").
+    var into = agree ? _TPLA : _TPL;
     if (/[{[]/.test(t))
       _SAY_AS.forEach(function (p) {
-        _TPL[_tplKey(forStudent(t, { name: '', pronouns: p }))] = t;
+        into[_tplKey(forStudent(t, { name: '', pronouns: p }))] = t;
       });
     return forStudent(t, f);
   }
+  var _TPLA = {};
+  var _AGREE_SLOTS = { strengthAt: 1, habitDoes: 1, habitDoes2: 1 };
   /* The tokens for a slot that holds a said string, or null. */
   function _sayToks(k, value) {
     if (!_TPL_SLOTS[k] || !value) return null;
-    var t = _TPL[_tplKey(value)];
+    var t = (_AGREE_SLOTS[k] ? _TPLA : _TPL)[_tplKey(value)];
     return t ? R.tokens(t) : null;
   }
 
@@ -3278,6 +3335,20 @@ window.CommentBank = (function () {
     });
   }
   /* The best piece this term (bestOrderOf), or null with no scored work. */
+  /* A piece's mark before rounding: its % in a Letter class, else its
+     proficiency. */
+  function _rawMark(f, w) {
+    if (f.grade && f.grade.mode === 'letter' && w.pct != null && !isNaN(Number(w.pct))) return Number(w.pct);
+    return Number(w.v);
+  }
+  /* Whether another piece's mark equals or beats this one's before
+     rounding: "her highest mark" would not be strictly true. */
+  function _pieceShared(f, w) {
+    var mine = _rawMark(f, w);
+    return (f.work || []).some(function (x) {
+      return x !== w && x.id !== w.id && _rawMark(f, x) >= mine - 1e-9;
+    });
+  }
   function bestPieceOf(f) {
     return bestOrderOf(f)[0] || null;
   }
@@ -4221,6 +4292,10 @@ window.CommentBank = (function () {
     // A tie at the top (topTieOf): any of the tied skills, the one the fewest
     // classmates were given first (a strength, never "the strongest").
     var tie = topTieSkills(f);
+    if (tie.length > 1)
+      tie = tie.filter(function (x, i) {
+        return i === 0 || _closeToTop(tie[0].comp, x.comp);
+      });
     if (tie.length) {
       var uses = _topUsesFor(f.cid, f.sid);
       return tie
@@ -4254,10 +4329,23 @@ window.CommentBank = (function () {
       .filter(function (r) {
         return !!r.word;
       });
+    // Only the skills within 0.2 of the highest and not falling: the
+    // strength said is the top one or as good as it.
+    var near = function (xs) {
+      var max = xs.reduce(function (m, x) {
+        return Math.max(m, Number(x.comp.level) || 0);
+      }, 0);
+      return xs.filter(function (x) {
+        return _closeToTop({ level: max }, x.comp);
+      });
+    };
+    even = near(even);
     if (even.length) return even;
-    return (hiSk || []).map(function (x) {
-      return { comp: x.comp, key: x.key, skill: x.skill, word: x.word, strongest: false };
-    });
+    return near(
+      (hiSk || []).map(function (x) {
+        return { comp: x.comp, key: x.key, skill: x.skill, word: x.word, strongest: false };
+      }),
+    );
   }
   function _entryOf(f, comp) {
     var sk = comp ? skillFor(f, comp) : null;
@@ -4305,6 +4393,18 @@ window.CommentBank = (function () {
       out.push(t.replace(/\.$/, ''));
     });
     return out;
+  }
+  /* Whether a competency may stand in for the top one: within 0.2 of its
+     level and its marks not falling (the term's trend, or now against the
+     start). */
+  function _closeToTop(top, c) {
+    if (!top || !c) return false;
+    if (Number(top.level) - Number(c.level) > 0.2 + 1e-9) return false;
+    var t = trendOf(c.termScores || c.scores);
+    if (t != null && t < 0) return false;
+    // Lower now than at the start (the last report's level, or the term's
+    // first marks): falling, too.
+    return !(Number(c.start) > 0 && Number(c.now) > 0 && Number(c.now) < Number(c.start) - 1e-9);
   }
   /* Whether the two roster students just before this one lead their
      strength with this skill (each one's first strength route). */
@@ -4363,7 +4463,16 @@ window.CommentBank = (function () {
     // The skill's phrase said for the two roster students just before this
     // one (lexical memory, until the cards are written): another strength
     // past the gate instead, when there is one.
-    var also = r && routes.length > 1 && routes[1].also && _rosterSaidTwice(f, r.key) ? routes[1] : null;
+    // Only a second strength within 0.2 of the top and not falling (the
+    // four-audience review, Nov 4 2026: Caleb's 2.93, falling, beside 3.17).
+    var also =
+      r &&
+      routes.length > 1 &&
+      routes[1].also &&
+      _closeToTop(routes[0].comp, routes[1].comp) &&
+      _rosterSaidTwice(f, r.key)
+        ? routes[1]
+        : null;
     if (also) r = also;
     var re = r ? _entryOf(f, r.comp) : null;
     put('strengthAt', r ? strengthAtPool(f, re, r.skill, r.word) : [], compKey(r && r.comp));
@@ -4374,12 +4483,14 @@ window.CommentBank = (function () {
     // "{His} strongest area is …" only past the "strongest" gate.
     put('area', r && r.strongest && !also && re && re.area ? [re.area] : [], compKey(r && r.comp));
     ctx._strengthRoutes = routes;
+    ctx._strengthWord = r ? r.word : '';
     // The best piece: its title by kind, and what the student did in it
     // (the teacher's Note for the Report, else the skill it was scored on).
     var w = x.top;
     var tk = w ? titleKind(w.title) : { title: '', kind: '' };
     var wk = w ? ['work:' + w.id] : [];
     put('pieceTitle', tk.title ? [tk.title] : [], wk);
+    put('pieceTie', w && _pieceShared(f, w) ? ['yes'] : [], wk);
     put('pieceOwned', tk.kind === 'owned' ? ['yes'] : [], wk);
     put('pieceScored', tk.kind === 'scored' ? ['yes'] : [], wk);
     var note = w ? noteSlot(w.note) : '';
@@ -4435,8 +4546,26 @@ window.CommentBank = (function () {
     // The next step, and the next step's card prompt for home.
     var stepText = x.lstep ? x.lstep.text : x.next ? x.next.skill : '';
     var stepComp = x.lstep ? x.lstep.comp : x.next ? x.next.comp : null;
-    put('step', stepText ? [stepText] : [], compKey(stepComp));
-    put('stepDoing', stepText && F ? [F.doing(stepText)] : [], compKey(stepComp));
+    // The card's other ways to say the step at that level, so classmates
+    // with the same next step read different words (_chosenCtx).
+    var stepEntry = x.lstep && x.next ? _entryOf(f, x.next.comp) : null;
+    var stepAlt =
+      stepEntry && stepEntry.stepsAlt
+        ? (stepEntry.stepsAlt[word(x.next.comp.level)] || []).map(function (t) {
+            return _say(t, f);
+          })
+        : [];
+    var steps = stepText ? [stepText].concat(stepAlt) : [];
+    put('step', steps, compKey(stepComp));
+    put(
+      'stepDoing',
+      F
+        ? steps.map(function (t) {
+            return F.doing(t);
+          })
+        : [],
+      compKey(stepComp),
+    );
     var ne = x.next ? _entryOf(f, x.next.comp) : null;
     var prompts = ne && ne.home.length ? ne.home : x.next ? _homePrompts(ctx, x.next.key) : [];
     put(
@@ -4821,11 +4950,19 @@ window.CommentBank = (function () {
     return String(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
   var _anchored = {};
-  function valuesIn(s, text) {
+  /* A later sentence says the course no more (the realiser names it once):
+     with opts.courseSaid (a sentence after the course was named), its values
+     are read from the wording without it too. */
+  function valuesIn(s, text, opts) {
+    var got = _valuesFrom(s, text, String((s && s.text) || ''));
+    if (got || !s || !(opts && opts.courseSaid)) return got;
+    var bare = _courseDropped(s.text);
+    return bare !== s.text ? _valuesFrom(s, text, bare) : null;
+  }
+  function _valuesFrom(s, text, src) {
     var t = String(text || '')
       .replace(/\s+/g, ' ')
       .trim();
-    var src = String((s && s.text) || '');
     var whole = src.match(/^\{(\w+)\}$/);
     if (whole) {
       var shape = READ_SHAPES[whole[1]];
@@ -6062,7 +6199,17 @@ window.CommentBank = (function () {
         };
       }
       try {
-        return _profileOf(facts(f.cid, st, f.termId));
+        // As the classmate's own draft sees it: from the classmate's context,
+        // so both drafts agree on the classmate's shape.
+        var fx = facts(f.cid, st, f.termId);
+        var cx = context(fx, {});
+        return {
+          ie: cx._path === 'ie',
+          grade: !!cx._grade && cx._path !== 'ie',
+          strength: !!cx.strengthAt,
+          growth: !!cx.progressDoing,
+          piece: !!cx.pieceTitle,
+        };
       } catch (e) {
         return null;
       }
@@ -6177,10 +6324,12 @@ window.CommentBank = (function () {
     var lead = ctx._path ? 'grade' : CP.LEAD[shape] || 'grade';
     if (lead !== 'grade' && sal[lead] <= 0) lead = 'grade';
     if (lead === 'overall' && shape === 'growth' && !ctx.progressDoing) lead = 'grade';
-    var opt = CP.chosen(sal, 3);
+    // Up to four optional facts: with the grade and the step, six, so two
+    // join and the comment keeps five sentences.
+    var opt = CP.chosen(sal, 4);
     // Attendance the teacher entered is always said, like the missing work.
     if (ctx.attendance) opt.push('attendance');
-    if (lead !== 'grade' && opt.indexOf(lead) < 0) opt = [lead].concat(opt).slice(0, 3);
+    if (lead !== 'grade' && opt.indexOf(lead) < 0) opt = [lead].concat(opt).slice(0, 4);
     // A habit sentence is said when one is notable; with too little else to
     // say (fewer than five sentences), a habit at Consistently is.
     var fixed = (ctx._grade ? 1 : 0) + (ctx.step ? 1 : 0) + (ctx.missingWork ? 1 : 0) - (ctx.attendance ? 1 : 0);
@@ -6189,10 +6338,12 @@ window.CommentBank = (function () {
     var ratedDoes = hp.does.filter(function (k) {
       return (ctx._rated || {})[k] === CONSISTENTLY;
     });
-    if (opt.indexOf('habits') < 0 && ratedDoes.length && fixed + opt.length < 5) opt.push('habits');
+    // Six facts where the student has them, so two can join and the comment
+    // still has five sentences (the blind sort: no flat list of items).
+    if (opt.indexOf('habits') < 0 && ratedDoes.length && fixed + opt.length < 6) opt.push('habits');
     // Still short, with a habit to build: what the student does well gets a
     // sentence of its own before it (the Strong Habits step).
-    var strong = opt.indexOf('habits') >= 0 && hp.invite.length > 0 && hp.does.length > 0 && fixed + opt.length < 5;
+    var strong = opt.indexOf('habits') >= 0 && hp.invite.length > 0 && hp.does.length > 0 && fixed + opt.length < 6;
     // A redraw after the teacher rated habits or entered attendance says them.
     var force = opts._force || {};
     if ((force.habits || force.strongHabits) && opt.indexOf('habits') < 0 && (hp.does.length || hp.invite.length))
@@ -6347,12 +6498,20 @@ window.CommentBank = (function () {
     if (key === 'overall')
       v2 = v2.filter(function (x) {
         var kind = needs(x, 'progressDoing') ? 'growth' : needs(x, 'climb') ? 'climb' : 'strength';
+        // An Emerging strength is said at its level ("is beginning to"),
+        // never as a bare skill.
+        if (kind === 'strength' && ctx._strengthWord === 'Emerging' && !needs(x, 'strengthAt')) return false;
         return kind === st.plan.overall;
       });
     // The teacher's Note for the Report on the best piece is the teacher's
     // pick: a frame that says it ({pieceDid}) when one fits. A title kept in
     // quotes (a question) takes no "the" before it.
     if (key === 'example') {
+      // A piece tied at the top (before rounding) takes a tie-safe frame;
+      // one strictly highest takes the others.
+      v2 = v2.filter(function (x) {
+        return needs(x, 'pieceTie') === !!ctx.pieceTie;
+      });
       if (/^“/.test(ctx.pieceTitle || ''))
         v2 = v2.filter(function (x) {
           return !/\b[Tt]he \{pieceTitle\}/.test(x.text);
@@ -6406,20 +6565,39 @@ window.CommentBank = (function () {
   /* The context with each choice slot set for this student and press: the
      ways rotate with the roster place, so the three students before say
      a strength another way; habits by news value. */
-  function _chosenCtx(ctx, plan, idx, press) {
+  function _chosenCtx(ctx, plan, idx, press, around) {
     var CP = window.CommentPipeline;
     var out = Object.assign({}, ctx);
     var pick = ctx._pick || {};
+    // A phrasing one of the three students before this one holds is passed
+    // over while another is left (the next step, the home prompt, a
+    // strength or a habit said the same way in neighbouring comments).
+    var recent = (around && around.recent) || [];
+    var heldBy = function (v) {
+      var key = _tplKey(v);
+      return (
+        !!v &&
+        recent.some(function (r) {
+          return r.key.indexOf(key) >= 0;
+        })
+      );
+    };
+    var turnOf = function (pool, start) {
+      for (var j = 0; j < pool.length; j++) {
+        var v = pool[(start + j) % pool.length];
+        if (!heldBy(v)) return v;
+      }
+      return pool[start % pool.length];
+    };
     Object.keys(pick).forEach(function (k) {
       if (/^habit/.test(k)) return;
-      var pool = pick[k];
-      out[k] = pool[(idx + press + (CP.hash(k) % 7)) % pool.length];
+      out[k] = turnOf(pick[k], idx + press + (CP.hash(k) % 7));
     });
     var f = ctx._f;
     var hp = ctx._habitPlan || { does: [], invite: [] };
     var say = function (key, form, n) {
       var xs = key ? habitPhrases(f, key, form) : [];
-      return xs.length ? xs[(idx + press + n) % xs.length] : '';
+      return xs.length ? turnOf(xs, idx + press + n) : '';
     };
     var d = plan.doesOrder || hp.does;
     out.habitDoes = say(d[0], 'does', 0);
@@ -6443,22 +6621,45 @@ window.CommentBank = (function () {
   var SHAPE_FAMILIES = {
     grade: ['name', 'course', 'courseLead'],
     ie: ['name', 'course'],
-    strength: ['time', 'other', 'time', 'other', 'name'],
-    piece: ['other', 'time', 'name', 'other', 'time'],
-    growth: ['other', 'time', 'other'],
+    strength: ['time', 'other', 'name', 'other'],
+    piece: ['time', 'work', 'other', 'work', 'name'],
+    growth: ['time', 'other', 'name', 'other'],
   };
   /* This student's opening: the next in its shape's turn, counting the
      classmates before them with the same shape at this press. */
   function _wantFamily(plan, around, press) {
     var CP = window.CommentPipeline;
     var fams = SHAPE_FAMILIES[plan.shape] || SHAPE_FAMILIES.strength;
+    // A time opening only in the comments that may have one (one in four),
+    // and in those, first.
+    if ((around.idx + press) % 4 !== 0)
+      fams = fams.filter(function (x) {
+        return x !== 'time';
+      });
+    else if (fams.indexOf('time') >= 0) return 'time';
     var shapes = CP.rosterShapes(around.profiles, press);
     var k = 0;
     for (var i = 0; i < around.idx; i++) if (shapes[i] === plan.shape) k++;
     return fams[(k + press) % fams.length];
   }
+  /* Whether a sentence repeats a run of three words of the comment so far
+     (the name and pronouns as one word each). */
+  function _sharesTrigram(t, sofar, name) {
+    var CP = window.CommentPipeline;
+    var grams = function (text) {
+      var ws = CP.words(text, name);
+      var out = {};
+      for (var i = 0; i + 2 < ws.length; i++) out[ws.slice(i, i + 3).join(' ')] = true;
+      return out;
+    };
+    var a = grams(t);
+    var b = grams(sofar);
+    return Object.keys(a).some(function (g) {
+      return b[g];
+    });
+  }
   var REPEAT_ONCE = ['over the year', 'this year', 'right now', 'at this point', 'by now', 'for now', 'consistently'];
-  var OPEN_TIME = /^(so|over|since|this|right|now|after|across|by|at|from|recent|over)$/;
+  var OPEN_TIME = /^(so|over|since|this|right|now|across|by|recent)$/;
   function _openFamily(text, ctx) {
     var ws = String(text || '')
       .toLowerCase()
@@ -6473,13 +6674,15 @@ window.CommentBank = (function () {
     if (course && ws[0] === course) return 'courseLead';
     if (course && ws[0] === 'in' && ws[1] === course) return 'course';
     if (OPEN_TIME.test(ws[0] || '')) return 'time';
+    // The piece of work first ("The Field Journal …", "Of all her work …").
+    if (/^(the|of|for|on|in)$/.test(ws[0] || '')) return 'work';
     return 'other';
   }
   function _pipelineCompose(ctx, bank, seq, kept, plan, cand, around, press, exclude, usage) {
     usage = usage || {};
     var CP = window.CommentPipeline;
     var f = ctx._f;
-    var c = _chosenCtx(ctx, plan, around.idx, press);
+    var c = _chosenCtx(ctx, plan, around.idx, press, around);
     var byKey = {};
     DRAFT_STEPS.forEach(function (x) {
       byKey[x.key] = x;
@@ -6503,6 +6706,12 @@ window.CommentBank = (function () {
     var items = [];
     var got = {};
     var who = whoOf(c);
+    var timeOK = (around.idx + press) % 4 === 0;
+    var timeSaid = function (text) {
+      return R.sentences(text).some(function (x) {
+        return OPEN_TIME.test(CP.firstWord(x));
+      });
+    };
     var state = { named: false };
     seq.forEach(function (key, at) {
       var step = byKey[key];
@@ -6562,7 +6771,7 @@ window.CommentBank = (function () {
       // a class uses each frame about equally and neighbours differ.
       var base = around.idx + (CP.hash(key) % list.length);
       // The home line goes to every third student, so it counts them in turn.
-      if (key === 'home') base = Math.floor((around.idx + press) / 3) * 5 - press + (CP.hash(key) % list.length);
+      if (key === 'home') base = Math.floor((around.idx + press) / 3) * 7 + 3 * press + (CP.hash(key) % list.length);
       var prevText = items.length ? items[items.length - 1].sent.text : '';
       var sofar = items
         .map(function (x) {
@@ -6588,6 +6797,21 @@ window.CommentBank = (function () {
         .map(function (o) {
           return o.x;
         });
+      // A frame one of the three students before this one holds goes last
+      // (lexical memory on frames, not only on the card's phrasings).
+      var recent = around.recent || [];
+      if (recent.length) {
+        var fresh = turn.filter(function (x) {
+          return !recent.some(function (r) {
+            return _holds(x, r.text, r.lower);
+          });
+        });
+        turn = fresh.concat(
+          turn.filter(function (x) {
+            return fresh.indexOf(x) < 0;
+          }),
+        );
+      }
       // The comment's first sentence opens, in turn along the roster, on the
       // student, the course, a time or something else (the piece, a
       // strength), so a class's comments do not all start with the name.
@@ -6606,42 +6830,96 @@ window.CommentBank = (function () {
           var r0 = (around.idx + press) % least.length;
           hit = least.slice(r0).concat(least.slice(0, r0), hit.slice(least.length));
         }
-        if (hit.length)
+        // Not at the price of a frame the class has used more than another.
+        if (hit.length && used(hit[0]) <= used(turn[0]) + 2)
           turn = hit.concat(
             turn.filter(function (x) {
               return hit.indexOf(x) < 0;
             }),
           );
       }
-      var pick = null;
-      for (var k = 0; k < turn.length && !pick; k++) {
-        var x = turn[k];
-        // As the realiser will say it: the course named once, so a frame
-        // that opens on the course as its subject waits for a comment that
-        // has not named it.
-        var courseSaid = !!c.course && sofar.indexOf(c.course) >= 0;
-        var t = R.render(sentenceTokens(x, c), who, { named: state.named, course: courseSaid });
+      // Every frame in turn against the rules; when none keeps the soft ones
+      // (an opener, "class" twice, a time phrase, three words said again),
+      // the first that keeps the hard ones (length, a title twice, "so far"
+      // and the scale once), so a forced repeat is the least used frame.
+      var courseSaid = !!c.course && sofar.indexOf(c.course) >= 0;
+      var hardOk = function (t) {
         var quotes = t.match(/“[^”]+”/g) || [];
-        if (
-          (courseSaid && /^\{course\} (?!work\b)/.test(x.text) && k < turn.length - 1) ||
+        return !(
           R.tooLong(t) ||
           quotes.some(function (qt) {
             return sofar.indexOf(qt) >= 0;
           }) ||
-          (prevText && CP.firstWord(prevText) === CP.firstWord(t) && k < turn.length - 1) ||
           (CP.count(t, 'so far') && CP.count(sofar, 'so far')) ||
           // A time phrase once a comment ("over the year" twice reads as
-          // filler), and "class" once a sentence ("In class, he joins in
-          // class discussions").
+          // filler).
           REPEAT_ONCE.some(function (ph) {
             return CP.count(t, ph) && CP.count(sofar, ph);
           }) ||
-          (CP.count(t, 'class') > 1 && k < turn.length - 1) ||
           (CP.count(t, 'proficiency scale') && CP.count(sofar, 'proficiency scale'))
-        )
-          continue;
-        pick = { s: x, t: t };
+        );
+      };
+      // How badly a frame breaks the soft rules: an opener like the sentence
+      // before counts double (the blind sort's plainest tell).
+      var softCost = function (x, t) {
+        return (
+          (courseSaid && /^\{course\} (?!work\b)/.test(x.text) ? 1 : 0) +
+          (prevText && CP.firstWord(prevText) === CP.firstWord(t) ? 2 : 0) +
+          (CP.count(t, 'class') > 1 ? 1 : 0) +
+          (OPEN_TIME.test(CP.firstWord(t)) && (!timeOK || timeSaid(sofar)) ? 1 : 0) +
+          (_sharesTrigram(t, sofar, who.name) ? 1 : 0)
+        );
+      };
+      var softOk = function (x, t) {
+        return !(
+          // The course named once: a frame that opens on the course as its
+          // subject waits for a comment that has not named it.
+          (
+            (courseSaid && /^\{course\} (?!work\b)/.test(x.text)) ||
+            (prevText && CP.firstWord(prevText) === CP.firstWord(t)) ||
+            // "class" once a sentence ("In class, he joins in class
+            // discussions").
+            CP.count(t, 'class') > 1 ||
+            // A time phrase opens a sentence in one comment of four (by roster
+            // place and press), and once in that comment.
+            (OPEN_TIME.test(CP.firstWord(t)) && (!timeOK || timeSaid(sofar))) ||
+            // No run of three words twice in a comment (names and pronouns as
+            // one word).
+            _sharesTrigram(t, sofar, who.name)
+          )
+        );
+      };
+      var pick = null;
+      var spare = null;
+      // A slot may be said another of its true ways (the card's other
+      // phrasings and prompts) when the one chosen breaks a rule: too long,
+      // or the step's words again in the home line.
+      var ctxs = [c];
+      ['homeLine', 'strengthAt', 'strengthDoing', 'step', 'stepDoing', 'pieceDid', 'progressDoing'].forEach(
+        function (sk) {
+          ((c._pick || {})[sk] || []).forEach(function (v) {
+            if (v === c[sk]) return;
+            var alt = Object.assign({}, c);
+            alt[sk] = v;
+            ctxs.push(alt);
+          });
+        },
+      );
+      for (var ci = 0; ci < ctxs.length && !pick; ci++) {
+        var cx = ctxs[ci];
+        for (var k = 0; k < turn.length && !pick; k++) {
+          var x = turn[k];
+          var t = R.render(sentenceTokens(x, cx), who, { named: state.named, course: courseSaid });
+          if (!hardOk(t)) continue;
+          if (softOk(x, t)) pick = { s: x, t: t, c: cx };
+          else {
+            var cost = softCost(x, t);
+            if (!spare || cost < spare.cost) spare = { s: x, t: t, cost: cost, c: cx };
+          }
+        }
       }
+      // The home line is optional: none rather than one that breaks a rule.
+      if (!pick && key !== 'home') pick = spare;
       if (!pick) return;
       state.named = true;
       st.taken[pick.s.id] = true;
@@ -6649,8 +6927,15 @@ window.CommentBank = (function () {
       if (advises(pick.s)) st.said.advice = true;
       items.push({
         s: pick.s,
-        sent: { id: pick.s.id, part: pick.s.part, step: key, text: pick.t, toks: sentenceTokens(pick.s, c), who: who },
-        prov: provenance(pick.s, c),
+        sent: {
+          id: pick.s.id,
+          part: pick.s.part,
+          step: key,
+          text: pick.t,
+          toks: sentenceTokens(pick.s, pick.c || c),
+          who: who,
+        },
+        prov: provenance(pick.s, pick.c || c),
       });
       got[key] = true;
     });
@@ -6671,7 +6956,9 @@ window.CommentBank = (function () {
     // Aggregation: the cand.join-th pair that may join becomes one sentence,
     // while the draft keeps five or more.
     var joins = 0;
-    if (cand.join && items.length > 5) {
+    // (Five facts or more: a joined pair leaves four sentences or more, each
+    // fact said; the blind sort read unjoined comments as a list.)
+    if (cand.join && items.length >= 5) {
       var seen = 0;
       for (var i = 0; i + 1 < items.length; i++) {
         var a = items[i];
@@ -6681,6 +6968,9 @@ window.CommentBank = (function () {
         var bs = Object.assign({}, b.s, { step: b.sent.step });
         var conn = CP.joinable(as, bs);
         if (!conn) continue;
+        // The joined sentence must not open like the one after it.
+        var after = items[i + 2];
+        if (after && CP.firstWord(a.sent.text) === CP.firstWord(after.sent.text)) continue;
         var js = CP.joined(as, bs, conn);
         var jt = fill(js, c);
         if (R.tooLong(jt)) continue;
@@ -6716,6 +7006,42 @@ window.CommentBank = (function () {
   }
 
   /* One press of Generate through the pipeline. */
+  /* A comment with the student's name as NAME, for comparing comments of
+     different students. */
+  function _named(text, name) {
+    if (!name) return String(text || '');
+    var esc = String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return String(text || '').replace(new RegExp('\\b' + esc + '\\b', 'g'), 'NAME');
+  }
+  /* Every classmate's comment, name as NAME: the saved comments passed in
+     (so the same comments give the same draft). */
+  /* The saved comments of the n roster students before this one, nearest
+     first. */
+  function _savedBefore(around, comments, n) {
+    var bySid = {};
+    (comments || []).map(_comment).forEach(function (c) {
+      if (c.sid != null) bySid[String(c.sid)] = c.text;
+    });
+    var out = [];
+    for (var k = around.idx - 1; k >= 0 && out.length < n; k--) {
+      var st = around.roster[k];
+      if (st && bySid[String(st.id)]) out.push(bySid[String(st.id)]);
+    }
+    return out;
+  }
+  function _classmateTexts(f, around, comments) {
+    var bySid = {};
+    (comments || []).map(_comment).forEach(function (c) {
+      if (c.sid != null) bySid[String(c.sid)] = c.text;
+    });
+    var out = [];
+    (around.roster || []).forEach(function (st) {
+      var sid = String(st.id);
+      if (sid === String(f.sid)) return;
+      if (bySid[sid]) out.push(_named(bySid[sid], st.firstName || ''));
+    });
+    return out;
+  }
   function _pipelineDraft(ctx, opts, bank, f, story) {
     var CP = window.CommentPipeline;
     var around = _classAround(f, ctx);
@@ -6728,6 +7054,15 @@ window.CommentBank = (function () {
     });
     var previous = String(opts.previous == null ? '' : opts.previous).trim();
     var neighbours = _neighbours(f, around, opts.comments);
+    // The comments of the three students before this one, as the class's
+    // saved comments hold them (passed in): the same comments give the same
+    // draft, whatever was drafted earlier in the session.
+    around.recent = _savedBefore(around, opts.comments, 3).map(function (t) {
+      return { text: t, lower: t.toLowerCase(), key: _tplKey(t) };
+    });
+    // Every classmate's comment (saved, or drafted this session), each with
+    // the classmate's name as one word, for the near-copy check.
+    var mates = _classmateTexts(f, around, opts.comments);
     var seen = {};
     var cands = [];
     for (var c = 0; c < PIPE_CANDIDATES; c++) {
@@ -6735,7 +7070,8 @@ window.CommentBank = (function () {
       var cand = {
         variant: (c + press) % BODY_ORDERS.length,
         kind: c % 3,
-        join: Math.floor(c / 4) % 3,
+        // Insert's draft (everyPart) offers each part as its own sentence.
+        join: opts.everyPart ? 0 : Math.floor(c / 4) % 3,
       };
       // The teacher's order, when there is one, is the comment's steps: the
       // ones the teacher arranged, in that order (the class's lines in place).
@@ -6763,8 +7099,32 @@ window.CommentBank = (function () {
       d.score = CP.score(d, { name: f.name, previous: previous, neighbours: neighbours, wordCap: R.MAX_WORDS });
       cands.push(d);
     }
+    // No comment within half its words of a classmate's (normalised edit
+    // distance under 0.5), and one sentence or more that joins two facts in
+    // a comment of five or more sentences: a candidate that keeps both
+    // rules first, then one that keeps the first.
+    var CLOSE = 0.5;
+    cands.forEach(function (d) {
+      var mine = _named(d.text, f.name);
+      d.near = mates.some(function (m) {
+        return CP.distance(mine, m) < CLOSE;
+      });
+      d.flat = d.sentences.length >= 5 && !d.joins;
+      // A press of Generate changes four sentences or more of the text on
+      // screen (or all of a shorter one).
+      if (previous) {
+        var was = R.sentences(previous);
+        var fresh = d.sentences.filter(function (x) {
+          return was.indexOf(x.text) < 0;
+        }).length;
+        d.stale = fresh < Math.min(4, d.sentences.length);
+      }
+    });
+    var cost = function (d) {
+      return (d.near ? 4 : 0) + (d.stale ? 2 : 0) + (d.flat ? 1 : 0);
+    };
     cands.sort(function (a, b) {
-      return b.score - a.score;
+      return cost(a) - cost(b) || b.score - a.score;
     });
     var best =
       cands.find(function (d) {
@@ -7474,11 +7834,20 @@ window.CommentBank = (function () {
               return String(rt.comp.id) === id;
             });
           });
-        // "Strongest", "highest" and the area name the first route only.
+        // "Strongest", "highest" and the area name the first route only; a
+        // strength said as one ("a strength in her work") names a route at
+        // Proficient or above.
         var first = routes[0] ? String(routes[0].comp.id) : '';
-        ['strengthTop', 'strengthHigh', 'area'].forEach(function (k) {
+        ['strengthTop', 'area'].forEach(function (k) {
           if (_has(pv, k) && _ids(pv, k, 'comp')[0] !== first) ok = false;
         });
+        if (_has(pv, 'strengthHigh')) {
+          var hid = _ids(pv, 'strengthHigh', 'comp')[0];
+          var hr = routes.find(function (rt) {
+            return String(rt.comp.id) === hid;
+          });
+          if (!hr || !/^(Proficient|Extending)$/.test(hr.word)) ok = false;
+        }
         return (
           ok &&
           mine.every(function (k) {
@@ -7721,10 +8090,14 @@ window.CommentBank = (function () {
       // The pipeline's best-piece slots: the piece named is at the top mark,
       // its title said by kind, and what the student did in it (the
       // teacher's note, or the skill it was scored on) one of its true ways.
+      // "Highest" and "best" are strict (the four-audience review, Nov 4
+      // 2026): a piece another one equals or beats, before rounding, is said
+      // only by a tie-safe frame ("one of her strongest pieces").
+      var tieSafe = _has(pv, 'pieceTie');
       ['pieceTitle', 'pieceOwned', 'pieceScored', 'pieceDid'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
         var pw = _byId(f.work, _ids(pv, slot, 'work')[0]);
-        checks.push(!!pw && markRank(f, pw) === top && _slotHolds(pv, ctx, slot));
+        checks.push(!!pw && markRank(f, pw) === top && _slotHolds(pv, ctx, slot) && (tieSafe || !_pieceShared(f, pw)));
       });
       ['assignment', 'seeWork'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
@@ -8758,6 +9131,7 @@ window.CommentBank = (function () {
     ANGLES: ANGLES,
     angle: angle,
     trendOf: trendOf,
+    markRank: markRank,
     improvedGate: improvedGate,
     improvedComp: improvedComp,
     strengthSkills: strengthSkills,

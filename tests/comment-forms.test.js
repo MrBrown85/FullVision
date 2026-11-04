@@ -71,6 +71,46 @@ describe('the spelling rule', () => {
   });
 });
 
+describe('coordinated verbs in every card', () => {
+  // "choose units that suit each measurement and check conversions" said
+  // "choosing … and check …" (the coordinator's blind sort, Nov 4 2026):
+  // every verb joined by "and" or "or" takes the form too, except an
+  // infinitive after "to", an adjective pair ("how reliable and correct",
+  // "a past or present action") or the end of a noun list.
+  it('derives both verbs of every "X and Y" in every card phrase', () => {
+    const phrases = [];
+    cards.forEach(([k, c]) => {
+      const v = cardV2(c);
+      v.forms.base.forEach(b => phrases.push([k, b, v.forms.override]));
+    });
+    let checked = 0;
+    phrases.forEach(([k, b, o]) => {
+      const ws = b.split(/\s+/);
+      const does = F.does(b, o).split(/\s+/);
+      const doing = F.doing(b, o).split(/\s+/);
+      if (does.length !== ws.length) return;
+      ws.forEach((w, j) => {
+        if (j < 2 || !/^(and|or)$/.test(ws[j - 1]) || F.VERBS.indexOf(w) < 0 || /s$/.test(w)) return;
+        const before = ws.slice(1, j - 1);
+        if (before.indexOf('to') >= 0) return;
+        if (/,$/.test(ws[j - 3] || '') || /^(how|a|an|the|more|most|very|so)$/.test(ws[j - 3] || '')) return;
+        if (/^(personal|social|local|global|new|own|public|private|physical|digital|written|oral)$/.test(ws[j - 2]))
+          return;
+        if (/^(test (results|data)|work (samples|networks|spaces))$/.test(w + ' ' + (ws[j + 1] || ''))) return;
+        checked++;
+        expect(does[j], k + ': ' + F.does(b, o)).not.toBe(w);
+        expect(doing[j], k + ': ' + F.doing(b, o)).toMatch(/ing$/);
+      });
+    });
+    expect(checked).toBeGreaterThan(20);
+    expect(F.doing('choose units that suit each measurement and check conversions')).toBe(
+      'choosing units that suit each measurement and checking conversions',
+    );
+    expect(F.does('make changes, fix problems and retest')).toBe('makes changes, fixes problems and retests');
+    expect(F.does('check how reliable and correct a text is')).toBe('checks how reliable and correct a text is');
+  });
+});
+
 describe('every derived form, printed for review', () => {
   it('matches tests/__forms__/derived-forms.txt', async () => {
     const lines = [];
@@ -98,6 +138,7 @@ describe('schema version 2 in the build step and the engine', () => {
       did: [],
       at: { developing: [], proficient: [], extending: [] },
       override: {},
+      next: { emerging: [], developing: [], proficient: [], extending: [] },
     });
     expect(v.next_steps.extending).toBe('');
     expect(v.home).toEqual([]);
@@ -113,7 +154,9 @@ describe('schema version 2 in the build step and the engine', () => {
     expect(v2.forms.at.Extending).toHaveLength(3);
     expect(v2.steps.Extending).toBe('explain why a result that does not fit the pattern might have happened');
     expect(v2.area).toBe('reading data');
-    const v1 = CommentBank.bankEntry('bc.sci8.cc.11');
+    // (Every Science 8 card is on version 2 since Nov 4 2026; a Math 8 one
+    // is not.)
+    const v1 = CommentBank.bankEntry('bc.math8.cc.1');
     expect(v1.v2).toBe(false);
     expect(v1.forms.base).toEqual([v1.phrase]);
     expect(v1.forms.did).toEqual([]);

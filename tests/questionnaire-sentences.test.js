@@ -317,8 +317,11 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   const draftWith = (st, steps) => {
     const f = CommentBank.facts(cid, st, 'term-2');
     const ctx = CommentBank.context(f, {});
-    for (let n = 0; n < 40; n++) {
+    // (A press that joins two facts in one sentence has one row for both;
+    // these checks want a row per step, so a press with no join.)
+    for (let n = 0; n < 200; n++) {
       const d = CommentBank.draft(ctx, { seed: CommentBank.seedFor(st.id + '|term-2') + n, quiet: true });
+      if (d.sentences.some(x => x.steps)) continue;
       if (steps.every(k => d.sentences.some(x => x.step === k))) return { f, ctx, d };
     }
     throw new Error('no press has ' + steps.join(', '));
@@ -830,7 +833,7 @@ describe('the card drawn for a Demo Mode student', () => {
     const f = CommentBank.facts(cid, st, termId);
     // A press with a home line, so the next-step sentences share a row.
     let d = null;
-    for (let n = 0; n < 40 && !(d && d.sentences.some(x => x.step === 'home')); n++)
+    for (let n = 0; n < 200 && !(d && d.sentences.some(x => x.step === 'home')); n++)
       d = CommentBank.draft(CommentBank.context(f, {}), { seed: CommentBank.seedFor(st.id) + n, quiet: true });
     upsertTermRating(cid, st.id, termId, { narrative: d.text });
     const html = RQ.renderTermQuestionnaire(cid);

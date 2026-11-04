@@ -166,7 +166,8 @@ describe('the highest-marked skill (highestOf)', () => {
     const d = CommentBank.draft(ctx, { seed: 3 });
     const row = d.sentences.find(x => x.step === 'overall');
     // The skill as written or as a gerund (the pipeline's {strengthDoing}).
-    const said = w => [w, CommentForms.doing(w)].some(t => row.text.toLowerCase().indexOf(t.toLowerCase()) >= 0);
+    const said = w =>
+      [w, CommentForms.doing(w), CommentForms.does(w)].some(t => row.text.toLowerCase().indexOf(t.toLowerCase()) >= 0);
     expect(said(skillWords('socials', 'significance')), row.text).toBe(true);
     expect(said(skillWords('socials', 'evidence')), row.text).toBe(false);
     expect(d.replaced).toEqual([]);

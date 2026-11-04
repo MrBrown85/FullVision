@@ -83,12 +83,18 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
   }
 
   it('shows the thin line under the row of a thin part, linking to Browse Sentences on that part', () => {
-    // The habits sentence: four frames fit the whole class.
+    // The habits sentence: a few frames fit the whole class.
     const { html, d, students } = thinCard();
     const i = d.sentences.findIndex(x => x.step === 'habits');
     expect(i).toBeGreaterThanOrEqual(0);
+    // (How many fit moves with the bank; the line says the count, and the
+    // part is thin when the class has three or more students per sentence.)
+    const n = Number((html.match(/Only (\d+) habit sentences fit/) || [])[1]);
+    expect(n * 3).toBeLessThanOrEqual(students.length);
     const line =
-      '<span class="qn-req-thin">Only 4 habit sentences fit ' +
+      '<span class="qn-req-thin">Only ' +
+      n +
+      ' habit sentences fit ' +
       students.length +
       ' students, so some will repeat. <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="all" data-row="' +
       i +

@@ -44,7 +44,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 /* ── Sampling (the Nov 4 audit's harness) ───────────────────────────── */
 
-export async function sample(base) {
+export async function sample(base, offset = 0) {
   const { chromium } = await import('playwright');
   const b = await chromium.launch();
   const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
@@ -55,7 +55,7 @@ export async function sample(base) {
   await p.goto(base + '/reports');
   await p.waitForSelector('.qn-left');
   await p.waitForTimeout(1500);
-  const rows = await p.evaluate(async () => {
+  const rows = await p.evaluate(async offset => {
     /* global getActiveCourse, ReportBlocks, getStudents, COURSES, clearProfCache, upsertTermRating, CommentBank */
     const cid = getActiveCourse();
     const term = ReportBlocks.getTermId();
@@ -65,15 +65,30 @@ export async function sample(base) {
       COURSES[cid].gradingSystem = mode === 'letter' ? 'letter' : 'proficiency';
       if (typeof clearProfCache === 'function') clearProfCache();
       const out = [];
-      studs.forEach((st, i) => {
+      const ctxs = studs.map((st, i) => {
         // Varied but realistic habit ratings (1 Rarely … 4 Consistently).
         const habits = {};
         keys.forEach((k, j) => (habits[k] = [4, 3, 3, 4, 2, 3, 4, 2, 1, 3][(i + j * 3) % 10]));
         upsertTermRating(cid, st.id, term, { habits });
         const f = CommentBank.facts(cid, st, term);
-        const ctx = CommentBank.context(f, { habits });
-        for (let k = 1; k <= 4; k++) {
-          const d = CommentBank.draft(ctx, { seed: CommentBank.seedFor(st.id + '|' + term) + k, quiet: true });
+        return CommentBank.context(f, { habits });
+      });
+      // A teacher going down the roster: each press, every student in turn,
+      // with the comments already drafted at that press as the class's
+      // (Generate passes the classmates' comments the same way).
+      const onScreen = [];
+      for (let k = 1; k <= 4; k++) {
+        const comments = [];
+        studs.forEach((st, i) => {
+          const d = CommentBank.draft(ctxs[i], {
+            seed: CommentBank.seedFor(st.id + '|' + term) + k + offset,
+            // The text on screen from the press before, as Generate passes it.
+            previous: onScreen[i] || '',
+            // Not quiet: counted in the class, as a press of Generate is.
+            comments: comments.slice(),
+          });
+          comments.push({ sid: st.id, text: d.text });
+          onScreen[i] = d.text;
           out.push({
             mode,
             sid: st.id,
@@ -85,12 +100,12 @@ export async function sample(base) {
             parts: (d.sentences || []).map(x => x.text),
             replaced: (d.replaced || []).length,
           });
-        }
-      });
+        });
+      }
       return out;
     };
     return run('proficiency').concat(run('letter'));
-  });
+  }, offset);
   await b.close();
   if (errors.length) throw new Error('page errors: ' + errors.join(' | '));
   return rows;
@@ -262,7 +277,8 @@ export function measure(rows) {
     perDraft.thisTerm.push(count(r.text, 'this term'));
     perDraft.soFar.push(count(r.text, 'so far'));
     perDraft.scale.push(count(r.text, 'proficiency scale'));
-    perDraft.sentences.push(r.parts.length);
+    // Facts said: each sentence, and a joined sentence twice (two facts).
+    perDraft.sentences.push(r.parts.length + r.ids.filter(id => /^j:/.test(String(id))).length);
     perDraft.words.push(words(r.text).length);
     r.parts.forEach(t => sentWords.push(words(t).length));
     BANNED.forEach(b => {
@@ -346,6 +362,63 @@ export function measure(rows) {
   out.distinct3 = r2(mean(d3));
   out.selfBleu3 = r2(mean(sb));
   out.neighbourEditDistance = r2(mean(neigh));
+  // The blind sort's tells (Nov 4 2026): time openers, stock openers, a
+  // three-word run said twice in a comment, near-copies within a class,
+  // comments with no joined sentence, and phrases shared across a class.
+  const TIME = /^(so|over|since|this|right|now|across|by|recent|recently)$/i;
+  const STOCK = /^(right now|at this point|by now|for now|from the start of the term to now)\b/i;
+  let timeComments = 0;
+  let timeMax = 0;
+  let stock = 0;
+  let trigram = 0;
+  let flat = 0;
+  rows.forEach(r => {
+    const t = r.parts.filter(x => TIME.test(words(x)[0] || '')).length;
+    if (t) timeComments++;
+    timeMax = Math.max(timeMax, t);
+    stock += r.parts.filter(x => STOCK.test(x)).length;
+    const seenG = {};
+    let rep3 = false;
+    r.parts.forEach((x, i) => {
+      const w = normWords(x, r.name);
+      const mine = {};
+      for (let j = 0; j + 2 < w.length; j++) mine[w.slice(j, j + 3).join(' ')] = true;
+      Object.keys(mine).forEach(g => {
+        if (seenG[g] != null && seenG[g] !== i) rep3 = true;
+        seenG[g] = i;
+      });
+    });
+    if (rep3) trigram++;
+    if (r.parts.length >= 5 && !r.ids.some(id => /^j:/.test(id))) flat++;
+  });
+  let near = 0;
+  let shared4 = 0;
+  Object.values(sets).forEach(set => {
+    const ws = set.map(r => normWords(r.text, r.name));
+    for (let i = 0; i < ws.length; i++)
+      for (let j = i + 1; j < ws.length; j++) if (editDistance(ws[i], ws[j]) < 0.5) near++;
+    const holds = {};
+    ws.forEach(w => {
+      const mine = {};
+      for (let j = 0; j + 3 < w.length; j++) {
+        const g = w.slice(j, j + 4);
+        if (g.includes('NAME') || g.includes('PRON')) continue;
+        mine[g.join(' ')] = true;
+      }
+      Object.keys(mine).forEach(g => (holds[g] = (holds[g] || 0) + 1));
+    });
+    const top = Math.max(0, ...Object.values(holds));
+    shared4 = Math.max(shared4, top / set.length);
+  });
+  out.tells = {
+    timeComments: pct(timeComments / rows.length),
+    timeMax,
+    stock,
+    trigram,
+    flat,
+    near,
+    shared4: pct(shared4),
+  };
   out.adjacentSameStart = { total: sharedStarts, worstClass: worstClassShared };
 
   // A student's four presses.
@@ -407,7 +480,7 @@ export function targets(m) {
       m.adjacentSameStart.worstClass <= 2,
     ],
     [
-      'Sentences per draft',
+      'Facts per draft (a joined sentence is two)',
       m.sentencesPerDraft.mean + ' (' + m.sentencesPerDraft.min + '–' + m.sentencesPerDraft.max + ')',
       '5–7',
       m.sentencesPerDraft.min >= 5 && m.sentencesPerDraft.max <= 7,
@@ -419,6 +492,13 @@ export function targets(m) {
       m.wordsPerSentence.max <= 24,
     ],
     ['Press edit distance', m.pressEditDistance, '≥ 0.6', m.pressEditDistance >= 0.6],
+    ['Comments with a time opener', m.tells.timeComments + '%', '≤ 25%', m.tells.timeComments <= 25],
+    ['Time openers in one comment (max)', m.tells.timeMax, '≤ 1', m.tells.timeMax <= 1],
+    ['Stock time openers', m.tells.stock, '0', m.tells.stock === 0],
+    ['Comments repeating a 3-word run', m.tells.trigram, '0', m.tells.trigram === 0],
+    ['Classmate pairs under 0.5 edit distance', m.tells.near, '0', m.tells.near === 0],
+    ['Comments of 5+ sentences with no join', m.tells.flat, '0', m.tells.flat === 0],
+    ['Most shared 4-word run in a class', m.tells.shared4 + '% of comments', 'reported', true],
     ['Self-BLEU-3', m.selfBleu3, 'reported (lower is more varied)', true],
     ['Distinct-2 / distinct-3', m.distinct2 + ' / ' + m.distinct3, 'reported', true],
   ];
@@ -543,6 +623,34 @@ async function main() {
   const m = measure(rows);
   if (process.argv.includes('--json')) console.log(JSON.stringify(m, null, 1));
   else console.log(markdown(m));
+  // Fresh seeds (the four-audience review, Nov 4 2026): the frame and
+  // shape caps on presses no committed run used, worst of N runs.
+  const fresh = Number(arg('fresh', 0));
+  let freshFail = false;
+  if (fresh && base) {
+    const worst = { frame: 0, family: 0, shape: 0 };
+    for (let i = 1; i <= fresh; i++) {
+      const t = targets(measure(await sample(base, 1000 * i)));
+      const num = row => parseFloat(String(row[1]));
+      worst.shape = Math.max(worst.shape, num(t[0]));
+      worst.family = Math.max(worst.family, num(t[1]));
+      worst.frame = Math.max(worst.frame, num(t[2]));
+      if (t.some(x => !x[3])) freshFail = true;
+    }
+    console.log(
+      '\nFresh seeds (' +
+        fresh +
+        ' runs of 216, worst): top first-sentence shape ' +
+        worst.shape +
+        '%, largest shape family ' +
+        worst.family +
+        '%, largest frame share of a part ' +
+        worst.frame +
+        '%; every target met: ' +
+        (freshFail ? 'no' : 'yes') +
+        '.',
+    );
+  }
   const n = Number(arg('blind', 0));
   if (n) {
     const controls = controlsFrom(
@@ -552,7 +660,7 @@ async function main() {
     writeFileSync(arg('sheet', 'blind-sheet.md'), sheet + '\n');
     writeFileSync(arg('key', 'blind-key.md'), key);
   }
-  if (process.argv.includes('--strict') && targets(m).some(t => !t[3])) process.exit(1);
+  if (process.argv.includes('--strict') && (freshFail || targets(m).some(t => !t[3]))) process.exit(1);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();

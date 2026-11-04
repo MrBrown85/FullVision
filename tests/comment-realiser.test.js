@@ -381,7 +381,7 @@ describe('the draft passes through the realiser', () => {
       'One assignment is not handed in: “Map Quiz.”',
       'To earn a grade, he needs to submit the missing work.',
       'The deadline to replace this IE with a grade is December 18.',
-      'Please contact me so we can talk about this plan together.',
+      'Please call or email me so we can make this plan together.',
     ]);
   });
 });

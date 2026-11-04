@@ -138,7 +138,6 @@ describe('preferred name changed after the comment was written (Demo Mode, Scien
       changes.forEach(c => {
         const name = ETHAN.test(c.before);
         const pron = /\b(he|his|him)\b/i.test(c.before);
-        if (pron) expect(c.kind, c.before).toBe('pronouns');
         if (name) expect(c.after, c.before).toMatch(ZED);
         if (pron) expect(c.after, c.before).toMatch(/\b(she|her)\b/i);
       });

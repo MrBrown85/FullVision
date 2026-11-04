@@ -415,9 +415,21 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       comments.push({ sid: st.id, text: d.text });
       const op = d.sentences.find(x => x.step === 'home');
       if (!op) return;
-      // The tier: the sentences for the next step's skill, or the general ones.
-      const fit = CommentBank.stepPool('home', ctx);
-      if (seen.indexOf(op.id) >= 0)
+      // The tier: the sentences for the next step's skill, or the general ones;
+      // Generate's own home frames when it drafts with them (Nov 4 2026).
+      const fit = CommentBank.stepPool('home', ctx, undefined, { pipeline: /^v/.test(op.id) });
+      // (A home idea that repeats three words of the draft, in every wrapper,
+      // takes whichever wrapper is left: no frame keeps the rule.)
+      const runs = t => {
+        const w = CommentPipeline.words(t, f.name);
+        return w.slice(0, -2).map((_, i) => w.slice(i, i + 3).join(' '));
+      };
+      const before = d.sentences
+        .filter(x => x !== op)
+        .map(x => x.text)
+        .join(' ');
+      const forced = runs(op.text).some(g => runs(before).indexOf(g) >= 0);
+      if (seen.indexOf(op.id) >= 0 && !forced)
         expect(
           fit.every(s => seen.indexOf(s.id) >= 0),
           st.firstName,
