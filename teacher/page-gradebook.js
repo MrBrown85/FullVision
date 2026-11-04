@@ -1508,7 +1508,7 @@ window.PageGradebook = (function () {
           'cursor:default"><span class="gb-avg-val" style="color:' +
           PROF_COLORS[Math.round(stats.avg)] +
           ';font-weight:700">' +
-          formatLevel(cid, stats.avg) +
+          formatColumnAverageLevel(cid, stats.avg) +
           '</span></td>';
       }
     });
@@ -1765,7 +1765,7 @@ window.PageGradebook = (function () {
         '<td class="gb-scores-avg"><span class="gb-avg-val" style="color:' +
         (PROF_COLORS[level] || PROF_COLORS[0]) +
         '">' +
-        (isPointsScored(a) || isCompletionScored(a) ? _csvAverageText(a, stats) : _levelCellHtml(cid, stats.avg)) +
+        (isPointsScored(a) || isCompletionScored(a) ? _csvAverageText(cid, a, stats) : _levelCellHtml(cid, stats.avg)) +
         '</span></td>';
     });
     html += '</tr>';
@@ -2018,7 +2018,7 @@ window.PageGradebook = (function () {
      cell: a student's cell (assessmentCellValue), whose % is the piece's
      own; none for a Class Average. */
   function _levelCellHtml(cid, value, cell) {
-    if (courseGradeMode(cid) !== 'both') return esc(cell ? cell.text : formatLevel(cid, value));
+    if (courseGradeMode(cid) !== 'both') return esc(cell ? cell.text : formatColumnAverageLevel(cid, value));
     return (
       '<span class="gb-cell-both"><span>' +
       esc(formatLevelAs(cid, value, 'proficiency')) +
@@ -2453,11 +2453,11 @@ window.PageGradebook = (function () {
   }
 
   /* A Class Average as the CSV prints it, the printed sheet's way. */
-  function _csvAverageText(a, stats) {
+  function _csvAverageText(cid, a, stats) {
     if (!stats) return '';
     if (isCompletionScored(a)) return Math.round(stats.pct) + '%';
     if (isPointsScored(a)) return formatPoints(Math.round(stats.avg * 10) / 10);
-    return formatLevelAs(null, stats.avg, 'proficiency');
+    return formatColumnAverageLevel(cid, stats.avg, 'proficiency');
   }
 
   function exportScoresCSV() {
@@ -2529,7 +2529,7 @@ window.PageGradebook = (function () {
     var avgRow = ['Class Average'];
     for (var pad = 1; pad < headers.length - assessments.length; pad++) avgRow.push('');
     assessments.forEach(function (a) {
-      avgRow.push(_csvAverageText(a, classColumnAverage(cid, students, { assessment: a })));
+      avgRow.push(_csvAverageText(cid, a, classColumnAverage(cid, students, { assessment: a })));
     });
     rows.push(avgRow);
 

@@ -2515,7 +2515,19 @@ function classColumnAverageText(cid, assessment, res) {
       '%'
     );
   }
-  return formatLevel(cid, res.avg);
+  return formatColumnAverageLevel(cid, res.avg);
+}
+
+/* A Class Average that is a level (classColumnAverage's avg), as `as` asks
+   (formatLevelAs's 'percent' or 'proficiency'), or as the class shows it
+   (formatLevel) when `as` is left out. Call it only when someone counted.
+   In a Letter class Missing counts as 0 in every column, so a column whose
+   counted students are all Missing averages 0 and reads "0%" ("0.0" where
+   the column prints proficiency figures), not the "—" of a column nobody
+   counts in (Nov 3 bug sweep). */
+function formatColumnAverageLevel(cid, avg, as) {
+  if (!(avg > 0) && courseGradeMode(cid) === 'letter') return as === 'proficiency' ? '0.0' : '0%';
+  return as ? formatLevelAs(cid, avg, as) : formatLevel(cid, avg);
 }
 
 /* How many students sit at each grade, best first: by letter grade (A to F)
@@ -2822,6 +2834,7 @@ window.Calc = {
   classGradeDistribution,
   competencyDistribution,
   classColumnAverageText,
+  formatColumnAverageLevel,
   getAssessmentGroupPercentage,
   rubricCompetencyIds,
   rubricCriteriaForTag,
