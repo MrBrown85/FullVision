@@ -82,6 +82,9 @@ describe('a rubric piece alone in its category', () => {
     expect(row).toMatchObject({ score: '3.3', outOf: '4', percent: '87%' });
     expect(GradeReport.categorySummary(CID, STUDENT).find(c => c.name === 'Projects').grade).toBe('A 87%');
 
+    // The printed graded rubric's Overall.
+    expect(RubricPrint.sheetData(CID, 'lhi', SID).overall).toMatchObject({ text: '87%' });
+
     const grades = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, {}));
     expect(grades).toContain('Local History Inquiry 3.3 / 4 \u00B7 87%');
   });

@@ -385,7 +385,9 @@
       if (value > 0) {
         overall = {
           value: value,
-          text: typeof formatLevel === 'function' ? formatLevel(cid, value) : '',
+          // As the gradebook cell shows it: in a Letter or Both class, the %
+          // the piece counts as in its category (Colin, 2026-11-03).
+          text: typeof assessmentCellValue === 'function' ? assessmentCellValue(cid, sid, assessment).text : '',
           word: typeof levelWord === 'function' ? levelWord(cid, value) : '',
         };
       }
