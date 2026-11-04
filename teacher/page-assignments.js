@@ -269,6 +269,7 @@ window.PageAssignments = (function () {
     if (!focusStudentId) return;
     var memo = _graderFocusMemo();
     if (_grader && _graderStepGroup(dir)) {
+      _graderToTop();
       _restoreGraderFocus(memo);
       return;
     }
@@ -294,9 +295,18 @@ window.PageAssignments = (function () {
     _syncSidebarSelection();
     render();
     var card = document.querySelector('.assess-card.open');
-    if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
+    if (_grader) _graderToTop();
+    else if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
     if (hadKbFocus && card) kbFocusCell(card.querySelector('.rsg-criterion-row'));
     else _restoreGraderFocus(memo);
+  }
+
+  /* The grader opens the next student at the top, under their name: kept
+     scrolled down, the name was off screen and a teacher could score the
+     wrong student (Nov 3 sweep). The same card keeps the focus. */
+  function _graderToTop() {
+    var sc = _grader && _grader.overlay.querySelector('.grader-scroll');
+    if (sc) sc.scrollTop = 0;
   }
 
   /* The grading control that has focus (a criterion or competency card, a
