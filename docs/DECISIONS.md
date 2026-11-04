@@ -73,7 +73,7 @@ A 72% test showed 2.9 (Proficient's colour) on the student page, while its compe
 
 - **A points or Complete/Incomplete assessment's level is the level its % reaches on the class's Points to Proficiency table**, everywhere a level is shown: group grades and single-assignment grades on the student page, level averages, report blocks, the printed sheet's level reading. Before, it was a straight share of 4 (72% = 2.88).
 - **The % doesn't change.** Points work still counts its points in the course %.
-- A points 0 and Incomplete are Emerging, the table's bottom, as their competency already read them. Missing points work stays a 0 level.
+- A points 0 and Incomplete are Emerging, the table's bottom, as their competency already read them. Missing points work stays a 0 level, except in a Proficiency class, where it is no evidence ("Class Averages and statuses" 6, 2026-11-03).
 
 ## Where DIBELS is offered (2026-11-02)
 
@@ -350,7 +350,7 @@ Context: the Competencies view, the printed grade sheet and the CSV export each 
 3. **A criterion column averages every competency it feeds** (Colin, 2026-10-22). In Rubrics by Criterion, each student's value is the mean of their scores on the criterion's competencies, so each student counts once.
 4. **The NS mark says how it counts.** Its tooltip reads "counts as 0" on points work; on proficiency work, "not counted, no evidence yet" in a Proficiency class and "0 in the course %, not counted in proficiency" in a class with a course %.
 5. **The CSV export prints what the Scores view shows** (`assessmentCellValue`: points as points, levels on the proficiency scale, NS and EXC as such) and ends with a Class Average row under each assessment.
-6. **Level averages follow the same rule** (2026-11-01). A group grade's level (a category, module or type on the student page, or one assignment's pill) leaves Missing proficiency work out instead of counting it as 0, so a 3 and a Missing read 3.0, not 1.5. The % beside it still counts the Missing work as 0 (D7). Missing points work stays a 0 level, as its column counts it.
+6. **Level averages follow the same rule** (2026-11-01). A group grade's level (a category, module or type on the student page, or one assignment's pill) leaves Missing proficiency work out instead of counting it as 0, so a 3 and a Missing read 3.0, not 1.5. The % beside it still counts the Missing work as 0 (D7). Missing points work stays a 0 level, as its column counts it, except in a Proficiency class (2026-11-03): Colin, "Yes, no evidence there too." There every level average (a category, folder, module or assignment type, the student page's group grades, one assignment's pill) leaves Missing points work out as no evidence, as it leaves out Missing proficiency work, so they agree with competency proficiency: a 3 and a Missing points quiz read 3.0, not 1.5. Its column's Class Average still counts it as 0 (2).
 
 ## Buttons and breadcrumbs (2026-10-19)
 

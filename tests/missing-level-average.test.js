@@ -5,7 +5,9 @@
  * alone showed "0.0", while the competency said 3. Missing proficiency
  * work is no evidence there, as in competency proficiency and Class
  * Averages (docs/DECISIONS.md, "Class Averages and statuses"); it still
- * counts 0 in the % (D7).
+ * counts 0 in the % (D7). In a Proficiency class Missing points work is no
+ * evidence there too (Colin, 2026-11-03); its Class Average still counts it
+ * as 0.
  */
 import './setup.js';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -54,8 +56,18 @@ describe('Missing proficiency work in level averages', () => {
     expect(getCourseLetterData(CID, SID).R).toBe(37.5);
   });
 
-  it('Missing points work stays a 0, as its column counts it', () => {
+  // Colin, 2026-11-03: "Yes, no evidence there too."
+  it('Missing points work is no evidence in a Proficiency class; its Class Average still counts it as 0', () => {
     seed('proficiency', [x, quiz], [three], { [SID + ':q']: 'NS' });
+    expect(assessmentGroupGrade(CID, SID, [x, quiz])).toMatchObject({ text: '3.0', prof: 3 });
+    expect(assessmentGroupGrade(CID, SID, [quiz])).toBeNull();
+    expect(getTagProficiency(CID, SID, 't1')).toBe(3);
+    expect(classColumnAverage(CID, [{ id: SID }], { assessment: quiz, measure: 'level' })).toMatchObject({ avg: 0 });
+    expect(getClassPointsAverage(CID, [{ id: SID }], quiz)).toMatchObject({ avg: 0, pct: 0 });
+  });
+
+  it('Missing points work stays a 0 level in a class with a course %', () => {
+    seed('both', [x, quiz], [three], { [SID + ':q']: 'NS' });
     expect(assessmentGroupGrade(CID, SID, [x, quiz]).prof).toBe(1.5);
   });
 });
