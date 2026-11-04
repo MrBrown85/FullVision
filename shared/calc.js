@@ -2590,11 +2590,12 @@ function classColumnAverageText(cid, assessment, res) {
    (formatLevelAs's 'percent' or 'proficiency'), or as the class shows it
    (formatLevel) when `as` is left out. Call it only when someone counted.
    In a Letter class Missing counts as 0 in every column, so a column whose
-   counted students are all Missing averages 0 and reads "0%" ("0.0" where
-   the column prints proficiency figures), not the "—" of a column nobody
-   counts in (Nov 3 bug sweep). */
+   counted students are all Missing averages 0 and reads "0%", not the "—"
+   of a column nobody counts in (Nov 3 bug sweep). It says 0% where the
+   column prints proficiency figures too (the CSV, the printed sheet), as
+   the screen does: a Letter class has no 0.0 level (Colin, 2026-11-03). */
 function formatColumnAverageLevel(cid, avg, as) {
-  if (!(avg > 0) && courseGradeMode(cid) === 'letter') return as === 'proficiency' ? '0.0' : '0%';
+  if (!(avg > 0) && courseGradeMode(cid) === 'letter') return '0%';
   return as ? formatLevelAs(cid, avg, as) : formatLevel(cid, avg);
 }
 

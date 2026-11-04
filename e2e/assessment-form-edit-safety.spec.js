@@ -37,7 +37,8 @@ test('changing the scoring of scored work asks; Cancel keeps it', async ({ page 
   await page.locator('.af-scoremode-btn[data-mode="points"]').click();
   await expect(page.locator('#af-dialog-title')).toHaveText('Change the Scoring?');
   await page.locator('.af-dialog-card button', { hasText: 'Cancel' }).click();
-  await expect(page.locator('#af-scoremode')).toHaveValue('proficiency');
+  // Work with no rubric opens on Competencies (Step 4 group 3 #24).
+  await expect(page.locator('#af-scoremode')).toHaveValue('competencies');
   await page.locator('.af-scoremode-btn[data-mode="points"]').click();
   await page.locator('.af-dialog-card button', { hasText: 'Change the Scoring' }).click();
   await expect(page.locator('#af-scoremode')).toHaveValue('points');
@@ -54,6 +55,15 @@ test('changing the rubric of scored work asks first', async ({ page }) => {
   await expect(page.locator('#af-rubric')).toHaveValue(a.rubricId);
 });
 
+/* Work with no rubric opens on Competencies. Moving it to Rubric changes
+   nothing yet, so it doesn't ask; choosing the rubric does. */
+async function useRubricScoring(page) {
+  await expect(page.locator('#af-scoremode')).toHaveValue('competencies');
+  await page.locator('.af-scoremode-btn[data-mode="proficiency"]').click();
+  await expect(page.locator('#af-dialog-title')).toHaveCount(0);
+  await expect(page.locator('#af-scoremode')).toHaveValue('proficiency');
+}
+
 // Science 7, another curriculum, with a copy of one of Science 8's rubrics.
 function addScience7() {
   COURSES.sci7 = Object.assign(structuredClone(COURSES.sci8), {
@@ -68,6 +78,7 @@ function addScience7() {
 
 test('copying a rubric onto scored work with no rubric asks first', async ({ page }) => {
   await editScored(page, false, addScience7);
+  await useRubricScoring(page);
   await page.locator('[data-action="rubricFromClass"]').click();
   await page.selectOption('#af-copy-from', 'sci7');
   const card = page.locator('#af-rubric-view .af-start-card[data-start="copy"]');
@@ -82,6 +93,7 @@ test('a Blank rubric on scored work with no rubric asks first, on Save Rubric an
   page,
 }) => {
   const a = await editScored(page, false);
+  await useRubricScoring(page);
   await page.locator('.af-rubric-start[data-start="blank"]').click();
   const ed = page.locator('#af-rubric-view .af-ge-card');
   await ed.locator('[data-ge="level"][data-i="0"][data-level="4"]').fill('Goes beyond.');

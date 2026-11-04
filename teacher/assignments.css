@@ -591,7 +591,7 @@
   overflow-wrap: anywhere;
 }
 
-/* Scoring Mode: three cards, the chosen one outlined in blue. Its settings
+/* Scoring Mode: a card per way to score, the chosen one outlined in blue. Its settings
    (Max Points, Factor) sit in a row below at one 36px height. */
 .af-mode-cards {
   display: grid;
@@ -735,6 +735,28 @@
 }
 .af-mode-tip-pic .cmp-btn {
   cursor: default;
+}
+/* Competencies: a competency a row, each with its level. */
+.af-tip-comp {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.af-tip-comp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 170px;
+}
+.af-tip-comp-row .gb-score-val {
+  width: 34px;
+  height: 26px;
+}
+.af-tip-comp-name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text);
 }
 @media (max-width: 560px) {
   .af-mode-cards {
@@ -1316,8 +1338,9 @@
 .af-card-scoring .af-mode-item {
   flex: 0 0 auto;
 }
+/* 140px keeps four cards and Factor on one row on a 1440px screen. */
 .af-card-scoring .af-mode-card {
-  min-width: 168px;
+  min-width: 140px;
   white-space: nowrap;
   padding: 0 18px;
 }
