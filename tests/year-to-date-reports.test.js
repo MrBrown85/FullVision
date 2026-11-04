@@ -192,3 +192,56 @@ describe("Missing Work lists anything still Missing up to the report's end (deci
     expect(quick.map(r => r.title).sort()).toEqual(['September Quiz', 'Undated Poster']);
   });
 });
+
+describe('growth compares the year to date at the last report with now (decision 18)', () => {
+  const was = globalThis.courseToday;
+  beforeEach(() => {
+    localStorage.clear();
+    globalThis.courseToday = () => '2027-02-10';
+    seed('proficiency');
+  });
+  afterEach(() => {
+    setActiveTerm(CID, null);
+    globalThis.courseToday = was;
+    delete COURSES[CID];
+  });
+
+  it('Growth Since Last Report: Report 1 2.0 beside Report 2 3.0, up', () => {
+    setActiveTerm(CID, 2);
+    const html = ReportBlocks.renderBlockGrowth(CID, STUDENT);
+    const t = text(html);
+    expect(t).toContain('Competency Report 1 Report 2');
+    expect(t).toMatch(/Questioning .*Developing .*Proficient/);
+    expect(html).toContain('aria-label="Up"');
+    expect(getActiveTerm(CID).ordinal).toBe(2);
+  });
+
+  it('Proficiency and Progress in One Area say "Report 1" and "since Report 1"', () => {
+    setActiveTerm(CID, 2);
+    const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, { termId: 'term-2' }, {}));
+    expect(prof).toContain('Competency Report 1 Now');
+    const progress = text(ReportBlocks.renderBlockProgress(CID, STUDENT, { termId: 'term-2' }, {}));
+    expect(progress).toContain('Report 1 2.0 Developing');
+    expect(progress).toContain('Now 3.0 Proficient (+1.0 since Report 1)');
+  });
+
+  it("Start of Term is measured inside the report's own term", () => {
+    // Report 1 has no report before it: Start of Term, from Term 1's work.
+    setActiveTerm(CID, 1);
+    const r1 = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, { termId: 'term-1' }, {}));
+    expect(r1).toContain('Competency Start of Term Now');
+    // Asked for on Report 2, the start is Term 2's first piece (the 4), not September's 2.
+    setActiveTerm(CID, 2);
+    const r2 = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, { termId: 'term-2' }, { compare: 'start' }));
+    expect(r2).toContain('Questioning 4.0');
+  });
+
+  it('the dashboard arrow: the year to date at Report 1 beside the year so far', () => {
+    globalThis.courseToday = () => '2027-01-10'; // in Term 2: Report 1 is the last report
+    expect(getActiveTerm(CID)).toBeNull();
+    expect(classGradeChange(CID, [SID])).toEqual({ text: '▲ 1.0', dir: 1, since: 'Report 1' });
+    // Before Report 1 has ended there is nothing to compare with.
+    globalThis.courseToday = () => '2026-11-15';
+    expect(classGradeChange(CID, [SID])).toBeNull();
+  });
+});

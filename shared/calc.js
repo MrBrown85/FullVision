@@ -2544,25 +2544,26 @@ function _classGradeMeans(cid, studentIds) {
   return { prof: mean(profs), pct: mean(pcts) };
 }
 
-/* How the class average moved since the reporting term before the active
-   one, in the grade the class shows first (the % in a Letter class, else
-   the proficiency): { text: '\u25B2 0.1', dir: 1, since: 'Term 1' }, dir -1 for
-   down and 0 (text 'No Change') when it rounds to nothing. Null when no term
-   is active, the active term is the first, or either term has no grades. */
+/* "Report 2": a reporting term by the number the Reports page gives it. */
+function reportName(term) {
+  return term ? 'Report ' + Number(term.ordinal) : '';
+}
+
+/* How the class average moved since the last report, in the grade the
+   class shows first (the % in a Letter class, else the proficiency): the
+   year to date at the last report's end beside the year to date now (or,
+   with a report in view, at its end; Colin, 2026-11-03).
+   { text: '\u25B2 0.1', dir: 1, since: 'Report 1' }, dir -1 for down and
+   0 (text 'No Change') when it rounds to nothing. Null before the first
+   report has ended, or when either has no grades. */
 function classGradeChange(cid, studentIds) {
-  var active = getActiveTerm(cid);
-  if (!active) return null;
-  var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
-  var prev = null;
-  terms.forEach(function (t) {
-    if (t.ordinal < active.ordinal && (!prev || t.ordinal > prev.ordinal)) prev = t;
-  });
+  var prev = previousReportTerm(cid);
   if (!prev) return null;
   var key = courseGradeMode(cid) === 'letter' ? 'pct' : 'prof';
   var now = _classGradeMeans(cid, studentIds)[key];
-  setActiveTerm(cid, prev.ordinal);
-  var before = _classGradeMeans(cid, studentIds)[key];
-  setActiveTerm(cid, active.ordinal);
+  var before = readAsOfTerm(cid, prev.ordinal, function () {
+    return _classGradeMeans(cid, studentIds)[key];
+  });
   if (now == null || before == null) return null;
   var diff =
     key === 'pct'
@@ -2574,7 +2575,7 @@ function classGradeChange(cid, studentIds) {
   return {
     text: dir === 0 ? 'No Change' : (dir > 0 ? '\u25B2 ' : '\u25BC ') + amount,
     dir: dir,
-    since: prev.label || 'Term ' + prev.ordinal,
+    since: reportName(prev),
   };
 }
 
@@ -2939,6 +2940,7 @@ window.Calc = {
   studentGradeSummary,
   classGradeSummary,
   classGradeChange,
+  reportName,
   classGradeDistribution,
   competencyDistribution,
   classColumnAverageText,

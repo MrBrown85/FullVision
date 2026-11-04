@@ -874,13 +874,22 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('term-glance', CID, CECE, {}, {})).toBe('');
   });
 
-  it('Growth Since Last Report reads the previous term through calc.js and puts the term back', () => {
+  it('Growth Since Last Report reads the last report through calc.js and puts the report back', () => {
     let term = 2;
     const set = [];
     stub('getActiveTerm', () => ({ ordinal: term, label: 'Term ' + term }));
-    stub('setActiveTerm', (cid, n) => {
+    stub('previousReportTerm', () => (term > 1 ? { ordinal: term - 1, label: 'Term ' + (term - 1) } : null));
+    // The last report is read as of its end (the year to date) and this one put back.
+    stub('readAsOfTerm', (cid, n, read) => {
+      const was = term;
       set.push(n);
       term = n;
+      try {
+        return read();
+      } finally {
+        term = was;
+        set.push(was);
+      }
     });
     stub('getReportingTerms', () => [
       { ordinal: 1, label: 'Term 1' },
@@ -896,7 +905,7 @@ describe('stage 3 blocks', () => {
     expect(set).toEqual([1, 2]);
     expect(term).toBe(2);
     expect(text(html)).toBe(
-      'Growth Since Last Report Competency Term 1 Term 2 Questioning ●●○○ Developing ●●●○ Proficient ↑ Planning ●●●○ Proficient ●●●○ Proficient →',
+      'Growth Since Last Report Competency Report 1 Report 2 Questioning ●●○○ Developing ●●●○ Proficient ↑ Planning ●●●○ Proficient ●●●○ Proficient →',
     );
     // No earlier term, or nothing in it: nothing prints.
     term = 1;
