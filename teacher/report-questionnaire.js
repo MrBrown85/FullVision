@@ -133,7 +133,7 @@ window.ReportQuestionnaire = (function () {
     if (text === plainComment(before.narrative || '').replace(/\s+$/, '')) {
       // The same words, but a sentence became the teacher's (Keep This
       // Sentence): only the record is saved.
-      var rec = _withTeacherText(cid, sid, termId, { narrative: text }).draftMeta;
+      var rec = _withTeacherText(cid, sid, termId, _withName(cid, sid, termId, { narrative: text })).draftMeta;
       var was = (before.draftMeta || {}).teacher_text;
       if (rec && JSON.stringify(rec.teacher_text) !== JSON.stringify(was || null))
         upsertTermRating(cid, sid, termId, { draftMeta: rec });
@@ -154,10 +154,14 @@ window.ReportQuestionnaire = (function () {
      record, or from the old generator) and Generate replaces it. With no
      rows for the box nothing is recorded. */
   function _withTeacherText(cid, sid, termId, data) {
-    var rows = _rows[cid + '|' + sid + '|' + termId];
-    if (!rows) return data;
-    var text = teacherText(alignRows(rows, String(data.narrative || '')));
+    var key = cid + '|' + sid + '|' + termId;
     var r = getStudentTermRating(cid, sid, termId) || {};
+    var rows = _rows[key];
+    // A comment typed into an empty box before its rows were drawn (the
+    // teacher moved on within the align delay): every sentence is theirs.
+    if (!rows && !plainComment(r.narrative || '').trim()) rows = [];
+    if (!rows) return data;
+    var text = teacherText(alignRows(rows, String(data.narrative || ''), _replacedEarlier[key]));
     var meta = data.draftMeta || r.draftMeta || { v: 1, sentences: [] };
     return Object.assign({}, data, { draftMeta: Object.assign({}, meta, { teacher_text: text }) });
   }
@@ -166,7 +170,10 @@ window.ReportQuestionnaire = (function () {
     var out = [];
     (rows || []).forEach(function (r) {
       if (!r || r.earlier || !String(r.text || '').trim()) return;
-      if ((isTyped(r) || r.edited) && out.indexOf(r.text) < 0) out.push(String(r.text));
+      // A sentence from the teacher's own bank (My Bank) is theirs too, so
+      // it stays theirs if they later delete it from the bank.
+      var own = (r.s && r.s.mine) || /^mine:/.test(String(r.id || ''));
+      if ((isTyped(r) || r.edited || own) && out.indexOf(r.text) < 0) out.push(String(r.text));
     });
     return out;
   }
@@ -638,7 +645,7 @@ window.ReportQuestionnaire = (function () {
     var key = _rowKey(st);
     var rows = _rowsFor(st, f);
     if (text != null) {
-      rows = alignRows(rows, text);
+      rows = alignRows(rows, text, _replacedEarlier[key]);
       _rows[key] = rows;
     }
     var prev = (getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).draftMeta || null;
@@ -821,7 +828,7 @@ window.ReportQuestionnaire = (function () {
           return y.text === x.before;
         });
         if (at < 0) {
-          rows = alignRows(rows, next);
+          rows = alignRows(rows, next, _replacedEarlier[key]);
           return;
         }
         var step = rows[at].step || (r.draftMeta.sentences[x.i] || {}).step || null;
@@ -1759,6 +1766,10 @@ window.ReportQuestionnaire = (function () {
   // it), so choosing IE or goals can redraw a draft the teacher has not
   // edited, and a habit rating can redraw its habits sentence.
   var _lastDraft = {};
+  // The Earlier Comment sentences Generate replaced, per comment: one that
+  // comes back (⌘Z in the box) is the Earlier Comment's again, not a
+  // sentence the teacher typed.
+  var _replacedEarlier = {};
   // And the seed it was drafted with, so a class line's change can draft it
   // again with only that line different.
   var _lastSeed = {};
@@ -1838,9 +1849,19 @@ window.ReportQuestionnaire = (function () {
     // still works in the box too).
     // Sentences of the Earlier Comment are replaced too, and the toast
     // says so.
-    var earlierN = rows.filter(function (r) {
+    var gone = rows.filter(function (r) {
       return r.earlier;
-    }).length;
+    });
+    var earlierN = gone.length;
+    if (earlierN) {
+      var was = _replacedEarlier[key] || (_replacedEarlier[key] = {});
+      gone.forEach(function (r) {
+        was[r.text] = true;
+        sentencesOf(r.text).forEach(function (t) {
+          was[t] = true;
+        });
+      });
+    }
     if (before && before.text !== el.value)
       _undoToast(
         st,
@@ -2268,29 +2289,39 @@ window.ReportQuestionnaire = (function () {
     return v;
   }
 
-  /* Whether a sentence states a letter grade, or an overall %, other than
-     the gradebook's (g, the facts' grade). Only in a class with letter
-     grades; a sentence about a piece's own % ("80% on the quiz") is left
-     alone. */
+  /* Whether a sentence states a course letter grade, or an overall %, other
+     than the gradebook's (g, the facts' grade). Only in a class with letter
+     grades. A letter counts only in a sentence about the course grade
+     ("overall", "this term", "grade", "standing", "average", "mark"), and
+     never when it is a piece's ("an A on the essay") or an initial ("A.
+     Singh"). A % counts only beside a letter ("C- (58.3%)") or after
+     "overall" or "average", never a piece's ("90% on the unit test"). */
   var GRADE_SAID_RE =
-    /(?:^|[\s(])(?:[Aa]n?|earns?|earned|earning|has|had|have|got|gets|getting|of|is|at|with|receives?|received|receiving)\s+(?:an?\s+)?(A|B|C|F|IE)([+−-]?)(?=$|[\s,.;:!?()])/g;
+    /(?:^|[\s(])(?:[Aa]n?|earns?|earned|earning|has|had|have|got|gets|getting|of|is|at|with|receives?|received|receiving)\s+(?:an?\s+)?(A|B|C|F|IE)([+\u2212-]?)(?=$|[\s,;:!?()]|\.(?!\s*[A-Z]))/g;
+  var GRADE_CONTEXT_RE = /\b(overall|this term|so far|grade|standing|average|mark|in the course|in this course)\b/i;
+  var PIECE_AFTER_RE = /^\s*(?:\([^)]*\)\s*)?(?:on|in|for)\s+(?:the|her|his|their|a|an|this|that|my|each|every)\b/i;
   function gradeClaimWrong(text, g) {
     if (!g || g.letter == null || g.mode === 'proficiency') return false;
     var t = String(text || '');
-    var said = false;
-    var wrong = false;
+    if (!GRADE_CONTEXT_RE.test(t)) return false;
     var m;
     GRADE_SAID_RE.lastIndex = 0;
     while ((m = GRADE_SAID_RE.exec(t))) {
-      said = true;
-      var letter = m[1] + (m[2] === '−' ? '-' : m[2] || '');
-      if (letter !== String(g.letter)) wrong = true;
+      if (PIECE_AFTER_RE.test(t.slice(m.index + m[0].length))) continue;
+      var letter = m[1] + (m[2] === '\u2212' ? '-' : m[2] || '');
+      if (letter !== String(g.letter)) return true;
     }
-    if (wrong) return true;
-    if (!said && !/\boverall\b/i.test(t)) return false;
     if (g.pct == null || g.pct === '') return false;
-    var p = t.match(/(\d{1,3}(?:\.\d+)?)\s?%/);
-    return !!p && Math.abs(Number(p[1]) - Number(g.pct)) >= 0.5;
+    var pctRe =
+      /(?:[ABCF][+\u2212-]?\s*\(\s*(\d{1,3}(?:\.\d+)?)\s?%\s*\))|(?:\b(?:overall|average)\b[^.%\d]{0,30}(\d{1,3}(?:\.\d+)?)\s?%)|(?:(\d{1,3}(?:\.\d+)?)\s?%\s+overall)/gi;
+    var p;
+    while ((p = pctRe.exec(t))) {
+      var after = t.slice(p.index + p[0].length);
+      if (PIECE_AFTER_RE.test(after)) continue;
+      var n = Number(p[1] || p[2] || p[3]);
+      if (Math.abs(n - Number(g.pct)) >= 0.5) return true;
+    }
+    return false;
   }
   /* An approved comment with a sentence that no longer matches: Approve
      and Next waits for Keep as Approved or Use the New Sentence. */
@@ -3138,7 +3169,7 @@ window.ReportQuestionnaire = (function () {
      rows they replaced, the last row taking the rest); a sentence with no
      row becomes the teacher's own row; a row whose sentence is gone goes.
      A row of several sentences (a teacher line) matches as a run. */
-  function alignRows(rows, text) {
+  function alignRows(rows, text, earlierTexts) {
     var ss = sentencesOf(text);
     var units = rows.map(function (r) {
       var k = sentencesOf(r.text).length || 1;
@@ -3170,6 +3201,8 @@ window.ReportQuestionnaire = (function () {
       pendR.forEach(function (r, k) {
         if (k >= pendS.length) return;
         var t = k === pendR.length - 1 ? pendS.slice(k).join(' ') : pendS[k];
+        // An Earlier Comment sentence put back (⌘Z after Generate).
+        if (earlierTexts && earlierTexts[t]) return out.push(earlierRow(t, out.length));
         var c = Object.assign({}, r, { text: t });
         c.edited = c.drafted == null || t !== c.drafted;
         // An Earlier Comment sentence the teacher changed is theirs now.
@@ -3181,6 +3214,7 @@ window.ReportQuestionnaire = (function () {
       });
       if (!pendR.length)
         pendS.forEach(function (t) {
+          if (earlierTexts && earlierTexts[t]) return out.push(earlierRow(t, out.length));
           out.push({
             id: 'text:' + out.length,
             step: null,
@@ -3952,7 +3986,7 @@ window.ReportQuestionnaire = (function () {
     if (!st || !el || String(el.dataset.sid) !== String(st.id)) return;
     var key = _rowKey(st);
     var rows = _rows[key] || _rowsFor(st, _facts(st));
-    var next = alignRows(rows, el.value);
+    var next = alignRows(rows, el.value, _replacedEarlier[key]);
     var mark = function (xs) {
       return JSON.stringify(
         xs.map(function (r) {
@@ -7038,7 +7072,7 @@ window.ReportQuestionnaire = (function () {
         });
         _adoptDraft(key, last);
       } else if (_rows[key]) {
-        _rows[key] = alignRows(_rows[key], next);
+        _rows[key] = alignRows(_rows[key], next, _replacedEarlier[key]);
       }
     });
   }

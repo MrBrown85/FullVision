@@ -3399,6 +3399,14 @@ function seedIfNeeded() {
         modified: new Date('2026-03-20').toISOString(),
       },
     };
+    // The demo teacher typed these comments, so they are recorded as theirs
+    // (draft_meta.teacher_text) and Generate keeps them.
+    Object.keys(sci8TR).forEach(sid => {
+      Object.keys(sci8TR[sid]).forEach(term => {
+        const r = sci8TR[sid][term];
+        if (r.narrative && !r.draftMeta) r.draftMeta = { v: 1, sentences: [], teacher_text: [r.narrative] };
+      });
+    });
     saveTermRatings('sci8', current(sci8TR));
   }
 

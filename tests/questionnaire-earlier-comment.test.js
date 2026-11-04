@@ -148,6 +148,21 @@ describe('a saved comment with no record of what the teacher typed', () => {
     expect(el.value).not.toContain(OLD_1);
   });
 
+  it('⌘Z in the box after Generate brings them back as the Earlier Comment, not as typed', () => {
+    const text = OLD_1 + ' ' + OLD_2;
+    rate({ narrative: text });
+    open();
+    const el = box(text);
+    RQ.tqGenerate();
+    // The box's own undo puts the old words back; the save that follows
+    // must not record them as the teacher's.
+    el.value = text;
+    RQ.tqSaveNarrative();
+    expect(saved().draftMeta.teacher_text || []).toEqual([]);
+    RQ.tqGenerate();
+    expect(el.value).not.toContain(OLD_1);
+  });
+
   it('Keep This Sentence makes one the teacher’s: recorded, and Generate keeps it', () => {
     const text = OLD_1 + ' ' + OLD_2;
     rate({ narrative: text });
@@ -177,6 +192,30 @@ describe('a saved comment with no record of what the teacher typed', () => {
 });
 
 describe('a sentence the teacher types', () => {
+  it('typed into an empty box and saved at once (moving on before the rows are drawn) is theirs', () => {
+    open();
+    const typed = 'Maya led her group’s debate prep. She asked good questions.';
+    box(typed);
+    RQ.tqSaveNarrative();
+    const rows = RQ.recoverRows(
+      typed,
+      CommentBank.context(CommentBank.facts(CID, student(), TERM), {}),
+      saved().draftMeta,
+    );
+    expect(rows.map(r => RQ.isTyped(r))).toEqual([true, true]);
+  });
+
+  it('a sentence from My Bank counts as theirs', () => {
+    const own = {
+      id: 'mine:abc',
+      step: 'opening',
+      text: 'Maya brings energy to labs.',
+      s: { mine: true },
+      edited: false,
+    };
+    expect(RQ.teacherText([own])).toEqual(['Maya brings energy to labs.']);
+  });
+
   it('is recorded as theirs when the comment saves, and stays through Generate after a reload', () => {
     open();
     const el = box('');
@@ -209,8 +248,17 @@ describe('an Earlier Comment sentence that gives a grade the gradebook does not 
     expect(RQ.gradeClaimWrong('Her average is 67% overall.', g)).toBe(false);
     // A piece's own % is not the course grade.
     expect(RQ.gradeClaimWrong('She scored 80% on the essay.', g)).toBe(false);
+    // A piece's letter, an initial, and a % about a piece are left alone.
+    const b = { mode: 'letter', letter: 'B', pct: 75 };
+    expect(RQ.gradeClaimWrong('Maya earned an A on the essay.', b)).toBe(false);
+    expect(RQ.gradeClaimWrong('Maya got a C+ on her first quiz but improved.', b)).toBe(false);
+    expect(RQ.gradeClaimWrong('She often works with A. Singh.', b)).toBe(false);
+    expect(RQ.gradeClaimWrong('Maya has a B and scored 95% on the lab.', b)).toBe(false);
+    expect(RQ.gradeClaimWrong('Overall, she scored 90% on the unit test.', b)).toBe(false);
+    expect(RQ.gradeClaimWrong('Overall Maya has a B.', b)).toBe(false);
     expect(RQ.gradeClaimWrong('Maya asks good questions.', g)).toBe(false);
     expect(RQ.gradeClaimWrong('Maya has a C- overall.', { mode: 'proficiency', letter: null })).toBe(false);
+    expect(RQ.gradeClaimWrong('Maya has a C- overall.', b)).toBe(true);
   });
 
   it('is flagged before Approve; Remove It takes it out with Undo', () => {
