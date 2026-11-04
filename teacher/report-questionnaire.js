@@ -1081,6 +1081,12 @@ window.ReportQuestionnaire = (function () {
   function bestPiece(f) {
     return CommentBank.bestPieceOf(f);
   }
+  /* A piece's mark on a row's source: in a Letter class points work's own
+     % (CommentBank.workMark, calc.js), as At a Glance and the comment
+     print it, never its level as a %; else its proficiency word. */
+  function _pieceMark(cid, f, w) {
+    return courseGradeMode(cid) === 'letter' ? CommentBank.workMark(f, w) : f.levelText(w.v);
+  }
 
   /* Work labelled Missing this term (status NS), whatever its due date:
      the one rule everywhere (Decision 4; facts().notHandedIn counts the
@@ -4177,7 +4183,7 @@ window.ReportQuestionnaire = (function () {
     }
     if ((m = k.match(/^work:(.+)$/))) {
       var w = find(f.work, m[1]);
-      return w ? w.title + ' · ' + f.levelText(w.v) : '';
+      return w ? w.title + ' · ' + _pieceMark(cid, f, w) : '';
     }
     if ((m = k.match(/^habit:(.+)$/))) {
       var hs = _habitsOf(cid, student, f);
