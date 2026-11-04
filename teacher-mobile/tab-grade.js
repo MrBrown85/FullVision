@@ -794,8 +794,11 @@ window.MGrade = (function () {
       });
       var currentClass = idx === 0 ? ' m-thumb-current' : '';
       var gradedClass = isGraded ? ' m-thumb-graded' : '';
+      // A real button with the student's (or group's) name, so it can be
+      // reached with Tab and read aloud.
+      var thumbName = unit.view ? unit.view.label : displayNameWithLast(st);
       thumbs +=
-        '<div class="m-thumb' +
+        '<button type="button" class="m-thumb' +
         currentClass +
         gradedClass +
         '" style="background:' +
@@ -804,9 +807,15 @@ window.MGrade = (function () {
         idx +
         '" data-sid="' +
         st.id +
-        '">' +
+        '" aria-label="' +
+        MC.esc(thumbName) +
+        '" title="' +
+        MC.esc(thumbName) +
+        '"' +
+        (idx === 0 ? ' aria-current="true"' : '') +
+        '>' +
         MC.esc(initials) +
-        '</div>';
+        '</button>';
     });
     thumbs += '</div>';
 
@@ -990,7 +999,9 @@ window.MGrade = (function () {
         '" data-max="' +
         assessment.maxPoints +
         '" style="width:44px;height:44px;font-size:20px">−</button>' +
-        '<div style="display:flex;align-items:center;gap:6px"><input class="m-pts-input" type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="\u2014" aria-label="Points out of ' +
+        '<div style="display:flex;align-items:center;gap:6px"><input class="m-pts-input" type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="\u2014" aria-label="Points for ' +
+        MC.esc(unit && unit.view ? unit.view.label : displayNameWithLast(st)) +
+        ', out of ' +
         assessment.maxPoints +
         '" id="m-pts-' +
         st.id +
@@ -1742,6 +1753,7 @@ window.MGrade = (function () {
         jumpToStudent(parseInt(thumb.getAttribute('data-idx'), 10));
       });
     }
+    _installArrowKeys();
     var lastCard = swiper.querySelector('.m-swiper-card:last-child .m-pts-input');
     if (lastCard) lastCard.setAttribute('enterkeyhint', 'done');
     // Enter saves and moves to the next student's points, as Enter does in
@@ -1803,6 +1815,28 @@ window.MGrade = (function () {
     );
   }
 
+  // ← and → move between students on the grading screen, unless the
+  // cursor is in a text field. Installed once; it acts only while the
+  // grading screen is the open one and no sheet is up.
+  var _arrowKeysOn = false;
+  function _installArrowKeys() {
+    if (_arrowKeysOn) return;
+    _arrowKeysOn = true;
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      var screen = document.getElementById('m-screen-grade-swiper');
+      if (!screen || screen.offsetParent === null || screen.nextElementSibling) return;
+      var backdrop = document.getElementById('m-sheet-backdrop');
+      if (backdrop && !backdrop.classList.contains('u-hidden')) return;
+      if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+      var total = document.querySelectorAll('#m-thumb-strip .m-thumb').length;
+      var next = _currentIdx + (e.key === 'ArrowRight' ? 1 : -1);
+      if (next < 0 || next >= total) return;
+      e.preventDefault();
+      jumpToStudent(next);
+    });
+  }
+
   function _nextStudentPoints(swiper, inp) {
     var cards = Array.prototype.slice.call(swiper.querySelectorAll('.m-swiper-card'));
     var idx = cards.indexOf(inp.closest('.m-swiper-card'));
@@ -1836,6 +1870,8 @@ window.MGrade = (function () {
     var thumbs = document.querySelectorAll('#m-thumb-strip .m-thumb');
     thumbs.forEach(function (t, i) {
       t.classList.toggle('m-thumb-current', i === idx);
+      if (i === idx) t.setAttribute('aria-current', 'true');
+      else t.removeAttribute('aria-current');
     });
     // Scroll thumb into view
     var current = thumbs[idx];

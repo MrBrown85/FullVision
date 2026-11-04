@@ -296,3 +296,51 @@ test('grading screen works as soon as it opens', async ({ page }) => {
   await page.locator('#m-thumb-strip .m-thumb').nth(2).tap();
   await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('3 of');
 });
+
+// Group 3 #82: the phone app works from a keyboard and a mouse too. The
+// arrow keys move between student cards and between students on the
+// grading screen; a mouse drag moves the cards; avatars are named
+// buttons; each points box names its student.
+test('arrow keys, mouse drag and names on the phone app', async ({ page }) => {
+  await openPhone(page);
+  const count = page.locator('#m-student-card-count');
+  await expect(count).toContainText('1 of');
+  await page.locator('.m-card-stack').focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(count).toContainText('2 of');
+  await page.waitForTimeout(400); // the card's exit animation
+  await page.keyboard.press('ArrowLeft');
+  await expect(count).toContainText('1 of');
+  await page.waitForTimeout(400);
+
+  const box = await page.locator('.m-card-stack-item[data-depth="0"]').boundingBox();
+  const y = box.y + 40;
+  await page.mouse.move(box.x + box.width - 40, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + box.width - 40 - i * 25, y);
+  await page.mouse.up();
+  await expect(count).toContainText('2 of');
+  await page.waitForTimeout(400);
+
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('[data-action="m-grade-assess"]', { hasText: 'Data Reading Quiz' }).first().click();
+  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
+  const thumb = page.locator('#m-thumb-strip .m-thumb').first();
+  await expect(thumb).toHaveJSProperty('tagName', 'BUTTON');
+  const name = await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const sid = document.querySelector('#m-thumb-strip .m-thumb').dataset.sid;
+    return displayNameWithLast(getStudents(cid).find(s => s.id === sid));
+  });
+  await expect(thumb).toHaveAttribute('aria-label', name);
+  await expect(page.locator('.m-pts-input').first()).toHaveAttribute('aria-label', new RegExp('^Points for ' + name));
+  await page
+    .locator('body')
+    .click({ position: { x: 5, y: 300 } })
+    .catch(() => {});
+  await page.evaluate(() => document.activeElement && document.activeElement.blur());
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('2 of');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('1 of');
+});
