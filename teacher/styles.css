@@ -2816,7 +2816,13 @@ body.offline-active #app-dock {
   display: flex;
   align-items: center;
   margin-left: auto;
-  margin-right: 8px;
+  /* The padding gives a red dot a target to click (try again); the margin
+     shrinks by the same amount, so the dot stays where it was. */
+  padding: 6px;
+  margin-right: 2px;
+}
+.tb-sync:has(.tb-sync-dot.error) {
+  cursor: pointer;
 }
 .tb-sync-dot {
   width: 8px;

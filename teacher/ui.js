@@ -300,7 +300,7 @@ function renderDock(activePage, rightHTML) {
     <div class="tb-group tb-center">
       <div class="seg tb-seg">${seg}</div>
     </div>
-    <div class="tb-group tb-right">${rightHTML || ''}<div class="tb-sync" role="status" aria-label="Sync status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>${userMenu}</div>
+    <div class="tb-group tb-right">${rightHTML || ''}<div class="tb-sync" role="status" aria-label="Sync status" data-action="retry-sync-dot"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>${userMenu}</div>
   </nav>`;
 }
 
@@ -344,6 +344,22 @@ function refreshSyncStatusUI() {
   // The dot is drawn in one place (shared/data.js getSyncDotState), so the
   // phone and desktop agree and two painters can't contradict each other.
   if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
+}
+
+/* A click on a red sync dot tries again at once: paused cloud sync probes
+   the server, a class that couldn't load loads again. Otherwise it does
+   nothing; the outbox already retries on its own. */
+function _retryFromSyncDot() {
+  var dot = document.getElementById('sync-indicator-dot');
+  if (!dot || !/\berror\b/.test(dot.className || '')) return;
+  if (window.GB && typeof window.GB.isSupabaseDegraded === 'function' && window.GB.isSupabaseDegraded()) {
+    if (typeof window.GB.retrySupabaseRecovery === 'function') window.GB.retrySupabaseRecovery();
+    return;
+  }
+  var cid = typeof getActiveCourse === 'function' ? getActiveCourse() : null;
+  if (cid && typeof courseLoadFailed === 'function' && courseLoadFailed(cid)) {
+    if (typeof window.retryActiveCourseLoad === 'function') window.retryActiveCourseLoad();
+  }
 }
 
 function _ensureSyncStatusUI() {
@@ -1440,20 +1456,13 @@ let _syncToastTimer = null;
 function showSyncToast(message, type) {
   dismissSyncToast();
   const toast = document.createElement('div');
-  // 'degraded' reuses the error visual but persists (no auto-dismiss) and
-  // wires a different retry action that re-runs bootstrap_teacher rather
-  // than flushing the offline queue.
-  var visualClass = type === 'degraded' ? 'error' : type || 'error';
-  toast.className = 'sync-toast ' + visualClass;
+  // A failed class load and paused cloud sync show only on the sync dot
+  // (CLAUDE.md rule 5), so there is no persistent load toast here.
+  toast.className = 'sync-toast ' + (type || 'error');
   toast.id = 'sync-toast';
   toast.setAttribute('role', 'alert');
   toast.setAttribute('aria-live', 'assertive');
-  if (type === 'degraded') {
-    toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-supabase-recovery">Retry Now</button>`;
-  } else if (type === 'load-failed') {
-    toast.className = 'sync-toast error';
-    toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-course-load">Retry</button>`;
-  } else if (type === 'error') {
+  if (type === 'error') {
     toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-sync">Retry Now</button>`;
   } else {
     toast.innerHTML = `<span>${esc(message)}</span>`;
@@ -1655,17 +1664,8 @@ document.addEventListener('click', function (e) {
       retrySyncQueue();
       dismissSyncToast();
       break;
-    case 'retry-course-load':
-      dismissSyncToast();
-      if (typeof window.retryActiveCourseLoad === 'function') window.retryActiveCourseLoad();
-      break;
-    case 'retry-supabase-recovery':
-      if (window.GB && typeof window.GB.retrySupabaseRecovery === 'function') {
-        window.GB.retrySupabaseRecovery();
-      }
-      // Don't dismiss — the recovery probe will dismiss/replace the toast itself
-      // (success → "Cloud sync restored" via _exitDegradedMode; failure → keep
-      // the existing toast in place and reschedule the next probe).
+    case 'retry-sync-dot':
+      _retryFromSyncDot();
       break;
     case 'copy-session-draft':
       _copySessionExpiredDraft().then(function (copied) {

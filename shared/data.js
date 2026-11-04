@@ -334,6 +334,8 @@ function getSyncDotState() {
   var problem = getSaveProblem();
   if (problem) return { status: 'error', title: problem };
   if (_syncStatus === 'degraded') return { status: 'error', title: 'Cloud sync paused — saving on this device' };
+  var loadProblem = _loadProblem();
+  if (loadProblem) return { status: 'error', title: loadProblem };
   var q = typeof window !== 'undefined' ? window.v2Queue : null;
   if (q && typeof q.stats === 'function') {
     var stats = q.stats() || {};
@@ -414,10 +416,8 @@ function _enterDegradedMode(reason) {
   _supabaseDegraded = true;
   _degradedReason = reason;
   _syncStatus = 'degraded';
+  // Shown only on the sync dot (CLAUDE.md rule 5); the probe keeps retrying.
   _updateSyncIndicator();
-  if (typeof showSyncToast === 'function') {
-    showSyncToast('Saving locally — cloud sync paused.', 'degraded');
-  }
   _scheduleRecoveryProbe();
 }
 
@@ -449,8 +449,8 @@ async function _attemptRecoveryProbe() {
   }
 }
 
-/* Manual retry — wired to the "Retry now" button in the degraded toast.
-   Cancels the pending timer and probes immediately. */
+/* Manual retry — a click on the sync dot while sync is paused. Cancels the
+   pending timer and probes immediately. */
 function retrySupabaseRecovery() {
   if (!_supabaseDegraded) return Promise.resolve();
   if (_recoveryProbeTimer) {
@@ -496,10 +496,6 @@ function _exitDegradedMode(bootstrapData) {
   var outbox = _outbox();
   if (outbox) outbox.flush();
   _updateSyncIndicator();
-  if (typeof dismissSyncToast === 'function') dismissSyncToast();
-  if (typeof showSyncToast === 'function') {
-    showSyncToast('Cloud sync restored. Catching up…', 'success');
-  }
 }
 
 /* Migrate course-scoped data from a local placeholder cid to the canonical
@@ -4066,13 +4062,13 @@ async function _doInitData(cid) {
       } else {
         var bundle = _rpcObject(bundleRes.data) || {};
         if (bundle.not_modified) {
-          delete _loadError[cid];
+          _clearLoadError(cid);
           _classFresh[cid] = true;
           return;
         }
         try {
           _bundleToCache(cid, bundle);
-          delete _loadError[cid];
+          _clearLoadError(cid);
         } catch (e) {
           // A payload this code can't read must not leave the class half
           // applied with no word to the teacher.
@@ -4094,7 +4090,7 @@ async function _doInitData(cid) {
       _courseLoadFailed(cid, gbRes && gbRes.error);
       return;
     }
-    delete _loadError[cid];
+    _clearLoadError(cid);
     _v2GradebookToCache(cid, gbRes.data || {});
     await _hydrateCanonicalDetails(cid);
     await loadStudentProfileSummaries(cid);
@@ -4683,7 +4679,10 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
 }
 
 /* A class load failed. Nothing is written: the copy this device already has
-   (memory, else localStorage) stays on screen, with a message and a retry.
+   (memory, else localStorage) stays on screen. The sync dot turns red and
+   says so (CLAUDE.md rule 5: no toast, which covered Save buttons and Undo
+   toasts and outlasted class changes), and the load is tried again on its
+   own; a click on the dot tries at once.
    This used to write an empty class over localStorage and the server
    baseline, so one failed request blanked the class and the next save
    diffed against "the server has nothing". */
@@ -4695,15 +4694,51 @@ function _courseLoadFailed(cid, error) {
   console.warn('get_gradebook failed for ' + cid + '; keeping the saved copy:', error);
   _loadError[cid] = { at: Date.now(), message: message };
   if (_cache.students[cid] === undefined) _loadCourseFromLS(cid);
-  // The message must never be what breaks a load. A class loaded in the
-  // background says nothing: it is said when the teacher opens it.
+  // The dot must never be what breaks a load. A class loaded in the
+  // background shows nothing: the dot speaks for the class that is open.
   try {
-    if (typeof showSyncToast === 'function' && cid === getActiveCourse()) {
-      showSyncToast("Couldn't load the latest data for this class. " + _savedCopyDescription(cid), 'load-failed');
-    }
+    _updateSyncIndicator();
   } catch (e) {
-    console.warn('Could not show the load-failed message:', e);
+    console.warn('Could not show the load problem on the sync dot:', e);
   }
+  _scheduleLoadRetry(cid);
+}
+
+/* Tries a failed load again after 15 s, 30 s, 1 minute, then every
+   2 minutes, while that class stays open and the problem lasts. */
+var _LOAD_RETRY_DELAYS_MS = [15000, 30000, 60000, 120000];
+var _loadRetryTimer = null;
+var _loadRetryCount = 0;
+function _scheduleLoadRetry(cid) {
+  if (_loadRetryTimer || cid !== getActiveCourse()) return;
+  var delay = _LOAD_RETRY_DELAYS_MS[Math.min(_loadRetryCount, _LOAD_RETRY_DELAYS_MS.length - 1)];
+  _loadRetryCount += 1;
+  _loadRetryTimer = setTimeout(function () {
+    _loadRetryTimer = null;
+    if (!_loadError[cid] || cid !== getActiveCourse()) return;
+    _handleExternalCourseUpdate(cid, 'gradebook');
+  }, delay);
+}
+
+function _clearLoadError(cid) {
+  if (!_loadError[cid]) return;
+  delete _loadError[cid];
+  if (cid === getActiveCourse()) {
+    _loadRetryCount = 0;
+    if (_loadRetryTimer) {
+      clearTimeout(_loadRetryTimer);
+      _loadRetryTimer = null;
+    }
+  }
+  _updateSyncIndicator();
+}
+
+/* The sync dot's words while the open class couldn't load, or null. */
+function _loadProblem() {
+  var cid = typeof getActiveCourse === 'function' ? getActiveCourse() : null;
+  if (!cid || !_loadError[cid]) return null;
+  var text = "Couldn't load the latest data for this class. " + _savedCopyDescription(cid);
+  return window.__MOBILE ? text + ' Pull down to try again.' : text + ' Click the dot to try again.';
 }
 
 function _savedCopyDescription(cid) {
