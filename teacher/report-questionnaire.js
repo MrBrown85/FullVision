@@ -974,7 +974,9 @@ window.ReportQuestionnaire = (function () {
       var opts = CommentBank.SCALE.map(function (label, i) {
         var val = i + 1;
         var on = v === val;
-        var tip = (SCALE_TIPS[label] || label) + (on && fromRecord ? ' From the assignment record; pick a rating to change it.' : '');
+        var tip =
+          (SCALE_TIPS[label] || label) +
+          (on && fromRecord ? ' From the assignment record; pick a rating to change it.' : '');
         return `<span class="qn-habit-cell"><button type="button" role="radio" aria-checked="${on}" tabindex="${val === stop ? 0 : -1}" class="qn-radio${on ? ' on' : ''}${on && fromRecord ? ' from-record' : ''}" data-action="tqRate" data-habit="${h.key}" data-value="${val}" aria-label="${esc(name + ': ' + label + (on && fromRecord ? ', from the record' : ''))}" title="${esc(tip)}"></button></span>`;
       }).join('');
       return `<div class="qn-habit-row" role="radiogroup" aria-label="${esc(name)}">
@@ -4088,7 +4090,12 @@ window.ReportQuestionnaire = (function () {
     );
     // An edited sentence: the bank's own wording of it comes first.
     if (row.edited && row.s)
-      mine += item(row.id, CommentBank.fill(row.s, ctx, { first: i === 0 }), 'The bank’s wording, before your edit', false);
+      mine += item(
+        row.id,
+        CommentBank.fill(row.s, ctx, { first: i === 0 }),
+        'The bank’s wording, before your edit',
+        false,
+      );
     var others = alternatives(row, ctx, usage, taken)
       .map(function (s) {
         return item(s.id, CommentBank.fill(s, ctx, { first: i === 0 }), _usedMeta(usage[s.id] || 0), false);
@@ -4139,14 +4146,14 @@ window.ReportQuestionnaire = (function () {
     if (!nx) return head;
     var gap = Math.round((nx.min - Number(g.pct)) * 10) / 10;
     var next = CommentBank.aOrAn(nx.letter);
-    if (CommentBank.closeTo(g)) return head + '. Close to ' + next + ': ' + gap + ' points short.';
-    var why =
-      gap > 2
-        ? gap + ' points short'
-        : (g.pieces || []).length < 6
-          ? 'fewer than six marked pieces'
-          : 'the marks are going down';
-    return head + '. Not called close to ' + next + ': ' + why + '.';
+    // Plain sentences (Nov 3 sweep, group 3 #71: "Not called close to an
+    // A: 13 points short." read as jargon).
+    var pts = gap + (gap === 1 ? ' point' : ' points');
+    var below = pts + ' below ' + next;
+    if (CommentBank.closeTo(g)) return head + '. Close to ' + next + ', ' + pts + ' below it.';
+    if (gap > 2) return head + '. ' + _cap(below) + '.';
+    var why = (g.pieces || []).length < 6 ? 'there are fewer than six marked pieces' : 'the marks are going down';
+    return head + '. ' + _cap(below) + ', but the comment does not say close because ' + why + '.';
   }
 
   function _habitName(k) {
@@ -6228,9 +6235,11 @@ window.ReportQuestionnaire = (function () {
       // Grade, Support and Closing take no sentence of the teacher's own:
       // the grade sentence states the mark, and Support and Closing are
       // the class's lines, set on their rows.
-      var fromPart = o.from ? PARTS.find(function (x) {
-        return x.id === o.from;
-      }) : null;
+      var fromPart = o.from
+        ? PARTS.find(function (x) {
+            return x.id === o.from;
+          })
+        : null;
       var note = fromPart
         ? `<span class="qn-own-hint">My Bank keeps no ${esc(fromPart.label)} sentences${fromPart.id === 'grade' ? ': the grade sentence states the mark' : ': they are set for the class on their row'}. Pick the part this one belongs under.</span>`
         : '';
@@ -7398,7 +7407,14 @@ window.ReportQuestionnaire = (function () {
     // In a menu the arrow keys move between its items, and on a Work
     // Habits rating between Rarely and Not Seen; neither changes the
     // student (Nov 3 sweep: Down in Other Wording opened the next one).
-    if (t && t.closest && !e.altKey && !e.metaKey && !e.ctrlKey && /^(Arrow(Up|Down|Left|Right)|Home|End)$/.test(e.key)) {
+    if (
+      t &&
+      t.closest &&
+      !e.altKey &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      /^(Arrow(Up|Down|Left|Right)|Home|End)$/.test(e.key)
+    ) {
       if (t.getAttribute && t.getAttribute('role') === 'radio' && t.closest('[role="radiogroup"]')) {
         if (t.classList && t.classList.contains('qn-radio')) {
           e.preventDefault();
@@ -7459,7 +7475,9 @@ window.ReportQuestionnaire = (function () {
       key === 'Home' ? 0 : key === 'End' ? radios.length - 1 : (at + (back ? -1 : 1) + radios.length) % radios.length;
     var b = radios[next];
     tqRate(b.dataset.habit, b.dataset.value);
-    var now = document.querySelector('.qn-radio[data-habit="' + b.dataset.habit + '"][data-value="' + b.dataset.value + '"]');
+    var now = document.querySelector(
+      '.qn-radio[data-habit="' + b.dataset.habit + '"][data-value="' + b.dataset.value + '"]',
+    );
     if (now) now.focus();
   }
 
