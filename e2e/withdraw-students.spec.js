@@ -209,10 +209,10 @@ test.describe('Withdraw students', () => {
     expect((await rpcCalls(page, 'delete_withdrawn_student'))[0].p_enrollment_id).toBe(ALICE);
     expect(await rpcCalls(page, 'delete_student')).toHaveLength(0);
 
+    // A reload comes back to Class Management on the Students tab.
     await page.reload();
     await page.waitForSelector('#dock-mount nav');
-    await page.locator('[data-action="openClassManager"]').first().click();
-    await page.getByRole('tab', { name: /^Students/ }).click();
+    await expect(page.getByRole('tab', { name: /^Students/ })).toHaveAttribute('aria-selected', 'true');
     await expect(rosterRow(page, 'Baker')).toHaveCount(1);
     await expect(rosterRow(page, 'Anderson')).toHaveCount(0);
     await expect(withdrawn(page)).toHaveCount(0);

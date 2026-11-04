@@ -2708,9 +2708,11 @@ window.DashClassManager = (function () {
   }
 
   /* `tab` opens the manager on that tab (a link from another page). */
-  function openClassManager(tab) {
+  // tab: a Class Management tab, or 'new' for the New Class wizard. cid: a
+  // class to show other than the open one (from the address's &class=).
+  function openClassManager(tab, cid) {
     classManagerOpen = true;
-    cmSelectedCourse = _activeCourse;
+    cmSelectedCourse = cid && COURSES[cid] ? cid : _activeCourse;
     cmMode = 'edit';
     if (
       CM_TABS.some(function (t) {
@@ -2718,12 +2720,34 @@ window.DashClassManager = (function () {
       })
     )
       cmTab = tab;
+    if (tab === 'new') {
+      cmStartCreate();
+      return;
+    }
     renderClassManager();
     _cmFollowLoads();
   }
+
+  /* Class Management's own address, kept in step as it changes, so a reload
+     or Back returns to the same tab and class (or the New Class wizard):
+     /dashboard?manage=grading&class=… . The dashboard opens it from there. */
+  function _cmSyncUrl() {
+    if (!classManagerOpen || typeof Router === 'undefined' || !Router.setUrl) return;
+    if (location.pathname !== '/dashboard') return;
+    var url = '/dashboard?manage=' + (cmMode === 'create' ? 'new' : cmTab);
+    if (cmMode !== 'create' && cmSelectedCourse && cmSelectedCourse !== _activeCourse && COURSES[cmSelectedCourse])
+      url += '&class=' + encodeURIComponent(cmSelectedCourse);
+    Router.setUrl(url);
+    document.title = 'FullVision \u2014 Class Management';
+  }
+
   function closeClassManager() {
     classManagerOpen = false;
     closeColorPop();
+    if (typeof Router !== 'undefined' && Router.setUrl && location.pathname === '/dashboard') {
+      Router.setUrl('/dashboard');
+      document.title = 'FullVision \u2014 Dashboard';
+    }
     // Hand a course switch made in here back to the parent, so it re-syncs its
     // own activeCourse, loads that course's data and renders it. Without this
     // the parent falls back to whichever class was active before the manager
@@ -2812,6 +2836,7 @@ window.DashClassManager = (function () {
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
     var html = '';
+    _cmSyncUrl();
 
     // Top bar
     var detailTitle =

@@ -58,10 +58,10 @@ window.PageDashboard = (function () {
   var CM = DashClassManager;
   var Overview = DashOverview;
   var StudentCards = DashStudentCards;
-  function openClassManager(tab) {
+  function openClassManager(tab, cid) {
     CM.classManagerOpen = true;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
-    CM.openClassManager(tab);
+    CM.openClassManager(tab, cid);
   }
   function closeClassManager() {
     CM.closeClassManager();
@@ -1180,7 +1180,7 @@ window.PageDashboard = (function () {
     }
     // A "manage" link (the Term Questionnaire's "Questionnaires ›", the
     // gradebook's Add Students): Class Management open on that tab.
-    else if (params && params.manage) openClassManager(params.manage);
+    else if (params && params.manage) openClassManager(params.manage, params.class);
 
     // Ensure page starts at top
     requestAnimationFrame(function () {

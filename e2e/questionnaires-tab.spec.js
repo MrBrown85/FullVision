@@ -35,8 +35,9 @@ test('About Me shows who answered, turns off and on, saves an edited question, a
   const first = card.getByLabel('Question 1');
   await first.fill('What name do you go by?');
   await first.blur();
+  // A reload comes back to Class Management on the Questionnaires tab.
   await page.reload();
-  await openQuestionnaires(page);
+  await expect(page.getByRole('tab', { name: /Questionnaires/ })).toHaveAttribute('aria-selected', 'true');
   await page.locator('[data-card="about-me"]').getByRole('button', { name: 'Show Questions' }).click();
   await expect(page.locator('[data-card="about-me"]').getByLabel('Question 1')).toHaveValue('What name do you go by?');
 
