@@ -1240,7 +1240,8 @@ test.describe('the Sentences card', () => {
     }
     for (const r of await sheet.locator('.qn-browse-sentence').all()) await expect(r).toHaveText(/at home/i);
     await sheet.locator('#tq-browse-search').fill('zzzz');
-    await expect(sheet.locator('.qn-browse-empty')).toHaveText('No sentences match “zzzz”.');
+    await expect(sheet.locator('.qn-browse-empty')).toContainText('match “zzzz”.');
+    await expect(sheet.locator('.qn-browse-elsewhere')).toHaveText('No sentence in the bank matches “zzzz”.');
     await sheet.locator('#tq-browse-search').fill('');
     // The bottom edge: ↓ makes the list taller; the height comes back next time.
     const list = sheet.locator('#tq-browse-list');
