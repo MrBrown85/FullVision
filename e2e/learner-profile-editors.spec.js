@@ -118,3 +118,18 @@ test("Core Competencies in Cece's Words shows what she answered, without retypin
   await expect(row('Personal Awareness & Responsibility').locator('.stu-core-from')).toContainText('From Cece');
   await expect(row('Communicating').getByRole('button', { name: '+ Self-Assessment' })).toBeVisible();
 });
+
+test('the Core Competencies table fits inside its card at 1440 px', async ({ page }) => {
+  await openStudent(page, 'Cece');
+  const fit = await page.evaluate(() => {
+    const panel = document.querySelector('.stu-panel').getBoundingClientRect();
+    const rows = [...document.querySelectorAll('#lp-core .stu-core-trow')];
+    return {
+      over: rows.filter(r => r.scrollWidth > r.clientWidth + 1).length,
+      right: Math.max(...[...document.querySelectorAll('#lp-core .stu-core-work')].map(w => w.getBoundingClientRect().right)),
+      panelRight: panel.right,
+    };
+  });
+  expect(fit.over).toBe(0);
+  expect(fit.right).toBeLessThanOrEqual(fit.panelRight - 12);
+});

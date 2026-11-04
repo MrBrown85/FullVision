@@ -2068,7 +2068,9 @@ button.ced-obs-row {
 }
 .stu-core-trow {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.4fr) minmax(180px, 1.1fr) 180px;
+  /* Only the steps need a floor; the other columns wrap, so the row never
+     runs past its card. */
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 1.4fr) minmax(0, 1.1fr) minmax(0, 0.8fr);
   align-items: center;
   gap: 14px;
   min-height: 52px;
