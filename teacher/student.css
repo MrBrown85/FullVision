@@ -2111,11 +2111,24 @@ button.ced-obs-row {
   border-radius: 6px;
   color: var(--text-2);
 }
+/* The chosen step is a solid block in its level's colour, readable on a
+   dim screen. */
 .stu-core-step.on {
-  background: var(--seg-thumb);
-  color: var(--text);
+  background: var(--active);
+  color: #fff;
   font-weight: 700;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+.stu-core-step.on.lv-1 {
+  background: var(--score-1);
+}
+.stu-core-step.on.lv-2 {
+  background: var(--score-2);
+}
+.stu-core-step.on.lv-3 {
+  background: var(--score-3);
+}
+.stu-core-step.on.lv-4 {
+  background: var(--score-4);
 }
 .stu-core-words,
 .stu-core-goal {

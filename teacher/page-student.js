@@ -2721,7 +2721,7 @@ window.PageStudent = (function () {
         CORE_STEPS.forEach(function (lv) {
           html +=
             '<span class="stu-core-step' +
-            (e.level === lv ? ' on' : '') +
+            (e.level === lv ? ' on lv-' + lv : '') +
             '">' +
             esc(CONFIDENCE_LABELS[lv]) +
             '</span>';

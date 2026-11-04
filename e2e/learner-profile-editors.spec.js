@@ -133,3 +133,20 @@ test('the Core Competencies table fits inside its card at 1440 px', async ({ pag
   expect(fit.over).toBe(0);
   expect(fit.right).toBeLessThanOrEqual(fit.panelRight - 12);
 });
+
+test("the student's chosen self-assessment step is a solid colour block", async ({ page }) => {
+  await openStudent(page, 'Cece');
+  const on = page.locator('#lp-refl .stu-core-step.on').first();
+  await expect(on).toHaveText('Growing');
+  const look = await on.evaluate(el => {
+    const cs = getComputedStyle(el);
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--score-2)';
+    document.body.appendChild(probe);
+    const want = getComputedStyle(probe).color;
+    probe.remove();
+    return { bg: cs.backgroundColor, color: cs.color, want };
+  });
+  expect(look.bg).toBe(look.want);
+  expect(look.color).toBe('rgb(255, 255, 255)');
+});

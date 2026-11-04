@@ -301,7 +301,7 @@ var LearnerProfile = (function () {
       esc(label) +
       '">' +
       STEPS.map(function (s, i) {
-        return '<span class="stu-core-step' + (level === i + 1 ? ' on' : '') + '">' + s + '</span>';
+        return '<span class="stu-core-step' + (level === i + 1 ? ' on lv-' + level : '') + '">' + s + '</span>';
       }).join('') +
       '</div>'
     );
