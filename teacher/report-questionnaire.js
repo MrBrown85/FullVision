@@ -2804,11 +2804,16 @@ window.ReportQuestionnaire = (function () {
   }
 
   function _bankById(id) {
-    return (
-      COMMENT_BANK.sentences.find(function (s) {
-        return s.id === id;
-      }) || null
-    );
+    var find = function (k) {
+      return (
+        COMMENT_BANK.sentences.find(function (s) {
+          return s.id === k;
+        }) || null
+      );
+    };
+    // A sentence of the teacher's own drawn before its save landed is
+    // found under the server's id.
+    return find(id) || (window.PersonalBank && PersonalBank.currentId ? find(PersonalBank.currentId(id)) : null);
   }
 
   /* The rows of the comment on screen, per class, student and report: one

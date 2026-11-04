@@ -574,6 +574,27 @@ describe('the bank on the device and the server', () => {
     expect(JSON.parse(localStorage.getItem('gb-comment-templates'))[0].id).toBe('11111111-1111-4111-8111-111111111111');
   });
 
+  it('finds a sentence by the id it was kept under after the server’s id lands (Step 4 group 2 #54)', async () => {
+    window.v2 = Object.assign({}, originalV2, {
+      saveCommentTemplate: () => Promise.resolve({ data: { id: '22222222-2222-4222-8222-222222222222' }, error: null }),
+    });
+    const f = facts();
+    const out = PB.compose('Gabriel checks each graph twice before he hands it in.', { step: 'habits' }, CommentBank.context(f, {}), f, GABRIEL, {
+      others: [],
+    });
+    const e = PB.keep(out.template);
+    const drawn = 'mine:' + e.id;
+    expect(COMMENT_BANK.sentences.some(x => x.id === drawn)).toBe(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(COMMENT_BANK.sentences.some(x => x.id === drawn)).toBe(false);
+    expect(PB.currentId(drawn)).toBe('mine:22222222-2222-4222-8222-222222222222');
+    expect(COMMENT_BANK.sentences.some(x => x.id === PB.currentId(drawn))).toBe(true);
+    // Browse Sentences' Use looks the row's id up this way.
+    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../teacher/report-questionnaire.js'), 'utf8');
+    expect(src).toMatch(/PersonalBank\.currentId\(id\)/);
+  });
+
   it('keeps the device copy when the list fails (no table yet, offline): an empty bank to start', async () => {
     window.v2 = Object.assign({}, originalV2, {
       listCommentTemplates: () => Promise.resolve({ data: null, error: { message: 'function does not exist' } }),

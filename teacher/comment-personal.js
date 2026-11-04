@@ -1412,6 +1412,19 @@ window.PersonalBank = (function () {
   /* Keep a template: in the bank now, and to the server through the
      outbox. The same text replaces the earlier one's condition, as the
      server does. Returns the entry. */
+  /* A sentence's bank id after its save landed: the server's id in place
+     of the one it was kept under, so a row drawn before then (Browse
+     Sentences' Use) still finds it (Nov 3 sweep). */
+  var _alias = {};
+  function currentId(id) {
+    var seen = {};
+    while (_alias[id] && !seen[id]) {
+      seen[id] = true;
+      id = _alias[id];
+    }
+    return id;
+  }
+
   function keep(t) {
     if (!t || !t.text) return null;
     _unmarkRemoved(t.text);
@@ -1443,6 +1456,7 @@ window.PersonalBank = (function () {
           var row = res && res.data && res.data.id ? res.data : null;
           if (!row || _isUuid(localId)) return;
           if (_deleteIfRemoved({ id: row.id, text: entry.text })) return;
+          _alias['mine:' + localId] = 'mine:' + row.id;
           _save(
             list().map(function (x) {
               return x.id === localId ? Object.assign({}, x, { id: row.id }) : x;
@@ -1782,6 +1796,7 @@ window.PersonalBank = (function () {
     list: list,
     load: load,
     keep: keep,
+    currentId: currentId,
     remove: remove,
     forget: forget,
     restore: restore,
