@@ -7158,11 +7158,27 @@ window.PageAssignments = (function () {
       m.classList.remove('open');
     });
   }
+  /* The menu opens under its own row. Near the foot of the window it used
+     to open upward over the row above, so one student's menu (with Clear)
+     looked like the student's above (Nov 3 sweep): the page scrolls up to
+     make room first, and only a window too short for it opens it above. */
   function positionMenu(trigger, menu) {
+    menu.style.visibility = 'hidden';
+    menu.classList.add('open');
+    var menuH = menu.offsetHeight || 180;
+    menu.classList.remove('open');
+    menu.style.visibility = '';
     var rect = trigger.getBoundingClientRect();
-    var menuH = 180;
+    var short = menuH + 8 - (window.innerHeight - rect.bottom);
+    if (short > 0) {
+      var scroller = _scrollParent(trigger);
+      if (scroller) {
+        scroller.scrollTop += Math.min(short, Math.max(0, rect.top - 8));
+        rect = trigger.getBoundingClientRect();
+      }
+    }
     var spaceBelow = window.innerHeight - rect.bottom;
-    if (spaceBelow < menuH) {
+    if (spaceBelow < menuH + 4) {
       menu.style.bottom = window.innerHeight - rect.top + 4 + 'px';
       menu.style.top = 'auto';
     } else {
@@ -7174,6 +7190,13 @@ window.PageAssignments = (function () {
     if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
     if (left < 8) left = 8;
     menu.style.left = left + 'px';
+  }
+  function _scrollParent(el) {
+    for (var p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      var oy = getComputedStyle(p).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p;
+    }
+    return document.scrollingElement;
   }
   function toggleScoreMenu(trigger) {
     var menu = trigger.querySelector('.col-fill-menu');
@@ -7216,7 +7239,7 @@ window.PageAssignments = (function () {
         _setTagScore(cid, st.id, aid, tagId, value);
       });
       selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"][data-tag="' + tagId + '"]';
-      toastMsg = 'Column filled';
+      toastMsg = value ? 'Column filled' : 'Column cleared';
     } else if (scope === 'row') {
       if (!assess) return;
       var sid = tagId;
@@ -7225,7 +7248,7 @@ window.PageAssignments = (function () {
           setScore(cid, sid, aid, tid, value);
         });
       selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"][data-student="' + sid + '"]';
-      toastMsg = 'Row filled';
+      toastMsg = value ? 'Row filled' : 'Row cleared';
     } else {
       if (!assess) return;
       var plan = _setEveryonePlan(cid, aid);
@@ -7319,7 +7342,7 @@ window.PageAssignments = (function () {
         });
       });
       selector = '.rsg-criterion-row[data-assess="' + aid + '"][data-criterion="' + critId + '"]';
-      toastMsg = 'Criterion filled';
+      toastMsg = value ? 'Criterion filled' : 'Criterion cleared';
     } else if (scope === 'row') {
       if (!assess || !assess.rubricId) return;
       var rubric = getRubricById(cid, assess.rubricId);
@@ -7332,7 +7355,7 @@ window.PageAssignments = (function () {
           });
         });
       selector = '.rsg-criterion-row[data-assess="' + aid + '"][data-student="' + sid + '"]';
-      toastMsg = 'Row filled';
+      toastMsg = value ? 'Row filled' : 'Row cleared';
     } else {
       if (!assess || !assess.rubricId) return;
       var plan = _setEveryonePlan(cid, aid);
@@ -10980,6 +11003,12 @@ window.PageAssignments = (function () {
     ) {
       e.preventDefault();
       executeUndo();
+      return;
+    }
+    // Escape closes an open fill menu (it used to stay open).
+    if (e.key === 'Escape' && document.querySelector('.col-fill-menu.open')) {
+      e.preventDefault();
+      closeMenus();
       return;
     }
     // One student's grader open on the page (the dialog runs its own).
