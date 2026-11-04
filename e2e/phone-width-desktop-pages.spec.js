@@ -77,3 +77,26 @@ test('Class Management class list works on a phone', async ({ page }) => {
   await page.locator('.cm-new-btn', { hasText: 'New Class' }).click();
   await expect(page.locator('.cm-create-active, .cm-wizard, [class*="wizard"]').first()).toBeVisible();
 });
+
+// Group 2 #42: an open rubric card on Assignments fits a phone, its level
+// names don't overlap, and + New Assessment stays on screen.
+test('Assignments rubric grid fits a phone', async ({ page }) => {
+  await openDesktop(page, '/assignments');
+  await page.locator('.assess-card', { hasText: 'Science Fair Proposal' }).first().locator('.assess-header').click();
+  await expect(page.locator('.rsg-levels').first()).toBeVisible();
+  const r = await page.evaluate(() => {
+    const main = document.getElementById('main');
+    const levels = [...document.querySelectorAll('.rsg-level')].filter(l => l.getBoundingClientRect().width > 0);
+    const btn = [...document.querySelectorAll('button')].find(b => /New Assessment/.test(b.textContent));
+    return {
+      sideways: main.scrollWidth > main.clientWidth + 1,
+      cardRight: document.querySelector('.assess-card.open').getBoundingClientRect().right,
+      overlapping: levels.filter(l => l.scrollWidth > l.clientWidth + 1).length,
+      newRight: btn.getBoundingClientRect().right,
+    };
+  });
+  expect(r.sideways).toBe(false);
+  expect(r.cardRight).toBeLessThanOrEqual(375);
+  expect(r.overlapping).toBe(0);
+  expect(r.newRight).toBeLessThanOrEqual(375);
+});

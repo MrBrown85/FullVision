@@ -8315,3 +8315,51 @@ button.grader-member-name {
   outline: none;
   border-bottom-color: var(--active);
 }
+
+/* ── Assignments on a phone (Nov 3 sweep) ─────────────────────
+   An open rubric card was 557 px wide at 375: the page's grid let its one
+   column grow to the card's widest row, the header actions and Set
+   Everyone To chips stayed on one line, and each criterion kept a 200 px
+   label column beside its levels, so the level names overlapped. Under
+   600 px the column holds the screen's width, those rows wrap, and a
+   criterion's name goes above its levels. */
+@media (max-width: 600px) {
+  .settings-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .assess-header-actions,
+  .rsg-header,
+  .rsg-header-levels,
+  .rsg-student-head {
+    flex-wrap: wrap;
+  }
+  .rsg-header,
+  .rsg-student {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .rsg-criteria {
+    padding-left: 0;
+  }
+  .rsg-criterion-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .rsg-criterion-main {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .rsg-criterion-main > .rsg-comment-cell {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+  }
+  .rsg-level {
+    overflow: hidden;
+    font-size: var(--text-sm);
+  }
+  .rsg-level-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
