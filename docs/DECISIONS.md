@@ -36,6 +36,14 @@ Colin: "when I click on Proficient for the first criterion, it automatically set
 - **Assignments' Competencies | Rubric switch stays as planned** (2026-10-29, drift from #502 undone). Competencies lists the competencies the rubric's criteria feed, then any criterion that feeds none; each shows its criteria's level the way the gradebook cell does (one level, or the lowest striped as mixed, with no ±). A level set there goes to every criterion that feeds the competency; clicking a mixed level sets them all to it. Rubric shows the rubric as built.
 - **A competency key on rubric work sends nothing** (`_persistScoreToCanonical`): it can only be a stale entry, and the old tag-to-criterion mirror could clear a criterion the teacher never touched. **A save's baseline is read in the same key space as the scores**, so a copy saved before this never makes competency keys look removed. **A saved copy that still keeps rubric scores under competencies is loaded again in full**; a schema 3 copy without any is used as before (`_BUNDLE_SCHEMA` 4, `_savedCopyUsable`). Any other key on rubric work is sent as a criterion and checked by the server, never dropped (review of #502 and #503, 2026-10-29).
 
+## A competency's mark on mixed rubric criteria, on reports (2026-11-03)
+
+Colin: "Mixed rubric criteria on one competency: Progress in One Area, Next Steps and Generate's trend follow the gradebook's lowest-when-mixed mark (tagMarksByAssessment), not the average." (Colin, 2026-11-03.) Assignment Grades by Competency and the Proficiency block's best and lowest work already read the gradebook's mark (#831); these read the criteria's average (`tagScoresByAssessment`), so Thesis 4 and Evidence Use 1 on one competency printed 2.5 there and 1 everywhere else.
+
+- **Every report block and Generate read a piece's mark on a competency through `tagMarksByAssessment`**: one level when its criteria agree, the lowest when they don't, as the gradebook cell shows it. That covers Progress in One Area's pieces (its list, Best and Latest), Next Steps' Latest, Ways to Support at Home (it shares their list), and Generate's per-competency scores.
+- **Start of Term stays on the level's footing**: Progress in One Area's Start of Term and Generate's start and now count each criterion as its own score (`getTagScores`, as the Proficiency block's Start of Term and Now do), so a change is never only a change of basis (Nov 3 review: steady essays at 4 and 1 read 1.0 → 2.5).
+- Competency proficiency itself is unchanged: each criterion still counts as its own evidence (`getTagScores`).
+
 ## Counts As by step (2026-10-29)
 
 Colin: "3+ should be 86." With one Counts As value per level and a + or − a third of the way, 3+ was 83.3% (a B) and could not be an A; Developing− failed (41.7%) and Emerging was 25%. Plan: [`plans/counts-as-steps-plan.md`](plans/counts-as-steps-plan.md).

@@ -2161,9 +2161,10 @@ window.CommentBank = (function () {
       .map(function (sec) {
         var scores = [];
         (sec.tags || []).forEach(function (tag) {
-          // One point per piece of work: a rubric's criteria on the
-          // competency average into it (calc.js tagScoresByAssessment).
-          tagScoresByAssessment(cid, sid, tag.id).forEach(function (sc) {
+          // One point per piece of work, the competency's mark on it as the
+          // gradebook shows it: rubric criteria that disagree give the
+          // lowest (calc.js tagMarksByAssessment; Colin, 2026-11-03).
+          tagMarksByAssessment(cid, sid, tag.id).forEach(function (sc) {
             var a = byId[sc.assessmentId];
             if (!(sc.score > 0) || !inTerm(a) || !dateOf(a)) return;
             scores.push({ id: a.id, v: Number(sc.score), d: dateOf(a), title: a.title || '' });
@@ -2172,11 +2173,20 @@ window.CommentBank = (function () {
         scores.sort(function (x, y) {
           return x.d.localeCompare(y.d);
         });
-        var sn = startAndNow(
-          scores.map(function (s) {
-            return { t: Math.round(parseLocalDate(s.d).getTime() / 86400000), v: s.v };
-          }),
-        );
+        // Start and now are on the level's footing, each rubric criterion
+        // its own score (calc.js getTagScores), as the report's Start of
+        // Term is, so they compare like with like with level and a student
+        // whose criteria disagree is not written up as growing (Nov 3
+        // review).
+        var points = [];
+        (sec.tags || []).forEach(function (tag) {
+          getTagScores(cid, sid, tag.id).forEach(function (sc) {
+            var a = byId[sc.assessmentId];
+            if (!(sc.score > 0) || !inTerm(a) || !dateOf(a)) return;
+            points.push({ t: Math.round(parseLocalDate(dateOf(a)).getTime() / 86400000), v: Number(sc.score) });
+          });
+        });
+        var sn = startAndNow(points);
         var iCans = [];
         (sec.tags || []).forEach(function (t) {
           (t.i_can_statements || []).forEach(function (s) {
