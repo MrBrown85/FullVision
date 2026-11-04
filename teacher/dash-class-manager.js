@@ -3533,6 +3533,8 @@ window.DashClassManager = (function () {
     )
       return;
     cmTab = tab;
+    // A school picked but not used goes back to the class's own.
+    if (cmSelectedCourse) delete _cmTermSchool[cmSelectedCourse];
     renderClassManager();
     var detail = document.querySelector('.cm-detail');
     if (detail) detail.scrollTop = 0;
@@ -6176,20 +6178,33 @@ window.DashClassManager = (function () {
   }
 
   // The Surrey secondary school whose published dates fill the rows
-  // (shared/reporting-term-presets.js). Grandview Heights unless changed.
-  var _cmTermSchool = null;
+  // (shared/reporting-term-presets.js), per class: the school the teacher
+  // just picked, else the school whose dates the class has, else Grandview
+  // Heights. Cancel, Save and leaving the tab drop the pick.
+  var _cmTermSchool = {};
 
-  function _cmTermSchoolId() {
-    return (
-      _cmTermSchool || (typeof REPORTING_TERM_PRESETS !== 'undefined' ? REPORTING_TERM_PRESETS.defaultSchool : null)
-    );
+  function _cmTermSchoolId(cid) {
+    if (cid && _cmTermSchool[cid]) return _cmTermSchool[cid];
+    var rows = cid ? _cmTermRows(cid).rows : [];
+    var match =
+      typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(normalizeTermOrdinals(rows)) : null;
+    if (match) return match.school.id;
+    return typeof REPORTING_TERM_PRESETS !== 'undefined' ? REPORTING_TERM_PRESETS.defaultSchool : null;
+  }
+
+  // The chosen school's terms for this class's span, or null.
+  function _cmTermSchoolRows(cid) {
+    if (typeof reportingTermPreset !== 'function') return null;
+    var full = reportingTermPreset(_cmTermSchoolId(cid), courseToday(cid));
+    if (!full) return null;
+    return termsInSpan(full, _cmTermRows(cid).span, semesterTwoStart(full));
   }
 
   function _cmRenderSchoolPreset(cid, hasRows) {
     if (typeof reportingTermSchools !== 'function') return '';
     var schools = reportingTermSchools();
     if (!schools.length) return '';
-    var chosen = _cmTermSchoolId();
+    var chosen = _cmTermSchoolId(cid);
     var available = typeof reportingTermPreset === 'function' && !!reportingTermPreset(chosen, courseToday(cid));
     var school = schools.find(function (s) {
       return s.id === chosen;
@@ -6217,6 +6232,28 @@ window.DashClassManager = (function () {
         '</button>';
     }
     html += '</div>';
+    // A school picked from the menu shows its dates before they replace
+    // the class's.
+    var preview = available ? _cmTermSchoolRows(cid) : null;
+    var current = normalizeTermOrdinals(_cmTermRows(cid).rows);
+    var same =
+      preview &&
+      preview.length === current.length &&
+      preview.every(function (t, i) {
+        return t.starts_on === current[i].starts_on && t.ends_on === current[i].ends_on;
+      });
+    if (preview && preview.length && !same) {
+      html +=
+        '<div class="cm-hint cm-term-school-preview">' +
+        esc(school ? school.name : '') +
+        ': ' +
+        preview
+          .map(function (t) {
+            return esc(t.label + ' ' + _cmTermDay(t.starts_on) + ' \u2013 ' + _cmTermDay(t.ends_on));
+          })
+          .join(' \u00B7 ') +
+        '</div>';
+    }
     if (!available) {
       html +=
         '<div class="cm-hint">School dates are loaded for ' +
@@ -6246,7 +6283,7 @@ window.DashClassManager = (function () {
     var rows = normalizeTermOrdinals(st.rows);
     var match = typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(rows) : null;
     var reports = typeof reportingTermReportNames === 'function' ? reportingTermReportNames(rows) : null;
-    var chosen = _cmTermSchoolId();
+    var chosen = _cmTermSchoolId(cid);
     // The school menu offers another school's dates only once a different
     // school is picked.
     var preset = _cmRenderSchoolPreset(cid, true);
@@ -6368,6 +6405,7 @@ window.DashClassManager = (function () {
   function cmTermCancel() {
     if (!cmSelectedCourse) return;
     delete _cmTermState[cmSelectedCourse];
+    delete _cmTermSchool[cmSelectedCourse];
     _cmTermEditing[cmSelectedCourse] = false;
     renderClassManager();
   }
@@ -6443,13 +6481,15 @@ window.DashClassManager = (function () {
   }
 
   function cmTermSchool(id) {
-    _cmTermSchool = id || null;
+    if (!cmSelectedCourse) return;
+    if (id) _cmTermSchool[cmSelectedCourse] = id;
+    else delete _cmTermSchool[cmSelectedCourse];
     renderClassManager();
   }
 
   function cmTermSchoolPreset() {
     if (!cmSelectedCourse || typeof reportingTermPreset !== 'function') return;
-    var rows = reportingTermPreset(_cmTermSchoolId(), courseToday(cmSelectedCourse));
+    var rows = reportingTermPreset(_cmTermSchoolId(cmSelectedCourse), courseToday(cmSelectedCourse));
     if (!rows) return;
     var st = _cmTermRows(cmSelectedCourse);
     var full = rows.map(function (r) {
@@ -6515,6 +6555,7 @@ window.DashClassManager = (function () {
       return;
     }
     delete _cmTermState[cid];
+    delete _cmTermSchool[cid];
     _cmTermEditing[cid] = false;
     renderClassManager();
   }
