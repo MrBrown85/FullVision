@@ -3079,6 +3079,20 @@ body.fv-switching-course::after {
   pointer-events: none;
   flex-shrink: 0;
 }
+/* More rows below: a taller fade that says so (tab-students.js marks it). */
+.m-scard-widgets.m-more-below::after {
+  content: 'More Below \2193';
+  height: 34px;
+  margin-top: -34px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: linear-gradient(rgba(255, 255, 255, 0), var(--surface) 60%);
+}
 
 /* Hero fallback (minimal name-only) */
 .m-scard-hero-min {

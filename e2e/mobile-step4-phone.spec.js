@@ -385,3 +385,17 @@ test('Observe starters say Post and can be undone', async ({ page }) => {
   await page.locator('#m-toast [data-action="m-toast-undo"]').click();
   expect(await page.evaluate(s => (getQuickObs(getActiveCourse())[s] || []).length, sid)).toBe(before);
 });
+
+// Group 3 #85: a card whose list runs past its bottom says "More Below"
+// until it is scrolled to the end.
+test('student card says when more rows are below', async ({ page }) => {
+  await openPhone(page);
+  const box = page.locator('.m-card-stack-item[data-depth="0"] .m-scard-widgets');
+  await expect(box).toHaveClass(/m-more-below/);
+  const cue = await box.evaluate(el => getComputedStyle(el, '::after').content);
+  expect(cue).toContain('More Below');
+  await box.evaluate(el => {
+    el.scrollTop = el.scrollHeight;
+  });
+  await expect(box).not.toHaveClass(/m-more-below/);
+});
