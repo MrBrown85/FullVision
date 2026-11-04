@@ -5382,7 +5382,7 @@ window.DashClassManager = (function () {
       proficiency:
         'Students are scored on the BC proficiency scale: 1 Emerging, 2 Developing, 3 Proficient, 4 Extending.',
       letter:
-        'Students receive letter grades (A, B, C+, C, C\u2013, F) using BC Ministry of Education percentage cutoffs and conversion tables. All calculations follow the official BC grading scale, so report cards are generated correctly without manual conversion.',
+        'A letter grade and % on the BC scale: A, B, C+, C and C\u2013. Under 50% shows IE (Insufficient Evidence) until the course ends, then F.',
       both: 'Proficiency day to day, and a letter grade and % on reports. Useful in grades 10\u201312, where report cards need a letter and %.',
     };
     return esc(map[gs] || map.proficiency);

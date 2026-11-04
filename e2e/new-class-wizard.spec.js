@@ -94,3 +94,18 @@ test('A long step keeps Next in view, every step has Cancel, and each step opens
   await page.locator('.cw-footer [data-action="cmCancelCreate"]').click();
   await expect(page.locator('.cw-steps')).toHaveCount(0);
 });
+
+test('Class Details: the Letter description is plain and names IE', async ({ page }) => {
+  await enterDemo(page);
+  await openWizard(page);
+  await page.locator('.cw-grade-btn', { hasText: 'Grade 11' }).click();
+  await page.locator('.cw-subject-btn', { hasText: 'Social Studies' }).first().click();
+  await page.locator('.cw-course-item').first().click();
+  await page.locator('[data-action="cwGoToStep2"]').click();
+  await page.locator('[data-action="cwCompsNext"]').click();
+  await page.locator('#cm-cg-grading [data-val="letter"]').click();
+  const desc = page.locator('#cm-cg-grading-desc');
+  await expect(desc).toHaveText(
+    'A letter grade and % on the BC scale: A, B, C+, C and C–. Under 50% shows IE (Insufficient Evidence) until the course ends, then F.',
+  );
+});
