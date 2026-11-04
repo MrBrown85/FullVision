@@ -233,15 +233,16 @@ window.PageStudent = (function () {
     // Focus goes back where it came from when the dialog closes.
     overlay._opener = document.activeElement;
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) return closeEditStudent();
+      if (e.target === overlay) return _dismissEditStudent();
       var el = e.target.closest ? e.target.closest('[data-action]') : null;
       if (!el) return;
       var action = el.dataset.action;
       if (action === 'closeEditStudent') closeEditStudent();
       else if (action === 'saveEditStudent') saveEditStudent();
-      else if (action === 'toggleEditDesig')
+      else if (action === 'toggleEditDesig') {
         el.setAttribute('aria-pressed', String(el.getAttribute('aria-pressed') !== 'true'));
-      else return;
+        overlay._dirty = true;
+      } else return;
       e.preventDefault();
       e.stopPropagation();
     });
@@ -373,12 +374,25 @@ window.PageStudent = (function () {
       });
     }
 
+    // Anything typed or picked counts as a change Escape mustn't lose.
+    overlay._dirty = false;
+    var markDirty = function () {
+      overlay._dirty = true;
+    };
+    overlay.addEventListener('input', markDirty);
+    overlay.addEventListener('change', markDirty);
+
     document.body.appendChild(overlay);
     document.getElementById('edit-first').focus();
     overlay._escHandler = function (e) {
       if (e.key === 'Escape') {
         e.preventDefault();
-        return closeEditStudent();
+        return _dismissEditStudent();
+      }
+      // Enter in a box saves, as in any form.
+      if (e.key === 'Enter' && !e.isComposing && e.target && e.target.tagName === 'INPUT' && overlay.contains(e.target)) {
+        e.preventDefault();
+        return saveEditStudent();
       }
       // Focus stays inside the dialog while it is open.
       if (e.key === 'Tab') return _trapEditFocus(overlay, e);
@@ -416,6 +430,27 @@ window.PageStudent = (function () {
       if (msg) msg.hidden = true;
     };
     el.focus();
+  }
+
+  /* Escape or a click outside: closes, and changes not saved can be got
+     back with Undo, which opens the dialog again as it was. */
+  function _dismissEditStudent() {
+    var overlay = document.getElementById('edit-modal-overlay');
+    if (!overlay) return;
+    var changed = overlay._dirty;
+    closeEditStudent();
+    if (!changed || typeof showUndoToast !== 'function') return;
+    var st = getStudents(overlay.dataset.cid).find(function (s) {
+      return s.id === overlay.dataset.sid;
+    });
+    showUndoToast('Changes to ' + (st ? displayNameFirst(st) : 'the student') + ' not saved', function () {
+      if (document.getElementById('edit-modal-overlay')) return;
+      overlay._opener = document.activeElement;
+      document.body.appendChild(overlay);
+      document.addEventListener('keydown', overlay._escHandler);
+      var first = overlay.querySelector('#edit-first');
+      if (first) first.focus();
+    });
   }
 
   function closeEditStudent() {

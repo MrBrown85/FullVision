@@ -74,4 +74,37 @@ describe('Edit Student keys', () => {
     expect(doc.getElementById('edit-modal-overlay')).toBe(null);
     expect(doc.activeElement).toBe(opener);
   });
+
+  it('Escape after a change closes with an Undo that brings the dialog back as it was', () => {
+    PageStudent.openEditStudent(CID, 'st-a', () => {});
+    const pref = doc.getElementById('edit-pref');
+    pref.value = 'Lee';
+    pref.dispatchEvent(new doc.defaultView.Event('input', { bubbles: true }));
+    key('Escape');
+    expect(doc.getElementById('edit-modal-overlay')).toBe(null);
+    expect(toasts.map(t => t.msg)).toEqual(['Changes to Ava not saved']);
+    toasts[0].undo();
+    expect(doc.getElementById('edit-modal-overlay')).not.toBe(null);
+    expect(doc.getElementById('edit-pref').value).toBe('Lee');
+    expect(doc.activeElement.id).toBe('edit-first');
+  });
+
+  it('Escape with nothing changed just closes', () => {
+    PageStudent.openEditStudent(CID, 'st-a', () => {});
+    key('Escape');
+    expect(toasts).toEqual([]);
+  });
+
+  it('Enter in a box saves', () => {
+    let saved = 0;
+    PageStudent.openEditStudent(CID, 'st-a', () => saved++);
+    const pref = doc.getElementById('edit-pref');
+    pref.value = 'Lee';
+    pref.focus();
+    const e = key('Enter');
+    expect(e.defaultPrevented).toBe(true);
+    expect(saved).toBe(1);
+    expect(getStudents(CID)[0].preferred).toBe('Lee');
+    expect(doc.getElementById('edit-modal-overlay')).toBe(null);
+  });
 });
