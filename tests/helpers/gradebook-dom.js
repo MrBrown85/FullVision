@@ -13,7 +13,7 @@ export function mount(seed, params = {}) {
   localStorage.clear();
   stubDocument = globalThis.document;
   const dom = parseHTML(
-    '<!DOCTYPE html><html><body><div id="page-layout"><div id="sidebar-mount"></div><div id="main"></div></div></body></html>',
+    '<!DOCTYPE html><html><body><div id="page-layout"><div id="sidebar-mount"></div><div id="main"></div></div><div id="gb-tooltip"></div></body></html>',
   );
   win = dom.window;
   const doc = dom.document;
@@ -22,6 +22,7 @@ export function mount(seed, params = {}) {
   doc.createElement = tag => {
     const el = make(tag);
     if (tag === 'canvas') el.getContext = () => ({ measureText: () => ({ width: 50 }) });
+    if (tag === 'input' && !el.select) el.select = () => {};
     return el;
   };
   // linkedom draws no layout: scrolling into view does nothing.

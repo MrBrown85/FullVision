@@ -599,6 +599,10 @@ window.PageGradebook = (function () {
       showScoreContextMenu({ clientX: r.left + r.width / 2, clientY: r.bottom }, focused);
       return;
     }
+    if (/^[0-9]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      _scoresTypeDigit(e, focused);
+      return;
+    }
     if (nav.indexOf(e.key) < 0) return;
     var row = -1,
       col = -1;
@@ -619,6 +623,45 @@ window.PageGradebook = (function () {
     else if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) col = Math.min(col + 1, cols - 1);
     else col = Math.max(col - 1, 0);
     if (rows[row][col]) _selectCell(rows[row][col]);
+  }
+
+  /* A digit typed on a selected Scores cell starts Edit Score with it, as
+     in a spreadsheet and the Competencies view: any digit on points work,
+     1–4 on a level. Work that takes no typed score says what to do. */
+  function _scoresTypeDigit(e, cell) {
+    var cid = activeCourse;
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === cell.dataset.aid;
+    });
+    if (!a) return;
+    e.preventDefault();
+    var status = getAssignmentStatus(cid, cell.dataset.sid, a.id);
+    if (status === 'NS' || status === 'EXC') {
+      _showCellTip(
+        cell,
+        (status === 'NS' ? 'Marked Missing' : 'Excused') + '. Take it off in the cell menu to score this work.',
+      );
+      return;
+    }
+    if (isCompletionScored(a)) {
+      _showCellTip(cell, 'Complete or Incomplete work is marked in the grader. Press Return to open it.');
+      return;
+    } else if (isDibelsScored(a)) {
+      _showCellTip(cell, 'Press Return to enter the scores.');
+      return;
+    } else if (isPointsScored(a)) {
+      startCellEdit(cell);
+    } else if (a.rubricId || a.rubric_id) {
+      _showCellTip(cell, 'Scored on the rubric. Press Return to open it.');
+      return;
+    } else if (/^[1-4]$/.test(e.key)) {
+      startCellEdit(cell);
+    } else {
+      _showCellTip(cell, 'Type a level from 1 to 4.');
+      return;
+    }
+    var inp = cell.querySelector('.gb-scores-input');
+    if (inp) inp.value = e.key;
   }
 
   var _hasRubricWork = false;
