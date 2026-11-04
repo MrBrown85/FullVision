@@ -124,7 +124,7 @@ describe('the Skills drawer', () => {
   });
 
   it('has one group for a class without folders', () => {
-    const comps = CommentBank.facts(CID, cece(), 'term-2').year.comps;
+    const comps = CommentBank.facts(CID, cece(), 'term-2').comps;
     const was = globalThis.getCompetencyGroups;
     globalThis.getCompetencyGroups = () => [];
     try {
