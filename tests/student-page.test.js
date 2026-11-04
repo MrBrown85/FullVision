@@ -91,6 +91,8 @@ function setup() {
   };
   calls = [];
   replies = [];
+  // A slip locked in one test is remembered on the "phone"; start clean.
+  localStorage.clear();
   globalThis.fetch = async (url, init) => {
     const body = JSON.parse(init.body);
     calls.push({ url, body });
@@ -344,6 +346,30 @@ describe('student page: who are you? (a questionnaire slip)', () => {
     expect(root.querySelector('[data-act="start"]').textContent).toBe('Yes, Start');
   });
 
+  it('the last try warns it will lock; a locked slip says so straight away when opened again', async () => {
+    replies.push(CHECK);
+    T.start(root, '#K7M4QX');
+    await tick();
+    type('#sp-ident', '999');
+    replies.push({ ok: false, error: 'wrong_identity', tries_left: 1 });
+    click('[data-act="start"]');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(root.querySelector('.sp-ident .sp-msg').textContent).toBe(
+      "That doesn't match. Check your birthday or student number. 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.",
+    );
+    replies.push({ ok: false, error: 'slip_locked' });
+    click('[data-act="start"]');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(root.textContent).toContain('This slip is locked after too many wrong tries.');
+
+    // The page opened again on this phone: the lock shows, not the form.
+    replies.push(CHECK);
+    T.start(root, '#K7M4QX');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(root.querySelector('#sp-ident')).toBeNull();
+    expect(root.textContent).toContain('This slip is locked after too many wrong tries.');
+  });
+
   it('a slip with a password asks for the password', async () => {
     replies.push(Object.assign({}, CHECK, { check: 'password' }));
     T.start(root, '#K7M4QX');
@@ -356,7 +382,7 @@ describe('student page: who are you? (a questionnaire slip)', () => {
     for (let i = 0; i < 3; i++) await tick();
     expect(calls[1].body).toMatchObject({ route: 'verify', password: '4821', birthday: null, student_number: null });
     expect(root.querySelector('.sp-ident .sp-msg').textContent).toBe(
-      "That password doesn't match. Check the password on your slip. 1 try left.",
+      "That password doesn't match. Check the password on your slip. 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.",
     );
     replies.push({ ok: false, error: 'slip_locked' });
     click('[data-act="start"]');

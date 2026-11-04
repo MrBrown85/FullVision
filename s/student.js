@@ -1197,6 +1197,33 @@ var StudentPage = (function () {
     el.style.height = el.scrollHeight + 2 + 'px';
   }
 
+  /* A slip that locked on this phone stays locked when the page is opened
+     again (the server says so only after another try). */
+  function lockKey(code) {
+    return 'fv-s-locked-' + code;
+  }
+  function slipLockedHere(code) {
+    try {
+      return !!localStorage.getItem(lockKey(code));
+    } catch (e) {
+      return false;
+    }
+  }
+  function markSlipLocked(code) {
+    try {
+      localStorage.setItem(lockKey(code), '1');
+    } catch (e) {
+      /* private mode: the server still refuses it */
+    }
+  }
+
+  /* "2 tries left." and, before the last, what happens after it. */
+  function triesLeftText(n) {
+    if (n == null) return '';
+    if (n === 1) return ' 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.';
+    return ' ' + n + ' tries left.';
+  }
+
   function openCode(code) {
     var c = cleanCode(code);
     S.typed = prettyCode(c);
@@ -1215,6 +1242,11 @@ var StudentPage = (function () {
         S.data = res;
         S.screen = 'rcheck';
         S.message = '';
+        paint();
+      } else if (res && res.ok && res.check && slipLockedHere(c)) {
+        // Locked on this phone already: say so now, not after another try.
+        S.message = MESSAGES.slip_locked;
+        S.screen = 'message';
         paint();
       } else if (res && res.ok) {
         S.data = res;
@@ -1355,10 +1387,9 @@ var StudentPage = (function () {
         return;
       }
       var e = res && res.error;
+      if (e === 'slip_locked' && !S.demo) markSlipLocked(S.code);
       if (e === 'wrong_identity') {
-        S.message =
-          MESSAGES[by === 'password' ? 'wrong_password' : 'wrong_identity'] +
-          (res.tries_left != null ? ' ' + res.tries_left + (res.tries_left === 1 ? ' try' : ' tries') + ' left.' : '');
+        S.message = MESSAGES[by === 'password' ? 'wrong_password' : 'wrong_identity'] + triesLeftText(res.tries_left);
       } else {
         S.message = messageFor(res);
         if (e !== 'network' && e !== 'busy') S.screen = 'message';
