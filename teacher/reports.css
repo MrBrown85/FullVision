@@ -3745,18 +3745,20 @@ textarea.studio-text {
 }
 /* Side by side (Questionnaire glance plan, step 6): the right column (the
    Teacher Comment, Attendance, Sentences) stays in view while the left
-   scrolls, and scrolls on its own when it is taller than the window; the
-   left column takes the room the student list leaves when it is hidden
-   (470 → 710 px at 1440), the right keeps 662. Its 4 px padding, taken
-   back by the margin, keeps the cards' shadows from being cut. */
+   scrolls, and scrolls on its own when it is taller than the window. The
+   left column stays 470 px wide, as it was, and the right takes the rest;
+   only when the student list is hidden does the left column take the
+   list's room (470 → 710 px). Colin, Nov 4: the left column had grown on
+   every wide screen ("i wanted it the way it was before, but only for that
+   to grow when the name block was minimized"). The right column's 4 px
+   padding, taken back by the margin, keeps the cards' shadows from being
+   cut. */
 @media (min-width: 1281px) {
-  .qn-left {
-    flex: 1 0 470px;
-    width: auto;
-    min-width: 0;
+  .page-layout.sidebar-hidden .qn-left {
+    width: calc(470px + var(--sidebar-w));
   }
   .qn-right {
-    flex: 0 1 670px;
+    flex: 1;
     position: sticky;
     top: 0;
     align-self: flex-start;
