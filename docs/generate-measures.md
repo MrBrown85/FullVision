@@ -48,69 +48,53 @@ First-sentence families: name-first 48.1%, other 29.6%, time-first 9.3%, grade-f
 Top first-sentence shapes: “NAME is earning” 11.6%, “NAME is proficient” 11.1%, “the work marked” 6%, “across NAME science” 6%, “the bc proficiency” 5.6% (38 distinct).
 Banned phrases: “is able to” 16, “the work marked” 27, “this term” 374, “all six” 10, “rated” 20, “proficiency scale calls” 12, “skill by skill” 6, “marks are close” 22, “across skills” 7, “work on” 56, “ability to” 17, “each skill” 4, “marked highest” 14, “every one” 4.
 
-## After (feat/generate-flow, Nov 4 2026, after the blind sort and the four-audience review)
+## After (feat/generate-flow, Nov 4 2026, after the second blind sort)
 
-The harness now drafts the way a teacher does: each press goes down the roster with the class's comments so far passed in, and the text on screen from the press before (Generate passes both). "Facts per draft" counts a joined sentence as two. The fresh-seed line reruns the class twice on presses no committed run used.
+The harness drafts the way a teacher does: each press goes down the roster with the class's comments so far passed in, and the text on screen from the press before (Generate passes both). "Facts per draft" counts a joined sentence as two. The fresh-seed line reruns the class twice on presses no committed run used.
 
 | Measure                                    | Value             | Target                          | Met |
 | ------------------------------------------ | ----------------- | ------------------------------- | --- |
-| Top first-sentence shape                   | 14.8%             | ≤ 15%                           | yes |
-| Largest shape family                       | 28.7%             | ≤ 25%                           | no  |
-| Largest frame share of a part              | 9%                | ≤ 10%                           | yes |
+| Top first-sentence shape                   | 7.4%              | ≤ 15%                           | yes |
+| Largest shape family                       | 43.1%             | ≤ 25%                           | no  |
+| Largest frame share of a part              | 9.9%              | ≤ 10%                           | yes |
 | Consecutive same-opener pairs              | 0                 | 0                               | yes |
 | "this term" per draft                      | 0                 | 0                               | yes |
 | "so far" per draft (max)                   | 1                 | ≤ 1                             | yes |
 | "proficiency scale" per draft (max)        | 1                 | ≤ 1                             | yes |
 | Banned phrases                             | 0                 | 0                               | yes |
-| Presses changing ≥ 4 sentences             | 98.8% (min 3)     | 100%                            | no  |
-| Neighbour edit distance                    | 0.9               | ≥ 0.6                           | yes |
-| Adjacent students sharing first 3 words    | 3 (worst class 1) | ≤ 2 a class                     | yes |
-| Facts per draft (a joined sentence is two) | 5.62 (3–7)        | 5–7                             | no  |
-| Words per sentence                         | 14.8 (max 24)     | mean ≈ 15, max ≤ 24             | yes |
-| Press edit distance                        | 0.8               | ≥ 0.6                           | yes |
-| Comments with a time opener                | 10.2%             | ≤ 25%                           | yes |
+| Presses changing ≥ 4 sentences             | 99.4% (min 3)     | 100%                            | no  |
+| Neighbour edit distance                    | 0.89              | ≥ 0.6                           | yes |
+| Adjacent students sharing first 3 words    | 0 (worst class 0) | ≤ 2 a class                     | yes |
+| Facts per draft (a joined sentence is two) | 5.62 (4–7)        | 5–7                             | no  |
+| Words per sentence                         | 14.52 (max 24)    | mean ≈ 15, max ≤ 24             | yes |
+| Press edit distance                        | 0.81              | ≥ 0.6                           | yes |
+| Comments with a time opener                | 12.5%             | ≤ 25%                           | yes |
 | Time openers in one comment (max)          | 1                 | ≤ 1                             | yes |
 | Stock time openers                         | 0                 | 0                               | yes |
 | Comments repeating a 3-word run            | 0                 | 0                               | yes |
 | Classmate pairs under 0.5 edit distance    | 0                 | 0                               | yes |
-| Comments of 5+ sentences with no join      | 107               | 0                               | no  |
+| Comments of 5+ sentences with no join      | 102               | 0                               | no  |
 | Most shared 4-word run in a class          | 59.3% of comments | reported                        | yes |
-| Self-BLEU-3                                | 0.72              | reported (lower is more varied) | yes |
-| Distinct-2 / distinct-3                    | 0.47 / 0.63       | reported                        | yes |
+| Self-BLEU-3                                | 0.7               | reported (lower is more varied) | yes |
+| Distinct-2 / distinct-3                    | 0.49 / 0.64       | reported                        | yes |
 
 Frames per part (bank sentences used; the top sentence and its share of the part):
 
 | Part     | Used | Top   | Share |
 | -------- | ---- | ----- | ----- |
-| example  | 66   | vbt08 | 8.2%  |
-| grade    | 67   | vgl04 | 9%    |
-| habits   | 35   | vsh18 | 7.1%  |
-| nextStep | 14   | vns01 | 7.4%  |
-| home     | 17   | vho01 | 8.3%  |
-| overall  | 39   | vcl05 | 6.4%  |
+| example  | 60   | vbt08 | 9.9%  |
+| grade    | 64   | vgl06 | 5.9%  |
+| habits   | 37   | vh207 | 8.7%  |
+| nextStep | 12   | vns21 | 9.3%  |
+| home     | 14   | vho01 | 8.3%  |
+| overall  | 34   | vcl05 | 6.3%  |
 
-First-sentence families: name-first 28.7%, course-first 25.9%, other 21.3%, work-first 13.9%, time-first 7.9%, grade-first 2.3%.
-Top first-sentence shapes: “in science 8” 14.8%, “science 8 work” 7.4%, “one of NAME” 4.2%, “science 8 marks” 3.7%, “NAME marks have” 2.8% (78 distinct).
+First-sentence families: name-first 43.1%, work-first 22.7%, course-first 13.4%, other 13%, time-first 7.9%.
+Top first-sentence shapes: “the biodiversity field” 7.4%, “in science 8” 5.1%, “science 8 marks” 5.1%, “NAME science 8” 5.1%, “the science fair” 3.2% (71 distinct).
 
-Fresh seeds (2 runs of 216, worst): top first-sentence shape 13%, largest shape family 30.6%, largest frame share of a part 11.1%; every target met: no.
+Fresh seeds (2 runs of 216, worst): top first-sentence shape 7.9%, largest shape family 45.4%, largest frame share of a part 11.1%; every target met: no.
 
-Not met: the largest shape family (28.7% name-first; grade sentences may now open only on the student or the course, and a time opener is allowed in one comment of four, which leaves four families for the first sentence); presses changing four sentences (98.8%: three presses of 216 change three); facts per draft (an F in a Letter class has no grade sentence, and a student whose top skill is falling has no strength sentence, so a few drafts say three or four true things); comments with no joined sentence (107 of 216: two facts join only when they sit side by side and one is the grade, the strength or the piece); and on fresh seeds one frame reached 11.1% of its part.
-
-| Measure                                 | Before             | After            | Target                |
-| --------------------------------------- | ------------------ | ---------------- | --------------------- |
-| Largest shape family                    | 48.1%              | 28.7%            | ≤ 25%                 |
-| Largest frame share of a part           | 30.1%              | 9% (11.1% fresh) | ≤ 10%                 |
-| "this term" per draft                   | 1.73               | 0                | 0                     |
-| Banned phrases                          | 589                | 0                | 0                     |
-| Presses changing ≥ 4 sentences          | 94.4% (min 3)      | 98.8% (min 3)    | 100%                  |
-| Adjacent students sharing first 3 words | 24 (worst class 5) | 0                | ≤ 2 a class           |
-| Classmate pairs under 0.5 edit distance | not measured       | 0                | 0                     |
-| Comments repeating a 3-word run         | not measured       | 0                | 0                     |
-| Stock time openers                      | not measured       | 0                | 0                     |
-| Comments with a time opener             | not measured       | 10.2%            | ≤ 25%                 |
-| Press edit distance                     | 0.54               | 0.8              | ≥ 0.6                 |
-| Self-BLEU-3                             | 0.84               | 0.72             | lower is more varied  |
-| Distinct-2 / distinct-3                 | 0.33 / 0.45        | 0.47 / 0.63      | higher is more varied |
+Not met, and why: the largest shape family is name-first (43.1%), because every frame now opens on the student, the piece, the course or "Next" (the second blind sort: clefts and inversions read as assembled) and a time opener is allowed in one comment of four; the 25% cap was set when clefts were allowed. Presses changing four sentences: 99.4% (one press of 216 changes three). Facts per draft: a few drafts say four true things (an F in a Letter class has no grade sentence; a falling top skill has no strength sentence). Comments with no joined sentence: 102 of 216 (two facts join only when the grade, strength and piece sit side by side). On fresh seeds one frame reached 11.1% of its part.
 
 ## Twelve Drafts, Two per Standing
 
@@ -118,21 +102,21 @@ As Generate gives them, unedited, from the run above. Demo Mode has no IE studen
 
 ### Extending
 
-**Noor, Proficiency class, press 1.** In Science 8, Noor is at an Extending level, which means she is going beyond what the course expects. The Science Fair Proposal shares her top mark with other pieces, and observing and describing nature close to home stands out in her work. She joins in class discussions. Beginning the task as soon as class starts would help, and so would sharing the work in a group. Next, she can explain how much each source of error changed the results.
+**Noor, Proficiency class, press 1.** In Science 8, Noor is at an Extending level, which means she is going beyond what the course expects. She joins in class discussions. To get more from each lesson, she can practise beginning the task as soon as class starts. Her Science Fair Proposal is one of her strongest pieces, and she does well at explaining what she notices in the local environment. Next, she can learn to explain how much each error changed the results.
 
-**Mei, Proficiency class, press 2.** This year, Mei connects observations of a local place to several science ideas and explains the links. She is now at an Extending level in Science 8, which means she is going beyond what the course expects. Where she can grow in class is sharing the work in a group. She earned one of her top marks on the Data Reading Quiz. With practice in class, she can select fitting units and confirm every conversion. You might ask her to convert the millilitres on a juice carton to litres.
+**Mei, Proficiency class, press 2.** Over the year, Mei studies one local place over time and explains what changes. Science 8 marks place her at an Extending level so far, and she earned one of her top marks on the Data Reading Quiz. Her goal in class is doing her part in a group task. Next, she can learn to show the units at each step of a calculation. You could ask her to measure a room in metres and then in centimetres.
 
 ### Proficient
 
-**Cece, Proficiency class, press 1.** Among Cece’s best pieces is her Biodiversity Field Journal. In Science 8, the work she does is at a Proficient level. She consistently starts the task as soon as class begins and works well in a group. Her next step is to connect a science problem to a local or world need.
+**Cece, Proficiency class, press 1.** The Biodiversity Field Journal shares Cece’s top mark with other pieces. Her marks put her at a Proficient level in Science 8. She both starts the task as soon as class begins and works well in a group. Her next goal is to describe how the issue looks in B.C. and in another country.
 
-**Liam, Proficiency class, press 3.** In Science 8, the work Liam does is at a Proficient level, and one of his highest marks came on the Microscope Skills Check. A strength in his work is studying a nearby place first-hand and explaining it. He reliably comes to class ready to work. The one habit that would help him most is keeping his phone away during lessons. One way to grow from here is to choose a question that a fair test can answer. When he brings work home, ask him which question about your kitchen, like why bread goes stale, a test could answer.
+**Liam, Proficiency class, press 3.** Liam has worked at a Proficient level in Science 8 over the year. He reliably comes to class ready to work. In class, he could focus on keeping his phone away during lessons. One of his highest marks came on the Microscope Skills Check, and he explains what he observes in the local environment using science ideas. To grow further, he can choose a question with something to measure in the answer. At home, it helps to ask him to think of a question about the kitchen that a simple test could answer.
 
 ### Developing
 
-**Ethan, Proficiency class, press 2.** There has been growth in turning results into a clear chart or labelled table, from Emerging to Developing. Ethan is at a Developing level in Science 8 so far. His Science Fair Proposal is one of his strongest pieces. He keeps his phone away during lessons. The one habit that would help him most is beginning the task as soon as class starts. One way to grow from here is to stay with one science topic across several weeks.
+**Ethan, Proficiency class, press 2.** Ethan has grown from Emerging to Developing in giving a graph a title, axis names and units. His Science 8 work is at a Developing level, and the Science Fair Proposal is among his best pieces. He keeps his phone away during lessons. To get more from each lesson, he can practise beginning the task as soon as class starts. Looking ahead, he can add one new note to his topic page each lesson.
 
-**Darius, Proficiency class, press 1.** Science 8 work puts Darius at a Developing level, and his Biodiversity Field Journal earned one of his top marks. He joins in class discussions and uses feedback to improve his next piece. Coming to class with what he needs would help him most. One way to grow from here is to keep exploring one science topic over several weeks.
+**Darius, Proficiency class, press 1.** Science 8 marks place Darius at a Developing level so far, and the Biodiversity Field Journal is one of his strongest pieces. He joins in class discussions and uses feedback to improve his next piece. To get more from each lesson, he can practise coming to class with what he needs. After this, he can add one new note to his topic page each lesson.
 
 ### IE
 
@@ -142,125 +126,125 @@ As Generate gives them, unedited, from the run above. Demo Mode has no IE studen
 
 ### C+
 
-**Sam (they/them), Letter class, press 1.** The Energy Transfer Investigation is one of Sam’s strongest pieces, and their Science 8 mark is a C+, which is good work. They would gain most from listening to others in group work. The step that would help most now is to stay with one science topic across several weeks. When they bring work home, ask them what science question they have wondered about lately and why.
+**Sam (they/them), Letter class, press 1.** In Sam’s Energy Transfer Investigation, one of their strongest pieces, they calculated averages to compare trials in their lab. Their Science 8 mark is a C+, which is good work. They can make progress by listening to others in group work. With some practice, they can add one new note to their topic page each lesson. At home, ask them to pick one thing in the yard to watch for a few weeks and say what changes.
 
-**Caleb, Letter class, press 2.** The Circuit Design Challenge is Caleb’s best piece: in it, he followed each safety rule during his lab. He is earning a C+ in Science 8, good work. I notice that he starts the task as soon as class begins. He would gain most from keeping his device on the task. With practice in class, he can check each reading and include its unit.
+**Caleb, Letter class, press 2.** On Caleb’s Circuit Design Challenge, he earned his top mark. He has a C+ in Science 8, which is work of a good standard. I notice that he starts the task as soon as class begins. He would gain most from keeping his device on the task. Next, he can learn to use the smallest marks on a ruler.
 
 ### Strong, One Habit to Build
 
-**Sofia, Proficiency class, press 1.** Of all Sofia’s work in Science 8, the Circuit Design Challenge stands out, and her work is at a Proficient level. In studying a nearby place first-hand and explaining it, her work has risen from Developing to Proficient. She reliably comes to class ready to work. What would help her most in class is using the device for the work in front of her. The next thing to practise is connecting a science problem to a local or world need.
+**Sofia, Proficiency class, press 1.** Of all Sofia’s work in Science 8, the Circuit Design Challenge stands out, and her work is at a Proficient level. In using what local people know about a nearby place, her work has risen from Developing to Proficient. She consistently starts the task as soon as class begins. Her goal in class is keeping her phone away during lessons. Next, she can learn to explain why the topic matters to families nearby.
 
-**Tessa (B), Letter class, press 3.** The Mineral Identification Lab shares Tessa’s top mark with other pieces, and she is earning a B in Science 8, very good work. In class, she finishes her work by the due date. What would help her most in class is asking what to change after a piece is marked. She can describe her own view of a place and consider others, one of her strengths. To grow further, she can connect a science problem to a local or world need.
+**Tessa (B), Letter class, press 3.** In Tessa’s Mineral Identification Lab, one of her strongest pieces, she noted a result that broke the pattern in her lab conclusion. She has earned a B in Science 8, work of a high standard. In her assignments, she explains what a local place means to her and to others. She is a student who finishes her work by the due date. In class, she could focus on using the feedback on one piece in the next. From here, she can describe how the issue looks in B.C. and in another country.
 
 ## Blind Sort Sheet
 
-Ten generated drafts mixed with the ten stand-in comments in `docs/generate-gold-standin.md` (seed 23, a new draw). The stand-ins are not Colin's; the release test needs ten to twenty of his own comments in their place, read by three people, sorted at 60% or worse.
+Ten generated drafts mixed with the ten stand-in comments in `docs/generate-gold-standin.md` (seed 37, a new draw). The stand-ins are not Colin's; the release test needs ten to twenty of his own comments in their place, read by three people, sorted at 60% or worse.
 
 ### Which Were Written by a Teacher?
 
 For each comment, write T (a teacher wrote it) or G (it was generated). 20 comments; half are each.
 
-1. Science 8 work has earned Darius a C, which is satisfactory work. His Biodiversity Field Journal is one of his strongest pieces. He consistently asks questions in class. His next habits to build are beginning the task as soon as class starts and listening to others in group work. One way to grow from here is to stay with one science topic across several weeks.
+1. In Sam’s Energy Transfer Investigation, one of their strongest pieces, they calculated averages to compare trials in their lab. Their mark in Science 8 is a C+, good work. They would gain most from listening to others in group work. Looking ahead, they can return to one science question each week for a month. When they bring work home, ask them to pick one thing in the yard to watch for a few weeks and say what changes.
 
    T / G
 
-2. Caleb has a C+ in Science 8, which is good work. His Circuit Design Challenge is his best piece. He looks closely at the world outdoors and asks questions about what he sees, and he hands in his work on time. Putting his phone away when asked is the one habit to build. Next, he can measure carefully and write the units down each time. At home, ask him to measure something in the kitchen and tell you the units.
+2. Ethan's marks for showing patterns in data have risen from Emerging to Developing. He is now working at a Developing level in Science 8. His Science Fair Proposal is his best piece. He uses the class devices well, and starting work when class begins is the habit to build. Next, he can follow one science topic for several weeks and see what questions it raises. If he notices something odd at home, ask him what he thinks is causing it.
 
    T / G
 
-3. This year, Mei connects observations of a local place to several science ideas and explains the links. She is earning an A in Science 8, excellent work, and the Data Reading Quiz is among her highest marks. Sharing the work in a group would help, and so would making one change from each piece of feedback. Looking ahead, she can select fitting units and confirm every conversion. You might ask her to convert the millilitres on a juice carton to litres.
+3. Ethan has grown from Emerging to Developing in giving a graph a title, axis names and units. His Science 8 work is at a Developing level, and the Science Fair Proposal is among his best pieces. He keeps his phone away during lessons. To get more from each lesson, he can practise beginning the task as soon as class starts. Looking ahead, he can add one new note to his topic page each lesson.
 
    T / G
 
-4. In Science 8, Olivia is earning a B, which is very good work. Her Chemical Reactions Lab earned one of her top marks. She reliably completes her work on time. The habit to build is asking what to change after a piece is marked. What would help her most now is to add new facts to one science topic over a month.
+4. Anisa’s Science 8 work is at a Proficient level, and the Scientific Method Quiz is among her highest marks. She consistently shares the work in a group. In class, she could focus on finishing each piece by its due date. Next, she can add a column for what she sees during the lab. At home, ask her to measure a cup of flour in the kitchen and say how sure the reading is.
 
    T / G
 
-5. Raj’s Science Fair Proposal earned one of his top marks, and he can keep other variables the same in some of his work. I notice that he comes to class ready to work. He can practise finishing each piece by its due date. What would help him most now is to name a science topic he wonders about and ask one question.
+5. The Data Reading Quiz is among Mei’s highest marks, and her Science 8 work is at an Extending level. She compares two local places and explains why they differ. Her next steps in class are sharing the work in a group and using the feedback on one piece in the next. From here, she can check that each converted answer makes sense.
 
    T / G
 
-6. Noor is working at an Extending level in Science 8. Her Science Fair Proposal is the piece that stands out, and it earned her top mark. In class she joins discussions and uses feedback to improve the next piece. Starting the task as soon as class begins would help her get more from each lesson. Her next step is to find the sources of error in an investigation and suggest a change for each. At home, ask her how sure the class can be about a result.
+6. Science 8 work has earned Noor an A, which is work of a very high standard. She asks questions in class and uses feedback to improve her next piece. Her next habits to build are starting work when class begins and listening to others in group work. The Science Fair Proposal is among her best pieces. In her assignments, she connects views of a place to choices about caring for it. With some practice, she can estimate the size of each error. If she talks about class at home, ask her what might make a kitchen scale give a wrong reading.
 
    T / G
 
-7. Liam's marks in Science 8 put him at a Proficient level. He explains what he sees in the local environment, and his Microscope Skills Check earned his highest mark. He comes to class ready and finishes his work on time. Keeping his phone away during lessons is the habit to build. The next step is for him to choose a question that a fair test can answer.
+7. Caleb is earning a C+ in Science 8, solid work. He consistently comes to class ready to work and finishes his work by the due date. His goal in class is keeping his device on the task. This year, his best piece is his Circuit Design Challenge. Caleb can now aim to measure twice and compare the readings. You might ask him to measure a cup of flour in the kitchen and say how sure the reading is.
 
    T / G
 
-8. Raj is at an Emerging level in Science 8, so the first signs of the learning are there. His Science Fair Proposal is the piece that shows them most. He comes to class ready, works well in a group and joins discussions. Finishing each piece by its due date would help his marks show what he knows. His next step is to ask his own questions about a science topic that interests him.
+8. Liam's marks in Science 8 put him at a Proficient level. He explains what he sees in the local environment, and his Microscope Skills Check earned his highest mark. He comes to class ready and finishes his work on time. Keeping his phone away during lessons is the habit to build. The next step is for him to choose a question that a fair test can answer.
 
    T / G
 
-9. Darius is at a Developing level in Science 8, which means his understanding is growing and becoming steadier. His best piece is his Biodiversity Field Journal. He asks questions in class and uses feedback on his work. Using the start of class well and sharing the work in a group would help him most. His next step is to follow one science topic over several weeks and keep asking questions about it.
+9. Jas has a B in Science 8, which is strong work. He completes his work on time. His goal in class is making one change from each piece of feedback. The Data Analysis Project is one of his strongest pieces. To grow further, he can stay with the same question until he has three answers.
 
    T / G
 
-10. Tyler earned one of his top marks on the Forces & Motion Quick Check. His Science 8 mark is a C-, which is minimally acceptable work. In class, he shares the work in a group. His next habits to build are keeping track of due dates and starting work when class begins. Practice at identifying assumptions in a source or in a lab would help him most now.
+10. Noor is working at an Extending level in Science 8. Her Science Fair Proposal is the piece that stands out, and it earned her top mark. In class she joins discussions and uses feedback to improve the next piece. Starting the task as soon as class begins would help her get more from each lesson. Her next step is to find the sources of error in an investigation and suggest a change for each. At home, ask her how sure the class can be about a result.
 
 T / G
 
-11. Jas has a B in Science 8 so far, which is very good work. He consistently completes his work on time. Where he can grow in class is making one change from each piece of feedback. His Data Analysis Project earned one of his top marks. After this, he can keep exploring one science topic over several weeks.
+11. Science 8 work puts Jordan at a Proficient level, and the Science Fair Proposal is one of his strongest pieces. Over the year, he makes tables and graphs that show a pattern in the data. His goal in class is asking a question when something is unclear. Next, he can learn to use lab results to decide whether a claim holds. To support this at home, ask him what evidence a cleaning product label gives for its claims.
 
 T / G
 
-12. In Science 8, the work Tessa does is at a Proficient level, and her Mineral Identification Lab is among her best pieces. She judges how fair an experiment was and how good its data are, a strength in her work. In class, she completes her work on time. She would get more from each class by making one change from each piece of feedback. The step that would help most now is to say why a science issue matters to people in B.C. or elsewhere.
+12. Tessa's mark in Science 8 is a B, very good work. Her Mineral Identification Lab earned her highest mark, and in it she used what she had learned in a new setting. She completes her work on time. Reading the feedback on a piece and using it on the next one is the habit to build. Her next step is to explain why a science problem matters to people here and elsewhere.
 
 T / G
 
-13. Ethan's marks for showing patterns in data have risen from Emerging to Developing. He is now working at a Developing level in Science 8. His Science Fair Proposal is his best piece. He uses the class devices well, and starting work when class begins is the habit to build. Next, he can follow one science topic for several weeks and see what questions it raises. If he notices something odd at home, ask him what he thinks is causing it.
+13. Sam is working at a Proficient level in Science 8. Their Energy Transfer Investigation is their best piece; it shows they can use a science idea in a new setting. They complete their work and come to class ready. Sharing the work in a group is the habit to build. Their next step is to follow one science topic over several weeks. At home, you could ask them what question an experiment in class was trying to answer.
 
 T / G
 
-14. Tessa's mark in Science 8 is a B, very good work. Her Mineral Identification Lab earned her highest mark, and in it she used what she had learned in a new setting. She completes her work on time. Reading the feedback on a piece and using it on the next one is the habit to build. Her next step is to explain why a science problem matters to people here and elsewhere.
+14. The Biodiversity Field Journal earned one of Fatima’s top marks, and she is earning a B in Science 8, work of a high standard. I notice that she comes to class ready to work. Her goal in class is finishing each piece by its due date. Next, she can learn to design a fair test of an advertised claim.
 
 T / G
 
-15. Sam is working at a Proficient level in Science 8. Their Energy Transfer Investigation is their best piece; it shows they can use a science idea in a new setting. They complete their work and come to class ready. Sharing the work in a group is the habit to build. Their next step is to follow one science topic over several weeks. At home, you could ask them what question an experiment in class was trying to answer.
+15. Science 8 is going well for Cece, who is working at a Proficient level. Her Biodiversity Field Journal is her best piece, and it shows how clearly she presents data in tables and graphs. She hands in her work on time and comes to class ready. Next, she can explain why a science problem matters to people here and elsewhere. When something in the news is about science, ask her who it affects.
 
 T / G
 
-16. Maya identifies sources of error and suggests improvements to the method, and her marks show it. She is working at a Proficient level in Science 8, and the Scientific Method Quiz is among her highest marks. In class, she makes changes from the feedback on her work and keeps her phone away during lessons. She can practise completing work on time. What would help her most now is to connect a science problem to a local or world need. One idea for home: ask her what science question she has wondered about lately and why.
+16. Caleb has a C+ in Science 8, which is good work. His Circuit Design Challenge is his best piece. He looks closely at the world outdoors and asks questions about what he sees, and he hands in his work on time. Putting his phone away when asked is the one habit to build. Next, he can measure carefully and write the units down each time. At home, ask him to measure something in the kitchen and tell you the units.
 
 T / G
 
-17. Ethan's grade in Science 8 is IE for now, because his marks so far average under 50 percent. There is time to change that. His best piece is his Earth Science Unit Test. He uses the class devices well, and starting work when class begins would help him most. The plan is for him to follow one science topic over several weeks and finish the pieces that count. Please call or email me so we can set a deadline together.
+17. Darius is at a Developing level in Science 8, which means his understanding is growing and becoming steadier. His best piece is his Biodiversity Field Journal. He asks questions in class and uses feedback on his work. Using the start of class well and sharing the work in a group would help him most. His next step is to follow one science topic over several weeks and keep asking questions about it.
 
 T / G
 
-18. Science 8 work has earned Marcus a C-, which is minimally acceptable work. He is starting to name the variable being changed in a test, which shows in his marks. The piece that stands out is his Chemical Reactions Lab. He asks questions in class and makes changes from the feedback on his work. Marcus’s next habits to build are starting work when class begins and doing his part in a group task. To grow further, he can stay with one science topic across several weeks. You could ask him what science question he has wondered about lately and why.
+18. Raj is at an Emerging level in Science 8, so the first signs of the learning are there. His Science Fair Proposal is the piece that shows them most. He comes to class ready, works well in a group and joins discussions. Finishing each piece by its due date would help his marks show what he knows. His next step is to ask his own questions about a science topic that interests him.
 
 T / G
 
-19. One of Jordan’s best pieces is his Science Fair Proposal, where he followed each safety rule during his lab. He has earned a B in Science 8, very good work. One thing he does well is showing data patterns in tables, graphs and models. He can practise asking a question when something is unclear and using the device for the work in front of him. Looking ahead, he can plan a simple investigation to test a claim.
+19. Tyler is working at a Developing level in Science 8, and his Forces & Motion Quick Check result is his best. He consistently shares the work in a group and asks questions in class. His next habits to build are keeping track of due dates and starting work when class begins. From here, he can ask what a source leaves unsaid.
 
 T / G
 
-20. Science 8 is going well for Cece, who is working at a Proficient level. Her Biodiversity Field Journal is her best piece, and it shows how clearly she presents data in tables and graphs. She hands in her work on time and comes to class ready. Next, she can explain why a science problem matters to people here and elsewhere. When something in the news is about science, ask her who it affects.
+20. Ethan's grade in Science 8 is IE for now, because his marks so far average under 50 percent. There is time to change that. His best piece is his Earth Science Unit Test. He uses the class devices well, and starting work when class begins would help him most. The plan is for him to follow one science topic over several weeks and finish the pieces that count. Please call or email me so we can set a deadline together.
 
 T / G
 
 ### Answer Key
 
-Seed 23.
+Seed 37.
 
 1. G (generated)
 2. T (control)
 3. G (generated)
 4. G (generated)
 5. G (generated)
-6. T (control)
-7. T (control)
+6. G (generated)
+7. G (generated)
 8. T (control)
-9. T (control)
-10. G (generated)
+9. G (generated)
+10. T (control)
 11. G (generated)
-12. G (generated)
+12. T (control)
 13. T (control)
-14. T (control)
+14. G (generated)
 15. T (control)
-16. G (generated)
+16. T (control)
 17. T (control)
-18. G (generated)
+18. T (control)
 19. G (generated)
 20. T (control)
