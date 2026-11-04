@@ -203,6 +203,11 @@
         border-bottom: 2.4px solid #0071e3;
         transform: rotate(-45deg);
       }
+      .cards2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
       .extra {
         background: #f5f5f7;
         border-radius: 16px;
@@ -274,7 +279,8 @@
           padding: 0 16px;
         }
         .facts,
-        .extras {
+        .extras,
+        .cards2 {
           grid-template-columns: minmax(0, 1fr);
         }
         .h1 {
@@ -355,6 +361,7 @@
           </a>
           <nav class="navlinks" aria-label="Main">
             <a class="navlink" href="#assignments">Gradebook</a>
+            <a class="navlink" href="#curriculum">Curriculum</a>
             <a class="navlink" href="#reports">Reports</a>
             <a class="navlink" href="#student-voice">Student Voice</a>
             <a class="navlink" href="#observations">Observations</a>
@@ -393,9 +400,9 @@
                 Make Every Student's Growth Visible
               </h1>
               <p style="margin: 0; font-size: 20px; line-height: 1.5; color: #48484d">
-                Make assignments, score them on the Provincial Proficiency Scale, and keep every mark in one gradebook.
-                When Learning Updates are due, families get clear feedback, next steps, and their child's own
-                self-assessment and goals.
+                Make assignments, score them on the Provincial Proficiency Scale, and keep every mark in one gradebook
+                that builds all year. When Learning Updates are due, families get the year so far, clear feedback, next
+                steps, and their child's own self-assessment and goals.
               </p>
               <div style="display: flex; flex-wrap: wrap; gap: 12px; padding-top: 4px">
                 <a class="btn btn-solid" href="/login.html?demo=1" data-link="demo" style="background: #0071e3"
@@ -405,6 +412,7 @@
               </div>
               <ul class="minis">
                 <li>BC curriculum built in</li>
+                <li>Grades build all year</li>
                 <li>Core Competency self-assessment</li>
                 <li>Stored in Canada</li>
                 <li>No AI</li>
@@ -414,7 +422,7 @@
               <img
                 class="collage-back"
                 src="/assets/splash/growth.jpg"
-                alt="A competency rising from 3.0 to 3.2, with the work behind it."
+                alt="A competency rising from 3.0 to 3.3, with its next step and the work behind it."
               />
               <img
                 class="collage-front"
@@ -439,7 +447,8 @@
             >
               <span style="font-size: 16px; font-weight: 700">BC Curriculum Built In</span>
               <span style="font-size: 14px; line-height: 1.45; color: #48484d"
-                >Competencies and I-can statements for 223 BC courses load when you set up a class.</span
+                >Every competency for 226 BC courses, grades 8 to 12, in the Ministry's own words, with I Can
+                statements.</span
               >
             </div>
             <div
@@ -508,12 +517,17 @@
                 <li>
                   Create assignments with dates, a category, and the curricular and Core Competencies they assess.
                 </li>
-                <li>Score by proficiency with + and −, points, complete or incomplete, or DIBELS 8.</li>
+                <li>
+                  Score by proficiency with + and −, points, complete or incomplete, or DIBELS 8 in ELA and Social
+                  Studies 8 classes.
+                </li>
+                <li>Score by competency: each tagged competency on the proficiency scale, with no rubric needed.</li>
                 <li>
                   Advanced Rubrics hold a checklist in each level. The suggested level is the highest one with every box
                   ticked.
                 </li>
-                <li>Set Everyone To a level, then change the few who differ.</li>
+                <li>Pair and Group work takes one grade per pair or group, or grade a student separately.</li>
+                <li>Set Everyone To a level for the students not yet scored, then change the few who differ.</li>
                 <li>Comment on any criterion, and add an overall comment for each student.</li>
                 <li>Mark work Late, Excused or Missing.</li>
               </ul>
@@ -535,13 +549,20 @@
                 <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
                   Every Score in One Grid
                 </h2>
+                <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
+                  Grades build all year. A Learning Update is a checkpoint, not a fresh start: each report shows the
+                  year to date as of its date, and how each competency has changed since the last report.
+                </p>
                 <ul class="ticks">
                   <li>Score on the four-point scale with + and −, or in points.</li>
                   <li>Show proficiency, letter grades and percentages, or both, set per class.</li>
                   <li>Switch between Scores and Competencies views.</li>
-                  <li>Categories with weights, and a term picker for each reporting period.</li>
-                  <li>Keep rubrics in a Rubric Bank and print graded copies to hand back.</li>
-                  <li>Add one assignment to every block that teaches the course. Edits stay linked.</li>
+                  <li>Categories with weights.</li>
+                  <li>
+                    Missing work counts the way the class grades: 0 in a percent grade, and no evidence, not a zero, on
+                    the proficiency scale.
+                  </li>
+                  <li>Mark Blank Cells Missing in one step, and undo any change with ⌘Z.</li>
                 </ul>
               </div>
               <img
@@ -554,6 +575,69 @@
           </div>
         </section>
 
+        <section id="curriculum" style="background: #ffffff; padding: 96px 0">
+          <div class="wrap feat">
+            <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
+              <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">BC Curriculum</p>
+              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
+                The Curriculum in the Ministry's Own Words
+              </h2>
+              <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
+                FullVision's curriculum is copied from the Ministry's course files: every grade 8 to 12 course except
+                second languages, 226 courses and 5,029 curricular competencies, word for word.
+              </p>
+              <ul class="ticks">
+                <li>The New Class wizard loads each course's competencies in the Ministry's order and folders.</li>
+                <li>Every competency has a short name, a code and I Can statements for students.</li>
+                <li>Hover a level wherever you pick one to see what it means for that competency.</li>
+                <li>Tag the seven Core Competencies, with the Ministry's description of each.</li>
+                <li>
+                  Combine courses in one class, like Humanities 8. Each Course Counts Equally keeps one course from
+                  outweighing the other.
+                </li>
+                <li>Folders Count as One, or turn it off so each competency counts on its own.</li>
+              </ul>
+            </div>
+            <img
+              class="shot"
+              loading="lazy"
+              src="/assets/splash/curriculum.jpg"
+              alt="The New Class wizard listing English Language Arts 8 competencies in the Ministry's wording."
+            />
+          </div>
+        </section>
+
+        <section id="setup" style="padding: 96px 0">
+          <div class="wrap feat flip">
+            <div class="feat-text" style="display: flex; flex-direction: column; gap: 18px">
+              <p style="margin: 0; font-size: 15px; font-weight: 600; color: #0058b0">New Assessment</p>
+              <h2 class="h2" style="margin: 0; font-size: 38px; line-height: 1.1; letter-spacing: -0.03em">
+                Set Up an Assessment in Fewer Steps
+              </h2>
+              <p style="margin: 0; font-size: 18px; line-height: 1.55; color: #48484d">
+                Tick the competencies an assessment covers and FullVision shows how each will be scored, in the same
+                words that print on the student's rubric.
+              </p>
+              <ul class="ticks">
+                <li>Start From a Past Assessment copies its scoring, competencies and rubric, from any class.</li>
+                <li>Create and Add Another saves this one and keeps the setup for the next.</li>
+                <li>
+                  Start a rubric from the Competency Rubric, from a rubric in this class, by copying one from another
+                  class, or from a blank rubric.
+                </li>
+                <li>Make Pair and Group work, with one grade for each pair or group.</li>
+                <li>Add one assessment to every block that teaches the course. Edits stay linked.</li>
+              </ul>
+            </div>
+            <img
+              class="shot"
+              loading="lazy"
+              src="/assets/splash/assessment-form.jpg"
+              alt="A new assessment scored by competency, with the Competency Rubric for the three ticked."
+            />
+          </div>
+        </section>
+
         <section id="reports" style="background: #ffffff; padding: 96px 0">
           <div class="wrap" style="display: flex; flex-direction: column; gap: 112px">
             <div class="feat">
@@ -563,17 +647,22 @@
                   Write Each Comment From the Evidence
                 </h2>
                 <ul class="ticks">
-                  <li>Rate work habits, and see each student's best piece, missing work and skills at a glance.</li>
-                  <li>Generate Comment builds a draft from a sentence bank you can browse and change.</li>
-                  <li>Reword or reorder any sentence. Your edits are kept when you generate again.</li>
+                  <li>
+                    At a Glance shows the year so far: each student's strongest skill, next step and biggest change
+                    since the last report, their best piece, and missing and late work.
+                  </li>
+                  <li>An Observations card beside the comment shows the newest notes and the counts by type.</li>
+                  <li>Generate Comment builds a draft from a subject-aware sentence bank you can browse and change.</li>
+                  <li>Add your own sentences to My Bank, for other students they fit.</li>
+                  <li>Generate keeps the sentences you wrote. An earlier draft is replaced, and Undo puts it back.</li>
                   <li>Approve and Next moves through the class one student at a time.</li>
                 </ul>
               </div>
               <img
                 class="shot"
                 loading="lazy"
-                src="/assets/splash/comment.jpg"
-                alt="A report comment and the editable sentences it was built from."
+                src="/assets/splash/questionnaire.jpg"
+                alt="At a Glance and Observations beside a student's Teacher Comment."
               />
             </div>
 
@@ -594,11 +683,12 @@
                     Grades: proficiency by competency, assignment grades, missing work, attendance and progress in one
                     area.
                   </li>
+                  <li>Every grade is the year to date as of the report, with the change since the last one.</li>
                   <li>Comments and evidence: your teacher comment and next steps.</li>
                   <li>Student voice: self-assessment and goal, and reflections on learning and habits.</li>
                   <li>A proficiency legend and a parent or guardian response strip.</li>
                   <li>Start from Report Card, Interim Update or Conference Pack, then Save as Template.</li>
-                  <li>Letter or Legal, front only or front and back, black or colour.</li>
+                  <li>Letter or Legal, front only or front and back, in black and white for the photocopier.</li>
                 </ul>
               </div>
               <img
@@ -616,7 +706,10 @@
                   Print the Whole Class at Once
                 </h2>
                 <ul class="ticks">
-                  <li>A grade sheet for every student with each assignment, a category summary and the term grade.</li>
+                  <li>
+                    A grade sheet for every student with each assignment, a category summary and the course grade, year
+                    to date.
+                  </li>
                   <li>Add feedback pages for rubrics, assignment comments, observations and the term comment.</li>
                   <li>One student or everyone, in one print job.</li>
                   <li>Sent to Phones puts the report on each student's phone instead of paper.</li>
@@ -640,6 +733,7 @@
                   <li>Completed rubrics, one per student, with their scores marked.</li>
                   <li>Or a blank rubric with no names or scores, to hand out before the task.</li>
                   <li>Print for all scored students, the whole class, or the students you pick.</li>
+                  <li>Not Yet Printed and Changed Since Printed pick up where your last print left off.</li>
                   <li>One, two or four rubrics per page: full page, half sheets or quarter sheets.</li>
                   <li>Black and white, ready for the photocopier.</li>
                 </ul>
@@ -726,10 +820,13 @@
                 Know Who Needs You Today
               </h2>
               <ul class="ticks">
-                <li>Class average and how many students are Extending, Proficient and Developing.</li>
+                <li>
+                  Class average, its change since the last report, and how many students are Extending, Proficient and
+                  Developing.
+                </li>
                 <li>
                   Needs Attention lists students below Proficient, not observed in 3+ weeks, with no strength recorded,
-                  or with missing work. You set the rule.
+                  or with missing work, with each student's next step. You set the rule.
                 </li>
                 <li>
                   Proficiency for each curricular competency, and how many assessments cover each Core Competency.
@@ -755,7 +852,7 @@
               </h2>
               <ul class="ticks">
                 <li>Proficiency for each competency, with every score from oldest to newest.</li>
-                <li>Select a competency to see the work and observations behind it.</li>
+                <li>Select a competency to see where the student is now, the next step, and the work behind it.</li>
                 <li>Assessments, observations, a grade breakdown by category and the Learner Profile.</li>
                 <li>Ready for a parent meeting without extra prep.</li>
               </ul>
@@ -777,9 +874,9 @@
                 Your Class in Your Pocket
               </h2>
               <ul class="ticks">
-                <li>Swipe through students to see each one's proficiency and latest note.</li>
+                <li>Swipe through students to see each one's proficiency in every competency.</li>
                 <li>Observe adds a note in seconds while you walk the room.</li>
-                <li>Grade scores an assessment student by student.</li>
+                <li>Grade scores an assessment student by student, or Pair and Group work by group.</li>
                 <li>Works offline and syncs when you are back online.</li>
               </ul>
             </div>
@@ -789,7 +886,7 @@
                   class="phone"
                   loading="lazy"
                   src="/assets/splash/phone-app.jpg"
-                  alt="The phone app showing one student's card."
+                  alt="The phone app showing one student's proficiency in each competency."
                 />
               </div>
             </div>
@@ -821,7 +918,10 @@
               </div>
               <div class="extra">
                 <h3>Reporting Terms</h3>
-                <p>Up to six dated terms per class, with presets for Surrey secondary schools.</p>
+                <p>
+                  Up to six dated reporting periods per class, with presets for Surrey secondary schools. Each report
+                  shows the year to date.
+                </p>
               </div>
               <div class="extra">
                 <h3>Rubric Bank</h3>
@@ -830,8 +930,14 @@
                 </p>
               </div>
               <div class="extra">
-                <h3>One Assessment, Every Block</h3>
-                <p>Make an assessment once and add it to each class that teaches the course. Edits stay linked.</p>
+                <h3>Class Backup and Restore</h3>
+                <p>
+                  Download a class as a backup file, and restore it later as a new class with every score and comment.
+                </p>
+              </div>
+              <div class="extra">
+                <h3>Re-link Curriculum</h3>
+                <p>Move an older class onto the rebuilt curriculum. Nothing changes until you apply it.</p>
               </div>
               <div class="extra">
                 <h3>Counts As</h3>
@@ -840,10 +946,6 @@
               <div class="extra">
                 <h3>Late, Missing and Excused</h3>
                 <p>Mark work with a status, and see missing work on the dashboard and in reports.</p>
-              </div>
-              <div class="extra">
-                <h3>Core Competencies</h3>
-                <p>Tag assessments to the BC Core Competencies and see which ones you have covered.</p>
               </div>
               <div class="extra">
                 <h3>Withdraw and Re-Enrol</h3>
@@ -876,7 +978,7 @@
                 >Read the Privacy Policy</a
               >
             </div>
-            <div style="display: flex; flex-direction: column; gap: 12px">
+            <div class="cards2">
               <div
                 style="
                   background: #ffffff;
@@ -920,6 +1022,53 @@
                 <span style="font-size: 16px; font-weight: 700">No Student Logins</span
                 ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
                   >Students answer with a code from a printed slip, not an account.</span
+                >
+              </div>
+              <div
+                style="
+                  background: #ffffff;
+                  border-radius: 14px;
+                  padding: 20px 22px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 4px;
+                "
+              >
+                <span style="font-size: 16px; font-weight: 700">Private Error Reports</span
+                ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
+                  >When something breaks, the report FullVision sends leaves out names, emails, student numbers and
+                  anything typed.</span
+                >
+              </div>
+              <div
+                style="
+                  background: #ffffff;
+                  border-radius: 14px;
+                  padding: 20px 22px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 4px;
+                "
+              >
+                <span style="font-size: 16px; font-weight: 700">Sign Out Clears the Device</span
+                ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
+                  >Sign Out signs out every open tab and deletes the class data and report copies saved on that
+                  computer.</span
+                >
+              </div>
+              <div
+                style="
+                  background: #ffffff;
+                  border-radius: 14px;
+                  padding: 20px 22px;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 4px;
+                "
+              >
+                <span style="font-size: 16px; font-weight: 700">Password Reset</span
+                ><span style="font-size: 15px; line-height: 1.45; color: #48484d"
+                  >A password reset email opens Choose a New Password on the sign-in page.</span
                 >
               </div>
             </div>
