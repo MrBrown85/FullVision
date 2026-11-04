@@ -145,3 +145,23 @@ test('sheet filters are not narrowed by Recent', async ({ page }) => {
   await page.locator('.m-tab-item[data-tab="grade"]').click();
   await expect(page.locator('[data-action="m-grade-seg"][data-val="all"]')).toHaveClass(/m-seg-active/);
 });
+
+// Group 2 #38: a long category no longer cuts the Grade list's titles.
+test('Grade list titles are not cut by the category', async ({ page }) => {
+  await openPhone(page);
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const cats = getCategories(cid);
+    cats[0].name = 'Summative Assessments and Major Projects';
+  });
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('[data-action="m-grade-seg"][data-val="all"]').click();
+  const cut = await page.evaluate(() =>
+    [...document.querySelectorAll('#m-grade-list .m-cell')]
+      .filter(c => c.style.display !== 'none')
+      .map(c => c.querySelector('.m-cell-title'))
+      .filter(t => t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1)
+      .map(t => t.textContent),
+  );
+  expect(cut).toEqual([]);
+});

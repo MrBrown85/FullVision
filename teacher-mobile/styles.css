@@ -525,6 +525,15 @@ body.fv-switching-course::after {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* A Grade list title wraps to two lines before it is cut. */
+.m-cell-title.m-grade-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
 .m-cell-subtitle {
   font-size: 13px;
   color: var(--text-3);

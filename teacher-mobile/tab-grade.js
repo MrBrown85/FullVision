@@ -204,15 +204,17 @@ window.MGrade = (function () {
           (_matchesAllFilters(a, ctx) ? '' : ' style="display:none"') +
           '>' +
           '<div class="m-cell-body">' +
-          '<div class="m-cell-title">' +
-          '<span class="m-type-badge ' +
-          badge.className +
-          '" style="margin-right:6px">' +
-          MC.esc(badge.label) +
-          '</span>' +
+          // The title has its own line (up to two); the category goes on
+          // the line under it, so a long category can't squeeze the title.
+          '<div class="m-cell-title m-grade-title">' +
           MC.esc(a.title) +
           '</div>' +
           '<div class="m-cell-subtitle">' +
+          '<span class="m-type-badge ' +
+          badge.className +
+          '">' +
+          MC.esc(badge.label) +
+          '</span>' +
           '<span>' +
           dateStr +
           '</span>' +
