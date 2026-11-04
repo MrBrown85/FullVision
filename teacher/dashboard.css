@@ -2182,10 +2182,11 @@ a.dash-ins-name:hover {
   font-weight: 600;
   color: var(--text);
 }
-.cm-sidebar-count {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
+.cm-action-btn.cm-new-class-btn {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  color: var(--text);
+  white-space: nowrap;
 }
 .cm-class-list {
   flex: 1;

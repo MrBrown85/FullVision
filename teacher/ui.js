@@ -931,6 +931,8 @@ function _rosterShowMenuHtml(cid, mode) {
 }
 
 let _sidebarCid = null;
+// The class picker's last option, which opens the New Class wizard.
+const CLASS_PICKER_NEW = '__new_class__';
 // html-safe: course names are escaped; labels come from the fixed roster lists; rows come from _sidebarRowsHtml.
 function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
   _sidebarClickFnName = onStudentClick || null;
@@ -946,6 +948,7 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
         ${getPickerCourses(cid)
           .map(c => `<option value="${c.id}"${c.id === cid ? ' selected' : ''}>${esc(c.name)}</option>`)
           .join('')}
+        <option value="${CLASS_PICKER_NEW}">New Class…</option>
       </select>
       <div class="sb-search-row">
         <input id="gb-roster-search" type="text" placeholder="Search..." aria-label="Search students">
@@ -1193,9 +1196,14 @@ function filterRoster() {
 /* The CSP blocks inline on* attributes, so the sidebar's class picker and
    roster search are wired here, once, by delegation. */
 document.addEventListener('change', function (e) {
-  if (e.target.matches('[data-action="sidebarSwitchCourse"]') && window._pageSwitchCourse) {
-    window._pageSwitchCourse(e.target.value);
+  if (!e.target.matches('[data-action="sidebarSwitchCourse"]')) return;
+  // "New Class…" opens the New Class wizard; the picker stays on this class.
+  if (e.target.value === CLASS_PICKER_NEW) {
+    e.target.value = _sidebarCid || '';
+    if (window.Router) Router.navigate('/dashboard?manage=new');
+    return;
   }
+  if (window._pageSwitchCourse) window._pageSwitchCourse(e.target.value);
 });
 document.addEventListener('input', function (e) {
   if (e.target.id === 'gb-roster-search') filterRoster();

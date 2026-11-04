@@ -2961,11 +2961,11 @@ window.DashClassManager = (function () {
       '<aside class="cm-sidebar" aria-label="Classes">' +
       '<div class="cm-sidebar-header">' +
       '<span class="cm-sidebar-title">Classes</span>' +
-      '<span class="cm-sidebar-count">' +
-      courseIds.length +
-      ' class' +
-      (courseIds.length !== 1 ? 'es' : '') +
-      '</span>' +
+      // New Class sits at the top of the class list, as a button (in place
+      // of the class count, which the list itself shows).
+      '<button type="button" class="cm-action-btn cm-new-class-btn" data-action="cmStartCreate">' +
+      '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>' +
+      'New Class</button>' +
       '</div>' +
       '<div class="cm-class-list">';
     if (cmMode === 'create') {
@@ -3007,9 +3007,6 @@ window.DashClassManager = (function () {
     html +=
       '</div>' +
       '<div class="cm-sidebar-foot">' +
-      '<button type="button" class="cm-new-btn" data-action="cmStartCreate">' +
-      '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>' +
-      'New Class</button>' +
       '<button type="button" class="cm-new-btn" data-action="cmRestoreBackup">Restore from Backup</button>' +
       '</div>' +
       '</aside>';
