@@ -6856,16 +6856,33 @@ window.CommentBank = (function () {
 
   /* The pieces whose mark changed between two marksOf() records, by title,
      each once, in the order they come. */
-  function changedPieces(was, now) {
+  /* cid (optional): the class, so a piece scored on proficiency or a
+     rubric whose mark is the same and only its % differs is not named: the
+     % was worked out again from the same marks (a rubric piece's % changed
+     with #885), nothing was marked (step 4 batch). Points and
+     Complete/Incomplete work's % is its mark. */
+  function changedPieces(was, now, cid) {
     var out = [];
     was = was || {};
     now = now || {};
+    var byId = {};
+    if (cid != null && typeof getAssessments === 'function') {
+      (getAssessments(cid) || []).forEach(function (a) {
+        byId[a.id] = a;
+      });
+    }
+    var sameMark = function (k, a, b) {
+      if (k.indexOf('work:') !== 0) return false;
+      var piece = byId[k.slice(5)];
+      if (!piece || (typeof isPointsScored === 'function' && isPointsScored(piece))) return false;
+      return String(a.m).split('|')[0] === String(b.m).split('|')[0];
+    };
     Object.keys(was)
       .concat(Object.keys(now))
       .forEach(function (k) {
         var a = was[k];
         var b = now[k];
-        if (a && b && a.m === b.m) return;
+        if (a && b && (a.m === b.m || sameMark(k, a, b))) return;
         var t = String((b && b.t) || (a && a.t) || '').trim();
         if (t && out.indexOf(t) < 0) out.push(t);
       });
@@ -6998,7 +7015,7 @@ window.CommentBank = (function () {
     });
     return {
       changes: changes,
-      pieces: marks && moved ? changedPieces(meta.marks, marksOf(f)) : [],
+      pieces: marks && moved ? changedPieces(meta.marks, marksOf(f), f.cid) : [],
       moved: moved,
       hasGrade: list.some(function (x) {
         return x && x.step === 'grade';

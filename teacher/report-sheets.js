@@ -14,8 +14,11 @@ window.ReportSheets = (function () {
 
   var PX_PER_IN = 96;
   var PAPER = {
-    letter: { w: 8.5, h: 11, size: '8.5in 11in' },
-    legal: { w: 8.5, h: 14, size: '8.5in 14in' },
+    // The paper by name and portrait, not inches, so the print dialog picks
+    // the Legal tray instead of shrinking the sheet onto Letter (DECISIONS
+    // "Printed class grade sheet" 11).
+    letter: { w: 8.5, h: 11, size: 'letter portrait' },
+    legal: { w: 8.5, h: 14, size: 'legal portrait' },
   };
   /* The sheet's padding: the letterhead sits near the top; the content
      column is 720px wide on both papers. */
@@ -740,7 +743,7 @@ window.ReportSheets = (function () {
         if (hide.length) per[sid] = { hide: hide };
       });
     }
-    return {
+    var out = {
       v: 6,
       id: base.id || 'report-card',
       name: base.name || 'Report Card',
@@ -749,6 +752,17 @@ window.ReportSheets = (function () {
       pinned: pinned,
       perStudent: per,
     };
+    // Front Only remembers the side each folded block came from, so Front
+    // and Back puts it back (setSides). Only a one-sided form keeps it.
+    if (sides.length === 1 && base.folded && typeof base.folded === 'object') {
+      var folded = {};
+      Object.keys(base.folded).forEach(function (id) {
+        var at = Number(base.folded[id]);
+        if (seen[id] && id !== 'header' && at >= 1 && at === Math.floor(at)) folded[id] = at;
+      });
+      if (Object.keys(folded).length) out.folded = folded;
+    }
+    return out;
   }
 
   /* The class's form from its report config. A class still on the old
@@ -989,13 +1003,21 @@ window.ReportSheets = (function () {
      past the Front moves onto it, in order, so nothing is lost; the fit
      line then says what that costs. Going to Front and Back from one side
      adds an empty Back. */
+  /* Front Only folds every side onto the Front and notes where each block
+     was; Front and Back puts the blocks that are still on the Front back on
+     the side they came from, in their order (step 4 group 2 #4). A block
+     added under Front Only stays on the Front. */
   function setSides(f, n) {
     f = _clone(f);
     if (n === 1) {
       var front = f.sides[0];
       var pinnedRow = null;
-      f.sides.slice(1).forEach(function (sd) {
+      var folded = {};
+      f.sides.slice(1).forEach(function (sd, i) {
         sd.rows.forEach(function (row) {
+          row.cells.forEach(function (c) {
+            folded[c.block] = i + 1;
+          });
           if (
             row.cells.some(function (c) {
               return c.block === f.pinned;
@@ -1007,8 +1029,24 @@ window.ReportSheets = (function () {
       });
       if (pinnedRow) front.rows.push(pinnedRow);
       f.sides = [front];
+      if (Object.keys(folded).length) f.folded = folded;
     } else if (f.sides.length < 2) {
-      f.sides.push({ rows: [] });
+      var back = f.folded || {};
+      var keep = [];
+      var more = [];
+      f.sides[0].rows.forEach(function (row) {
+        var at = 0;
+        row.cells.forEach(function (c) {
+          if (back[c.block] >= 1) at = Math.max(at, back[c.block]);
+        });
+        if (!at) keep.push(row);
+        else {
+          while (more.length < at) more.push({ rows: [] });
+          more[at - 1].rows.push(row);
+        }
+      });
+      f.sides = [{ rows: keep }].concat(more.length ? more : [{ rows: [] }]);
+      delete f.folded;
     }
     return normalizeForm(f);
   }
@@ -1460,8 +1498,14 @@ window.ReportSheets = (function () {
     // html-safe: block ids are BLOCKS keys (_cleanCell); widths are numbers; c.html is _cellHtml, a ReportBlocks.renderReportBlock render
     stage.innerHTML = cells
       .map(function (c) {
+        // The cell's classes as the sheet prints it (_cellTag): a fill
+        // block lays out as a column there, so its margins don't collapse,
+        // and a Response measured without it came out 16 px short and ran
+        // past the foot of its side (step 4 group 2 #5).
         return (
-          '<div class="sheet-cell" data-block="' +
+          '<div class="sheet-cell' +
+          ((BLOCKS[c.cell.block] || {}).fill ? ' sheet-fill' : '') +
+          '" data-block="' +
           c.cell.block +
           '" style="width:' +
           cellWidth(c.size) +

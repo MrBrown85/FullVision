@@ -191,8 +191,9 @@ test('the roster marks survive a sidebar redraw; arrows move without approving a
   await page.locator('.report-seg-btn[data-tab="progress"]').click();
   await expect(page.locator('#gb-sidebar .student-row-note')).toHaveCount(0);
   await expect(page.locator('#gb-sidebar-extra')).toHaveCount(0);
-  // Cece's Report Card runs to two sheets, so her row shows that instead.
-  await expect(row(noor).locator('.student-row-prof').first()).toBeVisible();
+  // Every Demo student's Report Card runs to two sheets, and each row
+  // says so, as the fit line does (step 4 group 2 #9).
+  await expect(row(noor).locator('.student-row-sheets')).toHaveText('2 sheets');
 });
 
 test('Generate Comment drafts from the bank; the box grows, the count follows, ⌘Z brings the old text back', async ({
@@ -1053,6 +1054,23 @@ test.describe('the Sentences card', () => {
     await page.keyboard.press('Escape');
     await expect(sheet).toHaveCount(0);
     await expect(gaps.last().locator('.qn-gap-add')).toBeFocused();
+  });
+
+  test('Tab and Shift-Tab stay inside Browse Sentences (step 4 group 3 #64)', async ({ page }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    await page.locator('#tq-browse-btn').click();
+    const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+    await expect(sheet).toBeVisible();
+    const inside = () => sheet.evaluate(d => d.contains(document.activeElement));
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press('Tab');
+      expect(await inside()).toBe(true);
+    }
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await inside()).toBe(true);
+    }
   });
 
   test('Browse Sentences: a sentence that does not fit, used for a classmate, goes in as written and Approve stays on', async ({

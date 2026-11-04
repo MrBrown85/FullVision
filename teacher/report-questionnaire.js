@@ -667,7 +667,9 @@ window.ReportQuestionnaire = (function () {
             ? q[0] + ' and ' + q[1] + ' were marked'
             : p.length > 2
               ? _cap(CommentBank.numberWords(p.length)) + ' assignments were marked'
-              : 'Marks changed';
+              : // No piece was marked since: the grades worked out from the
+                // same marks changed.
+                'Grades changed';
       out.push(who + ' after ' + day + ', so ' + _sentenceCount(marks) + ' the gradebook.');
     }
     var cls = stale.changes.filter(function (c) {
@@ -7093,6 +7095,11 @@ window.ReportQuestionnaire = (function () {
     // Tab and Shift-Tab stay inside the ⓘ sheet while it is open.
     if (e.key === 'Tab' && document.getElementById(INFO_ID)) {
       _trapTab(e, document.getElementById(INFO_ID));
+      return;
+    }
+    // And inside Browse Sentences, a modal sheet too (step 4 group 3 #64).
+    if (e.key === 'Tab' && browseOpen()) {
+      _trapTab(e, document.getElementById(BROWSE_ID));
       return;
     }
     if (document.getElementById(INFO_ID) || document.getElementById(BOTH_ID)) return;

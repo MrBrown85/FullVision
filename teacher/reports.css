@@ -4706,7 +4706,9 @@ body.qn-roster #gb-sidebar .student-row-note {
 /* ── Grade Report (grade-report.js) ──────────────────────────────
    A plain table of this term's work, black on white, like the old
    gradebook printouts. Rows have a fixed height so the layout can count
-   how many fit on a side; a title too long for its cell ends in "…". */
+   how many fit on a side; a row whose title or category is too long for
+   its cell is two lines high (.gr-wrap), and only a third line ends in
+   "…". */
 .gr-sheet .sheet-body {
   align-items: stretch;
 }
@@ -4727,6 +4729,18 @@ body.qn-roster #gb-sidebar .student-row-note {
   height: var(--gr-row, 19px);
   border-bottom: 1px solid #d0d0d0;
   white-space: nowrap;
+}
+.gr-row.gr-wrap {
+  height: var(--gr-row2, auto);
+}
+.gr-wrap .gr-title,
+.gr-wrap .gr-category {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 .gr-head {
   height: auto;

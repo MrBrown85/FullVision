@@ -281,7 +281,8 @@ describe('the note in the Teacher Comment card', () => {
     expect(RQ.staleNote(m(3, { pieces: ['A', 'B', 'C'] }), 'Oct 28')).toMatch(
       /^Three assignments were marked after Oct 28, so three sentences/,
     );
-    expect(RQ.staleNote(m(1, { pieces: [] }), 'Oct 28')).toMatch(/^Marks changed after Oct 28, so one sentence/);
+    // Nothing was marked since: the note says so without naming a piece.
+    expect(RQ.staleNote(m(1, { pieces: [] }), 'Oct 28')).toMatch(/^Grades changed after Oct 28, so one sentence/);
   });
   it('names a class sentence edited since', () => {
     expect(RQ.staleNote({ changes: [{ kind: 'class', key: 'closing' }], pieces: [] }, 'Oct 28')).toBe(

@@ -177,8 +177,8 @@ window.GradeReport = (function () {
      by what the student's rows need (show.catPx and show.titlePx, measured
      in layoutStudent): both print in full when they fit; when they don't,
      each gets a share in proportion to its need, the title never less
-     than TITLE_MIN_PX and the category never less than 100px, and the
-     rest ends in "…". */
+     than TITLE_MIN_PX and the category never less than 100px, and a row
+     whose title or category is still too long prints on two lines. */
   var TITLE_MIN_PX = 200;
   var COL_GAP = 6; // reports.css .gr-row column-gap
   function _cols(show, tier) {
@@ -234,7 +234,47 @@ window.GradeReport = (function () {
     return Math.ceil(w) + 4;
   }
 
-  function _tableHtml(list, show, tier) {
+  /* Each text's width in a table of one tier's type, in px, in order. */
+  function _textWidths(stage, names, key) {
+    // html-safe: key is a tier key ('regular' or 'small'); every name goes through esc
+    stage.innerHTML =
+      '<div class="gr-table gr-' +
+      key +
+      '">' +
+      names
+        .map(function (n) {
+          return (
+            '<div><span class="gr-measure" style="display:inline-block;white-space:nowrap">' +
+            esc(n || '') +
+            '</span></div>'
+          );
+        })
+        .join('') +
+      '</div>';
+    return Array.prototype.map.call(stage.querySelectorAll('.gr-measure'), function (el) {
+      return el.offsetWidth;
+    });
+  }
+
+  /* The assignment and category cells' widths at one tier, in px (the
+     category 0 when the tier has none). */
+  function _cellWidths(show, tier) {
+    var cols = _cols(show, tier);
+    // Two columns of rows: each table is half the side, less the gap
+    // between them (reports.css .gr-split).
+    var rowW = tier.cols === 2 ? (ROW_W - 16) / 2 : ROW_W;
+    var fixed = 0;
+    var cat = 0;
+    cols.forEach(function (c) {
+      if (c[2] && /px$/.test(c[2])) fixed += parseFloat(c[2]);
+      if (c[0] === 'category') cat = parseFloat(c[2]);
+    });
+    return { title: rowW - fixed - COL_GAP * (cols.length - 1), category: cat };
+  }
+
+  /* wrap: for each row of list, true when its title or category is too
+     long for one line, so the row prints on two (reports.css .gr-wrap). */
+  function _tableHtml(list, show, tier, wrap) {
     var cols = _cols(show, tier);
     var tmpl = cols
       .map(function (c) {
@@ -260,10 +300,11 @@ window.GradeReport = (function () {
         .join('') +
       '</div>';
     var body = list
-      .map(function (r) {
+      .map(function (r, i) {
         return (
           '<div class="gr-row' +
           (r.note === 'Missing' ? ' gr-missing' : '') +
+          (wrap && wrap[i] ? ' gr-wrap' : '') +
           '">' +
           cols
             .map(function (c) {
@@ -281,7 +322,9 @@ window.GradeReport = (function () {
       tmpl +
       ';--gr-row:' +
       tier.rowPx +
-      'px">' +
+      'px;--gr-row2:' +
+      (tier.row2Px ? tier.row2Px + 'px' : 'auto') +
+      '">' +
       head +
       body +
       '</div>'
@@ -290,14 +333,15 @@ window.GradeReport = (function () {
 
   /* A side's rows: one table, or two side by side, filled down the left
      column and then the right. */
-  function _sideTableHtml(list, show, tier) {
+  function _sideTableHtml(list, show, tier, wrap) {
     if (!list.length) return '';
-    if (tier.cols === 1) return _tableHtml(list, show, tier);
+    if (tier.cols === 1) return _tableHtml(list, show, tier, wrap);
     var cut = Math.ceil(list.length / 2);
+    wrap = wrap || [];
     return (
       '<div class="gr-split">' +
-      _tableHtml(list.slice(0, cut), show, tier) +
-      _tableHtml(list.slice(cut), show, tier) +
+      _tableHtml(list.slice(0, cut), show, tier, wrap.slice(0, cut)) +
+      _tableHtml(list.slice(cut), show, tier, wrap.slice(cut)) +
       '</div>'
     );
   }
@@ -343,23 +387,43 @@ window.GradeReport = (function () {
   /* ── Fitting ───────────────────────────────────────────────── */
 
   /* How the rows fall on the front and back at one tier, from the measured
-     heights: { front, back, tailOnFront, fits }. H is a side's height. */
+     heights: { front, back, tailOnFront, fits }. H is a side's height.
+     sizes.namePx: the line naming the student at the top of the Back (and
+     the gap under it), kept off the Back's room. sizes.tall: for each row,
+     true when it prints on two lines, tier.row2Px high. */
   function plan(n, sizes, tier, H) {
-    var per = function (room) {
-      return Math.max(0, Math.floor((room - sizes.headPx) / tier.rowPx)) * tier.cols;
+    var tall = sizes.tall || [];
+    var rowH = function (i) {
+      return tall[i] ? tier.row2Px || tier.rowPx : tier.rowPx;
     };
-    var tableH = function (k) {
-      return k ? sizes.headPx + Math.ceil(k / tier.cols) * tier.rowPx : 0;
+    // Rows from..from+k as the side prints them: the header, then one
+    // column, or the first half down the left and the rest down the right.
+    var tableH = function (from, k) {
+      if (!k) return 0;
+      var left = tier.cols === 2 ? Math.ceil(k / 2) : k;
+      var a = 0;
+      var b = 0;
+      for (var i = 0; i < k; i++) {
+        if (i < left) a += rowH(from + i);
+        else b += rowH(from + i);
+      }
+      return sizes.headPx + Math.max(a, b);
+    };
+    var per = function (from, room) {
+      var k = 0;
+      while (from + k < n && tableH(from, k + 1) <= room) k++;
+      return k;
     };
     var frontRoom = H - sizes.letterheadPx - GAP;
-    var front = Math.min(n, per(frontRoom));
+    var front = per(0, frontRoom);
     var rest = n - front;
-    if (!rest && sizes.letterheadPx + GAP + tableH(front) + (front ? GAP : 0) + sizes.tailPx <= H) {
+    if (!rest && sizes.letterheadPx + GAP + tableH(0, front) + (front ? GAP : 0) + sizes.tailPx <= H) {
       return { front: front, back: 0, tailOnFront: true, fits: true };
     }
-    var backRoom = H - sizes.tailPx - (rest ? GAP : 0);
-    var back = Math.min(rest, per(backRoom));
-    return { front: front, back: back, tailOnFront: false, fits: back === rest && sizes.tailPx <= H };
+    var name = sizes.namePx ? sizes.namePx + GAP : 0;
+    var backRoom = H - name - sizes.tailPx - (rest ? GAP : 0);
+    var back = per(front, backRoom);
+    return { front: front, back: back, tailOnFront: false, fits: back === rest && name + sizes.tailPx <= H };
   }
 
   function _measure(stage, html) {
@@ -863,6 +927,11 @@ window.GradeReport = (function () {
     var list = rows(cid, student, o);
     var letterhead = ReportBlocks.renderBlockHeader(cid, student, ctx, { name: o.name });
     var tail = _tailHtml(cid, student, o, ctx);
+    // The Back starts with the line naming the student, as every side after
+    // the Front of a built report does, so a sheet printed single-sided can
+    // be matched to its student (DECISIONS "Report forms" 13; Colin, Nov 3:
+    // "Yes, all three"). The Feedback Pages name the student in their head.
+    var nameLine = ReportBlocks.renderContinuedLine(cid, student, { name: o.name });
     if (o.numbers) {
       show.numbers = true;
       show.numPx = 8 + 7 * String(Math.max(1, list.length)).length;
@@ -870,6 +939,7 @@ window.GradeReport = (function () {
     var own = !opts.stage;
     var stage = opts.stage || _stage(document.body);
     var chosen = null;
+    var chosenTall = [];
     var p = null;
     var fb = null;
     try {
@@ -889,15 +959,56 @@ window.GradeReport = (function () {
           }),
         ),
       );
-      var sizes = { letterheadPx: _measure(stage, letterhead), tailPx: _measure(stage, tail) };
+      // Each title's and category's width at each size of type, to find
+      // the rows too long for one line at a tier.
+      var titles = list.map(function (r) {
+        return r.title;
+      });
+      var cats = list.map(function (r) {
+        return r.category;
+      });
+      var textW = {};
+      ['regular', 'small'].forEach(function (key) {
+        textW[key] = { title: _textWidths(stage, titles, key), category: _textWidths(stage, cats, key) };
+      });
+      var sizes = {
+        letterheadPx: _measure(stage, letterhead),
+        tailPx: _measure(stage, tail),
+        namePx: _measure(stage, nameLine),
+      };
       for (var t = 0; t < TIERS.length; t++) {
         var tier = TIERS[t];
         // The header row and one row, measured at this tier.
         var one = _measure(stage, _tableHtml(list.slice(0, 1).concat(list.slice(0, 1)), show, tier));
         var head = _measure(stage, _tableHtml([], show, tier));
         tier = Object.assign({}, tier, { rowPx: Math.max(tier.rowPx, (one - head) / 2) });
-        p = plan(list.length, { letterheadPx: sizes.letterheadPx, tailPx: sizes.tailPx, headPx: head }, tier, H);
+        // A title or category too long for its cell prints on two lines
+        // rather than ending in "…" (step 4 group 3 #91); such a row is as
+        // high as two lines need, measured here.
+        var cw = _cellWidths(show, tier);
+        var w = textW[tier.key === 'regular' ? 'regular' : 'small'];
+        var tall = list.map(function (r, i) {
+          return (w.title[i] || 0) > cw.title || (cw.category > 0 && (w.category[i] || 0) > cw.category);
+        });
+        if (tall.indexOf(true) >= 0) {
+          var sample = Object.assign({}, list[0], { title: new Array(80).join('Assignment ') });
+          var two = _measure(stage, _tableHtml([sample, sample], show, tier, [true, true]));
+          tier.row2Px = Math.max(tier.rowPx + 10, Math.ceil((two - head) / 2));
+        }
+        p = plan(
+          list.length,
+          {
+            letterheadPx: sizes.letterheadPx,
+            tailPx: sizes.tailPx,
+            namePx: sizes.namePx,
+            headPx: head,
+            tall: tall,
+          },
+          tier,
+          H,
+        );
         chosen = tier;
+        chosenTall = tall;
         if (p.fits) break;
       }
       // Still too many at the smallest size: two rows less on the back
@@ -910,9 +1021,11 @@ window.GradeReport = (function () {
     var frontRows = list.slice(0, p.front);
     var backRows = list.slice(p.front, p.front + p.back);
     var cut = list.length - p.front - p.back;
-    var frontBody = letterhead + _sideTableHtml(frontRows, show, chosen) + (p.tailOnFront ? tail : '');
+    var frontBody =
+      letterhead + _sideTableHtml(frontRows, show, chosen, chosenTall.slice(0, p.front)) + (p.tailOnFront ? tail : '');
     var backBody =
-      _sideTableHtml(backRows, show, chosen) +
+      nameLine +
+      _sideTableHtml(backRows, show, chosen, chosenTall.slice(p.front, p.front + p.back)) +
       (cut > 0 ? '<div class="gr-cut">' + cut + ' more not shown: they do not fit on one sheet.</div>' : '') +
       tail;
     var gradeSides = p.tailOnFront ? 1 : 2;

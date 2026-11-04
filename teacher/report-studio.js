@@ -213,7 +213,7 @@ window.ReportStudio = (function () {
           placed +
           '"' +
           (nofit ? ' aria-disabled="true"' : '') +
-          (placed ? ' title="On the report. Click to remove it."' : '') +
+          (placed ? ' title="On the report. Click to find it."' : '') +
           '>' +
           '<span class="studio-tick" aria-hidden="true">' +
           (placed ? '✓' : '') +
@@ -268,14 +268,22 @@ window.ReportStudio = (function () {
       );
     }
     if (more) {
-      var most = Math.max.apply(
-        null,
-        ids.map(function (id) {
+      // The sheets each of those students needs: "2 sheets for 3
+      // students", or "2 to 8 sheets for 30 students" when they differ
+      // (it read "8 sheets for 30 students", the most any one needs:
+      // step 4 group 2 #9).
+      var counts = ids
+        .map(function (id) {
           return summary.perStudent[id].sheets;
-        }),
-      );
+        })
+        .filter(function (k) {
+          return k > 1;
+        });
+      var most = Math.max.apply(null, counts);
+      var least = Math.min.apply(null, counts);
       return (
         '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">' +
+        (least < most ? least + ' to ' : '') +
         most +
         ' sheets for ' +
         students(more) +
@@ -345,6 +353,11 @@ window.ReportStudio = (function () {
     if (s === 1) return 'Back';
     return 'Page ' + (s + 1);
   }
+  /* A side as a sentence names it: "the Front", "the Back", "Page 3" (it
+     read "the Page 3": step 4 group 3 #63). */
+  function sideWhere(s) {
+    return s === 0 ? 'the Front' : s === 1 ? 'the Back' : 'Page ' + (s + 1);
+  }
 
   /* The selected block's inspector, pinned at the top right of the canvas
      (Colin, Oct 29: mockup A). Where the block is and its name; Place: its
@@ -367,8 +380,8 @@ window.ReportStudio = (function () {
       '" role="region" aria-label="' +
       esc(def.label) +
       ' Settings">' +
-      '<div class="studio-insp-head"><div class="studio-bar-where">On the ' +
-      esc(_sideName(form, at.side)) +
+      '<div class="studio-insp-head"><div class="studio-bar-where">On ' +
+      esc(sideWhere(at.side)) +
       '</div>' +
       '<div class="studio-bar-name">' +
       esc(def.label) +
@@ -1001,6 +1014,13 @@ window.ReportStudio = (function () {
     document.addEventListener(
       'keydown',
       function (e) {
+        // Escape closes what is open on the screen (api.escape says whether
+        // it did).
+        // A drag let go by Escape has already used it.
+        if (e.key === 'Escape' && !e.defaultPrevented && api.escape && api.escape(e)) {
+          e.preventDefault();
+          return;
+        }
         var cell = e.target.closest ? e.target.closest('.studio-pages .sheet-body .sheet-cell[data-block]') : null;
         if (!cell) return;
         var id = cell.dataset.block;
@@ -1046,6 +1066,7 @@ window.ReportStudio = (function () {
     hasOptions: hasOptions,
     blockToolbarHtml: blockToolbarHtml,
     placeText: placeText,
+    sideWhere: sideWhere,
     fitZoom: fitZoom,
     initKeys: initKeys,
     initDrag: initDrag,
