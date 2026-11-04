@@ -732,7 +732,8 @@ test.describe('the Sentences card', () => {
     await expect(first.locator('.qn-edited')).toHaveText('Edited');
     await expect(first.locator('.qn-req-text')).toHaveText('Cece had a steady term in Science 8.');
     await expect(first.locator('.qn-req-source')).toHaveText('Edited by you · kept when you regenerate');
-    await expect(first.locator('[data-do="wording"]')).toHaveCount(0);
+    // Other Wording stays, so the sentence can go back to a bank wording.
+    await expect(first.locator('[data-do="wording"]')).toHaveCount(1);
     await page.locator('#tq-generate').click();
     await expect(page.locator('#tq-narrative')).toHaveValue(/^Cece had a steady term in Science 8\. /);
     await expect(first.locator('.qn-edited')).toHaveText('Edited');

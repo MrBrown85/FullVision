@@ -61,3 +61,35 @@ test('Generate Comment again offers Undo, which brings the last version back', a
   const shown = await rows(page).locator('.qn-req-text').allTextContents();
   for (const t of shown) expect(first).toContain(t.trim().slice(0, 20));
 });
+
+/* Step 4 group 3 #67: a bank sentence's row can be removed, and an edited
+   one can go back to the bank's wording. */
+test('Other Wording has Remove From Comment, and an edited sentence can go back to the bank wording', async ({ page }) => {
+  await open(page);
+  const box = page.locator('#tq-narrative');
+  await page.locator('#tq-generate').click();
+  // Edit a bank sentence in the box.
+  const last = rows(page).filter({ has: page.locator('[data-do="wording"]') }).nth(1);
+  const bankText = (await last.locator('.qn-req-text').textContent()).trim();
+  await box.evaluate((el, t) => {
+    const i = el.value.indexOf(t) + t.length - 1;
+    el.focus();
+    el.setSelectionRange(i, i);
+  }, bankText);
+  await page.keyboard.type(' today');
+  const edited = rows(page).filter({ hasText: 'today.' });
+  await expect(edited.locator('.qn-edited')).toHaveText('Edited');
+  await edited.locator('[data-do="wording"]').click();
+  const menu = page.locator('#tq-wording-menu');
+  await menu.locator('.qn-menu-item', { hasText: 'The bank’s wording, before your edit' }).click();
+  await expect(box).toHaveValue(new RegExp(bankText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  await expect(rows(page).filter({ hasText: 'today.' })).toHaveCount(0);
+  // Remove From Comment on a bank sentence, then Undo.
+  const before = await box.inputValue();
+  const row = rows(page).filter({ hasText: bankText });
+  await row.locator('[data-do="wording"]').click();
+  await menu.locator('[data-do="remove"]').click();
+  await expect(box).not.toHaveValue(new RegExp(bankText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  await page.locator('#undo-toast button', { hasText: 'Undo' }).click();
+  await expect(box).toHaveValue(before);
+});

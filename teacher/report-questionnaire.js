@@ -4047,11 +4047,15 @@ window.ReportQuestionnaire = (function () {
     };
     var n = usage[row.id] || 0;
     var mine = item(
-      row.id,
+      // An edited sentence in use is the teacher's text, not the bank's.
+      row.edited ? '' : row.id,
       row.text,
       'In use' + (n ? ' · used for ' + _plural(n, 'classmate', 'classmates') : ''),
       true,
     );
+    // An edited sentence: the bank's own wording of it comes first.
+    if (row.edited && row.s)
+      mine += item(row.id, CommentBank.fill(row.s, ctx, { first: i === 0 }), 'The bank’s wording, before your edit', false);
     var others = alternatives(row, ctx, usage, taken)
       .map(function (s) {
         return item(s.id, CommentBank.fill(s, ctx, { first: i === 0 }), _usedMeta(usage[s.id] || 0), false);
@@ -4063,6 +4067,7 @@ window.ReportQuestionnaire = (function () {
       ${mine}${others}
       <div class="qn-menu-sep" role="separator"></div>
       <button type="button" role="menuitem" class="qn-menu-add qn-menu-all" data-action="tqSentences" data-do="all" data-row="${i}" title="Opens Browse Sentences on ${esc(part.label)}: every sentence that fits ${esc(first)}.">All ${_plural(_fitCount(part, ctx), esc(low) + ' sentence', esc(low) + ' sentences')}…</button>
+      <button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="remove" data-row="${i}" title="Takes this sentence out of the comment. Undo puts it back.">Remove From Comment</button>
       ${
         window.PersonalBank && PersonalBank.stepAllowed(row.step)
           ? `<button type="button" role="menuitem" class="qn-menu-add" data-action="tqSentences" data-do="ownOpen" data-where="row" data-mode="write" data-row="${i}" title="Write a sentence of your own for this part. It goes in your bank and into ${esc(first)}’s comment here.">+ Write Your Own</button>`
@@ -4077,7 +4082,7 @@ window.ReportQuestionnaire = (function () {
     var s = _bankById(id);
     _wording = null;
     _addAt = null;
-    if (!rows[i] || !s || rows[i].id === id) {
+    if (!rows[i] || !s || (rows[i].id === id && !rows[i].edited)) {
       _syncRequired();
       _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="wording"]');
       return;
@@ -4409,14 +4414,19 @@ window.ReportQuestionnaire = (function () {
         : '';
     // A sentence the teacher typed: Options (Add to My Bank, Remove From
     // Comment), the InsertRows mockup.
+    var wordingBtn =
+      row.step && row.s
+        ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="${edited ? 'Go back to the bank’s wording, pick another, or remove the sentence.' : 'Shows other ways to say this sentence. Pick one to use it, or remove the sentence.'}">Other Wording ▾</button>`
+        : '';
+    // An edited bank sentence keeps Other Wording, so it can go back to a
+    // bank wording (Nov 3 sweep).
     var act = typed
       ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="options" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Add this sentence to your bank, or remove it.">Options ▾</button>`
       : edited
         ? '<span class="qn-edited" title="You changed this sentence. Generate Comment keeps it.">Edited</span>' +
-          addBank
-        : row.step && row.s
-          ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="Shows other ways to say this sentence. Pick one to use it.">Other Wording ▾</button>`
-          : addBank;
+          addBank +
+          (unit.length === 1 ? wordingBtn : '')
+        : wordingBtn || addBank;
     var ownBox = _own && _own.where === 'row' && _own.index === i ? _ownBoxHtml(student) : '';
     var added = _justAdded(row);
     var tint = added ? ' added' : _isBestRow(row) ? ' best' : row.step === 'attendance' ? ' attendance' : '';
