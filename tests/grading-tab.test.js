@@ -130,7 +130,7 @@ describe('switching the calculation method', () => {
     expect(COURSES[CID].calcMethod).toBe('highest');
   });
 
-  it('Check With a Student shows the year so far, even over a report in view (Colin, 2026-11-03)', () => {
+  it('Class Management shows the year so far, even when opened over a report in view (Colin, 2026-11-03)', () => {
     // Most Recent: Amara's last score is the 4 on Oct 3. As of a report
     // ending Oct 2 it would be her 2.
     _cache.courseConfigs[CID] = {
@@ -138,14 +138,17 @@ describe('switching the calculation method', () => {
     };
     clearProfCache();
     setActiveTerm(CID, 1);
+    expect(studentGradeSummary(CID, 's1').text).toBe('2.0');
     try {
       DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
-      // As of the report it would be 2.0; the check shows the year so far.
-      expect(studentGradeSummary(CID, 's1').text).toBe('2.0');
-      expect(readAsOfTerm(CID, null, () => getOverallProficiency(CID, 's1'))).toBe(4);
-      // The report in view is put back for the Reports page.
-      expect(getActiveTerm(CID).ordinal).toBe(1);
       expect(main.innerHTML).toContain('cm-check-value">4.0<');
+      // The report's term is cleared, so the method preview counts the year so far.
+      expect(getActiveTerm(CID)).toBeNull();
+      expect(previewCalcMethodChange(CID, 'average').example).toEqual({
+        name: 'Amara Osei',
+        before: '4.0',
+        after: '2.3',
+      });
     } finally {
       setActiveTerm(CID, null);
     }

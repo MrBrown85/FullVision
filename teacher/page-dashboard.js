@@ -182,6 +182,10 @@ window.PageDashboard = (function () {
 
   /* ── Main render ────────────────────────────────────────── */
   function render() {
+    // Every grade on this page, Class Management's included, is the year so
+    // far: a report's term from the Reports page never carries over (Colin,
+    // 2026-11-03).
+    if (activeCourse && typeof setActiveTerm === 'function') setActiveTerm(activeCourse, null);
     if (CM.classManagerOpen) {
       renderClassManager();
       return;
@@ -198,7 +202,6 @@ window.PageDashboard = (function () {
     }
     _syncSidebar();
     var cid = activeCourse;
-    // Every grade on this page is the year so far (Colin, 2026-11-03).
     if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var sections = getSections(cid);
     var students = getStudents(cid);

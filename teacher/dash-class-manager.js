@@ -2835,6 +2835,14 @@ window.DashClassManager = (function () {
 
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
+    // Class Management reads the year so far for every class: its previews
+    // (calculation method, Folders Count as One) and Check With a Student
+    // never count as of a report left in view on the Reports page.
+    if (typeof setActiveTerm === 'function') {
+      courseIds.forEach(function (c) {
+        setActiveTerm(c, null);
+      });
+    }
     var html = '';
     _cmSyncUrl();
 
