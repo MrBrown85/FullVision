@@ -41,7 +41,15 @@ function seed(gradingSystem) {
     { id: 'inq', title: 'Local History Inquiry', date: '2026-10-20', tagIds: ['t1', 't2'], categoryId: 'proj' },
     { id: 'quiz', title: 'Unit Quiz', date: '2026-10-21', tagIds: ['t1'], categoryId: 'proj' },
     // Points work on no competency pulls the course grade down.
-    { id: 'test', title: 'Unit Test', date: '2026-10-22', tagIds: [], scoreMode: 'points', maxPoints: 10, categoryId: 'test' },
+    {
+      id: 'test',
+      title: 'Unit Test',
+      date: '2026-10-22',
+      tagIds: [],
+      scoreMode: 'points',
+      maxPoints: 10,
+      categoryId: 'test',
+    },
   ];
   _cache.scores[CID] = {
     [SID]: [
@@ -57,7 +65,8 @@ function seed(gradingSystem) {
   _cache.courseConfigs[CID] = { calcMethod: 'average' };
   clearProfCache();
 }
-const overallRow = html => text(html.slice(html.indexOf('report-prof-overall'), html.indexOf('</tr>', html.indexOf('report-prof-overall'))));
+const overallRow = html =>
+  text(html.slice(html.indexOf('report-prof-overall'), html.indexOf('</tr>', html.indexOf('report-prof-overall'))));
 
 describe('one overall figure on the report', () => {
   afterEach(() => delete COURSES[CID]);
@@ -139,6 +148,8 @@ describe('best and lowest work print the mark Assignment Grades prints', () => {
     const back = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { score: false, word: false }, {}));
     const pct = back.match(/Local History Inquiry (\d+%)/)[1];
     expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toContain('Local History Inquiry (Oct 20)');
-    expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toMatch(new RegExp('Best work: [^.]*, ' + pct + '\\.'));
+    expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toMatch(
+      new RegExp('Best work: [^.]*, ' + pct + '\\.'),
+    );
   });
 });

@@ -38,9 +38,13 @@ describe('changedPieces names only work that was marked', () => {
   it('still names a piece newly marked or no longer Missing', () => {
     _cache.assessments[CID] = [{ id: 'lab', title: 'Pendulum Lab Report', rubricId: 'r1' }];
     expect(
-      CommentBank.changedPieces({ 'missing:Pendulum Lab Report': { t: 'Pendulum Lab Report', m: 'NS' } }, {
-        'work:lab': { t: 'Pendulum Lab Report', m: '3|75|75' },
-      }, CID),
+      CommentBank.changedPieces(
+        { 'missing:Pendulum Lab Report': { t: 'Pendulum Lab Report', m: 'NS' } },
+        {
+          'work:lab': { t: 'Pendulum Lab Report', m: '3|75|75' },
+        },
+        CID,
+      ),
     ).toEqual(['Pendulum Lab Report']);
   });
 });
