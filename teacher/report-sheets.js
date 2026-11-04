@@ -1198,17 +1198,22 @@ window.ReportSheets = (function () {
      { id, size, px, empty?, rows?, chrome? }: px is the height the
      student's content takes at the cell's width (0 when the block prints
      nothing), rows and chrome a table's row heights and the rest of it in
-     px. opts: { H (a side's height), gap, pinned (id) }.
+     px. opts: { H (a side's height), gap, pinned (id), head (the px of
+     the line naming the student at the top of every side after the
+     Front) }. Every side but the Front keeps room for that line, so the
+     Front is the only side with the whole height.
      Each side is laid top to bottom: a row takes the taller of its cells
      and sits `gap` under the row before it. The pinned block is docked to
      the bottom of its side, and the gap above it is the side's limit. A
      row that passes the limit, and every row after it on that side, moves
      to a continued side inserted after it (for this student only). A row
-     taller than a whole side is held back and printed after the report,
+     taller than a whole side (below the line, unless it fits where it
+     is on the Front) is held back and printed after the report,
      on as many sides as it needs: a table is cut at its rows, anything
      else goes alone and over. Returns { sides: [{ rows: [{ y, h, cells:
      [{ id, size, h, part? }] }], pinned?, kind: 'side' | 'continued' |
-     'after', from }], after: [id], continued: [id], over }. */
+     'after', from, head }], after: [id], continued: [id], over }; head
+     is true on every side but the Front. */
   function pack(sides, opts) {
     var H = opts.H;
     var gap = opts.gap != null ? opts.gap : GAP;
@@ -1216,6 +1221,8 @@ window.ReportSheets = (function () {
     var after = [];
     var continued = [];
     var over = false;
+    var top = opts.head ? opts.head + gap : 0;
+    var full = H - top;
     var sum = function (list) {
       return list.reduce(function (a, b) {
         return a + b;
@@ -1249,16 +1256,18 @@ window.ReportSheets = (function () {
         else queue.push(r);
       });
       var limit = H;
-      var side = { rows: [], kind: 'side', from: s };
+      var side = { rows: [], kind: 'side', from: s, head: s > 0 };
       out.push(side);
       if (pin && pin.live.length) {
-        var ph = Math.min(pin.h, H);
-        if (pin.h > H) over = true;
+        var cap = s > 0 ? full : H;
+        var ph = Math.min(pin.h, cap);
+        if (pin.h > cap) over = true;
         limit = Math.max(0, H - ph - gap);
         side.pinned = { id: pin.cells[0].id, size: 'row', h: ph, y: H - ph };
       }
       var cur = side;
-      var y = 0;
+      var y = s > 0 ? top : 0;
+      var y0 = y;
       queue.forEach(function (r) {
         if (!r.live.length) {
           // Nothing to print: the row keeps its place at no height, so the
@@ -1273,25 +1282,29 @@ window.ReportSheets = (function () {
           });
           return;
         }
-        if (r.h > H) {
+        // Fits a side: under the line, or where it is on the Front.
+        var fits = function (h) {
+          return h <= full || (cur === side && s === 0 && y + h <= limit);
+        };
+        if (!fits(r.h)) {
           // Taller than a whole side: after the report. A short partner
           // stays on its side, alone in the row.
           var short = [];
           r.live.forEach(function (c) {
-            if (c.px > H) after.push(c);
-            else short.push(c);
+            if (fits(c.px)) short.push(c);
+            else after.push(c);
           });
           if (!short.length) return;
           r = rowOf(short);
         }
         var lim = cur === side ? limit : H;
-        if (y + r.h > lim && (y > 0 || cur === side)) {
+        if (y + r.h > lim && (y > y0 || cur === side)) {
           // The rest of this side continues on a side of its own, for this
           // student. (A side with only a docked block above the limit
           // continues too: nothing fits above the block.)
-          cur = { rows: [], kind: 'continued', from: s };
+          cur = { rows: [], kind: 'continued', from: s, head: true };
           out.push(cur);
-          y = 0;
+          y = y0 = top;
         }
         var row = {
           y: y,
@@ -1315,7 +1328,7 @@ window.ReportSheets = (function () {
       if (c.rows && c.rows.length > 1) {
         var start = 0;
         while (start < c.rows.length) {
-          var room = H - c.chrome - 1;
+          var room = full - c.chrome - 1;
           var take = 0;
           var used = 0;
           while (start + take < c.rows.length && used + c.rows[start + take] <= room) {
@@ -1326,17 +1339,25 @@ window.ReportSheets = (function () {
             take = 1;
             over = true;
           }
-          var h = Math.min(H, c.chrome + sum(c.rows.slice(start, start + take)));
+          var h = Math.min(full, c.chrome + sum(c.rows.slice(start, start + take)));
           out.push({
-            rows: [{ y: 0, h: h, cells: [{ id: c.id, size: 'row', h: h, part: { start: start, end: start + take } }] }],
+            rows: [
+              { y: top, h: h, cells: [{ id: c.id, size: 'row', h: h, part: { start: start, end: start + take } }] },
+            ],
             kind: 'after',
             from: null,
+            head: true,
           });
           start += take;
         }
       } else {
         over = true;
-        out.push({ rows: [{ y: 0, h: H, cells: [{ id: c.id, size: 'row', h: H }] }], kind: 'after', from: null });
+        out.push({
+          rows: [{ y: top, h: full, cells: [{ id: c.id, size: 'row', h: full }] }],
+          kind: 'after',
+          from: null,
+          head: true,
+        });
       }
     });
     return {
@@ -1541,6 +1562,13 @@ window.ReportSheets = (function () {
           return _rowTag(row, cellHtml, offIds, '');
         })
         .join('');
+      // Every side after the Front names its student, when it prints anything.
+      var prints =
+        side.pinned ||
+        side.rows.some(function (row) {
+          return !row.empty;
+        });
+      if (side.head && prints && opts.head) body = opts.head + body;
       if (side.pinned) {
         body += _rowTag(
           { h: side.pinned.h, cells: [{ id: side.pinned.id, size: 'row', h: side.pinned.h }] },
@@ -1601,6 +1629,13 @@ window.ReportSheets = (function () {
       });
     });
     _measureCells(opts.stage, measured);
+    // The line naming the student at the top of every side after the
+    // Front, so a sheet printed single-sided can be matched to its student.
+    var header = f.sides[0].rows[0].cells[0];
+    var head = ReportBlocks.renderContinuedLine(cid, student, optionsFor(header));
+    // html-safe: head is ReportBlocks.renderContinuedLine, its text esc()'d
+    opts.stage.innerHTML = head;
+    var headPx = opts.stage.firstChild.offsetHeight;
     var cellHtml = {};
     var used = 0;
     var comment = null;
@@ -1617,7 +1652,7 @@ window.ReportSheets = (function () {
           });
         });
       }),
-      { H: H, gap: GAP, pinned: f.pinned },
+      { H: H, gap: GAP, pinned: f.pinned, head: headPx },
     );
     // The room left on each stored side, for the palette's fit checks.
     var free = f.sides.map(function (sd, s) {
@@ -1630,7 +1665,7 @@ window.ReportSheets = (function () {
         return !row.empty;
       });
       var last = filled[filled.length - 1];
-      var bottom = last ? last.y + last.h : 0;
+      var bottom = last ? last.y + last.h : s > 0 && headPx ? headPx + GAP : 0;
       var contd = r.sides.some(function (x) {
         return x.kind === 'continued' && x.from === s;
       });
@@ -1687,7 +1722,7 @@ window.ReportSheets = (function () {
         '><div class="sheet-label no-print">' +
         esc(sideLabel(side, s)) +
         '</div>' +
-        _sideHtml(side, cellHtml, hidden, paper, { type: f.type }) +
+        _sideHtml(side, cellHtml, hidden, paper, { type: f.type, head: head }) +
         '</div>';
     }
     html += '</div>';
