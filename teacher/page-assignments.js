@@ -6583,18 +6583,22 @@ window.PageAssignments = (function () {
     });
     var html = '<span><b>' + vals.length + '</b> Marked</span><span><b>' + left + '</b> Unmarked</span>';
     var stats = grid.querySelector('.ldg-stats');
-    if (vals.length) {
-      var sorted = vals.slice().sort(function (x, y) {
+    // Median, Lowest and Highest count Missing as 0 too, so the line uses
+    // one rule (Nov 3 sweep: the Average counted it, the rest left it out).
+    var counted = vals.slice();
+    for (var m = 0; m < missing; m++) counted.push(0);
+    if (counted.length) {
+      var sorted = counted.slice().sort(function (x, y) {
         return x - y;
       });
-      var sum = vals.reduce(function (x, y) {
+      var sum = counted.reduce(function (x, y) {
         return x + y;
       }, 0);
       var mid =
         sorted.length % 2
           ? sorted[(sorted.length - 1) / 2]
           : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
-      html += '<span>Average <b>' + Math.round(((sum / (vals.length + missing)) * 100) / max) + '%</b></span>';
+      html += '<span>Average <b>' + Math.round(((sum / counted.length) * 100) / max) + '%</b></span>';
       if (stats)
         stats.innerHTML =
           '<span class="ldg-name">Class</span><span>Median <b>' +
