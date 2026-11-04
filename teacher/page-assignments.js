@@ -1546,10 +1546,13 @@ window.PageAssignments = (function () {
 
     // New assessment form
     html +=
-      '<div id="new-assess-form" style="display:' +
+      '<div id="new-assess-form" data-cid="' +
+      esc(cid) +
+      '" style="display:' +
       (_showingNewForm ? 'block' : 'none') +
       ';background:var(--bg);border:2px solid var(--active);border-radius:var(--radius);padding:16px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,122,255,0.12)">' +
-      (_showingNewForm
+      // An open form kept through this redraw is put back by render().
+      (_showingNewForm && !_keepingForm
         ? renderAssessForm(
             cid,
             _editingAssessId
@@ -2377,6 +2380,20 @@ window.PageAssignments = (function () {
     if (el && el === _afTipSource) _showAfTip(el, el === document.activeElement);
   }
 
+  /* An open New or Edit Assessment form is kept as the teacher has it
+     through a redraw of the page. A data refresh waits for the teacher to
+     leave a field, then redraws: rebuilding the form there blanked it (title,
+     dates and scoring back to the defaults, a Blank Rubric's name gone), and
+     the click that left the field (Points, Complete/Incomplete, a Category)
+     landed on the old form. A form drawn for another class is not kept. */
+  var _keepingForm = false;
+  function _openFormToKeep(cid) {
+    if (!_showingNewForm) return null;
+    var form = document.getElementById('new-assess-form');
+    if (!form || form.dataset.cid !== cid || !form.querySelector('#af-title')) return null;
+    return form;
+  }
+
   function render() {
     _hideChipTip();
     _hideAfTip();
@@ -2436,14 +2453,26 @@ window.PageAssignments = (function () {
     document.getElementById('page-toolbar-mount').innerHTML = result.toolbarHtml;
 
     // Render assessment list
-    document.getElementById('main').innerHTML = renderAssessmentList(
-      cid,
-      assessments,
-      allAssessments,
-      students,
-      scores,
-      modules,
-    );
+    var keptForm = _openFormToKeep(cid);
+    var keptFocus = keptForm && keptForm.contains(document.activeElement) ? document.activeElement : null;
+    _keepingForm = !!keptForm;
+    try {
+      document.getElementById('main').innerHTML = renderAssessmentList(
+        cid,
+        assessments,
+        allAssessments,
+        students,
+        scores,
+        modules,
+      );
+    } finally {
+      _keepingForm = false;
+    }
+    if (keptForm) {
+      var freshForm = document.getElementById('new-assess-form');
+      if (freshForm) freshForm.replaceWith(keptForm);
+      if (keptFocus && keptFocus.isConnected) keptFocus.focus({ preventScroll: true });
+    }
     document.querySelectorAll('#main .ldg-grid').forEach(refreshLedgerSummary);
 
     // Show/hide descriptor bar
