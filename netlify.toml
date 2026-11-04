@@ -1,6 +1,10 @@
 [build]
   command = "bash scripts/build.sh"
   publish = "dist"
+  # Only main deploys. PR and branch builds are skipped (exit 0 = skip) to
+  # save Netlify build credits; PRs are still tested by GitHub CI (Colin,
+  # 2026-11-03).
+  ignore = "if [ \"$CONTEXT\" = \"production\" ]; then exit 1; else exit 0; fi"
 
 # Sentry build plugin config:
 # - skipSetCommits: the default sentry-cli `releases set-commits` step fails
