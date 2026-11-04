@@ -457,20 +457,19 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
 
 /* The mean of a student's overall levels on a group of assessments, each
    counted its Factor times. { mean, count }, or null when none is scored.
-   Missing proficiency work is no evidence here, as in competency
-   proficiency and Class Averages (the BC scale has no level 0); it still
-   counts 0 in the %. Missing points work is a 0 level, as its column is,
-   except in a Proficiency class, where it is no evidence too, as in
-   competency proficiency (Colin, 2026-11-03); its Class Average still
-   counts it as 0. */
+   Missing work follows the class's grading style (Colin, 2026-11-03): in a
+   Proficiency or Both class it is no evidence here, as in competency
+   proficiency (the BC scale has no level 0); in a Letter class it is a 0
+   level, as it is 0 in the %. The % counts it as 0 in a Letter or Both
+   class, and a points column's Class Average counts it as 0 in every
+   class. */
 function _factoredMeanLevel(cid, studentId, assessments) {
   var sum = 0;
   var factors = 0;
   var count = 0;
-  var profClass = courseGradeMode(cid) === 'proficiency';
+  var noEvidence = courseGradeMode(cid) !== 'letter';
   (assessments || []).forEach(function (assessment) {
-    var missing = getAssignmentStatus(cid, studentId, assessment.id) === 'NS';
-    if (missing && (profClass || !isPointsScored(assessment))) return;
+    if (noEvidence && getAssignmentStatus(cid, studentId, assessment.id) === 'NS') return;
     var value = getAssessmentOverallScore(cid, studentId, assessment.id);
     if (value == null) return;
     var factor = getAssessmentWeight(assessment);

@@ -56,7 +56,8 @@ describe('Missing proficiency work in level averages', () => {
     expect(getCourseLetterData(CID, SID).R).toBe(37.5);
   });
 
-  // Colin, 2026-11-03: "Yes, no evidence there too."
+  // Colin, 2026-11-03: "Yes, no evidence there too." and "0 in the %, no
+  // evidence in levels".
   it('Missing points work is no evidence in a Proficiency class; its Class Average still counts it as 0', () => {
     seed('proficiency', [x, quiz], [three], { [SID + ':q']: 'NS' });
     expect(assessmentGroupGrade(CID, SID, [x, quiz])).toMatchObject({ text: '3.0', prof: 3 });
@@ -66,8 +67,17 @@ describe('Missing proficiency work in level averages', () => {
     expect(getClassPointsAverage(CID, [{ id: SID }], quiz)).toMatchObject({ avg: 0, pct: 0 });
   });
 
-  it('Missing points work stays a 0 level in a class with a course %', () => {
+  it('Missing points work is no evidence in a Both class too, and 0 in its %', () => {
     seed('both', [x, quiz], [three], { [SID + ':q']: 'NS' });
+    expect(assessmentGroupGrade(CID, SID, [x, quiz])).toMatchObject({ prof: 3 });
+    expect(assessmentGroupGrade(CID, SID, [x, quiz]).text).toMatch(/^3\.0 · /);
+    expect(getAssessmentGroupPercentage(CID, SID, [x, quiz]).pct).toBeCloseTo(75 / 3.5, 9);
+  });
+
+  it('Missing work is a 0 level in a Letter class, points and proficiency alike', () => {
+    seed('letter', [x, quiz], [three], { [SID + ':q']: 'NS' });
     expect(assessmentGroupGrade(CID, SID, [x, quiz]).prof).toBe(1.5);
+    seed('letter', [x, y], [three], { [SID + ':y']: 'NS' });
+    expect(assessmentGroupGrade(CID, SID, [x, y]).prof).toBe(1.5);
   });
 });
