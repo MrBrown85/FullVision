@@ -257,7 +257,12 @@ describe('3b. A meeting sentence the teacher typed', () => {
 
   it('stands for the Meeting row, Written by you, and Generate keeps it instead of adding one', () => {
     seed();
-    rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18', narrative: TYPED });
+    rate({
+      reportingBasis: 'ie',
+      ieDeadline: '2026-12-18',
+      narrative: TYPED,
+      draftMeta: { v: 1, sentences: [], teacher_text: [MEET] },
+    });
     let html = open();
     expect(meetingRows(html)).toBe(1);
     expect(html).toMatch(

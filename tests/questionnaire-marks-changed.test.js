@@ -537,9 +537,14 @@ describe('the Sentences rows recover from the record (recoverRows)', () => {
     expect(exact.map(r => r.id)).toEqual(meta.sentences.map(x => x.id));
     expect(exact[at]).toMatchObject({ edited: true, step: 'overall', text: 'Her source work is careful.' });
     expect(exact.find(r => r.step === 'closer')).toMatchObject({ classLine: true, id: 'class:closer' });
-    // Without the record the edited sentence is the teacher's own.
+    // Without the record nothing says the teacher wrote it: the Earlier
+    // Comment's, which Generate replaces.
     const guessed = RQ.recoverRows(text, ctx);
-    expect(guessed[at]).toMatchObject({ step: null, edited: true });
+    expect(guessed[at]).toMatchObject({ step: null, edited: false, earlier: true });
+    // With the record of what they typed (draft_meta.teacher_text), theirs.
+    const theirs = RQ.recoverRows(text, ctx, { teacher_text: ['Her source work is careful.'] });
+    expect(theirs[at]).toMatchObject({ step: null, edited: true });
+    expect(theirs[at].earlier).toBeFalsy();
     // The approved values travel with the row, so a later approval keeps
     // the record of what was claimed.
     const nh = exact.find(r => r.step === 'notHandedIn');
