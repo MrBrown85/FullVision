@@ -169,7 +169,8 @@ describe('getSectionEvidenceCount', () => {
 
 /* ── getFocusAreas ────────────────────────────────────────── */
 describe('getFocusAreas', () => {
-  it('puts tags with no evidence first', () => {
+  // Step 4 group 3 #42: competencies nobody has assessed are left out.
+  it('leaves out competencies with no evidence', () => {
     mockDataLayer({
       getSections: () => [
         {
@@ -195,9 +196,7 @@ describe('getFocusAreas', () => {
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
     });
     const result = getFocusAreas('test', 'stu1', 3);
-    expect(result[0].tag.id).toBe('t2'); // no evidence → first
-    expect(result[0].prof).toBe(0);
-    expect(result[1].tag.id).toBe('t1');
+    expect(result.map(r => r.tag.id)).toEqual(['t1']);
   });
 
   it('sorts by lowest proficiency after no-evidence tags', () => {
@@ -230,8 +229,16 @@ describe('getFocusAreas', () => {
       getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }, { id: 't2' }, { id: 't3' }, { id: 't4' }] }],
       getAllTags: () => [{ id: 't1' }, { id: 't2' }, { id: 't3' }, { id: 't4' }],
       getSectionForTag: () => ({ id: 'sec1' }),
-      getScores: () => ({}),
-      getAssessments: () => [],
+      getScores: () => ({
+        stu1: ['t1', 't2', 't3', 't4'].map((t, i) => ({
+          score: 2,
+          tagId: t,
+          assessmentId: 'a' + i,
+          date: '2025-01-01',
+          type: 'summative',
+        })),
+      }),
+      getAssessments: () => [0, 1, 2, 3].map(i => ({ id: 'a' + i, type: 'summative', weight: 1 })),
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
     });
     expect(getFocusAreas('test', 'stu1')).toHaveLength(3);
@@ -242,8 +249,16 @@ describe('getFocusAreas', () => {
       getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }, { id: 't2' }, { id: 't3' }] }],
       getAllTags: () => [{ id: 't1' }, { id: 't2' }, { id: 't3' }],
       getSectionForTag: () => ({ id: 'sec1' }),
-      getScores: () => ({}),
-      getAssessments: () => [],
+      getScores: () => ({
+        stu1: ['t1', 't2'].map((t, i) => ({
+          score: 2,
+          tagId: t,
+          assessmentId: 'a' + i,
+          date: '2025-01-01',
+          type: 'summative',
+        })),
+      }),
+      getAssessments: () => [0, 1].map(i => ({ id: 'a' + i, type: 'summative', weight: 1 })),
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
     });
     expect(getFocusAreas('test', 'stu1', 1)).toHaveLength(1);

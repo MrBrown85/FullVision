@@ -334,7 +334,8 @@ describe('Focus areas card', () => {
     expect(html).toContain('Focus Areas');
     expect(html).toContain('Questioning');
     expect(html).toContain('1.5');
-    expect(html).toContain('No evidence');
+    // Step 4 group 3 #42: no-evidence competencies are not focus areas.
+    expect(html).not.toContain('Evaluating');
   });
 
   it('hides focus areas when all tags are proficient', () => {

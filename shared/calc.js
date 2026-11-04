@@ -1968,14 +1968,13 @@ function getFocusAreas(cid, studentId, maxItems) {
     prof: getTagProficiency(cid, studentId, t.id),
     section: getSectionForTag(cid, t.id),
   }));
-  // Tags with no evidence first, then lowest proficiency
-  scored.sort((a, b) => {
-    if (a.prof === 0 && b.prof === 0) return 0;
-    if (a.prof === 0) return -1;
-    if (b.prof === 0) return 1;
-    return a.prof - b.prof;
-  });
-  return scored.slice(0, maxItems || 3);
+  // The student's weakest assessed competencies, lowest first. Ones nobody
+  // has assessed yet are the same for every student in the class and say
+  // nothing about this one, so they are left out (Step 4 sweep, Nov 3).
+  return scored
+    .filter(x => x.prof > 0)
+    .sort((a, b) => a.prof - b.prof)
+    .slice(0, maxItems || 3);
 }
 
 /** Calculate the percentage of tags that have at least one scored evidence entry.

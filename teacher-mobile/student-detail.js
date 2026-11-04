@@ -351,16 +351,12 @@ window.MStudentDetail = (function () {
       '</div>' +
       '</div>';
 
-    var focusAreas = getFocusAreas(cid, sid, 3);
+    // The assessed competencies below Proficient, weakest first.
+    var focusAreas = getFocusAreas(cid, sid, 3).filter(function (f) {
+      return f.prof > 0 && f.prof < 3;
+    });
     var focusHTML = '';
-    var hasFocus =
-      focusAreas.some(function (f) {
-        return f.prof > 0 && f.prof < 3;
-      }) ||
-      focusAreas.some(function (f) {
-        return f.prof === 0;
-      });
-    if (hasFocus) {
+    if (focusAreas.length) {
       focusHTML = '<div class="m-list-inset-header">Focus Areas</div>';
       focusAreas.forEach(function (f) {
         var secColor = f.section ? f.section.color : '#888';
