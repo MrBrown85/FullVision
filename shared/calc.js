@@ -613,13 +613,18 @@ function _assessmentPoints(cid, studentId, assessment) {
    - Points and Complete/Incomplete work, as in the course %: Excused is
      left out, Not Submitted counts as 0 (_assessmentPoints,
      getAssessmentOverallScore follow the same rule).
-   - Proficiency work, as in competency proficiency: Excused and Not
-     Submitted are both left out. Missing work is no evidence, not a level
-     of 0; the BC proficiency scale has none.
+   - Proficiency and rubric work, as in competency proficiency: Excused and
+     Not Submitted are both left out. Missing work is no evidence, not a
+     level of 0; the BC proficiency scale has none.
+   - Except in a Letter class, where the column follows the grading style
+     (Colin, 2026-11-03: "Follow the grading style"): Missing proficiency
+     and rubric work counts as 0 there, as it does in the % and the level
+     averages (letterProficiency).
    Students without a score are left out. */
 var COLUMN_STATUS_RULES = {
   points: { EXC: 'out', NS: 'zero' },
   proficiency: { EXC: 'out', NS: 'out' },
+  letterProficiency: { EXC: 'out', NS: 'zero' },
 };
 
 /* What one student counts for in one column, or null when they don't.
@@ -641,7 +646,11 @@ function columnCountedValue(cid, sid, col) {
     }
     return _assessmentPoints(cid, sid, a);
   }
-  if (COLUMN_STATUS_RULES.proficiency[status] === 'out') return null;
+  var rules =
+    courseGradeMode(cid) === 'letter' ? COLUMN_STATUS_RULES.letterProficiency : COLUMN_STATUS_RULES.proficiency;
+  var profRule = rules[status];
+  if (profRule === 'out') return null;
+  if (profRule === 'zero') return { value: 0 };
   if (col.tagIds && col.tagIds.length) {
     var entries = getScores(cid)[sid] || [];
     var vals = [];
