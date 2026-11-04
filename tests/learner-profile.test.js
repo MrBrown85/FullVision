@@ -245,6 +245,11 @@ describe('LearnerProfile', () => {
     expect(mount(LearnerProfile.aboutHtml(o)).textContent).toContain('Harjot hasn’t answered About Me yet.');
     o.aboutOn = false;
     expect(mount(LearnerProfile.aboutHtml(o)).textContent).toContain('About Me isn’t turned on for this class.');
+    // Where to turn it on is a link straight to that tab.
+    o.cid = CID;
+    const link = mount(LearnerProfile.aboutHtml(o)).querySelector('a.lp-link');
+    expect(link.textContent).toBe('Class Management › Questionnaires');
+    expect(link.getAttribute('data-href')).toBe('/dashboard?course=' + CID + '&manage=questionnaires');
   });
 
   it('the student’s goals: the course goal in full with its status and next step, then the Core Competency goal', () => {

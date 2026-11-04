@@ -181,7 +181,13 @@ var LearnerProfile = (function () {
         '<div class="lp-none">' +
         (o.aboutOn
           ? esc(o.first) + ' hasn’t answered About Me yet.'
-          : 'About Me isn’t turned on for this class. Turn it on in Class Management › Questionnaires.') +
+          : 'About Me isn’t turned on for this class. Turn it on in ' +
+            (o.cid
+              ? '<a class="lp-link" role="link" tabindex="0" data-href="/dashboard?course=' +
+                esc(encodeURIComponent(o.cid)) +
+                '&amp;manage=questionnaires">Class Management › Questionnaires</a>'
+              : 'Class Management › Questionnaires') +
+            '.') +
         '</div></section>'
       );
     }

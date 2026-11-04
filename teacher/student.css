@@ -3091,6 +3091,11 @@ button.stu-bd-row:focus-visible {
 .lp-static {
   cursor: default;
 }
+.lp-link {
+  color: var(--link);
+  font-weight: 600;
+  cursor: pointer;
+}
 .lp-none {
   font-size: var(--text-md);
   color: var(--text-3);

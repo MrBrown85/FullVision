@@ -2562,6 +2562,7 @@ window.PageStudent = (function () {
     var goals = getGoals(cid)[studentId] || {};
     var block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
     var o = {
+      cid: cid,
       model: model,
       first: first,
       initials: initials(ctx.student),
