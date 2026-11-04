@@ -124,3 +124,23 @@ test('gradebook grader fits a phone', async ({ page }) => {
   expect(r.score).toBe(true);
   expect(r.commentWidth).toBeGreaterThan(250);
 });
+
+// Group 2 #44: the desktop student page fits a phone: ‹ › clear the
+// breadcrumb, the term picker stays on screen, and the page doesn't scroll
+// sideways.
+test('desktop student page fits a phone', async ({ page }) => {
+  await openDesktop(page, '/student?id=st1');
+  await expect(page.locator('.student-toolbar .term-select')).toBeVisible();
+  const r = await page.evaluate(() => {
+    const crumb = document.querySelector('.student-toolbar .tb-breadcrumb').getBoundingClientRect();
+    const step = document.querySelector('.student-toolbar .stu-step').getBoundingClientRect();
+    const term = document.querySelector('.student-toolbar .term-select').getBoundingClientRect();
+    const main = document.getElementById('main');
+    const overlap = !(step.right <= crumb.left || step.left >= crumb.right || step.bottom <= crumb.top || step.top >= crumb.bottom);
+    return { crumbWidth: crumb.width, overlap, termRight: term.right, sideways: main.scrollWidth > main.clientWidth + 1 };
+  });
+  expect(r.crumbWidth).toBeGreaterThan(100);
+  expect(r.overlap).toBe(false);
+  expect(r.termRight).toBeLessThanOrEqual(375);
+  expect(r.sideways).toBe(false);
+});

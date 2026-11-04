@@ -3496,3 +3496,26 @@ button.stu-bd-row:focus-visible {
   color: var(--link);
   font-weight: 600;
 }
+
+/* The student page's toolbar on a phone (Nov 3 sweep): at 375 px ‹ › sat
+   on the breadcrumb, which had shrunk to nothing, and the term picker ran
+   260 px past the edge, so the page scrolled sideways. Under 600 px the
+   breadcrumb takes its own line and the picker takes the room left. */
+@media (max-width: 600px) {
+  .student-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .student-toolbar .tb-breadcrumb {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .student-toolbar .term-select {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+  }
+  .student-toolbar .tb-edit-btn {
+    padding: 7px 12px;
+  }
+}
