@@ -59,7 +59,7 @@ Rubric work counts as the sum of its criteria's points, so a 5-criterion rubric 
 
 Colin: "Rubric row %: match the category. A rubric piece's row on the Quick Report and Grade Breakdown uses the same math as its category, so a piece alone in its category shows the category's %." (Colin, 2026-11-03.) Zoe's Local History Inquiry, alone in Projects on the BC Letter Bands, has criteria at 3− and 4: Projects counts (73 + 100) / 2 = 86.5%, "A 87%", but her row averaged the levels first (3.33 = 3+ = 86%).
 
-- **A rubric piece's % is its criteria's percents, by weight**, as its category counts it (`assessmentCellValue` `percent` and `percentText`, from `getAssessmentGroupPercentage` of the piece alone). The Quick Report row, Assignment Grades, the gradebook cell in a Letter or Both class and the printed grade sheet's Percent all print it. Other proficiency work keeps the % its level counts as, which is the same math.
+- **A rubric piece's % is its criteria's percents, by weight**, as its category counts it (`assessmentCellValue` `percent` and `percentText`, from `getAssessmentGroupPercentage` of the piece alone). The Quick Report row, Assignment Grades, the gradebook cell in a Letter or Both class, the printed grade sheet's Percent and the graded rubric handout's Overall all print it. Other proficiency work keeps the % its level counts as, which is the same math.
 - The level beside it (3.3 / 4) doesn't change, nor does any category, course % or competency.
 
 ## Proficiency percents (2026-10-29)
