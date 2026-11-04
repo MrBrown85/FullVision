@@ -848,7 +848,7 @@ window.PageReports = (function () {
       ' \u00B7 ' +
       (reportPaper === 'legal' ? 'Legal' : 'Letter') +
       ' \u00B7 ' +
-      (grade ? 'black' : reportView === 'photocopy' ? 'black' : 'colour') +
+      (grade ? 'Black' : reportView === 'photocopy' ? 'Black' : 'Colour') +
       '</span>';
     html += '<span class="issue-k">Sheets</span><span>' + studentsLine + '</span>';
     html +=
@@ -1621,8 +1621,15 @@ window.PageReports = (function () {
             return ReportStudio.fitsOn(f, id, s, _blockSizes, fit());
           });
           if (next != null) {
-            var full = to.side === 0 ? 'The Front is full' : to.side === 1 ? 'The Back is full' : 'That page is full';
-            label += ' to the ' + (next === 1 ? 'Back' : next === 0 ? 'Front' : 'Page ' + (next + 1)) + '. ' + full;
+            var full =
+              to.side === 0 && next > 1
+                ? 'The Front and Back are full'
+                : to.side === 0
+                  ? 'The Front is full'
+                  : to.side === 1
+                    ? 'The Back is full'
+                    : 'That page is full';
+            label += ' to ' + ReportStudio.sideWhere(next) + '. ' + full;
             to = { side: next };
           }
         }
@@ -1944,7 +1951,10 @@ window.PageReports = (function () {
         var label = 'Added ' + _label(id);
         if (land.after) label += '. It prints after the report';
         else if (land.side > 0 && f.sides.length > 1)
-          label += ' to the ' + (land.side === 1 ? 'Back' : 'Page ' + (land.side + 1)) + '. The Front is full';
+          label +=
+            ' to ' +
+            ReportStudio.sideWhere(land.side) +
+            (land.side > 1 ? '. The Front and Back are full' : '. The Front is full');
         _setForm(ReportSheets.insert(f, id, { side: land.side }), label);
         _announce(ReportStudio.placeText(_formOf(), id) + '.');
       },
@@ -1985,7 +1995,7 @@ window.PageReports = (function () {
         var to = Number(el.dataset.side) || 0;
         _setForm(
           ReportSheets.moveToSide(_formOf(), id, to),
-          'Moved ' + _label(id) + ' to the ' + (to === 0 ? 'Front' : to === 1 ? 'Back' : 'Page ' + (to + 1)),
+          'Moved ' + _label(id) + ' to ' + ReportStudio.sideWhere(to),
         );
         _announce(ReportStudio.placeText(_formOf(), id) + '.');
       },

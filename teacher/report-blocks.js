@@ -612,7 +612,7 @@ window.ReportBlocks = (function () {
     return sections
       .map((sec, i) => {
         const now = getSectionProficiency(cid, sid, sec.id);
-        const then = last ? last.levels[i] : _sectionStart(cid, sid, sec);
+        const then = last ? last.levels[i] : _startLevel(cid, sid, sec);
         return {
           sec,
           name: _competencyLabel(sec),
@@ -634,9 +634,12 @@ window.ReportBlocks = (function () {
     if (which === 'highest') sorted.sort((a, b) => b.now - a.now);
     else if (which === 'lowest') sorted.sort((a, b) => a.now - b.now);
     else {
-      // The biggest change, then the lowest now.
+      // The biggest change, then the lowest now. by says which picked it,
+      // so a block never calls a change of 0.0 the biggest (step 4 group 3
+      // #63).
       const change = r => (r.then > 0 ? Math.abs(Math.round(r.now * 10) - Math.round(r.then * 10)) : -1);
       sorted.sort((a, b) => change(b) - change(a) || a.now - b.now);
+      return Object.assign({ by: change(sorted[0]) > 0 ? 'change' : 'lowest' }, sorted[0]);
     }
     return sorted[0];
   }
@@ -805,8 +808,7 @@ window.ReportBlocks = (function () {
     // Proficiency block's Start of Term (_sectionStart): the first weeks'
     // mean, or with too few dated scores the first piece's. The pieces
     // below show the gradebook's mark on each (_sectionWork).
-    const start = _sectionStart(cid, student.id, area.sec);
-    const startV = start != null ? start : work.length ? _pieceLevel(cid, student.id, area.sec, work[0].a) : 0;
+    const startV = _startLevel(cid, student.id, area.sec);
     const nowV = area.now;
     const bests = _namedWork(cid, student.id, work, true);
     const latest = work[work.length - 1];
@@ -818,7 +820,9 @@ window.ReportBlocks = (function () {
           ? 'Highest now'
           : area.picked
             ? 'Focus area'
-            : 'Focus area (biggest change)';
+            : area.by === 'lowest'
+              ? 'Focus area (lowest now)'
+              : 'Focus area (biggest change)';
     const when = a => (_assessmentWhen(a) ? ', ' + _assessmentWhen(a) : '');
     const facts = [];
     if (options.startNow !== false && (startV > 0 || nowV > 0)) {
@@ -914,6 +918,16 @@ window.ReportBlocks = (function () {
     return _pass('start|' + cid + '|' + sid + '|' + (now ? now.ordinal : '') + '|' + sec.id, () =>
       _sectionStartNow(cid, sid, sec),
     );
+  }
+  /* A section's Start of Term as every block prints it: _sectionStart, or
+     with too few dated scores the first piece's level this term; 0 without
+     any. The Proficiency table printed "—" where Progress in One Area
+     printed the first piece's level (step 4 group 3 #63). */
+  function _startLevel(cid, sid, sec) {
+    const start = _sectionStart(cid, sid, sec);
+    if (start != null) return start;
+    const work = _sectionWork(cid, sid, sec).filter(w => assessmentInActiveTerm(cid, w.a));
+    return work.length ? _pieceLevel(cid, sid, sec, work[0].a) : 0;
   }
   function _sectionStartNow(cid, sid, sec) {
     const dates = {};
@@ -1027,7 +1041,7 @@ window.ReportBlocks = (function () {
     const rowsBySection = {};
     sections.forEach((sec, i) => {
       const now = getSectionProficiency(cid, sid, sec.id);
-      const then = last ? last.levels[i] : _sectionStart(cid, sid, sec);
+      const then = last ? last.levels[i] : _startLevel(cid, sid, sec);
       const ev = _sectionEvidence(cid, sid, sec);
       rowsBySection[sec.id] = { sec, name: _competencyLabel(sec), then: then > 0 ? then : 0, now, ev };
     });
@@ -1051,7 +1065,7 @@ window.ReportBlocks = (function () {
     const head = (nameLabel, short) =>
       `<tr><th>${nameLabel}</th><th class="report-prof-n">${esc(short ? thenLabel.replace(/^(Term|Start of Term)$/, m => (m === 'Start of Term' ? 'Start' : m)) : thenLabel)}</th><th class="report-prof-n">${nowLabel}</th>${showChange ? '<th class="report-prof-n">Change</th>' : ''}${showAssessed ? `<th class="report-prof-n">${short ? 'Ev.' : 'Assessed'}</th>` : ''}</tr>`;
     const tr = (name, then, now, n, cls, count) =>
-      `<tr${cls ? ` class="${cls}"` : ''}><td class="report-ct-name">${esc(name)}${count ? `<span class="report-prof-count"> · ${count}</span>` : ''}</td><td class="report-prof-n">${fig(then)}</td><td class="report-prof-n">${fig(now)}</td>${showChange ? `<td class="report-prof-n">${esc(change(then, now))}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${n}</td>` : ''}</tr>`;
+      `<tr${cls ? ` class="${cls}"` : ''}><td class="report-ct-name">${esc(name)}${count ? `<span class="report-prof-count"> · ${count} competenc${count === 1 ? 'y' : 'ies'}</span>` : ''}</td><td class="report-prof-n">${fig(then)}</td><td class="report-prof-n">${fig(now)}</td>${showChange ? `<td class="report-prof-n">${esc(change(then, now))}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${n}</td>` : ''}</tr>`;
     const headRow = name => `<tr class="report-ct-group"><td colspan="${colCount}">${esc(name)}</td></tr>`;
     const sortRows = list => (lowestFirst ? list.slice().sort((a, b) => (a.now || 9) - (b.now || 9)) : list);
     const avg = (list, k) => {

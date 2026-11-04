@@ -353,6 +353,11 @@ window.ReportStudio = (function () {
     if (s === 1) return 'Back';
     return 'Page ' + (s + 1);
   }
+  /* A side as a sentence names it: "the Front", "the Back", "Page 3" (it
+     read "the Page 3": step 4 group 3 #63). */
+  function sideWhere(s) {
+    return s === 0 ? 'the Front' : s === 1 ? 'the Back' : 'Page ' + (s + 1);
+  }
 
   /* The selected block's inspector, pinned at the top right of the canvas
      (Colin, Oct 29: mockup A). Where the block is and its name; Place: its
@@ -375,8 +380,8 @@ window.ReportStudio = (function () {
       '" role="region" aria-label="' +
       esc(def.label) +
       ' Settings">' +
-      '<div class="studio-insp-head"><div class="studio-bar-where">On the ' +
-      esc(_sideName(form, at.side)) +
+      '<div class="studio-insp-head"><div class="studio-bar-where">On ' +
+      esc(sideWhere(at.side)) +
       '</div>' +
       '<div class="studio-bar-name">' +
       esc(def.label) +
@@ -1054,6 +1059,7 @@ window.ReportStudio = (function () {
     hasOptions: hasOptions,
     blockToolbarHtml: blockToolbarHtml,
     placeText: placeText,
+    sideWhere: sideWhere,
     fitZoom: fitZoom,
     initKeys: initKeys,
     initDrag: initDrag,

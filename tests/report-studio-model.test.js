@@ -945,9 +945,11 @@ describe('stage 3 blocks', () => {
     expect(t).toContain('Proficiency Curricular Competencies · Science 8');
     expect(t).toContain('Competency Start of Term Now Change Assessed');
     // Assessed counts each assessment once, however many competencies it scored.
-    expect(t).toContain('Overall 3.0 Proficient 3.3 Proficient +0.3 2');
+    // A competency with too few dated scores starts at its first piece, as
+    // Progress in One Area prints it (step 4 group 3 #63).
+    expect(t).toContain('Overall 3.5 Extending 3.3 Proficient −0.2 2');
     expect(t).toContain('Question and Predict 3.0 Proficient 3.2 Proficient +0.2 2');
-    expect(t).toContain('Plan Investigations — 3.4 Proficient — 1');
+    expect(t).toContain('Plan Investigations 4.0 Extending 3.4 Proficient −0.6 1');
     expect(t).toContain('Evaluate Methods — — — 0');
     expect(t).toContain('Highest now: Plan Investigations 3.4. Best work: Quiz (Oct 5), 3.7 / 4.');
     expect(t).toContain('Lowest now: Question and Predict 3.2. Lowest work: Lab Report (Sep 10), 3.0 / 4.');
@@ -981,7 +983,7 @@ describe('stage 3 blocks', () => {
     }));
     stub('getGroupProficiency', () => 3.3);
     const asGraded = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, {}));
-    expect(asGraded).toContain('Inquiry · 2 3.0 Proficient 3.3 Proficient +0.3 2');
+    expect(asGraded).toContain('Inquiry · 2 competencies 3.5 Extending 3.3 Proficient −0.2 2');
     expect(asGraded).not.toContain('Inquiry Question and Predict');
     expect(asGraded).toContain('Other Competencies Evaluate Methods');
     // The highest and lowest lines name what the report prints: the folder.
@@ -990,7 +992,7 @@ describe('stage 3 blocks', () => {
     expect(each).toContain('Inquiry Question and Predict');
     expect(each).toContain('Other Competencies Evaluate Methods');
     const byGroup = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { rows: 'group' }));
-    expect(byGroup).toContain('Inquiry · 2 3.0 Proficient 3.3 Proficient +0.3 2');
+    expect(byGroup).toContain('Inquiry · 2 competencies 3.5 Extending 3.3 Proficient −0.2 2');
     expect(byGroup).toContain('Other Competencies Evaluate Methods');
     // A folder the grade doesn't count as one (Folders Count as One off, or
     // the folder's own switch off) prints its competencies under its name.
@@ -998,7 +1000,7 @@ describe('stage 3 blocks', () => {
     const notOne = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, {}));
     expect(notOne).toContain('Inquiry Question and Predict');
     expect(text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { rows: 'group' }))).toContain(
-      'Inquiry · 2',
+      'Inquiry · 2 competencies',
     );
     // Only folders: the column says Group.
     stub('folderCountsAsOne', () => true);
