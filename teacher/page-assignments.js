@@ -2641,7 +2641,7 @@ window.PageAssignments = (function () {
       !categories.some(function (c) {
         return c.id === categoryId;
       });
-    var scoreMode = assess ? assess.scoreMode || 'proficiency' : 'proficiency';
+    var scoreMode = assess ? _formModeOf(assess) : 'proficiency';
     var maxPoints = assess ? assess.maxPoints || 100 : 100;
     var weight = getAssessmentWeight(assess);
 
@@ -2787,6 +2787,7 @@ window.PageAssignments = (function () {
       SCORE_MODE_CARDS.filter(function (m) {
         // DIBELS only in ELA and Social Studies 8 classes; work that is
         // already DIBELS keeps its card wherever it is.
+        if (m.mode === 'competencies') return scoreMode === 'competencies' || getSections(cid).length > 0;
         return m.mode !== 'dibels' || scoreMode === 'dibels' || courseOffersDibels(COURSES[cid]);
       })
         .map(function (m) {
@@ -2834,7 +2835,15 @@ window.PageAssignments = (function () {
       '</div>' +
       '<p class="af-dibels-note" id="af-dibels-note"' +
       (scoreMode === 'dibels' ? '' : ' hidden') +
-      '>Words Correct, Errors and Maze are entered at the Beginning, Middle and End of Year, and their levels are worked out on the Grade 8 goals. It counts toward no grade and needs no category.</p>';
+      '>Words Correct, Errors and Maze are entered at the Beginning, Middle and End of Year, and their levels are worked out on the Grade 8 goals. It counts toward no grade and needs no category.</p>' +
+      '<p class="af-dibels-note" id="af-comp-note"' +
+      (scoreMode === 'competencies' ? '' : ' hidden') +
+      '>Each competency you tag below is scored Emerging to Extending, with + and \u2212. No rubric is needed.</p>' +
+      '<p class="af-category-hint" id="af-comp-hint"' +
+      (scoreMode === 'competencies' && !(assess && (assess.tagIds || []).length) ? '' : ' hidden') +
+      '>' +
+      COMPETENCIES_NEED_TAG_HINT +
+      '</p>';
     // Rubric (redesign PR 6): a chosen rubric shows as a card with its
     // wording; with none, four ways to start one. The select stays the
     // form's record of the rubric; it shows only while choosing.
@@ -3135,12 +3144,48 @@ window.PageAssignments = (function () {
     // until save, so switching back finds it as it was.
     var show = { 'af-maxpoints-wrap': mode === 'points', 'af-rubric-wrap': mode === 'proficiency' };
     show['af-dibels-note'] = mode === 'dibels';
+    show['af-comp-note'] = mode === 'competencies';
     show['af-weight-wrap'] = mode !== 'dibels';
     Object.keys(show).forEach(function (id) {
       var node = document.getElementById(id);
       if (node) node.hidden = !show[id];
     });
     _syncCodes();
+  }
+
+  /* Competencies is the form's name for proficiency work with no rubric:
+     each tagged competency is scored on its own, Emerging to Extending, the
+     way it always was (scoreMode 'proficiency', no rubricId). Only the form
+     tells it from Rubric; what is saved and the grade math are the same. */
+  var COMPETENCIES_NEED_TAG_HINT =
+    'Tag at least one competency below. Each one you tag is what students are scored on.';
+  function _storedScoreMode(mode) {
+    return mode === 'competencies' ? 'proficiency' : mode || 'proficiency';
+  }
+  function _formModeOf(a) {
+    var m = (a && a.scoreMode) || 'proficiency';
+    return m === 'proficiency' && !a.rubricId ? 'competencies' : m;
+  }
+  function _formMode() {
+    return (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+  }
+  // Shows the Competencies hint while no competency is tagged; true when shown.
+  function _refreshCompHint() {
+    var hint = document.getElementById('af-comp-hint');
+    if (!hint) return false;
+    var show = _formMode() === 'competencies' && !document.querySelector('.af-tag-cb:checked');
+    hint.hidden = !show;
+    return show;
+  }
+  /* A save of Competencies work with nothing tagged stops at the hint and
+     brings the competency list into view. */
+  function _formCompetencyTagged() {
+    if (!_refreshCompHint()) return true;
+    var card = document.querySelector('.af-card-competencies');
+    if (card && card.scrollIntoView) card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    var first = document.querySelector('.af-card-competencies .af-code, .af-card-competencies .af-tag-cb');
+    if (first) first.focus({ preventScroll: true });
+    return false;
   }
 
   // The Factor menu's words: the multiplier, and what the common ones mean.
@@ -3151,14 +3196,14 @@ window.PageAssignments = (function () {
     return w + 'x';
   }
 
-  // The three ways to score an assessment, as cards with an icon each. On
+  // The ways to score an assessment, as cards with an icon each. On
   // hover or keyboard focus each shows a tooltip: a picture of how its scores
   // are entered, built from the grading screens' own pieces, and a sentence.
   var SCORE_MODE_CARDS = [
     {
       mode: 'proficiency',
-      // Every proficiency assessment is scored on a rubric, its own or the
-      // Competency Rubric (Colin, Nov 2); the 1–4 scale is still proficiency.
+      // Proficiency work on a rubric of its own; with no rubric it is
+      // Competencies below (Colin, Nov 3). The 1–4 scale is proficiency.
       label: 'Rubric',
       tip: 'Score with a rubric, Emerging to Extending.',
       picture: function () {
@@ -3201,6 +3246,31 @@ window.PageAssignments = (function () {
         );
       },
       icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m6.8 10.2 2.2 2.2 4.2-4.6"/></svg>',
+    },
+    {
+      mode: 'competencies',
+      label: 'Competencies',
+      tip: 'Score each competency you tag, Emerging to Extending, with + and \u2212. No rubric is needed.',
+      picture: function () {
+        var rows = [
+          ['1', 3, 'P'],
+          ['2', 2, 'D+'],
+        ]
+          .map(function (row) {
+            return (
+              '<span class="af-tip-comp-row"><span class="af-tip-comp-name">Competency ' +
+              row[0] +
+              '</span><span class="gb-score-val s' +
+              row[1] +
+              '">' +
+              row[2] +
+              '</span></span>'
+            );
+          })
+          .join('');
+        return '<span class="af-tip-comp">' + rows + '</span>';
+      },
+      icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5.5h8"/><path d="M3 10h8"/><path d="M3 14.5h8"/><circle cx="15.5" cy="5.5" r="1.4"/><circle cx="15.5" cy="10" r="1.4"/><circle cx="15.5" cy="14.5" r="1.4"/></svg>',
     },
     {
       mode: 'dibels',
@@ -3279,7 +3349,7 @@ window.PageAssignments = (function () {
       categoryId: (document.getElementById('af-category') || {}).value || '',
       rubricId: rid,
       rubric: mode === 'proficiency' ? _formDraftRubric(rid) : null,
-      scoreMode: mode,
+      scoreMode: _storedScoreMode(mode),
       maxPoints: parseFloat((document.getElementById('af-maxpoints') || {}).value) || 0,
       weight: _formAssessWeight(),
     });
@@ -3292,7 +3362,7 @@ window.PageAssignments = (function () {
     var hint = document.getElementById('af-category-hint');
     if (!sel || !hint) return false;
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
-    var show = !sel.value && categoryRequired(activeCourse, { scoreMode: mode });
+    var show = !sel.value && categoryRequired(activeCourse, { scoreMode: _storedScoreMode(mode) });
     hint.hidden = !show;
     if (!show) {
       sel.style.border = '';
@@ -3341,7 +3411,7 @@ window.PageAssignments = (function () {
       });
       parts.push(term ? term.label : 'In no reporting term');
     }
-    if (!catId && categoryRequired(cid, { scoreMode: mode }))
+    if (!catId && categoryRequired(cid, { scoreMode: _storedScoreMode(mode) }))
       return { strong: 'Needs a category', rest: 'to count toward the grade.' };
     if (!codes.length && courseGradeMode(cid) !== 'letter' && getSections(cid).length)
       return {
@@ -4964,7 +5034,12 @@ window.PageAssignments = (function () {
     var aid = _editingAssessId;
     var scored = aid ? _scoredStudentCount(activeCourse, aid) : 0;
     var current = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
-    if (!scored || (what === 'scoring' && nextMode === current)) return go();
+    var keepsScores =
+      what === 'scoring' &&
+      (nextMode === current ||
+        (_storedScoreMode(nextMode) === _storedScoreMode(current) &&
+          !(current === 'proficiency' && (document.getElementById('af-rubric') || {}).value)));
+    if (!scored || keepsScores) return go();
     var title = ((document.getElementById('af-title') || {}).value || '').trim() || 'This assessment';
     var who = scored + (scored === 1 ? ' student' : ' students');
     _formDialog(
@@ -5061,6 +5136,8 @@ window.PageAssignments = (function () {
     if (!tags.length || !window.CompetencyWording) return;
     var title = ((document.getElementById('af-title') || {}).value || '').trim();
     CompetencyWording.loadBank().then(function () {
+      // A rubric made from the competencies is Rubric scoring.
+      if (_formMode() === 'competencies') setScoreMode('proficiency');
       var held = {
         id: uid(),
         name: _rubricNameFrom(title, 'Competency Rubric'),
@@ -5098,7 +5175,8 @@ window.PageAssignments = (function () {
         return getTagById(cid, cb.value);
       })
       .filter(Boolean);
-    if (mode !== 'proficiency' || hasRubric || !tags.length || !window.CompetencyWording || !window.RubricBank) {
+    var onCompetencies = mode === 'competencies' || (mode === 'proficiency' && !hasRubric);
+    if (!onCompetencies || !tags.length || !window.CompetencyWording || !window.RubricBank) {
       slot.innerHTML = '';
       return;
     }
@@ -5315,6 +5393,7 @@ window.PageAssignments = (function () {
 
   // Chips, header chips and the rubric note follow the checkboxes.
   function _syncCodes() {
+    _refreshCompHint();
     var card = document.querySelector('.af-card-competencies');
     if (!card) return;
     var cid = activeCourse;
@@ -5784,6 +5863,7 @@ window.PageAssignments = (function () {
     }
     if (!_formCategoryChosen()) return;
     if (!_formMaxPointsOk()) return;
+    if (!_formCompetencyTagged()) return;
     if (
       _commitOpenBlank(function () {
         saveNewAssess(addAnother);
@@ -6045,7 +6125,7 @@ window.PageAssignments = (function () {
     if (m === 'points') return (a.maxPoints || 100) + ' Points';
     if (m === 'complete') return 'Complete/Incomplete';
     if (m === 'dibels') return 'DIBELS';
-    return 'Rubric';
+    return a.rubricId ? 'Rubric' : 'Competencies';
   }
 
   function _fillFromPast(srcCid, a) {
@@ -6054,7 +6134,7 @@ window.PageAssignments = (function () {
     if (!title) return;
     title.value = a.title || '';
     title.removeAttribute('aria-invalid');
-    var mode = a.scoreMode || 'proficiency';
+    var mode = _formModeOf(a);
     if (!document.querySelector('.af-scoremode-btn[data-mode="' + mode + '"]')) mode = 'proficiency';
     setScoreMode(mode);
     var mp = document.getElementById('af-maxpoints');
@@ -6205,6 +6285,12 @@ window.PageAssignments = (function () {
     // Everything is checked before anything is written: a stopped save
     // leaves the stored assessment as it was.
     if (!_formMaxPointsOk()) return;
+    // Older untagged work saves as it was; a change to its scoring or its
+    // competencies needs one tagged.
+    var compChange = _formChanges().some(function (k) {
+      return k === 'mode' || k === 'tags';
+    });
+    if (compChange && !_formCompetencyTagged()) return;
     if (
       _commitOpenBlank(function () {
         saveEditAssess(aid);
