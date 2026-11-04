@@ -916,10 +916,10 @@ function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
     const clickAttr = onStudentClick
       ? `type="button" data-action="sidebarStudentClick"`
       : `role="link" tabindex="0" data-href="${href}"`;
-    html += `<${tag} class="student-row${s.id === selectedStudentId ? ' selected' : ''}" ${clickAttr} data-sid="${s.id}">
+    html += `<${tag} class="student-row${s.id === selectedStudentId ? ' selected' : ''}" ${clickAttr} data-sid="${s.id}" data-search="${esc((displayName(s) + ' ' + fullName(s)).toLowerCase())}">
       <span class="student-avatar" style="background:${avatarBg}">${esc(initials(s))}</span>
       <span class="student-info">
-        <span class="student-row-name">${flagged ? '<span style="color:var(--priority);margin-right:3px">\u2691</span>' : ''}${esc(fullName(s))}</span>
+        <span class="student-row-name">${flagged ? '<span style="color:var(--priority);margin-right:3px">\u2691</span>' : ''}${esc(displayName(s))}</span>
       </span>
       <span class="student-row-grades" data-prof-sid="${s.id}"></span>
     </${tag}>`;
@@ -1201,7 +1201,8 @@ function applySidebarAnnotations() {
 function filterRoster() {
   const q = (document.getElementById('gb-roster-search').value || '').toLowerCase().trim();
   document.querySelectorAll('.student-row').forEach(row => {
-    const name = row.querySelector('.student-row-name')?.textContent?.toLowerCase() || '';
+    // The row shows the preferred name; its search key holds the legal name too.
+    const name = row.dataset.search || row.querySelector('.student-row-name')?.textContent?.toLowerCase() || '';
     row.style.display = !q || name.includes(q) ? '' : 'none';
   });
 }

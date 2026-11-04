@@ -918,7 +918,7 @@ window.ReportQuestionnaire = (function () {
     return `<div class="qn-head">
       <span class="qn-avatar" style="background:${_avatarColor(sid)}" aria-hidden="true">${esc(initials(student))}</span>
       <div class="qn-who">
-        <span class="qn-name">${esc(fullName(student))}</span>
+        <span class="qn-name">${esc(displayName(student))}</span>
         <span class="qn-head-sub">${student.pronouns ? esc(student.pronouns) + ' · ' : ''}${des.map(d => esc(d) + ' · ').join('')}${link}</span>
       </div>
       <div class="qn-grade">

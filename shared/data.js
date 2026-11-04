@@ -5898,7 +5898,8 @@ function initials(st) {
     if (p.length >= 2) return (p[0][0] + p[p.length - 1][0]).toUpperCase();
     return (p[0] || '?').slice(0, 2).toUpperCase();
   }
-  const f = (st.firstName || '').trim(),
+  // From the name shown on screen, so "Teddy Okafor" is TO.
+  const f = (st.preferred || st.firstName || '').trim(),
     l = (st.lastName || '').trim();
   if (f && l) return (f[0] + l[0]).toUpperCase();
   return (f || l || '?').slice(0, 2).toUpperCase();
@@ -5922,8 +5923,12 @@ function pronounsSelect(id, selected, attrs) {
 function fullName(st) {
   return ((st.firstName || '') + ' ' + (st.lastName || '')).trim();
 }
+/* The name shown on screen for a student, everywhere: the preferred name
+   (the first name when there is none), then the last name ("Teddy Okafor"
+   for Theodore Okafor). fullName stays the legal name for the roster's
+   fields, sorting, import matching and exports. */
 function displayName(st) {
-  return st.preferred || fullName(st);
+  return displayNameWithLast(st) || fullName(st);
 }
 function displayNameFirst(st) {
   return st.preferred || st.firstName || st.lastName || '';

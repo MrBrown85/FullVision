@@ -178,7 +178,7 @@ window.Router = (function () {
         var stu = getStudents(getActiveCourse()).find(function (s) {
           return s.id === params.id;
         });
-        if (stu) pageTitle = fullName(stu);
+        if (stu) pageTitle = displayName(stu);
       } catch (e) {
         /* use default */
       }

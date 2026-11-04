@@ -338,7 +338,7 @@ test('the Edit Student icon opens the dialog; a save redraws the name', async ({
   await page.locator('#tq-edit-student-btn').click();
   const dialog = page.getByRole('dialog', { name: 'Edit Student' });
   await expect(dialog).toBeVisible();
-  await dialog.locator('#edit-first').fill('Cecilia');
+  await dialog.locator('#edit-pref').fill('Cecilia');
   await dialog.locator('[data-action="saveEditStudent"]').click();
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('.qn-name')).toHaveText('Cecilia Adeyemi');

@@ -2729,9 +2729,9 @@ window.PageStudent = (function () {
       '<button type="button" class="stu-step-btn" data-action="stuStep" data-sid="' +
       (st ? esc(st.id) : '') +
       '"' +
-      (st ? ' title="' + esc(label + ': ' + fullName(st)) + '"' : ' disabled') +
+      (st ? ' title="' + esc(label + ': ' + displayName(st)) + '"' : ' disabled') +
       ' aria-label="' +
-      esc(st ? label + ': ' + fullName(st) : label) +
+      esc(st ? label + ': ' + displayName(st) : label) +
       '">' +
       (dir === 'prev' ? '‹' : '›') +
       '</button>'
@@ -2784,7 +2784,7 @@ window.PageStudent = (function () {
     // ── Toolbar ──
     var html =
       '<div class="student-toolbar">' +
-      renderBreadcrumb('Dashboard', '/dashboard', fullName(student) || displayName(student)) +
+      renderBreadcrumb('Dashboard', '/dashboard', displayName(student)) +
       '<span class="stu-step">' +
       _stepButtonHtml('prev', _neighbours().prev) +
       _stepButtonHtml('next', _neighbours().next) +
