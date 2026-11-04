@@ -279,6 +279,13 @@ function waitForPendingSyncs(timeoutMs) {
   });
 }
 
+/* A class just loaded from the server is in step with it: the phone's
+   Settings says when, not "Not yet synced this session", even before the
+   first change is saved. Writes still in flight keep their own time. */
+function _markLoadSynced() {
+  if (_pendingSyncs === 0) _lastSyncedAt = new Date().toISOString();
+}
+
 function _trackPendingSync(promise) {
   if (!promise || typeof promise.finally !== 'function') return promise;
   _pendingSyncs += 1;
@@ -4061,11 +4068,13 @@ async function _doInitData(cid) {
         if (bundle.not_modified) {
           delete _loadError[cid];
           _classFresh[cid] = true;
+          _markLoadSynced();
           return;
         }
         try {
           _bundleToCache(cid, bundle);
           delete _loadError[cid];
+          _markLoadSynced();
         } catch (e) {
           // A payload this code can't read must not leave the class half
           // applied with no word to the teacher.

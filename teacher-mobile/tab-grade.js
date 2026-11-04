@@ -425,9 +425,9 @@ window.MGrade = (function () {
     // One option per reporting term, after the fixed ranges. The list on
     // this screen follows the term; grades on mobile stay all-time.
     var dateOptions = [
-      { val: 'all', label: 'All time' },
-      { val: 'week', label: 'This week' },
-      { val: '30d', label: 'Last 30 days' },
+      { val: 'all', label: 'All Time' },
+      { val: 'week', label: 'This Week' },
+      { val: '30d', label: 'Last 30 Days' },
     ].concat(
       _terms(cid).map(function (t) {
         return { val: _termValue(t), label: t.label };
@@ -439,15 +439,15 @@ window.MGrade = (function () {
       'gradedStatus',
       [
         { val: 'all', label: 'All' },
-        { val: 'has-ungraded', label: 'Has ungraded' },
-        { val: 'fully-graded', label: 'Fully graded' },
+        { val: 'has-ungraded', label: 'Has Ungraded' },
+        { val: 'fully-graded', label: 'Fully Graded' },
       ],
       _sheetStaged.gradedStatus,
     );
 
     return (
       '<div class="m-filter-sheet">' +
-      '<div class="m-filter-sheet-heading">Filter assessments</div>' +
+      '<div class="m-filter-sheet-heading">Filter Assessments</div>' +
       '<div class="m-filter-sheet-section">' +
       '<div class="m-filter-sheet-title">Category</div>' +
       '<div class="m-filter-strip m-filter-strip-wrap">' +
@@ -464,7 +464,7 @@ window.MGrade = (function () {
       statusSeg +
       '</div>' +
       '<div class="m-filter-sheet-footer">' +
-      '<button class="m-btn-ghost" data-action="m-grade-filter-clear">Clear all</button>' +
+      '<button class="m-btn-ghost" data-action="m-grade-filter-clear">Clear All</button>' +
       '<button class="m-btn-primary" data-action="m-grade-filter-apply">Apply</button>' +
       '</div>' +
       '</div>'

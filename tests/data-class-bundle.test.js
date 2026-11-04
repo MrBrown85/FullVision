@@ -416,6 +416,18 @@ describe('get_class_bundle', () => {
     expect(bundled.tagProficiency).toEqual(legacy.tagProficiency);
   });
 
+  // Step 4 group 3 #80: a class loaded from the server counts as synced, so
+  // the phone's Settings doesn't say "Not yet synced this session".
+  it('records the load as the last sync', async () => {
+    resetClass();
+    _lastSyncedAt = null;
+    globalThis.__FV_CLASS_BUNDLE = true;
+    globalThis.getSupabase = bundleServer;
+    await initData(CID);
+    expect(getLastSyncedAt()).toBeTruthy();
+    expect(Date.now() - Date.parse(getLastSyncedAt())).toBeLessThan(60000);
+  });
+
   it('keeps rubric scores under their criterion on the very first load', async () => {
     resetClass();
     globalThis.__FV_CLASS_BUNDLE = true;
