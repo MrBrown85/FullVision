@@ -609,10 +609,10 @@ window.AssessmentCopy = (function () {
         })
         .join('');
       _dialog({
-        title: 'Check before adding',
+        title: 'Check Before Adding',
         html: html,
         okLabel: okLabel || 'Add',
-        cancelLabel: 'Don’t add',
+        cancelLabel: 'Don’t Add',
         onOpen: function (root) {
           // A choice clears the outline a stopped OK left, and the hint.
           root.addEventListener('change', function (e) {
@@ -693,7 +693,7 @@ window.AssessmentCopy = (function () {
           p.dates = { dateAssigned: t.dateAssigned, dueDate: t.dueDate };
           return p;
         });
-        return reviewPlans(plans, 'Add to ' + (plans.length === 1 ? plans[0].dstName : plans.length + ' classes'));
+        return reviewPlans(plans, 'Add to ' + (plans.length === 1 ? plans[0].dstName : plans.length + ' Classes'));
       })
       .then(function (plans) {
         if (!plans) return [];

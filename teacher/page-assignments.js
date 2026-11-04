@@ -9279,10 +9279,10 @@ window.PageAssignments = (function () {
       var ok = root.querySelector('[data-copy-ok]');
       if (!ok) return;
       ok.disabled = !n;
-      ok.textContent = n ? 'Add ' + n + (n === 1 ? ' criterion' : ' criteria') : 'Add';
+      ok.textContent = n ? 'Add ' + n + (n === 1 ? ' Criterion' : ' Criteria') : 'Add';
     }
     AssessmentCopy.dialog({
-      title: 'Criteria from competencies',
+      title: 'Criteria From Competencies',
       html: html,
       okLabel: 'Add',
       onOpen: function (root) {
