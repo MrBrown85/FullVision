@@ -137,6 +137,16 @@ describe('breadcrumbs', () => {
     const rpc = crumb({ category: 'fetch', data: { url: urls[2] } });
     expect(rpc.data.url).toBe('https://x.supabase.co/rest/v1/rpc/get_class_bundle');
   });
+
+  it('scrubs the message of a breadcrumb for an earlier event', () => {
+    const out = crumb({
+      category: 'sentry.event',
+      message: 'Error: enrollment ' + EID + ' not found for maya.okafor@student.surreyschools.ca',
+      event_id: 'abc',
+    });
+    expect(leaks(out)).toEqual([]);
+    expect(out.message).toContain('not found');
+  });
 });
 
 function exceptionEvent(value, extra = {}) {
@@ -238,6 +248,49 @@ describe('events', () => {
     expect(Object.keys(out.contexts)).toEqual(['trace']);
     expect(out.request).toEqual({ url: 'https://fullvision.ca/', headers: { 'User-Agent': 'Mozilla/5.0' } });
     expect(out.transaction).toBe('/student');
+  });
+
+  it('redacts personal values inside error messages', () => {
+    const values = [
+      // Postgres and RPC messages that quote a value
+      'invalid input syntax for type date: "2012-04-17"',
+      'invalid input syntax for type uuid: "Maya Okafor"',
+      'enrollment ' + EID + ' not found',
+      'import_json_restore: ' + CID + ' not found',
+      'Key (email)=(maya.okafor@student.surreyschools.ca) already exists.',
+      'Key (student_number)=(1234567) already exists.',
+      // Engine messages that quote the input
+      'Unexpected token \'M\', "Maya Okafor" is not valid JSON',
+      "Failed to execute 'querySelector' on 'Document': '#Mo Okafor (she/her)' is not a valid selector.",
+      // A rejection with a plain string
+      'Non-Error promise rejection captured with value: Maya struggled with fractions',
+      'Object captured as promise rejection with keys: Science 8 Block B, code',
+      // Codes, tokens and URLs
+      'slip K7P-3QX was already used',
+      'JWT expired: ' + JWT,
+      'Failed to fetch https://x.supabase.co/rest/v1/student?id=eq.' + SID,
+    ];
+    for (const value of values) {
+      const out = send(exceptionEvent(value));
+      expect(leaks(out), value).toEqual([]);
+    }
+    // Identifiers, property names and constraint names stay readable.
+    const kept = send(
+      exceptionEvent('duplicate key value violates unique constraint "enrollment_student_id_course_id_key"'),
+    );
+    expect(kept.exception.values[0].value).toContain('"enrollment_student_id_course_id_key"');
+  });
+
+  it('redacts captureMessage text, including the outbox and missing-RPC reports', () => {
+    for (const message of [
+      'Outbox dropped upsert_score: enrollment ' + EID + ' not found',
+      'Outbox dropped save_observation: value too long for "Maya struggled with fractions"',
+      'Missing RPC: upsert_term_rating',
+    ]) {
+      const out = send({ message, level: 'warning', logentry: { message, params: ['Maya Okafor'] } });
+      expect(leaks(out), message).toEqual([]);
+      expect(out.message).toMatch(/^(Outbox dropped|Missing RPC)/);
+    }
   });
 
   it('scrubs breadcrumbs carried on the event too', () => {

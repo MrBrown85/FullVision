@@ -57,9 +57,69 @@
      comes out. */
   var EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
   var UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+  var JWT_RE = /\beyJ[\w-]*\.[\w-]+(?:\.[\w-]+)?/g;
+  var SECRET_RE = /\b(\w*(?:token|code|key|secret|pass)\w*)=[^&\s]+/gi;
+  // Slip codes: three and three from the slip alphabet (K7P-3QX).
+  var SLIP_RE = /\b[A-HJKMNP-RT-Z2-46-9]{3}-[A-HJKMNP-RT-Z2-46-9]{3}\b/g;
+  var DATE_RE = /\b(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\/\d{1,2}\/\d{2,4})\b/g;
+  // Long letter-and-digit runs are tokens; long digit runs are student numbers.
+  var TOKEN_RE = /\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]{24,}\b/g;
+  var NUMBER_RE = /\b\d{5,}\b/g;
+  var URL_RE = /\b(?:https?|wss?):\/\/[^\s"'<>()]+/gi;
 
+  /* Ids, emails, tokens, slip codes, dates and student numbers, wherever
+     they appear. */
   function mask(text) {
-    return typeof text === 'string' ? text.replace(EMAIL_RE, '[email]') : text;
+    if (typeof text !== 'string') return text;
+    return text
+      .replace(EMAIL_RE, '[email]')
+      .replace(JWT_RE, '[token]')
+      .replace(SECRET_RE, '$1=[value]')
+      .replace(UUID_RE, '[id]')
+      .replace(SLIP_RE, '[code]')
+      .replace(DATE_RE, '[date]')
+      .replace(TOKEN_RE, '[token]')
+      .replace(NUMBER_RE, '[number]');
+  }
+
+  // A quoted word that reads like code (a property, column or constraint
+  // name) stays; anything else quoted could be a value someone typed.
+  function quoted(q, inner) {
+    return /^[a-z_$][\w$]*$/.test(inner) ? q + inner + q : q + '[value]' + q;
+  }
+
+  /* An error message or a breadcrumb's text. Engine and Postgres messages
+     quote the value that failed (invalid input syntax for type date:
+     "2012-04-17", Unexpected token 'M', "Maya" is not valid JSON, Key
+     (email)=(…)), and a rejected plain value is printed whole. */
+  function scrubText(text) {
+    if (typeof text !== 'string') return text;
+    return mask(
+      text
+        .replace(URL_RE, scrubUrl)
+        .replace(/^(Non-Error (?:promise rejection|exception) captured with value: )[\s\S]*$/, '$1[value]')
+        .replace(/(captured as [a-z ]*with keys: )([\s\S]*)$/, function (m, lead, keys) {
+          return (
+            lead +
+            keys
+              .split(/,\s*/)
+              .map(function (k) {
+                return /^[a-z_$][\w$]*$/.test(k) ? k : '[key]';
+              })
+              .join(', ')
+          );
+        })
+        .replace(/(, )[\s\S]*( is not valid JSON)/, '$1"[value]"$2')
+        .replace(/\)=\([^)]*\)/g, ')=([value])')
+        .replace(/(Failing row contains )\([\s\S]*\)/, '$1([value])')
+        .replace(/: "[^"]*"/g, ': "[value]"')
+        .replace(/"([^"]*)"/g, function (m, inner) {
+          return quoted('"', inner);
+        })
+        .replace(/(^|[^\w])'([^']*)'(?!\w)/g, function (m, lead, inner) {
+          return lead + quoted("'", inner);
+        }),
+    );
   }
 
   /* A URL keeps its address and path only. The query and the #fragment hold
@@ -67,7 +127,7 @@
      (?id=eq.…), sign-in tokens (#access_token=…) and slip codes (/s/#…). */
   function scrubUrl(url) {
     if (typeof url !== 'string') return url;
-    return mask(url.split(/[?#]/)[0]).replace(UUID_RE, '[id]');
+    return mask(url.split(/[?#]/)[0]);
   }
 
   /* A click or key press is recorded as the element's CSS path. Sentry adds
@@ -83,7 +143,7 @@
     // Console breadcrumbs go: the app's warnings log whole records (names,
     // notes, observation text).
     if (!crumb || crumb.category === 'console') return null;
-    crumb.message = /^ui\./.test(crumb.category || '') ? scrubSelector(crumb.message) : mask(crumb.message);
+    crumb.message = /^ui\./.test(crumb.category || '') ? scrubSelector(crumb.message) : scrubText(crumb.message);
     if (crumb.data) {
       // A request keeps its method, path and status; a page change its from
       // and to paths. Anything else goes.
@@ -140,11 +200,11 @@
       if (ua) event.request.headers = { 'User-Agent': ua };
     }
     if (event.transaction) event.transaction = scrubUrl(event.transaction);
-    event.message = mask(event.message);
-    if (event.logentry) event.logentry = { message: mask(event.logentry.message) };
+    event.message = scrubText(event.message);
+    if (event.logentry) event.logentry = { message: scrubText(event.logentry.message) };
     if (event.exception && event.exception.values) {
       event.exception.values.forEach(function (ex) {
-        ex.value = mask(ex.value);
+        ex.value = scrubText(ex.value);
         if (ex.mechanism) {
           var mechanism = {};
           MECHANISM_KEPT.forEach(function (k) {
