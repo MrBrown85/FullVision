@@ -216,7 +216,7 @@ describe('Evidence panel in the page', () => {
 
   it('shows one Evidence panel with tabs, counts and cards newest first, without the name', () => {
     expect($('#ev-title').textContent).toBe('Observations');
-    expect(tabText()).toEqual(['All 3', 'By competency 0', 'Assessments 1', 'Concerns 1']);
+    expect(tabText()).toEqual(['All 3', 'By Competency 0', 'Assessments 1', 'Concerns 1']);
     expect(cardIds()).toEqual(['o3', 'o2', 'o1']);
     expect($('#ev-list .obs-card-student')).toBeNull();
     expect($('#ev-list .obs-card-with')).toBeNull();
@@ -251,7 +251,7 @@ describe('Evidence panel in the page', () => {
     input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     // "Left the lab early" by text, "Strong graph" by its assessment title.
     expect(cardIds()).toEqual(['o3', 'o2']);
-    expect(tabText()).toEqual(['All 2', 'By competency 0', 'Assessments 1', 'Concerns 1']);
+    expect(tabText()).toEqual(['All 2', 'By Competency 0', 'Assessments 1', 'Concerns 1']);
     $('[data-ev-tab="concerns"]').click();
     expect(cardIds()).toEqual(['o3']);
     input.value = 'zebra';

@@ -13,7 +13,7 @@ window.StudentEvidence = (function () {
 
   var TABS = [
     { key: 'all', label: 'All' },
-    { key: 'competency', label: 'By competency' },
+    { key: 'competency', label: 'By Competency' },
     { key: 'assessments', label: 'Assessments' },
     { key: 'concerns', label: 'Concerns' },
   ];
