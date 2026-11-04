@@ -454,3 +454,22 @@ test('phone titles, chips and sparklines are not cut', async ({ page }) => {
   const chips = await page.locator('#m-thumb-strip .m-thumb').allTextContents();
   expect(new Set(chips).size).toBe(chips.length);
 });
+
+// Group 3 #78: an assessment row on the student screen opens that
+// assessment on that student; the Grade button says which piece it opens.
+test('student screen assessment rows open their grading', async ({ page }) => {
+  await openPhone(page);
+  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+  await page.locator('[data-action="m-student-tab"][data-tab="assess"]').click();
+  const row = page.locator('#m-screen-student-detail .m-assess-compact[data-action="m-assess-grade"]').nth(2);
+  const [sid, aid] = [await row.getAttribute('data-sid'), await row.getAttribute('data-aid')];
+  const title = await page.evaluate(a => getAssessments(getActiveCourse()).find(x => x.id === a).title, aid);
+  await row.click();
+  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
+  await expect(page.locator('#m-nav-bar-grade-swiper .m-nav-bar-title-inline')).toContainText(title);
+  await expect(page.locator('#m-thumb-strip .m-thumb-current')).toHaveAttribute('data-sid', sid);
+  await page.locator('[data-action="m-back"]').first().click();
+  await expect(page.locator('#m-screen-student-detail button[data-action="m-student-grade"]')).toContainText(
+    'Grade Newest: ',
+  );
+});

@@ -815,13 +815,20 @@
 
       // Grade on a student page: the newest assessment's grading screen on
       // the Grade tab, at that student's card. Back returns to the page.
-      if (action === 'm-student-grade') {
+      if (action === 'm-student-grade' || action === 'm-assess-grade') {
         var gradeSid = target.getAttribute('data-sid');
-        var newest = getAssessments(_cid)
-          .slice()
-          .sort(function (a, b) {
-            return (b.date || '').localeCompare(a.date || '');
-          })[0];
+        // A row on the student screen opens its own assessment; the Grade
+        // button opens the newest.
+        var wantAid = target.getAttribute('data-aid');
+        var newest = wantAid
+          ? getAssessments(_cid).find(function (a) {
+              return a.id === wantAid;
+            })
+          : getAssessments(_cid)
+              .slice()
+              .sort(function (a, b) {
+                return (b.date || '').localeCompare(a.date || '');
+              })[0];
         // The Grade tab opens on its list. A grading screen left open there
         // would come back under this one with the same ids, and the handlers
         // would bind to the hidden copy.
@@ -1355,6 +1362,15 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         MC.dismissSheet();
+      }
+      // A row that acts as a button (role="button") answers Enter and Space
+      // as a real button does.
+      if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.getAttribute) {
+        var t = e.target;
+        if (t.getAttribute('role') === 'button' && t.tagName !== 'BUTTON' && t.hasAttribute('data-action')) {
+          e.preventDefault();
+          t.click();
+        }
       }
     });
 

@@ -466,8 +466,15 @@ window.MStudentDetail = (function () {
         var name = tag ? tag.label || tag.shortName || tag.code || '' : '';
         if (name && toward.indexOf(name) < 0) toward.push(name);
       });
+      // Tapping a row opens that assessment's grading screen on this student.
       assessHtml +=
-        '<div class="m-assess-compact">' +
+        '<div class="m-assess-compact" role="button" tabindex="0" data-action="m-assess-grade" data-sid="' +
+        MC.esc(sid) +
+        '" data-aid="' +
+        MC.esc(a.id) +
+        '" aria-label="Grade ' +
+        MC.esc(a.title) +
+        '">' +
         '<div class="m-assess-top">' +
         '<span class="m-assess-date">' +
         MC.esc(_shortDay(a.date)) +
@@ -622,9 +629,19 @@ window.MStudentDetail = (function () {
       hero +
       tabsBlock +
       '<div class="m-scard-actions" style="padding:16px">' +
-      '<button class="m-scard-btn m-scard-btn-view" data-action="m-student-grade" data-sid="' +
-      sid +
-      '">Grade</button>' +
+      (getAssessments(cid).length
+        ? '<button class="m-scard-btn m-scard-btn-view" data-action="m-student-grade" data-sid="' +
+          sid +
+          '">Grade Newest: ' +
+          MC.esc(
+            getAssessments(cid)
+              .slice()
+              .sort(function (a, b) {
+                return (b.date || '').localeCompare(a.date || '');
+              })[0].title,
+          ) +
+          '</button>'
+        : '') +
       '</div>' +
       '<div style="height:32px"></div>' +
       '</div></div>'

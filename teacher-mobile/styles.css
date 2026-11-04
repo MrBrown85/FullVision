@@ -4418,3 +4418,11 @@ body.fv-switching-course::after {
   font-size: 12px;
   letter-spacing: -0.02em;
 }
+/* An assessment row on the student screen opens its grading. */
+.m-assess-compact[data-action] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-assess-compact[data-action]:active {
+  background: var(--overlay-pressed);
+}
