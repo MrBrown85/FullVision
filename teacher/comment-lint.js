@@ -21,7 +21,8 @@ window.CommentLint = (function () {
   // right after it or after a short object ("talk it through").
   var PHRASAL = [
     ['act', 'on'],
-    ['ask', 'for'],
+    // "ask for support", "ask for evidence": the Ministry's own term
+    // (Nov 4 2026 review), so ask for is not banned.
     ['come', 'from'],
     ['come', 'with'],
     ['keep', 'going'],
@@ -304,7 +305,9 @@ window.CommentLint = (function () {
     /\bbest in (the )?class\b/i,
     /\bthan (others|other students|most|the rest|everyone|anyone|classmates|(his|her|their|X) peers|the class)\b/i,
     /\bclassmates?\b/i,
-    /\bpeers?\b/i,
+    // "peers, users or experts" is the Ministry's own term (Nov 4 2026
+    // review): feedback sources, not a comparison.
+    /\bpeers?\b(?!, users\b)/i,
     /\bthe (rest of the|whole) class\b/i,
     /\beveryone else\b/i,
     /\bone of the (best|strongest|top|most)\b/i,
@@ -440,6 +443,10 @@ window.CommentLint = (function () {
     clear: 'a skill to show ("ask a clear question")',
     carefully: 'a skill to show ("record measurements carefully")',
     reliable: 'a skill to show ("find information in a reliable source")',
+    // The Ministry's own term (Nov 4 2026 review): science data and
+    // measurement collected "accurately".
+    accurate: 'the Ministry’s own term: "collect and record accurate data"',
+    accurately: 'the Ministry’s own term: "measure accurately"',
   };
 
   /* ── The check ─────────────────────────────────────────────────────── */
@@ -452,7 +459,12 @@ window.CommentLint = (function () {
   }
   // Compounds whose word is no judgement: "high school" is a place, not a
   // mark ("high" alone is evaluative).
-  var COMPOUNDS = [[/\bhigh school\b/gi, 'highschool']];
+  // "Creative work" and "creative process" are the Ministry's own terms
+  // for an arts piece and its steps (Nov 4 2026 review), not praise.
+  var COMPOUNDS = [
+    [/\bhigh school\b/gi, 'highschool'],
+    [/\bcreative (work|works|process|processes)\b/gi, 'creative$1'],
+  ];
   function words(text) {
     var t = plain(text);
     COMPOUNDS.forEach(function (c) {

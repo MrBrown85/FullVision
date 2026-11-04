@@ -108,6 +108,15 @@ export function cardV2(c) {
         extending: (at.extending || []).slice(),
       },
       override: Object.assign({}, forms.override || {}),
+      // Other ways to say each level's next step (the coordinator's blind
+      // sort, Nov 4 2026): classmates with the same next step read different
+      // words.
+      next: {
+        emerging: ((forms.next || {}).emerging || []).slice(),
+        developing: ((forms.next || {}).developing || []).slice(),
+        proficient: ((forms.next || {}).proficient || []).slice(),
+        extending: ((forms.next || {}).extending || []).slice(),
+      },
     },
     skill_key: c.skill_key,
     next_steps: Object.assign({ extending: '' }, c.next_steps),
@@ -130,6 +139,7 @@ function v2Slot(v) {
     h: v.home,
   };
   if (Object.keys(v.forms.override).length) out.o = v.forms.override;
+  if (Object.values(v.forms.next).some(xs => xs.length)) out.n = v.forms.next;
   return out;
 }
 
