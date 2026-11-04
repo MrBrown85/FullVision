@@ -749,3 +749,24 @@ describe('MStudents.initCardStack term', () => {
     expect(cardTerm('2026-12-10', [])).toBe('term-1');
   });
 });
+
+/* ── Step 4 group 3 #43: Missing work says Missing ─────────────────── */
+describe('Competency card with no evidence yet', () => {
+  it('says Missing for work marked Missing, not "not yet scored"', () => {
+    mockDataLayer({
+      getSections: () => [
+        { id: 's1', name: 'Graphs & Models', shortName: 'Graphs', tags: [{ id: 't1' }], color: '#888' },
+      ],
+      getSectionProficiency: () => 0,
+      getAssessments: () => [
+        { id: 'a1', title: 'Homework Check 1', tagIds: ['t1'] },
+        { id: 'a2', title: 'Lab 2', tagIds: ['t1'] },
+      ],
+      getAssignmentStatuses: () => ({ 'stu1:a1': 'NS' }),
+    });
+    const html = MStudents.renderDetail(CID, 'stu1');
+    expect(html).toContain('1 assessment marked Missing');
+    expect(html).toContain('1 assessment assigned but not yet scored');
+    expect(html).not.toContain('2 assessments assigned');
+  });
+});

@@ -104,13 +104,23 @@ window.MStudentDetail = (function () {
           return secTagIds.has(tid);
         });
       });
-      if (secAssessments.length > 0) {
-        insightHtml =
-          '<div class="m-sec-insight m-sec-insight-alert">' +
-          secAssessments.length +
-          ' assessment' +
-          (secAssessments.length !== 1 ? 's' : '') +
-          ' assigned but not yet scored</div>';
+      // Work the teacher marked Missing or Excused says so; only the rest
+      // is "not yet scored".
+      var statuses = getAssignmentStatuses(cid);
+      var by = { NS: 0, EXC: 0, open: 0 };
+      secAssessments.forEach(function (a) {
+        var st = statuses[sid + ':' + a.id];
+        by[st === 'NS' || st === 'EXC' ? st : 'open']++;
+      });
+      var lines = [];
+      var n = function (k) {
+        return by[k] + (by[k] === 1 ? ' assessment' : ' assessments');
+      };
+      if (by.NS) lines.push(n('NS') + ' marked Missing');
+      if (by.EXC) lines.push(n('EXC') + ' marked Excused');
+      if (by.open) lines.push(n('open') + ' assigned but not yet scored');
+      if (lines.length) {
+        insightHtml = '<div class="m-sec-insight m-sec-insight-alert">' + lines.join('<br>') + '</div>';
       }
     }
 
