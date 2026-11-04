@@ -1518,7 +1518,7 @@ window.PageGradebook = (function () {
                 '</span><span class="gb-pts-pct">' +
                 pct +
                 '%</span></div>'
-              : '<span class="gb-pts-empty">\u00B7</span>';
+              : '<span class="gb-pts-empty">\u2014</span>';
           html +=
             '<td class="gb-score gb-score-pts' +
             startClass +
@@ -1557,7 +1557,7 @@ window.PageGradebook = (function () {
             : score > 0
               ? formatScoreLevel(score, entry.mod) + lateMark
               : assigned
-                ? '<span class="gb-unscored">\u00B7</span>'
+                ? '<span class="gb-unscored">\u2014</span>'
                 : '\u2014';
           var rubricTitle =
             entry && entry.whole
@@ -1802,7 +1802,16 @@ window.PageGradebook = (function () {
                   '</span>'
                 );
               })
-              .join('')
+              .join('') +
+            // A Proficiency class's overall says its word under the number,
+            // as the Competencies view does, so colour isn't the only sign.
+            (gradeParts.length === 1 && badges.prof && levelWord(cid, getOverallProficiency(cid, s.id))
+              ? '<small class="gb-grade-word" style="color:' +
+                (PROF_COLORS[badges.prof.level] || PROF_COLORS[0]) +
+                '">' +
+                levelWord(cid, getOverallProficiency(cid, s.id)) +
+                '</small>'
+              : '')
           : '<span style="color:var(--text-3)">\u2014</span>') +
         '</span>' +
         '</div>';
@@ -1915,7 +1924,11 @@ window.PageGradebook = (function () {
         '<td class="gb-scores-avg"><span class="gb-avg-val" style="color:' +
         (PROF_COLORS[level] || PROF_COLORS[0]) +
         '">' +
-        (isPointsScored(a) || isCompletionScored(a) ? _csvAverageText(cid, a, stats) : _levelCellHtml(cid, stats.avg)) +
+        (isCompletionScored(a)
+          ? _csvAverageText(cid, a, stats)
+          : isPointsScored(a)
+            ? _pointsAverageText(a, stats)
+            : _levelCellHtml(cid, stats.avg)) +
         '</span></td>';
     });
     html += '</tr>';
@@ -2146,9 +2159,7 @@ window.PageGradebook = (function () {
     var open = '<td class="gb-score' + classes + '" style="' + wStyle + 'cursor:default">';
     if (!stats) return open + '<span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
     var r = pointsToProf(stats.pct, 100, getGradingScale(cid));
-    var text = isCompletionScored(assess)
-      ? Math.round(stats.pct) + '%'
-      : formatPoints(Math.round(stats.avg * 10) / 10) + '/' + (assess.maxPoints || 100);
+    var text = isCompletionScored(assess) ? Math.round(stats.pct) + '%' : _pointsAverageText(assess, stats);
     return (
       open +
       '<span class="gb-avg-val" style="color:' +
@@ -2199,7 +2210,7 @@ window.PageGradebook = (function () {
   function completionCellHtml(mark) {
     if (mark === 'complete') return '<span class="gb-cmp gb-cmp-complete">\u2713</span>';
     if (mark === 'incomplete') return '<span class="gb-cmp gb-cmp-incomplete">\u2717</span>';
-    return '<span class="gb-pts-empty">\u00B7</span>';
+    return '<span class="gb-pts-empty">\u2014</span>';
   }
 
   // Click order: unmarked → Complete → Incomplete → unmarked.
@@ -2680,6 +2691,11 @@ window.PageGradebook = (function () {
     if (cell.kind === 'level') return formatLevelAs(null, cell.value, 'proficiency');
     if (cell.kind === 'dibels') return cell.dibels ? cell.text : '';
     return '';
+  }
+
+  /* A points Class Average on screen, in both views: "6/10". */
+  function _pointsAverageText(a, stats) {
+    return formatPoints(Math.round(stats.avg * 10) / 10) + '/' + formatPoints(Number(a.maxPoints) || 100);
   }
 
   /* A Class Average as the CSV prints it, the printed sheet's way. */

@@ -1185,6 +1185,11 @@ th.gb-group-alt {
   flex-shrink: 0;
   margin-left: 8px;
 }
+/* "Proficient" under a Proficiency class's overall, as in Competencies. */
+.gb-grid-rowhead-grade .gb-grade-word {
+  font-size: 12px;
+  font-weight: 600;
+}
 /* ── Competencies grid variant ─────────────────────────────── */
 .gb-grid-corner-comp {
   display: flex;

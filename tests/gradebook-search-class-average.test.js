@@ -42,7 +42,7 @@ describe('Class Average while searching', () => {
     mount(seed, { course: CID });
     search('mat');
     expect(rows()).toBe(1);
-    expect(document.querySelector('.gb-scores-stats .gb-avg-val').textContent).toBe('6');
+    expect(document.querySelector('.gb-scores-stats .gb-avg-val').textContent).toBe('6/10');
   });
 
   it('stays the class average in the Competencies view', () => {
