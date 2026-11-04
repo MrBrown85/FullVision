@@ -148,12 +148,12 @@ describe('schema version 2 in the build step and the engine', () => {
   it('reads a version 2 card with its forms, and a version 1 card with the phrase alone', () => {
     const v2 = CommentBank.bankEntry('bc.sci8.cc.14');
     expect(v2.v2).toBe(true);
-    // (Rewritten as a teacher would say it, Nov 4 2026.)
-    expect(v2.forms.base[0]).toBe('spot patterns and odd results in data');
-    expect(v2.forms.does[0]).toBe('spots patterns and odd results in data');
-    expect(v2.forms.doing[1]).toBe('describing how one measurement changes with another');
+    // (Rewritten in the science register, Nov 4 2026.)
+    expect(v2.forms.base[0]).toBe('find patterns in data from an investigation');
+    expect(v2.forms.does[0]).toBe('finds patterns in data from an investigation');
+    expect(v2.forms.doing[1]).toBe('describing how one variable changes as another changes');
     expect(v2.forms.at.Extending).toHaveLength(3);
-    expect(v2.steps.Extending).toBe('explain why an odd result might have happened');
+    expect(v2.steps.Extending).toBe('suggest a cause for a result that does not match the trend');
     expect(v2.area).toBe('reading data');
     // (Every Science 8 card is on version 2 since Nov 4 2026; a Math 8 one
     // is not.)

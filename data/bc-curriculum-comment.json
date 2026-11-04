@@ -6555,65 +6555,65 @@
     "exemplar": "bc.chem11.cc.7"
   },
   "sci-assumptions-bias": {
-    "phrase": "notice when a source takes something for granted",
+    "phrase": "name the assumptions in an investigation",
     "area": "bias and assumptions",
     "forms": {
       "base": [
-        "notice when a source takes something for granted",
-        "spot one-sided views in sources and {his} own work",
-        "ask who made a piece of information and why"
+        "name the assumptions in an investigation",
+        "identify bias in a science source",
+        "explain how the purpose of a source affects its claims"
       ],
       "did": [
-        "noted the assumptions behind a source in {his} research notes",
-        "spotted a one-sided claim during {his} source check",
-        "asked who wrote a website in {his} project notes"
+        "named an assumption in {his} own experiment",
+        "identified bias in a science source for {his} project",
+        "explained how the purpose of a source affected its claims"
       ],
       "at": {
         "developing": [
-          "is starting to ask who made a source and why",
-          "is learning to notice what a source takes for granted",
-          "can spot a one-sided claim with help"
+          "names one assumption in an investigation with help",
+          "says whether a source shows one view or several views",
+          "names the purpose of a science source"
         ],
         "proficient": [
-          "notices what a source takes for granted",
-          "spots one-sided views in sources and in {his} own lab work",
-          "questions information before using it in a project"
+          "names the assumptions in an investigation",
+          "identifies bias in a science source",
+          "explains how the purpose of a source affects its claims"
         ],
         "extending": [
-          "explains how bias changes what a source claims",
-          "names what {his} own lab took for granted and how it shaped the results",
-          "compares how two sources describe the same event and why they differ"
+          "identifies bias in {his} own work and explains its effect",
+          "explains how an assumption affects the results of an investigation",
+          "compares claims from sources with different interests"
         ]
       },
       "next": {
         "emerging": [
-          "check the author and date of a website",
-          "ask whether a source is trying to sell something",
-          "name the group behind a website"
+          "say whether a source gives evidence for its claims",
+          "name the group that made a science source",
+          "identify a claim in a science source"
         ],
         "developing": [
-          "list beliefs a writer treats as fact",
-          "mark sentences that state an opinion as fact",
-          "ask what a source leaves unsaid"
+          "describe the interests of the group behind a source",
+          "name an assumption made before the experiment began",
+          "identify words in a source that show a view"
         ],
         "proficient": [
-          "check {his} own lab for choices that favoured an outcome",
-          "compare two sources on the same topic",
-          "describe the slant in a news headline"
+          "compare two sources on the same science issue",
+          "explain how bias affects the data a source chooses",
+          "name the assumptions in the hypothesis"
         ],
         "extending": [
-          "explain how the goals of a funder could shape a study",
-          "rewrite a slanted sentence in neutral words",
-          "show how bias in a method changed a result"
+          "explain how the choice of data can show bias",
+          "evaluate a source with interests in the outcome",
+          "reflect on bias in the design of an investigation"
         ]
       }
     },
     "skill_key": "evaluating",
     "next_steps": {
-      "emerging": "ask who made a source and why",
-      "developing": "name what a source takes for granted",
-      "proficient": "spot one-sided views in a source and in a personal investigation",
-      "extending": "explain how bias changes what a source claims"
+      "emerging": "name who made a science source and its purpose",
+      "developing": "identify one assumption in the method of an experiment",
+      "proficient": "explain how an assumption could affect the results",
+      "extending": "identify bias in data collection and propose a change to the method"
     },
     "evidence": "research notes or a source check for a project",
     "home": [
@@ -6651,65 +6651,65 @@
     "exemplar": "bc.sci9.cc.18"
   },
   "sci-contributing-to-care": {
-    "phrase": "help care for the school, the community or nature",
+    "phrase": "take action to care for the local environment",
     "area": "caring for others",
     "forms": {
       "base": [
-        "help care for the school, the community or nature",
-        "plan a group action to protect a local place",
-        "take steps to care for {his} own health"
+        "take action to care for the local environment",
+        "plan ways to care for {his} own well-being",
+        "care for others on {his} own or with a group"
       ],
       "did": [
-        "helped plan a schoolyard cleanup with {his} group",
-        "followed {his} group’s care plan for the class garden",
-        "tracked the results of {his} recycling project"
+        "took action with a group to care for a local ecosystem",
+        "planned ways to care for {his} own health and well-being",
+        "supported others in {his} group during a project"
       ],
       "at": {
         "developing": [
-          "is starting to describe one action that cares for the environment",
-          "is learning to plan a caring action with a group",
-          "can follow a group’s care plan with help"
+          "names one action to care for the local environment",
+          "names one way to care for {his} own well-being",
+          "helps a group care for a local place"
         ],
         "proficient": [
-          "follows a plan to care for a local place",
-          "plans a caring action with a group and does {his} part",
-          "makes choices that protect {his} own health and the health of others"
+          "takes action to care for the local environment",
+          "plans ways to care for {his} own well-being",
+          "cares for others on {his} own or with a group"
         ],
         "extending": [
-          "judges how well a caring action worked and improves it",
-          "leads a group in planning an action for the community",
-          "measures the effect of a project, such as litter collected"
+          "plans a group action that supports sustainability in the community",
+          "explains how an action supports the health of an ecosystem",
+          "connects care for the environment to the well-being of people"
         ]
       },
       "next": {
         "emerging": [
-          "name a problem in the schoolyard that needs care",
-          "choose one daily habit that protects nature",
-          "suggest a way to help a neighbour or friend"
+          "describe one healthy choice in daily life",
+          "name one way to care for living things",
+          "share one idea for a group care action"
         ],
         "developing": [
-          "write the steps for a class garden or cleanup",
-          "share the jobs in a group action plan",
-          "pick a date and goal for a group project"
+          "describe how a care action helps living things",
+          "plan one healthy lifestyle choice and record it",
+          "identify a local place that needs care"
         ],
         "proficient": [
-          "do {his} part in the group’s care plan",
-          "keep a log of actions taken for the project",
-          "make one choice each week that supports {his} health"
+          "collect data on the results of a care action",
+          "connect a care action to stewardship of the land",
+          "describe the needs of a local ecosystem"
         ],
         "extending": [
-          "count the litter collected before and after a cleanup",
-          "ask people affected by the project what helped",
-          "adjust the plan using what the results show"
+          "evaluate the results of a care action with data",
+          "propose a conservation project for the community",
+          "explain how personal choices affect global sustainability"
         ]
       }
     },
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "describe one action that helps the environment",
-      "developing": "plan a caring action with a small group",
-      "proficient": "follow a plan to care for the school or community",
-      "extending": "measure how much a caring action helped and improve it"
+      "emerging": "name one action that cares for the local environment",
+      "developing": "plan one action with a group to care for a local place",
+      "proficient": "explain how a care action affects the local ecosystem",
+      "extending": "plan a sustainability action and share its results with the community"
     },
     "evidence": "a group action project, such as a cleanup or a care plan",
     "home": [
@@ -6737,65 +6737,65 @@
     "exemplar": "bc.chem11.cc.6"
   },
   "sci-data-patterns": {
-    "phrase": "spot patterns and odd results in data",
+    "phrase": "find patterns in data from an investigation",
     "area": "reading data",
     "forms": {
       "base": [
-        "spot patterns and odd results in data",
-        "describe how one measurement changes with another",
-        "use simple math to compare results"
+        "find patterns in data from an investigation",
+        "describe how one variable changes as another changes",
+        "find connections between data and other sources"
       ],
       "did": [
-        "described a trend in {his} results table",
-        "noted a result that broke the pattern in {his} lab conclusion",
+        "described a trend in {his} data table",
+        "identified a result that did not match the trend in {his} lab",
         "calculated averages to compare trials in {his} lab"
       ],
       "at": {
         "developing": [
-          "is starting to describe one pattern in a table or graph",
-          "is learning to say how one thing changes as another changes",
-          "can find an average with help"
+          "describes one pattern in a table or graph with help",
+          "says how one variable changes in a data table",
+          "finds the average of several trials with help"
         ],
         "proficient": [
-          "describes the pattern between two measurements",
-          "uses calculations to compare results",
-          "spots results that break the pattern"
+          "finds patterns in data from an investigation",
+          "describes how one variable changes as another changes",
+          "finds connections between data and other sources"
         ],
         "extending": [
-          "explains why a result that breaks the pattern might have happened",
+          "explains why a result does not match the trend",
           "uses a trend to predict a value beyond the data",
-          "compares patterns in {his} data with published data"
+          "connects patterns in {his} data to data from scientific sources"
         ]
       },
       "next": {
         "emerging": [
-          "say whether the numbers in a table rise or fall",
-          "circle the biggest and smallest values",
-          "describe the shape of a line on a graph"
+          "name the most common value in a data table",
+          "describe the direction of a trend on a graph",
+          "read one value from a graph"
         ],
         "developing": [
-          "use a sentence like as one rises, the other falls",
-          "connect the change in one column to another",
-          "mark the trend on a graph with an arrow"
+          "connect a change in one column to another column",
+          "describe the trend in a sentence with both variables",
+          "identify a value that does not match the trend"
         ],
         "proficient": [
-          "calculate the average of repeated trials",
-          "circle results far from the rest",
-          "use a percentage to compare two results"
+          "calculate the average of several trials",
+          "interpolate a value between two data points",
+          "describe the relationship between two variables in a graph"
         ],
         "extending": [
-          "predict a value outside the measured range",
-          "compare the trend with data from a science website",
-          "suggest a cause for a result that breaks the pattern"
+          "extrapolate a value beyond the measured range",
+          "compare the trend with data from a scientific source",
+          "explain a correlation and whether it shows cause"
         ]
       }
     },
     "skill_key": "processing",
     "next_steps": {
       "emerging": "describe one pattern in a data table or graph",
-      "developing": "describe how one measurement changes as another changes",
-      "proficient": "use averages to compare results and spot odd ones",
-      "extending": "explain why an odd result might have happened"
+      "developing": "say how the variable measured changes with the variable changed",
+      "proficient": "use averages to compare results from several trials",
+      "extending": "suggest a cause for a result that does not match the trend"
     },
     "evidence": "a lab with a results table and a conclusion",
     "home": [
@@ -6813,65 +6813,65 @@
     }
   },
   "sci-data-recording": {
-    "phrase": "measure carefully and record every reading with its unit",
+    "phrase": "measure accurately and record each measurement with units",
     "area": "measuring and recording",
     "forms": {
       "base": [
-        "measure carefully and record every reading with its unit",
-        "use a ruler, scale or thermometer correctly",
-        "note what {he} [sees|see] next to the numbers"
+        "measure accurately and record each measurement with units",
+        "use lab equipment and tools in the right way",
+        "record qualitative and quantitative data in a table"
       ],
       "did": [
-        "recorded measurements with units in {his} lab table",
-        "used a thermometer and timer in {his} heating lab",
-        "noted colour and smell changes in {his} lab notes"
+        "measured accurately and recorded units in {his} data table",
+        "used a thermometer and scale to collect data in {his} lab",
+        "recorded qualitative and quantitative data from {his} experiment"
       ],
       "at": {
         "developing": [
-          "is starting to record each measurement as it is taken",
-          "is learning to read a scale at eye level",
-          "can use a balance or graduated cylinder with help"
+          "records measurements with units when given a table",
+          "uses one piece of lab equipment with help",
+          "records observations and measurements in a table with help"
         ],
         "proficient": [
-          "measures accurately and records the unit beside each number",
-          "records what {he} [observes|observe] along with each measurement",
-          "uses lab tools, including a probe or app, to collect data"
+          "measures accurately and records each measurement with units",
+          "uses lab equipment and tools in the right way",
+          "records qualitative and quantitative data in a table"
         ],
         "extending": [
-          "explains how sure {he} [is|are] of each reading and why",
-          "repeats measurements and averages them",
-          "chooses the tool that gives the closest reading for a task"
+          "chooses equipment that suits the measurement and explains why",
+          "uses digital tools to collect and record data",
+          "records the uncertainty of each measurement"
         ]
       },
       "next": {
         "emerging": [
-          "read the line on a graduated cylinder at eye level",
-          "copy each reading straight into the data table",
-          "check the scale reads zero before weighing anything"
+          "read the scale on a thermometer in the right way",
+          "name the equipment for each measurement",
+          "label each column of a data table"
         ],
         "developing": [
-          "label each column of the table with its unit",
-          "measure twice and compare the readings",
-          "use the smallest marks on a ruler"
+          "record the date and time of each measurement",
+          "use a table with a column for each variable",
+          "measure each trial with the same equipment"
         ],
         "proficient": [
-          "add a column for what {he} [sees|see] during the lab",
-          "describe changes in colour, smell or texture",
-          "use a digital probe or phone app to collect readings"
+          "record an average for each set of trials",
+          "check the scale before each measurement",
+          "describe qualitative data in scientific terms"
         ],
         "extending": [
-          "state the uncertainty of each measurement",
-          "average three readings for each trial",
-          "explain which tool gives the closest reading and why"
+          "explain how the equipment affects the accuracy of data",
+          "choose between two tools for a measurement and explain why",
+          "record the range of the measurements"
         ]
       }
     },
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "record each measurement in a table as it is taken",
-      "developing": "include the unit with every number",
-      "proficient": "record both observations and measurements in one table",
-      "extending": "explain how sure each measurement is and why"
+      "emerging": "record one measurement and its unit in a table",
+      "developing": "add qualitative observations beside the measurements",
+      "proficient": "measure each trial of an experiment and record every result",
+      "extending": "use a digital tool to collect data over time"
     },
     "evidence": "a lab data table with measurements, units and observations",
     "home": [
@@ -6894,60 +6894,60 @@
     "forms": {
       "base": [
         "show data in a table or graph",
-        "give a graph a title, axis names and units",
+        "give each graph a title, axis labels and units",
         "choose a graph that suits the data"
       ],
       "did": [
-        "made a labelled graph of the results in {his} lab report",
-        "built a data table with units in {his} lab",
-        "used a key to show groups in {his} diagram"
+        "showed {his} data in a table and a graph",
+        "gave {his} graph a title, axis labels and units",
+        "chose a graph that suited {his} lab data"
       ],
       "at": {
         "developing": [
-          "is starting to put data into a labelled table",
-          "is learning to make a graph that shows a pattern",
-          "can choose between a bar graph and a line graph with help"
+          "makes a table for data with help",
+          "makes a graph with some axis labels and units",
+          "chooses a graph type from two given types"
         ],
         "proficient": [
-          "makes tables and graphs that show a pattern in the data",
-          "labels axes, units and titles on each graph",
-          "chooses a graph, key or model that suits the data"
+          "shows data in a table or graph",
+          "gives each graph a title, axis labels and units",
+          "chooses a graph that suits the data"
         ],
         "extending": [
-          "explains why one type of graph suits the results best",
-          "uses a digital tool to graph data and add a trend line",
-          "shows a relationship with both a model and a graph"
+          "uses a model or diagram to show a relationship in data",
+          "uses digital tools to represent data and patterns",
+          "explains why a graph suits the data and the audience"
         ]
       },
       "next": {
         "emerging": [
-          "copy lab results into a table with headings",
-          "add units to each column heading",
-          "give each data table a title"
+          "give each column of a table a label",
+          "draw a graph from a table with help",
+          "write units in each column of a table"
         ],
         "developing": [
-          "plot points on a line graph with a ruler",
-          "label both axes with names and units",
-          "pick a scale that uses most of the grid"
+          "choose a scale for each axis of a graph",
+          "label both sets of data on one graph",
+          "put the variable changed on the horizontal axis"
         ],
         "proficient": [
-          "use a bar graph for groups and a line graph for change",
-          "add a key when a graph shows two sets of data",
-          "use a spreadsheet to make a graph"
+          "use a diagram to show how parts of a system connect",
+          "describe the pattern a graph shows",
+          "match each type of graph to the data it suits"
         ],
         "extending": [
-          "draw a line of best fit on a scatter graph",
-          "compare two graphs of the same data and pick one",
-          "build a model that shows how parts of a system connect"
+          "build a model that represents a relationship in the data",
+          "design a graph for a public audience",
+          "show the uncertainty of measurements on a graph"
         ]
       }
     },
     "skill_key": "communicating",
     "next_steps": {
-      "emerging": "put data into a table with labelled columns",
-      "developing": "make a graph that shows a pattern in the data",
-      "proficient": "choose a graph, key or model that suits the data",
-      "extending": "explain why one way of showing data suits the results"
+      "emerging": "put data in a table with a column for each variable",
+      "developing": "add a title, axis labels and units to each graph",
+      "proficient": "choose a graph type and explain why it suits the data",
+      "extending": "use a digital tool to graph data and show the trend"
     },
     "evidence": "a lab report with a data table and a graph",
     "home": [
@@ -6970,60 +6970,60 @@
     "forms": {
       "base": [
         "write a conclusion that matches the results",
-        "use a science idea to explain what happened",
-        "say what the data show about the question"
+        "use a science concept to explain the results",
+        "identify a relationship between variables in the data"
       ],
       "did": [
-        "wrote a conclusion that matched the data in {his} lab report",
-        "used a science idea to explain {his} results",
-        "answered the lab question in {his} conclusion"
+        "wrote a conclusion that matched {his} results",
+        "used a science concept to explain the results of {his} lab",
+        "identified a relationship between variables in {his} data"
       ],
       "at": {
         "developing": [
-          "is starting to state what the results of a lab show",
-          "is learning to make a conclusion match the data",
-          "can answer the lab question from the results with help"
+          "writes a conclusion that names one result with help",
+          "names a science concept connected to the results",
+          "describes one relationship in the data with help"
         ],
         "proficient": [
-          "writes a conclusion that matches the evidence",
-          "uses a science idea to explain why the results happened",
-          "answers the lab question using numbers from the data"
+          "writes a conclusion that matches the results",
+          "uses a science concept to explain the results",
+          "identifies a relationship between variables in the data"
         ],
         "extending": [
-          "explains what more evidence would make a conclusion more certain",
-          "links the result to a science idea from another unit",
-          "explains where a conclusion holds and where it may not"
+          "explains the results with science concepts and evidence",
+          "explains whether the results support the hypothesis",
+          "identifies the limitations of a conclusion"
         ]
       },
       "next": {
         "emerging": [
-          "answer the lab question in one sentence",
-          "describe the main result in {his} own words",
-          "start a conclusion with the results show"
+          "answer the inquiry question in one sentence",
+          "name one result from the data table",
+          "say whether the prediction matched the results"
         ],
         "developing": [
-          "quote a number from the data in the conclusion",
-          "check that each claim fits the data",
-          "remove any claim the data do not support"
+          "name the science concept behind the results",
+          "use one number from the data in the conclusion",
+          "describe the relationship the graph shows"
         ],
         "proficient": [
-          "connect the result to a law or theory from class",
-          "explain the cause behind a pattern in the results",
-          "name the science concept that explains the outcome"
+          "explain whether the results support the hypothesis",
+          "explain the results with a model or diagram",
+          "include a source of error in the conclusion"
         ],
         "extending": [
-          "suggest another test that would add evidence",
-          "describe when the conclusion might not hold",
-          "weigh another explanation for the same results"
+          "connect the conclusion to a scientific theory",
+          "suggest a new question from the conclusion",
+          "explain how the uncertainty of data affects the conclusion"
         ]
       }
     },
     "skill_key": "processing",
     "next_steps": {
-      "emerging": "state what the results of a lab show",
-      "developing": "make each conclusion match the data",
-      "proficient": "use a science idea to explain why a result happened",
-      "extending": "explain what more evidence would make a conclusion more certain"
+      "emerging": "write one sentence that says what the results show",
+      "developing": "connect the conclusion to the question the experiment asked",
+      "proficient": "use data from the results as evidence in each conclusion",
+      "extending": "explain the limitations of a conclusion and propose a new test"
     },
     "evidence": "the conclusion of a lab report",
     "home": [
@@ -7041,65 +7041,65 @@
     }
   },
   "sci-evidence": {
-    "phrase": "use data and observations to support a science idea",
+    "phrase": "use evidence from data to support a science idea",
     "area": "using evidence",
     "forms": {
       "base": [
-        "use data and observations to support a science idea",
-        "sort evidence into numbers and descriptions",
+        "use evidence from data to support a science idea",
+        "sort evidence into qualitative and quantitative types",
         "explain why a claim needs evidence"
       ],
       "did": [
-        "supported {his} claim with data in {his} lab conclusion",
-        "sorted evidence into measured and observed lists in {his} notes",
-        "used numbers from {his} table to defend a science idea"
+        "used data as evidence to support {his} science idea",
+        "sorted evidence into qualitative and quantitative types in {his} lab",
+        "explained why {his} claim needed evidence"
       ],
       "at": {
         "developing": [
-          "is starting to give one piece of evidence for an idea",
-          "is learning to sort evidence into measured and observed",
-          "can match a claim to its evidence with help"
+          "uses one piece of evidence to support an idea with help",
+          "sorts evidence into qualitative and quantitative types with help",
+          "says that a claim needs evidence"
         ],
         "proficient": [
-          "supports a science idea with both numbers and observations",
-          "explains why evidence matters before reaching a conclusion",
-          "chooses evidence that directly supports a claim"
+          "uses evidence from data to support a science idea",
+          "sorts evidence into qualitative and quantitative types",
+          "explains why a claim needs evidence"
         ],
         "extending": [
-          "judges how much weight a piece of evidence carries and explains why",
-          "explains when one observation is not enough to support a claim",
-          "combines several kinds of evidence into one argument"
+          "uses qualitative and quantitative evidence together to support a claim",
+          "explains which evidence gives the most support to a claim",
+          "explains why scientists need evidence to accept an idea"
         ]
       },
       "next": {
         "emerging": [
-          "circle the numbers and underline the descriptions in a set of results",
-          "list what {he} measured and what {he} saw",
-          "match a fact from the lab to a claim"
+          "name one observation that supports a claim",
+          "identify a number in the data that supports an idea",
+          "say what evidence a claim gives"
         ],
         "developing": [
-          "add a number from the data to each claim",
-          "use a quote from a source to support an idea",
-          "pair each statement with something {he} observed"
+          "match each claim to the evidence for it",
+          "use a measurement as evidence in a conclusion",
+          "explain why an observation is evidence"
         ],
         "proficient": [
-          "show how the evidence leads to the conclusion",
-          "describe what a claim without data would lack",
-          "choose the data that answer the question"
+          "explain how the evidence supports the claim",
+          "identify evidence that does not support a claim",
+          "connect evidence to a science concept"
         ],
         "extending": [
-          "rank evidence by how trustworthy it is",
-          "explain why a single trial cannot settle a question",
-          "combine data from two labs into one argument"
+          "evaluate evidence from a scientific source",
+          "explain what new evidence could change a conclusion",
+          "use evidence from two investigations to support one claim"
         ]
       }
     },
     "skill_key": "processing",
     "next_steps": {
-      "emerging": "sort evidence into measured and observed types",
-      "developing": "give two pieces of evidence for each claim",
-      "proficient": "explain why a conclusion needs evidence",
-      "extending": "judge how much weight a piece of evidence carries"
+      "emerging": "name one piece of evidence that supports a science idea",
+      "developing": "explain the difference between qualitative and quantitative evidence",
+      "proficient": "use both qualitative and quantitative evidence for each claim",
+      "extending": "evaluate how much the evidence supports a claim"
     },
     "evidence": "a lab conclusion or claim supported with data",
     "home": [
@@ -7137,65 +7137,65 @@
     "exemplar": "bc.chem11.cc.11"
   },
   "sci-hypotheses": {
-    "phrase": "suggest two or more possible explanations to test",
+    "phrase": "write a hypothesis in if-then form",
     "area": "writing hypotheses",
     "forms": {
       "base": [
-        "suggest two or more possible explanations to test",
-        "write a hypothesis as an if-then sentence",
-        "name more than one result a test could give"
+        "write a hypothesis in if-then form",
+        "propose more than one hypothesis for a question",
+        "give a scientific reason for each hypothesis"
       ],
       "did": [
-        "wrote two hypotheses in {his} lab plan",
-        "used if-then sentences in {his} hypothesis section",
-        "listed more than one possible result before {his} experiment"
+        "wrote a hypothesis in if-then form for {his} experiment",
+        "proposed two hypotheses for {his} inquiry question",
+        "gave a scientific reason for each hypothesis in {his} lab"
       ],
       "at": {
         "developing": [
-          "is starting to write a hypothesis as an if-then sentence",
-          "is learning to offer a second explanation besides {his} first",
-          "can suggest two possible outcomes with help"
+          "writes a hypothesis in if-then form with a model to follow",
+          "proposes one hypothesis for a question",
+          "names the variable in a hypothesis with help"
         ],
         "proficient": [
-          "writes two hypotheses and says what result each one expects",
-          "uses if-then sentences that name what changes and what is measured",
-          "gives a science reason for each possible explanation"
+          "writes a hypothesis in if-then form",
+          "proposes more than one hypothesis for a question",
+          "gives a scientific reason for each hypothesis"
         ],
         "extending": [
-          "explains which result would show each hypothesis is wrong",
-          "weighs several explanations and says which one a test could disprove",
-          "links each hypothesis to a science idea from the unit"
+          "proposes alternative hypotheses and explains how to test each one",
+          "uses science concepts to explain each hypothesis",
+          "explains what results would support each hypothesis"
         ]
       },
       "next": {
         "emerging": [
-          "finish an if-then sentence about what {he} [expects|expect]",
-          "guess an answer to a lab question and say why",
-          "start a hypothesis with if and end it with then"
+          "complete an if-then frame for one experiment",
+          "name one possible cause of a result",
+          "say what might happen in the experiment"
         ],
         "developing": [
-          "list two different outcomes before starting a test",
-          "offer another explanation besides {his} first idea",
-          "think of a second way the experiment could go"
+          "write a second hypothesis for the same question",
+          "link the then part to a measurement",
+          "add a reason to the end of a hypothesis"
         ],
         "proficient": [
-          "connect each hypothesis to an idea from class",
-          "say what each hypothesis expects the data to show",
-          "use a science fact to support every if-then statement"
+          "propose an alternative hypothesis for the same results",
+          "use a science concept as the reason for a hypothesis",
+          "describe the data that would show a hypothesis is wrong"
         ],
         "extending": [
-          "decide which test would separate two hypotheses",
-          "plan a check that could disprove {his} favourite explanation",
-          "rank several explanations by how easy they are to test"
+          "explain which hypothesis the data support and why",
+          "refine a hypothesis after the first results",
+          "connect each hypothesis to a scientific theory"
         ]
       }
     },
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "write one if-then hypothesis for a lab question",
-      "developing": "add a second explanation beside the first hypothesis",
-      "proficient": "give the science reason behind each hypothesis",
-      "extending": "describe a result that would prove a hypothesis wrong"
+      "emerging": "write one hypothesis using the words if and then",
+      "developing": "name the variable changed and the result in a hypothesis",
+      "proficient": "describe the results that would support each hypothesis",
+      "extending": "design an experiment that tests two hypotheses at once"
     },
     "evidence": "the hypothesis section of a lab or inquiry plan",
     "home": [
@@ -7213,65 +7213,65 @@
     }
   },
   "sci-idea-generation": {
-    "phrase": "suggest new ideas when solving a problem",
+    "phrase": "generate new ideas to solve a problem",
     "area": "new ideas",
     "forms": {
       "base": [
-        "suggest new ideas when solving a problem",
-        "improve an idea after testing it",
-        "offer more than one way to solve a design challenge"
+        "generate new ideas to solve a problem",
+        "refine an idea to improve a solution",
+        "propose ideas to help solve a problem"
       ],
       "did": [
-        "suggested new ideas in {his} design challenge",
-        "improved {his} design after the first test",
-        "sketched several solutions in {his} design notebook"
+        "generated new ideas to solve a design problem in {his} group",
+        "refined {his} idea to improve the solution after a test",
+        "proposed several ideas to help solve a problem"
       ],
       "at": {
         "developing": [
-          "is starting to share one idea to help solve a problem",
-          "is learning to change an idea after a test",
-          "can suggest a second solution with help"
+          "generates one idea to solve a problem with help",
+          "refines an idea after feedback with help",
+          "shares one idea with a group"
         ],
         "proficient": [
-          "suggests new ideas and improves them after testing",
-          "offers several ways to solve a problem",
-          "changes a design using what a test shows"
+          "generates new ideas to solve a problem",
+          "refines an idea to improve a solution",
+          "proposes ideas to help solve a problem"
         ],
         "extending": [
-          "compares several ideas and explains which one works best",
-          "combines two ideas into a new solution",
-          "tries an unusual approach and explains why it might work"
+          "generates several solutions and tests each one",
+          "refines a solution from test results and explains each change",
+          "proposes ideas that use science concepts to solve a problem"
         ]
       },
       "next": {
         "emerging": [
-          "draw a quick sketch of one possible solution",
-          "list every idea before judging any of them",
-          "suggest a material to use in a design"
+          "draw one idea for a solution",
+          "describe the problem in one sentence",
+          "name one material a solution could use"
         ],
         "developing": [
-          "offer another way to solve the same problem",
-          "write three ideas before building anything",
-          "ask how a design could be made simpler"
+          "list the ideas of the group before choosing one",
+          "explain one advantage of each idea",
+          "change one part of an idea after feedback"
         ],
         "proficient": [
-          "improve one part of a design after each test",
-          "record what to change after a trial",
-          "refine {his} idea using feedback from a partner"
+          "explain the advantages and limitations of each solution",
+          "test an idea and record the results",
+          "propose an alternative idea from the test results"
         ],
         "extending": [
-          "rank ideas by cost, time and how they perform",
-          "combine the useful parts of two designs",
-          "explain why one solution suits the problem more"
+          "design a model to test a solution",
+          "evaluate solutions against the needs of the problem",
+          "explain how a technology solves a problem like this one"
         ]
       }
     },
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "share one idea to help solve a problem",
-      "developing": "sketch two different solutions before choosing one",
-      "proficient": "change a design using what a test shows",
-      "extending": "compare several ideas and explain which one works best"
+      "emerging": "share one idea to solve a problem",
+      "developing": "generate two possible solutions before choosing one",
+      "proficient": "test a solution and refine it from the results",
+      "extending": "explain which science concepts make a solution work"
     },
     "evidence": "a design challenge with a plan, tests and changes",
     "home": [
@@ -7289,65 +7289,65 @@
     }
   },
   "sci-implications": {
-    "phrase": "explain how results could affect people and nature",
+    "phrase": "explain how findings could affect society",
     "area": "effects of science",
     "forms": {
       "base": [
-        "explain how results could affect people and nature",
-        "describe what a finding could mean for the environment",
-        "ask what is right and fair about using a discovery"
+        "explain how findings could affect society",
+        "describe how findings could affect the environment",
+        "identify ethical questions raised by findings"
       ],
       "did": [
-        "explained in {his} lab report what the results mean for people",
-        "described how a finding could affect a local creek",
-        "raised an ethical question about a discovery in {his} report"
+        "explained how {his} findings could affect society",
+        "described how findings could affect a local ecosystem",
+        "identified an ethical question raised by a science finding"
       ],
       "at": {
         "developing": [
-          "is starting to describe how a finding could affect the environment",
-          "is learning to explain what results mean for people",
-          "can name an ethical question a finding raises with help"
+          "names one way findings could affect people",
+          "names one way findings could affect the environment",
+          "asks one ethical question about a finding with help"
         ],
         "proficient": [
-          "explains how a finding could affect people and the environment",
-          "asks the ethical questions a set of results raises",
-          "connects lab results to a choice people make in daily life"
+          "explains how findings could affect society",
+          "describes how findings could affect the environment",
+          "identifies ethical questions raised by findings"
         ],
         "extending": [
-          "weighs the benefits and harms of a finding for different groups",
-          "explains who gains and who loses from a new technology",
-          "suggests a rule or choice based on the results"
+          "explains the benefits and risks of findings for society",
+          "connects findings to environmental issues in the local community",
+          "explains different perspectives on an ethical question in science"
         ]
       },
       "next": {
         "emerging": [
-          "name one living thing a result could harm or help",
-          "say how a finding might change a local place",
-          "list what a discovery could mean for water or air"
+          "name one way a finding could affect the environment",
+          "describe one use of a science finding in daily life",
+          "say who a finding could help"
         ],
         "developing": [
-          "describe a daily habit that a finding could change",
-          "connect {his} results to a news story",
-          "explain what a result means for families"
+          "explain one ethical question about a technology",
+          "describe how a finding could affect health",
+          "connect a finding to a local environmental issue"
         ],
         "proficient": [
-          "decide whether a use of the results is fair",
-          "list who is affected by a finding",
-          "raise a question about the right use of a discovery"
+          "explain how a finding could change the actions of a community",
+          "describe the impacts of a technology on an ecosystem",
+          "identify who benefits from a finding"
         ],
         "extending": [
-          "argue both sides of using a new technology",
-          "compare the costs and gains of a finding for two communities",
-          "propose a rule based on the results"
+          "propose an action based on findings and explain its impacts",
+          "explain the long-term impacts of a finding on the environment",
+          "explain how findings could inform a public policy"
         ]
       }
     },
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "describe how a finding could affect plants or animals",
-      "developing": "explain how results could change a choice people make",
-      "proficient": "ask an ethical question raised by a set of results",
-      "extending": "weigh the benefits and harms of a finding for different groups"
+      "emerging": "name one way a finding could affect people",
+      "developing": "describe one effect of a finding on an ecosystem",
+      "proficient": "explain the benefits and risks of a finding",
+      "extending": "evaluate an ethical question in science from several perspectives"
     },
     "evidence": "a lab conclusion or report that discusses what the results mean",
     "home": [
@@ -7365,65 +7365,65 @@
     }
   },
   "sci-informed-skepticism": {
-    "phrase": "ask for evidence before believing a claim",
+    "phrase": "ask for evidence before accepting a claim",
     "area": "checking claims",
     "forms": {
       "base": [
-        "ask for evidence before believing a claim",
-        "check a claim against what science shows",
-        "test a claim with a simple experiment"
+        "ask for evidence before accepting a claim",
+        "evaluate a claim using scientific knowledge",
+        "use findings from an investigation to evaluate a claim"
       ],
       "did": [
-        "checked a product claim against science facts in {his} claim-check task",
-        "asked for evidence in {his} review of an online claim",
-        "planned a lab to test a claim in {his} project"
+        "asked for evidence before accepting a claim in {his} project",
+        "evaluated a claim using scientific knowledge from the unit",
+        "used findings from {his} investigation to evaluate a claim"
       ],
       "at": {
         "developing": [
-          "is starting to ask for evidence before accepting a claim",
-          "is learning to check a claim using what {he} [knows|know] from class",
-          "can plan a test of a claim with help"
+          "asks for evidence for a claim with help",
+          "names the claim a source makes",
+          "connects a claim to one science concept"
         ],
         "proficient": [
-          "checks claims in sources against science knowledge",
-          "uses results from {his} own lab to judge a claim",
-          "plans a simple test of a claim"
+          "asks for evidence before accepting a claim",
+          "evaluates a claim using scientific knowledge",
+          "uses findings from an investigation to evaluate a claim"
         ],
         "extending": [
-          "explains what the results of a test mean for the claim",
-          "judges how much support a claim has across several sources",
-          "explains why a claim cannot be tested as stated"
+          "designs an investigation to test a claim from a source",
+          "explains why a claim is or is not supported by evidence",
+          "evaluates the sources and evidence behind a claim"
         ]
       },
       "next": {
         "emerging": [
-          "ask what proof an ad offers",
-          "pause before sharing a surprising science post",
-          "question a claim that sounds hard to believe"
+          "say whether a claim gives evidence",
+          "identify one claim about health in a source",
+          "say whether a claim matches what was learned in class"
         ],
         "developing": [
-          "compare a claim with facts from the textbook",
-          "check whether a claim names its study",
-          "use a science idea to decide if a claim makes sense"
+          "identify the evidence a source gives for a claim",
+          "check a claim against a scientific source",
+          "name the data a claim would need"
         ],
         "proficient": [
-          "design a fair test of an advertised claim",
-          "use lab results to decide whether a claim holds",
-          "list what data would support or reject a claim"
+          "compare a claim with the results of a class experiment",
+          "evaluate a claim about the environment using evidence",
+          "identify a claim that no experiment could test"
         ],
         "extending": [
-          "explain whether a test settles a claim or not",
-          "describe what a claim would need to be testable",
-          "weigh several sources before deciding on a claim"
+          "evaluate a claim using data from several sources",
+          "explain how scientists judge a new claim",
+          "share findings that support or question a claim"
         ]
       }
     },
     "skill_key": "evaluating",
     "next_steps": {
-      "emerging": "ask for evidence before accepting a science claim",
-      "developing": "check a claim in a source using class knowledge",
-      "proficient": "plan a simple test of a claim",
-      "extending": "explain what the results of a test mean for the claim"
+      "emerging": "name the claim in a science source",
+      "developing": "ask what evidence supports a claim before accepting it",
+      "proficient": "use scientific knowledge to explain whether a claim is valid",
+      "extending": "design a test of a claim and share the findings"
     },
     "evidence": "a claim-check task or a lab that tests a claim",
     "home": [
@@ -7441,65 +7441,65 @@
     }
   },
   "sci-inquiry-questions": {
-    "phrase": "ask a question an experiment can answer",
+    "phrase": "ask a question that an experiment can answer",
     "area": "asking testable questions",
     "forms": {
       "base": [
-        "ask a question an experiment can answer",
-        "describe a problem science could help solve",
-        "choose a question {he} can test in class"
+        "ask a question that an experiment can answer",
+        "describe a problem that scientific inquiry could solve",
+        "choose an inquiry question with a variable to measure"
       ],
       "did": [
-        "wrote the testable question for {his} lab",
-        "described a problem {he} wanted to solve in {his} inquiry project",
-        "chose a question to test in {his} plant experiment"
+        "asked a question that {his} experiment could answer",
+        "described a problem that {his} inquiry could solve",
+        "chose a question with a variable to measure for {his} lab"
       ],
       "at": {
         "developing": [
-          "is starting to see which questions a test can answer",
-          "is learning to word a question so an experiment can answer it",
-          "can describe a problem science might solve with help"
+          "asks a science question and matches it to an experiment with help",
+          "names a problem that science could help solve",
+          "chooses a question from a list for an investigation"
         ],
         "proficient": [
-          "asks a question that a fair test can answer",
-          "words a lab question so the result can be measured",
-          "describes a real problem and writes a question to test about it"
+          "asks a question that an experiment can answer",
+          "describes a problem that scientific inquiry could solve",
+          "chooses an inquiry question with a variable to measure"
         ],
         "extending": [
-          "explains why some questions cannot be answered by an experiment",
-          "narrows a broad question into one a lab can test",
-          "weighs several questions and explains which one a lab can settle"
+          "refines a large question into one an experiment can answer",
+          "explains why a question suits an experiment or a field study",
+          "asks questions that connect a local problem to science concepts"
         ]
       },
       "next": {
         "emerging": [
-          "describe something in daily life that science might fix",
-          "list two problems around the school a test could help with",
-          "share a question {he} [has|have] about how something works"
+          "begin a question with what happens to",
+          "name one problem in the local environment",
+          "write one question about a material in the lab"
         ],
         "developing": [
-          "start a lab question with what happens to",
-          "change a yes-or-no question into one with a number for an answer",
-          "make sure {his} question names what {he} will measure"
+          "match each question to the data that would answer it",
+          "change a yes-or-no question into one about a quantity",
+          "explain what equipment the question needs"
         ],
         "proficient": [
-          "pick a question that a fair test can answer",
-          "word a question so the result is a number",
-          "check that {his} question names one thing to change and one to record"
+          "connect the question to a science concept",
+          "say whether the question suits field work or a lab",
+          "propose a hypothesis for the inquiry question"
         ],
         "extending": [
-          "sort questions into ones science can test and ones it cannot",
-          "explain how a question about values differs from one a lab can test",
-          "break a big question into two smaller ones an experiment can answer"
+          "ask a question that links two science concepts",
+          "describe a local problem and the inquiry that could solve it",
+          "judge which questions the class data could answer"
         ]
       }
     },
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "name a problem at school that science could help solve",
-      "developing": "rewrite a question so a test can answer it",
-      "proficient": "choose a question with something to measure in the answer",
-      "extending": "explain why some questions cannot be settled by a test"
+      "emerging": "ask one question about an object in the lab",
+      "developing": "name the variable to measure in an inquiry question",
+      "proficient": "explain which method suits each inquiry question",
+      "extending": "refine a large question into several questions for experiments"
     },
     "evidence": "the question and purpose of a lab or inquiry project",
     "home": [
@@ -7517,65 +7517,65 @@
     }
   },
   "sci-investigation-plans": {
-    "phrase": "plan the steps and materials for an experiment",
+    "phrase": "plan the steps and materials for an investigation",
     "area": "planning investigations",
     "forms": {
       "base": [
-        "plan the steps and materials for an experiment",
-        "choose a lab or outdoor method that suits the question",
-        "plan to collect both numbers and observations"
+        "plan the steps and materials for an investigation",
+        "choose field work or an experiment to suit the question",
+        "plan an investigation with a group"
       ],
       "did": [
-        "wrote the method and materials list for {his} lab",
-        "planned a field study with {his} group",
-        "made a data table before {his} experiment began"
+        "planned the steps and materials for {his} investigation",
+        "chose field work to answer {his} question about an ecosystem",
+        "planned an experiment with {his} group and shared the steps"
       ],
       "at": {
         "developing": [
-          "is starting to list the steps of a lab in order",
-          "is learning to choose a method that matches the question",
-          "can plan an experiment with help from a template"
+          "plans the steps for an investigation with help",
+          "lists the materials for an experiment",
+          "names one type of investigation that suits a question"
         ],
         "proficient": [
-          "plans steps someone else could follow and repeat",
-          "chooses a lab or field method that suits the question",
-          "plans to record both measurements and observations"
+          "plans the steps and materials for an investigation",
+          "chooses field work or an experiment to suit the question",
+          "plans an investigation with a group"
         ],
         "extending": [
-          "plans repeat trials so the results are reliable",
-          "compares two methods and explains why {he} [picks|pick] one",
-          "plans field work and a lab test that answer the same question"
+          "plans an investigation with steps another group could follow",
+          "explains why a type of investigation suits the question",
+          "plans how to collect both qualitative and quantitative data"
         ]
       },
       "next": {
         "emerging": [
-          "read each step of a method before starting",
-          "gather the materials on the list before a lab",
-          "tick off each step as {he} [completes|complete] it"
+          "name the question the investigation should answer",
+          "draw the equipment for the experiment",
+          "choose the first step of the procedure"
         ],
         "developing": [
-          "write steps clear enough for another student to follow",
-          "number the steps of {his} method",
-          "pick a method that matches {his} question"
+          "number each step of the procedure",
+          "add safety steps to the procedure",
+          "name the data each step collects"
         ],
         "proficient": [
-          "include both counts and descriptions in {his} plan",
-          "make a blank data table before collecting anything",
-          "decide how many times to repeat each test"
+          "plan how to record data before the investigation begins",
+          "include a step for each measurement",
+          "share the role of each group member"
         ],
         "extending": [
-          "compare a lab method with a field method for one question",
-          "explain what repeat trials add to the results",
-          "plan how to handle a result that does not match"
+          "plan field work and an experiment for the same question",
+          "explain the limitations of the chosen method",
+          "refine the procedure after a first trial"
         ]
       }
     },
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "follow a written method step by step",
-      "developing": "list materials and numbered steps before a lab",
-      "proficient": "plan three trials for each test",
-      "extending": "explain how repeated trials make results more reliable"
+      "emerging": "list the materials needed for an experiment",
+      "developing": "write the steps of a procedure in order",
+      "proficient": "explain why field work or an experiment suits the question",
+      "extending": "plan a procedure that another group could follow"
     },
     "evidence": "a written method with steps, materials and a data table",
     "home": [
@@ -7593,65 +7593,65 @@
     }
   },
   "sci-local-environment": {
-    "phrase": "explore a park, creek or schoolyard first-hand",
+    "phrase": "explore a local ecosystem first-hand during field work",
     "area": "the local environment",
     "forms": {
       "base": [
-        "explore a park, creek or schoolyard first-hand",
-        "explain what {he} [notices|notice] in the local environment",
-        "use what local people know about a nearby place"
+        "explore a local ecosystem first-hand during field work",
+        "describe the living things in a local ecosystem",
+        "connect observations of a local place to science concepts"
       ],
       "did": [
-        "recorded what {he} saw outdoors during {his} field study",
-        "explained a change {he} noticed at the school creek",
-        "used a neighbour’s or Elder’s knowledge in {his} field notes"
+        "explored a local ecosystem first-hand during field work",
+        "described the living things in a local ecosystem in {his} field notes",
+        "connected {his} observations of a local place to science concepts"
       ],
       "at": {
         "developing": [
-          "is starting to describe what {he} [sees|see] in a nearby park or creek",
-          "is learning to explain one thing {he} [notices|notice] outdoors",
-          "can connect a local observation to a science idea with help"
+          "describes one thing in the local environment with help",
+          "explores a local place first-hand and records one observation",
+          "names one living thing in a local ecosystem"
         ],
         "proficient": [
-          "explains what {he} [observes|observe] in the local environment using science ideas",
-          "explores an outdoor place first-hand and records what is there",
-          "uses local knowledge to make sense of what {he} [finds|find] outdoors"
+          "explores a local ecosystem first-hand during field work",
+          "describes the living things in a local ecosystem",
+          "connects observations of a local place to science concepts"
         ],
         "extending": [
-          "studies one local place over time and explains what changes",
-          "links a change in a nearby creek to its cause",
-          "compares two local places and explains why they differ"
+          "explains interactions between living things in a local ecosystem",
+          "explains changes in the local environment with evidence",
+          "uses field data to explain a pattern in a local place"
         ]
       },
       "next": {
         "emerging": [
-          "sketch the plants and animals in one small area",
-          "list what lives under a log or rock",
-          "note the sounds and smells of a nearby park"
+          "record one observation during field work",
+          "draw one organism from a local place",
+          "describe the weather during field work"
         ],
         "developing": [
-          "give a reason for something {he} saw outside",
-          "ask a local expert about a plant {he} noticed",
-          "tell how the weather affects a spot near school"
+          "sort things in a local place into living and non-living",
+          "record the date and place of each field observation",
+          "connect one field observation to a science concept"
         ],
         "proficient": [
-          "link a pattern outdoors to a lesson from class",
-          "use a field guide to name what {he} [finds|find]",
-          "explain how water, soil and light shape a local place"
+          "describe how one organism depends on another",
+          "explain how weather affects a local ecosystem",
+          "use evidence from field work in a conclusion"
         ],
         "extending": [
-          "visit the same spot each month and record changes",
-          "compare a shaded and a sunny area near school",
-          "trace a change in a local place to its cause"
+          "explain how human action affects a local ecosystem",
+          "propose an investigation about a local environmental problem",
+          "use field data and a model to explain the local ecosystem"
         ]
       }
     },
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "describe what is noticed on a walk around the school",
-      "developing": "explain one observation from the local environment",
-      "proficient": "connect an outdoor observation to a science idea",
-      "extending": "study one local place over time and explain what changes"
+      "emerging": "name three living things in a local place",
+      "developing": "describe the soil, water and air in a local place",
+      "proficient": "explain one interaction between living things in a local ecosystem",
+      "extending": "collect field data to explain a change in the local environment"
     },
     "evidence": "a field study with observations recorded outdoors",
     "home": [
@@ -7689,65 +7689,65 @@
     "exemplar": "bc.chem11.cc.15"
   },
   "sci-method-reflection": {
-    "phrase": "think about what worked in a lab method",
+    "phrase": "reflect on the methods used in an investigation",
     "area": "judging methods",
     "forms": {
       "base": [
-        "think about what worked in a lab method",
-        "check whether a test was fair",
-        "judge how much to trust the data"
+        "reflect on the methods used in an investigation",
+        "check whether the variables were controlled",
+        "judge whether the data are reliable"
       ],
       "did": [
-        "evaluated the method in {his} lab conclusion",
-        "judged whether {his} experiment was a fair test",
-        "explained in {his} report how much the data could be trusted"
+        "reflected on the methods of {his} investigation",
+        "checked whether {his} variables were controlled",
+        "judged whether {his} data were reliable"
       ],
       "at": {
         "developing": [
-          "is starting to describe the steps of a lab in order",
-          "is learning to check whether a test was fair",
-          "can name a step that did not work with help"
+          "names one step of a method that worked",
+          "checks whether one variable was controlled with help",
+          "says whether data are reliable with help"
         ],
         "proficient": [
-          "explains which steps of a method worked and which did not",
-          "checks whether conditions stayed the same through a test",
-          "judges how much the data can be trusted and why"
+          "reflects on the methods used in an investigation",
+          "checks whether the variables were controlled",
+          "judges whether the data are reliable"
         ],
         "extending": [
-          "explains how a change in method would make the data more trustworthy",
-          "weighs the limits of the method when stating a conclusion",
-          "suggests a new procedure that answers the question more directly"
+          "explains how a method affected the validity of the results",
+          "explains how to control a variable that was not controlled",
+          "uses inconsistencies in the data to judge a method"
         ]
       },
       "next": {
         "emerging": [
-          "list what {he} did first, next and last in a lab",
-          "retell the method in {his} own words",
-          "note one step that was hard to do"
+          "describe the steps of the method in order",
+          "say whether the test was fair",
+          "name one problem with the equipment"
         ],
         "developing": [
-          "ask whether each trial used the same amounts",
-          "mark any step that changed partway",
-          "compare the plan with what really happened"
+          "compare results from two trials of the same test",
+          "explain one way the method could be changed",
+          "check whether each trial used the same materials"
         ],
         "proficient": [
-          "explain what made the data less trustworthy",
-          "name the step that most affected the results",
-          "describe how the equipment limited the data"
+          "judge whether there were enough trials",
+          "identify inconsistencies in the data from each trial",
+          "explain why a result does not fit the pattern"
         ],
         "extending": [
-          "propose a new step that removes a weakness",
-          "explain how more trials would change the results",
-          "redesign one part of the method"
+          "explain the limitations of the method",
+          "design a second method to test the same question",
+          "judge the validity of a conclusion from the method used"
         ]
       }
     },
     "skill_key": "evaluating",
     "next_steps": {
-      "emerging": "describe the steps of an investigation in order",
-      "developing": "check whether the conditions stayed the same in a test",
-      "proficient": "judge how much to trust the data and why",
-      "extending": "explain how a change in method would give more trustworthy data"
+      "emerging": "name one step of the method that worked",
+      "developing": "list the variables that were controlled and ones that were not",
+      "proficient": "explain how the method affected the accuracy of the data",
+      "extending": "propose changes to a method that would improve validity"
     },
     "evidence": "a lab conclusion that evaluates the method",
     "home": [
@@ -7785,65 +7785,65 @@
     "exemplar": "bc.sci9.cc.16"
   },
   "sci-observation": {
-    "phrase": "notice details in nature and ask questions about them",
+    "phrase": "observe nature and ask questions about it",
     "area": "observing nature",
     "forms": {
       "base": [
-        "notice details in nature and ask questions about them",
-        "describe what {he} [sees|see] in a plant, rock or sky",
-        "wonder why things outdoors happen the way they do"
+        "observe nature and ask questions about it",
+        "describe the details of an observation in words",
+        "use observations of living things to form a question"
       ],
       "did": [
-        "described what {he} saw on {his} schoolyard walk",
-        "asked {his} own questions in {his} field notebook",
-        "sketched and labelled a plant during an outdoor lesson"
+        "observed plants and soil and asked questions about them",
+        "described the details of a rock in {his} observation record",
+        "asked a question from {his} observations of a local ecosystem"
       ],
       "at": {
         "developing": [
-          "is starting to describe the colour, size and shape of what {he} [sees|see]",
-          "is learning to turn something {he} [notices|notice] outdoors into a question",
-          "can ask a question about a plant or rock with help"
+          "describes one detail of an observation with help",
+          "observes living things and names one question about them",
+          "records a few words about each observation"
         ],
         "proficient": [
-          "describes what {he} [sees|see] outdoors and asks why it happens",
-          "notices small changes in a plant or the sky and records them",
-          "asks questions an experiment could answer about what {he} [watches|watch]"
+          "observes nature and asks questions about it",
+          "describes several details in each observation",
+          "uses observations of living things to form a question"
         ],
         "extending": [
-          "asks about hidden causes, such as what happens inside a seed",
-          "links what {he} [observes|observe] to a science idea from class",
-          "notices a pattern over several visits and asks what drives it"
+          "forms questions for an experiment from {his} observations",
+          "notices patterns across many observations of the same place",
+          "connects {his} observations to science concepts"
         ]
       },
       "next": {
         "emerging": [
-          "list what {he} [sees|see], hears and smells during an observation",
-          "sketch a leaf or rock and label two features",
-          "note the colour, size and shape of one living thing"
+          "draw one object from nature and name it",
+          "use the senses to describe one rock or plant",
+          "name one thing that changes in the local environment"
         ],
         "developing": [
-          "write a testable question from something {he} noticed",
-          "ask how a change, like more light, might affect a plant",
-          "pick one detail from {his} notes and ask what causes it"
+          "add a date and place to every observation",
+          "write one question beside each observation",
+          "observe the same place at two different times"
         ],
         "proficient": [
-          "wonder about the hidden reasons behind what {he} [sees|see]",
-          "ask how something {he} [observes|observe] connects to a class idea",
-          "compare two spots outdoors and ask why they differ"
+          "sort the questions from observations into types",
+          "connect an observation to a science concept",
+          "observe one organism over several weeks"
         ],
         "extending": [
-          "choose one question from {his} notebook and design an experiment",
-          "visit the same spot over a month and track one change",
-          "check {his} question with a small trial at school"
+          "propose a hypothesis from a pattern in the observations",
+          "share the observations and questions with an audience",
+          "connect field observations to data from a scientific source"
         ]
       }
     },
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "describe three things noticed on a short walk outside",
-      "developing": "change one observation into a question to test",
-      "proficient": "ask about a cause that an observation cannot show",
-      "extending": "plan a small test for a question from field notes"
+      "emerging": "describe one detail of a plant, rock or animal",
+      "developing": "record three details in each observation of nature",
+      "proficient": "ask one question from each observation of a living thing",
+      "extending": "plan an investigation from a question raised in field observations"
     },
     "evidence": "an observation log or field notes with sketches and questions",
     "home": [
@@ -7861,65 +7861,65 @@
     }
   },
   "sci-place-perspectives": {
-    "phrase": "share how different people see a place",
+    "phrase": "share different experiences of a place",
     "area": "views of place",
     "forms": {
       "base": [
-        "share how different people see a place",
-        "describe a personal experience of a place",
-        "think about what a place means to others"
+        "share different experiences of a place",
+        "describe a personal experience of a local place",
+        "reflect on how different people see a place"
       ],
       "did": [
-        "described {his} own experience of a local place in {his} reflection",
-        "shared views from family and community in {his} project",
-        "reflected on what a place means to different people in {his} writing"
+        "shared different experiences of a local place",
+        "described a personal experience of a place on the land",
+        "reflected on how different people see a local place"
       ],
       "at": {
         "developing": [
-          "is starting to describe a personal experience of a place",
-          "is learning to share more than one point of view about a place",
-          "can explain what a place means to someone else with help"
+          "shares one experience of a place",
+          "describes one point of view about a place with help",
+          "names one way people see a place"
         ],
         "proficient": [
-          "shares different points of view about a place",
-          "reflects on how different worldviews shape what a place means",
-          "explains what a local place means to {him} and to others"
+          "shares different experiences of a place",
+          "describes a personal experience of a local place",
+          "reflects on how different people see a place"
         ],
         "extending": [
-          "connects views of a place to choices about caring for it",
-          "explains how history shapes what a place means to a community",
-          "compares how a scientist and a knowledge keeper might describe one place"
+          "explains how worldviews influence how people see a place",
+          "connects perspectives on a place to care for the land",
+          "explains how the values of people affect their use of a place"
         ]
       },
       "next": {
         "emerging": [
-          "write about a place that matters to {him}",
-          "describe what {he} [sees|see] and feels at a favourite spot",
-          "share a memory of a park, beach or forest"
+          "name one local place of personal interest",
+          "share one thing about a place in the community",
+          "draw a local place and describe it"
         ],
         "developing": [
-          "ask a family member what a local place means to them",
-          "describe how a farmer and a hiker might see the same field",
-          "list who uses a place and why"
+          "ask a community member about a local place",
+          "describe how different people use one place",
+          "compare two experiences of the same place"
         ],
         "proficient": [
-          "explain how culture shapes what people value in a place",
-          "compare what a place means to two communities",
-          "describe how the history of a place affects how people feel about it"
+          "describe the values people connect to a place",
+          "explain how a place changed over time for the community",
+          "reflect on a point of view different from a personal one"
         ],
         "extending": [
-          "suggest a way to protect a place that honours several views",
-          "explain how different views lead to different land choices",
-          "plan a project that brings several voices into caring for a place"
+          "explain how First Peoples worldviews connect people and land",
+          "explain how perspectives on a place affect its management",
+          "share perspectives on a place with an audience"
         ]
       }
     },
     "skill_key": null,
     "next_steps": {
-      "emerging": "describe a personal experience of a local place",
-      "developing": "share two points of view about a place",
-      "proficient": "reflect on how worldviews shape the meaning of a place",
-      "extending": "connect views of a place to choices about caring for it"
+      "emerging": "describe one personal experience of a local place",
+      "developing": "describe two points of view about the same place",
+      "proficient": "explain why people experience a place in different ways",
+      "extending": "connect First Peoples perspectives on a place to stewardship"
     },
     "evidence": "a reflection or project about a local place",
     "home": [
@@ -7937,65 +7937,65 @@
     }
   },
   "sci-predictions": {
-    "phrase": "say what a lab should show and why",
+    "phrase": "make a prediction before an experiment begins",
     "area": "making predictions",
     "forms": {
       "base": [
-        "say what a lab should show and why",
-        "make a prediction before a lab begins",
-        "give a reason for each guess about a result"
+        "make a prediction before an experiment begins",
+        "explain the reason for each prediction",
+        "use science concepts to support a prediction"
       ],
       "did": [
-        "made a prediction at the start of {his} lab",
-        "explained the reason behind the prediction in {his} lab report",
-        "compared {his} prediction with the results in {his} conclusion"
+        "made a prediction before {his} experiment began",
+        "explained the reason for {his} prediction in the lab",
+        "used a science concept to support {his} prediction"
       ],
       "at": {
         "developing": [
-          "is starting to make a prediction before a lab",
-          "is learning to give a reason for each prediction",
-          "can explain why {he} [expects|expect] a result with help"
+          "makes a prediction before an experiment with help",
+          "gives a reason for a prediction with a sentence frame",
+          "makes a prediction that names one result"
         ],
         "proficient": [
-          "makes a prediction and gives a science reason for it",
-          "explains why {his} guess makes sense using what {he} [knows|know]",
-          "checks a prediction against the results at the end of a lab"
+          "makes a prediction before an experiment begins",
+          "explains the reason for each prediction",
+          "uses science concepts to support a prediction"
         ],
         "extending": [
-          "explains the gap between a prediction and the results",
-          "uses a science idea to predict a result in a new setting",
-          "predicts how big a change will be and in which direction"
+          "predicts results as numbers and explains the reason",
+          "uses data from past experiments to support a prediction",
+          "explains whether the results match the prediction and why"
         ]
       },
       "next": {
         "emerging": [
-          "guess what will happen before mixing or heating anything",
-          "say what {he} [thinks|think] the result will be",
-          "record a prediction at the top of the lab sheet"
+          "name one result that might happen",
+          "write a prediction before the lab begins",
+          "choose a prediction from two possible results"
         ],
         "developing": [
-          "tell why {he} [expects|expect] a certain result",
-          "connect each guess to something {he} [has|have] seen",
-          "finish each prediction with a reason"
+          "explain each prediction with something learned in class",
+          "use a sentence frame to give the reason",
+          "compare the prediction with the results after the lab"
         ],
         "proficient": [
-          "link a prediction to a science fact",
-          "explain how a class idea supports {his} guess",
-          "name the science rule behind each prediction"
+          "explain why the results did or did not match the prediction",
+          "use data from a past lab to make a prediction",
+          "predict the result of a change to one variable"
         ],
         "extending": [
-          "compare {his} prediction and data, then explain the gap",
-          "predict how large a change will be",
-          "use the results to shape the next prediction"
+          "predict a trend on a graph before the data are collected",
+          "explain the science behind a prediction that did not match",
+          "make predictions for several values of the variable changed"
         ]
       }
     },
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "write a prediction before each lab starts",
-      "developing": "add a because sentence to every prediction",
-      "proficient": "use an idea from class to explain a prediction",
-      "extending": "explain any difference between the prediction and the results"
+      "emerging": "make one prediction about the result of an experiment",
+      "developing": "add a reason to each prediction",
+      "proficient": "connect each prediction to a science concept",
+      "extending": "predict a result as a number and explain the reason"
     },
     "evidence": "the prediction and conclusion of a lab",
     "home": [
@@ -8013,65 +8013,65 @@
     }
   },
   "sci-project-design": {
-    "phrase": "plan a science project with a group",
+    "phrase": "design a science project with a group",
     "area": "group project design",
     "forms": {
       "base": [
-        "plan a science project with a group",
+        "design a science project with a group",
         "share ideas and add to a group plan",
-        "explain how a project could help our community"
+        "connect the ideas of others to the project design"
       ],
       "did": [
-        "shared ideas while {his} group planned a design challenge",
-        "added to the group plan for {his} team project",
-        "explained how {his} group design could help the community"
+        "designed a science project with {his} group",
+        "shared ideas and added steps to the group plan",
+        "connected the idea of a group member to the project design"
       ],
       "at": {
         "developing": [
-          "is starting to share an idea during group planning",
-          "is learning to add to a teammate’s idea",
-          "can explain the purpose of a project with help"
+          "shares one idea for a group project",
+          "adds one step to a group plan with help",
+          "names the role of each group member"
         ],
         "proficient": [
-          "shares ideas and adds to others’ ideas as a group plans",
-          "helps a team agree on one design",
-          "explains how the project could help people here or around the world"
+          "designs a science project with a group",
+          "shares ideas and adds to a group plan",
+          "connects the ideas of others to the project design"
         ],
         "extending": [
-          "tests the group design and suggests changes from the results",
-          "helps the team weigh two plans and pick one",
-          "connects the project to a real need in the community"
+          "refines a project design from group feedback",
+          "plans roles and steps so the project meets its purpose",
+          "explains how the project design answers the inquiry question"
         ]
       },
       "next": {
         "emerging": [
-          "offer a suggestion at the start of group planning",
-          "write one idea on the group planning sheet",
-          "ask a teammate a question about the plan"
+          "name the question the group project answers",
+          "choose one role in the group project",
+          "describe one material the project needs"
         ],
         "developing": [
-          "help the group combine two ideas into one plan",
-          "respond to a teammate’s idea with a related one",
-          "ask how a teammate’s idea could grow"
+          "explain why an idea suits the project",
+          "ask a group member a question about an idea",
+          "record the ideas of the group in one list"
         ],
         "proficient": [
-          "name a local need the project meets",
-          "describe how the design could work in another country",
-          "write a sentence on the plan about who benefits"
+          "plan the steps and roles for a group project",
+          "suggest a change to the plan with a reason",
+          "connect the project to a local problem"
         ],
         "extending": [
-          "run a trial of the design and record what fails",
-          "lead the group in revising the plan after testing",
-          "compare the design with a real product that solves the same problem"
+          "plan how the group could test the design",
+          "evaluate the project against its purpose",
+          "explain the project design to an audience"
         ]
       }
     },
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "share one idea while a group plans a project",
-      "developing": "add a detail to a teammate’s idea during planning",
-      "proficient": "explain who in the community a project could help",
-      "extending": "test a group design and suggest changes from the results"
+      "emerging": "share one idea during group planning",
+      "developing": "add one step to the group plan and explain it",
+      "proficient": "connect each idea in the plan to the purpose of the project",
+      "extending": "refine the project design after feedback from the group"
     },
     "evidence": "a group project plan or design challenge",
     "home": [
@@ -8109,65 +8109,65 @@
     "exemplar": "bc.sci9.cc.27"
   },
   "sci-safety-ethics": {
-    "phrase": "check the safety steps before each lab",
+    "phrase": "follow the safety guidelines in each investigation",
     "area": "lab safety",
     "forms": {
       "base": [
-        "check the safety steps before each lab",
-        "wear goggles and handle lab tools safely",
-        "explain the rules for treating living things with care"
+        "follow the safety guidelines in each investigation",
+        "name the safety guidelines before a lab begins",
+        "explain the ethical guidelines for work with living things"
       ],
       "did": [
-        "followed the safety steps during {his} heating lab",
-        "wrote the safety section of {his} investigation plan",
-        "explained the rules for handling animals in {his} project"
+        "followed the safety guidelines in {his} lab",
+        "named the safety guidelines before {his} experiment began",
+        "explained the ethical guidelines for {his} work with organisms"
       ],
       "at": {
         "developing": [
-          "is starting to name the safety rules for a lab",
-          "is learning to read the safety checklist before each lab",
-          "can explain why a safety rule matters with help"
+          "follows the safety guidelines listed on the lab sheet",
+          "names one safety guideline for a lab",
+          "names one ethical guideline for work with living things"
         ],
         "proficient": [
-          "checks the safety steps before each lab and follows them",
-          "wears goggles and handles chemicals and glass safely",
-          "explains the ethical rules for a study with living things"
+          "follows the safety guidelines in each investigation",
+          "names the safety guidelines before a lab begins",
+          "explains the ethical guidelines for work with living things"
         ],
         "extending": [
-          "writes the safety and ethics section of {his} own lab plan",
-          "names the risks in a new method and plans for each one",
-          "explains why consent matters when a study involves people"
+          "identifies the hazards of an investigation and plans for them",
+          "explains the reason for each safety guideline",
+          "adds safety and ethical guidelines to {his} own procedures"
         ]
       },
       "next": {
         "emerging": [
-          "name where the eyewash station and fire blanket are",
-          "repeat the safety rules of the lab to a partner",
-          "put on goggles before touching any equipment"
+          "read the safety guidelines on the lab sheet",
+          "name where the safety equipment is in the lab",
+          "describe one hazard in the lab"
         ],
         "developing": [
-          "tick each safety step on the checklist before starting",
-          "tie back hair and clear the bench before a lab",
-          "store bags under the desk before a lab begins"
+          "list the safety steps at the start of a procedure",
+          "explain how to care for living things in a lab",
+          "describe how to use and store lab equipment"
         ],
         "proficient": [
-          "describe how to treat living things gently in a study",
-          "explain why a survey needs consent",
-          "describe how to throw away chemicals safely"
+          "identify the risks of each step in a procedure",
+          "explain why an organism needs care in an experiment",
+          "describe the safety equipment each step requires"
         ],
         "extending": [
-          "list the hazards in a new method and how to handle each",
-          "plan the safety steps for a field trip study",
-          "explain the ethics of using animals in research"
+          "plan a safety guideline for a field investigation",
+          "explain an ethical question raised by an experiment",
+          "explain how safety guidelines help people and organisms"
         ]
       }
     },
     "skill_key": null,
     "next_steps": {
-      "emerging": "read the safety steps on the lab sheet before starting",
-      "developing": "use the safety checklist at the start of each lab",
-      "proficient": "explain the ethical rules that apply to an investigation",
-      "extending": "write the safety and ethics section of an investigation plan"
+      "emerging": "name the safety equipment for each lab",
+      "developing": "name the hazards of an investigation before it begins",
+      "proficient": "explain the reason for each safety guideline in a lab",
+      "extending": "write safety and ethical guidelines for a new investigation"
     },
     "evidence": "lab work and the safety section of an investigation plan",
     "home": [
@@ -8205,65 +8205,65 @@
     "exemplar": "bc.chem11.cc.30"
   },
   "sci-sharing-findings": {
-    "phrase": "share results using science words and a chart",
+    "phrase": "share findings with a group using scientific language",
     "area": "sharing results",
     "forms": {
       "base": [
-        "share results using science words and a chart",
-        "explain findings so a listener can follow",
-        "present results on a poster or slide"
+        "share findings with a group using scientific language",
+        "use visuals to share solutions to problems",
+        "choose digital tools that suit the findings"
       ],
       "did": [
-        "explained {his} results with science words in {his} lab report",
-        "made a poster to share {his} findings",
-        "used slides and a chart in {his} presentation"
+        "shared {his} findings using scientific language",
+        "used visuals to share {his} solution to a problem",
+        "chose a digital tool to share {his} lab findings"
       ],
       "at": {
         "developing": [
-          "is starting to describe findings with a few science words",
-          "is learning to add a chart or diagram to a report",
-          "can present results to a small group with help"
+          "shares findings with some scientific terms",
+          "uses one visual to share a solution",
+          "chooses a digital tool with help"
         ],
         "proficient": [
-          "explains findings with science words and a chart",
-          "chooses words and visuals that suit the audience",
-          "uses a digital tool to share results"
+          "shares findings with a group using scientific language",
+          "uses visuals to share solutions to problems",
+          "chooses digital tools that suit the findings"
         ],
         "extending": [
-          "presents the same findings for two different audiences",
-          "explains a complex result in plain words for younger students",
-          "designs a visual that makes a pattern easy to see"
+          "shares findings in a format that suits the audience",
+          "uses scientific language and visuals to explain evidence",
+          "explains how a visual helps an audience understand the data"
         ]
       },
       "next": {
         "emerging": [
-          "use the unit vocabulary list when writing results",
-          "define one science term in a report",
-          "write a sentence about each result"
+          "share one finding with a group",
+          "name the science terms in a finding",
+          "draw one diagram of a result"
         ],
         "developing": [
-          "include a labelled diagram in a report",
-          "add a graph to a poster",
-          "use a photo of the lab equipment with a caption"
+          "use the terms from the unit to explain a result",
+          "give each visual a title and a label",
+          "explain one finding in two or three sentences"
         ],
         "proficient": [
-          "plan a talk for a grade 5 class",
-          "pick a digital tool that suits the message",
-          "keep each slide to a few words and a picture"
+          "use symbols and terms that follow scientific conventions",
+          "explain how the visuals support the findings",
+          "share a solution with a diagram and a model"
         ],
         "extending": [
-          "write the findings as a news article and as a lab report",
-          "explain the results to a family member in plain words",
-          "make an infographic that shows the main pattern"
+          "communicate findings to a community audience",
+          "use a digital tool to share data and conclusions",
+          "respond to audience questions with evidence"
         ]
       }
     },
     "skill_key": "communicating",
     "next_steps": {
-      "emerging": "describe findings using three science words",
-      "developing": "add a chart or diagram to share findings",
-      "proficient": "choose words and visuals that suit the audience",
-      "extending": "present the same findings for two different audiences"
+      "emerging": "use one science term to share a finding",
+      "developing": "add a diagram or graph to the findings",
+      "proficient": "choose a format and digital tool that suit the audience",
+      "extending": "explain the evidence behind the findings to a public audience"
     },
     "evidence": "a lab report, poster or presentation of results",
     "home": [
@@ -8301,65 +8301,65 @@
     "exemplar": "bc.chem11.cc.22"
   },
   "sci-sources-of-error": {
-    "phrase": "name what could have affected the results",
+    "phrase": "identify possible sources of error in an investigation",
     "area": "errors and improvements",
     "forms": {
       "base": [
-        "name what could have affected the results",
-        "suggest how to improve a lab method",
-        "spot mistakes in measuring or timing"
+        "identify possible sources of error in an investigation",
+        "suggest improvements to an investigation method",
+        "explain how an error affected the results"
       ],
       "did": [
-        "listed sources of error in {his} lab conclusion",
-        "suggested a change to the method in {his} lab report",
-        "explained how timing mistakes affected {his} results"
+        "identified sources of error in {his} lab",
+        "suggested improvements to {his} investigation method",
+        "explained how an error affected {his} results"
       ],
       "at": {
         "developing": [
-          "is starting to name one thing that could have affected the results",
-          "is learning to suggest a change to a lab method",
-          "can spot a measuring mistake with help"
+          "names one possible source of error with help",
+          "suggests one improvement to a method",
+          "describes an error in a measurement"
         ],
         "proficient": [
-          "names possible sources of error and a fix for each",
-          "suggests a specific change to the method for each error",
-          "explains how a mistake in measuring changed the data"
+          "identifies possible sources of error in an investigation",
+          "suggests improvements to an investigation method",
+          "explains how an error affected the results"
         ],
         "extending": [
-          "explains how much each source of error changed the results",
-          "separates errors in the method from errors in measuring",
-          "plans a new trial that tests whether a fix works"
+          "explains which source of error had the most effect",
+          "suggests improvements and explains how each one helps",
+          "identifies errors in both the equipment and the method"
         ]
       },
       "next": {
         "emerging": [
-          "describe a moment in the lab when something went wrong",
-          "ask whether the tools gave true readings",
-          "note anything that changed during the test"
+          "describe one problem during the experiment",
+          "name one error in a measurement",
+          "say which step of the method could change"
         ],
         "developing": [
-          "check timing, measuring and equipment for mistakes",
-          "describe how a spill or leak affected the data",
-          "separate human mistakes from equipment limits"
+          "name errors in equipment and errors in method",
+          "suggest one change to the equipment",
+          "explain how an error could affect a conclusion"
         ],
         "proficient": [
-          "match each error with a fix",
-          "propose a more exact tool for one step",
-          "add a step to the method that prevents an error"
+          "explain how each improvement affects the results",
+          "identify errors in reading the equipment",
+          "explain how more trials could improve accuracy"
         ],
         "extending": [
-          "estimate the size of each error",
-          "rank errors by how much they matter",
-          "test whether a suggested fix changes the results"
+          "explain the uncertainty of each measurement",
+          "propose a new method without a source of error",
+          "judge which improvements matter most to the results"
         ]
       }
     },
     "skill_key": "evaluating",
     "next_steps": {
       "emerging": "name one thing that could have affected the results",
-      "developing": "list possible sources of error in a lab",
-      "proficient": "suggest a specific change for each source of error",
-      "extending": "explain how much each error changed the results"
+      "developing": "describe how one error changed a measurement",
+      "proficient": "suggest an improvement for each source of error",
+      "extending": "test an improvement to the method and compare the results"
     },
     "evidence": "a lab conclusion with sources of error and improvements",
     "home": [
@@ -8377,65 +8377,65 @@
     }
   },
   "sci-sustained-inquiry": {
-    "phrase": "keep following one science question for a few weeks",
+    "phrase": "explore one science question over several weeks",
     "area": "following a science interest",
     "forms": {
       "base": [
-        "keep following one science question for a few weeks",
-        "stay curious about a science topic over time",
-        "ask questions about a science topic that interests {him}"
+        "explore one science question over several weeks",
+        "ask new questions about a science topic of interest",
+        "keep a record of observations on one science topic"
       ],
       "did": [
-        "kept a question log during {his} inquiry project",
-        "followed {his} own science question across several lessons",
-        "explained in {his} project report why {his} topic matters to our community"
+        "explored one science question over several weeks in {his} inquiry project",
+        "asked new questions about {his} science topic after each observation",
+        "kept a record of data on one science topic for a unit"
       ],
       "at": {
         "developing": [
-          "is starting to ask {his} own questions about a science topic",
-          "is learning to stay with one science question for a few weeks",
-          "can add to a project notebook with help"
+          "asks one question about a science topic with help",
+          "records observations on one science topic for a few lessons",
+          "names a science topic of interest and one question about it"
         ],
         "proficient": [
-          "keeps asking new questions as {he} [learns|learn] more about a topic",
-          "stays with a science question for weeks and adds to {his} notes",
-          "explains why {his} topic matters to people nearby and far away"
+          "explores one science question over several weeks",
+          "asks new questions as {his} observations change",
+          "keeps a record of data and ideas on one science topic"
         ],
         "extending": [
-          "follows a question for weeks and lets each answer lead to a new one",
-          "connects {his} topic to a problem in our town and one overseas",
-          "suggests what people could do about the problem {he} [studies|study]"
+          "explores one science question over a unit and refines it",
+          "asks questions that lead to a new investigation",
+          "connects {his} science topic to knowledge from scientific sources"
         ]
       },
       "next": {
         "emerging": [
-          "choose a science topic and list what {he} [wonders|wonder] about it",
-          "start a page of questions about an animal, a plant or the weather",
-          "ask {his} own question about something in science that interests {him}"
+          "name one thing in nature that raises a question",
+          "write one question about a science topic of interest",
+          "record one observation about the chosen science topic"
         ],
         "developing": [
-          "add one new note to {his} topic page each lesson",
-          "stay with the same question until {he} [has|have] three answers",
-          "keep a running list of what {he} [learns|learn] about one topic"
+          "add a date to every observation on the science topic",
+          "ask one new question after each observation",
+          "keep all data on the science topic in one place"
         ],
         "proficient": [
-          "show who in our community the problem touches",
-          "connect {his} question to a local news story",
-          "describe how the issue looks in B.C. and in another country"
+          "connect new data to the first question about the topic",
+          "explore the topic with a second method or tool",
+          "read one scientific source on the science topic"
         ],
         "extending": [
-          "propose a small action a family or school could take",
-          "draft a short plan for how our town could respond",
-          "share {his} findings with someone who can make a change"
+          "share the findings on the science topic with an audience",
+          "propose a hypothesis from the record of observations",
+          "connect the record of data to a scientific theory"
         ]
       }
     },
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "write three questions about a science topic of interest",
-      "developing": "return to one science question each week for a month",
-      "proficient": "explain why the topic matters to families nearby",
-      "extending": "suggest one thing people could do about the problem studied"
+      "emerging": "choose one science topic and ask one question about it",
+      "developing": "record new observations on the science topic over several weeks",
+      "proficient": "ask a new question when the data show a new pattern",
+      "extending": "plan a new investigation from one science question"
     },
     "evidence": "an inquiry project with a question log, notes and a final report",
     "home": [
@@ -8463,65 +8463,65 @@
     "exemplar": "bc.sci9.cc.28"
   },
   "sci-transfer-of-learning": {
-    "phrase": "apply a science idea to something new",
+    "phrase": "apply a science concept to a new situation",
     "area": "using what is learned",
     "forms": {
       "base": [
-        "apply a science idea to something new",
-        "connect a new problem to something learned before",
-        "use a class idea to explain an everyday event"
+        "apply a science concept to a new situation",
+        "connect a new situation to a concept learned before",
+        "use a science concept to explain a daily event"
       ],
       "did": [
-        "applied a science idea to a new question on {his} unit test",
-        "connected a new problem to an earlier lab in {his} answer",
-        "explained an everyday event with an idea from {his} unit"
+        "applied a science concept to a new situation in {his} lab",
+        "connected a new problem to a concept from a past unit",
+        "used a science concept to explain an event in daily life"
       ],
       "at": {
         "developing": [
-          "is starting to connect a new situation to something learned before",
-          "is learning to use a class idea outside the lab",
-          "can apply a science idea to a new problem with help"
+          "applies a science concept to a new situation with help",
+          "names a concept learned before that connects to a problem",
+          "names one science concept in an event from daily life"
         ],
         "proficient": [
-          "applies a science idea to a situation not seen in class",
-          "uses several ideas together to explain something unfamiliar",
-          "connects an everyday event to the matching science idea"
+          "applies a science concept to a new situation",
+          "connects a new situation to a concept learned before",
+          "uses a science concept to explain a daily event"
         ],
         "extending": [
-          "explains where a science idea fits a new situation and where it does not",
-          "applies ideas from two units to solve one problem",
-          "creates a new example of a science idea"
+          "applies several science concepts to solve a new problem",
+          "explains how a concept from one unit connects to another",
+          "uses a model to explain a new situation"
         ]
       },
       "next": {
         "emerging": [
-          "say which lesson a new question reminds {him} of",
-          "match a new problem to a lab {he} [has|have] done",
-          "name the unit a test question belongs to"
+          "describe an event in daily life that connects to science",
+          "name a concept from the unit seen in daily life",
+          "match a new situation to a lesson topic"
         ],
         "developing": [
-          "explain a kitchen event with a class idea",
-          "use a lesson to predict what happens in a new case",
-          "describe how a lab idea shows in daily life"
+          "explain what a new situation shares with a past lab",
+          "use science terms to explain a new situation",
+          "apply one concept to a question from daily life"
         ],
         "proficient": [
-          "combine ideas from two lessons to answer one question",
-          "solve a question set in a place never studied",
-          "test a class idea on a real-world example"
+          "explain why a concept does or does not apply to a situation",
+          "predict a result in a new situation from a concept",
+          "connect a concept to a technology in daily life"
         ],
         "extending": [
-          "find the limits of a science idea in a new case",
-          "invent an example that shows a science idea",
-          "explain why an idea does not work in some cases"
+          "explain the limitations of a model in a new situation",
+          "design an experiment to test a concept in a new situation",
+          "connect a concept to a career in science"
         ]
       }
     },
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "connect a new problem to an earlier lesson",
-      "developing": "apply one science idea to an everyday event",
-      "proficient": "use two ideas together to explain an unfamiliar case",
-      "extending": "explain where an idea applies to a new case and where it fails"
+      "emerging": "name one science concept in a new situation",
+      "developing": "explain how a new problem connects to a past lesson",
+      "proficient": "use a model from class to explain a new event",
+      "extending": "apply concepts from two units to one new problem"
     },
     "evidence": "test questions or tasks that ask for ideas in a new setting",
     "home": [
@@ -8539,65 +8539,65 @@
     }
   },
   "sci-unit-conversions": {
-    "phrase": "pick the right unit and check each conversion twice",
+    "phrase": "use the right metric unit for each measurement",
     "area": "units and conversions",
     "forms": {
       "base": [
-        "pick the right unit and check each conversion twice",
-        "change grams to kilograms or centimetres to metres",
+        "use the right metric unit for each measurement",
+        "convert a measurement from one metric unit to another",
         "write the unit beside every measurement"
       ],
       "did": [
-        "labelled each measurement with a unit in {his} data table",
+        "used the right metric units in {his} data table",
         "converted centimetres to metres in {his} lab calculations",
-        "chose metric units for the measurements in {his} lab"
+        "wrote the unit beside every measurement in {his} lab"
       ],
       "at": {
         "developing": [
-          "is starting to label each number with a unit",
-          "is learning to move between millimetres, centimetres and metres",
-          "can convert from one metric unit to another with help"
+          "uses metric units with help from a unit chart",
+          "converts centimetres to metres with a model to follow",
+          "writes units in each column of a data table"
         ],
         "proficient": [
-          "picks the right metric unit for each measurement",
-          "converts between units and checks the answer makes sense",
-          "keeps units with the numbers through each step of a calculation"
+          "uses the right metric unit for each measurement",
+          "converts a measurement from one metric unit to another",
+          "writes the unit beside every measurement"
         ],
         "extending": [
-          "solves problems that need more than one conversion",
-          "uses unit labels to catch mistakes in a calculation",
-          "explains why scientists use the same metric units everywhere"
+          "converts units within multi-step lab calculations",
+          "explains why scientists use metric units",
+          "chooses an metric unit that suits the quantity measured"
         ]
       },
       "next": {
         "emerging": [
-          "write cm, g or mL after every number",
-          "match each tool to the unit it measures",
-          "say which unit suits the length of a desk"
+          "write the unit beside each number in a data table",
+          "match each quantity to its metric unit",
+          "use grams for every mass measurement"
         ],
         "developing": [
-          "move the decimal to change millimetres to centimetres",
-          "use a metric chart to change units",
-          "change millilitres to litres in a recipe problem"
+          "convert millilitres to litres in a lab",
+          "show each conversion as a step in the calculation",
+          "use a unit chart to convert a measurement"
         ],
         "proficient": [
-          "estimate the answer before converting",
-          "show the units at each step of a calculation",
-          "choose a unit that keeps numbers easy to read"
+          "convert all data to the same unit before graphing",
+          "label each graph axis with its metric unit",
+          "explain which unit suits a measurement and why"
         ],
         "extending": [
-          "convert a speed from metres per second to kilometres per hour",
-          "use unit labels to catch errors in a calculation",
-          "explain why science uses metric units around the world"
+          "convert units for data from a scientific source",
+          "explain an error caused by a wrong unit",
+          "use metric units for energy and force"
         ]
       }
     },
     "skill_key": "processing",
     "next_steps": {
-      "emerging": "label each measurement with its unit",
-      "developing": "convert between grams and kilograms",
-      "proficient": "check that each converted answer makes sense",
-      "extending": "solve problems that need two or more conversions"
+      "emerging": "name the metric unit for each quantity in a lab",
+      "developing": "convert centimetres to metres in a data table",
+      "proficient": "use conversions in lab calculations and show each unit",
+      "extending": "explain how metric units help scientists share data"
     },
     "evidence": "a lab data table and calculations with units",
     "home": [
@@ -8615,65 +8615,65 @@
     }
   },
   "sci-variable-control": {
-    "phrase": "change one thing at a time in an experiment",
+    "phrase": "change one variable at a time in an experiment",
     "area": "fair tests",
     "forms": {
       "base": [
-        "change one thing at a time in an experiment",
-        "hold everything else the same during a test",
-        "name the thing changed and the thing measured"
+        "change one variable at a time in an experiment",
+        "keep the controlled variables the same in a test",
+        "name the variable changed and the variable measured"
       ],
       "did": [
-        "kept the water and soil the same in {his} plant test",
-        "labelled what {he} changed and measured in {his} lab",
-        "ran a fair test with one change in {his} experiment"
+        "changed one variable at a time in {his} experiment",
+        "kept the controlled variables the same in {his} fair test",
+        "named the variable changed and the variable measured in {his} lab"
       ],
       "at": {
         "developing": [
-          "is starting to name the one thing {he} [changes|change] in a test",
-          "is learning to keep the other conditions the same",
-          "can tell what is changed and what is measured with help"
+          "names the variable changed with help",
+          "keeps one or two variables the same in a test",
+          "names the variable measured in an experiment"
         ],
         "proficient": [
-          "changes one thing and keeps everything else the same",
-          "names what {he} [changes|change], what {he} [measures|measure] and what stays fixed",
-          "runs a fair test from start to finish"
+          "changes one variable at a time in an experiment",
+          "keeps the controlled variables the same in a test",
+          "names the variable changed and the variable measured"
         ],
         "extending": [
-          "explains how a condition that was not held fixed could change results",
-          "spots hidden factors, like room temperature, and controls them",
-          "designs a fair test with a control group to compare against"
+          "explains how a variable not controlled could affect the results",
+          "plans how to measure and control every variable",
+          "designs a fair test with several controlled variables"
         ]
       },
       "next": {
         "emerging": [
-          "say what {he} will change before a lab begins",
-          "circle the thing being changed in a lab plan",
-          "pick one thing to change in a simple test"
+          "label the variable changed in a data table",
+          "name the result measured in an experiment",
+          "say what is kept the same in a fair test"
         ],
         "developing": [
-          "name what {he} will measure in each trial",
-          "check that the amounts, times and tools match in each trial",
-          "make a list of things to hold the same"
+          "explain why one variable changes at a time",
+          "describe how to measure the controlled variables",
+          "match each variable to its role in the test"
         ],
         "proficient": [
-          "add a control group to compare with",
-          "test one factor while the rest stay fixed",
-          "record the conditions kept the same in {his} lab report"
+          "explain how the variable changed affects the variable measured",
+          "identify a variable that was not controlled",
+          "plan a control group for an experiment"
         ],
         "extending": [
-          "describe a hidden factor that could spoil a fair test",
-          "explain what would happen if two things changed at once",
-          "design a fair test for {his} own question"
+          "explain the effect of a variable not controlled on the data",
+          "design a test with a control and several trials",
+          "judge whether a test was fair from the data"
         ]
       }
     },
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "name the one thing changed on purpose in a test",
-      "developing": "list what stays the same before each test",
-      "proficient": "keep every other condition fixed while changing one",
-      "extending": "explain how an uncontrolled factor could change the results"
+      "emerging": "name the one variable changed in an experiment",
+      "developing": "list every variable to keep the same in a test",
+      "proficient": "explain how each controlled variable keeps a test fair",
+      "extending": "identify variables that are hard to control and plan for them"
     },
     "evidence": "an experiment with labelled conditions and a fair-test method",
     "home": [
@@ -8691,65 +8691,65 @@
     }
   },
   "sci-ways-of-knowing": {
-    "phrase": "use First Peoples and local knowledge in science work",
+    "phrase": "use First Peoples knowledge in science work",
     "area": "other ways of knowing",
     "forms": {
       "base": [
-        "use First Peoples and local knowledge in science work",
-        "gather what local knowledge keepers share about a place",
-        "use two ways of knowing to answer a question"
+        "use First Peoples knowledge in science work",
+        "gather information from local knowledge keepers",
+        "use two ways of knowing to answer a science question"
       ],
       "did": [
-        "used knowledge shared by a local Indigenous guest in {his} project",
-        "gathered local knowledge about plants for {his} research",
-        "answered a science question with knowledge from {his} community"
+        "used First Peoples knowledge in {his} study of ecosystems",
+        "collected information from local knowledge keepers for {his} project",
+        "used two ways of knowing to answer {his} science question"
       ],
       "at": {
         "developing": [
-          "is starting to gather information from local knowledge",
-          "is learning to include First Peoples knowledge in a science question",
-          "can link a story or teaching to a science idea with help"
+          "names one way First Peoples knowledge connects to science",
+          "gathers information from local knowledge with help",
+          "names one other way of knowing about nature"
         ],
         "proficient": [
-          "applies First Peoples knowledge to a science question",
-          "uses local knowledge alongside lab results to answer a question",
-          "credits the people and communities who shared their knowledge"
+          "uses First Peoples knowledge in science work",
+          "gathers information from local knowledge keepers",
+          "uses two ways of knowing to answer a science question"
         ],
         "extending": [
-          "explains how different ways of knowing add to one answer",
-          "shows where Indigenous knowledge and lab science agree and differ",
-          "asks knowledge keepers questions that shape a project"
+          "explains how First Peoples knowledge and science support each other",
+          "connects traditional practices on the land to science concepts",
+          "explains how worldviews influence questions about nature"
         ]
       },
       "next": {
         "emerging": [
-          "listen to a guest speaker and note one teaching about the land",
-          "ask a family member what they know about a local plant",
-          "read a First Peoples story about an animal and note what it teaches"
+          "name one First Peoples practice on the land",
+          "share one thing learned from a local knowledge keeper",
+          "describe one place of interest to the local community"
         ],
         "developing": [
-          "connect a teaching about seasons to a lesson on weather",
-          "include knowledge from a guest in {his} research notes",
-          "explain how a local practice relates to a science idea"
+          "record the source of each piece of local knowledge",
+          "connect local knowledge to one observation",
+          "ask a local knowledge keeper one science question"
         ],
         "proficient": [
-          "credit the source of each piece of local knowledge",
-          "use a lab result and a teaching to answer the same question",
-          "describe how First Peoples have studied a place over generations"
+          "explain how local knowledge and data answer the same question",
+          "describe a traditional practice that sustains an ecosystem",
+          "include First Peoples perspectives in a science project"
         ],
         "extending": [
-          "compare what a teaching and an experiment each show",
-          "explain why long-term local observation counts as evidence",
-          "plan a project that respects protocols for sharing knowledge"
+          "explain how traditional practices support sustainability",
+          "propose an investigation that uses two ways of knowing",
+          "describe how First Peoples knowledge informs stewardship of the land"
         ]
       }
     },
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "gather information from local knowledge in the community",
-      "developing": "apply First Peoples knowledge to a science question",
-      "proficient": "answer one question with both a teaching and lab results",
-      "extending": "explain how different ways of knowing add to one science answer"
+      "emerging": "describe one First Peoples practice connected to the land",
+      "developing": "record information shared by a local knowledge keeper",
+      "proficient": "use First Peoples knowledge and data to answer one question",
+      "extending": "explain how a worldview influences a science question"
     },
     "evidence": "a project that uses knowledge shared by local Indigenous guests or community sources",
     "home": [

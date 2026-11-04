@@ -180,6 +180,17 @@ describe('version 2 cards', () => {
       });
     });
   });
+  // Blind sort 3 (Nov 4 2026): Science 8 strings drifted into Socials and
+  // Math talk. Every content word of a Science 8 card's skill strings is in
+  // the Science Ministry text or I Can set, or the checker's short list.
+  it('keeps every Science 8 card in its subject register', async () => {
+    const { courseStems, strayWords } = await import('../scripts/card-register.mjs');
+    const stems = courseStems('SCI8');
+    const stray = SCIENCE8.concat(['sci-data-patterns'])
+      .map(k => [k, strayWords(comment[k], stems)])
+      .filter(([, w]) => w.length);
+    expect(stray).toEqual([]);
+  });
   it('includes the eight sample cards and the Science 8 cards', () => {
     expect(v2.map(([k]) => k).sort()).toEqual(
       SCIENCE8.concat([

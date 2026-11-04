@@ -639,103 +639,103 @@ phe-substance-use-causes: explain factors that can lead to substance use | she e
 phe-supporting-others: describe ways to support others with well-being concerns | she describes ways to support others with well-being concerns | at describing ways to support others with well-being concerns
 phe-training-styles: explain how training styles affect fitness results | she explains how training styles affect fitness results | at explaining how training styles affect fitness results
 sci-accuracy-precision: check procedures and data for accuracy and precision | she checks procedures and data for accuracy and precision | at checking procedures and data for accuracy and precision
-sci-assumptions-bias: notice when a source takes something for granted | she notices when a source takes something for granted | at noticing when a source takes something for granted
-sci-assumptions-bias: spot one-sided views in sources and {his} own work | she spots one-sided views in sources and {his} own work | at spotting one-sided views in sources and {his} own work
-sci-assumptions-bias: ask who made a piece of information and why | she asks who made a piece of information and why | at asking who made a piece of information and why
+sci-assumptions-bias: name the assumptions in an investigation | she names the assumptions in an investigation | at naming the assumptions in an investigation
+sci-assumptions-bias: identify bias in a science source | she identifies bias in a science source | at identifying bias in a science source
+sci-assumptions-bias: explain how the purpose of a source affects its claims | she explains how the purpose of a source affects its claims | at explaining how the purpose of a source affects its claims
 sci-cause-effect: explain how a cause leads to an effect | she explains how a cause leads to an effect | at explaining how a cause leads to an effect
 sci-changing-knowledge: explain how new tools changed scientific knowledge | she explains how new tools changed scientific knowledge | at explaining how new tools changed scientific knowledge
-sci-contributing-to-care: help care for the school, the community or nature | she helps care for the school, the community or nature | at helping care for the school, the community or nature
-sci-contributing-to-care: plan a group action to protect a local place | she plans a group action to protect a local place | at planning a group action to protect a local place
-sci-contributing-to-care: take steps to care for {his} own health | she takes steps to care for {his} own health | at taking steps to care for {his} own health
+sci-contributing-to-care: take action to care for the local environment | she takes action to care for the local environment | at taking action to care for the local environment
+sci-contributing-to-care: plan ways to care for {his} own well-being | she plans ways to care for {his} own well-being | at planning ways to care for {his} own well-being
+sci-contributing-to-care: care for others on {his} own or with a group | she cares for others on {his} own or with a group | at caring for others on {his} own or with a group
 sci-data-collection: collect and record accurate data with the right units | she collects and records accurate data with the right units | at collecting and recording accurate data with the right units
-sci-data-patterns: spot patterns and odd results in data | she spots patterns and odd results in data | at spotting patterns and odd results in data
-sci-data-patterns: describe how one measurement changes with another | she describes how one measurement changes with another | at describing how one measurement changes with another
-sci-data-patterns: use simple math to compare results | she uses simple math to compare results | at using simple math to compare results
-sci-data-recording: measure carefully and record every reading with its unit | she measures carefully and records every reading with its unit | at measuring carefully and recording every reading with its unit
-sci-data-recording: use a ruler, scale or thermometer correctly | she uses a ruler, scale or thermometer correctly | at using a ruler, scale or thermometer correctly
-sci-data-recording: note what {he} [sees|see] next to the numbers | she notes what {he} [sees|see] next to the numbers | at noting what {he} [sees|see] next to the numbers
+sci-data-patterns: find patterns in data from an investigation | she finds patterns in data from an investigation | at finding patterns in data from an investigation
+sci-data-patterns: describe how one variable changes as another changes | she describes how one variable changes as another changes | at describing how one variable changes as another changes
+sci-data-patterns: find connections between data and other sources | she finds connections between data and other sources | at finding connections between data and other sources
+sci-data-recording: measure accurately and record each measurement with units | she measures accurately and records each measurement with units | at measuring accurately and recording each measurement with units
+sci-data-recording: use lab equipment and tools in the right way | she uses lab equipment and tools in the right way | at using lab equipment and tools in the right way
+sci-data-recording: record qualitative and quantitative data in a table | she records qualitative and quantitative data in a table | at recording qualitative and quantitative data in a table
 sci-data-representation: show data in a table or graph | she shows data in a table or graph | at showing data in a table or graph
-sci-data-representation: give a graph a title, axis names and units | she gives a graph a title, axis names and units | at giving a graph a title, axis names and units
+sci-data-representation: give each graph a title, axis labels and units | she gives each graph a title, axis labels and units | at giving each graph a title, axis labels and units
 sci-data-representation: choose a graph that suits the data | she chooses a graph that suits the data | at choosing a graph that suits the data
 sci-drawing-conclusions: write a conclusion that matches the results | she writes a conclusion that matches the results | at writing a conclusion that matches the results
-sci-drawing-conclusions: use a science idea to explain what happened | she uses a science idea to explain what happened | at using a science idea to explain what happened
-sci-drawing-conclusions: say what the data show about the question | she says what the data show about the question | at saying what the data show about the question
-sci-evidence: use data and observations to support a science idea | she uses data and observations to support a science idea | at using data and observations to support a science idea
-sci-evidence: sort evidence into numbers and descriptions | she sorts evidence into numbers and descriptions | at sorting evidence into numbers and descriptions
+sci-drawing-conclusions: use a science concept to explain the results | she uses a science concept to explain the results | at using a science concept to explain the results
+sci-drawing-conclusions: identify a relationship between variables in the data | she identifies a relationship between variables in the data | at identifying a relationship between variables in the data
+sci-evidence: use evidence from data to support a science idea | she uses evidence from data to support a science idea | at using evidence from data to support a science idea
+sci-evidence: sort evidence into qualitative and quantitative types | she sorts evidence into qualitative and quantitative types | at sorting evidence into qualitative and quantitative types
 sci-evidence: explain why a claim needs evidence | she explains why a claim needs evidence | at explaining why a claim needs evidence
 sci-finding-solutions: use inquiry to help solve local or global problems | she uses inquiry to help solve local or global problems | at using inquiry to help solve local or global problems
 sci-graphs-models: make and interpret graphs, models and diagrams | she makes and interprets graphs, models and diagrams | at making and interpreting graphs, models and diagrams
-sci-hypotheses: suggest two or more possible explanations to test | she suggests two or more possible explanations to test | at suggesting two or more possible explanations to test
-sci-hypotheses: write a hypothesis as an if-then sentence | she writes a hypothesis as an if-then sentence | at writing a hypothesis as an if-then sentence
-sci-hypotheses: name more than one result a test could give | she names more than one result a test could give | at naming more than one result a test could give
-sci-idea-generation: suggest new ideas when solving a problem | she suggests new ideas when solving a problem | at suggesting new ideas when solving a problem
-sci-idea-generation: improve an idea after testing it | she improves an idea after testing it | at improving an idea after testing it
-sci-idea-generation: offer more than one way to solve a design challenge | she offers more than one way to solve a design challenge | at offering more than one way to solve a design challenge
-sci-implications: explain how results could affect people and nature | she explains how results could affect people and nature | at explaining how results could affect people and nature
-sci-implications: describe what a finding could mean for the environment | she describes what a finding could mean for the environment | at describing what a finding could mean for the environment
-sci-implications: ask what is right and fair about using a discovery | she asks what is right and fair about using a discovery | at asking what is right and fair about using a discovery
-sci-informed-skepticism: ask for evidence before believing a claim | she asks for evidence before believing a claim | at asking for evidence before believing a claim
-sci-informed-skepticism: check a claim against what science shows | she checks a claim against what science shows | at checking a claim against what science shows
-sci-informed-skepticism: test a claim with a simple experiment | she tests a claim with a simple experiment | at testing a claim with a simple experiment
-sci-inquiry-questions: ask a question an experiment can answer | she asks a question an experiment can answer | at asking a question an experiment can answer
-sci-inquiry-questions: describe a problem science could help solve | she describes a problem science could help solve | at describing a problem science could help solve
-sci-inquiry-questions: choose a question {he} can test in class | she chooses a question {he} can test in class | at choosing a question {he} can test in class
-sci-investigation-plans: plan the steps and materials for an experiment | she plans the steps and materials for an experiment | at planning the steps and materials for an experiment
-sci-investigation-plans: choose a lab or outdoor method that suits the question | she chooses a lab or outdoor method that suits the question | at choosing a lab or outdoor method that suits the question
-sci-investigation-plans: plan to collect both numbers and observations | she plans to collect both numbers and observations | at planning to collect both numbers and observations
-sci-local-environment: explore a park, creek or schoolyard first-hand | she explores a park, creek or schoolyard first-hand | at exploring a park, creek or schoolyard first-hand
-sci-local-environment: explain what {he} [notices|notice] in the local environment | she explains what {he} [notices|notice] in the local environment | at explaining what {he} [notices|notice] in the local environment
-sci-local-environment: use what local people know about a nearby place | she uses what local people know about a nearby place | at using what local people know about a nearby place
+sci-hypotheses: write a hypothesis in if-then form | she writes a hypothesis in if-then form | at writing a hypothesis in if-then form
+sci-hypotheses: propose more than one hypothesis for a question | she proposes more than one hypothesis for a question | at proposing more than one hypothesis for a question
+sci-hypotheses: give a scientific reason for each hypothesis | she gives a scientific reason for each hypothesis | at giving a scientific reason for each hypothesis
+sci-idea-generation: generate new ideas to solve a problem | she generates new ideas to solve a problem | at generating new ideas to solve a problem
+sci-idea-generation: refine an idea to improve a solution | she refines an idea to improve a solution | at refining an idea to improve a solution
+sci-idea-generation: propose ideas to help solve a problem | she proposes ideas to help solve a problem | at proposing ideas to help solve a problem
+sci-implications: explain how findings could affect society | she explains how findings could affect society | at explaining how findings could affect society
+sci-implications: describe how findings could affect the environment | she describes how findings could affect the environment | at describing how findings could affect the environment
+sci-implications: identify ethical questions raised by findings | she identifies ethical questions raised by findings | at identifying ethical questions raised by findings
+sci-informed-skepticism: ask for evidence before accepting a claim | she asks for evidence before accepting a claim | at asking for evidence before accepting a claim
+sci-informed-skepticism: evaluate a claim using scientific knowledge | she evaluates a claim using scientific knowledge | at evaluating a claim using scientific knowledge
+sci-informed-skepticism: use findings from an investigation to evaluate a claim | she uses findings from an investigation to evaluate a claim | at using findings from an investigation to evaluate a claim
+sci-inquiry-questions: ask a question that an experiment can answer | she asks a question that an experiment can answer | at asking a question that an experiment can answer
+sci-inquiry-questions: describe a problem that scientific inquiry could solve | she describes a problem that scientific inquiry could solve | at describing a problem that scientific inquiry could solve
+sci-inquiry-questions: choose an inquiry question with a variable to measure | she chooses an inquiry question with a variable to measure | at choosing an inquiry question with a variable to measure
+sci-investigation-plans: plan the steps and materials for an investigation | she plans the steps and materials for an investigation | at planning the steps and materials for an investigation
+sci-investigation-plans: choose field work or an experiment to suit the question | she chooses field work or an experiment to suit the question | at choosing field work or an experiment to suit the question
+sci-investigation-plans: plan an investigation with a group | she plans an investigation with a group | at planning an investigation with a group
+sci-local-environment: explore a local ecosystem first-hand during field work | she explores a local ecosystem first-hand during field work | at exploring a local ecosystem first-hand during field work
+sci-local-environment: describe the living things in a local ecosystem | she describes the living things in a local ecosystem | at describing the living things in a local ecosystem
+sci-local-environment: connect observations of a local place to science concepts | she connects observations of a local place to science concepts | at connecting observations of a local place to science concepts
 sci-method-evaluation: judge a method and find possible sources of error | she judges a method and find possible sources of error | at judging a method and find possible sources of error
 sci-method-improvement: suggest specific ways to improve a method | she suggests specific ways to improve a method | at suggesting specific ways to improve a method
-sci-method-reflection: think about what worked in a lab method | she thinks about what worked in a lab method | at thinking about what worked in a lab method
-sci-method-reflection: check whether a test was fair | she checks whether a test was fair | at checking whether a test was fair
-sci-method-reflection: judge how much to trust the data | she judges how much to trust the data | at judging how much to trust the data
+sci-method-reflection: reflect on the methods used in an investigation | she reflects on the methods used in an investigation | at reflecting on the methods used in an investigation
+sci-method-reflection: check whether the variables were controlled | she checks whether the variables were controlled | at checking whether the variables were controlled
+sci-method-reflection: judge whether the data are reliable | she judges whether the data are reliable | at judging whether the data are reliable
 sci-method-risks: assess the risks and ethics of a planned method | she assesses the risks and ethics of a planned method | at assessing the risks and ethics of a planned method
 sci-model-limitations: judge how well a model fits what it shows | she judges how well a model fits what it shows | at judging how well a model fits what it shows
-sci-observation: notice details in nature and ask questions about them | she notices details in nature and asks questions about them | at noticing details in nature and asking questions about them
-sci-observation: describe what {he} [sees|see] in a plant, rock or sky | she describes what {he} [sees|see] in a plant, rock or sky | at describing what {he} [sees|see] in a plant, rock or sky
-sci-observation: wonder why things outdoors happen the way they do | she wonders why things outdoors happen the way they do | at wondering why things outdoors happen the way they do
-sci-place-perspectives: share how different people see a place | she shares how different people see a place | at sharing how different people see a place
-sci-place-perspectives: describe a personal experience of a place | she describes a personal experience of a place | at describing a personal experience of a place
-sci-place-perspectives: think about what a place means to others | she thinks about what a place means to others | at thinking about what a place means to others
-sci-predictions: say what a lab should show and why | she says what a lab should show and why | at saying what a lab should show and why
-sci-predictions: make a prediction before a lab begins | she makes a prediction before a lab begins | at making a prediction before a lab begins
-sci-predictions: give a reason for each guess about a result | she gives a reason for each guess about a result | at giving a reason for each guess about a result
-sci-project-design: plan a science project with a group | she plans a science project with a group | at planning a science project with a group
+sci-observation: observe nature and ask questions about it | she observes nature and asks questions about it | at observing nature and asking questions about it
+sci-observation: describe the details of an observation in words | she describes the details of an observation in words | at describing the details of an observation in words
+sci-observation: use observations of living things to form a question | she uses observations of living things to form a question | at using observations of living things to form a question
+sci-place-perspectives: share different experiences of a place | she shares different experiences of a place | at sharing different experiences of a place
+sci-place-perspectives: describe a personal experience of a local place | she describes a personal experience of a local place | at describing a personal experience of a local place
+sci-place-perspectives: reflect on how different people see a place | she reflects on how different people see a place | at reflecting on how different people see a place
+sci-predictions: make a prediction before an experiment begins | she makes a prediction before an experiment begins | at making a prediction before an experiment begins
+sci-predictions: explain the reason for each prediction | she explains the reason for each prediction | at explaining the reason for each prediction
+sci-predictions: use science concepts to support a prediction | she uses science concepts to support a prediction | at using science concepts to support a prediction
+sci-project-design: design a science project with a group | she designs a science project with a group | at designing a science project with a group
 sci-project-design: share ideas and add to a group plan | she shares ideas and adds to a group plan | at sharing ideas and adding to a group plan
-sci-project-design: explain how a project could help our community | she explains how a project could help our community | at explaining how a project could help our community
+sci-project-design: connect the ideas of others to the project design | she connects the ideas of others to the project design | at connecting the ideas of others to the project design
 sci-risk-assessment: assess risks to personal safety and to others | she assesses risks to personal safety and to others | at assessing risks to personal safety and to others
 sci-role-of-scientists: explain the role scientists play in innovation | she explains the role scientists play in innovation | at explaining the role scientists play in innovation
-sci-safety-ethics: check the safety steps before each lab | she checks the safety steps before each lab | at checking the safety steps before each lab
-sci-safety-ethics: wear goggles and handle lab tools safely | she wears goggles and handles lab tools safely | at wearing goggles and handling lab tools safely
-sci-safety-ethics: explain the rules for treating living things with care | she explains the rules for treating living things with care | at explaining the rules for treating living things with care
+sci-safety-ethics: follow the safety guidelines in each investigation | she follows the safety guidelines in each investigation | at following the safety guidelines in each investigation
+sci-safety-ethics: name the safety guidelines before a lab begins | she names the safety guidelines before a lab begins | at naming the safety guidelines before a lab begins
+sci-safety-ethics: explain the ethical guidelines for work with living things | she explains the ethical guidelines for work with living things | at explaining the ethical guidelines for work with living things
 sci-science-careers: connect science work in class to science careers | she connects science work in class to science careers | at connecting science work in class to science careers
 sci-scientific-argument: build a science argument from evidence for an audience | she builds a science argument from evidence for an audience | at building a science argument from evidence for an audience
-sci-sharing-findings: share results using science words and a chart | she shares results using science words and a chart | at sharing results using science words and a chart
-sci-sharing-findings: explain findings so a listener can follow | she explains findings so a listener can follow | at explaining findings so a listener can follow
-sci-sharing-findings: present results on a poster or slide | she presents results on a poster or slide | at presenting results on a poster or slide
+sci-sharing-findings: share findings with a group using scientific language | she shares findings with a group using scientific language | at sharing findings with a group using scientific language
+sci-sharing-findings: use visuals to share solutions to problems | she uses visuals to share solutions to problems | at using visuals to share solutions to problems
+sci-sharing-findings: choose digital tools that suit the findings | she chooses digital tools that suit the findings | at choosing digital tools that suit the findings
 sci-solution-strategies: use more than one strategy to solve a problem | she uses more than one strategy to solve a problem | at using more than one strategy to solve a problem
 sci-source-validity: judge whether science information in a source is valid | she judges whether science information in a source is valid | at judging whether science information in a source is valid
-sci-sources-of-error: name what could have affected the results | she names what could have affected the results | at naming what could have affected the results
-sci-sources-of-error: suggest how to improve a lab method | she suggests how to improve a lab method | at suggesting how to improve a lab method
-sci-sources-of-error: spot mistakes in measuring or timing | she spots mistakes in measuring or timing | at spotting mistakes in measuring or timing
-sci-sustained-inquiry: keep following one science question for a few weeks | she keeps following one science question for a few weeks | at following one science question for a few weeks
-sci-sustained-inquiry: stay curious about a science topic over time | she stays curious about a science topic over time | at staying curious about a science topic over time
-sci-sustained-inquiry: ask questions about a science topic that interests {him} | she asks questions about a science topic that interests {him} | at asking questions about a science topic that interests {him}
+sci-sources-of-error: identify possible sources of error in an investigation | she identifies possible sources of error in an investigation | at identifying possible sources of error in an investigation
+sci-sources-of-error: suggest improvements to an investigation method | she suggests improvements to an investigation method | at suggesting improvements to an investigation method
+sci-sources-of-error: explain how an error affected the results | she explains how an error affected the results | at explaining how an error affected the results
+sci-sustained-inquiry: explore one science question over several weeks | she explores one science question over several weeks | at exploring one science question over several weeks
+sci-sustained-inquiry: ask new questions about a science topic of interest | she asks new questions about a science topic of interest | at asking new questions about a science topic of interest
+sci-sustained-inquiry: keep a record of observations on one science topic | she keeps a record of observations on one science topic | at keeping a record of observations on one science topic
 sci-theoretical-models: build a model that explains how something works | she builds a model that explains how something works | at building a model that explains how something works
-sci-transfer-of-learning: apply a science idea to something new | she applies a science idea to something new | at applying a science idea to something new
-sci-transfer-of-learning: connect a new problem to something learned before | she connects a new problem to something learned before | at connecting a new problem to something learned before
-sci-transfer-of-learning: use a class idea to explain an everyday event | she uses a class idea to explain an everyday event | at using a class idea to explain an everyday event
-sci-unit-conversions: pick the right unit and check each conversion twice | she picks the right unit and checks each conversion twice | at picking the right unit and checking each conversion twice
-sci-unit-conversions: change grams to kilograms or centimetres to metres | she changes grams to kilograms or centimetres to metres | at changing grams to kilograms or centimetres to metres
+sci-transfer-of-learning: apply a science concept to a new situation | she applies a science concept to a new situation | at applying a science concept to a new situation
+sci-transfer-of-learning: connect a new situation to a concept learned before | she connects a new situation to a concept learned before | at connecting a new situation to a concept learned before
+sci-transfer-of-learning: use a science concept to explain a daily event | she uses a science concept to explain a daily event | at using a science concept to explain a daily event
+sci-unit-conversions: use the right metric unit for each measurement | she uses the right metric unit for each measurement | at using the right metric unit for each measurement
+sci-unit-conversions: convert a measurement from one metric unit to another | she converts a measurement from one metric unit to another | at converting a measurement from one metric unit to another
 sci-unit-conversions: write the unit beside every measurement | she writes the unit beside every measurement | at writing the unit beside every measurement
-sci-variable-control: change one thing at a time in an experiment | she changes one thing at a time in an experiment | at changing one thing at a time in an experiment
-sci-variable-control: hold everything else the same during a test | she holds everything else the same during a test | at holding everything else the same during a test
-sci-variable-control: name the thing changed and the thing measured | she names the thing changed and the thing measured | at naming the thing changed and the thing measured
-sci-ways-of-knowing: use First Peoples and local knowledge in science work | she uses First Peoples and local knowledge in science work | at using First Peoples and local knowledge in science work
-sci-ways-of-knowing: gather what local knowledge keepers share about a place | she gathers what local knowledge keepers share about a place | at gathering what local knowledge keepers share about a place
-sci-ways-of-knowing: use two ways of knowing to answer a question | she uses two ways of knowing to answer a question | at using two ways of knowing to answer a question
+sci-variable-control: change one variable at a time in an experiment | she changes one variable at a time in an experiment | at changing one variable at a time in an experiment
+sci-variable-control: keep the controlled variables the same in a test | she keeps the controlled variables the same in a test | at keeping the controlled variables the same in a test
+sci-variable-control: name the variable changed and the variable measured | she names the variable changed and the variable measured | at naming the variable changed and the variable measured
+sci-ways-of-knowing: use First Peoples knowledge in science work | she uses First Peoples knowledge in science work | at using First Peoples knowledge in science work
+sci-ways-of-knowing: gather information from local knowledge keepers | she gathers information from local knowledge keepers | at gathering information from local knowledge keepers
+sci-ways-of-knowing: use two ways of knowing to answer a science question | she uses two ways of knowing to answer a science question | at using two ways of knowing to answer a science question
 ss-cau: explain the causes and results of an event | she explains the causes and results of an event | at explaining the causes and results of an event
 ss-cau-people-place: explain how people and a place shape each other | she explains how people and a place shape each other | at explaining how people and a place shape each other
 ss-cau-theory-impacts: explain how an economic theory changed society and politics | she explains how an economic theory changed society and politics | at explaining how an economic theory changed society and politics
