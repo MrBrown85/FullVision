@@ -97,7 +97,7 @@ window.Router = (function () {
     if (!mount) return;
     mount.innerHTML = renderDock(activePage);
     // On a phone the tabs scroll sideways; keep the open one in view.
-    var seg = mount.querySelector('.tb-seg');
+    var seg = typeof mount.querySelector === 'function' ? mount.querySelector('.tb-seg') : null;
     var on = seg && seg.querySelector('.tb-seg-active');
     if (on && seg.scrollWidth > seg.clientWidth) {
       seg.scrollLeft = on.offsetLeft - seg.offsetLeft - (seg.clientWidth - on.offsetWidth) / 2;
