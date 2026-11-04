@@ -71,3 +71,31 @@ test('the capture box stays where it is when the first observation is added', as
   const after = await input.boundingBox();
   expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(2);
 });
+
+test('a card opens the edit window to fix a typo, and its Delete has Undo', async ({ page }) => {
+  const panel = await openObservations(page);
+  const card = panel.locator('#ev-list .obs-card').first();
+  const obId = await card.getAttribute('data-obid');
+  await card.locator('.obs-card-text').click();
+  const editor = page.locator('#obs-focus-card');
+  await expect(editor).toBeVisible();
+  await expect(page.locator('#focus-textarea')).toBeFocused();
+  await page.locator('#focus-textarea').fill('Fixed the typo here');
+  await page.keyboard.press('Enter');
+  await expect(editor).toHaveCount(0);
+  await expect(panel.locator('#ev-list .obs-card[data-obid="' + obId + '"] .obs-card-text')).toHaveText(
+    'Fixed the typo here',
+  );
+  expect(await page.evaluate(id => getStudentQuickObs('sci8', 'st23').find(o => o.id === id).text, obId)).toBe(
+    'Fixed the typo here',
+  );
+
+  // Keyboard: Enter on a focused card opens it; Delete hides it with Undo.
+  await panel.locator('#ev-list .obs-card[data-obid="' + obId + '"]').focus();
+  await page.keyboard.press('Enter');
+  await expect(editor).toBeVisible();
+  await page.locator('#obs-focus-card [data-action="focusDelete"]').click();
+  await expect(panel.locator('#ev-list .obs-card[data-obid="' + obId + '"]')).toHaveCount(0);
+  await page.locator('#undo-toast').getByRole('button', { name: 'Undo' }).click();
+  await expect(panel.locator('#ev-list .obs-card[data-obid="' + obId + '"]')).toHaveCount(1);
+});

@@ -347,7 +347,7 @@ window.StudentEvidence = (function () {
     }
     var ctx = ObsCard.context(_cid, { hidden: _pending });
     function card(o) {
-      return ObsCard.html(o, ctx, { showStudent: false, action: null, when: 'date' });
+      return ObsCard.html(o, ctx, { showStudent: false, action: 'evEditOb', when: 'date' });
     }
     if (_tab !== 'competency') return list.map(card).join('');
     return groupByCompetency(list, ObsCapture.competencyItems(_cid), function (id) {
@@ -575,10 +575,42 @@ window.StudentEvidence = (function () {
       e.preventDefault();
       e.stopPropagation();
       deleteOb(del.getAttribute('data-obid'));
+      return;
     }
+    var card = e.target.closest('.obs-card[data-action="evEditOb"]');
+    if (card) editOb(card.getAttribute('data-obid'));
+  }
+
+  /* A card opens the Observations page's edit window over this page. */
+  function editOb(obId) {
+    if (!obId || typeof PageObservations === 'undefined' || !PageObservations.openEditor) return;
+    var cid = _cid;
+    var sid = _sid;
+    PageObservations.openEditor(cid, sid, obId, {
+      onSaved: function () {
+        if (_cid === cid && _sid === sid) {
+          refresh();
+          changed();
+        }
+      },
+      onDelete: function (id) {
+        if (_cid === cid && _sid === sid) deleteOb(id);
+      },
+    });
   }
 
   function onKeydown(e) {
+    // A focused card opens with Enter or Space, like a button.
+    if (
+      (e.key === 'Enter' || e.key === ' ') &&
+      e.target.classList &&
+      e.target.classList.contains('obs-card') &&
+      e.target.getAttribute('data-action') === 'evEditOb'
+    ) {
+      e.preventDefault();
+      editOb(e.target.getAttribute('data-obid'));
+      return;
+    }
     var tab = e.target.closest && e.target.closest('[data-ev-tab]');
     if (tab && (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'Home' || e.key === 'End')) {
       var i = TABS.findIndex(function (t) {

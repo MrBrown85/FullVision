@@ -433,8 +433,9 @@ window.MStudentDetail = (function () {
     var cells = termAssess.map(function (a) {
       return { a: a, cell: assessmentCellValue(cid, sid, a) };
     });
+    // A deleted one waiting on its Undo is already gone from the list.
     var obs = getStudentQuickObs(cid, sid).filter(function (o) {
-      return _obsInTerm(o, term);
+      return _obsInTerm(o, term) && !(window.MObserve && MObserve.isPending && MObserve.isPending(o.id));
     });
 
     // Assessments
@@ -504,7 +505,6 @@ window.MStudentDetail = (function () {
         evidenceHtml += MObserve.cardHtml(cid, Object.assign({ studentId: sid }, ob), obsCtx, {
           showStudent: false,
           when: 'date',
-          editable: false,
         });
       });
     }
@@ -625,8 +625,34 @@ window.MStudentDetail = (function () {
     );
   }
 
+  /* After an observation is edited, deleted or put back from the student's
+     page, its Evidence list and count are drawn again in place. */
+  function refreshEvidence(cid) {
+    var screen = document.getElementById('m-screen-student-detail');
+    if (!screen) return;
+    var desc = null;
+    try {
+      desc = JSON.parse(screen.getAttribute('data-restore') || 'null');
+    } catch (e) {
+      desc = null;
+    }
+    if (!desc || !desc.sid) return;
+    var tmp = document.createElement('div');
+    if (!window.MStudents || !MStudents.renderDetail) return;
+    // html-safe: MStudents.renderDetail escapes its text (checked where the shell places it).
+    tmp.innerHTML = MStudents.renderDetail(cid, desc.sid);
+    var fresh = tmp.querySelector('#m-st-panel-evidence');
+    var panel = screen.querySelector('#m-st-panel-evidence');
+    // html-safe: the panel comes from MStudents.renderDetail above.
+    if (fresh && panel) panel.innerHTML = fresh.innerHTML;
+    var freshStat = tmp.querySelector('[data-tab="evidence"] .m-st-tab-stat');
+    var stat = screen.querySelector('[data-tab="evidence"] .m-st-tab-stat');
+    if (freshStat && stat) stat.textContent = freshStat.textContent;
+  }
+
   return {
     renderDetail: renderDetail,
     selectTab: selectTab,
+    refreshEvidence: refreshEvidence,
   };
 })();

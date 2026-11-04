@@ -220,7 +220,9 @@ describe('Evidence panel in the page', () => {
     expect(cardIds()).toEqual(['o3', 'o2', 'o1']);
     expect($('#ev-list .obs-card-student')).toBeNull();
     expect($('#ev-list .obs-card-with')).toBeNull();
-    expect($('#ev-list .obs-card').getAttribute('data-action')).toBeNull();
+    // A card opens the edit window (the Observations page's, over this page).
+    expect($('#ev-list .obs-card').getAttribute('data-action')).toBe('evEditOb');
+    expect($('#ev-list .obs-card').getAttribute('tabindex')).toBe('0');
   });
 
   it('draws a mark per observation and labels the gap', () => {

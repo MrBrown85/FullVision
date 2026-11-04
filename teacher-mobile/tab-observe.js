@@ -1116,10 +1116,17 @@ window.MObserve = (function () {
         if (first) first.classList.add('m-post-new');
       }
     }
+    // A student's page lists the same cards.
+    if (window.MStudentDetail && MStudentDetail.refreshEvidence) MStudentDetail.refreshEvidence(cid);
+  }
+
+  function isPending(obId) {
+    return !!_pendingDeletes[obId];
   }
 
   return {
     renderFeed: renderFeed,
+    isPending: isPending,
     applyFilter: applyFilter,
     presentNewObsSheet: presentNewObsSheet,
     resetSheetState: resetSheetState,
