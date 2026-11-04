@@ -4826,6 +4826,34 @@ window.ReportQuestionnaire = (function () {
     var card = document.getElementById('tq-sentences');
     if (!st || !card) return;
     card.outerHTML = _sentencesHtml(_activeCourse, st, _facts(st));
+    _fitMenus();
+  }
+
+  /* An open menu or calendar on the Sentences card kept inside the window
+     (Nov 3 sweep: Other Wording, Support and Pick a Date opened past the
+     bottom): it opens upward when there is room above its row, else its
+     list scrolls inside a box that ends at the window's foot. */
+  function _fitMenus() {
+    if (typeof document === 'undefined' || !document.querySelectorAll || typeof window.innerHeight !== 'number') return;
+    var pane = document.getElementById('report-output');
+    var box = pane && pane.getBoundingClientRect ? pane.getBoundingClientRect() : null;
+    var top = (box ? Math.max(0, box.top) : 0) + 12;
+    var bottom = (box ? Math.min(window.innerHeight, box.bottom) : window.innerHeight) - 12;
+    document.querySelectorAll('#tq-sentences .qn-menu, #tq-sentences .qn-cal').forEach(function (m) {
+      if (!m.getBoundingClientRect || !m.parentElement) return;
+      m.classList.remove('up');
+      m.style.maxHeight = '';
+      m.style.overflowY = '';
+      var r = m.getBoundingClientRect();
+      if (r.bottom <= bottom) return;
+      var row = m.parentElement.getBoundingClientRect();
+      if (r.height <= row.top - top) {
+        m.classList.add('up');
+        return;
+      }
+      m.style.maxHeight = Math.max(160, bottom - r.top) + 'px';
+      m.style.overflowY = 'auto';
+    });
   }
 
   /* ── Browse Sentences ────────────────────────────────────── */
@@ -6804,6 +6832,7 @@ window.ReportQuestionnaire = (function () {
     var st = _current();
     if (st) _facts(st, true);
     rerender();
+    _fitMenus();
     var el = focusId && document.getElementById(focusId);
     if (el) el.focus();
   }
