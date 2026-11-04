@@ -67,3 +67,36 @@ test('Missing and Excused follow the score and feedback in the grader dialog', a
   await expect(btn('NS')).toHaveAttribute('aria-pressed', 'true');
   await expect(dialog.locator('.grader-grade')).toHaveText('Missing');
 });
+
+// Nov 3 sweep (step 4 group 3 #19): a greyed-out Missing looked like an
+// enabled one and its tip didn't say what to do; Clear Score was offered on
+// a cell with nothing to clear.
+test('a locked Missing looks off and says to clear the score; Clear Score is off on an empty cell', async ({
+  page,
+}) => {
+  await mockAuth(page);
+  await seedCourse(page);
+  await seedStudents(page);
+  await seedAssessments(page, [{ ...TEST_ASSESSMENT, rubricId: '' }]);
+  await seedScores(page, { 'stu-001': { 'assess-001': { QAP: 3 } } });
+  await gotoApp(page, '/gradebook');
+  await page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-001"]').click();
+  const ns = page.locator('#grader-overlay .grader-status [data-status="NS"]');
+  const late = page.locator('#grader-overlay .grader-status [data-status="LATE"]');
+  await expect(ns).toBeDisabled();
+  await expect(ns).toHaveAttribute('title', /Clear it first to mark Missing or Excused/);
+  const opacity = el => el.evaluate(b => Number(getComputedStyle(b).opacity));
+  expect(await opacity(ns)).toBeLessThan(0.6);
+  expect(await opacity(late)).toBe(1);
+  await page.keyboard.press('Escape');
+
+  await page.locator('.gb-scores-cell[data-sid="stu-002"][data-aid="assess-001"]').click({ button: 'right' });
+  await expect(page.locator('.gb-ctx-item[data-ctx="clearCell"]')).toHaveClass(/is-disabled/);
+  await page.keyboard.press('Escape');
+  await page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-001"]').click({ button: 'right' });
+  await expect(page.locator('.gb-ctx-item[data-ctx="clearCell"]')).not.toHaveClass(/is-disabled/);
+  await expect(page.locator('.gb-ctx-item[data-ctx="markMissing"]')).toHaveAttribute(
+    'title',
+    /Clear it first to mark Missing or Excused/,
+  );
+});

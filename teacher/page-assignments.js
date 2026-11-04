@@ -11850,7 +11850,9 @@ window.PageAssignments = (function () {
   var _GRADER_STATUS_LABELS = { NS: 'Missing', EXC: 'Excused', LATE: 'Late' };
   // Missing and Excused are greyed out on work with a score or feedback
   // (canSetAssignmentStatus, shared/data.js).
-  var _STATUS_LOCKED_TITLE = 'This student has a score or feedback on this work.';
+  // It says why, and what to do (Nov 3 sweep).
+  var _STATUS_LOCKED_TITLE =
+    'This student has a score or feedback on this work. Clear it first to mark Missing or Excused.';
   function _statusLockAttrs(aid, sid, key) {
     return canSetAssignmentStatus(activeCourse, sid, aid, key) ? '' : ' disabled title="' + _STATUS_LOCKED_TITLE + '"';
   }

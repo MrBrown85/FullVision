@@ -2640,6 +2640,8 @@ window.PageGradebook = (function () {
     if (restoreFocus === true && back && back.isConnected && back.focus) back.focus({ preventScroll: true });
   }
 
+  var STATUS_LOCKED_TITLE =
+    'This student has a score or feedback on this work. Clear it first to mark Missing or Excused.';
   function showScoreContextMenu(e, cell) {
     _dismissContextMenu();
     var aid = cell.dataset.aid;
@@ -2650,7 +2652,7 @@ window.PageGradebook = (function () {
       var locked = !canSetAssignmentStatus(activeCourse, sid, aid, key);
       return (
         '<div class="gb-ctx-item' +
-        (locked ? ' is-disabled" aria-disabled="true" title="This student has a score or feedback on this work.' : '') +
+        (locked ? ' is-disabled" aria-disabled="true" title="' + STATUS_LOCKED_TITLE : '') +
         '" data-ctx="' +
         ctx +
         '">' +
@@ -2658,12 +2660,22 @@ window.PageGradebook = (function () {
         '</div>'
       );
     }
+    // Clear Score has nothing to clear on a cell with no score (Nov 3 sweep).
+    var cellAssess = getAssessments(activeCourse).find(function (a) {
+      return a.id === aid;
+    });
+    var hasScore =
+      (getScores(activeCourse)[sid] || []).some(function (en) {
+        return en && en.assessmentId === aid && isScoreEntered(cellAssess, en);
+      }) || getRubricCheckIds(activeCourse, sid, aid).length > 0;
     var menu = document.createElement('div');
     menu.className = 'gb-ctx-menu';
     // html-safe: statusItem gets only fixed actions and labels.
     menu.innerHTML =
       '<div class="gb-ctx-item" data-ctx="editCell">Edit Score</div>' +
-      '<div class="gb-ctx-item" data-ctx="clearCell">Clear Score</div>' +
+      '<div class="gb-ctx-item' +
+      (hasScore ? '' : ' is-disabled" aria-disabled="true" title="There is no score to clear.') +
+      '" data-ctx="clearCell">Clear Score</div>' +
       '<div class="gb-ctx-divider"></div>' +
       statusItem('markMissing', 'NS', status === 'NS' ? 'Undo Missing' : 'Mark Missing') +
       statusItem('excuseCell', 'EXC', status === 'EXC' ? 'Undo Excuse' : 'Excuse') +

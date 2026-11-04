@@ -5975,7 +5975,9 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 }
 .grader-status-btn:disabled {
   color: var(--text-3);
-  cursor: default;
+  cursor: not-allowed;
+  /* Unmistakably off beside an enabled Late (Nov 3 sweep). */
+  opacity: 0.45;
 }
 .grader-status-btn.is-on {
   color: #fff;
