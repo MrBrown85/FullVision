@@ -343,7 +343,9 @@ window.GradeReport = (function () {
   /* ── Fitting ───────────────────────────────────────────────── */
 
   /* How the rows fall on the front and back at one tier, from the measured
-     heights: { front, back, tailOnFront, fits }. H is a side's height. */
+     heights: { front, back, tailOnFront, fits }. H is a side's height.
+     sizes.namePx: the line naming the student at the top of the Back (and
+     the gap under it), kept off the Back's room. */
   function plan(n, sizes, tier, H) {
     var per = function (room) {
       return Math.max(0, Math.floor((room - sizes.headPx) / tier.rowPx)) * tier.cols;
@@ -357,9 +359,10 @@ window.GradeReport = (function () {
     if (!rest && sizes.letterheadPx + GAP + tableH(front) + (front ? GAP : 0) + sizes.tailPx <= H) {
       return { front: front, back: 0, tailOnFront: true, fits: true };
     }
-    var backRoom = H - sizes.tailPx - (rest ? GAP : 0);
+    var name = sizes.namePx ? sizes.namePx + GAP : 0;
+    var backRoom = H - name - sizes.tailPx - (rest ? GAP : 0);
     var back = Math.min(rest, per(backRoom));
-    return { front: front, back: back, tailOnFront: false, fits: back === rest && sizes.tailPx <= H };
+    return { front: front, back: back, tailOnFront: false, fits: back === rest && name + sizes.tailPx <= H };
   }
 
   function _measure(stage, html) {
@@ -863,6 +866,11 @@ window.GradeReport = (function () {
     var list = rows(cid, student, o);
     var letterhead = ReportBlocks.renderBlockHeader(cid, student, ctx, { name: o.name });
     var tail = _tailHtml(cid, student, o, ctx);
+    // The Back starts with the line naming the student, as every side after
+    // the Front of a built report does, so a sheet printed single-sided can
+    // be matched to its student (DECISIONS "Report forms" 13; Colin, Nov 3:
+    // "Yes, all three"). The Feedback Pages name the student in their head.
+    var nameLine = ReportBlocks.renderContinuedLine(cid, student, { name: o.name });
     if (o.numbers) {
       show.numbers = true;
       show.numPx = 8 + 7 * String(Math.max(1, list.length)).length;
@@ -889,14 +897,23 @@ window.GradeReport = (function () {
           }),
         ),
       );
-      var sizes = { letterheadPx: _measure(stage, letterhead), tailPx: _measure(stage, tail) };
+      var sizes = {
+        letterheadPx: _measure(stage, letterhead),
+        tailPx: _measure(stage, tail),
+        namePx: _measure(stage, nameLine),
+      };
       for (var t = 0; t < TIERS.length; t++) {
         var tier = TIERS[t];
         // The header row and one row, measured at this tier.
         var one = _measure(stage, _tableHtml(list.slice(0, 1).concat(list.slice(0, 1)), show, tier));
         var head = _measure(stage, _tableHtml([], show, tier));
         tier = Object.assign({}, tier, { rowPx: Math.max(tier.rowPx, (one - head) / 2) });
-        p = plan(list.length, { letterheadPx: sizes.letterheadPx, tailPx: sizes.tailPx, headPx: head }, tier, H);
+        p = plan(
+          list.length,
+          { letterheadPx: sizes.letterheadPx, tailPx: sizes.tailPx, namePx: sizes.namePx, headPx: head },
+          tier,
+          H,
+        );
         chosen = tier;
         if (p.fits) break;
       }
@@ -912,6 +929,7 @@ window.GradeReport = (function () {
     var cut = list.length - p.front - p.back;
     var frontBody = letterhead + _sideTableHtml(frontRows, show, chosen) + (p.tailOnFront ? tail : '');
     var backBody =
+      nameLine +
       _sideTableHtml(backRows, show, chosen) +
       (cut > 0 ? '<div class="gr-cut">' + cut + ' more not shown: they do not fit on one sheet.</div>' : '') +
       tail;

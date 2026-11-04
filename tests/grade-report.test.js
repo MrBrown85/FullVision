@@ -200,6 +200,14 @@ describe('plan', () => {
     expect(p.fits).toBe(true);
   });
 
+  it('keeps room on the back for the line naming the student', () => {
+    const p = G.plan(60, sizes, regular, H);
+    const named = G.plan(60, Object.assign({ namePx: 16 }, sizes), regular, H);
+    expect(named.front).toBe(p.front);
+    expect(named.back).toBe(Math.min(60 - p.front, Math.floor((H - 28 - 200 - 12 - 20) / 19)));
+    expect(G.plan(10, Object.assign({}, sizes, { tailPx: H - 20, namePx: 16 }), regular, H).fits).toBe(false);
+  });
+
   it('does not fit past both sides at a size, and holds twice the rows in two columns', () => {
     expect(G.plan(120, sizes, regular, H).fits).toBe(false);
     const p = G.plan(120, sizes, two, H);
@@ -214,6 +222,7 @@ describe('Assignment Numbers column', () => {
     stub('courseToday', () => '2026-10-29');
     stub('ReportBlocks', {
       renderBlockHeader: () => '<div class="gr-letterhead">Letterhead</div>',
+      renderContinuedLine: () => '<div class="sheet-name-line">Ada Lovelace (continued)</div>',
       reportContext: () => ({}),
     });
     stub('ReportSheets', { sideHeight: () => 996 });
@@ -466,5 +475,43 @@ describe('extra cards: Observations and Term Comment', () => {
       [0, 3],
       [3, 6],
     ]);
+  });
+});
+
+/* The Grade Report's Back started straight with the table or the summary,
+   so a sheet printed single-sided could not be matched to its student;
+   every side after the Front of a built report names the student (#875,
+   Colin Nov 3: "Yes, all three"). */
+describe('the Back names the student', () => {
+  const layout = sideH => {
+    seed();
+    stub('courseToday', () => '2026-10-29');
+    stub('ReportBlocks', {
+      renderBlockHeader: () => '<div class="gr-letterhead">Letterhead</div>',
+      renderContinuedLine: () => '<div class="sheet-name-line">Ada Lovelace (continued)</div>',
+      reportContext: () => ({}),
+    });
+    stub('ReportSheets', { sideHeight: () => sideH });
+    stub('studentGradeSummary', () => ({ text: '80%' }));
+    stub('assessmentGroupGrade', () => ({ text: '80%' }));
+    stub('categoryCalcMode', () => 'average');
+    stub('fullName', s => s.firstName + ' ' + s.lastName);
+    const stage = { innerHTML: '', firstChild: { offsetHeight: 50 }, querySelectorAll: () => [] };
+    return G.layoutStudent(CID, ST, {}, { paper: 'letter', stage, grade: {} });
+  };
+  const sidesOf = html => html.split('<div class="sheet-zoom"').slice(1);
+
+  it('puts the line at the top of the Back, not on the Front', () => {
+    const r = layout(200);
+    expect(r.sides).toBe(2);
+    const [front, back] = sidesOf(r.html);
+    expect(front).not.toContain('sheet-name-line');
+    expect(back).toMatch(/<div class="sheet-body"><div class="sheet-name-line">Ada Lovelace \(continued\)<\/div>/);
+  });
+
+  it('a report that fits the Front has no line', () => {
+    const r = layout(996);
+    expect(r.sides).toBe(1);
+    expect(r.html).not.toContain('sheet-name-line');
   });
 });
