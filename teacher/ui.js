@@ -1504,21 +1504,22 @@ function rerenderKeeping(id, renderFn) {
 
 /* The mark a gradebook cell shows for a status that replaces its score:
    M (missing, stored as NS) or EXC (excused, not counted). Its tooltip says how M
-   counts for this work (calc.js's COLUMN_STATUS_RULES): 0 on points work,
-   though in a Proficiency class only in its Class Average, as it is no
-   evidence for proficiency (Colin, 2026-11-03); on proficiency work no
-   evidence, though a class with a course % counts it as 0 there. Empty for
-   no status or Late, which keeps its score. */
+   counts, by the class's grading style (Colin, 2026-11-03; DECISIONS
+   "Class Averages and statuses" 7): 0 in a Letter class; 0 in the course %
+   and no evidence in proficiency in a Both class; no evidence in a
+   Proficiency class, where a points column's Class Average still counts it
+   as 0 (calc.js's COLUMN_STATUS_RULES). Empty for no status or Late, which
+   keeps its score. */
 function scoreStatusMarker(status, cid, assessment) {
   if (status === 'NS') {
     var nsTitle = 'Missing: counts as 0';
-    if (assessment && isPointsScored(assessment) && courseGradeMode(cid) === 'proficiency') {
-      nsTitle = 'Missing: 0 in the Class Average, not counted in proficiency';
-    } else if (assessment && !isPointsScored(assessment)) {
-      nsTitle =
-        courseGradeMode(cid) === 'proficiency'
-          ? 'Missing: not counted, no evidence yet'
-          : 'Missing: 0 in the course %, not counted in proficiency';
+    if (assessment) {
+      var mode = courseGradeMode(cid);
+      if (mode === 'both') nsTitle = 'Missing: 0 in the course %, not counted in proficiency';
+      else if (mode === 'proficiency')
+        nsTitle = isPointsScored(assessment)
+          ? 'Missing: no evidence yet, 0 in the Class Average'
+          : 'Missing: not counted, no evidence yet';
     }
     return '<span class="gb-status gb-status-ns" title="' + nsTitle + '">M</span>';
   }

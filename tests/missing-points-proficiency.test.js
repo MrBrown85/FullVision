@@ -4,7 +4,9 @@
  * competency proficiency, as Missing proficiency work does (#634); its
  * column's Class Average still counts it as 0. Sofia's Missing Unit 1 Quiz
  * left her at 3.0 while the column averaged it as 0, which is the rule. The
- * M mark's tooltip said "counts as 0", which it doesn't in her grade.
+ * M mark's tooltip said "counts as 0", which it doesn't in her grade. Missing
+ * follows the class's grading style (Colin, 2026-11-03): 0 in a Letter
+ * class, 0 in the course % and no evidence in levels in a Both class.
  */
 import './setup.js';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -64,13 +66,15 @@ describe('Missing points work in a Proficiency class', () => {
     expect(getClassPointsAverage(CID, [SOFIA, LIAM], quiz)).toMatchObject({ avg: 4.5, pct: 22.5, count: 2 });
   });
 
-  it('its M says it counts only in the Class Average', () => {
+  it('its M says how it counts in each grading style', () => {
     seed();
-    expect(scoreStatusMarker('NS', CID, quiz)).toContain(
-      'title="Missing: 0 in the Class Average, not counted in proficiency"',
-    );
+    expect(scoreStatusMarker('NS', CID, quiz)).toContain('title="Missing: no evidence yet, 0 in the Class Average"');
     expect(scoreStatusMarker('NS', CID, quiz)).not.toContain('counts as 0');
     COURSES[CID].gradingSystem = 'letter';
     expect(scoreStatusMarker('NS', CID, quiz)).toContain('title="Missing: counts as 0"');
+    COURSES[CID].gradingSystem = 'both';
+    expect(scoreStatusMarker('NS', CID, quiz)).toContain(
+      'title="Missing: 0 in the course %, not counted in proficiency"',
+    );
   });
 });
