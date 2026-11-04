@@ -11562,7 +11562,8 @@ window.PageAssignments = (function () {
      saved points and leaves the box (a second Escape, or one with nothing
      typed, closes the dialog);
      1–4 picks a level and + / − fine-tunes it on a focused criterion or
-     competency card. True when the key was used. */
+     competency card, and ↓ / ↑ move to the next or previous one. True when
+     the key was used. */
   function _graderCardKey(e) {
     var t = e.target;
     var cls = t && t.classList;
@@ -11604,6 +11605,19 @@ window.PageAssignments = (function () {
       e.preventDefault();
       if (card) _graderSetMod(aid, card.dataset.critid, up ? 1 : -1);
       else _graderSetTagMod(aid, tagCard.dataset.tag, up ? 1 : -1);
+      return true;
+    }
+    // ↓ and ↑ move to the next and previous criterion or competency, so
+    // 1–4 scores it; they used to scroll the dialog and leave the focus.
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.shiftKey) {
+      var root = _graderRoot(aid);
+      var cards = root ? Array.prototype.slice.call(root.querySelectorAll(card ? '.grdt-crit' : '.grdl-card')) : [];
+      var to = cards[cards.indexOf(t) + (e.key === 'ArrowDown' ? 1 : -1)];
+      e.preventDefault();
+      if (to) {
+        to.focus({ preventScroll: true });
+        to.scrollIntoView({ block: 'nearest' });
+      }
       return true;
     }
     return false;
