@@ -4271,6 +4271,10 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: var(--text-sm);
   color: var(--text-2);
 }
+/* In the drawer the empty line lines up with the rows. */
+.qno-panel .qno-empty {
+  padding: 14px 18px 14px 24px;
+}
 
 .qno-skill-card {
   margin: 0 18px 0 24px;
