@@ -11,7 +11,7 @@
  *   fv-sync-owner-v1          — { tab, at }: which tab sends (fallback only, see Tabs)
  *
  * Entry shape:
- *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, next_at, blocked_on, sent_at }
+ *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, last_code, next_at, blocked_on, sent_at }
  *
  * Tabs: every tab shares the queue, but only one tab — the owner — sends.
  *   The owner holds the Web Lock fv-sync-queue-v1 for as long as it is open;
@@ -982,6 +982,7 @@
 
     entry.attempts = (entry.attempts || 0) + 1;
     entry.last_error = _errorText(res);
+    entry.last_code = (res && res.error && res.error.code) || undefined;
     if (_isTransient(res)) {
       var delay = BACKOFF_MS[Math.min(entry.attempts, BACKOFF_MS.length) - 1];
       entry.next_at = new Date(Date.now() + delay).toISOString();
@@ -1017,12 +1018,14 @@
     _pump(false);
   }
 
-  /* A write the server rejected twice, given up on. The endpoint and the
-     server's message only: the payload holds student data. */
+  /* A write the server rejected twice, given up on. Sentry gets the
+     endpoint and the Postgres error code only: the payload holds student
+     data, and the server's message can quote an id or a value. */
   function _reportDropped(entry) {
     console.warn('[v2Queue] dropped ' + entry.endpoint + ' after a second rejection: ' + entry.last_error);
     if (window.Sentry && typeof window.Sentry.captureMessage === 'function') {
-      window.Sentry.captureMessage('Outbox dropped ' + entry.endpoint + ': ' + entry.last_error, 'warning');
+      var code = /^[0-9A-Z]{5}$/.test(entry.last_code || '') ? ' (' + entry.last_code + ')' : '';
+      window.Sentry.captureMessage('Outbox dropped ' + entry.endpoint + code, 'warning');
     }
   }
 
