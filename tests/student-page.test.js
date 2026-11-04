@@ -187,6 +187,19 @@ describe('student page', () => {
     expect(root.textContent).toContain('It will be part of your report.');
   });
 
+  it('with no course goal written, the check-in says so instead of asking how the goal is going', async () => {
+    replies.push(Object.assign({}, OPEN, { context: {} }));
+    T.start(root, '#K7M4QX');
+    await tick();
+    click('[data-act="start"]');
+    expect(root.querySelector('#sp-count').textContent).toBe('0 of 4 answered');
+    click('[data-act="next"]');
+    expect(root.textContent).toContain('You haven’t written a Science 8 goal yet, so there is nothing to check on here.');
+    expect(root.textContent).not.toContain('How is your goal going?');
+    expect(root.querySelector('[data-q="g1"]')).toBeNull();
+    expect(root.querySelector('[data-act="pick"][data-q="g3"]')).toBeTruthy();
+  });
+
   it('a set of choices is one Tab stop, and the arrow keys choose within it', async () => {
     replies.push(OPEN);
     T.start(root, '#K7M4QX');

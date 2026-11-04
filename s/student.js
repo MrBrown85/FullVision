@@ -133,9 +133,48 @@ var StudentPage = (function () {
 
   function allQuestions(data) {
     var out = [];
+    var skip = noGoalQuestions(data);
     ((data && data.parts) || []).forEach(function (p) {
       (p.questions || []).forEach(function (q) {
-        out.push(q);
+        if (!skip[q.id]) out.push(q);
+      });
+    });
+    return out;
+  }
+
+  /* A Goal Check-In's part is grouped as the phone shows it: a goal status
+     question and the ones after it, then a Core Competency pick and the
+     ones after it. */
+  function goalGroups(part) {
+    var groups = [];
+    var cur = null;
+    (part.questions || []).forEach(function (q) {
+      if (q.kind === 'goal_status' || q.kind === 'core_pick' || !cur) {
+        cur = { lead: q.kind, items: [] };
+        groups.push(cur);
+      }
+      cur.items.push(q);
+    });
+    return groups;
+  }
+
+  function hasCourseGoal(data) {
+    var goal = data && data.context && data.context.course_goal;
+    return !!(goal && String(goal.text || '').trim());
+  }
+
+  /* With no course goal written yet there is nothing to check on: the goal
+     status and its next step are left out ({question id: true}). */
+  function noGoalQuestions(data) {
+    var out = {};
+    if (!data || !data.parts || hasCourseGoal(data)) return out;
+    data.parts.forEach(function (p) {
+      if (p.kind !== 'goal_checkin') return;
+      goalGroups(p).forEach(function (g) {
+        if (g.lead !== 'goal_status') return;
+        g.items.forEach(function (q) {
+          out[q.id] = true;
+        });
       });
     });
     return out;
@@ -682,19 +721,21 @@ var StudentPage = (function () {
      question) and the Core Competency goal (from its pick). */
   function goalSections(state, part) {
     var course = state.data.course.name;
-    var qs = part.questions || [];
-    var groups = [];
-    var cur = null;
-    qs.forEach(function (q) {
-      if (q.kind === 'goal_status' || q.kind === 'core_pick' || !cur) {
-        cur = { lead: q.kind, items: [] };
-        groups.push(cur);
-      }
-      cur.items.push(q);
-    });
+    var groups = goalGroups(part);
     return groups
       .map(function (g) {
         var html = '<section class="sp-card">';
+        if (g.lead === 'goal_status' && !hasCourseGoal(state.data)) {
+          // No goal to check on: say so instead of asking how it is going.
+          return (
+            html +
+            '<h2 class="sp-h2">' +
+            esc('My ' + course + ' Goal') +
+            '</h2><p class="sp-note">' +
+            esc('You haven’t written a ' + course + ' goal yet, so there is nothing to check on here.') +
+            '</p></section>'
+          );
+        }
         if (g.lead === 'goal_status') {
           html += '<h2 class="sp-h2">' + esc('My ' + course + ' Goal') + '</h2>';
           var goal = state.data.context && state.data.context.course_goal;
