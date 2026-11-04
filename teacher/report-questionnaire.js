@@ -6094,7 +6094,7 @@ window.ReportQuestionnaire = (function () {
     if (o.where === 'gap') {
       // At a gap: the sentence goes into the comment there, not the bank.
       return `<div class="qn-own qn-own-gap" id="tq-own" role="group" aria-label="A sentence of your own">
-      <input type="text" class="qn-line-input" id="tq-own-input" value="${esc(o.text)}" autocomplete="off" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}. It goes into the comment here.">
+      <textarea class="qn-line-input qn-own-text" id="tq-own-input" rows="2" autocomplete="off" spellcheck="true" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}. It goes into the comment here. Return adds it.">${esc(o.text)}</textarea>
       <span class="qn-own-hint">One sentence for this student. Its row’s Options menu can add it to your bank.</span>
       <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqSentences" data-do="ownCancel" title="Closes without adding anything.">Cancel</button><button type="button" class="qn-line-save" id="tq-own-save" data-action="tqSentences" data-do="ownSave"${o.text.trim() ? '' : ' disabled'} title="Puts this sentence in the comment here.">Add Here</button></div>
     </div>`;
@@ -6113,11 +6113,20 @@ window.ReportQuestionnaire = (function () {
           return `<option value="${esc(x.key)}"${x.key === o.caseKey ? ' selected' : ''}>${esc(x.label)}</option>`;
         })
         .join('');
-      picker = `<div class="qn-own-under"><span class="qn-own-label">Belongs Under</span><select class="qn-own-select" id="tq-own-part" data-tq-own="part" aria-label="The part of the comment this sentence belongs under" title="The part of the comment this sentence belongs under.">${parts}</select><select class="qn-own-select" id="tq-own-case" data-tq-own="case" aria-label="The case this sentence is for" title="When Generate may use it: a case that is true for ${esc(first)} now, or any case."><option value=""${o.caseKey ? '' : ' selected'}>Any Case</option>${cases}</select></div>`;
+      // Grade, Support and Closing take no sentence of the teacher's own:
+      // the grade sentence states the mark, and Support and Closing are
+      // the class's lines, set on their rows.
+      var fromPart = o.from ? PARTS.find(function (x) {
+        return x.id === o.from;
+      }) : null;
+      var note = fromPart
+        ? `<span class="qn-own-hint">My Bank keeps no ${esc(fromPart.label)} sentences${fromPart.id === 'grade' ? ': the grade sentence states the mark' : ': they are set for the class on their row'}. Pick the part this one belongs under.</span>`
+        : '';
+      picker = `${note}<div class="qn-own-under"><span class="qn-own-label">Belongs Under</span><select class="qn-own-select" id="tq-own-part" data-tq-own="part" aria-label="The part of the comment this sentence belongs under" title="The part of the comment this sentence belongs under.">${parts}</select><select class="qn-own-select" id="tq-own-case" data-tq-own="case" aria-label="The case this sentence is for" title="When Generate may use it: a case that is true for ${esc(first)} now, or any case."><option value=""${o.caseKey ? '' : ' selected'}>Any Case</option>${cases}</select></div>`;
     }
     var ok = !!c && !!c.template && !c.blocked;
     return `<div class="qn-own" id="tq-own" role="group" aria-label="A sentence of your own">
-      <input type="text" class="qn-line-input" id="tq-own-input" value="${esc(o.text)}" autocomplete="off" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}.">
+      <textarea class="qn-line-input qn-own-text" id="tq-own-input" rows="2" autocomplete="off" spellcheck="true" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}. Return saves it.">${esc(o.text)}</textarea>
       <span class="qn-own-hint">Write it for this student; FullVision turns the name and pronouns into slots.</span>
       ${picker}
       <div class="qn-own-out" id="tq-own-out">${_ownOutHtml(c)}</div>
@@ -6189,13 +6198,19 @@ window.ReportQuestionnaire = (function () {
     }
     var part = opts.part || '';
     var index = Number(opts.index);
+    // The part it was opened from, to say so when My Bank keeps none of it.
+    var from = part;
     if (where === 'row' && !part) {
       var r = (_rows[_rowKey(st)] || [])[index];
       var p = r && r.step ? partOf(r.step) : null;
+      from = p ? p.id : '';
       part = p && _ownStep(p.id) ? p.id : '';
     }
     // The sheet's top button starts on the part that is open.
-    if (where === 'top' && !part && _browse && _ownStep(_browse.part)) part = _browse.part;
+    if (where === 'top' && !part && _browse) {
+      from = _browse.part || '';
+      if (_ownStep(_browse.part)) part = _browse.part;
+    }
     if (where === 'browse' && !_ownStep(part)) part = '';
     if (!part) part = (_ownParts()[0] || {}).id || '';
     _own = {
@@ -6206,6 +6221,7 @@ window.ReportQuestionnaire = (function () {
       part: part,
       caseId: where === 'browse' ? String(opts.caseId || '') : '',
       caseKey: '',
+      from: from && !_ownStep(from) ? from : '',
       key: _rowKey(st),
     };
     if (where === 'row') _syncRequired();

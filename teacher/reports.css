@@ -6273,6 +6273,13 @@ body.qn-roster #gb-sidebar .student-row-note {
   width: 100%;
   box-sizing: border-box;
 }
+/* Two lines that wrap, so a long sentence can be read while it is typed. */
+.qn-own .qn-own-text {
+  display: block;
+  line-height: 1.4;
+  resize: vertical;
+  min-height: calc(2 * 1.4em + 12px);
+}
 .qn-own-hint,
 .qn-own-offered,
 .qn-own-label {
