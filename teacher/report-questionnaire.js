@@ -4992,11 +4992,11 @@ window.ReportQuestionnaire = (function () {
   // The stories a strengths sentence can be written for (CommentBank.ANGLES
   // ids); any other story reads as steady.
   var STORIES = [
-    ['steady', 'Steady'],
+    ['steady', 'Any Student'],
     ['climb', 'Marks Climbed'],
     ['slide', 'Marks Slid'],
     ['split', 'Strong in One Skill'],
-    ['hidden', 'Hidden by Missing Work'],
+    ['hidden', 'Grade Lowered by Missing Work'],
     ['newcomer', 'New to the Class'],
   ];
   var SUMMARY_CASES = [
@@ -5079,8 +5079,8 @@ window.ReportQuestionnaire = (function () {
       add('languageGoals', 'Language Goals');
       add('iepGoals', 'IEP Goals');
     } else if (part === 'bestPiece') {
-      add('note', 'With a Note');
-      add('noNote', 'Without a Note');
+      add('note', 'With a Note for the Report');
+      add('noNote', 'Without a Note for the Report');
     } else if (part === 'strengths') {
       STORIES.forEach(function (x) {
         add(x[0], x[1]);
@@ -5488,11 +5488,11 @@ window.ReportQuestionnaire = (function () {
       return !q || t.toLowerCase().indexOf(q) >= 0;
     };
     // yours: null, or { id, general } for a sentence of the teacher's own:
-    // the Yours chip ("Yours · Any Case" when it is bound to no case) and
+    // the Yours chip ("Yours · Any Student" when it is bound to no case) and
     // a × that removes it from their bank, with Undo.
     var row = function (text, meta, ctrl, on, yours) {
       var chip = yours
-        ? `<span class="qn-chip-yours" title="${yours.general ? 'A sentence of your own for this part, with no case: Generate uses it when nothing more specific fits.' : 'A sentence of your own.'}">${yours.general ? 'Yours · Any Case' : 'Yours'}</span>`
+        ? `<span class="qn-chip-yours" title="${yours.general ? 'A sentence of your own for this part, for any student: Generate uses it when nothing more specific fits.' : 'A sentence of your own.'}">${yours.general ? 'Yours · Any Student' : 'Yours'}</span>`
         : '';
       var del = yours
         ? `<button type="button" class="qn-browse-del" data-action="tqSentences" data-do="ownDelete" data-sentence="${esc(yours.id)}" aria-label="Delete this sentence from your bank" title="Removes this sentence from your bank. Undo for a few seconds.">×</button>`
@@ -6243,12 +6243,12 @@ window.ReportQuestionnaire = (function () {
       var note = fromPart
         ? `<span class="qn-own-hint">My Bank keeps no ${esc(fromPart.label)} sentences${fromPart.id === 'grade' ? ': the grade sentence states the mark' : ': they are set for the class on their row'}. Pick the part this one belongs under.</span>`
         : '';
-      picker = `${note}<div class="qn-own-under"><span class="qn-own-label">Belongs Under</span><select class="qn-own-select" id="tq-own-part" data-tq-own="part" aria-label="The part of the comment this sentence belongs under" title="The part of the comment this sentence belongs under.">${parts}</select><select class="qn-own-select" id="tq-own-case" data-tq-own="case" aria-label="The case this sentence is for" title="When Generate may use it: a case that is true for ${esc(first)} now, or any case."><option value=""${o.caseKey ? '' : ' selected'}>Any Case</option>${cases}</select></div>`;
+      picker = `${note}<div class="qn-own-under"><span class="qn-own-label">Belongs Under</span><select class="qn-own-select" id="tq-own-part" data-tq-own="part" aria-label="The part of the comment this sentence belongs under" title="The part of the comment this sentence belongs under.">${parts}</select><label class="qn-own-label" for="tq-own-case">Used For</label><select class="qn-own-select" id="tq-own-case" data-tq-own="case" title="When Generate may use it: a case that is true for ${esc(first)} now, or any student."><option value=""${o.caseKey ? '' : ' selected'}>Any Student</option>${cases}</select></div>`;
     }
     var ok = !!c && !!c.template && !c.blocked;
     return `<div class="qn-own" id="tq-own" role="group" aria-label="A sentence of your own">
       <textarea class="qn-line-input qn-own-text" id="tq-own-input" rows="2" autocomplete="off" spellcheck="true" aria-label="A sentence of your own for ${esc(first)}" title="One sentence in plain words about ${esc(first)}. Return saves it.">${esc(o.text)}</textarea>
-      <span class="qn-own-hint">Write it for this student; FullVision turns the name and pronouns into slots.</span>
+      <span class="qn-own-hint">Write it for this student. In the saved sentence, the words in brackets change for each student.</span>
       ${picker}
       <div class="qn-own-out" id="tq-own-out">${_ownOutHtml(c)}</div>
       <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqSentences" data-do="ownCancel" title="Closes without saving.">Cancel</button><button type="button" class="qn-line-save" id="tq-own-save" data-action="tqSentences" data-do="ownSave"${ok ? '' : ' disabled'} title="Adds this sentence to your bank.">Save</button></div>

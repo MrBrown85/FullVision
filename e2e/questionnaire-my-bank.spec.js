@@ -39,7 +39,9 @@ test('Belongs Under starts on the part it was opened from, says why Grade is not
   // The box is two lines and wraps a long sentence.
   const input = box.locator('#tq-own-input');
   await expect(input).toHaveJSProperty('tagName', 'TEXTAREA');
-  await input.fill('Cece reads every lab question twice, plans each step on paper first and then checks her results with a partner.');
+  await input.fill(
+    'Cece reads every lab question twice, plans each step on paper first and then checks her results with a partner.',
+  );
   expect(await input.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   expect(await input.evaluate(el => el.clientHeight)).toBeGreaterThan(40);
 });
@@ -74,4 +76,21 @@ test('a search with no match here offers the parts where it does match (group 3 
   await go.click();
   await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Next Step');
   await expect(sheet.locator('.qn-browse-row').first()).toBeVisible();
+});
+
+test('the My Bank form names its case select and says what the brackets mean (group 3 #72)', async ({ page }) => {
+  await open(page);
+  await page.locator('#tq-generate').click();
+  await page.locator('#tq-browse-btn').click();
+  const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+  await sheet.locator('[role="tab"]', { hasText: 'Strengths' }).click();
+  await sheet.locator('.qn-browse-add-top').click();
+  const box = sheet.locator('#tq-own');
+  await expect(box.getByLabel('Used For')).toHaveValue('');
+  await expect(box.locator('label.qn-own-label', { hasText: 'Used For' })).toBeVisible();
+  await expect(box.locator('#tq-own-case option').first()).toHaveText('Any Student');
+  await expect(box.locator('.qn-own-hint')).toHaveText(
+    'Write it for this student. In the saved sentence, the words in brackets change for each student.',
+  );
+  await expect(box).not.toContainText('slots');
 });
