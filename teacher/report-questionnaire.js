@@ -1346,6 +1346,104 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
+  /* ── Observations (Questionnaire glance plan, step 4) ────────
+     For reading only: nothing here feeds Generate. */
+
+  /* The four types in order (OBS_SENTIMENTS), then All: [{ key, label, title }]. */
+  function _obsTypes() {
+    var plural = { strength: 'strengths', growth: 'growth', concern: 'concerns', note: 'notes' };
+    return Object.keys(OBS_SENTIMENTS)
+      .map(function (k) {
+        return { key: k, label: OBS_SENTIMENTS[k].label, title: 'Show ' + (plural[k] || k) };
+      })
+      .concat([{ key: 'all', label: 'All', title: 'Show all observations' }]);
+  }
+
+  /* The student's observations, newest first, each with its studentId (the
+     store keys them by student), as the student page lists them. */
+  function studentObs(cid, sid) {
+    return (getStudentQuickObs(cid, sid) || [])
+      .map(function (o) {
+        return Object.assign({}, o, { studentId: sid });
+      })
+      .sort(function (a, b) {
+        return (
+          String(ObsCard.obDay(b)).localeCompare(String(ObsCard.obDay(a))) ||
+          String(b.created || '').localeCompare(String(a.created || ''))
+        );
+      });
+  }
+
+  /* How many of each type, and all: { strength, growth, concern, note, all }. */
+  function obsCounts(list) {
+    var out = { all: list.length };
+    Object.keys(OBS_SENTIMENTS).forEach(function (k) {
+      out[k] = 0;
+    });
+    list.forEach(function (ob) {
+      if (out[ob.sentiment] != null) out[ob.sentiment]++;
+    });
+    return out;
+  }
+
+  /* The observations dated after the earlier report's last day, or null
+     with no earlier report. */
+  function obsSinceReport(list, f) {
+    if (!f.lastReport) return null;
+    return list.filter(function (ob) {
+      return ObsCard.obDay(ob) > f.lastReport.endsOn;
+    }).length;
+  }
+
+  // html-safe: counts are numbers, type keys and labels are OBS_SENTIMENTS' own, labels esc()'d
+  function _obsStripHtml(counts, on) {
+    return _obsTypes()
+      .map(function (t) {
+        var chosen = on === t.key;
+        return `<button type="button" class="qno-seg${chosen ? ' on' : ''}" data-sentiment="${t.key}" data-action="tqOpenObs" data-filter="${t.key}"${on != null ? ` aria-pressed="${chosen}"` : ` title="${esc(t.title)}"`}><span class="qno-seg-n">${counts[t.key] || 0}</span><span class="qno-seg-word">${esc(t.label)}</span></button>`;
+      })
+      .join('');
+  }
+
+  // html-safe: observation cards from ObsCard.html (escapes every value); names, pronouns and the sub-line esc()'d
+  function _obsHtml(cid, student, f) {
+    var first = student.firstName || displayNameFirst(student);
+    var list = studentObs(cid, student.id);
+    var since = obsSinceReport(list, f);
+    var sub =
+      list.length && since != null
+        ? 'So far this year · ' + since + ' since the ' + f.lastReport.label + ' report'
+        : 'So far this year';
+    var top = `<div class="qn-card-top"><span class="qn-card-title">Observations</span><span class="qn-sub">${esc(sub)}</span></div>`;
+    if (!list.length) {
+      var her = (f.pronouns && f.pronouns.obj) || 'them';
+      return `<div class="qn-card qn-obs">${top}
+        <div class="qno-empty">No observations for ${esc(first)} yet. Observations you record for ${esc(her)} this year show here.</div>
+      </div>`;
+    }
+    var ctx = ObsCard.context(cid);
+    var cards = list
+      .slice(0, 3)
+      .map(function (ob) {
+        return ObsCard.html(ob, ctx, {
+          showStudent: false,
+          when: 'day',
+          readOnly: true,
+          action: 'tqOpenObsAt',
+          title: 'Opens this observation in full',
+        });
+      })
+      .join('');
+    return `<div class="qn-card qn-obs">${top}
+      <div class="qno-strip" role="group" aria-label="Open observations by type">${_obsStripHtml(obsCounts(list))}</div>
+      <div class="qno-recent">${cards}</div>
+      <div class="qno-foot">
+        <button type="button" class="qn-card-link qno-view-all" data-action="tqOpenObs" data-filter="all" aria-haspopup="dialog">View All ${list.length}</button>
+        <span class="qno-foot-note">Newest first</span>
+      </div>
+    </div>`;
+  }
+
   /* ── The student's Voice ─────────────────────────────────── */
 
   function _answer(it) {
@@ -7799,6 +7897,7 @@ window.ReportQuestionnaire = (function () {
         ${_headerHtml(cid, student, f)}
         ${_habitsHtml(cid, f)}
         ${_glanceHtml(cid, student, f)}
+        ${_obsHtml(cid, student, f)}
         ${_voiceHtml(cid, student, f, comment)}
       </div>
       <div class="qn-right">
@@ -8096,6 +8195,8 @@ window.ReportQuestionnaire = (function () {
     basisChoices: basisChoices,
     renderTermQuestionnaire: renderTermQuestionnaire,
     afterRender: afterRender,
+    studentObs: studentObs,
+    obsCounts: obsCounts,
     tqOpenSkills: tqOpenSkills,
     tqCloseDrawer: tqCloseDrawer,
     drawerOpen: drawerOpen,
