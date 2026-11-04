@@ -575,6 +575,8 @@
     if (restore) newScreen.setAttribute('data-restore', JSON.stringify(restore));
     newScreen.classList.add('m-push-enter');
     stack.appendChild(newScreen);
+    // The student screen's open tab, in view in its strip.
+    if (window.MStudentDetail) MStudentDetail.scrollActiveTab(newScreen);
     // A pushed screen with its own sync dot shows the current state.
     if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
 
@@ -665,6 +667,7 @@
       screen.classList.remove('m-screen-hidden');
       screen.setAttribute('data-restore', JSON.stringify({ kind: 'detail', sid: sid }));
       stack.appendChild(screen);
+      if (window.MStudentDetail) MStudentDetail.scrollActiveTab(screen);
       if (list) list.style.display = 'none';
       _navStacks[_activeTab].push('detail');
       var navBar = screen.querySelector('.m-nav-bar');

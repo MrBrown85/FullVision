@@ -219,15 +219,28 @@ describe('MStudents.renderDetail', () => {
     expect(html).toContain('Student not found');
   });
 
-  it('shows the five tabs with their counts', () => {
+  // Step 4 group 3 #74: Goals is part of the Learner Profile, as on the
+  // desktop, whose tile counts goals.
+  it('shows the desktop tabs with their counts', () => {
     mockDataLayer({
       getStudentQuickObs: () => [{ id: 'ob1' }, { id: 'ob2' }, { id: 'ob3' }],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
     const labels = [...html.matchAll(/class="m-st-tab-label">([^<]+)</g)].map(m => m[1]);
-    expect(labels).toEqual(['Competencies', 'Assessments', 'Evidence', 'Goals', 'Learner Profile']);
+    expect(labels).toEqual(['Competencies', 'Assessments', 'Evidence', 'Learner Profile']);
     expect(html).toContain('3 Observations');
     expect(html).toContain('m-st-panel-evidence');
+    expect(html).toContain('0 Goals');
+    const profile = html.slice(html.indexOf('id="m-st-panel-profile"'));
+    expect(profile).toContain('Goals and Reflections');
+    expect(profile).toContain('Seen in Observations');
+  });
+
+  // Step 4 group 3 #74: designations show by name, as on the desktop.
+  it('shows each designation by code and name in the header', () => {
+    mockDataLayer({});
+    const html = MStudents.renderDetail(CID, 'stu2');
+    expect(html).toContain('>G ' + BC_DESIGNATIONS.G.name + '<');
   });
 
   it('shows how many are missing on the Assessments tab', () => {

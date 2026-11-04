@@ -4426,3 +4426,15 @@ body.fv-switching-course::after {
 .m-assess-compact[data-action]:active {
   background: var(--overlay-pressed);
 }
+
+/* A designation by code and name ("P Gifted") in the student screen's header. */
+.m-badge.m-badge-des {
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+/* The Learner Profile's two parts. */
+.m-st-profile-h {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
