@@ -1263,6 +1263,10 @@ window.PersonalBank = (function () {
     var fam = FAMILY_LABEL[c.family] || '';
     var list = _R().list(bits);
     if (list) return 'Offered when ' + list + (fam ? ', in ' + fam + ' classes' : '');
+    // A part with no case: Generate puts it in a draft whenever nothing
+    // more specific fits, so the preview says so (Nov 3 sweep).
+    if (c.general)
+      return 'Generate uses it for any student' + (fam ? ' in ' + fam + ' classes' : '') + ' when nothing more specific fits';
     return fam ? 'Offered in ' + fam + ' classes' : 'Offered for every student';
   }
 
@@ -1336,7 +1340,11 @@ window.PersonalBank = (function () {
       mine: true,
       src: 'yours',
     };
-    if (c.family) s.subjects = [c.family];
+    // Always the kind of class: one written in a class FullVision has no
+    // kind for stays in such classes, and never reaches a Socials or
+    // Science class (Nov 3 sweep: a lab sentence in a Social Studies 11
+    // draft).
+    s.subjects = [c.family || ''];
     if (c.comps && Object.keys(c.comps).length) s.comps = c.comps;
     if (c.counts && Object.keys(c.counts).length) s.counts = c.counts;
     if (c.general) s.general = true;

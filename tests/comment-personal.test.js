@@ -935,9 +935,21 @@ describe('a sentence of the teacher’s own', () => {
     expect(cased.offered).toBe('Offered when one habit is rated Sometimes or Rarely, in Socials classes');
     const general = composeFor('Gabriel asks a question when a step is unclear.', { step: 'habits' });
     expect(general.template.condition).toMatchObject({ step: 'habits', general: true, when: {}, claims: [] });
-    expect(general.offered).toBe('Offered in Socials classes');
+    expect(general.offered).toBe('Generate uses it for any student in Socials classes when nothing more specific fits');
     const e = PB.keep(general.template);
     expect(COMMENT_BANK.sentences.find(x => x.id === 'mine:' + e.id).general).toBe(true);
+  });
+
+  it('keeps a sentence written in a class of no known kind out of Socials and Science classes (Step 4 group 2 #49)', () => {
+    const general = composeFor('Gabriel asks careful questions when a step is unclear.', { step: 'habits' }, { family: '' });
+    expect(general.offered).toBe('Generate uses it for any student when nothing more specific fits');
+    const e = PB.keep(general.template);
+    const s = COMMENT_BANK.sentences.find(x => x.id === 'mine:' + e.id);
+    expect(s.subjects).toEqual(['']);
+    const ctxIn = fam => Object.assign(CommentBank.context(facts({ family: fam }), {}), { _family: fam });
+    expect(CommentBank.fits(s, ctxIn(''))).toBe(true);
+    expect(CommentBank.fits(s, ctxIn('socials'))).toBe(false);
+    expect(CommentBank.fits(s, ctxIn('science'))).toBe(false);
   });
 
   it('Generate picks a general sentence only when nothing more specific fits; a cased one ranks first', () => {
