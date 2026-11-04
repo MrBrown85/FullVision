@@ -76,6 +76,7 @@ function trackFocus(doc, proto) {
     send(this, 'focusout', null);
   };
   if (!proto.select) proto.select = function () {};
+  if (!proto.setSelectionRange) proto.setSelectionRange = function () {};
 }
 
 export function unmount() {

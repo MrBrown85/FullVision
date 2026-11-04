@@ -50,6 +50,7 @@ window.PageGradebook = (function () {
   var filterStudentIds = [];
   var searchQuery = '';
   var searchText = ''; // what the box holds, spaces and capitals as typed
+  var _averageStudents = null; // the class's students, for Class Average
   var sortCol = null;
   var _filterStripOpen = false;
   var _printTerm = 'all';
@@ -234,6 +235,10 @@ window.PageGradebook = (function () {
     var isLetter = courseShowsLetterGrades(course);
     var scores = getScores(cid);
 
+    // Class Average is the whole class's, whoever a search or a dashboard
+    // link leaves on screen.
+    _averageStudents = students;
+
     if (filterStudentIds.length) {
       students = students.filter(function (s) {
         return filterStudentIds.indexOf(s.id) >= 0;
@@ -344,7 +349,11 @@ window.PageGradebook = (function () {
       LINE_ICONS.search +
       '</span><input class="gb-search-input" type="text" placeholder="Search…" value="' +
       esc(searchText) +
-      '" data-action-input="gbSearch" aria-label="Search students"></div>';
+      '" data-action-input="gbSearch" aria-label="Search students">' +
+      (searchText
+        ? '<button type="button" class="gb-search-clear" data-action="clearSearch" aria-label="Clear search" title="Clear search">\u00D7</button>'
+        : '') +
+      '</div>';
 
     if (filterStudentIds.length) {
       html +=
@@ -1522,12 +1531,12 @@ window.PageGradebook = (function () {
       var cellW = col.colWidth || 54;
       var wStyle = cellW !== 54 ? 'min-width:' + cellW + 'px;width:' + cellW + 'px;' : '';
       if (col.isPointsCol) {
-        html += _pointsAverageCell(cid, sortedStudents, col, startClass + altClass, wStyle);
+        html += _pointsAverageCell(cid, _averageStudents || sortedStudents, col, startClass + altClass, wStyle);
         return;
       }
       // calc.js's one column rule; a criterion column (Rubrics by Criterion)
       // averages every competency the criterion feeds.
-      var stats = classColumnAverage(cid, sortedStudents, {
+      var stats = classColumnAverage(cid, _averageStudents || sortedStudents, {
         assessment: assessments.find(function (a) {
           return a.id === col.assessmentId;
         }),
@@ -1796,7 +1805,7 @@ window.PageGradebook = (function () {
     // as the printed sheet and the CSV write it.
     html += '<tr class="gb-stats-row gb-scores-stats">';
     sortedAssess.forEach(function (a) {
-      var stats = classColumnAverage(cid, sortedStudents, { assessment: a });
+      var stats = classColumnAverage(cid, _averageStudents || sortedStudents, { assessment: a });
       if (!stats) {
         html += '<td class="gb-scores-avg"><span class="gb-avg-val" style="color:var(--text-3)">\u2014</span></td>';
         return;
@@ -3378,6 +3387,12 @@ window.PageGradebook = (function () {
     if (_graderOpen()) return;
     // Escape closes a tooltip first (WCAG 1.4.13: dismissible without moving).
     if (e.key === 'Escape' && _tipSource) _hideTip();
+    // Escape in the search box clears it; the box keeps the focus.
+    if (e.key === 'Escape' && e.target.matches && e.target.matches('.gb-search-input') && searchText) {
+      e.preventDefault();
+      onSearch('', 0);
+      return;
+    }
     // Cmd+Z undoes the last score in either view; in a text field it stays
     // the field's own undo.
     var inTextField =
@@ -3859,9 +3874,7 @@ window.PageGradebook = (function () {
         clearAllFilters();
       },
       clearSearch: function () {
-        searchQuery = '';
-        searchText = '';
-        render();
+        onSearch('', 0);
       },
       showAllTime: function () {
         if (typeof setSelectedTermOrdinal === 'function') setSelectedTermOrdinal(activeCourse, null);

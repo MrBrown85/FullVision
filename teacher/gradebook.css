@@ -169,6 +169,29 @@
 .gb-search-input::placeholder {
   color: var(--text-3);
 }
+/* × at the box's right end while it holds a search; Escape does the same. */
+.gb-search-clear {
+  position: absolute;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--text-base);
+  line-height: 1;
+  cursor: pointer;
+}
+.gb-search-clear:hover {
+  background: var(--overlay-hover);
+}
+.gb-search-wrap:has(.gb-search-clear) .gb-search-input {
+  padding-right: 30px;
+}
 
 /* + New Assessment link */
 .gb-add-btn {
