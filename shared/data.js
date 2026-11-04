@@ -4408,7 +4408,12 @@ function _markSavedCopyDirty(cid) {
 /* Ask the server whether the class on screen changed. Editing waits for the
    answer (usually 100-200 ms) so nothing is typed into data another device
    has replaced; after 3 seconds, or offline, it unlocks anyway and the
-   saved copy stays on screen. */
+   saved copy stays on screen. The "Checking for updates…" note (after
+   400 ms) stays until the answer comes, not just while editing is locked:
+   when it went at 3 seconds, a class switch showed a score saved on the
+   phone as blank for several more seconds, then changed with no word. It
+   goes after 30 seconds at most, so a check stuck behind unsent changes
+   (offline) doesn't leave it up. */
 function _startClassCheck(cid) {
   _classFresh[cid] = false;
   // Only the class on screen holds the page while it is checked; another
@@ -4416,21 +4421,28 @@ function _startClassCheck(cid) {
   var offline = (typeof navigator !== 'undefined' && navigator.onLine === false) || cid !== getActiveCourse();
   if (!offline) setPageLock('checking', true);
   var body = typeof document !== 'undefined' ? document.body : null;
-  var noteTimer = setTimeout(function () {
-    if (!released && !offline && body && body.classList) body.classList.add('fv-checking-slow');
-  }, 400);
-  var released = false;
-  function release() {
-    clearTimeout(noteTimer);
+  var answered = false;
+  function hideNote() {
     if (body && body.classList) body.classList.remove('fv-checking-slow');
-    if (released || offline) return;
-    released = true;
+  }
+  var noteTimer = setTimeout(function () {
+    if (!answered && !offline && body && body.classList) body.classList.add('fv-checking-slow');
+  }, 400);
+  var noteCap = setTimeout(hideNote, 30000);
+  var unlocked = false;
+  function unlock() {
+    if (unlocked || offline) return;
+    unlocked = true;
     setPageLock('checking', false);
   }
-  var timer = setTimeout(release, 3000);
+  var timer = setTimeout(unlock, 3000);
   return _handleExternalCourseUpdate(cid, 'gradebook').finally(function () {
+    answered = true;
     clearTimeout(timer);
-    release();
+    clearTimeout(noteTimer);
+    clearTimeout(noteCap);
+    hideNote();
+    unlock();
   });
 }
 
