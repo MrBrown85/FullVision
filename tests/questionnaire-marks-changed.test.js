@@ -314,7 +314,7 @@ describe('the review screen', () => {
     const html = open();
     expect(rating().narrative).toBe(text);
     expect(rating().approvedAt).toBe(APPROVED_AT);
-    expect(html).toContain('<span class="qn-approved-chip">Approved Oct 28</span>');
+    expect(html).toMatch(/<span class="qn-approved-chip" id="tq-approved-chip"[^>]*>Approved Oct 28<\/span>/);
     expect(html).toContain(
       '“Task 4” was marked after Oct 28, so ' +
         (CommentBank.staleness(rating().draftMeta, facts(), {}).changes.length === 1
@@ -388,6 +388,25 @@ describe('the review screen', () => {
     expect(html).not.toContain(NH_BEFORE);
     RQ.syncRoster();
     expect(annotator(PRI.id).sub).toBe('Needs Approval');
+  });
+
+  it('an approved comment says Approved on its own screen; a student with no comment says No Comment (Step 4 group 3 #66)', () => {
+    const { text } = approved();
+    let html = open();
+    expect(html).toContain('id="tq-approved-chip"');
+    expect(html).toMatch(/>Approved [A-Z][a-z]{2} \d{1,2}<\/span>/);
+    RQ.syncRoster();
+    expect(annotator(PRI.id).sub).toBe('');
+    // Edited: needs approval again, and the chip is gone.
+    upsertTermRating(CID, PRI.id, TERM, { narrative: text + ' One more sentence.' });
+    html = open();
+    expect(html).not.toContain('tq-approved-chip');
+    RQ.syncRoster();
+    expect(annotator(PRI.id).sub).toBe('Needs Approval');
+    // No comment at all: nothing to approve yet.
+    upsertTermRating(CID, PRI.id, TERM, { narrative: '' });
+    RQ.syncRoster();
+    expect(annotator(PRI.id).sub).toBe('No Comment');
   });
 
   it('a sentence kept as approved stays kept when the comment is approved again', () => {

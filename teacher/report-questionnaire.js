@@ -479,6 +479,10 @@ window.ReportQuestionnaire = (function () {
   /* The Ready count and the roster. */
   function _syncStatus() {
     syncRoster();
+    // An edit takes the approval off: so does the comment's Approved chip.
+    var cur = _current();
+    var chip = document.getElementById('tq-approved-chip');
+    if (chip && cur && !_approved(cur.id)) chip.remove();
   }
 
   /* ── Before Generate (the States mockup) ─────────────────── */
@@ -814,11 +818,15 @@ window.ReportQuestionnaire = (function () {
     _readyText = ready + ' of ' + students.length + ' Ready';
     _syncReadyLine();
     var cur = _current();
+    var termId = getTermId();
     var annotate = function (sid) {
       var ok = _approved(sid);
       var flag = ok && _flagged(sid);
+      // A student with no comment yet has nothing to approve.
+      var r = getStudentTermRating(_activeCourse, sid, termId) || {};
+      var empty = !plainComment(r.narrative || '').trim();
       return {
-        sub: ok ? '' : 'Needs Approval',
+        sub: ok ? '' : empty ? 'No Comment' : 'Needs Approval',
         mark: flag
           ? '<span class="student-row-mark flag" role="img" aria-label="Approved, Something Changed" title="Approved, but a sentence no longer matches the gradebook or your class settings. Open the student to see what changed.">●</span>'
           : ok
@@ -1870,7 +1878,7 @@ window.ReportQuestionnaire = (function () {
     return `<div class="qn-comment" id="tq-comment-card">
         <div class="qn-comment-top">
           <span class="qn-comment-title">Teacher Comment</span>
-          ${stale && rating.approvedAt ? `<span class="qn-approved-chip">Approved ${esc(_shortDay(rating.approvedAt))}</span>` : ''}
+          ${thisTab && rating.approvedAt ? `<span class="qn-approved-chip" id="tq-approved-chip" title="You approved this comment. Changing it takes the approval off until you approve it again.">Approved ${esc(_shortDay(rating.approvedAt))}</span>` : ''}
           ${tabs}
           ${thisTab ? '<button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="Writes the comment from the gradebook, your ratings and Student Voice. Press again for another version. Sentences you typed or edited and your order stay.">Generate Comment</button>' : ''}
         </div>
