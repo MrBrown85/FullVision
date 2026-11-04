@@ -1229,6 +1229,16 @@ th.gb-group-alt {
 .gb-name-sort:hover {
   color: var(--active);
 }
+/* The name order on, on its own line under Student: "Last Name A–Z". */
+.gb-name-sort {
+  text-align: left;
+}
+.gb-sort-order {
+  display: block;
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+}
 .gb-grid-colheads-comp {
   flex-direction: column;
 }

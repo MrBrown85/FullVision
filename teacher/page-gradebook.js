@@ -141,18 +141,20 @@ window.PageGradebook = (function () {
     inp.focus();
     if (caret != null) inp.setSelectionRange(caret, caret);
   }
-  /* Student name sort cycles on every click and loops:
-     first name A–Z, first Z–A, last name A–Z, last Z–A. */
+  /* Student name sort cycles on every click and loops, from the page's
+     own order (last name A–Z): last Z–A, first A–Z, first Z–A, last A–Z. */
   var NAME_SORT_CYCLE = [
-    { by: 'first', dir: 'asc' },
-    { by: 'first', dir: 'desc' },
     { by: 'last', dir: 'asc' },
     { by: 'last', dir: 'desc' },
+    { by: 'first', dir: 'asc' },
+    { by: 'first', dir: 'desc' },
   ];
   function toggleSort(key) {
     _flushActiveScoreEditor();
     if (key === 'name') {
-      var step = -1;
+      // No sort chosen yet is last name A–Z, the cycle's first step; from
+      // the Overall sort a click goes back to it.
+      var step = sortCol ? -1 : 0;
       if (sortCol && sortCol.key === 'name') {
         step = NAME_SORT_CYCLE.findIndex(function (c) {
           return c.by === sortCol.by && c.dir === sortCol.dir;
@@ -167,6 +169,54 @@ window.PageGradebook = (function () {
   function sortArrow(key) {
     if (!sortCol || sortCol.key !== key) return '';
     return '<span class="gb-sort-arrow">' + (sortCol.dir === 'asc' ? '▲' : '▼') + '</span>';
+  }
+
+  /* The grid corner's two sort buttons. Student says which name order is
+     on (no sort chosen is last name A–Z) and what a click turns it to;
+     Overall sorts by the overall grade, lowest first, then highest. */
+  var NAME_SORT_TEXT = {
+    'last-asc': 'Last Name A\u2013Z',
+    'last-desc': 'Last Name Z\u2013A',
+    'first-asc': 'First Name A\u2013Z',
+    'first-desc': 'First Name Z\u2013A',
+  };
+  function _cornerSortButtons() {
+    var byName = !sortCol || sortCol.key === 'name';
+    var cur = byName ? (sortCol ? sortCol.by + '-' + sortCol.dir : 'last-asc') : null;
+    var at = cur
+      ? NAME_SORT_CYCLE.findIndex(function (c) {
+          return c.by + '-' + c.dir === cur;
+        })
+      : -1;
+    var next = NAME_SORT_CYCLE[(at + 1) % NAME_SORT_CYCLE.length];
+    var nextText = NAME_SORT_TEXT[next.by + '-' + next.dir];
+    var nameTip = cur
+      ? 'Sorted by ' + NAME_SORT_TEXT[cur] + '. Click for ' + nextText + '.'
+      : 'Click to sort by ' + nextText + '.';
+    var byOverall = sortCol && sortCol.key === 'overall';
+    var overallTip = byOverall
+      ? 'Sorted by Overall, ' +
+        (sortCol.dir === 'asc' ? 'lowest' : 'highest') +
+        ' first. Click for ' +
+        (sortCol.dir === 'asc' ? 'highest' : 'lowest') +
+        ' first.'
+      : 'Click to sort by Overall, lowest first.';
+    return (
+      '<button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name" title="' +
+      esc(nameTip) +
+      '" aria-label="Student. ' +
+      esc(nameTip) +
+      '">Student' +
+      (cur ? '<span class="gb-sort-order">' + esc(NAME_SORT_TEXT[cur]) + '</span>' : '') +
+      '</button>' +
+      '<button type="button" class="gb-grid-corner-label gb-name-sort gb-overall-sort" data-action="toggleSort" data-sortkey="overall" title="' +
+      esc(overallTip) +
+      '" aria-label="Overall. ' +
+      esc(overallTip) +
+      '">Overall' +
+      sortArrow('overall') +
+      '</button>'
+    );
   }
 
   function _getSortedCategories(cid) {
@@ -1248,9 +1298,9 @@ window.PageGradebook = (function () {
     html +=
       '<div class="gb-grid-corner gb-grid-corner-comp">' +
       _cornerTools(true) +
-      '<div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
-      sortArrow('name') +
-      '</button><span class="gb-grid-corner-label">Overall</span></div>' +
+      '<div class="gb-grid-corner-row1">' +
+      _cornerSortButtons() +
+      '</div>' +
       '</div>';
 
     // Q2: Column headers — assessment names (row 1) + tag codes (row 2)
@@ -1602,9 +1652,9 @@ window.PageGradebook = (function () {
     html +=
       '<div class="gb-grid-corner gb-grid-corner-comp">' +
       _cornerTools(false) +
-      '<div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
-      sortArrow('name') +
-      '</button><span class="gb-grid-corner-label">Overall</span></div></div>';
+      '<div class="gb-grid-corner-row1">' +
+      _cornerSortButtons() +
+      '</div></div>';
 
     // Q2: Column headers (top-right, scrolls horizontally)
     html += '<div class="gb-grid-colheads" id="gb-colheads"><div class="gb-grid-colheads-inner">';
