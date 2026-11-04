@@ -7038,9 +7038,24 @@ window.PageAssignments = (function () {
     // them all to it rather than clearing.
     var wasActive = el.classList.contains('active') && !el.classList.contains('mixed');
     var next = wasActive ? 0 : value;
+    var before = wasActive ? structuredClone(getScores(activeCourse)) : null;
     _setTagScore(activeCourse, sid, aid, tagId, next);
     _syncTagRows(aid, sid);
     refreshSidebarGrades(sid);
+    if (before) _offerClearUndo(activeCourse, before);
+  }
+
+  /* A click on the chosen level clears it. A misclick is put right from the
+     toast (or Cmd+Z while it is up), as the phone's "Score cleared" does:
+     Undo puts back the level and its + or −, unless it was scored again
+     since (Nov 3 sweep). */
+  function _offerClearUndo(cid, before) {
+    var after = structuredClone(getScores(cid));
+    _showFillUndo('Score cleared', function () {
+      restoreScoreCells(cid, before, after);
+      render();
+      refreshSidebarGrades();
+    });
   }
 
   // A criterion can feed several competencies, so a level set on one
@@ -7198,6 +7213,7 @@ window.PageAssignments = (function () {
     var next = wasActive ? 0 : value;
     // Missing and Excused work takes no level (isScoreLocked); 1–4 reach here by key.
     if (next && isScoreLocked(activeCourse, sid, aid)) return;
+    var before = wasActive ? structuredClone(getScores(activeCourse)) : null;
     rubricCriterionScoreKeys(crit).forEach(function (tagId) {
       setScore(activeCourse, sid, aid, tagId, next);
     });
@@ -7210,6 +7226,7 @@ window.PageAssignments = (function () {
     // An open checklist's hint says whether the level is the boxes' or picked.
     if (RubricChecks.hasChecks(crit) && _isChecklistOpen(aid, sid, critId))
       _refreshChecklistRow(aid, sid, critId, false);
+    if (before) _offerClearUndo(activeCourse, before);
   }
   function updateRubricRowUI(row, value) {
     row.querySelectorAll('.rsg-level').forEach(function (l) {
@@ -12209,12 +12226,14 @@ window.PageAssignments = (function () {
     if (!crit) return;
     var state = _criterionState(activeCourse, focusStudentId, aid, crit);
     var next = state.level === level && !state.mixed ? 0 : level;
+    var before = next ? null : structuredClone(getScores(activeCourse));
     rubricCriterionScoreKeys(crit).forEach(function (tid) {
       setScore(activeCourse, focusStudentId, aid, tid, next, 0);
     });
     refreshSidebarGrades(focusStudentId);
     render();
     _focusGraderCard(aid, '.grdt-crit[data-critid="' + critId + '"]');
+    if (before) _offerClearUndo(activeCourse, before);
   }
   function _graderSetMod(aid, critId, mod) {
     if (!aid || !focusStudentId) return;
@@ -12260,10 +12279,13 @@ window.PageAssignments = (function () {
   function _graderSetTagLevel(aid, tagId, level) {
     if (!aid || !focusStudentId) return;
     var state = _tagState(activeCourse, focusStudentId, aid, tagId);
-    _setTagScore(activeCourse, focusStudentId, aid, tagId, state.level === level && !state.mixed ? 0 : level, 0);
+    var next = state.level === level && !state.mixed ? 0 : level;
+    var before = next ? null : structuredClone(getScores(activeCourse));
+    _setTagScore(activeCourse, focusStudentId, aid, tagId, next, 0);
     refreshSidebarGrades(focusStudentId);
     render();
     _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');
+    if (before) _offerClearUndo(activeCourse, before);
   }
   function _graderSetTagMod(aid, tagId, mod) {
     if (!aid || !focusStudentId) return;
