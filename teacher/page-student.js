@@ -2180,7 +2180,7 @@ window.PageStudent = (function () {
       esc(sec.name) +
       '" placeholder="' +
       esc(first) +
-      '’s own words about their learning…">' +
+      '’s own words about this competency…">' +
       esc(refl.text || '') +
       '</textarea>' +
       '<div class="inline-edit-actions">' +
@@ -2279,7 +2279,7 @@ window.PageStudent = (function () {
       esc(sec.name) +
       '" placeholder="' +
       esc(first) +
-      '’s own words about their learning…">' +
+      '’s own words about this competency…">' +
       esc(refl.text || '') +
       '</textarea><div class="inline-edit-actions"><button class="btn btn-primary" data-action="saveReflField" data-secid="' +
       sec.id +

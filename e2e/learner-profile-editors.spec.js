@@ -23,3 +23,9 @@ test('+ Reflection puts the cursor in the box, so typing lands there', async ({ 
   await page.keyboard.type('I can plan a fair test now.');
   await expect(row.locator('textarea[id^="refl-input-"]')).toHaveValue('I can plan a fair test now.');
 });
+
+test("the reflection box's hint uses no pronoun, so it fits every student", async ({ page }) => {
+  await openStudent(page, 'Liam');
+  const box = page.locator('.gl-row').first().locator('textarea[id^="refl-input-"]');
+  await expect(box).toHaveAttribute('placeholder', 'Liam’s own words about this competency…');
+});
