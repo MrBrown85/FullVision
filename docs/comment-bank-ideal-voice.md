@@ -13,8 +13,10 @@ Five to seven sentences, one gradebook fact each, two short facts joined when th
 ## The Rules
 
 - **The name first, pronouns after**, the pronouns on file, the name again only at the start of a sentence three or more after it was said.
-- **The grade once, in plain words**: "working at a Proficient level", "a C+, which is good work". The proficiency scale is named at most once, and only to explain a level. "So far" at most once. Never "this term": the comment is the year to date.
-- **Habits as behaviour a parent can picture**: "finishes her work by the due date", "puts his phone away when asked". Never the rating words (Consistently, Usually) or the questionnaire's labels. Say a habit when it is news for this student, not because it is true of everyone.
+- **The grade once, in plain words, with the student or the course first**: "Sam is earning a C+, which is good work", "In Science 8, Liam is at a Proficient level". Never the grade before the student ("A B is her mark", "IE is his grade"). What a level means, when it is said, is a family's clause, never the Ministry's descriptor: Proficient "which means she has the learning the course expects", Extending "which means her work goes beyond what the course expects", Developing "which means his understanding is growing but not yet steady", Emerging "which means she is just beginning". It is in three grade frames of eleven, so most comments do not say it. The proficiency scale is named at most once. "So far" at most once. Never "this term": the comment is the year to date.
+- **The course named once.** A later sentence drops "in Science 8" ("Looking ahead, she can …").
+- **Habits as behaviour a parent can picture**: "She finishes her work by the due date.", "He keeps his phone away during lessons." The behaviour stands alone, with no label in front ("As a habit,", "In her work habits,"). A habit is a rating, not a count: "consistently" or "usually" (the rating's own word) or nothing, never "most days", "each week", "day after day" or "every lesson". Never the questionnaire's labels. Say a habit when it is news for this student, not because it is true of everyone.
+- **The strength stated directly**: "She shows data patterns clearly in tables and graphs.", "Her strongest area is reading data: she …". No lead that says nothing ("it is clear that", "her marks show that", "in class tasks"). When the two students before named the same skill, a second strength past the gate is said instead.
 - **One next step, as a skill** the student can practise: "find sources of error and suggest improvements".
 - **Home as an invitation**, to about a third of the class at a time: "ask her what pattern the numbers from an experiment showed".
 - **Skills in the family's words.** The skill card's phrase, inflected by rule ("finds patterns", "at finding patterns"), never the Ministry's sentence pasted in.
@@ -23,15 +25,15 @@ Five to seven sentences, one gradebook fact each, two short facts joined when th
 
 ## Never Say
 
-The lint (`CommentLint.BANNED_PHRASES`) stops these in frames and card strings: "is able to", "ability to", "this term", "rated", "skill by skill", "across skills", "each skill", "every one", "all six", "marks are close", "marked highest", "the work marked", "proficiency scale calls", "keep going". "Work on" as advice is caught by the phrasal-verb rule. They are the phrases that made the Nov 4 drafts read "translated from another language".
+The lint (`CommentLint.BANNED_PHRASES`) stops these in frames and card strings: "is able to", "ability to", "this term", "rated", "skill by skill", "across skills", "each skill", "every one", "all six", "marks are close", "marked highest", "the work marked", "proficiency scale calls", "keep going", and the frequencies and descriptors above ("day after day", "most days", "every lesson", "as a rule", "depth and complexity", "it is clear that", "marks show that", "top marks went to", and a sentence opening "Each week" or "Every class"). "Work on" as advice is caught by the phrasal-verb rule. They are the phrases that made the Nov 4 drafts read "translated from another language".
 
 ## Examples
 
 From Demo Mode, unedited:
 
-> Mei’s marks have climbed since the term began, and she can explore and explain the local environment with depth and complexity. Over the year, she has worked at an Extending level in Science 8. Of her marked work, the Data Reading Quiz has the top mark. What would help her most in class is sharing the work in a group. To grow further, she can choose units that suit each measurement and check conversions. One thing to try at home: ask her what pattern the numbers from an experiment showed.
+> Since the start of the term, Mei’s marks have risen, and she can explore and explain the local environment in depth. Her marks put her at an Extending level in Science 8. On the Data Reading Quiz, she earned her highest mark so far. What would help her most in class is sharing the work in a group. To grow further, she can choose units that suit each measurement and check conversions. One thing to try at home: ask her what pattern the numbers from an experiment showed.
 
-> With a C+ in Science 8, Sam is doing good work. They would get more from class by sharing the work in a group and making one change from each piece of feedback. So far, their best piece is their Energy Transfer Investigation. In class tasks, they can consistently apply science learning to new situations. The goal for them now is to keep exploring one science topic over several weeks. Families can help too: ask them what question an experiment in class was trying to answer.
+> In Science 8, Sam is earning a C+, which is good work. They would get more from class by sharing the work in a group and making one change from each piece of feedback. So far, their best piece is their Energy Transfer Investigation. By now, they can consistently apply science learning to new situations. The goal for them now is to keep exploring one science topic over several weeks. Families can help too: ask them what question an experiment in class was trying to answer.
 
 Twelve more, two per standing, are in `docs/generate-measures.md`.
 
