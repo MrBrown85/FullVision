@@ -3217,6 +3217,15 @@ window.PageAssignments = (function () {
     );
   }
 
+  /* The rubric the form is building, for the Counts As line: the Blank
+     Rubric while it is open or written in, else a rubric made on the form
+     and held unsaved. Null: a saved rubric, looked up by its id. */
+  function _formDraftRubric(rid) {
+    if (_blank && (_startOpen === 'blank' || _blankWritten())) return _blank.draft;
+    if (_pendingFormRubric && _pendingFormRubric.id === rid) return _pendingFormRubric;
+    return null;
+  }
+
   // The form's Counts As line, from what the form says now.
   function _refreshFormCountsAs() {
     _refreshCountsToward();
@@ -3228,9 +3237,11 @@ window.PageAssignments = (function () {
       line.textContent = '';
       return;
     }
+    var rid = mode === 'proficiency' ? (document.getElementById('af-rubric') || {}).value || '' : '';
     line.textContent = _countsAsText(activeCourse, {
       categoryId: (document.getElementById('af-category') || {}).value || '',
-      rubricId: mode === 'proficiency' ? (document.getElementById('af-rubric') || {}).value || '' : '',
+      rubricId: rid,
+      rubric: mode === 'proficiency' ? _formDraftRubric(rid) : null,
       scoreMode: mode,
       maxPoints: parseFloat((document.getElementById('af-maxpoints') || {}).value) || 0,
       weight: _formAssessWeight(),
@@ -3406,13 +3417,19 @@ window.PageAssignments = (function () {
     if (t.id === 'af-maxpoints') {
       t.style.border = '';
       t.removeAttribute('aria-invalid');
-      var v = Number(t.value);
-      document.querySelectorAll('#af-maxpoints-picks .seg-btn').forEach(function (b) {
-        var hit = String(t.value).trim() !== '' && Number(b.dataset.value) === v;
-        b.classList.toggle('active', hit);
-        b.setAttribute('aria-pressed', hit ? 'true' : 'false');
-      });
+      _syncMaxPointsPicks();
     }
+  }
+  // The Max Points quick pick that matches the box is lit; none when none does.
+  function _syncMaxPointsPicks() {
+    var el = document.getElementById('af-maxpoints');
+    if (!el) return;
+    var v = Number(el.value);
+    document.querySelectorAll('#af-maxpoints-picks .seg-btn').forEach(function (b) {
+      var hit = String(el.value).trim() !== '' && Number(b.dataset.value) === v;
+      b.classList.toggle('active', hit);
+      b.setAttribute('aria-pressed', hit ? 'true' : 'false');
+    });
   }
 
   function _formKeydown(e) {
@@ -6063,6 +6080,7 @@ window.PageAssignments = (function () {
     };
     set('af-module', keep.module);
     set('af-maxpoints', keep.maxPoints);
+    _syncMaxPointsPicks();
     set('af-weight', keep.weight);
     set('af-date-assigned', keep.assigned);
     set('af-due', keep.due);

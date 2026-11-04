@@ -365,7 +365,8 @@ function _rubricAssessmentPoints(cid, studentId, assessment) {
    { possible, criteria } (criteria = how many), as not-submitted work
    counts out of. When every criterion weighs 0 they count equally. */
 function _rubricFullPoints(cid, assessment) {
-  var rubric = getRubricById(cid, assessment.rubricId || assessment.rubric_id);
+  // assessment.rubric: a rubric not saved yet (the assessment form's draft).
+  var rubric = assessment.rubric || getRubricById(cid, assessment.rubricId || assessment.rubric_id);
   var criteria = ((rubric && rubric.criteria) || []).filter(Boolean);
   var weights = criteria.map(_rubricCriterionWeight);
   var anyWeight = weights.some(function (w) {
@@ -781,7 +782,10 @@ function assessmentCourseWorth(cid, assessment) {
   var criteria = null;
   if (isPointsScored(assessment)) {
     base = isCompletionScored(assessment) ? COMPLETE_MAX_POINTS : Number(assessment.maxPoints) || 0;
-  } else if ((assessment.rubricId || assessment.rubric_id) && typeof getRubricById === 'function') {
+  } else if (
+    (assessment.rubric || assessment.rubricId || assessment.rubric_id) &&
+    typeof getRubricById === 'function'
+  ) {
     var full = _rubricFullPoints(cid, assessment);
     if (full.criteria) {
       base = full.possible;
