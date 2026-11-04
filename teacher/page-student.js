@@ -2658,6 +2658,12 @@ window.PageStudent = (function () {
     var first = displayNameFirst(ctx.student);
     var tk = _coreTermKeys(ctx);
     var mine = ((typeof getCoreSelf === 'function' ? getCoreSelf(cid)[studentId] : null) || {})[tk.key] || {};
+    // What the student gave in that term's questionnaire, where you haven't
+    // entered anything yourself.
+    var theirs =
+      tk.pick && typeof StudentVoice !== 'undefined' && StudentVoice.coreSelf && StudentVoice.loaded(cid)
+        ? StudentVoice.coreSelf(StudentVoice.entries(cid, studentId), tk.pick.ordinal)
+        : {};
     // Scored work tagged with each Core Competency: evidence to point to.
     var tally = {};
     ctx.assessments.forEach(function (a) {
@@ -2698,7 +2704,7 @@ window.PageStudent = (function () {
       esc(first) +
       '’s Goal</span><span>Work to Point To</span></div>';
     CORE_COMPETENCIES.forEach(function (cc) {
-      var e = mine[cc.id];
+      var e = mine[cc.id] || theirs[cc.id];
       var editing = _coreEditing === cc.id;
       var n = tally[cc.id] || 0;
       html +=
@@ -2723,6 +2729,9 @@ window.PageStudent = (function () {
         html +=
           '</span>' +
           (e.text ? '<span class="stu-core-words">' + esc(e.text) + '</span>' : '') +
+          (e.fromStudent
+            ? '<span class="stu-core-from">' + LearnerProfile.src('them', first) + ' ' + esc(_shortDay(e.at)) + '</span>'
+            : '') +
           '</span><span class="stu-core-goal">' +
           (e.goal ? esc(e.goal) : '<span class="stu-muted">—</span>') +
           '</span>';
@@ -2790,7 +2799,7 @@ window.PageStudent = (function () {
       ' will work on"></label><div class="inline-edit-actions"><button type="button" class="btn btn-primary" data-action="stuCoreSave" data-core="' +
       cc.id +
       '">Save</button><button type="button" class="btn" data-action="stuCoreCancel">Cancel</button>' +
-      (e.level || e.text || e.goal
+      (!e.fromStudent && (e.level || e.text || e.goal)
         ? '<button type="button" class="btn" data-action="stuCoreClear" data-core="' + cc.id + '">Clear</button>'
         : '') +
       '</div></div>'

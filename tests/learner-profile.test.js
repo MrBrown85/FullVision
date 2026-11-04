@@ -145,6 +145,16 @@ describe('StudentVoice', () => {
     expect(p.reflections).toHaveLength(1);
     expect(p.last).toBe('2025-11-07T18:00:00Z');
   });
+
+  it("the Core Competencies for a term, as the student answered them: step, why and the check-in's goal", () => {
+    const list = StudentVoice.entries(CID, 'e1');
+    const core = StudentVoice.coreSelf(list, 1);
+    expect(core.PPI).toMatchObject({ level: 3, text: 'Family is everything', goal: '', fromStudent: true });
+    // The Goal Check-In follows the reflection, so its goal is that term's.
+    expect(core.PAR).toMatchObject({ level: 1, text: '', goal: 'turn stuff in' });
+    expect(Object.keys(core).sort()).toEqual(['PAR', 'PPI']);
+    expect(StudentVoice.coreSelf(list, 2)).toEqual({});
+  });
 });
 
 describe('LearnerProfile', () => {

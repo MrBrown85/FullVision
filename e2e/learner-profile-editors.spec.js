@@ -107,3 +107,14 @@ test('a saved reflection counts on the ID card, in Reflections and on the tab', 
   );
   await expect(page.locator('#stu-tab-profile .stu-tab-sub')).toContainText('Last answer');
 });
+
+test("Core Competencies in Cece's Words shows what she answered, without retyping", async ({ page }) => {
+  await openStudent(page, 'Cece');
+  await page.locator('#lp-core .seg-btn', { hasText: /1/ }).first().click();
+  const row = name => page.locator('#lp-core .stu-core-trow', { hasText: name });
+  await expect(row('Personal Awareness & Responsibility').locator('.stu-core-step.on')).toHaveText('Growing');
+  await expect(row('Personal Awareness & Responsibility')).toContainText('I set goals but I forget to check on them.');
+  await expect(row('Personal & Cultural Identity').locator('.stu-core-step.on')).toHaveText('Confident');
+  await expect(row('Personal Awareness & Responsibility').locator('.stu-core-from')).toContainText('From Cece');
+  await expect(row('Communicating').getByRole('button', { name: '+ Self-Assessment' })).toBeVisible();
+});
