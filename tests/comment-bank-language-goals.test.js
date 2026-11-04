@@ -150,9 +150,13 @@ describe('the line in the comment', () => {
         'She can read a text aloud in English; the next step is answering a question about what it says.',
       );
       expect(d.text).toContain(got.text);
-      expect(d.sentences[0].text).toBe(
-        'This term, Noor is assessed in relation to her goals for English language proficiency.',
-      );
+      // The comment opens on how Noor is assessed (a Language Goals grade
+      // frame, Nov 4 2026), named, with no term in it.
+      expect(d.sentences[0]).toMatchObject({ step: 'grade' });
+      expect(d.sentences[0].id).toMatch(/^vgg\d\d$/);
+      expect(d.sentences[0].text).toMatch(/Noor/);
+      expect(d.sentences[0].text).toMatch(/language goals|English language goals|goals for learning English/);
+      expect(d.sentences[0].text).not.toMatch(/this term/);
       // Before the support line and the closing, after the next step.
       const steps = d.sentences.map(x => x.step);
       expect(steps.indexOf('languageGoals')).toBeGreaterThan(steps.indexOf('grade'));

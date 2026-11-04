@@ -133,8 +133,8 @@ describe('lowGrade and checksFor', () => {
 });
 
 describe('longSentences', () => {
-  it('finds a sentence over 20 words, a quoted title counting as one', () => {
-    const long = 'He ' + 'always '.repeat(20) + 'tries.';
+  it('finds a sentence over 24 words (the cap since Nov 4 2026), a quoted title counting as one', () => {
+    const long = 'He ' + 'always '.repeat(24) + 'tries.';
     expect(RQ.longSentences('Short one. ' + long)).toEqual([long]);
     const title = 'His best piece was “' + 'word '.repeat(25).trim() + '”, where he linked two ideas.';
     expect(RQ.longSentences(title)).toEqual([]);
@@ -203,18 +203,18 @@ describe('the character count and the 20-word rule', () => {
     RQ.syncApprove();
     expect(ready.textContent).toBe('0 of 2 Ready');
   });
-  it('a sentence over 20 words: the count says so and Approve stays on', () => {
+  it('a sentence over 24 words: the count says so and Approve stays on', () => {
     seed();
-    const long = 'Gabriel ' + 'really '.repeat(20) + 'tries.';
+    const long = 'Gabriel ' + 'really '.repeat(24) + 'tries.';
     upsertTermRating(CID, GAB.id, TERM, { narrative: long + ' His work habits are steady.' });
     const html = open();
     expect(html).toContain('class="qn-count-btn over"');
-    expect(html).toContain('<span id="tq-limit-text"> · one sentence is over 20 words</span>');
+    expect(html).toContain('<span id="tq-limit-text"> · one sentence is over 24 words</span>');
     expect(RQ.approveBlockers(current())).toEqual([]);
     RQ.syncApprove();
     expect(btn.disabled).toBe(false);
     upsertTermRating(CID, GAB.id, TERM, { narrative: long + ' ' + long });
-    expect(open()).toContain('<span id="tq-limit-text"> · two sentences are over 20 words</span>');
+    expect(open()).toContain('<span id="tq-limit-text"> · two sentences are over 24 words</span>');
     expect(RQ.approveBlockers(current())).toEqual([]);
   });
   it('a comment that fits shows the limit after the count, as before', () => {

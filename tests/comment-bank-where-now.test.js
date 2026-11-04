@@ -79,7 +79,7 @@ const withWork = (levels, bank = true) => {
   f.work = [0, 1, 2].map(i => ({ id: 'w' + i, title: 'Task ' + i, d: day(i * 7), v: levels[0], pct: null, note: '' }));
   return f;
 };
-const overallOf = d => d.sentences.find(x => x.step === 'overall');
+const overallOf = d => d.sentences.find(x => x.step === 'overall' || (x.steps || []).indexOf('overall') >= 0);
 
 describe('where the student is now', () => {
   it('gives the first strength its phrase and level word', () => {
@@ -101,9 +101,21 @@ describe('where the student is now', () => {
       for (let seed = 1; seed <= 6; seed++) {
         const d = CommentBank.draft(CommentBank.context(f, {}), { seed, quiet: true });
         const o = overallOf(d);
-        expect(o && o.id, w + ' seed ' + seed).toMatch(/^wn\d\d$/);
-        expect(o.text).toContain(comment['ss-evi'].phrase);
-        expect(o.text, w).toMatch(QUALIFIER[w]);
+        // The pipeline's strength frames (v: 2, Nov 4 2026), alone or joined.
+        expect(o && o.id, w + ' seed ' + seed).toMatch(/vst\d\d/);
+        const pv = d.provenance[d.sentences.indexOf(o)];
+        const ctx = CommentBank.context(f, {});
+        const slot = pv.values.strengthAt ? 'strengthAt' : 'strengthDoing';
+        const ways = (ctx._pick || {})[slot] || [ctx[slot]];
+        expect(ways, w).toContain(pv.values[slot]);
+        // Emerging keeps the Ministry's "is beginning to" and the phrase; a
+        // version 2 card says the other levels in its own three ways.
+        const card = comment['ss-evi'].forms.at[w.toLowerCase()];
+        if (slot === 'strengthAt' && w === 'Emerging') {
+          expect(o.text).toContain(comment['ss-evi'].phrase);
+          expect(o.text, w).toMatch(QUALIFIER[w]);
+        } else if (slot === 'strengthAt') expect(ways).toHaveLength(card.length);
+        expect(o.text).not.toMatch(/\bis able to\b|\bability to\b/);
         expect(CommentBank.verify(d, f, {}).replaced, w + ' seed ' + seed).toEqual([]);
       }
     });

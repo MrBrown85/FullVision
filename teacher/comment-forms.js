@@ -24,6 +24,12 @@ window.CommentForms = (function () {
   // syllable ending consonant-vowel-consonant).
   var DOUBLE = [
     'admit',
+    'compel',
+    'forget',
+    'infer',
+    'propel',
+    'spot',
+    'transfer',
     'bat',
     'begin',
     'chat',
@@ -111,6 +117,19 @@ window.CommentForms = (function () {
     while (i < ws.length && /,$/.test(ws[i - 1]) && /^[a-z]+,?$/.test(ws[i]) && !NOT_VERB.test(ws[i])) form(i++);
     if ((ws[i] === 'and' || ws[i] === 'or') && ws[i + 1] && !NOT_VERB.test(ws[i + 1]) && /^[a-z]+$/.test(ws[i + 1]))
       form(i + 1);
+    // A second predicate later in the phrase ("plan a fair test and record
+    // measurements"): the first verb's object opens on a determiner, no
+    // "to" or "that" clause comes before the "and", and the word after it is
+    // a known verb in base form.
+    var det = /^(a|an|the|his|her|their|its|one|each|every|\{his\})$/;
+    if (det.test(ws[1] || ''))
+      for (var j = 2; j + 1 < ws.length; j++) {
+        if (ws[j] === 'to' || ws[j] === 'that' || ws[j] === 'who' || ws[j] === 'which') break;
+        if (ws[j] !== 'and') continue;
+        var w = ws[j + 1];
+        if (/^[a-z]+$/.test(w) && !/s$/.test(w) && VERBS.indexOf(w) >= 0 && !NOT_VERB.test(w)) form(j + 1);
+        break;
+      }
     return ws.join(' ');
   }
   function _override(phrase, overrides, key) {
@@ -123,8 +142,280 @@ window.CommentForms = (function () {
   }
   /* The phrase after "at": "finding patterns and trends in data". */
   function doing(phrase, overrides) {
-    return _override(phrase, overrides, 'doing') || _apply(phrase, gerund);
+    var o = _override(phrase, overrides, 'doing');
+    if (o) return o;
+    // "keep exploring a topic" is "exploring a topic" after "at".
+    var keep = String(phrase || '')
+      .trim()
+      .match(/^keep (\w+ing\b.*)$/);
+    return keep ? keep[1] : _apply(phrase, gerund);
   }
 
-  return { third: third, gerund: gerund, does: does, doing: doing };
+  /* A verb after "she" as it is after "they": "finds" → "find", "is" →
+     "are", "carries" → "carry", "finishes" → "finish". */
+  var PLURAL = { is: 'are', has: 'have', does: 'do', goes: 'go', was: 'were', says: 'say' };
+  function plural(w) {
+    var low = String(w || '').toLowerCase();
+    if (PLURAL[low]) return PLURAL[low];
+    if (/[^aeiou]ies$/.test(low)) return w.slice(0, -3) + 'y';
+    if (/(ches|shes|sses|xes|zes|oes)$/.test(low)) return w.slice(0, -2);
+    if (/[^s]s$/.test(low)) return w.slice(0, -1);
+    return w;
+  }
+  // Words that sit before the verb of a predicate ("consistently finds").
+  var ADVERBS = /^(consistently|also|often|usually|now)$/i;
+  // The verbs a second predicate after "and" can open on: the first words
+  // of the skill cards' phrases and next steps, and the habit phrases.
+  var VERBS = [
+    'act',
+    'adapt',
+    'add',
+    'adjust',
+    'analyze',
+    'anticipate',
+    'apply',
+    'arrange',
+    'ask',
+    'assemble',
+    'assess',
+    'balance',
+    'bring',
+    'build',
+    'care',
+    'carry',
+    'change',
+    'check',
+    'choose',
+    'cite',
+    'collaborate',
+    'collect',
+    'combine',
+    'come',
+    'communicate',
+    'compare',
+    'compile',
+    'complete',
+    'compose',
+    'conduct',
+    'connect',
+    'consider',
+    'contribute',
+    'control',
+    'convert',
+    'correct',
+    'create',
+    'credit',
+    'critically',
+    'critique',
+    'decide',
+    'demonstrate',
+    'describe',
+    'design',
+    'determine',
+    'develop',
+    'direct',
+    'discuss',
+    'do',
+    'document',
+    'draft',
+    'draw',
+    'edit',
+    'embody',
+    'estimate',
+    'evaluate',
+    'examine',
+    'expand',
+    'experiment',
+    'explain',
+    'explore',
+    'express',
+    'extend',
+    'find',
+    'finish',
+    'follow',
+    'form',
+    'gather',
+    'generate',
+    'give',
+    'guide',
+    'handle',
+    'help',
+    'identify',
+    'improve',
+    'improvise',
+    'include',
+    'infer',
+    'interact',
+    'interpret',
+    'join',
+    'judge',
+    'justify',
+    'keep',
+    'label',
+    'lead',
+    'learn',
+    'link',
+    'list',
+    'listen',
+    'maintain',
+    'make',
+    'manage',
+    'manipulate',
+    'match',
+    'measure',
+    'model',
+    'move',
+    'name',
+    'note',
+    'notice',
+    'observe',
+    'offer',
+    'operate',
+    'order',
+    'organize',
+    'participate',
+    'perform',
+    'persist',
+    'pick',
+    'picture',
+    'plan',
+    'play',
+    'practise',
+    'prepare',
+    'present',
+    'prioritize',
+    'produce',
+    'propose',
+    'protect',
+    'pursue',
+    'put',
+    'question',
+    'rank',
+    'read',
+    'recall',
+    'receive',
+    'recognize',
+    'record',
+    'recreate',
+    'refine',
+    'reflect',
+    'rehearse',
+    'relate',
+    'remember',
+    'repeat',
+    'request',
+    'reread',
+    'research',
+    'respect',
+    'respond',
+    'restate',
+    'retell',
+    'retest',
+    'return',
+    'revise',
+    'run',
+    'say',
+    'screen',
+    'season',
+    'select',
+    'sense',
+    'sequence',
+    'set',
+    'shape',
+    'share',
+    'shift',
+    'show',
+    'solve',
+    'sort',
+    'speak',
+    'spot',
+    'start',
+    'state',
+    'stay',
+    'store',
+    'strengthen',
+    'suggest',
+    'support',
+    'tackle',
+    'tailor',
+    'take',
+    'talk',
+    'tell',
+    'test',
+    'think',
+    'trace',
+    'track',
+    'transform',
+    'troubleshoot',
+    'try',
+    'turn',
+    'understand',
+    'update',
+    'use',
+    'vary',
+    'view',
+    'watch',
+    'weigh',
+    'work',
+    'write',
+  ];
+  // Words ending in -s after "and" that are never a second verb.
+  var NOT_SECOND = /^(its|this|his|hers|ours|yours|theirs|us|plus|thus|less|unless|across|was|has|is|does)$/;
+  // Third-person verbs the predicates open on (after "she"), and modals.
+  var MODAL = /^(can|could|would|will|may|might|should)$/i;
+  /* A predicate written after "she" said after "they": its first verb (past
+     an adverb), and the verb after "and" that joins a second predicate to
+     it ("comes to class ready and works well"). Modals and past tense stay. */
+  function forThey(text) {
+    return _agreeWith(text, function (from, to) {
+      return to;
+    });
+  }
+  /* The same predicate as a template that agrees with whichever student it
+     is said about: each verb that changes after "they" as [one|many] ("[finds|find]
+     patterns"), for the realiser. */
+  function agreeable(text) {
+    return _agreeWith(text, function (from, to) {
+      return /[[\]{}|]/.test(from) ? from : '[' + from + '|' + to + ']';
+    });
+  }
+  function _agreeWith(text, put) {
+    var ws = String(text || '').split(' ');
+    var plainFirst = null;
+    var i = 0;
+    while (i < ws.length && ADVERBS.test(ws[i])) i++;
+    if (i >= ws.length || MODAL.test(ws[i]) || /ed$/.test(ws[i])) return ws.join(' ');
+    var first = ws[i];
+    plainFirst = plural(first);
+    if (plainFirst === first) return ws.join(' ');
+    ws[i] = put(first, plainFirst);
+    // An auxiliary ("is beginning to …", "has …") has no second predicate
+    // to agree.
+    if (PLURAL[first.toLowerCase()]) return ws.join(' ');
+    for (var j = i + 1; j + 1 < ws.length; j++) {
+      if (ws[j] !== 'and') continue;
+      var k = j + 1;
+      while (k < ws.length && ADVERBS.test(ws[k])) k++;
+      if (
+        k < ws.length &&
+        /^[a-z]+s$/.test(ws[k]) &&
+        !NOT_SECOND.test(ws[k]) &&
+        VERBS.indexOf(plural(ws[k])) >= 0 &&
+        plural(ws[k]) !== ws[k] &&
+        third(plural(ws[k])) === ws[k]
+      )
+        ws[k] = put(ws[k], plural(ws[k]));
+    }
+    return ws.join(' ');
+  }
+
+  return {
+    third: third,
+    gerund: gerund,
+    does: does,
+    doing: doing,
+    plural: plural,
+    forThey: forThey,
+    agreeable: agreeable,
+  };
 })();

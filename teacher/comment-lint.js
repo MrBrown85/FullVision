@@ -6,8 +6,8 @@
    own passes the same lint as the shared bank's.
 
    It finds any phrasal verb, idiom, person-praise word, comparison with
-   classmates, sentence over 20 words, or evaluative word outside the
-   controlled vocabulary. Teacher-typed class lines (support, closing,
+   classmates, banned phrase (BANNED_PHRASES), sentence over 24 words, or
+   evaluative word outside the controlled vocabulary. Teacher-typed class lines (support, closing,
    late work) are used as typed and are not linted.
 
    To add wording: if the lint flags a word that is right for the bank, add
@@ -247,6 +247,32 @@ window.CommentLint = (function () {
     'standout',
   ];
 
+  // Phrases that count or name the questionnaire's lists, rate the student,
+  // pin the comment to a term, or wrap a skill in a form's words (Colin,
+  // Nov 4 2026: comments "translated from another language"; the plan v2
+  // lint bans). Matched as whole words, so "biodegradability together" is
+  // not "ability to", and "work on time" is not "work on" (the phrasal
+  // verb list has that rule).
+  var BANNED_PHRASES = [
+    'all six',
+    'every one',
+    'each skill',
+    'across skills',
+    'rated',
+    'is able to',
+    'ability to',
+    'the work marked',
+    'marked highest',
+    'proficiency scale calls',
+    'skill by skill',
+    'marks are close',
+    'this term',
+    'keep going',
+  ];
+  var BANNED_RES = BANNED_PHRASES.map(function (w) {
+    return { name: w, re: new RegExp('\\b' + w.replace(/ /g, '\\s+') + '\\b', 'i') };
+  });
+
   // Words a student reads as shame (the acceptability checklist): one
   // appearing anywhere in a sentence about them.
   var SHAME = ['finally', 'still', 'again', 'only', 'at least', 'unfortunately'];
@@ -464,11 +490,15 @@ window.CommentLint = (function () {
     SHAME_RES.forEach(function (x) {
       if (x.re.test(p)) out.push('shame word: ' + x.name);
     });
+    BANNED_RES.forEach(function (x) {
+      if (x.re.test(p)) out.push('banned phrase: ' + x.name);
+    });
     ws.forEach(function (w) {
       if (EVALUATIVE.indexOf(w) >= 0 && !CONTROLLED[w]) out.push('evaluative word: ' + w);
     });
     var n = window.CommentRealiser.wordCount(p);
-    if (n > window.CommentRealiser.MAX_WORDS) out.push('over 20 words: ' + n);
+    var cap = window.CommentRealiser.MAX_WORDS;
+    if (n > cap) out.push('over ' + cap + ' words: ' + n);
     return out;
   }
 
@@ -534,6 +564,7 @@ window.CommentLint = (function () {
     PRAISE: PRAISE,
     COMPARISONS: COMPARISONS,
     SHAME: SHAME,
+    BANNED_PHRASES: BANNED_PHRASES,
     EVALUATIVE: EVALUATIVE,
     CONTROLLED: CONTROLLED,
     plain: plain,

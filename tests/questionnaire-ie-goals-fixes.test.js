@@ -401,6 +401,10 @@ describe('6. Completes Work on a thin IE comment', () => {
     d.sentences.filter((x, i) => {
       const pv = d.provenance[i] || {};
       if ((pv.values || {})['when.completes'] === 4) return true;
+      // The pipeline's habits as behaviour (Nov 4 2026): Completes Work said
+      // as what the student does.
+      const said = [pv.values || {}].map(v => [v.habitDoes, v.habitDoes2].join(' '))[0];
+      if (/\b(completes|finishes) (his|her|their) work\b/.test(said)) return true;
       return ['habitStrengths', 'strongHabits', 'habitsExcellent'].some(k =>
         ((pv.sources || {})[k] || [])
           .concat(k === 'habitsExcellent' && (pv.values || {})[k] ? ['habit:completes'] : [])
@@ -443,7 +447,7 @@ describe('6. Completes Work on a thin IE comment', () => {
     const ids = onTime(d).map(x => x.id);
     const failed = v.replaced.filter(r => ids.indexOf(r.sentenceId) >= 0);
     expect(failed.length).toBe(ids.length);
-    failed.forEach(r => expect(r.failed).toContain('habits'));
+    failed.forEach(r => expect(r.failed.some(c => c === 'habits' || c === 'habitBehaviour')).toBe(true));
   });
 });
 

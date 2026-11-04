@@ -442,12 +442,14 @@ describe('1b. a skill chosen among several valid ones is never a false flag', ()
       upsertTermRating(CID, k.id, TERM, { narrative: getStudentTermRating(was, k.id, TERM).narrative }),
     );
   }
+  // The pipeline (Nov 4 2026) names one even skill at its level
+  // ({strengthAt}), the one the fewest classmates were given.
   const evenNamed = () =>
     KIDS.filter(k => {
       const f = CommentBank.facts(CID, k, TERM);
       const ctx = CommentBank.context(f, {});
       return RQ.recoverRows(rating(k.id).narrative, ctx, null).some(
-        r => r.prov && r.prov.values && r.prov.values.evenSkill,
+        r => r.prov && r.prov.values && r.prov.values.strengthAt,
       );
     });
   /* The checks after a reload: every comment's rows recovered from its
@@ -467,7 +469,7 @@ describe('1b. a skill chosen among several valid ones is never a false flag', ()
   it('drafted, nothing changed, checked again after a reload: no flags', () => {
     draftClass();
     // The rotation named different skills, so the check sees choices.
-    expect(evenNamed().length).toBeGreaterThan(3);
+    expect(evenNamed().length).toBeGreaterThan(1);
 
     expect(flagged()).toEqual([]);
   });
@@ -480,9 +482,9 @@ describe('1b. a skill chosen among several valid ones is never a false flag', ()
     draftClass();
     const tieNamed = KIDS.filter(k => {
       const ctx = CommentBank.context(CommentBank.facts(CID, k, TERM), {});
-      return RQ.recoverRows(rating(k.id).narrative, ctx, null).some(r => r.prov && r.prov.values['when.topSkill']);
+      return RQ.recoverRows(rating(k.id).narrative, ctx, null).some(r => r.prov && r.prov.values.strengthAt);
     });
-    expect(tieNamed.length).toBeGreaterThan(3);
+    expect(tieNamed.length).toBeGreaterThan(1);
 
     expect(flagged()).toEqual([]);
   });
@@ -492,8 +494,9 @@ describe('1b. a skill chosen among several valid ones is never a false flag', ()
     const k = evenNamed()[0];
     const f = CommentBank.facts(CID, k, TERM);
     const ctx = CommentBank.context(f, {});
-    const row = RQ.recoverRows(rating(k.id).narrative, ctx, null).find(r => r.prov && r.prov.values.evenSkill);
-    const named = (ctx._evenSkills || []).find(x => x.skill === row.prov.values.evenSkill);
+    const row = RQ.recoverRows(rating(k.id).narrative, ctx, null).find(r => r.prov && r.prov.values.strengthAt);
+    const id = row.prov.sources.strengthAt[0].slice('comp:'.length);
+    const named = (ctx._strengthRoutes || []).find(x => String(x.comp.id) === id);
     expect(named).toBeTruthy();
     // Every piece of that competency marked down a whole step.
     _cache.scores[CID][k.id].forEach(e => {

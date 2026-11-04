@@ -17,7 +17,9 @@
    - Numbers spelled out at the start of a sentence and from one to ten
      inside one; numerals for 11 and up inside a sentence.
    - Lists: "A and B", "A, B and C" (no serial comma).
-   - Length: at most 20 words a sentence, a quoted title counting as one.
+   - Length: at most 24 words a sentence, a quoted title counting as one.
+   - The name again: a sentence that opens on the student three sentences
+     after the name was last said takes the name, not the pronoun.
 
    Teacher text (support lines, the closing sentence, the late-work line,
    and any sentence the teacher kept as written) is used exactly as typed.
@@ -30,7 +32,12 @@
 window.CommentRealiser = (function () {
   'use strict';
 
-  var MAX_WORDS = 20;
+  // 24 words a sentence (plan v2, Nov 4 2026: the 20-word cap was part of
+  // the choppiness); Generate aims for a mean near 15.
+  var MAX_WORDS = 24;
+  // The name again when a sentence opens on the student after this many
+  // sentences of pronouns (plan v2, referring expressions).
+  var RENAME_AFTER = 3;
 
   /* ── Numbers ───────────────────────────────────────────────────────── */
 
@@ -247,11 +254,15 @@ window.CommentRealiser = (function () {
         // The name: the first mention in the comment and an explicit
         // {name}; every other mention is a pronoun. The bank writes no
         // reflexive, so no "Ava sees Ava".
-        var useName = !!tok.name || (role !== 'refl' && !state.named);
+        // After RENAME_AFTER sentences without it, a sentence that opens on
+        // the student says the name again (realise() counts state.since).
+        var again = !mentioned && role !== 'refl' && role !== 'obj' && atStart() && (state.since || 0) >= RENAME_AFTER;
+        var useName = !!tok.name || (role !== 'refl' && !state.named) || again;
         var w;
         if (useName && who.name) {
           w = role === 'poss' ? possessive(who.name) : who.name;
           state.named = true;
+          state.since = -1;
           if (role === 'subj') one = true;
         } else {
           w = String(p[role] || THEY[role]);
@@ -328,11 +339,15 @@ window.CommentRealiser = (function () {
     xs.forEach(function (x) {
       if (!who && x && x.who) who = x.who;
     });
-    var state = { named: false };
+    var state = { named: false, since: 0 };
     var out = xs.map(function (x) {
       var copy = Object.assign({}, x);
       if (x && x.toks) copy.text = render(x.toks, x.who || who, state);
-      else if (who && _names(copy.text, who.name)) state.named = true;
+      else if (who && _names(copy.text, who.name)) {
+        state.named = true;
+        state.since = -1;
+      }
+      state.since = (state.since || 0) + 1;
       copy.words = wordCount(copy.text);
       return copy;
     });

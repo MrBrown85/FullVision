@@ -15,7 +15,7 @@ adst-concept-extensions: explain how others could extend or reuse a design | she
 adst-concept-research: research and explain economic concepts | she researches and explains economic concepts | at researching and explaining economic concepts
 adst-conditions-tools: explain how conditions shape tools and technology | she explains how conditions shape tools and technology | at explaining how conditions shape tools and technology
 adst-constraint-decisions: decide the starting ideas and limits of a design | she decides the starting ideas and limits of a design | at deciding the starting ideas and limits of a design
-adst-constraint-inference: infer a design's limits and set success criteria | she infers a design's limits and set success criteria | at infering a design's limits and set success criteria
+adst-constraint-inference: infer a design's limits and set success criteria | she infers a design's limits and sets success criteria | at inferring a design's limits and setting success criteria
 adst-consultation: ask the people involved for ideas to improve work | she asks the people involved for ideas to improve work | at asking the people involved for ideas to improve work
 adst-consumer-context: identify who might eat a food product and where | she identifies who might eat a food product and where | at identifying who might eat a food product and where
 adst-consumer-involvement: work with consumers throughout a tourism design | she works with consumers throughout a tourism design | at working with consumers throughout a tourism design
@@ -32,7 +32,7 @@ adst-decision-evaluation: judge whether design decisions worked | she judges whe
 adst-design-creation: create a design that uses feedback and test results | she creates a design that uses feedback and test results | at creating a design that uses feedback and test results
 adst-design-evaluation: judge a design against critiques, tests and criteria | she judges a design against critiques, tests and criteria | at judging a design against critiques, tests and criteria
 adst-design-goals: set new design goals | she sets new design goals | at setting new design goals
-adst-design-issues: spot new design problems as work goes on | she spots new design problems as work goes on | at spoting new design problems as work goes on
+adst-design-issues: spot new design problems as work goes on | she spots new design problems as work goes on | at spotting new design problems as work goes on
 adst-design-iteration: improve a design through repeated versions | she improves a design through repeated versions | at improving a design through repeated versions
 adst-design-reflection: reflect on design thinking and the design process | she reflects on design thinking and the design process | at reflecting on design thinking and the design process
 adst-design-research: research design opportunities and barriers | she researches design opportunities and barriers | at researching design opportunities and barriers
@@ -90,7 +90,7 @@ adst-material-evaluation: judge materials for use and for reuse or recycling | s
 adst-material-testing: test different materials to see how well each works | she tests different materials to see how well each works | at testing different materials to see how well each works
 adst-needs-wants: tell needs from wants for the people involved | she tells needs from wants for the people involved | at telling needs from wants for the people involved
 adst-new-possibilities: find and analyze new design possibilities | she finds and analyzes new design possibilities | at finding and analyzing new design possibilities
-adst-opportunity-choice: choose a design opportunity and explain why | she chooses a design opportunity and explain why | at choosing a design opportunity and explain why
+adst-opportunity-choice: choose a design opportunity and explain why | she chooses a design opportunity and explains why | at choosing a design opportunity and explaining why
 adst-optimal-solutions: find a solution that fits the situation | she finds a solution that fits the situation | at finding a solution that fits the situation
 adst-outcome-format: share results in a clear, short format | she shares results in a clear, short format | at sharing results in a clear, short format
 adst-plan-development: plan a prototype with key stages and resources | she plans a prototype with key stages and resources | at planning a prototype with key stages and resources
@@ -100,23 +100,23 @@ adst-point-of-view: state a point of view for a design opportunity | she states 
 adst-points-of-view: explain different views on a meal design task | she explains different views on a meal design task | at explaining different views on a meal design task
 adst-potential-customers: identify customers for a design opportunity | she identifies customers for a design opportunity | at identifying customers for a design opportunity
 adst-potential-users: identify who a meal, product or idea is for | she identifies who a meal, product or idea is for | at identifying who a meal, product or idea is for
-adst-problem-solving: use a problem-solving framework and judge if it fits | she uses a problem-solving framework and judge if it fits | at using a problem-solving framework and judge if it fits
+adst-problem-solving: use a problem-solving framework and judge if it fits | she uses a problem-solving framework and judges if it fits | at using a problem-solving framework and judging if it fits
 adst-procedure-changes: change tools, materials or steps when needed | she changes tools, materials or steps when needed | at changing tools, materials or steps when needed
 adst-process-reflection: reflect on a project and set new goals | she reflects on a project and set new goals | at reflecting on a project and set new goals
 adst-product-evaluation: judge a product against its criteria | she judges a product against its criteria | at judging a product against its criteria
-adst-product-presentation: show a product and explain how it was made | she shows a product and explain how it was made | at showing a product and explain how it was made
+adst-product-presentation: show a product and explain how it was made | she shows a product and explains how it was made | at showing a product and explaining how it was made
 adst-product-research: research which product suits an application | she researches which product suits an application | at researching which product suits an application
-adst-production-planning: make a step-by-step plan and follow it | she makes a step-by-step plan and follow it | at making a step-by-step plan and follow it
+adst-production-planning: make a step-by-step plan and follow it | she makes a step-by-step plan and follows it | at making a step-by-step plan and following it
 adst-production-tools: identify the tools, materials and time a project needs | she identifies the tools, materials and time a project needs | at identifying the tools, materials and time a project needs
 adst-progress-sharing: share progress to get feedback and collaborators | she shares progress to get feedback and collaborators | at sharing progress to get feedback and collaborators
 adst-project-management: manage a project alone or with a team | she manages a project alone or with a team | at managing a project alone or with a team
-adst-prototype-building: build a prototype and adjust it as needed | she builds a prototype and adjust it as needed | at building a prototype and adjust it as needed
+adst-prototype-building: build a prototype and adjust it as needed | she builds a prototype and adjusts it as needed | at building a prototype and adjusting it as needed
 adst-prototype-form: choose a prototype's form, scale and detail | she chooses a prototype's form, scale and detail | at choosing a prototype's form, scale and detail
 adst-prototype-procedures: plan the steps to prototype several ideas | she plans the steps to prototype several ideas | at planning the steps to prototype several ideas
 adst-prototype-testing: test a prototype to see if it works | she tests a prototype to see if it works | at testing a prototype to see if it works
-adst-prototype-testing: try a first version and say what the test showed | she tries a first version and say what the test showed | at trying a first version and say what the test showed
+adst-prototype-testing: try a first version and say what the test showed | she tries a first version and says what the test showed | at trying a first version and saying what the test showed
 adst-prototype-testing: test a design before changing it | she tests a design before changing it | at testing a design before changing it
-adst-recipe-comprehension: read a recipe and spot the parts to clarify | she reads a recipe and spot the parts to clarify | at reading a recipe and spot the parts to clarify
+adst-recipe-comprehension: read a recipe and spot the parts to clarify | she reads a recipe and spots the parts to clarify | at reading a recipe and spotting the parts to clarify
 adst-recipe-methodology: follow a recipe safely with the right skills | she follows a recipe safely with the right skills | at following a recipe safely with the right skills
 adst-recipe-selection: choose recipes and techniques that fit the goal | she chooses recipes and techniques that fit the goal | at choosing recipes and techniques that fit the goal
 adst-recipe-tasks: list the tasks a recipe or service needs | she lists the tasks a recipe or service needs | at listing the tasks a recipe or service needs
@@ -145,7 +145,7 @@ adst-strategy-ethics: identify the ethical issues in a proposed solution | she i
 adst-strategy-evaluation: judge whether a strategy works and whom it affects | she judges whether a strategy works and whom it affects | at judging whether a strategy works and whom it affects
 adst-strategy-selection: choose strategies that suit the task | she chooses strategies that suit the task | at choosing strategies that suit the task
 adst-success-criteria: set success criteria and limits for a design | she sets success criteria and limits for a design | at setting success criteria and limits for a design
-adst-success-evaluation: share a product with users and judge its success | she shares a product with users and judge its success | at sharing a product with users and judge its success
+adst-success-evaluation: share a product with users and judge its success | she shares a product with users and judges its success | at sharing a product with users and judging its success
 adst-task-tools: identify the tools, materials and time a task needs | she identifies the tools, materials and time a task needs | at identifying the tools, materials and time a task needs
 adst-technique-selection: compare and choose techniques that suit a task | she compares and chooses techniques that suit a task | at comparing and choosing techniques that suit a task
 adst-technology-impacts: judge the effects of choices about technology | she judges the effects of choices about technology | at judging the effects of choices about technology
@@ -154,11 +154,11 @@ adst-terminology-use: use the correct terms to explain the work | she uses the c
 adst-test-data-evaluation: use test data to decide on design changes | she uses test data to decide on design changes | at using test data to decide on design changes
 adst-test-design: plan a test that checks how a prototype works | she plans a test that checks how a prototype works | at planning a test that checks how a prototype works
 adst-test-marketing: gather audience feedback to judge test marketing | she gathers audience feedback to judge test marketing | at gathering audience feedback to judge test marketing
-adst-testing-data: test a prototype and organize the results | she tests a prototype and organize the results | at testing a prototype and organize the results
+adst-testing-data: test a prototype and organize the results | she tests a prototype and organizes the results | at testing a prototype and organizing the results
 adst-textile-creation: make textile items and improve them with feedback | she makes textile items and improve them with feedback | at making textile items and improve them with feedback
 adst-tool-application: choose and use kitchen tools that suit a task | she chooses and uses kitchen tools that suit a task | at choosing and using kitchen tools that suit a task
 adst-tool-experimentation: try tools, materials and processes to improve a product | she tries tools, materials and processes to improve a product | at trying tools, materials and processes to improve a product
-adst-tool-selection: choose the right tools and learn new ones | she chooses the right tools and learn new ones | at choosing the right tools and learn new ones
+adst-tool-selection: choose the right tools and learn new ones | she chooses the right tools and learns new ones | at choosing the right tools and learning new ones
 adst-tool-suitability: judge which tools suit a task | she judges which tools suit a task | at judging which tools suit a task
 adst-tool-use: use tools, materials and processes to make textiles | she uses tools, materials and processes to make textiles | at using tools, materials and processes to make textiles
 adst-trend-analysis: analyze data to find trends and patterns | she analyzes data to find trends and patterns | at analyzing data to find trends and patterns
@@ -432,7 +432,7 @@ car-community-care: help care for coworkers and the community | she helps care f
 car-curriculum-choices: explain how course choices can shape a career path | she explains how course choices can shape a career path | at explaining how course choices can shape a career path
 car-decision-making: use a decision-making strategy on a real problem | she uses a decision-making strategy on a real problem | at using a decision-making strategy on a real problem
 car-exploring-interests: connect personal interests to work placement options | she connects personal interests to work placement options | at connecting personal interests to work placement options
-car-goal-setting: set a realistic goal and keep working toward it | she sets a realistic goal and keep working toward it | at setting a realistic goal and keep working toward it
+car-goal-setting: set a realistic goal and keep working toward it | she sets a realistic goal and keeps working toward it | at setting a realistic goal and keeping working toward it
 car-graduation-planning: weigh personal and outside factors when planning after graduation | she weighs personal and outside factors when planning after graduation | at weighing personal and outside factors when planning after graduation
 car-hours-documentation: keep a correct record of work experience hours | she keeps a correct record of work experience hours | at keeping a correct record of work experience hours
 car-job-search: use job search and interview skills | she uses job search and interview skills | at using job search and interview skills
@@ -455,7 +455,7 @@ car-risk-identification: identify the safety risks of a workplace before startin
 car-safe-interactions: interact respectfully, safely and inclusively in many settings | she interacts respectfully, safely and inclusively in many settings | at interacting respectfully, safely and inclusively in many settings
 car-safety-procedures: follow legal and site safety procedures at work | she follows legal and site safety procedures at work | at following legal and site safety procedures at work
 car-self-assessment: name personal strengths and skills, with examples | she names personal strengths and skills, with examples | at naming personal strengths and skills, with examples
-car-self-assessment: describe a strength and give an example of it | she describes a strength and give an example of it | at describing a strength and give an example of it
+car-self-assessment: describe a strength and give an example of it | she describes a strength and gives an example of it | at describing a strength and giving an example of it
 car-self-assessment: use a self-assessment to describe {his} skills | she uses a self-assessment to describe {his} skills | at using a self-assessment to describe {his} skills
 car-skill-development: make a plan to build work skills | she makes a plan to build work skills | at making a plan to build work skills
 car-skill-progression: show growth in the skills a work placement needs | she shows growth in the skills a work placement needs | at showing growth in the skills a work placement needs
@@ -482,7 +482,7 @@ cle-mentorship: use a mentor's advice in career exploration | she uses a mentor'
 cle-public-profiles: explain how personal and public profiles affect opportunities | she explains how personal and public profiles affect opportunities | at explaining how personal and public profiles affect opportunities
 cle-safe-interactions: interact respectfully, safely and inclusively with others | she interacts respectfully, safely and inclusively with others | at interacting respectfully, safely and inclusively with others
 cle-sharing-strengths: present personal strengths and accomplishments clearly | she presents personal strengths and accomplishments clearly | at presenting personal strengths and accomplishments clearly
-ela-bias-distortion: spot bias and contradictions in a text | she spots bias and contradictions in a text | at spoting bias and contradictions in a text
+ela-bias-distortion: spot bias and contradictions in a text | she spots bias and contradictions in a text | at spotting bias and contradictions in a text
 ela-contexts-values: explain the values and perspectives in a text | she explains the values and perspectives in a text | at explaining the values and perspectives in a text
 ela-creative-process: plan and create an engaging spoken or written piece | she plans and creates an engaging spoken or written piece | at planning and creating an engaging spoken or written piece
 ela-cultural-diversity: describe the diversity among First Peoples cultures in media | she describes the diversity among First Peoples cultures in media | at describing the diversity among First Peoples cultures in media
@@ -495,8 +495,8 @@ ela-form-selection: choose a form and features that suit the audience | she choo
 ela-genre-experiments: try different genres, forms and styles of texts | she tries different genres, forms and styles of texts | at trying different genres, forms and styles of texts
 ela-idea-analysis: analyze ideas in and across texts | she analyzes ideas in and across texts | at analyzing ideas in and across texts
 ela-idea-exchange: share ideas in discussion and extend others' ideas | she shares ideas in discussion and extend others' ideas | at sharing ideas in discussion and extend others' ideas
-ela-idea-exploration: explore a text's ideas and take them further | she explores a text's ideas and take them further | at exploring a text's ideas and take them further
-ela-idea-exploration: take an idea from a text and ask where it leads | she takes an idea from a text and ask where it leads | at taking an idea from a text and ask where it leads
+ela-idea-exploration: explore a text's ideas and take them further | she explores a text's ideas and takes them further | at exploring a text's ideas and taking them further
+ela-idea-exploration: take an idea from a text and ask where it leads | she takes an idea from a text and asks where it leads | at taking an idea from a text and asking where it leads
 ela-idea-exploration: connect the ideas in one text to another | she connects the ideas in one text to another | at connecting the ideas in one text to another
 ela-idea-synthesis: combine ideas from several sources to explain a topic | she combines ideas from several sources to explain a topic | at combining ideas from several sources to explain a topic
 ela-idea-transformation: transform ideas and information into a new text | she transforms ideas and information into a new text | at transforming ideas and information into a new text
@@ -516,7 +516,7 @@ ela-media-techniques: judge how media techniques suit purpose and audience | she
 ela-multimedia-design: plan and create a multimedia piece for an audience | she plans and creates a multimedia piece for an audience | at planning and creating a multimedia piece for an audience
 ela-new-media-effects: explain how new media affect First Peoples cultures | she explains how new media affect First Peoples cultures | at explaining how new media affect First Peoples cultures
 ela-new-media-techniques: explain how new media techniques shape meaning | she explains how new media techniques shape meaning | at explaining how new media techniques shape meaning
-ela-opinion-evidence: state an opinion and support it with credible evidence | she states an opinion and support it with credible evidence | at stating an opinion and support it with credible evidence
+ela-opinion-evidence: state an opinion and support it with credible evidence | she states an opinion and supports it with credible evidence | at stating an opinion and supporting it with credible evidence
 ela-oral-formats: choose a speaking format that suits the purpose | she chooses a speaking format that suits the purpose | at choosing a speaking format that suits the purpose
 ela-oral-storytelling: tell stories aloud, trying different ways of telling | she tells stories aloud, trying different ways of telling | at telling stories aloud, trying different ways of telling
 ela-oral-traditions: explain how oral traditions matter in First Peoples cultures | she explains how oral traditions matter in First Peoples cultures | at explaining how oral traditions matter in First Peoples cultures
@@ -568,7 +568,7 @@ math-puzzles-games: use thinking strategies to solve puzzles and play games | sh
 math-question-strategies: choose methods that fit a statistics question | she chooses methods that fit a statistics question | at choosing methods that fit a statistics question
 math-reflection: reflect on the thinking used to solve a problem | she reflects on the thinking used to solve a problem | at reflecting on the thinking used to solve a problem
 math-representation: show math ideas with objects, pictures and symbols | she shows math ideas with objects, pictures and symbols | at showing math ideas with objects, pictures and symbols
-math-research-questions: keep exploring a research question when answers are unclear | she keeps exploring a research question when answers are unclear | at keeping exploring a research question when answers are unclear
+math-research-questions: keep exploring a research question when answers are unclear | she keeps exploring a research question when answers are unclear | at exploring a research question when answers are unclear
 math-solution-strategies: choose and adapt strategies to solve problems | she chooses and adapts strategies to solve problems | at choosing and adapting strategies to solve problems
 math-spatial-reasoning: use spatial reasoning to explore shapes | she uses spatial reasoning to explore shapes | at using spatial reasoning to explore shapes
 math-statistical-language: use statistics vocabulary in class discussions | she uses statistics vocabulary in class discussions | at using statistics vocabulary in class discussions
@@ -617,7 +617,7 @@ phe-managing-change: explain strategies for managing changes in adolescence | sh
 phe-motivational-factors: explain what motivates people to be active | she explains what motivates people to be active | at explaining what motivates people to be active
 phe-movement-concepts: use movement concepts and strategies in games | she uses movement concepts and strategies in games | at using movement concepts and strategies in games
 phe-movement-concepts: use a strategy during a game | she uses a strategy during a game | at using a strategy during a game
-phe-movement-concepts: plan a strategy and use it in play | she plans a strategy and use it in play | at planning a strategy and use it in play
+phe-movement-concepts: plan a strategy and use it in play | she plans a strategy and uses it in play | at planning a strategy and using it in play
 phe-movement-skills: use movement skills in different activities | she uses movement skills in different activities | at using movement skills in different activities
 phe-muscle-training: explain how to train the muscles a movement uses | she explains how to train the muscles a movement uses | at explaining how to train the muscles a movement uses
 phe-outdoor-activities: take part in a range of outdoor activities | she takes part in a range of outdoor activities | at taking part in a range of outdoor activities
@@ -660,14 +660,14 @@ sci-informed-skepticism: check claims in sources against scientific evidence | s
 sci-inquiry-questions: pick a question science can answer | she picks a question science can answer | at picking a question science can answer
 sci-investigation-plans: plan an investigation that collects reliable data | she plans an investigation that collects reliable data | at planning an investigation that collects reliable data
 sci-local-environment: explore and explain the local environment | she explores and explains the local environment | at exploring and explaining the local environment
-sci-method-evaluation: judge a method and find possible sources of error | she judges a method and find possible sources of error | at judging a method and find possible sources of error
+sci-method-evaluation: judge a method and find possible sources of error | she judges a method and finds possible sources of error | at judging a method and finding possible sources of error
 sci-method-improvement: suggest specific ways to improve a method | she suggests specific ways to improve a method | at suggesting specific ways to improve a method
 sci-method-reflection: reflect on how well an investigation was done | she reflects on how well an investigation was done | at reflecting on how well an investigation was done
 sci-method-risks: assess the risks and ethics of a planned method | she assesses the risks and ethics of a planned method | at assessing the risks and ethics of a planned method
 sci-model-limitations: judge how well a model fits what it shows | she judges how well a model fits what it shows | at judging how well a model fits what it shows
 sci-observation: observe nature and ask questions about it | she observes nature and ask questions about it | at observing nature and ask questions about it
 sci-place-perspectives: share and reflect on different views of a place | she shares and reflects on different views of a place | at sharing and reflecting on different views of a place
-sci-predictions: make a prediction and explain the reason for it | she makes a prediction and explain the reason for it | at making a prediction and explain the reason for it
+sci-predictions: make a prediction and explain the reason for it | she makes a prediction and explains the reason for it | at making a prediction and explaining the reason for it
 sci-project-design: design a group project with local or global uses | she designs a group project with local or global uses | at designing a group project with local or global uses
 sci-risk-assessment: assess risks to personal safety and to others | she assesses risks to personal safety and to others | at assessing risks to personal safety and to others
 sci-role-of-scientists: explain the role scientists play in innovation | she explains the role scientists play in innovation | at explaining the role scientists play in innovation
@@ -681,7 +681,7 @@ sci-sources-of-error: find sources of error and suggest improvements | she finds
 sci-sustained-inquiry: explore a science topic of interest over time | she explores a science topic of interest over time | at exploring a science topic of interest over time
 sci-theoretical-models: build a model that explains how something works | she builds a model that explains how something works | at building a model that explains how something works
 sci-transfer-of-learning: apply science learning to new situations | she applies science learning to new situations | at applying science learning to new situations
-sci-unit-conversions: use the right units and convert between them | she uses the right units and convert between them | at using the right units and convert between them
+sci-unit-conversions: use the right units and convert between them | she uses the right units and converts between them | at using the right units and converting between them
 sci-variable-control: run a fair test by controlling variables | she runs a fair test by controlling variables | at running a fair test by controlling variables
 sci-ways-of-knowing: use First Peoples and local knowledge in science | she uses First Peoples and local knowledge in science | at using First Peoples and local knowledge in science
 ss-cau: explain the causes and results of an event | she explains the causes and results of an event | at explaining the causes and results of an event
@@ -702,7 +702,7 @@ ss-gim-importance: explain what makes a place or feature important | she explain
 ss-gvj-ethical-judgment: judge a controversial action fairly, giving reasons | she judges a controversial action fairly, giving reasons | at judging a controversial action fairly, giving reasons
 ss-gvj-impact-on-people: explain how a geographic event or action affects people | she explains how a geographic event or action affects people | at explaining how a geographic event or action affects people
 ss-ias-factor-interactions: explain how people and the environment affect each other | she explains how people and the environment affect each other | at explaining how people and the environment affect each other
-ss-inq: ask a clear question and research it using sources | she asks a clear question and research it using sources | at asking a clear question and research it using sources
+ss-inq: ask a clear question and research it using sources | she asks a clear question and researches it using sources | at asking a clear question and researching it using sources
 ss-ipr-indigenous-learning: explain First Peoples' two-way relationship with the land | she explains First Peoples' two-way relationship with the land | at explaining First Peoples' two-way relationship with the land
 ss-per: explain how beliefs and values shape a viewpoint | she explains how beliefs and values shape a viewpoint | at explaining how beliefs and values shape a viewpoint
 ss-per-sense-of-place: explain how groups see the same land or place | she explains how groups see the same land or place | at explaining how groups see the same land or place

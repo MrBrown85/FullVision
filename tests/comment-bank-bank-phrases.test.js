@@ -106,9 +106,16 @@ describe('a bank competency in a comment', () => {
     const f = facts([3.6, 3, 2]);
     for (let seed = 1; seed <= 6; seed++) {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed, quiet: true });
-      const next = d.sentences.find(x => x.step === 'nextStep');
-      expect(next && next.id, 'seed ' + seed).toMatch(/^ls0\d$/);
-      expect(d.text).toContain(comment['ss-sig'].next_steps.developing);
+      // The pipeline's Next Step frames (v: 2), alone or joined to the
+      // sentence before; each says the level step ({step}).
+      const next = d.sentences.find(x => x.step === 'nextStep' || (x.steps || []).indexOf('nextStep') >= 0);
+      expect(next && next.id, 'seed ' + seed).toMatch(/^(vns\d\d|j:.*\+vns\d\d:\w+)$/);
+      // The step as written, or as a gerund ("The next thing to practise is …").
+      const step = comment['ss-sig'].next_steps.developing;
+      expect(
+        [step, CommentForms.doing(step)].some(t => d.text.indexOf(t) >= 0),
+        d.text,
+      ).toBe(true);
       expect(CommentBank.verify(d, f, {}).replaced, 'seed ' + seed).toEqual([]);
     }
   });
@@ -118,7 +125,7 @@ describe('a bank competency in a comment', () => {
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 2, quiet: true });
     const moved = facts([3.6, 2, 3]);
     const r = CommentBank.verify(d, moved, {});
-    const next = d.sentences.find(x => x.step === 'nextStep');
+    const next = d.sentences.find(x => x.step === 'nextStep' || (x.steps || []).indexOf('nextStep') >= 0);
     expect(r.replaced.map(x => x.sentenceId)).toContain(next.id);
     expect(r.replaced.find(x => x.sentenceId === next.id).failed).toContain('nextStep');
   });

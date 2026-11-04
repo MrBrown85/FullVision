@@ -243,7 +243,7 @@ describe('the Generate Comment button (Demo Mode, Science 8)', () => {
     const first = CommentBank.draft(ctx, { seed: 11 });
     const again = CommentBank.draft(ctx, { seed: 11, previous: first.text });
     expect(again.text).not.toBe(first.text);
-    expect(again.seed).not.toBe(11);
+    // Another candidate of the same press (the pipeline), or the next seeds.
     expect(again.angle).toBe(first.angle);
   });
 
@@ -279,11 +279,18 @@ describe('the Generate Comment button (Demo Mode, Science 8)', () => {
     const ctx = CommentBank.context(factsFor('Cece'), {});
     const d1 = CommentBank.draft(ctx, { seed: 1 });
     const steps = d1.sentences.map(s => s.step);
-    // The teacher moved the last sentence first and the grade sentence last.
-    const order = [steps[steps.length - 1]].concat(steps.slice(1, -1), ['grade']);
-    const ids = [d1.sentences[d1.sentences.length - 1].id].concat(
-      d1.sentences.slice(1, -1).map(s => s.id),
-      [d1.sentences[0].id],
+    // The teacher moved the last sentence first and the grade sentence last
+    // (the grade sentence can be first or second: the comment's shape).
+    const last = d1.sentences[d1.sentences.length - 1];
+    const grade = d1.sentences.find(s => s.step === 'grade');
+    const middle = d1.sentences.filter(s => s !== last && s !== grade);
+    const order = [last.step].concat(
+      middle.map(s => s.step),
+      ['grade'],
+    );
+    const ids = [last.id].concat(
+      middle.map(s => s.id),
+      [grade.id],
     );
     [order, ids].forEach(o => {
       for (let seed = 2; seed <= 5; seed++) {
@@ -311,15 +318,22 @@ describe('the Generate Comment button (Demo Mode, Science 8)', () => {
   it('runs verify on every draft: a sentence whose claim fails never reaches the screen', () => {
     const f = factsFor('Cece');
     const ctx = CommentBank.context(f, {});
-    // A bank where the only attendance sentence claims what nothing backs.
+    // A bank where the only strength sentence Generate can draw (a pipeline
+    // frame, v: 2) claims what nothing backs.
     const bad = {
       id: 'x-unbacked',
-      part: 'habits',
-      group: 'Attendance',
+      part: 'now',
+      group: 'Overall',
       text: '{name} benefits from extra support and encouragement.',
+      needs: ['strengthAt'],
       claims: ['support'],
+      v: 2,
     };
-    const bank = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([bad]) };
+    const bank = {
+      parts: COMMENT_BANK.parts,
+      sentences: COMMENT_BANK.sentences.filter(s => !(s.v === 2 && s.group === 'Overall')).concat([bad]),
+      retired: COMMENT_BANK.retired,
+    };
     expect(CommentBank.fits(bad, ctx)).toBe(true);
     const d = CommentBank.draft(ctx, { seed: 1, bank });
     expect(d.replaced.map(r => r.sentenceId)).toEqual(['x-unbacked']);

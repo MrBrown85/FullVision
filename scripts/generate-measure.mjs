@@ -134,17 +134,19 @@ function normWords(text, name) {
   });
 }
 function count(text, phrase) {
-  const re = new RegExp('\\b' + phrase.replace(/\s+/g, '\\s+') + '\\b', 'gi');
+  // "work on" is the phrasal verb, not "work on time" (the lint's own rule).
+  const after = phrase === 'work on' ? '(?!\\s+time\\b)' : '';
+  const re = new RegExp('\\b' + phrase.replace(/\s+/g, '\\s+') + '\\b' + after, 'gi');
   return (String(text).match(re) || []).length;
 }
-/* The family of a first sentence, by what it opens on: the student's name,
-   a pronoun, the course, a grade or level word, the piece of work (the first
-   sentence is the best piece's), a time phrase ("So far", "Over the
-   year"), or anything else. */
+/* The family of a first sentence, by what it opens on: the student's name
+   (or their possessive), a pronoun, the course, a grade or level word, the
+   piece of work (a best-piece sentence opening "The", "Of", "For", "On" or
+   "In"), a time phrase ("So far", "Over the year"), or anything else. */
 function family(firstWords, row) {
   const w = firstWords[0] || '';
-  if ((row.steps || [])[0] === 'example') return 'work-first';
   if (w === 'NAME') return 'name-first';
+  if ((row.steps || [])[0] === 'example' && /^(the|of|for|on|in)$/.test(w)) return 'work-first';
   if (w === 'PRON') return 'pronoun-first';
   if (w === 'science' || (w === 'in' && firstWords[1] === 'science')) return 'course-first';
   if (/^(extending|proficient|developing|emerging|ie|a|an|b|b\+|b-|c|c\+|c-|a-|a\+|with|marks?|grade|level)$/.test(w))
@@ -245,7 +247,9 @@ export function measure(rows) {
     const fam = family(first, r);
     families[fam] = (families[fam] || 0) + 1;
     r.steps.forEach((st, i) => {
-      const k = st || 'none';
+      // A part as the questionnaire groups its steps: the habits sentence
+      // and the strong-habits sentence are one part (Habits).
+      const k = st === 'strongHabits' ? 'habits' : st || 'none';
       byStep[k] = byStep[k] || {};
       const id = r.ids[i];
       byStep[k][id] = (byStep[k][id] || 0) + 1;
@@ -424,9 +428,9 @@ export function markdown(m) {
   const lines = ['| Measure | Value | Target | Met |', '|---|---|---|---|'];
   targets(m).forEach(([k, v, want, ok]) => lines.push(`| ${k} | ${v} | ${want} | ${ok ? 'yes' : 'no'} |`));
   lines.push('');
-  lines.push('Frames per step (bank sentences used; top sentence and its share of the step):');
+  lines.push('Frames per part (bank sentences used; the top sentence and its share of the part):');
   lines.push('');
-  lines.push('| Step | Used | Top | Share |');
+  lines.push('| Part | Used | Top | Share |');
   lines.push('|---|---|---|---|');
   Object.entries(m.frames).forEach(([k, v]) => lines.push(`| ${k} | ${v.used} | ${v.top} | ${v.topShare}% |`));
   lines.push('');

@@ -263,9 +263,13 @@ describe('numbers', () => {
     expect(CommentBank.attendanceText(1, null)).toBe('missed one class');
     expect(CommentBank.attendanceText(0, 2)).toBe('been late twice');
     expect(CommentBank.attendanceText(0, 0)).toBe('');
-    const h60 = COMMENT_BANK.sentences.find(s => s.id === 'h60');
+    // h60 ("… this term") is retired (Nov 4 2026); its text is kept.
+    const h60 = COMMENT_BANK.retired.find(s => s.id === 'h60');
     const ctx = { _p: HE, name: 'Jack', attendance: CommentBank.attendanceText(3, 1) };
     expect(CommentBank.fill(h60, ctx)).toBe('He has missed three classes and been late once this term.');
+    const vat05 = COMMENT_BANK.sentences.find(s => s.id === 'vat05');
+    const both = { _p: HE, name: 'Jack', ...CommentBank.attendanceSlots(3, 1) };
+    expect(CommentBank.fill(vat05, both)).toBe('He has missed three classes and been late once.');
   });
 });
 
@@ -277,16 +281,17 @@ describe('lists and length', () => {
     expect(R.list(['A', 'A', '', 'B'])).toBe('A and B');
   });
 
-  it('counts words with a quoted title as one, and flags a sentence over 20', () => {
+  it('counts words with a quoted title as one, and flags a sentence over 24', () => {
     expect(R.wordCount('Her best piece was “What Does the Poster Show, and What Does It Hide?”.')).toBe(5);
-    const twenty = Array.from({ length: 20 }, () => 'word').join(' ') + '.';
-    expect(R.tooLong(twenty)).toBe(false);
-    expect(R.tooLong('One more ' + twenty)).toBe(true);
-    expect(R.realise([{ id: 'x', text: twenty }]).sentences[0].words).toBe(20);
+    const cap = Array.from({ length: 24 }, () => 'word').join(' ') + '.';
+    expect(R.MAX_WORDS).toBe(24);
+    expect(R.tooLong(cap)).toBe(false);
+    expect(R.tooLong('One more ' + cap)).toBe(true);
+    expect(R.realise([{ id: 'x', text: cap }]).sentences[0].words).toBe(24);
   });
 
-  it('drafts a sentence over 20 words only when nothing shorter fits', () => {
-    const long = '{He} ' + Array.from({ length: 22 }, () => 'worked').join(' ') + '.';
+  it('drafts a sentence over 24 words only when nothing shorter fits', () => {
+    const long = '{He} ' + Array.from({ length: 26 }, () => 'worked').join(' ') + '.';
     const bank = {
       parts: [{ id: 'how', title: 'How' }],
       sentences: [
@@ -324,14 +329,24 @@ describe('the draft passes through the realiser', () => {
     return { st, f, d: CommentBank.draft(CommentBank.context(f, {}), { seed: CommentBank.seedFor(st.id) }) };
   };
 
-  it('names the student once, first, and uses the pronouns on file after', () => {
+  it('names the student first, uses the pronouns on file after, and the name again only after three sentences', () => {
     getStudents(cid)
       .filter(s => String(s.pronouns || '').trim())
       .forEach(s => {
         const { f, d } = draftFor(s.firstName);
         const name = new RegExp('\\b' + f.name + '\\b');
         expect(d.sentences[0].text, f.name).toMatch(name);
-        d.sentences.slice(1).forEach(x => expect(x.text, f.name).not.toMatch(name));
+        // The name again (plan v2, referring expressions): only at the start
+        // of a sentence three or more sentences after it was last said.
+        let last = 0;
+        d.sentences.slice(1).forEach((x, i) => {
+          const at = i + 1;
+          if (name.test(x.text)) {
+            expect(at - last, f.name + ': ' + x.text).toBeGreaterThanOrEqual(4);
+            expect(x.text.indexOf(f.name), f.name).toBe(0);
+            last = at;
+          }
+        });
         d.sentences.forEach(x => expect(x.text, f.name).not.toMatch(/[{}[\]]|\bthe “/));
       });
   });
@@ -342,7 +357,8 @@ describe('the draft passes through the realiser', () => {
     const r = CommentBank.realise(d.sentences, [d.sentences[1].id]);
     expect(r.sentences[0].id).toBe(d.sentences[1].id);
     expect(r.sentences[0].text).toMatch(new RegExp('\\b' + f.name + '\\b'));
-    expect(r.sentences[1].text).toMatch(/^She is /);
+    // The sentence that led no longer names her.
+    expect(r.sentences[1].text).not.toMatch(new RegExp('\\b' + f.name + '\\b'));
     expect(r.sentences.length).toBe(last + 1);
   });
 
@@ -354,12 +370,14 @@ describe('the draft passes through the realiser', () => {
       _grade: 'ie',
       _ieProblem: 'missing',
       name: 'Jack',
+      course: 'History 12',
+      ieReason: COMMENT_BANK.pipeline.ieReason.missing,
       missingWork: 'One assignment is not handed in: “Map Quiz.”',
       ieDeadline: 'December 18',
     };
     const parts = CommentBank.requiredParts(ctx);
     expect(parts.map(p => p.text)).toEqual([
-      'Jack’s mark this term is IE, which means there is not yet enough evidence for a letter grade.',
+      'Jack’s grade in History 12 is IE for now, because some of the work that counts is not handed in yet.',
       'One assignment is not handed in: “Map Quiz.”',
       'To earn a grade, he needs to submit the missing work.',
       'The deadline to replace this IE with a grade is December 18.',

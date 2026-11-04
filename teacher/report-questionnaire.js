@@ -233,7 +233,8 @@ window.ReportQuestionnaire = (function () {
   function _thousands(n) {
     return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
-  /* The sentences of a comment over 20 words, a quoted title counting as
+  /* The sentences of a comment over the realiser's cap (24 words since Nov 4
+     2026, CommentRealiser.MAX_WORDS), a quoted title counting as
      one (the realiser's rule; a teacher's edit can pass it). */
   function longSentences(text) {
     return sentencesOf(text).filter(function (t) {
@@ -241,14 +242,15 @@ window.ReportQuestionnaire = (function () {
     });
   }
   /* After the count: that it is past the class's limit or a sentence is
-     over 20 words (the count turns orange), else the class's limit. Only
+     over the cap (the count turns orange), else the class's limit. Only
      information: nothing is blocked (Colin, 2026-11-02: "i don't care about
      comment maximum length for myedbc - don't restrict users"). */
   function _countTail(text) {
     if (_overLimit(text)) return ' · over the limit';
     var n = longSentences(text).length;
-    if (n === 1) return ' · one sentence is over 20 words';
-    if (n > 1) return ' · ' + CommentBank.numberWords(n) + ' sentences are over 20 words';
+    var cap = CommentRealiser.MAX_WORDS;
+    if (n === 1) return ' · one sentence is over ' + cap + ' words';
+    if (n > 1) return ' · ' + CommentBank.numberWords(n) + ' sentences are over ' + cap + ' words';
     return _limitText();
   }
   function _countFlag(text) {
@@ -2648,7 +2650,7 @@ window.ReportQuestionnaire = (function () {
      until an IE's deadline is picked, each check not yet ticked, 'claims'
      while a sentence no longer matches the gradebook. The length never
      keeps it off: the count says when the comment is past the class's
-     limit or a sentence is over 20 words. */
+     limit or a sentence is over the cap (24 words). */
   function approveBlockers(st) {
     if (!st) return [];
     var f = _facts(st);
@@ -3219,7 +3221,13 @@ window.ReportQuestionnaire = (function () {
     };
     // A sentence of the teacher's own drawn before its save landed is
     // found under the server's id.
-    return find(id) || (window.PersonalBank && PersonalBank.currentId ? find(PersonalBank.currentId(id)) : null);
+    // A joined sentence (the Generate pipeline: two frames as one) is built
+    // from its two frames.
+    return (
+      find(id) ||
+      (/^j:/.test(String(id)) && CommentBank.sentenceById ? CommentBank.sentenceById(id) : null) ||
+      (window.PersonalBank && PersonalBank.currentId ? find(PersonalBank.currentId(id)) : null)
+    );
   }
 
   /* The rows of the comment on screen, per class, student and report: one
@@ -3567,16 +3575,17 @@ window.ReportQuestionnaire = (function () {
         used[x.id] = true;
         return _rowFromMeta(x, t, i, ctx, yours);
       }
+      // The bank sentence that gives the text, its slots said any of their
+      // true ways (CommentBank.filledAs: the pipeline's lexical choices).
+      var exactCtx = null;
       var exact = COMMENT_BANK.sentences.find(function (s) {
-        return (
-          !used[s.id] &&
-          CommentBank.fits(s, ctx) &&
-          (CommentBank.fill(s, ctx) === t || CommentBank.fill(s, ctx, { first: true }) === t)
-        );
+        if (used[s.id] || !CommentBank.fits(s, ctx)) return false;
+        exactCtx = CommentBank.filledAs ? CommentBank.filledAs(s, ctx, t) : null;
+        return !!exactCtx;
       });
       if (exact) {
         used[exact.id] = true;
-        var r = rowFromSentence(exact, ctx, null, i === 0);
+        var r = rowFromSentence(exact, exactCtx || ctx, null, i === 0);
         r.text = r.drafted = t;
         return r;
       }
@@ -3751,6 +3760,10 @@ window.ReportQuestionnaire = (function () {
     if (!v) return null;
     var toks = CommentRealiser.tokens(r.s.text, function (k) {
       var x = v[k] == null ? '' : String(v[k]);
+      // A said value (the Generate pipeline: a card's wording, a habit as
+      // behaviour) holds its own pronouns: its template's tokens.
+      var said = CommentBank.saidTokens ? CommentBank.saidTokens(k, x) : null;
+      if (said) return said;
       // A title is read with its quotes; the realiser puts them back.
       return CommentRealiser.TITLE_SLOTS[k] ? x.replace(/^[“"]/, '').replace(/[”"]$/, '') : x;
     });
@@ -5016,6 +5029,8 @@ window.ReportQuestionnaire = (function () {
       order: order,
       bank: opts.bank,
       quiet: true,
+      // Every part with something to say, so a missing one can be offered.
+      everyPart: true,
     });
     var out = [];
     PARTS.forEach(function (p) {
@@ -5605,23 +5620,35 @@ window.ReportQuestionnaire = (function () {
     var step = CommentBank.stepOf(s);
     if (part === 'grade') {
       if (s.standing) return [_standingCase(s.standing) || 'other'];
-      var g = when.grade;
-      if (g === 'letter')
-        return LETTERS.slice(0, 4).map(function (l) {
-          return 'w:' + l;
-        });
-      if (g === 'letterClose')
-        return LETTERS.slice(1, 4).map(function (l) {
-          return 'w:' + l;
-        });
-      if (g === 'cminus' || g === 'cminusClose') return ['w:C-'];
-      if (g === 'proficiency')
-        return PROFICIENCY_WORDS.map(function (w) {
-          return 'p:' + w;
-        });
-      return /^(ie|languageGoals|iepGoals)$/.test(g || '') ? [g] : ['other'];
+      // A frame can serve several kinds (the pipeline's: letter and C-).
+      var gradeCases = [];
+      var addCase = function (c) {
+        if (gradeCases.indexOf(c) < 0) gradeCases.push(c);
+      };
+      [].concat(when.grade || []).forEach(function (g) {
+        if (g === 'letter')
+          LETTERS.slice(0, 4).forEach(function (l) {
+            addCase('w:' + l);
+          });
+        else if (g === 'letterClose')
+          LETTERS.slice(1, 4).forEach(function (l) {
+            addCase('w:' + l);
+          });
+        else if (g === 'cminus' || g === 'cminusClose') addCase('w:C-');
+        else if (g === 'proficiency')
+          PROFICIENCY_WORDS.forEach(function (w) {
+            addCase('p:' + w);
+          });
+        else if (/^(ie|languageGoals|iepGoals)$/.test(g)) addCase(g);
+      });
+      return gradeCases.length ? gradeCases : ['other'];
     }
-    if (part === 'bestPiece') return has('bestNote') ? ['note'] : has('assignment') ? ['noNote'] : ['note', 'noNote'];
+    if (part === 'bestPiece')
+      return has('bestNote') || has('pieceDid')
+        ? ['note']
+        : has('assignment') || has('pieceTitle')
+          ? ['noNote']
+          : ['note', 'noNote'];
     if (part === 'strengths') {
       if (s.story) return [_storyCase(s.story)];
       var story = ['climb', 'slide', 'split', 'hidden', 'newcomer'].find(has);
@@ -5671,6 +5698,10 @@ window.ReportQuestionnaire = (function () {
       if (has('habitsGood')) return ['sum:good'];
       if (has('habitToBuild')) return ['sum:one'];
       if (has('habitsToBuild')) return ['sum:two'];
+      // The pipeline's habits as behaviour (Nov 4 2026).
+      if (has('habitInvite2')) return ['sum:two'];
+      if (has('habitInvite')) return ['sum:one'];
+      if (has('habitDoes')) return ['strong'];
       return ['sum:any'];
     }
     if (part === 'notHandedIn') {
@@ -5711,7 +5742,9 @@ window.ReportQuestionnaire = (function () {
         };
       }
       var p = /^p:(.+)$/.exec(id);
-      return p ? { gradeWord: p[1] } : null;
+      // The pipeline's frames say the level ({standing}) and what it means.
+      var meaning = ((COMMENT_BANK.pipeline || {}).levelMeaning || {})[p && p[1]] || '';
+      return p ? { gradeWord: p[1], standing: CommentBank.aOrAn(p[1]) + ' level', levelMeaning: meaning } : null;
     }
     var needs = s.needs || [];
     if (part === 'habits' && /^att:/.test(id) && needs.indexOf('attendance') >= 0) return { attendance: '' };

@@ -27,10 +27,10 @@ describe('thinLine', () => {
 describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
   let cid, saved, hadDoc, oldDoc, fullBank;
   beforeAll(() => {
-    // The bank as it was before Nov 1 (the first 18 family sentences), so
-    // the family part is thin for the class: four sentences for Science.
+    // A bank with four habit frames (the pipeline's first four invitation
+    // frames, Nov 4 2026), so the habits part is thin for the class.
     fullBank = COMMENT_BANK.sentences;
-    COMMENT_BANK.sentences = fullBank.filter(s => s.group !== 'For the Family' || Number(s.id.slice(1)) <= 18);
+    COMMENT_BANK.sentences = fullBank.filter(s => !(s.v === 2 && s.part === 'habits') || /^vhi0[1-4]$/.test(s.id));
     saved = window.isDemoMode;
     window.isDemoMode = () => true;
     localStorage.clear();
@@ -38,6 +38,13 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
     seedIfNeeded();
     cid = 'sci8';
     setActiveTerm(cid, 2);
+    // Every student with one habit to build, so each comment has a habits
+    // sentence from the four frames.
+    getStudents(cid).forEach(st =>
+      upsertTermRating(cid, st.id, ReportBlocks.getTermId(), {
+        habits: { completes: 3, ready: 3, others: 3, part: 3, feedback: 2, devices: 3 },
+      }),
+    );
     hadDoc = 'document' in globalThis;
     oldDoc = globalThis.document;
     globalThis.document = { getElementById: () => null, querySelectorAll: () => [] };
@@ -65,28 +72,36 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
     return { html: html.slice(html.indexOf('id="tq-sentences"')), d, students, st, termId };
   }
 
+  /* The first student whose draft has a habits sentence, with its card. */
+  function thinCard() {
+    const names = RQ.getTqStudents().map(s => s.firstName);
+    for (const first of names) {
+      const c = card(first);
+      if (c.d.sentences.some(x => x.step === 'habits')) return c;
+    }
+    return null;
+  }
+
   it('shows the thin line under the row of a thin part, linking to Browse Sentences on that part', () => {
-    // The family sentence: four fit the whole class. The card shows it in
-    // the Next Step row with the next-step sentence, so the row is that one.
-    const { html, d, students } = card('Noor');
-    expect(d.sentences.some(x => x.step === 'home')).toBe(true);
-    const i = d.sentences.findIndex(x => x.step === 'nextStep');
+    // The habits sentence: four frames fit the whole class.
+    const { html, d, students } = thinCard();
+    const i = d.sentences.findIndex(x => x.step === 'habits');
     expect(i).toBeGreaterThanOrEqual(0);
     const line =
-      '<span class="qn-req-thin">Only 4 next step sentences fit ' +
+      '<span class="qn-req-thin">Only 4 habit sentences fit ' +
       students.length +
       ' students, so some will repeat. <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="all" data-row="' +
       i +
-      '" title="Opens Browse Sentences on Next Step, where you can pick another sentence for this part.">Write one of your own</button> to add more.</span>';
+      '" title="Opens Browse Sentences on Habits, where you can pick another sentence for this part.">Write one of your own</button> to add more.</span>';
     expect(html).toContain(line);
     // In that row, after its source line.
     const row = html.slice(html.lastIndexOf('<div class="qn-req-row', html.indexOf(line)), html.indexOf(line));
-    expect(row).toContain('<span class="qn-req-label">Next Step</span>');
+    expect(row).toContain('<span class="qn-req-label">Habits</span>');
     expect(row).toContain('class="qn-req-source"');
   });
 
   it('shows it only for the parts that are thin for the student, never the grade, best piece or next step sentence', () => {
-    const { html, d, st, termId, students } = card('Noor');
+    const { html, d, st, termId, students } = thinCard();
     const strength = CommentBank.bankStrength(cid, { termId, students });
     const thin = d.sentences.filter(x => (strength.byStudent[st.id][x.step] || {}).thin);
     expect(thin.length).toBeGreaterThan(0);

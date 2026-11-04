@@ -1685,7 +1685,7 @@ window.CommentBank = (function () {
     },
     {
       id: 'lg-writing',
-      text: '{His} writing in English has grown this term; the next step is a paragraph with one clear main idea.',
+      text: '{His} writing in English has grown over the year; the next step is a paragraph with one clear main idea.',
       src: 'GHS 315',
     },
     {
@@ -2468,6 +2468,10 @@ window.CommentBank = (function () {
       // then says no "this term" about them.
       missingOutsideTerm: missingOutsideTerm,
       lastReport: lastReport,
+      // The report the facts are for, so a draft can tell which press of
+      // Generate it is (the screen seeds each press from the student and
+      // the term).
+      termId: termId,
       voice: voice,
       confidence: conf,
       overall: overall,
@@ -3032,7 +3036,55 @@ window.CommentBank = (function () {
     if (!n || !n.steps) return null;
     // At Extending, a version 2 card's own step (next_steps.extending), said
     // for this student; a version 1 card has none, and the step is the phrase.
-    return { comp: n.comp, text: forStudent(n.steps[word(n.comp.level)] || n.skill, f) };
+    return { comp: n.comp, text: _say(n.steps[word(n.comp.level)] || n.skill, f) };
+  }
+
+  /* A card or pipeline string said for one student (forStudent), and kept
+     as the template it came from, so a slot that holds it renders its {his}
+     and [one|many] verbs for whoever the sentence is about: drawn again
+     after the pronouns change, or with they/them. agree: the string is a
+     predicate after "she", whose verbs agree by the realiser's [a|b]. The
+     template is found from the said text with the pronouns as one word, for
+     either pronoun it was said with. */
+  var _TPL = {};
+  var _TPL_SLOTS = {
+    strengthAt: 1,
+    strengthDoing: 1,
+    pieceDid: 1,
+    progressDoing: 1,
+    habitDoes: 1,
+    habitDoes2: 1,
+    habitInvite: 1,
+    habitInvite2: 1,
+    habitWhy: 1,
+    step: 1,
+    stepDoing: 1,
+    homeLine: 1,
+    levelStep: 1,
+  };
+  function _tplKey(said) {
+    return String(said || '')
+      .replace(/\b(he|she|they|him|her|them|his|their|hers|theirs|himself|herself|themselves)\b/gi, 'P')
+      .toLowerCase();
+  }
+  var _SAY_AS = [
+    { subj: 'she', obj: 'her', poss: 'her', refl: 'herself' },
+    { subj: 'they', obj: 'them', poss: 'their', refl: 'themselves' },
+  ];
+  function _say(text, f, agree) {
+    var F = typeof window !== 'undefined' ? window.CommentForms : null;
+    var t = agree && F ? F.agreeable(String(text || '')) : String(text || '');
+    if (/[{[]/.test(t))
+      _SAY_AS.forEach(function (p) {
+        _TPL[_tplKey(forStudent(t, { name: '', pronouns: p }))] = t;
+      });
+    return forStudent(t, f);
+  }
+  /* The tokens for a slot that holds a said string, or null. */
+  function _sayToks(k, value) {
+    if (!_TPL_SLOTS[k] || !value) return null;
+    var t = _TPL[_tplKey(value)];
+    return t ? R.tokens(t) : null;
   }
 
   /* A card string said for one student: its {he} {his} {him} slots and
@@ -3043,7 +3095,9 @@ window.CommentBank = (function () {
     var t = String(text || '');
     if (!/[{[]/.test(t)) return t;
     var said = R.render(R.tokens(t), { name: (f && f.name) || '', p: f && f.pronouns }, { named: true });
-    return /^[a-z]/.test(t) ? said.charAt(0).toLowerCase() + said.slice(1) : said;
+    // The first letter as written: a template opening on "[finds|find]" or
+    // "{his}" is lower case too.
+    return /^[[{]*[a-z]/.test(t) ? said.charAt(0).toLowerCase() + said.slice(1) : said;
   }
 
   /* The next step most of the class shares (Colin, 2026-11-02), for the
@@ -3863,7 +3917,7 @@ window.CommentBank = (function () {
     var att = attendanceSlots(f.absent, f.late);
     var ms = missingN > 0 ? missingSlots(f.notHandedIn) : { title: '', titles: '', many: '', group: '' };
 
-    return {
+    var out = {
       // The facts and picks this context was built from, so draft() can
       // pick the story (angle) and verify the draft before returning it.
       _f: f,
@@ -4067,6 +4121,292 @@ window.CommentBank = (function () {
       absentCount: absentN > 0 ? String(absentN) : '',
       standingWord: f.standing || '',
     };
+    return pipelineSlots(out, f, {
+      habits: habits,
+      rated: effectiveHabits(picks.habits || f.habits, null),
+      nowSk: nowSk,
+      hiSk: hiSk,
+      hiTop: hiTop,
+      prog: prog,
+      top: top,
+      topPieceSkill: topPieceSkill,
+      next: next,
+      lstep: lstep,
+      gr: gr,
+    });
+  }
+
+  /* ── The pipeline's slots (Nov 4 2026) ─────────────────────────────── */
+
+  /* The slots the version 2 frames are written for, added to a context:
+     each is a fact the engine already computes, said in plain words, or a
+     string read from the skill card by cluster and level, filled for the
+     student. A slot that can be said several ways (three phrasings of a
+     strength, two of a habit) has every way in ctx._choices: Generate picks
+     one (lexical choice, rotated along the roster) and verify() accepts any
+     of them, so the choice is never a fact that goes stale. '' when a slot
+     does not apply. The wording that is not on a card (what each level
+     means, why a grade is IE, a strength at its level for a version 1 card,
+     the habits as behaviour) is COMMENT_BANK.pipeline. */
+  var HABIT_ORDER = ['completes', 'ready', 'others', 'part', 'feedback', 'devices'];
+  var SCORED = /\b(quiz|test|check|exam)\b/i;
+  function _pipelineWords() {
+    var b = typeof window !== 'undefined' && window.COMMENT_BANK;
+    return (b && b.pipeline) || { levelMeaning: {}, ieReason: {}, at: {}, did: [], habits: {} };
+  }
+  /* A best piece's title as a comment says it (plan v2, titles by kind):
+     a quiz, test or check is scored ("the Periodic Table Quiz", never "the
+     The"); a question or a long title stays in quotes; any other title is
+     a thing the student made, owned and unquoted ("her Biodiversity Field
+     Journal"). { title, kind: 'owned' | 'scored' }. */
+  function titleKind(title) {
+    var t = R.workTitle(title).replace(/\.+$/, '');
+    if (!t) return { title: '', kind: '' };
+    var kind = SCORED.test(t) ? 'scored' : 'owned';
+    if (/[?!“”"]/.test(t) || R.wordCount(t) > 6) return { title: R.quoteTitle(title), kind: kind };
+    return { title: kind === 'scored' ? t.replace(/^the\s+/i, '') : t, kind: kind };
+  }
+  /* The ways to say a strength at its level, for a card entry (or a table
+     skill: entry null) and its phrase: the card's own "at" forms when it
+     has them, else the pipeline's by level with the phrase in them. */
+  function strengthAtPool(f, entry, phrase, levelWord) {
+    var P = _pipelineWords();
+    var own = entry && entry.forms && entry.forms.at[levelWord];
+    var F = window.CommentForms;
+    var pool =
+      own && own.length
+        ? own
+        : (P.at[levelWord] || []).map(function (t) {
+            return t
+              .split('{base}')
+              .join(phrase)
+              .split('{does}')
+              .join(F ? F.does(phrase) : phrase);
+          });
+    return pool.map(function (t) {
+      return _say(t, f, true);
+    });
+  }
+  /* The gerund phrases a skill is said with ("finding patterns in data"). */
+  function doingPool(f, entry, phrase) {
+    var F = window.CommentForms;
+    var xs = entry && entry.forms && entry.forms.doing.length ? entry.forms.doing : F ? [F.doing(phrase)] : [];
+    return xs.map(function (t) {
+      return _say(t, f);
+    });
+  }
+  /* The strengths the pipeline may say, best first: the first strength past
+     the "strongest" gate (strengthNowOf), else the highest-marked skills
+     (highestSkills, whose order follows the class), each with its level. */
+  function strengthRoutes(f, nowSk, hiSk) {
+    if (nowSk) return [{ comp: nowSk.comp, key: nowSk.key, skill: nowSk.skill, word: nowSk.word, strongest: true }];
+    // A strongest skill from the table (a class not linked to the bank): its
+    // wording, at the competency's level.
+    var st = strengthSkills(f)[0];
+    if (st && word(st.comp.level))
+      return [{ comp: st.comp, key: st.key, skill: st.skill, word: word(st.comp.level), strongest: true }];
+    // A tie at the top (topTieOf): any of the tied skills, the one the fewest
+    // classmates were given first (a strength, never "the strongest").
+    var tie = topTieSkills(f);
+    if (tie.length) {
+      var uses = _topUsesFor(f.cid, f.sid);
+      return tie
+        .map(function (x, i) {
+          return { x: x, i: i };
+        })
+        .sort(function (a, b) {
+          return (uses[a.x.key] || 0) - (uses[b.x.key] || 0) || a.i - b.i;
+        })
+        .map(function (o) {
+          return {
+            comp: o.x.comp,
+            key: o.x.key,
+            skill: o.x.skill,
+            word: word(o.x.comp.level),
+            strongest: false,
+            tie: true,
+          };
+        })
+        .filter(function (r) {
+          return !!r.word;
+        });
+    }
+    // Even results (evenComps): one of the even skills, at its level, the
+    // one the fewest classmates were given first (evenSkills); the comment
+    // never says the results are even (Colin, Nov 4: never name the list).
+    var even = evenSkills(f)
+      .map(function (x) {
+        return { comp: x.comp, key: x.key, skill: x.skill, word: word(x.comp.level), strongest: false, even: true };
+      })
+      .filter(function (r) {
+        return !!r.word;
+      });
+    if (even.length) return even;
+    return (hiSk || []).map(function (x) {
+      return { comp: x.comp, key: x.key, skill: x.skill, word: x.word, strongest: false };
+    });
+  }
+  function _entryOf(f, comp) {
+    var sk = comp ? skillFor(f, comp) : null;
+    return (sk && sk.entry) || null;
+  }
+  /* The habits the pipeline can say: those at Consistently (on the IE path,
+     never Completes Work from the record beside missing or unmarked work,
+     as the habits claim says) in Colin's order, and those at Sometimes or
+     Rarely, lowest first. */
+  function habitPlan(f, habits, rated) {
+    var ie = reportPath(f) === 'ie' && !(rated || {}).completes && (_missingCount(f) > 0 || _unmarkedIe(f));
+    var cons = HABIT_ORDER.filter(function (k) {
+      return habits[k] === CONSISTENTLY && !(ie && k === 'completes');
+    });
+    var low = HABIT_ORDER.filter(function (k) {
+      return habits[k] === 1 || habits[k] === 2;
+    }).sort(function (a, b) {
+      return habits[a] - habits[b] || HABIT_ORDER.indexOf(a) - HABIT_ORDER.indexOf(b);
+    });
+    return { does: cons, invite: low };
+  }
+  function habitPhrases(f, key, form) {
+    var h = (_pipelineWords().habits || {})[key] || {};
+    return [].concat(h[form] || []).map(function (t) {
+      return _say(t, f, form === 'does');
+    });
+  }
+  /* The invitations in the For the Family lines written for a skill (Colin,
+     Nov 4 2026, decision 3: the card's own prompt first, the skill-keyed
+     lines as the fallback), without their wrapper ("At home, you can",
+     "You could", "One thing to try:"), so the pipeline's home wrappers can
+     say them. Only lines that start with an invitation verb once the
+     wrapper is off; each fits the student as the line itself would. */
+  var HOME_WRAPPER = /^(?:at home, you can|you could|one thing to try:|it helps to)\s+/i;
+  function _homePrompts(ctx, skillKey) {
+    var b = typeof window !== 'undefined' && window.COMMENT_BANK;
+    if (!b || !skillKey) return [];
+    var out = [];
+    b.sentences.forEach(function (x) {
+      if (x.group !== 'For the Family' || !x.when || x.when.nextSkill !== skillKey || x.v) return;
+      if (!forFamily(x, ctx._family || '')) return;
+      var t = String(x.text).replace(HOME_WRAPPER, '');
+      t = t.charAt(0).toLowerCase() + t.slice(1);
+      if (!/^(ask|invite|tell|show|let|talk|share)\b/.test(t)) return;
+      out.push(t.replace(/\.$/, ''));
+    });
+    return out;
+  }
+  function pipelineSlots(ctx, f, x) {
+    var P = _pipelineWords();
+    var F = window.CommentForms;
+    var choices = {};
+    var pick = {};
+    var fk = ctx._facts;
+    var compKey = function (c) {
+      return c ? ['comp:' + c.id] : [];
+    };
+    var put = function (k, pool, facts) {
+      pool = (pool || []).filter(Boolean);
+      ctx[k] = pool.length ? pool[0] : '';
+      if (pool.length > 1) choices[k] = pool;
+      if (pool.length > 1) pick[k] = pool;
+      fk[k] = facts || [];
+    };
+    // The grade: what the level means (the scale's words), the level beside
+    // the letter in a Both class, and why a grade is IE.
+    var standing = f.standing || '';
+    var prof = !!x.gr && x.gr.kind === 'proficiency';
+    put('levelMeaning', prof ? [P.levelMeaning[standing]] : [], ['overall']);
+    put('levelUp', prof && /^(Proficient|Extending)$/.test(standing) ? ['yes'] : [], ['overall']);
+    var both = !!(f.grade && f.grade.mode === 'both' && standing && x.gr && /^(letter|cminus)/.test(x.gr.kind));
+    put('gradeLevel', both ? [aOrAn(standing) + ' level'] : [], ['overall']);
+    put('ieReason', ctx._path === 'ie' && ctx._ieProblem ? [P.ieReason[ctx._ieProblem]] : [], ['grade']);
+    // The strength at its level now.
+    var routes = strengthRoutes(f, x.nowSk, x.hiSk);
+    var r = routes[0] || null;
+    var re = r ? _entryOf(f, r.comp) : null;
+    put('strengthAt', r ? strengthAtPool(f, re, r.skill, r.word) : [], compKey(r && r.comp));
+    put('strengthDoing', r ? doingPool(f, re, r.skill) : [], compKey(r && r.comp));
+    var top = !!r && (r.strongest || (!r.tie && !r.even && !!x.hiTop));
+    put('strengthTop', top ? ['yes'] : [], compKey(r && r.comp));
+    put('strengthHigh', r && /^(Proficient|Extending)$/.test(r.word) ? ['yes'] : [], compKey(r && r.comp));
+    // "{His} strongest area is …" only past the "strongest" gate.
+    put('area', r && r.strongest && re && re.area ? [re.area] : [], compKey(r && r.comp));
+    ctx._strengthRoutes = routes;
+    // The best piece: its title by kind, and what the student did in it
+    // (the teacher's Note for the Report, else the skill it was scored on).
+    var w = x.top;
+    var tk = w ? titleKind(w.title) : { title: '', kind: '' };
+    var wk = w ? ['work:' + w.id] : [];
+    put('pieceTitle', tk.title ? [tk.title] : [], wk);
+    put('pieceOwned', tk.kind === 'owned' ? ['yes'] : [], wk);
+    put('pieceScored', tk.kind === 'scored' ? ['yes'] : [], wk);
+    var note = w ? noteSlot(w.note) : '';
+    var did = [];
+    if (note) did = [note];
+    else if (x.topPieceSkill) {
+      var pe = _entryOf(f, x.topPieceSkill.comp);
+      did = (pe && pe.forms.did.length ? pe.forms.did : P.did || []).map(function (t) {
+        return _say(t.split('{base}').join(x.topPieceSkill.skill), f);
+      });
+    }
+    put('pieceDid', did, wk.concat(note ? [] : compKey(x.topPieceSkill && x.topPieceSkill.comp)));
+    // Growth: the skill whose level rose, as a gerund.
+    var pr = x.prog;
+    put('progressDoing', pr ? doingPool(f, _entryOf(f, pr.comp), pr.skill) : [], compKey(pr && pr.comp));
+    // The habits as behaviour: the first of each kind by default; Generate
+    // picks by news value in the class (draft()).
+    var hp = habitPlan(f, x.habits, x.rated);
+    ctx._habitPlan = hp;
+    var phr = function (keys, form) {
+      return keys.reduce(function (acc, k) {
+        return acc.concat(habitPhrases(f, k, form));
+      }, []);
+    };
+    var hk = function (keys) {
+      return keys.map(function (k) {
+        return 'habit:' + k;
+      });
+    };
+    put('habitDoes', hp.does.length ? phr([hp.does[0]], 'does') : [], hk(hp.does));
+    put('habitDoes2', hp.does.length > 1 ? phr([hp.does[1]], 'does') : [], hk(hp.does));
+    put('habitInvite', hp.invite.length ? phr([hp.invite[0]], 'invite') : [], hk(hp.invite));
+    put('habitInvite2', hp.invite.length > 1 ? phr([hp.invite[1]], 'invite') : [], hk(hp.invite));
+    put('habitWhy', hp.invite.length ? phr([hp.invite[0]], 'why') : [], hk(hp.invite));
+    // Every way a habit at that rating can be said: the choice is Generate's.
+    if (hp.does.length) choices.habitDoes = phr(hp.does, 'does');
+    if (hp.does.length > 1) choices.habitDoes2 = phr(hp.does, 'does');
+    if (hp.invite.length) {
+      choices.habitInvite = phr(hp.invite, 'invite');
+      choices.habitWhy = phr(hp.invite, 'why');
+    }
+    if (hp.invite.length > 1) choices.habitInvite2 = phr(hp.invite, 'invite');
+    // The strength: every highest-marked skill may be the one named (the
+    // order follows the class), so each one's wording is accepted.
+    if (routes.length > 1) {
+      choices.strengthAt = routes.reduce(function (acc, rt) {
+        return acc.concat(strengthAtPool(f, _entryOf(f, rt.comp), rt.skill, rt.word));
+      }, []);
+      choices.strengthDoing = routes.reduce(function (acc, rt) {
+        return acc.concat(doingPool(f, _entryOf(f, rt.comp), rt.skill));
+      }, []);
+    }
+    // The next step, and the next step's card prompt for home.
+    var stepText = x.lstep ? x.lstep.text : x.next ? x.next.skill : '';
+    var stepComp = x.lstep ? x.lstep.comp : x.next ? x.next.comp : null;
+    put('step', stepText ? [stepText] : [], compKey(stepComp));
+    put('stepDoing', stepText && F ? [F.doing(stepText)] : [], compKey(stepComp));
+    var ne = x.next ? _entryOf(f, x.next.comp) : null;
+    var prompts = ne && ne.home.length ? ne.home : x.next ? _homePrompts(ctx, x.next.key) : [];
+    put(
+      'homeLine',
+      prompts.map(function (t) {
+        return _say(t, f);
+      }),
+      compKey(x.next && x.next.comp),
+    );
+    // _choices: every way verify() accepts; _pick: the ways Generate picks
+    // from for this student (the first strength's own, say).
+    ctx._choices = choices;
+    ctx._pick = pick;
+    return ctx;
   }
 
   /* What the attendance sentence says after "{He} has": "missed three
@@ -4142,7 +4482,7 @@ window.CommentBank = (function () {
     return Object.keys(when).every(function (k) {
       if (k === 'picture') return ctx.picture === when[k];
       if (k === 'standing') return ctx._standing === when[k];
-      if (k === 'grade') return ctx._grade === when[k];
+      if (k === 'grade') return [].concat(when[k]).indexOf(ctx._grade) >= 0;
       if (k === 'path') return ctx._path === when[k];
       if (k === 'ieProblem') return ctx._ieProblem === when[k];
       if (k === 'nextSkill') return !!ctx._nextSkill && ctx._nextSkill === when[k];
@@ -4189,6 +4529,10 @@ window.CommentBank = (function () {
     var toks = ctx._toks || {};
     return R.tokens(s.text, function (k) {
       if (own.call(toks, k) && toks[k] && own.call(ctx, k) && ctx[k]) return toks[k];
+      // A said string (a card's wording, a habit as behaviour): its template,
+      // so its pronouns and verbs follow the student (_say).
+      var said = own.call(ctx, k) ? _sayToks(k, ctx[k]) : null;
+      if (said) return said;
       return own.call(ctx, k) && ctx[k] != null ? String(ctx[k]) : '';
     });
   }
@@ -4278,6 +4622,37 @@ window.CommentBank = (function () {
     return R.render(sentenceTokens(s, ctx), whoOf(ctx), { named: !(opts && opts.first) });
   }
 
+  /* The context a sentence was filled from to give this text, where the
+     slots it said one of several true ways (ctx._choices: a strength's
+     phrasings, a habit's) said it another way than the first: a saved
+     comment read back (the questionnaire's recoverRows). null when no way
+     gives the text. */
+  function filledAs(s, ctx, text) {
+    var gives = function (c) {
+      return fill(s, c) === text || fill(s, c, { first: true }) === text;
+    };
+    if (gives(ctx)) return ctx;
+    var ch = ctx._choices || {};
+    var keys = slotsOf(s).filter(function (k) {
+      return !!ch[k];
+    });
+    var found = null;
+    var tryAll = function (i, c) {
+      if (found) return;
+      if (i === keys.length) {
+        if (c !== ctx && gives(c)) found = c;
+        return;
+      }
+      ch[keys[i]].forEach(function (v) {
+        var next = Object.assign({}, c);
+        next[keys[i]] = v;
+        tryAll(i + 1, next);
+      });
+    };
+    if (keys.length && keys.length <= 2) tryAll(0, ctx);
+    return found;
+  }
+
   /* A comment's sentences put in order and filled for their places (the
      realiser, plan PR 9): the student named in the first sentence that
      mentions them, pronouns after; teacher text as typed. order: positions
@@ -4307,8 +4682,11 @@ window.CommentBank = (function () {
      comment that does not hold it. */
   var _patterns = {};
   var _literals = {};
-  function pattern(s) {
-    var key = s.id + '\u0000' + s.text;
+  /* loose: a pattern for a sentence with fewer than four words of its own,
+     for setting aside a grade sentence every student gets (nearIdentical),
+     where the sentence is already known to be a grade sentence's place. */
+  function pattern(s, loose) {
+    var key = s.id + '\u0000' + s.text + (loose ? '\u0000loose' : '');
     if (key in _patterns) return _patterns[key];
     var fixed = String(s.text)
       .replace(/\{\w+\}/g, ' ')
@@ -4319,7 +4697,7 @@ window.CommentBank = (function () {
       });
     var re = null;
     var lits = [];
-    if (fixed.length >= 4) {
+    if (fixed.length >= 4 || (loose && fixed.length >= 1)) {
       var src = String(s.text)
         .split(/(\{\w+\}|\[[^\]]*\])/)
         .map(function (part) {
@@ -4340,10 +4718,10 @@ window.CommentBank = (function () {
 
   /* Whether a comment holds the sentence: its pattern found in the text.
      lower: the text in lower case, for the quick check of its pieces. */
-  function _holds(s, text, lower) {
-    var re = pattern(s);
+  function _holds(s, text, lower, loose) {
+    var re = pattern(s, loose);
     if (!re) return false;
-    var lits = _literals[s.id + '\u0000' + s.text];
+    var lits = _literals[s.id + '\u0000' + s.text + (loose ? '\u0000loose' : '')];
     for (var i = 0; i < lits.length; i++) if (lower.indexOf(lits[i]) < 0) return false;
     return re.test(text);
   }
@@ -5026,9 +5404,29 @@ window.CommentBank = (function () {
     });
   }
   function _bankSentence(bank, id) {
-    return bank.sentences.find(function (x) {
-      return x.id === id;
+    return (
+      bank.sentences.find(function (x) {
+        return x.id === id;
+      }) || _joinedOf(bank, id)
+    );
+  }
+  /* A joined sentence by its id ("j:<first>+<second>:<connective>"): the
+     two bank frames as one (CommentPipeline.joined), or null when either is
+     gone from the bank or they may no longer join. */
+  function _joinedOf(bank, id) {
+    var CP = window.CommentPipeline;
+    var j = CP && CP.parseJoin(id);
+    if (!j) return null;
+    var a = null;
+    var b = null;
+    bank.sentences.forEach(function (x) {
+      if (x.id === j[0]) a = x;
+      if (x.id === j[1]) b = x;
     });
+    if (!a || !b) return null;
+    var as = Object.assign({}, a, { step: stepOf(a) });
+    var bs = Object.assign({}, b, { step: stepOf(b) });
+    return CP.joinable(as, bs) === j[2] ? CP.joined(as, bs, j[2]) : null;
   }
   function _kept(kept, bank) {
     var out = {};
@@ -5502,17 +5900,732 @@ window.CommentBank = (function () {
      Returns { text, ids, sentences, provenance, replaced, angle, seed,
      short }: each sentence { id, part, step, text, kept? } in
      order, where each came from (provenance()), what verify() replaced, the story told
-     (never shown), the seed used, and whether fewer than six sentences
-     were true for this student. A context built by hand, without facts, gets
+     (never shown), the seed used, and whether fewer than five sentences
+     were true for this student. With facts and a bank with the pipeline's
+     frames (v: 2), the pipeline drafts it (_pipelineDraft): the result
+     also has shape (the comment's lead) and press. A context built by hand, without facts, gets
      the steps in DRAFT_STEPS order and no verify. */
   var RETRIES = 8;
-  /* Six to nine sentences (plan): a draft is never longer than nine
-     (_compose drops the family sentence, then attendance, then the
-     strengths); one with fewer than six says only what is true and carries
-     `short: true` for the screen to show. Nothing is ever padded. */
+  /* Five to seven sentences (plan v2, Nov 4 2026; six to nine before): a
+     draft is never longer than nine (the family sentence goes first, then
+     attendance, then the strengths); one with fewer than five says only
+     what is true and carries `short: true` for the screen to show. Nothing
+     is ever padded. */
   var MAX_SENTENCES = 9;
-  var MIN_SENTENCES = 6;
+  var MIN_SENTENCES = 5;
   var DROP_FIRST = ['home', 'attendance', 'overall'];
+  /* ── The pipeline (Nov 4 2026) ─────────────────────────────────────── */
+
+  /* Generate as a small data-to-text pipeline (plan v2, after Reiter and
+     Dale): content determination (which facts this student's comment says,
+     by salience), document structure (the shape: which fact leads, rotated
+     along the roster), lexical choice (which of a fact's true wordings,
+     rotated so neighbours differ), aggregation (two facts about the
+     student joined into one sentence), referring expressions (the
+     realiser: the name, then pronouns, the name again after three
+     sentences) and surface realisation (the realiser). Every sentence is a
+     bank frame (v: 2, or the older frames where a step has none), filled
+     from the facts and checked by verify() like any other.
+
+     A press of Generate is repeatable: the press number comes from the
+     seed (seedFor(student|term) + n), and every rotation is a function of
+     it, the student's place in the roster and the student's id. Of a
+     handful of candidates (body orders, habit sentence kinds, joins) the
+     one that reads best and differs most from the text on screen and the
+     roster neighbours' drafts is kept (CommentPipeline.score). */
+  var PIPE_CANDIDATES = 12;
+  function _hasPipeline(bank) {
+    return (bank.sentences || []).some(function (x) {
+      return x.v === 2;
+    });
+  }
+  /* Which press of Generate a seed is: the screen's seeds are
+     seedFor(student|term) + n; a retry adds 7919. Any other seed is its own. */
+  function _pressOf(f, seed) {
+    var n = Number(seed) || 1;
+    if (f && f.sid != null && f.termId != null) {
+      var d = n - seedFor(f.sid + '|' + f.termId);
+      if (d >= 0 && d < 7919 * 50) return (d % 7919) + Math.floor(d / 7919);
+    }
+    return n % 997;
+  }
+  function _roster(cid) {
+    try {
+      return (typeof getStudents === 'function' && getStudents(cid)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+  /* What a student's facts allow the comment to lead with. */
+  function _profileOf(fx) {
+    if (!fx) return null;
+    var path = reportPath(fx);
+    // The same routes the student's own context uses (strengthRoutes).
+    var now = strengthNowOf(fx);
+    return {
+      ie: path === 'ie',
+      grade: !!gradeOf(fx) && path !== 'ie',
+      strength: strengthRoutes(fx, now, now ? [] : highestSkills(fx)).length > 0,
+      growth: !!progressOf(fx),
+      piece: !!bestPieceOf(fx),
+    };
+  }
+  /* The class around one student: each roster student's profile (the
+     student's own from the context), the student's place, and each habit's
+     share of the class at Consistently (for news value). */
+  function _classAround(f, ctx) {
+    var roster = _roster(f.cid);
+    var sid = String(f.sid);
+    var idx = -1;
+    var profiles = roster.map(function (st, i) {
+      if (String(st.id) === sid) {
+        idx = i;
+        return {
+          ie: ctx._path === 'ie',
+          grade: !!ctx._grade && ctx._path !== 'ie',
+          strength: !!ctx.strengthAt,
+          growth: !!ctx.progressDoing,
+          piece: !!ctx.pieceTitle,
+        };
+      }
+      try {
+        return _profileOf(facts(f.cid, st, f.termId));
+      } catch (e) {
+        return null;
+      }
+    });
+    if (idx < 0) {
+      idx = profiles.length;
+      profiles.push({
+        ie: ctx._path === 'ie',
+        grade: !!ctx._grade,
+        strength: !!ctx.strengthAt,
+        growth: !!ctx.progressDoing,
+        piece: !!ctx.pieceTitle,
+      });
+    }
+    var shares = {};
+    try {
+      var all = (typeof getTermRatings === 'function' && getTermRatings(f.cid)) || {};
+      var n = 0;
+      var con = {};
+      roster.forEach(function (st) {
+        var r = all[st.id] && all[st.id][f.termId];
+        if (!r || !r.habits) return;
+        n++;
+        var h = effectiveHabits(r.habits, null);
+        HABIT_ORDER.forEach(function (k) {
+          if (h[k] === CONSISTENTLY) con[k] = (con[k] || 0) + 1;
+        });
+      });
+      // With no classmate rated, nothing is news (shares stay unknown).
+      if (n)
+        HABIT_ORDER.forEach(function (k) {
+          shares[k] = (con[k] || 0) / n;
+        });
+      else shares = null;
+    } catch (e) {
+      shares = {};
+    }
+    return { roster: roster, idx: idx, profiles: profiles, shares: shares };
+  }
+  /* The drafts of the roster students just before this one, nearest first
+     ({ text, name }): from this session's drafts, else their saved
+     comments. */
+  function _neighbours(f, around, comments) {
+    var bySid = {};
+    (comments || []).map(_comment).forEach(function (c) {
+      if (c.sid != null) bySid[String(c.sid)] = c.text;
+    });
+    var mine = _drafted[f.cid] || {};
+    var out = [];
+    for (var k = around.idx - 1; k >= 0 && out.length < 3; k--) {
+      var st = around.roster[k];
+      if (!st) continue;
+      var sid = String(st.id);
+      var text = mine[sid]
+        ? mine[sid]
+            .map(function (x) {
+              return x.text;
+            })
+            .join(' ')
+        : bySid[sid] || '';
+      out.push(text ? { text: text, name: st.firstName || '' } : null);
+    }
+    return out;
+  }
+
+  /* The plan for one student's comment: the shape, the facts said (by
+     salience), the habit sentence's kinds, and whether a home line is
+     said. */
+  function _contentPlan(ctx, f, around, press, opts) {
+    var CP = window.CommentPipeline;
+    var shape = CP.rosterShapes(around.profiles, press)[around.idx] || 'grade';
+    var hp = ctx._habitPlan || { does: [], invite: [] };
+    var shares = around.shares || {};
+    // News value: a Consistently habit fewer than half the class shares,
+    // the least shared first; Colin's order breaks ties. Unknown without
+    // classmates' ratings.
+    var doesNews = (around.shares ? hp.does : [])
+      .filter(function (k) {
+        return (shares[k] || 0) < 0.5;
+      })
+      .sort(function (a, b) {
+        return (shares[a] || 0) - (shares[b] || 0) || HABIT_ORDER.indexOf(a) - HABIT_ORDER.indexOf(b);
+      });
+    var doesOrder = doesNews.concat(
+      hp.does.filter(function (k) {
+        return doesNews.indexOf(k) < 0;
+      }),
+    );
+    // What the earlier report already said, by step (its approved ids).
+    var bank = opts.bank || COMMENT_BANK;
+    var said = {};
+    (opts.exclude || []).forEach(function (id) {
+      var x = _bankSentence(bank, id);
+      var st = x && stepOf(x);
+      if (st) said[st] = true;
+    });
+    var routes = ctx._strengthRoutes || [];
+    var sal = CP.salience({
+      growth: !!ctx.progressDoing,
+      climb: !!ctx.climb,
+      strength: !!ctx.strengthAt,
+      strongest: !!(routes[0] && routes[0].strongest),
+      piece: !!ctx.pieceTitle,
+      pieceNote: !!ctx._bestNote,
+      pieceScored: !!ctx.pieceScored,
+      habitInvite: !!ctx.habitInvite,
+      habitNews: doesNews.length > 0,
+      said: said,
+    });
+    // The shape's lead is always said. A comment on goals or IE opens on how
+    // the student is assessed (its Required grade sentence).
+    var lead = ctx._path ? 'grade' : CP.LEAD[shape] || 'grade';
+    if (lead !== 'grade' && sal[lead] <= 0) lead = 'grade';
+    if (lead === 'overall' && shape === 'growth' && !ctx.progressDoing) lead = 'grade';
+    var opt = CP.chosen(sal, 3);
+    // Attendance the teacher entered is always said, like the missing work.
+    if (ctx.attendance) opt.push('attendance');
+    if (lead !== 'grade' && opt.indexOf(lead) < 0) opt = [lead].concat(opt).slice(0, 3);
+    // A habit sentence is said when one is notable; with too little else to
+    // say (fewer than five sentences), a habit at Consistently is.
+    var fixed = (ctx._grade ? 1 : 0) + (ctx.step ? 1 : 0) + (ctx.missingWork ? 1 : 0) - (ctx.attendance ? 1 : 0);
+    // Only a habit the teacher rated: Completes Work read from the record
+    // alone is not news enough to add.
+    var ratedDoes = hp.does.filter(function (k) {
+      return (ctx._rated || {})[k] === CONSISTENTLY;
+    });
+    if (opt.indexOf('habits') < 0 && ratedDoes.length && fixed + opt.length < 5) opt.push('habits');
+    // Still short, with a habit to build: what the student does well gets a
+    // sentence of its own before it (the Strong Habits step).
+    var strong = opt.indexOf('habits') >= 0 && hp.invite.length > 0 && hp.does.length > 0 && fixed + opt.length < 5;
+    // A redraw after the teacher rated habits or entered attendance says them.
+    var force = opts._force || {};
+    if ((force.habits || force.strongHabits) && opt.indexOf('habits') < 0 && (hp.does.length || hp.invite.length))
+      opt.push('habits');
+    if (force.attendance && ctx.attendance && opt.indexOf('attendance') < 0) opt.push('attendance');
+    var kinds = [];
+    if (hp.invite.length > 1) kinds.push('two');
+    if (hp.invite.length) kinds.push('invite');
+    if (hp.invite.length && doesNews.length && !strong) kinds.push('combined');
+    if (!hp.invite.length && hp.does.length) {
+      kinds.push('does');
+      if (hp.does.length > 1) kinds.push('pair');
+    }
+    // A home line only with the next step's own prompt (the card's, or a
+    // line written for its skill), for at most a third of the class.
+    var homeAvail =
+      !!ctx.homeLine ||
+      (!!ctx._nextSkill &&
+        bank.sentences.some(function (x) {
+          return x.group === 'For the Family' && x.when && x.when.nextSkill === ctx._nextSkill && fits(x, ctx);
+        }));
+    // The teacher's own sentences are the teacher's pick: a step that has
+    // one that fits is said (Colin, Nov 2: never block a teacher's choice).
+    var mineFits = function (key) {
+      var def = null;
+      DRAFT_STEPS.forEach(function (x) {
+        if (x.key === key) def = x;
+      });
+      return (
+        !!def &&
+        bank.sentences.some(function (x) {
+          return x.mine && !x.general && _stepFits(x, def, ctx);
+        })
+      );
+    };
+    ['overall', 'example', 'habits', 'attendance'].forEach(function (k) {
+      if (opt.indexOf(k) < 0 && mineFits(k)) opt.push(k);
+    });
+    var home = (homeAvail && (around.idx + press) % 3 === 0) || mineFits('home');
+    // Every part with something to say (the questionnaire's Insert, which
+    // offers a part the comment does not have): salience does not choose.
+    if (opts.everyPart) {
+      ['overall', 'example', 'habits', 'attendance'].forEach(function (k) {
+        if (
+          opt.indexOf(k) < 0 &&
+          (k !== 'overall' || sal.overall > 0) &&
+          (k !== 'example' || sal.example > 0) &&
+          (k !== 'habits' || ratedDoes.length || hp.invite.length) &&
+          (k !== 'attendance' || ctx.attendance)
+        )
+          opt.push(k);
+      });
+      home = homeAvail;
+    }
+    return {
+      shape: shape,
+      lead: lead,
+      opt: opt,
+      // The overall sentence says the level that rose, else the marks that
+      // climbed, else the strength.
+      overall:
+        shape === 'growth' || (!!ctx.progressDoing && sal.overall >= 0.9) ? 'growth' : ctx.climb ? 'climb' : 'strength',
+      kinds: kinds,
+      doesOrder: doesOrder,
+      home: home,
+      strong: strong,
+    };
+  }
+
+  /* The step order for a plan and a body variant: the lead, the grade, the
+     other facts in the variant's order, then the class's lines, the next
+     step, home and the closing line. */
+  var BODY_ORDERS = [
+    ['example', 'overall', 'habits', 'attendance'],
+    ['overall', 'example', 'habits', 'attendance'],
+    ['habits', 'example', 'overall', 'attendance'],
+    ['example', 'habits', 'overall', 'attendance'],
+  ];
+  function _pipelineOrder(plan, ctx, variant, story) {
+    if (ctx._path === 'ie' && story) return _withClassSteps(story.order, true);
+    var body = BODY_ORDERS[variant % BODY_ORDERS.length].filter(function (k) {
+      return plan.opt.indexOf(k) >= 0 && k !== plan.lead;
+    });
+    var hi = body.indexOf('habits');
+    if (plan.strong && hi >= 0) body.splice(hi, 0, 'strongHabits');
+    var seq = [plan.lead];
+    if (plan.lead !== 'grade') seq.push('grade');
+    seq = seq.concat(body, ['nextStep']);
+    if (plan.home) seq.push('home');
+    return _withClassSteps(seq, false);
+  }
+  /* The teacher's kept steps and order over a step list, as _sequence does,
+     without moving the grade to the front. */
+  function _pipelineSeq(order, keptSteps, teacherOrder) {
+    var seq = order.slice();
+    if (seq.indexOf('grade') < 0) seq.unshift('grade');
+    var all = DRAFT_STEPS.map(function (x) {
+      return x.key;
+    });
+    keptSteps.forEach(function (k) {
+      if (seq.indexOf(k) >= 0 || all.indexOf(k) < 0) return;
+      var at = 0;
+      seq.forEach(function (x, i) {
+        if (all.indexOf(x) < all.indexOf(k)) at = i + 1;
+      });
+      seq.splice(at, 0, k);
+    });
+    var named = (teacherOrder || []).filter(function (k, i, xs) {
+      return seq.indexOf(k) >= 0 && xs.indexOf(k) === i;
+    });
+    var slots = named
+      .map(function (k) {
+        return seq.indexOf(k);
+      })
+      .sort(function (x, y) {
+        return x - y;
+      });
+    slots.forEach(function (at, i) {
+      seq[at] = named[i];
+    });
+    return seq;
+  }
+
+  /* The frames one step may take for this student: the version 2 frames
+     that fit (the overall step's growth or strength frames by the plan, the
+     habits step's by the sentence kind, a Both class's that say the
+     level), else the older frames that fit the step as before. The
+     teacher's own sentences rank first, as in _compose. */
+  function _framesFor(key, ctx, bank, st) {
+    var step = null;
+    DRAFT_STEPS.forEach(function (x) {
+      if (x.key === key) step = x;
+    });
+    if (!step || step.line) return [];
+    var ok = function (x) {
+      if (st.exclude[x.id] || st.taken[x.id]) return false;
+      if (advises(x) && (st.said.advice || (key !== 'nextStep' && st.nextFires))) return false;
+      return !(x.claims || []).some(function (c) {
+        return c !== step.says && SAYS[c] && st.said[c];
+      });
+    };
+    var mine = bank.sentences.filter(function (x) {
+      return x.mine && !x.general && ok(x) && _stepFits(x, step, ctx);
+    });
+    if (mine.length) return _topTier(mine, ctx);
+    var needs = function (x, k) {
+      return (x.needs || []).indexOf(k) >= 0;
+    };
+    var v2 = bank.sentences.filter(function (x) {
+      return x.v === 2 && stepOf(x) === key && ok(x) && fits(x, ctx);
+    });
+    if (key === 'overall')
+      v2 = v2.filter(function (x) {
+        var kind = needs(x, 'progressDoing') ? 'growth' : needs(x, 'climb') ? 'climb' : 'strength';
+        return kind === st.plan.overall;
+      });
+    // The teacher's Note for the Report on the best piece is the teacher's
+    // pick: a frame that says it ({pieceDid}) when one fits. A title kept in
+    // quotes (a question) takes no "the" before it.
+    if (key === 'example') {
+      if (/^“/.test(ctx.pieceTitle || ''))
+        v2 = v2.filter(function (x) {
+          return !/\b[Tt]he \{pieceTitle\}/.test(x.text);
+        });
+      if (ctx._bestNote) {
+        var noted = v2.filter(function (x) {
+          return needs(x, 'pieceDid');
+        });
+        if (noted.length) v2 = noted;
+      }
+    }
+    if (key === 'grade' && ctx.gradeLevel) {
+      var lv = v2.filter(function (x) {
+        return needs(x, 'gradeLevel');
+      });
+      if (lv.length) v2 = lv;
+    }
+    if (key === 'habits' || key === 'strongHabits') {
+      var kind = st.habitKind;
+      var by = {
+        two: ['habitInvite2'],
+        invite: ['habitInvite'],
+        combined: ['habitDoes', 'habitInvite'],
+        does: ['habitDoes'],
+        pair: ['habitDoes2'],
+      }[kind];
+      if (key === 'habits' && by)
+        v2 = v2.filter(function (x) {
+          var ns = x.needs || [];
+          var has = function (k) {
+            return ns.indexOf(k) >= 0;
+          };
+          if (kind === 'two') return has('habitInvite2');
+          if (kind === 'invite') return has('habitInvite') && !has('habitInvite2') && !has('habitDoes');
+          if (kind === 'combined') return has('habitDoes') && has('habitInvite');
+          if (kind === 'does') return has('habitDoes') && !has('habitDoes2') && !has('habitInvite');
+          return has('habitDoes2');
+        });
+    }
+    if (v2.length) return v2;
+    var old = bank.sentences.filter(function (x) {
+      return !x.v && !x.habit && ok(x) && _stepFits(x, step, ctx);
+    });
+    if (key === 'home')
+      old = old.filter(function (x) {
+        return !!(x.when && x.when.nextSkill);
+      });
+    return _topTier(old, ctx);
+  }
+
+  /* The context with each choice slot set for this student and press: the
+     ways rotate with the roster place, so the three students before say
+     a strength another way; habits by news value. */
+  function _chosenCtx(ctx, plan, idx, press) {
+    var CP = window.CommentPipeline;
+    var out = Object.assign({}, ctx);
+    var pick = ctx._pick || {};
+    Object.keys(pick).forEach(function (k) {
+      if (/^habit/.test(k)) return;
+      var pool = pick[k];
+      out[k] = pool[(idx + press + (CP.hash(k) % 7)) % pool.length];
+    });
+    var f = ctx._f;
+    var hp = ctx._habitPlan || { does: [], invite: [] };
+    var say = function (key, form, n) {
+      var xs = key ? habitPhrases(f, key, form) : [];
+      return xs.length ? xs[(idx + press + n) % xs.length] : '';
+    };
+    var d = plan.doesOrder || hp.does;
+    out.habitDoes = say(d[0], 'does', 0);
+    out.habitDoes2 = say(d[1], 'does', 1);
+    out.habitInvite = say(hp.invite[0], 'invite', 0);
+    out.habitInvite2 = say(hp.invite[1], 'invite', 1);
+    out.habitWhy = say(hp.invite[0], 'why', 0);
+    return out;
+  }
+
+  /* One candidate: the steps filled in order, each step's frame rotated by
+     the student and the press, the first that keeps the draft's rules (no
+     sentence over the cap, no title twice, no two sentences in a row
+     opening the same way, "so far" and the scale once), then the join. */
+  function _pipelineCompose(ctx, bank, seq, kept, plan, cand, around, press, exclude, usage) {
+    usage = usage || {};
+    var CP = window.CommentPipeline;
+    var f = ctx._f;
+    var c = _chosenCtx(ctx, plan, around.idx, press);
+    var byKey = {};
+    DRAFT_STEPS.forEach(function (x) {
+      byKey[x.key] = x;
+    });
+    var st = {
+      taken: {},
+      said: {},
+      exclude: exclude,
+      plan: plan,
+      habitKind: plan.kinds.length ? plan.kinds[(cand.kind + press) % plan.kinds.length] : '',
+    };
+    Object.keys(kept).forEach(function (k) {
+      var ks = kept[k].s;
+      if (ks) st.taken[ks.id] = true;
+      if (byKey[k] && byKey[k].says) st.said[byKey[k].says] = true;
+      if (advises(ks)) st.said.advice = true;
+    });
+    if (seq.indexOf('notHandedIn') >= 0 && c.missingWork) st.said.notHandedIn = true;
+    if (seq.indexOf('grade') >= 0 && c._grade) st.said.grade = true;
+    st.nextFires = seq.indexOf('nextStep') >= 0 && (!!kept.nextStep || _framesFor('nextStep', c, bank, st).length > 0);
+    var items = [];
+    var got = {};
+    var who = whoOf(c);
+    var state = { named: false };
+    seq.forEach(function (key, at) {
+      var step = byKey[key];
+      if (!step) return;
+      if (step.line && !kept[key]) {
+        var lt = String(c[step.line] || '').trim();
+        if (!lt || (step.after && !got[step.after])) return;
+        var ls = { id: 'class:' + key, text: lt };
+        var lfilled = step.template ? fill(ls, c) : lt;
+        var item = {
+          sent: { id: ls.id, part: step.part, step: key, text: lfilled, classLine: true },
+          prov: {
+            sentenceId: ls.id,
+            part: step.part,
+            claims: [],
+            factKeys: ['class.' + key],
+            values: (function () {
+              var v = {};
+              v[step.line] = lt;
+              return v;
+            })(),
+            sources: {},
+            classLine: true,
+          },
+        };
+        if (step.template) {
+          item.sent.toks = sentenceTokens(ls, c);
+          item.sent.who = who;
+        }
+        items.push(item);
+        got[key] = true;
+        return;
+      }
+      if (kept[key]) {
+        items.push({
+          sent: { id: kept[key].id, part: step.part, step: key, text: kept[key].text, kept: true },
+          prov: {
+            sentenceId: kept[key].id,
+            part: step.part,
+            claims: [],
+            factKeys: [],
+            values: {},
+            sources: {},
+            kept: true,
+          },
+        });
+        got[key] = true;
+        return;
+      }
+      var list = _framesFor(key, c, bank, st)
+        .slice()
+        .sort(function (a, b) {
+          return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+        });
+      if (!list.length) return;
+      // Frames go round the roster: student n takes frame n + the press, so
+      // a class uses each frame about equally and neighbours differ.
+      var base = around.idx + (CP.hash(key) % list.length);
+      // The home line goes to every third student, so it counts them in turn.
+      if (key === 'home') base = Math.floor((around.idx + press) / 3) * 5 - press + (CP.hash(key) % list.length);
+      var prevText = items.length ? items[items.length - 1].sent.text : '';
+      var sofar = items
+        .map(function (x) {
+          return x.sent.text;
+        })
+        .join(' ');
+      // Two frames on a press, so a frame skipped on one press (too long,
+      // or opening like the sentence before) is never the next press's; and
+      // of those, one no classmate's comment holds before any one does
+      // (class memory: exhaust before repeat).
+      var turn = [];
+      for (var q = 0; q < list.length; q++) turn.push(list[(base + 2 * press + q) % list.length]);
+      var used = function (x) {
+        return usage[x.id] || 0;
+      };
+      turn = turn
+        .map(function (x, i) {
+          return { x: x, i: i };
+        })
+        .sort(function (a, b) {
+          return used(a.x) - used(b.x) || a.i - b.i;
+        })
+        .map(function (o) {
+          return o.x;
+        });
+      var pick = null;
+      for (var k = 0; k < turn.length && !pick; k++) {
+        var x = turn[k];
+        var t = R.render(sentenceTokens(x, c), who, { named: state.named });
+        var quotes = t.match(/“[^”]+”/g) || [];
+        if (
+          R.tooLong(t) ||
+          quotes.some(function (qt) {
+            return sofar.indexOf(qt) >= 0;
+          }) ||
+          (prevText && CP.firstWord(prevText) === CP.firstWord(t) && k < turn.length - 1) ||
+          (CP.count(t, 'so far') && CP.count(sofar, 'so far')) ||
+          (CP.count(t, 'proficiency scale') && CP.count(sofar, 'proficiency scale'))
+        )
+          continue;
+        pick = { s: x, t: t };
+      }
+      if (!pick) return;
+      state.named = true;
+      st.taken[pick.s.id] = true;
+      if (step.says) st.said[step.says] = true;
+      if (advises(pick.s)) st.said.advice = true;
+      items.push({
+        s: pick.s,
+        sent: { id: pick.s.id, part: pick.s.part, step: key, text: pick.t, toks: sentenceTokens(pick.s, c), who: who },
+        prov: provenance(pick.s, c),
+      });
+      got[key] = true;
+    });
+    // The family sentence belongs to the next step: none without one.
+    if (!got.nextStep)
+      items = items.filter(function (x) {
+        return x.sent.step !== 'home' || x.sent.kept;
+      });
+    // Never more than nine (the class's lines and the teacher's kept
+    // sentences stay): the family sentence goes first, then attendance, then
+    // the strengths, as before the pipeline.
+    DROP_FIRST.forEach(function (key) {
+      for (var i = items.length - 1; i >= 0 && items.length > MAX_SENTENCES; i--) {
+        var x = items[i].sent;
+        if (x.step === key && !x.kept && !x.classLine) items.splice(i, 1);
+      }
+    });
+    // Aggregation: the cand.join-th pair that may join becomes one sentence,
+    // while the draft keeps five or more.
+    var joins = 0;
+    if (cand.join && items.length > 5) {
+      var seen = 0;
+      for (var i = 0; i + 1 < items.length; i++) {
+        var a = items[i];
+        var b = items[i + 1];
+        if (!a.s || !b.s) continue;
+        var as = Object.assign({}, a.s, { step: a.sent.step });
+        var bs = Object.assign({}, b.s, { step: b.sent.step });
+        var conn = CP.joinable(as, bs);
+        if (!conn) continue;
+        var js = CP.joined(as, bs, conn);
+        var jt = fill(js, c);
+        if (R.tooLong(jt)) continue;
+        if (++seen !== cand.join) continue;
+        items.splice(i, 2, {
+          s: js,
+          sent: {
+            id: js.id,
+            part: js.part,
+            step: a.sent.step,
+            steps: js.steps,
+            text: jt,
+            toks: sentenceTokens(js, c),
+            who: who,
+          },
+          prov: provenance(js, c),
+        });
+        joins = 1;
+        break;
+      }
+    }
+    var sentences = items.map(function (x) {
+      return x.sent;
+    });
+    var d = _realised({
+      sentences: sentences,
+      provenance: items.map(function (x) {
+        return x.prov;
+      }),
+    });
+    d.joins = joins;
+    return d;
+  }
+
+  /* One press of Generate through the pipeline. */
+  function _pipelineDraft(ctx, opts, bank, f, story) {
+    var CP = window.CommentPipeline;
+    var around = _classAround(f, ctx);
+    var press = _pressOf(f, opts.seed);
+    var plan = _contentPlan(ctx, f, around, press, opts);
+    var kept = _kept(opts.kept, bank);
+    var exclude = {};
+    (opts.exclude || []).forEach(function (id) {
+      exclude[id] = true;
+    });
+    var previous = String(opts.previous == null ? '' : opts.previous).trim();
+    var neighbours = _neighbours(f, around, opts.comments);
+    var seen = {};
+    var cands = [];
+    for (var c = 0; c < PIPE_CANDIDATES; c++) {
+      // Candidates vary the body order, the habit sentence's kind and the join.
+      var cand = {
+        variant: (c + press) % BODY_ORDERS.length,
+        kind: c % 3,
+        join: Math.floor(c / 4) % 3,
+      };
+      // The teacher's order, when there is one, is the comment's steps: the
+      // ones the teacher arranged, in that order (the class's lines in place).
+      var teacher = _orderSteps(opts.order, bank).filter(function (k, i, xs) {
+        return xs.indexOf(k) === i;
+      });
+      // A step drawn again after a rating (redrawHabits) goes in where the
+      // draft's steps put it.
+      var forced = Object.keys(opts._force || {}).filter(function (k) {
+        return plan.opt.indexOf(k) >= 0 || (k === 'strongHabits' && plan.strong);
+      });
+      // Insert's draft (everyPart) says every part, the teacher's in order.
+      if (opts.everyPart)
+        forced = forced.concat(plan.opt, ['nextStep'], plan.home ? ['home'] : []).filter(function (k, i, xs) {
+          return xs.indexOf(k) === i;
+        });
+      var seq = _pipelineSeq(
+        teacher.length ? _withClassSteps(teacher, ctx._path === 'ie') : _pipelineOrder(plan, ctx, cand.variant, story),
+        Object.keys(kept).concat(forced),
+        teacher,
+      );
+      var d = _pipelineCompose(ctx, bank, seq, kept, plan, cand, around, press, exclude, opts._usage);
+      if (!d.text || seen[d.text]) continue;
+      seen[d.text] = true;
+      d.score = CP.score(d, { name: f.name, previous: previous, neighbours: neighbours, wordCap: R.MAX_WORDS });
+      cands.push(d);
+    }
+    cands.sort(function (a, b) {
+      return b.score - a.score;
+    });
+    var best =
+      cands.find(function (d) {
+        return !previous || d.text !== previous;
+      }) || cands[0];
+    if (!best) return null;
+    var out = verify(best, f, ctx._picks, { bank: bank });
+    out.shape = plan.shape;
+    out.press = press;
+    return out;
+  }
+
   function draft(ctx, opts) {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
@@ -5530,6 +6643,7 @@ window.CommentBank = (function () {
     );
     var previous = String(opts.previous == null ? '' : opts.previous).trim();
     var usage = classUsage(bank, opts.comments, cid, sid);
+    opts = Object.assign({}, opts, { _usage: usage });
     var exclude = {};
     (opts.exclude || []).forEach(function (id) {
       exclude[id] = true;
@@ -5537,7 +6651,18 @@ window.CommentBank = (function () {
     var base = Number(opts.seed) || 1;
     var d;
     var seed = base;
-    for (var k = 0; k < RETRIES; k++) {
+    // The pipeline, for a context built from facts and a bank with its
+    // frames; the older selection otherwise (a context built by hand, or a
+    // bank passed in without version 2 frames).
+    var piped = f && window.CommentPipeline && _hasPipeline(bank);
+    for (var k = 0; piped && k < RETRIES; k++) {
+      seed = base + k * 7919;
+      d = _pipelineDraft(ctx, Object.assign({}, opts, { seed: seed }), bank, f, story);
+      if (!d || !previous || d.text !== previous) break;
+    }
+    if (piped && !d) piped = false;
+    for (var k2 = 0; !piped && k2 < RETRIES; k2++) {
+      var k = k2;
       seed = base + k * 7919;
       // Selection, then the realiser (each sentence filled for its place),
       // then verify.
@@ -5578,6 +6703,20 @@ window.CommentBank = (function () {
             return x.skill === hi.values.highestSkill;
           });
         named = hiSk ? hiSk.key : '';
+      }
+      // The pipeline's strength (strengthAt, strengthDoing): the highest-marked
+      // skill it named, so classmates' drafts name another first.
+      if (!named) {
+        var pipeSk = null;
+        d.provenance.forEach(function (pv) {
+          if (pipeSk) return;
+          var src = ((pv.sources || {}).strengthAt || (pv.sources || {}).strengthDoing || [])[0];
+          if (!src) return;
+          pipeSk = (ctx._strengthRoutes || []).find(function (x) {
+            return 'comp:' + x.comp.id === src && !x.strongest;
+          });
+        });
+        named = pipeSk ? pipeSk.key : '';
       }
       if (named) {
         _topTold[cid] = _topTold[cid] || {};
@@ -5643,36 +6782,44 @@ window.CommentBank = (function () {
       bank: opts.bank,
       kept: kept,
       order: order,
+      // The teacher just rated or entered it: the steps drawn again are said
+      // whenever the facts give them a sentence (the pipeline's content
+      // determination would leave a habit at Consistently out).
+      _force: steps,
     });
-    // Only the habits sentence is taken from the new draft, with how many of
-    // the kept sentences come before it.
-    var nu = null;
+    // Only the habits sentences are taken from the new draft (a habit the
+    // student does well and one to build can be two), with how many of the
+    // kept sentences come before them; they replace the old ones together.
+    var nus = [];
     var keptBefore = 0;
     d.sentences.forEach(function (x, i) {
-      if (nu) return;
-      if (steps[x.step]) nu = { s: x, p: d.provenance[i] };
-      else if (x.kept) keptBefore++;
+      if (steps[x.step]) nus.push({ s: x, p: d.provenance[i] });
+      else if (x.kept && !nus.length) keptBefore++;
     });
-    var was = old.find(function (x) {
+    var wasList = old.filter(function (x) {
       return steps[x.step];
     });
+    var was = wasList[0];
     var sentences = [];
     var prov = [];
     var count = 0;
+    var placed = false;
     var put = function () {
-      if (!nu) return;
-      sentences.push(nu.s);
-      prov.push(nu.p);
-      nu.placed = true;
+      if (placed) return;
+      placed = true;
+      nus.forEach(function (n) {
+        sentences.push(n.s);
+        prov.push(n.p);
+      });
     };
     old.forEach(function (x, i) {
       if (steps[x.step]) return put();
-      if (nu && !nu.placed && !was && count === keptBefore) put();
+      if (nus.length && !placed && !was && count === keptBefore) put();
       sentences.push(x);
       prov.push((prev.provenance || [])[i]);
       count++;
     });
-    if (nu && !nu.placed) put();
+    if (nus.length && !placed) put();
     // The story and this student's record stay the draft's own.
     if (f && f.cid != null && f.sid != null) {
       if (told !== undefined) _told[f.cid][f.sid] = told;
@@ -5699,7 +6846,18 @@ window.CommentBank = (function () {
       replaced: d.replaced,
       angle: prev.angle,
       seed: prev.seed,
-      habits: { before: was ? was.text : '', after: nu ? nu.s.text : '' },
+      habits: {
+        before: wasList
+          .map(function (x) {
+            return x.text;
+          })
+          .join(' '),
+        after: nus
+          .map(function (n) {
+            return n.s.text;
+          })
+          .join(' '),
+      },
     };
   }
 
@@ -5770,7 +6928,7 @@ window.CommentBank = (function () {
   /* The sentences a step of the student's draft picks from: those that can
      fill it (_stepFits), at the top specificity, before the rest of the
      draft is chosen. */
-  function stepPool(step, ctx, bank) {
+  function stepPool(step, ctx, bank, opts) {
     var def =
       typeof step === 'string'
         ? DRAFT_STEPS.find(function (x) {
@@ -5778,12 +6936,23 @@ window.CommentBank = (function () {
           })
         : step;
     if (!def || !def.groups) return [];
-    return _topTier(
-      (bank || COMMENT_BANK).sentences.filter(function (s) {
-        return _stepFits(s, def, ctx);
-      }),
-      ctx,
-    );
+    var fit = (bank || COMMENT_BANK).sentences.filter(function (s) {
+      return _stepFits(s, def, ctx);
+    });
+    // opts.pipeline: the pool Generate draws from (the bank's strength,
+    // bankStrength): the pipeline's frames (v: 2) are one pool, rotated
+    // rather than tiered, where any fit. Otherwise the step's top tier of
+    // every frame that fits, as Browse and Other Wording read it.
+    if (opts && opts.pipeline) {
+      var v2 = fit.filter(function (s) {
+        return s.v === 2;
+      });
+      var mine = fit.filter(function (s) {
+        return s.mine;
+      });
+      if (v2.length && !mine.length) return v2;
+    }
+    return _topTier(fit, ctx);
   }
 
   /* The steps the comment runs whichever story it tells: those in every
@@ -5848,7 +7017,7 @@ window.CommentBank = (function () {
         if (!k.sure[step.key]) return null;
         var set = {};
         var n = 0;
-        stepPool(step, k.ctx, bank).forEach(function (s) {
+        stepPool(step, k.ctx, bank, { pipeline: true }).forEach(function (s) {
           set[s.id] = true;
           n++;
         });
@@ -5967,7 +7136,9 @@ window.CommentBank = (function () {
   }
   function _gradeSentences(bank) {
     var step = DRAFT_STEPS[0];
-    return bank.sentences.filter(function (s) {
+    // A saved comment may hold a retired grade wording: it is still the
+    // grade sentence every student gets.
+    return bank.sentences.concat(bank.retired || []).filter(function (s) {
       return s.part === step.part && step.groups.indexOf(s.group) >= 0;
     });
   }
@@ -5994,7 +7165,7 @@ window.CommentBank = (function () {
       if (lineKeys[_lineKey(sentence)]) return true;
       var lower = sentence.toLowerCase();
       return grades.some(function (s) {
-        return _holds(s, sentence, lower);
+        return _holds(s, sentence, lower, true);
       });
     };
     var docs = (comments || [])
@@ -6086,7 +7257,7 @@ window.CommentBank = (function () {
   var CLAIMS = {
     // The overall standing: the letter, the proficiency word, or what the
     // work shows overall.
-    grade: function (pv, f) {
+    grade: function (pv, f, ctx) {
       var v = pv.values;
       var now = f.overall > 0 ? word(f.overall) : '';
       var checks = [];
@@ -6100,7 +7271,12 @@ window.CommentBank = (function () {
       // close to the next letter, the proficiency word) and each grade
       // slot, against gradeOf on the facts.
       var gr = gradeOf(f);
-      if (_has(pv, 'when.grade')) checks.push(!!gr && v['when.grade'] === gr.kind);
+      if (_has(pv, 'when.grade')) checks.push(!!gr && [].concat(v['when.grade']).indexOf(gr.kind) >= 0);
+      // The pipeline's grade slots: what the level means, the level in a
+      // Both class, why the grade is IE; each as the facts give it now.
+      ['levelMeaning', 'levelUp', 'gradeLevel', 'ieReason'].forEach(function (k) {
+        if (_has(pv, k)) checks.push(!!ctx && !!ctx[k] && v[k] === ctx[k]);
+      });
       var want = gradeSlots(gr);
       Object.keys(want).forEach(function (k) {
         if (_has(pv, k)) checks.push(!!gr && !!want[k] && v[k] === want[k]);
@@ -6127,8 +7303,38 @@ window.CommentBank = (function () {
     // gate (strongestOf).
     // A strengths slot must also be the skill wording from the table for
     // those competencies (strengthsText), never a bare competency label.
-    strength: function (pv, f) {
+    strength: function (pv, f, ctx) {
       var v = pv.values || {};
+      // The pipeline's strength slots: the competency named is one the
+      // strength may be (strengthRoutes: past the "strongest" gate, else a
+      // highest-marked skill), and each slot is one of its true wordings.
+      var mine = ['strengthAt', 'strengthDoing', 'strengthTop', 'strengthHigh', 'area'].filter(function (k) {
+        return _has(pv, k);
+      });
+      if (mine.length) {
+        var routes = (ctx && ctx._strengthRoutes) || [];
+        var named = mine.reduce(function (acc, k) {
+          return acc.concat(_ids(pv, k, 'comp'));
+        }, []);
+        var ok =
+          named.length > 0 &&
+          named.every(function (id) {
+            return routes.some(function (rt) {
+              return String(rt.comp.id) === id;
+            });
+          });
+        // "Strongest", "highest" and the area name the first route only.
+        var first = routes[0] ? String(routes[0].comp.id) : '';
+        ['strengthTop', 'strengthHigh', 'area'].forEach(function (k) {
+          if (_has(pv, k) && _ids(pv, k, 'comp')[0] !== first) ok = false;
+        });
+        return (
+          ok &&
+          mine.every(function (k) {
+            return _slotHolds(pv, ctx, k);
+          })
+        );
+      }
       var ids = _ids(pv, 'strengths', 'comp')
         .concat(_ids(pv, 'strength', 'comp'))
         .concat(_ids(pv, 'strongSkill', 'comp'))
@@ -6279,7 +7485,7 @@ window.CommentBank = (function () {
       );
     },
     // A competency that rose: past the "improved" gate (improvedComp).
-    improved: function (pv, f) {
+    improved: function (pv, f, ctx) {
       var checks = [];
       var ids = _ids(pv, 'rise', 'comp');
       if (ids.length)
@@ -6291,6 +7497,15 @@ window.CommentBank = (function () {
       // The marks climbed over the term (the climb story): the scored
       // pieces' % past the "improved" gate (climbed).
       if (_has(pv, 'climb')) checks.push(climbed((f.grade && (f.grade.termPieces || f.grade.pieces)) || []));
+      // The pipeline's growth: the same competency, said as a gerund.
+      if (_has(pv, 'progressDoing')) {
+        var pd = progressOf(f);
+        checks.push(
+          !!pd && _ids(pv, 'progressDoing', 'comp')[0] === String(pd.comp.id) && _slotHolds(pv, ctx, 'progressDoing'),
+        );
+        if (_has(pv, 'progressFrom')) checks.push(!!pd && pv.values.progressFrom === pd.from);
+        if (_has(pv, 'progressTo')) checks.push(!!pd && pv.values.progressTo === pd.to);
+      }
       // Progress in levels: the same competency, climb and phrase (progressOf).
       if (_has(pv, 'progressSkill')) {
         var pg = progressOf(f);
@@ -6330,7 +7545,7 @@ window.CommentBank = (function () {
       return checks.length > 0 && checks.every(Boolean);
     },
     // The highest-marked work this term, with the proficiency it reached.
-    bestPiece: function (pv, f) {
+    bestPiece: function (pv, f, ctx) {
       // The top mark as it prints (markRank): in a Letter class a 90% piece
       // is not the highest beside a 100% one.
       var top = _maxMark(f);
@@ -6352,6 +7567,14 @@ window.CommentBank = (function () {
               }),
         );
       }
+      // The pipeline's best-piece slots: the piece named is at the top mark,
+      // its title said by kind, and what the student did in it (the
+      // teacher's note, or the skill it was scored on) one of its true ways.
+      ['pieceTitle', 'pieceOwned', 'pieceScored', 'pieceDid'].forEach(function (slot) {
+        if (!_has(pv, slot)) return;
+        var pw = _byId(f.work, _ids(pv, slot, 'work')[0]);
+        checks.push(!!pw && markRank(f, pw) === top && _slotHolds(pv, ctx, slot));
+      });
       ['assignment', 'seeWork'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
         var w = _byId(f.work, _ids(pv, slot, 'work')[0]);
@@ -6418,7 +7641,19 @@ window.CommentBank = (function () {
       return !see || !about || Math.max.apply(null, see) >= Math.min.apply(null, about);
     },
     // The Focus Area and its I Can statement.
-    nextStep: function (pv, f) {
+    nextStep: function (pv, f, ctx) {
+      // The pipeline's next step and home line: the next step's competency
+      // now, the step at its level (or its skill), and the card's prompt.
+      var pipe = ['step', 'stepDoing', 'homeLine'].filter(function (k) {
+        return _has(pv, k);
+      });
+      if (pipe.length) {
+        var want = ctx && ctx._facts ? ctx._facts : {};
+        return pipe.every(function (k) {
+          var id = _ids(pv, k, 'comp')[0];
+          return !!id && (want[k] || [])[0] === 'comp:' + id && _slotHolds(pv, ctx, k);
+        });
+      }
       // The next step as a skill: the competency nextStepOf() picks, said
       // with the table's skill for it.
       // A sentence bound to one skill without naming it (a For the Family
@@ -6512,6 +7747,22 @@ window.CommentBank = (function () {
     },
     lateWork: function (pv, f) {
       return !!f.record && f.record.late > 0;
+    },
+    // The habits as behaviour (the pipeline): each habit said is at
+    // Consistently, each invitation is for a habit at Sometimes or Rarely,
+    // in one of its true wordings for the ratings in force.
+    habitBehaviour: function (pv, f, ctx) {
+      var keys = ['habitDoes', 'habitDoes2', 'habitInvite', 'habitInvite2', 'habitWhy'].filter(function (k) {
+        return _has(pv, k);
+      });
+      return (
+        keys.length > 0 &&
+        keys.every(function (k) {
+          return _slotHolds(pv, ctx, k);
+        }) &&
+        (!_has(pv, 'habitDoes2') || pv.values.habitDoes2 !== pv.values.habitDoes) &&
+        (!_has(pv, 'habitInvite2') || pv.values.habitInvite2 !== pv.values.habitInvite)
+      );
     },
     notHandedIn: function (pv, f) {
       if (_has(pv, 'missingWork') && pv.values.missingWork !== notHandedInSentence(f.notHandedIn)) return false;
@@ -6664,6 +7915,35 @@ window.CommentBank = (function () {
     });
   }
 
+  /* A slot said one of several true ways (ctx._choices: a strength's three
+     phrasings, a habit's two) is a choice, not a fact: the context as the
+     sentence was filled, when the way it said is still one of them. */
+  function _asChosen(pv, ctx) {
+    var ch = (ctx && ctx._choices) || {};
+    var vals = (pv && pv.values) || {};
+    var out = null;
+    Object.keys(ch).forEach(function (k) {
+      if (!Object.prototype.hasOwnProperty.call(vals, k) || vals[k] === ctx[k]) return;
+      if (ch[k].indexOf(vals[k]) < 0) return;
+      out = out || Object.assign({}, ctx);
+      out[k] = vals[k];
+    });
+    // {strengths} said with the first strength alone (what it holds when two
+    // would run long, ctxFor) is still true while both pass the gate.
+    if (ctx && vals.strengths && ctx.strength && vals.strengths === ctx.strength && ctx.strengths !== ctx.strength) {
+      out = out || Object.assign({}, ctx);
+      out.strengths = ctx.strength;
+    }
+    return out || ctx;
+  }
+  /* Whether a pipeline slot holds: said, and one of the true ways now. */
+  function _slotHolds(pv, ctx, k) {
+    var v = (pv.values || {})[k];
+    if (!v || !ctx) return false;
+    var ch = (ctx._choices || {})[k];
+    return v === ctx[k] || (!!ch && ch.indexOf(v) >= 0);
+  }
+
   /* The claims that fail for one sentence, 'slots' when a value it was
      filled with is no longer what the facts give or it no longer fits, and
      'length' when the sentence as realised runs past 20 words (the
@@ -6671,7 +7951,7 @@ window.CommentBank = (function () {
   function _failed(s, pv, f, ctx) {
     var own = Object.prototype.hasOwnProperty;
     var out = [];
-    ctx = ctxFor(s, _asNamed(pv, ctx));
+    ctx = _asChosen(pv, ctxFor(s, _asNamed(pv, ctx)));
     if (R.tooLong(fill(s, ctx))) out.push('length');
     var stale =
       !_fitsSlots(s, ctx, { story: false }) ||
@@ -6765,12 +8045,14 @@ window.CommentBank = (function () {
       // A sentence the teacher kept is theirs, as written, and so is a class
       // line (support, closing, late work), and a sentence the bank has since
       // retired (RETIRED): not checked.
-      if (pv.kept || pv.classLine || (!byId[pv.sentenceId] && RETIRED[pv.sentenceId])) {
+      if (pv.kept || pv.classLine || (!byId[pv.sentenceId] && _isRetired(bank, pv.sentenceId))) {
         sentences.push(d.sentences[i]);
         out.push(pv);
         return;
       }
-      var s = byId[pv.sentenceId];
+      // A joined sentence (the pipeline's aggregation) is its two frames as
+      // one: checked claim by claim, each slot of each.
+      var s = byId[pv.sentenceId] || _joinedOf(bank, pv.sentenceId);
       var failed = s ? _failed(s, pv, f, ctx) : ['unknown'];
       if (!failed.length) {
         sentences.push(d.sentences[i]);
@@ -6797,10 +8079,21 @@ window.CommentBank = (function () {
     return _realised({ sentences: sentences, provenance: out, replaced: replaced });
   }
 
-  /* Bank sentences retired since a draft could have used them (Nov 2: the
-     Next Step frames that named a bare label or quoted an I Can). A saved
-     draft keeps one as written rather than having it swapped for a
-     sentence the teacher didn't choose. */
+  /* Bank sentences retired since a draft could have used them: the bank's
+     own list (COMMENT_BANK.retired, with the text a saved comment may hold:
+     the Nov 2 Next Step frames that named a bare label or quoted an I Can,
+     and the Nov 4 frames the pipeline replaced). A saved draft keeps one as
+     written rather than having it swapped for a sentence the teacher didn't
+     choose; Browse, Other Ways to Say This and Generate never offer one,
+     because none is in bank.sentences. RETIRED keeps the Nov 2 ids for a
+     bank passed in without its list. */
+  function _isRetired(bank, id) {
+    if (RETIRED[id]) return true;
+    var list = (bank && bank.retired) || (typeof COMMENT_BANK !== 'undefined' && COMMENT_BANK.retired) || [];
+    return list.some(function (x) {
+      return x.id === id;
+    });
+  }
   var RETIRED = {};
   [
     'g01',
@@ -7236,6 +8529,7 @@ window.CommentBank = (function () {
     context: context,
     fits: fits,
     fill: fill,
+    filledAs: filledAs,
     lastStart: lastStart,
     rowMeta: rowMeta,
     repeatsLast: repeatsLast,
@@ -7256,6 +8550,13 @@ window.CommentBank = (function () {
     bankStrength: bankStrength,
     THIN_PER_SENTENCE: THIN_PER_SENTENCE,
     stepPool: stepPool,
+    // The template tokens of a said slot value (a card's wording, a habit
+    // as behaviour), so it can be drawn again with other pronouns.
+    saidTokens: _sayToks,
+    // A bank sentence by id, a joined one ("j:a+b:and") included.
+    sentenceById: function (id, bank) {
+      return _bankSentence(bank || COMMENT_BANK, id) || null;
+    },
     provenance: provenance,
     verify: verify,
     ctxFor: ctxFor,
