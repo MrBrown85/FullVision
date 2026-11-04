@@ -203,15 +203,6 @@ window.ReportSheets = (function () {
         { key: 'overall', label: 'Overall', def: true },
         { key: 'facts', label: 'Highest and Lowest Lines', def: true },
         {
-          key: 'compare',
-          label: 'Compare With',
-          def: 'last',
-          choices: [
-            { v: 'last', label: 'Last Report' },
-            { v: 'start', label: 'Start of Term' },
-          ],
-        },
-        {
           key: 'order',
           label: 'Order',
           def: 'curriculum',

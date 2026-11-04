@@ -178,7 +178,9 @@ describe('ReportStudio', () => {
     expect(table).toContain('role="region"');
     expect(table).toContain('aria-label="Proficiency Settings"');
     expect(table).toContain('data-key="score"');
-    expect(table).toContain('aria-label="Compare With"');
+    // No Compare With: the first report compares with the start of the
+    // term, every later one with the last report (2026-11-03).
+    expect(table).not.toContain('aria-label="Compare With"');
     expect(table).toContain('Hide Row');
     expect(table).not.toMatch(/Width|Height|row \d/);
     const withSteps = ReportSheets.insert(f, 'next-steps', { side: 0 });

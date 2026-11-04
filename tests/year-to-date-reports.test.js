@@ -230,10 +230,13 @@ describe('growth compares the year to date at the last report with now (decision
     setActiveTerm(CID, 1);
     const r1 = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, { termId: 'term-1' }, {}));
     expect(r1).toContain('Competency Start of Term Now');
-    // Asked for on Report 2, the start is Term 2's first piece (the 4), not September's 2.
+    // On Report 2, even a form saved with Start of Term compares with Report
+    // 1's year to date (2.0), not Term 2's first piece (the 4), so a student
+    // who went 2 → 3 never prints a fall.
     setActiveTerm(CID, 2);
     const r2 = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, { termId: 'term-2' }, { compare: 'start' }));
-    expect(r2).toContain('Questioning 4.0');
+    expect(r2).toContain('Competency Report 1 Now');
+    expect(r2).toContain('Questioning 2.0 Developing 3.0 Proficient +1.0');
   });
 
   it('the dashboard arrow: the year to date at Report 1 beside the year so far', () => {
@@ -336,5 +339,14 @@ describe('review follow-ups', () => {
     clearProfCache();
     setActiveTerm(CID, 1);
     expect(getSectionProficiency(CID, SID, 'sec')).toBe(4);
+  });
+
+  it('4. Start of Term on a later report compares with the last report', () => {
+    setActiveTerm(CID, 2);
+    const t = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, { termId: 'term-2' }, { compare: 'start' }));
+    expect(t).toContain('Questioning 2.0 Developing 3.0 Proficient +1.0');
+    expect(text(ReportBlocks.renderBlockProgress(CID, STUDENT, { termId: 'term-2' }, {}))).toContain(
+      '(+1.0 since Report 1)',
+    );
   });
 });

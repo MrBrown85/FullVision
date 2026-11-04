@@ -1032,8 +1032,11 @@ window.ReportBlocks = (function () {
     const sections = _reportSections(cid);
     if (!sections.length) return '';
 
-    // Then and now, per section.
-    const last = options.compare !== 'start' ? _lastReportLevels(cid, sid, sections) : null;
+    // Then and now, per section. After the first report the comparison is
+    // always the last report's year-to-date level, Start of Term or not: a
+    // start inside this term beside a year-to-date Now would compare two
+    // spans of work (2026-11-03). Start of Term is the first report's.
+    const last = _lastReportLevels(cid, sid, sections);
     const thenLabel = last ? last.label : 'Start of Term';
     const nowLabel = 'Now';
     const rowsBySection = {};
