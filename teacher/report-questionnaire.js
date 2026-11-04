@@ -3697,6 +3697,7 @@ window.ReportQuestionnaire = (function () {
      the same report is on screen (Undo toasts, not confirm boxes). */
   function _undoToast(st, message, snap) {
     if (typeof showUndoToast !== 'function' || !snap) return;
+    if (typeof document === 'undefined' || typeof document.createElement !== 'function') return;
     showUndoToast(
       message,
       function () {
