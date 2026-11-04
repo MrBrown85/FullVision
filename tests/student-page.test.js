@@ -187,6 +187,28 @@ describe('student page', () => {
     expect(root.textContent).toContain('It will be part of your report.');
   });
 
+  it('a set of choices is one Tab stop, and the arrow keys choose within it', async () => {
+    replies.push(OPEN);
+    T.start(root, '#K7M4QX');
+    await tick();
+    click('[data-act="start"]');
+    const steps = () => Array.from(root.querySelectorAll('[data-act="step"][data-core="PAR"]'));
+    expect(steps().map(b => b.getAttribute('tabindex'))).toEqual(['0', '-1', '-1', '-1']);
+    const key = (el, k) => {
+      const e = new globalThis.window.Event('keydown', { bubbles: true, cancelable: true });
+      e.key = k;
+      el.dispatchEvent(e);
+      return e;
+    };
+    expect(key(steps()[0], 'ArrowRight').defaultPrevented).toBe(true);
+    expect(T.collect(T.state()).q3).toEqual({ levels: { PAR: 2 } });
+    expect(steps().map(b => b.getAttribute('tabindex'))).toEqual(['-1', '0', '-1', '-1']);
+    key(steps()[1], 'End');
+    expect(T.collect(T.state()).q3.levels.PAR).toBe(4);
+    key(steps()[3], 'ArrowRight');
+    expect(T.collect(T.state()).q3.levels.PAR).toBe(1);
+  });
+
   it('a token that ran out is renewed once with the same code, then the answers go', async () => {
     replies.push(OPEN);
     T.start(root, '#K7M4QX');

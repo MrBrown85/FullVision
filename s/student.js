@@ -1188,8 +1188,24 @@ var StudentPage = (function () {
     // html-safe: this file's render (the name is shared): every screen escapes server and typed text with esc; q.id is a question uuid; PhoneReportView.html escapes the report.
     root.innerHTML = render(S);
     root.querySelectorAll('textarea.sp-text').forEach(grow);
+    rovingRadios(root);
     var f = focusSel ? root.querySelector(focusSel) : null;
     if (f && f.focus) f.focus({ preventScroll: false });
+  }
+
+  /* Each set of choices is one Tab stop, as a radio group is: the chosen
+     one, or the first; the arrow keys move inside it. */
+  function rovingRadios(el) {
+    el.querySelectorAll('[role="radiogroup"]').forEach(function (g) {
+      var radios = Array.prototype.slice.call(g.querySelectorAll('[role="radio"]'));
+      if (!radios.length) return;
+      var on = radios.filter(function (r) {
+        return r.getAttribute('aria-checked') === 'true';
+      })[0];
+      radios.forEach(function (r) {
+        r.setAttribute('tabindex', r === (on || radios[0]) ? '0' : '-1');
+      });
+    });
   }
 
   function grow(el) {
@@ -1622,7 +1638,24 @@ var StudentPage = (function () {
     openCode(input ? input.value : '');
   }
 
+  var ARROWS = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
   function onKeydown(e) {
+    // Arrow keys, Home and End choose within a set of choices.
+    var t = e.target;
+    var group = t && t.getAttribute && t.getAttribute('role') === 'radio' && t.closest('[role="radiogroup"]');
+    if (group && (ARROWS[e.key] || e.key === 'Home' || e.key === 'End')) {
+      var radios = Array.prototype.slice.call(group.querySelectorAll('[role="radio"]'));
+      var i = radios.indexOf(t);
+      var n =
+        e.key === 'Home'
+          ? 0
+          : e.key === 'End'
+            ? radios.length - 1
+            : (i + ARROWS[e.key] + radios.length) % radios.length;
+      e.preventDefault();
+      if (radios[n]) radios[n].click();
+      return;
+    }
     // Enter in "Another" adds it instead of submitting anything.
     if (e.key === 'Enter' && e.target && /-other$/.test(e.target.id || '')) {
       e.preventDefault();
