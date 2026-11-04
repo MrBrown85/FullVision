@@ -97,6 +97,10 @@ describe('initials', () => {
     expect(initials({ firstName: 'John', lastName: 'Doe' })).toBe('JD');
   });
 
+  it('uses the preferred name, as the name on screen does', () => {
+    expect(initials({ firstName: 'Robert', preferred: 'Bobby', lastName: 'Smith' })).toBe('BS');
+  });
+
   it('handles missing lastName', () => {
     expect(initials({ firstName: 'John', lastName: '' })).toBe('JO');
   });

@@ -6008,7 +6008,8 @@ function initials(st) {
     if (p.length >= 2) return (p[0][0] + p[p.length - 1][0]).toUpperCase();
     return (p[0] || '?').slice(0, 2).toUpperCase();
   }
-  const f = (st.firstName || '').trim(),
+  // From the name shown on screen, so "Teddy Okafor" is TO.
+  const f = (st.preferred || st.firstName || '').trim(),
     l = (st.lastName || '').trim();
   if (f && l) return (f[0] + l[0]).toUpperCase();
   return (f || l || '?').slice(0, 2).toUpperCase();
@@ -6032,8 +6033,12 @@ function pronounsSelect(id, selected, attrs) {
 function fullName(st) {
   return ((st.firstName || '') + ' ' + (st.lastName || '')).trim();
 }
+/* The name shown on screen for a student, everywhere: the preferred name
+   (the first name when there is none), then the last name ("Teddy Okafor"
+   for Theodore Okafor). fullName stays the legal name for the roster's
+   fields, sorting, import matching and exports. */
 function displayName(st) {
-  return st.preferred || fullName(st);
+  return displayNameWithLast(st) || fullName(st);
 }
 function displayNameFirst(st) {
   return st.preferred || st.firstName || st.lastName || '';
@@ -7095,7 +7100,12 @@ function saveLearningMap(cid, map) {
   );
   map._customized = true;
   map._version = (map._version || 0) + 1;
-  _saveCourseField('learningMaps', cid, map); // derived tag/section caches auto-invalidate via mapRef check
+  _saveCourseField('learningMaps', cid, map);
+  // The derived tag and section caches key on the map object, and a map
+  // edited in place (removeCompetencies) is the same object, so drop them:
+  // otherwise counts kept a removed competency.
+  delete _allTagsCache[cid];
+  delete _tagToSectionCache[cid];
   if (!_writesEnabled() || !_isUuid(cid)) return Promise.resolve(true);
   _registerLearningMapRows(cid, map);
   return _persistLearningMapToCanonical(cid, prev, map);
@@ -7212,11 +7222,24 @@ function removeCompetencies(cid, sectionIds) {
     ids[resolveLearningMapId(cid, 'section', id)] = true;
   });
   var map = ensureCustomLearningMap(cid);
-  var taken = (map.sections || []).filter(function (s) {
+  var all = map.sections || [];
+  var taken = all.filter(function (s) {
     return ids[s.id];
   });
   if (!taken.length) return 0;
-  map.sections = map.sections.filter(function (s) {
+  // Where each one sat: the competencies that came after it (removed with
+  // it or not) and its index, so putting it back returns it to its place.
+  var place = {};
+  all.forEach(function (s, i) {
+    if (!ids[s.id]) return;
+    place[s.id] = {
+      index: i,
+      beforeIds: all.slice(i + 1, i + 31).map(function (x) {
+        return x.id;
+      }),
+    };
+  });
+  map.sections = all.filter(function (s) {
     return !ids[s.id];
   });
   var now = new Date().toISOString();
@@ -7227,7 +7250,12 @@ function removeCompetencies(cid, sectionIds) {
     cid,
     taken
       .map(function (s) {
-        return { section: structuredClone(s), removedAt: now };
+        return {
+          section: structuredClone(s),
+          removedAt: now,
+          index: place[s.id].index,
+          beforeIds: place[s.id].beforeIds,
+        };
       })
       .concat(list),
   );
@@ -7243,12 +7271,26 @@ function restoreCompetency(cid, sectionId) {
   });
   if (!entry) return false;
   var map = ensureCustomLearningMap(cid);
+  var secs = map.sections || [];
   if (
-    !(map.sections || []).some(function (s) {
+    !secs.some(function (s) {
       return s.id === sectionId;
     })
   ) {
-    map.sections = (map.sections || []).concat([structuredClone(entry.section)]);
+    // Back in its place: before the first competency that followed it and
+    // is still there, else at its old position, else at the end (removed
+    // before places were kept).
+    var at = -1;
+    (entry.beforeIds || []).some(function (id) {
+      var before = resolveLearningMapId(cid, 'section', id);
+      at = secs.findIndex(function (s) {
+        return s.id === before;
+      });
+      return at >= 0;
+    });
+    if (at < 0 && typeof entry.index === 'number') at = Math.min(entry.index, secs.length);
+    if (at < 0) at = secs.length;
+    map.sections = secs.slice(0, at).concat([structuredClone(entry.section)], secs.slice(at));
   }
   _saveRemovedSections(
     cid,

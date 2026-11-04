@@ -177,12 +177,14 @@ window.Router = (function () {
 
     // Update page title for browser tab, history, and screen readers
     var pageTitle = _titles[path] || 'Dashboard';
+    // /dashboard?manage=… is Class Management's own address.
+    if (path === '/dashboard' && params.manage && params.manage !== 'starters') pageTitle = 'Class Management';
     if (path === '/student' && params.id) {
       try {
         var stu = getStudents(getActiveCourse()).find(function (s) {
           return s.id === params.id;
         });
-        if (stu) pageTitle = fullName(stu);
+        if (stu) pageTitle = displayName(stu);
       } catch (e) {
         /* use default */
       }

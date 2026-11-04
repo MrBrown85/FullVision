@@ -2182,10 +2182,11 @@ a.dash-ins-name:hover {
   font-weight: 600;
   color: var(--text);
 }
-.cm-sidebar-count {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
+.cm-action-btn.cm-new-class-btn {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  color: var(--text);
+  white-space: nowrap;
 }
 .cm-class-list {
   flex: 1;
@@ -2933,9 +2934,11 @@ a.dash-ins-name:hover {
   font-style: italic;
   font-size: var(--text-xs);
 }
-.cm-cat-save:disabled {
+.cm-cat-save:disabled,
+.cm-detail .btn-primary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  filter: none;
 }
 
 /* Reporting terms editor (same row model as categories) */
@@ -3229,6 +3232,16 @@ a.dash-ins-name:hover {
   gap: 10px;
   justify-content: flex-end;
   margin-top: 16px;
+}
+/* Back and Next stay in view at the foot of a long step (Choose
+   Competencies runs to thousands of pixels). */
+.cm-detail .cw-footer {
+  position: sticky;
+  bottom: -20px;
+  z-index: 2;
+  margin-bottom: -20px;
+  padding: 12px 0 20px;
+  background: var(--bg);
 }
 
 /* ── Compact Standard Cards (used in class manager + wizard) ── */
@@ -4612,6 +4625,7 @@ a.dash-ins-name:hover {
   white-space: nowrap;
 }
 .cm-rs-section {
+  position: relative;
   padding: 0;
   overflow: hidden;
 }
@@ -4620,6 +4634,36 @@ a.dash-ins-name:hover {
   max-height: none;
   border: 0;
   margin: 0;
+}
+/* The roster scrolls sideways at most widths: its scrollbar always shows
+   (not only while scrolling), and the right edge fades while columns are
+   hidden past it. */
+.cm-rs-scroll::-webkit-scrollbar {
+  height: 12px;
+}
+.cm-rs-scroll::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+.cm-rs-scroll::-webkit-scrollbar-thumb {
+  background: var(--text-3);
+  border: 3px solid var(--bg);
+  border-radius: 6px;
+}
+.cm-rs-section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 12px;
+  width: 48px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--surface));
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 3;
+}
+.cm-rs-section.cm-rs-more-right::after {
+  opacity: 1;
 }
 .cm-rs-grid {
   display: grid;
@@ -5732,8 +5776,10 @@ label.cm-cr-row {
   width: 64px;
   text-align: center;
 }
+/* Wide enough for "100.0" and a one-decimal value beside the number
+   arrows ("83.3" was clipped to "83." at 64px). */
 .cm-pts-slot {
-  width: 64px;
+  width: 80px;
   flex-shrink: 0;
   text-align: center;
 }

@@ -32,8 +32,8 @@ describe('Add Student form: Enter saves', () => {
     _cache.students[CID] = [];
     originalGetElementById = document.getElementById;
     document.getElementById = id => {
-      if (id === 'cm-add-first') return { value: 'Amara', style: {} };
-      if (id === 'cm-add-last') return { value: 'Osei', style: {} };
+      if (id === 'cm-add-first') return { value: 'Amara', style: {}, focus() {} };
+      if (id === 'cm-add-last') return { value: 'Osei', style: {}, focus() {} };
       return originalGetElementById(id);
     };
     DashClassManager.resetState();

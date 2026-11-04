@@ -1323,7 +1323,7 @@ window.PageGradebook = (function () {
         (basisRow ? ' gb-row-basis' : '') +
         '">' +
         _rowheadNameOpen(cid, s) +
-        esc(fullName(s)) +
+        esc(displayName(s)) +
         '</a>' +
         '<span class="gb-grid-rowhead-overall" style="color:' +
         color +
@@ -1635,7 +1635,7 @@ window.PageGradebook = (function () {
         (basisRow ? ' gb-row-basis' : '') +
         '">' +
         _rowheadNameOpen(cid, s) +
-        esc(fullName(s)) +
+        esc(displayName(s)) +
         desTags +
         '</a>' +
         '<span class="gb-grid-rowhead-grade">' +
@@ -1718,7 +1718,7 @@ window.PageGradebook = (function () {
           '" style="' +
           cellStyle +
           '" tabindex="-1" role="gridcell" aria-label="' +
-          esc(fullName(s)) +
+          esc(displayName(s)) +
           ', ' +
           esc(a.title) +
           ': ' +
@@ -1821,7 +1821,7 @@ window.PageGradebook = (function () {
     // The full name first: the name column cuts long ones off.
     var tip =
       '<div class="gb-tip-name">' +
-      esc(fullName(student)) +
+      esc(displayName(student)) +
       '</div>' +
       '<div class="gb-tip-head">Course Grade</div>' +
       '<div class="gb-tip-grade" style="color:' +

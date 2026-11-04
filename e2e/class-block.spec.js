@@ -49,6 +49,7 @@ test.describe('Class blocks', () => {
       'A · Philosophy 12',
       'B · Philosophy 12',
       'D · English 10',
+      'New Class\u2026',
     ]);
   });
 

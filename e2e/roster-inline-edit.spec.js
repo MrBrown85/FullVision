@@ -125,3 +125,31 @@ test.describe('Students tab roster', () => {
       );
   });
 });
+
+test.describe('Students tab roster, Escape', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedClass(page);
+  });
+
+  test('Escape in a box puts back what is saved and saves nothing', async ({ page }) => {
+    await openRoster(page);
+    await box(page, ALICE, 'pron').fill('xyz');
+    await box(page, ALICE, 'pron').press('Escape');
+    await expect(box(page, ALICE, 'pron')).toHaveValue('');
+    await expect(box(page, ALICE, 'pron')).not.toBeFocused();
+    expect((await savedStudent(page, ALICE)).pronouns || '').toBe('');
+
+    await box(page, BOB, 'g0').fill('typo@example.com');
+    await box(page, BOB, 'g0').press('Escape');
+    await expect(box(page, BOB, 'g0')).toHaveValue('');
+
+    // A value saved earlier is what Escape goes back to.
+    await box(page, CHARLIE, 'first').fill('Charles');
+    await box(page, CHARLIE, 'first').press('Tab');
+    await box(page, CHARLIE, 'first').fill('Chuck');
+    await box(page, CHARLIE, 'first').press('Escape');
+    await expect(box(page, CHARLIE, 'first')).toHaveValue('Charles');
+    expect((await savedStudent(page, CHARLIE)).firstName).toBe('Charles');
+  });
+});

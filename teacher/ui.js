@@ -578,6 +578,19 @@ document.addEventListener('click', function (e) {
     if (button) button.setAttribute('aria-expanded', 'false');
   }
 });
+// Escape closes it too, and puts the focus back on the account button.
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  const menu = document.querySelector('.tb-user-menu.open');
+  if (!menu) return;
+  menu.classList.remove('open');
+  const button = menu.querySelector('.tb-user-btn');
+  if (button) {
+    button.setAttribute('aria-expanded', 'false');
+    button.focus();
+  }
+  e.preventDefault();
+});
 
 /* ── Upcoming Birthdays ────────────────────────────────────── */
 function getUpcomingBirthdays(cid) {
@@ -909,10 +922,10 @@ function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
     const clickAttr = onStudentClick
       ? `type="button" data-action="sidebarStudentClick"`
       : `role="link" tabindex="0" data-href="${href}"`;
-    html += `<${tag} class="student-row${s.id === selectedStudentId ? ' selected' : ''}" ${clickAttr} data-sid="${s.id}">
+    html += `<${tag} class="student-row${s.id === selectedStudentId ? ' selected' : ''}" ${clickAttr} data-sid="${s.id}" data-search="${esc((displayName(s) + ' ' + fullName(s)).toLowerCase())}">
       <span class="student-avatar" style="background:${avatarBg}">${esc(initials(s))}</span>
       <span class="student-info">
-        <span class="student-row-name">${flagged ? '<span style="color:var(--priority);margin-right:3px">\u2691</span>' : ''}${esc(fullName(s))}</span>
+        <span class="student-row-name">${flagged ? '<span style="color:var(--priority);margin-right:3px">\u2691</span>' : ''}${esc(displayName(s))}</span>
       </span>
       <span class="student-row-grades" data-prof-sid="${s.id}"></span>
     </${tag}>`;
@@ -937,6 +950,8 @@ function _rosterShowMenuHtml(cid, mode) {
 }
 
 let _sidebarCid = null;
+// The class picker's last option, which opens the New Class wizard.
+const CLASS_PICKER_NEW = '__new_class__';
 // html-safe: course names are escaped; labels come from the fixed roster lists; rows come from _sidebarRowsHtml.
 function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
   _sidebarClickFnName = onStudentClick || null;
@@ -952,6 +967,7 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
         ${getPickerCourses(cid)
           .map(c => `<option value="${c.id}"${c.id === cid ? ' selected' : ''}>${esc(c.name)}</option>`)
           .join('')}
+        <option value="${CLASS_PICKER_NEW}">New Class…</option>
       </select>
       <div class="sb-search-row">
         <input id="gb-roster-search" type="text" placeholder="Search..." aria-label="Search students">
@@ -1191,7 +1207,8 @@ function applySidebarAnnotations() {
 function filterRoster() {
   const q = (document.getElementById('gb-roster-search').value || '').toLowerCase().trim();
   document.querySelectorAll('.student-row').forEach(row => {
-    const name = row.querySelector('.student-row-name')?.textContent?.toLowerCase() || '';
+    // The row shows the preferred name; its search key holds the legal name too.
+    const name = row.dataset.search || row.querySelector('.student-row-name')?.textContent?.toLowerCase() || '';
     row.style.display = !q || name.includes(q) ? '' : 'none';
   });
 }
@@ -1199,9 +1216,14 @@ function filterRoster() {
 /* The CSP blocks inline on* attributes, so the sidebar's class picker and
    roster search are wired here, once, by delegation. */
 document.addEventListener('change', function (e) {
-  if (e.target.matches('[data-action="sidebarSwitchCourse"]') && window._pageSwitchCourse) {
-    window._pageSwitchCourse(e.target.value);
+  if (!e.target.matches('[data-action="sidebarSwitchCourse"]')) return;
+  // "New Class…" opens the New Class wizard; the picker stays on this class.
+  if (e.target.value === CLASS_PICKER_NEW) {
+    e.target.value = _sidebarCid || '';
+    if (window.Router) Router.navigate('/dashboard?manage=new');
+    return;
   }
+  if (window._pageSwitchCourse) window._pageSwitchCourse(e.target.value);
 });
 document.addEventListener('input', function (e) {
   if (e.target.id === 'gb-roster-search') filterRoster();

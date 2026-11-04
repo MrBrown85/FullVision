@@ -21,8 +21,12 @@ describe('fullName', () => {
 });
 
 describe('displayName', () => {
-  it('returns preferred when set', () => {
-    expect(displayName({ preferred: 'JD', firstName: 'Jane', lastName: 'Doe' })).toBe('JD');
+  it('puts the preferred name before the last name', () => {
+    expect(displayName({ preferred: 'Teddy', firstName: 'Theodore', lastName: 'Okafor' })).toBe('Teddy Okafor');
+  });
+
+  it('keeps a preferred name alone when there is no last name', () => {
+    expect(displayName({ preferred: 'Zee', firstName: '', lastName: '' })).toBe('Zee');
   });
 
   it('falls back to fullName when no preferred', () => {
