@@ -438,9 +438,7 @@ window.MStudentDetail = (function () {
     });
 
     // Assessments
-    var scoredN = cells.filter(function (c) {
-      return c.cell.kind === 'points' || c.cell.kind === 'level' || c.cell.kind === 'complete';
-    }).length;
+    var scoredN = MC.scoredAssessmentCount(cid, sid);
     var nsN = termAssess.filter(function (a) {
       return statuses[sid + ':' + a.id] === 'NS';
     }).length;

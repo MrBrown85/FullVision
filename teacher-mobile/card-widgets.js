@@ -268,7 +268,9 @@ window.MCardWidgets = (function () {
     });
     var g = studentGrowthLine(cid, st.id, tagIds);
     if (!g) return '';
-    var countText = g.count + (g.count === 1 ? ' assessment' : ' assessments');
+    // The same count as the student screen's "N Scored".
+    var n = MC.scoredAssessmentCount(cid, st.id);
+    var countText = n + ' scored';
 
     if (!g.startText) {
       // Under two weeks of work: where it is now.

@@ -72,7 +72,12 @@ window.MComponents = (function () {
     var name = course && course.name ? course.name : '';
     if (!name) return '';
     return (
-      '<div class="m-nav-bar-class" title="' + _esc(name) + '">' + '<span class="m-nav-bar-class-name">' + _esc(name) + '</span></div>'
+      '<div class="m-nav-bar-class" title="' +
+      _esc(name) +
+      '">' +
+      '<span class="m-nav-bar-class-name">' +
+      _esc(name) +
+      '</span></div>'
     );
   }
 
@@ -332,7 +337,19 @@ window.MComponents = (function () {
   }
 
   /* ── Public API ─────────────────────────────────────────────── */
+  /* How many of a student's assessments in the class's chosen term have a
+     score (points, a level or Complete/Incomplete): the student screen's
+     "N Scored" and the card's growth line read this one count. */
+  function scoredAssessmentCount(cid, sid) {
+    return getAssessments(cid).filter(function (a) {
+      if (typeof assessmentInActiveTerm === 'function' && !assessmentInActiveTerm(cid, a)) return false;
+      var kind = assessmentCellValue(cid, sid, a).kind;
+      return kind === 'points' || kind === 'level' || kind === 'complete';
+    }).length;
+  }
+
   return {
+    scoredAssessmentCount: scoredAssessmentCount,
     ICONS: ICONS,
     avatarColor: avatarColor,
     avatarInitials: avatarInitials,
