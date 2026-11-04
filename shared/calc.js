@@ -2341,7 +2341,8 @@ function studentGradeBadges(cid, sid, termId) {
 }
 
 /* A level as its short code: EXT, PRF, DEV or EMG for the whole level it
-   rounds to (the level its colour and word come from), IC with none. A +
+   rounds to (the level its colour and word come from), IE (Insufficient
+   Evidence) with none. A +
    or − is already in the value, so 2.67 (3−) is PRF and 3.33 (3+) is PRF. */
 function levelCode(value) {
   if (!(value > 0)) return PROF_CODES[0];
