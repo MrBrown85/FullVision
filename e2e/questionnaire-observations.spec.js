@@ -140,3 +140,44 @@ test('scrolling the drawer keeps the month heading in view', async ({ page }) =>
   expect(Math.abs(h.y - l.y)).toBeLessThan(2);
   await expect(head).toContainText('September 2026');
 });
+
+/* The page's layout (Questionnaire glance plan, step 6). */
+test('the right column stays in view while the left column scrolls', async ({ page }) => {
+  await open(page);
+  const right = page.locator('.qn-right');
+  const top = (await right.boundingBox()).y;
+  expect(Math.round(top)).toBe(123);
+  await page.locator('.qn').evaluate(el => (el.scrollTop = el.scrollHeight));
+  expect(await page.locator('.qn').evaluate(el => el.scrollTop)).toBeGreaterThan(500);
+  expect(Math.round((await right.boundingBox()).y)).toBe(123);
+  await expect(page.locator('.qn-comment')).toBeInViewport();
+});
+
+test('with the student list hidden the left column grows; the right keeps its width', async ({ page }) => {
+  await open(page);
+  expect(Math.round((await page.locator('.qn-left').boundingBox()).width)).toBe(470);
+  expect(Math.round((await page.locator('.qn-right').boundingBox()).width)).toBe(670);
+  await page.evaluate(() => toggleSidebar());
+  await expect(page.locator('.page-layout.sidebar-hidden')).toHaveCount(1);
+  await expect.poll(async () => Math.round((await page.locator('.qn-left').boundingBox()).width)).toBe(710);
+  expect(Math.round((await page.locator('.qn-right').boundingBox()).width)).toBe(670);
+  // The drawer still stops where the left column ends.
+  await page.locator('.qn-obs .qno-view-all').click();
+  const d = await page.locator('#tq-drawer').boundingBox();
+  const left = await page.locator('.qn-left').boundingBox();
+  expect(Math.round(d.x + d.width)).toBe(Math.round(left.x + left.width));
+  await page.evaluate(() => toggleSidebar());
+});
+
+test('at 1280 px the columns stack as before', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await open(page);
+  const left = await page.locator('.qn-left').boundingBox();
+  const right = await page.locator('.qn-right').boundingBox();
+  expect(right.y).toBeGreaterThan(left.y + left.height - 1);
+  expect(await page.locator('.qn-right').evaluate(el => getComputedStyle(el).position)).toBe('static');
+  await page.locator('.qn-obs .qno-view-all').click();
+  const d = await page.locator('#tq-drawer').boundingBox();
+  const out = await page.locator('#report-output').boundingBox();
+  expect(Math.round(d.width)).toBe(Math.round(out.width));
+});

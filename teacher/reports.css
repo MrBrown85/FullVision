@@ -3740,6 +3740,30 @@ textarea.studio-text {
   flex-direction: column;
   gap: 10px;
 }
+/* Side by side (Questionnaire glance plan, step 6): the right column (the
+   Teacher Comment, Attendance, Sentences) stays in view while the left
+   scrolls, and scrolls on its own when it is taller than the window; the
+   left column takes the room the student list leaves when it is hidden
+   (470 → 710 px at 1440), the right keeps 662. Its 4 px padding, taken
+   back by the margin, keeps the cards' shadows from being cut. */
+@media (min-width: 1281px) {
+  .qn-left {
+    flex: 1 0 470px;
+    width: auto;
+    min-width: 0;
+  }
+  .qn-right {
+    flex: 0 1 670px;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    max-height: calc(100vh - var(--dock-h) - 53px - 36px);
+    overflow-y: auto;
+    padding: 0 4px 6px;
+    margin: 0 -4px;
+    box-sizing: border-box;
+  }
+}
 .qn-muted {
   color: var(--text-2);
 }
