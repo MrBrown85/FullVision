@@ -201,9 +201,9 @@ describe('the strength named (topSkillOf)', () => {
       comments.push({ sid: 'st' + i, text: d.text });
       // The pipeline's strength frame (Nov 4 2026) names one skill of the
       // tie, the one the fewest classmates were given.
-      const row = d.sentences.find(x => x.step === 'overall');
+      const row = d.sentences.find(x => x.step === 'overall' || (x.steps || []).includes('overall'));
       expect(row, 'student ' + i).toBeTruthy();
-      expect(row.id).toMatch(/^vst\d\d$/);
+      expect(row.id).toMatch(/^vst\d\d$|^j:.*\bvst\d\d\b/);
       const said = k => {
         const w = CommentBank.SKILLS.socials.find(r => r.key === k).skill;
         return [w, CommentForms.does(w), CommentForms.doing(w)];
@@ -262,9 +262,9 @@ describe('the per-skill frames under a tie', () => {
     // Generate says it in the pipeline's frames; the tie frames stay in
     // Browse and Other Wording.
     const d = CommentBank.draft(ctx, { seed: 2 });
-    const row = d.sentences.find(x => x.step === 'overall');
+    const row = d.sentences.find(x => x.step === 'overall' || (x.steps || []).includes('overall'));
     if (row) {
-      expect(row.id).toMatch(/^vst\d\d$/);
+      expect(row.id).toMatch(/^vst\d\d$|^j:.*\bvst\d\d\b/);
       expect(row.text).not.toMatch(/[{}[\]]|strongest/);
     }
     expect(d.replaced).toEqual([]);

@@ -2647,6 +2647,16 @@ window.CommentBank = (function () {
   /* The standing words of the Letter Grades Order (M192/94). IE and F have
      none, so they get no grade sentence here. */
   var STANDING = { A: 'excellent', B: 'very good', 'C+': 'good', C: 'satisfactory', 'C-': 'minimally acceptable' };
+  // What each letter means said to a family, three ways each, rotated along
+  // the class (the blind sort, Nov 4 2026: the Ministry's "minimally
+  // acceptable" pasted in read as a form).
+  var STANDING_SAID = {
+    A: ['excellent work', 'work of a very high standard', 'excellent work all round'],
+    B: ['very good work', 'strong work', 'work of a high standard'],
+    'C+': ['good work', 'solid work', 'work of a good standard'],
+    C: ['satisfactory work', 'a fair standard of work', 'work that meets the course basics'],
+    'C-': ['a pass, with room to grow', 'passing work, with room to grow', 'a passing mark, with room to improve'],
+  };
   /* "Close to" the next letter: at most this many points below its band,
      with at least this many scored pieces. */
   var CLOSE_POINTS = 2;
@@ -3337,6 +3347,23 @@ window.CommentBank = (function () {
   /* The best piece this term (bestOrderOf), or null with no scored work. */
   /* A piece's mark before rounding: its % in a Letter class, else its
      proficiency. */
+  /* The kind of work a title or a string names: a lab, a quiz or test, a
+     proposal, a project, a presentation, a journal, a report or essay; ''
+     when it names none. */
+  var WORK_KINDS = [
+    ['lab', /\b(lab|labs|experiment|experiments|investigation)\b/i],
+    ['test', /\b(quiz|test|exam|check)\b/i],
+    ['proposal', /\b(proposal|plan)\b/i],
+    ['project', /\b(project|challenge|design|model|build)\b/i],
+    ['presentation', /\b(presentation|poster|talk)\b/i],
+    ['journal', /\b(journal|log|notebook)\b/i],
+    ['writing', /\b(report|essay|paragraph|write-up)\b/i],
+  ];
+  function _workKind(text) {
+    var t = String(text || '');
+    for (var i = 0; i < WORK_KINDS.length; i++) if (WORK_KINDS[i][1].test(t)) return WORK_KINDS[i][0];
+    return '';
+  }
   function _rawMark(f, w) {
     if (f.grade && f.grade.mode === 'letter' && w.pct != null && !isNaN(Number(w.pct))) return Number(w.pct);
     return Number(w.v);
@@ -4448,6 +4475,7 @@ window.CommentBank = (function () {
     // grade is IE.
     var standing = f.standing || '';
     var prof = !!x.gr && x.gr.kind === 'proficiency';
+    put('gradeSaid', x.gr && x.gr.letter ? (STANDING_SAID[x.gr.letter] || []).slice() : [], ['grade.letter']);
     put('levelMeaning', prof && P.levelMeaning[standing] ? [_say(P.levelMeaning[standing], f)] : [], ['overall']);
     put('levelUp', prof && /^(Proficient|Extending)$/.test(standing) ? ['yes'] : [], ['overall']);
     var both = !!(f.grade && f.grade.mode === 'both' && standing && x.gr && /^(letter|cminus)/.test(x.gr.kind));
@@ -4498,9 +4526,21 @@ window.CommentBank = (function () {
     if (note) did = [note];
     else if (x.topPieceSkill) {
       var pe = _entryOf(f, x.topPieceSkill.comp);
-      did = (pe && pe.forms.did.length ? pe.forms.did : P.did || []).map(function (t) {
-        return _say(t.split('{base}').join(x.topPieceSkill.skill), f);
-      });
+      var kindOf = _workKind(w && w.title);
+      // The skill said of the piece only when the kinds agree: the card's
+      // evidence and each phrasing's own words (a lab, a quiz, a proposal)
+      // match the piece, or say no kind (the second blind sort: "Science
+      // Fair Proposal, where he followed each safety rule during his lab").
+      var evKind = _workKind(pe && pe.evidence);
+      if (!(kindOf && evKind && kindOf !== evKind))
+        did = (pe && pe.forms.did.length ? pe.forms.did : P.did || [])
+          .filter(function (t) {
+            var k = _workKind(t);
+            return !k || !kindOf || k === kindOf;
+          })
+          .map(function (t) {
+            return _say(t.split('{base}').join(x.topPieceSkill.skill), f);
+          });
     }
     put('pieceDid', did, wk.concat(note ? [] : compKey(x.topPieceSkill && x.topPieceSkill.comp)));
     // Growth: the skill whose level rose, as a gerund.
@@ -6143,7 +6183,7 @@ window.CommentBank = (function () {
      handful of candidates (body orders, habit sentence kinds, joins) the
      one that reads best and differs most from the text on screen and the
      roster neighbours' drafts is kept (CommentPipeline.score). */
-  var PIPE_CANDIDATES = 12;
+  var PIPE_CANDIDATES = 16;
   function _hasPipeline(bank) {
     return (bank.sentences || []).some(function (x) {
       return x.v === 2;
@@ -6573,31 +6613,40 @@ window.CommentBank = (function () {
     // over while another is left (the next step, the home prompt, a
     // strength or a habit said the same way in neighbouring comments).
     var recent = (around && around.recent) || [];
-    var heldBy = function (v) {
+    var recent5 = (around && around.recent5) || recent;
+    var mates = (around && around.mates) || [];
+    // How far back a phrasing is remembered: the next step five students,
+    // the home line the whole class, the habits five, the rest three.
+    var memory = function (k) {
+      if (k === 'homeLine') return mates;
+      if (/^step/.test(k) || /^habit/.test(k)) return recent5;
+      return recent;
+    };
+    var heldBy = function (v, k) {
       var key = _tplKey(v);
       return (
         !!v &&
-        recent.some(function (r) {
+        memory(k).some(function (r) {
           return r.key.indexOf(key) >= 0;
         })
       );
     };
-    var turnOf = function (pool, start) {
+    var turnOf = function (pool, start, k) {
       for (var j = 0; j < pool.length; j++) {
         var v = pool[(start + j) % pool.length];
-        if (!heldBy(v)) return v;
+        if (!heldBy(v, k)) return v;
       }
       return pool[start % pool.length];
     };
     Object.keys(pick).forEach(function (k) {
       if (/^habit/.test(k)) return;
-      out[k] = turnOf(pick[k], idx + press + (CP.hash(k) % 7));
+      out[k] = turnOf(pick[k], idx + press + (CP.hash(k) % 7), k);
     });
     var f = ctx._f;
     var hp = ctx._habitPlan || { does: [], invite: [] };
     var say = function (key, form, n) {
       var xs = key ? habitPhrases(f, key, form) : [];
-      return xs.length ? turnOf(xs, idx + press + n) : '';
+      return xs.length ? turnOf(xs, idx + press + n, 'habit') : '';
     };
     var d = plan.doesOrder || hp.does;
     out.habitDoes = say(d[0], 'does', 0);
@@ -6644,6 +6693,14 @@ window.CommentBank = (function () {
   }
   /* Whether a sentence repeats a run of three words of the comment so far
      (the name and pronouns as one word each). */
+  /* Whether any frame in a list says what a level means. */
+  function x0text(list) {
+    return (list || [])
+      .map(function (x) {
+        return x.text;
+      })
+      .join(' ');
+  }
   function _sharesTrigram(t, sofar, name) {
     var CP = window.CommentPipeline;
     var grams = function (text) {
@@ -6831,7 +6888,7 @@ window.CommentBank = (function () {
           hit = least.slice(r0).concat(least.slice(0, r0), hit.slice(least.length));
         }
         // Not at the price of a frame the class has used more than another.
-        if (hit.length && used(hit[0]) <= used(turn[0]) + 2)
+        if (hit.length && used(hit[0]) <= used(turn[0]))
           turn = hit.concat(
             turn.filter(function (x) {
               return hit.indexOf(x) < 0;
@@ -6867,14 +6924,24 @@ window.CommentBank = (function () {
           (prevText && CP.firstWord(prevText) === CP.firstWord(t) ? 2 : 0) +
           (CP.count(t, 'class') > 1 ? 1 : 0) +
           (OPEN_TIME.test(CP.firstWord(t)) && (!timeOK || timeSaid(sofar)) ? 1 : 0) +
-          (_sharesTrigram(t, sofar, who.name) ? 1 : 0)
+          (_sharesTrigram(t, sofar, who.name) ? 1 : 0) +
+          (onScreen.indexOf(t) >= 0 ? 1 : 0)
         );
       };
+      var glossed =
+        /\{levelMeaning\}/.test(x0text(turn)) &&
+        (around.mates || []).some(function (m) {
+          return /\bwhich means\b/.test(m.text);
+        });
+      var onScreen = around.onScreen || [];
       var softOk = function (x, t) {
         return !(
-          // The course named once: a frame that opens on the course as its
-          // subject waits for a comment that has not named it.
+          // A sentence the text on screen already has, word for word.
           (
+            onScreen.indexOf(t) >= 0 ||
+            (glossed && /\{levelMeaning\}/.test(x.text)) ||
+            // The course named once: a frame that opens on the course as its
+            // subject waits for a comment that has not named it.
             (courseSaid && /^\{course\} (?!work\b)/.test(x.text)) ||
             (prevText && CP.firstWord(prevText) === CP.firstWord(t)) ||
             // "class" once a sentence ("In class, he joins in class
@@ -7060,9 +7127,21 @@ window.CommentBank = (function () {
     around.recent = _savedBefore(around, opts.comments, 3).map(function (t) {
       return { text: t, lower: t.toLowerCase(), key: _tplKey(t) };
     });
+    // The text on screen too: a new press says its frames and phrasings
+    // another way where it can.
+    if (previous)
+      around.recent = around.recent.concat([{ text: previous, lower: previous.toLowerCase(), key: _tplKey(previous) }]);
+    around.onScreen = previous ? R.sentences(previous) : [];
+    // Five students back for the next step's and the home line's words.
+    around.recent5 = _savedBefore(around, opts.comments, 5).map(function (t) {
+      return { text: t, lower: t.toLowerCase(), key: _tplKey(t) };
+    });
     // Every classmate's comment (saved, or drafted this session), each with
     // the classmate's name as one word, for the near-copy check.
     var mates = _classmateTexts(f, around, opts.comments);
+    around.mates = mates.map(function (t) {
+      return { text: t, key: _tplKey(t) };
+    });
     var seen = {};
     var cands = [];
     for (var c = 0; c < PIPE_CANDIDATES; c++) {
@@ -7788,6 +7867,9 @@ window.CommentBank = (function () {
       ['levelMeaning', 'levelUp', 'gradeLevel', 'ieReason'].forEach(function (k) {
         if (_has(pv, k)) checks.push(!!ctx && !!ctx[k] && v[k] === ctx[k]);
       });
+      // The standing said one of its plain ways for the letter now.
+      if (_has(pv, 'gradeSaid'))
+        checks.push(!!gr && !!gr.letter && (STANDING_SAID[gr.letter] || []).indexOf(v.gradeSaid) >= 0);
       var want = gradeSlots(gr);
       Object.keys(want).forEach(function (k) {
         if (_has(pv, k)) checks.push(!!gr && !!want[k] && v[k] === want[k]);

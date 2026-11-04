@@ -286,6 +286,7 @@ describe('the bank', () => {
       pieceScored: 'bestPiece',
       pieceDid: 'bestPiece',
       pieceTie: 'bestPiece',
+      gradeSaid: 'grade',
       progressDoing: 'improved',
       habitDoes: 'habitBehaviour',
       habitDoes2: 'habitBehaviour',
@@ -421,9 +422,11 @@ describe('fill', () => {
   });
 
   it('puts a habit phrase in as the context gives it', () => {
-    const vh203 = COMMENT_BANK.sentences.find(s => s.id === 'vh203');
+    const vh207 = COMMENT_BANK.sentences.find(s => s.id === 'vh207');
     const ctx = { ...fullContext(P.he), habitInvite: 'using feedback', habitInvite2: 'joining class discussions' };
-    expect(CommentBank.fill(vh203, ctx)).toBe('The habits to build are using feedback and joining class discussions.');
+    expect(CommentBank.fill(vh207, ctx)).toBe(
+      'His next habits to build are using feedback and joining class discussions.',
+    );
   });
 });
 
@@ -656,18 +659,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // five Habit Ratings frames for Completes Work at Consistently.
   // The counts since Nov 4 2026: the pipeline's frames fit beside the older
   // ones that stay in Browse.
-  it('knows the Demo class is Science from its name, and offers Cece 135 sentences (21, 54, 18, 42)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 125 sentences (21, 49, 16, 39)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 54, 18, 42]);
-    expect(CommentBank.fitCount(ctx)).toBe(135);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 49, 16, 39]);
+    expect(CommentBank.fitCount(ctx)).toBe(125);
   });
 
-  it('offers Jasper 136 (21, 54, 19, 42), by the name he goes by', () => {
+  it('offers Jasper 126 (21, 49, 17, 39), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 54, 19, 42]);
-    expect(CommentBank.fitCount(ctx)).toBe(136);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 49, 17, 39]);
+    expect(CommentBank.fitCount(ctx)).toBe(126);
     expect(ctx.name).toBe('Jas');
     // Nothing fell from Extending since Report 1's year to date (it fell
     // four times inside Term 2's own trend, which Generate no longer

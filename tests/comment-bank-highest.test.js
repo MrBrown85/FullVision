@@ -87,7 +87,8 @@ const frames = COMMENT_BANK.sentences.filter(s => s.when && s.when.highestWord);
 const isHigh = id => /^n10\d\d$/.test(id) && frames.some(s => s.id === id);
 // Generate's strength sentence since Nov 4 2026: the pipeline's frames,
 // with the highest-marked skill at its level ({strengthAt}, {strengthDoing}).
-const isPipelineStrength = id => /^vst\d\d$/.test(id);
+// A strength frame, or a joined sentence that holds one.
+const isPipelineStrength = id => /^vst\d\d$/.test(id) || /^j:.*\bvst\d\d\b/.test(id);
 const verified = (s, text, pv, f) =>
   CommentBank.verify({ text, sentences: [{ id: s.id, part: s.part, step: 'overall', text }], provenance: [pv] }, f, {});
 
@@ -141,7 +142,7 @@ describe('the highest-marked skill (highestOf)', () => {
     expect(ctx._highestWord).toBe('');
     expect(CommentBank.stepPool('overall', ctx).filter(s => isHigh(s.id))).toEqual([]);
     const d = CommentBank.draft(ctx, { seed: 1 });
-    expect(d.sentences.find(x => x.step === 'overall')).toBeUndefined();
+    expect(d.sentences.find(x => x.step === 'overall' || (x.steps || []).includes('overall'))).toBeUndefined();
   });
 
   it('leaves out the next step, even when it ties at the top, and says "highest" only with nothing above', () => {
@@ -164,7 +165,7 @@ describe('the highest-marked skill (highestOf)', () => {
       expect(s.needs, s.id).not.toContain('highestTop');
     });
     const d = CommentBank.draft(ctx, { seed: 3 });
-    const row = d.sentences.find(x => x.step === 'overall');
+    const row = d.sentences.find(x => x.step === 'overall' || (x.steps || []).includes('overall'));
     // The skill as written or as a gerund (the pipeline's {strengthDoing}).
     const said = w =>
       [w, CommentForms.doing(w), CommentForms.does(w)].some(t => row.text.toLowerCase().indexOf(t.toLowerCase()) >= 0);
@@ -181,7 +182,7 @@ describe('the highest-marked skill (highestOf)', () => {
       const ctx = CommentBank.context(f, {});
       const d = CommentBank.draft(ctx, { seed: i, comments: comments.slice() });
       comments.push({ sid: 'st' + i, text: d.text });
-      const row = d.sentences.find(x => x.step === 'overall');
+      const row = d.sentences.find(x => x.step === 'overall' || (x.steps || []).includes('overall'));
       expect(row, 'student ' + i).toBeTruthy();
       expect(isPipelineStrength(row.id), row.id).toBe(true);
       const said = k => [
@@ -343,7 +344,7 @@ describe('the highest-marked skill frames', () => {
     });
     expect(pool.filter(s => /marks are highest/.test(s.text)).length).toBe(3);
     const d = CommentBank.draft(ctx, { seed: 2 });
-    const row = d.sentences.find(x => x.step === 'overall');
+    const row = d.sentences.find(x => x.step === 'overall' || (x.steps || []).includes('overall'));
     if (row) {
       expect(isPipelineStrength(row.id)).toBe(true);
       expect(row.text).toMatch(/beginning to/);

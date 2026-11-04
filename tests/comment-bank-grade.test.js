@@ -74,14 +74,16 @@ describe('the grade sentences in the bank', () => {
     COMMENT_BANK.sentences.filter(x => x.group === 'Grade').forEach(x => expect(x.text, x.id).not.toMatch(/this term/));
   });
 
-  it('says C- with the minimally acceptable wording, in the letter frames', () => {
+  // (The Ministry's "minimally acceptable" read as a form in the second
+  // blind sort; a C- is said as a pass with room to grow, Nov 4 2026.)
+  it('says C- as a pass with room to grow, in the letter frames', () => {
     const c = CommentBank.context(letterFacts('C-', 55), {});
     expect(CommentBank.fill(byId('vgl01'), c, { first: true })).toBe(
-      'Noor has a C- in History 12, which is minimally acceptable work.',
+      'Noor has a C- in History 12, which is a pass, with room to grow.',
     );
     const close = CommentBank.context(letterFacts('C-', 59), {});
     expect(CommentBank.fill(byId('vgc01'), close, { first: true })).toBe(
-      'Noor has a C- in History 12, minimally acceptable work and close to a C.',
+      'Noor has a C- in History 12, a pass, with room to grow and close to a C.',
     );
     expect(byId('vgl01').when.grade).toEqual(['letter', 'cminus']);
     expect(byId('vgc01').when.grade).toEqual(['letterClose', 'cminusClose']);
@@ -201,7 +203,7 @@ describe('verify catches a wrong grade', () => {
   it('catches a grade sentence filled with a letter the facts do not give', () => {
     const f = letterFacts('B', 80);
     const ctx = CommentBank.context(f, {});
-    const wrong = one('vgl01', { ...ctx, gradeLetter: 'an A', gradeStanding: 'excellent' });
+    const wrong = one('vgl01', { ...ctx, gradeLetter: 'an A', gradeSaid: 'excellent work' });
     expect(wrong.text).toBe('Noor has an A in History 12, which is excellent work.');
     const v = CommentBank.verify(wrong, f, {});
     expect(v.replaced[0].failed).toEqual(['slots', 'grade']);
@@ -312,7 +314,11 @@ describe('Generate in a Letter class', () => {
     expect(f.grade.pieces).toHaveLength(4);
     for (let seedN = 1; seedN <= 10; seedN++) {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed: seedN });
-      leads(d, 'letter', /\ba B\b.*very good|very good.*\ba B\b/i);
+      leads(
+        d,
+        'letter',
+        /\ba B\b.*(very good|strong work|high standard)|(very good|strong work|high standard).*\ba B\b/i,
+      );
       expect(d.sentences[gradeAt(d)].text).not.toMatch(/close to/);
       expect(
         others(d).filter(id => byId(id) && claimsGrade(id)),
@@ -328,7 +334,7 @@ describe('Generate in a Letter class', () => {
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
     leads(d, 'letterClose', /close to an A/i);
     expect(d.sentences[gradeAt(d)].text).toMatch(/\ba B\b/i);
-    expect(d.sentences[gradeAt(d)].text).toMatch(/very good/);
+    expect(d.sentences[gradeAt(d)].text).toMatch(/very good|strong work|high standard/);
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
   });
 
@@ -364,7 +370,11 @@ describe('Generate in a Letter class', () => {
   it('uses the letter in a Both class', () => {
     const f = seed('both', [3, 3, 3, 3]);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    leads(d, 'letter', /\ba B\b.*very good|very good.*\ba B\b/i);
+    leads(
+      d,
+      'letter',
+      /\ba B\b.*(very good|strong work|high standard)|(very good|strong work|high standard).*\ba B\b/i,
+    );
     expect(others(d).filter(id => byId(id) && claimsGrade(id))).toEqual([]);
   });
 

@@ -7,7 +7,7 @@
 import './setup.js';
 import { readFileSync } from 'fs';
 import { runInThisContext } from 'vm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, afterEach } from 'vitest';
 
 const RQ = ReportQuestionnaire;
 
@@ -82,19 +82,37 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
     return null;
   }
 
+  // The Demo class has frames enough for every habits case since Nov 4
+  // 2026; these two keep a few habit frames only, so the part is thin and
+  // the line can be checked.
+  const FEW = ['vhd01', 'vhp01', 'vhi04', 'vh205', 'vhc01', 'vsh01', 'vsh03'];
+  let full = null;
+  const thinHabits = () => {
+    full = COMMENT_BANK.sentences;
+    COMMENT_BANK.sentences = full.filter(
+      s => !(s.v === 2 && (s.group === 'Work Habits' || s.group === 'Strong Habits')) || FEW.includes(s.id),
+    );
+  };
+  const restore = () => {
+    if (full) COMMENT_BANK.sentences = full;
+    full = null;
+  };
+  afterEach(restore);
+
   it('shows the thin line under the row of a thin part, linking to Browse Sentences on that part', () => {
+    thinHabits();
     // The habits sentence: a few frames fit the whole class.
     const { html, d, students } = thinCard();
     const i = d.sentences.findIndex(x => x.step === 'habits');
     expect(i).toBeGreaterThanOrEqual(0);
     // (How many fit moves with the bank; the line says the count, and the
     // part is thin when the class has three or more students per sentence.)
-    const n = Number((html.match(/Only (\d+) habit sentences fit/) || [])[1]);
+    const n = Number((html.match(/Only (\d+) habit sentences? fits?/) || [])[1]);
     expect(n * 3).toBeLessThanOrEqual(students.length);
     const line =
       '<span class="qn-req-thin">Only ' +
       n +
-      ' habit sentences fit ' +
+      (n === 1 ? ' habit sentence fits ' : ' habit sentences fit ') +
       students.length +
       ' students, so some will repeat. <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="all" data-row="' +
       i +
@@ -107,6 +125,7 @@ describe('the Sentences card in Demo Mode (Science 8, Report 2)', () => {
   });
 
   it('shows it only for the parts that are thin for the student, never the grade, best piece or next step sentence', () => {
+    thinHabits();
     const { html, d, st, termId, students } = thinCard();
     const strength = CommentBank.bankStrength(cid, { termId, students });
     const thin = d.sentences.filter(x => (strength.byStudent[st.id][x.step] || {}).thin);
