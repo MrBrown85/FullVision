@@ -100,3 +100,35 @@ test('the reopened form keeps what was typed when the other class’s copy lands
   await expect(page.locator('#af-title')).toHaveValue('Lab 2');
   await expect(page.locator('#af-category')).toHaveValue('sci8-cat-labs');
 });
+
+// Nov 3 sweep (step 4 group 2 #12): a data refresh that waited for the
+// teacher to leave the title redrew the page as they clicked Points, and the
+// next form came back blank (title, dates, Rubric scoring) with the click lost.
+test('a refresh waiting on the title keeps the next form and the click', async ({ page }) => {
+  await openForm(page);
+  await page.fill('#af-title', 'Lab Quiz 3');
+  await page.selectOption('#af-category', 'sci8-cat-labs');
+  await page.fill('#af-date-assigned', '2026-10-20');
+  await page.fill('#af-due', '2026-10-22');
+  await page.locator('[data-action="saveAndAddAnother"]').click();
+  await page.fill('#af-title', 'Lab Quiz 4');
+  // A refresh lands while the title has focus: it waits for the focusout.
+  await page.evaluate(() => _invalidateAndRerender());
+  await page.locator('.af-scoremode-btn[data-mode="points"]').click();
+  await page.waitForTimeout(100);
+  await expect(page.locator('#af-title')).toHaveValue('Lab Quiz 4');
+  await expect(page.locator('#af-date-assigned')).toHaveValue('2026-10-20');
+  await expect(page.locator('#af-due')).toHaveValue('2026-10-22');
+  await expect(page.locator('#af-scoremode')).toHaveValue('points');
+});
+
+test('a redraw keeps the Edit form as typed', async ({ page }) => {
+  await openForm(page);
+  await page.locator('[data-action="cancelAssessForm"]').click();
+  const aid = await page.evaluate(() => getAssessments('sci8')[0].id);
+  await page.evaluate(id => document.querySelector(`[data-action="editAssess"][data-aid="${id}"]`).click(), aid);
+  await page.fill('#af-title', 'Renamed While a Refresh Lands');
+  await page.evaluate(() => window.Router.getCurrentPage().render());
+  await expect(page.locator('#af-title')).toHaveValue('Renamed While a Refresh Lands');
+  await expect(page.locator('#af-title')).toBeFocused();
+});

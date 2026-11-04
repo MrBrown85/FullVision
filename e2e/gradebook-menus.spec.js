@@ -36,8 +36,8 @@ test('Escape closes a menu, and the arrow keys and Return pick an item', async (
   await expect(menu(page)).toHaveCount(0);
 
   await cell.click({ button: 'right' });
-  // Edit Score, Clear Score, Mark Missing: the third item.
-  await page.keyboard.press('ArrowDown');
+  // Edit Score, then Mark Missing: on an empty cell Clear Score is off and
+  // the arrows pass over it.
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('.gb-ctx-item[data-ctx="markMissing"]')).toBeFocused();

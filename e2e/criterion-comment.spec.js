@@ -136,4 +136,25 @@ test.describe('Criterion comment box', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toBeHidden();
   });
+
+  // Nov 3 sweep (step 4 group 2 #13): Escape threw away a typed comment.
+  test('Escape with a typed comment asks first; Keep Editing keeps it', async ({ page }) => {
+    await openGrid(page);
+    await commentButton(page, 'stu-001', 'crit-hyp').click();
+    const box = page.locator('#crit-comment-input');
+    await box.fill('Try writing two different predictions next time.');
+    await page.keyboard.press('Escape');
+    const ask = page.locator('.af-dialog-card');
+    await expect(ask.locator('.confirm-title')).toHaveText('Discard This Comment?');
+    await expect(ask.getByRole('button', { name: 'Keep Editing' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(ask).toHaveCount(0);
+    await expect(box).toBeVisible();
+    await expect(box).toHaveValue('Try writing two different predictions next time.');
+
+    await page.locator('.crit-comment-popover').getByRole('button', { name: 'Cancel' }).click();
+    await ask.getByRole('button', { name: 'Discard' }).click();
+    await expect(page.locator('.crit-comment-popover')).toHaveCount(0);
+    await expect(commentButton(page, 'stu-001', 'crit-hyp')).not.toHaveClass(/has-comment/);
+  });
 });

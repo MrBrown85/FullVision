@@ -27,7 +27,11 @@ const ASSESSMENT = {
   created: new Date('2026-03-21').toISOString(),
 };
 
-async function openGrid(page) {
+// On a touch screen the card is opened with a tap: a mouse click would leave
+// Playwright's mouse on the card title, and Chromium sends it a mouseout
+// after the next tap, which closes the tip (a real touch screen has no
+// second pointer). That was why the touch test failed about one run in five.
+async function openGrid(page, { touch = false } = {}) {
   await mockAuth(page);
   await seedCourse(page);
   await seedStudents(page);
@@ -40,7 +44,10 @@ async function openGrid(page) {
   );
   await gotoApp(page, '/assignments');
   const card = page.locator('#ac-assess-names');
-  if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
+  if (!(await card.evaluate(el => el.classList.contains('open')))) {
+    const title = card.locator('.assess-title');
+    await (touch ? title.tap() : title.click());
+  }
   return card.locator('.rsg-student[data-status-student="stu-001"]');
 }
 
@@ -87,12 +94,27 @@ test.describe('on a touch screen', () => {
   test.use({ hasTouch: true });
 
   test('tapping a cut-off name shows it at once; the next tap closes it', async ({ page }) => {
-    const alice = await openGrid(page);
+    const alice = await openGrid(page, { touch: true });
     const tip = page.locator('#gb-tooltip');
     const longLabel = alice.locator('.rsg-criterion-row[data-criterion="crit-long"] .rsg-criterion-label');
 
+    // "At once" means on the touch itself, not after the hover delay: by the
+    // time the finger lifts the tip is already showing. Checking at pointerup
+    // proves that without racing a wall-clock timeout on a busy machine.
+    await page.evaluate(() => {
+      window.__tipShownOnLift = null;
+      document.addEventListener(
+        'pointerup',
+        () => {
+          const el = document.getElementById('gb-tooltip');
+          window.__tipShownOnLift = !!el && getComputedStyle(el).display !== 'none' && !!el.textContent;
+        },
+        { once: true, capture: true },
+      );
+    });
     await longLabel.tap();
-    await expect(tip).toBeVisible({ timeout: 300 });
+    await expect.poll(() => page.evaluate(() => window.__tipShownOnLift)).toBe(true);
+    await expect(tip).toBeVisible();
     await expect(tip.locator('strong')).toHaveText(LONG);
 
     await alice.locator('.rsg-student-name').tap();

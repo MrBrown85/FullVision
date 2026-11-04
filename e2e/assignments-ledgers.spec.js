@@ -65,6 +65,10 @@ test('the points ledger Average counts Missing as 0, like the Class Average', as
   await card.locator('.ldg-row[data-status-student="stu-002"] .grader-status-btn[data-status="NS"]').click();
   await expect(card.locator('.ldg-tally')).toContainText('Average 35%');
   await expect(card.locator('.ldg-tally')).toContainText('1 Marked');
+  // Nov 3 sweep: Median and Lowest count the Missing 0 as the Average does.
+  await expect(card.locator('.ldg-stats')).toContainText('Median 3.5 / 10');
+  await expect(card.locator('.ldg-stats')).toContainText('Lowest 0 / 10');
+  await expect(card.locator('.ldg-stats')).toContainText('Highest 7 / 10');
 });
 
 test('the Complete / Incomplete ledger marks and clears', async ({ page }) => {
