@@ -3467,6 +3467,31 @@ window.PageAssignments = (function () {
     });
   }
 
+  /* Escape on the New or Edit Assessment form is its Cancel (Nov 3 sweep:
+     it did nothing): a form with changes asks first. A tip showing on a
+     field closes first; the rubric starts, the competency search and the
+     dialogs over the form take their own Escape before this runs. */
+  function _formEscape(e) {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+    var form = document.getElementById('new-assess-form');
+    if (!_showingNewForm || !form || form.style.display === 'none') return;
+    var t = e.target;
+    var inForm = t && t.closest && t.closest('#new-assess-form');
+    if (!inForm && t !== document.body) return;
+    if (document.querySelector('.confirm-overlay, #rubric-modal')) return;
+    if (window.RubricBank && RubricBank.isOpen()) return;
+    e.preventDefault();
+    if (_afTipSource) return _hideAfTip();
+    var aid = _editingAssessId;
+    cancelAssessForm(function () {
+      // Back to the button that opened the form.
+      var back = aid
+        ? document.querySelector('[data-action="editAssess"][data-aid="' + CSS.escape(aid) + '"]')
+        : document.querySelector('.tb-action-btn[data-action="showNewForm"]');
+      if (back) back.focus({ preventScroll: true });
+    });
+  }
+
   function _formKeydown(e) {
     if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.altKey) return;
     var form = document.getElementById('new-assess-form');
@@ -12681,6 +12706,7 @@ window.PageAssignments = (function () {
     _addDocListener('input', _formInput);
     _addDocListener('change', _formInput);
     _addDocListener('keydown', _compKeydown);
+    _addDocListener('keydown', _formEscape);
     _addDocListener('input', _compInput);
     _addDocListener('mouseover', _codeHover);
     _addDocListener('focusin', _codeHover);
