@@ -2157,6 +2157,86 @@ window.PageGradebook = (function () {
     return null;
   }
 
+  /* Puts back what one score edit replaced (an entry _takeUndo or
+     _takeUndoEntry handed over), ticks included, and redraws. */
+  function _restoreUndo(undo) {
+    if (_scoreToast === undo) {
+      _scoreToast = null;
+      if (typeof dismissUndoToast === 'function') dismissUndoToast();
+    }
+    var scores = getScores(undo.cid);
+    if (!scores[undo.sid]) scores[undo.sid] = [];
+    var beforeScores = structuredClone(scores);
+    // Missing or Excused work takes no score (isScoreLocked): an undo
+    // puts back no level or points under the status.
+    var undoAssess = getAssessments(undo.cid).find(function (a) {
+      return a.id === undo.aid;
+    });
+    var undoLocked = isScoreLocked(undo.cid, undo.sid, undo.aid);
+    // Restore previous entries (full objects)
+    (undo.tagIds || []).forEach(function (tid, i) {
+      var prevEntry = undo.prevEntries[i];
+      if (prevEntry && undoLocked && isScoreEntered(undoAssess, prevEntry)) prevEntry = null;
+      // Remove current entry for this tag
+      var idx = scores[undo.sid].findIndex(function (e) {
+        return e.assessmentId === undo.aid && e.tagId === tid;
+      });
+      if (idx >= 0) scores[undo.sid].splice(idx, 1);
+      // Restore previous entry if it existed
+      if (prevEntry) scores[undo.sid].push(prevEntry);
+    });
+    saveScores(undo.cid, scores);
+    persistScoreDiffToCanonical(undo.cid, beforeScores, scores);
+    // The Advanced Rubric ticks Clear Score took off.
+    (undo.checkIds || []).forEach(function (id) {
+      setRubricCheck(undo.cid, undo.sid, undo.aid, id, true);
+    });
+    clearProfCache();
+    if (_mounted && activeCourse === undo.cid) render();
+  }
+
+  /* `undo` taken off the stack for its toast's Undo, when the cell still
+     holds what the edit left. Null when it is gone or the cell has changed. */
+  function _takeUndoEntry(undo) {
+    var i = _undoStack.indexOf(undo);
+    if (i < 0) return null;
+    _undoStack.splice(i, 1);
+    return _undoCellState(undo.cid, undo.sid, undo.aid, undo.tagIds) === undo.after ? undo : null;
+  }
+
+  /* Whether what an edit replaced held a score, so clearing it is worth a toast. */
+  function _undoHadScore(undo) {
+    var assess = getAssessments(undo.cid).find(function (a) {
+      return a.id === undo.aid;
+    });
+    return undo.prevEntries.some(function (e) {
+      return e && isScoreEntered(assess, e);
+    });
+  }
+
+  /* After a score is cleared: an Undo toast, as elsewhere in the app. Its
+     Undo and Cmd+Z put back the same thing. */
+  var _scoreToast = null; // the clear the Undo toast on screen is for
+  function _showClearToast(undo) {
+    if (typeof showUndoToast !== 'function') return;
+    var student = getStudents(undo.cid).find(function (s) {
+      return s.id === undo.sid;
+    });
+    _scoreToast = undo;
+    showUndoToast(
+      'Score cleared' + (student ? ' for ' + displayNameWithLast(student) : ''),
+      function () {
+        _scoreToast = null;
+        var taken = _takeUndoEntry(undo);
+        if (taken) _restoreUndo(taken);
+      },
+      function () {
+        if (_scoreToast === undo) _scoreToast = null;
+      },
+      10000,
+    );
+  }
+
   /* The points assessment a Competencies-view cell is on, or null. */
   function _cellPointsAssess(td) {
     var a = td.dataset.aid
@@ -2695,12 +2775,14 @@ window.PageGradebook = (function () {
           checkIds.forEach(function (id) {
             setRubricCheck(cid, sid, aid, id, false);
           });
+          var hadScore = _undoHadScore(undo) || checkIds.length > 0;
           clearScoreEntries(cid, scores, sid, assess, clearIds);
           saveScores(cid, scores);
           _undoSaved(undo);
           clearProfCache();
           render();
           window.clearScore(sid, aid);
+          if (hadScore) _showClearToast(undo);
         }
       } else if (action === 'markMissing' || action === 'excuseCell' || action === 'lateCell') {
         // Same path as the Assignments page's NS / EXC / Late buttons; picking
@@ -3250,35 +3332,7 @@ window.PageGradebook = (function () {
         _undoBulkStatus(undo);
         return;
       }
-      var scores = getScores(undo.cid);
-      if (!scores[undo.sid]) scores[undo.sid] = [];
-      var beforeScores = structuredClone(scores);
-      // Missing or Excused work takes no score (isScoreLocked): an undo
-      // puts back no level or points under the status.
-      var undoAssess = getAssessments(undo.cid).find(function (a) {
-        return a.id === undo.aid;
-      });
-      var undoLocked = isScoreLocked(undo.cid, undo.sid, undo.aid);
-      // Restore previous entries (full objects)
-      (undo.tagIds || []).forEach(function (tid, i) {
-        var prevEntry = undo.prevEntries[i];
-        if (prevEntry && undoLocked && isScoreEntered(undoAssess, prevEntry)) prevEntry = null;
-        // Remove current entry for this tag
-        var idx = scores[undo.sid].findIndex(function (e) {
-          return e.assessmentId === undo.aid && e.tagId === tid;
-        });
-        if (idx >= 0) scores[undo.sid].splice(idx, 1);
-        // Restore previous entry if it existed
-        if (prevEntry) scores[undo.sid].push(prevEntry);
-      });
-      saveScores(undo.cid, scores);
-      persistScoreDiffToCanonical(undo.cid, beforeScores, scores);
-      // The Advanced Rubric ticks Clear Score took off.
-      (undo.checkIds || []).forEach(function (id) {
-        setRubricCheck(undo.cid, undo.sid, undo.aid, id, true);
-      });
-      clearProfCache();
-      render();
+      _restoreUndo(undo);
       return;
     }
     // Keys on a competency header move along the headers (_handleHeaderKeys), not the grid.
@@ -3434,19 +3488,22 @@ window.PageGradebook = (function () {
       var sid = focused.dataset.sid;
       if (aid && sid && focused.dataset.cmp === '1') {
         setCellCompletion(focused, null);
+        var cmpUndo = _undoStack[_undoStack.length - 1];
+        if (cmpUndo && cmpUndo.aid === aid && cmpUndo.sid === sid && _undoHadScore(cmpUndo)) _showClearToast(cmpUndo);
         return;
       }
       if (aid && sid) {
         var assess = getAssessments(activeCourse).find(function (a) {
           return a.id === aid;
         });
+        var undo = null;
         if (focused.dataset.pts === '1') {
-          var undo = _pushUndo(activeCourse, sid, aid, assess ? scoreTagIds(assess, activeCourse) : []);
+          undo = _pushUndo(activeCourse, sid, aid, assess ? scoreTagIds(assess, activeCourse) : []);
           setPointsScore(activeCourse, sid, aid, null);
           _undoSaved(undo);
         } else if (tid) {
           var clearKeys = _cellScoreKeys(focused);
-          var undo = _pushUndo(activeCourse, sid, aid, clearKeys);
+          undo = _pushUndo(activeCourse, sid, aid, clearKeys);
           clearKeys.forEach(function (key) {
             upsertScore(
               activeCourse,
@@ -3462,6 +3519,7 @@ window.PageGradebook = (function () {
           _undoSaved(undo);
         }
         _redrawCompetencyCell(focused);
+        if (undo && _undoHadScore(undo)) _showClearToast(undo);
       }
       return;
     } else return;
