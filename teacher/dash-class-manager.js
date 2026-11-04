@@ -2910,6 +2910,24 @@ window.DashClassManager = (function () {
       var newDetail = document.querySelector('.cm-detail');
       if (newDetail) newDetail.scrollTop = scrollTop;
     }
+    _cmRosterScrollCue();
+  }
+
+  /* The roster is wider than most windows (twelve columns). While columns
+     are hidden off its right edge, the edge fades and a line says to scroll
+     sideways, so the scrolling is plain to see. */
+  function _cmRosterScrollCue() {
+    var scroller = document.querySelector('.cm-rs-scroll');
+    if (!scroller || !scroller.addEventListener) return;
+    var section = scroller.closest('.cm-rs-section');
+    var note = document.getElementById('cm-rs-more');
+    function update() {
+      var more = scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 1;
+      if (section) section.classList.toggle('cm-rs-more-right', more);
+      if (note) note.hidden = scroller.scrollWidth <= scroller.clientWidth + 1;
+    }
+    scroller.addEventListener('scroll', update, { passive: true });
+    update();
   }
 
   /* The badge on a class row: its block ("A"), or the name's initials
@@ -3076,7 +3094,8 @@ window.DashClassManager = (function () {
           '<input class="cm-input" type="search" placeholder="Find a student" data-action-input="cmRosterSearch" value="' +
           esc(cmRosterQuery) +
           '"></label>' +
-          '<span class="cm-hint cm-rs-summary">Click any field to edit. Enter or ↓ moves down a column, Tab moves across.</span>' +
+          '<span class="cm-hint cm-rs-summary">Click any field to edit. Enter or ↓ moves down a column, Tab moves across.' +
+          '<span id="cm-rs-more" hidden> Scroll sideways for more columns.</span></span>' +
           '<span class="cm-hint cm-rs-summary" id="cm-rs-summary">' +
           esc(_cmRosterSummary(cid)) +
           '</span>'
