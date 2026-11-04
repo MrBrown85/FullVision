@@ -1756,7 +1756,10 @@ window.MGrade = (function () {
       });
     }
     _installArrowKeys();
-    var lastCard = swiper.querySelector('.m-swiper-card:last-child .m-pts-input');
+    var lastCard =
+      typeof swiper.querySelector === 'function'
+        ? swiper.querySelector('.m-swiper-card:last-child .m-pts-input')
+        : null;
     if (lastCard) lastCard.setAttribute('enterkeyhint', 'done');
     // Enter saves and moves to the next student's points, as Enter does in
     // the desktop grader; on the last student it just saves. Escape puts
