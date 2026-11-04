@@ -1,9 +1,9 @@
 /**
  * At a Glance sets up the comment (Questionnaire glance plan, step 2):
- * Strongest, Next step and Biggest change from the year so far, with the
- * change since the Term 1 report; Best piece (the comment's, this term),
- * Missing and Late so far this year; then View All N Skills. Demo Mode,
- * Science 8 from the bank, Cece on Report 2.
+ * Strongest, Next step and Biggest change from the year to date as of the
+ * report's end (the comment's own facts), with the change since the Term 1
+ * report; Best piece (the comment's), Missing and Late; then View All N
+ * Skills. Demo Mode, Science 8 from the bank, Cece on Report 2.
  */
 import './setup.js';
 import { readFileSync } from 'fs';
@@ -83,7 +83,9 @@ describe('At a Glance', () => {
       'Late',
     ]);
     expect(r[0]).toBe('Strongest | Data Representation | 3.3 · 5 pieces · ↑ from 3.0 | Proficient');
-    expect(r[1]).toBe('Next step | Observation | 2.9 · 3 pieces · ↓ from 3.0 | Proficient');
+    // The comment's next step: the lowest with 2+ pieces in the year to date
+    // (NEXT_STEP_PIECES), first assessed in Term 2.
+    expect(r[1]).toBe('Next step | Sustained Inquiry | 2.5 · 2 pieces · New since the report | Proficient');
     expect(r[2]).toBe('Biggest change | Sharing Findings | 2.8 → 3.2 · 11 pieces | Proficient');
     expect(r[4]).toBe('Missing | None so far this year');
     expect(r[5]).toBe('Late | None so far this year');
@@ -91,11 +93,11 @@ describe('At a Glance', () => {
 
   it('shows the highest skill with 3+ pieces when none clears the comment’s gate', () => {
     const f = CommentBank.facts(CID, cece(), 'term-2');
-    expect(CommentBank.strongestOf(f.year.comps)).toEqual([]);
+    expect(CommentBank.strongestOf(f.comps)).toEqual([]);
     expect(RQ.glanceRows(f).strongest.name).toBe('Data Representation');
   });
 
-  it('keeps the comment’s best piece, this term', () => {
+  it('keeps the comment’s best piece', () => {
     const f = CommentBank.facts(CID, cece(), 'term-2');
     const best = RQ.bestPiece(f);
     expect(rows(glance(cece()))[3]).toContain('Best piece | ' + best.title + ' · ');
@@ -126,7 +128,7 @@ describe('At a Glance', () => {
 
   it('says the change from each skill’s level at the report', () => {
     const f = CommentBank.facts(CID, cece(), 'term-2');
-    const by = name => f.year.comps.find(c => c.name === name);
+    const by = name => f.comps.find(c => c.name === name);
     expect(RQ.glanceChange(CID, f, by('Predictions'))).toBe('New since the report');
     expect(RQ.glanceChange(CID, f, by('Local Environment'))).toBe('No change');
     expect(RQ.glanceChange(CID, f, by('Hypotheses'))).toBe('↑ from 2.8');
