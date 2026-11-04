@@ -213,26 +213,53 @@ window.GradeReport = (function () {
     return cols;
   }
 
+  /* What has been measured, kept for the page: every student's report
+     lists the same assignment titles and categories and has the same table
+     header, so a class's reports measure each once, not once per student
+     (Nov 4: year-to-date reports list the whole year's work, and redrawing
+     27 students' reports took twice as long). Kept only once the fonts have
+     loaded, so a font that arrives late can't leave a wrong width. */
+  var _widthMemo = {};
+  var _heightMemo = {};
+  var _memoSize = 0;
+  function _memoOk() {
+    if (_memoSize > 20000) {
+      _widthMemo = {};
+      _heightMemo = {};
+      _memoSize = 0;
+    }
+    return typeof document === 'undefined' || !document.fonts || document.fonts.status === 'loaded';
+  }
+
   /* The widest of some texts at the table's largest type, in px. */
   function _textPx(stage, names) {
     names = names.filter(function (n, i) {
       return n && names.indexOf(n) === i;
     });
-    stage.innerHTML =
-      '<div class="gr-table gr-regular">' +
-      names
-        .map(function (n) {
-          return (
-            '<div><span class="gr-measure" style="display:inline-block;white-space:nowrap">' + esc(n) + '</span></div>'
-          );
-        })
-        .join('') +
-      '</div>';
     var w = 0;
-    Array.prototype.forEach.call(stage.querySelectorAll('.gr-measure'), function (el) {
-      w = Math.max(w, el.offsetWidth);
+    _textWidthsMemo(stage, names, 'regular').forEach(function (x) {
+      w = Math.max(w, x);
     });
     return Math.ceil(w) + 4;
+  }
+
+  /* _textWidths, measuring only the texts not measured before. */
+  function _textWidthsMemo(stage, names, key) {
+    if (!_memoOk()) return _textWidths(stage, names, key);
+    var memo = _widthMemo[key] || (_widthMemo[key] = {});
+    var todo = names.filter(function (n, i) {
+      var k = String(n || '');
+      return !Object.prototype.hasOwnProperty.call(memo, k) && names.indexOf(n) === i;
+    });
+    if (todo.length) {
+      _textWidths(stage, todo, key).forEach(function (w, i) {
+        memo[String(todo[i] || '')] = w;
+        _memoSize++;
+      });
+    }
+    return names.map(function (n) {
+      return memo[String(n || '')];
+    });
   }
 
   /* Each text's width in a table of one tier's type, in px, in order. */
@@ -428,9 +455,17 @@ window.GradeReport = (function () {
   }
 
   function _measure(stage, html) {
+    // The same markup is the same height (the table header, a sample row).
+    var ok = _memoOk();
+    if (ok && Object.prototype.hasOwnProperty.call(_heightMemo, html)) return _heightMemo[html];
     // html-safe: html is the letterhead (ReportBlocks.renderBlockHeader), _tailHtml or _tableHtml, all escaped
     stage.innerHTML = '<div class="sheet-item">' + html + '</div>';
-    return stage.firstChild.offsetHeight;
+    var h = stage.firstChild.offsetHeight;
+    if (ok) {
+      _heightMemo[html] = h;
+      _memoSize++;
+    }
+    return h;
   }
 
   function _stage(host) {
@@ -970,7 +1005,7 @@ window.GradeReport = (function () {
       });
       var textW = {};
       ['regular', 'small'].forEach(function (key) {
-        textW[key] = { title: _textWidths(stage, titles, key), category: _textWidths(stage, cats, key) };
+        textW[key] = { title: _textWidthsMemo(stage, titles, key), category: _textWidthsMemo(stage, cats, key) };
       });
       var sizes = {
         letterheadPx: _measure(stage, letterhead),
