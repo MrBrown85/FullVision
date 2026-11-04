@@ -37,6 +37,12 @@ window.MStudentsList = (function () {
       var color = MC.avatarColor(st.id);
       var initials = MC.avatarInitials(st);
       var name = displayName(st);
+      // Search finds every name the student goes by: legal first and last,
+      // and the preferred name, as a MyEd roster search does.
+      var searchText = [st.firstName, st.lastName, st.preferred, fullName(st), displayNameWithLast(st)]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
       var subtitle = '';
       if (st.pronouns) subtitle += MC.esc(st.pronouns);
 
@@ -52,6 +58,8 @@ window.MStudentsList = (function () {
         action +
         '" data-sid="' +
         st.id +
+        '" data-search="' +
+        MC.esc(searchText) +
         '">' +
         '<div class="m-cell-avatar" style="background:' +
         color +

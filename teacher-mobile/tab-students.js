@@ -175,8 +175,10 @@ window.MStudents = (function () {
     var q = (query || '').toLowerCase().trim();
     var matches = 0;
     document.querySelectorAll('#m-student-list .m-cell').forEach(function (cell) {
+      // The shown name, then every name the student goes by (data-search).
       var name = (cell.querySelector('.m-cell-title') || {}).textContent || '';
-      var match = name.toLowerCase().indexOf(q) >= 0;
+      var names = (name + ' ' + (cell.getAttribute('data-search') || '')).toLowerCase();
+      var match = names.indexOf(q) >= 0;
       if (match) matches++;
       cell.style.display = match ? '' : 'none';
     });
