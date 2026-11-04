@@ -1277,19 +1277,34 @@ window.DashClassManager = (function () {
   }
 
   /* ── Class Manager Student Functions ────────────────────── */
-  function cmShowAddStudent() {
+  function cmShowAddStudent(added) {
     var form = document.getElementById('cm-add-student-form');
     if (form) {
       form.style.display = 'block';
+      var status = document.getElementById('cm-add-status');
+      if (status)
+        status.textContent = added ? 'Added ' + added + '. Type the next student, or press Escape to close.' : '';
       var el = document.getElementById('cm-add-first');
       if (el) el.focus();
     }
+  }
+
+  // Cancel or Escape closes the form and puts the focus back on Add Student.
+  function cmCloseAddStudent() {
+    var form = document.getElementById('cm-add-student-form');
+    if (!form || form.style.display === 'none') return false;
+    cmCancelStudent();
+    var btn = document.querySelector('.cm-roster-add');
+    if (btn) btn.focus();
+    return true;
   }
 
   function cmCancelStudent() {
     cmEditingStudentId = null;
     var form = document.getElementById('cm-add-student-form');
     if (form) form.style.display = 'none';
+    var status = document.getElementById('cm-add-status');
+    if (status) status.textContent = '';
     var btn = document.getElementById('cm-save-btn');
     if (btn) btn.textContent = 'Save';
     ['cm-add-first', 'cm-add-last', 'cm-add-pref', 'cm-add-num', 'cm-add-dob', 'cm-add-email'].forEach(function (id) {
@@ -1329,6 +1344,7 @@ window.DashClassManager = (function () {
     });
     var students = getStudents(cmSelectedCourse);
     var sortName = ((lastName || '') + ' ' + firstName).trim();
+    var adding = !cmEditingStudentId;
 
     if (cmEditingStudentId) {
       var st = students.find(function (s) {
@@ -1367,6 +1383,12 @@ window.DashClassManager = (function () {
     saveStudents(cmSelectedCourse, students);
     cmCancelStudent();
     renderClassManager();
+    // A new student leaves the form open with the focus in First Name, so a
+    // roster can be typed one student after another without the mouse.
+    if (adding) {
+      cmShowAddStudent(((preferred || firstName) + ' ' + lastName).trim());
+      return;
+    }
     requestAnimationFrame(function () {
       var detail = document.querySelector('.cm-detail');
       if (detail) detail.scrollTop = 0;
@@ -3104,6 +3126,7 @@ window.DashClassManager = (function () {
       '</div>' +
       '</div>' +
       '<div class="cm-field" style="grid-column:1/-1;display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">' +
+      '<span class="cm-hint" id="cm-add-status" role="status" aria-live="polite" style="margin-right:auto;align-self:center"></span>' +
       '<button class="btn btn-ghost" data-action="cmCancelStudent" style="padding:6px 10px;font-size:0.8125rem">Cancel</button>' +
       '<button class="btn btn-primary" id="cm-save-btn" data-action="cmSaveStudent" style="padding:6px 14px;font-size:0.8125rem">Save</button>' +
       '</div>' +
@@ -9449,7 +9472,7 @@ window.DashClassManager = (function () {
         cmDeleteWithdrawn(el.dataset.sid);
       },
       cmCancelStudent: function () {
-        cmCancelStudent();
+        cmCloseAddStudent();
       },
       cmSaveStudent: function () {
         cmSaveStudent();
@@ -9884,6 +9907,10 @@ window.DashClassManager = (function () {
       return true;
     }
     if (e.key === 'Escape' && _cmCloseRosterPicker()) {
+      e.preventDefault();
+      return true;
+    }
+    if (e.key === 'Escape' && el && el.closest && el.closest('#cm-add-student-form') && cmCloseAddStudent()) {
       e.preventDefault();
       return true;
     }
