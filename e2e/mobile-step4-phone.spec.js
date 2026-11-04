@@ -78,3 +78,45 @@ test('grading card has the Overall Comment', async ({ page }) => {
     'Clear labels on every graph.',
   );
 });
+
+async function openAssessment(page, title) {
+  await openPhone(page);
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('[data-action="m-grade-assess"]', { hasText: title }).first().click();
+  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
+  await page.waitForTimeout(500);
+}
+
+function pointsNow(page) {
+  return page.evaluate(() => {
+    const el = document.querySelector('#m-screen-grade-swiper .m-pts-input');
+    return getPointsScore(getActiveCourse(), el.dataset.sid, el.dataset.aid);
+  });
+}
+
+// Group 2 #35: clearing a points score offers Undo; nonsense and Escape keep it.
+test('clearing a points score offers Undo; Escape and nonsense keep it', async ({ page }) => {
+  await openAssessment(page, 'Data Reading Quiz');
+  const box = page.locator('#m-screen-grade-swiper .m-pts-input').first();
+  const before = await pointsNow(page);
+  expect(before).not.toBeNull();
+
+  await box.fill('abc');
+  await box.blur();
+  expect(await pointsNow(page)).toBe(before);
+  await expect(box).toHaveValue(String(before));
+
+  await box.fill('3');
+  await box.press('Escape');
+  expect(await pointsNow(page)).toBe(before);
+  await expect(box).toHaveValue(String(before));
+
+  await box.fill('');
+  await box.blur();
+  expect(await pointsNow(page)).toBeNull();
+  const toast = page.locator('#m-toast');
+  await expect(toast).toContainText('Score cleared');
+  await toast.locator('[data-action="m-toast-undo"]').click();
+  expect(await pointsNow(page)).toBe(before);
+  await expect(box).toHaveValue(String(before));
+});

@@ -1675,7 +1675,9 @@ window.MGrade = (function () {
       selectOnUp = null;
     });
     swiper.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && e.target.classList.contains('m-pts-input')) e.target.blur();
+      if (!e.target.classList.contains('m-pts-input')) return;
+      if (e.key === 'Escape') e.target.dataset.revert = '1';
+      if (e.key === 'Enter' || e.key === 'Escape') e.target.blur();
     });
     // The % follows the typing, as on the desktop.
     swiper.addEventListener('input', function (e) {
@@ -1842,13 +1844,30 @@ window.MGrade = (function () {
     var sid = inp.dataset.sid;
     var aid = inp.dataset.aid;
     var max = parseFloat(inp.dataset.max) || 100;
-    var raw = parsePointsInput(inp.value, max, getPointsScore(cid, sid, aid));
+    var prev = getPointsScore(cid, sid, aid);
+    // Escape puts the saved score back without saving.
+    var raw = inp.dataset.revert ? prev : parsePointsInput(inp.value, max, prev);
+    delete inp.dataset.revert;
     inp.value = raw != null ? formatPoints(raw) : '';
     _updatePointsPct(sid, aid, raw, max);
-    if (raw === getPointsScore(cid, sid, aid)) return;
+    if (raw === prev) return;
     setPointsScore(cid, sid, aid, raw);
     clearProfCache();
     _updateThumbGraded(cid, aid);
+    // Emptying the box clears the score; Undo puts it back, as a level does.
+    if (raw == null && prev != null) {
+      MC.showToast('Score cleared', {
+        onUndo: function () {
+          setPointsScore(cid, sid, aid, prev);
+          clearProfCache();
+          var box = document.getElementById(inp.id) || inp;
+          box.value = formatPoints(prev);
+          _updatePointsPct(sid, aid, prev, max);
+          _updateThumbGraded(cid, aid);
+        },
+        duration: 5000,
+      });
+    }
   }
 
   /* ── Press and hold a level (Nov 2 mockup, batch 2) ──────────────
