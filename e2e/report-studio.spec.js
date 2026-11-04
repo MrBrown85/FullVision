@@ -477,10 +477,14 @@ test.describe('Page Studio', () => {
       'teacher-narrative',
       'missing-work/half',
     ]);
+    // The Back has no room left for the Legend with the Response measured
+    // as it prints (step 4 group 2 #5): take the Self-Assessment off first.
+    await cellOf(page, 'self-assessment').click();
+    await bar(page).getByRole('button', { name: 'Remove' }).click();
     await cellOf(page, 'legend').click();
     await bar(page).getByRole('button', { name: 'Move to Back' }).click();
-    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'grade-table', 'legend', 'parent-response']);
-    await expect(page.locator('#studio-live')).toHaveText('Proficiency Legend, Back, row 3 of 4.');
+    expect(await rowsOf(page, 1)).toEqual(['grade-table', 'legend', 'parent-response']);
+    await expect(page.locator('#studio-live')).toHaveText('Proficiency Legend, Back, row 2 of 3.');
     await cellOf(page, 'legend').click();
     await expect(bar(page)).toContainText('On the Back');
     await expect(bar(page).getByRole('button', { name: 'Move to Front' })).toBeVisible();
@@ -565,6 +569,20 @@ test.describe('Page Studio', () => {
     await applyTemplate(page, 'interim-update');
     await expect(page.locator('#studio-fit')).toHaveText('Front only · 1 page for all 27 students');
     await expect(page.locator('.sheet-label').nth(1)).toHaveText('Blank');
+  });
+
+  test('the docked Response is measured as it prints, so under Front Only it never runs past the foot (step 4 group 2 #5)', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    await page.getByRole('radio', { name: 'Front Only' }).click();
+    await showAllStudents(page);
+    const pinned = await page
+      .locator('.sheet-pinned')
+      .evaluateAll(rows => rows.map(r => r.offsetHeight - parseFloat(r.style.minHeight)));
+    expect(pinned.length).toBeGreaterThan(0);
+    expect(pinned.filter(d => Math.abs(d) > 1)).toEqual([]);
+    expect(await overflowing(page)).toEqual([]);
   });
 
   test('the Conference Pack’s grade table does not fit its side: it continues for every student', async ({ page }) => {
@@ -920,6 +938,8 @@ test.describe('Page Studio', () => {
     const empty = page.locator('.studio-page-empty');
     await expect(empty).toHaveText('Empty · Remove');
     await expect(empty).toHaveCount(1);
+    await cellOf(page, 'self-assessment').click();
+    await bar(page).getByRole('button', { name: 'Remove' }).click();
     await cellOf(page, 'legend').click();
     await bar(page).getByRole('button', { name: 'Move to Back' }).click();
     expect(await rowsOf(page, 1)).toContain('legend');

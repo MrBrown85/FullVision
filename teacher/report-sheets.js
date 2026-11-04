@@ -1498,8 +1498,14 @@ window.ReportSheets = (function () {
     // html-safe: block ids are BLOCKS keys (_cleanCell); widths are numbers; c.html is _cellHtml, a ReportBlocks.renderReportBlock render
     stage.innerHTML = cells
       .map(function (c) {
+        // The cell's classes as the sheet prints it (_cellTag): a fill
+        // block lays out as a column there, so its margins don't collapse,
+        // and a Response measured without it came out 16 px short and ran
+        // past the foot of its side (step 4 group 2 #5).
         return (
-          '<div class="sheet-cell" data-block="' +
+          '<div class="sheet-cell' +
+          ((BLOCKS[c.cell.block] || {}).fill ? ' sheet-fill' : '') +
+          '" data-block="' +
           c.cell.block +
           '" style="width:' +
           cellWidth(c.size) +
