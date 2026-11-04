@@ -434,7 +434,8 @@ test.describe('checks and approval', () => {
     // The missing-work sentence is ringed inside the comment (the LayoutE mockup).
     await expect(page.locator('#tq-marks .qn-mark.missing')).toContainText(title);
     await expect(row.locator('.qn-req-source').last()).toHaveText(
-      '1 of 22 · check that it is really missing before you approve',
+      // Of the year's work to Report 2's end (Colin, 2026-11-03), not Term 2's alone.
+      '1 of 37 · check that it is really missing before you approve',
     );
     const approve = page.locator('#tq-approve-next');
     await expect(approve).toBeDisabled();
@@ -445,7 +446,7 @@ test.describe('checks and approval', () => {
     await row.locator('[data-tq-check="missing"]').check();
     await expect(row).not.toHaveClass(/flag/);
     await expect(row.locator('.qn-req-ctrl')).toHaveClass(/on/);
-    await expect(row.locator('.qn-req-source').last()).toHaveText('1 of 22 · checked');
+    await expect(row.locator('.qn-req-source').last()).toHaveText('1 of 37 · checked');
     await expect(approve).toBeEnabled();
     // A sentence over 20 words: the count turns orange and says so;
     // Approve and Next stays on.

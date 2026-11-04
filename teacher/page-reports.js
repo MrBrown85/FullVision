@@ -275,12 +275,15 @@ window.PageReports = (function () {
   }
 
   /* ── Main render ─────────────────────────────────────────────── */
-  /* A report for Report N shows the grades of reporting term N when the
-     class has one (docs/DECISIONS.md, "Reporting periods"); otherwise all
-     time. This never changes the term chosen on the other pages. */
+  /* A report for Report N shows the grades as of reporting term N's end,
+     the year to date (docs/DECISIONS.md, "Reporting periods" 2), when the
+     class has that term; otherwise all time. The other pages always show
+     the year so far. When the report changes, the roster is drawn again so
+     its grades and its "Grades to" note follow the report. */
   function _applyReportTerm() {
     if (typeof setActiveTerm !== 'function') return;
     const cid = activeCourse;
+    const before = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
     const period = (document.getElementById('report-period')?.value || '').match(/Report\s+(\d+)/i);
     const n = period ? Number(period[1]) : null;
     const has =
@@ -289,7 +292,12 @@ window.PageReports = (function () {
       getReportingTerms(cid).some(function (t) {
         return t.ordinal === n;
       });
-    setActiveTerm(cid, has ? n : null);
+    const after = setActiveTerm(cid, has ? n : null);
+    const mount = document.getElementById('sidebar-mount');
+    if ((before ? before.ordinal : null) !== (after ? after.ordinal : null) && mount && mount.innerHTML) {
+      _restoreSidebarBadges();
+      mount.innerHTML = renderSidebar(cid, null);
+    }
   }
 
   /* The report picker lists the class's reporting terms. A class on a
