@@ -182,8 +182,10 @@ describe('scoreStatusMarker tooltip', () => {
     expect(scoreStatusMarker('NS', CID, pts)).toContain('no evidence yet, 0 in the Class Average');
     expect(scoreStatusMarker('NS', CID, prof)).toContain('not counted, no evidence yet');
     COURSES[CID].gradingSystem = 'letter';
-    expect(scoreStatusMarker('NS', CID, pts)).toContain('counts as 0');
-    expect(scoreStatusMarker('NS', CID, prof)).toContain('counts as 0');
+    expect(scoreStatusMarker('NS', CID, pts)).toContain('title="Missing: counts as 0"');
+    expect(scoreStatusMarker('NS', CID, prof)).toContain(
+      'title="Missing: counts as 0 in the % and averages, not in competency proficiency"',
+    );
     COURSES[CID].gradingSystem = 'both';
     expect(scoreStatusMarker('NS', CID, pts)).toContain('0 in the course %, not counted in proficiency');
     expect(scoreStatusMarker('NS', CID, prof)).toContain('0 in the course %, not counted in proficiency');
