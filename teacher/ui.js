@@ -328,12 +328,10 @@ function _getQueueStats() {
 
 // Sync shows only as the dot: no count, popover or list of failed writes
 // (Oct 2026). Teachers found the number confusing; the dot's colour and
-// tooltip say all they need.
+// tooltip say all they need, and the tooltip carries no count either.
 function refreshSyncStatusUI() {
   var stats = _getQueueStats();
-  var total = stats.queued;
   var banner = document.getElementById('offline-banner');
-  var dot = document.getElementById('sync-indicator-dot');
   var body = document.body;
 
   if (banner) {
@@ -343,30 +341,9 @@ function refreshSyncStatusUI() {
     body.classList.toggle('offline-active', !stats.online);
   }
 
-  if (dot) {
-    var dotStatus = 'idle';
-    var dotTitle = 'All changes saved';
-    var saveProblem = typeof getSaveProblem === 'function' ? getSaveProblem() : null;
-    if (saveProblem) {
-      dotStatus = 'error';
-      dotTitle = saveProblem;
-    } else if (stats.deadLettered > 0) {
-      dotStatus = 'error';
-      dotTitle = "Some changes couldn't be saved";
-    } else if (stats.signedOut && stats.queued > 0) {
-      dotStatus = 'error';
-      dotTitle = 'Signed out — changes are waiting until you sign in';
-    } else if (!stats.online && total > 0) {
-      dotStatus = 'error';
-      dotTitle = total === 1 ? 'Offline — 1 change queued' : 'Offline — ' + total + ' changes queued';
-    } else if (stats.flushing || (stats.online && stats.queued > 0)) {
-      dotStatus = 'syncing';
-      dotTitle = stats.queued === 1 ? 'Syncing 1 queued change' : 'Syncing ' + stats.queued + ' queued changes';
-    }
-    dot.className = 'tb-sync-dot ' + dotStatus;
-    dot.title = dotTitle;
-    dot.setAttribute('aria-label', dotTitle);
-  }
+  // The dot is drawn in one place (shared/data.js getSyncDotState), so the
+  // phone and desktop agree and two painters can't contradict each other.
+  if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
 }
 
 function _ensureSyncStatusUI() {

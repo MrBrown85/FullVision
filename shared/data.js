@@ -323,27 +323,42 @@ function _withTimeout(promise, ms, label) {
   );
 }
 
+/* The sync dot's state: the one place sync shows (DECISIONS, "Product
+   shape"), with no count of changes. Desktop and phone both draw the dot from
+   here. With the outbox loaded, its queue (shared by every tab) is the whole
+   story: a change is saving while it is queued, and saved once it leaves.
+   Counting this tab's own pending promises as well left the dot on
+   "Syncing..." with an empty queue when one never settled, and a second
+   painter flipped it to "All changes saved" with changes still queued. */
+function getSyncDotState() {
+  var problem = getSaveProblem();
+  if (problem) return { status: 'error', title: problem };
+  if (_syncStatus === 'degraded') return { status: 'error', title: 'Cloud sync paused — saving on this device' };
+  var q = typeof window !== 'undefined' ? window.v2Queue : null;
+  if (q && typeof q.stats === 'function') {
+    var stats = q.stats() || {};
+    var queued = Number(stats.queued || 0);
+    var online = stats.online !== false && !(typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (Number(stats.deadLettered || 0) > 0) return { status: 'error', title: "Some changes couldn't be saved" };
+    if (stats.signedOut && queued > 0)
+      return { status: 'error', title: 'Signed out — changes are waiting until you sign in' };
+    if (!online && queued > 0) return { status: 'error', title: 'Offline — changes are saved on this device' };
+    if (queued > 0) return { status: 'syncing', title: 'Syncing...' };
+    return { status: 'idle', title: 'All changes saved' };
+  }
+  if (_pendingSyncs > 0) return { status: 'syncing', title: 'Syncing...' };
+  return { status: 'idle', title: 'All changes saved' };
+}
+window.getSyncDotState = getSyncDotState;
+
 function _updateSyncIndicator() {
+  if (typeof document === 'undefined' || !document.getElementById) return;
   const dot = document.getElementById('sync-indicator-dot');
   if (!dot) return;
-  const problem = getSaveProblem();
-  if (problem) {
-    dot.className = 'tb-sync-dot error';
-    dot.title = problem;
-    return;
-  }
-  const s = getSyncStatus();
-  // Degraded mode reuses the 'error' visual but conveys a different message.
-  var visual = s.status === 'degraded' ? 'error' : s.status;
-  dot.className = 'tb-sync-dot ' + visual;
-  dot.title =
-    s.status === 'idle'
-      ? 'All changes saved'
-      : s.status === 'syncing'
-        ? 'Syncing...'
-        : s.status === 'degraded'
-          ? 'Cloud sync paused — saving locally'
-          : 'Sync error — changes saved locally';
+  var state = getSyncDotState();
+  dot.className = 'tb-sync-dot ' + state.status;
+  dot.title = state.title;
+  if (typeof dot.setAttribute === 'function') dot.setAttribute('aria-label', state.title);
 }
 
 function isSupabaseDegraded() {
@@ -2732,6 +2747,8 @@ function _onCreateAbandoned(entryId, failed, error) {
 }
 
 function _onOutboxEvent(evt) {
+  // The phone has no other listener on the queue; keep its dot current.
+  _updateSyncIndicator();
   var meta = evt && evt.meta;
   if (!meta) return;
   if (evt.kind === 'coalesce') {
