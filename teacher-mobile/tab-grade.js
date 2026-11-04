@@ -220,8 +220,7 @@ window.MGrade = (function () {
           '</span>' +
           '<span>' +
           tagCount +
-          ' tag' +
-          (tagCount !== 1 ? 's' : '') +
+          (tagCount !== 1 ? ' competencies' : ' competency') +
           '</span>' +
           '<span>' +
           gradedCount +
@@ -625,7 +624,7 @@ window.MGrade = (function () {
               ', ' +
               name +
               '">' +
-              (val === 'NS' ? 'M' : val) +
+              label +
               '</button>'
             );
           };
@@ -939,6 +938,10 @@ window.MGrade = (function () {
             assessment.id +
             '" data-tid="' +
             tid +
+            '" aria-label="' +
+            level +
+            ', ' +
+            PROF_LABELS[level] +
             '">' +
             level +
             '</button>';
@@ -1032,7 +1035,7 @@ window.MGrade = (function () {
       assessment.id +
       '"' +
       (canSetAssignmentStatus(cid, st.id, assessment.id, 'NS') ? '' : ' disabled') +
-      '>M</button>' +
+      '>Missing</button>' +
       '<button class="m-status-pill' +
       (status === 'EXC' ? ' m-status-active' : '') +
       '" data-action="m-grade-status" data-val="EXC" data-sid="' +
@@ -1041,18 +1044,39 @@ window.MGrade = (function () {
       assessment.id +
       '"' +
       (canSetAssignmentStatus(cid, st.id, assessment.id, 'EXC') ? '' : ' disabled') +
-      '>EXC</button>' +
+      '>Excused</button>' +
       '<button class="m-status-pill' +
       (status === 'LATE' ? ' m-status-active' : '') +
       '" data-action="m-grade-status" data-val="LATE" data-sid="' +
       st.id +
       '" data-aid="' +
       assessment.id +
-      '">LATE</button>' +
-      '</div>';
+      '">Late</button>' +
+      '</div>' +
+      // Why Missing and Excused can't be picked, where they can't.
+      '<div class="m-status-hint" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      assessment.id +
+      '"' +
+      (canSetAssignmentStatus(cid, st.id, assessment.id, 'NS') ? ' hidden' : '') +
+      '>Clear the score and comment to mark Missing or Excused.</div>';
 
     // A group's members each have their own status, in the list above.
     if (unit && unit.view) statusRow = '';
+
+    // What the level numbers mean, in the class's order.
+    var levelKey = '';
+    if (rubric || /m-score-btns/.test(tagGroups)) {
+      levelKey =
+        '<div class="m-level-key">' +
+        levelOrderFor(cid)
+          .map(function (lv) {
+            return '<span><b>' + lv + '</b> ' + MC.esc(PROF_LABELS[lv]) + '</span>';
+          })
+          .join('') +
+        '</div>';
+    }
 
     // The Overall Comment: the one feedback box on the work, as on the
     // desktop (score.comment; it prints on the rubric handout).
@@ -1084,6 +1108,7 @@ window.MGrade = (function () {
       '">' +
       header +
       tagGroups +
+      levelKey +
       statusRow +
       commentRow +
       '</div></div>'
@@ -1169,7 +1194,10 @@ window.MGrade = (function () {
       assessment.id +
       '" aria-pressed="' +
       rubricOn +
-      '">Rubric</button></div></div>'
+      '">Rubric</button></div>' +
+      '<div class="m-grade-view-hint">' +
+      (rubricOn ? 'One score for each rubric criterion.' : 'One score for each competency the work assesses.') +
+      '</div></div>'
     );
   }
 
@@ -1232,6 +1260,10 @@ window.MGrade = (function () {
         assessment.id +
         '" data-critid="' +
         crit.id +
+        '" aria-label="' +
+        level +
+        ', ' +
+        PROF_LABELS[level] +
         '">' +
         level +
         '</button>';
@@ -1371,6 +1403,10 @@ window.MGrade = (function () {
       var on = btn.getAttribute('data-view') === view;
       btn.classList.toggle('m-seg-active', on);
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('.m-grade-view-hint').forEach(function (hint) {
+      hint.textContent =
+        view === 'tags' ? 'One score for each competency the work assesses.' : 'One score for each rubric criterion.';
     });
     var assessment = getAssessments(cid).find(function (a) {
       return a.id === aid;
@@ -1780,6 +1816,9 @@ window.MGrade = (function () {
     // A score just changed: M and EXC grey out once the work has one.
     document.querySelectorAll('.m-status-pill[data-aid="' + aid + '"]').forEach(function (pill) {
       pill.disabled = !canSetAssignmentStatus(cid, pill.dataset.sid, aid, pill.dataset.val);
+    });
+    document.querySelectorAll('.m-status-hint[data-aid="' + aid + '"]').forEach(function (hint) {
+      hint.hidden = canSetAssignmentStatus(cid, hint.dataset.sid, aid, 'NS');
     });
     var allScores = getScores(cid);
     var assessment = getAssessments(cid).find(function (a) {

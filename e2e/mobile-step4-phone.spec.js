@@ -203,3 +203,56 @@ test('the open tab icon keeps its check mark', async ({ page }) => {
     expect(colours.mark).not.toBe(colours.fill);
   }
 });
+
+// Group 3 #21: the Grade tab uses the desktop's words: competencies, not
+// tags; Missing, Excused and Late spelled out; the level numbers named;
+// Excused grey, not Missing's red; and the two Score By views say how they
+// differ.
+test('Grade tab uses the desktop words', async ({ page }) => {
+  await openPhone(page);
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('[data-action="m-grade-seg"][data-val="all"]').click();
+  const subs = await page.locator('#m-grade-list .m-cell-subtitle').allTextContents();
+  expect(subs.join(' ')).toMatch(/competenc/);
+  expect(subs.join(' ')).not.toMatch(/\btags?\b/);
+
+  // A level-scored assessment with no score for the first student.
+  const title = await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const a = getAssessments(cid).find(x => !isPointsScored(x) && !isCompletionScored(x) && !x.rubricId);
+    return a.title;
+  });
+  await page.locator('[data-action="m-grade-assess"]', { hasText: title }).first().click();
+  await expect(page.locator('#m-screen-grade-swiper')).toBeVisible();
+  await page.waitForTimeout(500);
+  const card = page.locator('.m-swiper-card').first();
+  await expect(card.locator('.m-status-pill')).toHaveText(['Missing', 'Excused', 'Late']);
+  await expect(card.locator('.m-level-key')).toContainText('Proficient');
+  await expect(card.locator('.m-score-btn[data-score="3"]').first()).toHaveAttribute('aria-label', '3, Proficient');
+
+  // Each card's hint shows exactly when Missing can't be picked.
+  const hints = await page.evaluate(() =>
+    [...document.querySelectorAll('.m-swiper-card')].map(c => {
+      const ns = c.querySelector('.m-status-pill[data-val="NS"]');
+      const hint = c.querySelector('.m-status-hint');
+      return ns && hint ? ns.disabled === !hint.hidden : true;
+    }),
+  );
+  expect(hints.every(Boolean)).toBe(true);
+
+  // Excused, chosen, is grey like the desktop grader, not Missing's red.
+  const [excBg, nsBg] = await page.evaluate(() => {
+    const row = document.querySelector('.m-swiper-card .m-status-row');
+    const probe = val => {
+      const b = document.createElement('button');
+      b.className = 'm-status-pill m-status-active';
+      b.dataset.val = val;
+      row.appendChild(b);
+      const bg = getComputedStyle(b).backgroundColor;
+      b.remove();
+      return bg;
+    };
+    return [probe('EXC'), probe('NS')];
+  });
+  expect(excBg).not.toBe(nsBg);
+});
