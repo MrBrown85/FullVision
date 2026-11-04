@@ -147,6 +147,8 @@ window.PageStudent = (function () {
   function editReflection(secId) {
     document.getElementById('refl-edit-' + secId).style.display = '';
     document.getElementById('refl-text-' + secId).style.display = 'none';
+    // Typing goes straight into the box, as it does for + Goal.
+    document.getElementById('refl-input-' + secId).focus();
   }
   function cancelReflEdit(secId) {
     document.getElementById('refl-edit-' + secId).style.display = 'none';
