@@ -22,7 +22,6 @@ export function mount(seed, params = {}) {
   doc.createElement = tag => {
     const el = make(tag);
     if (tag === 'canvas') el.getContext = () => ({ measureText: () => ({ width: 50 }) });
-    if (tag === 'input' && !el.select) el.select = () => {};
     return el;
   };
   // linkedom draws no layout: scrolling into view does nothing.
@@ -41,12 +40,14 @@ export function mount(seed, params = {}) {
 }
 
 /* linkedom keeps no focus: focus() and blur() set document.activeElement
-   (the body when nothing, or a removed element, has it) and send blur with
-   its relatedTarget, as a browser does. */
+   (the body when nothing, or a removed element, has it) and send blur and
+   focusout, then focus and focusin, with their relatedTarget, as a browser
+   does. linkedom has no capture phase, so blur and focus bubble here to
+   reach the pages' capturing document listeners. */
 function trackFocus(doc, proto) {
   let active = null;
-  const sendBlur = (el, related) => {
-    const e = new doc.defaultView.Event('blur', { bubbles: false, cancelable: false });
+  const send = (el, type, related) => {
+    const e = new doc.defaultView.Event(type, { bubbles: true, cancelable: false });
     e.relatedTarget = related;
     el.dispatchEvent(e);
   };
@@ -58,14 +59,23 @@ function trackFocus(doc, proto) {
     if (active === this) return;
     const prev = active;
     active = null;
-    if (prev && prev.isConnected) sendBlur(prev, this);
+    if (prev && prev.isConnected) {
+      send(prev, 'blur', this);
+      send(prev, 'focusout', this);
+    }
     active = this;
+    if (this.isConnected) {
+      send(this, 'focus', prev);
+      send(this, 'focusin', prev);
+    }
   };
   proto.blur = function () {
     if (active !== this) return;
     active = null;
-    sendBlur(this, null);
+    send(this, 'blur', null);
+    send(this, 'focusout', null);
   };
+  if (!proto.select) proto.select = function () {};
 }
 
 export function unmount() {

@@ -10735,7 +10735,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (el.dataset.actionBlur === 'graderPoints') {
-      _graderCommitPoints(el);
+      _graderCommitPoints(el, e.relatedTarget);
       return;
     }
     if (el.dataset.actionBlur === 'graderCritNote') {
@@ -12214,7 +12214,7 @@ window.PageAssignments = (function () {
   // Saves typed points the way the Assignments ledger does: blank clears, a
   // typed 0 is a score, a typo puts the saved score back, leaving an
   // unchanged box saves nothing.
-  function _graderCommitPoints(inp) {
+  function _graderCommitPoints(inp, next) {
     var aid = _graderAid(inp);
     if (!aid || !focusStudentId) return;
     var cid = activeCourse;
@@ -12230,7 +12230,21 @@ window.PageAssignments = (function () {
     // points.
     setPointsScore(cid, focusStudentId, aid, raw);
     refreshSidebarGrades(focusStudentId);
+    var nextId = next && _grader && _grader.overlay.contains(next) ? next.id : '';
     render();
+    // The redraw replaced the control Tab (or a click) was moving to, such
+    // as Overall Comment, so focus would fall to the page: give it to the
+    // new one.
+    if (nextId) {
+      var refocus = function () {
+        var active = document.activeElement;
+        if (active && active !== document.body && active.isConnected) return;
+        var again = document.getElementById(nextId);
+        if (again && _grader && _grader.overlay.contains(again)) again.focus({ preventScroll: true });
+      };
+      refocus();
+      setTimeout(refocus, 0);
+    }
   }
   // A redraw keeps keyboard scoring on the same card.
   function _focusGraderCard(aid, selector) {
