@@ -525,6 +525,22 @@ body.fv-switching-course::after {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* A student's name gives way before its badges do. */
+.m-cell-title.m-student-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.m-student-title-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-student-title .m-badge {
+  flex-shrink: 0;
+}
 /* A Grade list title wraps to two lines before it is cut. */
 .m-cell-title.m-grade-title {
   white-space: normal;

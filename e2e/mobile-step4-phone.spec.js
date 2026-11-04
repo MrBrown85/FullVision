@@ -165,3 +165,22 @@ test('Grade list titles are not cut by the category', async ({ page }) => {
   );
   expect(cut).toEqual([]);
 });
+
+// Group 2 #39: a long name is cut before its IEP badge is.
+test('All Students keeps the IEP badge in view on a long name', async ({ page }) => {
+  await openPhone(page);
+  const sid = await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const st = getStudents(cid)[0];
+    st.designations = ['G'];
+    st.preferred = 'Maximiliano-Bartholomew Alexandrovich';
+    return st.id;
+  });
+  await page.locator('[data-action="m-all-students"]').click();
+  const cell = page.locator('#m-student-list .m-cell[data-sid="' + sid + '"]');
+  await cell.scrollIntoViewIfNeeded();
+  const badge = cell.locator('.m-badge-iep');
+  await expect(badge).toBeVisible();
+  const [b, c] = await Promise.all([badge.boundingBox(), cell.locator('.m-cell-body').boundingBox()]);
+  expect(b.x + b.width).toBeLessThanOrEqual(c.x + c.width + 0.5);
+});

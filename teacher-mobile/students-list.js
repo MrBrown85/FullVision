@@ -68,8 +68,10 @@ window.MStudentsList = (function () {
         missingDot +
         '</div>' +
         '<div class="m-cell-body">' +
-        '<div class="m-cell-title">' +
+        // A long name is cut, never the IEP, MOD or ELL badge after it.
+        '<div class="m-cell-title m-student-title"><span class="m-student-title-name">' +
         MC.esc(name) +
+        '</span>' +
         badges +
         '</div>' +
         (subtitle ? '<div class="m-cell-subtitle">' + subtitle + '</div>' : '') +
