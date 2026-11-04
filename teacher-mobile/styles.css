@@ -349,6 +349,21 @@ body.fv-switching-course::after {
 #m-nav-bar-grade-swiper .m-nav-bar-title-inline {
   opacity: 1;
 }
+/* The open class's name at the left of each tab's first screen. */
+.m-nav-bar-class {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.m-nav-bar-class-name {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .m-nav-bar-actions {
   display: flex;
   align-items: center;

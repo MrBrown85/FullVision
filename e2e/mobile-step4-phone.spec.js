@@ -42,3 +42,14 @@ test('grading screen shows a visible sync dot', async ({ page }) => {
   expect(box.width).toBeGreaterThan(4);
   await expect(dot).toHaveAttribute('title', /.+/);
 });
+
+// Group 2 #33: each tab's first screen names the open class.
+test('every tab names the open class', async ({ page }) => {
+  await openPhone(page);
+  await expect(page.locator('#m-nav-bar-students-list .m-nav-bar-class')).toHaveText('Science 8');
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await expect(page.locator('#m-nav-bar-grade-picker .m-nav-bar-class')).toBeVisible();
+  await expect(page.locator('#m-nav-bar-grade-picker .m-nav-bar-class')).toHaveText('Science 8');
+  await page.locator('.m-tab-item[data-tab="observe"]').click();
+  await expect(page.locator('#m-nav-bar-obs-feed .m-nav-bar-class')).toHaveText('Science 8');
+});

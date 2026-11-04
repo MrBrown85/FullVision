@@ -124,6 +124,7 @@ window.MGrade = (function () {
       id: 'grade-picker',
       title: 'Grade',
       compact: true,
+      classId: cid,
       rightHTML:
         '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
         '<button class="m-nav-bar-action" data-action="m-settings" title="Settings">' +

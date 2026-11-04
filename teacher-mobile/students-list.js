@@ -91,6 +91,7 @@ window.MStudentsList = (function () {
     var nav = MC.navBar({
       id: 'students-list',
       title: 'Students',
+      classId: cid,
       rightHTML:
         '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
         '<button class="m-nav-bar-action" data-action="m-sort" title="Sort">' +

@@ -39,6 +39,8 @@ window.MComponents = (function () {
         _esc(opts.backLabel) +
         '</span></button>';
     }
+    // `classId`: a tab's first screen names the open class at the left.
+    if (!back && opts.classId) back = classLabelHTML(opts.classId);
     var actions = '';
     if (opts.rightHTML) {
       actions = '<div class="m-nav-bar-actions">' + opts.rightHTML + '</div>';
@@ -61,6 +63,16 @@ window.MComponents = (function () {
       '</h1>' +
       actions +
       '</div></div>'
+    );
+  }
+
+  // The open class's name, so a teacher always knows which class they are in.
+  function classLabelHTML(cid) {
+    var course = (typeof COURSES !== 'undefined' && cid && COURSES[cid]) || null;
+    var name = course && course.name ? course.name : '';
+    if (!name) return '';
+    return (
+      '<div class="m-nav-bar-class" title="' + _esc(name) + '">' + '<span class="m-nav-bar-class-name">' + _esc(name) + '</span></div>'
     );
   }
 
