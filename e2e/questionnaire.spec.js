@@ -191,8 +191,9 @@ test('the roster marks survive a sidebar redraw; arrows move without approving a
   await page.locator('.report-seg-btn[data-tab="progress"]').click();
   await expect(page.locator('#gb-sidebar .student-row-note')).toHaveCount(0);
   await expect(page.locator('#gb-sidebar-extra')).toHaveCount(0);
-  // Cece's Report Card runs to two sheets, so her row shows that instead.
-  await expect(row(noor).locator('.student-row-prof').first()).toBeVisible();
+  // Every Demo student's Report Card runs to two sheets, and each row
+  // says so, as the fit line does (step 4 group 2 #9).
+  await expect(row(noor).locator('.student-row-sheets')).toHaveText('2 sheets');
 });
 
 test('Generate Comment drafts from the bank; the box grows, the count follows, ⌘Z brings the old text back', async ({
