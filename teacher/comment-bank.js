@@ -2161,9 +2161,10 @@ window.CommentBank = (function () {
       .map(function (sec) {
         var scores = [];
         (sec.tags || []).forEach(function (tag) {
-          // One point per piece of work: a rubric's criteria on the
-          // competency average into it (calc.js tagScoresByAssessment).
-          tagScoresByAssessment(cid, sid, tag.id).forEach(function (sc) {
+          // One point per piece of work, the competency's mark on it as the
+          // gradebook shows it: rubric criteria that disagree give the
+          // lowest (calc.js tagMarksByAssessment; Colin, 2026-11-03).
+          tagMarksByAssessment(cid, sid, tag.id).forEach(function (sc) {
             var a = byId[sc.assessmentId];
             if (!(sc.score > 0) || !inTerm(a) || !dateOf(a)) return;
             scores.push({ id: a.id, v: Number(sc.score), d: dateOf(a), title: a.title || '' });

@@ -631,14 +631,17 @@ window.ReportBlocks = (function () {
     return sorted[0];
   }
   /* A section's scored work, in date order: [{ a, d, score }], the highest
-     mark per assessment. */
+     mark per assessment. Each mark is the competency's on the piece, as the
+     gradebook shows it: rubric criteria that disagree give the lowest
+     (Colin, 2026-11-03). Progress in One Area, Next Steps and Ways to
+     Support at Home read it. */
   function _sectionWork(cid, sid, sec) {
     const byId = {};
     getAssessments(cid).forEach(a => (byId[a.id] = a));
     const best = {};
     (sec.tags || []).forEach(tag => {
-      // One point per piece of work on each competency (tagScoresByAssessment).
-      tagScoresByAssessment(cid, sid, tag.id).forEach(sc => {
+      // One mark per piece of work on each competency (tagMarksByAssessment).
+      tagMarksByAssessment(cid, sid, tag.id).forEach(sc => {
         if (!(sc.score > 0) || !byId[sc.assessmentId]) return;
         if (!best[sc.assessmentId] || sc.score > best[sc.assessmentId]) best[sc.assessmentId] = sc.score;
       });
