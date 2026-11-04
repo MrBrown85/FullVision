@@ -1395,12 +1395,15 @@ window.ReportQuestionnaire = (function () {
     }).length;
   }
 
+  /* The strip's five segments. On the card each opens the drawer on its
+     type; in the drawer (`on`, the chosen type) each filters the list. */
   // html-safe: counts are numbers, type keys and labels are OBS_SENTIMENTS' own, labels esc()'d
   function _obsStripHtml(counts, on) {
+    var inDrawer = on != null;
     return _obsTypes()
       .map(function (t) {
         var chosen = on === t.key;
-        return `<button type="button" class="qno-seg${chosen ? ' on' : ''}" data-sentiment="${t.key}" data-action="tqOpenObs" data-filter="${t.key}"${on != null ? ` aria-pressed="${chosen}"` : ` title="${esc(t.title)}"`}><span class="qno-seg-n">${counts[t.key] || 0}</span><span class="qno-seg-word">${esc(t.label)}</span></button>`;
+        return `<button type="button" class="qno-seg${chosen ? ' on' : ''}" data-sentiment="${t.key}" data-action="${inDrawer ? 'tqObsFilter' : 'tqOpenObs'}" data-filter="${t.key}"${inDrawer ? ` aria-pressed="${chosen}"` : ` title="${esc(t.title)}"`}><span class="qno-seg-n">${counts[t.key] || 0}</span><span class="qno-seg-word">${esc(t.label)}</span></button>`;
       })
       .join('');
   }
@@ -7788,10 +7791,217 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
+  /* The Observations drawer (step 5): every observation so far this year
+     under month headings that stay in view, newest first, with the strip
+     as a type filter and a search box. Filtering hides rows in place
+     (_syncObsList), so the search box keeps its focus. _obsIndex holds the
+     drawn rows and what each one is searched by. */
+  var _obsIndex = null; // { list: [{ ob, day, month, hay }], endsOn }
+
+  /* What a row is searched by: its text, tags, linked work, context and type. */
+  function _obsHay(ob, ctx) {
+    var p = ObsCard.parts(ob, ctx);
+    var type = ob.sentiment && OBS_SENTIMENTS[ob.sentiment] ? OBS_SENTIMENTS[ob.sentiment].label : '';
+    return [ob.text || '', p.assessment, p.context, type]
+      .concat(
+        (ob.dims || []).map(function (t) {
+          return resolveTag(t).label;
+        }),
+      )
+      .join(' ')
+      .toLowerCase();
+  }
+
+  /* Which rows the type and the search show, where the report's line goes
+     (before the newest one shown dated on or before the report's last day),
+     and the counts. */
+  function _obsView() {
+    var d = _drawer || {};
+    var q = String(d.q || '')
+      .trim()
+      .toLowerCase();
+    var shown = {};
+    var n = 0;
+    var cp = null;
+    var months = {};
+    (_obsIndex ? _obsIndex.list : []).forEach(function (x) {
+      var ok = (!d.filter || d.filter === 'all' || x.ob.sentiment === d.filter) && (!q || x.hay.indexOf(q) >= 0);
+      if (!ok) return;
+      shown[x.ob.id] = true;
+      n++;
+      months[x.month] = (months[x.month] || 0) + 1;
+      if (!cp && _obsIndex.endsOn && x.day <= _obsIndex.endsOn) cp = x.ob.id;
+    });
+    return {
+      shown: shown,
+      n: n,
+      total: _obsIndex ? _obsIndex.list.length : 0,
+      months: months,
+      cp: cp,
+      filtering: (d.filter && d.filter !== 'all') || !!q,
+    };
+  }
+  function _obsCount(n) {
+    return _plural(n, 'observation', 'observations');
+  }
+  function _showingText(v) {
+    return v.filtering ? 'Showing ' + v.n + ' of ' + v.total : '';
+  }
+
+  var SEARCH_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
+
+  // html-safe: cards from ObsCard.html (escapes every value); names, month labels, the report's line and the search text esc()'d; counts are numbers
+  function _obsDrawerHtml(cid, student, f) {
+    var first = student.firstName || displayNameFirst(student);
+    var ctx = ObsCard.context(cid);
+    var list = studentObs(cid, student.id);
+    _obsIndex = {
+      endsOn: f.lastReport ? f.lastReport.endsOn : '',
+      list: list.map(function (ob) {
+        var day = ObsCard.obDay(ob);
+        return { ob: ob, day: day, month: String(day).slice(0, 7), hay: _obsHay(ob, ctx) };
+      }),
+    };
+    var v = _obsView();
+    var cpLine = f.lastReport
+      ? f.lastReport.label +
+        ' report · ' +
+        parseLocalDate(f.lastReport.endsOn).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
+      : '';
+    var groups = [];
+    _obsIndex.list.forEach(function (x) {
+      var g = groups[groups.length - 1];
+      if (!g || g.month !== x.month) groups.push((g = { month: x.month, items: [] }));
+      g.items.push(x);
+    });
+    var body = groups
+      .map(function (g) {
+        var label = parseLocalDate(g.month + '-01').toLocaleDateString('en-CA', { month: 'long', year: 'numeric' });
+        var count = v.months[g.month] || 0;
+        var rows = g.items
+          .map(function (x) {
+            var id = x.ob.id;
+            var open = !!_drawer.expanded[id];
+            return `<div class="qno-item" data-obid="${esc(id)}" data-day="${esc(x.day)}"${v.shown[id] ? '' : ' hidden'}>${
+              v.cp === id ? `<div class="qno-checkpoint"><span>${esc(cpLine)}</span></div>` : ''
+            }${ObsCard.html(x.ob, ctx, {
+              showStudent: false,
+              when: 'day',
+              readOnly: true,
+              action: null,
+              className: open ? 'qno-open' : 'qno-clamp',
+            })}</div>`;
+          })
+          .join('');
+        return `<div class="qno-group" data-month="${esc(g.month)}"${count ? '' : ' hidden'}>
+          <div class="obs-feed-date-label qno-month"><span>${esc(label)}</span><span class="obs-feed-date-count">${_obsCount(count)}</span></div>
+          ${rows}
+        </div>`;
+      })
+      .join('');
+    // With nothing shown before it, the report's line waits hidden, to be
+    // moved in place when a filter shows a row it goes before.
+    if (cpLine && !v.cp) body += `<div class="qno-checkpoint" hidden><span>${esc(cpLine)}</span></div>`;
+    return `<div class="qno-panel" id="${DRAWER_ID}" data-kind="obs" role="dialog" aria-labelledby="tq-drawer-title">
+      <div class="qno-panel-head">
+        <div class="qno-panel-titles">
+          <span class="qno-panel-title" id="tq-drawer-title">${esc(first)}’s Observations</span>
+          <span class="qn-sub">${list.length} so far this year · newest first</span>
+        </div>
+        <button type="button" class="qno-close" data-action="tqCloseDrawer" title="Close (Esc)" aria-label="Close observations">✕</button>
+      </div>
+      <div class="qno-strip qno-strip-panel" role="group" aria-label="Show one type">${_obsStripHtml(obsCounts(list), _drawer.filter || 'all')}</div>
+      <div class="qno-search">
+        <div class="obs-search-wrap"><span class="obs-search-icon">${SEARCH_SVG}</span><input class="obs-search-input" id="tq-obs-search" type="text" placeholder="Search text, tags or work" aria-label="Search ${esc(first)}’s observations" value="${esc(_drawer.q || '')}" autocomplete="off"></div>
+        <span class="qno-showing" id="tq-obs-showing">${esc(_showingText(v))}</span>
+      </div>
+      <div class="qno-panel-list" id="tq-obs-list">
+        ${body}
+        <div class="qno-empty qno-nomatch"${v.n ? ' hidden' : ''}>No observations match. <button type="button" class="qn-card-link" data-action="tqObsShowAll">Show All</button></div>
+      </div>
+    </div>`;
+  }
+
+  /* The type and the search applied to the drawn rows, in place. */
+  function _syncObsList() {
+    var root = document.getElementById(DRAWER_ID);
+    if (!root || !_drawer || _drawer.kind !== 'obs' || !root.querySelectorAll) return;
+    var v = _obsView();
+    root.querySelectorAll('.qno-seg').forEach(function (b) {
+      var on = b.getAttribute('data-filter') === (_drawer.filter || 'all');
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    var cp = root.querySelector('.qno-checkpoint');
+    root.querySelectorAll('.qno-item').forEach(function (item) {
+      var id = item.getAttribute('data-obid');
+      item.hidden = !v.shown[id];
+      if (cp && v.cp === id) item.insertBefore(cp, item.firstChild);
+    });
+    if (cp) cp.hidden = !v.cp;
+    root.querySelectorAll('.qno-group').forEach(function (g) {
+      var n = v.months[g.getAttribute('data-month')] || 0;
+      g.hidden = !n;
+      var c = g.querySelector('.obs-feed-date-count');
+      if (c) c.textContent = _obsCount(n);
+    });
+    var showing = document.getElementById('tq-obs-showing');
+    if (showing) showing.textContent = _showingText(v);
+    var none = root.querySelector('.qno-nomatch');
+    if (none) none.hidden = v.n > 0;
+    _measureObs();
+  }
+
+  /* Show More on a row whose text runs past four lines, Show Less on an
+     opened one that would; nothing on a row that fits. Measured after the
+     rows are drawn or shown. */
+  function _measureObs() {
+    var root = document.getElementById(DRAWER_ID);
+    if (!root || !root.querySelectorAll || !_drawer || _drawer.kind !== 'obs') return;
+    root.querySelectorAll('.qno-item:not([hidden]) .obs-card').forEach(function (card) {
+      var text = card.querySelector('.obs-card-text');
+      if (!text) return;
+      var open = card.classList.contains('qno-open');
+      if (open) card.classList.add('qno-clamp');
+      var long = text.scrollHeight > text.clientHeight + 1;
+      if (open) card.classList.remove('qno-clamp');
+      var btn = card.querySelector('.qno-more');
+      if (!long) {
+        if (btn) btn.remove();
+        return;
+      }
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'qn-card-link qno-more';
+        btn.setAttribute('data-action', 'tqObsMore');
+        btn.setAttribute('data-obid', card.getAttribute('data-obid'));
+        text.insertAdjacentElement('afterend', btn);
+      }
+      btn.textContent = open ? 'Show Less' : 'Show More';
+      btn.setAttribute('aria-expanded', String(open));
+    });
+  }
+
+  /* A drawn row's card, by its observation's id. */
+  function _obRow(obid) {
+    var root = document.getElementById(DRAWER_ID);
+    var id = String(obid || '').replace(/["\\]/g, '\\$&');
+    return root && root.querySelector ? root.querySelector('.qno-item[data-obid="' + id + '"]') : null;
+  }
+  /* Brings a row into view under its month heading. */
+  function _scrollToOb(obid) {
+    var list = document.getElementById('tq-obs-list');
+    var el = _obRow(obid);
+    if (!el || !el.getBoundingClientRect) return;
+    list.scrollTop += el.getBoundingClientRect().top - list.getBoundingClientRect().top - 90;
+  }
+
   // html-safe: the drawer's own builders, which escape every value
   function _drawerHtml(cid, student, f) {
     if (!_drawer) return '';
-    return _skillsDrawerHtml(cid, student, f);
+    return _drawer.kind === 'obs' ? _obsDrawerHtml(cid, student, f) : _skillsDrawerHtml(cid, student, f);
   }
 
   /* Draws the drawer in place, or takes it away, and fits it to the left
@@ -7810,6 +8020,7 @@ window.ReportQuestionnaire = (function () {
     }
     el.outerHTML = _drawerHtml(_activeCourse, st, _facts(st));
     _fitDrawer();
+    _measureObs();
     var target = focusSel ? document.querySelector('#' + DRAWER_ID + ' ' + focusSel) : null;
     if (target && target.focus) target.focus();
   }
@@ -7838,6 +8049,56 @@ window.ReportQuestionnaire = (function () {
   }
   function tqOpenSkills(from) {
     _openDrawer({ kind: 'skills' }, from);
+  }
+  /* The card's strip or View All: the drawer on that type. */
+  function tqOpenObs(filter, from) {
+    _openDrawer({ kind: 'obs', filter: filter || 'all' }, from);
+  }
+  /* One of the card's observations: the drawer at that row, opened in full. */
+  function tqOpenObsAt(obid, from) {
+    var expanded = {};
+    expanded[obid] = true;
+    _drawerFrom = from || null;
+    _drawer = { kind: 'obs', filter: 'all', q: '', expanded: expanded };
+    _redrawDrawer();
+    _scrollToOb(obid);
+    var row = _obRow(obid);
+    var card = row && row.querySelector('.obs-card');
+    if (card && card.focus) card.focus({ preventScroll: true });
+  }
+  /* The drawer's strip: one type, or All. */
+  function tqObsFilter(filter) {
+    if (!_drawer || _drawer.kind !== 'obs') return;
+    _drawer.filter = filter || 'all';
+    _syncObsList();
+  }
+  /* Typing in the drawer's search box. */
+  function tqObsSearch(q) {
+    if (!_drawer || _drawer.kind !== 'obs') return;
+    _drawer.q = String(q || '');
+    _syncObsList();
+  }
+  /* "No observations match. Show All". */
+  function tqObsShowAll() {
+    if (!_drawer || _drawer.kind !== 'obs') return;
+    _drawer.filter = 'all';
+    _drawer.q = '';
+    var box = document.getElementById('tq-obs-search');
+    if (box) box.value = '';
+    _syncObsList();
+  }
+  /* Show More / Show Less on a row. */
+  function tqObsMore(obid) {
+    if (!_drawer || _drawer.kind !== 'obs') return;
+    var open = !_drawer.expanded[obid];
+    if (open) _drawer.expanded[obid] = true;
+    else delete _drawer.expanded[obid];
+    var row = _obRow(obid);
+    var card = row && row.querySelector('.obs-card');
+    if (!card) return;
+    card.classList.toggle('qno-open', open);
+    card.classList.toggle('qno-clamp', !open);
+    _measureObs();
   }
   if (typeof window.addEventListener === 'function')
     window.addEventListener('resize', function () {
@@ -7915,6 +8176,7 @@ window.ReportQuestionnaire = (function () {
     syncRoster();
     _fitBox();
     _fitDrawer();
+    _measureObs();
     syncApprove();
     _wireDrag();
     _wireSelAdd();
@@ -7936,6 +8198,17 @@ window.ReportQuestionnaire = (function () {
     // "Suggested for Your Bank" keeps the keys while it is open.
     if (window.PersonalBank && PersonalBank.isOpen()) {
       if (e.key === 'Escape') PersonalBank.close('later');
+      return;
+    }
+    // Return or Space on one of the Observations card's rows opens it.
+    if (
+      (e.key === 'Enter' || e.key === ' ') &&
+      t &&
+      t.closest &&
+      t.closest('.qn-obs .obs-card[data-action="tqOpenObsAt"]')
+    ) {
+      e.preventDefault();
+      tqOpenObsAt(t.getAttribute('data-obid'), t);
       return;
     }
     if (e.key === 'Escape') {
@@ -8198,6 +8471,12 @@ window.ReportQuestionnaire = (function () {
     studentObs: studentObs,
     obsCounts: obsCounts,
     tqOpenSkills: tqOpenSkills,
+    tqOpenObs: tqOpenObs,
+    tqOpenObsAt: tqOpenObsAt,
+    tqObsFilter: tqObsFilter,
+    tqObsSearch: tqObsSearch,
+    tqObsShowAll: tqObsShowAll,
+    tqObsMore: tqObsMore,
     tqCloseDrawer: tqCloseDrawer,
     drawerOpen: drawerOpen,
     skillGroups: skillGroups,

@@ -1935,6 +1935,23 @@ window.PageReports = (function () {
       tqCloseDrawer: function () {
         RQ.tqCloseDrawer();
       },
+      // The Observations card's strip, View All and rows; the drawer's
+      // strip, Show More and Show All.
+      tqOpenObs: function () {
+        RQ.tqOpenObs(el.dataset.filter, el);
+      },
+      tqOpenObsAt: function () {
+        RQ.tqOpenObsAt(el.dataset.obid, el);
+      },
+      tqObsFilter: function () {
+        RQ.tqObsFilter(el.dataset.filter);
+      },
+      tqObsMore: function () {
+        RQ.tqObsMore(el.dataset.obid);
+      },
+      tqObsShowAll: function () {
+        RQ.tqObsShowAll();
+      },
       // The class's lines on the Sentences card and the character limit.
       tqLine: function () {
         RQ.tqLine(el.dataset.do, el);
@@ -2238,6 +2255,7 @@ window.PageReports = (function () {
     if (e.target && e.target.id === 'tq-narrative') RQ.tqNarrativeInput();
     else if (e.target && e.target.id === 'tq-browse-search') RQ.tqSentences('search', e.target);
     else if (e.target && e.target.id === 'tq-own-input') RQ.tqSentences('ownInput', e.target);
+    else if (e.target && e.target.id === 'tq-obs-search') RQ.tqObsSearch(e.target.value);
   }
 
   /* ⌘ Return and the arrow keys on the questionnaire. */
