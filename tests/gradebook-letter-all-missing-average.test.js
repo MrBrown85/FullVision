@@ -3,8 +3,8 @@
  * (DECISIONS, Class Averages and statuses 7). A proficiency column whose
  * counted students are all Missing averages 0, but the gradebook, the
  * printed grade sheet and the CSV export printed "—", the mark for a column
- * nobody counts in (Nov 3 bug sweep). They now print 0%, or 0.0 where the
- * column prints proficiency figures.
+ * nobody counts in (Nov 3 bug sweep). They now print 0%, also where the
+ * column prints proficiency figures (Colin, 2026-11-03: as the screen does).
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -48,10 +48,10 @@ describe('a Letter column whose counted students are all Missing', () => {
     expect(classColumnAverageText(CID, essay, res)).toBe('0%');
   });
 
-  it('prints 0% on the grade sheet, or 0.0 as proficiency', () => {
+  it('prints 0% on the grade sheet, as percent or as proficiency', () => {
     const col = { id: 'a1', assessment: essay };
     expect(GradesPrint.columnAverageText(CID, STUDENTS, col, { scoresAs: 'percent' })).toBe('0%');
-    expect(GradesPrint.columnAverageText(CID, STUDENTS, col, { scoresAs: 'proficiency' })).toBe('0.0');
+    expect(GradesPrint.columnAverageText(CID, STUDENTS, col, { scoresAs: 'proficiency' })).toBe('0%');
   });
 
   it('still reads "—" in a Proficiency class, where Missing is left out', () => {
@@ -109,10 +109,10 @@ describe('the gradebook and its CSV', () => {
     expect(avg.textContent).toBe('0%');
   });
 
-  it('exports 0.0 as the Class Average, as the CSV prints levels', () => {
+  it('exports 0% as the Class Average, as the screen shows it', () => {
     const btn = document.querySelector('[data-action="exportScoresCSV"]');
     btn.dispatchEvent(new document.defaultView.Event('click', { bubbles: true, cancelable: true }));
     const last = csv.split('\n').pop();
-    expect(last.split(',').pop()).toBe('"0.0"');
+    expect(last.split(',').pop()).toBe('"0%"');
   });
 });
