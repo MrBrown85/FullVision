@@ -22,8 +22,10 @@ window.MStudentDetail = (function () {
     var trend = change && change.dir > 0 ? 'up' : change && change.dir < 0 ? 'down' : 'flat';
     var trendIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : '—';
     var trendColor = trend === 'up' ? 'var(--score-3)' : trend === 'down' ? 'var(--score-1)' : 'var(--text-3)';
+    // The last five points, as the timeline below lists the last five
+    // scores: a whole sparkline fits the header at phone width.
     var growthData = getSectionGrowthData(cid, sid, sec.id);
-    var sparkline = renderGrowthSparkline(growthData);
+    var sparkline = renderGrowthSparkline((growthData || []).slice(-5));
     var allAssessments = getAssessments(cid);
     var allEvidenceScores = [];
     sec.tags.forEach(function (tag) {
@@ -104,13 +106,23 @@ window.MStudentDetail = (function () {
           return secTagIds.has(tid);
         });
       });
-      if (secAssessments.length > 0) {
-        insightHtml =
-          '<div class="m-sec-insight m-sec-insight-alert">' +
-          secAssessments.length +
-          ' assessment' +
-          (secAssessments.length !== 1 ? 's' : '') +
-          ' assigned but not yet scored</div>';
+      // Work the teacher marked Missing or Excused says so; only the rest
+      // is "not yet scored".
+      var statuses = getAssignmentStatuses(cid);
+      var by = { NS: 0, EXC: 0, open: 0 };
+      secAssessments.forEach(function (a) {
+        var st = statuses[sid + ':' + a.id];
+        by[st === 'NS' || st === 'EXC' ? st : 'open']++;
+      });
+      var lines = [];
+      var n = function (k) {
+        return by[k] + (by[k] === 1 ? ' assessment' : ' assessments');
+      };
+      if (by.NS) lines.push(n('NS') + ' marked Missing');
+      if (by.EXC) lines.push(n('EXC') + ' marked Excused');
+      if (by.open) lines.push(n('open') + ' assigned but not yet scored');
+      if (lines.length) {
+        insightHtml = '<div class="m-sec-insight m-sec-insight-alert">' + lines.join('<br>') + '</div>';
       }
     }
 
@@ -193,12 +205,13 @@ window.MStudentDetail = (function () {
     );
   }
 
-  /* ── Tabs: the same five as the desktop student page ──────── */
+  /* ── Tabs: as on the desktop student page, where Goals is part of the
+     Learner Profile. (Evidence is the phone's name for Observations,
+     Observations decision 6; the desktop's Grade Breakdown stays there.) */
   var TABS = [
     { id: 'comps', label: 'Competencies' },
     { id: 'assess', label: 'Assessments' },
     { id: 'evidence', label: 'Evidence' },
-    { id: 'goals', label: 'Goals' },
     { id: 'profile', label: 'Learner Profile' },
   ];
   // Shared with the desktop page: the tab last opened on this device.
@@ -213,6 +226,9 @@ window.MStudentDetail = (function () {
   function savedTab() {
     try {
       var t = localStorage.getItem(TAB_KEY);
+      // The old Goals tab, and the desktop's Goals and Reflections, are in
+      // the Learner Profile now.
+      if (t === 'goals' || t === 'reflections') t = 'profile';
       return _isTab(t) ? t : 'comps';
     } catch (e) {
       return 'comps';
@@ -285,6 +301,17 @@ window.MStudentDetail = (function () {
     );
   }
 
+  /* The strip scrolls sideways on a narrow phone: keep the open tab in view. */
+  function scrollActiveTab(root) {
+    var strip = root && root.querySelector ? root.querySelector('.m-st-tabs') : null;
+    var on = strip && strip.querySelector('.m-st-tab.active');
+    if (!on || strip.scrollWidth <= strip.clientWidth) return;
+    var left = on.offsetLeft - strip.offsetLeft;
+    if (left < strip.scrollLeft || left + on.offsetWidth > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollLeft = left - (strip.clientWidth - on.offsetWidth) / 2;
+    }
+  }
+
   /* Show one tab of the student screen that holds `el`. */
   function selectTab(el, id) {
     if (!_isTab(id)) return;
@@ -298,6 +325,7 @@ window.MStudentDetail = (function () {
     screen.querySelectorAll('.m-st-panel').forEach(function (p) {
       p.hidden = p.getAttribute('data-tab') !== id;
     });
+    scrollActiveTab(screen);
     try {
       localStorage.setItem(TAB_KEY, id);
     } catch (e) {
@@ -325,7 +353,17 @@ window.MStudentDetail = (function () {
     var grade = studentGradeSummary(cid, sid);
     var gradeText = grade.text || '—';
     var nav = MC.navBar({ id: 'student-detail', title: name, backLabel: 'Students' });
-    var badges = renderBadges(st);
+    // Each designation by its code and name ("P Gifted"), as the desktop
+    // header shows them, then the IEP / MOD / ELL badges.
+    var desPills = (st.designations || [])
+      .filter(function (code) {
+        return typeof BC_DESIGNATIONS !== 'undefined' && BC_DESIGNATIONS[code];
+      })
+      .map(function (code) {
+        return '<span class="m-badge m-badge-des">' + MC.esc(code + ' ' + BC_DESIGNATIONS[code].name) + '</span>';
+      })
+      .join('');
+    var badges = desPills + renderBadges(st);
 
     var hero =
       '<div class="m-hero">' +
@@ -351,16 +389,12 @@ window.MStudentDetail = (function () {
       '</div>' +
       '</div>';
 
-    var focusAreas = getFocusAreas(cid, sid, 3);
+    // The assessed competencies below Proficient, weakest first.
+    var focusAreas = getFocusAreas(cid, sid, 3).filter(function (f) {
+      return f.prof > 0 && f.prof < 3;
+    });
     var focusHTML = '';
-    var hasFocus =
-      focusAreas.some(function (f) {
-        return f.prof > 0 && f.prof < 3;
-      }) ||
-      focusAreas.some(function (f) {
-        return f.prof === 0;
-      });
-    if (hasFocus) {
+    if (focusAreas.length) {
       focusHTML = '<div class="m-list-inset-header">Focus Areas</div>';
       focusAreas.forEach(function (f) {
         var secColor = f.section ? f.section.color : '#888';
@@ -438,9 +472,7 @@ window.MStudentDetail = (function () {
     });
 
     // Assessments
-    var scoredN = cells.filter(function (c) {
-      return c.cell.kind === 'points' || c.cell.kind === 'level' || c.cell.kind === 'complete';
-    }).length;
+    var scoredN = MC.scoredAssessmentCount(cid, sid);
     var nsN = termAssess.filter(function (a) {
       return statuses[sid + ':' + a.id] === 'NS';
     }).length;
@@ -460,8 +492,15 @@ window.MStudentDetail = (function () {
         var name = tag ? tag.label || tag.shortName || tag.code || '' : '';
         if (name && toward.indexOf(name) < 0) toward.push(name);
       });
+      // Tapping a row opens that assessment's grading screen on this student.
       assessHtml +=
-        '<div class="m-assess-compact">' +
+        '<div class="m-assess-compact" role="button" tabindex="0" data-action="m-assess-grade" data-sid="' +
+        MC.esc(sid) +
+        '" data-aid="' +
+        MC.esc(a.id) +
+        '" aria-label="Grade ' +
+        MC.esc(a.title) +
+        '">' +
         '<div class="m-assess-top">' +
         '<span class="m-assess-date">' +
         MC.esc(_shortDay(a.date)) +
@@ -547,7 +586,7 @@ window.MStudentDetail = (function () {
     ];
     var seen = 0;
     var allDims = 0;
-    var profileHtml = '';
+    var profileHtml = '<div class="m-list-inset-header m-st-profile-h">Seen in Observations</div>';
     dimGroups.forEach(function (gp) {
       profileHtml += '<div class="m-list-inset-header">' + MC.esc(gp.name) + '</div><div class="m-st-list">';
       gp.dims.forEach(function (d) {
@@ -567,7 +606,7 @@ window.MStudentDetail = (function () {
             ? MC.esc(_shortDay(_obDay(latest)) + ', ') +
               (isPrivateObservation(latest) ? obsPrivateLabelHtml(latest) + ' ' : '') +
               MC.esc(String(latest.text || '').split('\n')[0])
-            : 'Not seen yet') +
+            : 'Not Seen Yet') +
           '</span></div><span class="m-st-dim-count">' +
           tagged.length +
           '</span></div>';
@@ -597,8 +636,7 @@ window.MStudentDetail = (function () {
       },
       { id: 'assess', label: 'Assessments', stat: scoredN + ' Scored' },
       { id: 'evidence', label: 'Evidence', stat: obs.length + (obs.length === 1 ? ' Observation' : ' Observations') },
-      { id: 'goals', label: 'Goals', stat: goalCount + ' of ' + sections.length + ' Set' },
-      { id: 'profile', label: 'Learner Profile', stat: seen + ' of ' + allDims + ' Seen' },
+      { id: 'profile', label: 'Learner Profile', stat: goalCount + (goalCount === 1 ? ' Goal' : ' Goals') },
     ];
     var activeTab = savedTab();
     var tabsBlock =
@@ -606,8 +644,14 @@ window.MStudentDetail = (function () {
       _panel('comps', activeTab, focusHTML + '<div class="m-list-inset-header">Competencies</div>' + sectionCards) +
       _panel('assess', activeTab, '<div class="m-st-list">' + assessHtml + '</div>') +
       _panel('evidence', activeTab, evidenceHtml) +
-      _panel('goals', activeTab, '<div class="m-st-list">' + goalsHtml + '</div>') +
-      _panel('profile', activeTab, profileHtml);
+      _panel(
+        'profile',
+        activeTab,
+        '<div class="m-list-inset-header m-st-profile-h">Goals and Reflections</div><div class="m-st-list">' +
+          goalsHtml +
+          '</div>' +
+          profileHtml,
+      );
 
     return (
       '<div class="m-screen m-screen-hidden" id="m-screen-student-detail">' +
@@ -616,9 +660,19 @@ window.MStudentDetail = (function () {
       hero +
       tabsBlock +
       '<div class="m-scard-actions" style="padding:16px">' +
-      '<button class="m-scard-btn m-scard-btn-view" data-action="m-student-grade" data-sid="' +
-      sid +
-      '">Grade</button>' +
+      (getAssessments(cid).length
+        ? '<button class="m-scard-btn m-scard-btn-view" data-action="m-student-grade" data-sid="' +
+          sid +
+          '">Grade Newest: ' +
+          MC.esc(
+            getAssessments(cid)
+              .slice()
+              .sort(function (a, b) {
+                return (b.date || '').localeCompare(a.date || '');
+              })[0].title,
+          ) +
+          '</button>'
+        : '') +
       '</div>' +
       '<div style="height:32px"></div>' +
       '</div></div>'
@@ -628,5 +682,6 @@ window.MStudentDetail = (function () {
   return {
     renderDetail: renderDetail,
     selectTab: selectTab,
+    scrollActiveTab: scrollActiveTab,
   };
 })();

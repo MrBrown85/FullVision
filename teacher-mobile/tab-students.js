@@ -92,6 +92,40 @@ window.MStudents = (function () {
         /* no-op, browsing only */
       },
     });
+    _watchMoreBelow(container);
+  }
+
+  /* A card whose list runs past its bottom says so: "More Below" over a
+     fade, until it is scrolled to the end. Checked when cards are drawn
+     and as a card's list scrolls. */
+  var _moreObserver = null;
+  var _moreScrollOn = false;
+  function _markMoreBelow(box) {
+    box.classList.toggle('m-more-below', box.scrollHeight - box.scrollTop - box.clientHeight > 4);
+  }
+  function _watchMoreBelow(container) {
+    var check = function () {
+      container.querySelectorAll('.m-scard-widgets').forEach(_markMoreBelow);
+    };
+    requestAnimationFrame(check);
+    if (_moreObserver) _moreObserver.disconnect();
+    if (typeof MutationObserver === 'function') {
+      _moreObserver = new MutationObserver(function () {
+        requestAnimationFrame(check);
+      });
+      _moreObserver.observe(container, { childList: true, subtree: true });
+    }
+    if (!_moreScrollOn) {
+      _moreScrollOn = true;
+      document.addEventListener(
+        'scroll',
+        function (e) {
+          var box = e.target;
+          if (box && box.classList && box.classList.contains('m-scard-widgets')) _markMoreBelow(box);
+        },
+        true,
+      );
+    }
   }
 
   /* ── All Students sheet: the list, with search ─────────────── */
@@ -175,8 +209,10 @@ window.MStudents = (function () {
     var q = (query || '').toLowerCase().trim();
     var matches = 0;
     document.querySelectorAll('#m-student-list .m-cell').forEach(function (cell) {
+      // The shown name, then every name the student goes by (data-search).
       var name = (cell.querySelector('.m-cell-title') || {}).textContent || '';
-      var match = name.toLowerCase().indexOf(q) >= 0;
+      var names = (name + ' ' + (cell.getAttribute('data-search') || '')).toLowerCase();
+      var match = names.indexOf(q) >= 0;
       if (match) matches++;
       cell.style.display = match ? '' : 'none';
     });

@@ -279,6 +279,13 @@ function waitForPendingSyncs(timeoutMs) {
   });
 }
 
+/* A class just loaded from the server is in step with it: the phone's
+   Settings says when, not "Not yet synced this session", even before the
+   first change is saved. Writes still in flight keep their own time. */
+function _markLoadSynced() {
+  if (_pendingSyncs === 0) _lastSyncedAt = new Date().toISOString();
+}
+
 function _trackPendingSync(promise) {
   if (!promise || typeof promise.finally !== 'function') return promise;
   _pendingSyncs += 1;
@@ -354,6 +361,7 @@ function getSyncDotState() {
 window.getSyncDotState = getSyncDotState;
 
 function _updateSyncIndicator() {
+<<<<<<< HEAD
   if (typeof document === 'undefined' || !document.getElementById) return;
   const dot = document.getElementById('sync-indicator-dot');
   if (!dot) return;
@@ -361,6 +369,38 @@ function _updateSyncIndicator() {
   dot.className = 'tb-sync-dot ' + state.status;
   dot.title = state.title;
   if (typeof dot.setAttribute === 'function') dot.setAttribute('aria-label', state.title);
+=======
+  // The phone keeps one dot per open screen (the Grade list stays mounted,
+  // hidden, under the grading screen), so every copy is kept current.
+  const first = document.getElementById('sync-indicator-dot');
+  if (!first) return;
+  const dots = Array.from(document.querySelectorAll('[id="sync-indicator-dot"]'));
+  if (dots.indexOf(first) < 0) dots.unshift(first);
+  const problem = getSaveProblem();
+  let visual;
+  let title;
+  if (problem) {
+    visual = 'error';
+    title = problem;
+  } else {
+    const s = getSyncStatus();
+    // Degraded mode reuses the 'error' visual but conveys a different message.
+    visual = s.status === 'degraded' ? 'error' : s.status;
+    title =
+      s.status === 'idle'
+        ? 'All changes saved'
+        : s.status === 'syncing'
+          ? 'Syncing...'
+          : s.status === 'degraded'
+            ? 'Cloud sync paused — saving locally'
+            : 'Sync error — changes saved locally';
+  }
+  dots.forEach(function (dot) {
+    dot.className = 'tb-sync-dot ' + visual;
+    dot.title = title;
+    if (dot.hasAttribute && dot.hasAttribute('aria-label')) dot.setAttribute('aria-label', title);
+  });
+>>>>>>> s4/phone
 }
 
 function isSupabaseDegraded() {
@@ -4064,11 +4104,17 @@ async function _doInitData(cid) {
         if (bundle.not_modified) {
           _clearLoadError(cid);
           _classFresh[cid] = true;
+          _markLoadSynced();
           return;
         }
         try {
           _bundleToCache(cid, bundle);
+<<<<<<< HEAD
           _clearLoadError(cid);
+=======
+          delete _loadError[cid];
+          _markLoadSynced();
+>>>>>>> s4/phone
         } catch (e) {
           // A payload this code can't read must not leave the class half
           // applied with no word to the teacher.

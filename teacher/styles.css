@@ -2810,6 +2810,68 @@ body:has(.term-select) .sb-term-note {
   }
 }
 
+/* ── Top tabs on a phone ───────────────────────────────────
+   The five tabs don't fit beside the sidebar button, sync dot and account
+   button at phone width, and the centred row ran under both ends. Under
+   600 px the tabs sit between them and scroll sideways on their own (the
+   open tab is scrolled into view, router.js); the account button shows
+   its icon only. */
+@media (max-width: 600px) {
+  .tb-group.tb-center {
+    position: static;
+    transform: none;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0 4px;
+  }
+  .tb-seg {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tb-seg::-webkit-scrollbar {
+    display: none;
+  }
+  .tb-seg .seg-btn {
+    flex-shrink: 0;
+  }
+  .tb-group.tb-right {
+    margin-left: 0;
+    flex-shrink: 0;
+  }
+  .tb-sync {
+    margin-right: 2px;
+  }
+  .tb-user-menu {
+    margin-left: 0;
+  }
+  .tb-user-name {
+    display: none;
+  }
+}
+
+/* ── Touch targets on a phone (Step 4 sweep, Nov 3) ───────────
+   Under 600 px the toolbar controls and segmented controls (the top tabs,
+   Reports' Term Questionnaire | Progress Reports, the gradebook toolbar)
+   are 44 px high, a finger's size; on wider screens they stay 32 px. */
+@media (max-width: 600px) {
+  :root {
+    --control-h: 44px;
+  }
+  /* A segment is the full 44 px; its track is a little taller. */
+  .seg-btn {
+    line-height: calc(var(--control-h) - 10px);
+  }
+  /* The top bar's sidebar and account buttons. */
+  .tb-btn,
+  .tb-user-btn {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+}
+
 /* ── Responsive: Small Mobile (≤480px) ────────────────────── */
 @media (max-width: 480px) {
   .page-main {

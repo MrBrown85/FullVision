@@ -139,6 +139,11 @@ body.fv-switching-course::after {
   fill: var(--active);
   stroke: var(--active);
 }
+/* The marks inside a filled icon (Grade's check, Observe's lines) stay
+   visible on the fill. */
+.m-tab-item.m-tab-active .m-tab-icon .m-tab-mark {
+  stroke: var(--surface);
+}
 .m-tab-label {
   font-size: 12px;
   font-weight: 500;
@@ -349,6 +354,21 @@ body.fv-switching-course::after {
 #m-nav-bar-grade-swiper .m-nav-bar-title-inline {
   opacity: 1;
 }
+/* The open class's name at the left of each tab's first screen. */
+.m-nav-bar-class {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.m-nav-bar-class-name {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .m-nav-bar-actions {
   display: flex;
   align-items: center;
@@ -487,16 +507,6 @@ body.fv-switching-course::after {
   flex-shrink: 0;
   position: relative;
 }
-.m-cell-avatar .m-missing-dot {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  width: 10px;
-  height: 10px;
-  background: var(--priority);
-  border-radius: 50%;
-  border: 2px solid var(--surface);
-}
 
 .m-cell-body {
   flex: 1;
@@ -509,6 +519,31 @@ body.fv-switching-course::after {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* A student's name gives way before its badges do. */
+.m-cell-title.m-student-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.m-student-title-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-student-title .m-badge {
+  flex-shrink: 0;
+}
+/* A Grade list title wraps to two lines before it is cut. */
+.m-cell-title.m-grade-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 .m-cell-subtitle {
   font-size: 13px;
@@ -1843,6 +1878,9 @@ body.fv-switching-course::after {
   width: 36px;
   height: 36px;
   border-radius: 50%;
+  border: none;
+  padding: 0;
+  font-family: inherit;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2155,6 +2193,36 @@ body.fv-switching-course::after {
 }
 
 /* Status toggles */
+/* The Overall Comment under the score and status. */
+.m-overall {
+  margin-top: 16px;
+}
+.m-overall-label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.m-overall-comment {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  resize: vertical;
+  outline: none;
+}
+.m-overall-comment:focus {
+  box-shadow: 0 0 0 2px var(--active);
+}
 .m-status-row {
   display: flex;
   gap: 8px;
@@ -2178,10 +2246,45 @@ body.fv-switching-course::after {
   opacity: 0.4;
   cursor: default;
 }
+/* A chosen status is a solid block in the desktop grader's colours:
+   Missing red, Excused grey, Late amber. */
 .m-status-pill.m-status-active {
-  border-color: var(--priority);
-  background: var(--priority-light);
-  color: var(--priority);
+  border-color: transparent;
+  background: var(--score-1);
+  color: #fff;
+  font-weight: 700;
+}
+.m-status-pill.m-status-active[data-val='EXC'] {
+  background: var(--text-2);
+}
+.m-status-pill.m-status-active[data-val='LATE'] {
+  background: var(--score-2);
+}
+.m-status-hint {
+  margin: 8px 16px 0;
+  font-size: 13px;
+  color: var(--text-2);
+  text-align: center;
+}
+/* The level numbers' names, under the score rows. */
+.m-level-key {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  margin: 4px 16px 12px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.m-level-key b {
+  color: var(--text);
+}
+.m-grade-view-hint {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  text-align: center;
 }
 
 /* ── Undo Toast ────────────────────────────────────────────── */
@@ -2867,6 +2970,35 @@ body.fv-switching-course::after {
   border-radius: 3px;
   transition: width 0.3s ease;
 }
+/* Each row's figure, and the folder rows above their competencies. */
+.m-scard-sec-val {
+  width: 34px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.m-scard-folder {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.m-scard-folder + .m-scard-folder {
+  margin-top: 6px;
+}
+.m-scard-folder-row .m-scard-sec-name,
+.m-scard-folder-row .m-scard-sec-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.m-scard-folder-note {
+  margin-top: -4px;
+  font-size: 12px;
+  color: var(--text-2);
+}
 
 /* Latest observation snippet */
 .m-scard-obs {
@@ -2946,6 +3078,20 @@ body.fv-switching-course::after {
   background: linear-gradient(transparent, var(--surface));
   pointer-events: none;
   flex-shrink: 0;
+}
+/* More rows below: a taller fade that says so (tab-students.js marks it). */
+.m-scard-widgets.m-more-below::after {
+  content: 'More Below \2193';
+  height: 34px;
+  margin-top: -34px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: linear-gradient(rgba(255, 255, 255, 0), var(--surface) 60%);
 }
 
 /* Hero fallback (minimal name-only) */
@@ -3153,16 +3299,54 @@ body.fv-switching-course::after {
 
 /* ── Narrative excerpt ────────────────────────────────────── */
 .m-wdg-narrative {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
   background: var(--surface);
   border-radius: 12px;
   padding: 10px 14px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
+.m-wdg-narrative .m-wdg-section-label {
+  display: block;
+}
+/* The first three lines on the card; Read All opens the rest. */
 .m-wdg-narrative-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   font-size: 13px;
   color: var(--text-2);
   line-height: 1.4;
   margin-top: 4px;
+}
+.m-wdg-narrative-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--priority);
+}
+.m-wdg-narrative-more {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--link);
+}
+.m-comment-sheet {
+  padding: 0 16px 24px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.m-comment-sheet-name {
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -3407,6 +3591,13 @@ body.fv-switching-course::after {
   color: var(--text-3);
   font-size: 20px;
   line-height: 1;
+}
+/* A starter row posts on one tap; it ends in "Post", in link blue. */
+.m-quick-row-post {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--link);
 }
 .m-quick-own {
   grid-template-columns: minmax(0, 1fr) 14px;
@@ -3939,6 +4130,7 @@ body.fv-switching-course::after {
 /* ── Rubric view: one row per criterion (Rubric Bank PR 10) ──── */
 .m-grade-view-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   padding: 8px 16px 0;
 }
@@ -4140,4 +4332,109 @@ body.fv-switching-course::after {
 }
 .m-group-sheet-cancel {
   font-weight: 600;
+}
+
+/* ── Touch targets (Step 4 sweep, Nov 3) ───────────────────────
+   Every control the teacher taps is at least 44 px high: the card's
+   Observe and View Profile, All Students, segmented controls, the ± level
+   buttons, the Checks button and Customize Card's drag handles (44 × 44). */
+.m-scard-btn,
+.m-card-all,
+.m-seg-btn,
+.m-checks-btn {
+  min-height: 44px;
+}
+.m-card-all {
+  border-radius: 22px;
+}
+.m-mod-btn {
+  height: 44px;
+  border-radius: 22px;
+}
+.m-wdg-editor-drag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+.m-wdg-editor-drag-spacer {
+  width: 44px;
+}
+/* The grading strip's avatars, and the name on an observation card, which
+   filters the feed: the name keeps its look, its tap area grows. */
+.m-thumb {
+  width: 44px;
+  height: 44px;
+  font-size: 13px;
+}
+.m-obs-student-name {
+  padding: 13px 4px;
+  margin: -13px -4px;
+}
+
+/* "2 missing" under a name in All Students. */
+.m-cell-missing {
+  color: var(--priority);
+  font-weight: 600;
+}
+
+/* Whole titles on a phone (Step 4 sweep, Nov 3): assessment rows and the
+   competency timeline wrap instead of cutting the title; the grading bar
+   takes the title on up to two lines. */
+.m-assess-title,
+.m-sec-tl-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+#m-nav-bar-grade-swiper .m-nav-bar-inner {
+  height: auto;
+  min-height: 44px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+#m-nav-bar-grade-swiper .m-nav-bar-title-inline {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.m-section-header .growth-sparkline {
+  max-width: 72px;
+}
+/* Five points fit: 8 px dots, 6 px joins. */
+.m-section-header .sparkline-dot {
+  width: 8px;
+  height: 8px;
+}
+.m-section-header .sparkline-line {
+  width: 6px;
+}
+/* A chip with more letters to tell two students apart. */
+.m-thumb.m-thumb-long {
+  font-size: 12px;
+  letter-spacing: -0.02em;
+}
+/* An assessment row on the student screen opens its grading. */
+.m-assess-compact[data-action] {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-assess-compact[data-action]:active {
+  background: var(--overlay-pressed);
+}
+
+/* A designation by code and name ("P Gifted") in the student screen's header. */
+.m-badge.m-badge-des {
+  background: var(--bg-secondary);
+  color: var(--text);
+}
+/* The Learner Profile's two parts. */
+.m-st-profile-h {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
 }

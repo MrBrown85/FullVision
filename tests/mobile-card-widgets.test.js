@@ -288,6 +288,29 @@ describe('MCardWidgets.render sectionBars', () => {
     expect(html).toContain('Quest');
     expect(html).toContain('Plan');
   });
+
+  // Step 4 group 3 #76: folders with their average and note, as on the
+  // student screen, and a figure on every row.
+  it('groups competencies under their folders with the folder average and note', () => {
+    mockWidgetDataLayer({
+      getSectionProficiency: (cid, sid, secId) => (secId === 's1' ? 2.0 : 3.0),
+      getGroupedSections: () => ({
+        groups: [{ group: { id: 'g1', name: 'Questioning and Predicting' }, sections: SECTIONS }],
+        ungrouped: [],
+      }),
+      getGroupProficiency: () => 2.5,
+      folderAverageNote: () => 'Each competency counts on its own.',
+      formatLevel: (cid, v) => v.toFixed(1),
+    });
+    const html = MCardWidgets.render('sectionBars', STUDENT, CID, DATA);
+    expect(html).toContain('m-scard-folder-row');
+    expect(html).toContain('Questioning and Predicting');
+    expect(html).toContain('Each competency counts on its own.');
+    expect(html).toContain('>2.5<');
+    expect(html).toContain('>2.0<');
+    expect(html).toContain('>3.0<');
+    expect(html.indexOf('Questioning and Predicting')).toBeLessThan(html.indexOf('Quest<'));
+  });
 });
 
 /* ── Task 2: obsSnippet ──────────────────────────────────────────── */
@@ -337,8 +360,10 @@ describe('MCardWidgets.render completion', () => {
     const html = MCardWidgets.render('completion', STUDENT, CID, DATA);
     expect(html).toContain('m-wdg-tile');
     expect(html).toContain('m-wdg-arc');
-    expect(html).toContain('85');
-    expect(html).toContain('Complete');
+    // Step 4 group 3 #37: a % named as desktop names it.
+    expect(html).toContain('>85%</text>');
+    expect(html).toContain('Evidence Coverage');
+    expect(html).not.toContain('>Complete<');
   });
 
   it('uses green color for >= 80%', () => {
@@ -409,33 +434,25 @@ describe('MCardWidgets.render growth', () => {
     expect(html).toContain('var(--score-3)');
   });
 
-  it('counts assessments, not competency scores', () => {
-    // Two assessments, each scoring both competencies: four scores.
+  // Step 4 group 3 #77: the count is the student screen's "N Scored":
+  // every scored assessment, points and Complete/Incomplete work too,
+  // counted once however many competencies it scores.
+  it('counts what the student screen counts as Scored', () => {
+    const kinds = { a1: 'level', a2: 'level', a3: 'points', a4: 'complete', a5: 'none' };
     mockWidgetDataLayer({
       getTagScores: (cid, sid, tagId) => [
         { score: 2, type: 'summative', date: '2026-01-01', tagId, assessmentId: 'a1' },
         { score: 3, type: 'summative', date: '2026-02-01', tagId, assessmentId: 'a2' },
       ],
+      getAssessments: () => Object.keys(kinds).map(id => ({ id, title: id, tagIds: ['t1', 't2'] })),
+      assessmentCellValue: (cid, sid, a) => ({ kind: kinds[a.id] }),
     });
     const dataWithSections = {
       sections: [{ id: 's1', name: 'Test', shortName: 'Test', color: '#888', tags: [{ id: 't1' }, { id: 't2' }] }],
     };
     const html = MCardWidgets.render('growth', STUDENT, CID, dataWithSections);
-    expect(html).toContain('(2 assessments)');
-    expect(html).not.toContain('(4 assessments)');
-  });
-
-  it('says 1 assessment when one assessment scores several competencies', () => {
-    mockWidgetDataLayer({
-      getTagScores: (cid, sid, tagId) => [
-        { score: tagId === 't1' ? 2 : 3, type: 'summative', date: '2026-01-01', tagId, assessmentId: 'a1' },
-      ],
-    });
-    const dataWithSections = {
-      sections: [{ id: 's1', name: 'Test', shortName: 'Test', color: '#888', tags: [{ id: 't1' }, { id: 't2' }] }],
-    };
-    const html = MCardWidgets.render('growth', STUDENT, CID, dataWithSections);
-    expect(html).toContain('(1 assessment)');
+    expect(html).toContain('4 scored)');
+    expect(MComponents.scoredAssessmentCount(CID, STUDENT.id)).toBe(4);
   });
 
   it('shows single assessment note for only one score', () => {
@@ -443,12 +460,14 @@ describe('MCardWidgets.render growth', () => {
       getTagScores: (cid, sid, tagId) => [
         { score: 2, type: 'summative', date: '2026-01-01', tagId, assessmentId: 'a1' },
       ],
+      getAssessments: () => [{ id: 'a1', title: 'Lab', tagIds: ['t1'] }],
+      assessmentCellValue: () => ({ kind: 'level' }),
     });
     const dataWithSections = {
       sections: [{ id: 's1', name: 'Test', shortName: 'Test', color: '#888', tags: [{ id: 't1' }] }],
     };
     const html = MCardWidgets.render('growth', STUDENT, CID, dataWithSections);
-    expect(html).toContain('1 assessment');
+    expect(html).toContain('1 scored');
   });
 });
 
@@ -688,12 +707,38 @@ describe('MCardWidgets.render narrative', () => {
     const html = MCardWidgets.render('narrative', STUDENT, CID, d);
     expect(html).toContain('m-wdg-narrative');
     expect(html).toContain('m-wdg-section-label');
-    expect(html).toContain('Term Report');
     expect(html).toContain('m-wdg-narrative-text');
     // HTML tags should be stripped
     expect(html).not.toContain('<p>');
-    // Text is truncated at 80 chars
-    expect(html).toContain('\u2026');
+    // Step 4 group 3 #73: called Teacher Comment, as on desktop; the whole
+    // comment is there (the card shows three lines), and a tap opens it.
+    expect(html).toContain('>Teacher Comment<');
+    expect(html).not.toContain('Term Report');
+    expect(html).toContain('collaborative problem solving.');
+    expect(html).toContain('data-action="m-comment-full"');
+  });
+
+  // Step 4 group 3 #73: a comment written before a preferred name was set
+  // says so.
+  it('notes a comment that uses a name the student no longer goes by', () => {
+    mockWidgetDataLayer({});
+    const lee = { ...STUDENT, firstName: 'Liam', preferred: 'Lee', lastName: 'Nakamura' };
+    const d = { ...DATA, termRating: { narrative: "In Science, Liam's proficiency is Proficient." } };
+    const html = MCardWidgets.render('narrative', lee, CID, d);
+    expect(html).toContain('Written as Liam. Lee is the name now.');
+    const fine = { ...DATA, termRating: { narrative: 'Lee works well with others.' } };
+    expect(MCardWidgets.render('narrative', lee, CID, fine)).not.toContain('Written as');
+    expect(MCardWidgets.render('narrative', { ...lee, preferred: '' }, CID, d)).not.toContain('Written as');
+  });
+
+  it('the sheet holds the whole comment', () => {
+    mockWidgetDataLayer({
+      getStudentTermRating: () => ({ narrative: 'First paragraph.\n\nSecond paragraph.' }),
+      displayNameWithLast: st => (st.preferred || st.firstName) + ' ' + st.lastName,
+    });
+    const html = MCardWidgets.commentSheetHtml(STUDENT, CID, 't1');
+    expect(html).toContain('<p>First paragraph.</p><p>Second paragraph.</p>');
+    expect(html).toContain('Teacher Comment');
   });
 });
 

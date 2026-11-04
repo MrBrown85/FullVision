@@ -128,13 +128,19 @@ describe('MStudents.renderAllStudents', () => {
     expect(html).not.toContain('>0.0<');
   });
 
-  it('shows missing dot when student has NS status', () => {
+  // Step 4 group 3 #83: missing work is said in words, not an
+  // unexplained red dot on the avatar.
+  it('says how much work is missing under the name', () => {
     mockDataLayer({
-      getAssignmentStatuses: () => ({ 'stu1:a1': 'NS' }),
-      getAssessments: () => [{ id: 'a1', type: 'summative', date: '2025-01-01', tagIds: ['t1'] }],
+      getAssignmentStatuses: () => ({ 'stu1:a1': 'NS', 'stu1:a2': 'NS' }),
+      getAssessments: () => [
+        { id: 'a1', type: 'summative', date: '2025-01-01', tagIds: ['t1'] },
+        { id: 'a2', type: 'summative', date: '2025-01-02', tagIds: ['t1'] },
+      ],
     });
     const html = MStudents.renderAllStudents(CID);
-    expect(html).toContain('m-missing-dot');
+    expect(html).toContain('>2 missing<');
+    expect(html).not.toContain('m-missing-dot');
   });
 
   it('does NOT repeat getAssessments/getAssignmentStatuses per student (N+1 fix)', () => {
@@ -213,15 +219,28 @@ describe('MStudents.renderDetail', () => {
     expect(html).toContain('Student not found');
   });
 
-  it('shows the five tabs with their counts', () => {
+  // Step 4 group 3 #74: Goals is part of the Learner Profile, as on the
+  // desktop, whose tile counts goals.
+  it('shows the desktop tabs with their counts', () => {
     mockDataLayer({
       getStudentQuickObs: () => [{ id: 'ob1' }, { id: 'ob2' }, { id: 'ob3' }],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
     const labels = [...html.matchAll(/class="m-st-tab-label">([^<]+)</g)].map(m => m[1]);
-    expect(labels).toEqual(['Competencies', 'Assessments', 'Evidence', 'Goals', 'Learner Profile']);
+    expect(labels).toEqual(['Competencies', 'Assessments', 'Evidence', 'Learner Profile']);
     expect(html).toContain('3 Observations');
     expect(html).toContain('m-st-panel-evidence');
+    expect(html).toContain('0 Goals');
+    const profile = html.slice(html.indexOf('id="m-st-panel-profile"'));
+    expect(profile).toContain('Goals and Reflections');
+    expect(profile).toContain('Seen in Observations');
+  });
+
+  // Step 4 group 3 #74: designations show by name, as on the desktop.
+  it('shows each designation by code and name in the header', () => {
+    mockDataLayer({});
+    const html = MStudents.renderDetail(CID, 'stu2');
+    expect(html).toContain('>G ' + BC_DESIGNATIONS.G.name + '<');
   });
 
   it('shows how many are missing on the Assessments tab', () => {
@@ -334,7 +353,8 @@ describe('Focus areas card', () => {
     expect(html).toContain('Focus Areas');
     expect(html).toContain('Questioning');
     expect(html).toContain('1.5');
-    expect(html).toContain('No evidence');
+    // Step 4 group 3 #42: no-evidence competencies are not focus areas.
+    expect(html).not.toContain('Evaluating');
   });
 
   it('hides focus areas when all tags are proficient', () => {
@@ -746,5 +766,26 @@ describe('MStudents.initCardStack term', () => {
 
   it('shows Report 1 in a class with no terms', () => {
     expect(cardTerm('2026-12-10', [])).toBe('term-1');
+  });
+});
+
+/* ── Step 4 group 3 #43: Missing work says Missing ─────────────────── */
+describe('Competency card with no evidence yet', () => {
+  it('says Missing for work marked Missing, not "not yet scored"', () => {
+    mockDataLayer({
+      getSections: () => [
+        { id: 's1', name: 'Graphs & Models', shortName: 'Graphs', tags: [{ id: 't1' }], color: '#888' },
+      ],
+      getSectionProficiency: () => 0,
+      getAssessments: () => [
+        { id: 'a1', title: 'Homework Check 1', tagIds: ['t1'] },
+        { id: 'a2', title: 'Lab 2', tagIds: ['t1'] },
+      ],
+      getAssignmentStatuses: () => ({ 'stu1:a1': 'NS' }),
+    });
+    const html = MStudents.renderDetail(CID, 'stu1');
+    expect(html).toContain('1 assessment marked Missing');
+    expect(html).toContain('1 assessment assigned but not yet scored');
+    expect(html).not.toContain('2 assessments assigned');
   });
 });
