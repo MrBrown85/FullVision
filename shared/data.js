@@ -6985,7 +6985,12 @@ function saveLearningMap(cid, map) {
   );
   map._customized = true;
   map._version = (map._version || 0) + 1;
-  _saveCourseField('learningMaps', cid, map); // derived tag/section caches auto-invalidate via mapRef check
+  _saveCourseField('learningMaps', cid, map);
+  // The derived tag and section caches key on the map object, and a map
+  // edited in place (removeCompetencies) is the same object, so drop them:
+  // otherwise counts kept a removed competency.
+  delete _allTagsCache[cid];
+  delete _tagToSectionCache[cid];
   if (!_writesEnabled() || !_isUuid(cid)) return Promise.resolve(true);
   _registerLearningMapRows(cid, map);
   return _persistLearningMapToCanonical(cid, prev, map);
@@ -7102,11 +7107,24 @@ function removeCompetencies(cid, sectionIds) {
     ids[resolveLearningMapId(cid, 'section', id)] = true;
   });
   var map = ensureCustomLearningMap(cid);
-  var taken = (map.sections || []).filter(function (s) {
+  var all = map.sections || [];
+  var taken = all.filter(function (s) {
     return ids[s.id];
   });
   if (!taken.length) return 0;
-  map.sections = map.sections.filter(function (s) {
+  // Where each one sat: the competencies that came after it (removed with
+  // it or not) and its index, so putting it back returns it to its place.
+  var place = {};
+  all.forEach(function (s, i) {
+    if (!ids[s.id]) return;
+    place[s.id] = {
+      index: i,
+      beforeIds: all.slice(i + 1, i + 31).map(function (x) {
+        return x.id;
+      }),
+    };
+  });
+  map.sections = all.filter(function (s) {
     return !ids[s.id];
   });
   var now = new Date().toISOString();
@@ -7117,7 +7135,12 @@ function removeCompetencies(cid, sectionIds) {
     cid,
     taken
       .map(function (s) {
-        return { section: structuredClone(s), removedAt: now };
+        return {
+          section: structuredClone(s),
+          removedAt: now,
+          index: place[s.id].index,
+          beforeIds: place[s.id].beforeIds,
+        };
       })
       .concat(list),
   );
@@ -7133,12 +7156,26 @@ function restoreCompetency(cid, sectionId) {
   });
   if (!entry) return false;
   var map = ensureCustomLearningMap(cid);
+  var secs = map.sections || [];
   if (
-    !(map.sections || []).some(function (s) {
+    !secs.some(function (s) {
       return s.id === sectionId;
     })
   ) {
-    map.sections = (map.sections || []).concat([structuredClone(entry.section)]);
+    // Back in its place: before the first competency that followed it and
+    // is still there, else at its old position, else at the end (removed
+    // before places were kept).
+    var at = -1;
+    (entry.beforeIds || []).some(function (id) {
+      var before = resolveLearningMapId(cid, 'section', id);
+      at = secs.findIndex(function (s) {
+        return s.id === before;
+      });
+      return at >= 0;
+    });
+    if (at < 0 && typeof entry.index === 'number') at = Math.min(entry.index, secs.length);
+    if (at < 0) at = secs.length;
+    map.sections = secs.slice(0, at).concat([structuredClone(entry.section)], secs.slice(at));
   }
   _saveRemovedSections(
     cid,

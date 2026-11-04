@@ -2934,9 +2934,11 @@ a.dash-ins-name:hover {
   font-style: italic;
   font-size: var(--text-xs);
 }
-.cm-cat-save:disabled {
+.cm-cat-save:disabled,
+.cm-detail .btn-primary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  filter: none;
 }
 
 /* Reporting terms editor (same row model as categories) */
