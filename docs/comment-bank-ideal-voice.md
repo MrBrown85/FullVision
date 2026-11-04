@@ -20,6 +20,14 @@ Five to seven sentences, one gradebook fact each, two short facts joined when th
 - **One next step, as a skill** the student can practise: "find sources of error and suggest improvements".
 - **Home as an invitation**, to about a third of the class at a time: "ask her what pattern the numbers from an experiment showed".
 - **Skills in the family's words.** The skill card's phrase, inflected by rule ("finds patterns", "at finding patterns"), never the Ministry's sentence pasted in.
+- **No trend, frequency or cause the gradebook does not hold.** A strength at its level never says "more often" or "most of the time"; a rise is said only by the growth sentence; a habit carries no "so that".
+- **Highest means highest.** "Her best piece" and "her highest mark" only for a piece no other piece equals; a tie reads "one of her strongest pieces".
+- **The top strength.** The strength is the student's top competency, or one within 0.2 of it and not falling.
+- **Safety as a procedure.** A safety competency is the next step only when it is alone at the bottom, and then as a routine ("go through the safety checklist at the start of each lab").
+- **Classmates read different comments.** A frame or a phrasing one of the three students before used is not used again; no comment is within half its words of a classmate's.
+- **A comment, not a list.** Two facts that belong together join with "and"; no run of three words is said twice in one comment.
+- **Time phrases sparingly.** A sentence opens on a time in one comment of four, and never on "Right now,", "At this point,", "By now," or "For now,".
+- **Specific invitations.** Home prompts and the IE meeting line name something a family can do ("convert the millilitres on a juice carton to litres"; "please call or email me").
 - **24 words or fewer a sentence, about 15 on average.**
 - **Nothing the gradebook does not hold.** Every sentence names a fact `CommentBank.verify` can check. No comparisons with classmates, predictions, the teacher's feelings, or praise of the person.
 
