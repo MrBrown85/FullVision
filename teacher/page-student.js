@@ -189,6 +189,8 @@ window.PageStudent = (function () {
     overlay.dataset.cid = cid;
     overlay.dataset.sid = sid;
     overlay._onSaved = typeof onSaved === 'function' ? onSaved : null;
+    // Focus goes back where it came from when the dialog closes.
+    overlay._opener = document.activeElement;
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) return closeEditStudent();
       var el = e.target.closest ? e.target.closest('[data-action]') : null;
@@ -333,9 +335,31 @@ window.PageStudent = (function () {
     document.body.appendChild(overlay);
     document.getElementById('edit-first').focus();
     overlay._escHandler = function (e) {
-      if (e.key === 'Escape') closeEditStudent();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        return closeEditStudent();
+      }
+      // Focus stays inside the dialog while it is open.
+      if (e.key === 'Tab') return _trapEditFocus(overlay, e);
     };
     document.addEventListener('keydown', overlay._escHandler);
+  }
+
+  function _trapEditFocus(overlay, e) {
+    var boxes = Array.from(overlay.querySelectorAll('input, select, textarea, button')).filter(function (el) {
+      return !el.disabled && el.getAttribute('tabindex') !== '-1';
+    });
+    if (!boxes.length) return;
+    var first = boxes[0];
+    var last = boxes[boxes.length - 1];
+    var inside = overlay.contains(document.activeElement);
+    if (e.shiftKey && (document.activeElement === first || !inside)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 
   // Marks a field as needing a fix: a red edge and the line under it, until
@@ -358,7 +382,18 @@ window.PageStudent = (function () {
     if (overlay) {
       if (overlay._escHandler) document.removeEventListener('keydown', overlay._escHandler);
       overlay.remove();
+      _focusEditOpener(overlay._opener);
     }
+  }
+
+  // The button that opened the dialog, or this page's Edit Student after a
+  // redraw replaced it.
+  function _focusEditOpener(opener) {
+    var target =
+      opener && opener.isConnected && opener !== document.body
+        ? opener
+        : document.querySelector('[data-action="openEditStudent"]');
+    if (target && target.focus) target.focus();
   }
 
   function saveEditStudent() {
@@ -418,8 +453,12 @@ window.PageStudent = (function () {
       });
     }
     var onSaved = overlay._onSaved;
+    var opener = overlay._opener;
     closeEditStudent();
-    if (onSaved) return onSaved();
+    if (onSaved) {
+      onSaved();
+      return _focusEditOpener(opener);
+    }
     // Re-render sidebar with updated name
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
       activeCourse,
@@ -427,6 +466,7 @@ window.PageStudent = (function () {
       'PageStudent.switchStudent',
     );
     render();
+    _focusEditOpener(opener);
   }
 
   /* ── Tabs ───────────────────────────────────────────────── */
