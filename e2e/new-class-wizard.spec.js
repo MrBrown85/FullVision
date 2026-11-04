@@ -1,0 +1,40 @@
+import { test, expect } from '@playwright/test';
+
+/* The New Class wizard, Demo Mode. */
+
+async function enterDemo(page) {
+  await page.goto('/login.html');
+  await page.locator('#demo-mode-btn').click();
+  await page.waitForURL(/\/dashboard/);
+  await page.waitForFunction(() => getAssessments('sci8').length > 0);
+}
+
+async function openWizard(page) {
+  await page.locator('[data-action="openClassManager"]').first().click();
+  await page.locator('[data-action="cmStartCreate"]').first().click();
+  await expect(page.locator('.cw-grade-btn').first()).toBeVisible();
+}
+
+test('Choose Courses: a keyboard user Tabs to a course and ticks it with Space', async ({ page }) => {
+  await enterDemo(page);
+  await openWizard(page);
+  await page.locator('.cw-grade-btn', { hasText: 'Grade 9' }).click();
+  const subject = page.locator('.cw-subject-btn', { hasText: 'Science' }).first();
+  await subject.click();
+  await subject.focus();
+  // Tab on from the subject chips until a course row has the focus.
+  for (let i = 0; i < 15; i++) {
+    await page.keyboard.press('Tab');
+    if (await page.evaluate(() => document.activeElement.classList.contains('cw-course-item'))) break;
+  }
+  const row = page.locator('.cw-course-item').first();
+  await expect(row).toBeFocused();
+  await expect(row).toHaveAttribute('role', 'checkbox');
+  await expect(row).toHaveAttribute('aria-checked', 'false');
+  await page.keyboard.press('Space');
+  await expect(page.locator('.cw-course-item').first()).toBeFocused();
+  await expect(page.locator('.cw-course-item').first()).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('[data-action="cwGoToStep2"]')).toBeEnabled();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.cw-course-item').first()).toHaveAttribute('aria-checked', 'false');
+});

@@ -4568,6 +4568,8 @@ window.DashClassManager = (function () {
     return (
       '<div class="cw-course-item' +
       (r.on ? ' selected' : '') +
+      '" role="checkbox" tabindex="0" aria-checked="' +
+      (r.on ? 'true' : 'false') +
       '" data-action="' +
       r.action +
       '" data-tag="' +
@@ -6758,6 +6760,8 @@ window.DashClassManager = (function () {
               html +=
                 '<div class="cw-course-item' +
                 sel +
+                '" role="checkbox" tabindex="0" aria-checked="' +
+                (sel ? 'true' : 'false') +
                 '" data-action="cwToggleCourse" data-tag="' +
                 esc(c.short_tag) +
                 '">' +
@@ -9884,6 +9888,22 @@ window.DashClassManager = (function () {
       return true;
     }
     if (_cmRosterKeydown(e)) return true;
+    // A course row in New Class or Re-link ticks with Space or Enter, and
+    // keeps the focus through the redraw so the next row is one Tab away.
+    if (
+      el &&
+      el.classList &&
+      el.classList.contains('cw-course-item') &&
+      (e.key === ' ' || e.key === 'Enter') &&
+      !e.isComposing
+    ) {
+      e.preventDefault();
+      var courseTag = el.dataset.tag;
+      el.click();
+      var again = document.querySelector('.cw-course-item[data-tag="' + CSS.escape(courseTag) + '"]');
+      if (again) again.focus();
+      return true;
+    }
     // Arrow keys move between the class tabs, as in any tab list.
     if (el && el.classList && el.classList.contains('cm-tab') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
       var ids = CM_TABS.map(function (t) {
