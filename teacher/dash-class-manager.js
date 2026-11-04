@@ -1703,6 +1703,23 @@ window.DashClassManager = (function () {
     if (sum) sum.textContent = _cmRosterSummary(cid);
   }
 
+  /* What a roster box holds on record now, or null when it isn't a field. */
+  function _cmRosterSavedValue(el) {
+    var cid = cmSelectedCourse;
+    var col = el.dataset.col;
+    if (!cid) return null;
+    if (col === 'g0' || col === 'g1') {
+      var g = _cmGuardiansFor(cid, el.dataset.sid)[col === 'g0' ? 0 : 1];
+      return g ? g.email || '' : '';
+    }
+    var key = ROSTER_FIELD[col];
+    if (!key) return null;
+    var st = getStudents(cid).find(function (s) {
+      return s.id === el.dataset.sid;
+    });
+    return st ? st[key] || '' : null;
+  }
+
   function _cmSaveGuardianEmail(cid, el, email) {
     var idx = el.dataset.col === 'g0' ? 0 : 1;
     var g = _cmGuardiansFor(cid, el.dataset.sid)[idx];
@@ -1880,6 +1897,12 @@ window.DashClassManager = (function () {
       if (_cmCloseRosterPicker()) {
         e.preventDefault();
         return true;
+      }
+      // Escape cancels, as in the gradebook: the box goes back to what is
+      // saved before it loses focus, so the blur has nothing to save.
+      if (el.type !== 'checkbox') {
+        var saved = _cmRosterSavedValue(el);
+        if (saved !== null) el.value = saved;
       }
       el.blur();
       return true;
