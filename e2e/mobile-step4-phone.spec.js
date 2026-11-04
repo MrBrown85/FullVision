@@ -197,10 +197,16 @@ test('the open tab icon keeps its check mark', async ({ page }) => {
       const icon = document.querySelector('.m-tab-item[data-tab="' + t + '"] .m-tab-icon');
       const shape = icon.querySelector('circle, rect');
       const mark = icon.querySelector('.m-tab-mark');
-      return { fill: getComputedStyle(shape).fill, mark: mark && getComputedStyle(mark).stroke };
+      return {
+        fill: getComputedStyle(shape).fill,
+        mark: mark && getComputedStyle(mark).stroke,
+        // The mark is drawn after (over) the filled shape.
+        markOnTop: !!mark && !!(shape.compareDocumentPosition(mark) & Node.DOCUMENT_POSITION_FOLLOWING),
+      };
     }, tab);
     expect(colours.mark).toBeTruthy();
     expect(colours.mark).not.toBe(colours.fill);
+    expect(colours.markOnTop).toBe(true);
   }
 });
 
