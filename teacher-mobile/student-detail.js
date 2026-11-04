@@ -312,6 +312,159 @@ window.MStudentDetail = (function () {
     }
   }
 
+  /* ── The student's own words (questionnaires) ─────────────── */
+  function _voiceDay(iso) {
+    if (!iso) return '';
+    var t = new Date(String(iso).length === 10 ? iso + 'T12:00:00' : iso);
+    return isNaN(t) ? '' : t.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  }
+  function _coreLabel(id) {
+    var c = typeof getCoreCompetency === 'function' ? getCoreCompetency(id) : null;
+    return c ? c.label : id;
+  }
+  // An answer as plain text: the words, a list, or each competency's step.
+  function _answerText(q, v) {
+    if (!v) return '';
+    if (q.kind === 'scale4') {
+      var j = v.json || {};
+      var levels = j.levels || {};
+      var why = j.why && typeof j.why === 'object' ? j.why : {};
+      var steps = typeof CONFIDENCE_LABELS !== 'undefined' ? CONFIDENCE_LABELS : {};
+      var ids = (q.core_ids || []).length ? q.core_ids : Object.keys(levels);
+      return ids
+        .filter(function (k) {
+          return levels[k] || why[k];
+        })
+        .map(function (k) {
+          return _coreLabel(k) + ': ' + (steps[levels[k]] || 'No step') + (why[k] ? '. ' + why[k] : '');
+        })
+        .join('\n');
+    }
+    if (q.kind === 'core_pick' && v.text) return _coreLabel(String(v.text).trim());
+    if (Array.isArray(v.json))
+      return v.json
+        .filter(function (x) {
+          return String(x || '').trim();
+        })
+        .join(', ');
+    if (v.text != null && String(v.text).trim()) return String(v.text);
+    return v.num != null ? String(v.num) : '';
+  }
+  function _qaHtml(items) {
+    return items
+      .map(function (it) {
+        var t = _answerText(it.q, it.v);
+        if (!t) return '';
+        return (
+          '<div class="m-st-goal-label">' +
+          MC.esc(it.q.prompt || '') +
+          '</div><div class="m-st-goal-text m-st-voice-text">' +
+          MC.esc(t) +
+          '</div>'
+        );
+      })
+      .join('');
+  }
+
+  /* { goals, words }: the student's own goals (course goal with its
+     check-in, Core Competency goal), and About Me with each reflection.
+     The answers load once per class; the panels redraw when they arrive. */
+  // html-safe: prompts, answers, names and titles go through MC.esc.
+  function _voiceHtml(cid, sid, firstName) {
+    var out = { goals: '', words: '' };
+    if (typeof StudentVoice === 'undefined') return out;
+    if (!StudentVoice.loaded(cid)) {
+      StudentVoice.load(cid, function () {
+        refreshPanels(cid, ['goals', 'profile']);
+      });
+      if (!StudentVoice.loaded(cid)) return out;
+    }
+    var list = StudentVoice.entries(cid, sid);
+    var model = StudentVoice.profile(list);
+    var first = MC.esc(firstName);
+    var from = function (at) {
+      return 'From ' + first + (at ? ' · ' + MC.esc(_voiceDay(at)) : '');
+    };
+    var a = model.about;
+    var c = model.checkin;
+    var course = (COURSES[cid] && COURSES[cid].name) || 'Course';
+    var goals = '';
+    if ((a && a.goal && a.goal.v) || (c && c.status && c.status.v)) {
+      goals +=
+        '<div class="m-st-goal"><div class="m-st-goal-name">' +
+        MC.esc(course + ' Goal') +
+        '</div>' +
+        (a && a.goal && a.goal.v
+          ? '<div class="m-st-goal-label">' +
+            from(a.at) +
+            '</div><div class="m-st-goal-text m-st-voice-text">' +
+            MC.esc(_answerText(a.goal.q, a.goal.v)) +
+            '</div>'
+          : '') +
+        (c && c.status && c.status.v
+          ? '<div class="m-st-goal-label">Check-In · ' +
+            MC.esc(_voiceDay(c.at)) +
+            '</div><div class="m-st-goal-text">' +
+            MC.esc(_answerText(c.status.q, c.status.v)) +
+            (c.next && c.next.v ? ' · ' + MC.esc(_answerText(c.next.q, c.next.v)) : '') +
+            '</div>'
+          : '') +
+        '</div>';
+    }
+    if (c && c.core && c.core.v) {
+      goals +=
+        '<div class="m-st-goal"><div class="m-st-goal-name">Core Competency Goal · ' +
+        MC.esc(_answerText(c.core.q, c.core.v)) +
+        '</div><div class="m-st-goal-label">' +
+        from(c.at) +
+        '</div><div class="m-st-goal-text m-st-voice-text">' +
+        (c.coreGoal && c.coreGoal.v
+          ? MC.esc(_answerText(c.coreGoal.q, c.coreGoal.v))
+          : '<span class="m-st-muted">No answer</span>') +
+        '</div></div>';
+    }
+    if (goals)
+      out.goals =
+        '<div class="m-list-inset-header">' + first + '’s Own Goals</div><div class="m-st-list">' + goals + '</div>';
+
+    var words = '';
+    if (a) {
+      var aboutQa = _qaHtml(
+        [a.say, a.languages, a.learns, a.goodAt, a.hard, a.outside]
+          .concat(a.rest || [], [a.note])
+          .filter(function (it) {
+            return it && it.v;
+          }),
+      );
+      if (aboutQa)
+        words +=
+          '<div class="m-st-goal"><div class="m-st-goal-name">About Me</div><div class="m-st-goal-label">' +
+          from(a.at) +
+          '</div>' +
+          aboutQa +
+          '</div>';
+    }
+    model.reflections.forEach(function (e) {
+      var qa = _qaHtml(e.items);
+      if (!qa) return;
+      words +=
+        '<div class="m-st-goal"><div class="m-st-goal-name">' +
+        MC.esc(e.title || 'Reflection') +
+        '</div><div class="m-st-goal-label">' +
+        from(e.at) +
+        '</div>' +
+        qa +
+        '</div>';
+    });
+    out.words =
+      '<div class="m-list-inset-header">In ' +
+      first +
+      '’s Words</div><div class="m-st-list">' +
+      (words || '<div class="m-st-goal"><div class="m-st-muted">No answers from ' + first + ' yet.</div></div>') +
+      '</div>';
+    return out;
+  }
+
   /* Show one tab of the student screen that holds `el`. */
   function selectTab(el, id) {
     if (!_isTab(id)) return;
@@ -467,8 +620,9 @@ window.MStudentDetail = (function () {
     var cells = termAssess.map(function (a) {
       return { a: a, cell: assessmentCellValue(cid, sid, a) };
     });
+    // A deleted one waiting on its Undo is already gone from the list.
     var obs = getStudentQuickObs(cid, sid).filter(function (o) {
-      return _obsInTerm(o, term);
+      return _obsInTerm(o, term) && !(window.MObserve && MObserve.isPending && MObserve.isPending(o.id));
     });
 
     // Assessments
@@ -542,7 +696,6 @@ window.MStudentDetail = (function () {
         evidenceHtml += MObserve.cardHtml(cid, Object.assign({ studentId: sid }, ob), obsCtx, {
           showStudent: false,
           when: 'date',
-          editable: false,
         });
       });
     }
@@ -578,6 +731,11 @@ window.MStudentDetail = (function () {
         '</div>';
     });
 
+    // The student's own words from questionnaires: their goals on Goals,
+    // About Me and reflections on Learner Profile, as on the desktop page.
+    var voice = _voiceHtml(cid, sid, displayNameFirst(st));
+    goalsHtml = voice.goals + goalsHtml;
+
     // Learner Profile
     var dimGroups = [
       { name: 'Learning Dispositions', dims: typeof LEARNING_DIMS !== 'undefined' ? LEARNING_DIMS : [] },
@@ -585,7 +743,7 @@ window.MStudentDetail = (function () {
     ];
     var seen = 0;
     var allDims = 0;
-    var profileHtml = '<div class="m-list-inset-header m-st-profile-h">Seen in Observations</div>';
+    var profileHtml = voice.words + '<div class="m-list-inset-header m-st-profile-h">Seen in Observations</div>';
     dimGroups.forEach(function (gp) {
       profileHtml += '<div class="m-list-inset-header">' + MC.esc(gp.name) + '</div><div class="m-st-list">';
       gp.dims.forEach(function (d) {
@@ -678,9 +836,44 @@ window.MStudentDetail = (function () {
     );
   }
 
+  /* After an observation is edited, deleted or put back from the student's
+     page, its Evidence list and count are drawn again in place. */
+  function refreshEvidence(cid) {
+    refreshPanels(cid, ['evidence']);
+  }
+
+  /* Draws some of the open student screen's panels (and their tab stats)
+     again in place, keeping the tab strip and where it is scrolled. */
+  function refreshPanels(cid, ids) {
+    var screen = document.getElementById('m-screen-student-detail');
+    if (!screen) return;
+    var desc = null;
+    try {
+      desc = JSON.parse(screen.getAttribute('data-restore') || 'null');
+    } catch (e) {
+      desc = null;
+    }
+    if (!desc || !desc.sid) return;
+    var tmp = document.createElement('div');
+    if (!window.MStudents || !MStudents.renderDetail) return;
+    // html-safe: MStudents.renderDetail escapes its text (checked where the shell places it).
+    tmp.innerHTML = MStudents.renderDetail(cid, desc.sid);
+    ids.forEach(function (id) {
+      var fresh = tmp.querySelector('#m-st-panel-' + id);
+      var panel = screen.querySelector('#m-st-panel-' + id);
+      // html-safe: the panel comes from MStudents.renderDetail above.
+      if (fresh && panel) panel.innerHTML = fresh.innerHTML;
+      var freshStat = tmp.querySelector('.m-st-tab[data-tab="' + id + '"] .m-st-tab-stat');
+      var stat = screen.querySelector('.m-st-tab[data-tab="' + id + '"] .m-st-tab-stat');
+      if (freshStat && stat) stat.textContent = freshStat.textContent;
+    });
+  }
+
   return {
     renderDetail: renderDetail,
     selectTab: selectTab,
     scrollActiveTab: scrollActiveTab,
+    refreshEvidence: refreshEvidence,
+    refreshPanels: refreshPanels,
   };
 })();

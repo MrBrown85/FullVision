@@ -247,6 +247,146 @@ describe('Questionnaires tab', () => {
     expect(Questionnaires.find(CID, x => x.id === q.id).questions).toHaveLength(8);
   });
 
+  it('Remove offers Undo, which puts the question back in its place with its id', async () => {
+    var toasts = [];
+    var stub = globalThis.showUndoToast;
+    globalThis.showUndoToast = (msg, undo) => toasts.push({ msg, undo });
+    try {
+      var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
+      var before = Questionnaires.find(CID, x => x.id === q.id).questions.map(x => x.id);
+      mount();
+      click('[data-action="sqToggleQuestions"]');
+      mount();
+      expect(root.querySelector('[data-action="sqRemoveQuestion"][data-idx="1"]').getAttribute('aria-label')).toBe(
+        'Remove question 2',
+      );
+      click('[data-action="sqRemoveQuestion"][data-idx="1"]');
+      await tick();
+      expect(Questionnaires.find(CID, x => x.id === q.id).questions).toHaveLength(7);
+      expect(toasts.map(t => t.msg)).toEqual(['Question 2 removed']);
+      toasts[0].undo();
+      await tick();
+      expect(Questionnaires.find(CID, x => x.id === q.id).questions.map(x => x.id)).toEqual(before);
+    } finally {
+      globalThis.showUndoToast = stub;
+    }
+  });
+
+  it('the switch shows On as soon as it is clicked, while the save is still going', async () => {
+    var stubV2 = window.v2;
+    var finish;
+    try {
+      globalThis.isDemoMode = () => false;
+      Questionnaires._reset();
+      window.v2 = Object.assign({}, stubV2, {
+        listCourseQuestionnaires: () => Promise.resolve({ data: [] }),
+        listQuestionnaireTemplates: () => Promise.resolve({ data: null }),
+        upsertQuestionnaire: () => new Promise(r => (finish = r)),
+      });
+      await Questionnaires.load(CID);
+      var draws = 0;
+      DashClassManager.renderClassManager = () => {
+        draws++;
+        mount();
+      };
+      mount();
+      click('[data-card="about-me"] .seg-btn[data-on="1"]');
+      expect(draws).toBe(1);
+      expect(root.querySelector('[data-card="about-me"] .seg-btn[data-on="1"]').getAttribute('aria-checked')).toBe(
+        'true',
+      );
+      finish({ data: null });
+      await tick();
+      // A save that failed goes back to Off and says so.
+      var card = root.querySelector('[data-card="about-me"]');
+      expect(card.querySelector('.seg-btn[data-on="0"]').getAttribute('aria-checked')).toBe('true');
+      expect(card.querySelector('.sq-msg').textContent).toContain('Could not turn this on');
+    } finally {
+      window.v2 = stubV2;
+    }
+  });
+
+  it('answers sent since the last read show when the tab is opened again', async () => {
+    var stubV2 = window.v2;
+    var realNow = Date.now;
+    var answered = [];
+    try {
+      globalThis.isDemoMode = () => false;
+      Questionnaires._reset();
+      var row = {
+        id: '11111111-1111-1111-1111-111111111111',
+        course_id: CID,
+        kind: 'about_me',
+        title: 'About Me',
+        template_id: 'about-me',
+        is_on: true,
+        opens_on: '2000-01-01',
+        closes_on: '2999-01-01',
+        questions: [],
+      };
+      var reads = 0;
+      window.v2 = Object.assign({}, stubV2, {
+        listCourseQuestionnaires: () => {
+          reads++;
+          return Promise.resolve({ data: [Object.assign({}, row, { answered: answered.slice() })] });
+        },
+        listQuestionnaireTemplates: () => Promise.resolve({ data: null }),
+      });
+      await Questionnaires.load(CID);
+      DashClassManager.renderClassManager = () => mount();
+      mount();
+      expect(root.querySelector('[data-card="about-me"] .sq-facts').textContent).toContain('0 of 3');
+      expect(reads).toBe(1);
+
+      // Maya answers; a teacher opening the tab again within 15 s reads nothing new.
+      answered = ['e1'];
+      mount();
+      expect(reads).toBe(1);
+      // Later, opening it reads again and shows her answer.
+      var t = realNow() + 20000;
+      Date.now = () => t;
+      mount();
+      await tick();
+      expect(reads).toBe(2);
+      expect(root.querySelector('[data-card="about-me"] .sq-facts').textContent).toContain('1 of 3');
+    } finally {
+      Date.now = realNow;
+      window.v2 = stubV2;
+    }
+  });
+
+  it('prints one student’s slip alone, Not Answered first, and says a new slip replaces the old one', async () => {
+    var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
+    q.answered = ['e1'];
+    var asked = [];
+    var stubIssue = Questionnaires.issueCodes;
+    var stubPrint = QrSlips.print;
+    Questionnaires.issueCodes = (cid, qid, ids) => {
+      asked.push(ids);
+      return Promise.resolve({ data: ids.map(id => ({ enrollment_id: id, code: 'ABC-DEF' })) });
+    };
+    var printed = [];
+    QrSlips.print = (cid, qq, codes) => printed.push(codes);
+    try {
+      mount();
+      var card = root.querySelector('[data-card="about-me"]');
+      var pick = card.querySelector('select[data-action-change="sqPrintOne"]');
+      expect(Array.from(pick.querySelectorAll('optgroup')).map(g => g.getAttribute('label'))).toEqual([
+        'Not Answered',
+        'Answered',
+      ]);
+      expect(card.textContent).toContain('A new slip replaces the one that student already has');
+      pick.querySelector('option[value="e3"]').selected = true;
+      DashClassManager.handleChange(pick);
+      await tick();
+      expect(asked).toEqual([['e3']]);
+      expect(printed[0]).toEqual([{ enrollment_id: 'e3', code: 'ABC-DEF' }]);
+    } finally {
+      Questionnaires.issueCodes = stubIssue;
+      QrSlips.print = stubPrint;
+    }
+  });
+
   it('refuses dates that close before they open', async () => {
     var q = await Questionnaires.turnOn(CID, { kind: 'about_me', template_id: 'about-me' });
     mount();

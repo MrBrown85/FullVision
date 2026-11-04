@@ -31,7 +31,7 @@ test.describe('Student page Evidence panel', () => {
     const tabs = panel.getByRole('tab');
     await expect(tabs).toHaveText([
       new RegExp('^All ' + start + '$'),
-      /^By competency \d+$/,
+      /^By Competency \d+$/,
       /^Assessments \d+$/,
       /^Concerns \d+$/,
     ]);

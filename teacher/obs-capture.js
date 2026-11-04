@@ -640,6 +640,20 @@ window.ObsCapture = (function () {
       return out;
     }
 
+    /* The flag shows on the roster at once, and Undo takes it off. */
+    function _flagShown(fcid, sid) {
+      if (typeof refreshRosterRows === 'function') refreshRosterRows();
+      if (typeof showUndoToast !== 'function') return;
+      var s = studentList(fcid).find(function (x) {
+        return x.id === sid;
+      });
+      showUndoToast((s ? s.first || s.name : 'Student') + ' flagged', function () {
+        if (typeof isStudentFlagged === 'function' && isStudentFlagged(fcid, sid)) toggleFlag(fcid, sid);
+        if (typeof refreshRosterRows === 'function') refreshRosterRows();
+        if (typeof opts.onFlag === 'function') opts.onFlag(sid);
+      });
+    }
+
     function renderFlag() {
       if (state.error) return '<span class="obsc-error" role="alert">' + esc(state.error) + '</span>';
       if (!state.flagOffer.length) return '';
@@ -923,6 +937,7 @@ window.ObsCapture = (function () {
       } else if (!sg.items.length) {
         return '';
       } else {
+        if (sg.items[0].create) h += '<div class="obsc-menu-empty">No tag called “' + esc(sg.query) + '” yet.</div>';
         sg.items.forEach(function (it, i) {
           h +=
             '<div class="obsc-item' +
@@ -1218,6 +1233,10 @@ window.ObsCapture = (function () {
           .map(function (t) {
             return { label: t.label, value: t.key, dot: t.color };
           });
+        // A #word that names no tag says so and offers to make it. Nothing
+        // is highlighted, so Enter still adds the observation.
+        if (!items.length && tok.query)
+          items = [{ label: '+ New Tag “' + tok.query + '”', value: tok.query, create: true }];
       } else if (tok.kind === '!') {
         items = matchTypes(tok.query).map(function (k) {
           return { label: OBS_SENTIMENTS[k] ? OBS_SENTIMENTS[k].label : k, value: k };
@@ -1232,7 +1251,7 @@ window.ObsCapture = (function () {
       state.menu = null;
       // With no starter to pick, nothing is highlighted, so Enter still adds
       // the observation instead of leaving for Class Management.
-      var index = tok.kind === '/' && !items.length ? -1 : 0;
+      var index = (tok.kind === '/' && !items.length) || (items[0] && items[0].create) ? -1 : 0;
       state.suggest = { kind: tok.kind, query: tok.query, start: tok.start, end: tok.end, items: items, index: index };
       render();
     }
@@ -1287,7 +1306,12 @@ window.ObsCapture = (function () {
         useStarter(sg.items[i].value, { start: sg.start, end: sg.end });
         return;
       }
-      applyPick(sg.kind, sg.items[i].value);
+      var pickValue = sg.items[i].value;
+      if (sg.items[i].create) {
+        if (typeof addCustomTag === 'function') addCustomTag(cid, pickValue);
+        pickValue = 'tag:' + pickValue;
+      }
+      applyPick(sg.kind, pickValue);
       var v = input.value;
       var before = v.slice(0, sg.start);
       var after = v.slice(sg.end).replace(/^[ \t]+/, '');
@@ -1485,13 +1509,14 @@ window.ObsCapture = (function () {
       else if (act === 'editStarters') editStarters();
       else if (act === 'add') submit();
       else if (act === 'flag') {
-        if (typeof isStudentFlagged === 'function' && !isStudentFlagged(cid, val) && typeof toggleFlag === 'function') {
-          toggleFlag(cid, val);
-        }
+        var flaggedNow =
+          typeof isStudentFlagged === 'function' && !isStudentFlagged(cid, val) && typeof toggleFlag === 'function';
+        if (flaggedNow) toggleFlag(cid, val);
         state.flagOffer = state.flagOffer.filter(function (s) {
           return s !== val;
         });
         render();
+        if (flaggedNow) _flagShown(cid, val);
         if (typeof opts.onFlag === 'function') opts.onFlag(val);
       } else if (act === 'notNow') {
         state.flagOffer = [];

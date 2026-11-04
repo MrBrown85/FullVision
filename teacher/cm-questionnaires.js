@@ -13,12 +13,14 @@ var CmQuestionnaires = (function () {
   'use strict';
 
   var PERIOD_NAMES = { 1: 'November', 2: 'March', 3: 'June' };
+  var FRESH_MS = 15000;
   var _open = {}; // qid -> questions shown
   var _dates = {}; // qid -> the date editor's { opens, closes } while it is open
   var _grade = {}; // cid -> grade picked for a class with no single grade
   var _msg = {}; // qid or card key -> a line under the card's buttons
   var _saving = {}; // qid -> the save in flight, so saves go one at a time
   var _draft = {}; // qid -> a new question shown but not saved until it has words
+  var _turning = {}; // card key -> true while a first turn-on saves, so the switch shows On at once
 
   function _rerender() {
     if (typeof DashClassManager !== 'undefined' && DashClassManager.renderClassManager) {
@@ -183,6 +185,32 @@ var CmQuestionnaires = (function () {
     });
   }
 
+  /* One student's slip, for a lost or locked one: only that student's old
+     slip stops working. Not Answered students come first. */
+  // html-safe: names are escaped; ids are the class's student ids.
+  function _printOneHtml(cid, q) {
+    var left = _notAnswered(cid, q);
+    var leftIds = {};
+    left.forEach(function (s) {
+      leftIds[s.id] = true;
+    });
+    var rest = getStudents(cid).filter(function (s) {
+      return !leftIds[s.id];
+    });
+    var opt = function (s) {
+      return '<option value="' + esc(s.id) + '">' + esc(fullName(s)) + '</option>';
+    };
+    return (
+      '<select class="cm-input sq-print-one" data-action-change="sqPrintOne" data-qid="' +
+      q.id +
+      '" aria-label="Print one student’s slip">' +
+      '<option value="">Print One Slip…</option>' +
+      (left.length ? '<optgroup label="Not Answered">' + left.map(opt).join('') + '</optgroup>' : '') +
+      (rest.length ? '<optgroup label="Answered">' + rest.map(opt).join('') + '</optgroup>' : '') +
+      '</select>'
+    );
+  }
+
   function _actions(cid, q) {
     var shown = !!_open[q.id];
     var left = _notAnswered(cid, q).length;
@@ -199,6 +227,7 @@ var CmQuestionnaires = (function () {
           left +
           ' Not Answered</button>'
         : '') +
+      _printOneHtml(cid, q) +
       '<button type="button" class="cm-action-btn" data-action="sqToggleQuestions" data-qid="' +
       q.id +
       '" aria-expanded="' +
@@ -211,7 +240,8 @@ var CmQuestionnaires = (function () {
       '" aria-expanded="' +
       !!_dates[q.id] +
       '">Change Dates</button>' +
-      '</div>';
+      '</div>' +
+      '<div class="cm-hint sq-print-hint">A new slip replaces the one that student already has; the old code stops working.</div>';
     var d = _dates[q.id];
     if (d) {
       html +=
@@ -316,6 +346,8 @@ var CmQuestionnaires = (function () {
       q.id +
       '" data-idx="' +
       idx +
+      '" aria-label="Remove question ' +
+      (idx + 1) +
       '">Remove</button></div>' +
       '<label class="sq-vh" for="' +
       id +
@@ -419,7 +451,7 @@ var CmQuestionnaires = (function () {
 
   function _card(opts) {
     var q = opts.q;
-    var on = !!(q && q.is_on);
+    var on = !!(q && q.is_on) || (!q && !!_turning[opts.key]);
     var html =
       '<article class="sq-card' +
       (on ? '' : ' sq-off') +
@@ -517,6 +549,19 @@ var CmQuestionnaires = (function () {
       });
       return '<div class="cm-section"><div class="cm-hint">Loading questionnaires…</div></div>';
     }
+    // Answers sent since the last read show when the tab opens again,
+    // redrawn only when who has answered changed.
+    var answeredSig = function () {
+      return Questionnaires.list(cid)
+        .map(function (x) {
+          return x.id + ':' + (x.answered || []).length + ':' + !!x.is_on;
+        })
+        .join('|');
+    };
+    var was = answeredSig();
+    Questionnaires.refreshIfStale(cid, FRESH_MS, function (loadedCid) {
+      if (loadedCid === cid && answeredSig() !== was) _rerender();
+    });
     var current = Questionnaires.periodFor(new Date());
     var reflections = Questionnaires.list(cid).filter(function (x) {
       return x.kind === 'core_reflection';
@@ -582,7 +627,12 @@ var CmQuestionnaires = (function () {
     };
     if (!spec.template_id && !spec.id) return;
     delete _msg[key];
-    return Questionnaires.turnOn(cid, spec).then(function (q) {
+    // The switch shows On while it saves (the sync dot shows the save).
+    _turning[key] = true;
+    var saving = Questionnaires.turnOn(cid, spec);
+    _rerender();
+    return saving.then(function (q) {
+      delete _turning[key];
       if (!q) {
         _msg[key] = 'Could not turn this on. Check the connection and try again.';
         _rerender();
@@ -603,14 +653,16 @@ var CmQuestionnaires = (function () {
     });
   }
 
-  function _print(cid, qid, missingOnly) {
+  function _print(cid, qid, missingOnly, onlyIds) {
     var q = _find(cid, qid);
     if (!q) return;
-    var ids = missingOnly
-      ? _notAnswered(cid, q).map(function (s) {
-          return s.id;
-        })
-      : null;
+    var ids = onlyIds
+      ? onlyIds
+      : missingOnly
+        ? _notAnswered(cid, q).map(function (s) {
+            return s.id;
+          })
+        : null;
     _msg[qid] = 'Making slips…';
     _rerender();
     return Questionnaires.issueCodes(cid, qid, ids).then(function (res) {
@@ -640,7 +692,9 @@ var CmQuestionnaires = (function () {
         if (el.dataset.on === '1') {
           if (!q || !q.is_on) _turnOn(cid, el);
         } else if (q && q.is_on) {
+          // setOn changes the copy at once; draw it now, not after the save.
           Questionnaires.setOn(cid, q.id, false).then(_rerender);
+          _rerender();
         }
         return true;
       case 'sqGoalOn': {
@@ -711,10 +765,23 @@ var CmQuestionnaires = (function () {
         return true;
       case 'sqRemoveQuestion': {
         if (!q || idx < 0) return true;
+        var gone = _questions(q)[idx];
+        if (!gone) return true;
         var rest = _questions(q).filter(function (x, i) {
           return i !== idx;
         });
         _save(cid, q, { questions: rest }).then(_rerender);
+        // Undo puts it back in its place, with its id, so any answers to it
+        // show under it again.
+        if (typeof showUndoToast === 'function') {
+          showUndoToast('Question ' + (idx + 1) + ' removed', function () {
+            var cur = _find(cid, q.id);
+            if (!cur) return;
+            var back = _questions(cur).slice();
+            back.splice(Math.min(idx, back.length), 0, gone);
+            _save(cid, cur, { questions: back }).then(_rerender);
+          });
+        }
         return true;
       }
       case 'sqCoreRemove': {
@@ -740,6 +807,12 @@ var CmQuestionnaires = (function () {
     if (el.dataset.actionChange === 'sqGrade') {
       _grade[cid] = el.value ? Number(el.value) : null;
       _rerender();
+      return true;
+    }
+    if (el.dataset.actionChange === 'sqPrintOne') {
+      var sid = el.value;
+      el.selectedIndex = 0;
+      if (sid) _print(cid, el.dataset.qid, false, [sid]);
       return true;
     }
     if (el.dataset.actionChange === 'sqCoreAdd') {
@@ -801,6 +874,7 @@ var CmQuestionnaires = (function () {
     _msg = {};
     _saving = {};
     _draft = {};
+    _turning = {};
   }
 
   return {

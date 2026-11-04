@@ -15,6 +15,7 @@ var StudentVoice = (function () {
 
   var _resp = {}; // cid -> {questionnaire id: {enrollment id: [response]}}
   var _loading = {};
+  var _at = {}; // cid -> when the answers were last read
 
   function _demo() {
     return typeof isDemoMode === 'function' && isDemoMode();
@@ -59,10 +60,21 @@ var StudentVoice = (function () {
         : Promise.resolve(),
     ]).then(function () {
       delete _loading[cid];
+      _at[cid] = Date.now();
       if (!Object.prototype.hasOwnProperty.call(_resp, cid)) _resp[cid] = {};
       if (onChange) onChange(cid);
     });
     return _loading[cid];
+  }
+
+  /* Reads the answers again when they are older than `ms`, so a student's
+     answer sent since shows when the teacher opens the page again. */
+  function refreshIfStale(cid, ms, onChange) {
+    if (!cid || _demo() || _loading[cid] || !loaded(cid)) return false;
+    if (_at[cid] && Date.now() - _at[cid] < ms) return false;
+    // load() reads the questionnaires again too, with their answered lists.
+    load(cid, onChange);
+    return true;
   }
 
   function _has(v) {
@@ -108,6 +120,7 @@ var StudentVoice = (function () {
           title: q.title,
           theme: q.theme,
           report_period: q.report_period,
+          period: _period(cid, q),
           at: r.submitted_at,
           items: items,
         });
@@ -116,6 +129,57 @@ var StudentVoice = (function () {
     return out.sort(function (a, b) {
       return String(b.at || '').localeCompare(String(a.at || ''));
     });
+  }
+
+  // A Goal Check-In belongs to the reporting period of the reflection it follows.
+  function _period(cid, q) {
+    if (q.report_period != null) return q.report_period;
+    if (!q.parent_id) return null;
+    var parent = Questionnaires.list(cid).find(function (p) {
+      return p.id === q.parent_id;
+    });
+    return parent && parent.report_period != null ? parent.report_period : null;
+  }
+
+  /* The Core Competencies as the student answered them for one reporting
+     period: {COL: {level, text, goal, at}}. The step and why come from the
+     reflection's self-assessment, the goal from the Goal Check-In's
+     competency pick; a newer answer replaces an older one. */
+  function coreSelf(list, period) {
+    var out = {};
+    var slot = function (k, at) {
+      if (!out[k]) out[k] = { level: null, text: '', goal: '', at: at, fromStudent: true };
+      if (String(at || '') > String(out[k].at || '')) out[k].at = at;
+      return out[k];
+    };
+    list
+      .filter(function (e) {
+        return e.period === period && (e.kind === 'core_reflection' || e.kind === 'goal_checkin');
+      })
+      .slice()
+      .reverse()
+      .forEach(function (e) {
+        if (e.kind === 'core_reflection') {
+          e.items.forEach(function (it) {
+            if (it.q.kind !== 'scale4' || !it.v) return;
+            var j = it.v.json || {};
+            var levels = j.levels || {};
+            var why = j.why && typeof j.why === 'object' ? j.why : {};
+            (it.q.core_ids || []).forEach(function (k) {
+              if (!levels[k] && !why[k]) return;
+              var o = slot(k, e.at);
+              if (levels[k]) o.level = Number(levels[k]);
+              if (why[k]) o.text = String(why[k]);
+            });
+          });
+        } else {
+          var c = _checkin(e);
+          var pick = c && c.core && c.core.v ? String(c.core.v.text || '').trim() : '';
+          var goal = c && c.coreGoal && c.coreGoal.v ? String(c.coreGoal.v.text || '').trim() : '';
+          if (pick && goal) slot(pick, e.at).goal = goal;
+        }
+      });
+    return out;
   }
 
   function _find(items, pred) {
@@ -221,8 +285,17 @@ var StudentVoice = (function () {
   function _reset() {
     _resp = {};
     _loading = {};
+    _at = {};
   }
 
-  return { load: load, loaded: loaded, entries: entries, profile: profile, _reset: _reset };
+  return {
+    load: load,
+    loaded: loaded,
+    refreshIfStale: refreshIfStale,
+    entries: entries,
+    profile: profile,
+    coreSelf: coreSelf,
+    _reset: _reset,
+  };
 })();
 if (typeof window !== 'undefined') window.StudentVoice = StudentVoice;

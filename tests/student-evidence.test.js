@@ -216,11 +216,13 @@ describe('Evidence panel in the page', () => {
 
   it('shows one Evidence panel with tabs, counts and cards newest first, without the name', () => {
     expect($('#ev-title').textContent).toBe('Observations');
-    expect(tabText()).toEqual(['All 3', 'By competency 0', 'Assessments 1', 'Concerns 1']);
+    expect(tabText()).toEqual(['All 3', 'By Competency 0', 'Assessments 1', 'Concerns 1']);
     expect(cardIds()).toEqual(['o3', 'o2', 'o1']);
     expect($('#ev-list .obs-card-student')).toBeNull();
     expect($('#ev-list .obs-card-with')).toBeNull();
-    expect($('#ev-list .obs-card').getAttribute('data-action')).toBeNull();
+    // A card opens the edit window (the Observations page's, over this page).
+    expect($('#ev-list .obs-card').getAttribute('data-action')).toBe('evEditOb');
+    expect($('#ev-list .obs-card').getAttribute('tabindex')).toBe('0');
   });
 
   it('draws a mark per observation and labels the gap', () => {
@@ -251,7 +253,7 @@ describe('Evidence panel in the page', () => {
     input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     // "Left the lab early" by text, "Strong graph" by its assessment title.
     expect(cardIds()).toEqual(['o3', 'o2']);
-    expect(tabText()).toEqual(['All 2', 'By competency 0', 'Assessments 1', 'Concerns 1']);
+    expect(tabText()).toEqual(['All 2', 'By Competency 0', 'Assessments 1', 'Concerns 1']);
     $('[data-ev-tab="concerns"]').click();
     expect(cardIds()).toEqual(['o3']);
     input.value = 'zebra';
@@ -313,7 +315,10 @@ describe('Evidence panel in the page', () => {
     store = [];
     StudentEvidence.refresh();
     expect($('#ev-list').textContent).toBe('No observations yet. Add one above.');
-    expect($('#ev-timeline').innerHTML).toBe('');
+    // An empty strip keeps its height, so the capture box below it stays put.
+    expect($('#ev-timeline').hidden).toBe(false);
+    expect($('.ev-tl-range').textContent).toBe('All time · No observations yet');
+    expect($$('.ev-tl-mark')).toHaveLength(0);
     $('[data-ev-tab="concerns"]').click();
     expect($('#ev-list').textContent).toBe('No concerns recorded.');
   });

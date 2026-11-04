@@ -122,37 +122,78 @@ window.PageStudent = (function () {
   }
 
   /* ── Goal editing ───────────────────────────────────────── */
+  /* An open editor in a No Goal Yet row takes the row's whole width, so a
+     one-sentence goal fits without scrolling. */
+  function _markEditing(editId, on) {
+    var area = document.getElementById(editId);
+    if (!area) return;
+    var part = area.closest('.stu-goal-part');
+    var row = area.closest('.gl-row');
+    if (part) part.classList.toggle('is-editing', on);
+    if (row) row.classList.toggle('gl-editing', on || !!row.querySelector('.stu-goal-part.is-editing'));
+  }
   function editGoal(secId) {
     document.getElementById('goal-edit-' + secId).style.display = '';
     document.getElementById('goal-text-' + secId).style.display = 'none';
+    _markEditing('goal-edit-' + secId, true);
     document.getElementById('goal-input-' + secId).focus();
   }
   function cancelGoalEdit(secId) {
     document.getElementById('goal-edit-' + secId).style.display = 'none';
     document.getElementById('goal-text-' + secId).style.display = '';
+    _markEditing('goal-edit-' + secId, false);
+    _focusEditButton('editGoal', secId);
+  }
+  // Back on the + Goal / Edit button the editor came from.
+  function _focusEditButton(action, secId) {
+    var btn = document.querySelector('[data-action="' + action + '"][data-secid="' + secId + '"]');
+    if (btn) btn.focus();
   }
   async function saveGoalField(secId) {
     var text = (document.getElementById('goal-input-' + secId).value || '').trim();
     var cid = activeCourse;
-    var goals = getGoals(cid);
-    if (!goals[studentId]) goals[studentId] = {};
-    goals[studentId][secId] = text;
-    saveGoals(cid, goals);
-    if (typeof setGoalDate === 'function') setGoalDate(cid, studentId, secId, text ? new Date().toISOString() : null);
-    if (window.v2 && _isUuid && _isUuid(studentId)) {
-      await window.v2.saveGoal(studentId, secId, text);
-    }
+    var sid = studentId;
+    var was = (getGoals(cid)[sid] || {})[secId] || '';
+    var wasDate = (typeof getGoalDates === 'function' ? (getGoalDates(cid)[sid] || {})[secId] : null) || null;
+    var saving = _writeGoal(cid, sid, secId, text, text ? new Date().toISOString() : null);
     render();
+    // A goal taken away (Remove Goal, or its text cleared) can be put back.
+    if (was && !text && typeof showUndoToast === 'function') {
+      showUndoToast('Goal removed', function () {
+        _writeGoal(cid, sid, secId, was, wasDate);
+        if (activeCourse === cid && studentId === sid) render();
+      });
+    }
+    await saving;
+  }
+  function _writeGoal(cid, sid, secId, text, date) {
+    var goals = getGoals(cid);
+    if (!goals[sid]) goals[sid] = {};
+    goals[sid][secId] = text;
+    saveGoals(cid, goals);
+    if (typeof setGoalDate === 'function') setGoalDate(cid, sid, secId, text ? date : null);
+    if (window.v2 && _isUuid && _isUuid(sid)) return window.v2.saveGoal(sid, secId, text);
+    return Promise.resolve();
+  }
+  function removeGoal(secId) {
+    var box = document.getElementById('goal-input-' + secId);
+    if (box) box.value = '';
+    return saveGoalField(secId);
   }
 
   /* ── Reflection editing ─────────────────────────────────── */
   function editReflection(secId) {
     document.getElementById('refl-edit-' + secId).style.display = '';
     document.getElementById('refl-text-' + secId).style.display = 'none';
+    _markEditing('refl-edit-' + secId, true);
+    // Typing goes straight into the box, as it does for + Goal.
+    document.getElementById('refl-input-' + secId).focus();
   }
   function cancelReflEdit(secId) {
     document.getElementById('refl-edit-' + secId).style.display = 'none';
     document.getElementById('refl-text-' + secId).style.display = '';
+    _markEditing('refl-edit-' + secId, false);
+    _focusEditButton('editReflection', secId);
   }
   async function saveReflField(secId) {
     var text = (document.getElementById('refl-input-' + secId).value || '').trim();
@@ -191,16 +232,19 @@ window.PageStudent = (function () {
     overlay.dataset.cid = cid;
     overlay.dataset.sid = sid;
     overlay._onSaved = typeof onSaved === 'function' ? onSaved : null;
+    // Focus goes back where it came from when the dialog closes.
+    overlay._opener = document.activeElement;
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) return closeEditStudent();
+      if (e.target === overlay) return _dismissEditStudent();
       var el = e.target.closest ? e.target.closest('[data-action]') : null;
       if (!el) return;
       var action = el.dataset.action;
       if (action === 'closeEditStudent') closeEditStudent();
       else if (action === 'saveEditStudent') saveEditStudent();
-      else if (action === 'toggleEditDesig')
+      else if (action === 'toggleEditDesig') {
         el.setAttribute('aria-pressed', String(el.getAttribute('aria-pressed') !== 'true'));
-      else return;
+        overlay._dirty = true;
+      } else return;
       e.preventDefault();
       e.stopPropagation();
     });
@@ -332,12 +376,53 @@ window.PageStudent = (function () {
       });
     }
 
+    // Anything typed or picked counts as a change Escape mustn't lose.
+    overlay._dirty = false;
+    var markDirty = function () {
+      overlay._dirty = true;
+    };
+    overlay.addEventListener('input', markDirty);
+    overlay.addEventListener('change', markDirty);
+
     document.body.appendChild(overlay);
     document.getElementById('edit-first').focus();
     overlay._escHandler = function (e) {
-      if (e.key === 'Escape') closeEditStudent();
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        return _dismissEditStudent();
+      }
+      // Enter in a box saves, as in any form.
+      if (
+        e.key === 'Enter' &&
+        !e.isComposing &&
+        e.target &&
+        e.target.tagName === 'INPUT' &&
+        overlay.contains(e.target)
+      ) {
+        e.preventDefault();
+        return saveEditStudent();
+      }
+      // Focus stays inside the dialog while it is open.
+      if (e.key === 'Tab') return _trapEditFocus(overlay, e);
     };
     document.addEventListener('keydown', overlay._escHandler);
+  }
+
+  function _trapEditFocus(overlay, e) {
+    var boxes = Array.from(overlay.querySelectorAll('input, select, textarea, button')).filter(function (el) {
+      return !el.disabled && el.getAttribute('tabindex') !== '-1';
+    });
+    if (!boxes.length) return;
+    var first = boxes[0];
+    var last = boxes[boxes.length - 1];
+    var inside = overlay.contains(document.activeElement);
+    if (e.shiftKey && (document.activeElement === first || !inside)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (document.activeElement === last || !inside)) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 
   // Marks a field as needing a fix: a red edge and the line under it, until
@@ -355,12 +440,44 @@ window.PageStudent = (function () {
     el.focus();
   }
 
+  /* Escape or a click outside: closes, and changes not saved can be got
+     back with Undo, which opens the dialog again as it was. */
+  function _dismissEditStudent() {
+    var overlay = document.getElementById('edit-modal-overlay');
+    if (!overlay) return;
+    var changed = overlay._dirty;
+    closeEditStudent();
+    if (!changed || typeof showUndoToast !== 'function') return;
+    var st = getStudents(overlay.dataset.cid).find(function (s) {
+      return s.id === overlay.dataset.sid;
+    });
+    showUndoToast('Changes to ' + (st ? displayNameFirst(st) : 'the student') + ' not saved', function () {
+      if (document.getElementById('edit-modal-overlay')) return;
+      overlay._opener = document.activeElement;
+      document.body.appendChild(overlay);
+      document.addEventListener('keydown', overlay._escHandler);
+      var first = overlay.querySelector('#edit-first');
+      if (first) first.focus();
+    });
+  }
+
   function closeEditStudent() {
     var overlay = document.getElementById('edit-modal-overlay');
     if (overlay) {
       if (overlay._escHandler) document.removeEventListener('keydown', overlay._escHandler);
       overlay.remove();
+      _focusEditOpener(overlay._opener);
     }
+  }
+
+  // The button that opened the dialog, or this page's Edit Student after a
+  // redraw replaced it.
+  function _focusEditOpener(opener) {
+    var target =
+      opener && opener.isConnected && opener !== document.body
+        ? opener
+        : document.querySelector('[data-action="openEditStudent"]');
+    if (target && target.focus) target.focus();
   }
 
   function saveEditStudent() {
@@ -420,8 +537,12 @@ window.PageStudent = (function () {
       });
     }
     var onSaved = overlay._onSaved;
+    var opener = overlay._opener;
     closeEditStudent();
-    if (onSaved) return onSaved();
+    if (onSaved) {
+      onSaved();
+      return _focusEditOpener(opener);
+    }
     // Re-render sidebar with updated name
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
       activeCourse,
@@ -429,6 +550,7 @@ window.PageStudent = (function () {
       'PageStudent.switchStudent',
     );
     render();
+    _focusEditOpener(opener);
   }
 
   /* ── Tabs ───────────────────────────────────────────────── */
@@ -516,6 +638,36 @@ window.PageStudent = (function () {
     return _entryText(last, a) + (a ? ' on ' + a.title : '') + ', ' + _shortDay(last.date);
   }
 
+  /* The Observations tile: the term's observations, less any deleted one
+     still waiting on its Undo. */
+  function _evidenceSummary(obs, scope) {
+    var shown = obs.filter(function (o) {
+      return !Evidence.isPending(o.id);
+    });
+    var lastOb = shown[0];
+    return {
+      stat: _plural(shown.length, 'Note', 'Notes'),
+      sub: scope + (lastOb ? ' · Latest ' + _daysAgo(_obDay(lastOb)) : ' · None yet'),
+    };
+  }
+
+  /* After an observation is added, deleted or put back on this page, the
+     tile counts it at once (not at the next full redraw). */
+  function _refreshEvidenceTile() {
+    var tile = document.getElementById('stu-tab-evidence');
+    if (!tile) return;
+    var cid = activeCourse;
+    var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    var obs = getStudentQuickObs(cid, studentId).filter(function (o) {
+      return CompetencyEvidence._helpers.obsInTerm(o, term);
+    });
+    var sm = _evidenceSummary(obs, term ? term.label || 'This term' : 'All time');
+    var stat = tile.querySelector('.stu-tab-stat');
+    var sub = tile.querySelector('.stu-tab-sub');
+    if (stat) stat.textContent = sm.stat;
+    if (sub) sub.textContent = sm.sub;
+  }
+
   function _tabSummaries(ctx) {
     var cid = ctx.cid;
     var out = {};
@@ -560,11 +712,7 @@ window.PageStudent = (function () {
       sub:
         scope + (latestA ? ' · Latest ' + _shortDay(latestA) : '') + (unscored ? ' · ' + unscored + ' not scored' : ''),
     };
-    var lastOb = ctx.obs[0];
-    out.evidence = {
-      stat: _plural(ctx.obs.length, 'Note', 'Notes'),
-      sub: scope + (lastOb ? ' · Latest ' + _daysAgo(_obDay(lastOb)) : ' · None yet'),
-    };
+    out.evidence = _evidenceSummary(ctx.obs, scope);
     out.breakdown = _breakdownSummary(ctx);
     // The Learner Profile: goals set (the student's own and the competency
     // goals) and when the student last answered.
@@ -575,6 +723,7 @@ window.PageStudent = (function () {
       ctx.sections.filter(function (sec) {
         return !!(goals[sec.id] || '').trim();
       }).length;
+    var lastWords = _latest(voice.last, _compReflections(cid, ctx.sections).last);
     out.profile = _newReply(voice)
       ? {
           stat: 'New Reply',
@@ -582,7 +731,7 @@ window.PageStudent = (function () {
         }
       : {
           stat: _plural(goalCount, 'Goal', 'Goals'),
-          sub: voice.last ? 'Last answer ' + LearnerProfile.day(voice.last) : 'No answers yet',
+          sub: lastWords ? 'Last answer ' + LearnerProfile.day(lastWords) : 'No answers yet',
         };
     return out;
   }
@@ -2140,7 +2289,7 @@ window.PageStudent = (function () {
       esc(sec.name) +
       '" placeholder="' +
       esc(first) +
-      '’s own words about their learning…">' +
+      '’s own words about this competency…">' +
       esc(refl.text || '') +
       '</textarea>' +
       '<div class="inline-edit-actions">' +
@@ -2154,16 +2303,57 @@ window.PageStudent = (function () {
     );
   }
 
+  /* The competency reflections in the student's words (+ Reflection): how
+     many, and when the newest was saved. They count as reflections and
+     answers wherever the Learner Profile counts them. */
+  function _compReflections(cid, sections) {
+    var mine = getReflections(cid)[studentId] || {};
+    var out = { count: 0, last: null };
+    (sections || []).forEach(function (sec) {
+      var r = mine[sec.id];
+      if (!r || !(r.text || r.confidence)) return;
+      out.count++;
+      out.last = _latest(out.last, r.date);
+    });
+    return out;
+  }
+  function _latest(a, b) {
+    if (!a) return b || null;
+    if (!b) return a;
+    return String(a) > String(b) ? a : b;
+  }
+
   /* The student's answers as the Learner Profile reads them, once the class's
      questionnaires and responses are in (a redraw follows when they arrive). */
   var _EMPTY_VOICE = { about: null, checkin: null, reflections: [], last: null };
+  var VOICE_FRESH_MS = 15000;
   function _voiceModel(cid) {
     if (typeof StudentVoice === 'undefined') return _EMPTY_VOICE;
+    var redraw = function (loadedCid) {
+      if (loadedCid === activeCourse) render();
+    };
     if (!StudentVoice.loaded(cid)) {
-      StudentVoice.load(cid, function (loadedCid) {
-        if (loadedCid === activeCourse) render();
-      });
+      StudentVoice.load(cid, redraw);
       if (!StudentVoice.loaded(cid)) return _EMPTY_VOICE;
+    } else if (StudentVoice.refreshIfStale) {
+      // Answers sent since the last read show when the page opens again:
+      // redrawn only when this student's answers changed, and never under
+      // a box being typed in.
+      var sid = studentId;
+      var sig = function () {
+        return StudentVoice.entries(cid, sid)
+          .map(function (e) {
+            return e.rid + '@' + e.at;
+          })
+          .join('|');
+      };
+      var was = sig();
+      StudentVoice.refreshIfStale(cid, VOICE_FRESH_MS, function (loadedCid) {
+        if (loadedCid !== activeCourse || sid !== studentId || sig() === was) return;
+        var a = document.activeElement;
+        if (a && /^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName)) return;
+        render();
+      });
     }
     return StudentVoice.profile(StudentVoice.entries(cid, studentId));
   }
@@ -2208,7 +2398,13 @@ window.PageStudent = (function () {
       sec.id +
       '">Save</button><button class="btn" data-action="cancelGoalEdit" data-secid="' +
       sec.id +
-      '">Cancel</button></div></div>'
+      '">Cancel</button>' +
+      (goalText
+        ? '<button type="button" class="btn btn-danger stu-goal-remove" data-action="removeGoal" data-secid="' +
+          sec.id +
+          '">Remove Goal</button>'
+        : '') +
+      '</div></div>'
     );
   }
 
@@ -2239,7 +2435,7 @@ window.PageStudent = (function () {
       esc(sec.name) +
       '" placeholder="' +
       esc(first) +
-      '’s own words about their learning…">' +
+      '’s own words about this competency…">' +
       esc(refl.text || '') +
       '</textarea><div class="inline-edit-actions"><button class="btn btn-primary" data-action="saveReflField" data-secid="' +
       sec.id +
@@ -2456,6 +2652,7 @@ window.PageStudent = (function () {
     var goals = getGoals(cid)[studentId] || {};
     var block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
     var o = {
+      cid: cid,
       model: model,
       first: first,
       initials: initials(ctx.student),
@@ -2464,6 +2661,7 @@ window.PageStudent = (function () {
       pronouns: ctx.student.pronouns || '',
       courseName: course.name || 'Course',
       newReply: _newReply(model),
+      compRefl: _compReflections(cid, ctx.sections),
       aboutOn:
         typeof Questionnaires !== 'undefined' &&
         Questionnaires.list(cid).some(function (q) {
@@ -2551,6 +2749,12 @@ window.PageStudent = (function () {
     var first = displayNameFirst(ctx.student);
     var tk = _coreTermKeys(ctx);
     var mine = ((typeof getCoreSelf === 'function' ? getCoreSelf(cid)[studentId] : null) || {})[tk.key] || {};
+    // What the student gave in that term's questionnaire, where you haven't
+    // entered anything yourself.
+    var theirs =
+      tk.pick && typeof StudentVoice !== 'undefined' && StudentVoice.coreSelf && StudentVoice.loaded(cid)
+        ? StudentVoice.coreSelf(StudentVoice.entries(cid, studentId), tk.pick.ordinal)
+        : {};
     // Scored work tagged with each Core Competency: evidence to point to.
     var tally = {};
     ctx.assessments.forEach(function (a) {
@@ -2591,7 +2795,7 @@ window.PageStudent = (function () {
       esc(first) +
       '’s Goal</span><span>Work to Point To</span></div>';
     CORE_COMPETENCIES.forEach(function (cc) {
-      var e = mine[cc.id];
+      var e = mine[cc.id] || theirs[cc.id];
       var editing = _coreEditing === cc.id;
       var n = tally[cc.id] || 0;
       html +=
@@ -2608,7 +2812,7 @@ window.PageStudent = (function () {
         CORE_STEPS.forEach(function (lv) {
           html +=
             '<span class="stu-core-step' +
-            (e.level === lv ? ' on' : '') +
+            (e.level === lv ? ' on lv-' + lv : '') +
             '">' +
             esc(CONFIDENCE_LABELS[lv]) +
             '</span>';
@@ -2616,6 +2820,13 @@ window.PageStudent = (function () {
         html +=
           '</span>' +
           (e.text ? '<span class="stu-core-words">' + esc(e.text) + '</span>' : '') +
+          (e.fromStudent
+            ? '<span class="stu-core-from">' +
+              LearnerProfile.src('them', first) +
+              ' ' +
+              esc(_shortDay(e.at)) +
+              '</span>'
+            : '') +
           '</span><span class="stu-core-goal">' +
           (e.goal ? esc(e.goal) : '<span class="stu-muted">—</span>') +
           '</span>';
@@ -2683,7 +2894,7 @@ window.PageStudent = (function () {
       ' will work on"></label><div class="inline-edit-actions"><button type="button" class="btn btn-primary" data-action="stuCoreSave" data-core="' +
       cc.id +
       '">Save</button><button type="button" class="btn" data-action="stuCoreCancel">Cancel</button>' +
-      (e.level || e.text || e.goal
+      (!e.fromStudent && (e.level || e.text || e.goal)
         ? '<button type="button" class="btn" data-action="stuCoreClear" data-core="' + cc.id + '">Clear</button>'
         : '') +
       '</div></div>'
@@ -2855,8 +3066,18 @@ window.PageStudent = (function () {
     _placeAfter(main, place);
     // The Evidence panel and the competency drawers show the same
     // observations; a change in one redraws the other.
-    Evidence.mount(activeCourse, studentId, { onChange: CompetencyEvidence.refresh });
-    CompetencyEvidence.mount(activeCourse, studentId, main, { onAdd: Evidence.refresh });
+    Evidence.mount(activeCourse, studentId, {
+      onChange: function () {
+        CompetencyEvidence.refresh();
+        _refreshEvidenceTile();
+      },
+    });
+    CompetencyEvidence.mount(activeCourse, studentId, main, {
+      onAdd: function () {
+        Evidence.refresh();
+        _refreshEvidenceTile();
+      },
+    });
   }
 
   var _drawnFor = ''; // student and tab the page was last drawn for
@@ -2995,6 +3216,9 @@ window.PageStudent = (function () {
       cancelGoalEdit: function () {
         cancelGoalEdit(el.dataset.secid);
       },
+      removeGoal: function () {
+        removeGoal(el.dataset.secid);
+      },
       editReflection: function () {
         editReflection(el.dataset.secid);
       },
@@ -3031,8 +3255,31 @@ window.PageStudent = (function () {
     }
   }
 
+  /* In a goal or reflection box, Enter saves and Shift+Enter adds a line;
+     Escape leaves it as it was, as in the observation box. */
+  function _editorKeys(e) {
+    var box = e.target;
+    var m = box && box.tagName === 'TEXTAREA' && /^(goal|refl)-input-(.+)$/.exec(box.id || '');
+    if (!m || e.isComposing) return false;
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (m[1] === 'goal') saveGoalField(m[2]);
+      else saveReflField(m[2]);
+      return true;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      box.value = box.defaultValue;
+      if (m[1] === 'goal') cancelGoalEdit(m[2]);
+      else cancelReflEdit(m[2]);
+      return true;
+    }
+    return false;
+  }
+
   /* Arrow keys, Home and End move between the tabs. */
   function _handleKeydown(e) {
+    if (_editorKeys(e)) return;
     var tab = e.target && e.target.closest && e.target.closest('.stu-tab');
     if (!tab) return;
     var ids = TABS.map(function (t) {

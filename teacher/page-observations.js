@@ -862,14 +862,19 @@ window.PageObservations = (function () {
         dims: _focusDraft.dims.slice(),
       });
     }
+    var host = _focusHost;
     closeFocus();
+    if (host && host.onSaved) host.onSaved();
   }
 
   function focusDelete() {
     var sid = _focusSid;
     var obId = _focusObId;
+    var host = _focusHost;
     closeFocus();
-    deleteOb(sid, obId);
+    // Another page's card deletes the way that page does (with its Undo).
+    if (host && host.onDelete) host.onDelete(obId);
+    else deleteOb(sid, obId);
   }
 
   // html-safe: tag labels and keys are escaped; colours come from obsTagColor.
@@ -1035,6 +1040,25 @@ window.PageObservations = (function () {
     }
   }
 
+  /* The same edit window over another page (the student page's
+     Observations tab), while this page isn't open. Its listeners sit on the
+     window itself, and the host hears about a save or a delete:
+       host: { onSaved(), onDelete(obId) } */
+  var _focusHost = null;
+  function openEditor(cid, sid, obId, host) {
+    if (_alive || _focusBackdropEl) return false;
+    activeCourse = cid;
+    openFocus(sid, obId);
+    if (!_focusBackdropEl) return false;
+    _focusHost = host || {};
+    var bd = _focusBackdropEl;
+    bd.addEventListener('click', _handleClick);
+    bd.addEventListener('mousedown', _handleMousedown);
+    bd.addEventListener('input', _handleInput);
+    bd.addEventListener('keydown', _handleKeydown);
+    return true;
+  }
+
   function openFocus(sid, obId) {
     if (_focusBackdropEl) return; // already open
     var ob = _focusFindOb(sid, obId);
@@ -1079,7 +1103,8 @@ window.PageObservations = (function () {
     if (!_focusBackdropEl) return;
     _focusTagPopoverOpen = false;
     _focusCtxOpen = false;
-    refreshFeedAndCount();
+    _focusHost = null;
+    if (_alive) refreshFeedAndCount();
     var bd = _focusBackdropEl;
     _animateFocusClose(function () {
       if (bd && bd.parentNode) bd.parentNode.removeChild(bd);
@@ -1428,6 +1453,7 @@ window.PageObservations = (function () {
     destroy: destroy,
     render: render,
     switchCourse: switchCourse,
+    openEditor: openEditor,
     _helpers: {
       weekRange: weekRange,
       termRange: termRange,
