@@ -1477,6 +1477,9 @@ window.PageReports = (function () {
     var key = _classFitKeyNow();
     if (key === _classFitKey) {
       _renderFitLine();
+      // The rail's sheet badges follow the whole class's fit, as the fit
+      // line does (step 4 group 2 #9).
+      if (_classFit) _annotateSidebar(_classFit);
       return;
     }
     _classFitKey = key;
@@ -1492,8 +1495,11 @@ window.PageReports = (function () {
       } catch (e) {
         _classFit = null;
       }
-      // The palette greys the blocks with no room once the fit is in.
+      // The palette greys the blocks with no room once the fit is in, and
+      // every student's badge in the rail is redrawn from it: a render of
+      // one student only redraws that student's (step 4 group 2 #9).
       renderStudioPanels();
+      if (_classFit) _annotateSidebar(_classFit);
       // The summary names the longest report; the canvas moves to it.
       if (previewAuto && studioView === 'one') {
         var longest = ReportStudio.longestStudent(_classFit);

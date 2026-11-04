@@ -938,6 +938,20 @@ test.describe('Page Studio', () => {
     await expect(cellOf(page, 'teacher-narrative').locator('.report-comment-box')).toHaveCount(1);
   });
 
+  test('the rail’s sheet badges follow the class fit after + Page and its removal (step 4 group 2 #9)', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    const badges = page.locator('#gb-sidebar .student-row-sheets');
+    await page.locator('.studio-page-add').click();
+    await showEveryone(page, 4);
+    await expect(badges.filter({ hasText: '2 sheets' })).toHaveCount(STUDENTS);
+    await page.locator('.studio-view [data-view="one"]').click();
+    await page.locator('.studio-page-empty').click();
+    await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
+    await expect(badges.filter({ hasText: '2 sheets' })).toHaveCount(0);
+  });
+
   test('+ Page adds an empty side with Empty · Remove, which takes it away', async ({ page }) => {
     await openStudio(page);
     await page.locator('.studio-page-add').click();

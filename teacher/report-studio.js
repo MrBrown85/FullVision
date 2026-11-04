@@ -268,14 +268,22 @@ window.ReportStudio = (function () {
       );
     }
     if (more) {
-      var most = Math.max.apply(
-        null,
-        ids.map(function (id) {
+      // The sheets each of those students needs: "2 sheets for 3
+      // students", or "2 to 8 sheets for 30 students" when they differ
+      // (it read "8 sheets for 30 students", the most any one needs:
+      // step 4 group 2 #9).
+      var counts = ids
+        .map(function (id) {
           return summary.perStudent[id].sheets;
-        }),
-      );
+        })
+        .filter(function (k) {
+          return k > 1;
+        });
+      var most = Math.max.apply(null, counts);
+      var least = Math.min.apply(null, counts);
       return (
         '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">' +
+        (least < most ? least + ' to ' : '') +
         most +
         ' sheets for ' +
         students(more) +

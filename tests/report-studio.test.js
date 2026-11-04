@@ -50,6 +50,11 @@ describe('ReportStudio', () => {
     expect(more).toContain('2 sheets for 2 students');
     expect(more).toContain('data-action="studioView" data-view="all"');
     expect(ReportStudio.fitLineHtml(fit([{ sheets: 3 }]), f)).toContain('3 sheets for 1 student<');
+    // Students who need different counts: the range, not the most any one
+    // needs (it read "8 sheets for 30 students"; step 4 group 2 #9).
+    expect(ReportStudio.fitLineHtml(fit([{ sheets: 2 }, { sheets: 8 }, {}, { sheets: 5 }]), f)).toContain(
+      '2 to 8 sheets for 3 students<',
+    );
     const over = ReportStudio.fitLineHtml(fit([{ sheets: 2, over: true }, {}]), f);
     expect(over).toContain('A block is taller than a page for 1 student');
     expect(ReportStudio.fitLineHtml(fit([{}, {}]), ReportSheets.setSides(f, 1))).toBe(
