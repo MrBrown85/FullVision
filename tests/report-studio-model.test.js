@@ -847,7 +847,8 @@ describe('stage 3 blocks', () => {
       { id: 'c', name: 'Communicating', shortName: 'Comm.' },
     ]);
     // The competencies as the comment reads them (CommentBank.compsOf):
-    // Strongest and Growing pass its gates, 3+ pieces this term.
+    // Strongest and Growing pass its gates: 3+ pieces for Strongest, 2+
+    // for Growing (the next step), in the year to date.
     const pieces = n => Array.from({ length: n }, (_, i) => ({ id: 'w' + i, v: 3, d: '2026-09-1' + i }));
     const comps = [
       { id: 'q', level: 3, scores: pieces(3) },
@@ -860,10 +861,10 @@ describe('stage 3 blocks', () => {
       expect(text(ReportBlocks.renderReportBlock('term-glance', CID, CECE, {}, {}))).toBe(
         'This Term at a Glance 2 Assessed 1 Late 1 Missing 2 Observations Comm. Strongest Planning Growing',
       );
-      // On two pieces Communicating is not Strongest, and Planning is not
-      // Growing: the box names only what the comment can.
+      // On two pieces Communicating is not Strongest, and on one Planning
+      // is not Growing: the box names only what the comment can.
       comps[2].scores = pieces(2);
-      comps[1].scores = pieces(2);
+      comps[1].scores = pieces(1);
       expect(text(ReportBlocks.renderReportBlock('term-glance', CID, CECE, {}, {}))).toBe(
         'This Term at a Glance 2 Assessed 1 Late 1 Missing 2 Observations — Strongest Questioning Growing',
       );

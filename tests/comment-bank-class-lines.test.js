@@ -101,11 +101,14 @@ describe('the competency-to-skill table', () => {
 });
 
 describe('nextStepOf', () => {
-  it('is the lowest competency with three or more scored pieces, not among the strongest', () => {
+  it('is the lowest competency with two or more scored pieces, not among the strongest', () => {
     const f = facts();
     expect(CommentBank.nextStepOf(f.comps).id).toBe('c3');
-    // Two pieces is too little: the next lowest with enough is used.
-    const thin = [comp('a', 'Evidence', 3.5), comp('b', 'Perspective', 3), comp('c', 'Significance', 2, 2)];
+    // Two pieces are enough (Colin, 2026-11-03; was three).
+    const two = [comp('a', 'Evidence', 3.5), comp('b', 'Perspective', 3), comp('c', 'Significance', 2, 2)];
+    expect(CommentBank.nextStepOf(two).id).toBe('c');
+    // One piece is too little: the next lowest with enough is used.
+    const thin = [comp('a', 'Evidence', 3.5), comp('b', 'Perspective', 3), comp('c', 'Significance', 2, 1)];
     expect(CommentBank.nextStepOf(thin).id).toBe('b');
   });
   it('takes the first on a tie and none without enough evidence', () => {

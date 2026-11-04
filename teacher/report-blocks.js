@@ -2095,8 +2095,9 @@ window.ReportBlocks = (function () {
       _inActiveTerm(cid, String(o.date || o.created || '').slice(0, 10)),
     ).length;
     // Strongest and Growing by the comment's evidence gates (CommentBank
-    // strongestOf, nextStepOf: 3+ pieces this term), so the box, At a Glance
-    // and the comment name the same competencies; a dash when none passes.
+    // strongestOf: 3+ pieces; nextStepOf: 2+ pieces; both counted in the
+    // year to date), so the box, At a Glance and the comment name the same
+    // competencies; a dash when none passes.
     const secs = _reportSections(cid);
     const bank = typeof CommentBank !== 'undefined' ? CommentBank : null;
     const comps = bank ? bank.compsOf(cid, student) : [];

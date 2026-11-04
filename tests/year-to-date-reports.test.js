@@ -245,3 +245,29 @@ describe('growth compares the year to date at the last report with now (decision
     expect(classGradeChange(CID, [SID])).toBeNull();
   });
 });
+
+describe("Generate's next step needs 2 scored pieces, counted year to date (decision 20)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    seed('proficiency');
+  });
+  afterEach(() => {
+    setActiveTerm(CID, null);
+    delete COURSES[CID];
+  });
+
+  it('one piece in Term 1 and one in Term 2 are enough on Report 2', () => {
+    setActiveTerm(CID, 2);
+    const f = CommentBank.facts(CID, STUDENT, 'term-2');
+    expect(f.comps[0].termScores).toHaveLength(1); // Term 2 alone would be too little
+    expect(f.comps[0].scores).toHaveLength(2);
+    expect(CommentBank.nextStepOf(f.comps).id).toBe('sec');
+  });
+
+  it('one piece is not enough', () => {
+    setActiveTerm(CID, 1);
+    const f = CommentBank.facts(CID, STUDENT, 'term-1');
+    expect(f.comps[0].scores).toHaveLength(1);
+    expect(CommentBank.nextStepOf(f.comps)).toBeNull();
+  });
+});

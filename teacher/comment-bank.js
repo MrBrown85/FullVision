@@ -2809,6 +2809,9 @@ window.CommentBank = (function () {
      the claiming sentence is not eligible, and verify() fails it. */
   // Strongest needs 3+ scored pieces: the 3-score minimum used in practice (report D6).
   var STRONGEST_PIECES = 3;
+  // The next step needs 2+ scored pieces in the year to date (Colin, 2026-11-03;
+  // was 3 inside the term): naming where to go next asks less than a strength.
+  var NEXT_STEP_PIECES = 2;
   // And half a proficiency step over the next competency, a gap larger than one mark's noise (report D6).
   var STRONGEST_GAP = 0.5;
   // Improved needs 4+ pieces, so the change is not one mark against another (report D6).
@@ -2915,15 +2918,15 @@ window.CommentBank = (function () {
   }
 
   /* The next step (plan PR 8): the lowest competency with enough evidence,
-     3+ scored pieces this term (the "strongest" gate's minimum), and not
-     among the strongest; the first in report order on an exact tie. null when
+     2+ scored pieces in the year to date as of the report's end
+     (NEXT_STEP_PIECES; Colin, 2026-11-03), and not among the strongest; the first in report order on an exact tie. null when
      none has enough. The comment's next-step sentence and the At a Glance
      tag both read it. */
   function nextStepOf(comps) {
     var strong = strongestOf(comps);
     var low = null;
     (comps || []).forEach(function (c) {
-      if (!(c.level > 0) || (c.scores || []).length < STRONGEST_PIECES || strong.indexOf(c) >= 0) return;
+      if (!(c.level > 0) || (c.scores || []).length < NEXT_STEP_PIECES || strong.indexOf(c) >= 0) return;
       if (!low || c.level < low.level) low = c;
     });
     return low;

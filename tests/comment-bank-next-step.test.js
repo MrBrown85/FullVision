@@ -160,8 +160,9 @@ describe('the Next Step frames per skill', () => {
   });
 
   it('are never offered without a next step', () => {
-    // Two pieces in each competency: nothing has enough evidence for a next step.
-    const thin = (id, name) => Object.assign(comp(id, name, 3), { scores: pts([3, 3]) });
+    // One piece in each competency: nothing has enough evidence for a next
+    // step (two are enough; Colin, 2026-11-03).
+    const thin = (id, name) => Object.assign(comp(id, name, 3), { scores: pts([3]) });
     const f = facts('socials', CommentBank.SKILLS.socials[0], {
       comps: [thin('a', 'Evidence'), thin('b', 'Perspective')],
     });

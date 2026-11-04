@@ -1175,7 +1175,8 @@ window.ReportQuestionnaire = (function () {
   /* Strongest: the competencies past the comment's "strongest" evidence
      gate (CommentBank.strongestOf), so the tag and the comment agree; Next
      step: the competency the comment's next step names
-     (CommentBank.nextStepOf), the lowest with 3+ scored pieces. */
+     (CommentBank.nextStepOf), the lowest with 2+ scored pieces in the year
+     to date. */
   function skillTags(comps) {
     var list = (comps || []).filter(function (c) {
       return c.level > 0;
