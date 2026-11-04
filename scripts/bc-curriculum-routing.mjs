@@ -25,7 +25,13 @@ const derived = JSON.parse(readFileSync('data/bc-curriculum-derived.json', 'utf-
 const ctx = { console };
 ctx.window = ctx;
 vm.createContext(ctx);
-for (const f of ['shared/comment-bank.js', 'teacher/comment-realiser.js', 'teacher/comment-bank.js'])
+for (const f of [
+  'shared/comment-bank.js',
+  'teacher/comment-realiser.js',
+  'teacher/comment-forms.js',
+  'teacher/comment-pipeline.js',
+  'teacher/comment-bank.js',
+])
   vm.runInContext(readFileSync(f, 'utf-8'), ctx, { filename: f });
 const CB = ctx.CommentBank;
 
