@@ -519,20 +519,69 @@ window.MCardWidgets = (function () {
   };
 
   /* ── narrative ───────────────────────────────────────────────── */
+  // The Teacher Comment, as desktop calls it: the first lines on the card,
+  // the whole comment in a sheet on a tap. A comment that calls the student
+  // by a name they no longer go by says so.
   _renderers.narrative = function (st, cid, data) {
     var rating = data.termRating;
     if (!rating || !rating.narrative) return '';
     var raw = (rating.narrative || '').replace(/<[^>]+>/g, '').trim();
     if (!raw) return '';
+    var note = staleNameNote(st, raw);
     return (
-      '<div class="m-wdg-narrative">' +
-      '<div class="m-wdg-section-label">Term Report</div>' +
-      '<div class="m-wdg-narrative-text">' +
-      MC.esc(_trunc(raw, 80)) +
-      '</div>' +
-      '</div>'
+      '<button type="button" class="m-wdg-narrative" data-action="m-comment-full" data-sid="' +
+      MC.esc(st.id) +
+      '" data-term="' +
+      MC.esc(data.termId == null ? '' : String(data.termId)) +
+      '" aria-label="Teacher Comment. Read all of it">' +
+      '<span class="m-wdg-section-label">Teacher Comment</span>' +
+      '<span class="m-wdg-narrative-text">' +
+      MC.esc(raw) +
+      '</span>' +
+      (note ? '<span class="m-wdg-narrative-note">' + MC.esc(note) + '</span>' : '') +
+      '<span class="m-wdg-narrative-more">Read All</span>' +
+      '</button>'
     );
   };
+
+  /* "Written as Liam. Lee is the name now." when the comment uses the
+     student's legal first name and not the preferred name they now go by. */
+  function _hasWord(text, name) {
+    var esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(^|[^A-Za-z\\u00C0-\\u024F])' + esc + '(?![A-Za-z\\u00C0-\\u024F])').test(text);
+  }
+  function staleNameNote(st, text) {
+    var now = displayNameFirst(st);
+    var old = st.firstName;
+    if (!old || !now || old === now) return '';
+    if (!_hasWord(text, old) || _hasWord(text, now)) return '';
+    return 'Written as ' + old + '. ' + now + ' is the name now.';
+  }
+
+  /* The whole Teacher Comment, for its sheet. */
+  function commentSheetHtml(st, cid, termId) {
+    var rating = getStudentTermRating(cid, st.id, termId);
+    var raw = ((rating && rating.narrative) || '').replace(/<[^>]+>/g, '').trim();
+    var note = staleNameNote(st, raw);
+    return (
+      '<div class="m-sheet-title">Teacher Comment</div>' +
+      '<div class="m-comment-sheet">' +
+      '<div class="m-comment-sheet-name">' +
+      MC.esc(displayNameWithLast(st)) +
+      '</div>' +
+      (note ? '<div class="m-wdg-narrative-note">' + MC.esc(note) + '</div>' : '') +
+      raw
+        .split(/\n+/)
+        .filter(function (p) {
+          return p.trim();
+        })
+        .map(function (p) {
+          return '<p>' + MC.esc(p) + '</p>';
+        })
+        .join('') +
+      '</div>'
+    );
+  }
 
   /* ── flagStatus — no own output; flag icon is co-rendered by hero ── */
   _renderers.flagStatus = function () {
@@ -601,5 +650,7 @@ window.MCardWidgets = (function () {
     render: render,
     renderFallbackHero: renderFallbackHero,
     assembleCard: assembleCard,
+    commentSheetHtml: commentSheetHtml,
+    staleNameNote: staleNameNote,
   };
 })();

@@ -939,7 +939,7 @@ const WIDGET_REGISTRY = [
   { key: 'concerns', label: 'Concerns', defaultOn: false },
   { key: 'workHabits', label: 'Work Habits & Participation', defaultOn: false },
   { key: 'growthAreas', label: 'Growth Areas', defaultOn: false },
-  { key: 'narrative', label: 'Teacher Narrative', defaultOn: false },
+  { key: 'narrative', label: 'Teacher Comment', defaultOn: false },
   { key: 'actions', label: 'Action Buttons', defaultOn: true },
 ];
 const WIDGET_KEYS = WIDGET_REGISTRY.map(function (w) {

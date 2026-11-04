@@ -93,7 +93,7 @@ window.MComponents = (function () {
     var backdrop = document.getElementById('m-sheet-backdrop');
     var container = document.getElementById('m-sheet-container');
     var halfClass = opts.half ? ' m-sheet-half' : '';
-    // html-safe: every presentSheet caller (tab-observe, tab-grade, tab-students, card-widget-editor, shell settings) builds html with MC.esc on its text.
+    // html-safe: every presentSheet caller (tab-observe, tab-grade, tab-students, card-widget-editor, card-widgets commentSheetHtml, shell settings) builds html with MC.esc on its text.
     container.innerHTML =
       '<div class="m-sheet' +
       halfClass +

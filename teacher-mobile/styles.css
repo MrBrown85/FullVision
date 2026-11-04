@@ -3256,16 +3256,54 @@ body.fv-switching-course::after {
 
 /* ── Narrative excerpt ────────────────────────────────────── */
 .m-wdg-narrative {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
   background: var(--surface);
   border-radius: 12px;
   padding: 10px 14px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
+.m-wdg-narrative .m-wdg-section-label {
+  display: block;
+}
+/* The first three lines on the card; Read All opens the rest. */
 .m-wdg-narrative-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   font-size: 13px;
   color: var(--text-2);
   line-height: 1.4;
   margin-top: 4px;
+}
+.m-wdg-narrative-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--priority);
+}
+.m-wdg-narrative-more {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--link);
+}
+.m-comment-sheet {
+  padding: 0 16px 24px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.m-comment-sheet-name {
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
 /* ═══════════════════════════════════════════════════════════════

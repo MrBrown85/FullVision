@@ -684,12 +684,38 @@ describe('MCardWidgets.render narrative', () => {
     const html = MCardWidgets.render('narrative', STUDENT, CID, d);
     expect(html).toContain('m-wdg-narrative');
     expect(html).toContain('m-wdg-section-label');
-    expect(html).toContain('Term Report');
     expect(html).toContain('m-wdg-narrative-text');
     // HTML tags should be stripped
     expect(html).not.toContain('<p>');
-    // Text is truncated at 80 chars
-    expect(html).toContain('\u2026');
+    // Step 4 group 3 #73: called Teacher Comment, as on desktop; the whole
+    // comment is there (the card shows three lines), and a tap opens it.
+    expect(html).toContain('>Teacher Comment<');
+    expect(html).not.toContain('Term Report');
+    expect(html).toContain('collaborative problem solving.');
+    expect(html).toContain('data-action="m-comment-full"');
+  });
+
+  // Step 4 group 3 #73: a comment written before a preferred name was set
+  // says so.
+  it('notes a comment that uses a name the student no longer goes by', () => {
+    mockWidgetDataLayer({});
+    const lee = { ...STUDENT, firstName: 'Liam', preferred: 'Lee', lastName: 'Nakamura' };
+    const d = { ...DATA, termRating: { narrative: "In Science, Liam's proficiency is Proficient." } };
+    const html = MCardWidgets.render('narrative', lee, CID, d);
+    expect(html).toContain('Written as Liam. Lee is the name now.');
+    const fine = { ...DATA, termRating: { narrative: 'Lee works well with others.' } };
+    expect(MCardWidgets.render('narrative', lee, CID, fine)).not.toContain('Written as');
+    expect(MCardWidgets.render('narrative', { ...lee, preferred: '' }, CID, d)).not.toContain('Written as');
+  });
+
+  it('the sheet holds the whole comment', () => {
+    mockWidgetDataLayer({
+      getStudentTermRating: () => ({ narrative: 'First paragraph.\n\nSecond paragraph.' }),
+      displayNameWithLast: st => (st.preferred || st.firstName) + ' ' + st.lastName,
+    });
+    const html = MCardWidgets.commentSheetHtml(STUDENT, CID, 't1');
+    expect(html).toContain('<p>First paragraph.</p><p>Second paragraph.</p>');
+    expect(html).toContain('Teacher Comment');
   });
 });
 

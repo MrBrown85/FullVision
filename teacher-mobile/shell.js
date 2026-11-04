@@ -958,6 +958,17 @@
       }
 
       // ── Students tab ──
+      // The whole Teacher Comment from a student card.
+      if (action === 'm-comment-full') {
+        var cSid = target.getAttribute('data-sid');
+        var cSt = getStudents(_cid).find(function (s) {
+          return s.id === cSid;
+        });
+        var cTerm = target.getAttribute('data-term');
+        if (cSt) MC.presentSheet(MCardWidgets.commentSheetHtml(cSt, _cid, cTerm === '' ? null : cTerm));
+        return;
+      }
+
       if (action === 'm-all-students') {
         MStudents.showAllStudents();
         return;
