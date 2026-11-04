@@ -155,7 +155,7 @@ describe('the Observations drawer', () => {
     const cp = d.indexOf('<div class="qno-checkpoint"><span>Term 1 report · ');
     expect(cp).toBeGreaterThan(-1);
     expect(d).toMatch(/<div class="qno-checkpoint"><span>Term 1 report · [A-Z][a-z]{2} \d{1,2}<\/span><\/div>/);
-    const ends = CommentBank.facts(CID, cece(), 'term-2').asOfReport.endsOn;
+    const ends = CommentBank.facts(CID, cece(), 'term-2').lastReport.endsOn;
     const list = RQ.studentObs(CID, cece().id);
     const first = list.find(o => ObsCard.obDay(o) <= ends);
     const before = d.lastIndexOf('<div class="qno-item" data-obid="', cp);
