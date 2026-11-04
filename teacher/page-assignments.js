@@ -11425,6 +11425,25 @@ window.PageAssignments = (function () {
   }
 
   // A competency level reached by Tab shows its lines too.
+  /* "New Rubric" and "Criterion 2" are real names, so a rubric or criterion
+     saved untouched still has one. Typing used to go in front of them ("Lab
+     Report RubricNew Rubric"); the default name is now selected when its box
+     gets the focus, so typing replaces it (Nov 3 sweep). */
+  var DEFAULT_NAME_RE = /^(New Rubric|Criterion \d+)$/;
+  function _selectDefaultName(e) {
+    var t = e.target;
+    if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') || !DEFAULT_NAME_RE.test(t.value)) return;
+    if (!t.closest('#rubric-modal, #new-assess-form')) return;
+    t.select();
+    // A click that gave the focus would put the caret back on mouseup.
+    var keep = function (ev) {
+      if (ev.target === t) ev.preventDefault();
+    };
+    t.addEventListener('mouseup', keep, { once: true });
+    setTimeout(function () {
+      t.removeEventListener('mouseup', keep);
+    }, 500);
+  }
   function _handleFocusIn(e) {
     var tagLvl = e.target.closest && e.target.closest(TAG_LEVEL_SEL);
     if (tagLvl) showTagLevelBar(tagLvl);
@@ -12542,6 +12561,7 @@ window.PageAssignments = (function () {
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
     _addDocListener('focusin', _handleFocusIn);
+    _addDocListener('focusin', _selectDefaultName);
     _addDocListener('focusout', _handleFocusOut);
     _addDocListener('pointerdown', _handlePointerDown);
     _addDocListener('pointermove', _handlePointerMove);
