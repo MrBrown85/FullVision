@@ -62,9 +62,10 @@
   // Slip codes: three and three from the slip alphabet (K7P-3QX).
   var SLIP_RE = /\b[A-HJKMNP-RT-Z2-46-9]{3}-[A-HJKMNP-RT-Z2-46-9]{3}\b/g;
   var DATE_RE = /\b(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\/\d{1,2}\/\d{2,4})\b/g;
-  // Long letter-and-digit runs are tokens; long digit runs are student numbers.
+  // Long letter-and-digit runs are tokens; six or more digits, a student
+  // number (five-digit Postgres error codes such as 23505 stay).
   var TOKEN_RE = /\b(?=[\w-]*\d)(?=[\w-]*[A-Za-z])[\w-]{24,}\b/g;
-  var NUMBER_RE = /\b\d{5,}\b/g;
+  var NUMBER_RE = /\b\d{6,}\b/g;
   var URL_RE = /\b(?:https?|wss?):\/\/[^\s"'<>()]+/gi;
 
   /* Ids, emails, tokens, slip codes, dates and student numbers, wherever
