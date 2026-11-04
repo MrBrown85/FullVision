@@ -6764,11 +6764,13 @@ window.PageAssignments = (function () {
     var max = parseFloat(inp.dataset.max) || 100;
     // A typo that isn't a number puts the saved score back; only a blank
     // box clears.
-    var raw = parsePointsInput(inp.value, max, getPointsScore(cid, sid, aid));
+    var prev = getPointsScore(cid, sid, aid);
+    var over = _pointsOverLimit(inp.value, max);
+    var raw = parsePointsInput(inp.value, max, prev);
     inp.value = raw != null ? formatPoints(raw) : '';
     // Leaving a field without changing it saves nothing; an untouched blank
     // field used to write a 0. A typed 0 is a score; blank clears.
-    if (raw === getPointsScore(cid, sid, aid)) return;
+    if (raw === prev) return;
     // setPointsScore saves the one score, as the gradebook and phone do. A
     // second write under the assessment's own id left a stray entry and
     // sent the score twice.
@@ -6776,6 +6778,34 @@ window.PageAssignments = (function () {
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
     if (pctSpan) pctSpan.innerHTML = pointsPctHtml(raw, max, 0);
     refreshLedgerSummary(inp.closest('.ldg-grid'));
+    if (over != null) _sayPointsCapped(cid, sid, aid, over, raw, max, prev);
+  }
+  /* Extra credit goes up to twice the maximum (D4), and a score typed above
+     that is saved at the limit. That used to happen without a word, so a
+     typo such as 45 for 4.5 became a perfect double score (Nov 3 sweep).
+     The toast says what was saved, and Undo puts back the score before. */
+  function _pointsOverLimit(text, max) {
+    var n = parseFloat(
+      String(text == null ? '' : text)
+        .trim()
+        .replace(',', '.'),
+    );
+    return max > 0 && isFinite(n) && n > max * POINTS_EXTRA_CREDIT_FACTOR ? n : null;
+  }
+  function _sayPointsCapped(cid, sid, aid, typed, saved, max, prev) {
+    _showFillUndo(
+      formatPoints(typed) +
+        ' is more than twice the ' +
+        formatPoints(max) +
+        '-point maximum, so it was saved as ' +
+        formatPoints(saved) +
+        '.',
+      function () {
+        setPointsScore(cid, sid, aid, prev);
+        render();
+        refreshSidebarGrades(sid);
+      },
+    );
   }
   // The next (or previous) score box that is open for typing.
   function focusPointsBox(row, dir) {
@@ -12360,8 +12390,10 @@ window.PageAssignments = (function () {
     if (!aid || !focusStudentId) return;
     var cid = activeCourse;
     var max = parseFloat(inp.dataset.max) || 100;
-    var raw = parsePointsInput(inp.value, max, getPointsScore(cid, focusStudentId, aid));
-    if (raw === getPointsScore(cid, focusStudentId, aid)) {
+    var prev = getPointsScore(cid, focusStudentId, aid);
+    var over = _pointsOverLimit(inp.value, max);
+    var raw = parsePointsInput(inp.value, max, prev);
+    if (raw === prev) {
       inp.value = raw != null ? formatPoints(raw) : '';
       return;
     }
@@ -12369,9 +12401,11 @@ window.PageAssignments = (function () {
     // do. A second write under the assessment's own id left an entry later
     // edits elsewhere never updated, so the cell and course % kept the old
     // points.
-    setPointsScore(cid, focusStudentId, aid, raw);
-    refreshSidebarGrades(focusStudentId);
+    var sid = focusStudentId;
+    setPointsScore(cid, sid, aid, raw);
+    refreshSidebarGrades(sid);
     render();
+    if (over != null) _sayPointsCapped(cid, sid, aid, over, raw, max, prev);
   }
   // A redraw keeps keyboard scoring on the same card.
   function _focusGraderCard(aid, selector) {
