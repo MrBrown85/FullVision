@@ -89,6 +89,22 @@ describe('a rubric piece alone in its category', () => {
     expect(grades).toContain('Local History Inquiry 3.3 / 4 \u00B7 87%');
   });
 
+  it('Generate’s best and weakest piece print the same %', () => {
+    seed('letter');
+    const f = CommentBank.facts(CID, STUDENT, null);
+    const w = f.work.find(x => x.id === 'lhi');
+    expect(w.pct).toBeCloseTo(86.5, 9);
+    expect(CommentBank.workMark(f, w)).toBe(assessmentCellValue(CID, SID, inquiry).percentText);
+    expect(CommentBank.workMark(f, w)).toBe('87%');
+    // Plain proficiency work keeps its level's % (3+ = 86).
+    expect(
+      CommentBank.workMark(
+        f,
+        f.work.find(x => x.id === 'quiz'),
+      ),
+    ).toBe('86%');
+  });
+
   it('a Both class pairs the level with the same %', () => {
     seed('both');
     expect(assessmentCellValue(CID, SID, inquiry)).toMatchObject({ text: '3.3 · 87%', percentText: '87%' });

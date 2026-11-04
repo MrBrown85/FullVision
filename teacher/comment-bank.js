@@ -2245,9 +2245,15 @@ window.CommentBank = (function () {
         var note = typeof getScoreReportNote === 'function' ? getScoreReportNote(cid, sid, a.id) : '';
         // Points work's own % (points earned out of possible, calc.js), the
         // mark a Letter class prints for it (workMark): its level is only a
-        // band of that %.
+        // band of that %. Rubric work's own % is its criteria's percents, as
+        // its gradebook cell and report row print it (assessmentCellValue;
+        // Colin, 2026-11-03).
         var pc = isPointsScored(a) ? getAssessmentGroupPercentage(cid, sid, [a]) : null;
         var pct = pc && pc.pct != null ? pc.pct : null;
+        if (!isPointsScored(a) && (a.rubricId || a.rubric_id)) {
+          var cell = assessmentCellValue(cid, sid, a);
+          if (cell.kind === 'level' && cell.percent != null) pct = cell.percent;
+        }
         return v > 0 ? { id: a.id, title: a.title || '', d: dateOf(a), v: v, pct: pct, note: note } : null;
       })
       .filter(Boolean);
