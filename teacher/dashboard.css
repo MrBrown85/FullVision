@@ -6188,3 +6188,42 @@ label.cm-cr-row {
     text-align: left;
   }
 }
+
+/* Class Management below 1024 px: the student list's width is 0 there, so
+   the class list kept 1 px and New Class and Restore Class from Backup
+   couldn't be reached (Nov 3 sweep). It keeps its own width on a tablet
+   and, on a phone, sits above the class as a short list of its own. */
+@media (max-width: 1024px) {
+  #page-layout:has(.cm-toolbar) .cm-sidebar {
+    width: 220px;
+  }
+}
+@media (max-width: 600px) {
+  #page-layout:has(.cm-toolbar) {
+    flex-direction: column;
+  }
+  #page-layout:has(.cm-toolbar) #sidebar-mount {
+    height: auto;
+    flex-shrink: 0;
+  }
+  #page-layout:has(.cm-toolbar) .cm-sidebar {
+    width: 100%;
+    height: auto;
+    max-height: 40vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--divider-subtle);
+  }
+  #page-layout:has(.cm-toolbar) .cm-sidebar-header {
+    height: 44px;
+  }
+  #page-layout:has(.cm-toolbar) .cm-class-list {
+    min-height: 0;
+  }
+  #page-layout:has(.cm-toolbar) .cm-new-btn {
+    min-height: 44px;
+  }
+  #page-layout:has(.cm-toolbar) .page-main {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+}
