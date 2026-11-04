@@ -133,7 +133,7 @@ window.GradeReport = (function () {
       } else if (cv.kind === 'level' && cv.value > 0) {
         row.score = levelFigure(cv.value);
         row.outOf = '4';
-        row.percent = formatLevelAs(cid, cv.value, 'percent');
+        row.percent = cv.percentText;
       } else return;
       out.push(row);
     });

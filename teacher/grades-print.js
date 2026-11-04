@@ -472,7 +472,7 @@
     } else if (cell.kind === 'points' && as === 'proficiency') {
       out.text = formatLevelAs(cid, getAssessmentOverallScore(cid, sid, col.id), 'proficiency');
     } else if (cell.kind === 'level' && as !== 'points') {
-      out.text = formatLevelAs(cid, cell.value, as);
+      out.text = as === 'percent' ? cell.percentText : formatLevelAs(cid, cell.value, as);
     }
     if (cell.late && opts.late && (cell.kind === 'points' || cell.kind === 'level' || cell.kind === 'complete')) {
       out.late = true;
