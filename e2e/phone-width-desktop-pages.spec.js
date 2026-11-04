@@ -31,7 +31,8 @@ async function dockAndPage(page) {
       leftEnd: left.width ? left.right : 0,
       rightStart: right.left,
       activeIn: active.left >= segBox.left - 1 && active.right <= segBox.right + 1,
-      pageSideways: document.documentElement.scrollWidth > innerWidth || (main && main.scrollWidth > main.clientWidth + 1),
+      pageSideways:
+        document.documentElement.scrollWidth > innerWidth || (main && main.scrollWidth > main.clientWidth + 1),
     };
   });
 }
@@ -105,7 +106,9 @@ test('Assignments rubric grid fits a phone', async ({ page }) => {
 // Excused and Late are on screen, and the Overall Comment is full width.
 test('gradebook grader fits a phone', async ({ page }) => {
   await openDesktop(page, '/gradebook');
-  const aid = await page.evaluate(() => getAssessments(getActiveCourse()).find(a => a.title === 'Data Reading Quiz').id);
+  const aid = await page.evaluate(
+    () => getAssessments(getActiveCourse()).find(a => a.title === 'Data Reading Quiz').id,
+  );
   await page.locator(`.gb-scores-cell[data-aid="${aid}"]`).first().click();
   const dialog = page.locator('#grader-overlay .grader-dialog');
   await expect(dialog).toBeVisible();
@@ -136,8 +139,18 @@ test('desktop student page fits a phone', async ({ page }) => {
     const step = document.querySelector('.student-toolbar .stu-step').getBoundingClientRect();
     const term = document.querySelector('.student-toolbar .term-select').getBoundingClientRect();
     const main = document.getElementById('main');
-    const overlap = !(step.right <= crumb.left || step.left >= crumb.right || step.bottom <= crumb.top || step.top >= crumb.bottom);
-    return { crumbWidth: crumb.width, overlap, termRight: term.right, sideways: main.scrollWidth > main.clientWidth + 1 };
+    const overlap = !(
+      step.right <= crumb.left ||
+      step.left >= crumb.right ||
+      step.bottom <= crumb.top ||
+      step.top >= crumb.bottom
+    );
+    return {
+      crumbWidth: crumb.width,
+      overlap,
+      termRight: term.right,
+      sideways: main.scrollWidth > main.clientWidth + 1,
+    };
   });
   expect(r.crumbWidth).toBeGreaterThan(100);
   expect(r.overlap).toBe(false);
@@ -179,4 +192,33 @@ test('Term Questionnaire fits a phone', async ({ page }) => {
   expect(r.sideways).toBe(false);
   await page.locator('#app-dock [data-action="toggleSidebar"]').click();
   await expect(page.locator('#gb-sidebar')).toBeVisible();
+});
+
+// Group 2 #46: Progress Reports fits a phone: the sheet starts inside the
+// canvas, and Paper, Sides, Black / Colour and One Student / Everyone are
+// all on screen.
+test('Progress Reports fits a phone', async ({ page }) => {
+  await openDesktop(page, '/reports?tab=progress');
+  await expect(page.locator('#rb-preview .sheet-zoom .report-sheet').first()).toBeVisible();
+  const sheetIn = () =>
+    page.evaluate(() => {
+      const p = document.getElementById('rb-preview').getBoundingClientRect();
+      const s = document.querySelector('#rb-preview .sheet-zoom .report-sheet').getBoundingClientRect();
+      return s.left >= p.left - 0.5 && s.right <= p.right + 0.5;
+    });
+  await expect.poll(sheetIn).toBe(true);
+  // On a narrow screen the Report switch is in the Options panel.
+  await page.locator('#tb-rail-btn').click();
+  await page.locator('[data-action="progressMode"][data-mode="build"]').click();
+  await expect(page.locator('.studio-tools [data-action="setInk"]').first()).toBeVisible();
+  const off = await page.evaluate(() =>
+    [...document.querySelectorAll('.studio-tools button')]
+      .filter(b => {
+        const r = b.getBoundingClientRect();
+        return r.left < 0 || r.right > innerWidth;
+      })
+      .map(b => b.textContent.trim()),
+  );
+  expect(off).toEqual([]);
+  await expect.poll(sheetIn).toBe(true);
 });
