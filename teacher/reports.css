@@ -6040,6 +6040,14 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--text-2);
   white-space: nowrap;
 }
+/* A search with no match here: where else it matches (Nov 3 sweep). */
+.qn-browse-elsewhere {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 6px;
+}
 .qn-browse-empty {
   padding: 18px 14px;
   font-size: 13.5px;

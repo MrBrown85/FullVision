@@ -4033,6 +4033,39 @@ window.ReportQuestionnaire = (function () {
     }).length;
   }
 
+  /* A search with no match in the part and filter on screen: where else in
+     the bank it matches (every sentence for this part, then the other
+     parts), each a button that shows them (Nov 3 sweep). */
+  // html-safe: the query, part labels and counts esc()'d or numbers
+  function _searchElsewhereHtml(b, ctx, used, cid, student) {
+    var opts = { fits: false, q: b.q, usage: _usage(cid, student), inUse: used };
+    var here = PARTS.find(function (p) {
+      return p.id === b.part;
+    });
+    var btn = function (part, label, n) {
+      return `<button type="button" class="qn-card-link qn-browse-elsewhere-btn" data-action="tqSentences" data-do="searchIn" data-part="${esc(part)}" title="Shows every ${esc(label)} sentence that matches.">${esc(label)} (${n})</button>`;
+    };
+    var out = [];
+    if (b.fits) {
+      var all = browseList(b.part, ctx, opts).rows.length;
+      if (all) out.push(btn(b.part, 'Every ' + here.label + ' Sentence', all));
+    }
+    PARTS.forEach(function (p) {
+      if (p.id === b.part || p.id === 'support' || p.id === 'closing') return;
+      var n = browseList(p.id, ctx, opts).rows.length;
+      if (n) out.push(btn(p.id, p.label, n));
+    });
+    var said = '“' + b.q.trim() + '”';
+    var text = b.fits
+      ? 'No ' + here.label + ' sentences that fit match ' + said + '.'
+      : 'No ' + here.label + ' sentences match ' + said + '.';
+    return `<div class="qn-browse-empty">${esc(text)}${
+      out.length
+        ? `<span class="qn-browse-elsewhere">Matches elsewhere: ${out.join(' ')}</span>`
+        : `<span class="qn-browse-elsewhere">No sentence in the bank matches ${esc(said)}.</span>`
+    }</div>`;
+  }
+
   function _wordingMenuHtml(cid, student, ctx, rows, i) {
     var row = rows[i];
     var first = _first(student);
@@ -5521,6 +5554,7 @@ window.ReportQuestionnaire = (function () {
     });
     var list = browseList(b.part, ctx, { fits: b.fits, q: b.q, usage: _usage(cid, student), inUse: used });
     _initGroups(b.part, list.own);
+    if (!list.rows.length && q) return _searchElsewhereHtml(b, ctx, used, cid, student);
     if (!list.rows.length)
       return none(
         q
@@ -5885,6 +5919,19 @@ window.ReportQuestionnaire = (function () {
         })
           ? ds.part
           : 'grade';
+        _browse.menu = false;
+        _syncBrowse();
+        _focusSel('#tq-browse-overlay [role="tab"][aria-selected="true"]');
+        return;
+      case 'searchIn':
+        // A search's match elsewhere: that part, every sentence, same words.
+        if (!_browse) return;
+        _browse.part = PARTS.some(function (p) {
+          return p.id === ds.part;
+        })
+          ? ds.part
+          : _browse.part;
+        _browse.fits = false;
         _browse.menu = false;
         _syncBrowse();
         _focusSel('#tq-browse-overlay [role="tab"][aria-selected="true"]');

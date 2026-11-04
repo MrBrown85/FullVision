@@ -43,3 +43,35 @@ test('Belongs Under starts on the part it was opened from, says why Grade is not
   expect(await input.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   expect(await input.evaluate(el => el.clientHeight)).toBeGreaterThan(40);
 });
+
+test('a search with no match here offers the parts where it does match (group 3 #69)', async ({ page }) => {
+  await open(page);
+  await page.locator('#tq-generate').click();
+  await page.locator('#tq-browse-btn').click();
+  const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+  await sheet.locator('[role="tab"]', { hasText: 'Closing' }).click();
+  await sheet.locator('[role="tab"]', { hasText: 'Grade' }).click();
+  // A word only the Next Step sentences use.
+  const word = await page.evaluate(() => {
+    const words = s =>
+      new Set(
+        String(s.text)
+          .replace(/\{[^}]*\}|\[[^\]]*\]/g, ' ')
+          .toLowerCase()
+          .match(/[a-z]{6,}/g) || [],
+      );
+    const next = COMMENT_BANK.sentences.filter(s => s.group === 'Next Step' && !s.mine);
+    const grade = new Set(COMMENT_BANK.sentences.filter(s => s.group !== 'Next Step').flatMap(s => [...words(s)]));
+    for (const s of next) for (const w of words(s)) if (!grade.has(w)) return w;
+    return '';
+  });
+  expect(word).not.toBe('');
+  await sheet.locator('#tq-browse-search').fill(word);
+  const empty = sheet.locator('.qn-browse-empty');
+  await expect(empty).toContainText('match “' + word + '”');
+  const go = empty.locator('.qn-browse-elsewhere-btn', { hasText: 'Next Step' });
+  await expect(go).toHaveCount(1);
+  await go.click();
+  await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Next Step');
+  await expect(sheet.locator('.qn-browse-row').first()).toBeVisible();
+});
