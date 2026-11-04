@@ -4385,7 +4385,8 @@ body.fv-switching-course::after {
 
 /* Whole titles on a phone (Step 4 sweep, Nov 3): assessment rows and the
    competency timeline wrap instead of cutting the title; the grading bar
-   takes the title on up to two lines. */
+   takes the title on up to four lines (three on an iPhone; a wider font,
+   as on Android or Linux, needs the fourth). */
 .m-assess-title,
 .m-sec-tl-name {
   white-space: normal;
@@ -4400,7 +4401,7 @@ body.fv-switching-course::after {
 #m-nav-bar-grade-swiper .m-nav-bar-title-inline {
   white-space: normal;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   font-size: 15px;
   line-height: 1.25;
