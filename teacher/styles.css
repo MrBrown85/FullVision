@@ -2841,6 +2841,27 @@ body.offline-active #app-dock {
   }
 }
 
+/* ── Touch targets on a phone (Step 4 sweep, Nov 3) ───────────
+   Under 600 px the toolbar controls and segmented controls (the top tabs,
+   Reports' Term Questionnaire | Progress Reports, the gradebook toolbar)
+   are 44 px high, a finger's size; on wider screens they stay 32 px. */
+@media (max-width: 600px) {
+  :root {
+    --control-h: 44px;
+  }
+  /* A segment is the full 44 px; its track is a little taller. */
+  .seg-btn {
+    line-height: calc(var(--control-h) - 10px);
+  }
+  /* The top bar's sidebar and account buttons. */
+  .tb-btn,
+  .tb-user-btn {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
+}
+
 /* ── Responsive: Small Mobile (≤480px) ────────────────────── */
 @media (max-width: 480px) {
   .page-main {

@@ -6517,3 +6517,16 @@ body.qn-roster #gb-sidebar .student-row-note {
     padding-right: 0;
   }
 }
+
+/* With 44 px controls on a phone, the toolbar's right-hand group (Ready
+   count, Edit Student, the info button and Approve and Next) wraps inside
+   the page instead of running past its right edge. */
+@media (max-width: 600px) {
+  .report-toolbar > div:last-child {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+  }
+}

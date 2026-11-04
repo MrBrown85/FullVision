@@ -145,9 +145,8 @@ test.describe('Mobile: Dock Navigation', () => {
     expect(text).toContain('Dashboard');
   });
 
-  // BUG: dock nav links are only 25px tall, below the 44px Apple HIG recommendation
+  // The top tabs are 44 px tall at phone width (Step 4 group 3 #87).
   test('dock nav links should meet 44px touch target at 375px', async ({ page }) => {
-    test.fail(); // known bug: links are ~25px tall
     await page.setViewportSize(MOBILE);
     await gotoApp(page, '/dashboard');
     const links = page.locator('.tb-seg a.tb-seg-link');

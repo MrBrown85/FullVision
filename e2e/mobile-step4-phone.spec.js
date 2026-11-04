@@ -344,3 +344,26 @@ test('arrow keys, mouse drag and names on the phone app', async ({ page }) => {
   await page.keyboard.press('ArrowLeft');
   await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('1 of');
 });
+
+// Group 3 #87: the phone app's controls are at least 44 px high.
+test('phone controls are finger-sized', async ({ page }) => {
+  const small = () =>
+    [...document.querySelectorAll('button, [role=button], select, input, [data-action]')]
+      .filter(e => {
+        const r = e.getBoundingClientRect();
+        if (!r.width || !r.height || r.bottom < 0 || r.top > innerHeight) return false;
+        if (e.closest('#m-auth, .m-skip-nav, .m-obs-chev')) return false;
+        return r.height < 43.5;
+      })
+      .map(e => e.outerHTML.slice(0, 80) + ' ' + Math.round(e.getBoundingClientRect().height));
+  await openPhone(page);
+  expect(await page.evaluate(small)).toEqual([]);
+  await page.locator('.m-card-stack-item[data-depth="0"] [data-action="m-student-detail"]').click();
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(small)).toEqual([]);
+  await page.locator('[data-action="m-back"]').first().click();
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('[data-action="m-grade-assess"]').first().click();
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(small)).toEqual([]);
+});

@@ -4255,3 +4255,43 @@ body.fv-switching-course::after {
 .m-group-sheet-cancel {
   font-weight: 600;
 }
+
+/* ── Touch targets (Step 4 sweep, Nov 3) ───────────────────────
+   Every control the teacher taps is at least 44 px high: the card's
+   Observe and View Profile, All Students, segmented controls, the ± level
+   buttons, the Checks button and Customize Card's drag handles (44 × 44). */
+.m-scard-btn,
+.m-card-all,
+.m-seg-btn,
+.m-checks-btn {
+  min-height: 44px;
+}
+.m-card-all {
+  border-radius: 22px;
+}
+.m-mod-btn {
+  height: 44px;
+  border-radius: 22px;
+}
+.m-wdg-editor-drag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+}
+.m-wdg-editor-drag-spacer {
+  width: 44px;
+}
+/* The grading strip's avatars, and the name on an observation card, which
+   filters the feed: the name keeps its look, its tap area grows. */
+.m-thumb {
+  width: 44px;
+  height: 44px;
+  font-size: 13px;
+}
+.m-obs-student-name {
+  padding: 13px 4px;
+  margin: -13px -4px;
+}
