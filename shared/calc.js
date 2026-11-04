@@ -1708,10 +1708,22 @@ function getSectionProficiency(cid, studentId, sectionId) {
   if (profs.length === 0) return 0;
   const calculated = profs.reduce((a, b) => a + b, 0) / profs.length;
   // Check for teacher override
-  const overrides = getOverrides(cid);
-  const override = overrides[studentId]?.[sectionId];
-  if (override && override.level > 0) return override.level;
+  const override = sectionOverrideInView(cid, studentId, sectionId);
+  if (override) return override.level;
   return calculated;
+}
+
+/** The teacher's override for a section when it applies to the grade in
+ * view: always for the year so far; for a report, only when the override's
+ * date is on or before the report's end (an undated override applies
+ * everywhere). Null otherwise (DECISIONS, Reporting periods 4). */
+function sectionOverrideInView(cid, studentId, sectionId) {
+  const override = getSectionOverride(cid, studentId, sectionId);
+  if (!override || !(override.level > 0)) return null;
+  const t = _activeTerm[cid];
+  const d = override.date ? String(override.date).slice(0, 10) : '';
+  if (t && t.endsOn && d && d > t.endsOn) return null;
+  return override;
 }
 
 /** Calculate section proficiency ignoring any teacher overrides, for use in override UI display.
@@ -2973,6 +2985,7 @@ window.Calc = {
   getSectionProficiency,
   getSectionProficiencyRaw,
   getSectionOverride,
+  sectionOverrideInView,
   setSectionOverride,
   getGroupProficiency,
   getOverallProficiency,

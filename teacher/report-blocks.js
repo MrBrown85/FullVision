@@ -523,7 +523,8 @@ window.ReportBlocks = (function () {
     sections.forEach(sec => {
       const secProf = getSectionProficiency(cid, student.id, sec.id);
       const sr = Math.round(secProf);
-      const secOverride = getSectionOverride(cid, student.id, sec.id);
+      // Only an override that applies to this report (dated by its end).
+      const secOverride = sectionOverrideInView(cid, student.id, sec.id);
       html += `<div class="report-outcome-section" style="page-break-inside:avoid">
       <div class="report-outcome-section-header" style="display:flex;align-items:center;justify-content:space-between">
         <span>${esc(sec.shortName || sec.name)}</span>`;

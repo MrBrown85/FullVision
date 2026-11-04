@@ -321,4 +321,20 @@ describe('review follow-ups', () => {
     const c = CommentBank.facts(CID, STUDENT, 'term-1').comps[0];
     expect(c.since).toBe('');
   });
+
+  it('2. an override applies only to reports ending on or after its date; the year so far always', () => {
+    _cache.overrides[CID] = { [SID]: { sec: { level: 4, reason: 'Portfolio', date: '2027-01-20' } } };
+    clearProfCache();
+    expect(getSectionProficiency(CID, SID, 'sec')).toBe(4);
+    setActiveTerm(CID, 1);
+    expect(getSectionProficiency(CID, SID, 'sec')).toBe(2);
+    expect(text(ReportBlocks.renderBlockSectionOutcomes(CID, STUDENT))).not.toContain('Teacher override');
+    setActiveTerm(CID, 2);
+    expect(getSectionProficiency(CID, SID, 'sec')).toBe(4);
+    // An undated override applies everywhere.
+    _cache.overrides[CID] = { [SID]: { sec: { level: 4, reason: 'Portfolio' } } };
+    clearProfCache();
+    setActiveTerm(CID, 1);
+    expect(getSectionProficiency(CID, SID, 'sec')).toBe(4);
+  });
 });
