@@ -169,6 +169,29 @@
 .gb-search-input::placeholder {
   color: var(--text-3);
 }
+/* × at the box's right end while it holds a search; Escape does the same. */
+.gb-search-clear {
+  position: absolute;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--text-base);
+  line-height: 1;
+  cursor: pointer;
+}
+.gb-search-clear:hover {
+  background: var(--overlay-hover);
+}
+.gb-search-wrap:has(.gb-search-clear) .gb-search-input {
+  padding-right: 30px;
+}
 
 /* + New Assessment link */
 .gb-add-btn {
@@ -1007,6 +1030,38 @@ th.gb-group-alt {
 .gb-grid-colhead .gb-scores-assess-meta {
   font-size: 11px;
 }
+/* The title and a ⋯ that shows the title opens the column's menu. */
+.gb-colhead-name-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+.gb-colhead-name-row .gb-scores-assess-name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.gb-colhead-menu-mark {
+  flex: none;
+  display: inline-block;
+  color: var(--text-3);
+  line-height: 1;
+  /* Turned back upright against the title's slant, so it points down like
+     any menu's arrow and doesn't read as a cut-off title's "…". */
+  transform: rotate(45deg);
+}
+.gb-grid-colhead-label:hover .gb-colhead-menu-mark,
+.gb-grid-colhead.gb-col-menu .gb-colhead-menu-mark {
+  color: var(--active);
+}
+.gb-grid-colhead-label:focus {
+  outline: none;
+}
+.gb-grid-colhead-label:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 /* Subtle color fill behind angled header — inherits section color via inline style */
 .gb-grid-colhead-stripe {
   height: 4px;
@@ -1130,11 +1185,24 @@ th.gb-group-alt {
   flex-shrink: 0;
   margin-left: 8px;
 }
+/* "Proficient" under a Proficiency class's overall, as in Competencies. */
+.gb-grid-rowhead-grade .gb-grade-word {
+  font-size: 12px;
+  font-weight: 600;
+}
 /* ── Competencies grid variant ─────────────────────────────── */
 .gb-grid-corner-comp {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+}
+/* The Competencies view's names share their column with "3.3 Proficient",
+   so on a wide screen the column takes 240px: 15-letter names and the
+   Rubrics by Competency picker fit whole. */
+@media (min-width: 1200px) {
+  .gb-grid.gb-grid-comp {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
 }
 /* Sort toggle sits in the empty top of the corner, above Student / Overall. */
 /* View options sit in the empty top of the corner, above Student / Overall. */
@@ -1173,6 +1241,16 @@ th.gb-group-alt {
 }
 .gb-name-sort:hover {
   color: var(--active);
+}
+/* The name order on, on its own line under Student: "Last Name A–Z". */
+.gb-name-sort {
+  text-align: left;
+}
+.gb-sort-order {
+  display: block;
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
 }
 .gb-grid-colheads-comp {
   flex-direction: column;
@@ -1253,7 +1331,6 @@ th.gb-group-alt {
   white-space: nowrap;
 }
 .gb-grid-tag-header.gb-code-long {
-  font-size: 0.625rem;
   letter-spacing: 0;
 }
 /* A criterion column's header is its name, not a competency code */

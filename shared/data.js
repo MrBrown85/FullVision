@@ -3002,6 +3002,13 @@ function getAssessmentCategoryId(assessment) {
   return _getAssessmentCategoryId(assessment);
 }
 
+/* Whether an assessment's category badge shows: always when it has a
+   category, and "No Category" only in a class that has categories, where
+   it is something to fix. A class with none shows no badge at all. */
+function showsCategoryBadge(cid, assessment) {
+  return !!_getAssessmentCategoryId(assessment) || (getCategories(cid) || []).length > 0;
+}
+
 function getAssessmentCategoryName(cid, assessment) {
   var categoryId = _getAssessmentCategoryId(assessment);
   if (!categoryId) return 'No Category';
@@ -13579,6 +13586,7 @@ window.GB = {
   getCategoryById,
   getAssessmentCategoryId,
   getAssessmentCategoryName,
+  showsCategoryBadge,
   categoryRequired,
   assessmentNeedsCategory,
   getAssessments,

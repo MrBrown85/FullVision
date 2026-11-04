@@ -519,11 +519,10 @@ window.MStudentDetail = (function () {
         MC.esc(_cellText(c.cell, a)) +
         '</span>' +
         '</div>' +
-        '<div class="m-st-assess-sub"><span class="m-type-badge ' +
-        badge.className +
-        '">' +
-        MC.esc(badge.label) +
-        '</span>' +
+        '<div class="m-st-assess-sub">' +
+        (showsCategoryBadge(cid, a)
+          ? '<span class="m-type-badge ' + badge.className + '">' + MC.esc(badge.label) + '</span>'
+          : '') +
         (toward.length ? '<span class="m-st-toward">' + MC.esc(toward.join(', ')) + '</span>' : '') +
         '</div>' +
         '</div>';

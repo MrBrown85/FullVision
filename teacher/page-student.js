@@ -33,6 +33,8 @@ window.PageStudent = (function () {
   }
 
   function _assessmentCategoryBadge(cid, assessment) {
+    // A class with no categories shows no "No Category" badge.
+    if (!showsCategoryBadge(cid, assessment)) return '';
     var label = _assessmentCategoryLabel(cid, assessment);
     var categoryId = getAssessmentCategoryId(assessment);
     var hasCategory = !!(categoryId || (assessment && assessment.type === 'summative'));

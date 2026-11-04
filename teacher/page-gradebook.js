@@ -50,6 +50,7 @@ window.PageGradebook = (function () {
   var filterStudentIds = [];
   var searchQuery = '';
   var searchText = ''; // what the box holds, spaces and capitals as typed
+  var _averageStudents = null; // the class's students, for Class Average
   var sortCol = null;
   var _filterStripOpen = false;
   var _printTerm = 'all';
@@ -140,18 +141,20 @@ window.PageGradebook = (function () {
     inp.focus();
     if (caret != null) inp.setSelectionRange(caret, caret);
   }
-  /* Student name sort cycles on every click and loops:
-     first name A–Z, first Z–A, last name A–Z, last Z–A. */
+  /* Student name sort cycles on every click and loops, from the page's
+     own order (last name A–Z): last Z–A, first A–Z, first Z–A, last A–Z. */
   var NAME_SORT_CYCLE = [
-    { by: 'first', dir: 'asc' },
-    { by: 'first', dir: 'desc' },
     { by: 'last', dir: 'asc' },
     { by: 'last', dir: 'desc' },
+    { by: 'first', dir: 'asc' },
+    { by: 'first', dir: 'desc' },
   ];
   function toggleSort(key) {
     _flushActiveScoreEditor();
     if (key === 'name') {
-      var step = -1;
+      // No sort chosen yet is last name A–Z, the cycle's first step; from
+      // the Overall sort a click goes back to it.
+      var step = sortCol ? -1 : 0;
       if (sortCol && sortCol.key === 'name') {
         step = NAME_SORT_CYCLE.findIndex(function (c) {
           return c.by === sortCol.by && c.dir === sortCol.dir;
@@ -166,6 +169,54 @@ window.PageGradebook = (function () {
   function sortArrow(key) {
     if (!sortCol || sortCol.key !== key) return '';
     return '<span class="gb-sort-arrow">' + (sortCol.dir === 'asc' ? '▲' : '▼') + '</span>';
+  }
+
+  /* The grid corner's two sort buttons. Student says which name order is
+     on (no sort chosen is last name A–Z) and what a click turns it to;
+     Overall sorts by the overall grade, lowest first, then highest. */
+  var NAME_SORT_TEXT = {
+    'last-asc': 'Last Name A\u2013Z',
+    'last-desc': 'Last Name Z\u2013A',
+    'first-asc': 'First Name A\u2013Z',
+    'first-desc': 'First Name Z\u2013A',
+  };
+  function _cornerSortButtons() {
+    var byName = !sortCol || sortCol.key === 'name';
+    var cur = byName ? (sortCol ? sortCol.by + '-' + sortCol.dir : 'last-asc') : null;
+    var at = cur
+      ? NAME_SORT_CYCLE.findIndex(function (c) {
+          return c.by + '-' + c.dir === cur;
+        })
+      : -1;
+    var next = NAME_SORT_CYCLE[(at + 1) % NAME_SORT_CYCLE.length];
+    var nextText = NAME_SORT_TEXT[next.by + '-' + next.dir];
+    var nameTip = cur
+      ? 'Sorted by ' + NAME_SORT_TEXT[cur] + '. Click for ' + nextText + '.'
+      : 'Click to sort by ' + nextText + '.';
+    var byOverall = sortCol && sortCol.key === 'overall';
+    var overallTip = byOverall
+      ? 'Sorted by Overall, ' +
+        (sortCol.dir === 'asc' ? 'lowest' : 'highest') +
+        ' first. Click for ' +
+        (sortCol.dir === 'asc' ? 'highest' : 'lowest') +
+        ' first.'
+      : 'Click to sort by Overall, lowest first.';
+    return (
+      '<button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name" title="' +
+      esc(nameTip) +
+      '" aria-label="Student. ' +
+      esc(nameTip) +
+      '">Student' +
+      (cur ? '<span class="gb-sort-order">' + esc(NAME_SORT_TEXT[cur]) + '</span>' : '') +
+      '</button>' +
+      '<button type="button" class="gb-grid-corner-label gb-name-sort gb-overall-sort" data-action="toggleSort" data-sortkey="overall" title="' +
+      esc(overallTip) +
+      '" aria-label="Overall. ' +
+      esc(overallTip) +
+      '">Overall' +
+      sortArrow('overall') +
+      '</button>'
+    );
   }
 
   function _getSortedCategories(cid) {
@@ -233,6 +284,10 @@ window.PageGradebook = (function () {
     var course = COURSES[cid];
     var isLetter = courseShowsLetterGrades(course);
     var scores = getScores(cid);
+
+    // Class Average is the whole class's, whoever a search or a dashboard
+    // link leaves on screen.
+    _averageStudents = students;
 
     if (filterStudentIds.length) {
       students = students.filter(function (s) {
@@ -344,7 +399,11 @@ window.PageGradebook = (function () {
       LINE_ICONS.search +
       '</span><input class="gb-search-input" type="text" placeholder="Search…" value="' +
       esc(searchText) +
-      '" data-action-input="gbSearch" aria-label="Search students"></div>';
+      '" data-action-input="gbSearch" aria-label="Search students">' +
+      (searchText
+        ? '<button type="button" class="gb-search-clear" data-action="clearSearch" aria-label="Clear search" title="Clear search">\u00D7</button>'
+        : '') +
+      '</div>';
 
     if (filterStudentIds.length) {
       html +=
@@ -455,6 +514,11 @@ window.PageGradebook = (function () {
     _scrollKey = scrollKey;
 
     var refocus = _cellKey(document.activeElement);
+    var refocusHead =
+      document.activeElement && document.activeElement.closest
+        ? document.activeElement.closest('#gb-colheads .gb-grid-colhead[data-aid]')
+        : null;
+    var refocusHeadAid = refocusHead ? refocusHead.dataset.aid : null;
     // html-safe: names, titles and category/section/module names are escaped; colours go through cssColor; grades come from calc.js.
     document.getElementById('main').innerHTML = html;
     applyStickyLeft();
@@ -467,6 +531,12 @@ window.PageGradebook = (function () {
     var again = refocus && _findCell(refocus);
     if (again) _selectCell(again);
     else _initRovingCell();
+    var headAgain =
+      refocusHeadAid &&
+      document.querySelector(
+        '#gb-colheads .gb-grid-colhead[data-aid="' + CSS.escape(refocusHeadAid) + '"] .gb-grid-colhead-label',
+      );
+    if (headAgain) _focusColhead(headAgain);
   }
 
   /* ── Selecting a cell ──────────────────────────────────────
@@ -599,6 +669,10 @@ window.PageGradebook = (function () {
       showScoreContextMenu({ clientX: r.left + r.width / 2, clientY: r.bottom }, focused);
       return;
     }
+    if (/^[0-9]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      _scoresTypeDigit(e, focused);
+      return;
+    }
     if (nav.indexOf(e.key) < 0) return;
     var row = -1,
       col = -1;
@@ -619,6 +693,45 @@ window.PageGradebook = (function () {
     else if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) col = Math.min(col + 1, cols - 1);
     else col = Math.max(col - 1, 0);
     if (rows[row][col]) _selectCell(rows[row][col]);
+  }
+
+  /* A digit typed on a selected Scores cell starts Edit Score with it, as
+     in a spreadsheet and the Competencies view: any digit on points work,
+     1–4 on a level. Work that takes no typed score says what to do. */
+  function _scoresTypeDigit(e, cell) {
+    var cid = activeCourse;
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === cell.dataset.aid;
+    });
+    if (!a) return;
+    e.preventDefault();
+    var status = getAssignmentStatus(cid, cell.dataset.sid, a.id);
+    if (status === 'NS' || status === 'EXC') {
+      _showCellTip(
+        cell,
+        (status === 'NS' ? 'Marked Missing' : 'Excused') + '. Take it off in the cell menu to score this work.',
+      );
+      return;
+    }
+    if (isCompletionScored(a)) {
+      _showCellTip(cell, 'Complete or Incomplete work is marked in the grader. Press Return to open it.');
+      return;
+    } else if (isDibelsScored(a)) {
+      _showCellTip(cell, 'Press Return to enter the scores.');
+      return;
+    } else if (isPointsScored(a)) {
+      startCellEdit(cell);
+    } else if (a.rubricId || a.rubric_id) {
+      _showCellTip(cell, 'Scored on the rubric. Press Return to open it.');
+      return;
+    } else if (/^[1-4]$/.test(e.key)) {
+      startCellEdit(cell);
+    } else {
+      _showCellTip(cell, 'Type a level from 1 to 4.');
+      return;
+    }
+    var inp = cell.querySelector('.gb-scores-input');
+    if (inp) inp.value = e.key;
   }
 
   var _hasRubricWork = false;
@@ -1002,6 +1115,19 @@ window.PageGradebook = (function () {
     requestAnimationFrame(update);
   }
 
+  /* What a screen reader hears on a Competencies cell, as the Scores view
+     says it: "Mateo Alvarez, Density Worksheet, QAP1: 3, Proficient".
+     `value` is the score's text ('' for none); a status replaces it, and
+     Late follows it. Escaped for an attribute. */
+  function _compCellLabel(s, assess, col, status, value, hint) {
+    var what = status === 'NS' ? 'Missing' : status === 'EXC' ? 'Excused' : value ? value : 'No score';
+    if (status === 'LATE' && value) what += ', Late';
+    var code = col.isPointsCol ? '' : col.tagCode ? ', ' + col.tagCode : '';
+    return esc(
+      fullName(s) + ', ' + ((assess && assess.title) || 'Assessment') + code + ': ' + what + (hint ? '. ' + hint : ''),
+    );
+  }
+
   /* A student's name in the grid's left column: a link to their page. */
   /* Whether a student's grade shows a reporting basis (IE, or No Letter
      Grade for goals) for the term in view. That row keeps the name whole and
@@ -1133,13 +1259,24 @@ window.PageGradebook = (function () {
         });
       } else if (isPointsScored(a)) {
         var sec = getSectionForTag(cid, tagIds[0]);
+        // The header names the competencies the work feeds, as proficiency
+        // columns do, or says it feeds none (its total is in the title
+        // above), so work that counts toward no proficiency stands out.
+        var fedCodes = [];
+        tagIds.forEach(function (tid) {
+          var code = getSectionForTag(cid, tid) ? _tagShortCode(getTagById(cid, tid)) : '';
+          if (code && fedCodes.indexOf(code) < 0) fedCodes.push(code);
+        });
         cols.push({
           assessmentId: a.id,
           tagId: '__pts__',
           isPointsCol: true,
-          tagCode: isCompletionScored(a) ? '\u2713/\u2717' : '/' + (a.maxPoints || 100),
+          isNameCol: !fedCodes.length,
+          tagCode: fedCodes.length ? fedCodes.join(' ') : 'No Competency',
           sectionColor: cssColor(sec ? sec.color : 'var(--text-3)'),
-          tagText: a.title,
+          tagText: fedCodes.length
+            ? a.title + ' counts toward ' + fedCodes.join(', ')
+            : a.title + ' counts toward no competency',
         });
       } else {
         tagIds.forEach(function (tagId) {
@@ -1158,6 +1295,9 @@ window.PageGradebook = (function () {
             sectionColor: cssColor(sec ? sec.color : 'var(--text-3)'),
             tagText: key ? key.text || key.label : 'No longer in the learning map',
             groupName: sec ? sec.name || sec.shortName || '' : '',
+            // A rubric criterion that feeds no competency keeps its own
+            // column, headed by its name: written as named, not as a code.
+            isNameCol: !!(key && !key.tag),
           });
         });
       }
@@ -1185,9 +1325,9 @@ window.PageGradebook = (function () {
     html +=
       '<div class="gb-grid-corner gb-grid-corner-comp">' +
       _cornerTools(true) +
-      '<div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
-      sortArrow('name') +
-      '</button><span class="gb-grid-corner-label">Overall</span></div>' +
+      '<div class="gb-grid-corner-row1">' +
+      _cornerSortButtons() +
+      '</div>' +
       '</div>';
 
     // Q2: Column headers — assessment names (row 1) + tag codes (row 2)
@@ -1238,17 +1378,19 @@ window.PageGradebook = (function () {
             '">' +
             esc(NEEDS_CATEGORY_LABEL) +
             '</span>'
-          : '<span class="gb-assess-type-pill ' +
-            categoryClass +
-            '" style="background:' +
-            catTint.bg +
-            ';color:' +
-            catTint.fg +
-            '" title="' +
-            esc(categoryName) +
-            '">' +
-            esc(categoryName) +
-            '</span>') +
+          : showsCategoryBadge(cid, a)
+            ? '<span class="gb-assess-type-pill ' +
+              categoryClass +
+              '" style="background:' +
+              catTint.bg +
+              ';color:' +
+              catTint.fg +
+              '" title="' +
+              esc(categoryName) +
+              '">' +
+              esc(categoryName) +
+              '</span>'
+            : '') +
         '<span class="gb-assess-date">' +
         formatShortDate(a.date) +
         '</span>' +
@@ -1273,9 +1415,9 @@ window.PageGradebook = (function () {
       html +=
         '<div class="gb-grid-tag-header' +
         altClass +
-        (col.isCriterionCol ? ' gb-grid-tag-header-crit' : '') +
-        // A code longer than five characters drops a size so it still fits.
-        (!col.isCriterionCol && String(col.tagCode || '').length > 5 ? ' gb-code-long' : '') +
+        (col.isCriterionCol || col.isNameCol ? ' gb-grid-tag-header-crit' : '') +
+        // A code longer than five characters drops its spacing so it still fits.
+        (!col.isCriterionCol && !col.isNameCol && String(col.tagCode || '').length > 5 ? ' gb-code-long' : '') +
         '" style="flex:0 0 ' +
         tagW +
         'px;width:' +
@@ -1285,7 +1427,7 @@ window.PageGradebook = (function () {
         ';color:' +
         col.sectionColor +
         '" data-tip-code="' +
-        esc(col.isCriterionCol ? '' : col.tagCode) +
+        esc(col.isCriterionCol || col.isNameCol ? '' : col.tagCode) +
         '" data-tip-text="' +
         esc(col.tagText || col.tagCode) +
         '" data-tip-group="' +
@@ -1365,7 +1507,9 @@ window.PageGradebook = (function () {
             altClass +
             '"' +
             cellStyle +
-            ' tabindex="-1" role="gridcell" data-aid="' +
+            ' tabindex="-1" role="gridcell" aria-label="' +
+            _compCellLabel(s, assess, col, cellStatus, mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '') +
+            '" data-aid="' +
             col.assessmentId +
             '" data-pts="1" data-cmp="1" data-sid="' +
             s.id +
@@ -1390,14 +1534,16 @@ window.PageGradebook = (function () {
                 '</span><span class="gb-pts-pct">' +
                 pct +
                 '%</span></div>'
-              : '<span class="gb-pts-empty">\u00B7</span>';
+              : '<span class="gb-pts-empty">\u2014</span>';
           html +=
             '<td class="gb-score gb-score-pts' +
             startClass +
             altClass +
             '"' +
             cellStyle +
-            ' tabindex="-1" role="gridcell" data-aid="' +
+            ' tabindex="-1" role="gridcell" aria-label="' +
+            _compCellLabel(s, assess, col, cellStatus, score != null ? formatPoints(score) + ' out of ' + max : '') +
+            '" data-aid="' +
             col.assessmentId +
             '" data-pts="1" data-sid="' +
             s.id +
@@ -1427,7 +1573,7 @@ window.PageGradebook = (function () {
             : score > 0
               ? formatScoreLevel(score, entry.mod) + lateMark
               : assigned
-                ? '<span class="gb-unscored">\u00B7</span>'
+                ? '<span class="gb-unscored">\u2014</span>'
                 : '\u2014';
           var rubricTitle =
             entry && entry.whole
@@ -1443,7 +1589,16 @@ window.PageGradebook = (function () {
             altClass +
             '"' +
             cellStyle +
-            ' tabindex="-1" role="gridcell" data-aid="' +
+            ' tabindex="-1" role="gridcell" aria-label="' +
+            _compCellLabel(
+              s,
+              assess,
+              col,
+              cellStatus,
+              score > 0 ? formatScoreLevel(score, entry.mod) + ', ' + scoreLevelText(score, entry.mod) : '',
+              rubricCol ? 'Scored on the rubric. Press Return to open it.' : '',
+            ) +
+            '" data-aid="' +
             col.assessmentId +
             '" data-tid="' +
             col.tagId +
@@ -1479,12 +1634,12 @@ window.PageGradebook = (function () {
       var cellW = col.colWidth || 54;
       var wStyle = cellW !== 54 ? 'min-width:' + cellW + 'px;width:' + cellW + 'px;' : '';
       if (col.isPointsCol) {
-        html += _pointsAverageCell(cid, sortedStudents, col, startClass + altClass, wStyle);
+        html += _pointsAverageCell(cid, _averageStudents || sortedStudents, col, startClass + altClass, wStyle);
         return;
       }
       // calc.js's one column rule; a criterion column (Rubrics by Criterion)
       // averages every competency the criterion feeds.
-      var stats = classColumnAverage(cid, sortedStudents, {
+      var stats = classColumnAverage(cid, _averageStudents || sortedStudents, {
         assessment: assessments.find(function (a) {
           return a.id === col.assessmentId;
         }),
@@ -1508,7 +1663,7 @@ window.PageGradebook = (function () {
           'cursor:default"><span class="gb-avg-val" style="color:' +
           PROF_COLORS[Math.round(stats.avg)] +
           ';font-weight:700">' +
-          formatLevel(cid, stats.avg) +
+          formatColumnAverageLevel(cid, stats.avg) +
           '</span></td>';
       }
     });
@@ -1539,12 +1694,19 @@ window.PageGradebook = (function () {
     html +=
       '<div class="gb-grid-corner gb-grid-corner-comp">' +
       _cornerTools(false) +
-      '<div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
-      sortArrow('name') +
-      '</button><span class="gb-grid-corner-label">Overall</span></div></div>';
+      '<div class="gb-grid-corner-row1">' +
+      _cornerSortButtons() +
+      '</div></div>';
 
     // Q2: Column headers (top-right, scrolls horizontally)
     html += '<div class="gb-grid-colheads" id="gb-colheads"><div class="gb-grid-colheads-inner">';
+    // The titles are one Tab stop: ← → move along them, and Return, Space
+    // or Shift+F10 opens the column's menu (_colheadKeys).
+    var headStop = sortedAssess.some(function (a) {
+      return a.id === _colheadStopAid;
+    })
+      ? _colheadStopAid
+      : sortedAssess[0] && sortedAssess[0].id;
     sortedAssess.forEach(function (a) {
       var categoryId = _getAssessmentCategoryId(a);
       var categoryName = _getCategoryName(cid, categoryId);
@@ -1573,12 +1735,16 @@ window.PageGradebook = (function () {
         '<div class="gb-grid-colhead-fill" style="background:' +
         fillColor +
         '"></div>' +
-        '<div class="gb-grid-colhead-label" title="' +
+        '<div class="gb-grid-colhead-label" role="button" aria-haspopup="menu" tabindex="' +
+        (a.id === headStop ? '0' : '-1') +
+        '" aria-label="' +
+        esc(a.title) +
+        ', column menu" title="' +
         esc(a.title) +
         '">' +
-        '<span class="gb-scores-assess-name">' +
+        '<span class="gb-colhead-name-row"><span class="gb-scores-assess-name">' +
         esc(a.title) +
-        '</span>' +
+        '</span><span class="gb-colhead-menu-mark" aria-hidden="true">\u25BE</span></span>' +
         '<span class="gb-scores-assess-meta">' +
         shortDate +
         maxPts +
@@ -1652,7 +1818,16 @@ window.PageGradebook = (function () {
                   '</span>'
                 );
               })
-              .join('')
+              .join('') +
+            // A Proficiency class's overall says its word under the number,
+            // as the Competencies view does, so colour isn't the only sign.
+            (gradeParts.length === 1 && badges.prof && levelWord(cid, getOverallProficiency(cid, s.id))
+              ? '<small class="gb-grade-word" style="color:' +
+                (PROF_COLORS[badges.prof.level] || PROF_COLORS[0]) +
+                '">' +
+                levelWord(cid, getOverallProficiency(cid, s.id)) +
+                '</small>'
+              : '')
           : '<span style="color:var(--text-3)">\u2014</span>') +
         '</span>' +
         '</div>';
@@ -1753,7 +1928,7 @@ window.PageGradebook = (function () {
     // as the printed sheet and the CSV write it.
     html += '<tr class="gb-stats-row gb-scores-stats">';
     sortedAssess.forEach(function (a) {
-      var stats = classColumnAverage(cid, sortedStudents, { assessment: a });
+      var stats = classColumnAverage(cid, _averageStudents || sortedStudents, { assessment: a });
       if (!stats) {
         html += '<td class="gb-scores-avg"><span class="gb-avg-val" style="color:var(--text-3)">\u2014</span></td>';
         return;
@@ -1765,7 +1940,11 @@ window.PageGradebook = (function () {
         '<td class="gb-scores-avg"><span class="gb-avg-val" style="color:' +
         (PROF_COLORS[level] || PROF_COLORS[0]) +
         '">' +
-        (isPointsScored(a) || isCompletionScored(a) ? _csvAverageText(a, stats) : _levelCellHtml(cid, stats.avg)) +
+        (isCompletionScored(a)
+          ? _csvAverageText(cid, a, stats)
+          : isPointsScored(a)
+            ? _pointsAverageText(a, stats)
+            : _levelCellHtml(cid, stats.avg)) +
         '</span></td>';
     });
     html += '</tr>';
@@ -1996,9 +2175,7 @@ window.PageGradebook = (function () {
     var open = '<td class="gb-score' + classes + '" style="' + wStyle + 'cursor:default">';
     if (!stats) return open + '<span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
     var r = pointsToProf(stats.pct, 100, getGradingScale(cid));
-    var text = isCompletionScored(assess)
-      ? Math.round(stats.pct) + '%'
-      : formatPoints(Math.round(stats.avg * 10) / 10) + '/' + (assess.maxPoints || 100);
+    var text = isCompletionScored(assess) ? Math.round(stats.pct) + '%' : _pointsAverageText(assess, stats);
     return (
       open +
       '<span class="gb-avg-val" style="color:' +
@@ -2018,7 +2195,7 @@ window.PageGradebook = (function () {
      cell: a student's cell (assessmentCellValue), whose % is the piece's
      own; none for a Class Average. */
   function _levelCellHtml(cid, value, cell) {
-    if (courseGradeMode(cid) !== 'both') return esc(cell ? cell.text : formatLevel(cid, value));
+    if (courseGradeMode(cid) !== 'both') return esc(cell ? cell.text : formatColumnAverageLevel(cid, value));
     return (
       '<span class="gb-cell-both"><span>' +
       esc(formatLevelAs(cid, value, 'proficiency')) +
@@ -2049,7 +2226,7 @@ window.PageGradebook = (function () {
   function completionCellHtml(mark) {
     if (mark === 'complete') return '<span class="gb-cmp gb-cmp-complete">\u2713</span>';
     if (mark === 'incomplete') return '<span class="gb-cmp gb-cmp-incomplete">\u2717</span>';
-    return '<span class="gb-pts-empty">\u00B7</span>';
+    return '<span class="gb-pts-empty">\u2014</span>';
   }
 
   // Click order: unmarked → Complete → Incomplete → unmarked.
@@ -2155,6 +2332,86 @@ window.PageGradebook = (function () {
       return _undoCellState(undo.cid, undo.sid, undo.aid, undo.tagIds) === undo.after ? undo : null;
     }
     return null;
+  }
+
+  /* Puts back what one score edit replaced (an entry _takeUndo or
+     _takeUndoEntry handed over), ticks included, and redraws. */
+  function _restoreUndo(undo) {
+    if (_scoreToast === undo) {
+      _scoreToast = null;
+      if (typeof dismissUndoToast === 'function') dismissUndoToast();
+    }
+    var scores = getScores(undo.cid);
+    if (!scores[undo.sid]) scores[undo.sid] = [];
+    var beforeScores = structuredClone(scores);
+    // Missing or Excused work takes no score (isScoreLocked): an undo
+    // puts back no level or points under the status.
+    var undoAssess = getAssessments(undo.cid).find(function (a) {
+      return a.id === undo.aid;
+    });
+    var undoLocked = isScoreLocked(undo.cid, undo.sid, undo.aid);
+    // Restore previous entries (full objects)
+    (undo.tagIds || []).forEach(function (tid, i) {
+      var prevEntry = undo.prevEntries[i];
+      if (prevEntry && undoLocked && isScoreEntered(undoAssess, prevEntry)) prevEntry = null;
+      // Remove current entry for this tag
+      var idx = scores[undo.sid].findIndex(function (e) {
+        return e.assessmentId === undo.aid && e.tagId === tid;
+      });
+      if (idx >= 0) scores[undo.sid].splice(idx, 1);
+      // Restore previous entry if it existed
+      if (prevEntry) scores[undo.sid].push(prevEntry);
+    });
+    saveScores(undo.cid, scores);
+    persistScoreDiffToCanonical(undo.cid, beforeScores, scores);
+    // The Advanced Rubric ticks Clear Score took off.
+    (undo.checkIds || []).forEach(function (id) {
+      setRubricCheck(undo.cid, undo.sid, undo.aid, id, true);
+    });
+    clearProfCache();
+    if (_mounted && activeCourse === undo.cid) render();
+  }
+
+  /* `undo` taken off the stack for its toast's Undo, when the cell still
+     holds what the edit left. Null when it is gone or the cell has changed. */
+  function _takeUndoEntry(undo) {
+    var i = _undoStack.indexOf(undo);
+    if (i < 0) return null;
+    _undoStack.splice(i, 1);
+    return _undoCellState(undo.cid, undo.sid, undo.aid, undo.tagIds) === undo.after ? undo : null;
+  }
+
+  /* Whether what an edit replaced held a score, so clearing it is worth a toast. */
+  function _undoHadScore(undo) {
+    var assess = getAssessments(undo.cid).find(function (a) {
+      return a.id === undo.aid;
+    });
+    return undo.prevEntries.some(function (e) {
+      return e && isScoreEntered(assess, e);
+    });
+  }
+
+  /* After a score is cleared: an Undo toast, as elsewhere in the app. Its
+     Undo and Cmd+Z put back the same thing. */
+  var _scoreToast = null; // the clear the Undo toast on screen is for
+  function _showClearToast(undo) {
+    if (typeof showUndoToast !== 'function') return;
+    var student = getStudents(undo.cid).find(function (s) {
+      return s.id === undo.sid;
+    });
+    _scoreToast = undo;
+    showUndoToast(
+      'Score cleared' + (student ? ' for ' + displayNameWithLast(student) : ''),
+      function () {
+        _scoreToast = null;
+        var taken = _takeUndoEntry(undo);
+        if (taken) _restoreUndo(taken);
+      },
+      function () {
+        if (_scoreToast === undo) _scoreToast = null;
+      },
+      10000,
+    );
   }
 
   /* The points assessment a Competencies-view cell is on, or null. */
@@ -2452,12 +2709,17 @@ window.PageGradebook = (function () {
     return '';
   }
 
+  /* A points Class Average on screen, in both views: "6/10". */
+  function _pointsAverageText(a, stats) {
+    return formatPoints(Math.round(stats.avg * 10) / 10) + '/' + formatPoints(Number(a.maxPoints) || 100);
+  }
+
   /* A Class Average as the CSV prints it, the printed sheet's way. */
-  function _csvAverageText(a, stats) {
+  function _csvAverageText(cid, a, stats) {
     if (!stats) return '';
     if (isCompletionScored(a)) return Math.round(stats.pct) + '%';
     if (isPointsScored(a)) return formatPoints(Math.round(stats.avg * 10) / 10);
-    return formatLevelAs(null, stats.avg, 'proficiency');
+    return formatColumnAverageLevel(cid, stats.avg, 'proficiency');
   }
 
   function exportScoresCSV() {
@@ -2529,7 +2791,7 @@ window.PageGradebook = (function () {
     var avgRow = ['Class Average'];
     for (var pad = 1; pad < headers.length - assessments.length; pad++) avgRow.push('');
     assessments.forEach(function (a) {
-      avgRow.push(_csvAverageText(a, classColumnAverage(cid, students, { assessment: a })));
+      avgRow.push(_csvAverageText(cid, a, classColumnAverage(cid, students, { assessment: a })));
     });
     rows.push(avgRow);
 
@@ -2688,6 +2950,9 @@ window.PageGradebook = (function () {
       var item = ev.target.closest('[data-ctx]');
       if (!item || item.classList.contains('is-disabled')) return;
       var action = item.dataset.ctx;
+      // The cell takes the focus back first, so it keeps it through the
+      // redraw the item makes (Gradebook sweep 4).
+      _dismissContextMenu(true);
       if (action === 'editCell') startCellEdit(cell);
       else if (action === 'addObservation') openObservationDialog(sid, aid);
       else if (action === 'clearCell') {
@@ -2707,12 +2972,14 @@ window.PageGradebook = (function () {
           checkIds.forEach(function (id) {
             setRubricCheck(cid, sid, aid, id, false);
           });
+          var hadScore = _undoHadScore(undo) || checkIds.length > 0;
           clearScoreEntries(cid, scores, sid, assess, clearIds);
           saveScores(cid, scores);
           _undoSaved(undo);
           clearProfCache();
           render();
           window.clearScore(sid, aid);
+          if (hadScore) _showClearToast(undo);
         }
       } else if (action === 'markMissing' || action === 'excuseCell' || action === 'lateCell') {
         // Same path as the Assignments page's NS / EXC / Late buttons; picking
@@ -2829,11 +3096,12 @@ window.PageGradebook = (function () {
       cell.classList.add('gb-col-menu');
     });
     _placeContextMenu(menu, e.clientX, e.clientY);
-    _wireMenu(menu, header);
+    _wireMenu(menu, header.querySelector('.gb-grid-colhead-label') || header);
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-ctx]');
       if (!item) return;
       var action = item.dataset.ctx;
+      _dismissContextMenu(true);
       if (action === 'scoreMode') {
         // The grader opens on the top student in the order shown.
         var firstRow = document.querySelector('.gb-scores-row[data-sid]');
@@ -3046,10 +3314,23 @@ window.PageGradebook = (function () {
     _hideTip();
     PageAssignments.openGrader(activeCourse, aid, sid, {
       studentIds: ids,
-      onClose: function () {
+      // Closing selects the cell of the student the grader ended on.
+      onClose: function (lastSid) {
         clearProfCache();
         render();
-        var back = key && _findCell(key);
+        var at = key ? Object.assign({}, key) : { scores: viewMode === 'scores', aid: aid, sid: sid, tid: '' };
+        if (lastSid) at.sid = lastSid;
+        var back =
+          _findCell(at) ||
+          document.querySelector(
+            '#gb-data tr[data-sid="' +
+              CSS.escape(at.sid) +
+              '"] td[data-aid="' +
+              CSS.escape(aid) +
+              '"][data-sid="' +
+              CSS.escape(at.sid) +
+              '"]',
+          );
         if (back) _selectCell(back);
       },
     });
@@ -3184,13 +3465,20 @@ window.PageGradebook = (function () {
           return;
         }
       }
+      var commitKey = _refocusAfterCommit ? _cellKey(td) : null;
       render();
+      var commitBack = commitKey && _findCell(commitKey);
+      if (commitBack) _selectCell(commitBack);
     }
 
+    var _refocusAfterCommit = false;
     var _navDir = null; // 'down' | 'right' | null
     var _cancelled = false; // Escape: removing the input blurs it, and blur saves
-    inp.addEventListener('blur', function () {
+    inp.addEventListener('blur', function (ev) {
       if (_cancelled) return;
+      // Focus going nowhere (Return or Tab at a row's end, a click on the
+      // page) comes back to the cell; a click on another control keeps it.
+      _refocusAfterCommit = !ev || !ev.relatedTarget;
       commit(_navDir);
     });
     inp.addEventListener('keydown', function (ev) {
@@ -3204,9 +3492,13 @@ window.PageGradebook = (function () {
         inp.blur();
       } else if (ev.key === 'Escape') {
         _cancelled = true;
+        var escKey = _cellKey(td);
         inp.remove();
         if (span) span.style.display = '';
         exitScoreMode();
+        // The cell keeps the keyboard, as after the grader.
+        var escBack = escKey && _findCell(escKey);
+        if (escBack) _selectCell(escBack);
       }
     });
   }
@@ -3237,6 +3529,12 @@ window.PageGradebook = (function () {
     if (_graderOpen()) return;
     // Escape closes a tooltip first (WCAG 1.4.13: dismissible without moving).
     if (e.key === 'Escape' && _tipSource) _hideTip();
+    // Escape in the search box clears it; the box keeps the focus.
+    if (e.key === 'Escape' && e.target.matches && e.target.matches('.gb-search-input') && searchText) {
+      e.preventDefault();
+      onSearch('', 0);
+      return;
+    }
     // Cmd+Z undoes the last score in either view; in a text field it stays
     // the field's own undo.
     var inTextField =
@@ -3262,37 +3560,10 @@ window.PageGradebook = (function () {
         _undoBulkStatus(undo);
         return;
       }
-      var scores = getScores(undo.cid);
-      if (!scores[undo.sid]) scores[undo.sid] = [];
-      var beforeScores = structuredClone(scores);
-      // Missing or Excused work takes no score (isScoreLocked): an undo
-      // puts back no level or points under the status.
-      var undoAssess = getAssessments(undo.cid).find(function (a) {
-        return a.id === undo.aid;
-      });
-      var undoLocked = isScoreLocked(undo.cid, undo.sid, undo.aid);
-      // Restore previous entries (full objects)
-      (undo.tagIds || []).forEach(function (tid, i) {
-        var prevEntry = undo.prevEntries[i];
-        if (prevEntry && undoLocked && isScoreEntered(undoAssess, prevEntry)) prevEntry = null;
-        // Remove current entry for this tag
-        var idx = scores[undo.sid].findIndex(function (e) {
-          return e.assessmentId === undo.aid && e.tagId === tid;
-        });
-        if (idx >= 0) scores[undo.sid].splice(idx, 1);
-        // Restore previous entry if it existed
-        if (prevEntry) scores[undo.sid].push(prevEntry);
-      });
-      saveScores(undo.cid, scores);
-      persistScoreDiffToCanonical(undo.cid, beforeScores, scores);
-      // The Advanced Rubric ticks Clear Score took off.
-      (undo.checkIds || []).forEach(function (id) {
-        setRubricCheck(undo.cid, undo.sid, undo.aid, id, true);
-      });
-      clearProfCache();
-      render();
+      _restoreUndo(undo);
       return;
     }
+    if (_colheadKeys(e)) return;
     // Keys on a competency header move along the headers (_handleHeaderKeys), not the grid.
     if (e.target.closest && e.target.closest('.gb-grid-tag-header')) return;
     // → on a student's name goes to their first score; ← on a first score
@@ -3446,19 +3717,22 @@ window.PageGradebook = (function () {
       var sid = focused.dataset.sid;
       if (aid && sid && focused.dataset.cmp === '1') {
         setCellCompletion(focused, null);
+        var cmpUndo = _undoStack[_undoStack.length - 1];
+        if (cmpUndo && cmpUndo.aid === aid && cmpUndo.sid === sid && _undoHadScore(cmpUndo)) _showClearToast(cmpUndo);
         return;
       }
       if (aid && sid) {
         var assess = getAssessments(activeCourse).find(function (a) {
           return a.id === aid;
         });
+        var undo = null;
         if (focused.dataset.pts === '1') {
-          var undo = _pushUndo(activeCourse, sid, aid, assess ? scoreTagIds(assess, activeCourse) : []);
+          undo = _pushUndo(activeCourse, sid, aid, assess ? scoreTagIds(assess, activeCourse) : []);
           setPointsScore(activeCourse, sid, aid, null);
           _undoSaved(undo);
         } else if (tid) {
           var clearKeys = _cellScoreKeys(focused);
-          var undo = _pushUndo(activeCourse, sid, aid, clearKeys);
+          undo = _pushUndo(activeCourse, sid, aid, clearKeys);
           clearKeys.forEach(function (key) {
             upsertScore(
               activeCourse,
@@ -3474,6 +3748,7 @@ window.PageGradebook = (function () {
           _undoSaved(undo);
         }
         _redrawCompetencyCell(focused);
+        if (undo && _undoHadScore(undo)) _showClearToast(undo);
       }
       return;
     } else return;
@@ -3608,6 +3883,49 @@ window.PageGradebook = (function () {
   /* ← and → move between the competency headers, carrying the one Tab stop
      with the focus, so Tab reaches the score grid after a single header. */
   // The header that holds the Tab stop, kept across redraws.
+  /* Keys on a Scores column title: ← → Home End move along the titles,
+     Return, Space, Shift+F10 or the Menu key open the column's menu. True
+     when the key was used. */
+  var _colheadStopAid = null;
+  function _colheadKeys(e) {
+    var label = e.target.closest && e.target.closest('#gb-colheads .gb-grid-colhead-label');
+    if (!label) return false;
+    var head = label.closest('.gb-grid-colhead');
+    if (e.key === 'Enter' || e.key === ' ' || (e.key === 'F10' && e.shiftKey) || e.key === 'ContextMenu') {
+      e.preventDefault();
+      var r = label.getBoundingClientRect();
+      showHeaderContextMenu({ clientX: r.left + r.width / 2, clientY: r.bottom }, head);
+      return true;
+    }
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) < 0) return false;
+    var labels = Array.prototype.slice.call(document.querySelectorAll('#gb-colheads .gb-grid-colhead-label'));
+    var at = labels.indexOf(label);
+    var to = e.key === 'Home' ? 0 : e.key === 'End' ? labels.length - 1 : e.key === 'ArrowRight' ? at + 1 : at - 1;
+    e.preventDefault();
+    var next = labels[to];
+    if (!next || next === label) return true;
+    _focusColhead(next);
+    return true;
+  }
+  function _focusColhead(label) {
+    document.querySelectorAll('#gb-colheads .gb-grid-colhead-label[tabindex="0"]').forEach(function (el) {
+      if (el !== label) el.tabIndex = -1;
+    });
+    label.tabIndex = 0;
+    var head = label.closest('.gb-grid-colhead');
+    _colheadStopAid = head ? head.dataset.aid : null;
+    label.focus({ preventScroll: true });
+    // The header row follows the grid's scroll, so the grid scrolls to it.
+    var data = document.getElementById('gb-data');
+    var colheads = document.getElementById('gb-colheads');
+    if (data && colheads && head) {
+      var box = colheads.getBoundingClientRect();
+      var r = head.getBoundingClientRect();
+      if (r.right > box.right) data.scrollLeft += r.right - box.right + 8;
+      else if (r.left < box.left) data.scrollLeft -= box.left - r.left + 8;
+    }
+  }
+
   var _headerStop = 0;
   function _handleHeaderKeys(e) {
     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) < 0) return;
@@ -3693,6 +4011,9 @@ window.PageGradebook = (function () {
     // double-click time so a double-click (Score Mode) doesn't also open it.
     if (_inSlantedHeads(e.target)) {
       var hit = _slantedColAt(e.clientX, e.clientY);
+      // A click on a title is that title's column.
+      var onLabel = e.target.closest('.gb-grid-colhead-label');
+      if (onLabel) hit = { el: onLabel.closest('.gb-grid-colhead') };
       clearTimeout(_headClickTimer);
       if (hit && e.detail <= 1) {
         var at = { clientX: e.clientX, clientY: e.clientY };
@@ -3742,9 +4063,7 @@ window.PageGradebook = (function () {
         clearAllFilters();
       },
       clearSearch: function () {
-        searchQuery = '';
-        searchText = '';
-        render();
+        onSearch('', 0);
       },
       showAllTime: function () {
         if (typeof setSelectedTermOrdinal === 'function') setSelectedTermOrdinal(activeCourse, null);
@@ -3855,7 +4174,8 @@ window.PageGradebook = (function () {
       // A slanted title acts on the column it leans along, not the box under the pointer.
       if (_inSlantedHeads(e.target)) {
         var hit = _slantedColAt(e.clientX, e.clientY);
-        header = hit ? hit.el : null;
+        var onLabel = e.target.closest('.gb-grid-colhead-label');
+        header = onLabel ? onLabel.closest('.gb-grid-colhead') : hit ? hit.el : null;
         if (!header) e.preventDefault();
       }
       if (header) {
@@ -3870,7 +4190,8 @@ window.PageGradebook = (function () {
       var el = e.target.closest('[data-action-dblclick]');
       if (_inSlantedHeads(e.target)) {
         var hit = _slantedColAt(e.clientX, e.clientY);
-        el = hit ? hit.el : null;
+        var onLabel = e.target.closest('.gb-grid-colhead-label');
+        el = onLabel ? onLabel.closest('.gb-grid-colhead') : hit ? hit.el : null;
       }
       if (!el) return;
       e.preventDefault();

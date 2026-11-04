@@ -10998,7 +10998,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (el.dataset.actionBlur === 'graderPoints') {
-      _graderCommitPoints(el);
+      _graderCommitPoints(el, e.relatedTarget);
       return;
     }
     if (el.dataset.actionBlur === 'graderCritNote') {
@@ -11773,6 +11773,25 @@ window.PageAssignments = (function () {
       _focusGraderPoints(enterAid);
       return true;
     }
+    // ← → in the points box change student, as the hint says, while the
+    // box holds the saved points (nothing new typed); once the teacher
+    // types, they move the caret to fix a typo.
+    if (
+      (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
+      cls.contains('grdp-input') &&
+      _grader &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.shiftKey
+    ) {
+      var arrowAid = _graderAid(t);
+      var held = arrowAid && focusStudentId ? getPointsScore(activeCourse, focusStudentId, arrowAid) : null;
+      if (t.value.trim() !== (held != null ? formatPoints(held) : '')) return false;
+      e.preventDefault();
+      stepFocusStudent(e.key === 'ArrowRight' ? 1 : -1);
+      return true;
+    }
     if (e.key === 'Escape' && cls.contains('grdp-input')) {
       e.preventDefault();
       var escAid = _graderAid(t);
@@ -12322,9 +12341,12 @@ window.PageAssignments = (function () {
     // Missing and Excused set the grading controls aside, as the grids do.
     dialog.querySelector('.grader-body').classList.toggle('is-locked', status === 'NS' || status === 'EXC');
     dialog.querySelector('.grader-status').hidden = !!view;
+    // Points work's box takes Return to the next student, so the hint says
+    // so; ← → step while nothing new is typed in it (_graderCardKey).
+    var returnStep = isPointsScored(a) && !isCompletionScored(a) ? 'Return next student \u00B7 ' : '';
     dialog.querySelector('.grader-hint').textContent = view
-      ? '\u2190 \u2192 change group \u00B7 Esc closes'
-      : '\u2190 \u2192 change student \u00B7 Esc closes';
+      ? returnStep + '\u2190 \u2192 change group \u00B7 Esc closes'
+      : returnStep + '\u2190 \u2192 change student \u00B7 Esc closes';
     _refreshReportNote(dialog, cid, a, sid);
     // Printed / Changed Since Printed beside the name (teacher/rubric-print.js).
     var markHtml = view ? '' : _printMarkHtml(cid, a.id, sid);
@@ -12554,7 +12576,7 @@ window.PageAssignments = (function () {
   // Saves typed points the way the Assignments ledger does: blank clears, a
   // typed 0 is a score, a typo puts the saved score back, leaving an
   // unchanged box saves nothing.
-  function _graderCommitPoints(inp) {
+  function _graderCommitPoints(inp, next) {
     var aid = _graderAid(inp);
     if (!aid || !focusStudentId) return;
     var cid = activeCourse;
@@ -12573,8 +12595,22 @@ window.PageAssignments = (function () {
     var sid = focusStudentId;
     setPointsScore(cid, focusStudentId, aid, raw);
     refreshSidebarGrades(sid);
+    var nextId = next && _grader && _grader.overlay.contains(next) ? next.id : '';
     render();
     if (over != null) _sayPointsCapped(cid, sid, aid, over, raw, max, prev);
+    // The redraw replaced the control Tab (or a click) was moving to, such
+    // as Overall Comment, so focus would fall to the page: give it to the
+    // new one.
+    if (nextId) {
+      var refocus = function () {
+        var active = document.activeElement;
+        if (active && active !== document.body && active.isConnected) return;
+        var again = document.getElementById(nextId);
+        if (again && _grader && _grader.overlay.contains(again)) again.focus({ preventScroll: true });
+      };
+      refocus();
+      setTimeout(refocus, 0);
+    }
   }
   // A redraw keeps keyboard scoring on the same card.
   function _focusGraderCard(aid, selector) {
@@ -12614,9 +12650,11 @@ window.PageAssignments = (function () {
     _commentCapture = null;
     _critCommentState = null;
     _kbFocusEl = null;
+    // The student it ended on, so the gradebook selects their cell.
+    var lastSid = focusStudentId;
     focusStudentId = null;
     g.overlay.remove();
-    if (g.onClose) g.onClose();
+    if (g.onClose) g.onClose(lastSid);
   }
 
   /* ── init / destroy ─────────────────────────────────────── */

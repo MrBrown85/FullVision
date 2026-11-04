@@ -495,7 +495,7 @@
     // one column rule, the same as the gradebook's Class Average.
     var level = classColumnAverage(cid, students, { assessment: a, measure: 'level' });
     if (!level) return '—';
-    return as === 'points' ? formatLevel(cid, level.avg) : formatLevelAs(cid, level.avg, as);
+    return formatColumnAverageLevel(cid, level.avg, as === 'points' ? null : as);
   }
 
   /* ── Geometry and pagination ───────────────────────────── */
