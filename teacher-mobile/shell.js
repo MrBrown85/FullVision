@@ -1179,9 +1179,9 @@
         var aid = target.closest('[data-aid]').getAttribute('data-aid');
         var swiperHTML = MGrade.renderSwiper(_cid, aid);
         _pushScreen(swiperHTML, { kind: 'swiper', aid: aid });
-        setTimeout(function () {
-          MGrade.setupSwiper(_cid, aid);
-        }, 400);
+        // Wired at once, as when grading from a student: a score typed or an
+        // avatar tapped while the screen slides in is not lost.
+        MGrade.setupSwiper(_cid, aid);
         return;
       }
 

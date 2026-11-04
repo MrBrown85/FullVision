@@ -1724,6 +1724,24 @@ window.MGrade = (function () {
       if (e.target === selectOnUp) e.preventDefault();
       selectOnUp = null;
     });
+    // An avatar tap moves on the finger lifting, not only on the click the
+    // browser may swallow while the strip or the screen is still moving
+    // (the first tap after opening was often lost). A drag along the strip
+    // is not a tap. Jumping twice to the same student is harmless.
+    var strip = document.getElementById('m-thumb-strip');
+    if (strip) {
+      var down = null;
+      strip.addEventListener('pointerdown', function (e) {
+        down = { x: e.clientX, y: e.clientY };
+      });
+      strip.addEventListener('pointerup', function (e) {
+        var thumb = e.target.closest('.m-thumb');
+        var moved = down ? Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y) : 99;
+        down = null;
+        if (!thumb || moved > 10) return;
+        jumpToStudent(parseInt(thumb.getAttribute('data-idx'), 10));
+      });
+    }
     var lastCard = swiper.querySelector('.m-swiper-card:last-child .m-pts-input');
     if (lastCard) lastCard.setAttribute('enterkeyhint', 'done');
     // Enter saves and moves to the next student's points, as Enter does in

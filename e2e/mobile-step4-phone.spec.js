@@ -278,3 +278,21 @@ test('Enter in the points box saves and moves to the next student', async ({ pag
   });
   expect(focused).toBe(1);
 });
+
+// Group 3 #79: the grading screen works the moment it opens: a points
+// score typed straight away is saved, and an avatar tap moves at once.
+test('grading screen works as soon as it opens', async ({ page }) => {
+  await openPhone(page);
+  await page.locator('.m-tab-item[data-tab="grade"]').click();
+  await page.locator('[data-action="m-grade-assess"]', { hasText: 'Data Reading Quiz' }).first().click();
+  const box = page.locator('#m-screen-grade-swiper .m-pts-input').first();
+  await box.fill('6');
+  await box.blur();
+  const saved = await page.evaluate(() => {
+    const el = document.querySelector('#m-screen-grade-swiper .m-pts-input');
+    return getPointsScore(getActiveCourse(), el.dataset.sid, el.dataset.aid);
+  });
+  expect(saved).toBe(6);
+  await page.locator('#m-thumb-strip .m-thumb').nth(2).tap();
+  await expect(page.locator('#m-nav-bar-grade-swiper')).toContainText('3 of');
+});
