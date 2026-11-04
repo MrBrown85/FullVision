@@ -563,6 +563,87 @@ window.PersonalBank = (function () {
     return [one, w];
   }
 
+  /* Verbs that may share a subject with the first one ("asks questions and
+     shares ideas"): their plain forms. A word after "and", "or", "but" or a
+     comma is made to agree only when it is one of these, so a list of
+     nouns ("books and articles") is left alone. */
+  var COORD_VERBS = BASE_VERBS.concat([
+    'add',
+    'answer',
+    'apply',
+    'ask',
+    'attend',
+    'bring',
+    'build',
+    'come',
+    'complete',
+    'contribute',
+    'create',
+    'describe',
+    'design',
+    'discuss',
+    'draw',
+    'edit',
+    'encourage',
+    'follow',
+    'give',
+    'help',
+    'identify',
+    'include',
+    'join',
+    'label',
+    'lead',
+    'listen',
+    'look',
+    'make',
+    'manage',
+    'measure',
+    'meet',
+    'observe',
+    'offer',
+    'participate',
+    'predict',
+    'present',
+    'record',
+    'reflect',
+    'respond',
+    'return',
+    'revise',
+    'solve',
+    'submit',
+    'support',
+    'test',
+    'turn',
+    'work',
+  ]);
+  // Words that start a clause of its own: the scan for more verbs stops.
+  var CLAUSE_WORDS =
+    /\b(?:who|which|that|what|why|how|when|where|whether|because|while|if|until|before|after|since|although|though|once|unless)\b/i;
+  /* The rest of a clause after its first verb, with each further verb of
+     the same subject in both forms: "and shares" → "and [shares|share]".
+     Stops at the end of the sentence, at the next subject or at a clause
+     of its own. */
+  function _moreVerbs(rest, they, subjects) {
+    var end = rest.search(/[.;:!?]/);
+    if (end < 0) end = rest.length;
+    (subjects || []).forEach(function (x) {
+      var at = rest.indexOf('\u0001' + x.id + '\u0002');
+      if (at >= 0 && at < end) end = at;
+    });
+    var sub = CLAUSE_WORDS.exec(rest.slice(0, end));
+    if (sub) end = sub.index;
+    var seg = rest.slice(0, end).replace(
+      /((?:,\s*|\s+)(?:(?:and|or|but)\s+)?)((?:(?:[a-z]+ly|also|then|always|often|still|sometimes)\s+)*)([A-Za-z]+)(?=\s+[A-Za-z\u0001“"])/g,
+      function (m, lead, adv, w) {
+        if (!/,|\b(?:and|or|but)\s+$/.test(lead)) return m;
+        var pair = verbPair(w, they);
+        if (!pair || COORD_VERBS.indexOf(pair[1].toLowerCase()) < 0) return m;
+        return lead + adv + '[' + pair[0] + '|' + pair[1] + ']';
+      },
+    );
+    return seg + rest.slice(end);
+  }
+
   /* The student's details found in a sentence and swapped for slots.
      e: { names: the student's names, longest first; p: their pronouns
      { subj, obj, poss, refl } or null; values: { slot: value } from the
@@ -755,7 +836,8 @@ window.PersonalBank = (function () {
       var pair = verbPair(m[3], sub.they);
       if (!pair) return;
       var verb = '[' + pair[0] + '|' + pair[1] + ']';
-      s = s.slice(0, at + tag.length) + m[1] + m[2] + verb + rest.slice(m[0].length);
+      var head = s.slice(0, at + tag.length) + m[1] + m[2] + verb;
+      s = head + _moreVerbs(rest.slice(m[0].length), sub.they, subjects);
     });
 
     var slots = [];

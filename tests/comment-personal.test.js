@@ -346,6 +346,31 @@ describe('the student’s details as slots', () => {
     );
   });
 
+  it('makes every verb of the subject agree, not only the first (Step 4 group 2 #50)', () => {
+    const f = facts({ name: 'Liam', first: 'Liam', pronouns: THEY });
+    const ctx = CommentBank.context(f, {});
+    const sl = t => PB.slotify(t, PB.entities(ctx, f, { firstName: 'Liam' }, t)).text;
+    expect(sl('Liam asks careful questions during labs and shares ideas with the group.')).toBe(
+      '{He} [asks|ask] careful questions during labs and [shares|share] ideas with the group.',
+    );
+    expect(sl('Liam reads each source, checks the dates and also explains their choices.')).toBe(
+      '{He} [reads|read] each source, [checks|check] the dates and also [explains|explain] {his} choices.',
+    );
+    // A list of nouns, and a clause of its own, are left alone.
+    expect(sl('Liam reads books and articles about science in class.')).toBe(
+      '{He} [reads|read] books and articles about science in class.',
+    );
+    expect(sl('Liam explains why the rules and plans matter in each lab.')).toBe(
+      '{He} [explains|explain] why the rules and plans matter in each lab.',
+    );
+    const realised = CommentRealiser.render(
+      CommentRealiser.tokens('{He} [asks|ask] careful questions during labs and [shares|share] ideas with the group.'),
+      { name: 'Liam', p: THEY },
+      { named: true },
+    );
+    expect(realised).toBe('They ask careful questions during labs and share ideas with the group.');
+  });
+
   it('slots the assignment, the competency, the proficiency word and the class name', () => {
     const out = suggestFor('In History 12, Gabriel used Evidence in “The Poster” at a Proficient standard.');
     expect(out.template.text).toBe('In {course}, {he} used {strengths} in {assignment} at a {standingWord} standard.');
