@@ -50,6 +50,16 @@ describe('the spelling rule', () => {
       'shows data patterns in tables, graphs and models',
     );
     expect(F.does('compare and the rest')).toBe('compares and the rest');
+    // After a one-word object, the second predicate's verb too; a describing
+    // word or a compound noun stays as written.
+    expect(F.does('observe nature and ask questions about it')).toBe('observes nature and asks questions about it');
+    expect(F.doing('find problems and troubleshoot them')).toBe('finding problems and troubleshooting them');
+    expect(F.does('use feedback and test results to make changes')).toBe(
+      'uses feedback and test results to make changes',
+    );
+    expect(F.does('use personal and work networks to explore opportunities')).toBe(
+      'uses personal and work networks to explore opportunities',
+    );
   });
 
   it('takes a card override over the rule', () => {

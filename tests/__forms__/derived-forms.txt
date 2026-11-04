@@ -47,7 +47,7 @@ adst-emerging-tools: explore new tools and judge how well each fits | she explor
 adst-empathetic-research: research users' needs with care to find design ideas | she researches users' needs with care to find design ideas | at researching users' needs with care to find design ideas
 adst-equipment-operation: use kitchen equipment correctly and safely | she uses kitchen equipment correctly and safely | at using kitchen equipment correctly and safely
 adst-etiquette-reflection: reflect on etiquette skills and plan to build them | she reflects on etiquette skills and plan to build them | at reflecting on etiquette skills and plan to build them
-adst-feedback-collection: collect feedback and use it to improve a design | she collects feedback and use it to improve a design | at collecting feedback and use it to improve a design
+adst-feedback-collection: collect feedback and use it to improve a design | she collects feedback and uses it to improve a design | at collecting feedback and using it to improve a design
 adst-feedback-gathering: gather feedback from partners, users or experts | she gathers feedback from partners, users or experts | at gathering feedback from partners, users or experts
 adst-feedback-revisions: change a plan or product based on feedback | she changes a plan or product based on feedback | at changing a plan or product based on feedback
 adst-feedback-sources: find people to give feedback and ask them | she finds people to give feedback and ask them | at finding people to give feedback and ask them
@@ -63,7 +63,7 @@ adst-group-or-solo-work: decide whether to work with others or alone | she decid
 adst-idea-collaboration: build ideas with a group and keep options open | she builds ideas with a group and keep options open | at building ideas with a group and keep options open
 adst-idea-decisions: decide whether to remake or drop an idea | she decides whether to remake or drop an idea | at deciding whether to remake or drop an idea
 adst-idea-evaluation: judge design options against criteria and constraints | she judges design options against criteria and constraints | at judging design options against criteria and constraints
-adst-idea-generation: generate ideas and add to others' ideas | she generates ideas and add to others' ideas | at generating ideas and add to others' ideas
+adst-idea-generation: generate ideas and add to others' ideas | she generates ideas and adds to others' ideas | at generating ideas and adding to others' ideas
 adst-idea-prioritizing: rank ideas for a draft sample product | she ranks ideas for a draft sample product | at ranking ideas for a draft sample product
 adst-idea-screening: check ideas against criteria and constraints | she checks ideas against criteria and constraints | at checking ideas against criteria and constraints
 adst-idea-selection: choose an idea to pursue | she chooses an idea to pursue | at choosing an idea to pursue
@@ -163,7 +163,7 @@ adst-tool-suitability: judge which tools suit a task | she judges which tools su
 adst-tool-use: use tools, materials and processes to make textiles | she uses tools, materials and processes to make textiles | at using tools, materials and processes to make textiles
 adst-trend-analysis: analyze data to find trends and patterns | she analyzes data to find trends and patterns | at analyzing data to find trends and patterns
 adst-trend-identification: find patterns and trends in economic systems | she finds patterns and trends in economic systems | at finding patterns and trends in economic systems
-adst-troubleshooting: find problems and troubleshoot them | she finds problems and troubleshoot them | at finding problems and troubleshoot them
+adst-troubleshooting: find problems and troubleshoot them | she finds problems and troubleshoots them | at finding problems and troubleshooting them
 adst-user-analysis: identify and understand users of a fashion design | she identifies and understands users of a fashion design | at identifying and understanding users of a fashion design
 adst-user-collaboration: work with users throughout a design | she works with users throughout a design | at working with users throughout a design
 adst-user-empathy: learn what users need to find design ideas | she learns what users need to find design ideas | at learning what users need to find design ideas
@@ -265,11 +265,11 @@ arts-ensemble-performance: perform in large groups, small groups and solo | she 
 arts-ensemble-risk-taking: take risks while staying in sync with a group | she takes risks while staying in sync with a group | at taking risks while staying in sync with a group
 arts-ensemble-role: explain how a part fits within the ensemble | she explains how a part fits within the ensemble | at explaining how a part fits within the ensemble
 arts-ensemble-work: work co-operatively with an ensemble | she works co-operatively with an ensemble | at working co-operatively with an ensemble
-arts-equipment-care: care for and maintain equipment and work spaces safely | she cares for and maintain equipment and work spaces safely | at caring for and maintain equipment and work spaces safely
+arts-equipment-care: care for and maintain equipment and work spaces safely | she cares for and maintains equipment and work spaces safely | at caring for and maintaining equipment and work spaces safely
 arts-exercise-technique: use correct technique in dance conditioning | she uses correct technique in dance conditioning | at using correct technique in dance conditioning
 arts-experimentation: experiment with elements and techniques to create new work | she experiments with elements and techniques to create new work | at experimenting with elements and techniques to create new work
 arts-expressive-technique: build technical and expressive skills in music | she builds technical and expressive skills in music | at building technical and expressive skills in music
-arts-feedback: take feedback and use it to improve work | she takes feedback and use it to improve work | at taking feedback and use it to improve work
+arts-feedback: take feedback and use it to improve work | she takes feedback and uses it to improve work | at taking feedback and using it to improve work
 arts-feedback-dialogue: discuss feedback with others | she discusses feedback with others | at discussing feedback with others
 arts-feedback-reflection: give, analyze and reflect on feedback | she gives, analyzes and reflects on feedback | at giving, analyzing and reflecting on feedback
 arts-film-tv-reflection: reflect on a range of film and television | she reflects on a range of film and television | at reflecting on a range of film and television
@@ -386,7 +386,7 @@ arts-self-audience: stay aware of the audience while performing | she stays awar
 arts-self-care-practice: use self-care habits that prevent performance injury | she uses self-care habits that prevent performance injury | at using self-care habits that prevent performance injury
 arts-self-others-place: show respect for self, others and place | she shows respect for self, others and place | at showing respect for self, others and place
 arts-self-reflection: use reflection and audience awareness to refine ideas | she uses reflection and audience awareness to refine ideas | at using reflection and audience awareness to refine ideas
-arts-sharing-responding: share work and respond to others' work | she shares work and respond to others' work | at sharing work and respond to others' work
+arts-sharing-responding: share work and respond to others' work | she shares work and responds to others' work | at sharing work and responding to others' work
 arts-skills-conventions: build theatre skills, terms and conventions through performance | she builds theatre skills, terms and conventions through performance | at building theatre skills, terms and conventions through performance
 arts-skills-techniques: refine skills and techniques in media art | she refines skills and techniques in media art | at refining skills and techniques in media art
 arts-social-impact: explain how the arts affect cultures and societies | she explains how the arts affect cultures and societies | at explaining how the arts affect cultures and societies
@@ -426,7 +426,7 @@ arts-writing-directing: write and direct for an audience or message | she writes
 car-capstone: design, build and present a capstone project | she designs, builds and presents a capstone project | at designing, building and presenting a capstone project
 car-career-exploration: explore career options and reflect on what was learned | she explores career options and reflect on what was learned | at exploring career options and reflect on what was learned
 car-career-influences: explain what shapes career choices | she explains what shapes career choices | at explaining what shapes career choices
-car-career-research: research careers and sort them into clusters | she researches careers and sort them into clusters | at researching careers and sort them into clusters
+car-career-research: research careers and sort them into clusters | she researches careers and sorts them into clusters | at researching careers and sorting them into clusters
 car-collaboration: work respectfully with others to solve problems | she works respectfully with others to solve problems | at working respectfully with others to solve problems
 car-community-care: help care for coworkers and the community | she helps care for coworkers and the community | at helping care for coworkers and the community
 car-curriculum-choices: explain how course choices can shape a career path | she explains how course choices can shape a career path | at explaining how course choices can shape a career path
@@ -546,7 +546,7 @@ ela-writing-process: plan and develop texts for a purpose and audience | she pla
 math-concept-development: explain how and why a math idea works | she explains how and why a math idea works | at explaining how and why a math idea works
 math-consequences-of-math: explain how math has shaped cultures and societies | she explains how math has shaped cultures and societies | at explaining how math has shaped cultures and societies
 math-creating-algorithms: create and analyze algorithms to solve problems | she creates and analyzes algorithms to solve problems | at creating and analyzing algorithms to solve problems
-math-estimation: estimate answers and work flexibly with numbers | she estimates answers and work flexibly with numbers | at estimating answers and work flexibly with numbers
+math-estimation: estimate answers and work flexibly with numbers | she estimates answers and works flexibly with numbers | at estimating answers and working flexibly with numbers
 math-first-peoples-views: connect First Peoples knowledge and practices to math | she connects First Peoples knowledge and practices to math | at connecting First Peoples knowledge and practices to math
 math-geometric-vocabulary: use geometry vocabulary in class discussions | she uses geometry vocabulary in class discussions | at using geometry vocabulary in class discussions
 math-historical-symbols: use historical math symbols to explore ideas | she uses historical math symbols to explore ideas | at using historical math symbols to explore ideas
@@ -639,7 +639,7 @@ phe-substance-use-causes: explain factors that can lead to substance use | she e
 phe-supporting-others: describe ways to support others with well-being concerns | she describes ways to support others with well-being concerns | at describing ways to support others with well-being concerns
 phe-training-styles: explain how training styles affect fitness results | she explains how training styles affect fitness results | at explaining how training styles affect fitness results
 sci-accuracy-precision: check procedures and data for accuracy and precision | she checks procedures and data for accuracy and precision | at checking procedures and data for accuracy and precision
-sci-assumptions-bias: question information and spot bias in sources | she questions information and spot bias in sources | at questioning information and spot bias in sources
+sci-assumptions-bias: question information and spot bias in sources | she questions information and spots bias in sources | at questioning information and spotting bias in sources
 sci-cause-effect: explain how a cause leads to an effect | she explains how a cause leads to an effect | at explaining how a cause leads to an effect
 sci-changing-knowledge: explain how new tools changed scientific knowledge | she explains how new tools changed scientific knowledge | at explaining how new tools changed scientific knowledge
 sci-contributing-to-care: take part in caring for the community and environment | she takes part in caring for the community and environment | at taking part in caring for the community and environment
@@ -665,7 +665,7 @@ sci-method-improvement: suggest specific ways to improve a method | she suggests
 sci-method-reflection: reflect on how well an investigation was done | she reflects on how well an investigation was done | at reflecting on how well an investigation was done
 sci-method-risks: assess the risks and ethics of a planned method | she assesses the risks and ethics of a planned method | at assessing the risks and ethics of a planned method
 sci-model-limitations: judge how well a model fits what it shows | she judges how well a model fits what it shows | at judging how well a model fits what it shows
-sci-observation: observe nature and ask questions about it | she observes nature and ask questions about it | at observing nature and ask questions about it
+sci-observation: observe nature and ask questions about it | she observes nature and asks questions about it | at observing nature and asking questions about it
 sci-place-perspectives: share and reflect on different views of a place | she shares and reflects on different views of a place | at sharing and reflecting on different views of a place
 sci-predictions: make a prediction and explain the reason for it | she makes a prediction and explains the reason for it | at making a prediction and explaining the reason for it
 sci-project-design: design a group project with local or global uses | she designs a group project with local or global uses | at designing a group project with local or global uses

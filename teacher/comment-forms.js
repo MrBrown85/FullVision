@@ -103,6 +103,8 @@ window.CommentForms = (function () {
   /* The verbs at the front of a phrase take the form: the first word, each
      word after a comma that follows a verb ("design, create and test …"),
      and the word after "and" or "or" that follows one. Punctuation stays. */
+  var ADJ = /^(personal|social|local|global|new|own|public|private|physical|digital|written|oral)$/;
+  var COMPOUND = /^(test (results|data)|work (samples|networks|spaces))$/;
   function _apply(phrase, f) {
     var ws = String(phrase || '')
       .trim()
@@ -122,7 +124,13 @@ window.CommentForms = (function () {
     // "to" or "that" clause comes before the "and", and the word after it is
     // a known verb in base form.
     var det = /^(a|an|the|his|her|their|its|one|each|every|\{his\})$/;
-    if (det.test(ws[1] || ''))
+    // Or a one-word object ("observe nature and ask questions about it").
+    // Not when that word describes the next noun ("personal and work
+    // networks") or the second word is a noun in a compound ("test results").
+    if (ws[2] === 'and' && /^[a-z]+$/.test(ws[1] || '') && ws[3] && /^[a-z]+$/.test(ws[3])) {
+      var compound = ADJ.test(ws[1]) || COMPOUND.test(ws[3] + ' ' + (ws[4] || ''));
+      if (!compound && !/s$/.test(ws[3]) && VERBS.indexOf(ws[3]) >= 0 && !NOT_VERB.test(ws[3])) form(3);
+    } else if (det.test(ws[1] || ''))
       for (var j = 2; j + 1 < ws.length; j++) {
         if (ws[j] === 'to' || ws[j] === 'that' || ws[j] === 'who' || ws[j] === 'which') break;
         if (ws[j] !== 'and') continue;
