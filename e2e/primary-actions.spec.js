@@ -26,6 +26,8 @@ async function solidPrimaries(page) {
     return [...document.querySelectorAll('button, a, [role="button"]')]
       .filter(el => {
         if (el.closest('dialog, [role="dialog"], [aria-modal="true"]')) return false;
+        // A chosen radio (a Work Habits rating) is a choice, not an action.
+        if (el.getAttribute('role') === 'radio') return false;
         const r = el.getBoundingClientRect();
         if (!r.width || !r.height || r.bottom <= 0 || r.right <= 0) return false;
         const cs = getComputedStyle(el);

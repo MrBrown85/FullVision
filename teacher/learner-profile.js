@@ -123,6 +123,11 @@ var LearnerProfile = (function () {
     if (learns)
       facts += '<div><dt>' + icon('people') + 'Learns best</dt><dd><strong>' + esc(learns) + '</strong></dd></div>';
     var refl = o.model.reflections[0];
+    // A competency reflection (+ Reflection) counts too: the newer date shows.
+    var comp = o.compRefl || { count: 0, last: null };
+    var reflAt = refl ? refl.at : null;
+    if (comp.last && (!reflAt || String(comp.last) > String(reflAt))) reflAt = comp.last;
+    var reflNew = refl && o.newReply && reflAt === refl.at;
     var html =
       '<div class="id-card"><div class="id-band"><span>' +
       esc(o.classLabel) +
@@ -143,9 +148,9 @@ var LearnerProfile = (function () {
       esc(o.goalCount + ' set') +
       '</span></a>' +
       '<a href="#lp-refl" data-action="lpJump" data-target="lp-refl">Reflections <span' +
-      (o.newReply ? ' class="lp-new-text"' : '') +
+      (reflNew ? ' class="lp-new-text"' : '') +
       '>' +
-      esc(refl ? (o.newReply ? 'New · ' : '') + day(refl.at) : 'Not yet') +
+      esc(reflAt ? (reflNew ? 'New · ' : '') + day(reflAt) : 'Not yet') +
       '</span></a></nav></div>';
     var note = a && text(a.note && a.note.v);
     if (note) {
@@ -176,7 +181,13 @@ var LearnerProfile = (function () {
         '<div class="lp-none">' +
         (o.aboutOn
           ? esc(o.first) + ' hasn’t answered About Me yet.'
-          : 'About Me isn’t turned on for this class. Turn it on in Class Management › Questionnaires.') +
+          : 'About Me isn’t turned on for this class. Turn it on in ' +
+            (o.cid
+              ? '<a class="lp-link" role="link" tabindex="0" data-href="/dashboard?course=' +
+                esc(encodeURIComponent(o.cid)) +
+                '&amp;manage=questionnaires">Class Management › Questionnaires</a>'
+              : 'Class Management › Questionnaires') +
+            '.') +
         '</div></section>'
       );
     }
@@ -296,7 +307,7 @@ var LearnerProfile = (function () {
       esc(label) +
       '">' +
       STEPS.map(function (s, i) {
-        return '<span class="stu-core-step' + (level === i + 1 ? ' on' : '') + '">' + s + '</span>';
+        return '<span class="stu-core-step' + (level === i + 1 ? ' on lv-' + level : '') + '">' + s + '</span>';
       }).join('') +
       '</div>'
     );
@@ -394,7 +405,22 @@ var LearnerProfile = (function () {
           : '') +
       '</div>';
     if (!list.length) {
-      return html + '<div class="lp-none">No reflections from ' + esc(o.first) + ' yet.</div></section>';
+      var comp = (o.compRefl && o.compRefl.count) || 0;
+      return (
+        html +
+        '<div class="lp-none">' +
+        (comp
+          ? esc(
+              'No questionnaire reflections from ' +
+                o.first +
+                ' yet. ' +
+                (comp === 1
+                  ? '1 competency reflection is under Competency Goals.'
+                  : comp + ' competency reflections are under Competency Goals.'),
+            )
+          : 'No reflections from ' + esc(o.first) + ' yet.') +
+        '</div></section>'
+      );
     }
     list.forEach(function (e) {
       if (e.kind === 'report_reply') {

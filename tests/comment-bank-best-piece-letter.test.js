@@ -99,3 +99,26 @@ describe('the best piece in a Letter class', () => {
     r.students.forEach(s => expect(s.generated.text).not.toMatch(/highest mark[^.]*Treaty Debate/));
   });
 });
+
+describe('the best piece’s mark on the Term Questionnaire (Step 4 group 2 #59)', () => {
+  it('is the same on a row’s source as on At a Glance: the piece’s own %', () => {
+    const { cid, student, f } = lena();
+    const RQ = window.ReportQuestionnaire;
+    const ctx = CommentBank.context(f, {});
+    const s = highest();
+    const treaty = f.work.find(w => w.title === 'Lesson 4: Treaty Debate');
+    // A row whose sentence names the 90% piece: its source says 90%, not
+    // the % its proficiency 4 counts as.
+    const row = {
+      id: s.id,
+      step: CommentBank.stepOf(s),
+      text: '',
+      s,
+      prov: Object.assign({}, CommentBank.provenance(s, ctx), {
+        factKeys: ['work:' + treaty.id],
+        sources: { assignment: ['work:' + treaty.id] },
+      }),
+    };
+    expect(RQ.rowSource(row, cid, student, f, ctx)).toContain('Lesson 4: Treaty Debate · 90%');
+  });
+});

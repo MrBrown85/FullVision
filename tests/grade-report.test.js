@@ -200,11 +200,84 @@ describe('plan', () => {
     expect(p.fits).toBe(true);
   });
 
+  it('keeps room on the back for the line naming the student', () => {
+    const p = G.plan(60, sizes, regular, H);
+    const named = G.plan(60, Object.assign({ namePx: 16 }, sizes), regular, H);
+    expect(named.front).toBe(p.front);
+    expect(named.back).toBe(Math.min(60 - p.front, Math.floor((H - 28 - 200 - 12 - 20) / 19)));
+    expect(G.plan(10, Object.assign({}, sizes, { tailPx: H - 20, namePx: 16 }), regular, H).fits).toBe(false);
+  });
+
   it('does not fit past both sides at a size, and holds twice the rows in two columns', () => {
     expect(G.plan(120, sizes, regular, H).fits).toBe(false);
     const p = G.plan(120, sizes, two, H);
     expect(p.fits).toBe(true);
     expect(p.front % 2).toBe(0);
+  });
+
+  it('counts a two-line row at its height (step 4 group 3 #91)', () => {
+    const tall = Array.from({ length: 60 }, (_, i) => i < 10);
+    const p = G.plan(60, Object.assign({ tall }, sizes), Object.assign({ row2Px: 33 }, regular), H);
+    // 904px under the letterhead and header: ten rows of 33, then 30 of 19.
+    expect(p.front).toBe(40);
+    expect(p.front + p.back).toBe(60);
+    // In two columns the taller column decides.
+    const q = G.plan(
+      4,
+      Object.assign({ tall: [true, true, false, false] }, sizes),
+      Object.assign({ row2Px: 30 }, two),
+      200,
+    );
+    expect(q.front).toBe(4);
+    const r = G.plan(
+      4,
+      Object.assign({ tall: [true, true, false, false] }, sizes),
+      Object.assign({ row2Px: 30 }, two),
+      132,
+    );
+    // 132 - 72 = 60 under the letterhead: header 20 leaves 40, one tall row
+    // a column.
+    expect(r.front).toBe(2);
+  });
+});
+
+describe('long titles and categories (step 4 group 3 #91)', () => {
+  const LONG = "5.1 Mapping Germany's Conquest of Europe, 1939-1941, With Sources and a Written Response";
+  const layout = () => {
+    seed();
+    const work = getAssessments().map(a => (a.id === 'a2' ? Object.assign({}, a, { title: LONG }) : a));
+    stub('getAssessments', () => work);
+    stub('courseToday', () => '2026-10-29');
+    stub('ReportBlocks', {
+      renderBlockHeader: () => '<div class="gr-letterhead">Letterhead</div>',
+      renderContinuedLine: () => '<div class="sheet-name-line">Ada Lovelace (continued)</div>',
+      reportContext: () => ({}),
+    });
+    stub('ReportSheets', { sideHeight: () => 996 });
+    stub('studentGradeSummary', () => ({ text: '80%' }));
+    stub('assessmentGroupGrade', () => ({ text: '80%' }));
+    stub('categoryCalcMode', () => 'average');
+    stub('fullName', s => s.firstName + ' ' + s.lastName);
+    // No DOM here: every block 50px tall, every text 7px a character.
+    const stage = {
+      innerHTML: '',
+      firstChild: { offsetHeight: 50 },
+      querySelectorAll() {
+        return [...this.innerHTML.matchAll(/class="gr-measure"[^>]*>([^<]*)</g)].map(m => ({
+          offsetWidth: m[1].replace(/&#39;|&amp;/g, 'x').length * 7,
+        }));
+      },
+    };
+    return G.layoutStudent(CID, ST, {}, { paper: 'letter', stage, grade: {} }).html;
+  };
+
+  it('prints a title too long for its cell on two lines, and only that row', () => {
+    const html = layout();
+    const rows = [...html.matchAll(/<div class="gr-row([^"]*)">((?:(?!<div class="gr-row).)*)/g)];
+    const wrapped = rows.filter(m => m[1].includes('gr-wrap')).map(m => m[2]);
+    expect(wrapped).toHaveLength(1);
+    expect(wrapped[0]).toContain('Mapping Germany');
+    expect(html).toMatch(/--gr-row2:\d+px/);
   });
 });
 
@@ -214,6 +287,7 @@ describe('Assignment Numbers column', () => {
     stub('courseToday', () => '2026-10-29');
     stub('ReportBlocks', {
       renderBlockHeader: () => '<div class="gr-letterhead">Letterhead</div>',
+      renderContinuedLine: () => '<div class="sheet-name-line">Ada Lovelace (continued)</div>',
       reportContext: () => ({}),
     });
     stub('ReportSheets', { sideHeight: () => 996 });
@@ -466,5 +540,43 @@ describe('extra cards: Observations and Term Comment', () => {
       [0, 3],
       [3, 6],
     ]);
+  });
+});
+
+/* The Grade Report's Back started straight with the table or the summary,
+   so a sheet printed single-sided could not be matched to its student;
+   every side after the Front of a built report names the student (#875,
+   Colin Nov 3: "Yes, all three"). */
+describe('the Back names the student', () => {
+  const layout = sideH => {
+    seed();
+    stub('courseToday', () => '2026-10-29');
+    stub('ReportBlocks', {
+      renderBlockHeader: () => '<div class="gr-letterhead">Letterhead</div>',
+      renderContinuedLine: () => '<div class="sheet-name-line">Ada Lovelace (continued)</div>',
+      reportContext: () => ({}),
+    });
+    stub('ReportSheets', { sideHeight: () => sideH });
+    stub('studentGradeSummary', () => ({ text: '80%' }));
+    stub('assessmentGroupGrade', () => ({ text: '80%' }));
+    stub('categoryCalcMode', () => 'average');
+    stub('fullName', s => s.firstName + ' ' + s.lastName);
+    const stage = { innerHTML: '', firstChild: { offsetHeight: 50 }, querySelectorAll: () => [] };
+    return G.layoutStudent(CID, ST, {}, { paper: 'letter', stage, grade: {} });
+  };
+  const sidesOf = html => html.split('<div class="sheet-zoom"').slice(1);
+
+  it('puts the line at the top of the Back, not on the Front', () => {
+    const r = layout(200);
+    expect(r.sides).toBe(2);
+    const [front, back] = sidesOf(r.html);
+    expect(front).not.toContain('sheet-name-line');
+    expect(back).toMatch(/<div class="sheet-body"><div class="sheet-name-line">Ada Lovelace \(continued\)<\/div>/);
+  });
+
+  it('a report that fits the Front has no line', () => {
+    const r = layout(996);
+    expect(r.sides).toBe(1);
+    expect(r.html).not.toContain('sheet-name-line');
   });
 });

@@ -94,10 +94,15 @@ window.MCardStack = (function () {
     }
 
     // --- Touch handlers ---
+    // A mouse drags the cards the same way (Step 4 sweep): mouse events are
+    // read as a single touch.
+    function _touchOf(e) {
+      return e.touches ? e.touches[0] : e;
+    }
 
     function _onTouchStart(e) {
       if (_destroyed || _animating) return;
-      var touch = e.touches[0];
+      var touch = _touchOf(e);
       _startX = touch.clientX;
       _startY = touch.clientY;
       _startTime = Date.now();
@@ -109,7 +114,7 @@ window.MCardStack = (function () {
 
     function _onTouchMove(e) {
       if (_destroyed || _committed) return;
-      var touch = e.touches[0];
+      var touch = _touchOf(e);
       var dx = touch.clientX - _startX;
       var dy = touch.clientY - _startY;
 
@@ -150,8 +155,8 @@ window.MCardStack = (function () {
       if (active) active.classList.remove('m-card-dragging');
 
       if (!_isDragging) {
-        // It was a tap, not a drag
-        if (Math.abs(_deltaX) < 5) {
+        // It was a tap, not a drag (a mouse click reaches its button itself).
+        if (Math.abs(_deltaX) < 5 && e.type === 'touchend') {
           _onTap(_cards[_idx], _idx);
         }
         return;
@@ -248,6 +253,50 @@ window.MCardStack = (function () {
 
     // --- Public methods ---
 
+    // The arrow keys move between cards, as a swipe does: → the next
+    // student, ← the one before.
+    function _onKey(e) {
+      if (_destroyed || _animating || _cards.length < 2) return;
+      if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        _animateExit('left');
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        _animateExit('right');
+      }
+    }
+
+    var _mouseDown = false;
+    var _mouseDragged = false;
+    function _onMouseDown(e) {
+      if (e.button !== 0 || (e.target.closest && e.target.closest('button, input, textarea, select, a'))) return;
+      _mouseDown = true;
+      _mouseDragged = false;
+      e.preventDefault(); // no text selection while dragging
+      _onTouchStart(e);
+      document.addEventListener('mousemove', _onMouseMove);
+      document.addEventListener('mouseup', _onMouseUp);
+    }
+    function _onMouseMove(e) {
+      if (!_mouseDown) return;
+      _onTouchMove(e);
+      if (_isDragging) _mouseDragged = true;
+    }
+    function _onMouseUp(e) {
+      _mouseDown = false;
+      document.removeEventListener('mousemove', _onMouseMove);
+      document.removeEventListener('mouseup', _onMouseUp);
+      _onTouchEnd(e);
+    }
+    // A drag doesn't also click what it started on.
+    function _onClickCapture(e) {
+      if (!_mouseDragged) return;
+      _mouseDragged = false;
+      e.stopPropagation();
+      e.preventDefault();
+    }
+
     function goTo(idx) {
       if (idx < 0 || idx >= _cards.length) return;
       _idx = idx;
@@ -269,6 +318,11 @@ window.MCardStack = (function () {
       containerEl.removeEventListener('touchstart', _onTouchStart);
       containerEl.removeEventListener('touchmove', _onTouchMove);
       containerEl.removeEventListener('touchend', _onTouchEnd);
+      containerEl.removeEventListener('keydown', _onKey);
+      containerEl.removeEventListener('mousedown', _onMouseDown);
+      containerEl.removeEventListener('click', _onClickCapture, true);
+      document.removeEventListener('mousemove', _onMouseMove);
+      document.removeEventListener('mouseup', _onMouseUp);
       containerEl.innerHTML = '';
       _els = [];
     }
@@ -277,6 +331,14 @@ window.MCardStack = (function () {
     containerEl.addEventListener('touchstart', _onTouchStart, { passive: true });
     containerEl.addEventListener('touchmove', _onTouchMove, { passive: false });
     containerEl.addEventListener('touchend', _onTouchEnd, { passive: true });
+    containerEl.addEventListener('keydown', _onKey);
+    containerEl.addEventListener('mousedown', _onMouseDown);
+    containerEl.addEventListener('click', _onClickCapture, true);
+    // Reachable with Tab, and says how to move.
+    if (!containerEl.hasAttribute('tabindex')) containerEl.setAttribute('tabindex', '0');
+    containerEl.setAttribute('role', 'group');
+    containerEl.setAttribute('aria-roledescription', 'student cards');
+    containerEl.setAttribute('aria-label', 'Student cards. The left and right arrow keys move between students.');
     _render();
 
     return {

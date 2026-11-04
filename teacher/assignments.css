@@ -5975,7 +5975,9 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 }
 .grader-status-btn:disabled {
   color: var(--text-3);
-  cursor: default;
+  cursor: not-allowed;
+  /* Unmistakably off beside an enabled Late (Nov 3 sweep). */
+  opacity: 0.45;
 }
 .grader-status-btn.is-on {
   color: #fff;
@@ -6960,8 +6962,10 @@ button.grader-member-name {
   opacity: 0.45;
   cursor: default;
 }
-/* Missing or Excused: the work isn't graded, so the controls step back. */
-.grader-body.is-locked .grdt-tiles,
+/* Missing or Excused: the work isn't graded, so the controls step back.
+   The Overall Comment stays open, as on the Assignments rows (Nov 3
+   sweep): a note on missing work is still feedback a teacher may write. */
+.grader-body.is-locked .grdt-tiles:not(.grdt-overall),
 .grader-body.is-locked .grdl-cards,
 .grader-body.is-locked .grdp-card {
   opacity: 0.45;
@@ -7034,7 +7038,7 @@ button.grader-member-name {
   border-radius: 12px;
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.35);
 }
-.grader-inline.is-locked .grdt-tiles,
+.grader-inline.is-locked .grdt-tiles:not(.grdt-overall),
 .grader-inline.is-locked .grdl-cards,
 .grader-inline.is-locked .grdp-card {
   opacity: 0.45;
@@ -7199,6 +7203,18 @@ button.grader-member-name {
   border-radius: 10px;
   font-size: var(--text-xs);
   font-weight: 600;
+}
+.assess-meta .score-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(60, 60, 67, 0.45);
+  color: var(--text);
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
 }
 .assess-meta .rubric-badge {
   gap: 4px;
@@ -8314,4 +8330,147 @@ button.grader-member-name {
 .af-ge-check-input:focus {
   outline: none;
   border-bottom-color: var(--active);
+}
+
+/* ── Assignments on a phone (Nov 3 sweep) ─────────────────────
+   An open rubric card was 557 px wide at 375: the page's grid let its one
+   column grow to the card's widest row, the header actions and Set
+   Everyone To chips stayed on one line, and each criterion kept a 200 px
+   label column beside its levels, so the level names overlapped. Under
+   600 px the column holds the screen's width, those rows wrap, and a
+   criterion's name goes above its levels. */
+@media (max-width: 600px) {
+  .settings-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .assess-header-actions,
+  .rsg-header,
+  .rsg-header-levels,
+  .rsg-student-head {
+    flex-wrap: wrap;
+  }
+  .rsg-header,
+  .rsg-student {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .rsg-criteria {
+    padding-left: 0;
+  }
+  .rsg-criterion-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+  .rsg-criterion-main {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .rsg-criterion-main > .rsg-comment-cell {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+  }
+  .rsg-level {
+    overflow: hidden;
+    font-size: var(--text-sm);
+  }
+  .rsg-level-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* ── The grader on a phone (Nov 3 sweep) ──────────────────────
+   At 375 px the dialog kept its desktop columns: the score box ran off
+   the edge, Excused and Late were cut off, and the Overall Comment was
+   26 px wide beside a 200 px label column. Under 600 px the dialog fills
+   the screen, the student row wraps, a criterion's or competency's name
+   goes above its levels (two to a row for rubric tiles), and the
+   keyboard hint, which a phone has no use for, is left out. */
+@media (max-width: 600px) {
+  .grader-overlay {
+    padding: 8px;
+  }
+  .grader-dialog {
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 14px;
+  }
+  .grader-toolbar {
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .grader-scroll {
+    padding: 12px;
+  }
+  .grader-student-row {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+  }
+  .grader-student {
+    font-size: 1.375rem;
+  }
+  .grader-spacer {
+    display: none;
+  }
+  .grader-status {
+    flex-basis: 100%;
+    max-width: 100%;
+  }
+  .grader-status-btn {
+    flex: 1;
+  }
+  .grdt-legend {
+    display: none;
+  }
+  .grdt-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .grdt-row > .grdt-crit-side {
+    grid-column: 1 / -1;
+  }
+  /* With the column legend gone, each tile names its own level. */
+  .grdt-tile:not(.is-chosen) .grdt-tile-head::before {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--text);
+  }
+  .grdt-tile[data-level='1']:not(.is-chosen) .grdt-tile-head::before {
+    content: 'Emerging';
+  }
+  .grdt-tile[data-level='2']:not(.is-chosen) .grdt-tile-head::before {
+    content: 'Developing';
+  }
+  .grdt-tile[data-level='3']:not(.is-chosen) .grdt-tile-head::before {
+    content: 'Proficient';
+  }
+  .grdt-tile[data-level='4']:not(.is-chosen) .grdt-tile-head::before {
+    content: 'Extending';
+  }
+  .grdt-note-row,
+  .grdl-card,
+  .grdp-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .grdp-card {
+    padding: 14px 16px;
+  }
+  .grdl-controls {
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .grdl-level {
+    padding: 0 4px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--text-sm);
+  }
+  .grader-foot {
+    padding: 0 12px;
+  }
+  .grader-hint {
+    visibility: hidden;
+  }
 }

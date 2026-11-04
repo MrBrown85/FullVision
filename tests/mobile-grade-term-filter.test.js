@@ -256,3 +256,25 @@ describe('saved filter fallback', () => {
     expect(badge[2].trim()).toBe('2'); // category + graded status, not the date range
   });
 });
+
+// Step 4 group 3 #80: the filter sheet's heading, options and buttons are
+// in Title Case, like every other label.
+describe('filter sheet casing', () => {
+  it('uses Title Case for the heading, options and buttons', () => {
+    mockDataLayer({});
+    MGrade.renderPicker(CID);
+    const html = sheetHtml();
+    [
+      'Filter Assessments',
+      'All Time',
+      'This Week',
+      'Last 30 Days',
+      'Has Ungraded',
+      'Fully Graded',
+      'Clear All',
+    ].forEach(label => expect(html).toContain('>' + label + '<'));
+    expect(html).not.toMatch(
+      />(Filter assessments|All time|This week|Last 30 days|Has ungraded|Fully graded|Clear all)</,
+    );
+  });
+});

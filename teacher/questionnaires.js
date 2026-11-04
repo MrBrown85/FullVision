@@ -13,6 +13,7 @@ var Questionnaires = (function () {
 
   var _byCourse = {}; // cid -> [questionnaire]
   var _loading = {}; // cid -> Promise
+  var _at = {}; // cid -> when the server copy was last read
   var _templates = null;
 
   function _demo() {
@@ -110,11 +111,27 @@ var Questionnaires = (function () {
       : Promise.resolve();
     _loading[cid] = Promise.all([tpl, mine]).then(function () {
       delete _loading[cid];
+      _at[cid] = Date.now();
       if (!loaded(cid)) _byCourse[cid] = [];
       if (onChange) onChange(cid);
       return _byCourse[cid];
     });
     return _loading[cid];
+  }
+
+  /* How long ago the class's copy was read from the server (Infinity
+     before the first read). Demo Mode reads this device every time. */
+  function age(cid) {
+    if (_demo()) return 0;
+    return _at[cid] ? Date.now() - _at[cid] : Infinity;
+  }
+
+  /* Reads the class again when the copy is older than `ms`, so answers sent
+     since show when a teacher opens the page again; onChange after. */
+  function refreshIfStale(cid, ms, onChange) {
+    if (!cid || _demo() || _loading[cid] || !loaded(cid) || age(cid) < ms) return false;
+    load(cid, onChange);
+    return true;
   }
 
   function find(cid, pred) {
@@ -290,6 +307,7 @@ var Questionnaires = (function () {
   function _reset() {
     _byCourse = {};
     _loading = {};
+    _at = {};
     _templates = null;
   }
 
@@ -303,6 +321,8 @@ var Questionnaires = (function () {
     loaded: loaded,
     load: load,
     find: find,
+    age: age,
+    refreshIfStale: refreshIfStale,
     save: save,
     turnOn: turnOn,
     setOn: setOn,

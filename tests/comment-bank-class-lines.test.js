@@ -449,10 +449,54 @@ describe('the class settings (report_config) and the review screen', () => {
     COURSES[CID].lateWorkPolicy = 'Late work is accepted until December 4.';
     const html = open();
     expect(html).toContain('<span class="qn-req-label">Not Handed In</span>');
-    expect(html).toContain('Two assignments are not handed in: “Task 9” and “Task 10.”');
+    expect(html).toMatch(/<span class="qn-req-text">[^<]*“Task 9”[^<]*“Task 10\.?”/);
     expect(html).toContain('>Late work is accepted until December 4.</button>');
     expect(html).toContain('2 of 10 · check that both are really missing before you approve');
     expect(open(AVA.id)).not.toContain('Not Handed In');
+  });
+
+  it('shows the Not Handed In sentence the comment has, and before Generate the one it will write (Step 4 group 2 #52)', () => {
+    seed(['a9', 'a8']);
+    const st = getStudents(CID).find(s => s.id === GAB.id);
+    const f = CommentBank.facts(CID, st, TERM);
+    const fixed = CommentBank.notHandedInSentence(f.notHandedIn);
+    // Every frame of the step, until one words the fact differently.
+    let d;
+    for (let seedN = 1; seedN < 60; seedN++) {
+      d = CommentBank.draft(CommentBank.context(f, {}), { seed: seedN, quiet: true });
+      const x = d.sentences.find(y => y.step === 'notHandedIn');
+      if (x && x.text !== fixed) break;
+    }
+    const said = d.sentences.find(y => y.step === 'notHandedIn').text;
+    expect(said).not.toBe(fixed);
+    upsertTermRating(CID, GAB.id, TERM, { narrative: d.text });
+    const html = open();
+    const row = html.slice(html.indexOf('id="tq-row-missing"'));
+    expect(row.slice(0, row.indexOf('</div>\n    </div>'))).toContain(said);
+    expect(row.slice(0, 600)).not.toContain(fixed);
+  });
+
+  it('shows Completes Work from the record on the grid until the teacher rates it (Step 4 group 3 #65)', () => {
+    seed(['a9', 'a8']);
+    const st = getStudents(CID).find(s => s.id === GAB.id);
+    const auto = CommentBank.effectiveHabits({}, CommentBank.facts(CID, st, TERM).record).completes;
+    expect(auto).toBeGreaterThan(0);
+    const label = CommentBank.SCALE[auto - 1];
+    let html = open();
+    expect(html).toContain('Completes Work<span class="qn-habit-src">From the Record</span>');
+    expect(html).toContain(
+      'aria-checked="true" tabindex="0" class="qn-radio on from-record" data-action="tqRate" data-habit="completes" data-value="' +
+        auto +
+        '"',
+    );
+    expect(html).toContain('aria-label="Completes Work: ' + label + ', from the record"');
+    // Rated by the teacher: the grid shows their rating, not the record.
+    upsertTermRating(CID, GAB.id, TERM, { habits: { completes: 4 } });
+    html = open();
+    expect(html).not.toContain('From the Record');
+    expect(html).toContain(
+      'aria-checked="true" tabindex="0" class="qn-radio on" data-action="tqRate" data-habit="completes" data-value="4"',
+    );
   });
 
   it('saves the closing sentence for the class; approved comments keep the old one', () => {
@@ -540,6 +584,44 @@ describe('the class settings (report_config) and the review screen', () => {
       TERM,
     );
     expect(CommentBank.context(f, {}).supportLine).toBe('In class, I will give feedback on source work each week.');
+  });
+
+  it('puts a support line picked or ticked into a comment that had none, the rest as it was (Step 4 group 2 #51)', () => {
+    seed();
+    upsertTermRating(CID, GAB.id, TERM, { narrative: 'Gabriel is earning a B. Thank you for a good term.' });
+    open();
+    RQ.tqLineChange({ dataset: { tqSupport: 'sl-sources' }, checked: true });
+    expect(getStudentTermRating(CID, GAB.id, TERM).narrative).toBe(
+      'Gabriel is earning a B. Thank you for a good term. In class, I will give feedback on source work each week.',
+    );
+    // Swapped for another line in place, not added twice.
+    RQ.tqLine('writeOwn');
+    inputs['tq-line-own'] = { value: 'In class, I will meet with the group each Friday.', focus() {} };
+    RQ.tqLine('saveOwn');
+    delete inputs['tq-line-own'];
+    RQ.tqLine('pickSupport', { dataset: { line: settings().supportOwn[0].id } });
+    expect(getStudentTermRating(CID, GAB.id, TERM).narrative).toBe(
+      'Gabriel is earning a B. Thank you for a good term. In class, I will meet with the group each Friday.',
+    );
+    // An approved comment is never rewritten.
+    RQ.tqLine('pickSupport', { dataset: { line: 'none' } });
+    upsertTermRating(CID, GAB.id, TERM, { narrative: 'Gabriel is earning a B.', approvedAt: '2026-10-30T10:00:00Z' });
+    RQ.tqLine('pickSupport', { dataset: { line: 'sl-sources' } });
+    expect(getStudentTermRating(CID, GAB.id, TERM).narrative).toBe('Gabriel is earning a B.');
+  });
+
+  it('says why the Support row is empty when no ticked line fits, not that it was left out', () => {
+    seed();
+    // A line of the teacher's own fits no skill: ticked, it is picked only by hand.
+    saveReportConfig(CID, {
+      commentSettings: {
+        supportOwn: [{ id: 'own-1', text: 'In class, I will meet with the group each Friday.' }],
+        supportChosen: ['own-1'],
+      },
+    });
+    const html = open();
+    expect(html).toContain('None of the ticked lines fits Gabriel, so the comment leaves this sentence out.');
+    expect(html).not.toContain('Left out of this comment.');
   });
 
   it('sets the character limit from the count; past it the count turns orange and Approve stays on', () => {

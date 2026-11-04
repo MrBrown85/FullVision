@@ -452,10 +452,20 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const rows = RQ.recoverRows(d.text, ctx);
     expect(rows.map(r => r.id)).toEqual(d.ids);
     expect(rows.every(r => !r.edited)).toBe(true);
-    const own = RQ.recoverRows('Cece had a good term. She asks questions.', ctx);
-    expect(own.map(r => [r.step, r.edited])).toEqual([
-      [null, true],
-      [null, true],
+    // Recorded as typed by the teacher (draft_meta.teacher_text): theirs.
+    const own = RQ.recoverRows('Cece had a good term. She asks questions.', ctx, {
+      teacher_text: ['Cece had a good term.', 'She asks questions.'],
+    });
+    expect(own.map(r => [r.step, r.edited, !!r.earlier])).toEqual([
+      [null, true, false],
+      [null, true, false],
+    ]);
+    // With no record (saved before it, or the old generator's): the
+    // Earlier Comment's, which Generate replaces.
+    const old = RQ.recoverRows('Cece had a good term. She asks questions.', ctx);
+    expect(old.map(r => [r.step, r.edited, !!r.earlier])).toEqual([
+      [null, false, true],
+      [null, false, true],
     ]);
   });
 
@@ -837,6 +847,7 @@ describe('the card drawn for a Demo Mode student', () => {
     RQ.tqStudentIndex = students.indexOf(st);
     upsertTermRating(cid, st.id, ReportBlocks.getTermId(), {
       narrative: 'Hannah had a steady term. She asks good questions.',
+      draftMeta: { v: 1, sentences: [], teacher_text: ['Hannah had a steady term.', 'She asks good questions.'] },
     });
     const html = RQ.renderTermQuestionnaire(cid);
     const card = html.slice(html.indexOf('id="tq-sentences"'));

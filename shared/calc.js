@@ -365,7 +365,8 @@ function _rubricAssessmentPoints(cid, studentId, assessment) {
    { possible, criteria } (criteria = how many), as not-submitted work
    counts out of. When every criterion weighs 0 they count equally. */
 function _rubricFullPoints(cid, assessment) {
-  var rubric = getRubricById(cid, assessment.rubricId || assessment.rubric_id);
+  // assessment.rubric: a rubric not saved yet (the assessment form's draft).
+  var rubric = assessment.rubric || getRubricById(cid, assessment.rubricId || assessment.rubric_id);
   var criteria = ((rubric && rubric.criteria) || []).filter(Boolean);
   var weights = criteria.map(_rubricCriterionWeight);
   var anyWeight = weights.some(function (w) {
@@ -781,7 +782,10 @@ function assessmentCourseWorth(cid, assessment) {
   var criteria = null;
   if (isPointsScored(assessment)) {
     base = isCompletionScored(assessment) ? COMPLETE_MAX_POINTS : Number(assessment.maxPoints) || 0;
-  } else if ((assessment.rubricId || assessment.rubric_id) && typeof getRubricById === 'function') {
+  } else if (
+    (assessment.rubric || assessment.rubricId || assessment.rubric_id) &&
+    typeof getRubricById === 'function'
+  ) {
     var full = _rubricFullPoints(cid, assessment);
     if (full.criteria) {
       base = full.possible;
@@ -942,6 +946,70 @@ function startAndNow(points) {
     return p.t >= t1 - win;
   });
   return { start: mean(first), now: mean(last), startCount: first.length, nowCount: last.length };
+}
+
+/* Where a student's work started and where it is now (the phone card's
+   growth line), in the grade the class shows first. A Letter class reads
+   each piece's % as the course % counts it (Missing is 0, Excused left
+   out); a Proficiency or Both class reads each competency score that counts
+   (tagIds; no 0% category work). Start and now are the means of the first
+   and last weeks (startAndNow), so one early or late score doesn't decide
+   it. Returns { startText, nowText, change, dir, count } (count:
+   assessments), with startText null when the work spans under two weeks;
+   null when there is no work. */
+function studentGrowthLine(cid, sid, tagIds) {
+  var letter = courseGradeMode(cid) === 'letter';
+  var points = [];
+  var ids = {};
+  var day = function (d) {
+    var t = d ? Math.floor(Date.parse(d) / 86400000) : NaN;
+    return isFinite(t) ? t : null;
+  };
+  if (letter) {
+    _scopedAssessments(cid).forEach(function (a) {
+      if (isDibelsScored(a) || !countsTowardGrades(cid, a)) return;
+      var g = getAssessmentGroupPercentage(cid, sid, [a]);
+      if (!g) return;
+      ids[a.id] = true;
+      points.push({ t: day(a.date), v: g.pct });
+    });
+  } else {
+    (tagIds || []).forEach(function (tid) {
+      getCountedTagScores(cid, sid, tid).forEach(function (e) {
+        if (!(e.score > 0)) return;
+        ids[e.assessmentId] = true;
+        points.push({ t: day(e.date), v: Number(e.score) });
+      });
+    });
+  }
+  if (!points.length) return null;
+  var digits = getRoundWholePercent(cid) ? 0 : 1;
+  var text = function (v) {
+    if (letter) return _roundPercent(v, digits) + '%';
+    var word = levelWord(cid, v);
+    return formatLevel(cid, v) + (word ? ' ' + word : '');
+  };
+  var count = Object.keys(ids).length;
+  var run = startAndNow(points);
+  if (!run) {
+    var mean =
+      points.reduce(function (t, p) {
+        return t + p.v;
+      }, 0) / points.length;
+    return { startText: null, nowText: text(mean), change: '', dir: 0, count: count };
+  }
+  var change;
+  var dir;
+  if (letter) {
+    var d = Math.round((_roundPercent(run.now, digits) - _roundPercent(run.start, digits)) * 10) / 10;
+    dir = d > 0 ? 1 : d < 0 ? -1 : 0;
+    change = dir ? (dir > 0 ? '+' : '\u2212') + Math.abs(d) + '%' : '';
+  } else {
+    change = levelChange(run.start, run.now);
+    dir = change.charAt(0) === '+' ? 1 : change.charAt(0) === '\u2212' ? -1 : 0;
+    if (!dir) change = '';
+  }
+  return { startText: text(run.start), nowText: text(run.now), change: change, dir: dir, count: count };
 }
 
 /* The mean of a student's score entries (getTagScores), each at the value
@@ -1904,14 +1972,13 @@ function getFocusAreas(cid, studentId, maxItems) {
     prof: getTagProficiency(cid, studentId, t.id),
     section: getSectionForTag(cid, t.id),
   }));
-  // Tags with no evidence first, then lowest proficiency
-  scored.sort((a, b) => {
-    if (a.prof === 0 && b.prof === 0) return 0;
-    if (a.prof === 0) return -1;
-    if (b.prof === 0) return 1;
-    return a.prof - b.prof;
-  });
-  return scored.slice(0, maxItems || 3);
+  // The student's weakest assessed competencies, lowest first. Ones nobody
+  // has assessed yet are the same for every student in the class and say
+  // nothing about this one, so they are left out (Step 4 sweep, Nov 3).
+  return scored
+    .filter(x => x.prof > 0)
+    .sort((a, b) => a.prof - b.prof)
+    .slice(0, maxItems || 3);
 }
 
 /** Calculate the percentage of tags that have at least one scored evidence entry.
@@ -2341,7 +2408,8 @@ function studentGradeBadges(cid, sid, termId) {
 }
 
 /* A level as its short code: EXT, PRF, DEV or EMG for the whole level it
-   rounds to (the level its colour and word come from), IC with none. A +
+   rounds to (the level its colour and word come from), IE (Insufficient
+   Evidence) with none. A +
    or − is already in the value, so 2.67 (3−) is PRF and 3.33 (3+) is PRF. */
 function levelCode(value) {
   if (!(value > 0)) return PROF_CODES[0];
@@ -2515,7 +2583,19 @@ function classColumnAverageText(cid, assessment, res) {
       '%'
     );
   }
-  return formatLevel(cid, res.avg);
+  return formatColumnAverageLevel(cid, res.avg);
+}
+
+/* A Class Average that is a level (classColumnAverage's avg), as `as` asks
+   (formatLevelAs's 'percent' or 'proficiency'), or as the class shows it
+   (formatLevel) when `as` is left out. Call it only when someone counted.
+   In a Letter class Missing counts as 0 in every column, so a column whose
+   counted students are all Missing averages 0 and reads "0%" ("0.0" where
+   the column prints proficiency figures), not the "—" of a column nobody
+   counts in (Nov 3 bug sweep). */
+function formatColumnAverageLevel(cid, avg, as) {
+  if (!(avg > 0) && courseGradeMode(cid) === 'letter') return as === 'proficiency' ? '0.0' : '0%';
+  return as ? formatLevelAs(cid, avg, as) : formatLevel(cid, avg);
 }
 
 /* How many students sit at each grade, best first: by letter grade (A to F)
@@ -2822,6 +2902,7 @@ window.Calc = {
   classGradeDistribution,
   competencyDistribution,
   classColumnAverageText,
+  formatColumnAverageLevel,
   getAssessmentGroupPercentage,
   rubricCompetencyIds,
   rubricCriteriaForTag,
@@ -2838,6 +2919,7 @@ window.Calc = {
   groupGradeDiff,
   groupGradeValue,
   startAndNow,
+  studentGrowthLine,
   averageLevels,
   categoryCourseShares,
   rubricCriterionLevel,

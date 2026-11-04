@@ -2182,10 +2182,11 @@ a.dash-ins-name:hover {
   font-weight: 600;
   color: var(--text);
 }
-.cm-sidebar-count {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
+.cm-action-btn.cm-new-class-btn {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  color: var(--text);
+  white-space: nowrap;
 }
 .cm-class-list {
   flex: 1;
@@ -2933,9 +2934,11 @@ a.dash-ins-name:hover {
   font-style: italic;
   font-size: var(--text-xs);
 }
-.cm-cat-save:disabled {
+.cm-cat-save:disabled,
+.cm-detail .btn-primary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+  filter: none;
 }
 
 /* Reporting terms editor (same row model as categories) */
@@ -3229,6 +3232,16 @@ a.dash-ins-name:hover {
   gap: 10px;
   justify-content: flex-end;
   margin-top: 16px;
+}
+/* Back and Next stay in view at the foot of a long step (Choose
+   Competencies runs to thousands of pixels). */
+.cm-detail .cw-footer {
+  position: sticky;
+  bottom: -20px;
+  z-index: 2;
+  margin-bottom: -20px;
+  padding: 12px 0 20px;
+  background: var(--bg);
 }
 
 /* ── Compact Standard Cards (used in class manager + wizard) ── */
@@ -4612,6 +4625,7 @@ a.dash-ins-name:hover {
   white-space: nowrap;
 }
 .cm-rs-section {
+  position: relative;
   padding: 0;
   overflow: hidden;
 }
@@ -4620,6 +4634,36 @@ a.dash-ins-name:hover {
   max-height: none;
   border: 0;
   margin: 0;
+}
+/* The roster scrolls sideways at most widths: its scrollbar always shows
+   (not only while scrolling), and the right edge fades while columns are
+   hidden past it. */
+.cm-rs-scroll::-webkit-scrollbar {
+  height: 12px;
+}
+.cm-rs-scroll::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+.cm-rs-scroll::-webkit-scrollbar-thumb {
+  background: var(--text-3);
+  border: 3px solid var(--bg);
+  border-radius: 6px;
+}
+.cm-rs-section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 12px;
+  width: 48px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--surface));
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 3;
+}
+.cm-rs-section.cm-rs-more-right::after {
+  opacity: 1;
 }
 .cm-rs-grid {
   display: grid;
@@ -5732,8 +5776,10 @@ label.cm-cr-row {
   width: 64px;
   text-align: center;
 }
+/* Wide enough for "100.0" and a one-decimal value beside the number
+   arrows ("83.3" was clipped to "83." at 64px). */
 .cm-pts-slot {
-  width: 64px;
+  width: 80px;
   flex-shrink: 0;
   text-align: center;
 }
@@ -5875,6 +5921,16 @@ label.cm-cr-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.sq-print-one {
+  width: auto;
+  max-width: 220px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-2);
+}
+.sq-print-hint {
+  margin-top: 6px;
 }
 .sq-dates {
   display: flex;
@@ -6154,4 +6210,76 @@ label.cm-cr-row {
 .cm-relink-dropped {
   color: var(--text);
   margin-bottom: 12px;
+}
+
+/* Needs Attention on a phone: the filter buttons wrap onto more lines and
+   each student's facts go under the name, so the card never runs past the
+   screen and the page never scrolls sideways (Nov 3 sweep). */
+@media (max-width: 600px) {
+  .dash-na-head,
+  .dash-na-filters {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .dash-na-seg {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .dash-na-row {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+    padding: 6px 12px;
+  }
+  .dash-na-facts {
+    grid-column: 2 / -1;
+  }
+  .dash-na-fact {
+    white-space: normal;
+  }
+  .dash-ob2-flags {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .dash-ob2-flag {
+    white-space: normal;
+    text-align: left;
+  }
+}
+
+/* Class Management below 1024 px: the student list's width is 0 there, so
+   the class list kept 1 px and New Class and Restore Class from Backup
+   couldn't be reached (Nov 3 sweep). It keeps its own width on a tablet
+   and, on a phone, sits above the class as a short list of its own. */
+@media (max-width: 1024px) {
+  #page-layout:has(.cm-toolbar) .cm-sidebar {
+    width: 220px;
+  }
+}
+@media (max-width: 600px) {
+  #page-layout:has(.cm-toolbar) {
+    flex-direction: column;
+  }
+  #page-layout:has(.cm-toolbar) #sidebar-mount {
+    height: auto;
+    flex-shrink: 0;
+  }
+  #page-layout:has(.cm-toolbar) .cm-sidebar {
+    width: 100%;
+    height: auto;
+    max-height: 40vh;
+    border-right: 0;
+    border-bottom: 1px solid var(--divider-subtle);
+  }
+  #page-layout:has(.cm-toolbar) .cm-sidebar-header {
+    height: 44px;
+  }
+  #page-layout:has(.cm-toolbar) .cm-class-list {
+    min-height: 0;
+  }
+  #page-layout:has(.cm-toolbar) .cm-new-btn {
+    min-height: 44px;
+  }
+  #page-layout:has(.cm-toolbar) .page-main {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
 }

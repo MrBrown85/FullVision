@@ -80,7 +80,7 @@ describe('grades shown by grading setting', () => {
 
   it('shows the roster grade as a proficiency code', () => {
     expect([0, 1, 1.4, 1.5, 2.49, 2.67, 3, 3.33, 3.5, 4].map(levelCode)).toEqual([
-      'IC',
+      'IE',
       'EMG',
       'EMG',
       'DEV',
@@ -96,7 +96,8 @@ describe('grades shown by grading setting', () => {
       prof: { text: 'PRF', level: 3, title: 'Proficient' },
       letter: null,
     });
-    expect(studentRosterBadges(CID, 's3').prof).toEqual({ text: 'IC', level: 0, title: 'No Evidence' });
+    // No evidence reads IE, BC's Insufficient Evidence, not IC.
+    expect(studentRosterBadges(CID, 's3').prof).toEqual({ text: 'IE', level: 0, title: 'No Evidence' });
     setting('both');
     expect(studentRosterBadges(CID, 's1').prof.text).toBe('PRF');
     expect(studentRosterBadges(CID, 's1').letter.text).toBe('B 78.9%');

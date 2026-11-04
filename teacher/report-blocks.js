@@ -612,7 +612,7 @@ window.ReportBlocks = (function () {
     return sections
       .map((sec, i) => {
         const now = getSectionProficiency(cid, sid, sec.id);
-        const then = last ? last.levels[i] : _sectionStart(cid, sid, sec);
+        const then = last ? last.levels[i] : _startLevel(cid, sid, sec);
         return {
           sec,
           name: _competencyLabel(sec),
@@ -634,9 +634,12 @@ window.ReportBlocks = (function () {
     if (which === 'highest') sorted.sort((a, b) => b.now - a.now);
     else if (which === 'lowest') sorted.sort((a, b) => a.now - b.now);
     else {
-      // The biggest change, then the lowest now.
+      // The biggest change, then the lowest now. by says which picked it,
+      // so a block never calls a change of 0.0 the biggest (step 4 group 3
+      // #63).
       const change = r => (r.then > 0 ? Math.abs(Math.round(r.now * 10) - Math.round(r.then * 10)) : -1);
       sorted.sort((a, b) => change(b) - change(a) || a.now - b.now);
+      return Object.assign({ by: change(sorted[0]) > 0 ? 'change' : 'lowest' }, sorted[0]);
     }
     return sorted[0];
   }
@@ -690,9 +693,28 @@ window.ReportBlocks = (function () {
     const pct = _ownPct(cid, sid, a);
     return pct == null ? null : formatPointsPercent(pct, 100);
   }
-  /* One piece's mark: w is { a, score }. */
+  /* One piece's mark: w is { a, score }, or a whole piece (_wholeWork)
+     with the text it prints. */
   function _workMark(cid, sid, w, word) {
+    if (w.text) return w.text;
     return _mark(cid, w.score, word, _ownPercent(cid, sid, w.a));
+  }
+  /* A piece's whole mark as Assignment Grades prints it by default
+     (assessmentCellValue, _rowMarks): { a, score, ownPct, text }, or null
+     for work with no level (Complete/Incomplete, Missing, Excused, DIBELS)
+     (step 4 group 2 #3). */
+  function _wholeWork(cid, sid, a) {
+    const cv = assessmentCellValue(cid, sid, a);
+    const mode = courseGradeMode(cid);
+    if (cv.kind === 'points') {
+      const m = _rowMarks(cid, a, cv);
+      const text = mode === 'letter' ? m.percent : mode === 'both' ? m.score + ' \u00B7 ' + m.percent : m.score;
+      return { a, score: cv.level, ownPct: _ownPct(cid, sid, a), text };
+    }
+    if (cv.kind === 'level' && cv.value > 0) {
+      return { a, score: cv.value, ownPct: cv.percent, text: _mark(cid, cv.value, false, cv.percentText) };
+    }
+    return null;
   }
   /* Orders pieces { a, score } best first (or lowest first, best false).
      A Letter or Both class ranks them by the % it prints for them (points
@@ -701,12 +723,13 @@ window.ReportBlocks = (function () {
   function _byMark(cid, sid, best) {
     const pctOn = courseGradeMode(cid) !== 'proficiency';
     const shown = w => {
-      const own = _ownPct(cid, sid, w.a);
+      const own = w.ownPct != null ? w.ownPct : _ownPct(cid, sid, w.a);
       return own != null ? own : levelToPercent(cid, w.score);
     };
     return (x, y) => {
       const [p, q] = best ? [y, x] : [x, y];
-      return (pctOn ? shown(p) - shown(q) : 0) || p.score - q.score;
+      // Whole pieces at one level (16/20 and 17/20) go by the % they earned.
+      return (pctOn ? shown(p) - shown(q) : 0) || p.score - q.score || (p.text && q.text ? shown(p) - shown(q) : 0);
     };
   }
   /* The pieces a Best or Lowest line names: at the highest (or lowest)
@@ -785,8 +808,7 @@ window.ReportBlocks = (function () {
     // Proficiency block's Start of Term (_sectionStart): the first weeks'
     // mean, or with too few dated scores the first piece's. The pieces
     // below show the gradebook's mark on each (_sectionWork).
-    const start = _sectionStart(cid, student.id, area.sec);
-    const startV = start != null ? start : work.length ? _pieceLevel(cid, student.id, area.sec, work[0].a) : 0;
+    const startV = _startLevel(cid, student.id, area.sec);
     const nowV = area.now;
     const bests = _namedWork(cid, student.id, work, true);
     const latest = work[work.length - 1];
@@ -798,7 +820,9 @@ window.ReportBlocks = (function () {
           ? 'Highest now'
           : area.picked
             ? 'Focus area'
-            : 'Focus area (biggest change)';
+            : area.by === 'lowest'
+              ? 'Focus area (lowest now)'
+              : 'Focus area (biggest change)';
     const when = a => (_assessmentWhen(a) ? ', ' + _assessmentWhen(a) : '');
     const facts = [];
     if (options.startNow !== false && (startV > 0 || nowV > 0)) {
@@ -895,6 +919,16 @@ window.ReportBlocks = (function () {
       _sectionStartNow(cid, sid, sec),
     );
   }
+  /* A section's Start of Term as every block prints it: _sectionStart, or
+     with too few dated scores the first piece's level this term; 0 without
+     any. The Proficiency table printed "—" where Progress in One Area
+     printed the first piece's level (step 4 group 3 #63). */
+  function _startLevel(cid, sid, sec) {
+    const start = _sectionStart(cid, sid, sec);
+    if (start != null) return start;
+    const work = _sectionWork(cid, sid, sec).filter(w => assessmentInActiveTerm(cid, w.a));
+    return work.length ? _pieceLevel(cid, sid, sec, work[0].a) : 0;
+  }
   function _sectionStartNow(cid, sid, sec) {
     const dates = {};
     getAssessments(cid).forEach(a => {
@@ -949,6 +983,30 @@ window.ReportBlocks = (function () {
     if (!before.some(v => v > 0)) return null;
     return { label: prev.label || 'Last Report', levels: before };
   }
+  /* The course % (calc.js getCourseLetterData), null without one. */
+  function _coursePct(cid, sid) {
+    const lg = getCourseLetterData(cid, sid);
+    return lg && lg.R != null ? lg.R : null;
+  }
+  /* The course grade at the last report, read as _lastReportLevels reads
+     levels: { text, pct, level }, or null without a previous term. */
+  function _lastReportCourse(cid, sid) {
+    const now = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    if (!now) return null;
+    const prev = (typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [])
+      .filter(t => t.ordinal < now.ordinal)
+      .pop();
+    if (!prev) return null;
+    return _pass('course|' + cid + '|' + sid + '|' + now.ordinal, () => {
+      try {
+        setActiveTerm(cid, prev.ordinal);
+        const g = studentGradeSummary(cid, sid);
+        return g.text ? { text: g.text, pct: _coursePct(cid, sid), level: getOverallProficiency(cid, sid) } : null;
+      } finally {
+        setActiveTerm(cid, now.ordinal);
+      }
+    });
+  }
   function _profWord(v) {
     return v > 0 ? PROF_LABELS[Math.min(4, Math.max(1, Math.round(v)))] : '';
   }
@@ -983,7 +1041,7 @@ window.ReportBlocks = (function () {
     const rowsBySection = {};
     sections.forEach((sec, i) => {
       const now = getSectionProficiency(cid, sid, sec.id);
-      const then = last ? last.levels[i] : _sectionStart(cid, sid, sec);
+      const then = last ? last.levels[i] : _startLevel(cid, sid, sec);
       const ev = _sectionEvidence(cid, sid, sec);
       rowsBySection[sec.id] = { sec, name: _competencyLabel(sec), then: then > 0 ? then : 0, now, ev };
     });
@@ -1007,7 +1065,7 @@ window.ReportBlocks = (function () {
     const head = (nameLabel, short) =>
       `<tr><th>${nameLabel}</th><th class="report-prof-n">${esc(short ? thenLabel.replace(/^(Term|Start of Term)$/, m => (m === 'Start of Term' ? 'Start' : m)) : thenLabel)}</th><th class="report-prof-n">${nowLabel}</th>${showChange ? '<th class="report-prof-n">Change</th>' : ''}${showAssessed ? `<th class="report-prof-n">${short ? 'Ev.' : 'Assessed'}</th>` : ''}</tr>`;
     const tr = (name, then, now, n, cls, count) =>
-      `<tr${cls ? ` class="${cls}"` : ''}><td class="report-ct-name">${esc(name)}${count ? `<span class="report-prof-count"> · ${count}</span>` : ''}</td><td class="report-prof-n">${fig(then)}</td><td class="report-prof-n">${fig(now)}</td>${showChange ? `<td class="report-prof-n">${esc(change(then, now))}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${n}</td>` : ''}</tr>`;
+      `<tr${cls ? ` class="${cls}"` : ''}><td class="report-ct-name">${esc(name)}${count ? `<span class="report-prof-count"> · ${count} competenc${count === 1 ? 'y' : 'ies'}</span>` : ''}</td><td class="report-prof-n">${fig(then)}</td><td class="report-prof-n">${fig(now)}</td>${showChange ? `<td class="report-prof-n">${esc(change(then, now))}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${n}</td>` : ''}</tr>`;
     const headRow = name => `<tr class="report-ct-group"><td colspan="${colCount}">${esc(name)}</td></tr>`;
     const sortRows = list => (lowestFirst ? list.slice().sort((a, b) => (a.now || 9) - (b.now || 9)) : list);
     const avg = (list, k) => {
@@ -1028,10 +1086,29 @@ window.ReportBlocks = (function () {
       rs.forEach(r => r.ev.list.forEach(w => ids.add(w.a || w)));
       return ids.size;
     };
-    const overallRow =
-      options.overall !== false
-        ? tr('Overall', overallThen, overallNow, assessedOnce(live), 'report-prof-overall')
-        : '';
+    // A Letter or Both class's Overall is the course grade, as the Back's
+    // Course Grade prints it (studentGradeSummary), so a report has one
+    // overall figure; then is the course grade at the last report (step 4
+    // group 2 #2). A Proficiency class rolls its competencies up.
+    let overallRow = '';
+    if (options.overall !== false && mode === 'proficiency') {
+      overallRow = tr('Overall', overallThen, overallNow, assessedOnce(live), 'report-prof-overall');
+    } else if (options.overall !== false) {
+      const termId = ctx && ctx.termId;
+      const nowG = { text: studentGradeSummary(cid, sid, termId).text, pct: _coursePct(cid, sid), level: overallNow };
+      const thenG = last ? _lastReportCourse(cid, sid) : null;
+      const cell = (g, lvl) =>
+        g && g.text
+          ? esc(g.text) + (showWord && mode === 'both' && lvl > 0 ? ' ' + esc(_profWord(lvl)) : '')
+          : '<span class="report-ct-none">—</span>';
+      let ch = '\u2014';
+      if (thenG && mode === 'both') ch = levelChange(thenG.level, nowG.level);
+      else if (thenG && thenG.pct != null && nowG.pct != null) {
+        const d = Math.round((nowG.pct - thenG.pct) * 10) / 10;
+        ch = (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d) + '%';
+      }
+      overallRow = `<tr class="report-prof-overall"><td class="report-ct-name">Overall</td><td class="report-prof-n">${cell(thenG, thenG && thenG.level)}</td><td class="report-prof-n">${cell(nowG, overallNow)}</td>${showChange ? `<td class="report-prof-n">${esc(ch)}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${assessedOnce(live)}</td>` : ''}</tr>`;
+    }
 
     // The rows: blocks that never split across columns. A folder prints as
     // one row (its competencies averaged, as calc.js does) or as its
@@ -1144,11 +1221,29 @@ window.ReportBlocks = (function () {
             .map(r => r.name)
             .join(', ')
             .replace(/, ([^,]*)$/, list.length > 2 ? ', and $1' : ' and $1');
+        // A piece named as best work is not named again as lowest work
+        // (step 4 group 2 #2): a rubric can put one piece at the top of one
+        // competency and the bottom of another.
+        const namedBest = new Set();
+        // Each piece prints its whole mark, as Assignment Grades does, not
+        // its mark on one competency, so one piece shows one score on the
+        // report; work with no level is left out (step 4 group 2 #3).
+        const whole = new Map();
+        const wholeOf = a => {
+          if (!whole.has(a)) whole.set(a, _wholeWork(cid, sid, a));
+          return whole.get(a);
+        };
         const work = (list, best) => {
           const items = [];
-          list.forEach(r => r.ev.list.forEach(w => w.a && items.push(w)));
+          list.forEach(r =>
+            r.ev.list.forEach(w => {
+              const piece = w.a && (best || !namedBest.has(w.a)) && wholeOf(w.a);
+              if (piece) items.push(piece);
+            }),
+          );
           const top = _namedWork(cid, sid, items, best);
           if (!top) return '';
+          if (best) top.list.forEach(w => namedBest.add(w.a));
           const named = top.list
             .map(w => esc(w.a.title) + (_assessmentWhen(w.a) ? ' (' + _assessmentWhen(w.a) + ')' : ''))
             .join(' and ');
@@ -1179,14 +1274,18 @@ window.ReportBlocks = (function () {
     [3, PROF_LABELS[3], 'Complete understanding'],
     [4, PROF_LABELS[4], 'Sophisticated understanding'],
   ];
-  function renderBlockLegend(options) {
+  /* A Letter class prints its levels as percents, so its legend gives
+     the % each level counts as (formatLevel) and no "out of 4" (step 4
+     group 2 #2). */
+  function renderBlockLegend(options, cid) {
     const half = options && options.size === 'half';
+    const asPct = cid != null && courseGradeMode(cid) === 'letter';
     const items = LEGEND_LEVELS.map(
       ([n, word, what]) =>
-        `<div class="report-legend-item"><div class="report-legend-word">${n} \u00B7 ${word}</div><div class="report-legend-desc">${what}</div></div>`,
+        `<div class="report-legend-item"><div class="report-legend-word">${asPct ? esc(formatLevel(cid, n)) : n} \u00B7 ${word}</div><div class="report-legend-desc">${what}</div></div>`,
     ).join('');
     return `<div class="report-block-box report-legend${half ? ' report-legend-half' : ''}">
-    <div class="report-legend-title">BC Proficiency Scale, out of 4</div>
+    <div class="report-legend-title">${asPct ? 'BC Proficiency Scale' : 'BC Proficiency Scale, out of 4'}</div>
     <div class="report-legend-items">${items}</div>
   </div>`;
   }
@@ -2233,7 +2332,7 @@ window.ReportBlocks = (function () {
       case 'proficiency':
         return renderBlockProficiency(cid, student, ctx, options);
       case 'legend':
-        return renderBlockLegend(options);
+        return renderBlockLegend(options, cid);
       case 'parent-response':
         return renderBlockParentResponse(cid, student, options);
       case 'student-reflection-learning':

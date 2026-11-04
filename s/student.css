@@ -218,6 +218,9 @@ button {
 .sp-shield > div {
   display: flex;
   flex-direction: column;
+  /* A label that wraps to two lines grows up, so the boxes side by side
+     stay in line. */
+  justify-content: flex-end;
   gap: 4px;
   min-width: 0;
 }

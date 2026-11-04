@@ -124,6 +124,7 @@ window.MGrade = (function () {
       id: 'grade-picker',
       title: 'Grade',
       compact: true,
+      classId: cid,
       rightHTML:
         '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
         '<button class="m-nav-bar-action" data-action="m-settings" title="Settings">' +
@@ -138,7 +139,8 @@ window.MGrade = (function () {
     // Load persisted filters for this course. Cells that don't match are
     // drawn hidden, so the list never flashes unfiltered.
     _filters = _loadFilters(cid);
-    _segmentMode = 'recent';
+    // Saved filters cover the whole list; with none, the list opens on Recent.
+    _segmentMode = _activeFilterCount() > 0 ? 'all' : 'recent';
     var ctx = _filterCtx(cid);
 
     // Sort by date, newest first
@@ -153,8 +155,12 @@ window.MGrade = (function () {
     var segmented =
       '<div class="m-grade-filter-bar">' +
       '<div class="m-segmented">' +
-      '<button class="m-seg-btn m-seg-active" data-action="m-grade-seg" data-val="recent">Recent</button>' +
-      '<button class="m-seg-btn" data-action="m-grade-seg" data-val="all">All</button>' +
+      '<button class="m-seg-btn' +
+      (_segmentMode === 'recent' ? ' m-seg-active' : '') +
+      '" data-action="m-grade-seg" data-val="recent">Recent</button>' +
+      '<button class="m-seg-btn' +
+      (_segmentMode === 'all' ? ' m-seg-active' : '') +
+      '" data-action="m-grade-seg" data-val="all">All</button>' +
       '</div>' +
       '<button class="m-grade-filter-btn" data-action="m-grade-filter-open" aria-label="Filter assessments">' +
       _FILTER_ICON_SVG +
@@ -198,22 +204,22 @@ window.MGrade = (function () {
           (_matchesAllFilters(a, ctx) ? '' : ' style="display:none"') +
           '>' +
           '<div class="m-cell-body">' +
-          '<div class="m-cell-title">' +
-          '<span class="m-type-badge ' +
-          badge.className +
-          '" style="margin-right:6px">' +
-          MC.esc(badge.label) +
-          '</span>' +
+          // The title has its own line (up to two); the category goes on
+          // the line under it, so a long category can't squeeze the title.
+          '<div class="m-cell-title m-grade-title">' +
           MC.esc(a.title) +
           '</div>' +
           '<div class="m-cell-subtitle">' +
+          // A class with no categories shows no "No Category" chip.
+          (showsCategoryBadge(cid, a)
+            ? '<span class="m-type-badge ' + badge.className + '">' + MC.esc(badge.label) + '</span>'
+            : '') +
           '<span>' +
           dateStr +
           '</span>' +
           '<span>' +
           tagCount +
-          ' tag' +
-          (tagCount !== 1 ? 's' : '') +
+          (tagCount !== 1 ? ' competencies' : ' competency') +
           '</span>' +
           '<span>' +
           gradedCount +
@@ -317,6 +323,11 @@ window.MGrade = (function () {
 
   function filterAssessments(cid, mode) {
     if (mode) _segmentMode = mode;
+    // Recent is itself a date range, so it replaces the sheet's.
+    if (mode === 'recent' && _filters.dateRange !== 'all') {
+      _filters.dateRange = 'all';
+      _saveFilters(cid);
+    }
 
     var assessments = getAssessments(cid);
     var ctx = _filterCtx(cid);
@@ -412,9 +423,9 @@ window.MGrade = (function () {
     // One option per reporting term, after the fixed ranges. The list on
     // this screen follows the term; grades on mobile stay all-time.
     var dateOptions = [
-      { val: 'all', label: 'All time' },
-      { val: 'week', label: 'This week' },
-      { val: '30d', label: 'Last 30 days' },
+      { val: 'all', label: 'All Time' },
+      { val: 'week', label: 'This Week' },
+      { val: '30d', label: 'Last 30 Days' },
     ].concat(
       _terms(cid).map(function (t) {
         return { val: _termValue(t), label: t.label };
@@ -426,21 +437,25 @@ window.MGrade = (function () {
       'gradedStatus',
       [
         { val: 'all', label: 'All' },
-        { val: 'has-ungraded', label: 'Has ungraded' },
-        { val: 'fully-graded', label: 'Fully graded' },
+        { val: 'has-ungraded', label: 'Has Ungraded' },
+        { val: 'fully-graded', label: 'Fully Graded' },
       ],
       _sheetStaged.gradedStatus,
     );
 
+    // A class with no categories has nothing to filter by category.
+    var catSection = (categories || []).length
+      ? '<div class="m-filter-sheet-section">' +
+        '<div class="m-filter-sheet-title">Category</div>' +
+        '<div class="m-filter-strip m-filter-strip-wrap">' +
+        catPills +
+        '</div>' +
+        '</div>'
+      : '';
     return (
       '<div class="m-filter-sheet">' +
-      '<div class="m-filter-sheet-heading">Filter assessments</div>' +
-      '<div class="m-filter-sheet-section">' +
-      '<div class="m-filter-sheet-title">Category</div>' +
-      '<div class="m-filter-strip m-filter-strip-wrap">' +
-      catPills +
-      '</div>' +
-      '</div>' +
+      '<div class="m-filter-sheet-heading">Filter Assessments</div>' +
+      catSection +
       modSection +
       '<div class="m-filter-sheet-section">' +
       '<div class="m-filter-sheet-title">Date Range</div>' +
@@ -451,7 +466,7 @@ window.MGrade = (function () {
       statusSeg +
       '</div>' +
       '<div class="m-filter-sheet-footer">' +
-      '<button class="m-btn-ghost" data-action="m-grade-filter-clear">Clear all</button>' +
+      '<button class="m-btn-ghost" data-action="m-grade-filter-clear">Clear All</button>' +
       '<button class="m-btn-primary" data-action="m-grade-filter-apply">Apply</button>' +
       '</div>' +
       '</div>'
@@ -499,7 +514,9 @@ window.MGrade = (function () {
     _sheetStaged = null;
     _saveFilters(cid);
     MC.dismissSheet();
-    filterAssessments(cid);
+    // The sheet's filters apply to the whole list: Recent would otherwise
+    // keep hiding older work under them without a word.
+    filterAssessments(cid, _activeFilterCount() > 0 ? 'all' : null);
   }
 
   function clearFilterSheet(cid) {
@@ -610,7 +627,7 @@ window.MGrade = (function () {
               ', ' +
               name +
               '">' +
-              (val === 'NS' ? 'M' : val) +
+              label +
               '</button>'
             );
           };
@@ -762,22 +779,31 @@ window.MGrade = (function () {
       title: assessment.title,
       subtitle: _subtitleText(0, students.length),
       backLabel: 'Grade',
+      // The sync dot is the only place sync problems show, so the grading
+      // screen carries it too.
+      rightHTML:
+        '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>',
     });
 
     // Student thumbnail strip: a group's circle says G1, G2 … (P1 … for pairs).
+    var chipText = _thumbTexts(students, units);
     var thumbs = '<div class="m-thumb-strip" id="m-thumb-strip">';
     students.forEach(function (st, idx) {
       var unit = units[idx];
       var color = unit.view ? _GROUP_THUMB_COLOR : MC.avatarColor(st.id);
-      var initials = unit.view ? unit.thumb : MC.avatarInitials(st);
+      var initials = chipText[idx];
       var stScores = allScores[st.id] || [];
       var isGraded = stScores.some(function (s) {
         return s.assessmentId === aid && isScoreEntered(assessment, s);
       });
       var currentClass = idx === 0 ? ' m-thumb-current' : '';
       var gradedClass = isGraded ? ' m-thumb-graded' : '';
+      // A real button with the student's (or group's) name, so it can be
+      // reached with Tab and read aloud.
+      var thumbName = unit.view ? unit.view.label : displayNameWithLast(st);
       thumbs +=
-        '<div class="m-thumb' +
+        '<button type="button" class="m-thumb' +
+        (initials.length > 3 ? ' m-thumb-long' : '') +
         currentClass +
         gradedClass +
         '" style="background:' +
@@ -786,9 +812,15 @@ window.MGrade = (function () {
         idx +
         '" data-sid="' +
         st.id +
-        '">' +
+        '" aria-label="' +
+        MC.esc(thumbName) +
+        '" title="' +
+        MC.esc(thumbName) +
+        '"' +
+        (idx === 0 ? ' aria-current="true"' : '') +
+        '>' +
         MC.esc(initials) +
-        '</div>';
+        '</button>';
     });
     thumbs += '</div>';
 
@@ -920,6 +952,10 @@ window.MGrade = (function () {
             assessment.id +
             '" data-tid="' +
             tid +
+            '" aria-label="' +
+            level +
+            ', ' +
+            PROF_LABELS[level] +
             '">' +
             level +
             '</button>';
@@ -968,7 +1004,9 @@ window.MGrade = (function () {
         '" data-max="' +
         assessment.maxPoints +
         '" style="width:44px;height:44px;font-size:20px">−</button>' +
-        '<div style="display:flex;align-items:center;gap:6px"><input class="m-pts-input" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="\u2014" aria-label="Points out of ' +
+        '<div style="display:flex;align-items:center;gap:6px"><input class="m-pts-input" type="text" inputmode="decimal" enterkeyhint="next" autocomplete="off" placeholder="\u2014" aria-label="Points for ' +
+        MC.esc(unit && unit.view ? unit.view.label : displayNameWithLast(st)) +
+        ', out of ' +
         assessment.maxPoints +
         '" id="m-pts-' +
         st.id +
@@ -1013,7 +1051,7 @@ window.MGrade = (function () {
       assessment.id +
       '"' +
       (canSetAssignmentStatus(cid, st.id, assessment.id, 'NS') ? '' : ' disabled') +
-      '>M</button>' +
+      '>Missing</button>' +
       '<button class="m-status-pill' +
       (status === 'EXC' ? ' m-status-active' : '') +
       '" data-action="m-grade-status" data-val="EXC" data-sid="' +
@@ -1022,18 +1060,60 @@ window.MGrade = (function () {
       assessment.id +
       '"' +
       (canSetAssignmentStatus(cid, st.id, assessment.id, 'EXC') ? '' : ' disabled') +
-      '>EXC</button>' +
+      '>Excused</button>' +
       '<button class="m-status-pill' +
       (status === 'LATE' ? ' m-status-active' : '') +
       '" data-action="m-grade-status" data-val="LATE" data-sid="' +
       st.id +
       '" data-aid="' +
       assessment.id +
-      '">LATE</button>' +
-      '</div>';
+      '">Late</button>' +
+      '</div>' +
+      // Why Missing and Excused can't be picked, where they can't.
+      '<div class="m-status-hint" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      assessment.id +
+      '"' +
+      (canSetAssignmentStatus(cid, st.id, assessment.id, 'NS') ? ' hidden' : '') +
+      '>Clear the score and comment to mark Missing or Excused.</div>';
 
     // A group's members each have their own status, in the list above.
     if (unit && unit.view) statusRow = '';
+
+    // What the level numbers mean, in the class's order.
+    var levelKey = '';
+    if (rubric || /m-score-btns/.test(tagGroups)) {
+      levelKey =
+        '<div class="m-level-key">' +
+        levelOrderFor(cid)
+          .map(function (lv) {
+            return '<span><b>' + lv + '</b> ' + MC.esc(PROF_LABELS[lv]) + '</span>';
+          })
+          .join('') +
+        '</div>';
+    }
+
+    // The Overall Comment: the one feedback box on the work, as on the
+    // desktop (score.comment; it prints on the rubric handout).
+    var commentText = getScoreComment(cid, st.id, assessment.id);
+    var commentId = 'm-overall-' + st.id + '-' + assessment.id;
+    var commentRow =
+      '<div class="m-overall">' +
+      '<label class="m-overall-label" for="' +
+      commentId +
+      '">Overall Comment</label>' +
+      '<textarea class="m-overall-comment" id="' +
+      commentId +
+      '" rows="2" placeholder="Add an overall comment for ' +
+      MC.esc(unit && unit.view ? unit.view.label : displayNameFirst(st)) +
+      '" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      assessment.id +
+      '">' +
+      MC.esc(commentText) +
+      '</textarea></div>';
 
     return (
       '<div class="m-swiper-card" data-sid="' +
@@ -1044,7 +1124,9 @@ window.MGrade = (function () {
       '">' +
       header +
       tagGroups +
+      levelKey +
       statusRow +
+      commentRow +
       '</div></div>'
     );
   }
@@ -1128,7 +1210,10 @@ window.MGrade = (function () {
       assessment.id +
       '" aria-pressed="' +
       rubricOn +
-      '">Rubric</button></div></div>'
+      '">Rubric</button></div>' +
+      '<div class="m-grade-view-hint">' +
+      (rubricOn ? 'One score for each rubric criterion.' : 'One score for each competency the work assesses.') +
+      '</div></div>'
     );
   }
 
@@ -1191,6 +1276,10 @@ window.MGrade = (function () {
         assessment.id +
         '" data-critid="' +
         crit.id +
+        '" aria-label="' +
+        level +
+        ', ' +
+        PROF_LABELS[level] +
         '">' +
         level +
         '</button>';
@@ -1330,6 +1419,10 @@ window.MGrade = (function () {
       var on = btn.getAttribute('data-view') === view;
       btn.classList.toggle('m-seg-active', on);
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('.m-grade-view-hint').forEach(function (hint) {
+      hint.textContent =
+        view === 'tags' ? 'One score for each competency the work assesses.' : 'One score for each rubric criterion.';
     });
     var assessment = getAssessments(cid).find(function (a) {
       return a.id === aid;
@@ -1647,8 +1740,45 @@ window.MGrade = (function () {
       if (e.target === selectOnUp) e.preventDefault();
       selectOnUp = null;
     });
+    // An avatar tap moves on the finger lifting, not only on the click the
+    // browser may swallow while the strip or the screen is still moving
+    // (the first tap after opening was often lost). A drag along the strip
+    // is not a tap. Jumping twice to the same student is harmless.
+    var strip = document.getElementById('m-thumb-strip');
+    if (strip) {
+      var down = null;
+      strip.addEventListener('pointerdown', function (e) {
+        down = { x: e.clientX, y: e.clientY };
+      });
+      strip.addEventListener('pointerup', function (e) {
+        var thumb = e.target.closest('.m-thumb');
+        var moved = down ? Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y) : 99;
+        down = null;
+        if (!thumb || moved > 10) return;
+        jumpToStudent(parseInt(thumb.getAttribute('data-idx'), 10));
+      });
+    }
+    _installArrowKeys();
+    var lastCard =
+      typeof swiper.querySelector === 'function'
+        ? swiper.querySelector('.m-swiper-card:last-child .m-pts-input')
+        : null;
+    if (lastCard) lastCard.setAttribute('enterkeyhint', 'done');
+    // Enter saves and moves to the next student's points, as Enter does in
+    // the desktop grader; on the last student it just saves. Escape puts
+    // the score back.
     swiper.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && e.target.classList.contains('m-pts-input')) e.target.blur();
+      if (!e.target.classList.contains('m-pts-input')) return;
+      if (e.key === 'Escape') {
+        e.target.dataset.revert = '1';
+        e.target.blur();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var inp = e.target;
+        inp.blur();
+        _nextStudentPoints(swiper, inp);
+      }
     });
     // The % follows the typing, as on the desktop.
     swiper.addEventListener('input', function (e) {
@@ -1658,9 +1788,20 @@ window.MGrade = (function () {
       _updatePointsPct(inp.dataset.sid, inp.dataset.aid, parsePointsInput(inp.value, max), max);
     });
     swiper.addEventListener('focusout', function (e) {
+      if (e.target.classList.contains('m-overall-comment')) return _saveOverallComment(cid, e.target);
       if (!e.target.classList.contains('m-pts-input')) return;
       selectOnUp = null;
       commitPointsInput(cid, e.target);
+    });
+    // The Overall Comment saves as the teacher types and when they leave it.
+    swiper.addEventListener('input', function (e) {
+      if (!e.target.classList.contains('m-overall-comment')) return;
+      var el = e.target;
+      var key = el.dataset.sid + ':' + el.dataset.aid;
+      clearTimeout(_commentTimers[key]);
+      _commentTimers[key] = setTimeout(function () {
+        _saveOverallComment(cid, el);
+      }, 800);
     });
 
     swiper.addEventListener(
@@ -1682,6 +1823,107 @@ window.MGrade = (function () {
     );
   }
 
+  // ← and → move between students on the grading screen, unless the
+  // cursor is in a text field. Installed once; it acts only while the
+  // grading screen is the open one and no sheet is up.
+  var _arrowKeysOn = false;
+  function _installArrowKeys() {
+    if (_arrowKeysOn) return;
+    _arrowKeysOn = true;
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      var screen = document.getElementById('m-screen-grade-swiper');
+      if (!screen || screen.offsetParent === null || screen.nextElementSibling) return;
+      var backdrop = document.getElementById('m-sheet-backdrop');
+      if (backdrop && !backdrop.classList.contains('u-hidden')) return;
+      if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+      var total = document.querySelectorAll('#m-thumb-strip .m-thumb').length;
+      var next = _currentIdx + (e.key === 'ArrowRight' ? 1 : -1);
+      if (next < 0 || next >= total) return;
+      e.preventDefault();
+      jumpToStudent(next);
+    });
+  }
+
+  /* Each chip's letters: the initials, or, where students share them (two
+     JC), the shortest start of the first name, with the last initial, that
+     tells them apart ("JaC" and "JoC"; "JasC" and "JaqC"), else of the last
+     name ("JCha" and "JChe"). A group's chip keeps its G1 / P1. */
+  function _thumbTexts(students, units) {
+    var first = function (st) {
+      return String(st.preferred || st.firstName || '');
+    };
+    var last = function (st) {
+      return String(st.lastName || '');
+    };
+    var cap = function (s) {
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+    var out = students.map(function (st, i) {
+      return units[i] && units[i].view ? units[i].thumb : MC.avatarInitials(st);
+    });
+    var groups = {};
+    out.forEach(function (txt, i) {
+      if (units[i] && units[i].view) return;
+      (groups[txt] = groups[txt] || []).push(i);
+    });
+    Object.keys(groups).forEach(function (key) {
+      var idxs = groups[key];
+      if (idxs.length < 2) return;
+      var ways = [];
+      for (var k = 2; k <= 5; k++) {
+        ways.push(
+          (function (n) {
+            return function (st) {
+              return cap(first(st).slice(0, n)) + last(st).charAt(0).toUpperCase();
+            };
+          })(k),
+        );
+      }
+      for (var m = 2; m <= 5; m++) {
+        ways.push(
+          (function (n) {
+            return function (st) {
+              return first(st).charAt(0).toUpperCase() + cap(last(st).slice(0, n));
+            };
+          })(m),
+        );
+      }
+      idxs.forEach(function (i) {
+        var st = students[i];
+        var mine = null;
+        for (var w = 0; w < ways.length && !mine; w++) {
+          var t = ways[w](st);
+          var clash = idxs.some(function (j) {
+            return j !== i && ways[w](students[j]) === t;
+          });
+          if (!clash) mine = t;
+        }
+        out[i] = mine || key;
+      });
+    });
+    return out;
+  }
+
+  function _nextStudentPoints(swiper, inp) {
+    var cards = Array.prototype.slice.call(swiper.querySelectorAll('.m-swiper-card'));
+    var idx = cards.indexOf(inp.closest('.m-swiper-card'));
+    if (idx < 0 || idx >= cards.length - 1) return;
+    jumpToStudent(idx + 1);
+    var next = cards[idx + 1].querySelector('.m-pts-input');
+    if (next) next.focus({ preventScroll: true });
+  }
+
+  var _commentTimers = {};
+  function _saveOverallComment(cid, el) {
+    var key = el.dataset.sid + ':' + el.dataset.aid;
+    clearTimeout(_commentTimers[key]);
+    delete _commentTimers[key];
+    var text = el.value.trim();
+    if (text === getScoreComment(cid, el.dataset.sid, el.dataset.aid)) return;
+    saveScoreComment(cid, el.dataset.sid, el.dataset.aid, text);
+  }
+
   // `instant` lands on the student with no scroll animation.
   function jumpToStudent(idx, instant) {
     var swiper = document.getElementById('m-swiper');
@@ -1696,6 +1938,8 @@ window.MGrade = (function () {
     var thumbs = document.querySelectorAll('#m-thumb-strip .m-thumb');
     thumbs.forEach(function (t, i) {
       t.classList.toggle('m-thumb-current', i === idx);
+      if (i === idx) t.setAttribute('aria-current', 'true');
+      else t.removeAttribute('aria-current');
     });
     // Scroll thumb into view
     var current = thumbs[idx];
@@ -1716,6 +1960,9 @@ window.MGrade = (function () {
     // A score just changed: M and EXC grey out once the work has one.
     document.querySelectorAll('.m-status-pill[data-aid="' + aid + '"]').forEach(function (pill) {
       pill.disabled = !canSetAssignmentStatus(cid, pill.dataset.sid, aid, pill.dataset.val);
+    });
+    document.querySelectorAll('.m-status-hint[data-aid="' + aid + '"]').forEach(function (hint) {
+      hint.hidden = canSetAssignmentStatus(cid, hint.dataset.sid, aid, 'NS');
     });
     var allScores = getScores(cid);
     var assessment = getAssessments(cid).find(function (a) {
@@ -1794,13 +2041,30 @@ window.MGrade = (function () {
     var sid = inp.dataset.sid;
     var aid = inp.dataset.aid;
     var max = parseFloat(inp.dataset.max) || 100;
-    var raw = parsePointsInput(inp.value, max, getPointsScore(cid, sid, aid));
+    var prev = getPointsScore(cid, sid, aid);
+    // Escape puts the saved score back without saving.
+    var raw = inp.dataset.revert ? prev : parsePointsInput(inp.value, max, prev);
+    delete inp.dataset.revert;
     inp.value = raw != null ? formatPoints(raw) : '';
     _updatePointsPct(sid, aid, raw, max);
-    if (raw === getPointsScore(cid, sid, aid)) return;
+    if (raw === prev) return;
     setPointsScore(cid, sid, aid, raw);
     clearProfCache();
     _updateThumbGraded(cid, aid);
+    // Emptying the box clears the score; Undo puts it back, as a level does.
+    if (raw == null && prev != null) {
+      MC.showToast('Score cleared', {
+        onUndo: function () {
+          setPointsScore(cid, sid, aid, prev);
+          clearProfCache();
+          var box = document.getElementById(inp.id) || inp;
+          box.value = formatPoints(prev);
+          _updatePointsPct(sid, aid, prev, max);
+          _updateThumbGraded(cid, aid);
+        },
+        duration: 5000,
+      });
+    }
   }
 
   /* ── Press and hold a level (Nov 2 mockup, batch 2) ──────────────

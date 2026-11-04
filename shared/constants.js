@@ -310,9 +310,9 @@ function designationInfo(code) {
 }
 
 const PROF_LABELS = { 0: 'No Evidence', 1: 'Emerging', 2: 'Developing', 3: 'Proficient', 4: 'Extending' };
-// A level's short code, as the roster beside the names shows it. 0 is
-// Incomplete: nothing scored yet.
-const PROF_CODES = { 0: 'IC', 1: 'EMG', 2: 'DEV', 3: 'PRF', 4: 'EXT' };
+// A level's short code, as the roster beside the names shows it. 0 is IE,
+// Insufficient Evidence, as BC reports say it: nothing scored yet.
+const PROF_CODES = { 0: 'IE', 1: 'EMG', 2: 'DEV', 3: 'PRF', 4: 'EXT' };
 
 /* Rubric Levels: the order a class draws the four levels, wherever it draws
    them (scoring cards, the rubric editor, printed rubrics, reports, the
@@ -927,7 +927,7 @@ function obsTagColor(key) {
 const WIDGET_REGISTRY = [
   { key: 'hero', label: 'Name & Proficiency', defaultOn: true },
   { key: 'sectionBars', label: 'Section Progress', defaultOn: true },
-  { key: 'completion', label: 'Completion', defaultOn: true },
+  { key: 'completion', label: 'Evidence Coverage', defaultOn: true },
   { key: 'missingWork', label: 'Missing Work', defaultOn: false },
   { key: 'growth', label: 'Growth Journey', defaultOn: true },
   { key: 'obsSnippet', label: 'Latest Observation', defaultOn: true },
@@ -939,7 +939,7 @@ const WIDGET_REGISTRY = [
   { key: 'concerns', label: 'Concerns', defaultOn: false },
   { key: 'workHabits', label: 'Work Habits & Participation', defaultOn: false },
   { key: 'growthAreas', label: 'Growth Areas', defaultOn: false },
-  { key: 'narrative', label: 'Teacher Narrative', defaultOn: false },
+  { key: 'narrative', label: 'Teacher Comment', defaultOn: false },
   { key: 'actions', label: 'Action Buttons', defaultOn: true },
 ];
 const WIDGET_KEYS = WIDGET_REGISTRY.map(function (w) {

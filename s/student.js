@@ -48,7 +48,8 @@ var StudentPage = (function () {
   var CODE_RE = /^[ABCDEFGHJKMNPQRTUVWXYZ2346789]{6}$/;
 
   var MESSAGES = {
-    not_found: "That code didn't work. Check the letters and numbers on your slip, or ask your teacher for a new slip.",
+    not_found:
+      "That code didn't work. Check the letters and numbers on your slip. If you have a newer slip, use that one. If not, ask your teacher for a new slip.",
     used: 'This slip has already been used. Ask your teacher for a new slip if you need to change something.',
     closed: 'These questions are closed now. Ask your teacher if you still need to answer.',
     not_open_yet: 'These questions are not open yet.',
@@ -132,9 +133,48 @@ var StudentPage = (function () {
 
   function allQuestions(data) {
     var out = [];
+    var skip = noGoalQuestions(data);
     ((data && data.parts) || []).forEach(function (p) {
       (p.questions || []).forEach(function (q) {
-        out.push(q);
+        if (!skip[q.id]) out.push(q);
+      });
+    });
+    return out;
+  }
+
+  /* A Goal Check-In's part is grouped as the phone shows it: a goal status
+     question and the ones after it, then a Core Competency pick and the
+     ones after it. */
+  function goalGroups(part) {
+    var groups = [];
+    var cur = null;
+    (part.questions || []).forEach(function (q) {
+      if (q.kind === 'goal_status' || q.kind === 'core_pick' || !cur) {
+        cur = { lead: q.kind, items: [] };
+        groups.push(cur);
+      }
+      cur.items.push(q);
+    });
+    return groups;
+  }
+
+  function hasCourseGoal(data) {
+    var goal = data && data.context && data.context.course_goal;
+    return !!(goal && String(goal.text || '').trim());
+  }
+
+  /* With no course goal written yet there is nothing to check on: the goal
+     status and its next step are left out ({question id: true}). */
+  function noGoalQuestions(data) {
+    var out = {};
+    if (!data || !data.parts || hasCourseGoal(data)) return out;
+    data.parts.forEach(function (p) {
+      if (p.kind !== 'goal_checkin') return;
+      goalGroups(p).forEach(function (g) {
+        if (g.lead !== 'goal_status') return;
+        g.items.forEach(function (q) {
+          out[q.id] = true;
+        });
       });
     });
     return out;
@@ -681,19 +721,21 @@ var StudentPage = (function () {
      question) and the Core Competency goal (from its pick). */
   function goalSections(state, part) {
     var course = state.data.course.name;
-    var qs = part.questions || [];
-    var groups = [];
-    var cur = null;
-    qs.forEach(function (q) {
-      if (q.kind === 'goal_status' || q.kind === 'core_pick' || !cur) {
-        cur = { lead: q.kind, items: [] };
-        groups.push(cur);
-      }
-      cur.items.push(q);
-    });
+    var groups = goalGroups(part);
     return groups
       .map(function (g) {
         var html = '<section class="sp-card">';
+        if (g.lead === 'goal_status' && !hasCourseGoal(state.data)) {
+          // No goal to check on: say so instead of asking how it is going.
+          return (
+            html +
+            '<h2 class="sp-h2">' +
+            esc('My ' + course + ' Goal') +
+            '</h2><p class="sp-note">' +
+            esc('You haven’t written a ' + course + ' goal yet, so there is nothing to check on here.') +
+            '</p></section>'
+          );
+        }
         if (g.lead === 'goal_status') {
           html += '<h2 class="sp-h2">' + esc('My ' + course + ' Goal') + '</h2>';
           var goal = state.data.context && state.data.context.course_goal;
@@ -1187,13 +1229,57 @@ var StudentPage = (function () {
     // html-safe: this file's render (the name is shared): every screen escapes server and typed text with esc; q.id is a question uuid; PhoneReportView.html escapes the report.
     root.innerHTML = render(S);
     root.querySelectorAll('textarea.sp-text').forEach(grow);
+    rovingRadios(root);
     var f = focusSel ? root.querySelector(focusSel) : null;
     if (f && f.focus) f.focus({ preventScroll: false });
+  }
+
+  /* Each set of choices is one Tab stop, as a radio group is: the chosen
+     one, or the first; the arrow keys move inside it. */
+  function rovingRadios(el) {
+    el.querySelectorAll('[role="radiogroup"]').forEach(function (g) {
+      var radios = Array.prototype.slice.call(g.querySelectorAll('[role="radio"]'));
+      if (!radios.length) return;
+      var on = radios.filter(function (r) {
+        return r.getAttribute('aria-checked') === 'true';
+      })[0];
+      radios.forEach(function (r) {
+        r.setAttribute('tabindex', r === (on || radios[0]) ? '0' : '-1');
+      });
+    });
   }
 
   function grow(el) {
     el.style.height = 'auto';
     el.style.height = el.scrollHeight + 2 + 'px';
+  }
+
+  /* A slip that locked on this phone stays locked when the page is opened
+     again (the server says so only after another try). */
+  function lockKey(code) {
+    return 'fv-s-locked-' + code;
+  }
+  function slipLockedHere(code) {
+    try {
+      return !!localStorage.getItem(lockKey(code));
+    } catch (e) {
+      return false;
+    }
+  }
+  function markSlipLocked(code) {
+    try {
+      localStorage.setItem(lockKey(code), '1');
+    } catch (e) {
+      /* private mode: the server still refuses it */
+    }
+  }
+
+  /* "2 tries left." and, before the last, what happens after it. */
+  function triesLeftText(n) {
+    if (n == null) return '';
+    if (n === 1)
+      return ' 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.';
+    return ' ' + n + ' tries left.';
   }
 
   function openCode(code) {
@@ -1214,6 +1300,11 @@ var StudentPage = (function () {
         S.data = res;
         S.screen = 'rcheck';
         S.message = '';
+        paint();
+      } else if (res && res.ok && res.check && slipLockedHere(c)) {
+        // Locked on this phone already: say so now, not after another try.
+        S.message = MESSAGES.slip_locked;
+        S.screen = 'message';
         paint();
       } else if (res && res.ok) {
         S.data = res;
@@ -1354,10 +1445,9 @@ var StudentPage = (function () {
         return;
       }
       var e = res && res.error;
+      if (e === 'slip_locked' && !S.demo) markSlipLocked(S.code);
       if (e === 'wrong_identity') {
-        S.message =
-          MESSAGES[by === 'password' ? 'wrong_password' : 'wrong_identity'] +
-          (res.tries_left != null ? ' ' + res.tries_left + (res.tries_left === 1 ? ' try' : ' tries') + ' left.' : '');
+        S.message = MESSAGES[by === 'password' ? 'wrong_password' : 'wrong_identity'] + triesLeftText(res.tries_left);
       } else {
         S.message = messageFor(res);
         if (e !== 'network' && e !== 'busy') S.screen = 'message';
@@ -1590,7 +1680,24 @@ var StudentPage = (function () {
     openCode(input ? input.value : '');
   }
 
+  var ARROWS = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
   function onKeydown(e) {
+    // Arrow keys, Home and End choose within a set of choices.
+    var t = e.target;
+    var group = t && t.getAttribute && t.getAttribute('role') === 'radio' && t.closest('[role="radiogroup"]');
+    if (group && (ARROWS[e.key] || e.key === 'Home' || e.key === 'End')) {
+      var radios = Array.prototype.slice.call(group.querySelectorAll('[role="radio"]'));
+      var i = radios.indexOf(t);
+      var n =
+        e.key === 'Home'
+          ? 0
+          : e.key === 'End'
+            ? radios.length - 1
+            : (i + ARROWS[e.key] + radios.length) % radios.length;
+      e.preventDefault();
+      if (radios[n]) radios[n].click();
+      return;
+    }
     // Enter in "Another" adds it instead of submitting anything.
     if (e.key === 'Enter' && e.target && /-other$/.test(e.target.id || '')) {
       e.preventDefault();

@@ -301,7 +301,7 @@ test.describe('Page Studio', () => {
     await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toHaveText('Noor Al-Rashid');
   });
 
-  test('a click selects a block and shows its inspector at the top right; Remove takes it off with Undo; the palette removes it or adds it', async ({
+  test('a click selects a block and shows its inspector at the top right; Remove takes it off with Undo; the palette finds it or adds it', async ({
     page,
   }) => {
     await openStudio(page);
@@ -347,12 +347,21 @@ test.describe('Page Studio', () => {
     await expect(page.locator('#undo-toast')).toContainText('Removed Proficiency Legend');
     await undo(page).click();
     expect(await rowsOf(page, 0)).toContain('legend');
-    // Clicking a placed block in the palette takes it off; Undo puts it back.
+    // Clicking a placed block in the palette finds it on the page: selected,
+    // with its card, and nothing removed (step 4 group 2 #8).
+    await cellOf(page, 'header').click();
     await page.locator('[data-action="studioBlock"][data-block="legend"]').click();
-    await expect(page.locator('.sheet-cell[data-block="legend"]')).toHaveCount(0);
-    await expect(page.locator('#undo-toast')).toContainText('Removed Proficiency Legend');
-    await undo(page).click();
+    await expect(cellOf(page, 'legend')).toHaveClass(/studio-sel/);
+    await expect(cellOf(page, 'legend')).toBeFocused();
+    await expect(bar(page).locator('.studio-bar-name')).toHaveText('Proficiency Legend');
     expect(await rowsOf(page, 0)).toContain('legend');
+    await expect(page.locator('[data-action="studioBlock"][data-block="legend"]')).toHaveClass(/placed/);
+    // From Everyone it opens One Student on the block.
+    await page.locator('.studio-view [data-view="all"]').click();
+    await page.locator('[data-action="studioBlock"][data-block="missing-work"]').click();
+    await expect(page.locator('.report-sheet')).toHaveCount(2);
+    await expect(page.locator('.studio-view [data-view="one"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(cellOf(page, 'missing-work')).toHaveClass(/studio-sel/);
     // A block from the palette lands in its own row at the end of the Front when it has room.
     await page.locator('[data-action="studioBlock"][data-block="support-home"]').click();
     expect((await rowsOf(page, 0)).slice(-1)).toEqual(['support-home']);
@@ -477,10 +486,14 @@ test.describe('Page Studio', () => {
       'teacher-narrative',
       'missing-work/half',
     ]);
+    // The Back has no room left for the Legend with the Response measured
+    // as it prints (step 4 group 2 #5): take the Self-Assessment off first.
+    await cellOf(page, 'self-assessment').click();
+    await bar(page).getByRole('button', { name: 'Remove' }).click();
     await cellOf(page, 'legend').click();
     await bar(page).getByRole('button', { name: 'Move to Back' }).click();
-    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'grade-table', 'legend', 'parent-response']);
-    await expect(page.locator('#studio-live')).toHaveText('Proficiency Legend, Back, row 3 of 4.');
+    expect(await rowsOf(page, 1)).toEqual(['grade-table', 'legend', 'parent-response']);
+    await expect(page.locator('#studio-live')).toHaveText('Proficiency Legend, Back, row 2 of 3.');
     await cellOf(page, 'legend').click();
     await expect(bar(page)).toContainText('On the Back');
     await expect(bar(page).getByRole('button', { name: 'Move to Front' })).toBeVisible();
@@ -553,10 +566,32 @@ test.describe('Page Studio', () => {
     await undo(page).click();
     await expect(page.getByRole('radio', { name: 'Front and Back' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
+    // Front Only, then Front and Back, puts the Back's blocks back on the
+    // Back (step 4 group 2 #4).
+    const before = [await rowsOf(page, 0), await rowsOf(page, 1)];
+    await page.getByRole('radio', { name: 'Front Only' }).click();
+    await expect(page.locator('#studio-fit .studio-fit-link')).toHaveText('Continues on the back for 27 students');
+    await page.getByRole('radio', { name: 'Front and Back' }).click();
+    await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
+    expect([await rowsOf(page, 0), await rowsOf(page, 1)]).toEqual(before);
     // Interim Update is one side: the fit line says so.
     await applyTemplate(page, 'interim-update');
     await expect(page.locator('#studio-fit')).toHaveText('Front only · 1 page for all 27 students');
     await expect(page.locator('.sheet-label').nth(1)).toHaveText('Blank');
+  });
+
+  test('the docked Response is measured as it prints, so under Front Only it never runs past the foot (step 4 group 2 #5)', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    await page.getByRole('radio', { name: 'Front Only' }).click();
+    await showAllStudents(page);
+    const pinned = await page
+      .locator('.sheet-pinned')
+      .evaluateAll(rows => rows.map(r => r.offsetHeight - parseFloat(r.style.minHeight)));
+    expect(pinned.length).toBeGreaterThan(0);
+    expect(pinned.filter(d => Math.abs(d) > 1)).toEqual([]);
+    expect(await overflowing(page)).toEqual([]);
   });
 
   test('the Conference Pack’s grade table does not fit its side: it continues for every student', async ({ page }) => {
@@ -600,6 +635,41 @@ test.describe('Page Studio', () => {
       'rgb(255, 255, 255)',
     );
     await page.emulateMedia({ colorScheme: 'light' });
+  });
+
+  test('Escape closes the block card and the phone Blocks panel; Tab stays in the Print Reports dialog (step 4 group 3 #64)', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    const legend = cellOf(page, 'legend');
+    await legend.click();
+    await expect(bar(page)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.studio-bar')).toHaveCount(0);
+    await expect(legend).not.toHaveClass(/studio-sel/);
+    await expect(legend).toBeFocused();
+    // The print dialog keeps Tab and Shift-Tab inside it.
+    await page.getByRole('button', { name: 'Print Reports' }).click();
+    const dialog = page.locator('#issue-overlay');
+    await expect(dialog).toBeVisible();
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press('Tab');
+      expect(await dialog.evaluate(d => d.contains(document.activeElement))).toBe(true);
+    }
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press('Shift+Tab');
+      expect(await dialog.evaluate(d => d.contains(document.activeElement))).toBe(true);
+    }
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    // On a phone, Escape closes the Blocks panel.
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: 'Blocks', exact: true }).click();
+    await expect(page.locator('#studio-palette')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#studio-palette')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Blocks', exact: true })).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('every block, the letterhead too, is reached by Tab and selected with Enter', async ({ page }) => {
@@ -731,10 +801,20 @@ test.describe('Page Studio', () => {
     await expect(dialog.getByRole('radio', { name: /Preferred Name/ })).toBeChecked();
     await dialog.getByRole('radio', { name: 'First Name', exact: true }).check();
     await expect(jas.first()).toHaveText('Jasper Gill');
+    // Cancel and Escape change nothing: the class keeps the name it had
+    // (step 4 group 2 #6).
     await dialog.locator('[data-issue="cancel"]').click();
     await expect(dialog).toHaveCount(0);
+    await expect(jas.first()).toHaveText('Jas Gill');
     await page.getByRole('button', { name: 'Print Reports' }).click();
-    await expect(dialog.getByRole('radio', { name: 'First Name', exact: true })).toBeChecked();
+    await expect(dialog.getByRole('radio', { name: /Preferred Name/ })).toBeChecked();
+    await dialog.getByRole('radio', { name: 'First Name', exact: true }).check();
+    await expect(jas.first()).toHaveText('Jasper Gill');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(jas.first()).toHaveText('Jas Gill');
+    await page.getByRole('button', { name: 'Print Reports' }).click();
+    await expect(dialog.getByRole('radio', { name: /Preferred Name/ })).toBeChecked();
   });
 
   test('a long comment typed on the questionnaire continues on the printed report, nothing is cut', async ({
@@ -893,6 +973,20 @@ test.describe('Page Studio', () => {
     await expect(cellOf(page, 'teacher-narrative').locator('.report-comment-box')).toHaveCount(1);
   });
 
+  test('the rail’s sheet badges follow the class fit after + Page and its removal (step 4 group 2 #9)', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    const badges = page.locator('#gb-sidebar .student-row-sheets');
+    await page.locator('.studio-page-add').click();
+    await showEveryone(page, 4);
+    await expect(badges.filter({ hasText: '2 sheets' })).toHaveCount(STUDENTS);
+    await page.locator('.studio-view [data-view="one"]').click();
+    await page.locator('.studio-page-empty').click();
+    await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
+    await expect(badges.filter({ hasText: '2 sheets' })).toHaveCount(0);
+  });
+
   test('+ Page adds an empty side with Empty · Remove, which takes it away', async ({ page }) => {
     await openStudio(page);
     await page.locator('.studio-page-add').click();
@@ -902,6 +996,8 @@ test.describe('Page Studio', () => {
     const empty = page.locator('.studio-page-empty');
     await expect(empty).toHaveText('Empty · Remove');
     await expect(empty).toHaveCount(1);
+    await cellOf(page, 'self-assessment').click();
+    await bar(page).getByRole('button', { name: 'Remove' }).click();
     await cellOf(page, 'legend').click();
     await bar(page).getByRole('button', { name: 'Move to Back' }).click();
     expect(await rowsOf(page, 1)).toContain('legend');

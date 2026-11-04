@@ -105,7 +105,7 @@ describe('points work prints its own % on the report blocks', () => {
     // A Both class prints the % too, so it ranks the same way.
     seed('both', pieces, scores);
     expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toContain(
-      'Best work: Quiz Q (Oct 1), 3.0 / 4 · 85%.',
+      'Best work: Quiz Q (Oct 1), 17/20 · 85%.',
     );
     // A Proficiency class ranks by level: the 3+ is the best work.
     seed('proficiency', pieces, scores);
@@ -114,9 +114,10 @@ describe('points work prints its own % on the report blocks', () => {
     );
   });
 
-  it('leaves a Proficiency class as it was', () => {
+  it('a Proficiency class names points work at its points, as Assignment Grades prints it', () => {
     seed('proficiency', [quiz('A', '2026-10-01'), quiz('B', '2026-10-05')], [sc('A', 16), sc('B', 17)]);
     const prof = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
-    expect(prof).toContain('Best work: Quiz A (Oct 1) and Quiz B (Oct 5), 3.0 / 4.');
+    // Step 4 group 2 #3: the whole piece's mark, the higher of the two.
+    expect(prof).toContain('Best work: Quiz B (Oct 5), 17/20.');
   });
 });

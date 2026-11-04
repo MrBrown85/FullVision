@@ -507,6 +507,27 @@ describe('capture strip', () => {
     expect(st.dims).toEqual(['engagement', 'selfRegulation']);
   });
 
+  it('#word that names no tag says so and offers + New Tag; Enter still adds the observation', () => {
+    const made = [];
+    setGlobal('addCustomTag', (cid, label) => made.push(label));
+    const cap = mount({ students: ['s1'] });
+    type(cap, 'Asked a good question #curious');
+    const box = cap.el.querySelector('#capture-suggest');
+    expect(box.textContent).toContain('No tag called “curious” yet.');
+    expect(suggestLabels(cap)).toEqual(['+ New Tag “curious”']);
+    expect(cap.el.querySelector('#capture-suggest .is-active')).toBeNull();
+    click(cap.el.querySelector('#capture-suggest [data-obsc="pickSuggest"][data-value="0"]'));
+    expect(made).toEqual(['curious']);
+    expect(cap.getState().dims).toEqual(['tag:curious']);
+    expect(cap.getText()).toBe('Asked a good question ');
+
+    // Not picked: Enter sends with the word as typed, as before.
+    const cap2 = mount({ students: ['s1'] });
+    type(cap2, 'Keen #zzz');
+    press(cap2, 'Enter');
+    expect(added.at(-1).text).toBe('Keen #zzz');
+  });
+
   it('the arrows reach Edit My Starters…, and it opens My Sentence Starters', () => {
     withStarters();
     const navigated = [];
@@ -594,6 +615,24 @@ describe('capture strip', () => {
     click(offer.querySelector('[data-obsc="flag"]'));
     expect(flagged.s1).toBe(true);
     expect(cap.el.querySelector('[data-part="flag"]').textContent).toBe('');
+  });
+
+  it('Flag redraws the roster and offers an Undo that takes the flag off', () => {
+    const toasts = [];
+    let rosterDraws = 0;
+    setGlobal('showUndoToast', (msg, undo) => toasts.push({ msg, undo }));
+    setGlobal('refreshRosterRows', () => rosterDraws++);
+    const cap = mount({ students: ['s1'] });
+    click(cap.el.querySelector('[data-obsc="type"][data-value="concern"]'));
+    type(cap, 'Did not start the task');
+    cap.submit();
+    click(cap.el.querySelector('[data-part="flag"] [data-obsc="flag"]'));
+    expect(flagged.s1).toBe(true);
+    expect(rosterDraws).toBe(1);
+    expect(toasts.map(t => t.msg)).toEqual(['Mei flagged']);
+    toasts[0].undo();
+    expect(flagged.s1).toBe(false);
+    expect(rosterDraws).toBe(2);
   });
 
   it('Not Now dismisses the flag offer without flagging', () => {

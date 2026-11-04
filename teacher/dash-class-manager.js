@@ -1277,19 +1277,34 @@ window.DashClassManager = (function () {
   }
 
   /* ── Class Manager Student Functions ────────────────────── */
-  function cmShowAddStudent() {
+  function cmShowAddStudent(added) {
     var form = document.getElementById('cm-add-student-form');
     if (form) {
       form.style.display = 'block';
+      var status = document.getElementById('cm-add-status');
+      if (status)
+        status.textContent = added ? 'Added ' + added + '. Type the next student, or press Escape to close.' : '';
       var el = document.getElementById('cm-add-first');
       if (el) el.focus();
     }
+  }
+
+  // Cancel or Escape closes the form and puts the focus back on Add Student.
+  function cmCloseAddStudent() {
+    var form = document.getElementById('cm-add-student-form');
+    if (!form || form.style.display === 'none') return false;
+    cmCancelStudent();
+    var btn = document.querySelector('.cm-roster-add');
+    if (btn) btn.focus();
+    return true;
   }
 
   function cmCancelStudent() {
     cmEditingStudentId = null;
     var form = document.getElementById('cm-add-student-form');
     if (form) form.style.display = 'none';
+    var status = document.getElementById('cm-add-status');
+    if (status) status.textContent = '';
     var btn = document.getElementById('cm-save-btn');
     if (btn) btn.textContent = 'Save';
     ['cm-add-first', 'cm-add-last', 'cm-add-pref', 'cm-add-num', 'cm-add-dob', 'cm-add-email'].forEach(function (id) {
@@ -1329,6 +1344,7 @@ window.DashClassManager = (function () {
     });
     var students = getStudents(cmSelectedCourse);
     var sortName = ((lastName || '') + ' ' + firstName).trim();
+    var adding = !cmEditingStudentId;
 
     if (cmEditingStudentId) {
       var st = students.find(function (s) {
@@ -1367,6 +1383,12 @@ window.DashClassManager = (function () {
     saveStudents(cmSelectedCourse, students);
     cmCancelStudent();
     renderClassManager();
+    // A new student leaves the form open with the focus in First Name, so a
+    // roster can be typed one student after another without the mouse.
+    if (adding) {
+      cmShowAddStudent(((preferred || firstName) + ' ' + lastName).trim());
+      return;
+    }
     requestAnimationFrame(function () {
       var detail = document.querySelector('.cm-detail');
       if (detail) detail.scrollTop = 0;
@@ -1703,6 +1725,23 @@ window.DashClassManager = (function () {
     if (sum) sum.textContent = _cmRosterSummary(cid);
   }
 
+  /* What a roster box holds on record now, or null when it isn't a field. */
+  function _cmRosterSavedValue(el) {
+    var cid = cmSelectedCourse;
+    var col = el.dataset.col;
+    if (!cid) return null;
+    if (col === 'g0' || col === 'g1') {
+      var g = _cmGuardiansFor(cid, el.dataset.sid)[col === 'g0' ? 0 : 1];
+      return g ? g.email || '' : '';
+    }
+    var key = ROSTER_FIELD[col];
+    if (!key) return null;
+    var st = getStudents(cid).find(function (s) {
+      return s.id === el.dataset.sid;
+    });
+    return st ? st[key] || '' : null;
+  }
+
   function _cmSaveGuardianEmail(cid, el, email) {
     var idx = el.dataset.col === 'g0' ? 0 : 1;
     var g = _cmGuardiansFor(cid, el.dataset.sid)[idx];
@@ -1880,6 +1919,12 @@ window.DashClassManager = (function () {
       if (_cmCloseRosterPicker()) {
         e.preventDefault();
         return true;
+      }
+      // Escape cancels, as in the gradebook: the box goes back to what is
+      // saved before it loses focus, so the blur has nothing to save.
+      if (el.type !== 'checkbox') {
+        var saved = _cmRosterSavedValue(el);
+        if (saved !== null) el.value = saved;
       }
       el.blur();
       return true;
@@ -2663,9 +2708,11 @@ window.DashClassManager = (function () {
   }
 
   /* `tab` opens the manager on that tab (a link from another page). */
-  function openClassManager(tab) {
+  // tab: a Class Management tab, or 'new' for the New Class wizard. cid: a
+  // class to show other than the open one (from the address's &class=).
+  function openClassManager(tab, cid) {
     classManagerOpen = true;
-    cmSelectedCourse = _activeCourse;
+    cmSelectedCourse = cid && COURSES[cid] ? cid : _activeCourse;
     cmMode = 'edit';
     if (
       CM_TABS.some(function (t) {
@@ -2673,12 +2720,34 @@ window.DashClassManager = (function () {
       })
     )
       cmTab = tab;
+    if (tab === 'new') {
+      cmStartCreate();
+      return;
+    }
     renderClassManager();
     _cmFollowLoads();
   }
+
+  /* Class Management's own address, kept in step as it changes, so a reload
+     or Back returns to the same tab and class (or the New Class wizard):
+     /dashboard?manage=grading&class=… . The dashboard opens it from there. */
+  function _cmSyncUrl() {
+    if (!classManagerOpen || typeof Router === 'undefined' || !Router.setUrl) return;
+    if (location.pathname !== '/dashboard') return;
+    var url = '/dashboard?manage=' + (cmMode === 'create' ? 'new' : cmTab);
+    if (cmMode !== 'create' && cmSelectedCourse && cmSelectedCourse !== _activeCourse && COURSES[cmSelectedCourse])
+      url += '&class=' + encodeURIComponent(cmSelectedCourse);
+    Router.setUrl(url);
+    document.title = 'FullVision \u2014 Class Management';
+  }
+
   function closeClassManager() {
     classManagerOpen = false;
     closeColorPop();
+    if (typeof Router !== 'undefined' && Router.setUrl && location.pathname === '/dashboard') {
+      Router.setUrl('/dashboard');
+      document.title = 'FullVision \u2014 Dashboard';
+    }
     // Hand a course switch made in here back to the parent, so it re-syncs its
     // own activeCourse, loads that course's data and renders it. Without this
     // the parent falls back to whichever class was active before the manager
@@ -2767,6 +2836,7 @@ window.DashClassManager = (function () {
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
     var html = '';
+    _cmSyncUrl();
 
     // Top bar
     var detailTitle =
@@ -2840,6 +2910,25 @@ window.DashClassManager = (function () {
       var newDetail = document.querySelector('.cm-detail');
       if (newDetail) newDetail.scrollTop = scrollTop;
     }
+    _cmRosterScrollCue();
+    _cmRestoreKeptFocus();
+  }
+
+  /* The roster is wider than most windows (twelve columns). While columns
+     are hidden off its right edge, the edge fades and a line says to scroll
+     sideways, so the scrolling is plain to see. */
+  function _cmRosterScrollCue() {
+    var scroller = document.querySelector('.cm-rs-scroll');
+    if (!scroller || !scroller.addEventListener) return;
+    var section = scroller.closest('.cm-rs-section');
+    var note = document.getElementById('cm-rs-more');
+    function update() {
+      var more = scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 1;
+      if (section) section.classList.toggle('cm-rs-more-right', more);
+      if (note) note.hidden = scroller.scrollWidth <= scroller.clientWidth + 1;
+    }
+    scroller.addEventListener('scroll', update, { passive: true });
+    update();
   }
 
   /* The badge on a class row: its block ("A"), or the name's initials
@@ -2891,11 +2980,11 @@ window.DashClassManager = (function () {
       '<aside class="cm-sidebar" aria-label="Classes">' +
       '<div class="cm-sidebar-header">' +
       '<span class="cm-sidebar-title">Classes</span>' +
-      '<span class="cm-sidebar-count">' +
-      courseIds.length +
-      ' class' +
-      (courseIds.length !== 1 ? 'es' : '') +
-      '</span>' +
+      // New Class sits at the top of the class list, as a button (in place
+      // of the class count, which the list itself shows).
+      '<button type="button" class="cm-action-btn cm-new-class-btn" data-action="cmStartCreate">' +
+      '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>' +
+      'New Class</button>' +
       '</div>' +
       '<div class="cm-class-list">';
     if (cmMode === 'create') {
@@ -2937,9 +3026,6 @@ window.DashClassManager = (function () {
     html +=
       '</div>' +
       '<div class="cm-sidebar-foot">' +
-      '<button type="button" class="cm-new-btn" data-action="cmStartCreate">' +
-      '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>' +
-      'New Class</button>' +
       '<button type="button" class="cm-new-btn" data-action="cmRestoreBackup">Restore from Backup</button>' +
       '</div>' +
       '</aside>';
@@ -3009,7 +3095,8 @@ window.DashClassManager = (function () {
           '<input class="cm-input" type="search" placeholder="Find a student" data-action-input="cmRosterSearch" value="' +
           esc(cmRosterQuery) +
           '"></label>' +
-          '<span class="cm-hint cm-rs-summary">Click any field to edit. Enter or ↓ moves down a column, Tab moves across.</span>' +
+          '<span class="cm-hint cm-rs-summary">Click any field to edit. Enter or ↓ moves down a column, Tab moves across.' +
+          '<span id="cm-rs-more" hidden> Scroll sideways for more columns.</span></span>' +
           '<span class="cm-hint cm-rs-summary" id="cm-rs-summary">' +
           esc(_cmRosterSummary(cid)) +
           '</span>'
@@ -3029,15 +3116,21 @@ window.DashClassManager = (function () {
     html +=
       '<div id="cm-add-student-form" style="display:none" class="cm-add-student-form">' +
       '<div class="cm-student-form">' +
-      '<div class="cm-field"><label class="cm-label">First Name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Last Name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Preferred Name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Pronouns</label>' +
-      pronounsSelect('cm-add-pro', '') +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-first">First Name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-last">Last Name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-pref">Preferred Name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      // Pronouns take the same list and free text as the roster's box.
+      '<div class="cm-field"><label class="cm-label" for="cm-add-pro">Pronouns</label>' +
+      '<input class="cm-input" id="cm-add-pro" list="cm-add-pronouns" autocomplete="off" style="font-size:0.875rem;padding:6px 10px">' +
+      '<datalist id="cm-add-pronouns">' +
+      PRONOUNS_OPTIONS.map(function (p) {
+        return '<option value="' + esc(p) + '">';
+      }).join('') +
+      '</datalist>' +
       '</div>' +
-      '<div class="cm-field"><label class="cm-label">Student Number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Date of Birth</label><input class="cm-input" id="cm-add-dob" type="date" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-num">Student Number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-email">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-dob">Date of Birth</label><input class="cm-input" id="cm-add-dob" type="date" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Designations</label>' +
       '<div class="desig-check-grid">' +
       Object.entries(BC_DESIGNATIONS)
@@ -3081,6 +3174,7 @@ window.DashClassManager = (function () {
       '</div>' +
       '</div>' +
       '<div class="cm-field" style="grid-column:1/-1;display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">' +
+      '<span class="cm-hint" id="cm-add-status" role="status" aria-live="polite" style="margin-right:auto;align-self:center"></span>' +
       '<button class="btn btn-ghost" data-action="cmCancelStudent" style="padding:6px 10px;font-size:0.8125rem">Cancel</button>' +
       '<button class="btn btn-primary" id="cm-save-btn" data-action="cmSaveStudent" style="padding:6px 14px;font-size:0.8125rem">Save</button>' +
       '</div>' +
@@ -3459,6 +3553,8 @@ window.DashClassManager = (function () {
     )
       return;
     cmTab = tab;
+    // A school picked but not used goes back to the class's own.
+    if (cmSelectedCourse) delete _cmTermSchool[cmSelectedCourse];
     renderClassManager();
     var detail = document.querySelector('.cm-detail');
     if (detail) detail.scrollTop = 0;
@@ -4260,6 +4356,8 @@ window.DashClassManager = (function () {
       html +=
         '<button class="cw-grade-btn' +
         active +
+        '" aria-pressed="' +
+        (cwSelectedGrade === g) +
         '" data-action="cwSelectGrade" data-grade="' +
         g +
         '">Grade ' +
@@ -4285,6 +4383,8 @@ window.DashClassManager = (function () {
         html +=
           '<button class="cw-subject-btn' +
           active +
+          '" aria-pressed="' +
+          (cwSelectedSubject === subj) +
           '" data-action="cwSelectSubject" data-subject="' +
           esc(subj) +
           '">' +
@@ -4474,7 +4574,9 @@ window.DashClassManager = (function () {
       total +
       '</strong> competencies selected</div>';
     html +=
-      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button>' +
+      '<div class="cw-footer">' +
+      _cwCancelBtn() +
+      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button>' +
       '<button class="btn btn-primary" data-action="cwCompsNext"' +
       (on === 0 ? ' disabled style="opacity:0.4;pointer-events:none"' : '') +
       '>Next</button></div></div>';
@@ -4545,6 +4647,8 @@ window.DashClassManager = (function () {
     return (
       '<div class="cw-course-item' +
       (r.on ? ' selected' : '') +
+      '" role="checkbox" tabindex="0" aria-checked="' +
+      (r.on ? 'true' : 'false') +
       '" data-action="' +
       r.action +
       '" data-tag="' +
@@ -4641,7 +4745,7 @@ window.DashClassManager = (function () {
 
     html +=
       '<div class="cm-section"><div class="cm-section-title">Class Details</div>' +
-      '<div class="cm-field"><label class="cm-label">Class Name</label><input class="cm-input" id="cm-new-name" value="' +
+      '<div class="cm-field"><label class="cm-label" for="cm-new-name">Class Name</label><input class="cm-input" id="cm-new-name" value="' +
       esc(preName) +
       '" placeholder="e.g. English 10" autofocus></div>' +
       '<div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
@@ -4664,19 +4768,19 @@ window.DashClassManager = (function () {
         );
       }).join('') +
       '</div></div>' +
-      '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
+      '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label" for="cm-new-grade">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
       esc(preGrade) +
       '" placeholder="e.g. 8, 10-12" data-action-input="cwGradeInput"></div></div>' +
-      '<div class="cm-field"><label class="cm-label">Description</label><textarea class="cm-textarea" id="cm-new-desc" placeholder="Optional">' +
+      '<div class="cm-field"><label class="cm-label" for="cm-new-desc">Description</label><textarea class="cm-textarea" id="cm-new-desc" placeholder="Optional">' +
       esc(cwStep2Desc) +
       '</textarea></div></div>';
 
     html +=
       '<div class="cm-section"><div class="cm-section-title">Grading &amp; Calculation</div>' +
-      '<div class="cm-field"><label class="cm-label">Grading System</label>' +
+      '<div class="cm-field"><label class="cm-label" id="cm-cg-grading-label">Grading System</label>' +
       // T-UI-02 · wizard grading_system picker. Grades 10–12 default to
       // Letter; with no categories, letter grades use total points.
-      '<div class="seg cm-seg" id="cm-cg-grading" role="radiogroup" aria-label="Grading system">' +
+      '<div class="seg cm-seg" id="cm-cg-grading" role="radiogroup" aria-labelledby="cm-cg-grading-label" aria-describedby="cm-cg-grading-desc">' +
       GRADING_SYSTEMS.map(function (g) {
         return (
           '<button class="seg-btn cm-seg-btn' +
@@ -4695,8 +4799,8 @@ window.DashClassManager = (function () {
       _cmGradingSystemDescription(grading) +
       '</div>' +
       '</div>' +
-      '<div class="cm-field"><label class="cm-label">Calculation Method</label>' +
-      '<div class="seg cm-seg" id="cm-cg-calc" role="radiogroup" aria-label="Calculation method">' +
+      '<div class="cm-field"><label class="cm-label" id="cm-cg-calc-label">Calculation Method</label>' +
+      '<div class="seg cm-seg" id="cm-cg-calc" role="radiogroup" aria-labelledby="cm-cg-calc-label" aria-describedby="cm-cg-calc-desc">' +
       CALC_METHODS.map(function (m) {
         var action = m.value === 'decayingAvg' ? 'cmCreateToggleDecay' : 'cmCreateToggle';
         var isActive = m.value === calc;
@@ -4720,7 +4824,7 @@ window.DashClassManager = (function () {
       '</div></div>' +
       '<div id="cm-cg-decay" class="cm-field" style="' +
       (calc === 'decayingAvg' ? '' : 'display:none') +
-      '"><label class="cm-label">Decay Weight</label>' +
+      '"><label class="cm-label" for="cm-cg-decay-slider">Decay Weight</label>' +
       '<div class="cm-slider-row"><input type="range" min="10" max="95" value="' +
       esc(cwStep2Decay) +
       '" id="cm-cg-decay-slider" data-action-input="cmCreateDecaySlider" style="flex:1"><span class="cm-slider-label" id="cm-cg-decay-val">' +
@@ -4737,7 +4841,9 @@ window.DashClassManager = (function () {
       '</div>';
 
     html +=
-      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3">Next</button></div>';
+      '<div class="cw-footer">' +
+      _cwCancelBtn() +
+      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3">Next</button></div>';
     html += '</div>';
     return html;
   }
@@ -4784,7 +4890,9 @@ window.DashClassManager = (function () {
       '</div></div>' +
       '<div class="cm-field"><label class="cm-label">Late Work Policy</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
       esc(cwStep2LatePolicy.trim() || '\u2014') +
-      '</div></div></div>';
+      '</div></div>' +
+      _cwReviewSetupRows(cwStep2Grade || gradeLevel) +
+      '</div>';
 
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
       var anyFolder = false;
@@ -4853,8 +4961,42 @@ window.DashClassManager = (function () {
     }
 
     html +=
-      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate">Create Class</button></div>';
+      '<div class="cw-footer">' +
+      _cwCancelBtn() +
+      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate">Create Class</button></div>';
     html += '</div>';
+    return html;
+  }
+
+  /* What Create Class sets without asking, shown on the review so a teacher
+     at another school knows to change it: the reporting terms (the default
+     school's, for the chosen span) and, for a Letter class, Counts As. */
+  function _cwReviewSetupRows(gradeLevel) {
+    var val = function (text) {
+      return '<div style="font-size:var(--text-md);color:var(--text-2)">' + text + '</div>';
+    };
+    var terms = _cmDefaultReportingTerms(null, cwStep2Span);
+    var school = terms && typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(terms) : null;
+    var html =
+      '<div class="cm-field"><label class="cm-label">Reporting Terms</label>' +
+      (terms && terms.length
+        ? val(
+            esc(school ? school.school.name : '') +
+              (school ? ': ' : '') +
+              terms
+                .map(function (t) {
+                  return esc(t.label + ' ' + _cmTermDay(t.starts_on) + ' \u2013 ' + _cmTermDay(t.ends_on));
+                })
+                .join(' \u00B7 '),
+          ) + '<div class="cm-hint">Another school? Change the school or the dates later in Reporting Terms.</div>'
+        : val('None. You can add them later in Reporting Terms.')) +
+      '</div>';
+    if (_cmDefaultGradingScale(gradeLevel))
+      html +=
+        '<div class="cm-field"><label class="cm-label">Counts As</label>' +
+        val('BC Letter Bands') +
+        '<div class="cm-hint">Each proficiency counts as a percent in the course % from the BC letter bands. You can change this later in Grading.</div>' +
+        '</div>';
     return html;
   }
 
@@ -4928,22 +5070,37 @@ window.DashClassManager = (function () {
     _cmRenderWithScroll();
   }
 
+  // Cancel on every step, as on the first.
+  function _cwCancelBtn() {
+    return '<button class="btn btn-ghost cw-cancel" data-action="cmCancelCreate">Cancel</button>';
+  }
+
+  /* A new step opens at its top, with the step bar in view, whatever the
+     last step was scrolled to (the Class Name box's autofocus included). */
+  function _cwShowStep(step) {
+    cwStep = step;
+    renderClassManager();
+    var top = function () {
+      var detail = document.querySelector('.cm-detail');
+      if (detail) detail.scrollTop = 0;
+    };
+    top();
+    requestAnimationFrame(top);
+  }
+
   function cwSkipToCustom() {
     cwSelectedTags = [];
     cwPreset = null;
-    cwStep = 3;
-    renderClassManager();
+    _cwShowStep(3);
   }
 
   function cwGoToStep2() {
     if (cwSelectedTags.length === 0) return;
-    cwStep = 2;
-    renderClassManager();
+    _cwShowStep(2);
   }
 
   function cwCompsNext() {
-    cwStep = 3;
-    renderClassManager();
+    _cwShowStep(3);
   }
 
   // The review's grading switches. They don't touch any class until Finish.
@@ -4976,15 +5133,14 @@ window.DashClassManager = (function () {
       (document.querySelector('#cm-cg-calc .cm-seg-btn.active') || {}).dataset?.val || _cmDefaultCalcMethod();
     cwStep2Decay = document.getElementById('cm-cg-decay-slider')?.value || '65';
     cwStep2LatePolicy = document.getElementById('cm-new-late-policy')?.value || '';
-    cwStep = 4;
-    renderClassManager();
+    _cwShowStep(4);
   }
 
   function cwGoBack() {
-    if (cwStep === 4) cwStep = 3;
-    else if (cwStep === 3) cwStep = cwSelectedTags.length ? 2 : 1;
-    else if (cwStep === 2) cwStep = 1;
-    renderClassManager();
+    if (cwStep === 4) _cwShowStep(3);
+    else if (cwStep === 3) _cwShowStep(cwSelectedTags.length ? 2 : 1);
+    else if (cwStep === 2) _cwShowStep(1);
+    else renderClassManager();
   }
 
   function cwGetPreName() {
@@ -5274,7 +5430,7 @@ window.DashClassManager = (function () {
       proficiency:
         'Students are scored on the BC proficiency scale: 1 Emerging, 2 Developing, 3 Proficient, 4 Extending.',
       letter:
-        'Students receive letter grades (A, B, C+, C, C\u2013, F) using BC Ministry of Education percentage cutoffs and conversion tables. All calculations follow the official BC grading scale, so report cards are generated correctly without manual conversion.',
+        'A letter grade and % on the BC scale: A, B, C+, C and C\u2013. Under 50% shows IE (Insufficient Evidence) until the course ends, then F.',
       both: 'Proficiency day to day, and a letter grade and % on reports. Useful in grades 10\u201312, where report cards need a letter and %.',
     };
     return esc(map[gs] || map.proficiency);
@@ -6046,20 +6202,33 @@ window.DashClassManager = (function () {
   }
 
   // The Surrey secondary school whose published dates fill the rows
-  // (shared/reporting-term-presets.js). Grandview Heights unless changed.
-  var _cmTermSchool = null;
+  // (shared/reporting-term-presets.js), per class: the school the teacher
+  // just picked, else the school whose dates the class has, else Grandview
+  // Heights. Cancel, Save and leaving the tab drop the pick.
+  var _cmTermSchool = {};
 
-  function _cmTermSchoolId() {
-    return (
-      _cmTermSchool || (typeof REPORTING_TERM_PRESETS !== 'undefined' ? REPORTING_TERM_PRESETS.defaultSchool : null)
-    );
+  function _cmTermSchoolId(cid) {
+    if (cid && _cmTermSchool[cid]) return _cmTermSchool[cid];
+    var rows = cid ? _cmTermRows(cid).rows : [];
+    var match =
+      typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(normalizeTermOrdinals(rows)) : null;
+    if (match) return match.school.id;
+    return typeof REPORTING_TERM_PRESETS !== 'undefined' ? REPORTING_TERM_PRESETS.defaultSchool : null;
+  }
+
+  // The chosen school's terms for this class's span, or null.
+  function _cmTermSchoolRows(cid) {
+    if (typeof reportingTermPreset !== 'function') return null;
+    var full = reportingTermPreset(_cmTermSchoolId(cid), courseToday(cid));
+    if (!full) return null;
+    return termsInSpan(full, _cmTermRows(cid).span, semesterTwoStart(full));
   }
 
   function _cmRenderSchoolPreset(cid, hasRows) {
     if (typeof reportingTermSchools !== 'function') return '';
     var schools = reportingTermSchools();
     if (!schools.length) return '';
-    var chosen = _cmTermSchoolId();
+    var chosen = _cmTermSchoolId(cid);
     var available = typeof reportingTermPreset === 'function' && !!reportingTermPreset(chosen, courseToday(cid));
     var school = schools.find(function (s) {
       return s.id === chosen;
@@ -6087,6 +6256,28 @@ window.DashClassManager = (function () {
         '</button>';
     }
     html += '</div>';
+    // A school picked from the menu shows its dates before they replace
+    // the class's.
+    var preview = available ? _cmTermSchoolRows(cid) : null;
+    var current = normalizeTermOrdinals(_cmTermRows(cid).rows);
+    var same =
+      preview &&
+      preview.length === current.length &&
+      preview.every(function (t, i) {
+        return t.starts_on === current[i].starts_on && t.ends_on === current[i].ends_on;
+      });
+    if (preview && preview.length && !same) {
+      html +=
+        '<div class="cm-hint cm-term-school-preview">' +
+        esc(school ? school.name : '') +
+        ': ' +
+        preview
+          .map(function (t) {
+            return esc(t.label + ' ' + _cmTermDay(t.starts_on) + ' \u2013 ' + _cmTermDay(t.ends_on));
+          })
+          .join(' \u00B7 ') +
+        '</div>';
+    }
     if (!available) {
       html +=
         '<div class="cm-hint">School dates are loaded for ' +
@@ -6116,7 +6307,7 @@ window.DashClassManager = (function () {
     var rows = normalizeTermOrdinals(st.rows);
     var match = typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(rows) : null;
     var reports = typeof reportingTermReportNames === 'function' ? reportingTermReportNames(rows) : null;
-    var chosen = _cmTermSchoolId();
+    var chosen = _cmTermSchoolId(cid);
     // The school menu offers another school's dates only once a different
     // school is picked.
     var preset = _cmRenderSchoolPreset(cid, true);
@@ -6238,6 +6429,7 @@ window.DashClassManager = (function () {
   function cmTermCancel() {
     if (!cmSelectedCourse) return;
     delete _cmTermState[cmSelectedCourse];
+    delete _cmTermSchool[cmSelectedCourse];
     _cmTermEditing[cmSelectedCourse] = false;
     renderClassManager();
   }
@@ -6313,13 +6505,15 @@ window.DashClassManager = (function () {
   }
 
   function cmTermSchool(id) {
-    _cmTermSchool = id || null;
+    if (!cmSelectedCourse) return;
+    if (id) _cmTermSchool[cmSelectedCourse] = id;
+    else delete _cmTermSchool[cmSelectedCourse];
     renderClassManager();
   }
 
   function cmTermSchoolPreset() {
     if (!cmSelectedCourse || typeof reportingTermPreset !== 'function') return;
-    var rows = reportingTermPreset(_cmTermSchoolId(), courseToday(cmSelectedCourse));
+    var rows = reportingTermPreset(_cmTermSchoolId(cmSelectedCourse), courseToday(cmSelectedCourse));
     if (!rows) return;
     var st = _cmTermRows(cmSelectedCourse);
     var full = rows.map(function (r) {
@@ -6385,6 +6579,7 @@ window.DashClassManager = (function () {
       return;
     }
     delete _cmTermState[cid];
+    delete _cmTermSchool[cid];
     _cmTermEditing[cid] = false;
     renderClassManager();
   }
@@ -6690,6 +6885,8 @@ window.DashClassManager = (function () {
           html +=
             '<button class="cw-grade-btn' +
             (cwSelectedGrade === g ? ' active' : '') +
+            '" aria-pressed="' +
+            (cwSelectedGrade === g) +
             '" data-action="cwSelectGrade" data-grade="' +
             g +
             '">Grade ' +
@@ -6705,6 +6902,8 @@ window.DashClassManager = (function () {
             html +=
               '<button class="cw-subject-btn' +
               (cwSelectedSubject === s ? ' active' : '') +
+              '" aria-pressed="' +
+              (cwSelectedSubject === s) +
               '" data-action="cwSelectSubject" data-subject="' +
               esc(s) +
               '">' +
@@ -6735,6 +6934,8 @@ window.DashClassManager = (function () {
               html +=
                 '<div class="cw-course-item' +
                 sel +
+                '" role="checkbox" tabindex="0" aria-checked="' +
+                (sel ? 'true' : 'false') +
                 '" data-action="cwToggleCourse" data-tag="' +
                 esc(c.short_tag) +
                 '">' +
@@ -9376,6 +9577,7 @@ window.DashClassManager = (function () {
 
   /* ── Action dispatcher (called from parent's _handleClick) ── */
   function handleAction(action, el, e) {
+    _cmKeepFocusSel = null;
     // Any click other than on a card's More button closes its open menu.
     if (action !== 'cmStdMenu') _cmCloseStdMenus();
     if (action !== 'cmRosterDesigOpen') _cmCloseRosterPicker();
@@ -9422,7 +9624,7 @@ window.DashClassManager = (function () {
         cmDeleteWithdrawn(el.dataset.sid);
       },
       cmCancelStudent: function () {
-        cmCancelStudent();
+        cmCloseAddStudent();
       },
       cmSaveStudent: function () {
         cmSaveStudent();
@@ -9745,7 +9947,43 @@ window.DashClassManager = (function () {
     return false;
   }
 
+  /* A switch, checkbox, radio or menu changed with the keyboard keeps the
+     focus: most changes redraw Class Management, which made the control a
+     new element and dropped the focus to the page. Until the next click or
+     change, a redraw that leaves the focus nowhere gives it back to the same
+     control (by id, else by its data attributes), including the redraws
+     around a "Change Grades?" question and its answer. */
+  var _cmKeepFocusSel = null;
+
   function handleChange(el) {
+    _cmKeepFocusSel = _cmControlSelector(el);
+    return _handleChange(el);
+  }
+
+  function _cmRestoreKeptFocus() {
+    if (!_cmKeepFocusSel) return;
+    var active = document.activeElement;
+    if (active && active !== document.body) return;
+    var again = document.querySelector(_cmKeepFocusSel);
+    if (again && typeof again.focus === 'function') again.focus({ preventScroll: true });
+  }
+
+  function _cmControlSelector(el) {
+    if (!el || !el.tagName || typeof CSS === 'undefined' || !CSS.escape) return null;
+    var keep = el.tagName === 'SELECT' || (el.tagName === 'INPUT' && (el.type === 'checkbox' || el.type === 'radio'));
+    if (!keep) return null;
+    if (el.id) return '#' + CSS.escape(el.id);
+    var attrs = el.attributes || [];
+    var parts = [];
+    for (var i = 0; i < attrs.length; i++) {
+      var n = attrs[i].name;
+      if (n.indexOf('data-') === 0 || n === 'name' || (n === 'value' && el.type === 'radio'))
+        parts.push('[' + n + '="' + CSS.escape(attrs[i].value) + '"]');
+    }
+    return parts.length ? el.tagName.toLowerCase() + parts.join('') : null;
+  }
+
+  function _handleChange(el) {
     if (typeof CmQuestionnaires !== 'undefined' && CmQuestionnaires.handleChange(el)) return true;
     if (el.dataset.actionChange === 'cmCSV') {
       cmHandleCSV(el);
@@ -9860,7 +10098,27 @@ window.DashClassManager = (function () {
       e.preventDefault();
       return true;
     }
+    if (e.key === 'Escape' && el && el.closest && el.closest('#cm-add-student-form') && cmCloseAddStudent()) {
+      e.preventDefault();
+      return true;
+    }
     if (_cmRosterKeydown(e)) return true;
+    // A course row in New Class or Re-link ticks with Space or Enter, and
+    // keeps the focus through the redraw so the next row is one Tab away.
+    if (
+      el &&
+      el.classList &&
+      el.classList.contains('cw-course-item') &&
+      (e.key === ' ' || e.key === 'Enter') &&
+      !e.isComposing
+    ) {
+      e.preventDefault();
+      var courseTag = el.dataset.tag;
+      el.click();
+      var again = document.querySelector('.cw-course-item[data-tag="' + CSS.escape(courseTag) + '"]');
+      if (again) again.focus();
+      return true;
+    }
     // Arrow keys move between the class tabs, as in any tab list.
     if (el && el.classList && el.classList.contains('cm-tab') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
       var ids = CM_TABS.map(function (t) {

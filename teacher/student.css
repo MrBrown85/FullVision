@@ -2068,7 +2068,9 @@ button.ced-obs-row {
 }
 .stu-core-trow {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.4fr) minmax(180px, 1.1fr) 180px;
+  /* Only the steps need a floor; the other columns wrap, so the row never
+     runs past its card. */
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 1.4fr) minmax(0, 1.1fr) minmax(0, 0.8fr);
   align-items: center;
   gap: 14px;
   min-height: 52px;
@@ -2109,15 +2111,32 @@ button.ced-obs-row {
   border-radius: 6px;
   color: var(--text-2);
 }
+/* The chosen step is a solid block in its level's colour, readable on a
+   dim screen. */
 .stu-core-step.on {
-  background: var(--seg-thumb);
-  color: var(--text);
+  background: var(--active);
+  color: #fff;
   font-weight: 700;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+.stu-core-step.on.lv-1 {
+  background: var(--score-1);
+}
+.stu-core-step.on.lv-2 {
+  background: var(--score-2);
+}
+.stu-core-step.on.lv-3 {
+  background: var(--score-3);
+}
+.stu-core-step.on.lv-4 {
+  background: var(--score-4);
 }
 .stu-core-words,
 .stu-core-goal {
   line-height: 1.4;
+}
+.stu-core-from {
+  font-size: var(--text-xs);
+  color: var(--text-3);
 }
 .stu-core-work {
   display: flex;
@@ -3072,6 +3091,11 @@ button.stu-bd-row:focus-visible {
 .lp-static {
   cursor: default;
 }
+.lp-link {
+  color: var(--link);
+  font-weight: 600;
+  cursor: pointer;
+}
 .lp-none {
   font-size: var(--text-md);
   color: var(--text-3);
@@ -3409,6 +3433,22 @@ button.stu-bd-row:focus-visible {
   display: flex;
   gap: 6px;
 }
+/* An open goal or reflection editor takes the row's whole width. */
+.gl-row.gl-editing .gl-adds {
+  grid-column: 1 / -1;
+  align-items: flex-start;
+}
+.gl-adds > .stu-goal-part.is-editing {
+  flex: 1;
+  min-width: 0;
+}
+.stu-goal-remove {
+  margin-left: auto;
+}
+.gl-row .inline-edit-area textarea,
+.gl-pair .inline-edit-area textarea {
+  min-height: 76px;
+}
 .sh-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3495,4 +3535,27 @@ button.stu-bd-row:focus-visible {
 .id-jump a span.lp-new-text {
   color: var(--link);
   font-weight: 600;
+}
+
+/* The student page's toolbar on a phone (Nov 3 sweep): at 375 px ‹ › sat
+   on the breadcrumb, which had shrunk to nothing, and the term picker ran
+   260 px past the edge, so the page scrolled sideways. Under 600 px the
+   breadcrumb takes its own line and the picker takes the room left. */
+@media (max-width: 600px) {
+  .student-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .student-toolbar .tb-breadcrumb {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .student-toolbar .term-select {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+  }
+  .student-toolbar .tb-edit-btn {
+    padding: 7px 12px;
+  }
 }

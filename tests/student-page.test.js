@@ -91,6 +91,8 @@ function setup() {
   };
   calls = [];
   replies = [];
+  // A slip locked in one test is remembered on the "phone"; start clean.
+  localStorage.clear();
   globalThis.fetch = async (url, init) => {
     const body = JSON.parse(init.body);
     calls.push({ url, body });
@@ -183,6 +185,43 @@ describe('student page', () => {
     expect(calls[1].body.answers.g3).toBe('COL');
     expect(root.querySelector('.sp-big').textContent).toBe('Sent to Your Teacher');
     expect(root.textContent).toContain('It will be part of your report.');
+  });
+
+  it('with no course goal written, the check-in says so instead of asking how the goal is going', async () => {
+    replies.push(Object.assign({}, OPEN, { context: {} }));
+    T.start(root, '#K7M4QX');
+    await tick();
+    click('[data-act="start"]');
+    expect(root.querySelector('#sp-count').textContent).toBe('0 of 4 answered');
+    click('[data-act="next"]');
+    expect(root.textContent).toContain(
+      'You haven’t written a Science 8 goal yet, so there is nothing to check on here.',
+    );
+    expect(root.textContent).not.toContain('How is your goal going?');
+    expect(root.querySelector('[data-q="g1"]')).toBeNull();
+    expect(root.querySelector('[data-act="pick"][data-q="g3"]')).toBeTruthy();
+  });
+
+  it('a set of choices is one Tab stop, and the arrow keys choose within it', async () => {
+    replies.push(OPEN);
+    T.start(root, '#K7M4QX');
+    await tick();
+    click('[data-act="start"]');
+    const steps = () => Array.from(root.querySelectorAll('[data-act="step"][data-core="PAR"]'));
+    expect(steps().map(b => b.getAttribute('tabindex'))).toEqual(['0', '-1', '-1', '-1']);
+    const key = (el, k) => {
+      const e = new globalThis.window.Event('keydown', { bubbles: true, cancelable: true });
+      e.key = k;
+      el.dispatchEvent(e);
+      return e;
+    };
+    expect(key(steps()[0], 'ArrowRight').defaultPrevented).toBe(true);
+    expect(T.collect(T.state()).q3).toEqual({ levels: { PAR: 2 } });
+    expect(steps().map(b => b.getAttribute('tabindex'))).toEqual(['-1', '0', '-1', '-1']);
+    key(steps()[1], 'End');
+    expect(T.collect(T.state()).q3.levels.PAR).toBe(4);
+    key(steps()[3], 'ArrowRight');
+    expect(T.collect(T.state()).q3.levels.PAR).toBe(1);
   });
 
   it('a token that ran out is renewed once with the same code, then the answers go', async () => {
@@ -344,6 +383,30 @@ describe('student page: who are you? (a questionnaire slip)', () => {
     expect(root.querySelector('[data-act="start"]').textContent).toBe('Yes, Start');
   });
 
+  it('the last try warns it will lock; a locked slip says so straight away when opened again', async () => {
+    replies.push(CHECK);
+    T.start(root, '#K7M4QX');
+    await tick();
+    type('#sp-ident', '999');
+    replies.push({ ok: false, error: 'wrong_identity', tries_left: 1 });
+    click('[data-act="start"]');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(root.querySelector('.sp-ident .sp-msg').textContent).toBe(
+      "That doesn't match. Check your birthday or student number. 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.",
+    );
+    replies.push({ ok: false, error: 'slip_locked' });
+    click('[data-act="start"]');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(root.textContent).toContain('This slip is locked after too many wrong tries.');
+
+    // The page opened again on this phone: the lock shows, not the form.
+    replies.push(CHECK);
+    T.start(root, '#K7M4QX');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(root.querySelector('#sp-ident')).toBeNull();
+    expect(root.textContent).toContain('This slip is locked after too many wrong tries.');
+  });
+
   it('a slip with a password asks for the password', async () => {
     replies.push(Object.assign({}, CHECK, { check: 'password' }));
     T.start(root, '#K7M4QX');
@@ -356,7 +419,7 @@ describe('student page: who are you? (a questionnaire slip)', () => {
     for (let i = 0; i < 3; i++) await tick();
     expect(calls[1].body).toMatchObject({ route: 'verify', password: '4821', birthday: null, student_number: null });
     expect(root.querySelector('.sp-ident .sp-msg').textContent).toBe(
-      "That password doesn't match. Check the password on your slip. 1 try left.",
+      "That password doesn't match. Check the password on your slip. 1 try left. One more wrong try locks this slip, and you will need a new one from your teacher.",
     );
     replies.push({ ok: false, error: 'slip_locked' });
     click('[data-act="start"]');

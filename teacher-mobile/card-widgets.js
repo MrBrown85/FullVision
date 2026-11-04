@@ -121,31 +121,70 @@ window.MCardWidgets = (function () {
   }
 
   /* ── sectionBars ─────────────────────────────────────────────── */
+  // Grouped by folder as on the student screen: each folder's average,
+  // "Each competency counts on its own." under a folder that doesn't count
+  // as one, then its competencies; every row carries its figure.
+  function _secRowHtml(cid, name, color, value, cls) {
+    var pct = Math.round(levelBarPercent(cid, value));
+    return (
+      '<div class="m-scard-sec-row' +
+      (cls ? ' ' + cls : '') +
+      '">' +
+      (color ? '<div class="m-scard-sec-dot" style="background:' + cssColor(color) + '"></div>' : '') +
+      '<div class="m-scard-sec-name">' +
+      MC.esc(name) +
+      '</div>' +
+      '<div class="m-scard-sec-bar"><div class="m-scard-sec-fill" style="width:' +
+      pct +
+      '%;background:' +
+      MC.profBg(Math.round(value)) +
+      '"></div></div>' +
+      '<div class="m-scard-sec-val">' +
+      MC.esc(value > 0 ? formatLevel(cid, value) : '—') +
+      '</div>' +
+      '</div>'
+    );
+  }
+
   _renderers.sectionBars = function (st, cid, data) {
     var sections = data.sections;
     if (!sections || !sections.length) return '';
+    var secRow = function (sec) {
+      return _secRowHtml(
+        cid,
+        sec.shortName || sec.name,
+        sec.color || '#888',
+        getSectionProficiency(cid, st.id, sec.id),
+        '',
+      );
+    };
 
-    var secBars = '';
-    sections.forEach(function (sec) {
-      var secProf = getSectionProficiency(cid, st.id, sec.id);
-      var pct = Math.round(levelBarPercent(cid, secProf));
-      secBars +=
-        '<div class="m-scard-sec-row">' +
-        '<div class="m-scard-sec-dot" style="background:' +
-        cssColor(sec.color || '#888') +
-        '"></div>' +
-        '<div class="m-scard-sec-name">' +
-        MC.esc(sec.shortName || sec.name) +
-        '</div>' +
-        '<div class="m-scard-sec-bar"><div class="m-scard-sec-fill" style="width:' +
-        pct +
-        '%;background:' +
-        MC.profBg(Math.round(secProf)) +
-        '"></div></div>' +
-        '</div>';
-    });
-
-    return '<div class="m-scard-sections">' + secBars + '</div>';
+    var grouped = typeof getGroupedSections === 'function' ? getGroupedSections(cid) : null;
+    var html = '';
+    if (grouped && grouped.groups && grouped.groups.length) {
+      grouped.groups.forEach(function (gi) {
+        if (!gi.sections.length) return;
+        var note = typeof folderAverageNote === 'function' ? folderAverageNote(cid, gi.group) : '';
+        html +=
+          '<div class="m-scard-folder">' +
+          _secRowHtml(
+            cid,
+            gi.group.label || gi.group.name,
+            null,
+            getGroupProficiency(cid, st.id, gi.group.id),
+            'm-scard-folder-row',
+          ) +
+          (note ? '<div class="m-scard-folder-note">' + MC.esc(note) + '</div>' : '') +
+          gi.sections.map(secRow).join('') +
+          '</div>';
+      });
+      (grouped.ungrouped || []).forEach(function (sec) {
+        html += secRow(sec);
+      });
+    } else {
+      html = sections.map(secRow).join('');
+    }
+    return '<div class="m-scard-sections">' + html + '</div>';
   };
 
   /* ── obsSnippet ──────────────────────────────────────────────── */
@@ -185,16 +224,19 @@ window.MCardWidgets = (function () {
   };
 
   /* ── completion (arc ring metric tile) ───────────────────────── */
+  // Evidence coverage, as the desktop dashboard and student cards call it:
+  // a % with that name, not a bare number over "Complete".
   _renderers.completion = function (st, cid) {
     var pct = getCompletionPct(cid, st.id);
     var color = pct >= 80 ? 'var(--score-3)' : pct >= 50 ? 'var(--score-2)' : 'var(--score-1)';
-    var r = 16,
-      cx = 19,
-      cy = 19,
+    // Room inside the ring for "100%".
+    var r = 19,
+      cx = 22,
+      cy = 22,
       circ = 2 * Math.PI * r;
     var offset = circ * (1 - pct / 100);
     var svg =
-      '<svg class="m-wdg-arc" width="38" height="38" viewBox="0 0 38 38">' +
+      '<svg class="m-wdg-arc" width="44" height="44" viewBox="0 0 44 44">' +
       '<circle cx="' +
       cx +
       '" cy="' +
@@ -228,9 +270,9 @@ window.MCardWidgets = (function () {
       color +
       '">' +
       Math.round(pct) +
-      '</text>' +
+      '%</text>' +
       '</svg>';
-    return '<div class="m-wdg-tile">' + svg + '<div class="m-wdg-tile-label">Complete</div></div>';
+    return '<div class="m-wdg-tile">' + svg + '<div class="m-wdg-tile-label">Evidence Coverage</div></div>';
   };
 
   /* ── missingWork (alert metric tile) ─────────────────────────── */
@@ -252,73 +294,56 @@ window.MCardWidgets = (function () {
   };
 
   /* ── growth (journey pill) ────────────────────────────────────── */
+  // Where the student's work started and where it is now, in the grade the
+  // class shows first (studentGrowthLine): a % in a Letter class, the level
+  // and its word otherwise. The means of the first and last weeks, so one
+  // early or late score doesn't decide it.
   _renderers.growth = function (st, cid, data) {
-    var allEvidenceScores = [];
-    var sections = data.sections || [];
-    sections.forEach(function (sec) {
+    var tagIds = [];
+    (data.sections || []).forEach(function (sec) {
       (sec.tags || []).forEach(function (tag) {
-        // The evidence that counts toward the level (no 0% category work).
-        getCountedTagScores(cid, st.id, tag.id).forEach(function (s) {
-          if (s.score > 0) allEvidenceScores.push(s);
-        });
+        tagIds.push(tag.id);
       });
     });
+    var g = studentGrowthLine(cid, st.id, tagIds);
+    if (!g) return '';
+    // The same count as the student screen's "N Scored".
+    var n = MC.scoredAssessmentCount(cid, st.id);
+    var countText = n + ' scored';
 
-    if (!allEvidenceScores.length) return '';
-
-    allEvidenceScores.sort(function (a, b) {
-      return (a.date || '').localeCompare(b.date || '');
-    });
-
-    if (allEvidenceScores.length === 1) {
-      var onlyScore = allEvidenceScores[0].score;
+    if (!g.startText) {
+      // Under two weeks of work: where it is now.
       return (
         '<div class="m-wdg-growth">' +
         '<span class="m-wdg-growth-label">' +
-        (PROF_LABELS[Math.round(onlyScore)] || 'No Evidence') +
+        MC.esc(g.nowText) +
         '</span>' +
-        '<span class="m-wdg-growth-meta"> \u2014 1 assessment</span>' +
+        '<span class="m-wdg-growth-meta"> \u2014 ' +
+        countText +
+        '</span>' +
         '</div>'
       );
     }
 
-    // First and last compared by the level their words name (evidenceChange).
-    var change = evidenceChange(allEvidenceScores);
-    // One assessment scores several competencies; count each assessment once.
-    var assessmentIds = {};
-    allEvidenceScores.forEach(function (s) {
-      assessmentIds[s.assessmentId] = true;
-    });
-    var assessmentN = Object.keys(assessmentIds).length;
-    var arrowColor, arrowChar;
-    if (change.dir > 0) {
-      arrowColor = 'var(--score-3)';
-      arrowChar = '\u2191';
-    } else if (change.dir < 0) {
-      arrowColor = 'var(--score-1)';
-      arrowChar = '\u2193';
-    } else {
-      arrowColor = 'var(--text-3)';
-      arrowChar = '\u2192';
-    }
-
+    var arrowColor = g.dir > 0 ? 'var(--score-3)' : g.dir < 0 ? 'var(--score-1)' : 'var(--text-3)';
+    var arrowChar = g.dir > 0 ? '\u2191' : g.dir < 0 ? '\u2193' : '\u2192';
     return (
-      '<div class="m-wdg-growth">' +
-      '<span class="m-wdg-growth-label">' +
-      PROF_LABELS[change.first] +
+      '<div class="m-wdg-growth" title="Start is the first weeks of work; Now is the last weeks.">' +
+      '<span class="m-wdg-growth-label">Start ' +
+      MC.esc(g.startText) +
       '</span>' +
       '<span class="m-wdg-growth-arrow" style="color:' +
       arrowColor +
       '">' +
       arrowChar +
       '</span>' +
-      '<span class="m-wdg-growth-label">' +
-      PROF_LABELS[change.last] +
+      '<span class="m-wdg-growth-label">Now ' +
+      MC.esc(g.nowText) +
       '</span>' +
       '<span class="m-wdg-growth-meta"> (' +
-      assessmentN +
-      (assessmentN === 1 ? ' assessment)' : ' assessments)') +
-      '</span>' +
+      (g.change ? MC.esc(g.change) + ', ' : '') +
+      countText +
+      ')</span>' +
       '</div>'
     );
   };
@@ -533,20 +558,69 @@ window.MCardWidgets = (function () {
   };
 
   /* ── narrative ───────────────────────────────────────────────── */
+  // The Teacher Comment, as desktop calls it: the first lines on the card,
+  // the whole comment in a sheet on a tap. A comment that calls the student
+  // by a name they no longer go by says so.
   _renderers.narrative = function (st, cid, data) {
     var rating = data.termRating;
     if (!rating || !rating.narrative) return '';
     var raw = (rating.narrative || '').replace(/<[^>]+>/g, '').trim();
     if (!raw) return '';
+    var note = staleNameNote(st, raw);
     return (
-      '<div class="m-wdg-narrative">' +
-      '<div class="m-wdg-section-label">Term Report</div>' +
-      '<div class="m-wdg-narrative-text">' +
-      MC.esc(_trunc(raw, 80)) +
-      '</div>' +
-      '</div>'
+      '<button type="button" class="m-wdg-narrative" data-action="m-comment-full" data-sid="' +
+      MC.esc(st.id) +
+      '" data-term="' +
+      MC.esc(data.termId == null ? '' : String(data.termId)) +
+      '" aria-label="Teacher Comment. Read all of it">' +
+      '<span class="m-wdg-section-label">Teacher Comment</span>' +
+      '<span class="m-wdg-narrative-text">' +
+      MC.esc(raw) +
+      '</span>' +
+      (note ? '<span class="m-wdg-narrative-note">' + MC.esc(note) + '</span>' : '') +
+      '<span class="m-wdg-narrative-more">Read All</span>' +
+      '</button>'
     );
   };
+
+  /* "Written as Liam. Lee is the name now." when the comment uses the
+     student's legal first name and not the preferred name they now go by. */
+  function _hasWord(text, name) {
+    var esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(^|[^A-Za-z\\u00C0-\\u024F])' + esc + '(?![A-Za-z\\u00C0-\\u024F])').test(text);
+  }
+  function staleNameNote(st, text) {
+    var now = displayNameFirst(st);
+    var old = st.firstName;
+    if (!old || !now || old === now) return '';
+    if (!_hasWord(text, old) || _hasWord(text, now)) return '';
+    return 'Written as ' + old + '. ' + now + ' is the name now.';
+  }
+
+  /* The whole Teacher Comment, for its sheet. */
+  function commentSheetHtml(st, cid, termId) {
+    var rating = getStudentTermRating(cid, st.id, termId);
+    var raw = ((rating && rating.narrative) || '').replace(/<[^>]+>/g, '').trim();
+    var note = staleNameNote(st, raw);
+    return (
+      '<div class="m-sheet-title">Teacher Comment</div>' +
+      '<div class="m-comment-sheet">' +
+      '<div class="m-comment-sheet-name">' +
+      MC.esc(displayNameWithLast(st)) +
+      '</div>' +
+      (note ? '<div class="m-wdg-narrative-note">' + MC.esc(note) + '</div>' : '') +
+      raw
+        .split(/\n+/)
+        .filter(function (p) {
+          return p.trim();
+        })
+        .map(function (p) {
+          return '<p>' + MC.esc(p) + '</p>';
+        })
+        .join('') +
+      '</div>'
+    );
+  }
 
   /* ── flagStatus — no own output; flag icon is co-rendered by hero ── */
   _renderers.flagStatus = function () {
@@ -615,5 +689,7 @@ window.MCardWidgets = (function () {
     render: render,
     renderFallbackHero: renderFallbackHero,
     assembleCard: assembleCard,
+    commentSheetHtml: commentSheetHtml,
+    staleNameNote: staleNameNote,
   };
 })();

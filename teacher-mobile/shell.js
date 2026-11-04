@@ -575,6 +575,10 @@
     if (restore) newScreen.setAttribute('data-restore', JSON.stringify(restore));
     newScreen.classList.add('m-push-enter');
     stack.appendChild(newScreen);
+    // The student screen's open tab, in view in its strip.
+    if (window.MStudentDetail) MStudentDetail.scrollActiveTab(newScreen);
+    // A pushed screen with its own sync dot shows the current state.
+    if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
 
     _navStacks[_activeTab].push('detail');
     history.pushState({ m: _navStacks[_activeTab].length - 1 }, '');
@@ -663,6 +667,7 @@
       screen.classList.remove('m-screen-hidden');
       screen.setAttribute('data-restore', JSON.stringify({ kind: 'detail', sid: sid }));
       stack.appendChild(screen);
+      if (window.MStudentDetail) MStudentDetail.scrollActiveTab(screen);
       if (list) list.style.display = 'none';
       _navStacks[_activeTab].push('detail');
       var navBar = screen.querySelector('.m-nav-bar');
@@ -813,13 +818,20 @@
 
       // Grade on a student page: the newest assessment's grading screen on
       // the Grade tab, at that student's card. Back returns to the page.
-      if (action === 'm-student-grade') {
+      if (action === 'm-student-grade' || action === 'm-assess-grade') {
         var gradeSid = target.getAttribute('data-sid');
-        var newest = getAssessments(_cid)
-          .slice()
-          .sort(function (a, b) {
-            return (b.date || '').localeCompare(a.date || '');
-          })[0];
+        // A row on the student screen opens its own assessment; the Grade
+        // button opens the newest.
+        var wantAid = target.getAttribute('data-aid');
+        var newest = wantAid
+          ? getAssessments(_cid).find(function (a) {
+              return a.id === wantAid;
+            })
+          : getAssessments(_cid)
+              .slice()
+              .sort(function (a, b) {
+                return (b.date || '').localeCompare(a.date || '');
+              })[0];
         // The Grade tab opens on its list. A grading screen left open there
         // would come back under this one with the same ids, and the handlers
         // would bind to the hidden copy.
@@ -846,12 +858,13 @@
           })
           .join('');
         var hasCourses = pickerCourses.length > 1;
+        // getLastSyncedAt() is an ISO string (data.js). Calling .toISOString()
+        // on it threw, so the gear did nothing after the first sync.
         var lastSyncedAt = window.GB ? window.GB.getLastSyncedAt() : null;
+        if (lastSyncedAt instanceof Date) lastSyncedAt = lastSyncedAt.toISOString();
         var syncLine =
           '<div style="font-size:13px;color:var(--text-3);text-align:center;margin-bottom:16px">' +
-          (lastSyncedAt
-            ? 'Last synced: ' + MC.relativeTime(lastSyncedAt.toISOString())
-            : 'Not yet synced this session') +
+          (lastSyncedAt ? 'Last synced: ' + MC.relativeTime(String(lastSyncedAt)) : 'Not yet synced this session') +
           '</div>';
         var userBlock =
           '<div style="padding:4px 16px 12px;text-align:center">' +
@@ -956,6 +969,17 @@
       }
 
       // ── Students tab ──
+      // The whole Teacher Comment from a student card.
+      if (action === 'm-comment-full') {
+        var cSid = target.getAttribute('data-sid');
+        var cSt = getStudents(_cid).find(function (s) {
+          return s.id === cSid;
+        });
+        var cTerm = target.getAttribute('data-term');
+        if (cSt) MC.presentSheet(MCardWidgets.commentSheetHtml(cSt, _cid, cTerm === '' ? null : cTerm));
+        return;
+      }
+
       if (action === 'm-all-students') {
         MStudents.showAllStudents();
         return;
@@ -1177,9 +1201,9 @@
         var aid = target.closest('[data-aid]').getAttribute('data-aid');
         var swiperHTML = MGrade.renderSwiper(_cid, aid);
         _pushScreen(swiperHTML, { kind: 'swiper', aid: aid });
-        setTimeout(function () {
-          MGrade.setupSwiper(_cid, aid);
-        }, 400);
+        // Wired at once, as when grading from a student: a score typed or an
+        // avatar tapped while the screen slides in is not lost.
+        MGrade.setupSwiper(_cid, aid);
         return;
       }
 
@@ -1342,6 +1366,15 @@
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         MC.dismissSheet();
+      }
+      // A row that acts as a button (role="button") answers Enter and Space
+      // as a real button does.
+      if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.getAttribute) {
+        var t = e.target;
+        if (t.getAttribute('role') === 'button' && t.tagName !== 'BUTTON' && t.hasAttribute('data-action')) {
+          e.preventDefault();
+          t.click();
+        }
       }
     });
 

@@ -90,7 +90,8 @@ describe('MGrade.renderPicker', () => {
   });
 
   it('shows assessment type badges (S/F)', () => {
-    mockDataLayer({});
+    // Badges show in a class with categories (Step 4 group 3 #30).
+    mockDataLayer({ getCategories: () => [{ id: 'k1', name: 'Quizzes' }] });
     const html = MGrade.renderPicker(CID);
     expect(html).toContain('m-type-summative');
     expect(html).toContain('m-type-formative');
@@ -120,11 +121,13 @@ describe('MGrade.renderPicker', () => {
     expect(html).toContain('width:100%');
   });
 
-  it('shows tag count per assessment', () => {
+  // Step 4 group 3 #21: competencies, the desktop's word, not tags.
+  it('shows the competency count per assessment', () => {
     mockDataLayer({});
     const html = MGrade.renderPicker(CID);
-    expect(html).toContain('2 tags'); // a1 has 2 tagIds
-    expect(html).toContain('1 tag'); // a2 has 1 tagId
+    expect(html).toContain('2 competencies'); // a1 has 2 tagIds
+    expect(html).toContain('1 competency'); // a2 has 1 tagId
+    expect(html).not.toMatch(/\d tags?</);
   });
 
   it('shows empty state when no assessments', () => {
@@ -788,7 +791,7 @@ describe('MGrade.jumpToStudent', () => {
 
 /* ── Assessment picker edge cases ───────────────────────────── */
 describe('Assessment picker edge cases', () => {
-  it('shows correct tag count pluralization (1 tag vs 2 tags)', () => {
+  it('shows correct competency count pluralization (1 competency vs 3 competencies)', () => {
     mockDataLayer({
       getAssessments: () => [
         { id: 'a1', title: 'One Tag', type: 'summative', date: '2025-03-20', tagIds: ['t1'] },
@@ -796,8 +799,8 @@ describe('Assessment picker edge cases', () => {
       ],
     });
     const html = MGrade.renderPicker(CID);
-    expect(html).toContain('1 tag');
-    expect(html).toContain('3 tags');
+    expect(html).toContain('1 competency');
+    expect(html).toContain('3 competencies');
   });
 
   it('shows 0/N graded for ungraded assessments', () => {
@@ -810,11 +813,16 @@ describe('Assessment picker edge cases', () => {
   });
 
   it('shows category badges for assessments', () => {
-    mockDataLayer({});
+    mockDataLayer({ getCategories: () => [{ id: 'k1', name: 'Quizzes' }] });
     const html = MGrade.renderPicker(CID);
     expect(html).toContain('No Category');
     expect(html).toContain('m-type-summative');
     expect(html).toContain('m-type-formative');
+  });
+
+  it('shows no No Category badge in a class with no categories', () => {
+    mockDataLayer({ getCategories: () => [] });
+    expect(MGrade.renderPicker(CID)).not.toContain('No Category');
   });
 
   it('shows dates in readable format', () => {

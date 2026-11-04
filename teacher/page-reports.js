@@ -36,7 +36,7 @@ window.PageReports = (function () {
      style element that overrides it, the way rubric-print.js does for its
      layouts. DECISIONS.md, "Report forms" 4. */
   var PAPER_STYLE_ID = 'report-paper-style';
-  var PAPER_SIZES = { letter: '8.5in 11in', legal: '8.5in 14in' };
+  var PAPER_SIZES = { letter: 'letter portrait', legal: 'legal portrait' };
   var reportPaper = 'letter';
 
   function _loadPaper(cid) {
@@ -342,10 +342,24 @@ window.PageReports = (function () {
     sel.value = pick ? 'Report ' + pick.ordinal : values[0];
   }
 
+  /* The address follows the class, the tab and the open student, so a
+     reload or a shared link reopens the same place (Nov 3 sweep: it kept
+     the first student and class). */
+  function _syncUrl() {
+    if (!window.Router || typeof Router.setUrl !== 'function' || !activeCourse) return;
+    var url = '/reports?course=' + encodeURIComponent(activeCourse) + '&tab=' + encodeURIComponent(activeTab);
+    if (activeTab === 'questionnaire') {
+      var st = RQ.getTqStudents()[RQ.tqStudentIndex];
+      if (st) url += '&student=' + encodeURIComponent(st.id);
+    }
+    Router.setUrl(url);
+  }
+
   function renderReports() {
     const cid = activeCourse;
     const output = document.getElementById('report-output');
     _applyReportTerm();
+    _syncUrl();
 
     if (activeTab === 'questionnaire') {
       // The sentence bank loads the first time Reports needs it.
@@ -848,7 +862,7 @@ window.PageReports = (function () {
       ' \u00B7 ' +
       (reportPaper === 'legal' ? 'Legal' : 'Letter') +
       ' \u00B7 ' +
-      (grade ? 'black' : reportView === 'photocopy' ? 'black' : 'colour') +
+      (grade ? 'Black' : reportView === 'photocopy' ? 'Black' : 'Colour') +
       '</span>';
     html += '<span class="issue-k">Sheets</span><span>' + studentsLine + '</span>';
     html +=
@@ -954,7 +968,15 @@ window.PageReports = (function () {
     }
     if (!_lastSummary || !Object.keys(_lastSummary.perStudent || {}).length) return;
     var c = _issueCounts();
-    _issueState = { counts: c, trigger: document.activeElement };
+    // The Name choice redraws the reports while the dialog is open; Cancel
+    // and Escape put back what the class had (step 4 group 2 #6).
+    _issueState = {
+      counts: c,
+      trigger: document.activeElement,
+      nameChanged: false,
+      gradeBefore: reportConfig.gradeReport ? JSON.parse(JSON.stringify(reportConfig.gradeReport)) : null,
+      formBefore: reportConfig.form ? JSON.parse(JSON.stringify(reportConfig.form)) : null,
+    };
     var overlay = document.createElement('div');
     overlay.id = ISSUE_OVERLAY_ID;
     overlay.className = 'confirm-overlay issue-overlay';
@@ -991,10 +1013,16 @@ window.PageReports = (function () {
       if (!t || t.name !== 'issue-name') return;
       if (_isGrade()) _setGradeOption('name', t.value === 'first' ? 'first' : 'preferred');
       else _setForm(ReportSheets.setOption(_formOf(), 'header', 'name', t.value));
-      if (_issueState) _issueState.counts = _issueCounts();
+      if (_issueState) {
+        _issueState.nameChanged = true;
+        _issueState.counts = _issueCounts();
+      }
     });
     _issueState.keyHandler = function (e) {
       if (e.key === 'Escape') closeIssueDialog();
+      // Tab and Shift-Tab stay inside the dialog, which is modal (step 4
+      // group 3 #64).
+      else if (e.key === 'Tab') _trapTab(e, overlay);
     };
     document.addEventListener('keydown', _issueState.keyHandler);
     document.body.appendChild(overlay);
@@ -1002,9 +1030,52 @@ window.PageReports = (function () {
     if (first && first.focus) first.focus();
   }
 
+  /* Keeps Tab inside a modal dialog: past its last control it goes to the
+     first, before its first to the last. */
+  function _trapTab(e, box) {
+    var items = Array.prototype.slice
+      .call(
+        box.querySelectorAll(
+          'button:not([disabled]), a[href], input:not([disabled]), select, textarea, [tabindex="0"]',
+        ),
+      )
+      .filter(function (x) {
+        // A radio group is one stop: its checked radio.
+        return !x.hidden && x.offsetParent !== null && (x.type !== 'radio' || x.checked);
+      });
+    if (!items.length) return;
+    var first = items[0];
+    var last = items[items.length - 1];
+    var at = document.activeElement;
+    if (!box.contains(at)) {
+      e.preventDefault();
+      (e.shiftKey ? last : first).focus();
+    } else if (e.shiftKey && at === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && at === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  /* keepEveryone: the dialog closes to print, so the canvas stays on
+     Everyone and the Name chosen in it stays. Any other close is a cancel. */
   function closeIssueDialog(keepEveryone) {
     var overlay = document.getElementById(ISSUE_OVERLAY_ID);
     if (overlay && overlay.remove) overlay.remove();
+    if (_issueState && _issueState.nameChanged && !keepEveryone) {
+      _issueState.nameChanged = false;
+      if (_isGrade()) {
+        reportConfig.gradeReport = _issueState.gradeBefore;
+        _saveReportConfig();
+        _classFitKey = '';
+        renderStudioPanels();
+        renderReportPreview();
+      } else {
+        _setForm(_issueState.formBefore || ReportSheets.formFor(null));
+      }
+    }
     if (_restoreOneAfterPrint && !keepEveryone) {
       _restoreOneAfterPrint = false;
       studioView = 'one';
@@ -1452,6 +1523,9 @@ window.PageReports = (function () {
     var key = _classFitKeyNow();
     if (key === _classFitKey) {
       _renderFitLine();
+      // The rail's sheet badges follow the whole class's fit, as the fit
+      // line does (step 4 group 2 #9).
+      if (_classFit) _annotateSidebar(_classFit);
       return;
     }
     _classFitKey = key;
@@ -1467,8 +1541,11 @@ window.PageReports = (function () {
       } catch (e) {
         _classFit = null;
       }
-      // The palette greys the blocks with no room once the fit is in.
+      // The palette greys the blocks with no room once the fit is in, and
+      // every student's badge in the rail is redrawn from it: a render of
+      // one student only redraws that student's (step 4 group 2 #9).
       renderStudioPanels();
+      if (_classFit) _annotateSidebar(_classFit);
       // The summary names the longest report; the canvas moves to it.
       if (previewAuto && studioView === 'one') {
         var longest = ReportStudio.longestStudent(_classFit);
@@ -1590,8 +1667,15 @@ window.PageReports = (function () {
             return ReportStudio.fitsOn(f, id, s, _blockSizes, fit());
           });
           if (next != null) {
-            var full = to.side === 0 ? 'The Front is full' : to.side === 1 ? 'The Back is full' : 'That page is full';
-            label += ' to the ' + (next === 1 ? 'Back' : next === 0 ? 'Front' : 'Page ' + (next + 1)) + '. ' + full;
+            var full =
+              to.side === 0 && next > 1
+                ? 'The Front and Back are full'
+                : to.side === 0
+                  ? 'The Front is full'
+                  : to.side === 1
+                    ? 'The Back is full'
+                    : 'That page is full';
+            label += ' to ' + ReportStudio.sideWhere(next) + '. ' + full;
             to = { side: next };
           }
         }
@@ -1624,7 +1708,37 @@ window.PageReports = (function () {
         _selectBlock(id);
       },
       announce: _announce,
+      escape: _studioEscape,
     });
+  }
+
+  /* Escape on Progress Reports closes the Blocks panel on a narrow screen,
+     else the selected block's card, focus going back to the block (step 4
+     group 3 #64). A dialog over the page keeps Escape for itself. */
+  function _studioEscape(e) {
+    if (activeTab !== 'progress' || document.querySelector('.confirm-overlay, .studio-dragging')) return false;
+    // An Escape a dialog used to close itself (it is gone from the page) or
+    // pressed inside one is the dialog's.
+    var t = e && e.target;
+    if (t && t.nodeType === 1 && (!t.isConnected || (t.closest && t.closest('[role="dialog"]')))) return false;
+    var layout = document.getElementById('studio');
+    var rail = document.getElementById('tb-rail-btn');
+    if (layout && layout.classList.contains('rail-open')) {
+      layout.classList.remove('rail-open');
+      if (rail) {
+        rail.classList.remove('active');
+        rail.setAttribute('aria-pressed', 'false');
+        rail.focus();
+      }
+      return true;
+    }
+    if (studioSelected) {
+      var id = studioSelected;
+      _focusBlock = id;
+      _selectBlock(null);
+      return true;
+    }
+    return false;
   }
 
   function _label(id) {
@@ -1699,6 +1813,22 @@ window.PageReports = (function () {
     var next = ReportSheets.moveRow(f, id, dir);
     if (JSON.stringify(next) === JSON.stringify(f)) return;
     _setForm(next, 'Moved ' + _label(id) + (dir < 0 ? ' up' : ' down'));
+  }
+  /* Selects a placed block on the previewed student's page and brings it
+     into view, from the palette. Everyone view switches to One Student,
+     where a block can be selected. */
+  function _findBlock(id) {
+    if (studioView !== 'one') {
+      studioView = 'one';
+      studioSelected = id;
+      renderReports();
+    } else _selectBlock(id);
+    var cell = document.querySelector('#rb-preview .sheet-body .sheet-cell[data-block="' + id + '"]');
+    if (cell) {
+      cell.scrollIntoView({ block: 'nearest' });
+      cell.focus({ preventScroll: true });
+    }
+    _announce(ReportStudio.placeText(_formOf(), id) + '.');
   }
   function _removeBlock(id) {
     if (studioSelected === id) studioSelected = null;
@@ -1881,13 +2011,15 @@ window.PageReports = (function () {
         if (studioTab === 'templates') _syncTemplates();
       },
       studioBlock: function () {
-        // A block already on the form comes off it (Undo puts it back). One
-        // that isn't lands in a row of its own: on the Front when it has room for
+        // A block already on the form is found on the page: selected, with
+        // its card, and scrolled to (DECISIONS "Report forms" 13; it was
+        // removed, step 4 group 2 #8). Remove is on its card. One that isn't
+        // lands in a row of its own: on the Front when it has room for
         // every student, else on the Back, with a toast that says so. A
         // block taller than a side prints after the report.
         var id = el.dataset.block;
         var f = _formOf();
-        if (ReportSheets.locate(f, id)) return _removeBlock(id);
+        if (ReportSheets.locate(f, id)) return _findBlock(id);
         if (el.getAttribute('aria-disabled') === 'true') return;
         var land = _landing(id);
         if (!land) return;
@@ -1895,7 +2027,10 @@ window.PageReports = (function () {
         var label = 'Added ' + _label(id);
         if (land.after) label += '. It prints after the report';
         else if (land.side > 0 && f.sides.length > 1)
-          label += ' to the ' + (land.side === 1 ? 'Back' : 'Page ' + (land.side + 1)) + '. The Front is full';
+          label +=
+            ' to ' +
+            ReportStudio.sideWhere(land.side) +
+            (land.side > 1 ? '. The Front and Back are full' : '. The Front is full');
         _setForm(ReportSheets.insert(f, id, { side: land.side }), label);
         _announce(ReportStudio.placeText(_formOf(), id) + '.');
       },
@@ -1936,7 +2071,7 @@ window.PageReports = (function () {
         var to = Number(el.dataset.side) || 0;
         _setForm(
           ReportSheets.moveToSide(_formOf(), id, to),
-          'Moved ' + _label(id) + ' to the ' + (to === 0 ? 'Front' : to === 1 ? 'Back' : 'Page ' + (to + 1)),
+          'Moved ' + _label(id) + ' to ' + ReportStudio.sideWhere(to),
         );
         _announce(ReportStudio.placeText(_formOf(), id) + '.');
       },

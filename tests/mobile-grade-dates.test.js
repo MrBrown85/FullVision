@@ -126,7 +126,7 @@ describe('an undated assessment in the grade list', () => {
   it('says No Date, not Invalid Date', () => {
     const html = MGrade.renderPicker(CID);
     expect(html).not.toContain('Invalid Date');
-    expect(html).toMatch(/<span>No Date<\/span><span>1 tag/);
+    expect(html).toMatch(/<span>No Date<\/span><span>1 competency/);
   });
 
   it('is in no date range: not in Recent, This Week or Last 30 Days, only in All', () => {

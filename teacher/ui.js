@@ -300,7 +300,7 @@ function renderDock(activePage, rightHTML) {
     <div class="tb-group tb-center">
       <div class="seg tb-seg">${seg}</div>
     </div>
-    <div class="tb-group tb-right">${rightHTML || ''}<div class="tb-sync" role="status" aria-label="Sync status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>${userMenu}</div>
+    <div class="tb-group tb-right">${rightHTML || ''}<div class="tb-sync" role="status" aria-label="Sync status" data-action="retry-sync-dot"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>${userMenu}</div>
   </nav>`;
 }
 
@@ -328,12 +328,10 @@ function _getQueueStats() {
 
 // Sync shows only as the dot: no count, popover or list of failed writes
 // (Oct 2026). Teachers found the number confusing; the dot's colour and
-// tooltip say all they need.
+// tooltip say all they need, and the tooltip carries no count either.
 function refreshSyncStatusUI() {
   var stats = _getQueueStats();
-  var total = stats.queued;
   var banner = document.getElementById('offline-banner');
-  var dot = document.getElementById('sync-indicator-dot');
   var body = document.body;
 
   if (banner) {
@@ -343,29 +341,24 @@ function refreshSyncStatusUI() {
     body.classList.toggle('offline-active', !stats.online);
   }
 
-  if (dot) {
-    var dotStatus = 'idle';
-    var dotTitle = 'All changes saved';
-    var saveProblem = typeof getSaveProblem === 'function' ? getSaveProblem() : null;
-    if (saveProblem) {
-      dotStatus = 'error';
-      dotTitle = saveProblem;
-    } else if (stats.deadLettered > 0) {
-      dotStatus = 'error';
-      dotTitle = "Some changes couldn't be saved";
-    } else if (stats.signedOut && stats.queued > 0) {
-      dotStatus = 'error';
-      dotTitle = 'Signed out — changes are waiting until you sign in';
-    } else if (!stats.online && total > 0) {
-      dotStatus = 'error';
-      dotTitle = total === 1 ? 'Offline — 1 change queued' : 'Offline — ' + total + ' changes queued';
-    } else if (stats.flushing || (stats.online && stats.queued > 0)) {
-      dotStatus = 'syncing';
-      dotTitle = stats.queued === 1 ? 'Syncing 1 queued change' : 'Syncing ' + stats.queued + ' queued changes';
-    }
-    dot.className = 'tb-sync-dot ' + dotStatus;
-    dot.title = dotTitle;
-    dot.setAttribute('aria-label', dotTitle);
+  // The dot is drawn in one place (shared/data.js getSyncDotState), so the
+  // phone and desktop agree and two painters can't contradict each other.
+  if (typeof _updateSyncIndicator === 'function') _updateSyncIndicator();
+}
+
+/* A click on a red sync dot tries again at once: paused cloud sync probes
+   the server, a class that couldn't load loads again. Otherwise it does
+   nothing; the outbox already retries on its own. */
+function _retryFromSyncDot() {
+  var dot = document.getElementById('sync-indicator-dot');
+  if (!dot || !/\berror\b/.test(dot.className || '')) return;
+  if (window.GB && typeof window.GB.isSupabaseDegraded === 'function' && window.GB.isSupabaseDegraded()) {
+    if (typeof window.GB.retrySupabaseRecovery === 'function') window.GB.retrySupabaseRecovery();
+    return;
+  }
+  var cid = typeof getActiveCourse === 'function' ? getActiveCourse() : null;
+  if (cid && typeof courseLoadFailed === 'function' && courseLoadFailed(cid)) {
+    if (typeof window.retryActiveCourseLoad === 'function') window.retryActiveCourseLoad();
   }
 }
 
@@ -584,6 +577,19 @@ document.addEventListener('click', function (e) {
     const button = menu.querySelector('.tb-user-btn');
     if (button) button.setAttribute('aria-expanded', 'false');
   }
+});
+// Escape closes it too, and puts the focus back on the account button.
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  const menu = document.querySelector('.tb-user-menu.open');
+  if (!menu) return;
+  menu.classList.remove('open');
+  const button = menu.querySelector('.tb-user-btn');
+  if (button) {
+    button.setAttribute('aria-expanded', 'false');
+    button.focus();
+  }
+  e.preventDefault();
 });
 
 /* ── Upcoming Birthdays ────────────────────────────────────── */
@@ -889,6 +895,19 @@ function _rosterShowShort(cid, mode) {
   return mode === 'percent' ? '%' : _rosterShowLabel(cid, mode);
 }
 
+/* The grades beside the names follow the class's reporting term, picked on
+   the Gradebook, Dashboard and student page. Assignments, Observations and
+   Reports have no term picker, so with a term picked every name there could
+   read IC with nothing to say why. The roster names the term instead. */
+// html-safe: the term label goes through esc.
+function _sidebarTermNote(cid) {
+  var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+  if (!term || !term.label) return '';
+  var tip =
+    'The grades count only work dated in ' + term.label + '. The term is picked on the Gradebook and Dashboard.';
+  return `<div class="sb-term-note" id="sb-term-note" title="${esc(tip)}">Grades for ${esc(term.label)}</div>`;
+}
+
 // html-safe: names and initials go through esc; ids, the avatar colour and the flag mark are ours.
 function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
   const flags = getFlags(cid);
@@ -903,10 +922,10 @@ function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
     const clickAttr = onStudentClick
       ? `type="button" data-action="sidebarStudentClick"`
       : `role="link" tabindex="0" data-href="${href}"`;
-    html += `<${tag} class="student-row${s.id === selectedStudentId ? ' selected' : ''}" ${clickAttr} data-sid="${s.id}">
+    html += `<${tag} class="student-row${s.id === selectedStudentId ? ' selected' : ''}" ${clickAttr} data-sid="${s.id}" data-search="${esc((displayName(s) + ' ' + fullName(s)).toLowerCase())}">
       <span class="student-avatar" style="background:${avatarBg}">${esc(initials(s))}</span>
       <span class="student-info">
-        <span class="student-row-name">${flagged ? '<span style="color:var(--priority);margin-right:3px">\u2691</span>' : ''}${esc(fullName(s))}</span>
+        <span class="student-row-name">${flagged ? '<span style="color:var(--priority);margin-right:3px">\u2691</span>' : ''}${esc(displayName(s))}</span>
       </span>
       <span class="student-row-grades" data-prof-sid="${s.id}"></span>
     </${tag}>`;
@@ -931,6 +950,8 @@ function _rosterShowMenuHtml(cid, mode) {
 }
 
 let _sidebarCid = null;
+// The class picker's last option, which opens the New Class wizard.
+const CLASS_PICKER_NEW = '__new_class__';
 // html-safe: course names are escaped; labels come from the fixed roster lists; rows come from _sidebarRowsHtml.
 function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
   _sidebarClickFnName = onStudentClick || null;
@@ -946,6 +967,7 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
         ${getPickerCourses(cid)
           .map(c => `<option value="${c.id}"${c.id === cid ? ' selected' : ''}>${esc(c.name)}</option>`)
           .join('')}
+        <option value="${CLASS_PICKER_NEW}">New Class…</option>
       </select>
       <div class="sb-search-row">
         <input id="gb-roster-search" type="text" placeholder="Search..." aria-label="Search students">
@@ -963,7 +985,7 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4l2.5 2.5L7.5 4"/></svg>
         </button>
         <div class="sb-sort-menu" id="sb-show-menu" role="menu" aria-label="Grades beside each name" hidden>${_rosterShowMenuHtml(cid, show)}</div>
-      </div>
+      </div>${_sidebarTermNote(cid)}
     </div>
     <div id="gb-roster-list" role="list">${_sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick)}</div>
   </aside>`;
@@ -1185,7 +1207,8 @@ function applySidebarAnnotations() {
 function filterRoster() {
   const q = (document.getElementById('gb-roster-search').value || '').toLowerCase().trim();
   document.querySelectorAll('.student-row').forEach(row => {
-    const name = row.querySelector('.student-row-name')?.textContent?.toLowerCase() || '';
+    // The row shows the preferred name; its search key holds the legal name too.
+    const name = row.dataset.search || row.querySelector('.student-row-name')?.textContent?.toLowerCase() || '';
     row.style.display = !q || name.includes(q) ? '' : 'none';
   });
 }
@@ -1193,9 +1216,14 @@ function filterRoster() {
 /* The CSP blocks inline on* attributes, so the sidebar's class picker and
    roster search are wired here, once, by delegation. */
 document.addEventListener('change', function (e) {
-  if (e.target.matches('[data-action="sidebarSwitchCourse"]') && window._pageSwitchCourse) {
-    window._pageSwitchCourse(e.target.value);
+  if (!e.target.matches('[data-action="sidebarSwitchCourse"]')) return;
+  // "New Class…" opens the New Class wizard; the picker stays on this class.
+  if (e.target.value === CLASS_PICKER_NEW) {
+    e.target.value = _sidebarCid || '';
+    if (window.Router) Router.navigate('/dashboard?manage=new');
+    return;
   }
+  if (window._pageSwitchCourse) window._pageSwitchCourse(e.target.value);
 });
 document.addEventListener('input', function (e) {
   if (e.target.id === 'gb-roster-search') filterRoster();
@@ -1309,6 +1337,12 @@ function _keepRosterScroll() {
 if (typeof document !== 'undefined' && document.addEventListener) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _keepRosterScroll);
   else _keepRosterScroll();
+}
+
+// Redraw the roster rows (a flag set or cleared), keeping the sort, the
+// selected student and the search.
+function refreshRosterRows() {
+  if (_sidebarCid && document.getElementById('gb-roster-list')) _applyRosterSort(_rosterSortMode(_sidebarCid));
 }
 
 // Refresh sidebar in place (call after score changes)
@@ -1463,20 +1497,13 @@ let _syncToastTimer = null;
 function showSyncToast(message, type) {
   dismissSyncToast();
   const toast = document.createElement('div');
-  // 'degraded' reuses the error visual but persists (no auto-dismiss) and
-  // wires a different retry action that re-runs bootstrap_teacher rather
-  // than flushing the offline queue.
-  var visualClass = type === 'degraded' ? 'error' : type || 'error';
-  toast.className = 'sync-toast ' + visualClass;
+  // A failed class load and paused cloud sync show only on the sync dot
+  // (CLAUDE.md rule 5), so there is no persistent load toast here.
+  toast.className = 'sync-toast ' + (type || 'error');
   toast.id = 'sync-toast';
   toast.setAttribute('role', 'alert');
   toast.setAttribute('aria-live', 'assertive');
-  if (type === 'degraded') {
-    toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-supabase-recovery">Retry Now</button>`;
-  } else if (type === 'load-failed') {
-    toast.className = 'sync-toast error';
-    toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-course-load">Retry</button>`;
-  } else if (type === 'error') {
+  if (type === 'error') {
     toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-sync">Retry Now</button>`;
   } else {
     toast.innerHTML = `<span>${esc(message)}</span>`;
@@ -1678,17 +1705,8 @@ document.addEventListener('click', function (e) {
       retrySyncQueue();
       dismissSyncToast();
       break;
-    case 'retry-course-load':
-      dismissSyncToast();
-      if (typeof window.retryActiveCourseLoad === 'function') window.retryActiveCourseLoad();
-      break;
-    case 'retry-supabase-recovery':
-      if (window.GB && typeof window.GB.retrySupabaseRecovery === 'function') {
-        window.GB.retrySupabaseRecovery();
-      }
-      // Don't dismiss — the recovery probe will dismiss/replace the toast itself
-      // (success → "Cloud sync restored" via _exitDegradedMode; failure → keep
-      // the existing toast in place and reschedule the next probe).
+    case 'retry-sync-dot':
+      _retryFromSyncDot();
       break;
     case 'copy-session-draft':
       _copySessionExpiredDraft().then(function (copied) {

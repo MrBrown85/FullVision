@@ -187,6 +187,8 @@ window.PageAssignments = (function () {
     focusStudentId = null;
     collapsedModules = _loadClosedModules(cid);
     rubricViewStates = {};
+    // The roster's grades follow the class's saved term, as on the Gradebook.
+    if (typeof activateSavedTerm === 'function') activateSavedTerm(activeCourse);
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
       activeCourse,
       focusStudentId,
@@ -269,6 +271,7 @@ window.PageAssignments = (function () {
     if (!focusStudentId) return;
     var memo = _graderFocusMemo();
     if (_grader && _graderStepGroup(dir)) {
+      _graderToTop();
       _restoreGraderFocus(memo);
       return;
     }
@@ -294,9 +297,18 @@ window.PageAssignments = (function () {
     _syncSidebarSelection();
     render();
     var card = document.querySelector('.assess-card.open');
-    if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
+    if (_grader) _graderToTop();
+    else if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
     if (hadKbFocus && card) kbFocusCell(card.querySelector('.rsg-criterion-row'));
     else _restoreGraderFocus(memo);
+  }
+
+  /* The grader opens the next student at the top, under their name: kept
+     scrolled down, the name was off screen and a teacher could score the
+     wrong student (Nov 3 sweep). The same card keeps the focus. */
+  function _graderToTop() {
+    var sc = _grader && _grader.overlay.querySelector('.grader-scroll');
+    if (sc) sc.scrollTop = 0;
   }
 
   /* The grading control that has focus (a criterion or competency card, a
@@ -1546,10 +1558,13 @@ window.PageAssignments = (function () {
 
     // New assessment form
     html +=
-      '<div id="new-assess-form" style="display:' +
+      '<div id="new-assess-form" data-cid="' +
+      esc(cid) +
+      '" style="display:' +
       (_showingNewForm ? 'block' : 'none') +
       ';background:var(--bg);border:2px solid var(--active);border-radius:var(--radius);padding:16px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,122,255,0.12)">' +
-      (_showingNewForm
+      // An open form kept through this redraw is put back by render().
+      (_showingNewForm && !_keepingForm
         ? renderAssessForm(
             cid,
             _editingAssessId
@@ -1641,6 +1656,7 @@ window.PageAssignments = (function () {
                 : '';
             })()
           : '') +
+        _cardScoringBadges(a) +
         (a.coreCompetencyIds || [])
           .map(function (ccId) {
             var cc = getCoreCompetency(ccId);
@@ -1941,6 +1957,39 @@ window.PageAssignments = (function () {
 
   function _chipTipAttrs(name, text) {
     return ' tabindex="0" data-chip-tip="' + esc(text) + '" data-chip-tip-name="' + esc(name) + '"';
+  }
+
+  /* The card's scoring and Factor (Nov 3 sweep): how the work is scored,
+     unless its rubric chip already says so, and its Factor when it isn't
+     1x, so a teacher needn't open the form or the gradebook to see them. */
+  function _cardScoringBadges(a) {
+    var mode = a.scoreMode || 'proficiency';
+    var kind = '';
+    var tip = '';
+    if (mode === 'points') {
+      kind = formatPoints(Number(a.maxPoints) || 100) + ' Points';
+      tip = 'Scored in points.';
+    } else if (mode === 'complete') {
+      kind = 'Complete/Incomplete';
+      tip = 'Scored Complete or Incomplete.';
+    } else if (mode === 'dibels') {
+      kind = 'DIBELS';
+      tip = 'A DIBELS 8 benchmark. It counts toward no grade.';
+    } else if (!a.rubricId || !getRubricById(activeCourse, a.rubricId)) {
+      kind = 'Competencies';
+      tip = 'Scored on each competency, with no rubric.';
+    }
+    var factor = getAssessmentWeight(a);
+    return (
+      (kind ? '<span class="score-badge"' + _chipTipAttrs(kind, tip) + '>' + esc(kind) + '</span>' : '') +
+      (factor !== 1 && mode !== 'dibels'
+        ? '<span class="score-badge"' +
+          _chipTipAttrs('Factor ' + factor + 'x', 'Counts ' + factor + ' times as much as work at Factor 1x.') +
+          '>' +
+          esc('Factor ' + factor + 'x') +
+          '</span>'
+        : '')
+    );
   }
 
   function _categoryChipTip(cid, categoryId) {
@@ -2377,6 +2426,20 @@ window.PageAssignments = (function () {
     if (el && el === _afTipSource) _showAfTip(el, el === document.activeElement);
   }
 
+  /* An open New or Edit Assessment form is kept as the teacher has it
+     through a redraw of the page. A data refresh waits for the teacher to
+     leave a field, then redraws: rebuilding the form there blanked it (title,
+     dates and scoring back to the defaults, a Blank Rubric's name gone), and
+     the click that left the field (Points, Complete/Incomplete, a Category)
+     landed on the old form. A form drawn for another class is not kept. */
+  var _keepingForm = false;
+  function _openFormToKeep(cid) {
+    if (!_showingNewForm) return null;
+    var form = document.getElementById('new-assess-form');
+    if (!form || form.dataset.cid !== cid || !form.querySelector('#af-title')) return null;
+    return form;
+  }
+
   function render() {
     _hideChipTip();
     _hideAfTip();
@@ -2436,14 +2499,26 @@ window.PageAssignments = (function () {
     document.getElementById('page-toolbar-mount').innerHTML = result.toolbarHtml;
 
     // Render assessment list
-    document.getElementById('main').innerHTML = renderAssessmentList(
-      cid,
-      assessments,
-      allAssessments,
-      students,
-      scores,
-      modules,
-    );
+    var keptForm = _openFormToKeep(cid);
+    var keptFocus = keptForm && keptForm.contains(document.activeElement) ? document.activeElement : null;
+    _keepingForm = !!keptForm;
+    try {
+      document.getElementById('main').innerHTML = renderAssessmentList(
+        cid,
+        assessments,
+        allAssessments,
+        students,
+        scores,
+        modules,
+      );
+    } finally {
+      _keepingForm = false;
+    }
+    if (keptForm) {
+      var freshForm = document.getElementById('new-assess-form');
+      if (freshForm) freshForm.replaceWith(keptForm);
+      if (keptFocus && keptFocus.isConnected) keptFocus.focus({ preventScroll: true });
+    }
     document.querySelectorAll('#main .ldg-grid').forEach(refreshLedgerSummary);
 
     // Show/hide descriptor bar
@@ -2659,7 +2734,8 @@ window.PageAssignments = (function () {
         .join('') +
       '</select>' +
       (categories.length === 0
-        ? '<div class="af-rubric-info">No grading categories configured for this course yet.</div>'
+        ? '<div class="af-rubric-info">This class has no grading categories yet. ' +
+          '<button type="button" class="af-link-btn" data-action="afAddCategories">Add Categories</button></div>'
         : '<p class="af-category-hint" id="af-category-hint"' +
           (needsPick && scoreMode !== 'dibels' ? '' : ' hidden') +
           '>' +
@@ -2687,9 +2763,14 @@ window.PageAssignments = (function () {
       '</div>' +
       '<div class="af-field">' +
       '<label class="af-label">Due Date (optional)</label>' +
-      '<input class="af-input" id="af-due" type="date" value="' +
+      '<input class="af-input" id="af-due" type="date" aria-describedby="af-due-hint" value="' +
       esc(defaultDue) +
       '">' +
+      '<p class="af-category-hint" id="af-due-hint"' +
+      (_dueBeforeAssigned(dateAssigned, defaultDue) ? '' : ' hidden') +
+      '>' +
+      DUE_BEFORE_ASSIGNED_HINT +
+      '</p>' +
       '</div>' +
       '</div>';
     html += '</section>';
@@ -3013,6 +3094,21 @@ window.PageAssignments = (function () {
   /* A new Date Assigned moves Due Date with it only while Due is still the
      week-later date it was given (or empty); a due date the teacher set
      stays. */
+  /* A due date before the date assigned is said under the field as it is
+     picked; the card read "Nov 3, 2026 → Nov 2, 2026" with no word (Nov 3
+     sweep). Information only: Save still saves. */
+  var DUE_BEFORE_ASSIGNED_HINT = 'The due date is before the date assigned.';
+  function _dueBeforeAssigned(assigned, due) {
+    return !!(assigned && due && due < assigned);
+  }
+  function _refreshDueHint() {
+    var hint = document.getElementById('af-due-hint');
+    if (!hint) return;
+    hint.hidden = !_dueBeforeAssigned(
+      (document.getElementById('af-date-assigned') || {}).value,
+      (document.getElementById('af-due') || {}).value,
+    );
+  }
   function _weekAfter(day) {
     var d = new Date(day + 'T12:00:00');
     d.setDate(d.getDate() + 7);
@@ -3025,8 +3121,8 @@ window.PageAssignments = (function () {
     assigned.dataset.was = assigned.value;
     var dueEl = document.getElementById('af-due');
     if (!dueEl) return;
-    if (dueEl.value && !(was && dueEl.value === _weekAfter(was))) return;
-    dueEl.value = _weekAfter(assigned.value);
+    if (!(dueEl.value && !(was && dueEl.value === _weekAfter(was)))) dueEl.value = _weekAfter(assigned.value);
+    _refreshDueHint();
   }
 
   function setScoreMode(mode) {
@@ -3158,6 +3254,15 @@ window.PageAssignments = (function () {
     );
   }
 
+  /* The rubric the form is building, for the Counts As line: the Blank
+     Rubric while it is open or written in, else a rubric made on the form
+     and held unsaved. Null: a saved rubric, looked up by its id. */
+  function _formDraftRubric(rid) {
+    if (_blank && (_startOpen === 'blank' || _blankWritten())) return _blank.draft;
+    if (_pendingFormRubric && _pendingFormRubric.id === rid) return _pendingFormRubric;
+    return null;
+  }
+
   // The form's Counts As line, from what the form says now.
   function _refreshFormCountsAs() {
     _refreshCountsToward();
@@ -3169,9 +3274,11 @@ window.PageAssignments = (function () {
       line.textContent = '';
       return;
     }
+    var rid = mode === 'proficiency' ? (document.getElementById('af-rubric') || {}).value || '' : '';
     line.textContent = _countsAsText(activeCourse, {
       categoryId: (document.getElementById('af-category') || {}).value || '',
-      rubricId: mode === 'proficiency' ? (document.getElementById('af-rubric') || {}).value || '' : '',
+      rubricId: rid,
+      rubric: mode === 'proficiency' ? _formDraftRubric(rid) : null,
       scoreMode: mode,
       maxPoints: parseFloat((document.getElementById('af-maxpoints') || {}).value) || 0,
       weight: _formAssessWeight(),
@@ -3341,18 +3448,50 @@ window.PageAssignments = (function () {
       saved.textContent = '';
     }
     if (!t.id) return;
+    if (t.id === 'af-due' || t.id === 'af-date-assigned') _refreshDueHint();
     // A title clears the "Title is required" state as soon as it's typed.
     if (t.id === 'af-title' && t.value.trim()) t.removeAttribute('aria-invalid');
     if (t.id === 'af-maxpoints') {
       t.style.border = '';
       t.removeAttribute('aria-invalid');
-      var v = Number(t.value);
-      document.querySelectorAll('#af-maxpoints-picks .seg-btn').forEach(function (b) {
-        var hit = String(t.value).trim() !== '' && Number(b.dataset.value) === v;
-        b.classList.toggle('active', hit);
-        b.setAttribute('aria-pressed', hit ? 'true' : 'false');
-      });
+      _syncMaxPointsPicks();
     }
+  }
+  // The Max Points quick pick that matches the box is lit; none when none does.
+  function _syncMaxPointsPicks() {
+    var el = document.getElementById('af-maxpoints');
+    if (!el) return;
+    var v = Number(el.value);
+    document.querySelectorAll('#af-maxpoints-picks .seg-btn').forEach(function (b) {
+      var hit = String(el.value).trim() !== '' && Number(b.dataset.value) === v;
+      b.classList.toggle('active', hit);
+      b.setAttribute('aria-pressed', hit ? 'true' : 'false');
+    });
+  }
+
+  /* Escape on the New or Edit Assessment form is its Cancel (Nov 3 sweep:
+     it did nothing): a form with changes asks first. A tip showing on a
+     field closes first; the rubric starts, the competency search and the
+     dialogs over the form take their own Escape before this runs. */
+  function _formEscape(e) {
+    if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return;
+    var form = document.getElementById('new-assess-form');
+    if (!_showingNewForm || !form || form.style.display === 'none') return;
+    var t = e.target;
+    var inForm = t && t.closest && t.closest('#new-assess-form');
+    if (!inForm && t !== document.body) return;
+    if (document.querySelector('.confirm-overlay, #rubric-modal')) return;
+    if (window.RubricBank && RubricBank.isOpen()) return;
+    e.preventDefault();
+    if (_afTipSource) return _hideAfTip();
+    var aid = _editingAssessId;
+    cancelAssessForm(function () {
+      // Back to the button that opened the form.
+      var back = aid
+        ? document.querySelector('[data-action="editAssess"][data-aid="' + CSS.escape(aid) + '"]')
+        : document.querySelector('.tb-action-btn[data-action="showNewForm"]');
+      if (back) back.focus({ preventScroll: true });
+    });
   }
 
   function _formKeydown(e) {
@@ -5497,12 +5636,18 @@ window.PageAssignments = (function () {
   /* Cancel asks first when the form differs from how it opened: a new
      assessment from the blank form, an edit from the stored values. A
      rubric made for it is kept only when the assessment is saved. */
-  function cancelAssessForm() {
+  /* Cancel, or leaving the form for another page (`then`, after it
+     closes): a form with changes asks first. */
+  function cancelAssessForm(then) {
     var title = ((document.getElementById('af-title') || {}).value || '').trim();
     var editing = !!_editingAssessId;
     var dirty = _formChanges().length > 0 || !!_pendingFormRubric || _blankWritten();
-    if (!dirty) {
+    var close = function () {
       hideNewForm();
+      if (typeof then === 'function') then();
+    };
+    if (!dirty) {
+      close();
       return;
     }
     _formDialog(
@@ -5514,7 +5659,7 @@ window.PageAssignments = (function () {
             (_pendingFormRubric ? ' The rubric you made for it isn\u2019t kept either.' : ''),
       [
         { label: 'Keep Editing', style: 'cancel' },
-        { label: 'Discard', style: 'danger', run: hideNewForm },
+        { label: 'Discard', style: 'danger', run: close },
       ],
     );
   }
@@ -6003,11 +6148,13 @@ window.PageAssignments = (function () {
     };
     set('af-module', keep.module);
     set('af-maxpoints', keep.maxPoints);
+    _syncMaxPointsPicks();
     set('af-weight', keep.weight);
     set('af-date-assigned', keep.assigned);
     set('af-due', keep.due);
     var assignedEl = document.getElementById('af-date-assigned');
     if (assignedEl) assignedEl.dataset.was = assignedEl.value;
+    _refreshDueHint();
     if (
       keep.mode &&
       keep.mode !== 'proficiency' &&
@@ -6463,18 +6610,22 @@ window.PageAssignments = (function () {
     });
     var html = '<span><b>' + vals.length + '</b> Marked</span><span><b>' + left + '</b> Unmarked</span>';
     var stats = grid.querySelector('.ldg-stats');
-    if (vals.length) {
-      var sorted = vals.slice().sort(function (x, y) {
+    // Median, Lowest and Highest count Missing as 0 too, so the line uses
+    // one rule (Nov 3 sweep: the Average counted it, the rest left it out).
+    var counted = vals.slice();
+    for (var m = 0; m < missing; m++) counted.push(0);
+    if (counted.length) {
+      var sorted = counted.slice().sort(function (x, y) {
         return x - y;
       });
-      var sum = vals.reduce(function (x, y) {
+      var sum = counted.reduce(function (x, y) {
         return x + y;
       }, 0);
       var mid =
         sorted.length % 2
           ? sorted[(sorted.length - 1) / 2]
           : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
-      html += '<span>Average <b>' + Math.round(((sum / (vals.length + missing)) * 100) / max) + '%</b></span>';
+      html += '<span>Average <b>' + Math.round(((sum / counted.length) * 100) / max) + '%</b></span>';
       if (stats)
         stats.innerHTML =
           '<span class="ldg-name">Class</span><span>Median <b>' +
@@ -6725,11 +6876,13 @@ window.PageAssignments = (function () {
     var max = parseFloat(inp.dataset.max) || 100;
     // A typo that isn't a number puts the saved score back; only a blank
     // box clears.
-    var raw = parsePointsInput(inp.value, max, getPointsScore(cid, sid, aid));
+    var prev = getPointsScore(cid, sid, aid);
+    var over = _pointsOverLimit(inp.value, max);
+    var raw = parsePointsInput(inp.value, max, prev);
     inp.value = raw != null ? formatPoints(raw) : '';
     // Leaving a field without changing it saves nothing; an untouched blank
     // field used to write a 0. A typed 0 is a score; blank clears.
-    if (raw === getPointsScore(cid, sid, aid)) return;
+    if (raw === prev) return;
     // setPointsScore saves the one score, as the gradebook and phone do. A
     // second write under the assessment's own id left a stray entry and
     // sent the score twice.
@@ -6737,6 +6890,34 @@ window.PageAssignments = (function () {
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
     if (pctSpan) pctSpan.innerHTML = pointsPctHtml(raw, max, 0);
     refreshLedgerSummary(inp.closest('.ldg-grid'));
+    if (over != null) _sayPointsCapped(cid, sid, aid, over, raw, max, prev);
+  }
+  /* Extra credit goes up to twice the maximum (D4), and a score typed above
+     that is saved at the limit. That used to happen without a word, so a
+     typo such as 45 for 4.5 became a perfect double score (Nov 3 sweep).
+     The toast says what was saved, and Undo puts back the score before. */
+  function _pointsOverLimit(text, max) {
+    var n = parseFloat(
+      String(text == null ? '' : text)
+        .trim()
+        .replace(',', '.'),
+    );
+    return max > 0 && isFinite(n) && n > max * POINTS_EXTRA_CREDIT_FACTOR ? n : null;
+  }
+  function _sayPointsCapped(cid, sid, aid, typed, saved, max, prev) {
+    _showFillUndo(
+      formatPoints(typed) +
+        ' is more than twice the ' +
+        formatPoints(max) +
+        '-point maximum, so it was saved as ' +
+        formatPoints(saved) +
+        '.',
+      function () {
+        setPointsScore(cid, sid, aid, prev);
+        render();
+        refreshSidebarGrades(sid);
+      },
+    );
   }
   // The next (or previous) score box that is open for typing.
   function focusPointsBox(row, dir) {
@@ -7009,9 +7190,24 @@ window.PageAssignments = (function () {
     // them all to it rather than clearing.
     var wasActive = el.classList.contains('active') && !el.classList.contains('mixed');
     var next = wasActive ? 0 : value;
+    var before = wasActive ? structuredClone(getScores(activeCourse)) : null;
     _setTagScore(activeCourse, sid, aid, tagId, next);
     _syncTagRows(aid, sid);
     refreshSidebarGrades(sid);
+    if (before) _offerClearUndo(activeCourse, before);
+  }
+
+  /* A click on the chosen level clears it. A misclick is put right from the
+     toast (or Cmd+Z while it is up), as the phone's "Score cleared" does:
+     Undo puts back the level and its + or −, unless it was scored again
+     since (Nov 3 sweep). */
+  function _offerClearUndo(cid, before) {
+    var after = structuredClone(getScores(cid));
+    _showFillUndo('Score cleared', function () {
+      restoreScoreCells(cid, before, after);
+      render();
+      refreshSidebarGrades();
+    });
   }
 
   // A criterion can feed several competencies, so a level set on one
@@ -7052,11 +7248,27 @@ window.PageAssignments = (function () {
       m.classList.remove('open');
     });
   }
+  /* The menu opens under its own row. Near the foot of the window it used
+     to open upward over the row above, so one student's menu (with Clear)
+     looked like the student's above (Nov 3 sweep): the page scrolls up to
+     make room first, and only a window too short for it opens it above. */
   function positionMenu(trigger, menu) {
+    menu.style.visibility = 'hidden';
+    menu.classList.add('open');
+    var menuH = menu.offsetHeight || 180;
+    menu.classList.remove('open');
+    menu.style.visibility = '';
     var rect = trigger.getBoundingClientRect();
-    var menuH = 180;
+    var short = menuH + 8 - (window.innerHeight - rect.bottom);
+    if (short > 0) {
+      var scroller = _scrollParent(trigger);
+      if (scroller) {
+        scroller.scrollTop += Math.min(short, Math.max(0, rect.top - 8));
+        rect = trigger.getBoundingClientRect();
+      }
+    }
     var spaceBelow = window.innerHeight - rect.bottom;
-    if (spaceBelow < menuH) {
+    if (spaceBelow < menuH + 4) {
       menu.style.bottom = window.innerHeight - rect.top + 4 + 'px';
       menu.style.top = 'auto';
     } else {
@@ -7068,6 +7280,13 @@ window.PageAssignments = (function () {
     if (left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
     if (left < 8) left = 8;
     menu.style.left = left + 'px';
+  }
+  function _scrollParent(el) {
+    for (var p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+      var oy = getComputedStyle(p).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) return p;
+    }
+    return document.scrollingElement;
   }
   function toggleScoreMenu(trigger) {
     var menu = trigger.querySelector('.col-fill-menu');
@@ -7110,7 +7329,7 @@ window.PageAssignments = (function () {
         _setTagScore(cid, st.id, aid, tagId, value);
       });
       selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"][data-tag="' + tagId + '"]';
-      toastMsg = 'Column filled';
+      toastMsg = value ? 'Column filled' : 'Column cleared';
     } else if (scope === 'row') {
       if (!assess) return;
       var sid = tagId;
@@ -7119,7 +7338,7 @@ window.PageAssignments = (function () {
           setScore(cid, sid, aid, tid, value);
         });
       selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"][data-student="' + sid + '"]';
-      toastMsg = 'Row filled';
+      toastMsg = value ? 'Row filled' : 'Row cleared';
     } else {
       if (!assess) return;
       var plan = _setEveryonePlan(cid, aid);
@@ -7169,6 +7388,7 @@ window.PageAssignments = (function () {
     var next = wasActive ? 0 : value;
     // Missing and Excused work takes no level (isScoreLocked); 1–4 reach here by key.
     if (next && isScoreLocked(activeCourse, sid, aid)) return;
+    var before = wasActive ? structuredClone(getScores(activeCourse)) : null;
     rubricCriterionScoreKeys(crit).forEach(function (tagId) {
       setScore(activeCourse, sid, aid, tagId, next);
     });
@@ -7181,6 +7401,7 @@ window.PageAssignments = (function () {
     // An open checklist's hint says whether the level is the boxes' or picked.
     if (RubricChecks.hasChecks(crit) && _isChecklistOpen(aid, sid, critId))
       _refreshChecklistRow(aid, sid, critId, false);
+    if (before) _offerClearUndo(activeCourse, before);
   }
   function updateRubricRowUI(row, value) {
     row.querySelectorAll('.rsg-level').forEach(function (l) {
@@ -7211,7 +7432,7 @@ window.PageAssignments = (function () {
         });
       });
       selector = '.rsg-criterion-row[data-assess="' + aid + '"][data-criterion="' + critId + '"]';
-      toastMsg = 'Criterion filled';
+      toastMsg = value ? 'Criterion filled' : 'Criterion cleared';
     } else if (scope === 'row') {
       if (!assess || !assess.rubricId) return;
       var rubric = getRubricById(cid, assess.rubricId);
@@ -7224,7 +7445,7 @@ window.PageAssignments = (function () {
           });
         });
       selector = '.rsg-criterion-row[data-assess="' + aid + '"][data-student="' + sid + '"]';
-      toastMsg = 'Row filled';
+      toastMsg = value ? 'Row filled' : 'Row cleared';
     } else {
       if (!assess || !assess.rubricId) return;
       var plan = _setEveryonePlan(cid, aid);
@@ -9089,10 +9310,10 @@ window.PageAssignments = (function () {
       var ok = root.querySelector('[data-copy-ok]');
       if (!ok) return;
       ok.disabled = !n;
-      ok.textContent = n ? 'Add ' + n + (n === 1 ? ' criterion' : ' criteria') : 'Add';
+      ok.textContent = n ? 'Add ' + n + (n === 1 ? ' Criterion' : ' Criteria') : 'Add';
     }
     AssessmentCopy.dialog({
-      title: 'Criteria from competencies',
+      title: 'Criteria From Competencies',
       html: html,
       okLabel: 'Add',
       onOpen: function (root) {
@@ -9725,7 +9946,7 @@ window.PageAssignments = (function () {
       overlay.id = 'crit-comment-overlay';
       overlay.className = 'comment-popover-overlay';
       overlay.onclick = function (e) {
-        if (e.target === this) closeCriterionComment();
+        if (e.target === this) cancelCriterionComment();
       };
       document.body.appendChild(overlay);
     }
@@ -9739,7 +9960,7 @@ window.PageAssignments = (function () {
       esc(assess.title) +
       '</span>' +
       _critCommentLevelHtml(cid, sid, aid, crit) +
-      '</div></div><button class="comment-popover-close" data-action="closeCriterionComment" aria-label="Close">✕</button></div>' +
+      '</div></div><button class="comment-popover-close" data-action="cancelCriterionComment" aria-label="Close">✕</button></div>' +
       '<div class="crit-comment-body"><label class="crit-comment-label" for="crit-comment-input">Comment for ' +
       esc(name) +
       '</label><textarea class="crit-comment-input" id="crit-comment-input" rows="3" maxlength="' +
@@ -9753,7 +9974,7 @@ window.PageAssignments = (function () {
       (note
         ? '<button type="button" class="btn btn-danger crit-comment-remove" data-action="removeCriterionComment">Remove Comment</button>'
         : '') +
-      '<span class="crit-comment-spacer"></span><button type="button" class="btn btn-ghost" data-action="closeCriterionComment">Cancel</button>' +
+      '<span class="crit-comment-spacer"></span><button type="button" class="btn btn-ghost" data-action="cancelCriterionComment">Cancel</button>' +
       (next
         ? '<button type="button" class="btn btn-ghost crit-comment-next" data-action="saveCriterionCommentNext" aria-keyshortcuts="Meta+Enter Control+Enter">' +
           nextLabel +
@@ -9839,6 +10060,38 @@ window.PageAssignments = (function () {
       e.preventDefault();
       first.focus();
     }
+  }
+  /* Cancel, ✕, Escape and a click outside: a comment typed and not saved is
+     only thrown away after the teacher says so, as the assessment form's
+     Cancel asks (Nov 3 sweep: Escape lost 48 typed characters). */
+  function cancelCriterionComment() {
+    var st = _critCommentState;
+    var inp = document.getElementById('crit-comment-input');
+    if (!st || !inp || inp.value.trim() === (st.original || '').trim()) {
+      closeCriterionComment();
+      return;
+    }
+    var student = getStudents(st.cid).find(function (x) {
+      return x.id === st.sid;
+    });
+    var crit = getRubricCriterion(st.aid, st.critId);
+    _formDialog(
+      'Discard This Comment?',
+      'Your comment' +
+        (student ? ' for ' + displayName(student) : '') +
+        (crit && crit.name ? ' on ' + crit.name : '') +
+        ' isn\u2019t saved.',
+      [
+        { label: 'Keep Editing', style: 'cancel' },
+        {
+          label: 'Discard',
+          style: 'danger',
+          run: function () {
+            if (_critCommentState === st) closeCriterionComment();
+          },
+        },
+      ],
+    );
   }
   function closeCriterionComment() {
     _critCommentState = null;
@@ -10240,6 +10493,13 @@ window.PageAssignments = (function () {
       cancelAssessForm: function () {
         cancelAssessForm();
       },
+      // A class with no categories: Class Management's Grading tab.
+      afAddCategories: function () {
+        var cid = activeCourse;
+        cancelAssessForm(function () {
+          Router.navigate('/dashboard?course=' + encodeURIComponent(cid) + '&manage=grading');
+        });
+      },
       toggleAssess: function () {
         toggleAssess(el.dataset.aid);
       },
@@ -10537,6 +10797,9 @@ window.PageAssignments = (function () {
       closeCriterionComment: function () {
         closeCriterionComment();
       },
+      cancelCriterionComment: function () {
+        cancelCriterionComment();
+      },
       printRubrics: function () {
         // Grading one student: their rubric. Every student showing: everyone's.
         if (window.RubricPrint) RubricPrint.open(activeCourse, el.dataset.aid, { studentId: focusStudentId });
@@ -10735,7 +10998,7 @@ window.PageAssignments = (function () {
       return;
     }
     if (el.dataset.actionBlur === 'graderPoints') {
-      _graderCommitPoints(el);
+      _graderCommitPoints(el, e.relatedTarget);
       return;
     }
     if (el.dataset.actionBlur === 'graderCritNote') {
@@ -10839,6 +11102,12 @@ window.PageAssignments = (function () {
       executeUndo();
       return;
     }
+    // Escape closes an open fill menu (it used to stay open).
+    if (e.key === 'Escape' && document.querySelector('.col-fill-menu.open')) {
+      e.preventDefault();
+      closeMenus();
+      return;
+    }
     // One student's grader open on the page (the dialog runs its own).
     if (!_grader && _graderCardKey(e)) return;
     if (e.key === 'Escape' && document.querySelector('.rsg-group-members .grader-member-menu:not([hidden])')) {
@@ -10901,8 +11170,9 @@ window.PageAssignments = (function () {
     if (_critCommentState && document.activeElement.id !== 'crit-comment-input') {
       var critDialog = document.querySelector('#crit-comment-overlay .crit-comment-popover');
       if (e.key === 'Escape') {
+        // An Escape that closed the Discard question isn't a second one.
+        if (!e.defaultPrevented) cancelCriterionComment();
         e.preventDefault();
-        closeCriterionComment();
         return;
       }
       if (e.key === 'Tab' && critDialog) {
@@ -10927,9 +11197,9 @@ window.PageAssignments = (function () {
         if (e.metaKey || e.ctrlKey) saveCriterionCommentNext();
         else saveCriterionComment();
       }
-      if (e.key === 'Escape' && _critCommentState) {
+      if (e.key === 'Escape' && _critCommentState && !e.defaultPrevented) {
         e.preventDefault();
-        closeCriterionComment();
+        cancelCriterionComment();
       }
       // Handle points keyboard navigation
       if (document.activeElement.classList.contains('gb-pts-input')) {
@@ -11281,6 +11551,25 @@ window.PageAssignments = (function () {
   }
 
   // A competency level reached by Tab shows its lines too.
+  /* "New Rubric" and "Criterion 2" are real names, so a rubric or criterion
+     saved untouched still has one. Typing used to go in front of them ("Lab
+     Report RubricNew Rubric"); the default name is now selected when its box
+     gets the focus, so typing replaces it (Nov 3 sweep). */
+  var DEFAULT_NAME_RE = /^(New Rubric|Criterion \d+)$/;
+  function _selectDefaultName(e) {
+    var t = e.target;
+    if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') || !DEFAULT_NAME_RE.test(t.value)) return;
+    if (!t.closest('#rubric-modal, #new-assess-form')) return;
+    t.select();
+    // A click that gave the focus would put the caret back on mouseup.
+    var keep = function (ev) {
+      if (ev.target === t) ev.preventDefault();
+    };
+    t.addEventListener('mouseup', keep, { once: true });
+    setTimeout(function () {
+      t.removeEventListener('mouseup', keep);
+    }, 500);
+  }
   function _handleFocusIn(e) {
     var tagLvl = e.target.closest && e.target.closest(TAG_LEVEL_SEL);
     if (tagLvl) showTagLevelBar(tagLvl);
@@ -11470,7 +11759,8 @@ window.PageAssignments = (function () {
      saved points and leaves the box (a second Escape, or one with nothing
      typed, closes the dialog);
      1–4 picks a level and + / − fine-tunes it on a focused criterion or
-     competency card. True when the key was used. */
+     competency card, and ↓ / ↑ move to the next or previous one. True when
+     the key was used. */
   function _graderCardKey(e) {
     var t = e.target;
     var cls = t && t.classList;
@@ -11481,6 +11771,25 @@ window.PageAssignments = (function () {
       t.blur();
       stepFocusStudent(1);
       _focusGraderPoints(enterAid);
+      return true;
+    }
+    // ← → in the points box change student, as the hint says, while the
+    // box holds the saved points (nothing new typed); once the teacher
+    // types, they move the caret to fix a typo.
+    if (
+      (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
+      cls.contains('grdp-input') &&
+      _grader &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.shiftKey
+    ) {
+      var arrowAid = _graderAid(t);
+      var held = arrowAid && focusStudentId ? getPointsScore(activeCourse, focusStudentId, arrowAid) : null;
+      if (t.value.trim() !== (held != null ? formatPoints(held) : '')) return false;
+      e.preventDefault();
+      stepFocusStudent(e.key === 'ArrowRight' ? 1 : -1);
       return true;
     }
     if (e.key === 'Escape' && cls.contains('grdp-input')) {
@@ -11512,6 +11821,19 @@ window.PageAssignments = (function () {
       e.preventDefault();
       if (card) _graderSetMod(aid, card.dataset.critid, up ? 1 : -1);
       else _graderSetTagMod(aid, tagCard.dataset.tag, up ? 1 : -1);
+      return true;
+    }
+    // ↓ and ↑ move to the next and previous criterion or competency, so
+    // 1–4 scores it; they used to scroll the dialog and leave the focus.
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.shiftKey) {
+      var root = _graderRoot(aid);
+      var cards = root ? Array.prototype.slice.call(root.querySelectorAll(card ? '.grdt-crit' : '.grdl-card')) : [];
+      var to = cards[cards.indexOf(t) + (e.key === 'ArrowDown' ? 1 : -1)];
+      e.preventDefault();
+      if (to) {
+        to.focus({ preventScroll: true });
+        to.scrollIntoView({ block: 'nearest' });
+      }
       return true;
     }
     return false;
@@ -11644,7 +11966,9 @@ window.PageAssignments = (function () {
   var _GRADER_STATUS_LABELS = { NS: 'Missing', EXC: 'Excused', LATE: 'Late' };
   // Missing and Excused are greyed out on work with a score or feedback
   // (canSetAssignmentStatus, shared/data.js).
-  var _STATUS_LOCKED_TITLE = 'This student has a score or feedback on this work.';
+  // It says why, and what to do (Nov 3 sweep).
+  var _STATUS_LOCKED_TITLE =
+    'This student has a score or feedback on this work. Clear it first to mark Missing or Excused.';
   function _statusLockAttrs(aid, sid, key) {
     return canSetAssignmentStatus(activeCourse, sid, aid, key) ? '' : ' disabled title="' + _STATUS_LOCKED_TITLE + '"';
   }
@@ -11959,6 +12283,35 @@ window.PageAssignments = (function () {
 
   /* The parts of the dialog that change with every click: the status
      control, the Note for the Report and the grade. */
+  /* The same buttons with new states are updated where they are: a score
+     typed and then Late clicked locks Missing and Excused as the box loses
+     focus, mid-click, and a Late button swapped in then can lose the click.
+     False when the buttons themselves differ. */
+  function _patchStatusButtons(box, html) {
+    var tpl = document.createElement('template');
+    // html-safe: html is built by _graderStatusButtons
+    tpl.innerHTML = html;
+    var fresh = tpl.content.querySelectorAll('.grader-status-btn');
+    var now = box.querySelectorAll('.grader-status-btn');
+    if (!now.length || fresh.length !== now.length) return false;
+    for (var i = 0; i < now.length; i++) {
+      if (
+        now[i].dataset.status !== fresh[i].dataset.status ||
+        now[i].dataset.sid !== fresh[i].dataset.sid ||
+        now[i].dataset.aid !== fresh[i].dataset.aid
+      )
+        return false;
+    }
+    now.forEach(function (btn, j) {
+      var f = fresh[j];
+      btn.className = f.className;
+      btn.setAttribute('aria-pressed', f.getAttribute('aria-pressed'));
+      btn.disabled = f.disabled;
+      if (f.hasAttribute('title')) btn.title = f.title;
+      else btn.removeAttribute('title');
+    });
+    return true;
+  }
   function _refreshGraderChrome() {
     if (!_grader) return;
     var cid = activeCourse;
@@ -11980,16 +12333,20 @@ window.PageAssignments = (function () {
     // runs this, and new buttons under the mouse before it is released
     // lose the click.
     if (_grader.statusHtml !== statusHtml) {
+      var statusBox = dialog.querySelector('.grader-status');
       // html-safe: statusHtml is built by _graderStatusButtons
-      dialog.querySelector('.grader-status').innerHTML = statusHtml;
+      if (!_patchStatusButtons(statusBox, statusHtml)) statusBox.innerHTML = statusHtml;
       _grader.statusHtml = statusHtml;
     }
     // Missing and Excused set the grading controls aside, as the grids do.
     dialog.querySelector('.grader-body').classList.toggle('is-locked', status === 'NS' || status === 'EXC');
     dialog.querySelector('.grader-status').hidden = !!view;
+    // Points work's box takes Return to the next student, so the hint says
+    // so; ← → step while nothing new is typed in it (_graderCardKey).
+    var returnStep = isPointsScored(a) && !isCompletionScored(a) ? 'Return next student \u00B7 ' : '';
     dialog.querySelector('.grader-hint').textContent = view
-      ? '\u2190 \u2192 change group \u00B7 Esc closes'
-      : '\u2190 \u2192 change student \u00B7 Esc closes';
+      ? returnStep + '\u2190 \u2192 change group \u00B7 Esc closes'
+      : returnStep + '\u2190 \u2192 change student \u00B7 Esc closes';
     _refreshReportNote(dialog, cid, a, sid);
     // Printed / Changed Since Printed beside the name (teacher/rubric-print.js).
     var markHtml = view ? '' : _printMarkHtml(cid, a.id, sid);
@@ -12144,12 +12501,14 @@ window.PageAssignments = (function () {
     if (!crit) return;
     var state = _criterionState(activeCourse, focusStudentId, aid, crit);
     var next = state.level === level && !state.mixed ? 0 : level;
+    var before = next ? null : structuredClone(getScores(activeCourse));
     rubricCriterionScoreKeys(crit).forEach(function (tid) {
       setScore(activeCourse, focusStudentId, aid, tid, next, 0);
     });
     refreshSidebarGrades(focusStudentId);
     render();
     _focusGraderCard(aid, '.grdt-crit[data-critid="' + critId + '"]');
+    if (before) _offerClearUndo(activeCourse, before);
   }
   function _graderSetMod(aid, critId, mod) {
     if (!aid || !focusStudentId) return;
@@ -12195,10 +12554,13 @@ window.PageAssignments = (function () {
   function _graderSetTagLevel(aid, tagId, level) {
     if (!aid || !focusStudentId) return;
     var state = _tagState(activeCourse, focusStudentId, aid, tagId);
-    _setTagScore(activeCourse, focusStudentId, aid, tagId, state.level === level && !state.mixed ? 0 : level, 0);
+    var next = state.level === level && !state.mixed ? 0 : level;
+    var before = next ? null : structuredClone(getScores(activeCourse));
+    _setTagScore(activeCourse, focusStudentId, aid, tagId, next, 0);
     refreshSidebarGrades(focusStudentId);
     render();
     _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');
+    if (before) _offerClearUndo(activeCourse, before);
   }
   function _graderSetTagMod(aid, tagId, mod) {
     if (!aid || !focusStudentId) return;
@@ -12214,13 +12576,15 @@ window.PageAssignments = (function () {
   // Saves typed points the way the Assignments ledger does: blank clears, a
   // typed 0 is a score, a typo puts the saved score back, leaving an
   // unchanged box saves nothing.
-  function _graderCommitPoints(inp) {
+  function _graderCommitPoints(inp, next) {
     var aid = _graderAid(inp);
     if (!aid || !focusStudentId) return;
     var cid = activeCourse;
     var max = parseFloat(inp.dataset.max) || 100;
-    var raw = parsePointsInput(inp.value, max, getPointsScore(cid, focusStudentId, aid));
-    if (raw === getPointsScore(cid, focusStudentId, aid)) {
+    var prev = getPointsScore(cid, focusStudentId, aid);
+    var over = _pointsOverLimit(inp.value, max);
+    var raw = parsePointsInput(inp.value, max, prev);
+    if (raw === prev) {
       inp.value = raw != null ? formatPoints(raw) : '';
       return;
     }
@@ -12228,9 +12592,25 @@ window.PageAssignments = (function () {
     // do. A second write under the assessment's own id left an entry later
     // edits elsewhere never updated, so the cell and course % kept the old
     // points.
+    var sid = focusStudentId;
     setPointsScore(cid, focusStudentId, aid, raw);
-    refreshSidebarGrades(focusStudentId);
+    refreshSidebarGrades(sid);
+    var nextId = next && _grader && _grader.overlay.contains(next) ? next.id : '';
     render();
+    if (over != null) _sayPointsCapped(cid, sid, aid, over, raw, max, prev);
+    // The redraw replaced the control Tab (or a click) was moving to, such
+    // as Overall Comment, so focus would fall to the page: give it to the
+    // new one.
+    if (nextId) {
+      var refocus = function () {
+        var active = document.activeElement;
+        if (active && active !== document.body && active.isConnected) return;
+        var again = document.getElementById(nextId);
+        if (again && _grader && _grader.overlay.contains(again)) again.focus({ preventScroll: true });
+      };
+      refocus();
+      setTimeout(refocus, 0);
+    }
   }
   // A redraw keeps keyboard scoring on the same card.
   function _focusGraderCard(aid, selector) {
@@ -12270,9 +12650,11 @@ window.PageAssignments = (function () {
     _commentCapture = null;
     _critCommentState = null;
     _kbFocusEl = null;
+    // The student it ended on, so the gradebook selects their cell.
+    var lastSid = focusStudentId;
     focusStudentId = null;
     g.overlay.remove();
-    if (g.onClose) g.onClose();
+    if (g.onClose) g.onClose(lastSid);
   }
 
   /* ── init / destroy ─────────────────────────────────────── */
@@ -12319,6 +12701,9 @@ window.PageAssignments = (function () {
 
     // Set up sidebar with student list
     window.toggleFocusStudent = toggleFocusStudent;
+    // The roster's grades follow the class's saved term, as on the Gradebook,
+    // whether the page was reached in the app or loaded fresh.
+    if (typeof activateSavedTerm === 'function') activateSavedTerm(activeCourse);
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
       activeCourse,
       focusStudentId,
@@ -12345,6 +12730,7 @@ window.PageAssignments = (function () {
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
     _addDocListener('focusin', _handleFocusIn);
+    _addDocListener('focusin', _selectDefaultName);
     _addDocListener('focusout', _handleFocusOut);
     _addDocListener('pointerdown', _handlePointerDown);
     _addDocListener('pointermove', _handlePointerMove);
@@ -12363,6 +12749,7 @@ window.PageAssignments = (function () {
     _addDocListener('input', _formInput);
     _addDocListener('change', _formInput);
     _addDocListener('keydown', _compKeydown);
+    _addDocListener('keydown', _formEscape);
     _addDocListener('input', _compInput);
     _addDocListener('mouseover', _codeHover);
     _addDocListener('focusin', _codeHover);

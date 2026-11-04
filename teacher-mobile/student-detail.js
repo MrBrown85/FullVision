@@ -22,8 +22,10 @@ window.MStudentDetail = (function () {
     var trend = change && change.dir > 0 ? 'up' : change && change.dir < 0 ? 'down' : 'flat';
     var trendIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : '—';
     var trendColor = trend === 'up' ? 'var(--score-3)' : trend === 'down' ? 'var(--score-1)' : 'var(--text-3)';
+    // The last five points, as the timeline below lists the last five
+    // scores: a whole sparkline fits the header at phone width.
     var growthData = getSectionGrowthData(cid, sid, sec.id);
-    var sparkline = renderGrowthSparkline(growthData);
+    var sparkline = renderGrowthSparkline((growthData || []).slice(-5));
     var allAssessments = getAssessments(cid);
     var allEvidenceScores = [];
     sec.tags.forEach(function (tag) {
@@ -104,13 +106,23 @@ window.MStudentDetail = (function () {
           return secTagIds.has(tid);
         });
       });
-      if (secAssessments.length > 0) {
-        insightHtml =
-          '<div class="m-sec-insight m-sec-insight-alert">' +
-          secAssessments.length +
-          ' assessment' +
-          (secAssessments.length !== 1 ? 's' : '') +
-          ' assigned but not yet scored</div>';
+      // Work the teacher marked Missing or Excused says so; only the rest
+      // is "not yet scored".
+      var statuses = getAssignmentStatuses(cid);
+      var by = { NS: 0, EXC: 0, open: 0 };
+      secAssessments.forEach(function (a) {
+        var st = statuses[sid + ':' + a.id];
+        by[st === 'NS' || st === 'EXC' ? st : 'open']++;
+      });
+      var lines = [];
+      var n = function (k) {
+        return by[k] + (by[k] === 1 ? ' assessment' : ' assessments');
+      };
+      if (by.NS) lines.push(n('NS') + ' marked Missing');
+      if (by.EXC) lines.push(n('EXC') + ' marked Excused');
+      if (by.open) lines.push(n('open') + ' assigned but not yet scored');
+      if (lines.length) {
+        insightHtml = '<div class="m-sec-insight m-sec-insight-alert">' + lines.join('<br>') + '</div>';
       }
     }
 
@@ -193,12 +205,13 @@ window.MStudentDetail = (function () {
     );
   }
 
-  /* ── Tabs: the same five as the desktop student page ──────── */
+  /* ── Tabs: as on the desktop student page, where Goals is part of the
+     Learner Profile. (Evidence is the phone's name for Observations,
+     Observations decision 6; the desktop's Grade Breakdown stays there.) */
   var TABS = [
     { id: 'comps', label: 'Competencies' },
     { id: 'assess', label: 'Assessments' },
     { id: 'evidence', label: 'Evidence' },
-    { id: 'goals', label: 'Goals' },
     { id: 'profile', label: 'Learner Profile' },
   ];
   // Shared with the desktop page: the tab last opened on this device.
@@ -213,6 +226,9 @@ window.MStudentDetail = (function () {
   function savedTab() {
     try {
       var t = localStorage.getItem(TAB_KEY);
+      // The old Goals tab, and the desktop's Goals and Reflections, are in
+      // the Learner Profile now.
+      if (t === 'goals' || t === 'reflections') t = 'profile';
       return _isTab(t) ? t : 'comps';
     } catch (e) {
       return 'comps';
@@ -285,6 +301,170 @@ window.MStudentDetail = (function () {
     );
   }
 
+  /* The strip scrolls sideways on a narrow phone: keep the open tab in view. */
+  function scrollActiveTab(root) {
+    var strip = root && root.querySelector ? root.querySelector('.m-st-tabs') : null;
+    var on = strip && strip.querySelector('.m-st-tab.active');
+    if (!on || strip.scrollWidth <= strip.clientWidth) return;
+    var left = on.offsetLeft - strip.offsetLeft;
+    if (left < strip.scrollLeft || left + on.offsetWidth > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollLeft = left - (strip.clientWidth - on.offsetWidth) / 2;
+    }
+  }
+
+  /* ── The student's own words (questionnaires) ─────────────── */
+  function _voiceDay(iso) {
+    if (!iso) return '';
+    var t = new Date(String(iso).length === 10 ? iso + 'T12:00:00' : iso);
+    return isNaN(t) ? '' : t.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  }
+  function _coreLabel(id) {
+    var c = typeof getCoreCompetency === 'function' ? getCoreCompetency(id) : null;
+    return c ? c.label : id;
+  }
+  // An answer as plain text: the words, a list, or each competency's step.
+  function _answerText(q, v) {
+    if (!v) return '';
+    if (q.kind === 'scale4') {
+      var j = v.json || {};
+      var levels = j.levels || {};
+      var why = j.why && typeof j.why === 'object' ? j.why : {};
+      var steps = typeof CONFIDENCE_LABELS !== 'undefined' ? CONFIDENCE_LABELS : {};
+      var ids = (q.core_ids || []).length ? q.core_ids : Object.keys(levels);
+      return ids
+        .filter(function (k) {
+          return levels[k] || why[k];
+        })
+        .map(function (k) {
+          return _coreLabel(k) + ': ' + (steps[levels[k]] || 'No step') + (why[k] ? '. ' + why[k] : '');
+        })
+        .join('\n');
+    }
+    if (q.kind === 'core_pick' && v.text) return _coreLabel(String(v.text).trim());
+    if (Array.isArray(v.json))
+      return v.json
+        .filter(function (x) {
+          return String(x || '').trim();
+        })
+        .join(', ');
+    if (v.text != null && String(v.text).trim()) return String(v.text);
+    return v.num != null ? String(v.num) : '';
+  }
+  function _qaHtml(items) {
+    return items
+      .map(function (it) {
+        var t = _answerText(it.q, it.v);
+        if (!t) return '';
+        return (
+          '<div class="m-st-goal-label">' +
+          MC.esc(it.q.prompt || '') +
+          '</div><div class="m-st-goal-text m-st-voice-text">' +
+          MC.esc(t) +
+          '</div>'
+        );
+      })
+      .join('');
+  }
+
+  /* { goals, words }: the student's own goals (course goal with its
+     check-in, Core Competency goal), and About Me with each reflection.
+     The answers load once per class; the panels redraw when they arrive. */
+  // html-safe: prompts, answers, names and titles go through MC.esc.
+  function _voiceHtml(cid, sid, firstName) {
+    var out = { goals: '', words: '' };
+    if (typeof StudentVoice === 'undefined') return out;
+    if (!StudentVoice.loaded(cid)) {
+      StudentVoice.load(cid, function () {
+        refreshPanels(cid, ['profile']);
+      });
+      if (!StudentVoice.loaded(cid)) return out;
+    }
+    var list = StudentVoice.entries(cid, sid);
+    var model = StudentVoice.profile(list);
+    var first = MC.esc(firstName);
+    var from = function (at) {
+      return 'From ' + first + (at ? ' · ' + MC.esc(_voiceDay(at)) : '');
+    };
+    var a = model.about;
+    var c = model.checkin;
+    var course = (COURSES[cid] && COURSES[cid].name) || 'Course';
+    var goals = '';
+    if ((a && a.goal && a.goal.v) || (c && c.status && c.status.v)) {
+      goals +=
+        '<div class="m-st-goal"><div class="m-st-goal-name">' +
+        MC.esc(course + ' Goal') +
+        '</div>' +
+        (a && a.goal && a.goal.v
+          ? '<div class="m-st-goal-label">' +
+            from(a.at) +
+            '</div><div class="m-st-goal-text m-st-voice-text">' +
+            MC.esc(_answerText(a.goal.q, a.goal.v)) +
+            '</div>'
+          : '') +
+        (c && c.status && c.status.v
+          ? '<div class="m-st-goal-label">Check-In · ' +
+            MC.esc(_voiceDay(c.at)) +
+            '</div><div class="m-st-goal-text">' +
+            MC.esc(_answerText(c.status.q, c.status.v)) +
+            (c.next && c.next.v ? ' · ' + MC.esc(_answerText(c.next.q, c.next.v)) : '') +
+            '</div>'
+          : '') +
+        '</div>';
+    }
+    if (c && c.core && c.core.v) {
+      goals +=
+        '<div class="m-st-goal"><div class="m-st-goal-name">Core Competency Goal · ' +
+        MC.esc(_answerText(c.core.q, c.core.v)) +
+        '</div><div class="m-st-goal-label">' +
+        from(c.at) +
+        '</div><div class="m-st-goal-text m-st-voice-text">' +
+        (c.coreGoal && c.coreGoal.v
+          ? MC.esc(_answerText(c.coreGoal.q, c.coreGoal.v))
+          : '<span class="m-st-muted">No answer</span>') +
+        '</div></div>';
+    }
+    if (goals)
+      out.goals =
+        '<div class="m-list-inset-header">' + first + '’s Own Goals</div><div class="m-st-list">' + goals + '</div>';
+
+    var words = '';
+    if (a) {
+      var aboutQa = _qaHtml(
+        [a.say, a.languages, a.learns, a.goodAt, a.hard, a.outside]
+          .concat(a.rest || [], [a.note])
+          .filter(function (it) {
+            return it && it.v;
+          }),
+      );
+      if (aboutQa)
+        words +=
+          '<div class="m-st-goal"><div class="m-st-goal-name">About Me</div><div class="m-st-goal-label">' +
+          from(a.at) +
+          '</div>' +
+          aboutQa +
+          '</div>';
+    }
+    model.reflections.forEach(function (e) {
+      var qa = _qaHtml(e.items);
+      if (!qa) return;
+      words +=
+        '<div class="m-st-goal"><div class="m-st-goal-name">' +
+        MC.esc(e.title || 'Reflection') +
+        '</div><div class="m-st-goal-label">' +
+        from(e.at) +
+        '</div>' +
+        qa +
+        '</div>';
+    });
+    out.words =
+      '<div class="m-list-inset-header">In ' +
+      first +
+      '’s Words</div><div class="m-st-list">' +
+      (words || '<div class="m-st-goal"><div class="m-st-muted">No answers from ' + first + ' yet.</div></div>') +
+      '</div>';
+    return out;
+  }
+
   /* Show one tab of the student screen that holds `el`. */
   function selectTab(el, id) {
     if (!_isTab(id)) return;
@@ -298,6 +478,7 @@ window.MStudentDetail = (function () {
     screen.querySelectorAll('.m-st-panel').forEach(function (p) {
       p.hidden = p.getAttribute('data-tab') !== id;
     });
+    scrollActiveTab(screen);
     try {
       localStorage.setItem(TAB_KEY, id);
     } catch (e) {
@@ -325,7 +506,17 @@ window.MStudentDetail = (function () {
     var grade = studentGradeSummary(cid, sid);
     var gradeText = grade.text || '—';
     var nav = MC.navBar({ id: 'student-detail', title: name, backLabel: 'Students' });
-    var badges = renderBadges(st);
+    // Each designation by its code and name ("P Gifted"), as the desktop
+    // header shows them, then the IEP / MOD / ELL badges.
+    var desPills = (st.designations || [])
+      .filter(function (code) {
+        return typeof BC_DESIGNATIONS !== 'undefined' && BC_DESIGNATIONS[code];
+      })
+      .map(function (code) {
+        return '<span class="m-badge m-badge-des">' + MC.esc(code + ' ' + BC_DESIGNATIONS[code].name) + '</span>';
+      })
+      .join('');
+    var badges = desPills + renderBadges(st);
 
     var hero =
       '<div class="m-hero">' +
@@ -351,16 +542,12 @@ window.MStudentDetail = (function () {
       '</div>' +
       '</div>';
 
-    var focusAreas = getFocusAreas(cid, sid, 3);
+    // The assessed competencies below Proficient, weakest first.
+    var focusAreas = getFocusAreas(cid, sid, 3).filter(function (f) {
+      return f.prof > 0 && f.prof < 3;
+    });
     var focusHTML = '';
-    var hasFocus =
-      focusAreas.some(function (f) {
-        return f.prof > 0 && f.prof < 3;
-      }) ||
-      focusAreas.some(function (f) {
-        return f.prof === 0;
-      });
-    if (hasFocus) {
+    if (focusAreas.length) {
       focusHTML = '<div class="m-list-inset-header">Focus Areas</div>';
       focusAreas.forEach(function (f) {
         var secColor = f.section ? f.section.color : '#888';
@@ -433,14 +620,13 @@ window.MStudentDetail = (function () {
     var cells = termAssess.map(function (a) {
       return { a: a, cell: assessmentCellValue(cid, sid, a) };
     });
+    // A deleted one waiting on its Undo is already gone from the list.
     var obs = getStudentQuickObs(cid, sid).filter(function (o) {
-      return _obsInTerm(o, term);
+      return _obsInTerm(o, term) && !(window.MObserve && MObserve.isPending && MObserve.isPending(o.id));
     });
 
     // Assessments
-    var scoredN = cells.filter(function (c) {
-      return c.cell.kind === 'points' || c.cell.kind === 'level' || c.cell.kind === 'complete';
-    }).length;
+    var scoredN = MC.scoredAssessmentCount(cid, sid);
     var nsN = termAssess.filter(function (a) {
       return statuses[sid + ':' + a.id] === 'NS';
     }).length;
@@ -460,8 +646,15 @@ window.MStudentDetail = (function () {
         var name = tag ? tag.label || tag.shortName || tag.code || '' : '';
         if (name && toward.indexOf(name) < 0) toward.push(name);
       });
+      // Tapping a row opens that assessment's grading screen on this student.
       assessHtml +=
-        '<div class="m-assess-compact">' +
+        '<div class="m-assess-compact" role="button" tabindex="0" data-action="m-assess-grade" data-sid="' +
+        MC.esc(sid) +
+        '" data-aid="' +
+        MC.esc(a.id) +
+        '" aria-label="Grade ' +
+        MC.esc(a.title) +
+        '">' +
         '<div class="m-assess-top">' +
         '<span class="m-assess-date">' +
         MC.esc(_shortDay(a.date)) +
@@ -480,11 +673,10 @@ window.MStudentDetail = (function () {
         MC.esc(_cellText(c.cell, a)) +
         '</span>' +
         '</div>' +
-        '<div class="m-st-assess-sub"><span class="m-type-badge ' +
-        badge.className +
-        '">' +
-        MC.esc(badge.label) +
-        '</span>' +
+        '<div class="m-st-assess-sub">' +
+        (showsCategoryBadge(cid, a)
+          ? '<span class="m-type-badge ' + badge.className + '">' + MC.esc(badge.label) + '</span>'
+          : '') +
         (toward.length ? '<span class="m-st-toward">' + MC.esc(toward.join(', ')) + '</span>' : '') +
         '</div>' +
         '</div>';
@@ -504,7 +696,6 @@ window.MStudentDetail = (function () {
         evidenceHtml += MObserve.cardHtml(cid, Object.assign({ studentId: sid }, ob), obsCtx, {
           showStudent: false,
           when: 'date',
-          editable: false,
         });
       });
     }
@@ -540,6 +731,11 @@ window.MStudentDetail = (function () {
         '</div>';
     });
 
+    // The student's own words from questionnaires: their goals on Goals,
+    // About Me and reflections on Learner Profile, as on the desktop page.
+    var voice = _voiceHtml(cid, sid, displayNameFirst(st));
+    goalsHtml = voice.goals + goalsHtml;
+
     // Learner Profile
     var dimGroups = [
       { name: 'Learning Dispositions', dims: typeof LEARNING_DIMS !== 'undefined' ? LEARNING_DIMS : [] },
@@ -547,7 +743,7 @@ window.MStudentDetail = (function () {
     ];
     var seen = 0;
     var allDims = 0;
-    var profileHtml = '';
+    var profileHtml = voice.words + '<div class="m-list-inset-header m-st-profile-h">Seen in Observations</div>';
     dimGroups.forEach(function (gp) {
       profileHtml += '<div class="m-list-inset-header">' + MC.esc(gp.name) + '</div><div class="m-st-list">';
       gp.dims.forEach(function (d) {
@@ -567,7 +763,7 @@ window.MStudentDetail = (function () {
             ? MC.esc(_shortDay(_obDay(latest)) + ', ') +
               (isPrivateObservation(latest) ? obsPrivateLabelHtml(latest) + ' ' : '') +
               MC.esc(String(latest.text || '').split('\n')[0])
-            : 'Not seen yet') +
+            : 'Not Seen Yet') +
           '</span></div><span class="m-st-dim-count">' +
           tagged.length +
           '</span></div>';
@@ -597,8 +793,7 @@ window.MStudentDetail = (function () {
       },
       { id: 'assess', label: 'Assessments', stat: scoredN + ' Scored' },
       { id: 'evidence', label: 'Evidence', stat: obs.length + (obs.length === 1 ? ' Observation' : ' Observations') },
-      { id: 'goals', label: 'Goals', stat: goalCount + ' of ' + sections.length + ' Set' },
-      { id: 'profile', label: 'Learner Profile', stat: seen + ' of ' + allDims + ' Seen' },
+      { id: 'profile', label: 'Learner Profile', stat: goalCount + (goalCount === 1 ? ' Goal' : ' Goals') },
     ];
     var activeTab = savedTab();
     var tabsBlock =
@@ -606,8 +801,14 @@ window.MStudentDetail = (function () {
       _panel('comps', activeTab, focusHTML + '<div class="m-list-inset-header">Competencies</div>' + sectionCards) +
       _panel('assess', activeTab, '<div class="m-st-list">' + assessHtml + '</div>') +
       _panel('evidence', activeTab, evidenceHtml) +
-      _panel('goals', activeTab, '<div class="m-st-list">' + goalsHtml + '</div>') +
-      _panel('profile', activeTab, profileHtml);
+      _panel(
+        'profile',
+        activeTab,
+        '<div class="m-list-inset-header m-st-profile-h">Goals and Reflections</div><div class="m-st-list">' +
+          goalsHtml +
+          '</div>' +
+          profileHtml,
+      );
 
     return (
       '<div class="m-screen m-screen-hidden" id="m-screen-student-detail">' +
@@ -616,17 +817,63 @@ window.MStudentDetail = (function () {
       hero +
       tabsBlock +
       '<div class="m-scard-actions" style="padding:16px">' +
-      '<button class="m-scard-btn m-scard-btn-view" data-action="m-student-grade" data-sid="' +
-      sid +
-      '">Grade</button>' +
+      (getAssessments(cid).length
+        ? '<button class="m-scard-btn m-scard-btn-view" data-action="m-student-grade" data-sid="' +
+          sid +
+          '">Grade Newest: ' +
+          MC.esc(
+            getAssessments(cid)
+              .slice()
+              .sort(function (a, b) {
+                return (b.date || '').localeCompare(a.date || '');
+              })[0].title,
+          ) +
+          '</button>'
+        : '') +
       '</div>' +
       '<div style="height:32px"></div>' +
       '</div></div>'
     );
   }
 
+  /* After an observation is edited, deleted or put back from the student's
+     page, its Evidence list and count are drawn again in place. */
+  function refreshEvidence(cid) {
+    refreshPanels(cid, ['evidence']);
+  }
+
+  /* Draws some of the open student screen's panels (and their tab stats)
+     again in place, keeping the tab strip and where it is scrolled. */
+  function refreshPanels(cid, ids) {
+    var screen = document.getElementById('m-screen-student-detail');
+    if (!screen) return;
+    var desc = null;
+    try {
+      desc = JSON.parse(screen.getAttribute('data-restore') || 'null');
+    } catch (e) {
+      desc = null;
+    }
+    if (!desc || !desc.sid) return;
+    var tmp = document.createElement('div');
+    if (!window.MStudents || !MStudents.renderDetail) return;
+    // html-safe: MStudents.renderDetail escapes its text (checked where the shell places it).
+    tmp.innerHTML = MStudents.renderDetail(cid, desc.sid);
+    ids.forEach(function (id) {
+      var fresh = tmp.querySelector('#m-st-panel-' + id);
+      var panel = screen.querySelector('#m-st-panel-' + id);
+      // html-safe: the panel comes from MStudents.renderDetail above.
+      if (fresh && panel) panel.innerHTML = fresh.innerHTML;
+      var freshStat = tmp.querySelector('.m-st-tab[data-tab="' + id + '"] .m-st-tab-stat');
+      var stat = screen.querySelector('.m-st-tab[data-tab="' + id + '"] .m-st-tab-stat');
+      if (freshStat && stat) stat.textContent = freshStat.textContent;
+    });
+  }
+
   return {
     renderDetail: renderDetail,
     selectTab: selectTab,
+    scrollActiveTab: scrollActiveTab,
+    refreshEvidence: refreshEvidence,
+    refreshPanels: refreshPanels,
   };
 })();

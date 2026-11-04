@@ -3923,6 +3923,12 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-habit-name {
   font-size: var(--text-sm);
 }
+/* Completes Work as the assignment record has it, until the teacher picks. */
+.qn-habit-src {
+  display: block;
+  font-size: 12px;
+  color: var(--text-2);
+}
 .qn-habit-cell {
   display: flex;
   justify-content: center;
@@ -4706,7 +4712,9 @@ body.qn-roster #gb-sidebar .student-row-note {
 /* ── Grade Report (grade-report.js) ──────────────────────────────
    A plain table of this term's work, black on white, like the old
    gradebook printouts. Rows have a fixed height so the layout can count
-   how many fit on a side; a title too long for its cell ends in "…". */
+   how many fit on a side; a row whose title or category is too long for
+   its cell is two lines high (.gr-wrap), and only a third line ends in
+   "…". */
 .gr-sheet .sheet-body {
   align-items: stretch;
 }
@@ -4727,6 +4735,18 @@ body.qn-roster #gb-sidebar .student-row-note {
   height: var(--gr-row, 19px);
   border-bottom: 1px solid #d0d0d0;
   white-space: nowrap;
+}
+.gr-row.gr-wrap {
+  height: var(--gr-row2, auto);
+}
+.gr-wrap .gr-title,
+.gr-wrap .gr-category {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 .gr-head {
   height: auto;
@@ -5454,6 +5474,15 @@ body.qn-roster #gb-sidebar .student-row-note {
   display: flex;
   flex-direction: column;
 }
+/* Opened upward when the row is low in the window (_fitMenus). */
+.qn-menu.up {
+  top: auto;
+  bottom: calc(100% - 6px);
+}
+.qn-cal.up {
+  top: auto;
+  bottom: calc(100% - 4px);
+}
 .qn-menu-head {
   padding: 6px 10px 2px;
   font-size: 11.5px;
@@ -6025,6 +6054,14 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--text-2);
   white-space: nowrap;
 }
+/* A search with no match here: where else it matches (Nov 3 sweep). */
+.qn-browse-elsewhere {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 6px;
+}
 .qn-browse-empty {
   padding: 18px 14px;
   font-size: 13.5px;
@@ -6273,6 +6310,13 @@ body.qn-roster #gb-sidebar .student-row-note {
   width: 100%;
   box-sizing: border-box;
 }
+/* Two lines that wrap, so a long sentence can be read while it is typed. */
+.qn-own .qn-own-text {
+  display: block;
+  line-height: 1.4;
+  resize: vertical;
+  min-height: calc(2 * 1.4em + 12px);
+}
 .qn-own-hint,
 .qn-own-offered,
 .qn-own-label {
@@ -6408,4 +6452,125 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-shared-count {
   color: var(--text-2);
+}
+
+/* ── The Term Questionnaire on a phone (Nov 3 sweep) ───────────
+   At 375 px the student's name and "Student Dashboard" were squeezed into
+   58 px beside the grade and ran into it, the Work Habits labels ran
+   together left of their radios, Times Late was cut off, and each
+   sentence's text was squeezed between its label and Options. Under
+   600 px the grade goes under the name, a habit's name goes above its
+   five radios, Attendance wraps, and a sentence's label sits above its
+   text. */
+@media (max-width: 600px) {
+  .qn {
+    padding: 12px;
+  }
+  .qn-head {
+    flex-wrap: wrap;
+  }
+  .qn-who {
+    flex-basis: calc(100% - 52px);
+  }
+  .qn-head-sub {
+    white-space: normal;
+  }
+  .qn-grade {
+    align-items: flex-start;
+    margin-left: 52px;
+  }
+  .qn-grade-sub {
+    white-space: normal;
+  }
+  .qn-habit-head,
+  .qn-habit-row {
+    grid-template-columns: repeat(5, minmax(max-content, 1fr));
+    column-gap: 4px;
+  }
+  .qn-habit-head > span:first-child {
+    display: none;
+  }
+  .qn-habit-head > span {
+    white-space: nowrap;
+  }
+  .qn-habit-name {
+    grid-column: 1 / -1;
+    padding-bottom: 4px;
+  }
+  .qn-att {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+  }
+  .qn-att-title,
+  .qn-att-note {
+    flex-basis: 100%;
+    text-align: left;
+  }
+  .qn-req-top {
+    flex-wrap: wrap;
+  }
+  .qn-req-top .qn-sub {
+    flex-basis: 100%;
+    order: 3;
+  }
+  .qn-req-top .qn-card-link {
+    margin-left: auto;
+  }
+  .qn-sentences .qn-req-row {
+    flex-wrap: wrap;
+  }
+  .qn-sentences .qn-req-part {
+    width: auto;
+    flex: 1 1 auto;
+  }
+  .qn-sentences .qn-req-body,
+  .qn-sentences .qn-line-empty {
+    order: 3;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+}
+
+/* ── Progress Reports on a phone or narrow window (Nov 3 sweep) ──
+   The 900 px rule above that gives the canvas the whole width sits before
+   .studio's own rule, which won, so under 900 px the canvas kept the
+   palette's 272 px column (the palette itself hidden) and the sheets were
+   cut off at the left. Placed after it, the canvas takes the full width;
+   on a phone the toolbar's buttons and the canvas head wrap so Black,
+   Colour, One Student and Everyone stay on screen. */
+@media (max-width: 900px) {
+  .studio {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .studio-tools {
+    flex-wrap: wrap;
+    flex-shrink: 1;
+    min-width: 0;
+    margin-left: 0;
+  }
+}
+@media (max-width: 600px) {
+  /* No room for the inspector's gutter beside a page on a phone: the page
+     takes the canvas's width instead of sitting 92 px off its left edge. */
+  .rb-preview.studio-pages {
+    padding: 12px 12px 32px;
+  }
+  .rb-preview.studio-pages:not(.studio-all) .sheet-student {
+    padding-right: 0;
+  }
+}
+
+/* With 44 px controls on a phone, the toolbar's right-hand group (Ready
+   count, Edit Student, the info button and Approve and Next) wraps inside
+   the page instead of running past its right edge. */
+@media (max-width: 600px) {
+  .report-toolbar > div:last-child {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+  }
 }

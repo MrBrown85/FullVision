@@ -37,31 +37,42 @@ window.MStudentsList = (function () {
       var color = MC.avatarColor(st.id);
       var initials = MC.avatarInitials(st);
       var name = displayName(st);
-      var subtitle = '';
-      if (st.pronouns) subtitle += MC.esc(st.pronouns);
-
+      // Search finds every name the student goes by: legal first and last,
+      // and the preferred name, as a MyEd roster search does.
+      var searchText = [st.firstName, st.lastName, st.preferred, fullName(st), displayNameWithLast(st)]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
       var badges = renderBadges(st);
 
-      var hasMissing = allAssessments.some(function (a) {
+      // Missing work says so in words under the name; an unexplained red
+      // dot on the avatar told the teacher nothing.
+      var missingN = allAssessments.filter(function (a) {
         return allStatuses[st.id + ':' + a.id] === 'NS';
-      });
-      var missingDot = hasMissing ? '<div class="m-missing-dot"></div>' : '';
+      }).length;
+      var subtitle = [];
+      if (st.pronouns) subtitle.push(MC.esc(st.pronouns));
+      if (missingN) subtitle.push('<span class="m-cell-missing">' + missingN + ' missing</span>');
+      subtitle = subtitle.join(' \u00b7 ');
 
       html +=
         '<div class="m-cell" role="button" tabindex="0" data-action="' +
         action +
         '" data-sid="' +
         st.id +
+        '" data-search="' +
+        MC.esc(searchText) +
         '">' +
         '<div class="m-cell-avatar" style="background:' +
         color +
         '">' +
         MC.esc(initials) +
-        missingDot +
         '</div>' +
         '<div class="m-cell-body">' +
-        '<div class="m-cell-title">' +
+        // A long name is cut, never the IEP, MOD or ELL badge after it.
+        '<div class="m-cell-title m-student-title"><span class="m-student-title-name">' +
         MC.esc(name) +
+        '</span>' +
         badges +
         '</div>' +
         (subtitle ? '<div class="m-cell-subtitle">' + subtitle + '</div>' : '') +
@@ -83,6 +94,7 @@ window.MStudentsList = (function () {
     var nav = MC.navBar({
       id: 'students-list',
       title: 'Students',
+      classId: cid,
       rightHTML:
         '<div class="m-sync" role="status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>' +
         '<button class="m-nav-bar-action" data-action="m-sort" title="Sort">' +

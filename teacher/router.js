@@ -96,6 +96,12 @@ window.Router = (function () {
     var mount = document.getElementById('dock-mount');
     if (!mount) return;
     mount.innerHTML = renderDock(activePage);
+    // On a phone the tabs scroll sideways; keep the open one in view.
+    var seg = typeof mount.querySelector === 'function' ? mount.querySelector('.tb-seg') : null;
+    var on = seg && seg.querySelector('.tb-seg-active');
+    if (on && seg.scrollWidth > seg.clientWidth) {
+      seg.scrollLeft = on.offsetLeft - seg.offsetLeft - (seg.clientWidth - on.offsetWidth) / 2;
+    }
     if (typeof _populateDockUser === 'function') _populateDockUser();
     if (window.UI && typeof window.UI.refreshSyncStatusUI === 'function') window.UI.refreshSyncStatusUI();
   }
@@ -171,12 +177,14 @@ window.Router = (function () {
 
     // Update page title for browser tab, history, and screen readers
     var pageTitle = _titles[path] || 'Dashboard';
+    // /dashboard?manage=… is Class Management's own address.
+    if (path === '/dashboard' && params.manage && params.manage !== 'starters') pageTitle = 'Class Management';
     if (path === '/student' && params.id) {
       try {
         var stu = getStudents(getActiveCourse()).find(function (s) {
           return s.id === params.id;
         });
-        if (stu) pageTitle = fullName(stu);
+        if (stu) pageTitle = displayName(stu);
       } catch (e) {
         /* use default */
       }

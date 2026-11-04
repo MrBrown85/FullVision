@@ -39,6 +39,8 @@ window.MComponents = (function () {
         _esc(opts.backLabel) +
         '</span></button>';
     }
+    // `classId`: a tab's first screen names the open class at the left.
+    if (!back && opts.classId) back = classLabelHTML(opts.classId);
     var actions = '';
     if (opts.rightHTML) {
       actions = '<div class="m-nav-bar-actions">' + opts.rightHTML + '</div>';
@@ -64,6 +66,21 @@ window.MComponents = (function () {
     );
   }
 
+  // The open class's name, so a teacher always knows which class they are in.
+  function classLabelHTML(cid) {
+    var course = (typeof COURSES !== 'undefined' && cid && COURSES[cid]) || null;
+    var name = course && course.name ? course.name : '';
+    if (!name) return '';
+    return (
+      '<div class="m-nav-bar-class" title="' +
+      _esc(name) +
+      '">' +
+      '<span class="m-nav-bar-class-name">' +
+      _esc(name) +
+      '</span></div>'
+    );
+  }
+
   function largeTitleHTML(title) {
     return '<div class="m-title-large" aria-hidden="true">' + _esc(title) + '</div>';
   }
@@ -76,7 +93,7 @@ window.MComponents = (function () {
     var backdrop = document.getElementById('m-sheet-backdrop');
     var container = document.getElementById('m-sheet-container');
     var halfClass = opts.half ? ' m-sheet-half' : '';
-    // html-safe: every presentSheet caller (tab-observe, tab-grade, tab-students, card-widget-editor, shell settings) builds html with MC.esc on its text.
+    // html-safe: every presentSheet caller (tab-observe, tab-grade, tab-students, card-widget-editor, card-widgets commentSheetHtml, shell settings) builds html with MC.esc on its text.
     container.innerHTML =
       '<div class="m-sheet' +
       halfClass +
@@ -320,7 +337,19 @@ window.MComponents = (function () {
   }
 
   /* ── Public API ─────────────────────────────────────────────── */
+  /* How many of a student's assessments in the class's chosen term have a
+     score (points, a level or Complete/Incomplete): the student screen's
+     "N Scored" and the card's growth line read this one count. */
+  function scoredAssessmentCount(cid, sid) {
+    return getAssessments(cid).filter(function (a) {
+      if (typeof assessmentInActiveTerm === 'function' && !assessmentInActiveTerm(cid, a)) return false;
+      var kind = assessmentCellValue(cid, sid, a).kind;
+      return kind === 'points' || kind === 'level' || kind === 'complete';
+    }).length;
+  }
+
   return {
+    scoredAssessmentCount: scoredAssessmentCount,
     ICONS: ICONS,
     avatarColor: avatarColor,
     avatarInitials: avatarInitials,

@@ -279,6 +279,13 @@ function waitForPendingSyncs(timeoutMs) {
   });
 }
 
+/* A class just loaded from the server is in step with it: the phone's
+   Settings says when, not "Not yet synced this session", even before the
+   first change is saved. Writes still in flight keep their own time. */
+function _markLoadSynced() {
+  if (_pendingSyncs === 0) _lastSyncedAt = new Date().toISOString();
+}
+
 function _trackPendingSync(promise) {
   if (!promise || typeof promise.finally !== 'function') return promise;
   _pendingSyncs += 1;
@@ -323,27 +330,53 @@ function _withTimeout(promise, ms, label) {
   );
 }
 
-function _updateSyncIndicator() {
-  const dot = document.getElementById('sync-indicator-dot');
-  if (!dot) return;
-  const problem = getSaveProblem();
-  if (problem) {
-    dot.className = 'tb-sync-dot error';
-    dot.title = problem;
-    return;
+/* The sync dot's state: the one place sync shows (DECISIONS, "Product
+   shape"), with no count of changes. Desktop and phone both draw the dot from
+   here. With the outbox loaded, its queue (shared by every tab) is the whole
+   story: a change is saving while it is queued, and saved once it leaves.
+   Counting this tab's own pending promises as well left the dot on
+   "Syncing..." with an empty queue when one never settled, and a second
+   painter flipped it to "All changes saved" with changes still queued. */
+function getSyncDotState() {
+  var problem = getSaveProblem();
+  if (problem) return { status: 'error', title: problem };
+  if (_syncStatus === 'degraded') return { status: 'error', title: 'Cloud sync paused — saving on this device' };
+  var loadProblem = _loadProblem();
+  if (loadProblem) return { status: 'error', title: loadProblem };
+  var q = typeof window !== 'undefined' ? window.v2Queue : null;
+  if (q && typeof q.stats === 'function') {
+    var stats = q.stats() || {};
+    var queued = Number(stats.queued || 0);
+    var online = stats.online !== false && !(typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (Number(stats.deadLettered || 0) > 0) return { status: 'error', title: "Some changes couldn't be saved" };
+    if (stats.signedOut && queued > 0)
+      return { status: 'error', title: 'Signed out — changes are waiting until you sign in' };
+    if (!online && queued > 0) return { status: 'error', title: 'Offline — changes are saved on this device' };
+    if (queued > 0) return { status: 'syncing', title: 'Syncing...' };
+    return { status: 'idle', title: 'All changes saved' };
   }
-  const s = getSyncStatus();
-  // Degraded mode reuses the 'error' visual but conveys a different message.
-  var visual = s.status === 'degraded' ? 'error' : s.status;
-  dot.className = 'tb-sync-dot ' + visual;
-  dot.title =
-    s.status === 'idle'
-      ? 'All changes saved'
-      : s.status === 'syncing'
-        ? 'Syncing...'
-        : s.status === 'degraded'
-          ? 'Cloud sync paused — saving locally'
-          : 'Sync error — changes saved locally';
+  if (_pendingSyncs > 0) return { status: 'syncing', title: 'Syncing...' };
+  return { status: 'idle', title: 'All changes saved' };
+}
+window.getSyncDotState = getSyncDotState;
+
+function _updateSyncIndicator() {
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  // The phone keeps one dot per open screen (the Grade list stays mounted,
+  // hidden, under the grading screen), so every copy is kept current.
+  const first = document.getElementById('sync-indicator-dot');
+  if (!first) return;
+  const dots =
+    typeof document.querySelectorAll === 'function'
+      ? Array.from(document.querySelectorAll('[id="sync-indicator-dot"]'))
+      : [];
+  if (dots.indexOf(first) < 0) dots.unshift(first);
+  var state = getSyncDotState();
+  dots.forEach(function (dot) {
+    dot.className = 'tb-sync-dot ' + state.status;
+    dot.title = state.title;
+    if (typeof dot.setAttribute === 'function') dot.setAttribute('aria-label', state.title);
+  });
 }
 
 function isSupabaseDegraded() {
@@ -399,10 +432,8 @@ function _enterDegradedMode(reason) {
   _supabaseDegraded = true;
   _degradedReason = reason;
   _syncStatus = 'degraded';
+  // Shown only on the sync dot (CLAUDE.md rule 5); the probe keeps retrying.
   _updateSyncIndicator();
-  if (typeof showSyncToast === 'function') {
-    showSyncToast('Saving locally — cloud sync paused.', 'degraded');
-  }
   _scheduleRecoveryProbe();
 }
 
@@ -434,8 +465,8 @@ async function _attemptRecoveryProbe() {
   }
 }
 
-/* Manual retry — wired to the "Retry now" button in the degraded toast.
-   Cancels the pending timer and probes immediately. */
+/* Manual retry — a click on the sync dot while sync is paused. Cancels the
+   pending timer and probes immediately. */
 function retrySupabaseRecovery() {
   if (!_supabaseDegraded) return Promise.resolve();
   if (_recoveryProbeTimer) {
@@ -481,10 +512,6 @@ function _exitDegradedMode(bootstrapData) {
   var outbox = _outbox();
   if (outbox) outbox.flush();
   _updateSyncIndicator();
-  if (typeof dismissSyncToast === 'function') dismissSyncToast();
-  if (typeof showSyncToast === 'function') {
-    showSyncToast('Cloud sync restored. Catching up…', 'success');
-  }
 }
 
 /* Migrate course-scoped data from a local placeholder cid to the canonical
@@ -1233,6 +1260,52 @@ function _isEditingField() {
 
 var _rerenderDeferred = false;
 
+/* A press on a button is what usually moves focus out of a field. A redraw
+   between its pointerdown and the click swaps the button out from under the
+   pointer and the click is lost: Save Categories or Late took a second
+   click after typing (Nov 3 sweep). So a redraw that comes during a press
+   (often the one that waited for the field) waits for it to finish. */
+var _pointerPressed = false;
+var _pressDeferred = false;
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener(
+    'pointerdown',
+    function () {
+      _pointerPressed = true;
+    },
+    true,
+  );
+  ['pointerup', 'pointercancel'].forEach(function (type) {
+    document.addEventListener(
+      type,
+      function () {
+        _pointerPressed = false;
+      },
+      true,
+    );
+  });
+}
+function _afterPress(fn) {
+  if (!_pointerPressed) return fn();
+  var done = false;
+  var run = function () {
+    if (done) return;
+    done = true;
+    document.removeEventListener('pointerup', onEnd, true);
+    document.removeEventListener('pointercancel', onEnd, true);
+    clearTimeout(guard);
+    // The click is dispatched after pointerup in the same task.
+    setTimeout(fn, 0);
+  };
+  var onEnd = function () {
+    run();
+  };
+  document.addEventListener('pointerup', onEnd, true);
+  document.addEventListener('pointercancel', onEnd, true);
+  // A press that never reports its end (released outside the window).
+  var guard = setTimeout(run, 2000);
+}
+
 /* Scrolling over a focused number box changes its value in Chrome, one step
    per scroll tick: a teacher who typed 6 and then moved a trackpad or Magic
    Mouse saw it run to 1 or 9, and that number was saved when she left the
@@ -1269,6 +1342,16 @@ function _invalidateAndRerender() {
         },
         { once: true },
       );
+    }
+    return;
+  }
+  if (_pointerPressed) {
+    if (!_pressDeferred) {
+      _pressDeferred = true;
+      _afterPress(function () {
+        _pressDeferred = false;
+        _invalidateAndRerender();
+      });
     }
     return;
   }
@@ -2732,6 +2815,8 @@ function _onCreateAbandoned(entryId, failed, error) {
 }
 
 function _onOutboxEvent(evt) {
+  // The phone has no other listener on the queue; keep its dot current.
+  _updateSyncIndicator();
   var meta = evt && evt.meta;
   if (!meta) return;
   if (evt.kind === 'coalesce') {
@@ -2915,6 +3000,13 @@ function _getAssessmentCategoryId(assessment) {
 
 function getAssessmentCategoryId(assessment) {
   return _getAssessmentCategoryId(assessment);
+}
+
+/* Whether an assessment's category badge shows: always when it has a
+   category, and "No Category" only in a class that has categories, where
+   it is something to fix. A class with none shows no badge at all. */
+function showsCategoryBadge(cid, assessment) {
+  return !!_getAssessmentCategoryId(assessment) || (getCategories(cid) || []).length > 0;
 }
 
 function getAssessmentCategoryName(cid, assessment) {
@@ -4049,13 +4141,15 @@ async function _doInitData(cid) {
       } else {
         var bundle = _rpcObject(bundleRes.data) || {};
         if (bundle.not_modified) {
-          delete _loadError[cid];
+          _clearLoadError(cid);
           _classFresh[cid] = true;
+          _markLoadSynced();
           return;
         }
         try {
           _bundleToCache(cid, bundle);
-          delete _loadError[cid];
+          _clearLoadError(cid);
+          _markLoadSynced();
         } catch (e) {
           // A payload this code can't read must not leave the class half
           // applied with no word to the teacher.
@@ -4077,7 +4171,7 @@ async function _doInitData(cid) {
       _courseLoadFailed(cid, gbRes && gbRes.error);
       return;
     }
-    delete _loadError[cid];
+    _clearLoadError(cid);
     _v2GradebookToCache(cid, gbRes.data || {});
     await _hydrateCanonicalDetails(cid);
     await loadStudentProfileSummaries(cid);
@@ -4395,7 +4489,12 @@ function _markSavedCopyDirty(cid) {
 /* Ask the server whether the class on screen changed. Editing waits for the
    answer (usually 100-200 ms) so nothing is typed into data another device
    has replaced; after 3 seconds, or offline, it unlocks anyway and the
-   saved copy stays on screen. */
+   saved copy stays on screen. The "Checking for updates…" note (after
+   400 ms) stays until the answer comes, not just while editing is locked:
+   when it went at 3 seconds, a class switch showed a score saved on the
+   phone as blank for several more seconds, then changed with no word. It
+   goes after 30 seconds at most, so a check stuck behind unsent changes
+   (offline) doesn't leave it up. */
 function _startClassCheck(cid) {
   _classFresh[cid] = false;
   // Only the class on screen holds the page while it is checked; another
@@ -4403,21 +4502,28 @@ function _startClassCheck(cid) {
   var offline = (typeof navigator !== 'undefined' && navigator.onLine === false) || cid !== getActiveCourse();
   if (!offline) setPageLock('checking', true);
   var body = typeof document !== 'undefined' ? document.body : null;
-  var noteTimer = setTimeout(function () {
-    if (!released && !offline && body && body.classList) body.classList.add('fv-checking-slow');
-  }, 400);
-  var released = false;
-  function release() {
-    clearTimeout(noteTimer);
+  var answered = false;
+  function hideNote() {
     if (body && body.classList) body.classList.remove('fv-checking-slow');
-    if (released || offline) return;
-    released = true;
+  }
+  var noteTimer = setTimeout(function () {
+    if (!answered && !offline && body && body.classList) body.classList.add('fv-checking-slow');
+  }, 400);
+  var noteCap = setTimeout(hideNote, 30000);
+  var unlocked = false;
+  function unlock() {
+    if (unlocked || offline) return;
+    unlocked = true;
     setPageLock('checking', false);
   }
-  var timer = setTimeout(release, 3000);
+  var timer = setTimeout(unlock, 3000);
   return _handleExternalCourseUpdate(cid, 'gradebook').finally(function () {
+    answered = true;
     clearTimeout(timer);
-    release();
+    clearTimeout(noteTimer);
+    clearTimeout(noteCap);
+    hideNote();
+    unlock();
   });
 }
 
@@ -4666,7 +4772,10 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
 }
 
 /* A class load failed. Nothing is written: the copy this device already has
-   (memory, else localStorage) stays on screen, with a message and a retry.
+   (memory, else localStorage) stays on screen. The sync dot turns red and
+   says so (CLAUDE.md rule 5: no toast, which covered Save buttons and Undo
+   toasts and outlasted class changes), and the load is tried again on its
+   own; a click on the dot tries at once.
    This used to write an empty class over localStorage and the server
    baseline, so one failed request blanked the class and the next save
    diffed against "the server has nothing". */
@@ -4678,15 +4787,51 @@ function _courseLoadFailed(cid, error) {
   console.warn('get_gradebook failed for ' + cid + '; keeping the saved copy:', error);
   _loadError[cid] = { at: Date.now(), message: message };
   if (_cache.students[cid] === undefined) _loadCourseFromLS(cid);
-  // The message must never be what breaks a load. A class loaded in the
-  // background says nothing: it is said when the teacher opens it.
+  // The dot must never be what breaks a load. A class loaded in the
+  // background shows nothing: the dot speaks for the class that is open.
   try {
-    if (typeof showSyncToast === 'function' && cid === getActiveCourse()) {
-      showSyncToast("Couldn't load the latest data for this class. " + _savedCopyDescription(cid), 'load-failed');
-    }
+    _updateSyncIndicator();
   } catch (e) {
-    console.warn('Could not show the load-failed message:', e);
+    console.warn('Could not show the load problem on the sync dot:', e);
   }
+  _scheduleLoadRetry(cid);
+}
+
+/* Tries a failed load again after 15 s, 30 s, 1 minute, then every
+   2 minutes, while that class stays open and the problem lasts. */
+var _LOAD_RETRY_DELAYS_MS = [15000, 30000, 60000, 120000];
+var _loadRetryTimer = null;
+var _loadRetryCount = 0;
+function _scheduleLoadRetry(cid) {
+  if (_loadRetryTimer || cid !== getActiveCourse()) return;
+  var delay = _LOAD_RETRY_DELAYS_MS[Math.min(_loadRetryCount, _LOAD_RETRY_DELAYS_MS.length - 1)];
+  _loadRetryCount += 1;
+  _loadRetryTimer = setTimeout(function () {
+    _loadRetryTimer = null;
+    if (!_loadError[cid] || cid !== getActiveCourse()) return;
+    _handleExternalCourseUpdate(cid, 'gradebook');
+  }, delay);
+}
+
+function _clearLoadError(cid) {
+  if (!_loadError[cid]) return;
+  delete _loadError[cid];
+  if (cid === getActiveCourse()) {
+    _loadRetryCount = 0;
+    if (_loadRetryTimer) {
+      clearTimeout(_loadRetryTimer);
+      _loadRetryTimer = null;
+    }
+  }
+  _updateSyncIndicator();
+}
+
+/* The sync dot's words while the open class couldn't load, or null. */
+function _loadProblem() {
+  var cid = typeof getActiveCourse === 'function' ? getActiveCourse() : null;
+  if (!cid || !_loadError[cid]) return null;
+  var text = "Couldn't load the latest data for this class. " + _savedCopyDescription(cid);
+  return window.__MOBILE ? text + ' Pull down to try again.' : text + ' Click the dot to try again.';
 }
 
 function _savedCopyDescription(cid) {
@@ -5898,7 +6043,8 @@ function initials(st) {
     if (p.length >= 2) return (p[0][0] + p[p.length - 1][0]).toUpperCase();
     return (p[0] || '?').slice(0, 2).toUpperCase();
   }
-  const f = (st.firstName || '').trim(),
+  // From the name shown on screen, so "Teddy Okafor" is TO.
+  const f = (st.preferred || st.firstName || '').trim(),
     l = (st.lastName || '').trim();
   if (f && l) return (f[0] + l[0]).toUpperCase();
   return (f || l || '?').slice(0, 2).toUpperCase();
@@ -5922,8 +6068,12 @@ function pronounsSelect(id, selected, attrs) {
 function fullName(st) {
   return ((st.firstName || '') + ' ' + (st.lastName || '')).trim();
 }
+/* The name shown on screen for a student, everywhere: the preferred name
+   (the first name when there is none), then the last name ("Teddy Okafor"
+   for Theodore Okafor). fullName stays the legal name for the roster's
+   fields, sorting, import matching and exports. */
 function displayName(st) {
-  return st.preferred || fullName(st);
+  return displayNameWithLast(st) || fullName(st);
 }
 function displayNameFirst(st) {
   return st.preferred || st.firstName || st.lastName || '';
@@ -6985,7 +7135,12 @@ function saveLearningMap(cid, map) {
   );
   map._customized = true;
   map._version = (map._version || 0) + 1;
-  _saveCourseField('learningMaps', cid, map); // derived tag/section caches auto-invalidate via mapRef check
+  _saveCourseField('learningMaps', cid, map);
+  // The derived tag and section caches key on the map object, and a map
+  // edited in place (removeCompetencies) is the same object, so drop them:
+  // otherwise counts kept a removed competency.
+  delete _allTagsCache[cid];
+  delete _tagToSectionCache[cid];
   if (!_writesEnabled() || !_isUuid(cid)) return Promise.resolve(true);
   _registerLearningMapRows(cid, map);
   return _persistLearningMapToCanonical(cid, prev, map);
@@ -7102,11 +7257,24 @@ function removeCompetencies(cid, sectionIds) {
     ids[resolveLearningMapId(cid, 'section', id)] = true;
   });
   var map = ensureCustomLearningMap(cid);
-  var taken = (map.sections || []).filter(function (s) {
+  var all = map.sections || [];
+  var taken = all.filter(function (s) {
     return ids[s.id];
   });
   if (!taken.length) return 0;
-  map.sections = map.sections.filter(function (s) {
+  // Where each one sat: the competencies that came after it (removed with
+  // it or not) and its index, so putting it back returns it to its place.
+  var place = {};
+  all.forEach(function (s, i) {
+    if (!ids[s.id]) return;
+    place[s.id] = {
+      index: i,
+      beforeIds: all.slice(i + 1, i + 31).map(function (x) {
+        return x.id;
+      }),
+    };
+  });
+  map.sections = all.filter(function (s) {
     return !ids[s.id];
   });
   var now = new Date().toISOString();
@@ -7117,7 +7285,12 @@ function removeCompetencies(cid, sectionIds) {
     cid,
     taken
       .map(function (s) {
-        return { section: structuredClone(s), removedAt: now };
+        return {
+          section: structuredClone(s),
+          removedAt: now,
+          index: place[s.id].index,
+          beforeIds: place[s.id].beforeIds,
+        };
       })
       .concat(list),
   );
@@ -7133,12 +7306,26 @@ function restoreCompetency(cid, sectionId) {
   });
   if (!entry) return false;
   var map = ensureCustomLearningMap(cid);
+  var secs = map.sections || [];
   if (
-    !(map.sections || []).some(function (s) {
+    !secs.some(function (s) {
       return s.id === sectionId;
     })
   ) {
-    map.sections = (map.sections || []).concat([structuredClone(entry.section)]);
+    // Back in its place: before the first competency that followed it and
+    // is still there, else at its old position, else at the end (removed
+    // before places were kept).
+    var at = -1;
+    (entry.beforeIds || []).some(function (id) {
+      var before = resolveLearningMapId(cid, 'section', id);
+      at = secs.findIndex(function (s) {
+        return s.id === before;
+      });
+      return at >= 0;
+    });
+    if (at < 0 && typeof entry.index === 'number') at = Math.min(entry.index, secs.length);
+    if (at < 0) at = secs.length;
+    map.sections = secs.slice(0, at).concat([structuredClone(entry.section)], secs.slice(at));
   }
   _saveRemovedSections(
     cid,
@@ -13399,6 +13586,7 @@ window.GB = {
   getCategoryById,
   getAssessmentCategoryId,
   getAssessmentCategoryName,
+  showsCategoryBadge,
   categoryRequired,
   assessmentNeedsCategory,
   getAssessments,

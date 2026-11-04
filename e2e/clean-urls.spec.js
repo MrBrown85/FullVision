@@ -28,7 +28,8 @@ test('a reload keeps the page', async ({ page }) => {
   await signInDemo(page);
   await page.goto('/reports');
   await page.reload();
-  await expect(page).toHaveURL(/\/reports$/);
+  // Reports records the class, tab and student it opened on (Nov 3 sweep).
+  await expect(page).toHaveURL(/\/reports(\?course=[^&]+&tab=questionnaire(&student=[^&]+)?)?$/);
   await expect(page.locator('#dock-mount [aria-current="page"]')).toHaveText('Reports');
 });
 
