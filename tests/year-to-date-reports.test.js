@@ -357,4 +357,18 @@ describe('review follow-ups', () => {
     setActiveTerm(CID, 2);
     expect(getSectionProficiency(CID, SID, 'sec')).toBe(yearSoFar);
   });
+
+  it('6. Progress in One Area falls back to the start of the term when Report 1 had no level for it', () => {
+    // A second competency first assessed in Term 2.
+    _cache.learningMaps[CID].sections.push({ id: 'sec2', name: 'Planning', tags: [{ id: 't2', label: 'Planning' }] });
+    _cache.assessments[CID].push({ id: 'p1', title: 'Plan', date: '2026-12-12', tagIds: ['t2'], categoryId: 'cat' });
+    _cache.scores[CID][SID].push({ assessmentId: 'p1', tagId: 't2', score: 2, date: '2026-12-12' });
+    clearProfCache();
+    setActiveTerm(CID, 2);
+    const t = text(ReportBlocks.renderBlockProgress(CID, STUDENT, { termId: 'term-2' }, { area: 'lowest' }));
+    expect(t).toContain('Progress: Planning');
+    expect(t).toContain('Start of term 2.0 Developing');
+    expect(t).not.toContain('since Report 1');
+    expect(t).not.toContain('—');
+  });
 });

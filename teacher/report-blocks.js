@@ -613,13 +613,16 @@ window.ReportBlocks = (function () {
     return sections
       .map((sec, i) => {
         const now = getSectionProficiency(cid, sid, sec.id);
-        const then = last ? last.levels[i] : _startLevel(cid, sid, sec);
+        // The last report's level when it had one for this competency, else
+        // the start of this term (a competency first assessed this term).
+        const fromLast = !!last && last.levels[i] > 0;
+        const then = fromLast ? last.levels[i] : _startLevel(cid, sid, sec);
         return {
           sec,
           name: _competencyLabel(sec),
           then: then > 0 ? then : 0,
           now,
-          thenLabel: last ? last.label : 'Start of Term',
+          thenLabel: fromLast ? last.label : 'Start of Term',
         };
       })
       .filter(r => r.now > 0);
