@@ -121,31 +121,70 @@ window.MCardWidgets = (function () {
   }
 
   /* ── sectionBars ─────────────────────────────────────────────── */
+  // Grouped by folder as on the student screen: each folder's average,
+  // "Each competency counts on its own." under a folder that doesn't count
+  // as one, then its competencies; every row carries its figure.
+  function _secRowHtml(cid, name, color, value, cls) {
+    var pct = Math.round(levelBarPercent(cid, value));
+    return (
+      '<div class="m-scard-sec-row' +
+      (cls ? ' ' + cls : '') +
+      '">' +
+      (color ? '<div class="m-scard-sec-dot" style="background:' + cssColor(color) + '"></div>' : '') +
+      '<div class="m-scard-sec-name">' +
+      MC.esc(name) +
+      '</div>' +
+      '<div class="m-scard-sec-bar"><div class="m-scard-sec-fill" style="width:' +
+      pct +
+      '%;background:' +
+      MC.profBg(Math.round(value)) +
+      '"></div></div>' +
+      '<div class="m-scard-sec-val">' +
+      MC.esc(value > 0 ? formatLevel(cid, value) : '—') +
+      '</div>' +
+      '</div>'
+    );
+  }
+
   _renderers.sectionBars = function (st, cid, data) {
     var sections = data.sections;
     if (!sections || !sections.length) return '';
+    var secRow = function (sec) {
+      return _secRowHtml(
+        cid,
+        sec.shortName || sec.name,
+        sec.color || '#888',
+        getSectionProficiency(cid, st.id, sec.id),
+        '',
+      );
+    };
 
-    var secBars = '';
-    sections.forEach(function (sec) {
-      var secProf = getSectionProficiency(cid, st.id, sec.id);
-      var pct = Math.round(levelBarPercent(cid, secProf));
-      secBars +=
-        '<div class="m-scard-sec-row">' +
-        '<div class="m-scard-sec-dot" style="background:' +
-        cssColor(sec.color || '#888') +
-        '"></div>' +
-        '<div class="m-scard-sec-name">' +
-        MC.esc(sec.shortName || sec.name) +
-        '</div>' +
-        '<div class="m-scard-sec-bar"><div class="m-scard-sec-fill" style="width:' +
-        pct +
-        '%;background:' +
-        MC.profBg(Math.round(secProf)) +
-        '"></div></div>' +
-        '</div>';
-    });
-
-    return '<div class="m-scard-sections">' + secBars + '</div>';
+    var grouped = typeof getGroupedSections === 'function' ? getGroupedSections(cid) : null;
+    var html = '';
+    if (grouped && grouped.groups && grouped.groups.length) {
+      grouped.groups.forEach(function (gi) {
+        if (!gi.sections.length) return;
+        var note = typeof folderAverageNote === 'function' ? folderAverageNote(cid, gi.group) : '';
+        html +=
+          '<div class="m-scard-folder">' +
+          _secRowHtml(
+            cid,
+            gi.group.label || gi.group.name,
+            null,
+            getGroupProficiency(cid, st.id, gi.group.id),
+            'm-scard-folder-row',
+          ) +
+          (note ? '<div class="m-scard-folder-note">' + MC.esc(note) + '</div>' : '') +
+          gi.sections.map(secRow).join('') +
+          '</div>';
+      });
+      (grouped.ungrouped || []).forEach(function (sec) {
+        html += secRow(sec);
+      });
+    } else {
+      html = sections.map(secRow).join('');
+    }
+    return '<div class="m-scard-sections">' + html + '</div>';
   };
 
   /* ── obsSnippet ──────────────────────────────────────────────── */

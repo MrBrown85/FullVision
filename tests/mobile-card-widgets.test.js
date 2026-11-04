@@ -288,6 +288,29 @@ describe('MCardWidgets.render sectionBars', () => {
     expect(html).toContain('Quest');
     expect(html).toContain('Plan');
   });
+
+  // Step 4 group 3 #76: folders with their average and note, as on the
+  // student screen, and a figure on every row.
+  it('groups competencies under their folders with the folder average and note', () => {
+    mockWidgetDataLayer({
+      getSectionProficiency: (cid, sid, secId) => (secId === 's1' ? 2.0 : 3.0),
+      getGroupedSections: () => ({
+        groups: [{ group: { id: 'g1', name: 'Questioning and Predicting' }, sections: SECTIONS }],
+        ungrouped: [],
+      }),
+      getGroupProficiency: () => 2.5,
+      folderAverageNote: () => 'Each competency counts on its own.',
+      formatLevel: (cid, v) => v.toFixed(1),
+    });
+    const html = MCardWidgets.render('sectionBars', STUDENT, CID, DATA);
+    expect(html).toContain('m-scard-folder-row');
+    expect(html).toContain('Questioning and Predicting');
+    expect(html).toContain('Each competency counts on its own.');
+    expect(html).toContain('>2.5<');
+    expect(html).toContain('>2.0<');
+    expect(html).toContain('>3.0<');
+    expect(html.indexOf('Questioning and Predicting')).toBeLessThan(html.indexOf('Quest<'));
+  });
 });
 
 /* ── Task 2: obsSnippet ──────────────────────────────────────────── */
