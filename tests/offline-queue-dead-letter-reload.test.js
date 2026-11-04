@@ -108,10 +108,7 @@ describe('failed writes on the next page load', () => {
     await Q.flush();
 
     expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
-    expect(window.Sentry.captureMessage).toHaveBeenCalledWith(
-      'Outbox dropped update_assessment: assessment not found',
-      'warning',
-    );
+    expect(window.Sentry.captureMessage).toHaveBeenCalledWith('Outbox dropped update_assessment (P0002)', 'warning');
   });
 
   it("drops what can't be retried, and leaves another teacher's failed writes alone", () => {

@@ -3,11 +3,10 @@
  * Replaces __SUPABASE_URL__ and __SUPABASE_KEY__ placeholders in HTML responses
  * with values from Netlify environment variables.
  */
-// Blocked scripts and inline handlers are reported to Sentry's security
-// endpoint, so a CSP break shows up the day it happens. Same project and key
-// as the DSN in shared/sentry-init.js.
-const CSP_REPORT_URL =
-  'https://o4511109636685824.ingest.de.sentry.io/api/4511300618747984/security/?sentry_key=9f39b499781faa1a39607f208edb2cb8';
+// No report-uri or report-to: a browser's CSP report carries the page's
+// address with its query (/student?id=<student id>&course=<class id>), and
+// it goes to the endpoint directly, past the Sentry scrubber in
+// shared/sentry-init.js. Sentry is in the EU; student data stays in Canada.
 
 export default async function handler(request, context) {
   const response = await context.next();
@@ -51,11 +50,8 @@ export default async function handler(request, context) {
     // No page uses <base>, <object> or <embed>; injected markup can't either.
     "base-uri 'self'",
     "object-src 'none'",
-    `report-uri ${CSP_REPORT_URL}`,
-    'report-to csp-endpoint',
   ].join('; ');
   headers.set('Content-Security-Policy', csp);
-  headers.set('Reporting-Endpoints', `csp-endpoint="${CSP_REPORT_URL}"`);
 
   return new Response(html, {
     status: response.status,

@@ -121,8 +121,92 @@ async function maybePromptRestoreAccount(user) {
   return true;
 }
 
+/* ── Password reset ────────────────────────────────────────────
+   The reset email's link signs the teacher in for this one job and opens
+   login.html?reset=1 (or the site's front page, which sends it here). The
+   page shows Choose a New Password instead of going on to the gradebook.
+   Supabase puts the link's tokens, or an error for a used or expired link,
+   in the address; the client reads them as the page loads. */
+var RESET_EXPIRED =
+  'This reset link has expired or was already used. Enter your email and choose Forgot password? to get a new one.';
+
+function isResetLink() {
+  return new URLSearchParams(location.search).get('reset') === '1' || /(^|[#&])type=recovery(&|$)/.test(location.hash);
+}
+
+function resetLinkError() {
+  var hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+  var query = new URLSearchParams(location.search);
+  return hash.get('error') || hash.get('error_code') || query.get('error') || query.get('error_code') || null;
+}
+
+function showResetForm() {
+  document.querySelector('.auth-tabs').hidden = true;
+  document.getElementById('form-signin').hidden = true;
+  document.getElementById('form-signup').hidden = true;
+  document.querySelector('.auth-demo').hidden = true;
+  document.getElementById('form-reset').hidden = false;
+  document.getElementById('rs-password').focus();
+}
+
+/* A link that can't be used: back to Sign In, saying why. The address is
+   cleaned so a reload doesn't try the link again. */
+function resetLinkFailed() {
+  history.replaceState(null, '', location.pathname);
+  switchTab('signin');
+  showError(RESET_EXPIRED);
+}
+
+async function startPasswordReset(sb) {
+  if (resetLinkError()) return resetLinkFailed();
+  var result = await sb.auth.getSession();
+  if (!result.data.session) return resetLinkFailed();
+  // The tokens have been read; keep them out of the address bar and history.
+  history.replaceState(null, '', location.pathname + '?reset=1');
+  showResetForm();
+}
+
+async function handleResetSubmit(e) {
+  e.preventDefault();
+  hideMessages();
+  var password = document.getElementById('rs-password').value;
+  if (password !== document.getElementById('rs-confirm').value) {
+    showError('Passwords do not match.');
+    return;
+  }
+  var btn = document.getElementById('rs-submit');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    var sb = getSupabase();
+    var result = await sb.auth.updateUser({ password: password });
+    if (result.error) throw result.error;
+    showSuccess('Your password is changed. Opening FullVision…');
+    setTimeout(function () {
+      portalRedirect(result.data.user);
+    }, 1200);
+  } catch (err) {
+    showError(err.message || 'Could not save the new password. Please try again.');
+    btn.disabled = false;
+    btn.textContent = 'Save New Password';
+  }
+}
+
 /* ── Redirect if already logged in ─────────────────────────── */
 (async function () {
+  if (isResetLink()) {
+    var resetSb = getSupabase();
+    if (resetSb) {
+      try {
+        await startPasswordReset(resetSb);
+      } catch (e) {
+        resetLinkFailed();
+      }
+    } else {
+      resetLinkFailed();
+    }
+    return;
+  }
   // Opt-in demo via URL: /login.html?demo=1 wipes local state, sets the demo
   // flag, and drops the user at the dashboard with Science 8 auto-seeded.
   // Useful for testing and for sharing a "just works" local link.
@@ -315,7 +399,10 @@ async function handleForgot() {
   }
   try {
     var sb = getSupabase();
-    var result = await sb.auth.resetPasswordForEmail(email);
+    // The link comes back to this page, which shows Choose a New Password.
+    var result = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: location.origin + '/login.html?reset=1',
+    });
     if (result.error) throw result.error;
     showSuccess('Password reset email sent. Check your inbox.');
   } catch (err) {
@@ -326,6 +413,7 @@ async function handleForgot() {
 /* ── Form submit listeners ── */
 document.getElementById('form-signin').addEventListener('submit', handleSignIn);
 document.getElementById('form-signup').addEventListener('submit', handleSignUp);
+document.getElementById('form-reset').addEventListener('submit', handleResetSubmit);
 
 // The splash page's Create an Account link opens the Sign Up tab.
 if (window.location.hash === '#signup') switchTab('signup');

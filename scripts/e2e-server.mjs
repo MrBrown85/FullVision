@@ -5,8 +5,8 @@
  * nonce CSP the live site sends. A script or inline handler the CSP blocks in
  * production is blocked in the tests too.
  *
- * The CSP's report-uri and report-to are removed: they post violations to
- * Sentry, and test runs shouldn't. Enforcement is unchanged.
+ * Any report-uri or report-to in the CSP is removed, so test runs never post
+ * violations anywhere. Enforcement is unchanged.
  *
  * Run by playwright.config.js after scripts/build-e2e.sh.
  */
