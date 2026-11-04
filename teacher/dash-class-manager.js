@@ -4526,7 +4526,9 @@ window.DashClassManager = (function () {
       total +
       '</strong> competencies selected</div>';
     html +=
-      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button>' +
+      '<div class="cw-footer">' +
+      _cwCancelBtn() +
+      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button>' +
       '<button class="btn btn-primary" data-action="cwCompsNext"' +
       (on === 0 ? ' disabled style="opacity:0.4;pointer-events:none"' : '') +
       '>Next</button></div></div>';
@@ -4791,7 +4793,9 @@ window.DashClassManager = (function () {
       '</div>';
 
     html +=
-      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3">Next</button></div>';
+      '<div class="cw-footer">' +
+      _cwCancelBtn() +
+      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3">Next</button></div>';
     html += '</div>';
     return html;
   }
@@ -4909,7 +4913,9 @@ window.DashClassManager = (function () {
     }
 
     html +=
-      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate">Create Class</button></div>';
+      '<div class="cw-footer">' +
+      _cwCancelBtn() +
+      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate">Create Class</button></div>';
     html += '</div>';
     return html;
   }
@@ -5016,22 +5022,37 @@ window.DashClassManager = (function () {
     _cmRenderWithScroll();
   }
 
+  // Cancel on every step, as on the first.
+  function _cwCancelBtn() {
+    return '<button class="btn btn-ghost cw-cancel" data-action="cmCancelCreate">Cancel</button>';
+  }
+
+  /* A new step opens at its top, with the step bar in view, whatever the
+     last step was scrolled to (the Class Name box's autofocus included). */
+  function _cwShowStep(step) {
+    cwStep = step;
+    renderClassManager();
+    var top = function () {
+      var detail = document.querySelector('.cm-detail');
+      if (detail) detail.scrollTop = 0;
+    };
+    top();
+    requestAnimationFrame(top);
+  }
+
   function cwSkipToCustom() {
     cwSelectedTags = [];
     cwPreset = null;
-    cwStep = 3;
-    renderClassManager();
+    _cwShowStep(3);
   }
 
   function cwGoToStep2() {
     if (cwSelectedTags.length === 0) return;
-    cwStep = 2;
-    renderClassManager();
+    _cwShowStep(2);
   }
 
   function cwCompsNext() {
-    cwStep = 3;
-    renderClassManager();
+    _cwShowStep(3);
   }
 
   // The review's grading switches. They don't touch any class until Finish.
@@ -5064,15 +5085,14 @@ window.DashClassManager = (function () {
       (document.querySelector('#cm-cg-calc .cm-seg-btn.active') || {}).dataset?.val || _cmDefaultCalcMethod();
     cwStep2Decay = document.getElementById('cm-cg-decay-slider')?.value || '65';
     cwStep2LatePolicy = document.getElementById('cm-new-late-policy')?.value || '';
-    cwStep = 4;
-    renderClassManager();
+    _cwShowStep(4);
   }
 
   function cwGoBack() {
-    if (cwStep === 4) cwStep = 3;
-    else if (cwStep === 3) cwStep = cwSelectedTags.length ? 2 : 1;
-    else if (cwStep === 2) cwStep = 1;
-    renderClassManager();
+    if (cwStep === 4) _cwShowStep(3);
+    else if (cwStep === 3) _cwShowStep(cwSelectedTags.length ? 2 : 1);
+    else if (cwStep === 2) _cwShowStep(1);
+    else renderClassManager();
   }
 
   function cwGetPreName() {

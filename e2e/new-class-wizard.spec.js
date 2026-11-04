@@ -70,3 +70,27 @@ test('Review leaves out Counts As for a grade 9 Proficiency class', async ({ pag
   await expect(review).toContainText('Reporting Terms');
   await expect(review).not.toContainText('BC Letter Bands');
 });
+
+test('A long step keeps Next in view, every step has Cancel, and each step opens at its top', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await enterDemo(page);
+  await openWizard(page);
+  await page.locator('.cw-grade-btn', { hasText: 'Grade 9' }).click();
+  await page.locator('.cw-subject-btn', { hasText: 'Science' }).first().click();
+  await page.locator('.cw-course-item').first().click();
+  await page.locator('[data-action="cwGoToStep2"]').click();
+  // Choose Competencies is far taller than the window.
+  expect(await page.evaluate(() => document.querySelector('.cm-detail').scrollHeight)).toBeGreaterThan(1800);
+  await expect(page.locator('[data-action="cwCompsNext"]')).toBeInViewport();
+  await expect(page.locator('.cw-footer [data-action="cmCancelCreate"]')).toBeVisible();
+  await page.evaluate(() => (document.querySelector('.cm-detail').scrollTop = 99999));
+  await page.locator('[data-action="cwCompsNext"]').click();
+  await expect(page.locator('#cm-new-name')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.querySelector('.cm-detail').scrollTop)).toBe(0);
+  await expect(page.locator('.cw-steps')).toBeInViewport();
+  await expect(page.locator('.cw-footer [data-action="cmCancelCreate"]')).toBeVisible();
+  await page.locator('[data-action="cwGoToStep3"]').click();
+  await expect(page.locator('.cw-footer [data-action="cmCancelCreate"]')).toBeVisible();
+  await page.locator('.cw-footer [data-action="cmCancelCreate"]').click();
+  await expect(page.locator('.cw-steps')).toHaveCount(0);
+});

@@ -3230,6 +3230,16 @@ a.dash-ins-name:hover {
   justify-content: flex-end;
   margin-top: 16px;
 }
+/* Back and Next stay in view at the foot of a long step (Choose
+   Competencies runs to thousands of pixels). */
+.cm-detail .cw-footer {
+  position: sticky;
+  bottom: -20px;
+  z-index: 2;
+  margin-bottom: -20px;
+  padding: 12px 0 20px;
+  background: var(--bg);
+}
 
 /* ── Compact Standard Cards (used in class manager + wizard) ── */
 .cm-std-card {
