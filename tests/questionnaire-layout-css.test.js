@@ -29,12 +29,15 @@ function rule(media, selector) {
 
 describe('the questionnaire’s columns', () => {
   it('pins the right column side by side, scrolling on its own when taller than the window', () => {
-    const right = css.slice(css.indexOf('@media (min-width: 1281px) {\n  .qn-left {'));
+    const right = css.slice(css.indexOf('@media (min-width: 1281px) {\n  .page-layout.sidebar-hidden .qn-left {'));
     expect(right).toContain('.qn-right {');
-    const r = rule('min-width: 1281px', '.qn-left');
-    expect(r).toMatchObject({ flex: '1 0 470px', width: 'auto', 'min-width': '0' });
+    // The left column keeps 470 px and takes the list's room only when the
+    // list is hidden (Colin, Nov 4); the right takes the rest.
+    expect(rule('min-width: 1281px', '.page-layout.sidebar-hidden .qn-left')).toEqual({
+      width: 'calc(470px + var(--sidebar-w))',
+    });
     const block = right.slice(right.indexOf('.qn-right {'), right.indexOf('}', right.indexOf('.qn-right {')));
-    expect(block).toContain('flex: 0 1 670px;');
+    expect(block).toContain('flex: 1;');
     expect(block).toContain('position: sticky;');
     expect(block).toContain('top: 0;');
     expect(block).toContain('align-self: flex-start;');

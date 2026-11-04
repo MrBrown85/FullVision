@@ -153,6 +153,22 @@ test('the right column stays in view while the left column scrolls', async ({ pa
   await expect(page.locator('.qn-comment')).toBeInViewport();
 });
 
+// Colin, Nov 4: on a wide screen the left column had grown to fill it; it
+// stays 470 px, and the right column takes the rest.
+test('on a wide screen the left column keeps 470 px with the list shown, and grows by the list when hidden', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await open(page);
+  expect(Math.round((await page.locator('.qn-left').boundingBox()).width)).toBe(470);
+  const right = Math.round((await page.locator('.qn-right').boundingBox()).width);
+  expect(right).toBeGreaterThan(1000);
+  await page.evaluate(() => toggleSidebar());
+  await expect.poll(async () => Math.round((await page.locator('.qn-left').boundingBox()).width)).toBe(710);
+  expect(Math.round((await page.locator('.qn-right').boundingBox()).width)).toBe(right);
+  await page.evaluate(() => toggleSidebar());
+});
+
 test('with the student list hidden the left column grows; the right keeps its width', async ({ page }) => {
   await open(page);
   expect(Math.round((await page.locator('.qn-left').boundingBox()).width)).toBe(470);
