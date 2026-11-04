@@ -372,3 +372,14 @@ describe('review follow-ups', () => {
     expect(t).not.toContain('—');
   });
 });
+
+it('7. Strongest still needs 3 pieces, counted year to date', () => {
+  const pts = n => Array.from({ length: n }, (_, i) => ({ id: 'w' + i, v: 3, d: '2026-10-0' + (i + 1) }));
+  const comps = [
+    { id: 'a', level: 3.8, scores: pts(3) },
+    { id: 'b', level: 2.5, scores: pts(3) },
+  ];
+  expect(CommentBank.strongestOf(comps).map(c => c.id)).toEqual(['a']);
+  comps[0].scores = pts(2);
+  expect(CommentBank.strongestOf(comps)).toEqual([]);
+});
