@@ -2732,7 +2732,8 @@ window.PageAssignments = (function () {
         .join('') +
       '</select>' +
       (categories.length === 0
-        ? '<div class="af-rubric-info">No grading categories configured for this course yet.</div>'
+        ? '<div class="af-rubric-info">This class has no grading categories yet. ' +
+          '<button type="button" class="af-link-btn" data-action="afAddCategories">Add Categories</button></div>'
         : '<p class="af-category-hint" id="af-category-hint"' +
           (needsPick && scoreMode !== 'dibels' ? '' : ' hidden') +
           '>' +
@@ -5608,12 +5609,18 @@ window.PageAssignments = (function () {
   /* Cancel asks first when the form differs from how it opened: a new
      assessment from the blank form, an edit from the stored values. A
      rubric made for it is kept only when the assessment is saved. */
-  function cancelAssessForm() {
+  /* Cancel, or leaving the form for another page (`then`, after it
+     closes): a form with changes asks first. */
+  function cancelAssessForm(then) {
     var title = ((document.getElementById('af-title') || {}).value || '').trim();
     var editing = !!_editingAssessId;
     var dirty = _formChanges().length > 0 || !!_pendingFormRubric || _blankWritten();
-    if (!dirty) {
+    var close = function () {
       hideNewForm();
+      if (typeof then === 'function') then();
+    };
+    if (!dirty) {
+      close();
       return;
     }
     _formDialog(
@@ -5625,7 +5632,7 @@ window.PageAssignments = (function () {
             (_pendingFormRubric ? ' The rubric you made for it isn\u2019t kept either.' : ''),
       [
         { label: 'Keep Editing', style: 'cancel' },
-        { label: 'Discard', style: 'danger', run: hideNewForm },
+        { label: 'Discard', style: 'danger', run: close },
       ],
     );
   }
@@ -10454,6 +10461,13 @@ window.PageAssignments = (function () {
       },
       cancelAssessForm: function () {
         cancelAssessForm();
+      },
+      // A class with no categories: Class Management's Grading tab.
+      afAddCategories: function () {
+        var cid = activeCourse;
+        cancelAssessForm(function () {
+          Router.navigate('/dashboard?course=' + encodeURIComponent(cid) + '&manage=grading');
+        });
       },
       toggleAssess: function () {
         toggleAssess(el.dataset.aid);
