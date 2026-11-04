@@ -3162,9 +3162,13 @@ window.PageAssignments = (function () {
   function _storedScoreMode(mode) {
     return mode === 'competencies' ? 'proficiency' : mode || 'proficiency';
   }
-  function _formModeOf(a) {
+  // Work whose saved rubric is gone scores its competencies, as its card says.
+  // cid: the class the work is in (Start From Past can bring it from another).
+  function _formModeOf(a, cid) {
     var m = (a && a.scoreMode) || 'proficiency';
-    return m === 'proficiency' && !a.rubricId ? 'competencies' : m;
+    var held = !!a.rubricId && _pendingFormRubric && _pendingFormRubric.id === a.rubricId;
+    var gone = !!a.rubricId && !held && !getRubricById(cid || activeCourse, a.rubricId);
+    return m === 'proficiency' && (!a.rubricId || gone) ? 'competencies' : m;
   }
   function _formMode() {
     return (document.getElementById('af-scoremode') || {}).value || 'proficiency';
@@ -5127,6 +5131,13 @@ window.PageAssignments = (function () {
      else the bank's, else the BC scale's). It's held like any rubric made
      on the form and saved when the assessment is; Edit Rubric changes it. */
   function useCompetencyRubric() {
+    // Scored competencies stop showing once a rubric scores by criterion:
+    // ask first, as changing the scoring does.
+    // ('rubric' stands for the rubric scoring the scores don't carry into.)
+    if (_formMode() === 'competencies') return _askBeforeScoredChange('scoring', _useCompetencyRubric, 'rubric');
+    _useCompetencyRubric();
+  }
+  function _useCompetencyRubric() {
     var cid = activeCourse;
     var tags = Array.from(document.querySelectorAll('.af-tag-cb:checked'))
       .map(function (cb) {
@@ -6134,7 +6145,7 @@ window.PageAssignments = (function () {
     if (!title) return;
     title.value = a.title || '';
     title.removeAttribute('aria-invalid');
-    var mode = _formModeOf(a);
+    var mode = _formModeOf(a, srcCid);
     if (!document.querySelector('.af-scoremode-btn[data-mode="' + mode + '"]')) mode = 'proficiency';
     setScoreMode(mode);
     var mp = document.getElementById('af-maxpoints');
