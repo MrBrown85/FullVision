@@ -3077,8 +3077,14 @@ window.DashClassManager = (function () {
       '<div class="cm-field"><label class="cm-label">First Name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label">Last Name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label">Preferred Name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Pronouns</label>' +
-      pronounsSelect('cm-add-pro', '') +
+      // Pronouns take the same list and free text as the roster's box.
+      '<div class="cm-field"><label class="cm-label" for="cm-add-pro">Pronouns</label>' +
+      '<input class="cm-input" id="cm-add-pro" list="cm-add-pronouns" autocomplete="off" style="font-size:0.875rem;padding:6px 10px">' +
+      '<datalist id="cm-add-pronouns">' +
+      PRONOUNS_OPTIONS.map(function (p) {
+        return '<option value="' + esc(p) + '">';
+      }).join('') +
+      '</datalist>' +
       '</div>' +
       '<div class="cm-field"><label class="cm-label">Student Number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.875rem;padding:6px 10px"></div>' +

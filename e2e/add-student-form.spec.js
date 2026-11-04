@@ -38,3 +38,20 @@ test('Escape closes Add Student and puts the focus back on the button', async ({
   await expect(page.locator('#cm-add-student-form')).toBeHidden();
   await expect(page.locator('.cm-roster-add')).toBeFocused();
 });
+
+test('Add Student pronouns take the list or any typed set, as the roster does', async ({ page }) => {
+  await openAddStudent(page);
+  const pro = page.locator('#cm-add-pro');
+  await expect(pro).toHaveAttribute('list', 'cm-add-pronouns');
+  expect(await page.locator('#cm-add-pronouns option').evaluateAll(o => o.map(x => x.value))).toEqual([
+    'he/him',
+    'she/her',
+    'they/them',
+    'prefer not to say',
+  ]);
+  await page.locator('#cm-add-first').fill('Rin');
+  await pro.fill('he/they');
+  await page.keyboard.press('Enter');
+  const rin = await page.evaluate(() => getStudents('sci8').find(s => s.firstName === 'Rin'));
+  expect(rin.pronouns).toBe('he/they');
+});
