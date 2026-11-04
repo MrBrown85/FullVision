@@ -690,9 +690,28 @@ window.ReportBlocks = (function () {
     const pct = _ownPct(cid, sid, a);
     return pct == null ? null : formatPointsPercent(pct, 100);
   }
-  /* One piece's mark: w is { a, score }. */
+  /* One piece's mark: w is { a, score }, or a whole piece (_wholeWork)
+     with the text it prints. */
   function _workMark(cid, sid, w, word) {
+    if (w.text) return w.text;
     return _mark(cid, w.score, word, _ownPercent(cid, sid, w.a));
+  }
+  /* A piece's whole mark as Assignment Grades prints it by default
+     (assessmentCellValue, _rowMarks): { a, score, ownPct, text }, or null
+     for work with no level (Complete/Incomplete, Missing, Excused, DIBELS)
+     (step 4 group 2 #3). */
+  function _wholeWork(cid, sid, a) {
+    const cv = assessmentCellValue(cid, sid, a);
+    const mode = courseGradeMode(cid);
+    if (cv.kind === 'points') {
+      const m = _rowMarks(cid, a, cv);
+      const text = mode === 'letter' ? m.percent : mode === 'both' ? m.score + ' \u00B7 ' + m.percent : m.score;
+      return { a, score: cv.level, ownPct: _ownPct(cid, sid, a), text };
+    }
+    if (cv.kind === 'level' && cv.value > 0) {
+      return { a, score: cv.value, ownPct: cv.percent, text: _mark(cid, cv.value, false, cv.percentText) };
+    }
+    return null;
   }
   /* Orders pieces { a, score } best first (or lowest first, best false).
      A Letter or Both class ranks them by the % it prints for them (points
@@ -701,12 +720,13 @@ window.ReportBlocks = (function () {
   function _byMark(cid, sid, best) {
     const pctOn = courseGradeMode(cid) !== 'proficiency';
     const shown = w => {
-      const own = _ownPct(cid, sid, w.a);
+      const own = w.ownPct != null ? w.ownPct : _ownPct(cid, sid, w.a);
       return own != null ? own : levelToPercent(cid, w.score);
     };
     return (x, y) => {
       const [p, q] = best ? [y, x] : [x, y];
-      return (pctOn ? shown(p) - shown(q) : 0) || p.score - q.score;
+      // Whole pieces at one level (16/20 and 17/20) go by the % they earned.
+      return (pctOn ? shown(p) - shown(q) : 0) || p.score - q.score || (p.text && q.text ? shown(p) - shown(q) : 0);
     };
   }
   /* The pieces a Best or Lowest line names: at the highest (or lowest)
@@ -1191,9 +1211,22 @@ window.ReportBlocks = (function () {
         // (step 4 group 2 #2): a rubric can put one piece at the top of one
         // competency and the bottom of another.
         const namedBest = new Set();
+        // Each piece prints its whole mark, as Assignment Grades does, not
+        // its mark on one competency, so one piece shows one score on the
+        // report; work with no level is left out (step 4 group 2 #3).
+        const whole = new Map();
+        const wholeOf = a => {
+          if (!whole.has(a)) whole.set(a, _wholeWork(cid, sid, a));
+          return whole.get(a);
+        };
         const work = (list, best) => {
           const items = [];
-          list.forEach(r => r.ev.list.forEach(w => w.a && (best || !namedBest.has(w.a)) && items.push(w)));
+          list.forEach(r =>
+            r.ev.list.forEach(w => {
+              const piece = w.a && (best || !namedBest.has(w.a)) && wholeOf(w.a);
+              if (piece) items.push(piece);
+            }),
+          );
           const top = _namedWork(cid, sid, items, best);
           if (!top) return '';
           if (best) top.list.forEach(w => namedBest.add(w.a));

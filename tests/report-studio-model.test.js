@@ -934,6 +934,12 @@ describe('stage 3 blocks', () => {
           ? [{ assessmentId: 'a2', score: 4 }]
           : [],
     );
+    // Best and lowest work print each piece's whole mark, as Assignment
+    // Grades does (step 4 group 2 #3).
+    stub('assessmentCellValue', (cid, sid, a) => {
+      const v = { a1: 3, a2: 3.67 }[a.id];
+      return { kind: 'level', value: v, percent: v * 25, percentText: Math.round(v * 25) + '%' };
+    });
     const html = ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, S.optionsFor({ block: 'proficiency' }));
     const t = text(html);
     expect(t).toContain('Proficiency Curricular Competencies · Science 8');
@@ -943,7 +949,7 @@ describe('stage 3 blocks', () => {
     expect(t).toContain('Question and Predict 3.0 Proficient 3.2 Proficient +0.2 2');
     expect(t).toContain('Plan Investigations — 3.4 Proficient — 1');
     expect(t).toContain('Evaluate Methods — — — 0');
-    expect(t).toContain('Highest now: Plan Investigations 3.4. Best work: Quiz (Oct 5), 4.0 / 4.');
+    expect(t).toContain('Highest now: Plan Investigations 3.4. Best work: Quiz (Oct 5), 3.7 / 4.');
     expect(t).toContain('Lowest now: Question and Predict 3.2. Lowest work: Lab Report (Sep 10), 3.0 / 4.');
     expect(html).not.toMatch(/[●○]/);
     // Options: no word, no facts, hide empty rows, lowest first, no overall.

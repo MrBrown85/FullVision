@@ -106,3 +106,39 @@ describe('one overall figure on the report', () => {
     expect(t).not.toMatch(/Lowest work: Local History Inquiry/);
   });
 });
+
+/* Best Work and Lowest Work gave a piece's mark on one competency
+   (Pendulum Lab Report 4.0) while Assignment Grades gave its whole mark
+   (3.0), and Complete/Incomplete work printed as 4.0 (step 4 group 2 #3). */
+describe('best and lowest work print the mark Assignment Grades prints', () => {
+  afterEach(() => delete COURSES[CID]);
+
+  it('names a piece at its whole mark and leaves out Complete/Incomplete work', () => {
+    seed('proficiency');
+    _cache.assessments[CID].push({
+      id: 'safety',
+      title: 'Safety Contract',
+      date: '2026-10-01',
+      tagIds: ['t1'],
+      scoreMode: 'complete',
+      categoryId: 'proj',
+    });
+    _cache.scores[CID][SID].push({ assessmentId: 'safety', tagId: 't1', score: 4, date: '2026-10-01' });
+    clearProfCache();
+    const t = text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}));
+    const back = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { word: false }, {}));
+    // The Inquiry is 4 on Evidence and 2 on Inquiry: 3.0 as a whole.
+    expect(back).toContain('Local History Inquiry 3.0 / 4');
+    expect(t).toMatch(/Best work: Local History Inquiry \(Oct 20\)( and Unit Quiz \(Oct 21\))?, 3\.0 \/ 4\./);
+    expect(t).not.toContain('Safety Contract');
+    expect(t).not.toContain('4.0 / 4');
+  });
+
+  it('a Letter class names a piece at the % Assignment Grades prints', () => {
+    seed('letter');
+    const back = text(ReportBlocks.renderBlockGradeTable(CID, STUDENT, { score: false, word: false }, {}));
+    const pct = back.match(/Local History Inquiry (\d+%)/)[1];
+    expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toContain('Local History Inquiry (Oct 20)');
+    expect(text(ReportBlocks.renderBlockProficiency(CID, STUDENT, {}, {}))).toMatch(new RegExp('Best work: [^.]*, ' + pct + '\\.'));
+  });
+});
