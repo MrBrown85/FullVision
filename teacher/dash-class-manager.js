@@ -3116,9 +3116,9 @@ window.DashClassManager = (function () {
     html +=
       '<div id="cm-add-student-form" style="display:none" class="cm-add-student-form">' +
       '<div class="cm-student-form">' +
-      '<div class="cm-field"><label class="cm-label">First Name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Last Name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Preferred Name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-first">First Name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-last">Last Name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-pref">Preferred Name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
       // Pronouns take the same list and free text as the roster's box.
       '<div class="cm-field"><label class="cm-label" for="cm-add-pro">Pronouns</label>' +
       '<input class="cm-input" id="cm-add-pro" list="cm-add-pronouns" autocomplete="off" style="font-size:0.875rem;padding:6px 10px">' +
@@ -3128,9 +3128,9 @@ window.DashClassManager = (function () {
       }).join('') +
       '</datalist>' +
       '</div>' +
-      '<div class="cm-field"><label class="cm-label">Student Number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Date of Birth</label><input class="cm-input" id="cm-add-dob" type="date" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-num">Student Number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-email">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="cm-add-dob">Date of Birth</label><input class="cm-input" id="cm-add-dob" type="date" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Designations</label>' +
       '<div class="desig-check-grid">' +
       Object.entries(BC_DESIGNATIONS)
@@ -4356,6 +4356,8 @@ window.DashClassManager = (function () {
       html +=
         '<button class="cw-grade-btn' +
         active +
+        '" aria-pressed="' +
+        (cwSelectedGrade === g) +
         '" data-action="cwSelectGrade" data-grade="' +
         g +
         '">Grade ' +
@@ -4381,6 +4383,8 @@ window.DashClassManager = (function () {
         html +=
           '<button class="cw-subject-btn' +
           active +
+          '" aria-pressed="' +
+          (cwSelectedSubject === subj) +
           '" data-action="cwSelectSubject" data-subject="' +
           esc(subj) +
           '">' +
@@ -4741,7 +4745,7 @@ window.DashClassManager = (function () {
 
     html +=
       '<div class="cm-section"><div class="cm-section-title">Class Details</div>' +
-      '<div class="cm-field"><label class="cm-label">Class Name</label><input class="cm-input" id="cm-new-name" value="' +
+      '<div class="cm-field"><label class="cm-label" for="cm-new-name">Class Name</label><input class="cm-input" id="cm-new-name" value="' +
       esc(preName) +
       '" placeholder="e.g. English 10" autofocus></div>' +
       '<div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
@@ -4764,19 +4768,19 @@ window.DashClassManager = (function () {
         );
       }).join('') +
       '</div></div>' +
-      '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
+      '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label" for="cm-new-grade">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
       esc(preGrade) +
       '" placeholder="e.g. 8, 10-12" data-action-input="cwGradeInput"></div></div>' +
-      '<div class="cm-field"><label class="cm-label">Description</label><textarea class="cm-textarea" id="cm-new-desc" placeholder="Optional">' +
+      '<div class="cm-field"><label class="cm-label" for="cm-new-desc">Description</label><textarea class="cm-textarea" id="cm-new-desc" placeholder="Optional">' +
       esc(cwStep2Desc) +
       '</textarea></div></div>';
 
     html +=
       '<div class="cm-section"><div class="cm-section-title">Grading &amp; Calculation</div>' +
-      '<div class="cm-field"><label class="cm-label">Grading System</label>' +
+      '<div class="cm-field"><label class="cm-label" id="cm-cg-grading-label">Grading System</label>' +
       // T-UI-02 · wizard grading_system picker. Grades 10–12 default to
       // Letter; with no categories, letter grades use total points.
-      '<div class="seg cm-seg" id="cm-cg-grading" role="radiogroup" aria-label="Grading system">' +
+      '<div class="seg cm-seg" id="cm-cg-grading" role="radiogroup" aria-labelledby="cm-cg-grading-label" aria-describedby="cm-cg-grading-desc">' +
       GRADING_SYSTEMS.map(function (g) {
         return (
           '<button class="seg-btn cm-seg-btn' +
@@ -4795,8 +4799,8 @@ window.DashClassManager = (function () {
       _cmGradingSystemDescription(grading) +
       '</div>' +
       '</div>' +
-      '<div class="cm-field"><label class="cm-label">Calculation Method</label>' +
-      '<div class="seg cm-seg" id="cm-cg-calc" role="radiogroup" aria-label="Calculation method">' +
+      '<div class="cm-field"><label class="cm-label" id="cm-cg-calc-label">Calculation Method</label>' +
+      '<div class="seg cm-seg" id="cm-cg-calc" role="radiogroup" aria-labelledby="cm-cg-calc-label" aria-describedby="cm-cg-calc-desc">' +
       CALC_METHODS.map(function (m) {
         var action = m.value === 'decayingAvg' ? 'cmCreateToggleDecay' : 'cmCreateToggle';
         var isActive = m.value === calc;
@@ -4820,7 +4824,7 @@ window.DashClassManager = (function () {
       '</div></div>' +
       '<div id="cm-cg-decay" class="cm-field" style="' +
       (calc === 'decayingAvg' ? '' : 'display:none') +
-      '"><label class="cm-label">Decay Weight</label>' +
+      '"><label class="cm-label" for="cm-cg-decay-slider">Decay Weight</label>' +
       '<div class="cm-slider-row"><input type="range" min="10" max="95" value="' +
       esc(cwStep2Decay) +
       '" id="cm-cg-decay-slider" data-action-input="cmCreateDecaySlider" style="flex:1"><span class="cm-slider-label" id="cm-cg-decay-val">' +
@@ -6881,6 +6885,8 @@ window.DashClassManager = (function () {
           html +=
             '<button class="cw-grade-btn' +
             (cwSelectedGrade === g ? ' active' : '') +
+            '" aria-pressed="' +
+            (cwSelectedGrade === g) +
             '" data-action="cwSelectGrade" data-grade="' +
             g +
             '">Grade ' +
@@ -6896,6 +6902,8 @@ window.DashClassManager = (function () {
             html +=
               '<button class="cw-subject-btn' +
               (cwSelectedSubject === s ? ' active' : '') +
+              '" aria-pressed="' +
+              (cwSelectedSubject === s) +
               '" data-action="cwSelectSubject" data-subject="' +
               esc(s) +
               '">' +

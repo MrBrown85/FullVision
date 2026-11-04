@@ -109,3 +109,23 @@ test('Class Details: the Letter description is plain and names IE', async ({ pag
     'A letter grade and % on the BC scale: A, B, C+, C and C–. Under 50% shows IE (Insufficient Evidence) until the course ends, then F.',
   );
 });
+
+test('Screen readers hear each wizard field by its label, and which Grade and Subject are chosen', async ({ page }) => {
+  await enterDemo(page);
+  await openWizard(page);
+  const grade = page.locator('.cw-grade-btn', { hasText: 'Grade 9' });
+  await expect(grade).toHaveAttribute('aria-pressed', 'false');
+  await grade.click();
+  await expect(page.locator('.cw-grade-btn', { hasText: 'Grade 9' })).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('.cw-subject-btn', { hasText: 'Science' }).first().click();
+  await expect(page.locator('.cw-subject-btn', { hasText: 'Science' }).first()).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('.cw-course-item').first().click();
+  await page.locator('[data-action="cwGoToStep2"]').click();
+  await page.locator('[data-action="cwCompsNext"]').click();
+  await expect(page.getByRole('textbox', { name: 'Class Name' })).toHaveAttribute('id', 'cm-new-name');
+  await expect(page.getByRole('textbox', { name: 'Grade Level' })).toHaveAttribute('id', 'cm-new-grade');
+  await expect(page.getByRole('textbox', { name: 'Description' })).toHaveAttribute('id', 'cm-new-desc');
+  await expect(page.getByRole('radiogroup', { name: 'Grading System' })).toHaveAttribute('id', 'cm-cg-grading');
+  await expect(page.getByRole('radiogroup', { name: 'Calculation Method' })).toHaveAttribute('id', 'cm-cg-calc');
+  await expect(page.getByRole('radiogroup', { name: 'Block' })).toBeVisible();
+});

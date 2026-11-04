@@ -55,3 +55,18 @@ test('Add Student pronouns take the list or any typed set, as the roster does', 
   const rin = await page.evaluate(() => getStudents('sci8').find(s => s.firstName === 'Rin'));
   expect(rin.pronouns).toBe('he/they');
 });
+
+test('Add Student fields are named by their labels', async ({ page }) => {
+  await openAddStudent(page);
+  for (const name of [
+    'First Name *',
+    'Last Name',
+    'Preferred Name',
+    'Pronouns',
+    'Student Number',
+    'Email',
+    'Date of Birth',
+  ]) {
+    await expect(form(page).getByLabel(name, { exact: true })).toHaveCount(1);
+  }
+});
