@@ -130,6 +130,27 @@ describe('switching the calculation method', () => {
     expect(COURSES[CID].calcMethod).toBe('highest');
   });
 
+  it('Check With a Student shows the year so far, even over a report in view (Colin, 2026-11-03)', () => {
+    // Most Recent: Amara's last score is the 4 on Oct 3. As of a report
+    // ending Oct 2 it would be her 2.
+    _cache.courseConfigs[CID] = {
+      reportingTerms: [{ ordinal: 1, label: 'Term 1', starts_on: '2026-09-01', ends_on: '2026-10-02' }],
+    };
+    clearProfCache();
+    setActiveTerm(CID, 1);
+    try {
+      DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
+      // As of the report it would be 2.0; the check shows the year so far.
+      expect(studentGradeSummary(CID, 's1').text).toBe('2.0');
+      expect(readAsOfTerm(CID, null, () => getOverallProficiency(CID, 's1'))).toBe(4);
+      // The report in view is put back for the Reports page.
+      expect(getActiveTerm(CID).ordinal).toBe(1);
+      expect(main.innerHTML).toContain('cm-check-value">4.0<');
+    } finally {
+      setActiveTerm(CID, null);
+    }
+  });
+
   it('draws the tab with the method rule and the student check', () => {
     DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
     expect(main.innerHTML).toContain('Exactly How Most Recent Score Works');

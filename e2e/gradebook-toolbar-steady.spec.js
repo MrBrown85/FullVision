@@ -30,24 +30,12 @@ for (const width of [1440, 1024]) {
   });
 }
 
-test('at full width the term picker shows the whole chosen term', async ({ page }) => {
+test('the gradebook toolbar has no term picker: it always shows the year so far', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 800 });
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/\/dashboard/);
   await page.goto('/gradebook?course=sci8');
-  const picker = page.locator('.gb-toolbar .term-select');
-  const count = await picker.locator('option').count();
-  for (let i = 0; i < count; i++) {
-    await picker.selectOption({ index: i });
-    const [box, text] = await page.evaluate(() => {
-      const s = document.querySelector('.gb-toolbar .term-select');
-      const cs = getComputedStyle(s);
-      const ctx = document.createElement('canvas').getContext('2d');
-      ctx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
-      const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-      return [s.clientWidth, ctx.measureText(s.options[s.selectedIndex].text).width + pad];
-    });
-    expect(box).toBeGreaterThanOrEqual(Math.floor(text));
-  }
+  await expect(page.locator('[data-action="exportScoresCSV"]')).toBeVisible();
+  await expect(page.locator('.gb-toolbar .term-select')).toHaveCount(0);
 });

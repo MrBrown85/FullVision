@@ -198,8 +198,8 @@ window.PageDashboard = (function () {
     }
     _syncSidebar();
     var cid = activeCourse;
-    // Every grade on this page follows the class's chosen reporting term.
-    if (typeof activateSavedTerm === 'function') activateSavedTerm(cid);
+    // Every grade on this page is the year so far (Colin, 2026-11-03).
+    if (typeof setActiveTerm === 'function') setActiveTerm(cid, null);
     var sections = getSections(cid);
     var students = getStudents(cid);
     var flags = getFlags(cid);
@@ -489,7 +489,7 @@ window.PageDashboard = (function () {
     }
 
     /* -- Toolbar (rendered to separate mount) -- */
-    // html-safe: DashOverview.renderDashToolbar escapes class names; renderTermPicker is checked; the rest is a count.
+    // html-safe: DashOverview.renderDashToolbar escapes class names; the rest is a count.
     document.getElementById('page-toolbar-mount').innerHTML = Overview.renderDashToolbar({
       activeCourse: activeCourse,
       students: students,

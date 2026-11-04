@@ -137,10 +137,18 @@ describe('columnsFor', () => {
     expect(cols[4]).toMatchObject({ catName: 'No Category', complete: true, outOf: null });
   });
 
-  it('keeps a term to its dates and leaves undated work out unless asked', () => {
+  it('a term is the year to date as of its end: work up to the end, and undated work', () => {
     const t1 = GP.columnsFor(CID, GP.normalizeOptions({ term: '1' }));
-    expect(t1.map(c => c.id)).toEqual(['l1', 'q1', 'hw']);
-    const withUndated = GP.columnsFor(CID, GP.normalizeOptions({ term: '1', undated: true }));
+    expect(t1.map(c => c.id)).toEqual(['l1', 'u1', 'q1', 'hw']);
+    // Term 2 runs from Nov 1, but its year to date holds Term 1's work too.
+    const t2 = GP.columnsFor(CID, GP.normalizeOptions({ term: '2' }));
+    expect(t2.map(c => c.id)).toEqual(['l1', 'l2', 'u1', 'q1', 'hw']);
+  });
+
+  it('Custom Dates leaves undated work out unless asked', () => {
+    const range = { term: 'custom', from: '2026-09-01', to: '2026-10-31' };
+    expect(GP.columnsFor(CID, GP.normalizeOptions(range)).map(c => c.id)).toEqual(['l1', 'q1', 'hw']);
+    const withUndated = GP.columnsFor(CID, GP.normalizeOptions(Object.assign({ undated: true }, range)));
     expect(withUndated.map(c => c.id)).toEqual(['l1', 'u1', 'q1', 'hw']);
   });
 
@@ -278,12 +286,22 @@ describe('page geometry', () => {
 });
 
 describe('buildModel', () => {
-  it('reads the term and puts the gradebook term back', () => {
+  it('reads the year to date as of the term and puts the term in view back', () => {
     setActiveTerm(CID, 2);
     const model = GP.buildModel(CID, { term: '1' });
     expect(getActiveTerm(CID).ordinal).toBe(2);
-    expect(model.columns.map(c => c.id)).toEqual(['l1', 'q1', 'hw']);
-    expect(model.header.period).toContain('Term 1');
+    expect(model.columns.map(c => c.id)).toEqual(['l1', 'u1', 'q1', 'hw']);
+    expect(model.header.period).toBe('Term 1 Year to Date · Up to Oct 31, 2026');
+  });
+
+  it("the Final Grade is the year to date as of the term's end", () => {
+    // s1 has a 3+ on Sep 9; a 1 on Nov 20 counts from Term 2 on, not on Term 1's sheet.
+    _cache.scores[CID].s1.push({ assessmentId: 'l2', tagId: 'T1', score: 1 });
+    clearProfCache();
+    const final = term => GP.buildModel(CID, { term }).rows.find(r => r.id === 's1').final;
+    expect(final('1')).toBe('3.3');
+    expect(final('2')).toBe('2.2');
+    expect(final('all')).toBe('2.2');
   });
 
   it('carries the class header and only the marks it uses', () => {

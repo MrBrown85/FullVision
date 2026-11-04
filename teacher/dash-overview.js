@@ -18,7 +18,6 @@ window.DashOverview = (function () {
       courseOptions +
       '</select>' +
       '<button class="tb-action-btn tb-action-secondary" data-action="openClassManager">Class Management</button>' +
-      (typeof renderTermPicker === 'function' ? renderTermPicker(activeCourse) : '') +
       '<div class="dash-toolbar-spacer"></div>' +
       '<span class="dash-toolbar-label">' +
       students.length +

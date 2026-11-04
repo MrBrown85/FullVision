@@ -614,59 +614,6 @@ function getUpcomingBirthdays(cid) {
 }
 
 /* ── Shared HTML: Student Header ────────────────────────────── */
-/* ── Reporting term picker ──────────────────────────────────────
-   One control, shared by the gradebook, dashboard and student pages, that
-   picks the reporting term the class is viewed in. The choice is kept per
-   class on this device (setSelectedTermOrdinal) and every grade on these
-   pages follows it through calc.js. Hidden when the class has no terms. */
-// html-safe: cid and term labels/dates are escaped; ordinals are numbers.
-function renderTermPicker(cid) {
-  var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
-  if (!terms.length) return '';
-  var active = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
-  var chosen = active ? active.ordinal : null;
-  var today = typeof courseToday === 'function' ? courseToday(cid) : '';
-  var html =
-    '<select class="term-select" data-action="setTerm" data-cid="' +
-    esc(cid) +
-    '" aria-label="Reporting term" title="Reporting term: grades count only the assessments dated inside it">' +
-    '<option value="all"' +
-    (chosen == null ? ' selected' : '') +
-    '>All Time</option>';
-  terms.forEach(function (t) {
-    var now = today && today >= t.starts_on && today <= t.ends_on ? ' (now)' : '';
-    html +=
-      '<option value="' +
-      t.ordinal +
-      '"' +
-      (chosen === t.ordinal ? ' selected' : '') +
-      '>' +
-      esc(t.label) +
-      ' · ' +
-      esc(formatDate(t.starts_on)) +
-      ' – ' +
-      esc(formatDate(t.ends_on)) +
-      now +
-      '</option>';
-  });
-  html += '</select>';
-  return html;
-}
-
-/* A term picker on any page changes the class's term and redraws the page. */
-if (typeof document !== 'undefined' && !window._termPickerWired) {
-  window._termPickerWired = true;
-  document.addEventListener('change', function (e) {
-    var el = e.target;
-    if (!el || !el.matches || !el.matches('select[data-action="setTerm"]')) return;
-    var cid = el.dataset.cid;
-    if (!cid || typeof setSelectedTermOrdinal !== 'function') return;
-    setSelectedTermOrdinal(cid, el.value === 'all' ? null : Number(el.value));
-    var page = typeof Router !== 'undefined' && Router.getCurrentPage ? Router.getCurrentPage() : null;
-    if (page && typeof page.render === 'function') page.render();
-  });
-}
-
 /* ── Segmented control (.seg in styles.css) ─────────────────── */
 /* The chosen segment carries the ARIA state its role calls for:
    aria-selected on a tab, aria-checked on a radio, aria-pressed on a plain

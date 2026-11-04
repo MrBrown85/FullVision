@@ -258,15 +258,13 @@ test.describe('Print Grades', () => {
     await choose(dialog, 'Text Size', 'Normal');
   });
 
-  test('a term prints its own columns and leaves the gradebook as it was', async ({ page }) => {
+  test('a term prints the year to date as of its end and leaves the gradebook as it was', async ({ page }) => {
     await openDemoGradebook(page);
-    const picker = page.locator('#main .term-select');
-    const before = await picker.inputValue();
     const dialog = await openDialog(page);
-    await choose(dialog, 'Term', /^Term 2/);
-    await expect(dialog.getByRole('button', { name: /^Term / })).toHaveText('Term 2');
+    await choose(dialog, 'Term', /^Term 2 Year to Date/);
+    await expect(dialog.getByRole('button', { name: /^Term / })).toHaveText('Term 2 Year to Date');
     await stageFromDialog(page, dialog);
-    await expect(page.locator('#grades-print-root .gp-head').first()).toContainText('Term 2');
+    await expect(page.locator('#grades-print-root .gp-head').first()).toContainText('Term 2 Year to Date');
     expect(countPages(await pdfOfStaged(page))).toBeGreaterThan(0);
     // After the print dialog closes the sheet is cleared and the term is the gradebook's own.
     await page.evaluate(() => {
@@ -275,10 +273,7 @@ test.describe('Print Grades', () => {
     });
     await expect(page.locator('body.grades-print-active')).toHaveCount(0);
     await expect(page.locator('#grades-print-root .gp-page')).toHaveCount(0);
-    expect(await picker.inputValue()).toBe(before);
-    expect(await page.evaluate(() => (getActiveTerm(getActiveCourse()) || { ordinal: 'all' }).ordinal + '')).toBe(
-      before,
-    );
+    expect(await page.evaluate(() => getActiveTerm(getActiveCourse()))).toBeNull();
   });
 
   test('Blank Gradebook prints the assessment titles over empty score boxes', async ({ page }) => {

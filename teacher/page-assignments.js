@@ -187,8 +187,8 @@ window.PageAssignments = (function () {
     focusStudentId = null;
     collapsedModules = _loadClosedModules(cid);
     rubricViewStates = {};
-    // The roster's grades follow the class's saved term, as on the Gradebook.
-    if (typeof activateSavedTerm === 'function') activateSavedTerm(activeCourse);
+    // The roster's grades are the year so far, as on the Gradebook.
+    if (typeof setActiveTerm === 'function') setActiveTerm(activeCourse, null);
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
       activeCourse,
       focusStudentId,
@@ -12703,9 +12703,9 @@ window.PageAssignments = (function () {
 
     // Set up sidebar with student list
     window.toggleFocusStudent = toggleFocusStudent;
-    // The roster's grades follow the class's saved term, as on the Gradebook,
+    // The roster's grades are the year so far, as on the Gradebook,
     // whether the page was reached in the app or loaded fresh.
-    if (typeof activateSavedTerm === 'function') activateSavedTerm(activeCourse);
+    if (typeof setActiveTerm === 'function') setActiveTerm(activeCourse, null);
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
       activeCourse,
       focusStudentId,

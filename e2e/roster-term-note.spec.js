@@ -1,35 +1,28 @@
 /**
- * The grades beside the names follow the reporting term picked on the
- * Gradebook. Assignments has no term picker, so with Term 2 picked every
- * name there read IC with nothing to say why. The roster now names the term.
- * Runs in Demo Mode.
+ * The grades beside the names are the year so far everywhere but the
+ * Reports page, where they are the year to date as of the report's end
+ * (Colin, 2026-11-03). The roster says so while a report is in view, and
+ * a report's term never carries over to the other pages: they have no term
+ * picker. Runs in Demo Mode.
  */
 import { test, expect } from '@playwright/test';
 
-test('the roster says which term its grades cover on a page with no term picker', async ({ page }) => {
+test('the roster names the report’s end on the Reports page and nothing elsewhere', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
   await page.waitForURL(/\/dashboard/);
-  await page.goto('/gradebook?course=sci8');
-  const picker = page.locator('.gb-toolbar .term-select');
-  await picker.selectOption({ index: 1 });
-  const label = (await picker.locator('option:checked').textContent()).split(' · ')[0];
 
-  await page.goto('/assignments?course=sci8');
-  await expect(page.locator('#gb-roster-list .student-row').first()).toBeVisible();
-  await expect(page.locator('.term-select')).toHaveCount(0);
-  await expect(page.locator('#sb-term-note')).toHaveText('Grades for ' + label);
+  await page.goto('/reports?course=sci8&tab=questionnaire');
   await expect(page.locator('#sb-term-note')).toBeVisible();
+  const end = await page.evaluate(() => formatShortDate(getActiveTerm('sci8').endsOn));
+  await expect(page.locator('#sb-term-note')).toHaveText('Grades to ' + end);
 
-  // The Gradebook has its own picker, so the roster doesn't repeat it.
-  await page.goto('/gradebook?course=sci8');
-  await expect(page.locator('#sb-term-note')).toBeHidden();
-
-  // All Time says nothing extra.
-  await page.goto('/gradebook?course=sci8');
-  await page.locator('.gb-toolbar .term-select').selectOption('all');
-  await page.goto('/assignments?course=sci8');
-  await expect(page.locator('#gb-roster-list .student-row').first()).toBeVisible();
-  await expect(page.locator('#sb-term-note')).toHaveCount(0);
+  for (const path of ['/gradebook?course=sci8', '/assignments?course=sci8', '/dashboard?course=sci8']) {
+    await page.goto(path);
+    await expect(page.locator('#main')).not.toBeEmpty();
+    await expect(page.locator('[data-action="setTerm"]')).toHaveCount(0);
+    await expect(page.locator('#sb-term-note')).toHaveCount(0);
+    expect(await page.evaluate(() => getActiveTerm('sci8'))).toBeNull();
+  }
 });

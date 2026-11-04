@@ -73,6 +73,17 @@ describe('the name tip missing count', () => {
     expect(nameTip()).toContain('2 assessments missing (count as 0)');
   });
 
+  it('a report in view on the Reports page does not carry over: no term picker, the year so far', () => {
+    setActiveTerm(CID, 2);
+    const tip = nameTip();
+    expect(getActiveTerm(CID)).toBeNull();
+    expect(document.querySelector('.term-select')).toBeNull();
+    expect(document.querySelector('[data-action="setTerm"]')).toBeNull();
+    expect(document.body.textContent).not.toContain('Undated Not Shown');
+    expect(tip).toContain('2 assessments missing (count as 0)');
+    expect(localStorage.getItem('gb-term-' + CID)).toBeNull();
+  });
+
   it('leaves out Missing work in a 0% category', () => {
     _cache.categories[CID] = [
       { id: 'cat-tests', name: 'Tests', weight: 100 },

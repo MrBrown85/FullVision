@@ -63,12 +63,6 @@ function getActiveTerm(cid) {
   return _activeTerm[cid] || null;
 }
 
-/** Apply the term the teacher last chose for this class on this device. */
-function activateSavedTerm(cid) {
-  var saved = typeof getSelectedTermOrdinal === 'function' ? getSelectedTermOrdinal(cid) : null;
-  return setActiveTerm(cid, saved);
-}
-
 function _termKey(cid) {
   var t = _activeTerm[cid];
   return t ? '@' + t.ordinal : '';
@@ -2913,7 +2907,6 @@ window.Calc = {
   clearProfCache,
   setActiveTerm,
   getActiveTerm,
-  activateSavedTerm,
   assessmentInYearToDate,
   assessmentInTermWindow,
   previousReportTerm,

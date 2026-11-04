@@ -18,6 +18,9 @@ describe('DashOverview.renderDashToolbar', () => {
     expect(html).not.toContain('Archived');
     expect(html).toContain('2 Students');
     expect(html).not.toContain('dash-search-input');
+    // No term picker: the dashboard always shows the year so far (Colin, 2026-11-03).
+    expect(html).not.toContain('data-action="setTerm"');
+    expect(html).not.toContain('All Time');
   });
 
   it('puts search, sort and Flagged in the Students heading with their state', () => {

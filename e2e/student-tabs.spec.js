@@ -68,16 +68,12 @@ test('a competency goal saves from the Learner Profile', async ({ page }) => {
   expect(saved).toContain('Write a testable question before each lab');
 });
 
-test('the tab counts follow the reporting term', async ({ page }) => {
+test('the student page has no term picker and counts the year so far', async ({ page }) => {
   await openCece(page);
-  const stat = page.locator('#stu-tab-assess .stu-tab-stat');
-  const allTime = await stat.textContent();
-  const select = page.locator('select.term-select');
-  const terms = await select.locator('option').evaluateAll(os => os.map(o => o.value).filter(v => v !== 'all'));
-  test.skip(!terms.length, 'Demo class has no reporting terms');
-  await select.selectOption(terms[0]);
-  await expect(stat).not.toHaveText(allTime);
-  await expect(page.locator('#stu-tab-assess .stu-tab-sub')).not.toContainText('All Time');
+  await expect(page.locator('select.term-select')).toHaveCount(0);
+  const n = await page.evaluate(() => getAssessments(getActiveCourse()).length);
+  await expect(page.locator('#stu-tab-assess .stu-tab-sub')).toContainText(/all time/i);
+  expect(n).toBeGreaterThan(0);
 });
 
 test('a Letter class shows percents, not proficiency words', async ({ page }) => {

@@ -6761,15 +6761,6 @@ function saveReportingTerms(cid, terms) {
   var cc = Object.assign({}, getCourseConfig(cid) || {});
   cc.reportingTerms = clean;
   saveCourseConfig(cid, cc);
-  // A chosen term that no longer exists falls back to all time.
-  var chosen = getSelectedTermOrdinal(cid);
-  if (
-    chosen != null &&
-    !clean.some(function (t) {
-      return t.ordinal === chosen;
-    })
-  )
-    setSelectedTermOrdinal(cid, null);
   if (typeof clearProfCache === 'function') clearProfCache();
   return null;
 }
@@ -6782,33 +6773,6 @@ function reportingTermOn(cid, date) {
       return d >= t.starts_on && d <= t.ends_on;
     }) || null
   );
-}
-
-/* The term the teacher chose to view a class in, per device. Null is all
-   time, the default. gb- keys are wiped at sign-out. */
-function getSelectedTermOrdinal(cid) {
-  try {
-    var raw = localStorage.getItem('gb-term-' + cid);
-    if (raw == null || raw === '') return null;
-    var n = Number(raw);
-    if (!Number.isInteger(n)) return null;
-    return getReportingTerms(cid).some(function (t) {
-      return t.ordinal === n;
-    })
-      ? n
-      : null;
-  } catch (e) {
-    return null;
-  }
-}
-function setSelectedTermOrdinal(cid, ordinal) {
-  try {
-    if (ordinal == null || ordinal === '' || ordinal === 'all') localStorage.removeItem('gb-term-' + cid);
-    else localStorage.setItem('gb-term-' + cid, String(Number(ordinal)));
-  } catch (e) {
-    // localStorage unavailable: the choice lasts for this page only.
-  }
-  if (typeof setActiveTerm === 'function') setActiveTerm(cid, ordinal);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -13534,8 +13498,6 @@ window.GB = {
   reportingTermsError,
   saveReportingTerms,
   reportingTermOn,
-  getSelectedTermOrdinal,
-  setSelectedTermOrdinal,
   loadCurriculumIndex,
   getCoursesByGrade,
   getSubjectsByGrade,

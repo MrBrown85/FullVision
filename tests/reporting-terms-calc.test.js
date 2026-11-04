@@ -209,18 +209,10 @@ describe("a report reads the year to date as of its term's end", () => {
     expect(getActiveTerm(CID).startsOn).toBe('2026-12-01');
   });
 
-  it('the saved choice on this device is applied by activateSavedTerm', () => {
-    seed({ assessments: [points('t1', 10, '2026-10-01')], scores: [score('t1', 5, '2026-10-01')] });
-    expect(getSelectedTermOrdinal(CID)).toBeNull();
-    setSelectedTermOrdinal(CID, 2);
-    expect(getSelectedTermOrdinal(CID)).toBe(2);
-    expect(getActiveTerm(CID).ordinal).toBe(2);
-    setActiveTerm(CID, null);
-    expect(activateSavedTerm(CID).ordinal).toBe(2);
-    setSelectedTermOrdinal(CID, null);
-    expect(activateSavedTerm(CID)).toBeNull();
-    // A saved ordinal the class no longer has is ignored.
-    localStorage.setItem('gb-term-' + CID, '6');
-    expect(getSelectedTermOrdinal(CID)).toBeNull();
+  it('no term is saved per class: the gradebook, dashboard and student page show the year so far', () => {
+    expect(typeof activateSavedTerm).toBe('undefined');
+    expect(typeof getSelectedTermOrdinal).toBe('undefined');
+    expect(typeof setSelectedTermOrdinal).toBe('undefined');
+    expect(typeof renderTermPicker).toBe('undefined');
   });
 });
