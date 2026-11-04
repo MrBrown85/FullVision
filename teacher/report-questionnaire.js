@@ -1190,38 +1190,132 @@ window.ReportQuestionnaire = (function () {
     return out;
   }
 
-  // html-safe: competency names, titles, notes, marks and missing work esc()'d; tags are fixed words
+  /* ── At a Glance (Questionnaire glance plan, step 2) ─────────
+     Sets up the comment: the year so far, and the change since the
+     earlier report. */
+
+  /* A competency's colour step for .qn-level, 1 to 4. */
+  function _levelStep(v) {
+    return Math.max(1, Math.min(4, Math.round(v)));
+  }
+  /* "5 pieces", "1 piece": a competency's scored pieces. */
+  function _pieces(c) {
+    var n = (c.scores || []).length;
+    return n + (n === 1 ? ' piece' : ' pieces');
+  }
+  /* A competency's year-to-date level at the earlier report's end, or 0:
+     facts() reads it as c.start when c.since is set (CommentBank.compsOf,
+     calc.js readAsOfTerm), the same level Growth Since Last Report prints. */
+  function _levelThen(f, c) {
+    return f.lastReport && c.since && c.start > 0 ? c.start : 0;
+  }
+  /* The change since the earlier report: "↑ from 3.0", "↓ from 3.0",
+     "No change", or "New since the report" for a competency with no level
+     then; '' with no earlier report. */
+  function glanceChange(cid, f, c) {
+    if (!f.lastReport) return '';
+    var then = _levelThen(f, c);
+    if (!then) return 'New since the report';
+    if (Math.abs(c.level - then) < 0.05) return 'No change';
+    return (c.level > then ? '↑ from ' : '↓ from ') + formatLevel(cid, then);
+  }
+  /* The rows' competencies, from the year to date as of the report's end
+     (f.comps, the comment's own list): Strongest is the comment's
+     strongest (CommentBank.strongestOf) or, when none clears its gate, the
+     highest with 3+ pieces, then the highest of any (Colin: "Show the
+     highest anyway"); Next step is the comment's (CommentBank.nextStepOf);
+     Biggest change is the one with 3+ pieces that moved most since the
+     earlier report, null when none moved by 0.05 or there is no report. */
+  function glanceRows(f) {
+    var comps = (f.comps || []).filter(function (c) {
+      return c.level > 0;
+    });
+    var enough = comps.filter(function (c) {
+      return (c.scores || []).length >= 3;
+    });
+    var top = function (list) {
+      return list.reduce(function (a, c) {
+        return !a || c.level > a.level ? c : a;
+      }, null);
+    };
+    var strongest = CommentBank.strongestOf(comps)[0] || top(enough) || top(comps);
+    var move = null;
+    var moved = 0;
+    if (f.lastReport)
+      enough.forEach(function (c) {
+        var then = _levelThen(f, c);
+        var d = then ? Math.abs(c.level - then) : 0;
+        if (d > moved) {
+          move = c;
+          moved = d;
+        }
+      });
+    return {
+      comps: comps,
+      strongest: strongest,
+      next: CommentBank.nextStepOf(comps),
+      change: moved >= 0.05 ? move : null,
+    };
+  }
+
+  // html-safe: competency names, figures and words esc()'d; labels are fixed words
+  function _glanceSkillHtml(cid, f, label, c, fig) {
+    return `<div class="qn-fact">
+        <span class="qn-fact-label">${label}</span>
+        <div class="qn-fact-body"><span>${esc(c.name)}</span><span class="qn-muted">${esc(fig)}</span></div>
+        <span class="qn-level" data-level="${_levelStep(c.level)}">${esc(f.levelText(c.level))}</span>
+      </div>`;
+  }
+
+  // html-safe: competency names, titles, notes, marks, figures and missing work esc()'d; labels are fixed words
   function _glanceHtml(cid, student, f) {
     var best = bestPiece(f);
     // The best piece's mark as the comment prints it: in a Letter class,
     // points work's own % (CommentBank.workMark, calc.js), never its level
-    // as a %.
+    // as a %. The best piece is the comment's, from the same work.
     var bestMark = best
       ? courseGradeMode(cid) === 'letter'
         ? CommentBank.workMark(f, best)
         : formatLevel(cid, best.v)
       : '';
-    var missing = notHandedIn(cid, student.id);
-    var tags = skillTags(f.comps);
-    var skills = f.comps
-      .map(function (c) {
-        var tag = tags[c.id];
-        return `<div class="qn-skill">
-          <span class="qn-skill-name">${esc(c.name)}</span>
-          ${tag ? `<span class="qn-tag${tag === 'Strongest' ? ' strongest' : ''}">${tag}</span>` : ''}
-          <span class="qn-level" data-level="${Math.max(1, Math.min(4, Math.round(c.level)))}">${esc(f.levelText(c.level))}</span>
-        </div>`;
-      })
-      .join('');
-    return `<div class="qn-card qn-glance">
-      <div class="qn-card-top"><span class="qn-card-title">At a Glance</span></div>
+    // Missing and Late: the comment's record, the year to date as of the
+    // report's end (facts().notHandedIn, the Missing Work block's rule).
+    var missing = (f.notHandedIn && f.notHandedIn.titles) || [];
+    var late = (f.record && f.record.late) || 0;
+    var rows = glanceRows(f);
+    var withChange = function (c) {
+      return [formatLevel(cid, c.level), _pieces(c), glanceChange(cid, f, c)].filter(Boolean).join(' · ');
+    };
+    var skills = '';
+    if (rows.strongest) skills += _glanceSkillHtml(cid, f, 'Strongest', rows.strongest, withChange(rows.strongest));
+    if (rows.next) skills += _glanceSkillHtml(cid, f, 'Next step', rows.next, withChange(rows.next));
+    if (rows.change)
+      skills += _glanceSkillHtml(
+        cid,
+        f,
+        'Biggest change',
+        rows.change,
+        formatLevel(cid, _levelThen(f, rows.change)) +
+          ' → ' +
+          formatLevel(cid, rows.change.level) +
+          ' · ' +
+          _pieces(rows.change),
+      );
+    var sub = f.lastReport
+      ? 'So far this year · change since the ' + f.lastReport.label + ' report'
+      : 'So far this year';
+    var n = rows.comps.length;
+    return `<div class="qn-card qn-glance qno-glance">
+      <div class="qn-card-top"><span class="qn-card-title">At a Glance</span><span class="qn-sub">${esc(sub)}</span></div>
+      <div class="qn-band">Skills</div>
+      ${skills || '<div class="qn-fact"><span class="qn-muted">No scores so far this year</span></div>'}
       <div class="qn-band">Work</div>
       <div class="qn-fact qn-best">
         <span class="qn-fact-label">Best piece</span>
         <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(bestMark)}</span>${_reportNoteNudge(best)}` : '<span class="qn-muted">No marked work yet</span>'}</div>
       </div>
       <div class="qn-fact">
-        <span class="qn-fact-label">Not handed in</span>
+        <span class="qn-fact-label">Missing</span>
         <div class="qn-fact-body">${
           missing.length
             ? missing
@@ -1229,12 +1323,25 @@ window.ReportQuestionnaire = (function () {
                   return `<span>${esc(t)}</span>`;
                 })
                 .join('')
-            : '<span class="qn-muted">None</span>'
+            : '<span class="qn-muted">None so far this year</span>'
         }</div>
         ${missing.length ? `<span class="qn-count">${missing.length}</span>` : ''}
       </div>
-      <div class="qn-band">Skills</div>
-      ${skills || '<div class="qn-fact"><span class="qn-muted">No scores yet</span></div>'}
+      <div class="qn-fact">
+        <span class="qn-fact-label">Late</span>
+        <div class="qn-fact-body">${
+          late
+            ? `<span>${late === 1 ? '1 piece' : late + ' pieces'}</span>`
+            : '<span class="qn-muted">None so far this year</span>'
+        }</div>
+      </div>
+      ${
+        n
+          ? `<div class="qno-foot qno-glance-foot">
+        <button type="button" class="qn-card-link qno-view-all" data-action="tqOpenSkills" aria-haspopup="dialog">View All ${n} Skills</button>
+      </div>`
+          : ''
+      }
     </div>`;
   }
 
@@ -7855,6 +7962,8 @@ window.ReportQuestionnaire = (function () {
     bestPiece: bestPiece,
     notHandedIn: notHandedIn,
     skillTags: skillTags,
+    glanceRows: glanceRows,
+    glanceChange: glanceChange,
     voiceRows: voiceRows,
     SCREEN_SOURCES: SCREEN_SOURCES,
     get tqStudentIndex() {

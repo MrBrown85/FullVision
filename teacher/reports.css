@@ -4056,6 +4056,30 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--score-1);
 }
 
+/* At a Glance sets up the comment (Questionnaire glance plan, step 2):
+   three skill rows, three work rows and a foot that opens every skill. */
+.qno-glance .qn-fact {
+  align-items: center;
+}
+.qno-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 14px 12px;
+}
+.qno-glance-foot {
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--qn-hairline);
+}
+.qno-view-all {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
 /* The student's Voice */
 .qn-voice .qn-card-top {
   padding: 12px 14px 8px;

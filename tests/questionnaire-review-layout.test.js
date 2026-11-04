@@ -172,7 +172,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(html).toContain('Comes Ready, Uses Class Time');
     expect(html).toContain('At a Glance');
     expect(html).toContain('Best piece');
-    expect(html).toContain('Not handed in');
+    expect(html).toContain('<span class="qn-fact-label">Missing</span>');
     expect(html).toContain('Cece’s Voice');
     expect(html).toContain('Questionnaires ›');
     expect(html).toContain('Teacher Comment');

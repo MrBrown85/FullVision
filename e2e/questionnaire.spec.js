@@ -294,23 +294,29 @@ test('Work Habits: a rating saves in place and the count follows; nothing redraw
   await expect(page.locator('.qn-habit-name').nth(1)).toHaveText('Comes Ready, Uses Class Time');
 });
 
-test('At a Glance: the best piece and the skills with Strongest and Next step', async ({ page }) => {
+test('At a Glance: the year so far, the best piece and View All Skills', async ({ page }) => {
   await open(page);
   const expected = await page.evaluate(() => {
     const st = getStudents('sci8').find(s => s.id === 'st1');
     const f = CommentBank.facts('sci8', st, 'term-2');
-    const best = ReportQuestionnaire.bestPiece(f);
-    const tags = ReportQuestionnaire.skillTags(f.comps);
+    const rows = ReportQuestionnaire.glanceRows(f);
     return {
-      best: best.title,
-      comps: f.comps.length,
-      strongest: Object.values(tags).filter(t => t === 'Strongest').length,
+      best: ReportQuestionnaire.bestPiece(f).title,
+      strongest: rows.strongest.name,
+      next: rows.next.name,
+      change: rows.change ? rows.change.name : null,
+      comps: rows.comps.length,
     };
   });
+  const labels = ['Strongest', 'Next step'].concat(expected.change ? ['Biggest change'] : []);
+  await expect(page.locator('.qno-glance .qn-fact-label')).toHaveText(labels.concat(['Best piece', 'Missing', 'Late']));
+  await expect(page.locator('.qno-glance .qn-fact').nth(0)).toContainText(expected.strongest);
+  await expect(page.locator('.qno-glance .qn-fact').nth(1)).toContainText(expected.next);
   await expect(page.locator('.qn-best .qn-fact-body')).toContainText(expected.best);
-  await expect(page.locator('.qn-skill')).toHaveCount(expected.comps);
-  await expect(page.locator('.qn-tag.strongest')).toHaveCount(expected.strongest);
-  await expect(page.locator('.qn-tag:not(.strongest)')).toHaveText(['Next step']);
+  await expect(page.locator('.qno-glance .qn-sub')).toHaveText('So far this year · change since the Term 1 report');
+  await expect(page.locator('.qno-glance [data-action="tqOpenSkills"]')).toHaveText(
+    'View All ' + expected.comps + ' Skills',
+  );
 });
 
 test('Cece’s Voice: the answers, the private one marked, a quoted answer says In the comment', async ({ page }) => {
