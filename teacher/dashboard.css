@@ -2184,6 +2184,9 @@ a.dash-ins-name:hover {
 }
 .cm-action-btn.cm-new-class-btn {
   flex-shrink: 0;
+  /* At least 28 px tall whatever the font's line height (Linux fonts drew
+     it at 27). */
+  min-height: 28px;
   padding: 5px 10px;
   color: var(--text);
   white-space: nowrap;

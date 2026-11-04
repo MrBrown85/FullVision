@@ -11542,7 +11542,9 @@ window.PageAssignments = (function () {
     var nameLabel = e.target.closest('.rsg-criterion-label');
     if (nameLabel && !(e.relatedTarget && nameLabel.contains(e.relatedTarget))) {
       clearTimeout(_nameTipTimer);
-      if (nameLabel === _chipTipSource) _hideChipTip();
+      // A tap's emulated mouseout (a mouse pointer left elsewhere) is not
+      // the finger leaving: the tip a tap showed stays until the next tap.
+      if (nameLabel === _chipTipSource && Date.now() - _lastTouch > 800) _hideChipTip();
     }
     var lvl = e.target.closest('.rsg-level[data-action="selectRubricScore"]');
     if (lvl) resetDescriptorBar();
