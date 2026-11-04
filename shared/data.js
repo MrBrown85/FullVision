@@ -1233,6 +1233,52 @@ function _isEditingField() {
 
 var _rerenderDeferred = false;
 
+/* A press on a button is what usually moves focus out of a field. A redraw
+   between its pointerdown and the click swaps the button out from under the
+   pointer and the click is lost: Save Categories or Late took a second
+   click after typing (Nov 3 sweep). So a redraw that comes during a press
+   (often the one that waited for the field) waits for it to finish. */
+var _pointerPressed = false;
+var _pressDeferred = false;
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener(
+    'pointerdown',
+    function () {
+      _pointerPressed = true;
+    },
+    true,
+  );
+  ['pointerup', 'pointercancel'].forEach(function (type) {
+    document.addEventListener(
+      type,
+      function () {
+        _pointerPressed = false;
+      },
+      true,
+    );
+  });
+}
+function _afterPress(fn) {
+  if (!_pointerPressed) return fn();
+  var done = false;
+  var run = function () {
+    if (done) return;
+    done = true;
+    document.removeEventListener('pointerup', onEnd, true);
+    document.removeEventListener('pointercancel', onEnd, true);
+    clearTimeout(guard);
+    // The click is dispatched after pointerup in the same task.
+    setTimeout(fn, 0);
+  };
+  var onEnd = function () {
+    run();
+  };
+  document.addEventListener('pointerup', onEnd, true);
+  document.addEventListener('pointercancel', onEnd, true);
+  // A press that never reports its end (released outside the window).
+  var guard = setTimeout(run, 2000);
+}
+
 /* Scrolling over a focused number box changes its value in Chrome, one step
    per scroll tick: a teacher who typed 6 and then moved a trackpad or Magic
    Mouse saw it run to 1 or 9, and that number was saved when she left the
@@ -1269,6 +1315,16 @@ function _invalidateAndRerender() {
         },
         { once: true },
       );
+    }
+    return;
+  }
+  if (_pointerPressed) {
+    if (!_pressDeferred) {
+      _pressDeferred = true;
+      _afterPress(function () {
+        _pressDeferred = false;
+        _invalidateAndRerender();
+      });
     }
     return;
   }

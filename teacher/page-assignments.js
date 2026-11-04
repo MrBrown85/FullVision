@@ -12041,6 +12041,35 @@ window.PageAssignments = (function () {
 
   /* The parts of the dialog that change with every click: the status
      control, the Note for the Report and the grade. */
+  /* The same buttons with new states are updated where they are: a score
+     typed and then Late clicked locks Missing and Excused as the box loses
+     focus, mid-click, and a Late button swapped in then can lose the click.
+     False when the buttons themselves differ. */
+  function _patchStatusButtons(box, html) {
+    var tpl = document.createElement('template');
+    // html-safe: html is built by _graderStatusButtons
+    tpl.innerHTML = html;
+    var fresh = tpl.content.querySelectorAll('.grader-status-btn');
+    var now = box.querySelectorAll('.grader-status-btn');
+    if (!now.length || fresh.length !== now.length) return false;
+    for (var i = 0; i < now.length; i++) {
+      if (
+        now[i].dataset.status !== fresh[i].dataset.status ||
+        now[i].dataset.sid !== fresh[i].dataset.sid ||
+        now[i].dataset.aid !== fresh[i].dataset.aid
+      )
+        return false;
+    }
+    now.forEach(function (btn, j) {
+      var f = fresh[j];
+      btn.className = f.className;
+      btn.setAttribute('aria-pressed', f.getAttribute('aria-pressed'));
+      btn.disabled = f.disabled;
+      if (f.hasAttribute('title')) btn.title = f.title;
+      else btn.removeAttribute('title');
+    });
+    return true;
+  }
   function _refreshGraderChrome() {
     if (!_grader) return;
     var cid = activeCourse;
@@ -12062,8 +12091,9 @@ window.PageAssignments = (function () {
     // runs this, and new buttons under the mouse before it is released
     // lose the click.
     if (_grader.statusHtml !== statusHtml) {
+      var statusBox = dialog.querySelector('.grader-status');
       // html-safe: statusHtml is built by _graderStatusButtons
-      dialog.querySelector('.grader-status').innerHTML = statusHtml;
+      if (!_patchStatusButtons(statusBox, statusHtml)) statusBox.innerHTML = statusHtml;
       _grader.statusHtml = statusHtml;
     }
     // Missing and Excused set the grading controls aside, as the grids do.
