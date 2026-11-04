@@ -937,6 +937,7 @@ window.ObsCapture = (function () {
       } else if (!sg.items.length) {
         return '';
       } else {
+        if (sg.items[0].create) h += '<div class="obsc-menu-empty">No tag called “' + esc(sg.query) + '” yet.</div>';
         sg.items.forEach(function (it, i) {
           h +=
             '<div class="obsc-item' +
@@ -1232,6 +1233,9 @@ window.ObsCapture = (function () {
           .map(function (t) {
             return { label: t.label, value: t.key, dot: t.color };
           });
+        // A #word that names no tag says so and offers to make it. Nothing
+        // is highlighted, so Enter still adds the observation.
+        if (!items.length && tok.query) items = [{ label: '+ New Tag “' + tok.query + '”', value: tok.query, create: true }];
       } else if (tok.kind === '!') {
         items = matchTypes(tok.query).map(function (k) {
           return { label: OBS_SENTIMENTS[k] ? OBS_SENTIMENTS[k].label : k, value: k };
@@ -1246,7 +1250,7 @@ window.ObsCapture = (function () {
       state.menu = null;
       // With no starter to pick, nothing is highlighted, so Enter still adds
       // the observation instead of leaving for Class Management.
-      var index = tok.kind === '/' && !items.length ? -1 : 0;
+      var index = (tok.kind === '/' && !items.length) || (items[0] && items[0].create) ? -1 : 0;
       state.suggest = { kind: tok.kind, query: tok.query, start: tok.start, end: tok.end, items: items, index: index };
       render();
     }
@@ -1301,7 +1305,12 @@ window.ObsCapture = (function () {
         useStarter(sg.items[i].value, { start: sg.start, end: sg.end });
         return;
       }
-      applyPick(sg.kind, sg.items[i].value);
+      var pickValue = sg.items[i].value;
+      if (sg.items[i].create) {
+        if (typeof addCustomTag === 'function') addCustomTag(cid, pickValue);
+        pickValue = 'tag:' + pickValue;
+      }
+      applyPick(sg.kind, pickValue);
       var v = input.value;
       var before = v.slice(0, sg.start);
       var after = v.slice(sg.end).replace(/^[ \t]+/, '');
