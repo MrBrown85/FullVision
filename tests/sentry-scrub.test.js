@@ -72,6 +72,17 @@ describe('Sentry setup', () => {
     const html = readFileSync(new URL('../s/index.html', import.meta.url), 'utf-8');
     expect(html).not.toMatch(/sentry/i);
   });
+
+  it('sends no CSP reports straight to Sentry (they carry the page address unscrubbed)', async () => {
+    globalThis.Netlify = { env: { get: () => '' } };
+    const src = readFileSync(new URL('../netlify/edge-functions/inject-env.js', import.meta.url), 'utf-8');
+    const mod = await import('data:text/javascript;base64,' + Buffer.from(src).toString('base64'));
+    const res = await mod.default(new Request('https://fullvision.ca/student?id=' + SID), {
+      next: async () => new Response('<html></html>', { headers: { 'content-type': 'text/html' } }),
+    });
+    expect(res.headers.get('Content-Security-Policy')).not.toMatch(/report-(uri|to)/);
+    expect(res.headers.get('Reporting-Endpoints')).toBeNull();
+  });
 });
 
 describe('breadcrumbs', () => {
