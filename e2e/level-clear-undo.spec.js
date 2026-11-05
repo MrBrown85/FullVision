@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
 
 // Nov 3 sweep (step 4 group 2 #14): clicking the chosen level clears it, and
-// a misclick had no way back. The toast says "Score cleared" with Undo (as
-// the phone does), and Cmd+Z takes it while the toast is up.
+// a misclick had no way back. The toast says "Score cleared" with Undo, and
+// Cmd+Z takes it while the toast is up. (The phone clears with no toast.)
 const RUBRIC = {
   id: 'rubric-clear',
   name: 'Lab Report Rubric',

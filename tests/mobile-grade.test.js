@@ -368,7 +368,7 @@ describe('MGrade.setScore', () => {
     expect(toastCalls).toHaveLength(0);
   });
 
-  it('shows "Score cleared" toast with undo on toggle-off', () => {
+  it('clears on toggle-off without a toast', () => {
     const toastCalls = [];
     const origToast = window.MComponents.showToast;
     window.MComponents.showToast = (msg, opts) => toastCalls.push({ msg, opts });
@@ -382,9 +382,7 @@ describe('MGrade.setScore', () => {
     });
     MGrade.setScore(CID, 'stu1', 'a1', 't1', 2);
     window.MComponents.showToast = origToast;
-    expect(toastCalls).toHaveLength(1);
-    expect(toastCalls[0].msg).toBe('Score cleared');
-    expect(typeof toastCalls[0].opts.onUndo).toBe('function');
+    expect(toastCalls).toHaveLength(0);
   });
 
   it('tapping the already-active level clears the score (toggles off to 0)', () => {

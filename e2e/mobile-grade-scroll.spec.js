@@ -79,12 +79,10 @@ test.describe('Phone grading card', () => {
     await openLongRubric(page);
     await page.getByRole('button', { name: 'Competencies', exact: true }).click();
     await expect(card(page).locator('.m-score-group').first()).toBeVisible();
-    // Short competency lists don't scroll; give the card room to scroll.
-    await card(page).evaluate(el => {
-      const pad = document.createElement('div');
-      pad.style.height = '1200px';
-      el.prepend(pad);
-    });
+    // Short competency lists don't scroll; give the card room to scroll. A
+    // style rule, because a competency on rubric work redraws the card (its
+    // level is written to each criterion behind it).
+    await page.addStyleTag({ content: '.m-swiper-card { padding-top: 1200px !important; }' });
     const top = await scrollCardToBottom(page);
     const group = () => card(page).locator('.m-score-group').last();
     await group().locator('.m-score-btn[data-score="2"]').click();

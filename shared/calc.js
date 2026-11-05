@@ -1490,6 +1490,44 @@ function competencyLevelFromCriteria(cid, sid, assessment, tagId, criteria) {
   return { score: levels[low], mod: mods[low], mixed: true };
 }
 
+/* The rows of a rubric assessment's Competencies view, on desktop and
+   phone alike: each competency its criteria feed, then any criterion that
+   feeds none, by its own id. A whole-rubric competency has no row: its
+   level is worked out from all the criteria. Work with no rubric
+   competencies gets its usual score keys (scoreTagIds). */
+function rubricCompetencyRowKeys(cid, assessment) {
+  var comps = rubricCompetencyIds(cid, assessment);
+  if (!comps.length) return scoreTagIds(assessment, cid);
+  var rubric = _assessmentRubric(cid, assessment);
+  var whole = rubricWholeTagIds(cid, assessment);
+  return comps
+    .filter(function (t) {
+      return whole.indexOf(t) < 0;
+    })
+    .concat(
+      ((rubric && rubric.criteria) || [])
+        .filter(function (c) {
+          return c && c.id && !(c.tagIds || []).length;
+        })
+        .map(function (c) {
+          return c.id;
+        }),
+    );
+}
+
+/* Where a level set on one row of that view is saved: a competency's level
+   goes to every criterion that feeds it; a whole-rubric competency takes
+   none (its criteria are scored one by one); any other key is itself. */
+function rubricRowScoreKeys(cid, assessment, key) {
+  if (rubricWholeTagIds(cid, assessment).indexOf(key) >= 0) return [];
+  var crits = rubricCriteriaForTag(cid, assessment, key);
+  return crits.length
+    ? crits.map(function (c) {
+        return c.id;
+      })
+    : [key];
+}
+
 /* The score keys a column's ids name on an assessment: a criterion id is
    itself; on rubric work a competency id is every criterion that feeds it. */
 function _columnScoreKeys(cid, assessment, ids) {
@@ -2978,6 +3016,8 @@ window.Calc = {
   rubricScoredTagIds,
   wholeRubricLevel,
   competencyLevelFromCriteria,
+  rubricCompetencyRowKeys,
+  rubricRowScoreKeys,
   tagScoresByAssessment,
   tagMarksByAssessment,
   assessmentCourseWorth,
