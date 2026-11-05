@@ -4,7 +4,7 @@
  * the built-in support checklist, and the habit and evidence phrases the
  * engine puts into sentences (teacher/comment-bank.js). It fails on any
  * phrasal verb, idiom, person-praise word, comparison with classmates,
- * banned phrase, sentence over 24 words, or evaluative word outside the controlled
+ * sentence over 20 words, or evaluative word outside the controlled
  * vocabulary (teacher/comment-lint.js), and on the template rules the
  * realiser relies on.
  *
@@ -61,34 +61,6 @@ function texts() {
     ),
   );
   Object.entries(CommentBank.EVIDENCE).forEach(([k, t]) => out.push({ id: 'evidence ' + k, text: t }));
-  // The pipeline's own wording (COMMENT_BANK.pipeline), in the frames that
-  // say it: what each level means, why a grade is IE, a strength at its
-  // level, what a best piece showed, and each habit as behaviour.
-  const P = COMMENT_BANK.pipeline;
-  Object.entries(P.levelMeaning).forEach(([k, t]) =>
-    out.push({ id: 'pipeline level ' + k, text: '{His} work shows ' + t + '.' }),
-  );
-  Object.entries(P.ieReason).forEach(([k, t]) =>
-    out.push({ id: 'pipeline ie ' + k, text: 'The grade is IE, because ' + t + '.' }),
-  );
-  Object.entries(P.at).forEach(([k, xs]) =>
-    xs.forEach((t, i) =>
-      out.push({
-        id: 'pipeline at ' + k + i,
-        text: '{He} ' + t.replace('{base}', 'explain a result').replace('{does}', 'explains a result') + '.',
-      }),
-    ),
-  );
-  P.did.forEach((t, i) =>
-    out.push({ id: 'pipeline did ' + i, text: 'In it, {he} ' + t.replace('{base}', 'explain a result') + '.' }),
-  );
-  Object.entries(P.habits).forEach(([k, h]) => {
-    h.does.forEach((t, i) => out.push({ id: 'pipeline habit ' + k + ' does ' + i, text: '{He} ' + t + '.' }));
-    h.invite.forEach((t, i) =>
-      out.push({ id: 'pipeline habit ' + k + ' invite ' + i, text: 'The habit to build is ' + t + '.' }),
-    );
-    out.push({ id: 'pipeline habit ' + k + ' why', text: 'It would help, ' + h.why + '.' });
-  });
   return out;
 }
 function findings(t) {
@@ -140,42 +112,15 @@ describe('the vocabulary lint', () => {
     expect(findings({ text: 'In class, I will ask about missing work each week.', support: true })).toEqual([]);
     expect(f('{His} work is solid.')).toContain('evaluative word: solid');
     expect(f('{His} work habits are excellent.')).toEqual([]);
-    expect(f('{He} [is|are] earning {gradeLetter}, which is {gradeStanding} work.')).toEqual([]);
-    // The Nov 4 bans: the questionnaire's lists, ratings, terms and form words.
-    expect(f('{He} [is|are] earning {gradeLetter} this term.')).toContain('banned phrase: this term');
-    expect(f('All six of {his} work habits are good.')).toContain('banned phrase: all six');
-    expect(f('{He} [is|are] rated Consistently in every one.')).toEqual(
-      expect.arrayContaining(['banned phrase: rated', 'banned phrase: every one']),
-    );
-    expect(f('{He} is able to explain a result.')).toContain('banned phrase: is able to');
-    expect(f('{His} ability to explain a result has grown.')).toContain('banned phrase: ability to');
-    expect(f('The work marked highest is the lab.')).toEqual(
-      expect.arrayContaining(['banned phrase: the work marked', 'banned phrase: marked highest']),
-    );
-    expect(f('Marks are close across skills, skill by skill.')).toEqual(
-      expect.arrayContaining([
-        'banned phrase: marks are close',
-        'banned phrase: across skills',
-        'banned phrase: skill by skill',
-      ]),
-    );
-    expect(f('The proficiency scale calls {his} work Proficient.')).toContain('banned phrase: proficiency scale calls');
-    expect(f('Each skill is growing.')).toContain('banned phrase: each skill');
-    expect(f('Keep going with the labs.')).toContain('banned phrase: keep going');
-    expect(f('{He} [hands|hand] in work on time and studies biodegradability together.')).not.toContain(
-      'banned phrase: ability to',
-    );
-    // 24 words a sentence (plan v2, Nov 4 2026).
+    expect(f('{He} [is|are] earning {gradeLetter} this term, which is {gradeStanding} work.')).toEqual([]);
     expect(
-      f(
-        'One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen x y z w a b c.',
-      ),
+      f('One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen.'),
     ).toEqual([]);
     expect(
       f(
-        'One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen x y z w a b c d.',
+        'One two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen x y z w.',
       ),
-    ).toContain('over 24 words: 25');
+    ).toContain('over 20 words: 21');
   });
 
   it('declares every sentence that says "next step" or "to do next": claims nextStep or advises: true', () => {

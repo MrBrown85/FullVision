@@ -10,10 +10,7 @@
 import './setup.js';
 import { describe, expect, it } from 'vitest';
 
-// The grade frames here were retired on Nov 4 2026 (the pipeline's frames
-// replace them); a saved comment may still hold one, so the bank keeps their
-// text (COMMENT_BANK.retired), and it still reads plainly.
-const byId = id => COMMENT_BANK.sentences.find(s => s.id === id) || COMMENT_BANK.retired.find(s => s.id === id);
+const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
 const THEY = { subj: 'they', obj: 'them', poss: 'their', refl: 'themselves' };
 
 describe('the reworded frames', () => {

@@ -25,16 +25,7 @@ beforeAll(() => {
 });
 afterAll(() => vi.useRealTimers());
 
-// A retired frame (Nov 4 2026: gr06-gr08, and the IE Problem frames that
-// said "this term") keeps its text in COMMENT_BANK.retired, for the comments
-// that hold it; a joined sentence ("j:a+b:and") reads as its first frame.
-const byId = id =>
-  COMMENT_BANK.sentences.find(s => s.id === id) ||
-  COMMENT_BANK.retired.find(s => s.id === id) ||
-  (/^j:/.test(id) ? COMMENT_BANK.sentences.find(s => s.id === id.slice(2).split('+')[0]) : undefined);
-/* A grade frame of one kind (its when.grade may list several). */
-const gradeKind = id => [].concat(((byId(id) || {}).when || {}).grade);
-const isIeGrade = s => s.group === 'Grade' && [].concat((s.when || {}).grade).indexOf('ie') >= 0;
+const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
 const words = t => t.trim().split(/\s+/).length;
 const IE_IDS = ['gr06', 'ie01', 'ie02', 'ie03', 'ie04', 'ie05', 'ie06', 'ie07', 'ie08', 'ie09', 'ie10'];
 const claimsGrade = id => ((byId(id) || {}).claims || []).indexOf('grade') >= 0;
@@ -46,7 +37,7 @@ const IE_GROUPS = ['Grade', 'IE Problem', 'IE Plan', 'IE Deadline', 'IE Meeting'
 const required = d =>
   d.ids
     .map(byId)
-    .filter(s => s && (isIeGrade(s) || IE_GROUPS.indexOf(s.group) > 0))
+    .filter(s => s && (s.id === 'gr06' || IE_GROUPS.indexOf(s.group) > 0))
     .map(s => [s.group, (s.when || {}).ieProblem || '']);
 /* No Deadline sentence until a date is picked (Nov 2): `dated` false
    leaves it out. */
@@ -204,7 +195,7 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     // Letter Grade is the default: the letter sentence still leads (in one
     // of its frames; the grade step mixes them by seed).
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(gradeKind(d.ids[d.sentences.findIndex(x => x.step === 'grade')])).toContain('letter');
+    expect(byId(d.ids[0]).when.grade).toBe('letter');
   });
 
   it('is not offered with marks on half or more, in a Proficiency class, or below grade 10', () => {
@@ -229,7 +220,7 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     for (let n = 1; n <= 6; n++) {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed: n });
       expect(required(d), 'seed ' + n).toEqual(requiredFor('marks', false));
-      expect(d.ids[0]).toMatch(/^vgi\d\d$/);
+      expect(d.ids[0]).toBe('gr06');
       expect(d.ids.slice(1).filter(claimsGrade)).toEqual([]);
       // The problem states both counts, in whichever of its frames.
       expect(stepText(d, 'ieProblem'), 'seed ' + n).toMatch(/\bthree\b.*\beight\b|\beight\b.*\bthree\b/);
@@ -248,9 +239,7 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     expect(CommentBank.ieProblemOf(f)).toBe('noMarks');
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
     expect(stepText(d, 'ieProblem')).toMatch(/\beight\b/);
-    expect(stepText(d, 'ieProblem')).toMatch(
-      /\bno marks?\b|\bnone has a mark\b|\bnot yet have a mark\b|\bhas a mark for (him|her|them) yet\b/,
-    );
+    expect(stepText(d, 'ieProblem')).toMatch(/\bno marks?\b|\bnone has a mark\b|\bnot yet have a mark\b/);
     expect(required(d)).toEqual(requiredFor('noMarks', false));
     expect(d.replaced).toEqual([]);
   });
@@ -260,12 +249,10 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18' });
     const f = factsNow();
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    // The date in one of the Deadline frames.
-    expect(stepText(d, 'ieDeadline')).toContain('December 18');
+    expect(d.text).toContain('The deadline to replace this IE with a grade is December 18.');
     rate({ reportingBasis: 'ie', ieDeadline: '2027-01-08' });
     const v = CommentBank.verify(d, factsNow(), {});
-    const dl = d.sentences.find(x => x.step === 'ieDeadline').id;
-    expect(v.replaced.find(r => r.sentenceId === dl).failed).toContain('deadline');
+    expect(v.replaced.find(r => r.sentenceId === 'ie07').failed).toContain('deadline');
   });
 
   it('names the work labelled Missing as the problem and the plan', () => {
@@ -288,7 +275,7 @@ describe('Letter Grade | IE: the teacher’s choice', () => {
     rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18' });
     rate({ reportingBasis: 'grade', ieDeadline: '2026-12-18' });
     const d = CommentBank.draft(CommentBank.context(factsNow(), {}), { seed: 1 });
-    expect(gradeKind(d.ids[d.sentences.findIndex(x => x.step === 'grade')])).toContain('letter');
+    expect(byId(d.ids[0]).when.grade).toBe('letter');
   });
 
   it('is ignored in a Proficiency class', () => {
@@ -311,7 +298,7 @@ describe('Automatic IE: under 50% before the course ends', () => {
     expect(CommentBank.ieProblemOf(f)).toBe('low');
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
     expect(required(d)).toEqual(requiredFor('low', false));
-    expect(stepText(d, 'ieProblem')).toMatch(/below 50%|below 50 percent|under 50 percent/);
+    expect(stepText(d, 'ieProblem')).toContain('below 50%');
     expect(d.replaced).toEqual([]);
   });
 
@@ -343,21 +330,22 @@ describe('Letter Grade | Language Goals and IEP Goals', () => {
     expect(CommentBank.reportPath(f)).toBe('language_goals');
     for (let n = 1; n <= 6; n++) {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed: n });
-      // A Language Goals statement (the pipeline's frames, Nov 4 2026).
-      expect(d.ids[0]).toMatch(/^vgg\d\d$/);
-      expect(d.sentences[0].text).toMatch(/Noor/);
-      expect(d.sentences[0].text).toMatch(/language goals|goals for learning English/);
-      expect(d.sentences[0].text).not.toMatch(/this term/);
+      expect(d.sentences[0].text).toBe(
+        'This term, Noor is assessed in relation to her goals for English language proficiency.',
+      );
       expect(d.ids.slice(1).filter(claimsGrade)).toEqual([]);
       expect(d.ids.filter(id => IE_IDS.indexOf(id) >= 0)).toEqual([]);
       expect(d.text).not.toMatch(/earning a|\bB\b/);
       expect(d.replaced).toEqual([]);
     }
-    const parts = CommentBank.requiredParts(CommentBank.context(f, {}));
-    expect(parts).toHaveLength(1);
-    expect(parts[0]).toMatchObject({ key: 'grade', label: 'Statement' });
-    expect(parts[0].id).toMatch(/^vgg\d\d$/);
-    expect(parts[0].text).toMatch(/Noor/);
+    expect(CommentBank.requiredParts(CommentBank.context(f, {}))).toEqual([
+      {
+        key: 'grade',
+        label: 'Statement',
+        id: 'gr07',
+        text: 'This term, Noor is assessed in relation to her goals for English language proficiency.',
+      },
+    ]);
   });
 
   it('an IEP designation offers IEP Goals, with its own statement', () => {
@@ -365,9 +353,7 @@ describe('Letter Grade | Language Goals and IEP Goals', () => {
     expect(CommentBank.goalsOffered(factsNow())).toEqual(['iep_goals']);
     rate({ reportingBasis: 'iep_goals' });
     const d = CommentBank.draft(CommentBank.context(factsNow(), {}), { seed: 1 });
-    expect(d.ids[0]).toMatch(/^vge\d\d$/);
-    expect(d.sentences[0].text).toMatch(/Noor/);
-    expect(d.sentences[0].text).toMatch(/goals in her IEP/);
+    expect(d.sentences[0].text).toBe('This term, Noor is assessed in relation to the goals in her IEP.');
   });
 
   it('offers nothing without a designation, or in a Proficiency class', () => {

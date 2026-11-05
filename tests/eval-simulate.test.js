@@ -11,8 +11,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // These simulate whole classes: one test and the setup hook each take about
 // 5–10 s, over vitest's default limits on a slower CI runner.
-// Drafts every synthetic class: 65 s on CI (Nov 4 2026).
-vi.setConfig({ testTimeout: 180000, hookTimeout: 180000 });
+vi.setConfig({ testTimeout: 30000, hookTimeout: 30000 });
 import { formatReport, main, simulate } from '../scripts/eval/simulate.mjs';
 import { KINDS, syntheticClass } from '../scripts/eval/synthetic.mjs';
 import { loadClass, ROOT } from '../scripts/eval/app.mjs';

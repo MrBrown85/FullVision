@@ -200,22 +200,10 @@ describe('below a gate, the claiming sentence is not eligible', () => {
     for (let seed = 1; seed <= 40; seed++) {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed, angleUses: {} });
       expect(d.replaced, 'seed ' + seed).toEqual([]);
-      d.ids.forEach((id, i) => {
+      d.ids.forEach(id => {
         const claims = (byId(id) && byId(id).claims) || [];
+        expect(claims, id).not.toContain('strength');
         expect(claims, id).not.toContain('improved');
-        // Below the "strongest" gate a strength is only ever the student's
-        // highest-marked skill, said at its level (the pipeline's
-        // strengthAt): never "strongest", never the gated slots.
-        if (claims.indexOf('strength') >= 0) {
-          const pv = d.provenance[i];
-          expect(Object.keys(pv.values), id).not.toEqual(expect.arrayContaining(['strengths']));
-          expect(
-            Object.keys(pv.values).some(k => /^(strengths?|strengthNow|strongSkill|area)$/.test(k)),
-            id,
-          ).toBe(false);
-          expect(d.sentences[i].text, id).not.toMatch(/strongest/);
-          expect(CommentBank.CLAIMS.strength(pv, f, CommentBank.context(f, {})), id).toBe(true);
-        }
       });
     }
   });

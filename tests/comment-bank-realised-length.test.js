@@ -107,14 +107,14 @@ describe('{strengths} falls back to one skill when two run past 20 words', () =>
     expect(CommentBank.fill(short, long)).toBe('They can ' + DESIGNING + '.');
   });
 
-  it('never drafts a sentence over 24 words, and verify() keeps the one-skill sentence', () => {
+  it('never drafts a sentence over 20 words, and verify() keeps the one-skill sentence', () => {
     const f = facts();
     const ctx = CommentBank.context(f, {});
     const seen = {};
     for (let seed = 1; seed <= 12; seed++) {
       const d = CommentBank.draft(ctx, { seed });
       d.sentences.forEach(s => {
-        expect(words(s.text), s.id + ': ' + s.text).toBeLessThanOrEqual(24);
+        expect(words(s.text), s.id + ': ' + s.text).toBeLessThanOrEqual(20);
         seen[s.id] = true;
       });
       expect(d.replaced).toEqual([]);
@@ -122,9 +122,9 @@ describe('{strengths} falls back to one skill when two run past 20 words', () =>
       const v = CommentBank.verify(d, f, {});
       expect(v.replaced).toEqual([]);
     }
-    // The marks climbed: a draft says so in one of the pipeline's climb
-    // frames (vcl01-vcl08, Nov 4 2026; the n41x frames said "this term").
-    const climb = Object.keys(seen).filter(id => /vcl\d\d/.test(id));
+    // The climb frames (n411, n413-n415) fit with one skill; a draft has
+    // one of them, with the strongest skill alone.
+    const climb = ['n411', 'n413', 'n414', 'n415'].filter(id => seen[id]);
     expect(climb.length).toBeGreaterThan(0);
     const LONG = { id: 'x2', part: 'now', group: 'Overall', text: TOO_LONG, needs: ['climb', 'strengths'], claims: [] };
     const bank = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([LONG]) };

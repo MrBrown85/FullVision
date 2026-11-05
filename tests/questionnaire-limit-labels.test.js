@@ -145,8 +145,8 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
 
   describe('4. the limit is only information', () => {
     it('Generate on the review screen gives the whole draft past the class’s limit, and Approve stays on', () => {
-      setLimit(250);
-      const over = getStudents(cid).filter(st => draftOf(st).text.length > 250);
+      setLimit(350);
+      const over = getStudents(cid).filter(st => draftOf(st).text.length > 350);
       expect(over.length).toBeGreaterThan(10);
       const gen = st => {
         upsertTermRating(cid, st.id, term(), { narrative: '' });
@@ -156,10 +156,10 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
         return box.value;
       };
       // The students whose Generate draft runs past the limit.
-      const long = over.filter(st => gen(st).length > 250).slice(0, 3);
+      const long = over.filter(st => gen(st).length > 350).slice(0, 3);
       expect(long.length).toBe(3);
       long.forEach(st => {
-        expect(gen(st).length, st.firstName).toBeGreaterThan(250);
+        expect(gen(st).length, st.firstName).toBeGreaterThan(350);
         expect(RQ.approveBlockers(st), st.firstName).not.toContain('limit');
       });
       setLimit(null);
