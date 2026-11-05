@@ -132,7 +132,17 @@ describe('preferred name changed after the comment was written (Demo Mode, Scien
       const changes = RQ.staleFor(cid, st).changes;
       const befores = changes.map(c => c.before);
       expect(new Set(befores).size).toBe(befores.length);
-      expect(changes.some(c => c.kind === 'pronouns' && ETHAN.test(c.before) && ZED.test(c.after))).toBe(true);
+      // A sentence with the name and a pronoun gets one card with both
+      // changes; one with either gets its own (the draft decides which
+      // sentences hold both: the name again only after three sentences).
+      changes.forEach(c => {
+        const name = ETHAN.test(c.before);
+        const pron = /\b(he|his|him)\b/i.test(c.before);
+        if (name) expect(c.after, c.before).toMatch(ZED);
+        if (pron) expect(c.after, c.before).toMatch(/\b(she|her)\b/i);
+      });
+      expect(changes.some(c => c.kind === 'pronouns')).toBe(true);
+      expect(changes.some(c => ETHAN.test(c.before) && ZED.test(c.after))).toBe(true);
       expect(changes.every(c => !ETHAN.test(c.after))).toBe(true);
       expect(RQ.staleNote(RQ.staleFor(cid, st), 'Nov 1')).toContain('The name and pronouns changed after Nov 1');
       // Use the New Sentence on one puts in every name and pronoun change.

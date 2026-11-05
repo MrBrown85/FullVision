@@ -230,6 +230,8 @@ load('teacher/report-issues.js');
 load('shared/comment-bank.js');
 load('teacher/comment-realiser.js');
 load('teacher/comment-lint.js');
+load('teacher/comment-forms.js');
+load('teacher/comment-pipeline.js');
 load('shared/bank-comment.js');
 load('teacher/comment-bank.js');
 load('teacher/comment-personal.js');

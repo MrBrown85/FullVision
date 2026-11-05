@@ -152,7 +152,7 @@ describe('bankStrength on a synthetic History 12 class', () => {
     r = CommentBank.bankStrength(cid, { termId });
   });
 
-  it('the habits part is not thin: the six "excellent" frames fit every student rated all Consistently, six or more', () => {
+  it('the habits part is not thin: six or more frames fit every student rated all Consistently', () => {
     const excellent = getStudents(cid).filter(st => {
       const f = CommentBank.facts(cid, st, termId);
       const rating = getStudentTermRating(cid, st.id, termId) || {};
@@ -160,9 +160,12 @@ describe('bankStrength on a synthetic History 12 class', () => {
       return CommentBank.reportPath(f) !== 'ie' && ctx.habitsExcellent;
     });
     expect(excellent.length).toBeGreaterThanOrEqual(6);
-    excellent.forEach(st =>
-      expect(r.byStudent[st.id].habits).toEqual({ sentences: 6, students: excellent.length, thin: false }),
-    );
+    // The habits as behaviour (Nov 4 2026): what a student at Consistently
+    // does, said by the pipeline's habit frames.
+    excellent.forEach(st => {
+      expect(r.byStudent[st.id].habits.thin).toBe(false);
+      expect(r.byStudent[st.id].habits.sentences).toBeGreaterThanOrEqual(6);
+    });
     expect(r.parts.find(p => p.step === 'habits').thin).toBe(false);
   });
 

@@ -127,9 +127,14 @@ describe('missing work so far this year', () => {
     withTerm1Missing(() => {
       const ctx = CommentBank.context(facts(), {});
       const missing = COMMENT_BANK.sentences.filter(s => (s.claims || []).indexOf('notHandedIn') >= 0);
+      // Since Nov 4 2026 no live frame says "this term" (the lint bans it);
+      // the ones that did are retired, and the rule still holds for any a
+      // teacher keeps of their own.
       const thisTerm = missing.filter(s => /\bthis term\b/i.test(s.text));
-      expect(thisTerm.length).toBeGreaterThan(0);
-      thisTerm.forEach(s => expect(CommentBank.fits(s, ctx), s.id).toBe(false));
+      expect(thisTerm).toEqual([]);
+      COMMENT_BANK.retired
+        .filter(s => (s.claims || []).indexOf('notHandedIn') >= 0 && /\bthis term\b/i.test(s.text))
+        .forEach(s => expect(CommentBank.fits(s, ctx), s.id).toBe(false));
       expect(missing.some(s => !/\bthis term\b/i.test(s.text) && CommentBank.fits(s, ctx))).toBe(true);
     }));
 });

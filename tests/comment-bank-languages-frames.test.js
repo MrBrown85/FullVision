@@ -81,12 +81,19 @@ function realised(s, ctx, f) {
 }
 
 describe('the languages Overall frames', () => {
-  it('are 33: twelve even, three climb, nine hidden and nine newcomer, all tagged languages', () => {
-    expect(mine.length).toBe(33);
-    expect(mine.filter(s => s.when && s.when.evenWord).length).toBe(12);
-    expect(mine.filter(s => s.story === 'climb').length).toBe(3);
-    expect(mine.filter(s => s.story === 'hidden').length).toBe(9);
-    expect(mine.filter(s => s.story === 'newcomer').length).toBe(9);
+  it('are 33: twelve even, three climb, nine hidden and nine newcomer, all tagged languages (live or retired)', () => {
+    // Since Nov 4 2026 the ones with a banned phrase are retired, their text
+    // kept (COMMENT_BANK.retired); the rest stay in Browse.
+    const gone = COMMENT_BANK.retired.filter(
+      s => s.group === 'Overall' && (s.subjects || []).indexOf('languages') >= 0 && s.retired === '2026-11-04',
+    );
+    const both = mine.concat(gone);
+    expect(both.length).toBe(33);
+    expect(both.filter(s => s.when && s.when.evenWord).length).toBe(12);
+    expect(both.filter(s => s.story === 'climb').length).toBe(3);
+    expect(both.filter(s => s.story === 'hidden').length).toBe(9);
+    expect(both.filter(s => s.story === 'newcomer').length).toBe(9);
+    mine.forEach(s => expect(CommentLint.findings(s.text), s.id).toEqual([]));
     mine.forEach(s => {
       expect(s.subjects, s.id).toEqual(['languages']);
       expect(s.text, s.id).not.toMatch(/\{(strengths?|evenSkill|topSkill)\}/);
@@ -107,7 +114,7 @@ describe('the languages Overall frames', () => {
       expect(ctx._evenWord).toBe(w);
       const pool = CommentBank.stepPool('overall', ctx).map(s => s.id);
       const even = mine.filter(s => s.when && s.when.evenWord === w);
-      expect(even.length).toBe(3);
+      expect(even.length).toBeLessThanOrEqual(3);
       even.forEach(s => {
         expect(pool, s.id).toContain(s.id);
         expect(s.claims, s.id).toEqual(['evenResults']);
@@ -117,12 +124,11 @@ describe('the languages Overall frames', () => {
         const changed = Object.assign({}, f, { comps: [comp('a', 'Listening', 3.9), comp('b', 'Speaking', 2.8)] });
         expect(verified(s, t, CommentBank.provenance(s, ctx), changed, 'overall').replaced.length, s.id).toBe(1);
       });
-      // The draft gets a languages even frame: the untagged ones carry the
-      // skill and run past 20 words here.
+      // Generate says the strength in the pipeline's frames (Nov 4 2026),
+      // never the even results as a list.
       const d = CommentBank.draft(ctx, { seed: 2 });
-      const ov = d.sentences.find(x => x.step === 'overall');
-      expect(ov).toBeTruthy();
-      expect(even.map(s => s.id)).toContain(ov.id);
+      expect(d.replaced).toEqual([]);
+      d.sentences.forEach(x => expect(x.text).not.toMatch(/across (all )?(the )?skills|marks are close/));
       // A Letter class: only the frames that do not print the word fit.
       const lf = facts({
         comps,
@@ -171,9 +177,16 @@ describe('the languages Overall frames', () => {
         expect(pool, s.id).toContain(s.id);
         realised(s, ctx, f);
       });
-    const d = CommentBank.draft(ctx, { seed: 1 });
-    const ov = d.sentences.find(x => x.step === 'overall');
-    expect(ov && ov.text).toMatch(/in the language/i);
+    // The pipeline's climb frames that say the strength with it (vcl05,
+    // vcl06) fit, and say the skill in the language's words.
+    const both = COMMENT_BANK.sentences.filter(
+      x => x.v === 2 && /^vcl/.test(x.id) && (x.needs || []).includes('strengthAt'),
+    );
+    expect(both.length).toBeGreaterThan(0);
+    both.forEach(x => {
+      expect(CommentBank.fits(x, ctx), x.id).toBe(true);
+      expect(CommentBank.fill(x, ctx), x.id).toMatch(/in the language/i);
+    });
   });
 
   CommentBank.SKILLS.languages.forEach(row =>

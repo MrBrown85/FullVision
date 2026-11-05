@@ -3,7 +3,8 @@
     "description": "How each competency cluster is named in a report comment. phrase finishes '{He} can …' and 'Next, {he} can …': plain family words, a bare verb phrase, no competency label, code or Ministry wording. skill_key is the teacher/comment-bank.js SKILLS key whose For the Family and support lines fit it, or null. next_steps are the step toward the level above, by the student's level now (an Extending student's next step is the phrase). Keyed by the cluster in data/bc-curriculum-ican.json. The app doesn't read this file yet.",
     "method": "One card per cluster written from the exemplar competency’s Ministry wording and approved I Can set, scripted lint, one independent yes/no checklist review (fidelity, whole cluster, plain grammar, ladder, acceptability), one fix round, and a check that cluster-level text names no art form, trade or subject area that some member course lacks.",
     "approval": "Delegated: Colin Brown asked on Nov 2 2026 for the cards to be treated as approved after one checklist review and one fix round, since he would not see the approval page that night. Not read by Colin card by card.",
-    "plan": "~/reports/Competencies in report comments plan.md"
+    "plan": "~/reports/Competencies in report comments plan.md",
+    "schema": "Version 2 (Nov 4 2026): a card may add area (the family-facing name of the skill area), forms { base: [the phrase first, then alternatives], did: [past tense, tied to a piece], at: { developing, proficient, extending: [the strength at that level, after {he}] }, override: { base: { does, doing } } }, next_steps.extending, evidence (the kind of work that shows the skill), home ([invitations that start with a verb]) and prov. A card without them is version 1; scripts/build-curriculum-bank.mjs migrates it (forms.base = [phrase], the rest empty) and the engine falls back to the version 1 wording. does and doing are derived from each base form by teacher/comment-forms.js."
   },
   "adst-artistic-application": {
     "phrase": "use artistic elements to present dishes",
@@ -136,11 +137,11 @@
     "exemplar": "bc.bca12.cc.10"
   },
   "adst-concept-extensions": {
-    "phrase": "explain how others could build on a design",
+    "phrase": "explain how others could extend or reuse a design",
     "skill_key": "sharing",
     "next_steps": {
-      "emerging": "describe one way others could build on a design",
-      "developing": "point to parts of a design others could change or reuse",
+      "emerging": "describe one way others could extend a design",
+      "developing": "name parts of a design others could change or reuse",
       "proficient": "explain how a design concept could grow through others' work"
     },
     "exemplar": "bc.cprog11.cc.22"
@@ -170,7 +171,7 @@
     "skill_key": "designing",
     "next_steps": {
       "emerging": "decide on the limits a design must work within",
-      "developing": "decide on the starting ideas a design builds on",
+      "developing": "choose the starting ideas for a design",
       "proficient": "explain how premises and constraints set the range of possible designs"
     },
     "exemplar": "bc.cisys12.cc.4"
@@ -241,15 +242,15 @@
     "next_steps": {
       "emerging": "try one idea that is new",
       "developing": "pursue an unusual idea without knowing it works",
-      "proficient": "take creative risks across a whole project"
+      "proficient": "try ideas that are new and might not work throughout a project"
     },
     "exemplar": "bc.rob11.cc.6"
   },
   "adst-critical-feedback": {
-    "phrase": "gather honest feedback from several sources over time",
+    "phrase": "gather frank feedback from several sources over time",
     "skill_key": "testing",
     "next_steps": {
-      "emerging": "ask one source for honest feedback on work",
+      "emerging": "ask one source for frank feedback on work",
       "developing": "evaluate feedback to decide what is useful",
       "proficient": "gather feedback at the start and throughout a project"
     },
@@ -296,11 +297,11 @@
     "exemplar": "bc.cprog11.cc.30"
   },
   "adst-data-efficiencies": {
-    "phrase": "set up accounting records that save time",
+    "phrase": "arrange accounting records that save time",
     "skill_key": "business",
     "next_steps": {
-      "emerging": "find where the data for an accounting task comes from",
-      "developing": "set up accounting records that save time and effort",
+      "emerging": "find the source of the data for an accounting task",
+      "developing": "organize accounting records that save time and effort",
       "proficient": "find faster ways to process accounting records each day"
     },
     "exemplar": "bc.acct11.cc.8"
@@ -321,7 +322,7 @@
     "next_steps": {
       "emerging": "use personal reflections to improve a design",
       "developing": "use feedback from others to revise a design",
-      "proficient": "create a design that builds on prototype test results"
+      "proficient": "create a design that uses prototype test results"
     },
     "exemplar": "bc.elec11.cc.17"
   },
@@ -426,11 +427,11 @@
     "exemplar": "bc.acct11.cc.7"
   },
   "adst-economic-decisions": {
-    "phrase": "make responsible economic decisions",
+    "phrase": "weigh the costs and the effects on others",
     "skill_key": "business",
     "next_steps": {
-      "emerging": "explain what makes an economic decision responsible",
-      "developing": "make a responsible economic decision and explain it",
+      "emerging": "explain how to weigh the costs and the effects on others",
+      "developing": "weigh the costs and the effects on others and explain a decision",
       "proficient": "make an economic decision that considers its effects on others"
     },
     "exemplar": "bc.econbus12.cc.19"
@@ -506,10 +507,10 @@
     "exemplar": "bc.cis11.cc.14"
   },
   "adst-feedback-gathering": {
-    "phrase": "gather feedback from peers, users or experts",
+    "phrase": "gather feedback from partners, users or experts",
     "skill_key": "testing",
     "next_steps": {
-      "emerging": "ask a classmate for feedback on a design",
+      "emerging": "ask a partner for feedback on a design",
       "developing": "gather feedback from peers, users or experts",
       "proficient": "collect ideas from several people to inspire a design"
     },
@@ -630,7 +631,7 @@
     "skill_key": "collaborating",
     "next_steps": {
       "emerging": "share an idea with a group during brainstorming",
-      "developing": "build on other people's ideas during brainstorming",
+      "developing": "add to other people's ideas during brainstorming",
       "proficient": "consider whether an idea might work before setting it aside"
     },
     "exemplar": "bc.wdev10.cc.6"
@@ -661,7 +662,7 @@
     "next_steps": {
       "emerging": "share one new idea for a design",
       "developing": "try an unusual idea during brainstorming",
-      "proficient": "add to a classmate's idea in a way that improves it"
+      "proficient": "add to a partner's idea in a way that improves it"
     },
     "exemplar": "bc.adst9.cc.5"
   },
@@ -701,7 +702,7 @@
     "next_steps": {
       "emerging": "describe how a design affects the people who use it",
       "developing": "evaluate how a design affects the environment",
-      "proficient": "explain whether design choices are fair and responsible"
+      "proficient": "explain whether choices are fair and ethical for people and the environment"
     },
     "exemplar": "bc.adst8.cc.7"
   },
@@ -749,7 +750,7 @@
     "phrase": "judge ingredients for use and reuse",
     "skill_key": "materials",
     "next_steps": {
-      "emerging": "decide how to use an ingredient effectively",
+      "emerging": "decide how to use an ingredient in a recipe",
       "developing": "identify ingredients and materials that can be reused or recycled",
       "proficient": "assess ingredients on use, reuse and biodegradability together"
     },
@@ -761,7 +762,7 @@
     "next_steps": {
       "emerging": "identify sources of inspiration for a design",
       "developing": "judge how useful and reliable a source is",
-      "proficient": "use ideas from several sources in original work"
+      "proficient": "combine ideas from several sources into new work"
     },
     "exemplar": "bc.cul11.cc.10"
   },
@@ -779,7 +780,7 @@
     "phrase": "use safe, supportive communication in person and online",
     "skill_key": "safety",
     "next_steps": {
-      "emerging": "use respectful words in face-to-face and online talk",
+      "emerging": "use words that show respect in face-to-face and online talk",
       "developing": "use safe and supportive communication in digital spaces",
       "proficient": "take steps in advance to keep everyone safe"
     },
@@ -796,10 +797,10 @@
     "exemplar": "bc.auto11.cc.1"
   },
   "adst-interview-etiquette": {
-    "phrase": "use polite, suitable etiquette in interviews",
+    "phrase": "use suitable manners and etiquette in interviews",
     "skill_key": null,
     "next_steps": {
-      "emerging": "use polite etiquette when interviewing someone",
+      "emerging": "use suitable greetings and manners when interviewing someone",
       "developing": "apply etiquette in interviews and consultations",
       "proficient": "adjust etiquette to suit each person or group"
     },
@@ -840,7 +841,7 @@
     "skill_key": "designing",
     "next_steps": {
       "emerging": "keep a record of other ideas that might work",
-      "developing": "return to another idea when it might work better",
+      "developing": "return to another idea when it might suit the problem",
       "proficient": "compare a set-aside idea with the chosen one before deciding"
     },
     "exemplar": "bc.cstu10.cc.6"
@@ -859,7 +860,7 @@
     "phrase": "contribute to the kitchen through shared tasks",
     "skill_key": "foodPrep",
     "next_steps": {
-      "emerging": "take on one task in the kitchen",
+      "emerging": "handle one task in the kitchen",
       "developing": "contribute to the kitchen through several tasks",
       "proficient": "explain how each task supports the kitchen environment"
     },
@@ -869,7 +870,7 @@
     "phrase": "explain how land and culture shape tools and technology",
     "skill_key": null,
     "next_steps": {
-      "emerging": "describe how a natural resource shaped a tool",
+      "emerging": "describe how a resource from the land shaped a tool",
       "developing": "evaluate how culture influences the use of a tool",
       "proficient": "evaluate how land, resources and culture together shape a technology"
     },
@@ -921,7 +922,7 @@
     "next_steps": {
       "emerging": "identify new possibilities for a design",
       "developing": "analyze the strengths and limits of each new possibility",
-      "proficient": "explain how others might build on a design concept"
+      "proficient": "explain how others might extend a design concept"
     },
     "exemplar": "bc.draft11.cc.22"
   },
@@ -929,7 +930,7 @@
     "phrase": "choose a design opportunity and explain why",
     "skill_key": "designing",
     "next_steps": {
-      "emerging": "choose a design opportunity to work on",
+      "emerging": "choose a design opportunity to pursue",
       "developing": "give a reason for the opportunity chosen",
       "proficient": "compare opportunities and give reasons for the choice"
     },
@@ -946,7 +947,7 @@
     "exemplar": "bc.bca12.cc.14"
   },
   "adst-outcome-format": {
-    "phrase": "share results in a clear, brief format",
+    "phrase": "share results in a clear, short format",
     "skill_key": "sharing",
     "next_steps": {
       "emerging": "choose a format that suits the results",
@@ -1157,13 +1158,56 @@
   },
   "adst-prototype-testing": {
     "phrase": "test a prototype to see if it works",
+    "area": "testing a design",
+    "forms": {
+      "base": [
+        "test a prototype to see if it works",
+        "try a first version and say what the test showed",
+        "test a design before changing it"
+      ],
+      "did": [
+        "tested {his} first version and said what the test showed",
+        "tried {his} prototype and recorded what worked and what did not",
+        "used a test to decide what to change in {his} design"
+      ],
+      "at": {
+        "developing": [
+          "is starting to test a first version before changing it",
+          "can test a prototype in some of {his} work",
+          "is learning to say what a test showed about a design"
+        ],
+        "proficient": [
+          "tests a first version and says clearly what the test showed",
+          "tests a prototype and uses the results to decide what to change",
+          "describes what each test showed about {his} design"
+        ],
+        "extending": [
+          "tests a first version against each thing it was meant to do and explains the results",
+          "plans tests that check each part of a design",
+          "uses test results to explain why a design works or does not"
+        ]
+      }
+    },
     "skill_key": "testing",
     "next_steps": {
       "emerging": "test a prototype once to see if it works",
       "developing": "describe what a test showed about a prototype",
-      "proficient": "test a prototype against each success criterion"
+      "proficient": "test a prototype against each success criterion",
+      "extending": "plan a second test that checks what the first one could not"
     },
-    "exemplar": "bc.adst8.cc.14"
+    "evidence": "a design project with a tested first version",
+    "home": [
+      "ask {him} how {he} would test a fix for something at home before trusting it",
+      "ask {him} what {his} current project is meant to do and how {he} can tell it works",
+      "invite {him} to tell you what {his} last test showed and what {he} changed"
+    ],
+    "exemplar": "bc.adst8.cc.14",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "adst-recipe-comprehension": {
     "phrase": "read a recipe and spot the parts to clarify",
@@ -1340,8 +1384,8 @@
     "skill_key": "collaborating",
     "next_steps": {
       "emerging": "describe how a project was managed",
-      "developing": "assess how effectively work went alone on a project",
-      "proficient": "assess how effectively work went in a group, with examples"
+      "developing": "assess how well work went alone on a project",
+      "proficient": "assess how well work went in a group, with examples"
     },
     "exemplar": "bc.cis11.cc.20"
   },
@@ -1390,7 +1434,7 @@
     "skill_key": "drafting",
     "next_steps": {
       "emerging": "control tools with care in a simple hands-on task",
-      "developing": "use drafting techniques to make accurate drawings",
+      "developing": "use drafting techniques to make drawings with correct measurements",
       "proficient": "apply hand and drafting skills to harder tasks"
     },
     "exemplar": "bc.draft10.cc.23"
@@ -1406,7 +1450,7 @@
     "exemplar": "bc.cul10.cc.3"
   },
   "adst-step-sequencing": {
-    "phrase": "plan the steps to set up a workspace safely",
+    "phrase": "plan the steps to prepare a workspace safely",
     "skill_key": "safety",
     "next_steps": {
       "emerging": "choose the right tools for each step",
@@ -1766,7 +1810,7 @@
     "exemplar": "bc.arts9.cc.8"
   },
   "arts-adapting-technique": {
-    "phrase": "adapt performance skills in new and creative ways",
+    "phrase": "adapt performance skills in new and inventive ways",
     "skill_key": "technique",
     "next_steps": {
       "emerging": "adapt one performance technique for a new use",
@@ -1847,13 +1891,56 @@
   },
   "arts-artistic-choices": {
     "phrase": "choose elements to show a mood or meaning",
+    "area": "making artistic choices",
+    "forms": {
+      "base": [
+        "choose elements to show a mood or meaning",
+        "pick the elements that give a piece its mood",
+        "combine elements to show what a piece means"
+      ],
+      "did": [
+        "chose elements that gave the piece a clear mood",
+        "combined elements so the piece showed what {he} intended",
+        "explained the choices behind {his} piece"
+      ],
+      "at": {
+        "developing": [
+          "is starting to choose elements that show a mood on purpose",
+          "can combine elements to show a purpose in some of {his} work",
+          "is learning to explain why {he} chose an element"
+        ],
+        "proficient": [
+          "chooses and combines elements to show a clear mood or meaning",
+          "explains how {his} choices of elements show what {he} [intends|intend]",
+          "picks elements on purpose to give a piece its mood"
+        ],
+        "extending": [
+          "chooses and combines elements with a clear intent and can explain each choice",
+          "changes elements on purpose to shift a piece's meaning",
+          "explains how each element in a piece adds to its meaning"
+        ]
+      }
+    },
     "skill_key": "elements",
     "next_steps": {
       "emerging": "choose an element that shows a mood",
       "developing": "combine elements to show a clear purpose",
-      "proficient": "explain how element choices express intent"
+      "proficient": "explain how element choices express intent",
+      "extending": "change one element in a finished piece and explain how the meaning shifts"
     },
-    "exemplar": "bc.dfound11.cc.7"
+    "evidence": "a finished piece with a short note on the choices in it",
+    "home": [
+      "ask {him} what mood a song or picture {he} [likes|like] gives, and what creates it",
+      "ask {him} which choice in {his} current piece {he} [is|are] most sure about, and why",
+      "invite {him} to show you a piece and explain one choice in it"
+    ],
+    "exemplar": "bc.dfound11.cc.7",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "arts-artistic-creation": {
     "phrase": "create art alone and with others from new ideas",
@@ -2006,10 +2093,10 @@
     "exemplar": "bc.dcomp11.cc.1"
   },
   "arts-collaboration": {
-    "phrase": "build on partners' ideas during creative work",
+    "phrase": "add to partners' ideas during creative work",
     "skill_key": null,
     "next_steps": {
-      "emerging": "work with a partner during a creative process",
+      "emerging": "work with a partner while making a piece",
       "developing": "add ideas to a partner's work in return",
       "proficient": "build a two-way exchange of ideas across a whole project"
     },
@@ -2036,11 +2123,11 @@
     "exemplar": "bc.cmusic12.cc.2"
   },
   "arts-communicating-ideas": {
-    "phrase": "express ideas and emotions through creative work",
+    "phrase": "express ideas and emotions through dance",
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "interpret the emotion in a work being viewed",
-      "developing": "communicate an idea or emotion through a creative work",
+      "developing": "communicate an idea or emotion through dance",
       "proficient": "explain how specific choices communicate an idea"
     },
     "exemplar": "bc.dance11.cc.18"
@@ -2059,9 +2146,9 @@
     "phrase": "use the arts to connect with communities and issues",
     "skill_key": "connecting",
     "next_steps": {
-      "emerging": "use creative work to connect with an issue in the community",
-      "developing": "explain how a creative work connects to a national issue",
-      "proficient": "use creative work to connect with communities beyond the local area"
+      "emerging": "use dance to connect with an issue in the community",
+      "developing": "explain how a dance connects to a national issue",
+      "proficient": "use dance to connect with communities beyond the local area"
     },
     "exemplar": "bc.dtep10.cc.23"
   },
@@ -2146,12 +2233,12 @@
     "exemplar": "bc.instmus12.cc.3"
   },
   "arts-content-application": {
-    "phrase": "build on learned arts skills in new work",
+    "phrase": "use learned arts skills in new work",
     "skill_key": "technique",
     "next_steps": {
       "emerging": "use one learned skill in a new piece",
       "developing": "add detail when explaining arts ideas",
-      "proficient": "build on several learned skills in a new work"
+      "proficient": "combine several learned skills in a new work"
     },
     "exemplar": "bc.arts8.cc.16"
   },
@@ -2186,22 +2273,22 @@
     "exemplar": "bc.dcond11.cc.4"
   },
   "arts-creative-choices": {
-    "phrase": "recognize and judge creative choices in media art",
+    "phrase": "recognize and judge artistic choices in media art",
     "skill_key": "reflecting",
     "next_steps": {
-      "emerging": "point out creative choices in a media artwork",
-      "developing": "recognize creative choices while planning a media artwork",
-      "proficient": "evaluate the creative choices in a media artwork"
+      "emerging": "name artistic choices in a media artwork",
+      "developing": "recognize artistic choices while planning a media artwork",
+      "proficient": "evaluate the artistic choices in a media artwork"
     },
     "exemplar": "bc.media10.cc.9"
   },
   "arts-creative-innovation": {
-    "phrase": "create original work and solve creative problems",
+    "phrase": "create new work and solve problems in making art",
     "skill_key": "creating",
     "next_steps": {
-      "emerging": "create a piece that shows an original idea",
-      "developing": "solve a creative problem by trying a new approach",
-      "proficient": "bring original approaches to several creative challenges"
+      "emerging": "create a piece that shows a new idea",
+      "developing": "solve a problem in a piece by trying a new approach",
+      "proficient": "bring new approaches to several art-making challenges"
     },
     "exemplar": "bc.artstudio12.cc.6"
   },
@@ -2226,12 +2313,12 @@
     "exemplar": "bc.chor11.cc.21"
   },
   "arts-creative-risk-taking": {
-    "phrase": "explore new options and take creative risks",
+    "phrase": "explore new options and take risks in art",
     "skill_key": "creating",
     "next_steps": {
       "emerging": "explore different ideas for a piece",
-      "developing": "take a creative risk by trying something new",
-      "proficient": "take creative risks that change the direction of a piece"
+      "developing": "take a risk in art by trying something new",
+      "proficient": "take risks that change the direction of a piece"
     },
     "exemplar": "bc.artstudio10.cc.2"
   },
@@ -2271,7 +2358,7 @@
     "next_steps": {
       "emerging": "try a new artistic possibility in a piece",
       "developing": "explore how artworks from different cultures show points of view",
-      "proficient": "draw on cross-cultural perspectives in original work"
+      "proficient": "explore perspectives from several cultures in a new work"
     },
     "exemplar": "bc.garts11.cc.4"
   },
@@ -2280,8 +2367,8 @@
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "use movement to express an emotion",
-      "developing": "use creative work to express a perspective or value",
-      "proficient": "express cultural perspectives and emotions through creative work"
+      "developing": "use dance to express a perspective or value",
+      "proficient": "express cultural perspectives and emotions through dance"
     },
     "exemplar": "bc.dtep10.cc.19"
   },
@@ -2289,9 +2376,9 @@
     "phrase": "explain how culture and society influence the arts",
     "skill_key": "connecting",
     "next_steps": {
-      "emerging": "point out a cultural influence in a creative work",
-      "developing": "explain how culture and society affect a creative work",
-      "proficient": "describe how society shapes the way creative works are made"
+      "emerging": "name a cultural influence in a piece of art",
+      "developing": "explain how culture and society affect a piece of art",
+      "proficient": "describe how society shapes the way art is made"
     },
     "exemplar": "bc.ftvt11.cc.23"
   },
@@ -2330,7 +2417,7 @@
     "skill_key": "creating",
     "next_steps": {
       "emerging": "explore movement ideas for a composition",
-      "developing": "create an original dance composition",
+      "developing": "create a new dance composition",
       "proficient": "design how the parts of a composition fit together"
     },
     "exemplar": "bc.dchore10.cc.1"
@@ -2361,7 +2448,7 @@
     "next_steps": {
       "emerging": "use movement choices that show a dance's context",
       "developing": "explain how a context shaped choices in a dance",
-      "proficient": "create original dance works that draw on several contexts"
+      "proficient": "create new dance works that use several contexts"
     },
     "exemplar": "bc.dchore11.cc.21"
   },
@@ -2411,7 +2498,7 @@
     "next_steps": {
       "emerging": "describe rehearsals using dance vocabulary",
       "developing": "document a rehearsal or performance using dance terms",
-      "proficient": "use precise dance vocabulary to respond critically to a performance"
+      "proficient": "use the right dance terms to respond critically to a performance"
     },
     "exemplar": "bc.dcomp12.cc.17"
   },
@@ -2446,11 +2533,11 @@
     "exemplar": "bc.thprod11.cc.15"
   },
   "arts-design-innovation": {
-    "phrase": "bring original ideas to production design",
+    "phrase": "bring new ideas to production design",
     "skill_key": "creating",
     "next_steps": {
       "emerging": "suggest one new idea for a production design",
-      "developing": "bring original ideas to a production design",
+      "developing": "bring new ideas to a production design",
       "proficient": "try an unexpected approach to a design challenge"
     },
     "exemplar": "bc.thprod10.cc.5"
@@ -2460,7 +2547,7 @@
     "skill_key": "planning",
     "next_steps": {
       "emerging": "plan the parts of a graphic artwork",
-      "developing": "create a graphic artwork from an original design",
+      "developing": "create a graphic artwork from a new design",
       "proficient": "refine a graphic artwork after reviewing it"
     },
     "exemplar": "bc.garts11.cc.2"
@@ -2506,11 +2593,11 @@
     "exemplar": "bc.sa2d10.cc.13"
   },
   "arts-documentation": {
-    "phrase": "record and share creative work",
+    "phrase": "record and share music",
     "skill_key": "documenting",
     "next_steps": {
-      "emerging": "document a creative work or experience",
-      "developing": "share creative works in a variety of contexts",
+      "emerging": "document a musical work or experience",
+      "developing": "share musical works in a variety of contexts",
       "proficient": "choose a way of sharing that suits each context"
     },
     "exemplar": "bc.instmus10.cc.12"
@@ -2561,7 +2648,7 @@
     "next_steps": {
       "emerging": "use one drama technique in a performance",
       "developing": "try new drama techniques in a performance",
-      "proficient": "build on drama skills from one performance to the next"
+      "proficient": "carry drama skills from one performance to the next"
     },
     "exemplar": "bc.drama10.cc.3"
   },
@@ -2630,7 +2717,7 @@
     "skill_key": null,
     "next_steps": {
       "emerging": "work co-operatively with an ensemble in rehearsal",
-      "developing": "share and build on ideas with an ensemble",
+      "developing": "share ideas with an ensemble and extend them",
       "proficient": "support ensemble members during a performance"
     },
     "exemplar": "bc.dcomp10.cc.14"
@@ -2661,7 +2748,7 @@
     "next_steps": {
       "emerging": "try one element in a new piece of work",
       "developing": "try different principles and techniques in a piece",
-      "proficient": "explain what makes a piece of work original"
+      "proficient": "explain what makes a piece of work new and unique"
     },
     "exemplar": "bc.dfound11.cc.5"
   },
@@ -2686,12 +2773,12 @@
     "exemplar": "bc.chorus10.cc.13"
   },
   "arts-feedback-dialogue": {
-    "phrase": "discuss feedback with peers",
+    "phrase": "discuss feedback with others",
     "skill_key": "revising",
     "next_steps": {
-      "emerging": "discuss feedback received with a peer",
-      "developing": "ask peers questions to clarify feedback",
-      "proficient": "use dialogue with peers to decide how to act on feedback"
+      "emerging": "discuss feedback received with a partner",
+      "developing": "ask others questions to clarify feedback",
+      "proficient": "use dialogue with others to decide how to use feedback"
     },
     "exemplar": "bc.chor12.cc.13"
   },
@@ -2731,7 +2818,7 @@
     "next_steps": {
       "emerging": "demonstrate one safe flexibility exercise",
       "developing": "demonstrate ways to increase flexibility safely",
-      "proficient": "choose flexibility methods that work effectively"
+      "proficient": "choose flexibility methods that are safe for the body"
     },
     "exemplar": "bc.dcond11.cc.6"
   },
@@ -2739,17 +2826,17 @@
     "phrase": "explain the qualities that define a music genre",
     "skill_key": "reflecting",
     "next_steps": {
-      "emerging": "name one quality of a composition's genre",
+      "emerging": "name one feature of a composition's genre",
       "developing": "examine a composition for the qualities of its genre",
       "proficient": "explain how specific qualities place a composition in a genre"
     },
     "exemplar": "bc.chor12.cc.2"
   },
   "arts-gestural-vocabulary": {
-    "phrase": "use clear gestures to show how music should sound",
+    "phrase": "show with gestures how the music should be played",
     "skill_key": "communicating",
     "next_steps": {
-      "emerging": "use a gesture that shows how music should sound",
+      "emerging": "use a gesture that shows how music should be played",
       "developing": "use gestures other musicians can read and follow",
       "proficient": "adjust gestures to show musical intention more clearly"
     },
@@ -2940,7 +3027,7 @@
     "skill_key": "connecting",
     "next_steps": {
       "emerging": "describe what a 3D work shows about the land",
-      "developing": "describe how a 3D work shows First Peoples' relationship with natural resources",
+      "developing": "describe how a 3D work shows First Peoples' relationship with land resources",
       "proficient": "explain what several 3D works show about First Peoples and the land"
     },
     "exemplar": "bc.sa3d11.cc.20"
@@ -3026,12 +3113,12 @@
     "exemplar": "bc.arts8.cc.1"
   },
   "arts-meaning-emotion": {
-    "phrase": "express meaning and emotion in creative work",
+    "phrase": "express meaning and emotion in music",
     "skill_key": "performing",
     "next_steps": {
-      "emerging": "express a feeling through a creative work",
-      "developing": "make creative choices that show intent",
-      "proficient": "explain how creative choices express an emotion"
+      "emerging": "express a feeling through music",
+      "developing": "make musical choices that show intent",
+      "proficient": "explain how musical choices express an emotion"
     },
     "exemplar": "bc.chorus10.cc.2"
   },
@@ -3091,7 +3178,7 @@
     "next_steps": {
       "emerging": "create and perform a short piece of movement",
       "developing": "create a dance composition and perform it",
-      "proficient": "perform original work in groups and as a soloist"
+      "proficient": "create and perform dances in groups and as a soloist"
     },
     "exemplar": "bc.dchore10.cc.7"
   },
@@ -3106,10 +3193,10 @@
     "exemplar": "bc.dtep10.cc.1"
   },
   "arts-movement-interplay": {
-    "phrase": "combine movement, sound and image to show meaning",
+    "phrase": "combine movement, sounds and images to show meaning",
     "skill_key": "elements",
     "next_steps": {
-      "emerging": "combine movement and sound in a short dance",
+      "emerging": "combine movement and sounds in a short dance",
       "developing": "add images that support a dance's meaning",
       "proficient": "choose a structure that fits a dance's meaning"
     },
@@ -3211,7 +3298,7 @@
     "next_steps": {
       "emerging": "explore one emerging trend in music making",
       "developing": "describe how a music-making trend has changed over time",
-      "proficient": "try a new music-making trend in original work"
+      "proficient": "try a new music-making trend in a composition"
     },
     "exemplar": "bc.cp12.cc.8"
   },
@@ -3290,7 +3377,7 @@
     "skill_key": "creating",
     "next_steps": {
       "emerging": "contribute one idea when creating music",
-      "developing": "build on others' ideas when creating music together",
+      "developing": "add to others' ideas when creating music together",
       "proficient": "develop a musical idea alone to share with a group"
     },
     "exemplar": "bc.music9.cc.6"
@@ -3331,7 +3418,7 @@
     "next_steps": {
       "emerging": "try different instruments for a piece",
       "developing": "select instruments that suit a piece",
-      "proficient": "explore orchestration and sound samples to shape a composition"
+      "proficient": "explore orchestration and audio samples to shape a composition"
     },
     "exemplar": "bc.cp12.cc.7"
   },
@@ -3386,12 +3473,12 @@
     "exemplar": "bc.dance10.cc.20"
   },
   "arts-performing-sharing": {
-    "phrase": "perform, record and share creative work",
+    "phrase": "perform, record and share work",
     "skill_key": "performing",
     "next_steps": {
-      "emerging": "share a creative work in one way",
-      "developing": "document a creative work while making it",
-      "proficient": "share creative work in several different ways"
+      "emerging": "share a piece of work in one way",
+      "developing": "document a piece of work while making it",
+      "proficient": "share work in several different ways"
     },
     "exemplar": "bc.arts8.cc.14"
   },
@@ -3449,7 +3536,7 @@
     "phrase": "create art that shows a point of view",
     "skill_key": "creating",
     "next_steps": {
-      "emerging": "create a piece that shows an original idea",
+      "emerging": "create a piece that shows a new idea",
       "developing": "include part of a personal story in a piece",
       "proficient": "explain how a piece shows a point of view"
     },
@@ -3566,7 +3653,7 @@
     "exemplar": "bc.thco11.cc.1"
   },
   "arts-production-elements": {
-    "phrase": "explain how lights, sound and costume support a dance",
+    "phrase": "explain how lights, sounds and costume support a dance",
     "skill_key": "elements",
     "next_steps": {
       "emerging": "explain how one production element supports a dance",
@@ -3609,7 +3696,7 @@
     "phrase": "test how useful props and technologies are",
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "try out different props and technologies",
+      "emerging": "test different props and technologies",
       "developing": "judge which ways of working help a production",
       "proficient": "explain what makes a prop or technology useful"
     },
@@ -3686,12 +3773,12 @@
     "exemplar": "bc.chor12.cc.11"
   },
   "arts-resolving-challenges": {
-    "phrase": "solve creative challenges while making art",
+    "phrase": "solve challenges while making art",
     "skill_key": "creating",
     "next_steps": {
-      "emerging": "make a creative choice while developing a piece",
-      "developing": "try different solutions to a creative challenge",
-      "proficient": "explain how a creative challenge was solved"
+      "emerging": "make an artistic choice while developing a piece",
+      "developing": "try different solutions to a challenge in a piece",
+      "proficient": "explain how a challenge in a piece was solved"
     },
     "exemplar": "bc.artstudio11.cc.6"
   },
@@ -3746,12 +3833,12 @@
     "exemplar": "bc.dance11.cc.19"
   },
   "arts-responsible-practice": {
-    "phrase": "make respectful choices when creating and performing",
+    "phrase": "make choices that respect others when creating and performing",
     "skill_key": null,
     "next_steps": {
-      "emerging": "choose content that is respectful of others",
+      "emerging": "choose content that respects others",
       "developing": "act responsibly toward others when creating work",
-      "proficient": "explain why theme choices are respectful"
+      "proficient": "explain why theme choices respect others"
     },
     "exemplar": "bc.dance10.cc.19"
   },
@@ -3761,7 +3848,7 @@
     "next_steps": {
       "emerging": "find one thing to improve in a piece",
       "developing": "revise a piece to improve its presentation",
-      "proficient": "document creative work and experiences in different ways"
+      "proficient": "document artwork and experiences in different ways"
     },
     "exemplar": "bc.arts9.cc.10"
   },
@@ -3786,10 +3873,10 @@
     "exemplar": "bc.ftvt11.cc.25"
   },
   "arts-script-innovation": {
-    "phrase": "bring creative ideas to writing and directing",
+    "phrase": "bring new ideas to writing and directing",
     "skill_key": "creating",
     "next_steps": {
-      "emerging": "bring an original idea to a script",
+      "emerging": "bring a new idea to a script",
       "developing": "try a new way of writing a script",
       "proficient": "try a new way of directing a scene"
     },
@@ -3846,11 +3933,11 @@
     "exemplar": "bc.drama12.cc.11"
   },
   "arts-sharing-responding": {
-    "phrase": "share creative work and respond to others' work",
+    "phrase": "share work and respond to others' work",
     "skill_key": "communicating",
     "next_steps": {
-      "emerging": "share a creative work with an audience",
-      "developing": "respond to the creative work of others",
+      "emerging": "share a piece of work with an audience",
+      "developing": "respond to the work of others",
       "proficient": "respond to others' work with specific comments"
     },
     "exemplar": "bc.thco10.cc.11"
@@ -3936,10 +4023,10 @@
     "exemplar": "bc.cmusic10.cc.7"
   },
   "arts-structure-form": {
-    "phrase": "analyze how sound, image and form convey meaning",
+    "phrase": "analyze how sounds, images and form convey meaning",
     "skill_key": "reflecting",
     "next_steps": {
-      "emerging": "analyze how sound conveys meaning in a scene",
+      "emerging": "analyze how sounds convey meaning in a scene",
       "developing": "analyze how movement in a shot conveys meaning",
       "proficient": "analyze how structure and form shape a moving image's meaning"
     },
@@ -4120,7 +4207,7 @@
     "skill_key": "camera",
     "next_steps": {
       "emerging": "view a variety of moving images",
-      "developing": "create original moving images",
+      "developing": "create new moving images",
       "proficient": "explore new ways to make moving images"
     },
     "exemplar": "bc.ftvt11.cc.1"
@@ -4159,9 +4246,9 @@
     "phrase": "explore First Peoples and local knowledge through the arts",
     "skill_key": "connecting",
     "next_steps": {
-      "emerging": "connect local cultural knowledge to a creative work",
-      "developing": "explore First Peoples perspectives through creative work",
-      "proficient": "use creative work to explore a different way of knowing"
+      "emerging": "connect local cultural knowledge to a dance",
+      "developing": "explore First Peoples perspectives through dance",
+      "proficient": "use dance to explore a different way of knowing"
     },
     "exemplar": "bc.dance10.cc.21"
   },
@@ -4169,9 +4256,9 @@
     "phrase": "connect with people through the arts",
     "skill_key": "connecting",
     "next_steps": {
-      "emerging": "use creative work to connect with people in the community",
-      "developing": "use creative work to connect with people across the region",
-      "proficient": "use creative work to connect with people around the world"
+      "emerging": "use music to connect with people in the community",
+      "developing": "use music to connect with people across the region",
+      "proficient": "use music to connect with people around the world"
     },
     "exemplar": "bc.chorus10.cc.19"
   },
@@ -4311,7 +4398,7 @@
     "next_steps": {
       "emerging": "set one realistic learning goal with a clear step",
       "developing": "keep working toward a goal when it gets hard",
-      "proficient": "adjust a plan after a setback and keep going"
+      "proficient": "adjust a plan after a setback and continue"
     },
     "exemplar": "bc.caree8.cc.7"
   },
@@ -4326,11 +4413,11 @@
     "exemplar": "bc.clc12.cc.2"
   },
   "car-hours-documentation": {
-    "phrase": "keep an accurate record of work experience hours",
+    "phrase": "keep a correct record of work experience hours",
     "skill_key": null,
     "next_steps": {
       "emerging": "record work hours after each shift",
-      "developing": "keep an ongoing, accurate record of work hours",
+      "developing": "keep an ongoing, correct record of work hours",
       "proficient": "organize records to show all required hours clearly"
     },
     "exemplar": "bc.wex12a.cc.12"
@@ -4419,7 +4506,7 @@
     "phrase": "explain how different kinds of work help a community",
     "skill_key": "exploring",
     "next_steps": {
-      "emerging": "describe how one kind of work helps the community",
+      "emerging": "describe how one type of work helps the community",
       "developing": "explain a view on work with reasons and examples",
       "proficient": "compare different views on how work contributes to society"
     },
@@ -4436,12 +4523,12 @@
     "exemplar": "bc.ywt12.cc.12"
   },
   "car-preferred-futures": {
-    "phrase": "explore possible futures with creative thinking",
+    "phrase": "explore possible futures with imagination",
     "skill_key": "planning",
     "next_steps": {
       "emerging": "describe one possible future in education or work",
       "developing": "explore education and work options that fit a preferred future",
-      "proficient": "use creative thinking to map several possible futures"
+      "proficient": "use imagination to map several possible futures"
     },
     "exemplar": "bc.clc12.cc.9"
   },
@@ -4509,7 +4596,7 @@
     "phrase": "interact respectfully, safely and inclusively in many settings",
     "skill_key": null,
     "next_steps": {
-      "emerging": "use respectful language in a career-life setting",
+      "emerging": "use language that shows respect in a career-life setting",
       "developing": "include others in interactions across career-life settings",
       "proficient": "reflect on interactions and adjust them for new settings"
     },
@@ -4527,13 +4614,56 @@
   },
   "car-self-assessment": {
     "phrase": "name personal strengths and skills, with examples",
+    "area": "describing strengths and skills",
+    "forms": {
+      "base": [
+        "name personal strengths and skills, with examples",
+        "describe a strength and give an example of it",
+        "use a self-assessment to describe {his} skills"
+      ],
+      "did": [
+        "named a strength and gave a clear example of it",
+        "described {his} skills with examples from school and outside it",
+        "used a self-assessment to describe {his} strengths"
+      ],
+      "at": {
+        "developing": [
+          "is starting to name a strength and give an example of it",
+          "can describe {his} strengths in some of {his} work",
+          "is learning to use a self-assessment to describe {his} skills"
+        ],
+        "proficient": [
+          "names {his} strengths and skills and gives an example of each",
+          "uses a self-assessment to describe {his} strengths",
+          "describes {his} skills with examples from school and outside it"
+        ],
+        "extending": [
+          "explains what {his} interests show about {his} strengths and skills",
+          "connects {his} strengths to the things {he} [likes|like] to do",
+          "describes {his} strengths with examples from several settings"
+        ]
+      }
+    },
     "skill_key": "self",
     "next_steps": {
       "emerging": "name one strength and give an example of it",
       "developing": "use a self-assessment to describe strengths and skills",
-      "proficient": "reflect on what likes and preferences show about strengths and skills"
+      "proficient": "reflect on what likes and preferences show about strengths and skills",
+      "extending": "explain how a strength shows in two different parts of {his} life"
     },
-    "exemplar": "bc.caree8.cc.1"
+    "evidence": "a self-assessment with examples",
+    "home": [
+      "ask {him} to name one thing {he} did well this week and what skill it took",
+      "tell {him} one strength you see at home and ask whether {he} [sees|see] it too",
+      "ask {him} which school task {he} [enjoys|enjoy] most and what that says about {his} skills"
+    ],
+    "exemplar": "bc.caree8.cc.1",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "car-skill-development": {
     "phrase": "make a plan to build work skills",
@@ -4561,7 +4691,7 @@
     "next_steps": {
       "emerging": "name transferable skills, with an example of each",
       "developing": "use evidence from experience to assess transferable skills",
-      "proficient": "explain why each skill is a strength or needs refining"
+      "proficient": "explain why a skill is a strength or needs refining"
     },
     "exemplar": "bc.clc12.cc.3"
   },
@@ -4601,7 +4731,7 @@
     "next_steps": {
       "emerging": "name a strength and one way to use it at work",
       "developing": "try an approach someone suggests for using a strength",
-      "proficient": "find original ways to use strengths in a work setting"
+      "proficient": "find new ways to use strengths in a work setting"
     },
     "exemplar": "bc.wex12a.cc.1"
   },
@@ -4709,7 +4839,7 @@
     "phrase": "reflect on roles, growth and early career-life plans",
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "describe roles taken on at school or in the community",
+      "emerging": "describe roles held at school or in the community",
       "developing": "reflect on growth in career-life learning",
       "proficient": "connect reflections on growth to a preferred pathway"
     },
@@ -4769,7 +4899,7 @@
     "phrase": "interact respectfully, safely and inclusively with others",
     "skill_key": null,
     "next_steps": {
-      "emerging": "use respectful language with others in group settings",
+      "emerging": "use language that shows respect in group settings",
       "developing": "include others in interactions in career-life settings",
       "proficient": "interact safely and respectfully in new or unfamiliar settings"
     },
@@ -4789,8 +4919,8 @@
     "phrase": "spot bias and contradictions in a text",
     "skill_key": "information",
     "next_steps": {
-      "emerging": "point out one statement in a text that shows bias",
-      "developing": "point out contradictions between parts of a text",
+      "emerging": "find one statement in a text that shows bias",
+      "developing": "identify contradictions between parts of a text",
       "proficient": "explain how a distortion changes what readers believe"
     },
     "exemplar": "bc.comp10.cc.10"
@@ -4890,7 +5020,7 @@
     "skill_key": "writing",
     "next_steps": {
       "emerging": "write a short piece in a new form",
-      "developing": "use the features of a genre in an original piece",
+      "developing": "use the features of a genre in a new piece",
       "proficient": "experiment with style and explain what the choice adds"
     },
     "exemplar": "bc.efp12.cc.24"
@@ -4906,24 +5036,67 @@
     "exemplar": "bc.comp12.cc.9"
   },
   "ela-idea-exchange": {
-    "phrase": "share ideas in discussion and build on others' ideas",
+    "phrase": "share ideas in discussion and extend others' ideas",
     "skill_key": "speaking",
     "next_steps": {
       "emerging": "share one idea in a discussion and listen to others",
       "developing": "respond to another person's viewpoint in a discussion",
-      "proficient": "build on others' ideas to take a discussion further"
+      "proficient": "extend others' ideas to take a discussion further"
     },
     "exemplar": "bc.ela9.cc.15"
   },
   "ela-idea-exploration": {
     "phrase": "explore a text's ideas and take them further",
+    "area": "thinking about what a text says",
+    "forms": {
+      "base": [
+        "explore a text's ideas and take them further",
+        "take an idea from a text and ask where it leads",
+        "connect the ideas in one text to another"
+      ],
+      "did": [
+        "took an idea from the text and asked where it leads",
+        "connected an idea in the text to one from another piece",
+        "carried an idea from the text into a question of {his} own"
+      ],
+      "at": {
+        "developing": [
+          "is starting to connect an idea in one text to an idea in another",
+          "can explain a text's main idea in some of {his} work",
+          "is learning to ask where a text's idea leads"
+        ],
+        "proficient": [
+          "takes an idea from a text and asks what it means beyond the page",
+          "connects ideas within and between texts",
+          "explains a text's ideas and adds an example of {his} own"
+        ],
+        "extending": [
+          "takes a text's idea further with an example or question the text does not give",
+          "connects ideas across several texts and explains what they share",
+          "questions a text's idea and tests it against other texts"
+        ]
+      }
+    },
     "skill_key": "thinking",
     "next_steps": {
       "emerging": "explain one idea from a text in plain words",
       "developing": "connect an idea in one text to an idea in another",
-      "proficient": "take a text's idea further, with a new example or question"
+      "proficient": "take a text's idea further, with a new example or question",
+      "extending": "explain how {his} own thinking about a text's idea changed and why"
     },
-    "exemplar": "bc.ela9.cc.5"
+    "evidence": "a written response to a story or article",
+    "home": [
+      "ask {him} what idea a show or story was about and where else it appears",
+      "ask {him} which idea from something {he} read this week {he} [disagrees|disagree] with, and why",
+      "invite {him} to tell you about a character's choice and what {he} would have done"
+    ],
+    "exemplar": "bc.ela9.cc.5",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "ela-idea-synthesis": {
     "phrase": "combine ideas from several sources to explain a topic",
@@ -4936,12 +5109,12 @@
     "exemplar": "bc.ela9.cc.3"
   },
   "ela-idea-transformation": {
-    "phrase": "transform ideas and information into an original text",
+    "phrase": "transform ideas and information into a new text",
     "skill_key": "writing",
     "next_steps": {
       "emerging": "use one gathered idea in a new piece of writing",
       "developing": "present gathered information in a new form",
-      "proficient": "create an original text that shows a clear point of view"
+      "proficient": "create a new text that shows a clear point of view"
     },
     "exemplar": "bc.ela9.cc.21"
   },
@@ -4970,7 +5143,7 @@
     "skill_key": "information",
     "next_steps": {
       "emerging": "find information on a topic in two different sources",
-      "developing": "check whether a source's information is accurate and reliable",
+      "developing": "check whether a source's information is correct and reliable",
       "proficient": "compare sources and explain which suits a purpose and why"
     },
     "exemplar": "bc.ela9.cc.1"
@@ -5039,8 +5212,8 @@
     "phrase": "use digital media to work and communicate with others",
     "skill_key": "speaking",
     "next_steps": {
-      "emerging": "use a shared digital tool to work on a group task",
-      "developing": "use digital media to share work with classmates",
+      "emerging": "use a shared digital tool for a group task",
+      "developing": "use digital media to share work with others",
       "proficient": "use digital media to communicate with audiences beyond the classroom"
     },
     "exemplar": "bc.nm10.cc.18"
@@ -5171,7 +5344,7 @@
     "next_steps": {
       "emerging": "share a personal response to a text with one reason",
       "developing": "respond to a text's ideas and choices critically",
-      "proficient": "respond to a text in a creative form that adds meaning"
+      "proficient": "respond to a text in a new form that adds meaning"
     },
     "exemplar": "bc.ela9.cc.9"
   },
@@ -5190,7 +5363,7 @@
     "skill_key": "writing",
     "next_steps": {
       "emerging": "change a word or sentence to suit the purpose of a piece",
-      "developing": "explain why language was shaped in a particular way",
+      "developing": "explain why language was shaped in a certain way",
       "proficient": "vary sentences and word choice to create a deliberate effect"
     },
     "exemplar": "bc.cw12.cc.23"
@@ -5219,7 +5392,7 @@
     "phrase": "credit sources with clear citations",
     "skill_key": "information",
     "next_steps": {
-      "emerging": "note where each idea or quotation came from",
+      "emerging": "note the source of each idea or quotation",
       "developing": "cite each source in the format the class uses",
       "proficient": "decide when an idea needs a citation and cite it fully"
     },
@@ -5270,8 +5443,8 @@
     "skill_key": "reading",
     "next_steps": {
       "emerging": "use one strategy, such as rereading, when a text is hard",
-      "developing": "choose a strategy that suits each kind of text",
-      "proficient": "use strategies to ask deeper questions about a text"
+      "developing": "choose a strategy that suits each type of text",
+      "proficient": "use strategies to ask probing questions about a text"
     },
     "exemplar": "bc.ela9.cc.2"
   },
@@ -5316,7 +5489,7 @@
     "exemplar": "bc.ela9.cc.17"
   },
   "ela-text-reliability": {
-    "phrase": "check how reliable and accurate a text is",
+    "phrase": "check how reliable and correct a text is",
     "skill_key": "information",
     "next_steps": {
       "emerging": "check one fact in a text against another source",
@@ -5430,7 +5603,7 @@
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "use one geometry term correctly in a discussion",
-      "developing": "explain thinking to others with precise geometry language",
+      "developing": "explain thinking to others with the right math terms",
       "proficient": "use geometry language to question or extend others' ideas"
     },
     "exemplar": "bc.geom12.cc.14"
@@ -5447,13 +5620,56 @@
   },
   "math-justification": {
     "phrase": "explain and justify math ideas and decisions",
+    "area": "explaining math reasoning",
+    "forms": {
+      "base": [
+        "explain and justify math ideas and decisions",
+        "give the reasons behind a math decision",
+        "show why a math method works"
+      ],
+      "did": [
+        "explained each step and why it worked",
+        "gave a clear reason for the method {he} chose",
+        "showed the same idea in a second way"
+      ],
+      "at": {
+        "developing": [
+          "is starting to give a reason for the method {he} [chooses|choose]",
+          "can justify a math decision in some of {his} work",
+          "is learning to explain each step of a solution"
+        ],
+        "proficient": [
+          "gives clear reasons for a math decision and can show it a second way",
+          "explains each step of a solution and why it works",
+          "justifies {his} math decisions with reasons"
+        ],
+        "extending": [
+          "justifies a math idea in more than one way and explains which way holds",
+          "explains why a method works and when it would not",
+          "shows a math idea several ways and links them"
+        ]
+      }
+    },
     "skill_key": "reasoning",
     "next_steps": {
       "emerging": "explain a math decision with one reason",
       "developing": "justify a math decision with clear reasons",
-      "proficient": "justify a math idea in more than one way"
+      "proficient": "justify a math idea in more than one way",
+      "extending": "explain why one justification holds where another does not"
     },
-    "exemplar": "bc.fpc10.cc.11"
+    "evidence": "a solved problem with the reasoning written beside it",
+    "home": [
+      "ask {him} to explain one problem from this week to you as if you had never seen it",
+      "ask {him} how {he} [knows|know] an answer is right",
+      "invite {him} to show you two ways to find a total price or a travel time"
+    ],
+    "exemplar": "bc.fpc10.cc.11",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "math-logical-reasoning": {
     "phrase": "use reasoning and tools to explore math ideas",
@@ -5490,8 +5706,8 @@
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "use one math term correctly in a discussion",
-      "developing": "respond to classmates' ideas using math language",
-      "proficient": "explain thinking to others with precise math language"
+      "developing": "respond to others' ideas using math language",
+      "proficient": "explain thinking to others with the right math terms"
     },
     "exemplar": "bc.fpc10.cc.13"
   },
@@ -5521,17 +5737,17 @@
     "next_steps": {
       "emerging": "share thinking in class when unsure of the answer",
       "developing": "offer a new or untested idea in a discussion",
-      "proficient": "build on a classmate's idea with a new one"
+      "proficient": "add a new idea to a partner's idea"
     },
     "exemplar": "bc.fpc10.cc.14"
   },
   "math-persistent-solving": {
-    "phrase": "keep working on a hard problem",
+    "phrase": "persist with a hard problem",
     "skill_key": "solving",
     "next_steps": {
       "emerging": "try a second approach when a first one does not work",
-      "developing": "keep working on a problem through several attempts",
-      "proficient": "work on a challenging problem until it is solved"
+      "developing": "persist with a problem through several attempts",
+      "proficient": "stay with a challenging problem until it is solved"
     },
     "exemplar": "bc.fpc10.cc.9"
   },
@@ -5556,12 +5772,12 @@
     "exemplar": "bc.stat12.cc.10"
   },
   "math-problem-exploration": {
-    "phrase": "explore problems with curiosity and creative approaches",
+    "phrase": "explore problems with curiosity and new approaches",
     "skill_key": "solving",
     "next_steps": {
       "emerging": "ask a curious question about a problem",
-      "developing": "try a creative approach to a problem",
-      "proficient": "pursue a question that comes up while exploring a problem"
+      "developing": "try a new approach to a problem",
+      "proficient": "pursue a question that arises while exploring a problem"
     },
     "exemplar": "bc.fpc10.cc.5"
   },
@@ -5611,7 +5827,7 @@
     "next_steps": {
       "emerging": "keep exploring a research question after a first try",
       "developing": "keep exploring a research question when the answer is unclear",
-      "proficient": "take on a challenging research question with several approaches"
+      "proficient": "tackle a challenging research question with several approaches"
     },
     "exemplar": "bc.stat12.cc.9"
   },
@@ -5640,7 +5856,7 @@
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "use one statistics term correctly in a discussion",
-      "developing": "explain thinking to others with precise statistics language",
+      "developing": "explain thinking to others with the right math terms",
       "proficient": "use statistics language to question others' claims about data"
     },
     "exemplar": "bc.stat12.cc.13"
@@ -5681,7 +5897,7 @@
     "next_steps": {
       "emerging": "find where a mistake happened in a solution",
       "developing": "correct a mistake and explain what went wrong",
-      "proficient": "use a mistake to choose a better approach next time"
+      "proficient": "use a mistake to choose a more suitable approach next time"
     },
     "exemplar": "bc.fpc10.cc.17"
   },
@@ -5840,7 +6056,7 @@
     "skill_key": "safety",
     "next_steps": {
       "emerging": "identify when an outdoor situation is an emergency",
-      "developing": "describe the steps to take in an outdoor emergency",
+      "developing": "describe the steps for an outdoor emergency",
       "proficient": "practise emergency responses for several outdoor situations"
     },
     "exemplar": "bc.oded11.cc.12"
@@ -6040,7 +6256,7 @@
     "skill_key": "fitness",
     "next_steps": {
       "emerging": "describe how skill in an activity has grown",
-      "developing": "explain how getting better at an activity builds confidence",
+      "developing": "explain how improving at an activity builds confidence",
       "proficient": "explain how skill and confidence encourage lifelong participation"
     },
     "exemplar": "bc.al11.cc.1"
@@ -6077,13 +6293,56 @@
   },
   "phe-movement-concepts": {
     "phrase": "use movement concepts and strategies in games",
+    "area": "using strategy in games",
+    "forms": {
+      "base": [
+        "use movement concepts and strategies in games",
+        "use a strategy during a game",
+        "plan a strategy and use it in play"
+      ],
+      "did": [
+        "used a planned strategy during the game",
+        "moved to open space and used it during play",
+        "changed {his} strategy as the game changed"
+      ],
+      "at": {
+        "developing": [
+          "is starting to use a planned strategy during a game",
+          "can use a strategy in play in some of {his} work",
+          "is learning to move to open space during a game"
+        ],
+        "proficient": [
+          "uses a planned strategy during a game and adjusts it as play changes",
+          "applies a movement concept in different activities",
+          "plans a strategy and uses it during play"
+        ],
+        "extending": [
+          "carries a movement concept from one activity into a different one",
+          "explains why a strategy suits one game and not another",
+          "changes {his} strategy during play to suit what is happening"
+        ]
+      }
+    },
     "skill_key": "strategy",
     "next_steps": {
       "emerging": "use one strategy, such as moving to open space",
       "developing": "use a planned strategy during a game",
-      "proficient": "apply a movement concept in a different activity"
+      "proficient": "apply a movement concept in a different activity",
+      "extending": "explain which strategy suits a new activity and why"
     },
-    "exemplar": "bc.phe8.cc.2"
+    "evidence": "game play and a short strategy reflection",
+    "home": [
+      "ask {him} what a team should do next, and why, when you watch a game together",
+      "ask {him} which strategy from class {he} would use in a game {he} [plays|play] outside school",
+      "invite {him} to explain the plan behind a move in a sport {he} [enjoys|enjoy]"
+    ],
+    "exemplar": "bc.phe8.cc.2",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "phe-movement-skills": {
     "phrase": "use movement skills in different activities",
@@ -6240,7 +6499,7 @@
     "skill_key": null,
     "next_steps": {
       "emerging": "name one strength and give an example",
-      "developing": "explain an area for growth to work on",
+      "developing": "explain an area for growth to focus on",
       "proficient": "explain how a strength can help with an area for growth"
     },
     "exemplar": "bc.oded11.cc.7"
@@ -6291,19 +6550,85 @@
     "next_steps": {
       "emerging": "record measurements with the correct significant figures",
       "developing": "state the uncertainty in a measurement or result",
-      "proficient": "explain what makes a result accurate and precise"
+      "proficient": "explain what accuracy and precision mean for a result"
     },
     "exemplar": "bc.chem11.cc.7"
   },
   "sci-assumptions-bias": {
-    "phrase": "question information and spot bias in sources",
+    "phrase": "notice when a source takes something for granted",
+    "area": "bias and assumptions",
+    "forms": {
+      "base": [
+        "notice when a source takes something for granted",
+        "spot one-sided views in sources and {his} own work",
+        "ask who made a piece of information and why"
+      ],
+      "did": [
+        "noted the assumptions behind a source in {his} research notes",
+        "spotted a one-sided claim during {his} source check",
+        "asked who wrote a website in {his} project notes"
+      ],
+      "at": {
+        "developing": [
+          "is starting to ask who made a source and why",
+          "is learning to notice what a source takes for granted",
+          "can spot a one-sided claim with help"
+        ],
+        "proficient": [
+          "notices what a source takes for granted",
+          "spots one-sided views in sources and in {his} own lab work",
+          "questions information before using it in a project"
+        ],
+        "extending": [
+          "explains how bias changes what a source claims",
+          "names what {his} own lab took for granted and how it shaped the results",
+          "compares how two sources describe the same event and why they differ"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "check the author and date of a website",
+          "ask whether a source is trying to sell something",
+          "name the group behind a website"
+        ],
+        "developing": [
+          "list beliefs a writer treats as fact",
+          "mark sentences that state an opinion as fact",
+          "ask what a source leaves unsaid"
+        ],
+        "proficient": [
+          "check {his} own lab for choices that favoured an outcome",
+          "compare two sources on the same topic",
+          "describe the slant in a news headline"
+        ],
+        "extending": [
+          "explain how the goals of a funder could shape a study",
+          "rewrite a slanted sentence in neutral words",
+          "show how bias in a method changed a result"
+        ]
+      }
+    },
     "skill_key": "evaluating",
     "next_steps": {
-      "emerging": "ask where a piece of information came from",
-      "developing": "name the assumptions in a source or piece of work",
-      "proficient": "identify bias in sources and in a personal investigation"
+      "emerging": "ask who made a source and why",
+      "developing": "name what a source takes for granted",
+      "proficient": "spot one-sided views in a source and in a personal investigation",
+      "extending": "explain how bias changes what a source claims"
     },
-    "exemplar": "bc.chem11.cc.17"
+    "evidence": "research notes or a source check for a project",
+    "home": [
+      "talk with {him} about what an ad for a sports drink takes for granted",
+      "ask {him} who made a website the family uses and why",
+      "invite {him} to spot the one-sided words in a news headline"
+    ],
+    "exemplar": "bc.chem11.cc.17",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-cause-effect": {
     "phrase": "explain how a cause leads to an effect",
@@ -6326,14 +6651,80 @@
     "exemplar": "bc.sci9.cc.18"
   },
   "sci-contributing-to-care": {
-    "phrase": "take part in caring for the community and environment",
+    "phrase": "help care for the school, the community or nature",
+    "area": "caring for others",
+    "forms": {
+      "base": [
+        "help care for the school, the community or nature",
+        "plan a group action to protect a local place",
+        "take steps to care for {his} own health"
+      ],
+      "did": [
+        "helped plan a schoolyard cleanup with {his} group",
+        "followed {his} group’s care plan for the class garden",
+        "tracked the results of {his} recycling project"
+      ],
+      "at": {
+        "developing": [
+          "is starting to describe one action that cares for the environment",
+          "is learning to plan a caring action with a group",
+          "can follow a group’s care plan with help"
+        ],
+        "proficient": [
+          "follows a plan to care for a local place",
+          "plans a caring action with a group and does {his} part",
+          "makes choices that protect {his} own health and the health of others"
+        ],
+        "extending": [
+          "judges how well a caring action worked and improves it",
+          "leads a group in planning an action for the community",
+          "measures the effect of a project, such as litter collected"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "name a problem in the schoolyard that needs care",
+          "choose one daily habit that protects nature",
+          "suggest a way to help a neighbour or friend"
+        ],
+        "developing": [
+          "write the steps for a class garden or cleanup",
+          "share the jobs in a group action plan",
+          "pick a date and goal for a group project"
+        ],
+        "proficient": [
+          "do {his} part in the group’s care plan",
+          "keep a log of actions taken for the project",
+          "make one choice each week that supports {his} health"
+        ],
+        "extending": [
+          "count the litter collected before and after a cleanup",
+          "ask people affected by the project what helped",
+          "adjust the plan using what the results show"
+        ]
+      }
+    },
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "describe one action that cares for the environment",
-      "developing": "plan an action with a group to care for the community",
-      "proficient": "follow a plan to care for the community or world"
+      "emerging": "describe one action that helps the environment",
+      "developing": "plan a caring action with a small group",
+      "proficient": "follow a plan to care for the school or community",
+      "extending": "measure how much a caring action helped and improve it"
     },
-    "exemplar": "bc.sci9.cc.23"
+    "evidence": "a group action project, such as a cleanup or a care plan",
+    "home": [
+      "invite {him} to plan a family cleanup of a nearby park or street",
+      "talk with {him} about one change at home that saves water or power",
+      "ask {him} to help start a compost bin and track what goes in it"
+    ],
+    "exemplar": "bc.sci9.cc.23",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-data-collection": {
     "phrase": "collect and record accurate data with the right units",
@@ -6346,54 +6737,384 @@
     "exemplar": "bc.chem11.cc.6"
   },
   "sci-data-patterns": {
-    "phrase": "find patterns and trends in data",
+    "phrase": "spot patterns and odd results in data",
+    "area": "reading data",
+    "forms": {
+      "base": [
+        "spot patterns and odd results in data",
+        "describe how one measurement changes with another",
+        "use simple math to compare results"
+      ],
+      "did": [
+        "described a trend in {his} results table",
+        "noted a result that broke the pattern in {his} lab conclusion",
+        "calculated averages to compare trials in {his} lab"
+      ],
+      "at": {
+        "developing": [
+          "is starting to describe one pattern in a table or graph",
+          "is learning to say how one thing changes as another changes",
+          "can find an average with help"
+        ],
+        "proficient": [
+          "describes the pattern between two measurements",
+          "uses calculations to compare results",
+          "spots results that break the pattern"
+        ],
+        "extending": [
+          "explains why a result that breaks the pattern might have happened",
+          "uses a trend to predict a value beyond the data",
+          "compares patterns in {his} data with published data"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "say whether the numbers in a table rise or fall",
+          "circle the biggest and smallest values",
+          "describe the shape of a line on a graph"
+        ],
+        "developing": [
+          "use a sentence like as one rises, the other falls",
+          "connect the change in one column to another",
+          "mark the trend on a graph with an arrow"
+        ],
+        "proficient": [
+          "calculate the average of repeated trials",
+          "circle results far from the rest",
+          "use a percentage to compare two results"
+        ],
+        "extending": [
+          "predict a value outside the measured range",
+          "compare the trend with data from a science website",
+          "suggest a cause for a result that breaks the pattern"
+        ]
+      }
+    },
     "skill_key": "processing",
     "next_steps": {
       "emerging": "describe one pattern in a data table or graph",
-      "developing": "describe the relationship between two variables",
-      "proficient": "use calculations to analyze data and point out results that don't fit"
+      "developing": "describe how one measurement changes as another changes",
+      "proficient": "use averages to compare results and spot odd ones",
+      "extending": "explain why an odd result might have happened"
     },
-    "exemplar": "bc.chem11.cc.10"
+    "evidence": "a lab with a results table and a conclusion",
+    "home": [
+      "invite {him} to track the time of sunset for a week and describe the pattern",
+      "ask {him} to read a monthly power bill and explain the trend",
+      "let {him} record the height of a plant every few days and describe the pattern"
+    ],
+    "exemplar": "bc.chem11.cc.10",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-data-recording": {
-    "phrase": "measure and record data accurately with equipment",
+    "phrase": "measure carefully and record every reading with its unit",
+    "area": "measuring and recording",
+    "forms": {
+      "base": [
+        "measure carefully and record every reading with its unit",
+        "use a ruler, scale or thermometer correctly",
+        "note what {he} [sees|see] next to the numbers"
+      ],
+      "did": [
+        "recorded measurements with units in {his} lab table",
+        "used a thermometer and timer in {his} heating lab",
+        "noted colour and smell changes in {his} lab notes"
+      ],
+      "at": {
+        "developing": [
+          "is starting to record each measurement as it is taken",
+          "is learning to read a scale at eye level",
+          "can use a balance or graduated cylinder with help"
+        ],
+        "proficient": [
+          "measures accurately and records the unit beside each number",
+          "records what {he} [observes|observe] along with each measurement",
+          "uses lab tools, including a probe or app, to collect data"
+        ],
+        "extending": [
+          "explains how sure {he} [is|are] of each reading and why",
+          "repeats measurements and averages them",
+          "chooses the tool that gives the closest reading for a task"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "read the line on a graduated cylinder at eye level",
+          "copy each reading straight into the data table",
+          "check the scale reads zero before weighing anything"
+        ],
+        "developing": [
+          "label each column of the table with its unit",
+          "measure twice and compare the readings",
+          "use the smallest marks on a ruler"
+        ],
+        "proficient": [
+          "add a column for what {he} [sees|see] during the lab",
+          "describe changes in colour, smell or texture",
+          "use a digital probe or phone app to collect readings"
+        ],
+        "extending": [
+          "state the uncertainty of each measurement",
+          "average three readings for each trial",
+          "explain which tool gives the closest reading and why"
+        ]
+      }
+    },
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "record measurements in a table as they are taken",
-      "developing": "measure accurately and record units each time",
-      "proficient": "record both observations and measurements with precision"
+      "emerging": "record each measurement in a table as it is taken",
+      "developing": "include the unit with every number",
+      "proficient": "record both observations and measurements in one table",
+      "extending": "explain how sure each measurement is and why"
     },
-    "exemplar": "bc.sci8.cc.8"
+    "evidence": "a lab data table with measurements, units and observations",
+    "home": [
+      "ask {him} to measure a cup of flour in the kitchen and say how sure the reading is",
+      "invite {him} to record the outdoor temperature at the same time each day for a week",
+      "let {him} weigh fruit on a kitchen scale and note the unit"
+    ],
+    "exemplar": "bc.sci8.cc.8",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-data-representation": {
-    "phrase": "show data patterns in tables, graphs and models",
+    "phrase": "show data in a table or graph",
+    "area": "showing data",
+    "forms": {
+      "base": [
+        "show data in a table or graph",
+        "give a graph a title, axis names and units",
+        "choose a graph that suits the data"
+      ],
+      "did": [
+        "made a labelled graph of the results in {his} lab report",
+        "built a data table with units in {his} lab",
+        "used a key to show groups in {his} diagram"
+      ],
+      "at": {
+        "developing": [
+          "is starting to put data into a labelled table",
+          "is learning to make a graph that shows a pattern",
+          "can choose between a bar graph and a line graph with help"
+        ],
+        "proficient": [
+          "makes tables and graphs that show a pattern in the data",
+          "labels axes, units and titles on each graph",
+          "chooses a graph, key or model that suits the data"
+        ],
+        "extending": [
+          "explains why one type of graph suits the results best",
+          "uses a digital tool to graph data and add a trend line",
+          "shows a relationship with both a model and a graph"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "copy lab results into a table with headings",
+          "add units to each column heading",
+          "give each data table a title"
+        ],
+        "developing": [
+          "plot points on a line graph with a ruler",
+          "label both axes with names and units",
+          "pick a scale that uses most of the grid"
+        ],
+        "proficient": [
+          "use a bar graph for groups and a line graph for change",
+          "add a key when a graph shows two sets of data",
+          "use a spreadsheet to make a graph"
+        ],
+        "extending": [
+          "draw a line of best fit on a scatter graph",
+          "compare two graphs of the same data and pick one",
+          "build a model that shows how parts of a system connect"
+        ]
+      }
+    },
     "skill_key": "communicating",
     "next_steps": {
-      "emerging": "put data into a labelled table",
-      "developing": "make a graph that shows a pattern in data",
-      "proficient": "choose a model, key or graph that suits the data"
+      "emerging": "put data into a table with labelled columns",
+      "developing": "make a graph that shows a pattern in the data",
+      "proficient": "choose a graph, key or model that suits the data",
+      "extending": "explain why one way of showing data suits the results"
     },
-    "exemplar": "bc.sci8.cc.13"
+    "evidence": "a lab report with a data table and a graph",
+    "home": [
+      "invite {him} to graph the afternoon temperature each day for a week",
+      "ask {him} to make a table of how much water a plant drinks each day",
+      "let {him} chart how many birds visit a feeder over a few mornings"
+    ],
+    "exemplar": "bc.sci8.cc.13",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-drawing-conclusions": {
-    "phrase": "draw conclusions that fit the evidence",
+    "phrase": "write a conclusion that matches the results",
+    "area": "drawing conclusions",
+    "forms": {
+      "base": [
+        "write a conclusion that matches the results",
+        "use a science idea to explain what happened",
+        "say what the data show about the question"
+      ],
+      "did": [
+        "wrote a conclusion that matched the data in {his} lab report",
+        "used a science idea to explain {his} results",
+        "answered the lab question in {his} conclusion"
+      ],
+      "at": {
+        "developing": [
+          "is starting to state what the results of a lab show",
+          "is learning to make a conclusion match the data",
+          "can answer the lab question from the results with help"
+        ],
+        "proficient": [
+          "writes a conclusion that matches the evidence",
+          "uses a science idea to explain why the results happened",
+          "answers the lab question using numbers from the data"
+        ],
+        "extending": [
+          "explains what more evidence would make a conclusion more certain",
+          "links the result to a science idea from another unit",
+          "explains where a conclusion holds and where it may not"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "answer the lab question in one sentence",
+          "describe the main result in {his} own words",
+          "start a conclusion with the results show"
+        ],
+        "developing": [
+          "quote a number from the data in the conclusion",
+          "check that each claim fits the data",
+          "remove any claim the data do not support"
+        ],
+        "proficient": [
+          "connect the result to a law or theory from class",
+          "explain the cause behind a pattern in the results",
+          "name the science concept that explains the outcome"
+        ],
+        "extending": [
+          "suggest another test that would add evidence",
+          "describe when the conclusion might not hold",
+          "weigh another explanation for the same results"
+        ]
+      }
+    },
     "skill_key": "processing",
     "next_steps": {
-      "emerging": "state what the results of an investigation show",
-      "developing": "draw a conclusion that matches the evidence",
-      "proficient": "use science concepts to explain why a conclusion fits"
+      "emerging": "state what the results of a lab show",
+      "developing": "make each conclusion match the data",
+      "proficient": "use a science idea to explain why a result happened",
+      "extending": "explain what more evidence would make a conclusion more certain"
     },
-    "exemplar": "bc.sci9.cc.12"
+    "evidence": "the conclusion of a lab report",
+    "home": [
+      "ask {him} what a home test, like which towel dries fastest, showed and why",
+      "invite {him} to explain what {he} [concludes|conclude] after watching ice melt in a warm room and a cold one",
+      "let {him} test two ways to keep a drink cold and say what the results show"
+    ],
+    "exemplar": "bc.sci9.cc.12",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-evidence": {
-    "phrase": "use evidence to support science ideas",
+    "phrase": "use data and observations to support a science idea",
+    "area": "using evidence",
+    "forms": {
+      "base": [
+        "use data and observations to support a science idea",
+        "sort evidence into numbers and descriptions",
+        "explain why a claim needs evidence"
+      ],
+      "did": [
+        "supported {his} claim with data in {his} lab conclusion",
+        "sorted evidence into measured and observed lists in {his} notes",
+        "used numbers from {his} table to defend a science idea"
+      ],
+      "at": {
+        "developing": [
+          "is starting to give one piece of evidence for an idea",
+          "is learning to sort evidence into measured and observed",
+          "can match a claim to its evidence with help"
+        ],
+        "proficient": [
+          "supports a science idea with both numbers and observations",
+          "explains why evidence matters before reaching a conclusion",
+          "chooses evidence that directly supports a claim"
+        ],
+        "extending": [
+          "judges how much weight a piece of evidence carries and explains why",
+          "explains when one observation is not enough to support a claim",
+          "combines several kinds of evidence into one argument"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "circle the numbers and underline the descriptions in a set of results",
+          "list what {he} measured and what {he} saw",
+          "match a fact from the lab to a claim"
+        ],
+        "developing": [
+          "add a number from the data to each claim",
+          "use a quote from a source to support an idea",
+          "pair each statement with something {he} observed"
+        ],
+        "proficient": [
+          "show how the evidence leads to the conclusion",
+          "describe what a claim without data would lack",
+          "choose the data that answer the question"
+        ],
+        "extending": [
+          "rank evidence by how trustworthy it is",
+          "explain why a single trial cannot settle a question",
+          "combine data from two labs into one argument"
+        ]
+      }
+    },
     "skill_key": "processing",
     "next_steps": {
       "emerging": "sort evidence into measured and observed types",
-      "developing": "use evidence to support a science idea",
-      "proficient": "explain why evidence matters in reaching a science conclusion"
+      "developing": "give two pieces of evidence for each claim",
+      "proficient": "explain why a conclusion needs evidence",
+      "extending": "judge how much weight a piece of evidence carries"
     },
-    "exemplar": "bc.sci8.cc.19"
+    "evidence": "a lab conclusion or claim supported with data",
+    "home": [
+      "ask {him} what evidence would show that a houseplant needs more water",
+      "invite {him} to give evidence for which window in the house gets the most sun",
+      "talk with {him} about a claim in an ad and what evidence it gives"
+    ],
+    "exemplar": "bc.sci8.cc.19",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-finding-solutions": {
     "phrase": "use inquiry to help solve local or global problems",
@@ -6416,74 +7137,536 @@
     "exemplar": "bc.chem11.cc.11"
   },
   "sci-hypotheses": {
-    "phrase": "suggest more than one hypothesis and possible outcome",
+    "phrase": "suggest two or more possible explanations to test",
+    "area": "writing hypotheses",
+    "forms": {
+      "base": [
+        "suggest two or more possible explanations to test",
+        "write a hypothesis as an if-then sentence",
+        "name more than one result a test could give"
+      ],
+      "did": [
+        "wrote two hypotheses in {his} lab plan",
+        "used if-then sentences in {his} hypothesis section",
+        "listed more than one possible result before {his} experiment"
+      ],
+      "at": {
+        "developing": [
+          "is starting to write a hypothesis as an if-then sentence",
+          "is learning to offer a second explanation besides {his} first",
+          "can suggest two possible outcomes with help"
+        ],
+        "proficient": [
+          "writes two hypotheses and says what result each one expects",
+          "uses if-then sentences that name what changes and what is measured",
+          "gives a science reason for each possible explanation"
+        ],
+        "extending": [
+          "explains which result would show each hypothesis is wrong",
+          "weighs several explanations and says which one a test could disprove",
+          "links each hypothesis to a science idea from the unit"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "finish an if-then sentence about what {he} [expects|expect]",
+          "guess an answer to a lab question and say why",
+          "start a hypothesis with if and end it with then"
+        ],
+        "developing": [
+          "list two different outcomes before starting a test",
+          "offer another explanation besides {his} first idea",
+          "think of a second way the experiment could go"
+        ],
+        "proficient": [
+          "connect each hypothesis to an idea from class",
+          "say what each hypothesis expects the data to show",
+          "use a science fact to support every if-then statement"
+        ],
+        "extending": [
+          "decide which test would separate two hypotheses",
+          "plan a check that could disprove {his} favourite explanation",
+          "rank several explanations by how easy they are to test"
+        ]
+      }
+    },
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "make one hypothesis for a science question",
-      "developing": "form more than one hypothesis for a question",
-      "proficient": "explain the reasoning behind each hypothesis and outcome"
+      "emerging": "write one if-then hypothesis for a lab question",
+      "developing": "add a second explanation beside the first hypothesis",
+      "proficient": "give the science reason behind each hypothesis",
+      "extending": "describe a result that would prove a hypothesis wrong"
     },
-    "exemplar": "bc.sci9.cc.3"
+    "evidence": "the hypothesis section of a lab or inquiry plan",
+    "home": [
+      "ask {him} to give two possible reasons why bread goes stale and how to test them",
+      "invite {him} to suggest two explanations for why a houseplant is drooping",
+      "talk with {him} about two ideas for why ice melts faster on one plate than another"
+    ],
+    "exemplar": "bc.sci9.cc.3",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-idea-generation": {
     "phrase": "suggest new ideas when solving a problem",
+    "area": "new ideas",
+    "forms": {
+      "base": [
+        "suggest new ideas when solving a problem",
+        "improve an idea after testing it",
+        "offer more than one way to solve a design challenge"
+      ],
+      "did": [
+        "suggested new ideas in {his} design challenge",
+        "improved {his} design after the first test",
+        "sketched several solutions in {his} design notebook"
+      ],
+      "at": {
+        "developing": [
+          "is starting to share one idea to help solve a problem",
+          "is learning to change an idea after a test",
+          "can suggest a second solution with help"
+        ],
+        "proficient": [
+          "suggests new ideas and improves them after testing",
+          "offers several ways to solve a problem",
+          "changes a design using what a test shows"
+        ],
+        "extending": [
+          "compares several ideas and explains which one works best",
+          "combines two ideas into a new solution",
+          "tries an unusual approach and explains why it might work"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "draw a quick sketch of one possible solution",
+          "list every idea before judging any of them",
+          "suggest a material to use in a design"
+        ],
+        "developing": [
+          "offer another way to solve the same problem",
+          "write three ideas before building anything",
+          "ask how a design could be made simpler"
+        ],
+        "proficient": [
+          "improve one part of a design after each test",
+          "record what to change after a trial",
+          "refine {his} idea using feedback from a partner"
+        ],
+        "extending": [
+          "rank ideas by cost, time and how they perform",
+          "combine the useful parts of two designs",
+          "explain why one solution suits the problem more"
+        ]
+      }
+    },
     "skill_key": "applying",
     "next_steps": {
       "emerging": "share one idea to help solve a problem",
-      "developing": "suggest a new idea when solving a problem",
-      "proficient": "refine an idea to improve a solution"
+      "developing": "sketch two different solutions before choosing one",
+      "proficient": "change a design using what a test shows",
+      "extending": "compare several ideas and explain which one works best"
     },
-    "exemplar": "bc.sci8.cc.25"
+    "evidence": "a design challenge with a plan, tests and changes",
+    "home": [
+      "invite {him} to design a new way to store shoes by the door",
+      "ask {him} for three ideas to keep a drink cold on a hot day",
+      "let {him} build a paper bridge at home and change it after testing"
+    ],
+    "exemplar": "bc.sci8.cc.25",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-implications": {
-    "phrase": "explain how findings affect people and the environment",
+    "phrase": "explain how results could affect people and nature",
+    "area": "effects of science",
+    "forms": {
+      "base": [
+        "explain how results could affect people and nature",
+        "describe what a finding could mean for the environment",
+        "ask what is right and fair about using a discovery"
+      ],
+      "did": [
+        "explained in {his} lab report what the results mean for people",
+        "described how a finding could affect a local creek",
+        "raised an ethical question about a discovery in {his} report"
+      ],
+      "at": {
+        "developing": [
+          "is starting to describe how a finding could affect the environment",
+          "is learning to explain what results mean for people",
+          "can name an ethical question a finding raises with help"
+        ],
+        "proficient": [
+          "explains how a finding could affect people and the environment",
+          "asks the ethical questions a set of results raises",
+          "connects lab results to a choice people make in daily life"
+        ],
+        "extending": [
+          "weighs the benefits and harms of a finding for different groups",
+          "explains who gains and who loses from a new technology",
+          "suggests a rule or choice based on the results"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "name one living thing a result could harm or help",
+          "say how a finding might change a local place",
+          "list what a discovery could mean for water or air"
+        ],
+        "developing": [
+          "describe a daily habit that a finding could change",
+          "connect {his} results to a news story",
+          "explain what a result means for families"
+        ],
+        "proficient": [
+          "decide whether a use of the results is fair",
+          "list who is affected by a finding",
+          "raise a question about the right use of a discovery"
+        ],
+        "extending": [
+          "argue both sides of using a new technology",
+          "compare the costs and gains of a finding for two communities",
+          "propose a rule based on the results"
+        ]
+      }
+    },
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "describe how a finding could affect the environment",
-      "developing": "explain how findings could affect society",
-      "proficient": "identify ethical questions raised by a set of findings"
+      "emerging": "describe how a finding could affect plants or animals",
+      "developing": "explain how results could change a choice people make",
+      "proficient": "ask an ethical question raised by a set of results",
+      "extending": "weigh the benefits and harms of a finding for different groups"
     },
-    "exemplar": "bc.sci8.cc.21"
+    "evidence": "a lab conclusion or report that discusses what the results mean",
+    "home": [
+      "talk with {him} about how plastic packaging at home affects the environment",
+      "ask {him} what a news story about a new medicine could mean for families",
+      "invite {him} to explain who benefits and who pays when a nearby forest is cleared"
+    ],
+    "exemplar": "bc.sci8.cc.21",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-informed-skepticism": {
-    "phrase": "check claims in sources against scientific evidence",
+    "phrase": "ask for evidence before believing a claim",
+    "area": "checking claims",
+    "forms": {
+      "base": [
+        "ask for evidence before believing a claim",
+        "check a claim against what science shows",
+        "test a claim with a simple experiment"
+      ],
+      "did": [
+        "checked a product claim against science facts in {his} claim-check task",
+        "asked for evidence in {his} review of an online claim",
+        "planned a lab to test a claim in {his} project"
+      ],
+      "at": {
+        "developing": [
+          "is starting to ask for evidence before accepting a claim",
+          "is learning to check a claim using what {he} [knows|know] from class",
+          "can plan a test of a claim with help"
+        ],
+        "proficient": [
+          "checks claims in sources against science knowledge",
+          "uses results from {his} own lab to judge a claim",
+          "plans a simple test of a claim"
+        ],
+        "extending": [
+          "explains what the results of a test mean for the claim",
+          "judges how much support a claim has across several sources",
+          "explains why a claim cannot be tested as stated"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "ask what proof an ad offers",
+          "pause before sharing a surprising science post",
+          "question a claim that sounds hard to believe"
+        ],
+        "developing": [
+          "compare a claim with facts from the textbook",
+          "check whether a claim names its study",
+          "use a science idea to decide if a claim makes sense"
+        ],
+        "proficient": [
+          "design a fair test of an advertised claim",
+          "use lab results to decide whether a claim holds",
+          "list what data would support or reject a claim"
+        ],
+        "extending": [
+          "explain whether a test settles a claim or not",
+          "describe what a claim would need to be testable",
+          "weigh several sources before deciding on a claim"
+        ]
+      }
+    },
     "skill_key": "evaluating",
     "next_steps": {
       "emerging": "ask for evidence before accepting a science claim",
-      "developing": "evaluate a claim in a source using science knowledge",
-      "proficient": "plan a simple investigation to test a claim"
+      "developing": "check a claim in a source using class knowledge",
+      "proficient": "plan a simple test of a claim",
+      "extending": "explain what the results of a test mean for the claim"
     },
-    "exemplar": "bc.chem11.cc.20"
+    "evidence": "a claim-check task or a lab that tests a claim",
+    "home": [
+      "ask {him} what evidence a cleaning product label gives for its claims",
+      "talk with {him} about a health claim seen online and how to test it",
+      "invite {him} to test a kitchen claim, like whether salt makes water boil sooner"
+    ],
+    "exemplar": "bc.chem11.cc.20",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-inquiry-questions": {
-    "phrase": "pick a question science can answer",
+    "phrase": "ask a question an experiment can answer",
+    "area": "asking testable questions",
+    "forms": {
+      "base": [
+        "ask a question an experiment can answer",
+        "describe a problem science could help solve",
+        "choose a question {he} can test in class"
+      ],
+      "did": [
+        "wrote the testable question for {his} lab",
+        "described a problem {he} wanted to solve in {his} inquiry project",
+        "chose a question to test in {his} plant experiment"
+      ],
+      "at": {
+        "developing": [
+          "is starting to see which questions a test can answer",
+          "is learning to word a question so an experiment can answer it",
+          "can describe a problem science might solve with help"
+        ],
+        "proficient": [
+          "asks a question that a fair test can answer",
+          "words a lab question so the result can be measured",
+          "describes a real problem and writes a question to test about it"
+        ],
+        "extending": [
+          "explains why some questions cannot be answered by an experiment",
+          "narrows a broad question into one a lab can test",
+          "weighs several questions and explains which one a lab can settle"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "describe something in daily life that science might fix",
+          "list two problems around the school a test could help with",
+          "share a question {he} [has|have] about how something works"
+        ],
+        "developing": [
+          "start a lab question with what happens to",
+          "change a yes-or-no question into one with a number for an answer",
+          "make sure {his} question names what {he} will measure"
+        ],
+        "proficient": [
+          "pick a question that a fair test can answer",
+          "word a question so the result is a number",
+          "check that {his} question names one thing to change and one to record"
+        ],
+        "extending": [
+          "sort questions into ones science can test and ones it cannot",
+          "explain how a question about values differs from one a lab can test",
+          "break a big question into two smaller ones an experiment can answer"
+        ]
+      }
+    },
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "describe a problem science could help solve",
-      "developing": "write a clear question to answer by investigation",
-      "proficient": "choose a question that a fair test can answer"
+      "emerging": "name a problem at school that science could help solve",
+      "developing": "rewrite a question so a test can answer it",
+      "proficient": "choose a question with something to measure in the answer",
+      "extending": "explain why some questions cannot be settled by a test"
     },
-    "exemplar": "bc.sci8.cc.3"
+    "evidence": "the question and purpose of a lab or inquiry project",
+    "home": [
+      "ask {him} to think of a question about the kitchen that a simple test could answer",
+      "invite {him} to choose a problem in the house, like a slow drain, and say what science could test",
+      "talk with {him} about which of {his} questions about the garden could be tested"
+    ],
+    "exemplar": "bc.sci8.cc.3",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-investigation-plans": {
-    "phrase": "plan an investigation that collects reliable data",
+    "phrase": "plan the steps and materials for an experiment",
+    "area": "planning investigations",
+    "forms": {
+      "base": [
+        "plan the steps and materials for an experiment",
+        "choose a lab or outdoor method that suits the question",
+        "plan to collect both numbers and observations"
+      ],
+      "did": [
+        "wrote the method and materials list for {his} lab",
+        "planned a field study with {his} group",
+        "made a data table before {his} experiment began"
+      ],
+      "at": {
+        "developing": [
+          "is starting to list the steps of a lab in order",
+          "is learning to choose a method that matches the question",
+          "can plan an experiment with help from a template"
+        ],
+        "proficient": [
+          "plans steps someone else could follow and repeat",
+          "chooses a lab or field method that suits the question",
+          "plans to record both measurements and observations"
+        ],
+        "extending": [
+          "plans repeat trials so the results are reliable",
+          "compares two methods and explains why {he} [picks|pick] one",
+          "plans field work and a lab test that answer the same question"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "read each step of a method before starting",
+          "gather the materials on the list before a lab",
+          "tick off each step as {he} [completes|complete] it"
+        ],
+        "developing": [
+          "write steps clear enough for another student to follow",
+          "number the steps of {his} method",
+          "pick a method that matches {his} question"
+        ],
+        "proficient": [
+          "include both counts and descriptions in {his} plan",
+          "make a blank data table before collecting anything",
+          "decide how many times to repeat each test"
+        ],
+        "extending": [
+          "compare a lab method with a field method for one question",
+          "explain what repeat trials add to the results",
+          "plan how to handle a result that does not match"
+        ]
+      }
+    },
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "follow a planned method to collect data",
-      "developing": "choose a lab or field method that suits the question",
-      "proficient": "plan methods that collect both measured and observed data reliably"
+      "emerging": "follow a written method step by step",
+      "developing": "list materials and numbered steps before a lab",
+      "proficient": "plan three trials for each test",
+      "extending": "explain how repeated trials make results more reliable"
     },
-    "exemplar": "bc.sci9.cc.4"
+    "evidence": "a written method with steps, materials and a data table",
+    "home": [
+      "ask {him} to plan a test of which paper towel holds the most water",
+      "invite {him} to list the steps for growing a bean in a jar",
+      "talk with {him} about how to test which spot in the yard gets the most sun"
+    ],
+    "exemplar": "bc.sci9.cc.4",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-local-environment": {
-    "phrase": "explore and explain the local environment",
+    "phrase": "explore a park, creek or schoolyard first-hand",
+    "area": "the local environment",
+    "forms": {
+      "base": [
+        "explore a park, creek or schoolyard first-hand",
+        "explain what {he} [notices|notice] in the local environment",
+        "use what local people know about a nearby place"
+      ],
+      "did": [
+        "recorded what {he} saw outdoors during {his} field study",
+        "explained a change {he} noticed at the school creek",
+        "used a neighbour’s or Elder’s knowledge in {his} field notes"
+      ],
+      "at": {
+        "developing": [
+          "is starting to describe what {he} [sees|see] in a nearby park or creek",
+          "is learning to explain one thing {he} [notices|notice] outdoors",
+          "can connect a local observation to a science idea with help"
+        ],
+        "proficient": [
+          "explains what {he} [observes|observe] in the local environment using science ideas",
+          "explores an outdoor place first-hand and records what is there",
+          "uses local knowledge to make sense of what {he} [finds|find] outdoors"
+        ],
+        "extending": [
+          "studies one local place over time and explains what changes",
+          "links a change in a nearby creek to its cause",
+          "compares two local places and explains why they differ"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "sketch the plants and animals in one small area",
+          "list what lives under a log or rock",
+          "note the sounds and smells of a nearby park"
+        ],
+        "developing": [
+          "give a reason for something {he} saw outside",
+          "ask a local expert about a plant {he} noticed",
+          "tell how the weather affects a spot near school"
+        ],
+        "proficient": [
+          "link a pattern outdoors to a lesson from class",
+          "use a field guide to name what {he} [finds|find]",
+          "explain how water, soil and light shape a local place"
+        ],
+        "extending": [
+          "visit the same spot each month and record changes",
+          "compare a shaded and a sunny area near school",
+          "trace a change in a local place to its cause"
+        ]
+      }
+    },
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "describe what is noticed outdoors in the local area",
-      "developing": "explain an observation from the local environment",
-      "proficient": "connect observations of the local environment to science ideas"
+      "emerging": "describe what is noticed on a walk around the school",
+      "developing": "explain one observation from the local environment",
+      "proficient": "connect an outdoor observation to a science idea",
+      "extending": "study one local place over time and explain what changes"
     },
-    "exemplar": "bc.sci8.cc.11"
+    "evidence": "a field study with observations recorded outdoors",
+    "home": [
+      "ask {him} what plants and insects {he} [notices|notice] on a walk in your neighbourhood",
+      "invite {him} to explain why puddles on your street dry at different speeds",
+      "talk with {him} about how a nearby park changes from fall to winter"
+    ],
+    "exemplar": "bc.sci8.cc.11",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-method-evaluation": {
     "phrase": "judge a method and find possible sources of error",
@@ -6501,19 +7684,85 @@
     "next_steps": {
       "emerging": "name one part of a method that could be improved",
       "developing": "describe a specific change that would improve a method",
-      "proficient": "explain how each change would improve the quality of the data"
+      "proficient": "explain how each change would improve the data"
     },
     "exemplar": "bc.chem11.cc.15"
   },
   "sci-method-reflection": {
-    "phrase": "reflect on how well an investigation was done",
+    "phrase": "think about what worked in a lab method",
+    "area": "judging methods",
+    "forms": {
+      "base": [
+        "think about what worked in a lab method",
+        "check whether a test was fair",
+        "judge how much to trust the data"
+      ],
+      "did": [
+        "evaluated the method in {his} lab conclusion",
+        "judged whether {his} experiment was a fair test",
+        "explained in {his} report how much the data could be trusted"
+      ],
+      "at": {
+        "developing": [
+          "is starting to describe the steps of a lab in order",
+          "is learning to check whether a test was fair",
+          "can name a step that did not work with help"
+        ],
+        "proficient": [
+          "explains which steps of a method worked and which did not",
+          "checks whether conditions stayed the same through a test",
+          "judges how much the data can be trusted and why"
+        ],
+        "extending": [
+          "explains how a change in method would make the data more trustworthy",
+          "weighs the limits of the method when stating a conclusion",
+          "suggests a new procedure that answers the question more directly"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "list what {he} did first, next and last in a lab",
+          "retell the method in {his} own words",
+          "note one step that was hard to do"
+        ],
+        "developing": [
+          "ask whether each trial used the same amounts",
+          "mark any step that changed partway",
+          "compare the plan with what really happened"
+        ],
+        "proficient": [
+          "explain what made the data less trustworthy",
+          "name the step that most affected the results",
+          "describe how the equipment limited the data"
+        ],
+        "extending": [
+          "propose a new step that removes a weakness",
+          "explain how more trials would change the results",
+          "redesign one part of the method"
+        ]
+      }
+    },
     "skill_key": "evaluating",
     "next_steps": {
       "emerging": "describe the steps of an investigation in order",
-      "developing": "check whether the variables were controlled",
-      "proficient": "judge the quality of the data and what affected it"
+      "developing": "check whether the conditions stayed the same in a test",
+      "proficient": "judge how much to trust the data and why",
+      "extending": "explain how a change in method would give more trustworthy data"
     },
-    "exemplar": "bc.sci8.cc.16"
+    "evidence": "a lab conclusion that evaluates the method",
+    "home": [
+      "ask {him} what went right and wrong when cooking a meal at home",
+      "talk with {him} about how to make a home test of paper towels fairer",
+      "invite {him} to explain how sure {he} [is|are] of a result from a backyard experiment"
+    ],
+    "exemplar": "bc.sci8.cc.16",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-method-risks": {
     "phrase": "assess the risks and ethics of a planned method",
@@ -6536,44 +7785,308 @@
     "exemplar": "bc.sci9.cc.16"
   },
   "sci-observation": {
-    "phrase": "observe the natural world and ask questions about it",
+    "phrase": "notice details in nature and ask questions about them",
+    "area": "observing nature",
+    "forms": {
+      "base": [
+        "notice details in nature and ask questions about them",
+        "describe what {he} [sees|see] in a plant, rock or sky",
+        "wonder why things outdoors happen the way they do"
+      ],
+      "did": [
+        "described what {he} saw on {his} schoolyard walk",
+        "asked {his} own questions in {his} field notebook",
+        "sketched and labelled a plant during an outdoor lesson"
+      ],
+      "at": {
+        "developing": [
+          "is starting to describe the colour, size and shape of what {he} [sees|see]",
+          "is learning to turn something {he} [notices|notice] outdoors into a question",
+          "can ask a question about a plant or rock with help"
+        ],
+        "proficient": [
+          "describes what {he} [sees|see] outdoors and asks why it happens",
+          "notices small changes in a plant or the sky and records them",
+          "asks questions an experiment could answer about what {he} [watches|watch]"
+        ],
+        "extending": [
+          "asks about hidden causes, such as what happens inside a seed",
+          "links what {he} [observes|observe] to a science idea from class",
+          "notices a pattern over several visits and asks what drives it"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "list what {he} [sees|see], hears and smells during an observation",
+          "sketch a leaf or rock and label two features",
+          "note the colour, size and shape of one living thing"
+        ],
+        "developing": [
+          "write a testable question from something {he} noticed",
+          "ask how a change, like more light, might affect a plant",
+          "pick one detail from {his} notes and ask what causes it"
+        ],
+        "proficient": [
+          "wonder about the hidden reasons behind what {he} [sees|see]",
+          "ask how something {he} [observes|observe] connects to a class idea",
+          "compare two spots outdoors and ask why they differ"
+        ],
+        "extending": [
+          "choose one question from {his} notebook and design an experiment",
+          "visit the same spot over a month and track one change",
+          "check {his} question with a small trial at school"
+        ]
+      }
+    },
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "describe what is noticed during an observation",
-      "developing": "turn an observation into a question to investigate",
-      "proficient": "ask questions that go beyond what can be seen"
+      "emerging": "describe three things noticed on a short walk outside",
+      "developing": "change one observation into a question to test",
+      "proficient": "ask about a cause that an observation cannot show",
+      "extending": "plan a small test for a question from field notes"
     },
-    "exemplar": "bc.chem11.cc.2"
+    "evidence": "an observation log or field notes with sketches and questions",
+    "home": [
+      "ask {him} to watch birds at a feeder or in a park and say what {he} [wonders|wonder]",
+      "invite {him} to describe a houseplant and ask one question about why it grows that way",
+      "talk with {him} about how the moon changes shape over a week and what question it raises"
+    ],
+    "exemplar": "bc.chem11.cc.2",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-place-perspectives": {
-    "phrase": "share and reflect on different views of a place",
+    "phrase": "share how different people see a place",
+    "area": "views of place",
+    "forms": {
+      "base": [
+        "share how different people see a place",
+        "describe a personal experience of a place",
+        "think about what a place means to others"
+      ],
+      "did": [
+        "described {his} own experience of a local place in {his} reflection",
+        "shared views from family and community in {his} project",
+        "reflected on what a place means to different people in {his} writing"
+      ],
+      "at": {
+        "developing": [
+          "is starting to describe a personal experience of a place",
+          "is learning to share more than one point of view about a place",
+          "can explain what a place means to someone else with help"
+        ],
+        "proficient": [
+          "shares different points of view about a place",
+          "reflects on how different worldviews shape what a place means",
+          "explains what a local place means to {him} and to others"
+        ],
+        "extending": [
+          "connects views of a place to choices about caring for it",
+          "explains how history shapes what a place means to a community",
+          "compares how a scientist and a knowledge keeper might describe one place"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "write about a place that matters to {him}",
+          "describe what {he} [sees|see] and feels at a favourite spot",
+          "share a memory of a park, beach or forest"
+        ],
+        "developing": [
+          "ask a family member what a local place means to them",
+          "describe how a farmer and a hiker might see the same field",
+          "list who uses a place and why"
+        ],
+        "proficient": [
+          "explain how culture shapes what people value in a place",
+          "compare what a place means to two communities",
+          "describe how the history of a place affects how people feel about it"
+        ],
+        "extending": [
+          "suggest a way to protect a place that honours several views",
+          "explain how different views lead to different land choices",
+          "plan a project that brings several voices into caring for a place"
+        ]
+      }
+    },
     "skill_key": null,
     "next_steps": {
-      "emerging": "describe a personal experience of a place",
-      "developing": "share different points of view about a place",
-      "proficient": "reflect on how different worldviews shape the meaning of a place"
+      "emerging": "describe a personal experience of a local place",
+      "developing": "share two points of view about a place",
+      "proficient": "reflect on how worldviews shape the meaning of a place",
+      "extending": "connect views of a place to choices about caring for it"
     },
-    "exemplar": "bc.sci9.cc.30"
+    "evidence": "a reflection or project about a local place",
+    "home": [
+      "talk with {him} about a place that matters to your family and why",
+      "ask {him} how an older relative sees a nearby beach or park",
+      "invite {him} to compare what a local river means to people who fish and people who swim there"
+    ],
+    "exemplar": "bc.sci9.cc.30",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-predictions": {
-    "phrase": "make a prediction and explain the reason for it",
+    "phrase": "say what a lab should show and why",
+    "area": "making predictions",
+    "forms": {
+      "base": [
+        "say what a lab should show and why",
+        "make a prediction before a lab begins",
+        "give a reason for each guess about a result"
+      ],
+      "did": [
+        "made a prediction at the start of {his} lab",
+        "explained the reason behind the prediction in {his} lab report",
+        "compared {his} prediction with the results in {his} conclusion"
+      ],
+      "at": {
+        "developing": [
+          "is starting to make a prediction before a lab",
+          "is learning to give a reason for each prediction",
+          "can explain why {he} [expects|expect] a result with help"
+        ],
+        "proficient": [
+          "makes a prediction and gives a science reason for it",
+          "explains why {his} guess makes sense using what {he} [knows|know]",
+          "checks a prediction against the results at the end of a lab"
+        ],
+        "extending": [
+          "explains the gap between a prediction and the results",
+          "uses a science idea to predict a result in a new setting",
+          "predicts how big a change will be and in which direction"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "guess what will happen before mixing or heating anything",
+          "say what {he} [thinks|think] the result will be",
+          "record a prediction at the top of the lab sheet"
+        ],
+        "developing": [
+          "tell why {he} [expects|expect] a certain result",
+          "connect each guess to something {he} [has|have] seen",
+          "finish each prediction with a reason"
+        ],
+        "proficient": [
+          "link a prediction to a science fact",
+          "explain how a class idea supports {his} guess",
+          "name the science rule behind each prediction"
+        ],
+        "extending": [
+          "compare {his} prediction and data, then explain the gap",
+          "predict how large a change will be",
+          "use the results to shape the next prediction"
+        ]
+      }
+    },
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "make a prediction before an investigation starts",
-      "developing": "give a reason for each prediction",
-      "proficient": "explain why a prediction makes sense, using science ideas"
+      "emerging": "write a prediction before each lab starts",
+      "developing": "add a because sentence to every prediction",
+      "proficient": "use an idea from class to explain a prediction",
+      "extending": "explain any difference between the prediction and the results"
     },
-    "exemplar": "bc.sci8.cc.5"
+    "evidence": "the prediction and conclusion of a lab",
+    "home": [
+      "ask {him} to predict how long an ice cube will take to melt on the counter and why",
+      "invite {him} to guess which of two cups of water will cool sooner and explain the guess",
+      "let {him} predict whether a plant by the window will lean toward the light"
+    ],
+    "exemplar": "bc.sci8.cc.5",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-project-design": {
-    "phrase": "design a group project with local or global uses",
+    "phrase": "plan a science project with a group",
+    "area": "group project design",
+    "forms": {
+      "base": [
+        "plan a science project with a group",
+        "share ideas and add to a group plan",
+        "explain how a project could help our community"
+      ],
+      "did": [
+        "shared ideas while {his} group planned a design challenge",
+        "added to the group plan for {his} team project",
+        "explained how {his} group design could help the community"
+      ],
+      "at": {
+        "developing": [
+          "is starting to share an idea during group planning",
+          "is learning to add to a teammate’s idea",
+          "can explain the purpose of a project with help"
+        ],
+        "proficient": [
+          "shares ideas and adds to others’ ideas as a group plans",
+          "helps a team agree on one design",
+          "explains how the project could help people here or around the world"
+        ],
+        "extending": [
+          "tests the group design and suggests changes from the results",
+          "helps the team weigh two plans and pick one",
+          "connects the project to a real need in the community"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "offer a suggestion at the start of group planning",
+          "write one idea on the group planning sheet",
+          "ask a teammate a question about the plan"
+        ],
+        "developing": [
+          "help the group combine two ideas into one plan",
+          "respond to a teammate’s idea with a related one",
+          "ask how a teammate’s idea could grow"
+        ],
+        "proficient": [
+          "name a local need the project meets",
+          "describe how the design could work in another country",
+          "write a sentence on the plan about who benefits"
+        ],
+        "extending": [
+          "run a trial of the design and record what fails",
+          "lead the group in revising the plan after testing",
+          "compare the design with a real product that solves the same problem"
+        ]
+      }
+    },
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "share an idea while a group plans a project",
-      "developing": "build on others' ideas to design a project together",
-      "proficient": "explain how a project applies to the community or the world"
+      "emerging": "share one idea while a group plans a project",
+      "developing": "add a detail to a teammate’s idea during planning",
+      "proficient": "explain who in the community a project could help",
+      "extending": "test a group design and suggest changes from the results"
     },
-    "exemplar": "bc.earth11.cc.25"
+    "evidence": "a group project plan or design challenge",
+    "home": [
+      "talk with {him} about a problem in the neighbourhood a school group could help solve",
+      "invite {him} to plan a family project, like a compost bin, step by step",
+      "ask {him} how {his} group project could help a park or street nearby"
+    ],
+    "exemplar": "bc.earth11.cc.25",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-risk-assessment": {
     "phrase": "assess risks to personal safety and to others",
@@ -6596,14 +8109,80 @@
     "exemplar": "bc.sci9.cc.27"
   },
   "sci-safety-ethics": {
-    "phrase": "follow safety and ethical guidelines in investigations",
+    "phrase": "check the safety steps before each lab",
+    "area": "lab safety",
+    "forms": {
+      "base": [
+        "check the safety steps before each lab",
+        "wear goggles and handle lab tools safely",
+        "explain the rules for treating living things with care"
+      ],
+      "did": [
+        "followed the safety steps during {his} heating lab",
+        "wrote the safety section of {his} investigation plan",
+        "explained the rules for handling animals in {his} project"
+      ],
+      "at": {
+        "developing": [
+          "is starting to name the safety rules for a lab",
+          "is learning to read the safety checklist before each lab",
+          "can explain why a safety rule matters with help"
+        ],
+        "proficient": [
+          "checks the safety steps before each lab and follows them",
+          "wears goggles and handles chemicals and glass safely",
+          "explains the ethical rules for a study with living things"
+        ],
+        "extending": [
+          "writes the safety and ethics section of {his} own lab plan",
+          "names the risks in a new method and plans for each one",
+          "explains why consent matters when a study involves people"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "name where the eyewash station and fire blanket are",
+          "repeat the safety rules of the lab to a partner",
+          "put on goggles before touching any equipment"
+        ],
+        "developing": [
+          "tick each safety step on the checklist before starting",
+          "tie back hair and clear the bench before a lab",
+          "store bags under the desk before a lab begins"
+        ],
+        "proficient": [
+          "describe how to treat living things gently in a study",
+          "explain why a survey needs consent",
+          "describe how to throw away chemicals safely"
+        ],
+        "extending": [
+          "list the hazards in a new method and how to handle each",
+          "plan the safety steps for a field trip study",
+          "explain the ethics of using animals in research"
+        ]
+      }
+    },
     "skill_key": null,
     "next_steps": {
-      "emerging": "name the safety rules for an investigation",
-      "developing": "follow each safety rule during an investigation",
-      "proficient": "explain the ethical guidelines that apply to an investigation"
+      "emerging": "read the safety steps on the lab sheet before starting",
+      "developing": "use the safety checklist at the start of each lab",
+      "proficient": "explain the ethical rules that apply to an investigation",
+      "extending": "write the safety and ethics section of an investigation plan"
     },
-    "exemplar": "bc.sci8.cc.10"
+    "evidence": "lab work and the safety section of an investigation plan",
+    "home": [
+      "ask {him} to read the warning label on a cleaning product and explain it",
+      "invite {him} to list the safety steps for using the stove",
+      "talk with {him} about why some cleaners must never be mixed"
+    ],
+    "exemplar": "bc.sci8.cc.10",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-science-careers": {
     "phrase": "connect science work in class to science careers",
@@ -6626,21 +8205,87 @@
     "exemplar": "bc.chem11.cc.30"
   },
   "sci-sharing-findings": {
-    "phrase": "share findings clearly, using science words and visuals",
+    "phrase": "share results using science words and a chart",
+    "area": "sharing results",
+    "forms": {
+      "base": [
+        "share results using science words and a chart",
+        "explain findings so a listener can follow",
+        "present results on a poster or slide"
+      ],
+      "did": [
+        "explained {his} results with science words in {his} lab report",
+        "made a poster to share {his} findings",
+        "used slides and a chart in {his} presentation"
+      ],
+      "at": {
+        "developing": [
+          "is starting to describe findings with a few science words",
+          "is learning to add a chart or diagram to a report",
+          "can present results to a small group with help"
+        ],
+        "proficient": [
+          "explains findings with science words and a chart",
+          "chooses words and visuals that suit the audience",
+          "uses a digital tool to share results"
+        ],
+        "extending": [
+          "presents the same findings for two different audiences",
+          "explains a complex result in plain words for younger students",
+          "designs a visual that makes a pattern easy to see"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "use the unit vocabulary list when writing results",
+          "define one science term in a report",
+          "write a sentence about each result"
+        ],
+        "developing": [
+          "include a labelled diagram in a report",
+          "add a graph to a poster",
+          "use a photo of the lab equipment with a caption"
+        ],
+        "proficient": [
+          "plan a talk for a grade 5 class",
+          "pick a digital tool that suits the message",
+          "keep each slide to a few words and a picture"
+        ],
+        "extending": [
+          "write the findings as a news article and as a lab report",
+          "explain the results to a family member in plain words",
+          "make an infographic that shows the main pattern"
+        ]
+      }
+    },
     "skill_key": "communicating",
     "next_steps": {
-      "emerging": "describe findings using a few science words",
-      "developing": "use a visual, such as a chart, to share findings",
-      "proficient": "choose words, visuals and tools that suit the audience"
+      "emerging": "describe findings using three science words",
+      "developing": "add a chart or diagram to share findings",
+      "proficient": "choose words and visuals that suit the audience",
+      "extending": "present the same findings for two different audiences"
     },
-    "exemplar": "bc.sci8.cc.26"
+    "evidence": "a lab report, poster or presentation of results",
+    "home": [
+      "ask {him} to explain a recent lab result at dinner using science words from class",
+      "invite {him} to make a simple chart of something the family tracks, like the weather",
+      "let {him} show you a science poster or slide and explain it"
+    ],
+    "exemplar": "bc.sci8.cc.26",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-solution-strategies": {
     "phrase": "use more than one strategy to solve a problem",
     "skill_key": "applying",
     "next_steps": {
       "emerging": "use one strategy to solve a real-life problem",
-      "developing": "choose a strategy that suits each kind of problem",
+      "developing": "choose a strategy that suits each type of problem",
       "proficient": "use more than one strategy to solve a conceptual problem"
     },
     "exemplar": "bc.chem11.cc.27"
@@ -6649,31 +8294,163 @@
     "phrase": "judge whether science information in a source is valid",
     "skill_key": "evaluating",
     "next_steps": {
-      "emerging": "name where a piece of science information came from",
+      "emerging": "name the source of a piece of science information",
       "developing": "analyze whether information in a source is valid",
       "proficient": "compare the approaches people used to solve the same problem"
     },
     "exemplar": "bc.chem11.cc.22"
   },
   "sci-sources-of-error": {
-    "phrase": "find sources of error and suggest improvements",
+    "phrase": "name what could have affected the results",
+    "area": "errors and improvements",
+    "forms": {
+      "base": [
+        "name what could have affected the results",
+        "suggest how to improve a lab method",
+        "spot mistakes in measuring or timing"
+      ],
+      "did": [
+        "listed sources of error in {his} lab conclusion",
+        "suggested a change to the method in {his} lab report",
+        "explained how timing mistakes affected {his} results"
+      ],
+      "at": {
+        "developing": [
+          "is starting to name one thing that could have affected the results",
+          "is learning to suggest a change to a lab method",
+          "can spot a measuring mistake with help"
+        ],
+        "proficient": [
+          "names possible sources of error and a fix for each",
+          "suggests a specific change to the method for each error",
+          "explains how a mistake in measuring changed the data"
+        ],
+        "extending": [
+          "explains how much each source of error changed the results",
+          "separates errors in the method from errors in measuring",
+          "plans a new trial that tests whether a fix works"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "describe a moment in the lab when something went wrong",
+          "ask whether the tools gave true readings",
+          "note anything that changed during the test"
+        ],
+        "developing": [
+          "check timing, measuring and equipment for mistakes",
+          "describe how a spill or leak affected the data",
+          "separate human mistakes from equipment limits"
+        ],
+        "proficient": [
+          "match each error with a fix",
+          "propose a more exact tool for one step",
+          "add a step to the method that prevents an error"
+        ],
+        "extending": [
+          "estimate the size of each error",
+          "rank errors by how much they matter",
+          "test whether a suggested fix changes the results"
+        ]
+      }
+    },
     "skill_key": "evaluating",
     "next_steps": {
       "emerging": "name one thing that could have affected the results",
-      "developing": "identify possible sources of error in an investigation",
-      "proficient": "suggest a specific change to the method for each error"
+      "developing": "list possible sources of error in a lab",
+      "proficient": "suggest a specific change for each source of error",
+      "extending": "explain how much each error changed the results"
     },
-    "exemplar": "bc.sci8.cc.17"
+    "evidence": "a lab conclusion with sources of error and improvements",
+    "home": [
+      "ask {him} what might make a kitchen scale give a wrong reading",
+      "talk with {him} about why two thermometers in the house show different temperatures",
+      "invite {him} to time a kettle boiling twice and explain any difference"
+    ],
+    "exemplar": "bc.sci8.cc.17",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-sustained-inquiry": {
-    "phrase": "explore a science topic of interest over time",
+    "phrase": "keep following one science question for a few weeks",
+    "area": "following a science interest",
+    "forms": {
+      "base": [
+        "keep following one science question for a few weeks",
+        "stay curious about a science topic over time",
+        "ask questions about a science topic that interests {him}"
+      ],
+      "did": [
+        "kept a question log during {his} inquiry project",
+        "followed {his} own science question across several lessons",
+        "explained in {his} project report why {his} topic matters to our community"
+      ],
+      "at": {
+        "developing": [
+          "is starting to ask {his} own questions about a science topic",
+          "is learning to stay with one science question for a few weeks",
+          "can add to a project notebook with help"
+        ],
+        "proficient": [
+          "keeps asking new questions as {he} [learns|learn] more about a topic",
+          "stays with a science question for weeks and adds to {his} notes",
+          "explains why {his} topic matters to people nearby and far away"
+        ],
+        "extending": [
+          "follows a question for weeks and lets each answer lead to a new one",
+          "connects {his} topic to a problem in our town and one overseas",
+          "suggests what people could do about the problem {he} [studies|study]"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "choose a science topic and list what {he} [wonders|wonder] about it",
+          "start a page of questions about an animal, a plant or the weather",
+          "ask {his} own question about something in science that interests {him}"
+        ],
+        "developing": [
+          "add one new note to {his} topic page each lesson",
+          "stay with the same question until {he} [has|have] three answers",
+          "keep a running list of what {he} [learns|learn] about one topic"
+        ],
+        "proficient": [
+          "show who in our community the problem touches",
+          "connect {his} question to a local news story",
+          "describe how the issue looks in B.C. and in another country"
+        ],
+        "extending": [
+          "propose a small action a family or school could take",
+          "draft a short plan for how our town could respond",
+          "share {his} findings with someone who can make a change"
+        ]
+      }
+    },
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "ask questions about a science topic of interest",
-      "developing": "keep exploring one science topic over several weeks",
-      "proficient": "explain why a science problem matters locally or globally"
+      "emerging": "write three questions about a science topic of interest",
+      "developing": "return to one science question each week for a month",
+      "proficient": "explain why the topic matters to families nearby",
+      "extending": "suggest one thing people could do about the problem studied"
     },
-    "exemplar": "bc.chem11.cc.1"
+    "evidence": "an inquiry project with a question log, notes and a final report",
+    "home": [
+      "ask {him} to pick one thing in the yard to watch for a few weeks and say what changes",
+      "talk with {him} about a science story on the news and what {he} [wants|want] to know next",
+      "invite {him} to keep a question list on the fridge about something {he} [sees|see] outdoors"
+    ],
+    "exemplar": "bc.chem11.cc.1",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-theoretical-models": {
     "phrase": "build a model that explains how something works",
@@ -6686,44 +8463,308 @@
     "exemplar": "bc.sci9.cc.28"
   },
   "sci-transfer-of-learning": {
-    "phrase": "apply science learning to new situations",
+    "phrase": "apply a science idea to something new",
+    "area": "using what is learned",
+    "forms": {
+      "base": [
+        "apply a science idea to something new",
+        "connect a new problem to something learned before",
+        "use a class idea to explain an everyday event"
+      ],
+      "did": [
+        "applied a science idea to a new question on {his} unit test",
+        "connected a new problem to an earlier lab in {his} answer",
+        "explained an everyday event with an idea from {his} unit"
+      ],
+      "at": {
+        "developing": [
+          "is starting to connect a new situation to something learned before",
+          "is learning to use a class idea outside the lab",
+          "can apply a science idea to a new problem with help"
+        ],
+        "proficient": [
+          "applies a science idea to a situation not seen in class",
+          "uses several ideas together to explain something unfamiliar",
+          "connects an everyday event to the matching science idea"
+        ],
+        "extending": [
+          "explains where a science idea fits a new situation and where it does not",
+          "applies ideas from two units to solve one problem",
+          "creates a new example of a science idea"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "say which lesson a new question reminds {him} of",
+          "match a new problem to a lab {he} [has|have] done",
+          "name the unit a test question belongs to"
+        ],
+        "developing": [
+          "explain a kitchen event with a class idea",
+          "use a lesson to predict what happens in a new case",
+          "describe how a lab idea shows in daily life"
+        ],
+        "proficient": [
+          "combine ideas from two lessons to answer one question",
+          "solve a question set in a place never studied",
+          "test a class idea on a real-world example"
+        ],
+        "extending": [
+          "find the limits of a science idea in a new case",
+          "invent an example that shows a science idea",
+          "explain why an idea does not work in some cases"
+        ]
+      }
+    },
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "connect a new situation to something learned before",
-      "developing": "apply a science idea to a new situation",
-      "proficient": "apply several ideas together to explain an unfamiliar situation"
+      "emerging": "connect a new problem to an earlier lesson",
+      "developing": "apply one science idea to an everyday event",
+      "proficient": "use two ideas together to explain an unfamiliar case",
+      "extending": "explain where an idea applies to a new case and where it fails"
     },
-    "exemplar": "bc.sci8.cc.24"
+    "evidence": "test questions or tasks that ask for ideas in a new setting",
+    "home": [
+      "ask {him} to explain why a pot handle gets hot using what {he} learned in science",
+      "invite {him} to use a science idea to explain how the brakes on a bike work",
+      "talk with {him} about a science idea {he} [sees|see] at the grocery store"
+    ],
+    "exemplar": "bc.sci8.cc.24",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-unit-conversions": {
-    "phrase": "use the right units and convert between them",
+    "phrase": "pick the right unit and check each conversion twice",
+    "area": "units and conversions",
+    "forms": {
+      "base": [
+        "pick the right unit and check each conversion twice",
+        "change grams to kilograms or centimetres to metres",
+        "write the unit beside every measurement"
+      ],
+      "did": [
+        "labelled each measurement with a unit in {his} data table",
+        "converted centimetres to metres in {his} lab calculations",
+        "chose metric units for the measurements in {his} lab"
+      ],
+      "at": {
+        "developing": [
+          "is starting to label each number with a unit",
+          "is learning to move between millimetres, centimetres and metres",
+          "can convert from one metric unit to another with help"
+        ],
+        "proficient": [
+          "picks the right metric unit for each measurement",
+          "converts between units and checks the answer makes sense",
+          "keeps units with the numbers through each step of a calculation"
+        ],
+        "extending": [
+          "solves problems that need more than one conversion",
+          "uses unit labels to catch mistakes in a calculation",
+          "explains why scientists use the same metric units everywhere"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "write cm, g or mL after every number",
+          "match each tool to the unit it measures",
+          "say which unit suits the length of a desk"
+        ],
+        "developing": [
+          "move the decimal to change millimetres to centimetres",
+          "use a metric chart to change units",
+          "change millilitres to litres in a recipe problem"
+        ],
+        "proficient": [
+          "estimate the answer before converting",
+          "show the units at each step of a calculation",
+          "choose a unit that keeps numbers easy to read"
+        ],
+        "extending": [
+          "convert a speed from metres per second to kilometres per hour",
+          "use unit labels to catch errors in a calculation",
+          "explain why science uses metric units around the world"
+        ]
+      }
+    },
     "skill_key": "processing",
     "next_steps": {
-      "emerging": "label each measurement with the right unit",
-      "developing": "convert a measurement from one metric unit to another",
-      "proficient": "choose units that suit each measurement and check conversions"
+      "emerging": "label each measurement with its unit",
+      "developing": "convert between grams and kilograms",
+      "proficient": "check that each converted answer makes sense",
+      "extending": "solve problems that need two or more conversions"
     },
-    "exemplar": "bc.sci8.cc.9"
+    "evidence": "a lab data table and calculations with units",
+    "home": [
+      "ask {him} to measure a room in metres and then in centimetres",
+      "invite {him} to change the millilitres in a recipe into litres",
+      "let {him} read the grams on a cereal box and say how many kilograms that is"
+    ],
+    "exemplar": "bc.sci8.cc.9",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-variable-control": {
-    "phrase": "run a fair test by controlling variables",
+    "phrase": "change one thing at a time in an experiment",
+    "area": "fair tests",
+    "forms": {
+      "base": [
+        "change one thing at a time in an experiment",
+        "hold everything else the same during a test",
+        "name the thing changed and the thing measured"
+      ],
+      "did": [
+        "kept the water and soil the same in {his} plant test",
+        "labelled what {he} changed and measured in {his} lab",
+        "ran a fair test with one change in {his} experiment"
+      ],
+      "at": {
+        "developing": [
+          "is starting to name the one thing {he} [changes|change] in a test",
+          "is learning to keep the other conditions the same",
+          "can tell what is changed and what is measured with help"
+        ],
+        "proficient": [
+          "changes one thing and keeps everything else the same",
+          "names what {he} [changes|change], what {he} [measures|measure] and what stays fixed",
+          "runs a fair test from start to finish"
+        ],
+        "extending": [
+          "explains how a condition that was not held fixed could change results",
+          "spots hidden factors, like room temperature, and controls them",
+          "designs a fair test with a control group to compare against"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "say what {he} will change before a lab begins",
+          "circle the thing being changed in a lab plan",
+          "pick one thing to change in a simple test"
+        ],
+        "developing": [
+          "name what {he} will measure in each trial",
+          "check that the amounts, times and tools match in each trial",
+          "make a list of things to hold the same"
+        ],
+        "proficient": [
+          "add a control group to compare with",
+          "test one factor while the rest stay fixed",
+          "record the conditions kept the same in {his} lab report"
+        ],
+        "extending": [
+          "describe a hidden factor that could spoil a fair test",
+          "explain what would happen if two things changed at once",
+          "design a fair test for {his} own question"
+        ]
+      }
+    },
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "name the variable being changed in a test",
-      "developing": "identify the independent and dependent variables in a test",
-      "proficient": "keep every other variable the same while changing one"
+      "emerging": "name the one thing changed on purpose in a test",
+      "developing": "list what stays the same before each test",
+      "proficient": "keep every other condition fixed while changing one",
+      "extending": "explain how an uncontrolled factor could change the results"
     },
-    "exemplar": "bc.sci8.cc.7"
+    "evidence": "an experiment with labelled conditions and a fair-test method",
+    "home": [
+      "ask {him} how to test which paper airplane flies farthest by changing one thing at a time",
+      "invite {him} to grow two plants where the amount of light is the one difference",
+      "talk with {him} about keeping a recipe the same except for one ingredient"
+    ],
+    "exemplar": "bc.sci8.cc.7",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "sci-ways-of-knowing": {
-    "phrase": "use First Peoples and local knowledge in science",
+    "phrase": "use First Peoples and local knowledge in science work",
+    "area": "other ways of knowing",
+    "forms": {
+      "base": [
+        "use First Peoples and local knowledge in science work",
+        "gather what local knowledge keepers share about a place",
+        "use two ways of knowing to answer a question"
+      ],
+      "did": [
+        "used knowledge shared by a local Indigenous guest in {his} project",
+        "gathered local knowledge about plants for {his} research",
+        "answered a science question with knowledge from {his} community"
+      ],
+      "at": {
+        "developing": [
+          "is starting to gather information from local knowledge",
+          "is learning to include First Peoples knowledge in a science question",
+          "can link a story or teaching to a science idea with help"
+        ],
+        "proficient": [
+          "applies First Peoples knowledge to a science question",
+          "uses local knowledge alongside lab results to answer a question",
+          "credits the people and communities who shared their knowledge"
+        ],
+        "extending": [
+          "explains how different ways of knowing add to one answer",
+          "shows where Indigenous knowledge and lab science agree and differ",
+          "asks knowledge keepers questions that shape a project"
+        ]
+      },
+      "next": {
+        "emerging": [
+          "listen to a guest speaker and note one teaching about the land",
+          "ask a family member what they know about a local plant",
+          "read a First Peoples story about an animal and note what it teaches"
+        ],
+        "developing": [
+          "connect a teaching about seasons to a lesson on weather",
+          "include knowledge from a guest in {his} research notes",
+          "explain how a local practice relates to a science idea"
+        ],
+        "proficient": [
+          "credit the source of each piece of local knowledge",
+          "use a lab result and a teaching to answer the same question",
+          "describe how First Peoples have studied a place over generations"
+        ],
+        "extending": [
+          "compare what a teaching and an experiment each show",
+          "explain why long-term local observation counts as evidence",
+          "plan a project that respects protocols for sharing knowledge"
+        ]
+      }
+    },
     "skill_key": "applying",
     "next_steps": {
       "emerging": "gather information from local knowledge in the community",
       "developing": "apply First Peoples knowledge to a science question",
-      "proficient": "use other ways of knowing to answer a science question"
+      "proficient": "answer one question with both a teaching and lab results",
+      "extending": "explain how different ways of knowing add to one science answer"
     },
-    "exemplar": "bc.sci8.cc.12"
+    "evidence": "a project that uses knowledge shared by local Indigenous guests or community sources",
+    "home": [
+      "ask {him} what {he} [has|have] learned about the First Peoples whose land your town is on",
+      "talk with {him} about what a grandparent or neighbour knows about local plants or weather",
+      "invite {him} to share a teaching about the land that {he} heard at school"
+    ],
+    "exemplar": "bc.sci8.cc.12",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false,
+      "review": "Colin's five-card read (decision 5)"
+    }
   },
   "ss-cau": {
     "phrase": "explain the causes and results of an event",
@@ -6759,7 +8800,7 @@
     "phrase": "explain how history shaped an economic theory",
     "skill_key": "cause",
     "next_steps": {
-      "emerging": "name the time and place an economic theory came from",
+      "emerging": "name the time and place an economic theory began",
       "developing": "explain how conditions at the time shaped an economic theory",
       "proficient": "compare how different conditions shaped two economic theories"
     },
@@ -6776,12 +8817,12 @@
     "exemplar": "bc.ss8.cc.5"
   },
   "ss-cml-media-literacy": {
-    "phrase": "judge how accurately media show a religion",
+    "phrase": "judge how fairly and correctly media show a religion",
     "skill_key": "evidence",
     "next_steps": {
       "emerging": "describe how a film or show portrays a religion",
-      "developing": "use evidence to show where a portrayal is accurate or not",
-      "proficient": "compare how accurately two portrayals show a religion, using evidence"
+      "developing": "use evidence to show where a portrayal is correct or not",
+      "proficient": "compare how fairly and correctly two portrayals show a religion, using evidence"
     },
     "exemplar": "bc.rel12.cc.7"
   },
@@ -6827,13 +8868,56 @@
   },
   "ss-evi": {
     "phrase": "judge how reliable a source and its evidence are",
+    "area": "judging sources",
+    "forms": {
+      "base": [
+        "judge how reliable a source and its evidence are",
+        "decide how far a source can be trusted",
+        "check whether the evidence behind a claim is enough"
+      ],
+      "did": [
+        "weighed how far each source could be trusted",
+        "checked whether the evidence behind a claim was enough",
+        "compared accounts that disagree and judged their evidence"
+      ],
+      "at": {
+        "developing": [
+          "is starting to ask who made a source and why before using it",
+          "can judge a source's reliability in some of {his} work",
+          "is learning to check the evidence behind a claim"
+        ],
+        "proficient": [
+          "checks who made a source, why, and whether its evidence holds before using it",
+          "weighs whether the evidence behind a claim is enough",
+          "judges how far a source can be trusted and says why"
+        ],
+        "extending": [
+          "weighs sources that disagree and explains which one the evidence supports",
+          "names the points where accounts disagree and judges each one's evidence",
+          "explains why the evidence supports one account over another"
+        ]
+      }
+    },
     "skill_key": "evidence",
     "next_steps": {
       "emerging": "say who made a source and why it was made",
       "developing": "check whether each claim has enough evidence behind it",
-      "proficient": "weigh accounts that disagree and explain which is better supported"
+      "proficient": "weigh accounts that disagree and explain which has more support",
+      "extending": "explain what evidence would change {his} judgement of a source"
     },
-    "exemplar": "bc.ss10.cc.3"
+    "evidence": "a source analysis or a document-based question",
+    "home": [
+      "ask {him} who is making a claim you hear together and how you could check it",
+      "ask {him} which of two news stories on the same event {he} [trusts|trust] more, and why",
+      "invite {him} to show you how {he} [checks|check] whether a website can be trusted"
+    ],
+    "exemplar": "bc.ss10.cc.3",
+    "prov": {
+      "method": "v2",
+      "written": "2026-11-04",
+      "from": "the I Can set and the Ministry wording, written as a teacher would describe the work",
+      "approved_by_owner": false
+    }
   },
   "ss-evn-geographic-evidence": {
     "phrase": "judge how well geographic evidence supports an interpretation",
@@ -6891,7 +8975,7 @@
     "next_steps": {
       "emerging": "ask one clear question and find two sources about it",
       "developing": "analyze what each source says before writing an answer",
-      "proficient": "ask questions that lead to a deeper, more complete answer"
+      "proficient": "ask questions that lead to a more complete answer"
     },
     "exemplar": "bc.ss10.cc.1"
   },
@@ -6966,10 +9050,10 @@
     "exemplar": "bc.ss10.cc.2"
   },
   "ss-sig-significance-claims": {
-    "phrase": "point out what a source's creator saw as important",
+    "phrase": "identify what a source's creator saw as important",
     "skill_key": "significance",
     "next_steps": {
-      "emerging": "point to one detail that shows what a creator valued",
+      "emerging": "name one detail that shows what a creator valued",
       "developing": "explain what each source's creator chose to include",
       "proficient": "explain why a creator might have seen an event as significant"
     },

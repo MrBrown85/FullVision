@@ -6,8 +6,8 @@
    own passes the same lint as the shared bank's.
 
    It finds any phrasal verb, idiom, person-praise word, comparison with
-   classmates, sentence over 20 words, or evaluative word outside the
-   controlled vocabulary. Teacher-typed class lines (support, closing,
+   classmates, banned phrase (BANNED_PHRASES), sentence over 24 words, or
+   evaluative word outside the controlled vocabulary. Teacher-typed class lines (support, closing,
    late work) are used as typed and are not linted.
 
    To add wording: if the lint flags a word that is right for the bank, add
@@ -21,7 +21,8 @@ window.CommentLint = (function () {
   // right after it or after a short object ("talk it through").
   var PHRASAL = [
     ['act', 'on'],
-    ['ask', 'for'],
+    // "ask for support", "ask for evidence": the Ministry's own term
+    // (Nov 4 2026 review), so ask for is not banned.
     ['come', 'from'],
     ['come', 'with'],
     ['keep', 'going'],
@@ -247,6 +248,50 @@ window.CommentLint = (function () {
     'standout',
   ];
 
+  // Phrases that count or name the questionnaire's lists, rate the student,
+  // pin the comment to a term, or wrap a skill in a form's words (Colin,
+  // Nov 4 2026: comments "translated from another language"; the plan v2
+  // lint bans). Matched as whole words, so "biodegradability together" is
+  // not "ability to", and "work on time" is not "work on" (the phrasal
+  // verb list has that rule).
+  var BANNED_PHRASES = [
+    'all six',
+    'every one',
+    'each skill',
+    'across skills',
+    'rated',
+    'is able to',
+    'ability to',
+    'the work marked',
+    'marked highest',
+    'proficiency scale calls',
+    'skill by skill',
+    'marks are close',
+    'this term',
+    'keep going',
+    // A habit is a rating, not a count of days (the coordinator's review,
+    // Nov 4 2026): no frequency the gradebook does not hold. ("Each week"
+    // as a plan is fine: "I will check in each week"; as the opening of a
+    // sentence about the student it is banned below, FREQUENCY_OPENERS.)
+    'day after day',
+    'day to day',
+    'most days',
+    'every lesson',
+    'as a rule',
+    // The Ministry's descriptors, which read as pasted in.
+    'depth and complexity',
+    'consistently or most of the time',
+    'it is clear that',
+    'marks show that',
+    'top marks went to',
+  ];
+  var BANNED_RES = BANNED_PHRASES.map(function (w) {
+    return { name: w, re: new RegExp('\\b' + w.replace(/ /g, '\\s+') + '\\b', 'i') };
+  }).concat([
+    { name: 'each class or week', re: /^(?:each|every) (?:week|day|class)\b/i },
+    { name: 'through the year', re: /^through the year,/i },
+  ]);
+
   // Words a student reads as shame (the acceptability checklist): one
   // appearing anywhere in a sentence about them.
   var SHAME = ['finally', 'still', 'again', 'only', 'at least', 'unfortunately'];
@@ -260,7 +305,9 @@ window.CommentLint = (function () {
     /\bbest in (the )?class\b/i,
     /\bthan (others|other students|most|the rest|everyone|anyone|classmates|(his|her|their|X) peers|the class)\b/i,
     /\bclassmates?\b/i,
-    /\bpeers?\b/i,
+    // "peers, users or experts" is the Ministry's own term (Nov 4 2026
+    // review): feedback sources, not a comparison.
+    /\bpeers?\b(?!, users\b)/i,
     /\bthe (rest of the|whole) class\b/i,
     /\beveryone else\b/i,
     /\bone of the (best|strongest|top|most)\b/i,
@@ -396,6 +443,10 @@ window.CommentLint = (function () {
     clear: 'a skill to show ("ask a clear question")',
     carefully: 'a skill to show ("record measurements carefully")',
     reliable: 'a skill to show ("find information in a reliable source")',
+    // The Ministry's own term (Nov 4 2026 review): science data and
+    // measurement collected "accurately".
+    accurate: 'the Ministry’s own term: "collect and record accurate data"',
+    accurately: 'the Ministry’s own term: "measure accurately"',
   };
 
   /* ── The check ─────────────────────────────────────────────────────── */
@@ -408,7 +459,12 @@ window.CommentLint = (function () {
   }
   // Compounds whose word is no judgement: "high school" is a place, not a
   // mark ("high" alone is evaluative).
-  var COMPOUNDS = [[/\bhigh school\b/gi, 'highschool']];
+  // "Creative work" and "creative process" are the Ministry's own terms
+  // for an arts piece and its steps (Nov 4 2026 review), not praise.
+  var COMPOUNDS = [
+    [/\bhigh school\b/gi, 'highschool'],
+    [/\bcreative (work|works|process|processes)\b/gi, 'creative$1'],
+  ];
   function words(text) {
     var t = plain(text);
     COMPOUNDS.forEach(function (c) {
@@ -464,11 +520,15 @@ window.CommentLint = (function () {
     SHAME_RES.forEach(function (x) {
       if (x.re.test(p)) out.push('shame word: ' + x.name);
     });
+    BANNED_RES.forEach(function (x) {
+      if (x.re.test(p)) out.push('banned phrase: ' + x.name);
+    });
     ws.forEach(function (w) {
       if (EVALUATIVE.indexOf(w) >= 0 && !CONTROLLED[w]) out.push('evaluative word: ' + w);
     });
     var n = window.CommentRealiser.wordCount(p);
-    if (n > window.CommentRealiser.MAX_WORDS) out.push('over 20 words: ' + n);
+    var cap = window.CommentRealiser.MAX_WORDS;
+    if (n > cap) out.push('over ' + cap + ' words: ' + n);
     return out;
   }
 
@@ -534,6 +594,7 @@ window.CommentLint = (function () {
     PRAISE: PRAISE,
     COMPARISONS: COMPARISONS,
     SHAME: SHAME,
+    BANNED_PHRASES: BANNED_PHRASES,
     EVALUATIVE: EVALUATIVE,
     CONTROLLED: CONTROLLED,
     plain: plain,

@@ -17,7 +17,9 @@
    - Numbers spelled out at the start of a sentence and from one to ten
      inside one; numerals for 11 and up inside a sentence.
    - Lists: "A and B", "A, B and C" (no serial comma).
-   - Length: at most 20 words a sentence, a quoted title counting as one.
+   - Length: at most 24 words a sentence, a quoted title counting as one.
+   - The name again: a sentence that opens on the student three sentences
+     after the name was last said takes the name, not the pronoun.
 
    Teacher text (support lines, the closing sentence, the late-work line,
    and any sentence the teacher kept as written) is used exactly as typed.
@@ -30,7 +32,12 @@
 window.CommentRealiser = (function () {
   'use strict';
 
-  var MAX_WORDS = 20;
+  // 24 words a sentence (plan v2, Nov 4 2026: the 20-word cap was part of
+  // the choppiness); Generate aims for a mean near 15.
+  var MAX_WORDS = 24;
+  // The name again when a sentence opens on the student after this many
+  // sentences of pronouns (plan v2, referring expressions).
+  var RENAME_AFTER = 3;
 
   /* ── Numbers ───────────────────────────────────────────────────────── */
 
@@ -200,7 +207,7 @@ window.CommentRealiser = (function () {
       else {
         var v = get ? get(k) : '';
         if (Array.isArray(v)) out.push.apply(out, v);
-        else out.push({ value: v == null ? '' : String(v), title: !!TITLE_SLOTS[k] });
+        else out.push({ value: v == null ? '' : String(v), title: !!TITLE_SLOTS[k], slot: k });
       }
     }
     if (from < src.length) out.push(src.slice(from));
@@ -222,7 +229,12 @@ window.CommentRealiser = (function () {
 
   /* One sentence's tokens as text. state.named: whether the comment has
      named the student yet; the first mention in the comment takes the name
-     and sets it. */
+     and sets it. state.course: whether the comment has named the course; a
+     comment names it once (the coordinator's review, Nov 4 2026), so a
+     later {course} goes with its "in" or "for" ("So far in Science 8,"
+     → "So far,"), after "his" or "the" alone ("his Science 8 grade" →
+     "his grade"), and at the start of a sentence becomes "His work" or
+     "The course". */
   function render(toks, who, state) {
     who = _who(who);
     state = state || { named: true };
@@ -233,10 +245,38 @@ window.CommentRealiser = (function () {
     var atStart = function () {
       return !/[A-Za-z0-9]/.test(out);
     };
-    (toks || []).forEach(function (tok) {
+    var skipComma = false;
+    (toks || []).forEach(function (tok, i) {
       if (typeof tok === 'string') {
+        if (skipComma) tok = tok.replace(/^,\s*/, '');
+        skipComma = false;
         out += tok;
         return;
+      }
+      skipComma = false;
+      if (tok.slot === 'course' && tok.value) {
+        if (state.course) {
+          var lead = out.match(/(^|\s)(in|In|for|For) $/);
+          if (lead) {
+            out = out.slice(0, out.length - lead[2].length - 1);
+            if (atStart()) skipComma = true;
+            return;
+          }
+          if (/(^|\s)(his|her|their|its|the|\S+’s) $/i.test(out)) return;
+          if (atStart()) {
+            var next = toks[i + 1];
+            if (typeof next === 'string' && /^ work\b/.test(next)) {
+              var useName = !state.named && who.name;
+              out += useName ? possessive(who.name) : cap(String(p.poss || THEY.poss));
+              if (useName) {
+                state.named = true;
+                state.since = -1;
+              }
+            } else out += 'The course';
+            return;
+          }
+        }
+        state.course = true;
       }
       if (tok.verb) {
         out += one ? tok.verb[0] : tok.verb[1];
@@ -247,11 +287,15 @@ window.CommentRealiser = (function () {
         // The name: the first mention in the comment and an explicit
         // {name}; every other mention is a pronoun. The bank writes no
         // reflexive, so no "Ava sees Ava".
-        var useName = !!tok.name || (role !== 'refl' && !state.named);
+        // After RENAME_AFTER sentences without it, a sentence that opens on
+        // the student says the name again (realise() counts state.since).
+        var again = !mentioned && role !== 'refl' && role !== 'obj' && atStart() && (state.since || 0) >= RENAME_AFTER;
+        var useName = !!tok.name || (role !== 'refl' && !state.named) || again;
         var w;
         if (useName && who.name) {
           w = role === 'poss' ? possessive(who.name) : who.name;
           state.named = true;
+          state.since = -1;
           if (role === 'subj') one = true;
         } else {
           w = String(p[role] || THEY[role]);
@@ -281,6 +325,7 @@ window.CommentRealiser = (function () {
   function finish(text) {
     var t = String(text || '')
       .replace(/\s+/g, ' ')
+      .replace(/ ([,.;:])(?=\s|$)/g, '$1')
       .trim();
     t = t.replace(/^([“‘"(]*)([a-z])/, function (m, q, c) {
       return q + c.toUpperCase();
@@ -328,11 +373,15 @@ window.CommentRealiser = (function () {
     xs.forEach(function (x) {
       if (!who && x && x.who) who = x.who;
     });
-    var state = { named: false };
+    var state = { named: false, since: 0 };
     var out = xs.map(function (x) {
       var copy = Object.assign({}, x);
       if (x && x.toks) copy.text = render(x.toks, x.who || who, state);
-      else if (who && _names(copy.text, who.name)) state.named = true;
+      else if (who && _names(copy.text, who.name)) {
+        state.named = true;
+        state.since = -1;
+      }
+      state.since = (state.since || 0) + 1;
       copy.words = wordCount(copy.text);
       return copy;
     });

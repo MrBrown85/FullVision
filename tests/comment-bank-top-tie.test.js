@@ -199,10 +199,20 @@ describe('the strength named (topSkillOf)', () => {
       expect(ctx._strongSkill).toBe('');
       const d = CommentBank.draft(ctx, { seed: i, comments: comments.slice() });
       comments.push({ sid: 'st' + i, text: d.text });
-      const row = d.sentences.find(x => x.step === 'overall');
+      // The pipeline's strength frame (Nov 4 2026) names one skill of the
+      // tie, the one the fewest classmates were given.
+      const row = d.sentences.find(x => x.step === 'overall' || (x.steps || []).includes('overall'));
       expect(row, 'student ' + i).toBeTruthy();
-      expect(byId(row.id).when.topSkill).toBe(ctx._topSkill);
-      keys.push(ctx._topSkill);
+      expect(row.id).toMatch(/^vst\d\d$|^j:.*\bvst\d\d\b/);
+      const said = k => {
+        const w = CommentBank.SKILLS.socials.find(r => r.key === k).skill;
+        return [w, CommentForms.does(w), CommentForms.doing(w)];
+      };
+      const named = ['evidence', 'significance', 'cause'].filter(k =>
+        said(k).some(t => row.text.toLowerCase().indexOf(t) >= 0),
+      );
+      expect(named.length, row.text).toBe(1);
+      keys.push(named[0]);
     }
     // Three skills in the tie: each named once before any twice, in turn.
     expect(new Set(keys.slice(0, 3)).size).toBe(3);
@@ -212,11 +222,12 @@ describe('the strength named (topSkillOf)', () => {
 });
 
 describe('the per-skill frames under a tie', () => {
-  it('splits the 344 frames: 258 that claim a strength (topSkill), 86 that assert the strongest (strongSkill)', () => {
+  it('splits the 319 frames: 258 that claim a strength (topSkill), 61 that assert the strongest (strongSkill)', () => {
+    // 25 of the 86 strongest frames were retired on Nov 4 2026 (a banned phrase).
     // 43 tie-safe frames from lane G, then round three (lane I): 129 for the
     // 43 skills lane H added and 86 more for the original 43, all tie-safe.
     expect(topFrames.length).toBe(258);
-    expect(strongFrames.length).toBe(86);
+    expect(strongFrames.length).toBe(61);
     topFrames.forEach(s => {
       expect(s.needs, s.id).toEqual(['topSkill']);
       expect(s.claims, s.id).toEqual(['strength']);
@@ -248,10 +259,14 @@ describe('the per-skill frames under a tie', () => {
     expect(mine.length).toBeGreaterThan(0);
     expect(pool.sort()).toEqual(mine.sort());
     strongFrames.forEach(s => expect(CommentBank.fits(s, ctx), s.id).toBe(false));
+    // Generate says it in the pipeline's frames; the tie frames stay in
+    // Browse and Other Wording.
     const d = CommentBank.draft(ctx, { seed: 2 });
-    const row = d.sentences.find(x => x.step === 'overall');
-    expect(mine).toContain(row.id);
-    expect(row.text).not.toMatch(/[{}[\]]/);
+    const row = d.sentences.find(x => x.step === 'overall' || (x.steps || []).includes('overall'));
+    if (row) {
+      expect(row.id).toMatch(/^vst\d\d$|^j:.*\bvst\d\d\b/);
+      expect(row.text).not.toMatch(/[{}[\]]|strongest/);
+    }
     expect(d.replaced).toEqual([]);
   });
 
@@ -261,8 +276,8 @@ describe('the per-skill frames under a tie', () => {
     expect(ctx._strongSkill).toBe('evidence');
     expect(ctx._topSkill).toBe('evidence');
     const pool = CommentBank.stepPool('overall', ctx).map(s => s.id);
+    // n616 was retired on Nov 4 2026; the others stay.
     expect(pool).toContain('n617');
-    expect(pool).toContain('n616');
     expect(pool).toContain('n618');
   });
 
@@ -328,7 +343,7 @@ describe('the per-skill frames under a tie', () => {
     expect(RQ.skillTags(tieComps())).toEqual({ d: 'Next step' });
   });
 
-  it('when every frame of the top tier runs past 20 words, the next tier is tried before nothing', () => {
+  it('never drafts a sentence past the cap, whatever the skill’s wording', () => {
     // A newcomer whose strongest skill has a twelve-word wording: both
     // newcomer frames (n442, n443) run past 20 words with it, so the
     // per-skill frames one tier down fill the strengths step.
@@ -342,20 +357,14 @@ describe('the per-skill frames under a tie', () => {
     });
     const ctx = CommentBank.context(f, {});
     expect(ctx._strongSkill).toBe('relationships');
+    // n442 said "this term" and is retired (Nov 4 2026).
     const story = COMMENT_BANK.sentences.filter(s => s.story === 'newcomer' && s.group === 'Overall' && !s.subjects);
-    expect(story.map(s => s.id).sort()).toEqual(['n442', 'n443']);
-    story.forEach(s => {
-      expect(CommentBank.fits(s, ctx), s.id).toBe(true);
-      expect(CommentRealiser.tooLong(CommentBank.fill(s, ctx)), s.id).toBe(true);
-    });
+    expect(story.map(s => s.id).sort()).toEqual(['n443']);
+    story.forEach(s => expect(CommentBank.fits(s, ctx), s.id).toBe(true));
+    // The pipeline's strength frames fit within the cap with the twelve-word
+    // wording; no sentence of the draft runs past it.
     const d = CommentBank.draft(ctx, { seed: 3 });
-    expect(d.angle).toBe('newcomer');
-    const row = d.sentences.find(x => x.step === 'overall');
-    expect(row).toBeTruthy();
-    expect(
-      topFrames.filter(s => s.subjects[0] === 'pe' && s.when.topSkill === 'relationships').map(s => s.id),
-    ).toContain(row.id);
-    expect(CommentRealiser.tooLong(row.text)).toBe(false);
+    d.sentences.forEach(x => expect(CommentRealiser.tooLong(x.text), x.text).toBe(false));
     expect(d.replaced).toEqual([]);
   });
 });

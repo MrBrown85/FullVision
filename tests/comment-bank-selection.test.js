@@ -270,7 +270,8 @@ describe('near-identical comments', () => {
 
   it('counts a sentence shared when any run of four words matches, each sentence once', () => {
     const a = 'Jack is earning a B this term. One. Two. Three. Four.';
-    const b = 'Ava is earning a B, which is very good work.';
+    // (Not a grade frame's wording, which nearIdentical sets aside.)
+    const b = 'Ava is earning a B and reads well in class.';
     expect(
       CommentBank.nearIdentical(
         [
@@ -397,7 +398,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     // but the grade sentence, which every student gets (set aside).
     const twin = Object.assign({}, comments[0], { sid: 'twin' });
     const n = twin.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/).length;
-    expect(twin.text).toMatch(/on the BC proficiency scale this term/);
+    expect(twin.text).toMatch(/(Extending|Proficient|Developing|Emerging) level/);
     const flagged = CommentBank.nearIdentical([comments[0], twin]);
     expect(flagged).toHaveLength(n - 1 >= 5 ? 1 : 0);
     if (n - 1 >= 5) expect(flagged[0].shared).toBe(n - 1);
@@ -414,9 +415,21 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       comments.push({ sid: st.id, text: d.text });
       const op = d.sentences.find(x => x.step === 'home');
       if (!op) return;
-      // The tier: the sentences for the next step's skill, or the general ones.
-      const fit = CommentBank.stepPool('home', ctx);
-      if (seen.indexOf(op.id) >= 0)
+      // The tier: the sentences for the next step's skill, or the general ones;
+      // Generate's own home frames when it drafts with them (Nov 4 2026).
+      const fit = CommentBank.stepPool('home', ctx, undefined, { pipeline: /^v/.test(op.id) });
+      // (A home idea that repeats three words of the draft, in every wrapper,
+      // takes whichever wrapper is left: no frame keeps the rule.)
+      const runs = t => {
+        const w = CommentPipeline.words(t, f.name);
+        return w.slice(0, -2).map((_, i) => w.slice(i, i + 3).join(' '));
+      };
+      const before = d.sentences
+        .filter(x => x !== op)
+        .map(x => x.text)
+        .join(' ');
+      const forced = runs(op.text).some(g => runs(before).indexOf(g) >= 0);
+      if (seen.indexOf(op.id) >= 0 && !forced)
         expect(
           fit.every(s => seen.indexOf(s.id) >= 0),
           st.firstName,

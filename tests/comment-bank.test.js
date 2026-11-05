@@ -81,10 +81,24 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1702 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1702);
+  it('has its 1717 sentences in four parts, each with a unique id: live, or retired with its text', () => {
+    // Nov 4 2026: the pipeline's frames (v: 2) were added, and the sentences
+    // they replaced moved to COMMENT_BANK.retired with their text, so a
+    // saved comment that holds one keeps it. None is lost.
+    const old = COMMENT_BANK.sentences.filter(s => !s.v);
+    // The older sentences live or retired on Nov 4, the four IE meeting
+    // lines rewritten to name a call or email (iem1-iem4), and the eleven Habit
+    // Ratings cells reworded without a frequency the same day (hl121-hl131,
+    // their first wordings retired): 1702 + 11.
+    const nov4 = COMMENT_BANK.retired.filter(s => s.retired === '2026-11-04' && !s.v);
+    expect(old.length + nov4.length).toBe(1717);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1702);
+    const ids = COMMENT_BANK.sentences.map(s => s.id).concat(COMMENT_BANK.retired.map(s => s.id));
+    expect(new Set(ids).size).toBe(ids.length);
+    COMMENT_BANK.retired.forEach(s => {
+      expect(s.text, s.id).toBeTruthy();
+      expect(s.retiredWhy, s.id).toBeTruthy();
+    });
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -115,7 +129,8 @@ describe('the bank', () => {
     expect(examples.map(s => s.id)).toContain('n36');
     examples.forEach(s => {
       expect(s.claims, s.id).toEqual(['bestPiece']);
-      expect(s.needs, s.id).toContain(s.id === 'n36' ? 'bestPiece' : 'assignment');
+      // The pipeline's frames (v: 2) say the title by kind ({pieceTitle}).
+      expect(s.needs, s.id).toContain(s.id === 'n36' ? 'bestPiece' : s.v === 2 ? 'pieceTitle' : 'assignment');
     });
     expect(
       COMMENT_BANK.sentences.some(s =>
@@ -143,8 +158,10 @@ describe('the bank', () => {
         w,
       ).toEqual([]),
     );
+    // Those of the ten per word that neither said "this term" nor made the
+    // scale the subject stay (Nov 4 2026); the rest are retired.
     ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w =>
-      expect(at('standing', w).filter(s => s.group === 'Grade').length, w).toBe(10),
+      expect(at('standing', w).filter(s => s.group === 'Grade').length, w).toBeLessThanOrEqual(10),
     );
   });
 
@@ -254,6 +271,31 @@ describe('the bank', () => {
       selfLow: 'studentWords',
       goal: 'studentWords',
       plan: 'studentWords',
+      // The pipeline's slots (Nov 4 2026).
+      levelMeaning: 'grade',
+      levelUp: 'grade',
+      gradeLevel: 'grade',
+      ieReason: 'grade',
+      strengthAt: 'strength',
+      strengthDoing: 'strength',
+      strengthTop: 'strength',
+      strengthHigh: 'strength',
+      area: 'strength',
+      pieceTitle: 'bestPiece',
+      pieceOwned: 'bestPiece',
+      pieceScored: 'bestPiece',
+      pieceDid: 'bestPiece',
+      pieceTie: 'bestPiece',
+      gradeSaid: 'grade',
+      progressDoing: 'improved',
+      habitDoes: 'habitBehaviour',
+      habitDoes2: 'habitBehaviour',
+      habitInvite: 'habitBehaviour',
+      habitInvite2: 'habitBehaviour',
+      habitWhy: 'habitBehaviour',
+      step: 'nextStep',
+      stepDoing: 'nextStep',
+      homeLine: 'nextStep',
     };
     COMMENT_BANK.sentences.forEach(s => {
       const slots = (s.text.match(/\{(\w+)\}/g) || []).map(x => x.slice(1, -1)).concat(s.needs || []);
@@ -301,16 +343,20 @@ describe('the bank', () => {
         if (k === 'picture') expect(['strong', 'steady', 'challenge', 'early']).toContain(v);
         else if (k === 'standing') expect(['Emerging', 'Developing', 'Proficient', 'Extending']).toContain(v);
         else if (k === 'grade')
-          expect([
-            'letter',
-            'letterClose',
-            'cminus',
-            'cminusClose',
-            'proficiency',
-            'ie',
-            'languageGoals',
-            'iepGoals',
-          ]).toContain(v);
+          []
+            .concat(v)
+            .forEach(x =>
+              expect([
+                'letter',
+                'letterClose',
+                'cminus',
+                'cminusClose',
+                'proficiency',
+                'ie',
+                'languageGoals',
+                'iepGoals',
+              ]).toContain(x),
+            );
         else if (k === 'path') expect(v).toBe('ie');
         else if (k === 'ieProblem') expect(['missing', 'marks', 'noMarks', 'low']).toContain(v);
         else if (k === 'nextSkill') {
@@ -376,9 +422,10 @@ describe('fill', () => {
   });
 
   it('puts a habit phrase in as the context gives it', () => {
-    const hs08 = COMMENT_BANK.sentences.find(s => s.id === 'hs08');
-    expect(CommentBank.fill(hs08, fullContext(P.he))).toBe(
-      'His work habits to build are using feedback and taking part in class.',
+    const vh207 = COMMENT_BANK.sentences.find(s => s.id === 'vh207');
+    const ctx = { ...fullContext(P.he), habitInvite: 'using feedback', habitInvite2: 'joining class discussions' };
+    expect(CommentBank.fill(vh207, ctx)).toBe(
+      'His next habits to build are using feedback and joining class discussions.',
     );
   });
 });
@@ -399,7 +446,8 @@ describe('fill takes values as written', () => {
 
   it('gives nothing for a slot the context does not own', () => {
     const s = { id: 'x', text: '{name} and {constructor}.' };
-    expect(CommentBank.fill(s, fullContext(P.he))).toBe('Noor and .');
+    // (The realiser closes the space before the period.)
+    expect(CommentBank.fill(s, fullContext(P.he))).toBe('Noor and.');
   });
 
   it('fills the pronoun in a habit phrase when the context is built', () => {
@@ -456,8 +504,8 @@ describe('fits', () => {
     const n36 = COMMENT_BANK.sentences.find(s => s.id === 'n36');
     expect(CommentBank.fits(n36, ctx)).toBe(true);
     expect(CommentBank.fits(n36, { ...ctx, bestPiece: '' })).toBe(false);
-    const h60 = COMMENT_BANK.sentences.find(s => s.id === 'h60');
-    expect(CommentBank.fits(h60, { ...ctx, attendance: '' })).toBe(false);
+    const vat05 = COMMENT_BANK.sentences.find(s => s.id === 'vat05');
+    expect(CommentBank.fits(vat05, { ...ctx, absentClasses: '' })).toBe(false);
   });
 
   it('filters by habit level with `when`', () => {
@@ -578,9 +626,9 @@ describe('parts', () => {
   });
 
   it('never matches a sentence that is mostly slots', () => {
-    const hs11 = COMMENT_BANK.sentences.find(s => s.id === 'hs11');
-    expect(CommentBank.pattern(hs11)).toBeNull();
-    expect(CommentBank.usedBy(hs11, ['Anything at all.', 'More.', 'Yes.'])).toBe(0);
+    const vhd01 = COMMENT_BANK.sentences.find(s => s.id === 'vhd01');
+    expect(CommentBank.pattern(vhd01)).toBeNull();
+    expect(CommentBank.usedBy(vhd01, ['Anything at all.', 'More.', 'Yes.'])).toBe(0);
   });
 });
 
@@ -609,20 +657,20 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // The habits part: Completes Work from the record is the one strong
   // habit, so the four Strong Habits frames (hs11, hs13-hs15) fit, and the
   // five Habit Ratings frames for Completes Work at Consistently.
-  it('knows the Demo class is Science from its name, and offers Cece 78 sentences (9, 40, 4, 25)', () => {
+  // The counts since Nov 4 2026: the pipeline's frames fit beside the older
+  // ones that stay in Browse.
+  it('knows the Demo class is Science from its name, and offers Cece 125 sentences (21, 49, 16, 39)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 4, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(78);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 49, 16, 39]);
+    expect(CommentBank.fitCount(ctx)).toBe(125);
   });
 
-  it('offers Jasper 79 (9, 40, 5, 25), by the name he goes by', () => {
+  it('offers Jasper 126 (21, 49, 17, 39), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    // Overall: every competency is Proficient as the report grades it
-    // (2.9 to 3.3), so the even-results frames fit (Nov 3).
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 5, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(79);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 49, 17, 39]);
+    expect(CommentBank.fitCount(ctx)).toBe(126);
     expect(ctx.name).toBe('Jas');
     // Nothing fell from Extending since Report 1's year to date (it fell
     // four times inside Term 2's own trend, which Generate no longer
@@ -704,12 +752,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
-    expect(habits.fit).toBe(4 + 6 + 5);
     // The attendance frames for both counts (plan, Sentence grammar: both
-    // halves said, the exact counts): h60 and the five both-count frames.
+    // halves said, the exact counts): h74, h75 and the pipeline's vat05
+    // (the ones that said "this term" are retired).
     const att = habits.rows.filter(r => r.group === 'Attendance');
-    expect(att).toHaveLength(6);
-    expect(att.map(r => r.text)).toContain('She has missed four classes and been late twice this term.');
+    expect(att).toHaveLength(3);
+    expect(att.map(r => r.text)).toContain('She has missed four classes and been late twice.');
     att.forEach(r => {
       expect(r.text).toMatch(/four classes/);
       expect(r.text).toMatch(/twice/);
@@ -730,32 +778,36 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     ]);
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
     // The Demo class has no closing sentence or support lines set, so the
-    // comment leaves those out (plan PR 8): the grade, the best piece, the
-    // habits, the strengths (Cece's results are even: evenComps), the next
-    // step and the family sentence; six, so not flagged short, never padded.
-    expect(sentences.length).toBe(6);
-    expect(d.sentences.some(x => x.step === 'overall')).toBe(true);
+    // comment leaves those out (plan PR 8): the grade, the facts worth
+    // saying (the pipeline, Nov 4 2026), the next step; five to seven, so
+    // not flagged short, never padded.
+    expect(sentences.length).toBeGreaterThanOrEqual(5);
+    expect(sentences.length).toBeLessThanOrEqual(7);
     expect(d.short).toBe(false);
     expect(d.text).not.toMatch(/[{}[\]]/);
     expect(d.sentences[0].text).toContain('Cece');
     // The course is named wherever the story opens with it.
     if (d.sentences.some(x => x.step === 'opening')) expect(d.text).toMatch(/Science 8/);
-    // Each chosen sentence fits and is in the bank once.
-    expect(new Set(d.ids).size).toBe(d.ids.length);
-    d.ids.forEach(id =>
+    // Each chosen sentence fits and is in the bank once (a joined sentence,
+    // "j:a+b:and", is both its frames).
+    const frames = d.ids.reduce((a, id) => a.concat(/^j:/.test(id) ? id.slice(2).split(':')[0].split('+') : [id]), []);
+    expect(new Set(frames).size).toBe(frames.length);
+    frames.forEach(id =>
       expect(
         CommentBank.fits(
           COMMENT_BANK.sentences.find(s => s.id === id),
           ctx,
         ),
+        id,
       ).toBe(true),
     );
-    // In the draft's order: opening, habits, now, go, how.
-    const order = d.ids.map(id => COMMENT_BANK.sentences.find(s => s.id === id).part);
+    // In the draft's order: now (the grade and what leads), habits, go, how.
+    const order = frames.map(id => COMMENT_BANK.sentences.find(s => s.id === id).part);
     const first = part => order.indexOf(part);
     expect(order[0]).toBe('now');
     expect(first('habits')).toBeLessThan(first('go'));
-    expect(first('go')).toBeLessThan(first('how'));
+    // A home line is for about a third of the class (the pipeline).
+    if (first('how') >= 0) expect(first('go')).toBeLessThan(first('how'));
   });
 
   it('the same seed gives the same draft; a new seed a different one; classmates get different openings', () => {
@@ -763,18 +815,14 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(CommentBank.draft(ctx, { seed: 7 }).text).toBe(CommentBank.draft(ctx, { seed: 7 }).text);
     const texts = new Set([1, 2, 3, 4, 5, 6, 7, 8].map(seed => CommentBank.draft(ctx, { seed }).text));
     expect(texts.size).toBeGreaterThanOrEqual(2);
-    // The grade sentence leads both, in another of its frames once a
-    // classmate has this one (bank expansion, Nov 1); the family sentence,
-    // which has 18 to choose from, differs once a classmate has it.
+    // Once a classmate's comment holds a frame, the same press takes
+    // another: the grade sentence is said in another of its frames.
     const mine = CommentBank.draft(ctx, { seed: 7 });
     const other = CommentBank.draft(ctx, { seed: 7, comments: [mine.text] });
-    expect([mine.sentences[0].step, other.sentences[0].step]).toEqual(['grade', 'grade']);
-    expect(other.sentences[0].text).not.toBe(mine.sentences[0].text);
-    expect(other.sentences[0].text).toContain('Proficient');
-    const at = mine.sentences.findIndex(x => x.step === 'home');
-    expect(at).toBeGreaterThan(0);
-    expect(other.sentences[at].step).toBe(mine.sentences[at].step);
-    expect(other.sentences[at].text).not.toBe(mine.sentences[at].text);
+    const grade = d => d.sentences.find(x => x.step === 'grade');
+    expect(grade(other).id).not.toBe(grade(mine).id);
+    expect(grade(other).text).toContain('Proficient');
+    expect(other.text).not.toBe(mine.text);
   });
 
   it('drafts for every Demo student: four or more sentences, nothing unfilled, nothing quoted twice', () => {
@@ -784,12 +832,17 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       // The Demo class has no closing sentence or support lines (plan PR 8).
       // Titles are quoted (the realiser), so a piece already named is never
       // named again: Liv's revisit sentence would repeat one, and is left out.
-      expect(d.ids.length, st.firstName).toBeGreaterThanOrEqual(4);
+      // Facts said: a sentence that joins two counts as two.
+      // (One fewer when no strength holds: the top skill falling, the four-
+      // audience review's truth rule, Nov 4 2026.)
+      expect(d.ids.length + d.ids.filter(id => /^j:/.test(id)).length, st.firstName).toBeGreaterThanOrEqual(
+        ctx.strengthAt ? 4 : 3,
+      );
       expect(d.text, st.firstName).not.toMatch(/[{}[\]]|  /);
       const quotes = d.text.match(/“[^”]+”/g) || [];
       expect(new Set(quotes).size, st.firstName).toBe(quotes.length);
-      // The habits are said once, in one sentence.
-      const habits = d.ids.filter(id => /^hs/.test(id));
+      // The habit to build is said once, in one sentence.
+      const habits = d.sentences.filter(x => x.step === 'habits');
       expect(habits.length, st.firstName).toBeLessThanOrEqual(1);
     });
   });
@@ -815,7 +868,8 @@ describe('Demo Mode (Science 8, Report 2)', () => {
         expect(v.provenance).toEqual(d.provenance);
       }
     });
-  });
+    // 27 students × 10 presses, each building and scoring candidates: 35 s on CI.
+  }, 120000);
 
   it('names the facts behind a sentence: the work, the competency, the habit', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
@@ -847,8 +901,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       claims: ['improved'],
     };
     expect(CommentBank.provenance(rose, mctx).factKeys).toEqual(['comp:SC']);
-    // Only Completes Work is rated (from the record): the IE strengths name it.
-    expect(CommentBank.provenance(byId('hs11'), ctx).factKeys).toEqual(['habit:completes']);
+    // Only Completes Work is rated (from the record): the habits as
+    // behaviour rest on it.
+    expect(CommentBank.provenance(byId('vsh01'), ctx).factKeys).toEqual(['habit:completes']);
     const steady = {
       id: 'x-steady',
       part: 'now',

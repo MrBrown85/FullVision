@@ -171,17 +171,34 @@ describe('the Next Step frames per skill', () => {
     frames.forEach(s => expect(CommentBank.fits(s, ctx), s.id).toBe(false));
   });
 
-  it('are drawn in turn across a class: a skill’s frames are exhausted before one repeats', () => {
+  it('are drawn in turn across a class: the Next Step frames are exhausted before one repeats', () => {
+    // Generate's next step is a version 2 frame with the skill in {step}
+    // (Nov 4 2026); the per-skill frames stay in Browse and Other Wording.
+    // A frame a classmate's comment holds comes after every one none does.
     const row = CommentBank.SKILLS.ela.find(r => r.key === 'writing');
-    const ids = forSkill('ela', 'writing').map(s => s.id);
+    const first = CommentBank.context(facts('ela', row, { sid: 's0', cid: 'c-turns' }), {});
+    // Drafted in this session (not quiet), so a frame with too few words of
+    // its own for a pattern is still known in a classmate's comment.
+    const ids = COMMENT_BANK.sentences
+      .filter(s => s.v === 2 && s.group === 'Next Step' && CommentBank.fits(s, first))
+      .map(s => s.id);
+    expect(ids.length).toBeGreaterThanOrEqual(8);
     const comments = [];
     const seen = [];
+    const nextOf = d => {
+      const x = d.sentences.find(s => s.step === 'nextStep' || (s.steps || []).indexOf('nextStep') >= 0);
+      const m = x && x.id.match(/(vns\d\d)/);
+      return m ? m[1] : x && x.id;
+    };
     for (let i = 0; i < ids.length; i++) {
       const f = facts('ela', row, { sid: 's' + i, cid: 'c-turns' });
-      const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 3 + i, comments, quiet: true });
-      const next = d.sentences.find(x => x.step === 'nextStep');
-      expect(ids).toContain(next.id);
-      seen.push(next.id);
+      const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 3 + i, comments });
+      expect(ids).toContain(nextOf(d));
+      expect(
+        [row.skill, CommentForms.doing(row.skill)].some(t => d.text.indexOf(t) >= 0),
+        d.text,
+      ).toBe(true);
+      seen.push(nextOf(d));
       comments.push({ sid: f.sid, text: d.text });
     }
     expect(new Set(seen).size).toBe(ids.length);
