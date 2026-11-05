@@ -1026,13 +1026,12 @@ test.describe('the Sentences card', () => {
     const gaps = page.locator('#tq-sentences .qn-gap');
     const n = await rows(page).count();
     const gradeWas = await rows(page).first().locator('.qn-req-text').textContent();
-    // Every drafted part is in: Browse opens on Strengths, the first part
-    // with no row (Cece's strength is said in her best piece sentence, the
-    // sample voice, Nov 4), not on a part already there.
+    // Every drafted part is in: Browse opens on Habits (nothing rated, so no
+    // habits sentence fits), not on a part already there.
     await gaps.last().locator('.qn-gap-add').click();
     await page.locator('#tq-add-menu [data-do="browseAt"]').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
-    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Strengths');
+    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Habits');
     // Use adds, even a second grade sentence (Colin, 2026-11-02: "i should
     // be able to add ones i like, and make the comment longer"): it goes
     // in at the gap and the first Grade row stays as it was.

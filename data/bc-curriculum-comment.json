@@ -6451,7 +6451,7 @@
     "next_steps": {
       "emerging": "ask for evidence before accepting a science claim",
       "developing": "evaluate a claim in a source using science knowledge",
-      "proficient": "plan a simple investigation to test a claim"
+      "proficient": "practise checking a claim against the evidence before accepting it"
     },
     "exemplar": "bc.chem11.cc.20"
   },
@@ -6459,9 +6459,9 @@
     "phrase": "pick a question science can answer",
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "describe a problem science could help solve",
+      "emerging": "practise spotting questions that science can answer",
       "developing": "write a clear question to answer by investigation",
-      "proficient": "choose a question that a fair test can answer"
+      "proficient": "write questions that a fair test can answer"
     },
     "exemplar": "bc.sci8.cc.3"
   },
@@ -6569,7 +6569,7 @@
     "phrase": "design a group project with local or global uses",
     "skill_key": "planning",
     "next_steps": {
-      "emerging": "share an idea while a group plans a project",
+      "emerging": "share ideas when working in a group",
       "developing": "build on others' ideas to design a project together",
       "proficient": "explain how a project applies to the community or the world"
     },
@@ -6609,8 +6609,8 @@
     "phrase": "connect science work in class to science careers",
     "skill_key": "applying",
     "next_steps": {
-      "emerging": "name a science career linked to a class topic",
-      "developing": "connect a class investigation to a science career",
+      "emerging": "notice how the skills used in class are used in science work",
+      "developing": "connect the skills from an investigation to the work people do",
       "proficient": "describe how a science career uses skills from an investigation"
     },
     "exemplar": "bc.sci9.cc.19"
@@ -6669,9 +6669,9 @@
     "phrase": "explore a science topic of interest over time",
     "skill_key": "questioning",
     "next_steps": {
-      "emerging": "ask questions about a science topic of interest",
-      "developing": "keep exploring one science topic over several weeks",
-      "proficient": "explain why a science problem matters locally or globally"
+      "emerging": "ask questions while working and write them down",
+      "developing": "keep asking questions while working, and follow them up",
+      "proficient": "practise explaining how the science learned in class connects to real problems"
     },
     "exemplar": "bc.chem11.cc.1"
   },
@@ -6680,7 +6680,7 @@
     "skill_key": "communicating",
     "next_steps": {
       "emerging": "describe a phenomenon using a simple drawing or model",
-      "developing": "build a physical model of a phenomenon",
+      "developing": "use a model to explain how something works",
       "proficient": "explain a mental model of how a phenomenon works"
     },
     "exemplar": "bc.sci9.cc.28"

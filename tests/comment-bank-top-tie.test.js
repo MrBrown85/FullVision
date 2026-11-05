@@ -143,6 +143,9 @@ describe('the tie at the top (topTieOf)', () => {
     expect(CommentBank.topTieSkills(f).map(x => x.key)).toEqual(['evidence', 'cause']);
     const ctx = CommentBank.context(f, {});
     expect(['evidence', 'cause']).toContain(ctx._topSkill);
+    const s = topFrames.find(x => x.subjects[0] === 'socials' && x.when.topSkill === ctx._topSkill);
+    const text = CommentBank.fill(s, ctx, { first: true });
+    expect(verified(s, text, CommentBank.provenance(s, ctx), f, 'overall').replaced).toEqual([]);
   });
 
   it('yields to the strongest gate, and ignores a competency with no level', () => {
@@ -179,5 +182,180 @@ describe('the strength named (topSkillOf)', () => {
     const shortest = words.slice().sort((x, y) => x[1] - y[1])[0][0];
     expect(CommentBank.topSkillOf(f).key).toBe(shortest);
     expect(CommentBank.topSkillOf(facts([comp('a', 'Evidence', 3.4), comp('b', 'Significance', 3.2)]))).toBeNull();
+  });
+
+  it('across a class, names the skill the fewest classmates have, so a tie spreads', () => {
+    const comps = () => [
+      comp('a', 'Evidence', 3.6),
+      comp('b', 'Significance', 3.5),
+      comp('c', 'Cause and Consequence', 3.4),
+      comp('d', 'Inquiry', 2.8),
+    ];
+    const keys = [];
+    const comments = [];
+    for (let i = 1; i <= 5; i++) {
+      const f = facts(comps(), { cid: 'c-tie-spread', sid: 'st' + i });
+      const ctx = CommentBank.context(f, {});
+      expect(ctx._strongSkill).toBe('');
+      const d = CommentBank.draft(ctx, { seed: i, comments: comments.slice() });
+      comments.push({ sid: 'st' + i, text: d.text });
+      const row = d.sentences.find(x => x.step === 'overall');
+      expect(row, 'student ' + i).toBeTruthy();
+      expect(byId(row.id).when.topSkill).toBe(ctx._topSkill);
+      keys.push(ctx._topSkill);
+    }
+    // Three skills in the tie: each named once before any twice, in turn.
+    expect(new Set(keys.slice(0, 3)).size).toBe(3);
+    expect(keys[3]).toBe(keys[0]);
+    expect(keys[4]).toBe(keys[1]);
+  });
+});
+
+describe('the per-skill frames under a tie', () => {
+  it('splits the 344 frames: 258 that claim a strength (topSkill), 86 that assert the strongest (strongSkill)', () => {
+    // 43 tie-safe frames from lane G, then round three (lane I): 129 for the
+    // 43 skills lane H added and 86 more for the original 43, all tie-safe.
+    expect(topFrames.length).toBe(258);
+    expect(strongFrames.length).toBe(86);
+    topFrames.forEach(s => {
+      expect(s.needs, s.id).toEqual(['topSkill']);
+      expect(s.claims, s.id).toEqual(['strength']);
+      expect(s.text, s.id).not.toMatch(/strongest|highest|\bmost\b|\bbest\b|\btop\b/i);
+    });
+    strongFrames.forEach(s => expect(s.text, s.id).toMatch(/strongest|highest|\bmost\b|\bbest\b|\btop\b/i));
+    // Every skill in the table has three or more frames that fit a tie.
+    Object.entries(CommentBank.SKILLS).forEach(([family, rows]) =>
+      rows.forEach(row =>
+        expect(
+          topFrames.filter(s => s.subjects[0] === family && s.when.topSkill === row.key).length,
+          family + '.' + row.key,
+        ).toBeGreaterThanOrEqual(3),
+      ),
+    );
+  });
+
+  it('under a tie, the strengths pool is the tie frames for the skill named; the strongest frames are out', () => {
+    const f = facts(tieComps(), { cid: 'c-tie-pool' });
+    const ctx = CommentBank.context(f, {});
+    const key = ctx._topSkill;
+    expect(key).toBeTruthy();
+    expect(ctx.topSkill).toBe(key);
+    expect(ctx._strongSkill).toBe('');
+    expect(ctx.strengths).toBe('');
+    expect(ctx.evenResults).toBe('');
+    const pool = CommentBank.stepPool('overall', ctx).map(s => s.id);
+    const mine = topFrames.filter(s => s.subjects[0] === 'socials' && s.when.topSkill === key).map(s => s.id);
+    expect(mine.length).toBeGreaterThan(0);
+    expect(pool.sort()).toEqual(mine.sort());
+    strongFrames.forEach(s => expect(CommentBank.fits(s, ctx), s.id).toBe(false));
+    const d = CommentBank.draft(ctx, { seed: 2 });
+    const row = d.sentences.find(x => x.step === 'overall');
+    expect(mine).toContain(row.id);
+    expect(row.text).not.toMatch(/[{}[\]]/);
+    expect(d.replaced).toEqual([]);
+  });
+
+  it('under the strongest, both kinds fit and share the tier', () => {
+    const f = facts([comp('a', 'Evidence', 4), comp('b', 'Significance', 3.4), comp('c', 'Cause', 3.3)]);
+    const ctx = CommentBank.context(f, {});
+    expect(ctx._strongSkill).toBe('evidence');
+    expect(ctx._topSkill).toBe('evidence');
+    const pool = CommentBank.stepPool('overall', ctx).map(s => s.id);
+    expect(pool).toContain('n617');
+    expect(pool).toContain('n616');
+    expect(pool).toContain('n618');
+  });
+
+  it('comes after the strongest and before even results', () => {
+    // Even: every competency within half a step at the overall word.
+    const even = facts([comp('a', 'Evidence', 3.1), comp('b', 'Significance', 3.0), comp('c', 'Cause', 2.9)], {
+      overall: 3.0,
+    });
+    const ectx = CommentBank.context(even, {});
+    expect(ectx.evenResults).toBe('yes');
+    expect(ectx._topSkill).toBe('');
+    expect(CommentBank.topTieOf(even.comps)).toEqual([]);
+    // A tie: no even-results frame fits.
+    const tctx = CommentBank.context(facts(tieComps(), { cid: 'c-tie-order' }), {});
+    expect(tctx.evenResults).toBe('');
+    expect(tctx._evenWord).toBe('');
+    COMMENT_BANK.sentences
+      .filter(s => s.when && s.when.evenWord)
+      .forEach(s => expect(CommentBank.fits(s, tctx), s.id).toBe(false));
+  });
+
+  it('verify() keeps the sentence while the competency is in the tie or strongest, and replaces it otherwise', () => {
+    const f = facts(tieComps(), { cid: 'c-tie-verify' });
+    const ctx = CommentBank.context(f, {});
+    const key = ctx._topSkill;
+    const s = topFrames.find(x => x.subjects[0] === 'socials' && x.when.topSkill === key);
+    const text = CommentBank.fill(s, ctx, { first: true });
+    const pv = CommentBank.provenance(s, ctx);
+    const cid = ctx._facts.topSkill[0].split(':')[1];
+    expect(pv.factKeys).toContain('comp:' + cid);
+    expect(pv.values['when.topSkill']).toBe(key);
+    expect(verified(s, text, pv, f, 'overall').replaced).toEqual([]);
+    // That competency now the strongest: still a strength.
+    const strongest = Object.assign({}, f, {
+      comps: f.comps.map(c => (c.id === cid ? comp(c.id, c.name, 4) : comp(c.id, c.name, 3.2))),
+    });
+    expect(ids(CommentBank.strongestOf(strongest.comps))).toEqual([cid]);
+    expect(verified(s, text, pv, strongest, 'overall').replaced).toEqual([]);
+    // That competency now a full step below the others: replaced.
+    const dropped = Object.assign({}, f, {
+      comps: f.comps.map(c => (c.id === cid ? comp(c.id, c.name, 2.4) : c)),
+    });
+    expect(verified(s, text, pv, dropped, 'overall').replaced.length).toBe(1);
+    // Every competency within half a step (the even case): replaced.
+    const flat = Object.assign({}, f, { comps: f.comps.map(c => comp(c.id, c.name, 3.3)) });
+    expect(verified(s, text, pv, flat, 'overall').replaced.length).toBe(1);
+    // Another competency's key under the same frame: replaced.
+    const other = Object.assign({}, pv, {
+      values: Object.assign({}, pv.values, { 'when.topSkill': 'inquiry', topSkill: 'inquiry' }),
+    });
+    expect(verified(s, text, other, f, 'overall').replaced.length).toBe(1);
+  });
+
+  it('Browse Sentences files a tie frame under its skill, and the student’s own case names the skill', () => {
+    expect(
+      RQ.browseCase('strengths', { when: { topSkill: 'evidence' }, needs: ['topSkill'], subjects: ['socials'] }),
+    ).toEqual(['skill:socials:evidence']);
+    const ctx = CommentBank.context(facts(tieComps(), { cid: 'c-tie-browse' }), {});
+    expect(RQ.browseOwn('strengths', ctx)[0]).toBe('skill:socials:' + ctx._topSkill);
+  });
+
+  it('the At a Glance tag still means strongest: none under a tie', () => {
+    expect(RQ.skillTags(tieComps())).toEqual({ d: 'Next step' });
+  });
+
+  it('when every frame of the top tier runs past 20 words, the next tier is tried before nothing', () => {
+    // A newcomer whose strongest skill has a twelve-word wording: both
+    // newcomer frames (n442, n443) run past 20 words with it, so the
+    // per-skill frames one tier down fill the strengths step.
+    const f = facts([comp('a', 'Relationships and Consent', 4), comp('b', 'Fitness', 3), comp('c', 'Safety', 3)], {
+      cid: 'c-tier-down',
+      family: 'pe',
+      course: 'PHE 8',
+      enrolled: '2026-09-20',
+      classStart: '2026-09-01',
+      termStart: '2026-09-01',
+    });
+    const ctx = CommentBank.context(f, {});
+    expect(ctx._strongSkill).toBe('relationships');
+    const story = COMMENT_BANK.sentences.filter(s => s.story === 'newcomer' && s.group === 'Overall' && !s.subjects);
+    expect(story.map(s => s.id).sort()).toEqual(['n442', 'n443']);
+    story.forEach(s => {
+      expect(CommentBank.fits(s, ctx), s.id).toBe(true);
+      expect(CommentRealiser.tooLong(CommentBank.fill(s, ctx)), s.id).toBe(true);
+    });
+    const d = CommentBank.draft(ctx, { seed: 3 });
+    expect(d.angle).toBe('newcomer');
+    const row = d.sentences.find(x => x.step === 'overall');
+    expect(row).toBeTruthy();
+    expect(
+      topFrames.filter(s => s.subjects[0] === 'pe' && s.when.topSkill === 'relationships').map(s => s.id),
+    ).toContain(row.id);
+    expect(CommentRealiser.tooLong(row.text)).toBe(false);
+    expect(d.replaced).toEqual([]);
   });
 });

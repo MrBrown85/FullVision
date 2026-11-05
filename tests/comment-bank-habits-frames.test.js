@@ -330,7 +330,7 @@ describe('Strong Habits frames (the IE comment)', () => {
       expect(t).toMatch(/\bhe comes to class ready to start, listens to others, and joins in class discussions\.$/i),
     );
     expect(got.hs13).toBe(
-      'This term, he comes to class ready to start, listens to others, and joins in class discussions.',
+      'As a rule, he comes to class ready to start, listens to others, and joins in class discussions.',
     );
   });
 
@@ -363,7 +363,7 @@ describe('the frames and the lint', () => {
     const mine = COMMENT_BANK.sentences.filter(s =>
       /^(hs(1[3-9]|[23]\d)|hf\d\d|h(6[1-9]|7\d)|m(0[2-9]|1\d|2[01]))$/.test(s.id),
     );
-    expect(mine).toHaveLength(69);
+    expect(mine).toHaveLength(73);
     mine.forEach(s => {
       expect(s.part, s.id).toBe('habits');
       expect(

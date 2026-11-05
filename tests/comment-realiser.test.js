@@ -342,7 +342,7 @@ describe('the draft passes through the realiser', () => {
     const r = CommentBank.realise(d.sentences, [d.sentences[1].id]);
     expect(r.sentences[0].id).toBe(d.sentences[1].id);
     expect(r.sentences[0].text).toMatch(new RegExp('\\b' + f.name + '\\b'));
-    expect(r.sentences[1].text).toMatch(/^She is /);
+    expect(r.sentences[1].text).toMatch(/^(She is |Her |In Science 8, she )/);
     expect(r.sentences.length).toBe(last + 1);
   });
 

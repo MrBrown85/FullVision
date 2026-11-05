@@ -81,13 +81,14 @@ const withWork = (levels, bank = true, title = 'Task') => {
 };
 
 describe('the best piece names its skill', () => {
-  it('names the competency the piece scored highest on, Proficient or above', () => {
-    // Evidence is scored highest on the piece (and is the strength).
+  it('names the competency the piece scored highest on, Proficient or above, that no other sentence names', () => {
+    // Evidence is scored highest on the piece, but it is the strength the
+    // strength sentence names: the piece shows Perspective.
     const f = withWork([3.8, 3, 2]);
     const top = CommentBank.bestPieceOf(f);
     const sk = CommentBank.bestPieceSkillOf(f, top);
-    expect(sk.comp.id).toBe('c1');
-    expect(sk.skill).toBe(CommentBank.skillFor(f, f.comps[0]).skill);
+    expect(sk.comp.id).toBe('c2');
+    expect(sk.skill).toBe(CommentBank.skillFor(f, f.comps[1]).skill);
     const ctx = CommentBank.context(f, {});
     expect(ctx.piece).toBe('Task 2');
     expect(ctx.pieceSkill).toBe(sk.skill);
@@ -100,7 +101,7 @@ describe('the best piece names its skill', () => {
     ).toBeNull();
     const plain = withWork([3.8, 3, 2], false);
     expect(CommentBank.bestPieceSkillOf(plain, CommentBank.bestPieceOf(plain)).skill).toBe(
-      CommentBank.skillOf('socials', 'Evidence').skill,
+      CommentBank.skillOf('socials', 'Perspective').skill,
     );
     // Labels no table row matches: the label itself, in plain words.
     const own = withWork([3.8, 3, 2], false);

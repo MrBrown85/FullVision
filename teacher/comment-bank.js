@@ -3310,9 +3310,11 @@ window.CommentBank = (function () {
   function bestPieceSkillOf(f, w) {
     if (!w || reportNoteText(w.note)) return null;
     var taken = {};
-    [nextSkillOf(f), tentSkillOf(f), progressOf(f)].forEach(function (x) {
-      if (x) taken[x.key] = true;
-    });
+    [nextSkillOf(f), tentSkillOf(f), progressOf(f)]
+      .concat(strengthSkills(f), topTieSkills(f), highestSkills(f))
+      .forEach(function (x) {
+        if (x) taken[x.key] = true;
+      });
     var strong = strengthSkills(f)[0];
     var pick = null;
     var pickV = 0;
@@ -3396,11 +3398,42 @@ window.CommentBank = (function () {
     if (xs.length < 2 || !(tenths(xs[0].level) > tenths(xs[1].level))) return null;
     var c = xs[0];
     var step = nextStepOf(f.comps) || (tentSkillOf(f) || {}).comp;
-    if (step === c) return null;
+    var named = _namedComp(f, c);
+    var piece = _pieceSkill(f);
+    if (step === c || (piece && (piece.comp === c || (named && named.key === piece.key)))) return null;
+    return named;
+  }
+  /* A competency as a strength frame names it: its skill phrase, else its
+     plain label. null with neither. */
+  function _namedComp(f, c) {
     var sk = skillFor(f, c);
     if (sk && R.wordCount(sk.skill) <= PIECE_SKILL_WORDS) return { comp: c, key: sk.key, skill: sk.skill };
     var label = plainLabel(c.name);
     return label ? { comp: c, key: 'label:' + c.id, label: label } : null;
+  }
+  /* What the best piece's sentence names (bestPieceSkillOf), or null. */
+  function _pieceSkill(f) {
+    var top = bestPieceOf(f);
+    return top ? bestPieceSkillOf(f, top) : null;
+  }
+  /* Another strength, when the gated routes prove none (Colin, Nov 4: a
+     strength in every comment): the competency with the highest level at
+     Proficient or above (rounded), not the next step's, not the one the
+     best piece shows and not the one the highest-competency sentence names.
+     Its skill phrase or label. null when none is at Proficient. */
+  function altStrengthOf(f) {
+    var step = nextStepOf(f.comps) || (tentSkillOf(f) || {}).comp;
+    var hi = highestFallbackOf(f);
+    var piece = _pieceSkill(f);
+    var pick = null;
+    (f.comps || []).forEach(function (c) {
+      if (!(Math.round(c.level) >= 3) || c === step || (piece && piece.comp === c) || (hi && hi.comp === c)) return;
+      var named = _namedComp(f, c);
+      // Never the skill another sentence names, by its key.
+      if (!named || (piece && named.key === piece.key) || (hi && named.key === hi.key)) return;
+      if (!pick || tenths(c.level) > tenths(pick.comp.level)) pick = named;
+    });
+    return pick;
   }
 
   /* The next step when no competency has the 2+ pieces a settled one needs
@@ -3919,10 +3952,11 @@ window.CommentBank = (function () {
     // (the sample voice, Nov 4).
     var pieceName = top ? pieceTitle(top) : '';
     var pieceTest = !!pieceName && pieceIsTest(top);
-    // The strength said on its own, only when the best piece shows no skill
-    // (a teacher's note says what the piece shows, not a skill) and no
-    // growth or even marks say one (highestFallbackOf).
-    var hiFall = !topPieceSkill && !prog && !evenNow.length ? highestFallbackOf(f) : null;
+    // The strength said on its own when no gated route proves one: the
+    // highest competency (highestFallbackOf), another at Proficient or above
+    // (altStrengthOf); neither is the one the best piece shows.
+    var hiFall = highestFallbackOf(f);
+    var alt = altStrengthOf(f);
     // The tentative next step from thin evidence (tentSkillOf), and the
     // marks spread thinly (spreadOf).
     var tent = tentSkillOf(f);
@@ -4082,6 +4116,8 @@ window.CommentBank = (function () {
       pieceComp: keys('work', [top]).concat(keys('comp', [topPieceSkill && topPieceSkill.comp])),
       hiSkill: keys('comp', [hiFall && hiFall.comp]),
       hiComp: keys('comp', [hiFall && hiFall.comp]),
+      altSkill: keys('comp', [alt && alt.comp]),
+      altComp: keys('comp', [alt && alt.comp]),
       tentStep: keys('comp', [tent && tent.comp]),
       spread: keys('comp', spread ? spread.ids : []),
       spreadAll: keys('comp', spread ? spread.ids : []),
@@ -4330,9 +4366,12 @@ window.CommentBank = (function () {
       pieceTest: pieceTest ? 'yes' : '',
       pieceSkill: topPieceSkill && topPieceSkill.skill ? topPieceSkill.skill : '',
       pieceComp: topPieceSkill && topPieceSkill.label ? topPieceSkill.label : '',
-      // The strength on its own (highestFallbackOf), by skill or label.
+      // The strength on its own (highestFallbackOf), by skill or label, and
+      // another skill at Proficient or above (altStrengthOf).
       hiSkill: hiFall && hiFall.skill ? hiFall.skill : '',
       hiComp: hiFall && hiFall.label ? hiFall.label : '',
+      altSkill: alt && alt.skill ? alt.skill : '',
+      altComp: alt && alt.label ? alt.label : '',
       // The tentative next step (tentSkillOf), and the marks spread thinly.
       tentStep: tent ? tent.text : '',
       spread: spread ? 'yes' : '',
@@ -4944,7 +4983,12 @@ window.CommentBank = (function () {
     { key: 'spread', part: 'now', groups: ['How Much Evidence'] },
     { key: 'growth', part: 'now', groups: ['Growth', 'Even Marks'] },
     { key: 'example', part: 'now', groups: ['Examples From Work'] },
-    { key: 'overall', part: 'now', groups: ['Overall'] },
+    // The strength, always (Colin, Nov 4: every part, every comment): the
+    // first strength at its level now, else the frames for the strongest,
+    // a tie, even marks or the highest-marked skill; else the highest
+    // competency on its own, another skill at Proficient or above, and the
+    // course's highest mark last (specificity).
+    { key: 'overall', part: 'now', groups: ['Overall'], prefer: 'strengthNow', preferSoft: true },
     // The habits part for families (habitPlan, Nov 4): what the student
     // does, a second sentence for more of it, and the habits that would
     // help. Generate drafts only the Habits in Class frames here (and the
@@ -4992,7 +5036,7 @@ window.CommentBank = (function () {
   var SAYS = { grade: true, notHandedIn: true };
 
   /* Facts a draft states once, by topic. */
-  var NO_REPEAT = { nextStep: 'nextStep', evenResults: 'even' };
+  var NO_REPEAT = { nextStep: 'nextStep', evenResults: 'even', progressSkill: 'progress' };
 
   /* A sentence that gives the student a next step: a Next Step sentence
      (the group the Next Step step draws from) or one flagged `advises:
@@ -5461,11 +5505,13 @@ window.CommentBank = (function () {
     // (`when.strengthWord`): the two share the Overall step's tier.
     if (ctx.progressSkill && needs.indexOf('progressSkill') >= 0) n++;
     // What the best piece shows, when the facts give it, comes before the
-    // bare best piece; the grade with even marks before the grade alone
-    // (the sample voice, Nov 4). A frame that runs long falls to the next
-    // tier.
+    // bare best piece (the sample voice, Nov 4). A frame that runs long
+    // falls to the next tier. The grade frames with even marks rotate with
+    // the others: when one is drafted, the Overall step says another
+    // strength instead of the even marks again.
     if ((ctx.pieceSkill && needs.indexOf('pieceSkill') >= 0) || (ctx.pieceComp && needs.indexOf('pieceComp') >= 0)) n++;
-    if (s.group === 'Grade' && ctx.evenResults && needs.indexOf('evenResults') >= 0) n++;
+    // The course's highest mark is the strength of last resort.
+    if (s.group === 'Overall' && needs.indexOf('level') >= 0 && needs.indexOf('assignment') >= 0) n--;
     // Two for a story, so a frame written for the student's story comes
     // before one written for the strongest skill (`when.strongSkill`, bank
     // n6xx-n7xx), which comes before a general one.
@@ -5561,6 +5607,7 @@ window.CommentBank = (function () {
   function _standIns(step, ctx, bank, taken, exclude) {
     var ok = bank.sentences.filter(function (s) {
       return (
+        s.generate !== false &&
         s.part === step.part &&
         Array.isArray(s.claims) &&
         !s.claims.length &&
@@ -5724,7 +5771,7 @@ window.CommentBank = (function () {
       seq.indexOf('nextStep') >= 0 &&
       (!!kept.nextStep ||
         bank.sentences.some(function (s) {
-          return !exclude[s.id] && _stepFits(s, byKey.nextStep, ctx);
+          return s.generate !== false && !exclude[s.id] && _stepFits(s, byKey.nextStep, ctx);
         }));
     seq.forEach(function (key, at) {
       var step = byKey[key];
@@ -5780,7 +5827,12 @@ window.CommentBank = (function () {
       if (key === 'habitsMore' && (!got.habits || said.habitsOwn)) return;
       if (key === 'habitsBuild' && said.habitsOwn) return;
       var cands = bank.sentences.filter(function (s) {
+        // Browse only (`generate: false`, the sample voice, Nov 4): the
+        // teacher can choose it; Generate never does.
+        if (s.generate === false) return false;
         if (taken[s.id] || !_stepFits(s, step, ctx)) return false;
+        // Even marks said by the grade sentence are not said again.
+        if (said.even && s.when && s.when.evenWord) return false;
         // A fact the draft already states (the growing habits, the goal, the
         // competency that rose) is not said twice.
         if (
@@ -5842,7 +5894,8 @@ window.CommentBank = (function () {
         });
         // "So far" at most once a comment off the IE path (the sample
         // voice, Nov 4: the grade is year to date).
-        var twice = ctx._path !== 'ie' && SO_FAR.test(t) && SO_FAR.test(sofar);
+        // On the IE path its Required parts keep their own wording.
+        var twice = !(ctx._path === 'ie' && step.ie) && SO_FAR.test(t) && SO_FAR.test(sofar);
         return {
           s: s,
           t: t,
@@ -6013,7 +6066,9 @@ window.CommentBank = (function () {
      `short: true` for the screen to show. Nothing is ever padded. */
   var MAX_SENTENCES = 9;
   var MIN_SENTENCES = 6;
-  var DROP_FIRST = ['spread', 'attendance', 'growth', 'home', 'overall'];
+  // Nothing is trimmed (Colin, Nov 4: "longer is fine"; 2026-11-02: "don't
+  // restrict users").
+  var DROP_FIRST = [];
   /* A draft's sentences as the plan counts them: the habits part's second
      sentence and the habits that would help are part of its one. */
   function _counted(sentences) {
@@ -6309,7 +6364,7 @@ window.CommentBank = (function () {
     if (!def || !def.groups) return [];
     return _topTier(
       (bank || COMMENT_BANK).sentences.filter(function (s) {
-        return _stepFits(s, def, ctx);
+        return s.generate !== false && _stepFits(s, def, ctx);
       }),
       ctx,
     );
@@ -6498,8 +6553,9 @@ window.CommentBank = (function () {
   }
   function _gradeSentences(bank) {
     var step = DRAFT_STEPS[0];
-    // With the grade frames the bank retired (Nov 4), so a saved comment
-    // that holds one still has its grade sentence set aside.
+    // With the grade frames as worded before Nov 4 (COMMENT_BANK.retired),
+    // so a saved comment that holds one still has its grade sentence set
+    // aside.
     return bank.sentences.concat(bank.retired || []).filter(function (s) {
       return s.part === step.part && step.groups.indexOf(s.group) >= 0;
     });
@@ -6804,6 +6860,14 @@ window.CommentBank = (function () {
       var slot = _has(pv, 'hiSkill') ? 'hiSkill' : _has(pv, 'hiComp') ? 'hiComp' : '';
       if (!h || !slot || _ids(pv, slot, 'comp')[0] !== String(h.comp.id)) return false;
       return pv.values[slot] === (slot === 'hiSkill' ? h.skill : h.label);
+    },
+    // Another skill at Proficient or above (altStrengthOf): the same
+    // competency, still there, in its phrase or label.
+    altStrength: function (pv, f) {
+      var a = altStrengthOf(f);
+      var slot = _has(pv, 'altSkill') ? 'altSkill' : _has(pv, 'altComp') ? 'altComp' : '';
+      if (!a || !slot || _ids(pv, slot, 'comp')[0] !== String(a.comp.id)) return false;
+      return pv.values[slot] === (slot === 'altSkill' ? a.skill : a.label);
     },
     // The marks spread thinly (spreadOf): three or more competencies with a
     // level, most on one or two scored pieces (every one, for spreadAll).
@@ -7283,7 +7347,14 @@ window.CommentBank = (function () {
      group first, then bank order. None when the part has no such sentence. */
   function _fallback(s, ctx, bank, used) {
     var cands = bank.sentences.filter(function (x) {
-      return x.part === s.part && Array.isArray(x.claims) && !x.claims.length && !used[x.id] && fits(x, ctx);
+      return (
+        x.generate !== false &&
+        x.part === s.part &&
+        Array.isArray(x.claims) &&
+        !x.claims.length &&
+        !used[x.id] &&
+        fits(x, ctx)
+      );
     });
     return (
       cands.find(function (x) {
@@ -7394,579 +7465,11 @@ window.CommentBank = (function () {
      keeps one as written rather than having it swapped for a sentence the
      teacher didn't choose. */
   var RETIRED = {};
-  var RETIRED_SAMPLE_VOICE = [
-    'hf14',
-    'hf16',
-    'hf28',
-    'hf36',
-    'gr01',
-    'gr02',
-    'gr03',
-    'gr04',
-    'gr05',
-    'gr06',
-    'gr07',
-    'gr08',
-    'gr09',
-    'gr10',
-    'gr11',
-    'gr12',
-    'gr13',
-    'gr14',
-    'gr15',
-    'gr16',
-    'gr17',
-    'gr18',
-    'gr19',
-    'gr20',
-    'gr21',
-    'gr22',
-    'gr23',
-    'gr24',
-    'gr25',
-    'gr26',
-    'gr27',
-    'gr28',
-    'gr29',
-    'gr30',
-    'gr31',
-    'gr32',
-    'gr33',
-    'gr34',
-    'gr35',
-    'gr36',
-    'gr37',
-    'gr38',
-    'gr39',
-    'gr40',
-    'gr41',
-    'gr42',
-    'gr43',
-    'gr44',
-    'gr45',
-    'gr46',
-    'gr47',
-    'gr48',
-    'gr49',
-    'gr50',
-    'gr51',
-    'gr52',
-    'gr53',
-    'gr54',
-    'gr55',
-    'gr56',
-    'gr57',
-    'gr58',
-    'gr59',
-    'gr60',
-    'gr61',
-    'gr62',
-    'gr63',
-    'gr64',
-    'gr65',
-    'gr66',
-    'gr67',
-    'gr68',
-    'gr69',
-    'gr70',
-    'gr71',
-    'gr72',
-    'gr73',
-    'gr74',
-    'gr75',
-    'gr76',
-    'gr77',
-    'gr78',
-    'n36',
-    'n361',
-    'n362',
-    'n363',
-    'n364',
-    'n365',
-    'n366',
-    'n367',
-    'n372',
-    'n373',
-    'n374',
-    'n375',
-    'n376',
-    'n377',
-    'n378',
-    'n379',
-    'n380',
-    'n381',
-    'pg01',
-    'pg02',
-    'wn01',
-    'wn02',
-    'wn03',
-    'wn04',
-    'wn05',
-    'wn06',
-    'wn07',
-    'wn08',
-    'wn09',
-    'ls03',
-    'ls04',
-    'ls05',
-    'n411',
-    'n413',
-    'n414',
-    'n415',
-    'n431',
-    'n432',
-    'n434',
-    'n435',
-    'n442',
-    'n443',
-    'n501',
-    'n502',
-    'n503',
-    'n504',
-    'n505',
-    'n506',
-    'n507',
-    'n508',
-    'n509',
-    'n510',
-    'n511',
-    'n512',
-    'n513',
-    'n514',
-    'n515',
-    'n516',
-    'n517',
-    'n518',
-    'n519',
-    'n520',
-    'n521',
-    'n522',
-    'n523',
-    'n524',
-    'n525',
-    'n526',
-    'n527',
-    'n528',
-    'n529',
-    'n530',
-    'n531',
-    'n532',
-    'n533',
-    'n534',
-    'n535',
-    'n536',
-    'n537',
-    'n538',
-    'n601',
-    'n602',
-    'n603',
-    'n604',
-    'n605',
-    'n606',
-    'n607',
-    'n608',
-    'n609',
-    'n610',
-    'n611',
-    'n612',
-    'n613',
-    'n614',
-    'n615',
-    'n616',
-    'n617',
-    'n618',
-    'n619',
-    'n620',
-    'n621',
-    'n622',
-    'n623',
-    'n624',
-    'n625',
-    'n626',
-    'n627',
-    'n628',
-    'n629',
-    'n630',
-    'n631',
-    'n632',
-    'n633',
-    'n634',
-    'n635',
-    'n636',
-    'n637',
-    'n638',
-    'n639',
-    'n640',
-    'n641',
-    'n642',
-    'n643',
-    'n644',
-    'n645',
-    'n646',
-    'n647',
-    'n648',
-    'n649',
-    'n650',
-    'n651',
-    'n652',
-    'n653',
-    'n654',
-    'n655',
-    'n656',
-    'n657',
-    'n658',
-    'n659',
-    'n660',
-    'n661',
-    'n662',
-    'n663',
-    'n664',
-    'n665',
-    'n666',
-    'n667',
-    'n668',
-    'n669',
-    'n670',
-    'n671',
-    'n672',
-    'n673',
-    'n674',
-    'n675',
-    'n676',
-    'n677',
-    'n678',
-    'n679',
-    'n680',
-    'n681',
-    'n682',
-    'n683',
-    'n684',
-    'n685',
-    'n686',
-    'n687',
-    'n688',
-    'n689',
-    'n690',
-    'n691',
-    'n692',
-    'n693',
-    'n694',
-    'n695',
-    'n696',
-    'n697',
-    'n698',
-    'n699',
-    'n700',
-    'n701',
-    'n702',
-    'n703',
-    'n704',
-    'n705',
-    'n706',
-    'n707',
-    'n708',
-    'n709',
-    'n710',
-    'n711',
-    'n712',
-    'n713',
-    'n714',
-    'n715',
-    'n716',
-    'n717',
-    'n718',
-    'n719',
-    'n720',
-    'n721',
-    'n722',
-    'n723',
-    'n724',
-    'n725',
-    'n726',
-    'n727',
-    'n728',
-    'n729',
-    'n730',
-    'n731',
-    'n732',
-    'n733',
-    'n734',
-    'n735',
-    'n736',
-    'n737',
-    'n738',
-    'n739',
-    'n740',
-    'n741',
-    'n742',
-    'n743',
-    'n744',
-    'n745',
-    'n746',
-    'n747',
-    'n748',
-    'n749',
-    'n750',
-    'n751',
-    'n752',
-    'n753',
-    'n754',
-    'n755',
-    'n756',
-    'n757',
-    'n758',
-    'n759',
-    'n760',
-    'n761',
-    'n762',
-    'n763',
-    'n764',
-    'n765',
-    'n766',
-    'n767',
-    'n768',
-    'n769',
-    'n770',
-    'n771',
-    'n772',
-    'n773',
-    'n774',
-    'n775',
-    'n776',
-    'n777',
-    'n778',
-    'n779',
-    'n780',
-    'n781',
-    'n782',
-    'n783',
-    'n784',
-    'n785',
-    'n786',
-    'n787',
-    'n788',
-    'n789',
-    'n790',
-    'n791',
-    'n792',
-    'n793',
-    'n794',
-    'n795',
-    'n796',
-    'n797',
-    'n798',
-    'n799',
-    'n800',
-    'n801',
-    'n802',
-    'n803',
-    'n804',
-    'n805',
-    'n806',
-    'n807',
-    'n808',
-    'n809',
-    'n810',
-    'n811',
-    'n812',
-    'n813',
-    'n814',
-    'n815',
-    'n816',
-    'n817',
-    'n818',
-    'n819',
-    'n820',
-    'n821',
-    'n822',
-    'n823',
-    'n824',
-    'n825',
-    'n826',
-    'n827',
-    'n828',
-    'n829',
-    'n830',
-    'n831',
-    'n832',
-    'n833',
-    'n834',
-    'n835',
-    'n836',
-    'n837',
-    'n838',
-    'n839',
-    'n840',
-    'n841',
-    'n842',
-    'n843',
-    'n844',
-    'n845',
-    'n846',
-    'n847',
-    'n848',
-    'n849',
-    'n850',
-    'n851',
-    'n852',
-    'n853',
-    'n854',
-    'n855',
-    'n856',
-    'n857',
-    'n858',
-    'n859',
-    'n860',
-    'n861',
-    'n862',
-    'n863',
-    'n864',
-    'n865',
-    'n866',
-    'n867',
-    'n868',
-    'n869',
-    'n870',
-    'n871',
-    'n872',
-    'n873',
-    'n874',
-    'n875',
-    'n876',
-    'n877',
-    'n878',
-    'n879',
-    'n880',
-    'n881',
-    'n882',
-    'n883',
-    'n884',
-    'n885',
-    'n886',
-    'n887',
-    'n888',
-    'n889',
-    'n890',
-    'n891',
-    'n892',
-    'n893',
-    'n894',
-    'n895',
-    'n896',
-    'n897',
-    'n898',
-    'n899',
-    'n900',
-    'n901',
-    'n902',
-    'n903',
-    'n904',
-    'n905',
-    'n906',
-    'n907',
-    'n908',
-    'n909',
-    'n910',
-    'n911',
-    'n912',
-    'n913',
-    'n914',
-    'n915',
-    'n916',
-    'n917',
-    'n918',
-    'n919',
-    'n920',
-    'n921',
-    'n922',
-    'n923',
-    'n924',
-    'n925',
-    'n926',
-    'n927',
-    'n928',
-    'n929',
-    'n930',
-    'n931',
-    'n932',
-    'n933',
-    'n934',
-    'n935',
-    'n936',
-    'n937',
-    'n938',
-    'n939',
-    'n940',
-    'n941',
-    'n942',
-    'n943',
-    'n944',
-    'n945',
-    'n946',
-    'n947',
-    'n948',
-    'n949',
-    'n950',
-    'n951',
-    'n952',
-    'n953',
-    'n954',
-    'n955',
-    'n956',
-    'n957',
-    'n958',
-    'n959',
-    'n960',
-    'n961',
-    'n962',
-    'n963',
-    'n964',
-    'n965',
-    'n966',
-    'n967',
-    'n968',
-    'n969',
-    'n970',
-    'n971',
-    'n972',
-    'n973',
-    'n974',
-    'n975',
-    'n976',
-    'n977',
-    'n1001',
-    'n1002',
-    'n1003',
-    'n1004',
-    'n1005',
-    'n1006',
-    'n1007',
-    'n1008',
-    'n1009',
-    'n1010',
-    'n1011',
-    'n1013',
-    'n1014',
-    'n1015',
-    'n1016',
-    'n1017',
-    'n1018',
-    'n1019',
-    'n1020',
-    'n1021',
-    'n1022',
-    'n1023',
-    'n1025',
-    'n1026',
-    'n1027',
-    'scr01',
-    'scr02',
-    'scr03',
-    'scr04',
-    'scr05',
-    'scr06',
-    'scn01',
-  ];
+  // Nov 4, the sample voice: the frames that read the same as another once
+  // their wording was fixed ("this term" → "so far", "is able to" → "can",
+  // "as his marks show" dropped): gr07 and gr08 (now gv91 and gv92), n1005
+  // (n1001), n1026 (n1007) and n1027 (n1013).
+  var RETIRED_SAMPLE_VOICE = ['gr07', 'gr08', 'n1005', 'n1026', 'n1027'];
   [
     'g01',
     'g03',
@@ -8017,14 +7520,6 @@ window.CommentBank = (function () {
   ].forEach(function (id) {
     RETIRED[id] = true;
   });
-  // Nov 4, the sample voice (Colin approved six sample comments as the
-  // spec): every grade frame ("on the BC proficiency scale", "calls",
-  // "this term" for a year-to-date grade), every best-piece frame (titles
-  // quoted, "this term", "the piece with his highest mark"), every Overall
-  // strength frame ("is able to", "ability to", "as his marks show",
-  // "skill by skill"), the Next Step openers "After this term's work",
-  // "One thing he can try next is to" and "To keep growing", and the habits
-  // openers "Each day", "reliably" and "For him, two habits would help most".
   RETIRED_SAMPLE_VOICE.forEach(function (id) {
     RETIRED[id] = true;
   });
@@ -8535,6 +8030,7 @@ window.CommentBank = (function () {
     bestPieceOf: bestPieceOf,
     bestPieceSkillOf: bestPieceSkillOf,
     highestFallbackOf: highestFallbackOf,
+    altStrengthOf: altStrengthOf,
     tentSkillOf: tentSkillOf,
     stepSkillOf: stepSkillOf,
     spreadOf: spreadOf,

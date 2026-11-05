@@ -94,7 +94,9 @@ describe('thin evidence (Moon, Nov 4): every part is written', () => {
     for (let seed = 1; seed <= 6; seed++) {
       const d = draftOf(f, seed);
       const steps = stepsOf(d);
-      ['grade', 'example', 'habits', 'nextStep', 'home'].forEach(k => expect(steps, 'seed ' + seed).toContain(k));
+      ['grade', 'example', 'overall', 'habits', 'nextStep', 'home'].forEach(k =>
+        expect(steps, 'seed ' + seed).toContain(k),
+      );
       // The strength: what the best piece shows, by its competency's label.
       const ex = d.sentences.find(x => x.step === 'example');
       expect(ex.text, 'seed ' + seed).toMatch(/reasoning and argument/);
@@ -225,7 +227,9 @@ describe('the sample shape in Demo Mode (Science 8, Report 2)', () => {
         steps.forEach(
           (k, j) => j && expect(order.indexOf(k), st.firstName).toBeGreaterThan(order.indexOf(steps[j - 1])),
         );
-        ['grade', 'example', 'habits', 'nextStep', 'home'].forEach(k => expect(steps, st.firstName).toContain(k));
+        ['grade', 'example', 'overall', 'habits', 'nextStep', 'home'].forEach(k =>
+          expect(steps, st.firstName + ' seed ' + seed).toContain(k),
+        );
         // Grade, best piece and strength wording off the retired list; the
         // habits frames keep "This term" (a term's ratings).
         d.sentences

@@ -201,8 +201,12 @@ describe('below a gate, the claiming sentence is not eligible', () => {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed, angleUses: {} });
       expect(d.replaced, 'seed ' + seed).toEqual([]);
       d.ids.forEach(id => {
-        const claims = (byId(id) && byId(id).claims) || [];
-        expect(claims, id).not.toContain('strength');
+        const s = byId(id);
+        const claims = (s && s.claims) || [];
+        // Every comment has a strength (Colin, Nov 4): below the strongest
+        // gate it is the highest-marked skill (its own gate), or another
+        // route that claims no strongest.
+        if (claims.indexOf('strength') >= 0) expect(s.when && s.when.highestWord, id).toBeTruthy();
         expect(claims, id).not.toContain('improved');
       });
     }

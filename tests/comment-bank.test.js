@@ -91,10 +91,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1227 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1227);
+  it('has 1812 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(1812);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1227);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1812);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -119,13 +119,16 @@ describe('the bank', () => {
     const at = (key, lvl) => COMMENT_BANK.sentences.filter(s => s.when && s.when[key] === lvl);
     const gone = ['Openings', 'Growth This Term', "In the Student's Words", 'Looking Ahead', 'Work to Revisit'];
     COMMENT_BANK.sentences.forEach(s => expect(gone, s.id).not.toContain(s.group));
-    // The best piece owning its title (the sample voice, Nov 4), each
-    // frame claiming it.
+    // The best piece: the frames owning its title (the sample voice, Nov
+    // 4), and the plan's sentence n36 and the frames around the same title
+    // and note (bank expansion, Nov 1, Browse only since Nov 4), each
+    // claiming it.
     const examples = COMMENT_BANK.sentences.filter(s => s.group === 'Examples From Work');
-    expect(examples.map(s => s.id)).toContain('bp01');
+    expect(examples.map(s => s.id)).toEqual(expect.arrayContaining(['bp01', 'n36']));
     examples.forEach(s => {
       expect(s.claims, s.id).toEqual(['bestPiece']);
-      expect(s.needs, s.id).toContain('piece');
+      expect(s.needs, s.id).toContain(/^bp/.test(s.id) ? 'piece' : s.id === 'n36' ? 'bestPiece' : 'assignment');
+      if (!/^bp/.test(s.id)) expect(s.generate, s.id).toBe(false);
     });
     expect(
       COMMENT_BANK.sentences.some(s =>
@@ -154,7 +157,7 @@ describe('the bank', () => {
       ).toEqual([]),
     );
     ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w =>
-      expect(at('standing', w).filter(s => s.group === 'Grade').length, w).toBe(5),
+      expect(at('standing', w).filter(s => s.group === 'Grade').length, w).toBe(18),
     );
   });
 
@@ -250,6 +253,8 @@ describe('the bank', () => {
       hiSkill: 'highest',
       hiComp: 'highest',
       tentStep: 'nextStep',
+      altSkill: 'altStrength',
+      altComp: 'altStrength',
       spread: 'spread',
       spreadAll: 'spread',
       habitsExcellent: 'habits',
@@ -646,20 +651,20 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // from the record (Nov 4), so no habits frame fits. Before, the record's
   // Consistently fitted eight: the three Strong Habits frames (hs11, hs13,
   // hs15) and five Habit Ratings frames for Completes Work.
-  it('knows the Demo class is Science from its name, and offers Cece 47 sentences (0, 14, 8, 25)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 95 sentences (0, 62, 8, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 14, 8, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(47);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 62, 8, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(95);
   });
 
-  it('offers Jasper 48 (0, 14, 9, 25), by the name he goes by', () => {
+  it('offers Jasper 98 (0, 64, 9, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
     // Overall: every competency is Proficient as the report grades it
     // (2.9 to 3.3), so the even-results frames fit (Nov 3).
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 14, 9, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(48);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 64, 9, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(98);
     expect(ctx.name).toBe('Jas');
     // Nothing fell from Extending since Report 1's year to date (it fell
     // four times inside Term 2's own trend, which Generate no longer
@@ -775,13 +780,13 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     ]);
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
     // The Demo class has no closing sentence or support lines set, so the
-    // comment leaves those out (plan PR 8): the grade, the best piece with
-    // what it shows (the sample voice, Nov 4: the strength is said there),
-    // the habits, the next step and the family sentence; five as the plan
-    // counts them (the habits part is one, in two sentences), never padded.
-    expect(sentences.length).toBe(6);
-    expect(d.sentences.some(x => x.step === 'overall')).toBe(false);
-    expect(d.sentences.find(x => x.step === 'example').text).toMatch(/shows she can /);
+    // comment leaves those out (plan PR 8): the grade, the best piece, the
+    // strength (Colin, Nov 4: every part, every comment), the habits, the
+    // next step and the family sentence, never padded; growth or even
+    // marks may add one.
+    const steps = d.sentences.map(x => x.step);
+    ['grade', 'example', 'overall', 'habits', 'nextStep', 'home'].forEach(k => expect(steps).toContain(k));
+    expect(sentences.length).toBe(d.sentences.length);
     expect(d.text).not.toMatch(/[{}[\]]/);
     expect(d.sentences[0].text).toContain('Cece');
     // The course is named wherever the story opens with it.

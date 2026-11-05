@@ -90,6 +90,25 @@ describe('where the student is now', () => {
     expect(CommentBank.strengthNowOf(f).comp.id).toBe('c1');
   });
 
+  it('says the phrase with the qualifier for each level, and the draft verifies', () => {
+    [
+      [[1.2, 0.6, 0.6], 'Emerging'],
+      [[2.2, 1.4, 1.2], 'Developing'],
+      [[3.1, 2.4, 2], 'Proficient'],
+      [[3.8, 3, 2.4], 'Extending'],
+    ].forEach(([levels, w]) => {
+      const f = withWork(levels);
+      for (let seed = 1; seed <= 6; seed++) {
+        const d = CommentBank.draft(CommentBank.context(f, {}), { seed, quiet: true });
+        const o = overallOf(d);
+        expect(o && o.id, w + ' seed ' + seed).toMatch(/^wn\d\d$/);
+        expect(o.text).toContain(comment['ss-evi'].phrase);
+        expect(o.text, w).toMatch(QUALIFIER[w]);
+        expect(CommentBank.verify(d, f, {}).replaced, w + ' seed ' + seed).toEqual([]);
+      }
+    });
+  });
+
   it('is left out below the strongest gate and for a class not linked to the bank', () => {
     // Two pieces only: nothing is strongest.
     const thin = withWork([3.1, 2.4, 2]);
@@ -100,5 +119,26 @@ describe('where the student is now', () => {
     const d = CommentBank.draft(CommentBank.context(plain, {}), { seed: 1, quiet: true });
     const o = overallOf(d);
     if (o) expect(o.id).not.toMatch(/^wn/);
+  });
+
+  it('still lets the teacher’s own Overall sentence and the story’s frames fill the step', () => {
+    const f = withWork([3.1, 2.4, 2]);
+    const ctx = CommentBank.context(f, {});
+    const mine = { id: 'mine-1', part: 'now', group: 'Overall', text: '{He} works hard.', mine: true };
+    const story = { id: 'story-1', part: 'now', group: 'Overall', text: '{His} marks climbed.', needs: ['climb'] };
+    const plain = { id: 'plain-1', part: 'now', group: 'Overall', text: '{He} can {strength}.', needs: ['strength'] };
+    const pool = (...sentences) =>
+      CommentBank.stepPool('overall', Object.assign({}, ctx, { climb: 'yes' }), { sentences }).map(s => s.id);
+    expect(pool(mine, plain)).toEqual(['mine-1']);
+    expect(pool(story, plain)).toEqual(['story-1']);
+    expect(pool(plain)).toEqual([]);
+  });
+
+  it('fails verify() once the level word changes', () => {
+    const f = withWork([3.1, 2.4, 2]);
+    const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1, quiet: true });
+    const o = overallOf(d);
+    const r = CommentBank.verify(d, withWork([3.8, 2.4, 2]), {});
+    expect(r.replaced.map(x => x.sentenceId)).toContain(o.id);
   });
 });

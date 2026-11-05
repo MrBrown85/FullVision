@@ -389,11 +389,11 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const { d, ctx } = draftFor(cece());
     const rows = RQ.rowsFromDraft(d);
     // Browse from a gap: the first part that can go in; with every drafted
-    // part in, the first part with no row (Strengths for Cece: hers is in
-    // the best piece sentence); with every part in, Grade.
+    // part in, the first part with no row (Habits for Cece: nothing rated);
+    // with every part in, Grade.
     const fewer = rows.filter(r => r.step !== 'example');
     expect(RQ.gapPart(fewer, ctx, { seed: 3 })).toBe('bestPiece');
-    expect(RQ.gapPart(rows, ctx, { seed: 3 })).toBe('strengths');
+    expect(RQ.gapPart(rows, ctx, { seed: 3 })).toBe('habits');
     const every = RQ.PARTS.map(p => ({ id: 'x:' + p.id, step: p.steps[0], text: 'X.' }));
     expect(RQ.gapPart(every, ctx, { seed: 3 })).toBe('grade');
   });

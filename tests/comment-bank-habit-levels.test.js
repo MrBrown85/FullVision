@@ -367,6 +367,6 @@ describe('the taxonomy fields', () => {
     // The grade frames for one proficiency word (gv01-gv35, the sample
     // voice) carry it.
     expect(COMMENT_BANK.sentences.filter(s => s.standing && s.group !== 'Grade').length).toBe(0);
-    expect(COMMENT_BANK.sentences.filter(s => s.standing).length).toBe(20);
+    expect(COMMENT_BANK.sentences.filter(s => s.standing).length).toBe(72);
   });
 });
