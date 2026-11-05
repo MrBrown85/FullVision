@@ -789,6 +789,231 @@ document.addEventListener('keydown', function (e) {
   setHelpOpen(false, true);
 });
 
+/* ── Report a Problem ────────────────────────────────────────
+   A form from the Help panel, the account menu, and the help site
+   (/dashboard?report=1). The teacher describes the problem; the form shows
+   what goes with it, the page's name, the build and the browser, and never
+   student data. Send goes through the outbox (submitSupportReport in
+   shared/data.js). Demo Mode has no account to send from: Copy Text copies
+   the report instead. */
+
+/* The browser and system, in words: "Chrome 131 on macOS". */
+function reportBrowserText(ua) {
+  ua = String(ua || '');
+  var name = 'Browser';
+  var m;
+  if ((m = ua.match(/Edg\/(\d+)/))) name = 'Edge ' + m[1];
+  else if ((m = ua.match(/Firefox\/(\d+)/))) name = 'Firefox ' + m[1];
+  else if ((m = ua.match(/(?:Chrome|CriOS)\/(\d+)/))) name = 'Chrome ' + m[1];
+  else if ((m = ua.match(/Version\/(\d+)[.\d]* .*Safari/))) name = 'Safari ' + m[1];
+  var os = '';
+  if (/iPad/.test(ua)) os = 'iPadOS';
+  else if (/iPhone/.test(ua)) os = 'iOS';
+  else if (/Android/.test(ua)) os = 'Android';
+  else if (/CrOS/.test(ua)) os = 'ChromeOS';
+  else if (/Mac OS X|Macintosh/.test(ua)) os = 'macOS';
+  else if (/Windows/.test(ua)) os = 'Windows';
+  else if (/Linux/.test(ua)) os = 'Linux';
+  return os ? name + ' on ' + os : name;
+}
+
+/* This deploy's build: the service worker's cache is named after the commit
+   Netlify built (scripts/build.sh). */
+function _reportBuildId() {
+  if (!window.caches || typeof caches.keys !== 'function') return Promise.resolve('');
+  return caches
+    .keys()
+    .then(function (keys) {
+      // While a new deploy installs there are two; the newest is last.
+      var ours = keys.filter(function (x) {
+        return /^fullvision-/.test(x);
+      });
+      var k = ours[ours.length - 1];
+      return k ? k.replace(/^fullvision-/, '') : '';
+    })
+    .catch(function () {
+      return '';
+    });
+}
+
+function _reportAttachedText(page, build) {
+  return ['Page: ' + page, 'FullVision' + (build ? ' ' + build : ''), reportBrowserText(navigator.userAgent)].join(
+    ' · ',
+  );
+}
+
+function openReportProblem(opts) {
+  opts = opts || {};
+  if (document.getElementById('report-problem')) return;
+  // Close the menus it can be opened from.
+  document.querySelectorAll('.tb-user-menu.open').forEach(function (m) {
+    m.classList.remove('open');
+    var b = m.querySelector('.tb-user-btn');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  });
+  var page = opts.page || _helpPage().name;
+  var build = '';
+  var demo = typeof isDemoMode === 'function' && isDemoMode();
+  var trigger = document.activeElement;
+  // From the account menu, which closes: the focus goes back to its button.
+  var menu = trigger && trigger.closest && trigger.closest('.tb-user-menu');
+  if (menu) trigger = menu.querySelector('.tb-user-btn');
+  var overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay cm-help-overlay';
+  overlay.id = 'report-problem';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'report-problem-title');
+  // html-safe: the page name is escaped; the rest is fixed markup.
+  overlay.innerHTML =
+    '<div class="cm-help-card report-card">' +
+    '<div class="cm-help-head">' +
+    '<h2 class="cm-help-title" id="report-problem-title">Report a Problem</h2>' +
+    '<button type="button" class="cm-help-close" data-report="close" aria-label="Close">×</button>' +
+    '</div>' +
+    '<div class="report-body" id="report-body">' +
+    '<label class="report-label" for="report-message">Describe the Problem</label>' +
+    '<textarea class="report-message" id="report-message" rows="6" maxlength="5000" aria-describedby="report-hint"></textarea>' +
+    '<p class="report-hint" id="report-hint">Do not include student names.</p>' +
+    '<p class="report-attached" id="report-attached">' +
+    esc(_reportAttachedText(page, build)) +
+    '</p>' +
+    '<div class="report-actions">' +
+    (demo
+      ? '<p class="report-demo-note">Reports are sent from a signed-in account.</p>' +
+        '<button type="button" class="btn btn-ghost" data-report="cancel">Cancel</button>' +
+        '<button type="button" class="btn btn-primary" data-report="copy">Copy Text</button>'
+      : '<span class="report-spacer"></span>' +
+        '<button type="button" class="btn btn-ghost" data-report="cancel">Cancel</button>' +
+        '<button type="button" class="btn btn-primary" data-report="send" disabled>Send</button>') +
+    '</div></div></div>';
+  document.body.appendChild(overlay);
+  var text = overlay.querySelector('#report-message');
+  var attached = overlay.querySelector('#report-attached');
+  var send = overlay.querySelector('[data-report="send"]');
+  _reportBuildId().then(function (id) {
+    build = id;
+    if (attached.isConnected) attached.textContent = _reportAttachedText(page, build);
+  });
+  function close() {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey, true);
+    try {
+      if (trigger && typeof trigger.focus === 'function') trigger.focus();
+    } catch (e) {
+      /* the trigger may be gone */
+    }
+  }
+  function focusables() {
+    return Array.prototype.filter.call(overlay.querySelectorAll('button, textarea'), function (el) {
+      return !el.disabled;
+    });
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    } else if (e.key === 'Tab') {
+      var f = focusables();
+      var i = f.indexOf(document.activeElement);
+      if (i < 0) {
+        e.preventDefault();
+        f[0].focus();
+      } else if (e.shiftKey && i === 0) {
+        e.preventDefault();
+        f[f.length - 1].focus();
+      } else if (!e.shiftKey && i === f.length - 1) {
+        e.preventDefault();
+        f[0].focus();
+      }
+    }
+  }
+  function done(message) {
+    var body = overlay.querySelector('#report-body');
+    // html-safe: message is one of two fixed sentences.
+    body.innerHTML =
+      '<p class="report-done" role="status">' +
+      message +
+      '</p><div class="report-actions"><span class="report-spacer"></span>' +
+      '<button type="button" class="btn btn-primary" data-report="close">Done</button></div>';
+    body.querySelector('[data-report="close"]').focus();
+  }
+  if (send) {
+    text.addEventListener('input', function () {
+      send.disabled = !text.value.trim();
+    });
+  }
+  overlay.addEventListener('click', function (e) {
+    // A click beside the form closes it only when nothing has been typed.
+    if (e.target === overlay) {
+      if (!text.isConnected || !text.value.trim()) close();
+      return;
+    }
+    var b = e.target.closest('[data-report]');
+    if (!b) return;
+    var act = b.getAttribute('data-report');
+    if (act === 'close' || act === 'cancel') close();
+    else if (act === 'send') {
+      var message = text.value.trim();
+      if (!message || b.disabled) return;
+      b.disabled = true;
+      b.textContent = 'Sending';
+      var sent = window.submitSupportReport({
+        page: page,
+        message: message,
+        browser: reportBrowserText(navigator.userAgent),
+        appVersion: build,
+      });
+      // Sent once the server has it. A write that has to wait (offline, or
+      // the server is slow) stays in the outbox and is sent later; the sync
+      // dot shows it until then.
+      var waited = new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve(null);
+        }, 8000);
+      });
+      Promise.race([Promise.resolve(sent), waited]).then(function (res) {
+        if (!overlay.isConnected) return;
+        done(
+          res && !res.error
+            ? 'The report has been sent.'
+            : 'The report is saved on this device and will be sent when the connection allows.',
+        );
+      });
+    } else if (act === 'copy') {
+      var copy = (text.value.trim() ? text.value.trim() + '\n\n' : '') + _reportAttachedText(page, build);
+      _copyTextToClipboard(copy).then(function (ok) {
+        if (!ok) return;
+        b.textContent = 'Copied';
+        setTimeout(function () {
+          if (b.isConnected) b.textContent = 'Copy Text';
+        }, 1500);
+      });
+    }
+  });
+  document.addEventListener('keydown', onKey, true);
+  text.focus();
+}
+window.openReportProblem = openReportProblem;
+
+/* The help site's Report a Problem links to /dashboard?report=1: the form
+   opens once, with Page "Help site", and the address drops the parameter. */
+let _reportFromUrlDone = false;
+function _reportFromUrl() {
+  if (_reportFromUrlDone) return;
+  var params = new URLSearchParams((location && location.search) || '');
+  if (params.get('report') !== '1') return;
+  _reportFromUrlDone = true;
+  params.delete('report');
+  var q = params.toString();
+  var url = location.pathname + (q ? '?' + q : '');
+  // Through the router, so it knows the address it is on.
+  if (window.Router && typeof Router.setUrl === 'function') Router.setUrl(url);
+  else history.replaceState(history.state, '', url + location.hash);
+  openReportProblem({ page: 'Help site' });
+}
+
 /* ── Keyboard Shortcuts sheet ─────────────────────────────────
    Every shortcut in KEYBOARD_SHORTCUTS (shared/constants.js), grouped by
    where it works, in the Where These Appear modal's chrome. Opens from the
@@ -918,7 +1143,10 @@ function renderDock(activePage, rightHTML) {
   _ensureSyncStatusUI();
   // The router draws the dock on every route change; the Help panel then
   // shows the new page's articles.
-  setTimeout(_helpSync, 0);
+  setTimeout(function () {
+    _helpSync();
+    _reportFromUrl();
+  }, 0);
   const ap = activePage === 'student' ? 'dashboard' : activePage;
   const seg = TB_PAGES.map(
     p =>
@@ -937,7 +1165,7 @@ function renderDock(activePage, rightHTML) {
       <span class="tb-user-name" id="tb-user-name"></span>
     </button>
     <div class="tb-user-dropdown">
-      ${resetDemo}<button class="tb-user-signout" data-action="signOut">Sign Out</button>
+      <button class="tb-user-item tb-user-help" data-action="openHelpFromMenu">Help</button><button class="tb-user-item" data-action="openReportProblem">Report a Problem</button>${resetDemo}<button class="tb-user-signout" data-action="signOut">Sign Out</button>
     </div>
   </div>`;
 
@@ -2306,6 +2534,19 @@ document.addEventListener('click', function (e) {
     },
     openKeyboardShortcuts: function () {
       openKeyboardShortcuts();
+    },
+    openReportProblem: function () {
+      openReportProblem();
+    },
+    // Under 600 px Help is in the account menu (styles.css).
+    openHelpFromMenu: function () {
+      var menu = el.closest('.tb-user-menu');
+      if (menu) {
+        menu.classList.remove('open');
+        var b = menu.querySelector('.tb-user-btn');
+        if (b) b.setAttribute('aria-expanded', 'false');
+      }
+      setHelpOpen(true);
     },
     toggleDemoMenu: function () {
       _setDemoMenu(!el.parentElement.classList.contains('open'));
