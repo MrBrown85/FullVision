@@ -10,7 +10,7 @@ test.describe('Login Page', () => {
     await expect(page.locator('#form-signin')).toBeVisible();
     await expect(page.locator('#form-signup')).toBeHidden();
     await expect(page.locator('.auth-title')).toHaveText('FullVision');
-    await expect(page.locator('.auth-subtitle')).toHaveText('Learning Profile Builder and Communicator');
+    await expect(page.locator('.auth-subtitle')).toHaveText('The Gradebook for Communicating Student Learning in BC');
   });
 
   test('sign-in form has email and password fields', async ({ page }) => {

@@ -267,6 +267,59 @@ let _sessionExpiredRetries = {};
 let _sessionExpiredCopyDraft = null;
 let _sessionExpiredModalOpen = false;
 
+/* The Demo Mode pill at the left of the top bar, in Demo Mode only. Its
+   panel says what Demo Mode is and offers the ways out: Create an Account
+   and Sign In, which leave Demo Mode first (leaveDemoMode in shared/data.js),
+   and Reset Demo Data, the same action as the account menu's. It is a small
+   dialog, not a menu, because it holds a sentence. */
+const DEMO_CHEVRON_SVG =
+  '<svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5l3 3 3-3"/></svg>';
+const DEMO_MENU_TITLE = 'Demo Mode';
+const DEMO_MENU_TEXT = 'A sample Science 8 class. Nothing is saved to an account.';
+
+// html-safe: fixed strings only.
+function demoPillHTML() {
+  if (typeof isDemoMode !== 'function' || !isDemoMode()) return '';
+  return `<div class="tb-demo-menu">
+      <button type="button" class="tb-demo-pill" data-action="toggleDemoMenu" aria-expanded="false" aria-haspopup="dialog" aria-controls="tb-demo-panel">Demo Mode${DEMO_CHEVRON_SVG}</button>
+      <div class="tb-demo-panel" id="tb-demo-panel" role="dialog" aria-labelledby="tb-demo-title" hidden>
+        <div class="tb-demo-head">
+          <h2 class="tb-demo-title" id="tb-demo-title">${DEMO_MENU_TITLE}</h2>
+          <p class="tb-demo-text">${DEMO_MENU_TEXT}</p>
+        </div>
+        <div class="tb-demo-actions">
+          <a class="btn btn-primary tb-demo-btn" href="/login.html#signup" data-action="leaveDemoMode">Create an Account</a>
+          <a class="btn btn-ghost tb-demo-btn" href="/login.html" data-action="leaveDemoMode">Sign In</a>
+        </div>
+        <div class="tb-demo-rule"></div>
+        <button type="button" class="tb-demo-reset" data-action="resetDemoData">Reset Demo Data</button>
+      </div>
+    </div>`;
+}
+
+function _setDemoMenu(open, focusButton) {
+  var wrap = document.querySelector('.tb-demo-menu');
+  if (!wrap) return;
+  var btn = wrap.querySelector('.tb-demo-pill');
+  var panel = wrap.querySelector('.tb-demo-panel');
+  wrap.classList.toggle('open', !!open);
+  panel.hidden = !open;
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!open && focusButton) btn.focus();
+}
+
+document.addEventListener('click', function (e) {
+  var wrap = document.querySelector('.tb-demo-menu.open');
+  if (!wrap) return;
+  // A click outside closes it; so does Reset Demo Data, which opens its own confirm.
+  if (!wrap.contains(e.target) || e.target.closest('[data-action="resetDemoData"]')) _setDemoMenu(false);
+});
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape' || !document.querySelector('.tb-demo-menu.open')) return;
+  _setDemoMenu(false, true);
+  e.preventDefault();
+});
+
 // html-safe: TB_PAGES, OFFLINE_BANNER_COPY and the icons are fixed; the only caller (router.js) passes no rightHTML.
 function renderDock(activePage, rightHTML) {
   _ensureSyncStatusUI();
@@ -295,7 +348,7 @@ function renderDock(activePage, rightHTML) {
   return `<div class="offline-banner" id="offline-banner" role="status" aria-live="polite" hidden>${OFFLINE_BANNER_COPY}</div>
   <nav id="app-dock" role="navigation" aria-label="Main navigation">
     <div class="tb-group tb-left">
-      <button class="tb-btn" data-action="toggleSidebar" title="Toggle Sidebar" aria-label="Toggle Sidebar">${TB_SIDEBAR_SVG}</button>
+      <button class="tb-btn" data-action="toggleSidebar" title="Toggle Sidebar" aria-label="Toggle Sidebar">${TB_SIDEBAR_SVG}</button>${demoPillHTML()}
     </div>
     <div class="tb-group tb-center">
       <div class="seg tb-seg">${seg}</div>
@@ -1583,6 +1636,18 @@ document.addEventListener('click', function (e) {
       var isOpen = el.parentElement.classList.toggle('open');
       el.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     },
+    // Create an Account and Sign In leave Demo Mode first (shared/data.js).
+    leaveDemoMode: async function () {
+      var href = el.getAttribute('href');
+      var res = await window.leaveDemoMode(href);
+      if (!res || !res.unsent) return;
+      showConfirm('Unsent Changes', window.leaveDemoUnsentText(res.unsent), 'Leave Demo Mode', 'danger', function () {
+        window.leaveDemoMode(href, { force: true });
+      });
+    },
+    toggleDemoMenu: function () {
+      _setDemoMenu(!el.parentElement.classList.contains('open'));
+    },
     signOut: async function () {
       var res = await signOut();
       if (!res || !res.unsent) return;
@@ -1602,21 +1667,11 @@ document.addEventListener('click', function (e) {
       if (typeof isDemoMode !== 'function' || !isDemoMode()) return;
       showConfirm(
         'Reset Demo Data',
-        'Reset ALL data to demo defaults? This cannot be undone.',
+        'All classes are deleted and the sample Science 8 class is restored. This cannot be undone.',
         'Reset',
         'danger',
         async function () {
-          await Promise.all(
-            Object.keys(COURSES).map(function (cid) {
-              return deleteCourseData(cid);
-            }),
-          );
-          Object.keys(COURSES).forEach(function (cid) {
-            delete COURSES[cid];
-          });
-          Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
-          saveCourses(COURSES);
-          loadSeedIfNeeded();
+          await window.resetDemoData();
           Router.navigate('/dashboard');
         },
       );

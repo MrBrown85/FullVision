@@ -360,8 +360,9 @@
     // Printed report copies (teacher/report-issues.js) hold every student's
     // full report and live in IndexedDB, not localStorage.
     await _deleteReportCopies();
-    // All portals share the same login page — it routes to the right interface after sign-in
-    window.location.href = '/login.html';
+    // All portals share the same login page — it routes to the right interface after sign-in.
+    // opts.redirect picks its tab (Leave Demo Mode's Create an Account: /login.html#signup).
+    window.location.href = opts.redirect || '/login.html';
   };
 
   /**
