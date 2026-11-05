@@ -82,18 +82,14 @@ describe('At a Glance', () => {
       'Best Piece',
       'Missing and Late',
     ]);
-    // The competency's name, its own wording from the learning map (the tag's
-    // text, as Class Management shows it), the figure and pieces, then the
-    // word and the change.
-    expect(r[0]).toBe(
-      'Strongest | Data Representation | Construct and use a range of methods to represent patterns or relationships in data, including tables, graphs, keys, models, and digital technologies as appropriate | 3.3 · 5 pieces | Proficient · ↑ from 3.0',
-    );
+    // The competency's name only (no wording), the figure and pieces, then
+    // the word and the change.
+    expect(r[0]).toBe('Strongest | Data Representation | 3.3 · 5 pieces | Proficient · ↑ from 3.0');
+    expect(html).not.toContain('qn-glance-wording');
     // The comment's next step: the lowest with 2+ pieces in the year to date
     // (NEXT_STEP_PIECES), first assessed in Term 2.
-    expect(r[1]).toMatch(
-      /^Next Step \| Sustained Inquiry \| [^|]+ \| 2\.5 · 2 pieces \| Proficient · New since the report$/,
-    );
-    expect(r[2]).toMatch(/^Biggest Change \| Sharing Findings \| [^|]+ \| 3\.2 · 11 pieces \| 2\.8 → 3\.2$/);
+    expect(r[1]).toMatch(/^Next Step \| Sustained Inquiry \| 2\.5 · 2 pieces \| Proficient · New since the report$/);
+    expect(r[2]).toMatch(/^Biggest Change \| Sharing Findings \| 3\.2 · 11 pieces \| 2\.8 → 3\.2$/);
     expect(r[4]).toBe('Missing and Late | None so far this year');
   });
 
@@ -183,8 +179,8 @@ describe('At a Glance', () => {
     clearProfCache();
     try {
       const r = rows(glance(cece()));
-      expect(r[0]).toMatch(/^Strongest \| [^|]+ \| [^|]+ \| \d+% · \d+ pieces \| [↑↓] from \d+%$/);
-      expect(r[2]).toMatch(/^Biggest Change \| Sharing Findings \| [^|]+ \| \d+% · 11 pieces \| \d+% → \d+%$/);
+      expect(r[0]).toMatch(/^Strongest \| [^|]+ \| \d+% · \d+ pieces \| [↑↓] from \d+%$/);
+      expect(r[2]).toMatch(/^Biggest Change \| Sharing Findings \| \d+% · 11 pieces \| \d+% → \d+%$/);
     } finally {
       COURSES[CID].gradingSystem = was;
       clearProfCache();

@@ -64,6 +64,8 @@ async function overflow(page) {
     document.querySelectorAll('.qn *, #gb-sidebar *, .report-toolbar *').forEach(el => {
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || el.offsetParent === null) return;
+      // A line cut on purpose (a Work Habits name) ends in an ellipsis.
+      if (cs.textOverflow === 'ellipsis' && cs.overflowX === 'hidden' && el.title === el.textContent) return;
       if (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1 && !['auto', 'scroll'].includes(cs.overflowX)) {
         out.push((el.id || el.className || el.tagName) + ': ' + (el.textContent || '').trim().slice(0, 30));
       }
@@ -286,19 +288,44 @@ test('Work Habits: a rating saves in place and the count follows; nothing redraw
   const grid = page.locator('.qn-habits');
   await grid.evaluate(el => (el.__mark = 'same'));
   const slider = page.locator('.qn-hs[data-habit="part"]');
-  await page.locator('.qn-hs-label[data-habit="part"][data-value="4"]').click();
+  await page.locator('.qn-hs-stop[data-habit="part"][data-value="4"]').click();
   await expect(slider).toHaveAttribute('aria-valuenow', '4');
   await expect(slider).toHaveAttribute('aria-valuetext', 'Consistently');
-  await expect(page.locator('.qn-hs-label.on[data-habit="part"]')).toHaveText('Consistently');
   await expect(page.locator('#tq-rated')).toHaveText('1 of 6 rated');
   expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({ part: 4 });
   expect(await grid.evaluate(el => el.__mark)).toBe('same');
-  await expect(page.locator('.qn-habit-name').nth(1)).toHaveText('Comes Ready and Uses Class Time');
+  await expect(page.locator('.qn-habit-name').nth(1)).toHaveText('Comes Ready, Uses Class Time');
+  // The compact grid: the scale's words head four columns, each stop under
+  // its word; the rating area is 236 px.
+  const fit = await page.evaluate(() => {
+    const heads = [...document.querySelectorAll('.qn-habit-scale span')].map(e => e.getBoundingClientRect());
+    const dots = [...document.querySelectorAll('.qn-hs[data-habit="part"] .qn-hs-dot')].map(e =>
+      e.getBoundingClientRect(),
+    );
+    return {
+      width: Math.round(document.querySelector('.qn-hs').getBoundingClientRect().width),
+      off: heads.map((h, i) => Math.abs(h.x + h.width / 2 - (dots[i].x + dots[i].width / 2))),
+    };
+  });
+  expect(fit.width).toBe(236);
+  fit.off.forEach(d => expect(d).toBeLessThan(1));
   await expect(page.locator('.qn-habit-desc').nth(5)).toHaveText(
-    'Puts the phone away when asked, and uses devices for learning, not as a distraction.',
+    'Phone away when asked; devices for learning, not distraction.',
   );
+  // Each description is one line and, in the 470 px column, whole (no
+  // ellipsis); a name is one line, cut with its full text in its title.
+  const lines = await page.evaluate(() => ({
+    cut: [...document.querySelectorAll('.qn-habit-desc')]
+      .filter(el => el.scrollWidth > el.clientWidth)
+      .map(el => el.textContent),
+    tall: [...document.querySelectorAll('.qn-habit-name, .qn-habit-desc')].filter(
+      el => el.getBoundingClientRect().height > 20,
+    ).length,
+    titled: [...document.querySelectorAll('.qn-habit-name')].every(el => el.title === el.textContent),
+  }));
+  expect(lines).toEqual({ cut: [], tall: 0, titled: true });
   // The chosen stop clicked again clears the habit.
-  await page.locator('.qn-hs-label[data-habit="part"][data-value="4"]').click();
+  await page.locator('.qn-hs-stop[data-habit="part"][data-value="4"]').click();
   await expect(slider).not.toHaveAttribute('aria-valuenow', /./);
   await expect(page.locator('#tq-rated')).toHaveText('0 of 6 rated');
   expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({});
@@ -311,21 +338,22 @@ test('Work Habits: the track snaps to the nearest stop, past the ends too, and a
   const slider = page.locator('.qn-hs[data-habit="others"]');
   const track = await slider.locator('.qn-hs-track').boundingBox();
   const y = track.y + track.height / 2;
+  // Each stop is under its column of the scale, half a column in.
+  const col = track.width / 4;
   // Past the left end stop: Rarely.
-  await page.mouse.click(track.x + 6, y);
+  await page.mouse.click(track.x + 3, y);
   await expect(slider).toHaveAttribute('aria-valuenow', '1');
   // Past the right end stop: Consistently.
-  await page.mouse.click(track.x + track.width - 6, y);
+  await page.mouse.click(track.x + track.width - 3, y);
   await expect(slider).toHaveAttribute('aria-valuenow', '4');
   // A little right of the second stop: Sometimes.
-  const step = (track.width - 88) / 3;
-  await page.mouse.click(track.x + 44 + step + 10, y);
+  await page.mouse.click(track.x + col * 1.5 + 8, y);
   await expect(slider).toHaveAttribute('aria-valuenow', '2');
   // Dragged from Sometimes to the third stop: Usually, saved once let go.
-  await page.mouse.move(track.x + 44 + step, y);
+  await page.mouse.move(track.x + col * 1.5, y);
   await page.mouse.down();
-  await page.mouse.move(track.x + 44 + step * 1.5, y, { steps: 4 });
-  await page.mouse.move(track.x + 44 + step * 2, y, { steps: 4 });
+  await page.mouse.move(track.x + col * 2, y, { steps: 4 });
+  await page.mouse.move(track.x + col * 2.5, y, { steps: 4 });
   await page.mouse.up();
   await expect(slider).toHaveAttribute('aria-valuenow', '3');
   expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({ others: 3 });
@@ -456,7 +484,7 @@ test.describe('checks and approval', () => {
     await expect(page.locator('#tq-empty-rated')).toHaveText('0 of 6 habits rated');
     // No count or Copy under it.
     await expect(page.locator('#tq-comment-foot')).toBeHidden();
-    await page.locator('.qn-hs-label[data-habit="part"][data-value="4"]').click();
+    await page.locator('.qn-hs-stop[data-habit="part"][data-value="4"]').click();
     await expect(page.locator('#tq-empty-rated')).toHaveText('1 of 6 habits rated');
     // Clicking it puts the cursor in the box; typing hides it.
     await page.locator('#tq-empty').click();
@@ -542,7 +570,7 @@ test.describe('checks and approval', () => {
     // shared). Noor's comment is then a copy of its first six sentences,
     // so the two share exactly five whatever the bank drafts.
     for (const key of await page.evaluate(() => CommentBank.HABITS.map(h => h.key))) {
-      await page.locator(`.qn-hs-label[data-habit="${key}"][data-value="4"]`).click();
+      await page.locator(`.qn-hs-stop[data-habit="${key}"][data-value="4"]`).click();
     }
     await page.locator('#tq-att-absences').fill('3');
     await page.locator('#tq-att-absences').press('Tab');
@@ -626,7 +654,7 @@ test.describe('on a 1366 × 768 laptop', () => {
 
 test('end to end: rate, generate, approve, move on, and the report prints it', async ({ page }) => {
   await open(page);
-  await page.locator('.qn-hs-label[data-habit="part"][data-value="4"]').click();
+  await page.locator('.qn-hs-stop[data-habit="part"][data-value="4"]').click();
   await page.locator('#tq-generate').click();
   const draft = await page.locator('#tq-narrative').inputValue();
   await page.locator('#tq-approve-next').click();
@@ -747,7 +775,7 @@ test.describe('the Sentences card', () => {
     // Six habits rated, so the comment has a habits part with alternatives
     // (two sentences, each its own Habits row; the first is used here).
     for (const key of await page.evaluate(() => CommentBank.HABITS.map(h => h.key))) {
-      await page.locator(`.qn-hs-label[data-habit="${key}"][data-value="4"]`).click();
+      await page.locator(`.qn-hs-stop[data-habit="${key}"][data-value="4"]`).click();
     }
     await page.locator('#tq-generate').click();
     const home = rowByLabel(page, 'Habits').first();
@@ -1184,9 +1212,9 @@ test.describe('the Sentences card', () => {
     // Cece's habits: five Consistently, Uses Feedback Sometimes, so the
     // Habits part has her own cases.
     for (const k of ['completes', 'ready', 'others', 'part', 'devices']) {
-      await page.locator(`.qn-hs-label[data-habit="${k}"][data-value="4"]`).click();
+      await page.locator(`.qn-hs-stop[data-habit="${k}"][data-value="4"]`).click();
     }
-    await page.locator('.qn-hs-label[data-habit="feedback"][data-value="2"]').click();
+    await page.locator('.qn-hs-stop[data-habit="feedback"][data-value="2"]').click();
     await page.locator('#tq-browse-btn').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
     await expect(sheet).toBeVisible();
@@ -1358,7 +1386,7 @@ test('a rating adds the Habits row and attendance adds and removes its row, with
   await page.locator('#tq-generate').click();
   await expect(rowByLabel('Habits')).toHaveCount(0);
   for (const k of ['completes', 'ready', 'others', 'part', 'feedback', 'devices']) {
-    await page.locator(`.qn-hs-label[data-habit="${k}"][data-value="4"]`).click();
+    await page.locator(`.qn-hs-stop[data-habit="${k}"][data-value="4"]`).click();
   }
   // All six rated Consistently: the habits part for families, what Cece
   // does in two sentences, whichever frames the seed picks (Nov 4).

@@ -162,17 +162,17 @@ test('desktop student page fits a phone', async ({ page }) => {
 });
 
 // Group 2 #45: the Term Questionnaire works on a phone: the sidebar button
-// opens the student list, the name has room, a Work Habits slider's labels
-// stay inside it without running together, and Times Late is on screen.
+// opens the student list, the name has room, the Work Habits scale's words
+// sit over their stops, and Times Late is on screen.
 test('Term Questionnaire fits a phone', async ({ page }) => {
   await openDesktop(page, '/reports?tab=questionnaire');
   await expect(page.locator('.qn-habits')).toBeVisible();
   const r = await page.evaluate(() => {
     const toggle = document.querySelector('#app-dock [data-action="toggleSidebar"]');
     const tb = toggle.getBoundingClientRect();
-    const slider = document.querySelector('.qn-hs').getBoundingClientRect();
-    const labels = [...document.querySelector('.qn-hs').querySelectorAll('.qn-hs-label')].map(l =>
-      l.getBoundingClientRect(),
+    const heads = [...document.querySelectorAll('.qn-habit-scale span')].map(e => e.getBoundingClientRect());
+    const dots = [...document.querySelector('.qn-hs').querySelectorAll('.qn-hs-dot')].map(e =>
+      e.getBoundingClientRect(),
     );
     const late = document.querySelector('[data-tq-att="lates"]');
     const lb = late.getBoundingClientRect();
@@ -180,16 +180,17 @@ test('Term Questionnaire fits a phone', async ({ page }) => {
     return {
       toggleHit: toggle.contains(document.elementFromPoint(tb.x + tb.width / 2, tb.y + tb.height / 2)),
       whoWidth: document.querySelector('.qn-who').getBoundingClientRect().width,
-      labelsInside: labels.every(l => l.left >= slider.left - 0.5 && l.right <= slider.right + 0.5),
-      labelsApart: labels.every((l, i) => i === 0 || l.left >= labels[i - 1].right),
+      offsets: heads.map((h, i) => Math.abs(h.x + h.width / 2 - (dots[i].x + dots[i].width / 2))),
+      headsApart: heads.every((h, i) => i === 0 || h.left >= heads[i - 1].right - 0.5),
       lateInView: lb.width > 0 && lb.right <= innerWidth,
       sideways: qn.scrollWidth > qn.clientWidth + 1,
     };
   });
   expect(r.toggleHit).toBe(true);
   expect(r.whoWidth).toBeGreaterThan(200);
-  expect(r.labelsInside).toBe(true);
-  expect(r.labelsApart).toBe(true);
+  expect(r.offsets).toHaveLength(4);
+  r.offsets.forEach(d => expect(d).toBeLessThan(1));
+  expect(r.headsApart).toBe(true);
   expect(r.lateInView).toBe(true);
   expect(r.sideways).toBe(false);
   await page.locator('#app-dock [data-action="toggleSidebar"]').click();

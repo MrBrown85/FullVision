@@ -171,8 +171,23 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect((html.match(/role="slider"/g) || []).length).toBe(6);
     expect(html).not.toContain('role="radio"');
     expect(html).not.toContain('Not Seen');
-    expect(html).toContain('<span class="qn-habit-name" id="tq-habit-ready">Comes Ready and Uses Class Time</span>');
-    CommentBank.HABITS.forEach(h => expect(html).toContain('<span class="qn-habit-desc">' + h.desc + '</span>'));
+    expect(html).toContain(
+      '<span class="qn-habit-name" id="tq-habit-ready" title="Comes Ready, Uses Class Time">Comes Ready, Uses Class Time</span>',
+    );
+    CommentBank.HABITS.forEach(h =>
+      expect(html).toContain(
+        '<span class="qn-habit-desc" id="tq-habit-desc-' + h.key + '" title="' + h.desc + '">' + h.desc + '</span>',
+      ),
+    );
+    expect(CommentBank.HABITS.map(h => h.desc)).toEqual([
+      'Hands in assignments complete and on time, and finishes class work.',
+      'Brings materials, starts without a reminder, and stays on task.',
+      'Listens, does a fair share in groups, and helps others who are stuck.',
+      'Asks questions, adds to discussions, and joins in activities.',
+      'Revises work after feedback, keeps going, and asks for help.',
+      'Phone away when asked; devices for learning, not distraction.',
+    ]);
+    expect(html).not.toContain('From assignments:');
     expect(html).toContain('At a Glance');
     expect(html).toContain('Best Piece');
     expect(html).toContain('<span class="qn-fact-label">Missing and Late</span>');

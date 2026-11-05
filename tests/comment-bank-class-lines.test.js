@@ -486,8 +486,8 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(auto).toBeGreaterThan(0);
     const label = CommentBank.SCALE[auto - 1];
     let html = open();
-    // The slider shows the record's rating, marked from the record, with
-    // the record's line under the habit; it does not count as rated.
+    // The slider shows the record's rating, marked from the record (no
+    // record line under the habit); it does not count as rated.
     expect(html).toMatch(
       new RegExp(
         'class="qn-hs set from-record" role="slider" tabindex="0" data-habit="completes" data-value="' +
@@ -499,9 +499,7 @@ describe('the class settings (report_config) and the review screen', () => {
           ', from the assignment record"',
       ),
     );
-    expect(html).toMatch(
-      /<span class="qn-habit-note">From assignments: \d+ of \d+ handed in, \d+ late, \d+ missing<\/span>/,
-    );
+    expect(html).not.toContain('From assignments:');
     expect(html).toContain('id="tq-rated">0 of 6 rated');
     // Rated by the teacher: the slider shows their rating, not the record.
     upsertTermRating(CID, GAB.id, TERM, { habits: { completes: 4 } });
