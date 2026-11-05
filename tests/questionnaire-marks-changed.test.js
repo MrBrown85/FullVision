@@ -353,11 +353,7 @@ describe('the review screen', () => {
     );
     // The grade sentence edited by the teacher: never flagged, so it holds.
     seed();
-    // (The grade sentence is first or second: the comment's shape.)
-    approved(rows => {
-      const g = rows.findIndex(r => r.step === 'grade');
-      rows[g] = Object.assign({}, rows[g], { text: 'Priya worked hard this term.', edited: true });
-    });
+    approved(rows => (rows[0] = Object.assign({}, rows[0], { text: 'Priya worked hard this term.', edited: true })));
     markTask4();
     expect(open()).toContain('The grade sentence still holds.');
   });

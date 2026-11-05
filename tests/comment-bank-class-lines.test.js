@@ -120,16 +120,15 @@ describe('nextStepOf', () => {
 describe('the draft', () => {
   it('says the next step as a skill, never a bare competency label', () => {
     const d = draftOf(facts());
-    // One of the pipeline's Next Step frames (Nov 4 2026) with the skill for
-    // Significance in it, filled for singular they.
-    const got = d.sentences.find(x => x.step === 'nextStep' || (x.steps || []).indexOf('nextStep') >= 0);
-    expect(got.id).toMatch(/vns\d\d/);
-    const skill = CommentBank.SKILLS.socials.find(r => r.key === 'significance').skill;
-    expect(
-      [skill, CommentForms.doing(skill)].some(t => got.text.indexOf(t) >= 0),
-      got.text,
-    ).toBe(true);
-    expect(got.text).not.toMatch(/\b(he|she|his|her)\b/);
+    // One of the frames written for Significance, filled for singular they.
+    const got = d.sentences.find(x => x.step === 'nextStep');
+    const forSkill = COMMENT_BANK.sentences
+      .filter(s => s.when && s.when.nextSkill === 'significance' && s.subjects[0] === 'socials')
+      .map(s => s.id);
+    expect(forSkill).toContain(got.id);
+    expect(got.text).toMatch(
+      /^(Next, they can|The next step for them is to|Their next step is to|[A-Z]\w+ing .* (is their next step|is what they can practise next))/,
+    );
     expect(got.text).not.toContain('Significance');
     expect(d.replaced).toEqual([]);
     // No skill in the table: no next-step sentence that names a competency.
@@ -285,11 +284,7 @@ describe('For the Family sentences', () => {
       expect(words(s.text), s.id).toBeLessThanOrEqual(20);
       expect(s.text, s.id).not.toMatch(/\b(make sure|remind|supervis|monitor|homework|classmates?|peers?)\b/i);
       expect(s.text, s.id).not.toMatch(/\b(still|again|only|finally|unfortunately)\b|!|\bat least\b/i);
-      if (s.v === 2) {
-        // The pipeline's wrappers say the next step's own prompt ({homeLine}).
-        expect(s.needs, s.id).toEqual(['homeLine']);
-        expect(s.claims, s.id).toEqual(['nextStep']);
-      } else if (s.when) {
+      if (s.when) {
         expect(Object.keys(s.when), s.id).toEqual(['nextSkill']);
         expect(s.claims, s.id).toEqual(['nextStep']);
       } else expect(s.claims, s.id).toEqual([]);
@@ -316,9 +311,7 @@ describe('For the Family sentences', () => {
     const f = facts();
     const d = draftOf(f);
     const home = d.sentences.find(s => s.step === 'home');
-    // A pipeline wrapper around one of Significance's own prompts.
-    expect(COMMENT_BANK.sentences.find(s => s.id === home.id).needs).toEqual(['homeLine']);
-    expect(d.provenance[d.sentences.indexOf(home)].sources.homeLine).toEqual(['comp:c3']);
+    expect(COMMENT_BANK.sentences.find(s => s.id === home.id).when).toEqual({ nextSkill: 'significance' });
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     // Perspective drops below Significance: the next step is Perspective now.
     const f2 = facts({

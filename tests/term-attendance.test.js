@@ -124,23 +124,13 @@ describe('Report 2 with Report 1’s attendance blank (Colin, 2026-11-03: “Yea
     const ctx = CommentBank.context(CommentBank.facts(CID, MAX, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
     const att = habits.rows.filter(r => r.group === 'Attendance').map(r => r.text);
-    // h63 and the pipeline's absences-only frames (vat01, vat02); the ones
-    // that said "this term" (h62, h64-h66) are retired.
-    expect(att.sort()).toEqual(
-      [
-        'He has missed 14 classes.',
-        'In attendance, he has been away for 14 classes.',
-        'In attendance, he has missed 14 classes so far.',
-      ].sort(),
-    );
+    // h63 only: the other absences-only frames (h62, h64-h66) say "this term".
+    expect(att).toEqual(['In attendance, he has missed 14 classes so far.']);
     for (let seed = 1; seed <= 20; seed++) {
       const d = CommentBank.draft(ctx, { seed });
       const said = d.sentences.filter(x => x.step === 'attendance').map(x => x.text);
       expect(said).toHaveLength(1);
-      expect(said[0]).toMatch(
-        /^(In attendance, (he|Max) has (missed|been away for) 14 classes( so far)?|(He|Max) has missed 14 classes)\.$/,
-      );
-      expect(said[0]).not.toMatch(/this term/);
+      expect(said[0]).toMatch(/^In attendance, (he|Max) has missed 14 classes so far\.$/);
     }
   });
 

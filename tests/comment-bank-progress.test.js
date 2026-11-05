@@ -68,34 +68,31 @@ describe('progress in levels', () => {
     expect([pg.from, pg.to, pg.skill]).toEqual(['Developing', 'Proficient', comment['ss-evi'].phrase]);
     const ctx = CommentBank.context(f, {});
     expect(ctx.progressSkill).toBe(pg.skill);
-    // The pipeline's growth frames (vgw01-vgw08, Nov 4 2026) say it, with
-    // the skill as a gerund (pg01 and pg02 said "in their ability to").
-    expect(ctx.progressDoing).toBe(CommentForms.doing(comment['ss-evi'].phrase));
-    const growth = COMMENT_BANK.sentences.filter(x => /^vgw\d\d$/.test(x.id));
-    expect(growth.length).toBeGreaterThanOrEqual(8);
-    growth.forEach(x => expect(CommentBank.fits(x, ctx), x.id).toBe(true));
+    const pool = CommentBank.stepPool('overall', ctx).map(s => s.id);
+    expect(pool.some(id => /^pg\d\d$/.test(id))).toBe(true);
   });
 
   it('says it in sentences that verify, and is flagged once the climb is gone', () => {
     const f = facts(climbing());
     const ctx = CommentBank.context(f, {});
-    const g1 = COMMENT_BANK.sentences.find(x => x.id === 'vgw01');
-    const doing = CommentForms.doing(comment['ss-evi'].phrase);
-    expect(CommentBank.fill(g1, ctx)).toBe('Their marks for ' + doing + ' have risen from Developing to Proficient.');
-    const text = CommentBank.fill(g1, ctx);
+    const pg1 = COMMENT_BANK.sentences.find(x => x.id === 'pg01');
+    const pg2 = COMMENT_BANK.sentences.find(x => x.id === 'pg02');
+    expect(CommentBank.fill(pg1, ctx)).toBe(
+      'They rose from Developing to Proficient in their ability to ' + comment['ss-evi'].phrase + '.',
+    );
+    expect(CommentBank.fill(pg2, ctx)).toBe(
+      'They have reached Proficient in their ability to ' + comment['ss-evi'].phrase + ', up from Developing.',
+    );
+    const text = CommentBank.fill(pg1, ctx);
     const d = {
       text,
-      sentences: [{ id: 'vgw01', step: 'overall', text }],
-      provenance: [CommentBank.provenance(g1, ctx)],
+      sentences: [{ id: 'pg01', step: 'overall', text }],
+      provenance: [CommentBank.provenance(pg1, ctx)],
     };
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     const flat = climbing();
     flat[0] = comp('c1', 'Evidence', [3, 3, 3, 3, 3.1], 3, 3.1, 'bc.ss10.cc.3');
-    const v = CommentBank.verify(d, facts(flat), {});
-    expect(v.replaced.map(x => x.sentenceId)).toContain('vgw01');
-    expect(v.replaced.find(x => x.sentenceId === 'vgw01').failed).toContain('improved');
-    // The retired wording is kept for a saved comment that holds it.
-    expect(COMMENT_BANK.retired.find(x => x.id === 'pg01').text).toMatch(/ability to/);
+    expect(CommentBank.verify(d, facts(flat), {}).replaced.map(x => x.sentenceId)).toContain('pg01');
   });
 
   it('leaves out a climb below the gate, the next step’s skill, a Letter class and a class not linked to the bank', () => {
@@ -113,9 +110,9 @@ describe('progress in levels', () => {
     expect(CommentBank.progressOf(facts(plain))).toBeNull();
   });
 
-  it('stays within 24 words in every frame for every cluster it is offered for', () => {
-    const frames = COMMENT_BANK.sentences.filter(s => /^vgw\d\d$/.test(s.id));
-    expect(frames.length).toBeGreaterThanOrEqual(8);
+  it('stays within 20 words in every frame for every cluster it is offered for', () => {
+    const frames = COMMENT_BANK.sentences.filter(s => /^pg\d\d$/.test(s.id));
+    expect(frames.length).toBe(2);
     Object.keys(comment)
       .filter(k => !k.startsWith('_'))
       .forEach(k => {
@@ -127,8 +124,7 @@ describe('progress in levels', () => {
             .replace('{his}', 'her')
             .replace('{progressFrom}', 'Developing')
             .replace('{progressTo}', 'Proficient')
-            .replace('{progressSkill}', comment[k].phrase)
-            .replace('{progressDoing}', CommentForms.doing(comment[k].phrase));
+            .replace('{progressSkill}', comment[k].phrase);
           expect(CommentRealiser.tooLong(t), s.id + ' ' + k).toBe(false);
         });
       });

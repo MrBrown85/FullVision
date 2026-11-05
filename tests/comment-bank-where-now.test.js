@@ -79,7 +79,7 @@ const withWork = (levels, bank = true) => {
   f.work = [0, 1, 2].map(i => ({ id: 'w' + i, title: 'Task ' + i, d: day(i * 7), v: levels[0], pct: null, note: '' }));
   return f;
 };
-const overallOf = d => d.sentences.find(x => x.step === 'overall' || (x.steps || []).indexOf('overall') >= 0);
+const overallOf = d => d.sentences.find(x => x.step === 'overall');
 
 describe('where the student is now', () => {
   it('gives the first strength its phrase and level word', () => {
@@ -101,21 +101,9 @@ describe('where the student is now', () => {
       for (let seed = 1; seed <= 6; seed++) {
         const d = CommentBank.draft(CommentBank.context(f, {}), { seed, quiet: true });
         const o = overallOf(d);
-        // The pipeline's strength frames (v: 2, Nov 4 2026), alone or joined.
-        expect(o && o.id, w + ' seed ' + seed).toMatch(/vst\d\d/);
-        const pv = d.provenance[d.sentences.indexOf(o)];
-        const ctx = CommentBank.context(f, {});
-        const slot = pv.values.strengthAt ? 'strengthAt' : 'strengthDoing';
-        const ways = (ctx._pick || {})[slot] || [ctx[slot]];
-        expect(ways, w).toContain(pv.values[slot]);
-        // Emerging keeps the Ministry's "is beginning to" and the phrase; a
-        // version 2 card says the other levels in its own three ways.
-        const card = comment['ss-evi'].forms.at[w.toLowerCase()];
-        if (slot === 'strengthAt' && w === 'Emerging') {
-          expect(o.text).toContain(comment['ss-evi'].phrase);
-          expect(o.text, w).toMatch(QUALIFIER[w]);
-        } else if (slot === 'strengthAt') expect(ways).toHaveLength(card.length);
-        expect(o.text).not.toMatch(/\bis able to\b|\bability to\b/);
+        expect(o && o.id, w + ' seed ' + seed).toMatch(/^wn\d\d$/);
+        expect(o.text).toContain(comment['ss-evi'].phrase);
+        expect(o.text, w).toMatch(QUALIFIER[w]);
         expect(CommentBank.verify(d, f, {}).replaced, w + ' seed ' + seed).toEqual([]);
       }
     });
@@ -147,17 +135,8 @@ describe('where the student is now', () => {
   });
 
   it('fails verify() once the level word changes', () => {
-    // A strength said at its level (strengthAt: "can consistently …");
-    // a frame that names only the skill ("One thing she does well is …")
-    // stays true when the level rises.
     const f = withWork([3.1, 2.4, 2]);
-    let d = null;
-    for (let seed = 1; seed <= 24 && !d; seed++) {
-      const x = CommentBank.draft(CommentBank.context(f, {}), { seed, quiet: true });
-      const i = x.sentences.indexOf(overallOf(x));
-      if (i >= 0 && x.provenance[i].values.strengthAt) d = x;
-    }
-    expect(d).toBeTruthy();
+    const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1, quiet: true });
     const o = overallOf(d);
     const r = CommentBank.verify(d, withWork([3.8, 2.4, 2]), {});
     expect(r.replaced.map(x => x.sentenceId)).toContain(o.id);

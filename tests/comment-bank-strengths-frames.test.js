@@ -140,13 +140,14 @@ describe('even results (evenComps)', () => {
     expect(ctx._evenWord).toBe('');
     // The highest-marked skill holds instead (Nov 2): Evidence, at
     // Proficient; with a competency on one piece above it, no frame that
-    // says "highest" is offered (the pipeline's strengthTop is empty).
+    // says "highest" is offered.
     const pool = CommentBank.stepPool('overall', ctx);
     expect(pool.filter(x => x.when && x.when.evenWord)).toEqual([]);
     expect(pool.length).toBeGreaterThan(0);
-    expect(ctx.strengthTop).toBe('');
-    expect(ctx._strengthRoutes[0]).toMatchObject({ word: 'Proficient', strongest: false });
-    pool.forEach(x => expect(x.needs || [], x.id).not.toContain('strengthTop'));
+    pool.forEach(x => {
+      expect(x.when.highestWord, x.id).toBe('Proficient');
+      expect(x.needs, x.id).not.toContain('highestTop');
+    });
     const even = evenFacts('Proficient');
     const ectx = CommentBank.context(even, {});
     const s = frames.find(x => x.when.evenWord === 'Proficient');
@@ -159,36 +160,70 @@ describe('even results (evenComps)', () => {
   const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Overall' && s.when && s.when.evenWord && !s.subjects);
   const skillWords = (family, key) => CommentBank.SKILLS[family].find(r => r.key === key).skill;
 
-  // Since Nov 4 2026 (the Generate pipeline; Colin: never name the list,
-  // "her marks sit close together across skills") the even-results frames
-  // that said so are retired; an even student's comment names one skill,
-  // at its level, as for any student with a highest-marked skill.
-  it('with even results, the comment names one skill at its level, never the list', () => {
+  it('across a class, names the even skill the fewest classmates have, so one clause does not repeat', () => {
+    // Three even skills (the fourth competency is the next step).
     const comps = () => [
       comp('a', 'Evidence', 3.1),
       comp('b', 'Significance', 3.0),
       comp('c', 'Cause and Consequence', 3.0),
       comp('d', 'Inquiry', 2.9),
     ];
+    const keys = [];
+    const comments = [];
     for (let i = 1; i <= 5; i++) {
       const f = facts('socials', comps(), { cid: 'c-even-spread', sid: 'st' + i });
       const ctx = CommentBank.context(f, {});
       expect(ctx.evenResults).toBe('yes');
-      const d = CommentBank.draft(ctx, { seed: i });
+      expect(ctx._topSkill).toBe('');
+      expect(CommentBank.nextStepOf(f.comps).id).toBe('d');
+      const d = CommentBank.draft(ctx, { seed: i, comments: comments.slice() });
+      comments.push({ sid: 'st' + i, text: d.text });
+      const row = d.sentences.find(x => x.step === 'overall');
+      expect(row, 'student ' + i).toBeTruthy();
+      expect(frames.map(s => s.id)).toContain(row.id);
+      const named = ['evidence', 'significance', 'cause'].filter(k => row.text.indexOf(skillWords('socials', k)) >= 0);
+      expect(named.length, row.text).toBe(1);
       expect(d.replaced).toEqual([]);
-      d.sentences.forEach(x =>
-        expect(x.text).not.toMatch(/across (all )?(the |each )?skills|marks are close|skill by skill/),
-      );
-      const row = d.sentences.find(x => x.step === 'overall' || (x.steps || []).indexOf('overall') >= 0);
-      if (!row) continue;
-      expect(row.id).toMatch(/vst\d\d/);
+      keys.push(named[0]);
     }
+    // Each named once before any twice, in turn; a classmate's choice
+    // never makes a sentence stale.
+    expect(new Set(keys.slice(0, 3)).size).toBe(3);
+    expect(keys[3]).toBe(keys[0]);
+    expect(keys[4]).toBe(keys[1]);
   });
 
-  it('the live even-results frames never name the list', () => {
-    COMMENT_BANK.sentences
-      .filter(x => x.when && x.when.evenWord)
-      .forEach(x => expect(CommentLint.findings(x.text), x.id).toEqual([]));
+  it('a frame too long with the first even skill takes the next that fits, and verify() reads that competency', () => {
+    // Estimating's wording is twelve words, so the first Proficient even
+    // frame (nine of its own) runs past 20 with it; Connecting's is eight.
+    const f = facts('math', [
+      comp('a', 'Estimating', 3.1),
+      comp('b', 'Connecting and Reflecting', 3.0),
+      comp('c', 'Reasoning and Modelling', 2.9),
+    ]);
+    const ctx = CommentBank.context(f, {});
+    expect(ctx._evenSkills.map(x => x.key)).toEqual(['connecting', 'estimating']);
+    // As if classmates had been given Connecting: Estimating comes first.
+    const first = Object.assign({}, ctx, {
+      evenSkill: skillWords('math', 'estimating'),
+      _evenSkills: ctx._evenSkills.slice().reverse(),
+      _facts: Object.assign({}, ctx._facts, { evenSkill: ['comp:a'] }),
+    });
+    const s = frames.find(x => x.when.evenWord === 'Proficient');
+    const text = CommentBank.fill(s, first);
+    expect(CommentRealiser.tooLong(text)).toBe(false);
+    expect(text).toContain(skillWords('math', 'connecting'));
+    const pv = CommentBank.provenance(s, first);
+    expect(pv.values.evenSkill).toBe(skillWords('math', 'connecting'));
+    expect(pv.sources.evenSkill).toEqual(['comp:b']);
+    expect(pv.factKeys).toContain('comp:b');
+    expect(verified(s, text, pv, f, 'overall').replaced).toEqual([]);
+    // The step's pool is the Proficient frames, and the draft prints one within 20 words.
+    const d = CommentBank.draft(first, { seed: 1 });
+    const row = d.sentences.find(x => x.step === 'overall');
+    expect(row).toBeTruthy();
+    expect(CommentRealiser.tooLong(row.text)).toBe(false);
+    expect(d.replaced).toEqual([]);
   });
 
   it('verify() accepts any even competency on 3+ pieces in the table’s wording, and no other', () => {
@@ -216,6 +251,87 @@ describe('even results (evenComps)', () => {
     expect(verified(s, text, named('a', 'significance'), f, 'overall').replaced.length).toBe(1);
     // A competency outside the even results.
     expect(verified(s, text, named('d', 'inquiry'), f, 'overall').replaced.length).toBe(1);
+  });
+  // Twelve "can" frames for Extending and Proficient (six print the word);
+  // seven for Developing and Emerging, whose "is learning to" and "is
+  // beginning to" leave fewer words to spend (three print the word).
+  const COUNTS = { Extending: [12, 6], Proficient: [12, 6], Developing: [7, 3], Emerging: [7, 3] };
+  it('has six or more frames per proficiency word, all nine words around the skill', () => {
+    WORDS.forEach(w => {
+      const mine = frames.filter(s => s.when.evenWord === w);
+      expect(mine.length, w).toBe(COUNTS[w][0]);
+      expect(mine.filter(s => s.needs.indexOf('evenWord') >= 0).length, w).toBe(COUNTS[w][1]);
+      // Nine words around the skill (the slot counted once makes ten), so
+      // an eleven-word skill keeps the realised sentence within 20.
+      mine.forEach(s => expect(CommentLint.plain(s.text).split(/\s+/).length, s.id).toBe(10));
+      // The length rule (a sentence over 20 words loses to a shorter one)
+      // cannot favour one frame of the pool: each has the same number of
+      // words around the skill.
+      const around = mine.map(s => CommentLint.plain(s.text).split(/\s+/).length);
+      expect(new Set(around).size, w + ': ' + around.join(',')).toBe(1);
+      mine.forEach(s => {
+        expect(s.claims, s.id).toEqual(['evenResults']);
+        expect(s.needs, s.id).toContain('evenSkill');
+        expect(s.text, s.id).not.toMatch(/\b(same|equal|level|competency)\b/i);
+      });
+      // No two start with the same three words.
+      const starts = mine.map(s => CommentLint.plain(s.text).split(/\s+/).slice(0, 3).join(' '));
+      expect(new Set(starts).size, w).toBe(starts.length);
+    });
+  });
+
+  WORDS.forEach(w =>
+    it(`${w}: the frames are the strengths pool in a Proficiency class, print the word and verify`, () => {
+      const f = evenFacts(w);
+      const ctx = CommentBank.context(f, {});
+      expect(ctx.evenResults).toBe('yes');
+      expect(ctx._evenWord).toBe(w);
+      expect(ctx.evenWord).toBe(w);
+      expect(ctx._strongSkill).toBe('');
+      const pool = CommentBank.stepPool('overall', ctx);
+      expect(pool.map(s => s.id).sort()).toEqual(
+        frames
+          .filter(s => s.when.evenWord === w)
+          .map(s => s.id)
+          .sort(),
+      );
+      pool.forEach(s => {
+        const text = CommentBank.fill(s, ctx, { first: true });
+        expect(text, s.id).not.toMatch(/[{}[\]]/);
+        if (s.needs.indexOf('evenWord') >= 0) expect(text, s.id).toContain(w);
+        else WORDS.forEach(x => expect(text, s.id).not.toContain(x));
+        expect(text, s.id).toContain('support each claim with evidence from a source');
+        const pv = CommentBank.provenance(s, ctx);
+        expect(pv.factKeys, s.id).toContain('comp:a');
+        expect(verified(s, text, pv, f, 'overall').replaced, s.id).toEqual([]);
+        // Not even any more: the sentence is replaced.
+        const changed = Object.assign({}, f, { comps: [comp('a', 'Evidence', 3.9), comp('b', 'Significance', 2.8)] });
+        expect(verified(s, text, pv, changed, 'overall').replaced.length, s.id).toBe(1);
+      });
+      // The draft gets a strengths sentence.
+      const d = CommentBank.draft(ctx, { seed: 3 });
+      expect(d.sentences.some(x => x.step === 'overall')).toBe(true);
+    }),
+  );
+
+  it('in a Letter class, only the frames that do not print the word fit, bound to the same word', () => {
+    const f = evenFacts('Developing', {
+      standing: '',
+      letter: 'a C (62%)',
+      grade: { mode: 'letter', letter: 'C', pct: 62, pieces: [] },
+    });
+    const ctx = CommentBank.context(f, {});
+    expect(ctx.evenWord).toBe('');
+    expect(ctx._evenWord).toBe('Developing');
+    const pool = CommentBank.stepPool('overall', ctx);
+    expect(pool.length).toBe(4);
+    pool.forEach(s => {
+      expect(s.when.evenWord).toBe('Developing');
+      const text = CommentBank.fill(s, ctx, { first: true });
+      expect(text).toMatch(/learning to/);
+      WORDS.forEach(x => expect(text, s.id).not.toContain(x));
+      expect(verified(s, text, CommentBank.provenance(s, ctx), f, 'overall').replaced).toEqual([]);
+    });
   });
 });
 
@@ -247,8 +363,7 @@ describe('the strengths frames per skill', () => {
     // 129 from lane G (43 of them tie-safe), 129 for lane H's skills and 86
     // more tie-safe ones for the original skills (round three, lane I).
     expect(covered.length).toBe(86);
-    // 344 less the 25 retired on Nov 4 2026 for a banned phrase.
-    expect(frames.length).toBe(319);
+    expect(frames.length).toBe(344);
     covered.forEach(([family, row]) => {
       {
         const mine = forSkill(family, row.key);
@@ -291,42 +406,45 @@ describe('the strengths frames per skill', () => {
   });
 });
 
-// The grade frames for one proficiency word (gr39-gr78) are retired (Nov 4
-// 2026): they made the scale the subject or said "this term". The
-// pipeline's Proficiency frames say the level, what it means, and name the
-// scale in one frame only.
 describe('the grade frames per proficiency word', () => {
-  const frames = COMMENT_BANK.sentences.filter(
-    s => s.group === 'Grade' && s.v === 2 && [].concat((s.when || {}).grade).indexOf('proficiency') >= 0,
-  );
-  it('has eight or more structurally different frames, one naming the scale', () => {
-    expect(frames.length).toBeGreaterThanOrEqual(8);
-    expect(frames.filter(s => /proficiency scale/.test(s.text))).toHaveLength(1);
-    const starts = frames.map(s => CommentLint.plain(s.text).split(/\s+/).slice(0, 3).join(' '));
-    expect(new Set(starts).size).toBe(starts.length);
-    frames.forEach(s => expect(s.text, s.id).not.toMatch(/this term|calls|places/));
+  const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Grade' && s.when && s.when.grade === 'proficiency');
+  it('has ten frames per word beside the generic ones, each saying the word and "proficiency"', () => {
+    WORDS.forEach(w => {
+      const mine = frames.filter(s => s.when.standing === w);
+      expect(mine.length, w).toBe(10);
+      mine.forEach(s => {
+        expect(s.text, s.id).toContain(w);
+        // Every frame names the scale or the student's proficiency, never "level".
+        expect(s.text, s.id).toMatch(/\bproficiency\b/);
+        expect(s.text, s.id).not.toMatch(/\blevel\b/i);
+        expect(s.claims).toEqual(['grade']);
+        // The scale's descriptor, as the report legend words it; Extending is
+        // never "beyond the course".
+        if (w === 'Extending') expect(s.text, s.id).not.toMatch(/beyond/i);
+      });
+      const starts = mine.map(s => CommentLint.plain(s.text).split(/\s+/).slice(0, 3).join(' '));
+      expect(new Set(starts).size, w).toBe(starts.length);
+    });
+    expect(frames.filter(s => !s.when.standing).length).toBeGreaterThanOrEqual(7);
   });
 
   WORDS.forEach(w =>
-    it(`${w}: the frames fill with the word and its meaning, and verify`, () => {
+    it(`${w}: the word's frames and the generic ones share the grade tier, fill and verify`, () => {
       const f = facts('science', [comp('a', 'Questioning', LEVEL[w])], { overall: LEVEL[w], standing: w });
       const ctx = CommentBank.context(f, {});
       const pool = CommentBank.stepPool('grade', ctx).map(s => s.id);
+      expect(pool).toContain('gr05');
+      frames.filter(s => s.when.standing === w).forEach(s => expect(pool, s.id).toContain(s.id));
+      WORDS.filter(x => x !== w).forEach(x =>
+        frames.filter(s => s.when.standing === x).forEach(s => expect(pool, s.id).not.toContain(s.id)),
+      );
       frames
-        .filter(s => CommentBank.fits(s, ctx))
+        .filter(s => s.when.standing === w)
         .forEach(s => {
-          expect(pool, s.id).toContain(s.id);
           const text = CommentBank.fill(s, ctx, { first: true });
           expect(text).not.toMatch(/[{}[\]]/);
           expect(text).toContain(w);
           expect(verified(s, text, CommentBank.provenance(s, ctx), f, 'grade').replaced).toEqual([]);
-          // Another level: the sentence no longer holds.
-          const other = WORDS.find(x => x !== w);
-          const g = facts('science', [comp('a', 'Questioning', LEVEL[other])], {
-            overall: LEVEL[other],
-            standing: other,
-          });
-          expect(verified(s, text, CommentBank.provenance(s, ctx), g, 'grade').replaced.length, s.id).toBe(1);
         });
     }),
   );

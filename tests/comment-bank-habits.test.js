@@ -1,7 +1,6 @@
 /**
- * Generate plan PR 7 (habits half), as the Generate pipeline says it since
- * Nov 4 2026: the habits as behaviour (habitSummary below still gives the
- * facts the questionnaire and Browse read).
+ * Generate plan PR 7 (habits half): the habits part of the comment is one
+ * summary sentence.
  *
  * - All six rated and every one seen Consistently: "work habits are
  *   excellent."
@@ -65,22 +64,6 @@ function facts(over) {
     over || {},
   );
 }
-/* The pipeline's habit wording (COMMENT_BANK.pipeline.habits) for "he", as
-   patterns: what a student does at Consistently, and the invitations for a
-   habit at Sometimes or Rarely, per habit. */
-const P = COMMENT_BANK.pipeline.habits;
-const forHe = t =>
-  t
-    .replace(/\{his\}/g, 'his')
-    .replace(/\{he\}/g, 'he')
-    .replace(/\{him\}/g, 'him')
-    .replace(/\[(\w+)\|\w+\]/g, '$1');
-const esc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const phrases = (keys, form) => keys.reduce((a, k) => a.concat([].concat(P[k][form]).map(forHe)), []);
-const said = (keys, form) => new RegExp('(' + phrases(keys, form).map(esc).join('|') + ')', 'i');
-const DOES = said(KEYS, 'does');
-const INVITE = k => said([k], 'invite');
-const RATING = /\b(Consistently|Usually|Sometimes|Rarely|rated|all six|every one|excellent)\b/;
 const habitsSentence = (f, picks, seed) => {
   const d = CommentBank.draft(CommentBank.context(f, picks || {}), { seed: seed || 1 });
   return d.sentences.filter(x => x.step === 'habits' || x.step === 'strongHabits');
@@ -122,20 +105,15 @@ describe('habitSummary', () => {
   });
 });
 
-// Since Nov 4 2026 (the Generate pipeline; Colin: "say what the student
-// does, in context"), the habits are behaviour: a habit at Consistently as
-// what the student does, the lowest at Sometimes or Rarely as the habit to
-// build (two at most, the lower first), never a rating word or a count.
 describe('the habits sentence in a draft', () => {
-  it('all six Consistently: what the student does, never a rating or a count', () => {
+  it('all six Consistently: “His work habits are excellent.”', () => {
     for (let seed = 1; seed <= 6; seed++) {
       const hs = habitsSentence(facts({ habits: all(4) }), {}, seed);
-      expect(hs.length).toBeGreaterThanOrEqual(1);
-      hs.forEach(x => {
-        expect(x.text).toMatch(DOES);
-        expect(x.text).not.toMatch(RATING);
-        expect(x.text).not.toMatch(/to build/);
-      });
+      expect(hs).toHaveLength(1);
+      // One of the excellent frames (hs01, hs02, hs16-hs21): the plan's
+      // "work habits are excellent", or every habit rated Consistently.
+      expect(hs[0].text).toMatch(/work habits are excellent|rated Consistently/);
+      expect(hs[0].text).not.toMatch(/Usually|to build/);
     }
     // No pronouns on file: they/them (Colin, Nov 1), in whichever frame.
     const named = habitsSentence(facts({ habits: all(4), pronounsOnFile: false, pronouns: THEY }));
@@ -143,44 +121,32 @@ describe('the habits sentence in a draft', () => {
     expect(named[0].text).not.toMatch(/Gabriel/);
   });
 
-  it('one weak habit: the habit to build is that one', () => {
+  it('one weak habit: names only that one', () => {
     for (let seed = 1; seed <= 6; seed++) {
-      const hs = habitsSentence(facts({ habits: { ...all(4), feedback: 2 } }), {}, seed);
-      const build = hs.filter(x => x.step === 'habits');
-      expect(build).toHaveLength(1);
-      expect(build[0].text).toMatch(INVITE('feedback'));
-      ['completes', 'ready', 'others', 'part', 'devices'].forEach(k => expect(build[0].text).not.toMatch(INVITE(k)));
-      hs.forEach(x => expect(x.text).not.toMatch(RATING));
+      const [s] = habitsSentence(facts({ habits: { ...all(4), feedback: 2 } }), {}, seed);
+      // The fact: Uses Feedback is the one habit named, in the summary frame
+      // or in a Habit Ratings frame for it (they share a tier).
+      expect(s.text).toMatch(/feedback/i);
+      expect(s.text).not.toMatch(/class time|others|taking part|devices|completing/);
     }
   });
 
-  it('two weak habits: both, the lower first', () => {
-    for (let seed = 1; seed <= 8; seed++) {
-      const [s] = habitsSentence(facts({ habits: { ...all(3), ready: 2, devices: 1 } }), {}, seed).filter(
-        x => x.step === 'habits',
-      );
-      const dev = s.text.search(INVITE('devices'));
-      expect(dev, s.text).toBeGreaterThanOrEqual(0);
-      const rdy = s.text.search(INVITE('ready'));
-      if (rdy >= 0) expect(dev).toBeLessThan(rdy);
-    }
+  it('two weak habits: names both in one sentence', () => {
+    const [s] = habitsSentence(facts({ habits: { ...all(3), ready: 2, devices: 1 } }));
+    expect(s.text).toMatch(/using devices well and using class time well/i);
   });
 
   it('three weak habits: names the two lowest', () => {
-    for (let seed = 1; seed <= 8; seed++) {
-      const [s] = habitsSentence(facts({ habits: { ...all(4), completes: 2, part: 1, devices: 2 } }), {}, seed).filter(
-        x => x.step === 'habits',
-      );
-      expect(s.text).toMatch(INVITE('part'));
-      expect(s.text).not.toMatch(INVITE('devices'));
-    }
+    const [s] = habitsSentence(facts({ habits: { ...all(4), completes: 2, part: 1, devices: 2 } }));
+    expect(s.text).toMatch(/taking part in class and completing work on time/i);
+    expect(s.text).not.toMatch(/devices/);
   });
 
   it('Not Seen is ignored', () => {
-    const hs = habitsSentence(facts({ habits: { ...all(4), devices: 5 } }));
-    hs.forEach(x => expect(x.text).not.toMatch(said(['devices'], 'does')));
-    const [t] = habitsSentence(facts({ habits: { ...all(5), others: 1 } })).filter(x => x.step === 'habits');
-    expect(t.text).toMatch(INVITE('others'));
+    const [s] = habitsSentence(facts({ habits: { ...all(4), devices: 5 } }));
+    expect(s.text).toMatch(/work habits are excellent/);
+    const [t] = habitsSentence(facts({ habits: { ...all(5), others: 1 } }));
+    expect(t.text).toMatch(/working well with others/i);
   });
 
   it('nothing rated: no habits sentence', () => {
@@ -188,26 +154,21 @@ describe('the habits sentence in a draft', () => {
     expect(habitsSentence(facts({ habits: all(5) }))).toEqual([]);
   });
 
-  it('nothing notable (all Usually): no habits sentence, nothing padded', () => {
-    expect(habitsSentence(facts({ habits: all(3) }))).toEqual([]);
-  });
-
   it('is one sentence, and verifies against the ratings it was drafted from', () => {
     const f = facts({ habits: { ...all(4), part: 2 } });
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 3 });
-    const ids = d.sentences.filter(x => x.step === 'habits').map(x => x.id);
-    expect(ids).toHaveLength(1);
+    expect(d.ids.filter(id => /^hs/.test(id))).toHaveLength(1);
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     // The rating changed after the draft: the sentence no longer holds.
     const changed = { ...f, habits: { ...all(4), part: 3 } };
     const v = CommentBank.verify(d, changed, {});
-    expect(v.replaced.map(r => r.sentenceId)).toEqual(expect.arrayContaining(ids));
-    expect(v.replaced.find(r => r.sentenceId === ids[0]).failed).toEqual(expect.arrayContaining(['habitBehaviour']));
+    expect(v.replaced.map(r => r.sentenceId)).toEqual(d.ids.filter(id => /^hs/.test(id)));
+    expect(v.replaced[0].failed).toContain('habits');
   });
 
-  it('keeps every habits sentence within 24 words, in every kind of class', () => {
+  it('keeps every habits sentence at 20 words or fewer, in every kind of class', () => {
     const fams = ['', 'pe', 'arts', 'math', 'adst', 'ela', 'socials', 'science', 'career'];
-    const sentences = COMMENT_BANK.sentences.filter(s => s.part === 'habits' && s.v === 2);
+    const sentences = COMMENT_BANK.sentences.filter(s => s.part === 'habits' && /^hs/.test(s.id));
     fams.forEach(family => {
       KEYS.forEach(a =>
         KEYS.forEach(b => {
@@ -220,7 +181,7 @@ describe('the habits sentence in a draft', () => {
               .filter(s => CommentBank.fits(s, c))
               .forEach(s => {
                 const t = CommentBank.fill(s, c);
-                expect(words(t), family + ' ' + s.id + ': ' + t).toBeLessThanOrEqual(24);
+                expect(words(t), family + ' ' + s.id + ': ' + t).toBeLessThanOrEqual(20);
                 expect(t).not.toMatch(/[{}[\]]/);
               }),
           );
@@ -229,7 +190,7 @@ describe('the habits sentence in a draft', () => {
     });
   });
 
-  it('on the IE path, says what the student does at Consistently, as the IE mockup', () => {
+  it('on the IE path, names the habits rated Consistently, as the IE mockup', () => {
     const f = facts({
       habits: { completes: 2, ready: 4, others: 4, part: 4, feedback: 2, devices: 3 },
       grade: { ...facts().grade, basis: 'ie', ieAllowed: true, marked: { mine: 3, all: 8 } },
@@ -237,8 +198,9 @@ describe('the habits sentence in a draft', () => {
     expect(CommentBank.reportPath(f)).toBe('ie');
     const hs = habitsSentence(f);
     expect(hs.map(x => x.step)).toEqual(['strongHabits']);
-    expect(hs[0].text).toMatch(said(['ready', 'others', 'part'], 'does'));
-    expect(hs[0].text).not.toMatch(RATING);
+    // hs11 whole, or one of the frames around the same phrase (hs13-hs15).
+    expect(hs[0].text).toMatch(/\bhe comes to class ready, works well with others and takes part\.$/i);
+    expect(hs[0].text).not.toMatch(/Consistently|excellent/);
   });
 });
 
@@ -277,9 +239,9 @@ describe('redrawHabits: a rating changed after Generate', () => {
     const prev = draftFor({ ...all(4), feedback: 2 });
     const d = redraw(prev, { ...all(4), devices: 1 });
     // The fact in each: the one habit below Usually, in whichever frame.
-    expect(d.habits.before).toMatch(INVITE('feedback'));
-    expect(d.habits.after).toMatch(INVITE('devices'));
-    expect(d.habits.after).not.toMatch(INVITE('feedback'));
+    expect(d.habits.before).toMatch(/feedback/i);
+    expect(d.habits.after).toMatch(/device|phone|screen/i);
+    expect(d.habits.after).not.toMatch(/feedback/i);
     expect(others(d)).toEqual(others(prev));
     expect(d.sentences.map(x => x.step)).toEqual(prev.sentences.map(x => x.step));
     expect(d.text).toBe(prev.text.replace(d.habits.before, d.habits.after));
@@ -290,7 +252,7 @@ describe('redrawHabits: a rating changed after Generate', () => {
     expect(prev.sentences.some(x => x.step === 'habits')).toBe(false);
     const d = redraw(prev, all(4));
     expect(d.habits).toMatchObject({ before: '' });
-    expect(d.habits.after).toMatch(DOES);
+    expect(d.habits.after).toMatch(/work habits are excellent|rated Consistently/);
     expect(others(d)).toEqual(others(prev));
     const back = redraw(d, {});
     expect(back.habits).toMatchObject({ before: d.habits.after, after: '' });
@@ -396,19 +358,19 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
     expect(ReportBlocks.getTermId()).toBe(TERM);
     RQ.tqGenerate();
     const first = box.value;
-    expect(first).toMatch(INVITE('feedback'));
+    expect(first).toMatch(/feedback/i);
     RQ.tqRate('devices', 1);
-    expect(box.value).toMatch(INVITE('devices'));
-    // Everything but the habits sentences is as it was.
-    const strip = t => RQ.sentencesOf(t).filter(x => !DOES.test(x) && !said(KEYS, 'invite').test(x));
-    expect(strip(box.value)).toEqual(strip(first));
+    expect(box.value).toMatch(/using devices well and using feedback/i);
+    // Everything but the habits sentence (the one naming feedback) is as it was.
+    const strip = t => t.replace(/[^.]*feedback[^.]*\./i, '');
+    expect(strip(box.value)).toBe(strip(first));
     expect(saved()).toBe(box.value);
   });
 
   it('an edited habits sentence survives a rating change', () => {
     // The habits sentence as a whole sentence (a quoted title's period
     // would cut a regex short).
-    const habitsOf = text => RQ.sentencesOf(text).find(x => INVITE('feedback').test(x));
+    const habitsOf = text => RQ.sentencesOf(text).find(x => /feedback/i.test(x));
     RQ.tqGenerate();
     const habit = habitsOf(box.value);
     box.value = box.value.replace(habit, 'He is learning to act on feedback.');
@@ -432,7 +394,7 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
     RQ.tqRate('feedback', 4);
     expect(box.value).not.toContain(sentence);
     expect(box.value).toMatch(/^Gabriel worked hard\./);
-    expect(box.value).toMatch(DOES);
+    expect(box.value).toMatch(/work habits are excellent|rated Consistently/);
   });
 
   /* The Sentences card follows the comment without another Generate: a
@@ -459,20 +421,18 @@ describe('the Work Habits grid (teacher/report-questionnaire.js)', () => {
     it('a rating adds the Habits row, and changes it, without Generate', () => {
       upsertTermRating(CID, GABRIEL.id, TERM, { habits: {} });
       RQ.tqGenerate();
-      // No rating yet: no habit to build (Completes Work can come from the
-      // record of work handed in).
-      expect(box.value).not.toMatch(said(KEYS, 'invite'));
+      expect(box.value).not.toMatch(/work habits/);
       drawn = [];
       KEYS.forEach(k => RQ.tqRate(k, 4));
-      const excellent = DOES;
+      const excellent = /work habits are excellent|rated Consistently/;
       expect(box.value).toMatch(excellent);
       expect(drawn.length).toBeGreaterThan(0);
       const card = drawn[drawn.length - 1];
       expect(label(card, 'Habits')).toBe(true);
       expect(card).toMatch(excellent);
       RQ.tqRate('devices', 1);
-      expect(box.value).toMatch(INVITE('devices'));
-      expect(drawn[drawn.length - 1]).toMatch(INVITE('devices'));
+      expect(box.value).toMatch(/using devices well/i);
+      expect(drawn[drawn.length - 1]).toMatch(/using devices well/i);
       expect(label(drawn[drawn.length - 1], 'Habits')).toBe(true);
       expect(saved()).toBe(box.value);
     });
