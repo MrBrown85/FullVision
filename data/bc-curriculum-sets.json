@@ -36048,6 +36048,7 @@
     "Physical and Health Education 9",
     "Physical and Health Education 10"
    ],
+   "sensitive": true,
    "phrase": "suggest and compare ways to respond to bullying, stereotyping and discrimination",
    "next_steps": {
     "emerging": "name safe ways to respond to bullying",
@@ -36064,7 +36065,7 @@
     "proficient": "A good next step is to compare two responses and say which keeps everyone safer.",
     "extending": "{He} can now practise explaining how a response could change the way people think about a group."
    },
-   "home": "Ask {him} what {he} would do if a friend was being left out because of who they are."
+   "home": null
   },
   "phe-bullying-responses--phe|10-12": {
    "group": "phe-bullying-responses",
@@ -36073,6 +36074,7 @@
     "Physical and Health Education 9",
     "Physical and Health Education 10"
    ],
+   "sensitive": true,
    "phrase": "analyze strategies for responding to discrimination, stereotyping and bullying",
    "next_steps": {
     "emerging": "describe one strategy for responding to discrimination",
@@ -36089,7 +36091,7 @@
     "proficient": "{He} [is|are] ready to analyze how the setting, such as online or in person, changes the best response.",
     "extending": "To go further, {he} can explain how a response can address the stereotype behind a hurtful act."
    },
-   "home": "Ask {him} what makes it hard for a bystander to speak up, and what could help."
+   "home": null
   },
   "phe-collaboration--outdoor-education|all": {
    "group": "phe-collaboration",
@@ -36934,6 +36936,7 @@
    "courses": [
     "Physical and Health Education 8"
    ],
+   "sensitive": true,
    "phrase": "describe how changes and transitions can affect a person's identity",
    "next_steps": {
     "emerging": "name transitions people go through, such as starting at a new school",
@@ -36950,7 +36953,7 @@
     "proficient": "Next, {he} can try explaining how one change can lead to others in a person's life.",
     "extending": "{He} [is|are] ready to explain why a change that is hard for one person may be easy for another."
    },
-   "home": "Ask {him} what helps someone feel settled after a big change, such as starting at a new school."
+   "home": null
   },
   "phe-identity-factors--phe|8-9": {
    "group": "phe-identity-factors",
@@ -36958,6 +36961,7 @@
     "Physical and Health Education 9",
     "Physical and Health Education 10"
    ],
+   "sensitive": true,
    "phrase": "describe the social and cultural factors that shape who a person is",
    "next_steps": {
     "emerging": "name factors that can shape a person's identity, such as family",
@@ -36974,7 +36978,7 @@
     "proficient": "A good next step is to describe how a cultural factor can shape a person's values.",
     "extending": "To go further, {he} can explain how one identity can hold more than one culture."
    },
-   "home": "Share a tradition or story that matters to your family, and invite {him} to share one that matters to {him}."
+   "home": null
   },
   "phe-identity-factors--phe|10-12": {
    "group": "phe-identity-factors",
@@ -36982,6 +36986,7 @@
     "Physical and Health Education 9",
     "Physical and Health Education 10"
    ],
+   "sensitive": true,
    "phrase": "explore and describe how social and cultural factors shape personal identity",
    "next_steps": {
     "emerging": "describe factors that shape personal identity",
@@ -36998,7 +37003,7 @@
     "proficient": "Next, {he} can practise explaining why the same factor shapes two people in different ways.",
     "extending": "{He} [is|are] ready to explain how identity can shift when a person moves between communities."
    },
-   "home": "Ask {him} why a person might show different sides of themselves at home, at school and online."
+   "home": null
   },
   "phe-impact-reduction--outdoor-education|all": {
    "group": "phe-impact-reduction",
@@ -37220,6 +37225,7 @@
     "Physical and Health Education 9",
     "Physical and Health Education 10"
    ],
+   "sensitive": true,
    "phrase": "create and assess ways to manage the changes of puberty and adolescence",
    "next_steps": {
     "emerging": "name physical, emotional and social changes during adolescence",
@@ -37236,7 +37242,7 @@
     "proficient": "{His} next step is to explain why a strategy would or would not help with a change.",
     "extending": "{He} [is|are] ready to create strategies for different changes and judge which suit each one."
    },
-   "home": "Let {him} know who {he} can talk to if a change ever feels hard to manage."
+   "home": null
   },
   "phe-managing-change--phe|10-12": {
    "group": "phe-managing-change",
@@ -37245,6 +37251,7 @@
     "Physical and Health Education 9",
     "Physical and Health Education 10"
    ],
+   "sensitive": true,
    "phrase": "create and evaluate strategies for managing physical, emotional and social changes",
    "next_steps": {
     "emerging": "describe a strategy for managing a change in adolescence",
@@ -37261,7 +37268,7 @@
     "proficient": "A useful next step is to name the evidence that shows whether a strategy is working.",
     "extending": "To go further, {he} can explain why a strategy that suits one person may not suit another."
    },
-   "home": "Ask {him} what helps {him} most when a lot is changing at once."
+   "home": null
   },
   "phe-motivational-factors--phe-10-active-living-11|all": {
    "group": "phe-motivational-factors",
@@ -37583,6 +37590,7 @@
     "Physical and Health Education 9",
     "Physical and Health Education 10"
    ],
+   "sensitive": true,
    "phrase": "describe and assess ways to support mental well-being, for {himself} and others",
    "next_steps": {
     "emerging": "name strategies that support mental well-being",
@@ -37599,7 +37607,7 @@
     "proficient": "It would help {him} to practise judging whether an idea for coping with stress would work in real life.",
     "extending": "{He} [is|are] ready to analyze why a strategy suits some people and not others."
    },
-   "home": "Ask {him} who {he} would talk to if {he} [was|were] worried about a friend."
+   "home": null
   },
   "phe-promoting-well-being--phe|10-12": {
    "group": "phe-promoting-well-being",
@@ -37608,6 +37616,7 @@
     "Physical and Health Education 9",
     "Physical and Health Education 10"
    ],
+   "sensitive": true,
    "phrase": "evaluate and explain strategies for promoting mental well-being",
    "next_steps": {
     "emerging": "describe a strategy that promotes mental well-being",
@@ -37624,7 +37633,7 @@
     "proficient": "Next, {he} can try evaluating which strategies suit short-term stress and which suit ongoing stress.",
     "extending": "To go further, {he} can explain how a community can promote the well-being of its members."
    },
-   "home": "Ask {him} which habit does the most for {his} mood during a busy week."
+   "home": null
   },
   "phe-recreation--active-living-12|all": {
    "group": "phe-recreation",
@@ -37946,6 +37955,7 @@
    "courses": [
     "Physical and Health Education 10"
    ],
+   "sensitive": true,
    "phrase": "explore the factors that can contribute to substance use",
    "next_steps": {
     "emerging": "identify factors that can lead to substance use",
@@ -37962,7 +37972,7 @@
     "proficient": "{He} [is|are] ready to explain how several factors together can raise the risk of substance use.",
     "extending": "To go further, {he} can explain what lowers the risk of substance use, such as support from trusted people."
    },
-   "home": "Ask {him} what makes it easier for young people to say no to substances."
+   "home": null
   },
   "phe-supporting-others--phe-8-9|all": {
    "group": "phe-supporting-others",
@@ -37970,6 +37980,7 @@
     "Physical and Health Education 8",
     "Physical and Health Education 9"
    ],
+   "sensitive": true,
    "phrase": "describe and assess ways to help others with mental well-being or substance use problems",
    "next_steps": {
     "emerging": "name a strategy that helps someone with a well-being problem",
@@ -37986,7 +37997,7 @@
     "proficient": "Next, {he} can try comparing two ways of helping a friend and choosing the safer one.",
     "extending": "To go further, {he} can practise evaluating strategies for helping with substance use as well as mental well-being."
    },
-   "home": "Ask {him} how {he} would help a friend who seemed upset for a long time."
+   "home": null
   },
   "phe-training-styles--fitness-conditioning|all": {
    "group": "phe-training-styles",

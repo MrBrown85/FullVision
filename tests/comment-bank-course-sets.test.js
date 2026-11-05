@@ -230,6 +230,35 @@ describe('a sensitive set (abuse and exploitation) is never drafted from', () =>
   });
 });
 
+describe('the sensitive health topics (Colin, Nov 5) have no home line and are never drafted on their own', () => {
+  // Puberty and change, identity, bullying, substance use, supporting
+  // others' mental well-being, well-being and mood, and abuse: a comment
+  // never asks a family about these, and Generate never names them unasked.
+  const SENSITIVE = [
+    'phe-safety-strategies',
+    'phe-managing-change',
+    'phe-identity-change',
+    'phe-identity-factors',
+    'phe-bullying-responses',
+    'phe-substance-use-causes',
+    'phe-supporting-others',
+    'phe-promoting-well-being',
+  ];
+  const ican = JSON.parse(readFileSync(new URL('../data/bc-curriculum-ican.json', import.meta.url), 'utf8'));
+  const ids = Object.keys(ican.competencies || ican).filter(id =>
+    SENSITIVE.includes(((ican.competencies || ican)[id] || {}).cluster),
+  );
+  it('every competency in those groups is sensitive, with no home line', () => {
+    expect(ids.length).toBeGreaterThan(10);
+    ids.forEach(id => {
+      const e = CommentBank.setEntry(id);
+      if (!e) return;
+      expect(e.sensitive, id).toBe(true);
+      expect(e.home, id).toBe('');
+    });
+  });
+});
+
 describe('comments written before the course sets', () => {
   it('a sentence in the cluster wording still verifies once the sets load: a change of wording is not a change of marks', () => {
     const f = student('Philosophy 12', 'socials', [
