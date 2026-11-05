@@ -1318,7 +1318,9 @@ window.DashClassManager = (function () {
     });
   }
 
-  function cmSaveStudent() {
+  /* Save closes the form; Save and Add Another (and Enter in a field) keeps
+     it open, empty, with the focus in First Name for the next student. */
+  function cmSaveStudent(another) {
     if (!cmSelectedCourse) return;
     var firstName = (document.getElementById('cm-add-first')?.value || '').trim();
     var lastName = (document.getElementById('cm-add-last')?.value || '').trim();
@@ -1383,10 +1385,15 @@ window.DashClassManager = (function () {
     saveStudents(cmSelectedCourse, students);
     cmCancelStudent();
     renderClassManager();
-    // A new student leaves the form open with the focus in First Name, so a
-    // roster can be typed one student after another without the mouse.
-    if (adding) {
+    // Save and Add Another leaves the form open with the focus in First Name,
+    // so a roster can be typed one student after another without the mouse.
+    if (adding && another) {
       cmShowAddStudent(((preferred || firstName) + ' ' + lastName).trim());
+      return;
+    }
+    if (adding) {
+      var addBtn = document.querySelector('.cm-roster-add');
+      if (addBtn) addBtn.focus();
       return;
     }
     requestAnimationFrame(function () {
@@ -2833,6 +2840,68 @@ window.DashClassManager = (function () {
     });
   }
 
+  function _cmIsDemo() {
+    return typeof isDemoMode === 'function' && isDemoMode();
+  }
+
+  /* The first screen for a teacher with no classes: create one, or try
+     Demo Mode. Demo Mode already has a class, so a demo teacher
+     who deletes every class sees only Create a Class. */
+  function _cmEmptyStateHtml() {
+    var create =
+      '<section class="cm-empty-card" aria-labelledby="cm-empty-create">' +
+      '<h2 class="cm-empty-card-title" id="cm-empty-create">Create a Class</h2>' +
+      '<p class="cm-empty-card-text">Build a class from BC curriculum courses, then add students.</p>' +
+      '<button type="button" class="btn btn-primary cm-empty-card-btn" data-action="cmStartCreate">Create a Class</button>' +
+      '</section>';
+    var demo = _cmIsDemo()
+      ? ''
+      : '<section class="cm-empty-card" aria-labelledby="cm-empty-demo">' +
+        '<h2 class="cm-empty-card-title" id="cm-empty-demo">Try Demo Mode</h2>' +
+        '<p class="cm-empty-card-text">A sample Science 8 class with 27 students. Nothing is saved to your account.</p>' +
+        '<button type="button" class="btn btn-ghost cm-empty-card-btn" data-action="cmOpenDemoMode">Open Demo Mode</button>' +
+        '</section>';
+    return (
+      '<div class="cm-empty cm-first-run">' +
+      '<h1 class="cm-empty-title">No classes yet</h1>' +
+      '<div class="cm-empty-cards">' +
+      create +
+      demo +
+      '</div>' +
+      '<a class="cm-empty-help" href="/help/create-a-class">Getting Started Guide</a>' +
+      '</div>'
+    );
+  }
+
+  /* Demo Mode runs on this device only. Entering it from the login page
+     clears this device's FullVision data (login-auth.js), so say what happens
+     first, including any change not yet sent to the account. */
+  function cmOpenDemoMode() {
+    var unsent = 0;
+    try {
+      var q = window.v2Queue;
+      if (q && typeof q.stats === 'function') {
+        var s = q.stats();
+        unsent = Number(s.queued || 0) + Number(s.deadLettered || 0);
+      }
+    } catch (e) {
+      unsent = 0;
+    }
+    var message =
+      'Demo Mode opens a sample Science 8 class on this device and clears the FullVision data stored on it. ' +
+      'Classes saved to your account are not changed. ' +
+      'To return to your account, choose Sign Out in the account menu, then sign in.';
+    if (unsent > 0)
+      message +=
+        ' ' +
+        unsent +
+        (unsent === 1 ? ' change on this device has' : ' changes on this device have') +
+        ' not been sent to your account and will be lost.';
+    showConfirm('Open Demo Mode', message, 'Open Demo Mode', 'primary', function () {
+      window.location.href = '/login.html?demo=1';
+    });
+  }
+
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
     // Class Management reads the year so far for every class: its previews
@@ -2878,12 +2947,7 @@ window.DashClassManager = (function () {
 
     // Empty state
     if (courseIds.length === 0 && cmMode !== 'create') {
-      html +=
-        '<div class="cm-empty">' +
-        '<div class="cm-empty-title">No classes yet</div>' +
-        '<div class="cm-empty-text">Create your first class to get started with your gradebook.</div>' +
-        '<button class="btn btn-primary" data-action="cmStartCreate" style="margin-top:16px">Create a Class</button>' +
-        '</div>';
+      html += _cmEmptyStateHtml();
       document.getElementById('main').innerHTML = html;
       return;
     }
@@ -3184,6 +3248,7 @@ window.DashClassManager = (function () {
       '<div class="cm-field" style="grid-column:1/-1;display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">' +
       '<span class="cm-hint" id="cm-add-status" role="status" aria-live="polite" style="margin-right:auto;align-self:center"></span>' +
       '<button class="btn btn-ghost" data-action="cmCancelStudent" style="padding:6px 10px;font-size:0.8125rem">Cancel</button>' +
+      '<button class="btn btn-ghost" id="cm-save-another-btn" data-action="cmSaveStudentAndAnother" style="padding:6px 14px;font-size:0.8125rem">Save and Add Another</button>' +
       '<button class="btn btn-primary" id="cm-save-btn" data-action="cmSaveStudent" style="padding:6px 14px;font-size:0.8125rem">Save</button>' +
       '</div>' +
       '</div>' +
@@ -4344,7 +4409,7 @@ window.DashClassManager = (function () {
   }
 
   function renderCwStep1() {
-    var html = '<div class="cm-detail-inner" style="display:block">';
+    var html = '<div class="cm-detail-inner cw-wizard">';
     html += renderCwStepBar();
 
     if (!cwCurriculumLoaded && !cwLoadError) {
@@ -4496,7 +4561,7 @@ window.DashClassManager = (function () {
      Ministry order with their full wording, all ticked to start. A Ministry
      folder is a heading with its figure and Select All / Clear. */
   function renderCwCompetencies() {
-    var html = '<div class="cm-detail-inner" style="display:block">' + renderCwStepBar();
+    var html = '<div class="cm-detail-inner cw-wizard">' + renderCwStepBar();
     html +=
       '<div class="cw-cc-intro">The BC curriculum expects every competency to be taught. Untick only what you won\u2019t assess in this class.</div>';
     var total = 0;
@@ -4754,14 +4819,18 @@ window.DashClassManager = (function () {
     var grading = cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: preGrade });
     var calc = cwStep2Calc || _cmDefaultCalcMethod();
 
-    var html = '<div class="cm-detail-inner" style="display:block">';
+    var html = '<div class="cm-detail-inner cw-wizard">';
     html += renderCwStepBar();
 
     html +=
       '<div class="cm-section"><div class="cm-section-title">Class Details</div>' +
       '<div class="cm-field"><label class="cm-label" for="cm-new-name">Class Name</label><input class="cm-input" id="cm-new-name" value="' +
       esc(preName) +
-      '" placeholder="e.g. English 10" autofocus></div>' +
+      '" placeholder="e.g. English 10" required aria-describedby="cm-new-name-hint" data-action-input="cwNameInput" autofocus>' +
+      // Next waits for a name, so a slip can't make a class called Untitled.
+      '<div class="cm-hint" id="cm-new-name-hint"' +
+      (preName.trim() ? ' hidden' : '') +
+      '>Enter a Class Name to continue.</div></div>' +
       '<div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
       blockPickerHtml('cm-new-block', cwStep2Block) +
       '</div>' +
@@ -4857,13 +4926,15 @@ window.DashClassManager = (function () {
     html +=
       '<div class="cw-footer">' +
       _cwCancelBtn() +
-      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3">Next</button></div>';
+      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3"' +
+      (preName.trim() ? '' : ' disabled') +
+      '>Next</button></div>';
     html += '</div>';
     return html;
   }
 
   function renderCwStep3() {
-    var html = '<div class="cm-detail-inner" style="display:block">';
+    var html = '<div class="cm-detail-inner cw-wizard">';
     html += renderCwStepBar();
 
     var className = document.getElementById('cm-new-name')?.value || cwGetPreName();
@@ -4977,7 +5048,9 @@ window.DashClassManager = (function () {
     html +=
       '<div class="cw-footer">' +
       _cwCancelBtn() +
-      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate">Create Class</button></div>';
+      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate"' +
+      (className.trim() ? '' : ' disabled') +
+      '>Create Class</button></div>';
     html += '</div>';
     return html;
   }
@@ -5134,7 +5207,17 @@ window.DashClassManager = (function () {
     };
   }
 
+  // Class Details: Next comes on once the class has a name.
+  function cwNameInput(el) {
+    var named = !!(el.value || '').trim();
+    var next = document.querySelector('[data-action="cwGoToStep3"]');
+    if (next) next.disabled = !named;
+    var hint = document.getElementById('cm-new-name-hint');
+    if (hint) hint.hidden = named;
+  }
+
   function cwGoToStep3() {
+    if (!(document.getElementById('cm-new-name')?.value || '').trim()) return;
     cwStep2Name = document.getElementById('cm-new-name')?.value || '';
     cwStep2Block = readBlockPicker('cm-new-block');
     cwStep2Span = (document.querySelector('#cm-cg-span .cm-seg-btn.active') || {}).dataset?.val || 'full';
@@ -5263,6 +5346,8 @@ window.DashClassManager = (function () {
 
     cmSelectedCourse = course.id;
     cmMode = 'edit';
+    // A new class has no students yet, so it opens where they are added.
+    cmTab = 'students';
     _activeCourse = course.id;
     _activeCourseChanged = true;
     setActiveCourse(course.id);
@@ -9607,6 +9692,9 @@ window.DashClassManager = (function () {
       cmStartCreate: function () {
         cmStartCreate();
       },
+      cmOpenDemoMode: function () {
+        cmOpenDemoMode();
+      },
       cmCancelCreate: function () {
         cmCancelCreate();
       },
@@ -9641,7 +9729,10 @@ window.DashClassManager = (function () {
         cmCloseAddStudent();
       },
       cmSaveStudent: function () {
-        cmSaveStudent();
+        cmSaveStudent(false);
+      },
+      cmSaveStudentAndAnother: function () {
+        cmSaveStudent(true);
       },
       cmShowAddStudent: function () {
         cmShowAddStudent();
@@ -9912,6 +10003,10 @@ window.DashClassManager = (function () {
   }
 
   function handleInput(el) {
+    if (el.dataset.actionInput === 'cwNameInput') {
+      cwNameInput(el);
+      return true;
+    }
     if (el.dataset.actionInput === 'cmRosterSearch') {
       cmRosterSearch(el.value);
       return true;
@@ -10163,7 +10258,7 @@ window.DashClassManager = (function () {
     if (!el || el.tagName !== 'INPUT' || el.type === 'checkbox') return false;
     if (!el.closest || !el.closest('#cm-add-student-form')) return false;
     e.preventDefault();
-    cmSaveStudent();
+    cmSaveStudent(true);
     return true;
   }
 
