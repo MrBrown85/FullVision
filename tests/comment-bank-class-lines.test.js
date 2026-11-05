@@ -422,6 +422,7 @@ describe('the class settings (report_config) and the review screen', () => {
       languageGoalsFor: {},
       closing: '',
       charLimit: null,
+      studied: {},
     });
     saveReportConfig(CID, {
       form: { sides: [] },

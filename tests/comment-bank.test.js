@@ -128,7 +128,9 @@ describe('the bank', () => {
     const examples = COMMENT_BANK.sentences.filter(s => s.group === 'Examples From Work');
     expect(examples.map(s => s.id)).toContain('n36');
     examples.forEach(s => {
-      expect(s.claims, s.id).toEqual(['bestPiece']);
+      // (A frame that names the piece's strongest rubric criterion claims that
+      // too, inputs plan item 10.)
+      expect(s.claims, s.id).toEqual(/^vbc/.test(s.id) ? ['bestPiece', 'criterionTop'] : ['bestPiece']);
       // The pipeline's frames (v: 2) say the title by kind ({pieceTitle}).
       expect(s.needs, s.id).toContain(s.id === 'n36' ? 'bestPiece' : s.v === 2 ? 'pieceTitle' : 'assignment');
     });
@@ -286,6 +288,7 @@ describe('the bank', () => {
       pieceScored: 'bestPiece',
       pieceDid: 'bestPiece',
       pieceTie: 'bestPiece',
+      criterionTop: 'criterionTop',
       gradeSaid: 'grade',
       progressDoing: 'improved',
       habitDoes: 'habitBehaviour',
@@ -301,7 +304,8 @@ describe('the bank', () => {
       const slots = (s.text.match(/\{(\w+)\}/g) || []).map(x => x.slice(1, -1)).concat(s.needs || []);
       slots.forEach(k => {
         if (SLOT[k]) expect(s.claims, s.id + ' {' + k + '}').toContain(SLOT[k]);
-        else expect(['name', 'whose', 'course', 'He', 'he', 'him', 'His', 'his', 'himself'], s.id).toContain(k);
+        else
+          expect(['name', 'whose', 'course', 'studied', 'He', 'he', 'him', 'His', 'his', 'himself'], s.id).toContain(k);
       });
       Object.keys(s.when || {}).forEach(k =>
         expect(s.claims, s.id + ' when ' + k).toContain(
@@ -659,17 +663,17 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // five Habit Ratings frames for Completes Work at Consistently.
   // The counts since Nov 4 2026: the pipeline's frames fit beside the older
   // ones that stay in Browse.
-  it('knows the Demo class is Science from its name, and offers Cece 125 sentences (21, 49, 16, 39)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 125 sentences (20, 50, 16, 39)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 49, 16, 39]);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([20, 50, 16, 39]);
     expect(CommentBank.fitCount(ctx)).toBe(125);
   });
 
-  it('offers Jasper 126 (21, 49, 17, 39), by the name he goes by', () => {
+  it('offers Jasper 126 (20, 50, 17, 39), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([21, 49, 17, 39]);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([20, 50, 17, 39]);
     expect(CommentBank.fitCount(ctx)).toBe(126);
     expect(ctx.name).toBe('Jas');
     // Nothing fell from Extending since Report 1's year to date (it fell

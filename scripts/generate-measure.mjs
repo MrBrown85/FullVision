@@ -77,15 +77,17 @@ export async function sample(base, offset = 0) {
       // with the comments already drafted at that press as the class's
       // (Generate passes the classmates' comments the same way).
       const onScreen = [];
+      // The class's comments so far, every press: a class set keeps no two
+      // comments with the same sentence (blind sort 3).
+      const comments = [];
       for (let k = 1; k <= 4; k++) {
-        const comments = [];
         studs.forEach((st, i) => {
           const d = CommentBank.draft(ctxs[i], {
             seed: CommentBank.seedFor(st.id + '|' + term) + k + offset,
             // The text on screen from the press before, as Generate passes it.
             previous: onScreen[i] || '',
             // Not quiet: counted in the class, as a press of Generate is.
-            comments: comments.slice(),
+            comments: comments.filter(c => c.sid !== st.id),
           });
           comments.push({ sid: st.id, text: d.text });
           onScreen[i] = d.text;
@@ -410,7 +412,19 @@ export function measure(rows) {
     const top = Math.max(0, ...Object.values(holds));
     shared4 = Math.max(shared4, top / set.length);
   });
+  // Exact sentences said in the comments of two students of one class.
+  const byMode = {};
+  rows.forEach(r => {
+    const m = (byMode[r.mode] = byMode[r.mode] || {});
+    r.parts.forEach(t => {
+      const k = normWords(t, r.name).join(' ');
+      (m[k] = m[k] || new Set()).add(r.sid);
+    });
+  });
+  let exact = 0;
+  Object.values(byMode).forEach(m => Object.values(m).forEach(set => set.size > 1 && exact++));
   out.tells = {
+    exact,
     timeComments: pct(timeComments / rows.length),
     timeMax,
     stock,
@@ -495,6 +509,7 @@ export function targets(m) {
     ['Comments with a time opener', m.tells.timeComments + '%', '≤ 25%', m.tells.timeComments <= 25],
     ['Time openers in one comment (max)', m.tells.timeMax, '≤ 1', m.tells.timeMax <= 1],
     ['Stock time openers', m.tells.stock, '0', m.tells.stock === 0],
+    ["Sentences said in two students' comments", m.tells.exact, '0', m.tells.exact === 0],
     ['Comments repeating a 3-word run', m.tells.trigram, '0', m.tells.trigram === 0],
     ['Classmate pairs under 0.5 edit distance', m.tells.near, '0', m.tells.near === 0],
     ['Comments of 5+ sentences with no join', m.tells.flat, '0', m.tells.flat === 0],

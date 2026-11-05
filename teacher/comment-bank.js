@@ -1777,7 +1777,24 @@ window.CommentBank = (function () {
       languageGoalsFor: cs.languageGoalsFor && typeof cs.languageGoalsFor === 'object' ? cs.languageGoalsFor : {},
       closing: String(cs.closing || '').trim(),
       charLimit: _savedLimit(cs.charLimit),
+      // What the class studied, one line per report (inputs plan, item 6):
+      // { termId: text }.
+      studied: cs.studied && typeof cs.studied === 'object' ? cs.studied : {},
     };
+  }
+  /* What the class studied this report, as a topic a frame can hold:
+     "This report, we studied cells and ecosystems." gives "cells and
+     ecosystems". '' with none, or with a line too long to fit a frame. */
+  function studiedTopic(cid, termId) {
+    var line = String((classSettings(cid).studied || {})[termId] || '').trim();
+    var t = line
+      .replace(/^(this|in this) (report|term)[, ]+/i, '')
+      .replace(/^(we|the class|our class|students) (have )?(studied|explored|learned about|looked at)\s+/i, '')
+      .replace(/^(studied|we studied)\s+/i, '')
+      .replace(/[.!]+$/, '')
+      .trim();
+    if (!t || t.split(/\s+/).length > 8) return '';
+    return t.charAt(0).toLowerCase() + t.slice(1);
   }
 
   /* The class's checklist: the lines on offer for its kind of class, then
@@ -2278,6 +2295,9 @@ window.CommentBank = (function () {
             ).bank_id || null,
           scores: scores,
           termScores: termScores,
+          // Its first competency (a tag), for the teacher's own comment
+          // wording (CompetencyWording.commentWording).
+          tag: (sec.tags || [])[0] || null,
           // Start and now, for rises and falls only: with a last report that
           // had a level for the competency, its year-to-date level then and
           // the level now (since: "Report 1"); on the first report, or a
@@ -2334,7 +2354,9 @@ window.CommentBank = (function () {
           var cell = assessmentCellValue(cid, sid, a);
           if (cell.kind === 'level' && cell.percent != null) pct = cell.percent;
         }
-        return v > 0 ? { id: a.id, title: a.title || '', d: dateOf(a), v: v, pct: pct, note: note } : null;
+        return v > 0
+          ? { id: a.id, title: a.title || '', d: dateOf(a), v: v, pct: pct, note: note, kind: pieceKind(a) }
+          : null;
       })
       .filter(Boolean);
 
@@ -2511,6 +2533,8 @@ window.CommentBank = (function () {
       },
       defaultFocusId: (focus && focus.sec && focus.sec.id) || null,
       focusId: rating.focusSectionId || (focus && focus.sec && focus.sec.id) || null,
+      // The next step the teacher chose (inputs plan, item 7), or null.
+      focusPicked: rating.focusSectionId || null,
       // This term's absences and lates; the year's totals when an earlier
       // report's attendance is blank (attendanceYear: no "this term"
       // sentence is offered then; Colin, 2026-11-03).
@@ -2650,12 +2674,14 @@ window.CommentBank = (function () {
   // What each letter means said to a family, three ways each, rotated along
   // the class (the blind sort, Nov 4 2026: the Ministry's "minimally
   // acceptable" pasted in read as a form).
+  // (Blind sort 3: "solid work", "work of a very high standard" read as
+  // canned; one plain clause a letter, said in one Letter comment of three.)
   var STANDING_SAID = {
-    A: ['excellent work', 'work of a very high standard', 'excellent work all round'],
-    B: ['very good work', 'strong work', 'work of a high standard'],
-    'C+': ['good work', 'solid work', 'work of a good standard'],
-    C: ['satisfactory work', 'a fair standard of work', 'work that meets the course basics'],
-    'C-': ['a pass, with room to grow', 'passing work, with room to grow', 'a passing mark, with room to improve'],
+    A: ['excellent work'],
+    B: ['very good work'],
+    'C+': ['good work'],
+    C: ['satisfactory work'],
+    'C-': ['a pass, with room to grow'],
   };
   /* "Close to" the next letter: at most this many points below its band,
      with at least this many scored pieces. */
@@ -3082,10 +3108,57 @@ window.CommentBank = (function () {
   /* The skill the next step names, from the table: { comp, key, name,
      skill }, or null when there is no next step or the table has no skill
      for it. */
+  /* The competency the teacher chose as the next step (rating.focusSectionId,
+     read as picks.focus), when it has two pieces or more; else null. */
+  function _chosenNext(f) {
+    var id = f && f.focusPicked;
+    if (!id) return null;
+    var c = (f.comps || []).find(function (x) {
+      return String(x.id) === String(id);
+    });
+    return c && c.level > 0 && (c.scores || []).length >= NEXT_STEP_PIECES ? c : null;
+  }
+  /* The next step's three choices (the chooser on At a Glance and the Next
+     Step row): the three lowest competencies with two pieces or more, never
+     a strongest one, and never a safety or ethics one tied with another.
+     [{ id, name, skill, level, pieces, engine, chosen }], lowest first; the
+     engine's own pick marked. */
+  function nextStepChoices(f) {
+    var strong = strongestOf(f.comps);
+    var engine = nextStepOf(f.comps);
+    var ok = (f.comps || []).filter(function (c) {
+      return c.level > 0 && (c.scores || []).length >= NEXT_STEP_PIECES && strong.indexOf(c) < 0;
+    });
+    ok = ok.filter(function (c) {
+      if (!_isSafety(c)) return true;
+      return !ok.some(function (o) {
+        return o !== c && !_isSafety(o) && tenths(o.level) === tenths(c.level);
+      });
+    });
+    ok.sort(function (a, b) {
+      return a.level - b.level;
+    });
+    var picked = _chosenNext(f);
+    return ok.slice(0, 3).map(function (c) {
+      var sk = skillFor(f, c);
+      return {
+        id: c.id,
+        name: c.name,
+        skill: sk ? sk.skill : c.name,
+        level: c.level,
+        pieces: (c.scores || []).length,
+        engine: c === engine,
+        chosen: !!picked && c === picked,
+      };
+    });
+  }
   function nextSkillOf(f) {
-    var c = nextStepOf(f.comps);
+    var mine = _chosenNext(f);
+    var c = mine || nextStepOf(f.comps);
     var sk = skillFor(f, c);
-    return sk ? { comp: c, key: sk.key, name: sk.name, skill: sk.skill, steps: sk.steps || null } : null;
+    return sk
+      ? { comp: c, key: sk.key, name: sk.name, skill: sk.skill, steps: sk.steps || null, chosen: !!mine }
+      : null;
   }
 
   /* The next step at the student's level (Colin, 2026-11-02): for a bank
@@ -3338,11 +3411,39 @@ window.CommentBank = (function () {
         ? 1
         : 0;
     };
-    return (f.work || []).slice().sort(function (a, b) {
+    var made = function (w) {
+      return w.kind === 'lab' || w.kind === 'project' || w.kind === 'proposal' || w.kind === 'journal' ? 1 : 0;
+    };
+    var order = (f.work || []).slice().sort(function (a, b) {
       return (
-        markRank(f, b) - markRank(f, a) || onStrength(b) - onStrength(a) || b.v - a.v || String(b.d).localeCompare(a.d)
+        markRank(f, b) - markRank(f, a) ||
+        made(b) - made(a) ||
+        onStrength(b) - onStrength(a) ||
+        b.v - a.v ||
+        String(b.d).localeCompare(a.d)
       );
     });
+    // A quiz or test at the top gives way to a piece the student made, within
+    // 0.2 of it (5 points in a Letter class): a family learns more from it.
+    var top = order[0];
+    if (top && top.kind === 'test') {
+      var tol = f.grade && f.grade.mode === 'letter' ? 5 : 0.2;
+      var near = order.find(function (w) {
+        return made(w) && markRank(f, w) >= markRank(f, top) - tol - 1e-9;
+      });
+      if (near)
+        order = [near].concat(
+          order.filter(function (w) {
+            return w !== near;
+          }),
+        );
+    }
+    return order;
+  }
+  /* The tolerance a named piece may sit below the top mark (a project in
+     place of a quiz): 0.2 of a level, or 5 points in a Letter class. */
+  function _yieldTol(f) {
+    return f.grade && f.grade.mode === 'letter' ? 5 : 0.2;
   }
   /* The best piece this term (bestOrderOf), or null with no scored work. */
   /* A piece's mark before rounding: its % in a Letter class, else its
@@ -3359,6 +3460,29 @@ window.CommentBank = (function () {
     ['journal', /\b(journal|log|notebook)\b/i],
     ['writing', /\b(report|essay|paragraph|write-up)\b/i],
   ];
+  /* A piece's kind (inputs plan, item 8): the assessment's Evidence Type
+     (lab, test, quiz, project, presentation, written, other), else guessed
+     from its title ("Lab", "Quiz", "Test", "Project", "Proposal",
+     "Presentation"); as the WORK_KINDS keys: lab, test, proposal, project,
+     presentation, journal, writing, or ''. */
+  var EVIDENCE_KINDS = {
+    lab: 'lab',
+    test: 'test',
+    quiz: 'test',
+    project: 'project',
+    presentation: 'presentation',
+    written: 'writing',
+    observation: '',
+    other: '',
+  };
+  function pieceKind(a) {
+    var t = String((a && a.evidenceType) || '').toLowerCase();
+    var fromTitle = _workKind(a && a.title);
+    if (!t) return fromTitle;
+    // "Written" is the old default: a title that names a lab or a quiz says more.
+    if (t === 'written' && fromTitle) return fromTitle;
+    return Object.prototype.hasOwnProperty.call(EVIDENCE_KINDS, t) ? EVIDENCE_KINDS[t] || fromTitle : fromTitle;
+  }
   function _workKind(text) {
     var t = String(text || '');
     for (var i = 0; i < WORK_KINDS.length; i++) if (WORK_KINDS[i][1].test(t)) return WORK_KINDS[i][0];
@@ -4186,6 +4310,9 @@ window.CommentBank = (function () {
       // template, filled like a bank sentence), on that path only.
       languageGoalLine: goal ? goal.line.text : '',
       closingLine: lines.closing || '',
+      // The class's studied line as a topic (a class line: verify() checks
+      // it is still the saved one).
+      studied: f.cid != null && f.termId != null ? studiedTopic(f.cid, f.termId) : '',
       lateLine: lines.late || '',
       seeWork: seeWork,
       aboutWork: aboutWork,
@@ -4268,7 +4395,75 @@ window.CommentBank = (function () {
   /* The ways to say a strength at its level, for a card entry (or a table
      skill: entry null) and its phrase: the card's own "at" forms when it
      has them, else the pipeline's by level with the phrase in them. */
-  function strengthAtPool(f, entry, phrase, levelWord) {
+  /* The teacher's own comment wording for a competency (inputs plan, item
+     9): { area, at, next, home }, or empty. */
+  /* The best piece's strongest rubric criterion (inputs plan, item 10): of
+     the criteria scored on that piece, the one strictly highest (no tie),
+     whose competency is the comment's strength or the student's top
+     competency. { id, name, score, compId, said } or null; said is the
+     criterion's name as a noun phrase the student owns ("conclusion"),
+     null when the name is not one (then the skill's past form is said). */
+  var CRIT_VERBS =
+    /^(uses?|explains?|describes?|shows?|identifies|identify|applies|apply|makes?|creates?|follows?|demonstrates?|communicates?|analy[sz]es?|evaluates?|plans?|designs?|records?|selects?|chooses?|supports?|connects?)\b/i;
+  function criterionTopOf(f, w, routes) {
+    if (!w || typeof getTagScores !== 'function' || f.cid == null || f.sid == null) return null;
+    var byCrit = {};
+    (f.comps || []).forEach(function (c) {
+      if (!c.tag) return;
+      getTagScores(f.cid, f.sid, c.tag.id).forEach(function (sc) {
+        if (sc.assessmentId !== w.id || !sc.criterionId || !(sc.score > 0)) return;
+        if (!byCrit[sc.criterionId])
+          byCrit[sc.criterionId] = {
+            id: sc.criterionId,
+            name: sc.criterionName || '',
+            score: Number(sc.score),
+            comps: [],
+          };
+        byCrit[sc.criterionId].comps.push(c.id);
+      });
+    });
+    var list = Object.keys(byCrit).map(function (k) {
+      return byCrit[k];
+    });
+    if (list.length < 2) return null;
+    list.sort(function (a, b) {
+      return b.score - a.score;
+    });
+    if (list[0].score - list[1].score < 1e-9) return null;
+    var top = list[0];
+    var strength = routes && routes[0] ? String(routes[0].comp.id) : '';
+    var maxLevel = Math.max.apply(
+      null,
+      (f.comps || []).map(function (c) {
+        return Number(c.level) || 0;
+      }),
+    );
+    var ok = top.comps.some(function (id) {
+      var c = (f.comps || []).find(function (x) {
+        return String(x.id) === String(id);
+      });
+      return String(id) === strength || (c && Number(c.level) >= maxLevel - 1e-9);
+    });
+    if (!ok) return null;
+    var name = String(top.name || '').trim();
+    var noun = name && name.split(/\s+/).length <= 4 && /^[A-Za-z][A-Za-z '&-]*$/.test(name) && !CRIT_VERBS.test(name);
+    if (!noun) return null;
+    return {
+      id: top.id,
+      name: name,
+      score: top.score,
+      compId: top.comps[0],
+      said: name.charAt(0).toLowerCase() + name.slice(1),
+    };
+  }
+  function _ownWording(comp) {
+    var W = typeof window !== 'undefined' ? window.CompetencyWording : null;
+    return W && comp && comp.tag ? W.commentWording(comp.tag) : { area: '', at: {}, next: {}, home: [] };
+  }
+  function strengthAtPool(f, entry, phrase, levelWord, comp) {
+    // The teacher's own wording for the level first.
+    var mine = _ownWording(comp).at[levelWord];
+    if (mine) return [_say(mine, f, true)].concat(strengthAtPool(f, entry, phrase, levelWord, null));
     var P = _pipelineWords();
     var own = entry && entry.forms && entry.forms.at[levelWord];
     var F = window.CommentForms;
@@ -4503,22 +4698,34 @@ window.CommentBank = (function () {
         : null;
     if (also) r = also;
     var re = r ? _entryOf(f, r.comp) : null;
-    put('strengthAt', r ? strengthAtPool(f, re, r.skill, r.word) : [], compKey(r && r.comp));
+    put('strengthAt', r ? strengthAtPool(f, re, r.skill, r.word, r.comp) : [], compKey(r && r.comp));
     put('strengthDoing', r ? doingPool(f, re, r.skill) : [], compKey(r && r.comp));
     var top = !!r && !also && (r.strongest || (!r.tie && !r.even && !!x.hiTop));
     put('strengthTop', top ? ['yes'] : [], compKey(r && r.comp));
     put('strengthHigh', r && !also && /^(Proficient|Extending)$/.test(r.word) ? ['yes'] : [], compKey(r && r.comp));
     // "{His} strongest area is …" only past the "strongest" gate.
-    put('area', r && r.strongest && !also && re && re.area ? [re.area] : [], compKey(r && r.comp));
+    var ownArea = r ? _ownWording(r.comp).area : '';
+    put(
+      'area',
+      r && r.strongest && !also && (ownArea || (re && re.area)) ? [ownArea || re.area] : [],
+      compKey(r && r.comp),
+    );
     ctx._strengthRoutes = routes;
     ctx._strengthWord = r ? r.word : '';
     // The best piece: its title by kind, and what the student did in it
     // (the teacher's Note for the Report, else the skill it was scored on).
     var w = x.top;
     var tk = w ? titleKind(w.title) : { title: '', kind: '' };
+    // The Evidence Type decides scored or owned when the teacher set it.
+    if (w && w.kind) tk.kind = w.kind === 'test' ? 'scored' : 'owned';
     var wk = w ? ['work:' + w.id] : [];
     put('pieceTitle', tk.title ? [tk.title] : [], wk);
     put('pieceTie', w && _pieceShared(f, w) ? ['yes'] : [], wk);
+    // The rubric criterion that stood out on the best piece (inputs plan,
+    // item 10): its name as the teacher wrote it, owned ("her conclusion").
+    var crit = w ? criterionTopOf(f, w, routes) : null;
+    put('criterionTop', crit ? [crit.said] : [], crit ? wk.concat(['criterion:' + crit.id]) : []);
+    ctx._criterionTop = crit;
     put('pieceOwned', tk.kind === 'owned' ? ['yes'] : [], wk);
     put('pieceScored', tk.kind === 'scored' ? ['yes'] : [], wk);
     var note = w ? noteSlot(w.note) : '';
@@ -4526,7 +4733,7 @@ window.CommentBank = (function () {
     if (note) did = [note];
     else if (x.topPieceSkill) {
       var pe = _entryOf(f, x.topPieceSkill.comp);
-      var kindOf = _workKind(w && w.title);
+      var kindOf = (w && w.kind) || _workKind(w && w.title);
       // The skill said of the piece only when the kinds agree: the card's
       // evidence and each phrasing's own words (a lab, a quiz, a proposal)
       // match the piece, or say no kind (the second blind sort: "Science
@@ -4577,7 +4784,7 @@ window.CommentBank = (function () {
     // order follows the class), so each one's wording is accepted.
     if (routes.length > 1) {
       choices.strengthAt = routes.reduce(function (acc, rt) {
-        return acc.concat(strengthAtPool(f, _entryOf(f, rt.comp), rt.skill, rt.word));
+        return acc.concat(strengthAtPool(f, _entryOf(f, rt.comp), rt.skill, rt.word, rt.comp));
       }, []);
       choices.strengthDoing = routes.reduce(function (acc, rt) {
         return acc.concat(doingPool(f, _entryOf(f, rt.comp), rt.skill));
@@ -4595,7 +4802,9 @@ window.CommentBank = (function () {
             return _say(t, f);
           })
         : [];
+    var ownStep = x.next ? _ownWording(x.next.comp).next[word(x.next.comp.level)] : '';
     var steps = stepText ? [stepText].concat(stepAlt) : [];
+    if (ownStep) steps = [_say(ownStep, f)].concat(steps);
     put('step', steps, compKey(stepComp));
     put(
       'stepDoing',
@@ -4608,6 +4817,8 @@ window.CommentBank = (function () {
     );
     var ne = x.next ? _entryOf(f, x.next.comp) : null;
     var prompts = ne && ne.home.length ? ne.home : x.next ? _homePrompts(ctx, x.next.key) : [];
+    var ownHome = x.next ? _ownWording(x.next.comp).home : [];
+    if (ownHome.length) prompts = ownHome.concat(prompts);
     put(
       'homeLine',
       prompts.map(function (t) {
@@ -4943,7 +5154,9 @@ window.CommentBank = (function () {
       // A later sentence no longer names the course (the realiser names it
       // once): the wording without it matches too, and only the pieces both
       // wordings hold are required.
-      var bare = _courseDropped(s.text);
+      // (Not for a loose pattern: a short grade frame without its course
+      // would hold almost any sentence.)
+      var bare = loose ? s.text : _courseDropped(s.text);
       if (bare !== s.text) {
         var bareLits = [];
         src = '(?:' + src + ')|(?:' + build(bare, bareLits) + ')';
@@ -6561,7 +6774,24 @@ window.CommentBank = (function () {
           return needs(x, 'pieceDid');
         });
         if (noted.length) v2 = noted;
+      } else if (ctx.criterionTop) {
+        var crit = v2.filter(function (x) {
+          return needs(x, 'criterionTop');
+        });
+        if (crit.length) v2 = crit;
       }
+    }
+    // The standing ("which is good work") in one Letter comment of three, by
+    // roster place and press; the others say the letter alone.
+    if (!ctx._studiedOK)
+      v2 = v2.filter(function (x) {
+        return !needs(x, 'studied');
+      });
+    if (key === 'grade' && !ctx._standingOK) {
+      var plain = v2.filter(function (x) {
+        return !needs(x, 'gradeSaid');
+      });
+      if (plain.length) v2 = plain;
     }
     if (key === 'grade' && ctx.gradeLevel) {
       var lv = v2.filter(function (x) {
@@ -6642,6 +6872,8 @@ window.CommentBank = (function () {
       if (/^habit/.test(k)) return;
       out[k] = turnOf(pick[k], idx + press + (CP.hash(k) % 7), k);
     });
+    out._standingOK = (idx + press) % 3 === 0;
+    out._studiedOK = !!ctx.studied && (idx + press) % 3 === 1;
     var f = ctx._f;
     var hp = ctx._habitPlan || { does: [], invite: [] };
     var say = function (key, form, n) {
@@ -6925,7 +7157,8 @@ window.CommentBank = (function () {
           (CP.count(t, 'class') > 1 ? 1 : 0) +
           (OPEN_TIME.test(CP.firstWord(t)) && (!timeOK || timeSaid(sofar)) ? 1 : 0) +
           (_sharesTrigram(t, sofar, who.name) ? 1 : 0) +
-          (onScreen.indexOf(t) >= 0 ? 1 : 0)
+          (onScreen.indexOf(t) >= 0 ? 1 : 0) +
+          (mateSaid(t) ? 2 : 0)
         );
       };
       var glossed =
@@ -6934,26 +7167,39 @@ window.CommentBank = (function () {
           return /\bwhich means\b/.test(m.text);
         });
       var onScreen = around.onScreen || [];
+      var mateSaid = function (t) {
+        return !!(around.mateSentences || {})[_tplKey(_named(t, who.name))];
+      };
+      // The teacher's own eye ("I notice that", "I see that") in one comment a
+      // class (blind sort 3).
+      var iSee = /\bI (notice|see)\b/;
+      var iSaid = (around.mates || []).some(function (m) {
+        return iSee.test(m.text);
+      });
+      var studiedSaid = items.some(function (it) {
+        return it.s && /\{studied\}/.test(it.s.text);
+      });
       var softOk = function (x, t) {
         return !(
+          (studiedSaid && /\{studied\}/.test(x.text)) ||
+          (iSaid && iSee.test(x.text)) ||
+          mateSaid(t) ||
           // A sentence the text on screen already has, word for word.
-          (
-            onScreen.indexOf(t) >= 0 ||
-            (glossed && /\{levelMeaning\}/.test(x.text)) ||
-            // The course named once: a frame that opens on the course as its
-            // subject waits for a comment that has not named it.
-            (courseSaid && /^\{course\} (?!work\b)/.test(x.text)) ||
-            (prevText && CP.firstWord(prevText) === CP.firstWord(t)) ||
-            // "class" once a sentence ("In class, he joins in class
-            // discussions").
-            CP.count(t, 'class') > 1 ||
-            // A time phrase opens a sentence in one comment of four (by roster
-            // place and press), and once in that comment.
-            (OPEN_TIME.test(CP.firstWord(t)) && (!timeOK || timeSaid(sofar))) ||
-            // No run of three words twice in a comment (names and pronouns as
-            // one word).
-            _sharesTrigram(t, sofar, who.name)
-          )
+          onScreen.indexOf(t) >= 0 ||
+          (glossed && /\{levelMeaning\}/.test(x.text)) ||
+          // The course named once: a frame that opens on the course as its
+          // subject waits for a comment that has not named it.
+          (courseSaid && /^\{course\} (?!work\b)/.test(x.text)) ||
+          (prevText && CP.firstWord(prevText) === CP.firstWord(t)) ||
+          // "class" once a sentence ("In class, he joins in class
+          // discussions").
+          CP.count(t, 'class') > 1 ||
+          // A time phrase opens a sentence in one comment of four (by roster
+          // place and press), and once in that comment.
+          (OPEN_TIME.test(CP.firstWord(t)) && (!timeOK || timeSaid(sofar))) ||
+          // No run of three words twice in a comment (names and pronouns as
+          // one word).
+          _sharesTrigram(t, sofar, who.name)
         );
       };
       var pick = null;
@@ -6978,6 +7224,8 @@ window.CommentBank = (function () {
           var x = turn[k];
           var t = R.render(sentenceTokens(x, cx), who, { named: state.named, course: courseSaid });
           if (!hardOk(t)) continue;
+          // The home line is never a classmate's, word for word.
+          if (key === 'home' && mateSaid(t)) continue;
           if (softOk(x, t)) pick = { s: x, t: t, c: cx };
           else {
             var cost = softCost(x, t);
@@ -7141,6 +7389,20 @@ window.CommentBank = (function () {
     var mates = _classmateTexts(f, around, opts.comments);
     around.mates = mates.map(function (t) {
       return { text: t, key: _tplKey(t) };
+    });
+    // Every sentence a classmate's comment holds, word for word (the name
+    // as NAME): a comment never repeats one (blind sort 3: one home prompt
+    // in two comments).
+    around.mateSentences = {};
+    var nameOf = {};
+    (around.roster || []).forEach(function (st) {
+      nameOf[String(st.id)] = st.firstName || '';
+    });
+    (opts.comments || []).map(_comment).forEach(function (c) {
+      if (c.sid != null && String(c.sid) === String(f.sid)) return;
+      R.sentences(_named(c.text, nameOf[String(c.sid)] || '')).forEach(function (x) {
+        around.mateSentences[_tplKey(x)] = true;
+      });
     });
     var seen = {};
     var cands = [];
@@ -8147,6 +8409,14 @@ window.CommentBank = (function () {
       return checks.length > 0 && checks.every(Boolean);
     },
     // The highest-marked work this term, with the proficiency it reached.
+    // The best piece's strongest criterion: recomputed (piece, criterion,
+    // score) from the rubric scores now.
+    criterionTop: function (pv, f, ctx) {
+      var v = (pv && pv.values) || {};
+      var c = ctx && ctx._criterionTop;
+      var ids = _ids(pv, 'criterionTop', 'criterion');
+      return !!c && !!v.criterionTop && v.criterionTop === c.said && ids[0] === String(c.id);
+    },
     bestPiece: function (pv, f, ctx) {
       // The top mark as it prints (markRank): in a Letter class a 90% piece
       // is not the highest beside a 100% one.
@@ -8179,7 +8449,9 @@ window.CommentBank = (function () {
       ['pieceTitle', 'pieceOwned', 'pieceScored', 'pieceDid'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
         var pw = _byId(f.work, _ids(pv, slot, 'work')[0]);
-        checks.push(!!pw && markRank(f, pw) === top && _slotHolds(pv, ctx, slot) && (tieSafe || !_pieceShared(f, pw)));
+        var atTop = !!pw && markRank(f, pw) === top;
+        var yielded = !!pw && tieSafe && pw.kind !== 'test' && markRank(f, pw) >= top - _yieldTol(f) - 1e-9;
+        checks.push(!!pw && (atTop || yielded) && _slotHolds(pv, ctx, slot) && (tieSafe || !_pieceShared(f, pw)));
       });
       ['assignment', 'seeWork'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
@@ -9255,6 +9527,8 @@ window.CommentBank = (function () {
     supportFit: supportFit,
     fitName: fitName,
     classSettings: classSettings,
+    nextStepChoices: nextStepChoices,
+    studiedTopic: studiedTopic,
     classLines: classLines,
     parseLimit: parseLimit,
     LIMIT_MIN: LIMIT_MIN,

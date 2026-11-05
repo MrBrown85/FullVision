@@ -241,7 +241,8 @@ describe('the draft is the plan’s eight parts only', () => {
     expect(steps.indexOf('lateWork')).toBe(steps.indexOf('notHandedIn') + 1);
     const g = d.sentences.find(x => x.step === 'grade');
     expect(g.text).toMatch(/\b[Aa] B\b/);
-    expect(g.text).toMatch(/very good/);
+    // (The standing is said in one Letter comment of three, Nov 4 2026.)
+    expect(g.text).toMatch(/\ba B\b/);
     expect(d.sentences[0].text).toContain('Tomas');
     expect(d.text).toContain('not handed in');
     expect(d.text).toMatch(

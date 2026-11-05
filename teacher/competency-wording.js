@@ -136,7 +136,56 @@ window.CompetencyWording = (function () {
     return out.join('');
   }
 
+  /* A teacher's own comment wording for a competency (inputs plan, item 9),
+     kept in the same descriptor store the Levels use, one key per kind:
+     area (level 1), at (2 Developing, 3 Proficient, 4 Extending), next (1
+     Emerging … 4 Extending) and home (1, 2). No new table: the key is the
+     competency's key with "|comment:<kind>". */
+  var COMMENT_KINDS = ['area', 'at', 'next', 'home'];
+  // The level words by number, as constants.js names them (PROF_LABELS).
+  var LEVEL_WORDS = typeof PROF_LABELS !== 'undefined' ? PROF_LABELS : {};
+  function commentKey(tag, kind) {
+    if (!tag || COMMENT_KINDS.indexOf(kind) < 0 || typeof RubricDraft === 'undefined') return '';
+    var k = RubricDraft.competencyKey(tag);
+    return k ? (k + '|comment:' + kind).slice(0, 400) : '';
+  }
+  /* { area, at: { Developing, Proficient, Extending }, next: { Emerging …
+     Extending }, home: [ … ] }, each the teacher's own text or absent. */
+  function commentWording(tag) {
+    var out = { area: '', at: {}, next: {}, home: [] };
+    if (!tag || typeof getCompetencyDescriptor !== 'function') return out;
+    var get = function (kind) {
+      return getCompetencyDescriptor(commentKey(tag, kind)) || {};
+    };
+    var area = get('area');
+    out.area = String(area[1] || '').trim();
+    var at = get('at');
+    [2, 3, 4].forEach(function (l) {
+      if (String(at[l] || '').trim()) out.at[LEVEL_WORDS[l]] = String(at[l]).trim();
+    });
+    var next = get('next');
+    [1, 2, 3, 4].forEach(function (l) {
+      if (String(next[l] || '').trim()) out.next[LEVEL_WORDS[l]] = String(next[l]).trim();
+    });
+    var home = get('home');
+    [1, 2].forEach(function (l) {
+      if (String(home[l] || '').trim()) out.home.push(String(home[l]).trim());
+    });
+    return out;
+  }
+  /* Saves one string of the teacher's comment wording; an empty text goes
+     back to the bank's. */
+  function saveCommentWording(tag, kind, level, text) {
+    var key = commentKey(tag, kind);
+    if (!key || typeof saveCompetencyDescriptors !== 'function') return Promise.resolve(null);
+    return saveCompetencyDescriptors([{ key: key, level: Number(level), text: String(text || '').trim() }]);
+  }
+
   return {
+    commentKey: commentKey,
+    commentWording: commentWording,
+    saveCommentWording: saveCommentWording,
+    COMMENT_KINDS: COMMENT_KINDS,
     lines: lines,
     html: html,
     nextStep: nextStep,

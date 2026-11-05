@@ -13,7 +13,7 @@ import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
-const GRADE_IDS = ['vgl01', 'vgc01', 'vgp01'];
+const GRADE_IDS = ['vgl01', 'vgc02', 'vgp01'];
 const piece = (d, pct) => ({ id: 'p' + d, d: '2026-10-' + String(d).padStart(2, '0'), pct });
 const flat = (n, pct) => Array.from({ length: n }, (_, i) => piece(i + 1, pct));
 
@@ -63,8 +63,8 @@ describe('the grade sentences in the bank', () => {
     expect(CommentBank.fill(byId('vgl01'), { ...ctx, gradeNext: '' }, { first: true })).toBe(
       'Noor has a B in History 12, which is very good work.',
     );
-    expect(CommentBank.fill(byId('vgc01'), ctx, { first: true })).toBe(
-      'Noor has a B in History 12, very good work and close to an A.',
+    expect(CommentBank.fill(byId('vgc02'), ctx, { first: true })).toBe(
+      'Noor’s mark in History 12 is a B, which is very good work, and it is close to an A.',
     );
     GRADE_IDS.forEach(id => {
       expect(byId(id)).toMatchObject({ part: 'now', group: 'Grade', claims: ['grade'] });
@@ -82,11 +82,11 @@ describe('the grade sentences in the bank', () => {
       'Noor has a C- in History 12, which is a pass, with room to grow.',
     );
     const close = CommentBank.context(letterFacts('C-', 59), {});
-    expect(CommentBank.fill(byId('vgc01'), close, { first: true })).toBe(
-      'Noor has a C- in History 12, a pass, with room to grow and close to a C.',
+    expect(CommentBank.fill(byId('vgc02'), close, { first: true })).toBe(
+      'Noor’s mark in History 12 is a C-, which is a pass, with room to grow, and it is close to a C.',
     );
     expect(byId('vgl01').when.grade).toEqual(['letter', 'cminus']);
-    expect(byId('vgc01').when.grade).toEqual(['letterClose', 'cminusClose']);
+    expect(byId('vgc02').when.grade).toEqual(['letterClose', 'cminusClose']);
   });
 });
 
@@ -214,7 +214,7 @@ describe('verify catches a wrong grade', () => {
 
   it('catches "close to" once the gate no longer passes', () => {
     const f = letterFacts('B', 84.5);
-    const d = one('vgc01', CommentBank.context(f, {}));
+    const d = one('vgc02', CommentBank.context(f, {}));
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     expect(CommentBank.verify(d, letterFacts('B', 83.5), {}).replaced[0].failed).toContain('grade');
     expect(CommentBank.verify(d, letterFacts('B', 84.5, flat(5, 84.5)), {}).replaced[0].failed).toContain('grade');
@@ -314,11 +314,7 @@ describe('Generate in a Letter class', () => {
     expect(f.grade.pieces).toHaveLength(4);
     for (let seedN = 1; seedN <= 10; seedN++) {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed: seedN });
-      leads(
-        d,
-        'letter',
-        /\ba B\b.*(very good|strong work|high standard)|(very good|strong work|high standard).*\ba B\b/i,
-      );
+      leads(d, 'letter', /\ba B\b/i);
       expect(d.sentences[gradeAt(d)].text).not.toMatch(/close to/);
       expect(
         others(d).filter(id => byId(id) && claimsGrade(id)),
@@ -334,7 +330,7 @@ describe('Generate in a Letter class', () => {
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
     leads(d, 'letterClose', /close to an A/i);
     expect(d.sentences[gradeAt(d)].text).toMatch(/\ba B\b/i);
-    expect(d.sentences[gradeAt(d)].text).toMatch(/very good|strong work|high standard/);
+    expect(d.sentences[gradeAt(d)].text).toMatch(/\ban A\b/);
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
   });
 
@@ -370,11 +366,7 @@ describe('Generate in a Letter class', () => {
   it('uses the letter in a Both class', () => {
     const f = seed('both', [3, 3, 3, 3]);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    leads(
-      d,
-      'letter',
-      /\ba B\b.*(very good|strong work|high standard)|(very good|strong work|high standard).*\ba B\b/i,
-    );
+    leads(d, 'letter', /\ba B\b/i);
     expect(others(d).filter(id => byId(id) && claimsGrade(id))).toEqual([]);
   });
 

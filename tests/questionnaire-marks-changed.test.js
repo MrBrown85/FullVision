@@ -214,7 +214,8 @@ describe('marks changed (CommentBank.staleness)', () => {
     expect(meta.sentences[at].values).toBeUndefined();
     markTask4();
     const s = CommentBank.staleness(meta, facts(), {});
-    expect(s.changes.map(c => c.i)).not.toContain(at);
+    // (Nothing else may have moved: null is no card at all.)
+    expect(s === null || s.changes.every(c => c.i !== at)).toBe(true);
     // The grade sentence is gone from the saved comment: not shown.
     const text = RQ.composeRows(rows).replace(rows[0].text, '').trim();
     const t = CommentBank.staleness(meta, facts(), {}, { text: text });
