@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openCompPicker, closeCompPicker } from './helpers.js';
 
 /* Choose a Rubric (redesign PR 7; in place since rubric starts PR 3,
    2026-11-02): opens under its button, joined to it, from the assessment
@@ -27,8 +28,10 @@ test('opens in place under its button, search focused; suggests rubrics that sha
 }) => {
   await openForm(page);
   await page.fill('#af-title', 'Density Lab');
+  await openCompPicker(page);
   await page.locator('.af-code[data-tag="QP3"]').click();
   await page.locator('.af-code[data-tag="PC2"]').click();
+  await closeCompPicker(page);
   await page.locator('.af-rubric-start[data-action="chooseRubric"]').click();
   await expect(page.locator('#rubric-bank-overlay')).toHaveCount(0);
   const card = page.locator('#af-rubric-view .af-start-card');

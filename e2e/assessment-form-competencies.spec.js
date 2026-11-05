@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openCompPicker, closeCompPicker } from './helpers.js';
 
 /* The assessment form's competency picker (redesign PR 4, 2026-11-02):
    Codes (one-click chips by Ministry group, and a focus box)
@@ -35,6 +36,8 @@ async function openForm(page) {
   await page.evaluate(() => window.Router.navigate('/assignments?course=sci8'));
   await page.locator('button', { hasText: 'New Assessment' }).first().click();
   await expect(page.locator('#af-title')).toBeVisible();
+  // The list is in the Choose Competencies window (Nov 4).
+  await openCompPicker(page);
 }
 
 const ticked = page =>
@@ -103,6 +106,7 @@ test('List shows one row each with the whole wording, and the choice is remember
   // The page doesn't scroll sideways.
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
   // A ticked competency counts as filled in, so Cancel asks first.
+  await closeCompPicker(page);
   await page.locator('[data-action="cancelAssessForm"]').click();
   await page.locator('.af-dialog-card button', { hasText: 'Discard' }).click();
   await page.locator('button', { hasText: 'New Assessment' }).first().click();
@@ -112,6 +116,7 @@ test('List shows one row each with the whole wording, and the choice is remember
 test('a rubric decides the competencies, read only while it is chosen', async ({ page }) => {
   await openForm(page);
   await page.locator('.af-code[data-tag="CM2"]').click();
+  await closeCompPicker(page);
   const rubric = await page.evaluate(() => {
     const r = getRubrics('sci8')[0];
     return { id: r.id, tags: [...new Set(r.criteria.flatMap(c => c.tagIds || []))] };
@@ -119,12 +124,14 @@ test('a rubric decides the competencies, read only while it is chosen', async ({
   await pickRubric(page, rubric.id);
   expect((await ticked(page)).sort()).toEqual(rubric.tags.slice().sort());
   await expect(page.locator('#af-comp-rubric-note')).toBeVisible();
+  // The chips have no ✕ and Choose Competencies is gone while the rubric decides.
+  await expect(page.locator('#af-comp-choose')).toBeHidden();
+  await expect(page.locator('#af-comp-chosen .af-comp-chip-x')).toHaveCount(0);
   await expect(page.locator('.af-code[data-tag="CM2"]')).toHaveAttribute('aria-disabled', 'true');
-  await page.locator('.af-code[data-tag="CM2"]').click({ force: true });
-  expect((await ticked(page)).sort()).toEqual(rubric.tags.slice().sort());
   // None hands them back.
   await pickRubric(page, '');
   await expect(page.locator('#af-comp-rubric-note')).toBeHidden();
+  await openCompPicker(page);
   await page.locator('.af-code[data-tag="CM2"]').click();
   expect(await ticked(page)).toContain('CM2');
 });
@@ -167,4 +174,30 @@ test('a folder’s checkbox ticks the whole folder, shows a dash for some, and u
   await page.locator('.af-codes .af-group-cb').first().click();
   expect((await ticked(page)).sort()).toEqual(ids.slice().sort());
   await expect(page.locator('.af-comp-list .af-group-cb').first()).toBeChecked();
+});
+
+test('Choose Competencies: Done keeps the ticks, Cancel and Escape put them back, ✕ removes one', async ({ page }) => {
+  await openForm(page);
+  await expect(page.locator('#af-comp-find')).toBeFocused();
+  await page.locator('.af-code[data-tag="QP3"]').click();
+  await expect(page.locator('#af-comp-count')).toHaveText('1 chosen');
+  await closeCompPicker(page);
+  await expect(page.locator('#af-comp-chosen .af-comp-chip')).toHaveText([/QP3/]);
+  await expect(page.locator('#af-comp-choose')).toBeFocused();
+  // Cancel puts back the ticks the window opened with.
+  await openCompPicker(page);
+  await page.locator('.af-code[data-tag="PA4"]').click();
+  await page.locator('#af-comp-dialog [data-action="cancelCompPicker"]').click();
+  expect(await ticked(page)).toEqual(['QP3']);
+  // So does Escape, and the form stays open.
+  await openCompPicker(page);
+  await page.locator('.af-code[data-tag="PA4"]').click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#af-comp-dialog')).toBeHidden();
+  await expect(page.locator('#af-title')).toBeVisible();
+  expect(await ticked(page)).toEqual(['QP3']);
+  // A chip's ✕ unticks it.
+  await page.locator('#af-comp-chosen .af-comp-chip-x').first().click();
+  expect(await ticked(page)).toEqual([]);
+  await expect(page.locator('#af-comp-chosen .af-comp-chip')).toHaveCount(0);
 });

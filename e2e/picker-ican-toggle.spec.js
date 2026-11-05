@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openCompPicker, closeCompPicker } from './helpers.js';
 
 /* The assessment form's competency picker (Nov 2 mockup, batch 2): each
    competency has an "I Can" toggle beside it (in the List view) that shows its statements
@@ -13,7 +14,8 @@ test('the I Can toggle shows the statements without ticking the competency', asy
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(() => window.Router.navigate('/assignments?course=sci8'));
   await page.locator('button', { hasText: 'New Assessment' }).first().click();
-  // The I Can toggles are on the List view's rows.
+  // The I Can toggles are on the List view's rows, in Choose Competencies.
+  await openCompPicker(page);
   await page.locator('.af-comp-view [data-view="list"]').click();
   const icans = await page.evaluate(() => getTagById('sci8', 'PA4').i_can_statements);
   const row = page.locator('.af-tag-row', { has: page.locator('.af-tag-cb[value="PA4"]') });

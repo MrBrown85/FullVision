@@ -1445,3 +1445,19 @@ export function serverRekeysRubrics() {
     });
   };
 }
+
+/* Choose Competencies (Nov 4 2026): the form's competency list is in a
+   window opened from the Competencies field. Opens it if it isn't open. */
+export async function openCompPicker(page) {
+  const dlg = page.locator('#af-comp-dialog');
+  if (!(await dlg.isVisible())) await page.locator('#af-comp-choose').click();
+  await dlg.locator('.af-comp-dialog-foot').waitFor();
+  return dlg;
+}
+
+/* Done: closes the window, keeping the ticks. */
+export async function closeCompPicker(page) {
+  const dlg = page.locator('#af-comp-dialog');
+  if (await dlg.isVisible()) await dlg.locator('[data-action="closeCompPicker"]').click();
+  await dlg.waitFor({ state: 'hidden' });
+}

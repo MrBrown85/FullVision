@@ -922,15 +922,16 @@ window.AssessmentCopy = (function () {
       (active ? 'true' : 'false') +
       '"' +
       (disabled ? ' disabled' : '') +
-      '><span class="af-copy-chip-mark" aria-hidden="true"></span>' +
+      '><span class="af-copy-chip-mark" aria-hidden="true"></span><span class="af-copy-chip-name">' +
       esc(t.name) +
-      '</button>'
+      '</span></button>'
     );
   }
 
-  /* The Classes row: this class, then the other sections of the same course
-     as toggle chips, then any other classes behind "More". A new assessment
-     starts with the classes ticked last time; an edit starts with none. */
+  /* The Classes row: this class, then the other sections of the same course,
+     then every other class, all as even chips in one row (no "Other
+     classes" drop-down, Colin, Nov 4). A new assessment starts with the
+     classes ticked last time; an edit starts with none. */
   function renderClassesField(cid, assess) {
     var targets = copyTargets(cid);
     if (!targets.sameCourse.length && !targets.other.length) return '';
@@ -940,40 +941,25 @@ window.AssessmentCopy = (function () {
       '<label class="af-label">Classes</label>' +
       '<div class="af-copy-chips" role="group" aria-label="Classes this assessment goes to">' +
       '<span class="af-copy-chip af-copy-this" aria-current="true"><span class="af-copy-chip-mark" aria-hidden="true"></span>' +
+      '<span class="af-copy-chip-name">' +
       esc(_className(cid)) +
-      '</span>' +
+      '</span></span>' +
       targets.sameCourse
+        .concat(targets.other)
         .map(function (t) {
           return _chip(t, pre.indexOf(t.id) >= 0, false);
         })
         .join('');
-    if (targets.other.length) {
-      var anyPre = targets.other.some(function (t) {
-        return pre.indexOf(t.id) >= 0;
-      });
-      html +=
-        '<details class="af-copy-more"' +
-        (anyPre || !targets.sameCourse.length ? ' open' : '') +
-        '><summary>' +
-        (targets.sameCourse.length ? 'More classes' : 'Other classes') +
-        '</summary><div class="af-copy-chips">' +
-        targets.other
-          .map(function (t) {
-            return _chip(t, pre.indexOf(t.id) >= 0, false);
-          })
-          .join('') +
-        '</div></details>';
-    }
     html +=
       '</div>' +
       '<div class="af-rubric-info" id="af-copy-existing"' +
       (assess && assess.copyGroup ? '' : ' hidden') +
       '></div>' +
       '<div class="af-copy-dates-bar" id="af-copy-dates-bar" hidden>' +
-      '<span class="af-copy-dates-label">Dates</span>' +
-      '<div class="seg seg-sm af-type-toggle af-copy-dates-mode" role="group" aria-label="Dates">' +
-      '<button type="button" class="seg-btn af-type-btn active" data-action="copyDatesMode" data-mode="same" aria-pressed="true">Same for every class</button>' +
-      '<button type="button" class="seg-btn af-type-btn" data-action="copyDatesMode" data-mode="per" aria-pressed="false">Set per class</button>' +
+      '<span class="af-copy-dates-label" id="af-copy-dates-label">Dates</span>' +
+      '<div class="seg af-copy-dates-mode" role="group" aria-labelledby="af-copy-dates-label">' +
+      '<button type="button" class="seg-btn active" data-action="copyDatesMode" data-mode="same" aria-pressed="true">Same for Every Class</button>' +
+      '<button type="button" class="seg-btn" data-action="copyDatesMode" data-mode="per" aria-pressed="false">Set per Class</button>' +
       '</div>' +
       '</div>' +
       '<div id="af-copy-dates"></div>' +

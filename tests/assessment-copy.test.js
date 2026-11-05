@@ -321,7 +321,13 @@ describe('the Classes row, card chips and sibling toggle', () => {
     var editing = AssessmentCopy.renderClassesField(A, { id: 'a1', title: 'Essay' });
     expect(editing).toMatch(/data-cid="cls-eng9-b" aria-pressed="false"/);
     expect(fresh).toMatch(/English 9 - Block A/);
-    expect(fresh).toMatch(/More classes/);
+    // Every class is a chip in the one row: no "More classes" drop-down.
+    expect(fresh).not.toMatch(/More classes|Other classes|<details/);
+    expect(fresh.match(/class="af-copy-chip[ "]/g).length).toBe(
+      Object.keys(COURSES).filter(function (id) {
+        return id !== A && !(COURSES[id] || {}).deletedAt && !(COURSES[id] || {}).archived;
+      }).length + 1,
+    );
   });
 
   it('finds local copies and builds the card chip, delete note and sibling toggle', () => {

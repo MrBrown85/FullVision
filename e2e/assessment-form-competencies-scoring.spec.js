@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openCompPicker, closeCompPicker } from './helpers.js';
 
 /* New Assessment > Scoring > Competencies (Step 4 group 3 #24, Colin
    2026-11-03): score each tagged competency Emerging to Extending, with +
@@ -26,8 +27,10 @@ async function createOne(page, title) {
   await page.fill('#af-title', title);
   await page.selectOption('#af-category', 'sci8-cat-labs');
   await page.locator('.af-scoremode-btn[data-mode="competencies"]').click();
+  await openCompPicker(page);
   await page.locator('.af-tag-cb[value="QP1"]').check();
   await page.locator('.af-tag-cb[value="QP2"]').check();
+  await closeCompPicker(page);
   await page.locator('[data-action="saveNewAssess"]').click();
   return page.evaluate(t => getAssessments('sci8').find(a => a.title === t), title);
 }
@@ -53,7 +56,7 @@ function tagScore(page, aid, sid, tid) {
   );
 }
 
-test('Competencies is a fourth choice with a picture and a plain tip', async ({ page }) => {
+test('Competencies is a fourth choice, with no hover preview', async ({ page }) => {
   await openForm(page);
   const card = page.locator('.af-scoremode-btn[data-mode="competencies"]');
   await expect(page.locator('.af-scoremode-btn')).toHaveText([
@@ -62,14 +65,14 @@ test('Competencies is a fourth choice with a picture and a plain tip', async ({ 
     'Complete/Incomplete',
     'Competencies',
   ]);
-  // Keyboard focus shows the tooltip.
+  // No preview on hover or focus: it covered the rubric editor (Colin, Nov 4).
+  await card.hover();
+  await page.waitForTimeout(600);
+  await expect(page.locator('.af-mode-tip, [role="tooltip"]:visible')).toHaveCount(0);
   await page.locator('.af-scoremode-btn[data-mode="complete"]').focus();
   await page.keyboard.press('Tab');
   await expect(card).toBeFocused();
-  const tip = page.locator('#af-mode-tip-competencies');
-  await expect(tip).toBeVisible();
-  await expect(tip).toContainText('Score each competency you tag, Emerging to Extending');
-  await expect(tip.locator('.af-tip-comp-row')).toHaveCount(2);
+  await expect(card).not.toHaveAttribute('aria-describedby', /.+/);
   // Four cards and Factor on one row.
   const cardTop = (await card.boundingBox()).y;
   const factor = await page.locator('#af-weight-wrap').boundingBox();
@@ -83,14 +86,18 @@ test('it needs a tagged competency, says so, and saves no rubric', async ({ page
   await page.locator('.af-scoremode-btn[data-mode="competencies"]').click();
   await expect(page.locator('#af-rubric-wrap')).toBeHidden();
   await expect(page.locator('#af-comp-note')).toHaveText(
-    'Each competency you tag below is scored Emerging to Extending, with + and −. No rubric is needed.',
+    'Each competency you tag above is scored Emerging to Extending, with + and −. No rubric is needed.',
   );
   await expect(page.locator('#af-comp-hint')).toHaveText(
-    'Tag at least one competency below. Each one you tag is what students are scored on.',
+    'Tag at least one competency above. Each one you tag is what students are scored on.',
   );
   await page.locator('[data-action="saveNewAssess"]').click();
   expect(await page.evaluate(() => getAssessments('sci8').some(a => a.title === 'Direct Check'))).toBe(false);
+  // The save stops at Choose Competencies.
+  await expect(page.locator('#af-comp-choose')).toBeFocused();
+  await openCompPicker(page);
   await page.locator('.af-tag-cb[value="QP1"]').check();
+  await closeCompPicker(page);
   await expect(page.locator('#af-comp-hint')).toBeHidden();
   await page.locator('[data-action="saveNewAssess"]').click();
   const saved = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Direct Check'));
