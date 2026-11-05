@@ -868,7 +868,8 @@ describe('Demo Mode (Science 8, Report 2)', () => {
         expect(v.provenance).toEqual(d.provenance);
       }
     });
-  });
+    // 27 students × 10 presses, each building and scoring candidates: 35 s on CI.
+  }, 120000);
 
   it('names the facts behind a sentence: the work, the competency, the habit', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
