@@ -46,15 +46,9 @@ describe('the reworded frames', () => {
       {},
     );
     const fill = id => CommentBank.fill(byId(id), ctx, { first: true });
-    expect(fill('gr55')).toBe(
-      'Liam’s work meets what Science 9 expects, which is Proficient on the BC proficiency scale.',
-    );
-    expect(fill('gr57')).toBe(
-      'Liam’s work this term earns Proficient on the proficiency scale for its complete understanding of the course.',
-    );
-    expect(fill('gr58')).toBe(
-      'The BC proficiency scale calls Liam’s work in Science 9 Proficient, which means a complete understanding.',
-    );
+    expect(fill('gr55')).toBe('Liam’s work meets what Science 9 expects, which is Proficient.');
+    expect(fill('gr57')).toBe('Liam’s work so far earns Proficient for its complete understanding of the course.');
+    expect(fill('gr58')).toBe('Liam’s work in Science 9 is Proficient, which means a complete understanding.');
     expect(fill('hl013')).toBe(
       'Liam completes some tasks by the due date, and they can make a plan to finish the others on time.',
     );

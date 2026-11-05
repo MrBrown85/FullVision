@@ -1173,13 +1173,61 @@ window.CommentBank = (function () {
     };
   }
 
-  /* The skill a comment names a competency by: the bank's phrase for its
+  /* The per-course-set wording for a competency from the BC bank (Colin,
+     Nov 4: "each set of courses gets its own wording";
+     data/bc-curriculum-sets.json, shipped as shared/bank-sets.js and loaded
+     late): its set's phrase, next steps by level, two strength sentences,
+     next-step sentences by level and home line, for the competency's own
+     grade band. A sensitive set (abuse and exploitation) is never drafted
+     from (isSensitive). null when the id has no set or the file has not
+     loaded. */
+  function setEntry(bankId) {
+    var b = typeof window !== 'undefined' ? window.BANK_SETS : null;
+    var i = b && b.ids && bankId ? b.ids[bankId] : null;
+    var r = i != null && b.rows ? b.rows[i] : null;
+    if (!r) return null;
+    return {
+      key: r[0],
+      phrase: r[1],
+      steps: { Emerging: r[2], Developing: r[3], Proficient: r[4], Extending: r[5] },
+      strength: [r[6], r[7]],
+      next: { Developing: r[8], Proficient: r[9], Extending: r[10] },
+      home: r[11] || '',
+      sensitive: !!r[12],
+    };
+  }
+  function isSensitive(c) {
+    var e = c && c.bankId ? setEntry(c.bankId) : null;
+    return !!(e && e.sensitive);
+  }
+  /* Starts loading shared/bank-sets.js once, after the page is up: Generate
+     uses the cluster wording until it lands. */
+  var _setsLoading = false;
+  function loadSets() {
+    if (_setsLoading || typeof window === 'undefined' || window.BANK_SETS) return;
+    if (typeof document === 'undefined' || !document.head || !document.createElement) return;
+    _setsLoading = true;
+    var el = document.createElement('script');
+    el.src = '/shared/bank-sets.js';
+    el.async = true;
+    el.onerror = function () {
+      _setsLoading = false;
+    };
+    document.head.appendChild(el);
+  }
+
+  /* The skill a comment names a competency by: its course set's phrase
+     (setEntry) first, then the bank's phrase for its
      cluster when it came from the bank (Colin, 2026-11-02: one phrase per
      cluster, by bank id), else the table's skill for its label (skillOf),
      for classes not re-linked to the bank. { key, name, skill, steps? } or
      null. */
   function skillFor(f, c) {
-    if (!c) return null;
+    if (!c || isSensitive(c)) return null;
+    var se = c.bankId ? setEntry(c.bankId) : null;
+    // A course set's own key, so no line written for a table skill (a
+    // History frame for an Ethics competency) is bound to it.
+    if (se) return { key: 'set:' + se.key, name: c.name, skill: se.phrase, steps: se.steps, set: se };
     var e = c.bankId ? bankEntry(c.bankId) : null;
     if (e) return { key: e.key, name: c.name, skill: e.phrase, steps: e.steps };
     return skillOf(f.family, c.name);
@@ -2462,6 +2510,7 @@ window.CommentBank = (function () {
      report's end (Colin, 2026-11-03), with the term's own movement for the
      trend. Reads no DOM. */
   function facts(cid, student, termId) {
+    loadSets();
     var sid = student.id;
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
     var assessments = getAssessments(cid) || [];
@@ -3178,6 +3227,8 @@ window.CommentBank = (function () {
     var low = null;
     (comps || []).forEach(function (c) {
       if (!(c.level > 0) || (c.scores || []).length < NEXT_STEP_PIECES || strong.indexOf(c) >= 0) return;
+      // Never a sensitive set's competency (Colin, Nov 4): the next one.
+      if (isSensitive(c)) return;
       if (!low || c.level < low.level) low = c;
     });
     return low;
@@ -3274,7 +3325,8 @@ window.CommentBank = (function () {
     var next = nextSkillOf(f);
     var pick = null;
     (f.comps || []).forEach(function (c) {
-      var e = c.bankId ? bankEntry(c.bankId) : null;
+      var sk = c.bankId ? skillFor(f, c) : null;
+      var e = sk ? { key: sk.key, phrase: sk.skill } : null;
       if (!e || (next && next.key === e.key)) return;
       // Start and now on one footing (the last report's level and the level
       // now, or the term's trend), and the level reached must be the one
@@ -3297,44 +3349,194 @@ window.CommentBank = (function () {
     return w ? { comp: x.comp, key: x.key, skill: x.skill, word: w } : null;
   }
 
-  /* The skill a best piece with no teacher note shows (Colin, 2026-11-02):
-     of the competencies from the BC bank the piece was scored on at
-     Proficient or above, the highest-scored (the first in report order on
-     a tie), in its cluster's phrase. One sentence per skill: never a skill
-     the comment can name elsewhere (the strengths, a tie at the top, even
-     results, the highest-marked skill, the next step), by SKILLS key, and
-     only while the sentence stays within 20 words. { comp, key, skill } or
-     null; null with a note, which says what the piece shows itself. */
+  /* What a best piece with no teacher note shows (Colin, 2026-11-02; the
+     sample voice, Nov 4): the competency the piece scored highest on at
+     Proficient or above, even with one mark; on a tie the strongest
+     competency, then report order. Never a skill the comment names
+     elsewhere (the next step, a tentative next step, progress), by key.
+     Named by its skill phrase (skillFor: the bank's, else the table's),
+     else by its own label in plain words (plainLabel). { comp, key, skill }
+     or { comp, key, label }; null with a note, which says what the piece
+     shows itself, or when no competency qualifies. */
+  var PIECE_SKILL_WORDS = 11;
   function bestPieceSkillOf(f, w) {
     if (!w || reportNoteText(w.note)) return null;
     var taken = {};
-    [strengthSkills(f), topTieSkills(f), evenSkills(f), highestSkills(f), [nextSkillOf(f)], [progressOf(f)]].forEach(
-      function (xs) {
-        (xs || []).forEach(function (x) {
-          if (x) taken[x.key] = true;
-        });
-      },
-    );
+    [nextSkillOf(f), tentSkillOf(f), progressOf(f)]
+      .concat(strengthSkills(f), topTieSkills(f), evenSkills(f), highestSkills(f))
+      .forEach(function (x) {
+        if (x) taken[x.key] = true;
+      });
+    var strong = strengthSkills(f)[0];
     var pick = null;
     var pickV = 0;
     (f.comps || []).forEach(function (c) {
       var sc = (c.scores || []).find(function (x) {
         return x.id === w.id;
       });
-      var e = sc && c.bankId ? bankEntry(c.bankId) : null;
-      if (!e || taken[e.key] || !(Math.round(Number(sc.v)) >= 3) || !(Number(sc.v) > pickV)) return;
-      pick = { comp: c, key: e.key, skill: e.phrase };
-      pickV = Number(sc.v);
+      if (!sc || !(Math.round(Number(sc.v)) >= 3) || isSensitive(c)) return;
+      var sk = skillFor(f, c);
+      var key = sk ? sk.key : 'label:' + c.id;
+      if (taken[key]) return;
+      var v = Number(sc.v);
+      var better = !pick || v > pickV || (v === pickV && strong && strong.comp === c && pick.comp !== c);
+      if (!better) return;
+      if (sk && R.wordCount(sk.skill) <= PIECE_SKILL_WORDS) pick = { comp: c, key: key, skill: sk.skill };
+      else if (sk && c.bankId) return;
+      else {
+        // The label only for a competency with no wording of its own (a
+        // class not linked to the bank): "her skill in predictions" reads
+        // badly for a linked one whose phrase runs long.
+        var label = plainLabel(c.name);
+        pick = label ? { comp: c, key: key, label: label } : null;
+      }
+      pickV = pick ? v : pickV;
     });
-    if (!pick) return null;
-    var text = bestPieceSentence({
-      title: w.title,
-      skill: pick.skill,
-      name: f.name,
-      pronouns: f.pronouns,
-      onFile: f.pronounsOnFile,
+    return pick;
+  }
+
+  /* A competency's own label as a comment can say it inside a sentence:
+     lower case except names and initialisms ("Questioning and Predicting"
+     → "questioning and predicting"; "Indigenous Perspectives" keeps its
+     capital). '' for a label that reads as curriculum wording rather than
+     a name: a sentence, or longer than six words. */
+  var KEEP_CAPS =
+    /^(Indigenous|First|Peoples|Canada|Canadian|Canadians|BC|British|Columbia|English|French|Spanish|Mandarin|Punjabi|Japanese|German|Latin|Aboriginal|Métis|Inuit|Earth|I)$/;
+  function plainLabel(name) {
+    var t = String(name || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[.:;]+$/, '');
+    if (!t || /[.:;?!]/.test(t) || t.split(' ').length > 6) return '';
+    return t
+      .split(' ')
+      .map(function (w) {
+        if (KEEP_CAPS.test(w) || /^[A-Z0-9]{2,}$/.test(w) || !/^[A-Z][a-z’'-]*$/.test(w)) return w;
+        return w.toLowerCase();
+      })
+      .join(' ');
+  }
+
+  /* The best piece's title as a comment names it after "her" (the frames
+     own it: "her Biodiversity Field Journal"), the lesson number dropped and
+     no quotation marks (Colin, Nov 4: "her Thinking It Through: A Changing
+     Worldview"). A leading "The", "A" or "An" goes ("her Outsiders Essay");
+     a title with its own question mark, exclamation mark or quotation marks
+     reads as "her work “…”". '' with no title. */
+  var TEST_TITLE = /\b(quiz|quizzes|test|tests|exam|check)\b/i;
+  function pieceTitle(w) {
+    var t = w ? workTitle(w.title).replace(/\.+$/, '') : '';
+    if (!t) return '';
+    if (/[?!“”"]/.test(t)) return 'work ' + R.quoteTitle(t);
+    return t.replace(/^(the|a|an)\s+(?=\S)/i, '').replace(/^[a-z]/, function (c) {
+      return c.toUpperCase();
     });
-    return R.tooLong(text) ? null : pick;
+  }
+  /* Whether a piece is a quiz, test or check by its title: it "scored
+     highest", never "is her best piece". */
+  function pieceIsTest(w) {
+    return !!w && TEST_TITLE.test(workTitle(w.title));
+  }
+
+  /* The strength said on its own (Overall), when the best piece shows none:
+     the competency with the highest level now, strictly above every other
+     (so "highest" holds), of two or more with a level, and not the next
+     step's. Named by its skill phrase, else its plain label. { comp, key,
+     skill } or { comp, key, label }, or null. */
+  function highestFallbackOf(f) {
+    var xs = (f.comps || [])
+      .filter(function (c) {
+        return c.level > 0;
+      })
+      .slice()
+      .sort(function (a, b) {
+        return tenths(b.level) - tenths(a.level);
+      });
+    if (xs.length < 2 || !(tenths(xs[0].level) > tenths(xs[1].level))) return null;
+    var c = xs[0];
+    var step = nextStepOf(f.comps) || (tentSkillOf(f) || {}).comp;
+    var named = _namedComp(f, c);
+    var piece = _pieceSkill(f);
+    if (step === c || (piece && (piece.comp === c || (named && named.key === piece.key)))) return null;
+    return named;
+  }
+  /* A competency as a strength frame names it: its skill phrase, else its
+     plain label. null with neither. */
+  function _namedComp(f, c) {
+    if (isSensitive(c)) return null;
+    var sk = skillFor(f, c);
+    if (sk && R.wordCount(sk.skill) <= PIECE_SKILL_WORDS) return { comp: c, key: sk.key, skill: sk.skill };
+    if (sk && c.bankId) return null;
+    var label = plainLabel(c.name);
+    return label ? { comp: c, key: 'label:' + c.id, label: label } : null;
+  }
+  /* What the best piece's sentence names (bestPieceSkillOf), or null. */
+  function _pieceSkill(f) {
+    var top = bestPieceOf(f);
+    return top ? bestPieceSkillOf(f, top) : null;
+  }
+  /* Another strength, when the gated routes prove none (Colin, Nov 4: a
+     strength in every comment): the competency with the highest level at
+     Proficient or above (rounded), not the next step's, not the one the
+     best piece shows and not the one the highest-competency sentence names.
+     Its skill phrase or label. null when none is at Proficient. */
+  function altStrengthOf(f) {
+    var step = nextStepOf(f.comps) || (tentSkillOf(f) || {}).comp;
+    var hi = highestFallbackOf(f);
+    var piece = _pieceSkill(f);
+    var pick = null;
+    (f.comps || []).forEach(function (c) {
+      if (!(Math.round(c.level) >= 3) || c === step || (piece && piece.comp === c) || (hi && hi.comp === c)) return;
+      var named = _namedComp(f, c);
+      // Never the skill another sentence names, by its key.
+      if (!named || (piece && named.key === piece.key) || (hi && named.key === hi.key)) return;
+      if (!pick || tenths(c.level) > tenths(pick.comp.level)) pick = named;
+    });
+    return pick;
+  }
+
+  /* The next step when no competency has the 2+ pieces a settled one needs
+     (Colin, Nov 4: marks spread thinly): the lowest competency with a
+     scored piece, of two or more, said tentatively. Its bank step at its
+     level when it came from the bank, else the table's skill; null when
+     neither names it (a generic next step stands in). { comp, key, text }. */
+  function tentSkillOf(f) {
+    if (nextStepOf(f.comps)) return null;
+    var xs = (f.comps || []).filter(function (c) {
+      return c.level > 0 && (c.scores || []).length >= 1 && !isSensitive(c);
+    });
+    if (xs.length < 2) return null;
+    var low = xs.reduce(function (m, c) {
+      return tenths(c.level) < tenths(m.level) ? c : m;
+    }, xs[0]);
+    var sk = skillFor(f, low);
+    if (!sk) return null;
+    var text = sk.steps ? sk.steps[word(low.level)] || sk.skill : sk.skill;
+    return text ? { comp: low, key: sk.key, skill: sk.skill, text: text } : null;
+  }
+  /* The skill the comment's next step is about: the settled one, else the
+     tentative one. The family line follows it. */
+  function stepSkillOf(f) {
+    return nextSkillOf(f) || tentSkillOf(f);
+  }
+
+  /* Whether the marks are spread thinly (Colin, Nov 4): three or more
+     competencies with a level, most of them on one or two scored pieces.
+     { all: every one is, ids } or null. */
+  function spreadOf(f) {
+    var xs = (f.comps || []).filter(function (c) {
+      return c.level > 0;
+    });
+    var thin = xs.filter(function (c) {
+      return (c.scores || []).length <= 2;
+    });
+    if (xs.length < 3 || thin.length * 2 <= xs.length) return null;
+    return {
+      all: thin.length === xs.length,
+      ids: xs.map(function (c) {
+        return c.id;
+      }),
+    };
   }
 
   /* The work this term, best first: the one rule for "best piece" that the
@@ -3720,6 +3922,123 @@ window.CommentBank = (function () {
   /* Every value a bank sentence can ask for, from the facts and the
      teacher's picks { habits, focus, ican }. An empty value means the
      sentences that need it are not offered. */
+  /* The course-set sentences for one student's competencies (Colin, Nov
+     4): for each competency from a course set (not a sensitive one), its
+     two strength sentences while it is at Proficient or above, its next-step
+     sentence at the level it is at now, and its home line. Each needs its
+     own slot (sets_, setn_, seth_ and the competency id), which the context
+     fills with the set's key (and the level for a next step), so verify()
+     proves the competency, its set and its level. Generate drafts only the
+     ones for the competency the comment names (`browse` false): the
+     strength for the strength's competency (setStrengthCompOf), the next
+     step for the settled next step's, the home line for the next step's;
+     Browse Sentences offers every one under its competency's name. */
+  var SET_NEXT = { Emerging: 'Developing', Developing: 'Developing', Proficient: 'Proficient', Extending: 'Extending' };
+  function _setLevel(c) {
+    return SET_NEXT[word(c.level)] || '';
+  }
+  function setStrengthCompOf(f) {
+    var ok = function (c) {
+      return !!c && !!c.bankId && !!setEntry(c.bankId) && !isSensitive(c) && Math.round(c.level) >= 3;
+    };
+    var first = strengthSkills(f)[0];
+    if (first && ok(first.comp)) return first.comp;
+    // Else the highest competency at Proficient or above that is not the
+    // next step's or the one the best piece shows (its sentences say what
+    // it looks like in the work, whatever its phrase's length).
+    var step = nextStepOf(f.comps) || (tentSkillOf(f) || {}).comp;
+    var piece = _pieceSkill(f);
+    var pick = null;
+    (f.comps || []).forEach(function (c) {
+      if (!ok(c) || c === step || (piece && piece.comp === c)) return;
+      if (!pick || tenths(c.level) > tenths(pick.level)) pick = c;
+    });
+    return pick;
+  }
+  function setSentencesFor(f) {
+    var out = [];
+    var strong = setStrengthCompOf(f);
+    var next = nextSkillOf(f);
+    var step = stepSkillOf(f);
+    (f.comps || []).forEach(function (c) {
+      var e = c.bankId ? setEntry(c.bankId) : null;
+      if (!e || !(c.level > 0)) return;
+      var tag = String(c.id);
+      // A sensitive set's sentences are Browse only, and it has no home
+      // line (Colin, Nov 4).
+      var only = e.sensitive;
+      var label = String(c.name || '');
+      if (Math.round(c.level) >= 3)
+        e.strength.forEach(function (t, i) {
+          out.push({
+            id: 'set:' + tag + ':s' + i,
+            part: 'now',
+            group: 'Overall',
+            text: t,
+            needs: ['sets_' + tag],
+            claims: ['setStrength'],
+            setCase: 'comp:' + label,
+            setComp: label,
+            specific: 1,
+            browse: only || !strong || strong !== c,
+            src: 'set ' + e.key,
+          });
+        });
+      var lv = _setLevel(c);
+      if (lv && e.next[lv])
+        out.push({
+          id: 'set:' + tag + ':n',
+          part: 'go',
+          group: 'Next Step',
+          text: e.next[lv],
+          needs: ['setn_' + tag],
+          claims: ['setNext'],
+          setCase: 'comp:' + label,
+          setComp: label,
+          browse: only || !next || next.comp !== c,
+          src: 'set ' + e.key,
+        });
+      if (e.home && !only)
+        out.push({
+          id: 'set:' + tag + ':h',
+          part: 'how',
+          group: 'For the Family',
+          text: e.home,
+          needs: ['seth_' + tag],
+          claims: ['setHome'],
+          setCase: 'comp:' + label + ':home',
+          setComp: label + ' · For the Family',
+          specific: 1,
+          browse: !step || step.comp !== c,
+          src: 'set ' + e.key,
+        });
+    });
+    return out;
+  }
+  /* A saved course-set sentence by its id ("set:<competency id>:s0"), for a
+     comment whose student no longer has it among their own: the same slot
+     and claim, so verify() says what changed. null when the set file has
+     not loaded or the competency has no set. */
+  function setSentenceById(f, id) {
+    var m = String(id || '').match(/^set:(.+):(s0|s1|n|h)$/);
+    if (!m) return null;
+    var c = _byId((f && f.comps) || [], m[1]);
+    var e = c && c.bankId ? setEntry(c.bankId) : null;
+    if (!e) return null;
+    var kind = m[2].charAt(0);
+    var text = kind === 's' ? e.strength[Number(m[2].charAt(1))] : kind === 'n' ? e.next[_setLevel(c)] : e.home;
+    var slot = (kind === 's' ? 'sets_' : kind === 'n' ? 'setn_' : 'seth_') + c.id;
+    return {
+      id: id,
+      part: kind === 's' ? 'now' : kind === 'n' ? 'go' : 'how',
+      group: kind === 's' ? 'Overall' : kind === 'n' ? 'Next Step' : 'For the Family',
+      text: text || '',
+      needs: [slot],
+      claims: [kind === 's' ? 'setStrength' : kind === 'n' ? 'setNext' : 'setHome'],
+      browse: true,
+    };
+  }
+
   function context(f, picks) {
     picks = picks || {};
     var p = f.pronouns;
@@ -3804,7 +4123,20 @@ window.CommentBank = (function () {
     // The skill the best piece shows, said when it has no note
     // (bestPieceSkillOf).
     var topPieceSkill = top ? bestPieceSkillOf(f, top) : null;
-    var topSkillText = topPieceSkill ? topPieceSkill.skill : '';
+    var topSkillText = topPieceSkill ? topPieceSkill.skill || '' : '';
+    // The best piece owning its title, and whether it is a quiz or test
+    // (the sample voice, Nov 4).
+    var pieceName = top ? pieceTitle(top) : '';
+    var pieceTest = !!pieceName && pieceIsTest(top);
+    // The strength said on its own when no gated route proves one: the
+    // highest competency (highestFallbackOf), another at Proficient or above
+    // (altStrengthOf); neither is the one the best piece shows.
+    var hiFall = highestFallbackOf(f);
+    var alt = altStrengthOf(f);
+    // The tentative next step from thin evidence (tentSkillOf), and the
+    // marks spread thinly (spreadOf).
+    var tent = tentSkillOf(f);
+    var spread = spreadOf(f);
     var weak = low[0] && top && tenths(low[0].v) < tenths(top.v) ? low[0] : null;
     // Titles in quotes, the lesson number dropped (the realiser's rule).
     var the = function (w) {
@@ -3953,6 +4285,18 @@ window.CommentBank = (function () {
       assignment: keys('work', [top]),
       level: keys('work', [top]),
       bestPiece: keys('work', [top]).concat(keys('comp', [topPieceSkill && topPieceSkill.comp])),
+      piece: keys('work', [top]),
+      pieceWork: keys('work', [top]),
+      pieceTest: keys('work', [top]),
+      pieceSkill: keys('work', [top]).concat(keys('comp', [topPieceSkill && topPieceSkill.comp])),
+      pieceComp: keys('work', [top]).concat(keys('comp', [topPieceSkill && topPieceSkill.comp])),
+      hiSkill: keys('comp', [hiFall && hiFall.comp]),
+      hiComp: keys('comp', [hiFall && hiFall.comp]),
+      altSkill: keys('comp', [alt && alt.comp]),
+      altComp: keys('comp', [alt && alt.comp]),
+      tentStep: keys('comp', [tent && tent.comp]),
+      spread: keys('comp', spread ? spread.ids : []),
+      spreadAll: keys('comp', spread ? spread.ids : []),
       assignment2: keys('work', [weak]),
       level2: keys('work', [weak]),
       strongWorks: keys('work', best.slice(0, 2)),
@@ -4042,8 +4386,30 @@ window.CommentBank = (function () {
     var absentN = Math.floor(Number(f.absent)) || 0;
     var att = attendanceSlots(f.absent, f.late);
     var ms = missingN > 0 ? missingSlots(f.notHandedIn) : { title: '', titles: '', many: '', group: '' };
+    // The course-set sentences and their slots (setSentencesFor).
+    var setExtra = setSentencesFor(f);
+    var setSlots = {};
+    (f.comps || []).forEach(function (c) {
+      var e = c.bankId ? setEntry(c.bankId) : null;
+      if (!e) return;
+      var k = 'comp:' + c.id;
+      if (Math.round(c.level) >= 3) {
+        setSlots['sets_' + c.id] = e.key;
+        factsOf['sets_' + c.id] = [k];
+      }
+      if (_setLevel(c)) {
+        setSlots['setn_' + c.id] = e.key + '|' + _setLevel(c);
+        factsOf['setn_' + c.id] = [k];
+      }
+      if (e.home && !e.sensitive) {
+        setSlots['seth_' + c.id] = e.key;
+        factsOf['seth_' + c.id] = [k];
+      }
+    });
 
-    return {
+    return Object.assign(setSlots, {
+      // The course-set sentences for this student (setSentencesFor).
+      _extra: setExtra,
       // The facts and picks this context was built from, so draft() can
       // pick the story (angle) and verify the draft before returning it.
       _f: f,
@@ -4059,7 +4425,7 @@ window.CommentBank = (function () {
       _path: reportPath(f),
       // The next step's skill key (SKILLS), for the frames written for one
       // skill (`when.nextSkill`); '' when there is no next step.
-      _nextSkill: next ? next.key : '',
+      _nextSkill: next ? next.key : tent ? tent.key : '',
       // The strongest skill's key (SKILLS), for the per-skill strengths
       // frames (`when.strongSkill`); '' below the "strongest" gate.
       _strongSkill: strongSkills[0] ? strongSkills[0].key : '',
@@ -4187,6 +4553,27 @@ window.CommentBank = (function () {
             onFile: f.pronounsOnFile,
           })
         : '',
+      // The best piece's title, which the frames own ("{his} {piece}": "her
+      // Biodiversity Field Journal"), so a change of pronouns is not a
+      // change of marks. pieceWork
+      // or pieceTest ('yes') picks the frames that call it a best piece or
+      // say it scored highest; pieceSkill (a skill phrase) or pieceComp (a
+      // competency's plain label) is what it shows (bestPieceSkillOf).
+      piece: pieceName,
+      pieceWork: pieceName && !pieceTest ? 'yes' : '',
+      pieceTest: pieceTest ? 'yes' : '',
+      pieceSkill: topPieceSkill && topPieceSkill.skill ? topPieceSkill.skill : '',
+      pieceComp: topPieceSkill && topPieceSkill.label ? topPieceSkill.label : '',
+      // The strength on its own (highestFallbackOf), by skill or label, and
+      // another skill at Proficient or above (altStrengthOf).
+      hiSkill: hiFall && hiFall.skill ? hiFall.skill : '',
+      hiComp: hiFall && hiFall.label ? hiFall.label : '',
+      altSkill: alt && alt.skill ? alt.skill : '',
+      altComp: alt && alt.label ? alt.label : '',
+      // The tentative next step (tentSkillOf), and the marks spread thinly.
+      tentStep: tent ? tent.text : '',
+      spread: spread ? 'yes' : '',
+      spreadAll: spread && spread.all ? 'yes' : '',
       assignment2: weak ? weak.title : '',
       level2: weak ? workMark(f, weak) : '',
       strongWorks: list(best.slice(0, 2).map(the)),
@@ -4270,7 +4657,7 @@ window.CommentBank = (function () {
       missingCount: missingN > 0 ? String(missingN) : '',
       absentCount: absentN > 0 ? String(absentN) : '',
       standingWord: f.standing || '',
-    };
+    });
   }
 
   /* What the attendance sentence says after "{He} has": "missed three
@@ -4772,18 +5159,34 @@ window.CommentBank = (function () {
     return h || 1;
   }
 
-  /* The draft's steps, the plan's eight parts and nothing else: the grade
-     sentence (gradeOf; none for IE, F or no marks), the habits (two or three
-     sentences for families, then attendance when entered, then the work not handed in
-     and the late-work line), the best piece, the strengths (overall), the
-     next step with the support line and one thing the family can do, and
-     the closing sentence. Each step takes at most one sentence (the habits
-     part is three steps: habits, habitsMore, habitsBuild). A step that
-     `says` a fact (the grade) keeps every later sentence claiming it out.
-     The angle (angle()) sets which steps run and in what order; this is
-     the order with no story to tell. */
+  /* The draft's steps, in the order every comment off the IE path takes
+     (the sample voice, Nov 4): the grade sentence (gradeOf; none for F or
+     no marks), how much evidence there is, growth or even marks, the best
+     piece and what it shows, the strength on its own when the best piece
+     shows none, the habits (two or three sentences for families, then
+     attendance when entered, then the work not handed in and the late-work
+     line), the next step with the support line and one thing the family
+     can do, and the closing sentence. Each step takes at most one sentence
+     (the habits part is three steps: habits, habitsMore, habitsBuild). A
+     step that `says` a fact (the grade) keeps every later sentence claiming
+     it out. The IE comment runs its own steps (ANGLES). */
   var DRAFT_STEPS = [
     { key: 'grade', part: 'now', groups: ['Grade'], says: 'grade' },
+    // The sample voice (Colin, Nov 4): every comment has the same parts in
+    // the same order, as the six approved samples do. After the grade, a
+    // sentence that the picture rests on one or two pieces per skill
+    // (spreadOf), growth in levels or even marks (Growth, Even Marks), the
+    // best piece owning its title with what it shows, and the strength on
+    // its own only when the best piece shows none (Overall).
+    { key: 'spread', part: 'now', groups: ['How Much Evidence'] },
+    { key: 'growth', part: 'now', groups: ['Growth', 'Even Marks'] },
+    { key: 'example', part: 'now', groups: ['Examples From Work'] },
+    // The strength, always (Colin, Nov 4: every part, every comment): the
+    // first strength at its level now, else the frames for the strongest,
+    // a tie, even marks or the highest-marked skill; else the highest
+    // competency on its own, another skill at Proficient or above, and the
+    // course's highest mark last (specificity).
+    { key: 'overall', part: 'now', groups: ['Overall'], prefer: 'strengthNow', preferSoft: true },
     // The habits part for families (habitPlan, Nov 4): what the student
     // does, a second sentence for more of it, and the habits that would
     // help. Generate drafts only the Habits in Class frames here (and the
@@ -4797,25 +5200,19 @@ window.CommentBank = (function () {
     // (plan PR 8): only for a student with work not handed in.
     { key: 'notHandedIn', part: 'habits', groups: ['Not Handed In'], says: 'notHandedIn' },
     { key: 'lateWork', part: 'habits', line: 'lateLine', after: 'notHandedIn' },
-    // The strengths (plan part 3): one or two skills from the table.
-    // The first strength at its level now, for a bank competency
-    // (strengthNow), else one or two skills from the table; the teacher's
-    // own sentences and the story's frames stay in (preferSoft).
-    { key: 'overall', part: 'now', groups: ['Overall'], prefer: 'strengthNow', preferSoft: true },
-    // The best piece (plan part 2): the one sentence of Examples From Work.
-    { key: 'example', part: 'now', groups: ['Examples From Work'] },
     // The Language Goals line (plan PR 3b): a template the teacher picked,
     // filled for the student; empty off the language-goals path. Before the
     // Next Step sentence, never between it and its family line (#632).
     { key: 'languageGoals', part: 'go', line: 'languageGoalLine', template: true },
-    // One skill from the table when there is one (`prefer`); never a
-    // sentence that names a bare competency label (`never`).
+    // The bank's step at the student's level first, then the table's skill,
+    // then a tentative step from thin evidence (tentSkillOf); with none, a
+    // generic step that claims nothing. Never a sentence that names a bare
+    // competency label (`never`).
     {
       key: 'nextStep',
       part: 'go',
       groups: ['Next Step'],
-      // The bank's step at the student's level first, then the table's skill.
-      prefer: ['levelStep', 'nextSkill'],
+      prefer: ['levelStep', 'nextSkill', 'tentStep'],
       never: ['focus', 'focusLow', 'growthAreas', 'rise', 'fall'],
     },
     // The teacher's support line for this student, one thing the family can
@@ -4837,7 +5234,7 @@ window.CommentBank = (function () {
   var SAYS = { grade: true, notHandedIn: true };
 
   /* Facts a draft states once, by topic. */
-  var NO_REPEAT = { nextStep: 'nextStep' };
+  var NO_REPEAT = { nextStep: 'nextStep', evenResults: 'even', progressSkill: 'progress' };
 
   /* A sentence that gives the student a next step: a Next Step sentence
      (the group the Next Step step draws from) or one flagged `advises:
@@ -4938,6 +5335,15 @@ window.CommentBank = (function () {
   var NEW_DAYS = 14; // joined two weeks or more after the class began
   var THIN = 3; // fewer scored pieces than this is too little to judge
 
+  /* The order every comment off the IE path takes (the sample voice,
+     Colin, Nov 4: "what was the point of the plan if you're going to
+     change it?"). The story only decides which facts a part states (the
+     growth for a climb, say); it never moves or drops a part. The grade
+     comes first (_sequence), and the class's lines go in by
+     _withClassSteps. The IE comment keeps its own path, with the best
+     piece after the problem (the sample for an IE). */
+  var CORE_ORDER = ['spread', 'growth', 'example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'];
+
   var ANGLES = [
     {
       // The mark is IE (calc.js, under 50% before the course ends, or the
@@ -4949,7 +5355,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.ie;
       },
-      order: ['ieProblem', 'strongHabits', 'iePlan', 'ieDeadline', 'ieMeeting'],
+      order: ['ieProblem', 'example', 'strongHabits', 'iePlan', 'ieDeadline', 'ieMeeting'],
     },
     {
       // Too few scored pieces to say much: the habits and one example.
@@ -4958,7 +5364,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.scored < THIN;
       },
-      order: ['habits', 'attendance', 'example', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // Joined the class two weeks or more after it began, during this
@@ -4968,7 +5374,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.joinedLate;
       },
-      order: ['habits', 'attendance', 'example', 'overall', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // Strong handed-in work behind a grade pulled down by work labelled
@@ -4978,7 +5384,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.missing >= 2 && a.missing * 5 >= a.total && a.strongWork;
       },
-      order: ['example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // The marks climbed over the term, past the "improved" gate
@@ -4988,7 +5394,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.climb;
       },
-      order: ['example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // The marks slid over the term, by the same trend (slid()): the best
@@ -4998,7 +5404,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.slide;
       },
-      order: ['example', 'habits', 'attendance', 'overall', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // Strong in one skill (past the "strongest" gate), weak in another a
@@ -5009,7 +5415,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.split;
       },
-      order: ['overall', 'example', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // Good marks, with two or more habits rated Sometimes or Rarely: the
@@ -5019,7 +5425,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.growing >= 2 && a.good;
       },
-      order: ['example', 'habits', 'attendance', 'overall', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // An A or B (or Proficient and up), nothing missing, no slide: the
@@ -5029,7 +5435,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.high && !a.missing && !a.slide;
       },
-      order: ['example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // A C or C- (or below Proficient): what is working leads.
@@ -5038,7 +5444,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.low;
       },
-      order: ['example', 'habits', 'attendance', 'overall', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // No story stands out: the steps in their usual order.
@@ -5047,13 +5453,7 @@ window.CommentBank = (function () {
       when: function () {
         return true;
       },
-      order: DRAFT_STEPS.slice(1)
-        .filter(function (s) {
-          return !s.ie;
-        })
-        .map(function (s) {
-          return s.key;
-        }),
+      order: CORE_ORDER,
     },
   ];
 
@@ -5259,9 +5659,25 @@ window.CommentBank = (function () {
     });
   }
   function _bankSentence(bank, id) {
-    return bank.sentences.find(function (x) {
-      return x.id === id;
-    });
+    return (
+      bank.sentences.find(function (x) {
+        return x.id === id;
+      }) || _setSentenceNamed(id)
+    );
+  }
+  /* A course-set sentence by id, as a kept sentence's step reads it: its
+     part and group are fixed by its kind. */
+  function _setSentenceNamed(id) {
+    var m = String(id || '').match(/^set:.+:(s0|s1|n|h)$/);
+    if (!m) return undefined;
+    var k = m[1].charAt(0);
+    return {
+      id: id,
+      part: k === 's' ? 'now' : k === 'n' ? 'go' : 'how',
+      group: k === 's' ? 'Overall' : k === 'n' ? 'Next Step' : 'For the Family',
+      text: '',
+      claims: [],
+    };
   }
   function _kept(kept, bank) {
     var out = {};
@@ -5302,6 +5718,19 @@ window.CommentBank = (function () {
     // Progress in levels is as specific as the where-now frames
     // (`when.strengthWord`): the two share the Overall step's tier.
     if (ctx.progressSkill && needs.indexOf('progressSkill') >= 0) n++;
+    // What the best piece shows, when the facts give it, comes before the
+    // bare best piece (the sample voice, Nov 4). A frame that runs long
+    // falls to the next tier.
+    if ((ctx.pieceSkill && needs.indexOf('pieceSkill') >= 0) || (ctx.pieceComp && needs.indexOf('pieceComp') >= 0)) n++;
+    // The grade with even marks joined, as the sample has it, before the
+    // grade alone; the strength after it, in an even competency, before
+    // the other routes.
+    if (s.group === 'Grade' && ctx.evenResults && needs.indexOf('evenResults') >= 0) n++;
+    if (s.afterEven) n++;
+    // A course set's own sentence for the strength or the home line comes
+    // first (Colin, Nov 4: the student's own competency's wording first),
+    // until a classmate has it: then it takes its turn with the others.
+    if (s.specific && !(_usageNow[s.id] > 0)) n += s.specific;
     // Two for a story, so a frame written for the student's story comes
     // before one written for the strongest skill (`when.strongSkill`, bank
     // n6xx-n7xx), which comes before a general one.
@@ -5363,6 +5792,8 @@ window.CommentBank = (function () {
     var soft =
       step.preferSoft &&
       (s.mine ||
+        // A course set's own sentence (Nov 4) stays in too.
+        /^set:/.test(s.id) ||
         (s.needs || []).some(function (k) {
           return STORY_SLOTS.indexOf(k) >= 0 || k === 'progressSkill';
         }));
@@ -5397,6 +5828,7 @@ window.CommentBank = (function () {
   function _standIns(step, ctx, bank, taken, exclude) {
     var ok = bank.sentences.filter(function (s) {
       return (
+        s.generate !== false &&
         s.part === step.part &&
         Array.isArray(s.claims) &&
         !s.claims.length &&
@@ -5518,9 +5950,26 @@ window.CommentBank = (function () {
     return n;
   }
 
+  var SO_FAR = /\bso far\b/i;
+  /* The course-set sentences Generate may draft for this student. */
+  function _draftExtra(ctx) {
+    return ((ctx && ctx._extra) || []).filter(function (s) {
+      return !s.browse;
+    });
+  }
+  var SHOW_TWICE = /\bshow(?:s|n|ing)?\b.*\bshow(?:s|n|ing)?\b/i;
   /* One pass of the draft over the steps in `seq`. usage: { sentence id:
      classmates } (classUsage()); exclude: { sentence id: true }. */
+  var _usageNow = {};
   function _compose(ctx, bank, seq, kept, seed, usage, exclude) {
+    _usageNow = usage || {};
+    try {
+      return _composeNow(ctx, bank, seq, kept, seed, usage, exclude);
+    } finally {
+      _usageNow = {};
+    }
+  }
+  function _composeNow(ctx, bank, seq, kept, seed, usage, exclude) {
     var rand = _rng(seed);
     var byKey = {};
     DRAFT_STEPS.forEach(function (s) {
@@ -5558,8 +6007,8 @@ window.CommentBank = (function () {
     var nextFires =
       seq.indexOf('nextStep') >= 0 &&
       (!!kept.nextStep ||
-        bank.sentences.some(function (s) {
-          return !exclude[s.id] && _stepFits(s, byKey.nextStep, ctx);
+        bank.sentences.concat(_draftExtra(ctx)).some(function (s) {
+          return s.generate !== false && !exclude[s.id] && _stepFits(s, byKey.nextStep, ctx);
         }));
     seq.forEach(function (key, at) {
       var step = byKey[key];
@@ -5614,8 +6063,15 @@ window.CommentBank = (function () {
       // in the first's place (theirs says the habits their way).
       if (key === 'habitsMore' && (!got.habits || said.habitsOwn)) return;
       if (key === 'habitsBuild' && said.habitsOwn) return;
-      var cands = bank.sentences.filter(function (s) {
+      var cands = bank.sentences.concat(_draftExtra(ctx)).filter(function (s) {
+        // Browse only (`generate: false`, the sample voice, Nov 4): the
+        // teacher can choose it; Generate never does.
+        if (s.generate === false) return false;
         if (taken[s.id] || !_stepFits(s, step, ctx)) return false;
+        // Even marks said by the grade sentence are not said again; the
+        // frames written to follow it (`afterEven`) need it said.
+        if (said.even && s.when && s.when.evenWord) return false;
+        if (s.afterEven && !said.even) return false;
         // A fact the draft already states (the growing habits, the goal, the
         // competency that rose) is not said twice.
         if (
@@ -5675,10 +6131,17 @@ window.CommentBank = (function () {
         var dup = quotes.some(function (q) {
           return sofar.indexOf(q) >= 0;
         });
+        // "So far" at most once a comment off the IE path (the sample
+        // voice, Nov 4: the grade is year to date).
+        // On the IE path its Required parts keep their own wording.
+        var twice = !(ctx._path === 'ie' && step.ie) && SO_FAR.test(t) && SO_FAR.test(sofar);
+        // A frame whose own "show" meets a skill that starts with it ("she
+        // has shown that she can show data patterns") reads badly.
+        if (SHOW_TWICE.test(t)) twice = true;
         return {
           s: s,
           t: t,
-          dup: dup ? 1 : 0,
+          dup: dup || twice ? 1 : 0,
           // A sentence over 20 words as realised (a quoted title as one),
           // after {strengths} has fallen back to one skill (ctxFor), is
           // not offered (the realiser's length rule, 2026-11-01).
@@ -5690,6 +6153,11 @@ window.CommentBank = (function () {
           // a sentence that does not start like the one before it.
           general: s.subjects ? 0 : 1,
           repeats: repeatsLast(t, last) || (HABIT_PART_STEPS[key] && _sameHabitWords(s, out)) ? 1 : 0,
+          // A habits frame that repeats the habits sentence's own word
+          // ("always" twice) goes after every frame that does not, before
+          // the opening-word rule (Nov 4: with "Each day" and "reliably"
+          // retired, "always" could open both habits sentences).
+          sameWords: HABIT_PART_STEPS[key] && _sameHabitWords(s, out) ? 1 : 0,
           // A step that says a fact (the grade, the work not handed in)
           // draws no random number, so the rest of the draft's mix is as it
           // was; its frames are mixed by a hash of the seed and the id
@@ -5743,7 +6211,9 @@ window.CommentBank = (function () {
           .filter(fresh);
       if (!scored.length) return;
       scored.sort(function (a, b) {
-        return a.used - b.used || a.general - b.general || a.repeats - b.repeats || a.r - b.r;
+        return (
+          a.used - b.used || a.general - b.general || a.sameWords - b.sameWords || a.repeats - b.repeats || a.r - b.r
+        );
       });
       var pick = scored[0];
       taken[pick.s.id] = true;
@@ -5838,7 +6308,9 @@ window.CommentBank = (function () {
      `short: true` for the screen to show. Nothing is ever padded. */
   var MAX_SENTENCES = 9;
   var MIN_SENTENCES = 6;
-  var DROP_FIRST = ['home', 'attendance', 'overall'];
+  // Nothing is trimmed (Colin, Nov 4: "longer is fine"; 2026-11-02: "don't
+  // restrict users").
+  var DROP_FIRST = [];
   /* A draft's sentences as the plan counts them: the habits part's second
      sentence and the habits that would help are part of its one. */
   function _counted(sentences) {
@@ -5865,7 +6337,15 @@ window.CommentBank = (function () {
       _orderSteps(opts.order, bank),
     );
     var previous = String(opts.previous == null ? '' : opts.previous).trim();
-    var usage = classUsage(bank, opts.comments, cid, sid);
+    // Another press: the sentences of the comment on screen count as used
+    // once more, so each part takes another of its frames where one fits
+    // (Colin, Nov 4: a second press should change more than a sentence).
+    var usage = classUsage(
+      { parts: bank.parts, sentences: bank.sentences.concat((ctx && ctx._extra) || []) },
+      (opts.comments || []).concat(previous ? [{ sid: '\u0000previous', text: previous }] : []),
+      cid,
+      sid,
+    );
     var exclude = {};
     (opts.exclude || []).forEach(function (id) {
       exclude[id] = true;
@@ -6114,7 +6594,7 @@ window.CommentBank = (function () {
      best-piece forms, the skill-table sentence), class lines are the
      teacher's own text, and the IE path's Required parts are set. What is
      left is what a teacher can widen with sentences of their own. */
-  var FIXED_STEPS = { grade: true, attendance: true, notHandedIn: true, example: true, nextStep: true };
+  var FIXED_STEPS = { grade: true, spread: true, attendance: true, notHandedIn: true, example: true, nextStep: true };
   function _strengthSteps() {
     return DRAFT_STEPS.filter(function (s) {
       return !!s.groups && !s.line && !s.ie && !s.says && !FIXED_STEPS[s.key];
@@ -6134,7 +6614,9 @@ window.CommentBank = (function () {
     if (!def || !def.groups) return [];
     return _topTier(
       (bank || COMMENT_BANK).sentences.filter(function (s) {
-        return _stepFits(s, def, ctx);
+        // A frame that follows the grade's even marks (`afterEven`) fits
+        // only inside a draft that has them.
+        return s.generate !== false && !s.afterEven && _stepFits(s, def, ctx);
       }),
       ctx,
     );
@@ -6323,7 +6805,10 @@ window.CommentBank = (function () {
   }
   function _gradeSentences(bank) {
     var step = DRAFT_STEPS[0];
-    return bank.sentences.filter(function (s) {
+    // With the grade frames as worded before Nov 4 (COMMENT_BANK.retired),
+    // so a saved comment that holds one still has its grade sentence set
+    // aside.
+    return bank.sentences.concat(bank.retired || []).filter(function (s) {
       return s.part === step.part && step.groups.indexOf(s.group) >= 0;
     });
   }
@@ -6439,6 +6924,17 @@ window.CommentBank = (function () {
     return (f.record && f.record.missing) || 0;
   }
 
+  function _setClaim(pv, f, prefix, want) {
+    var slot = Object.keys(pv.values || {}).find(function (k) {
+      return k.indexOf(prefix) === 0;
+    });
+    if (!slot) return false;
+    var c = _byId(f.comps, slot.slice(prefix.length));
+    var e = c && c.bankId ? setEntry(c.bankId) : null;
+    if (!e) return false;
+    var w = want(c, e);
+    return !!w && pv.values[slot] === w;
+  }
   var CLAIMS = {
     // The overall standing: the letter, the proficiency word, or what the
     // work shows overall.
@@ -6620,6 +7116,50 @@ window.CommentBank = (function () {
       if (_has(pv, 'evenWord')) checks.push(!!now && !!f.standing && f.standing === now && v.evenWord === now);
       return checks.length > 0 && checks.every(Boolean);
     },
+    // The strength said on its own (highestFallbackOf): the same
+    // competency, strictly highest now, in its phrase or plain label.
+    highest: function (pv, f) {
+      var h = highestFallbackOf(f);
+      var slot = _has(pv, 'hiSkill') ? 'hiSkill' : _has(pv, 'hiComp') ? 'hiComp' : '';
+      if (!h || !slot || _ids(pv, slot, 'comp')[0] !== String(h.comp.id)) return false;
+      return pv.values[slot] === (slot === 'hiSkill' ? h.skill : h.label);
+    },
+    // A course set's strength sentence: the competency is from that set,
+    // not a sensitive one, and at Proficient or above now.
+    setStrength: function (pv, f) {
+      return _setClaim(pv, f, 'sets_', function (c, e) {
+        return Math.round(c.level) >= 3 ? e.key : null;
+      });
+    },
+    // Its next-step sentence: the same set, at the level the competency is
+    // at now.
+    setNext: function (pv, f) {
+      return _setClaim(pv, f, 'setn_', function (c, e) {
+        return _setLevel(c) ? e.key + '|' + _setLevel(c) : null;
+      });
+    },
+    // Its home line: the same set, which has one.
+    setHome: function (pv, f) {
+      return _setClaim(pv, f, 'seth_', function (c, e) {
+        return e.home && !e.sensitive ? e.key : null;
+      });
+    },
+    // Another skill at Proficient or above (altStrengthOf): the same
+    // competency, still there, in its phrase or label.
+    altStrength: function (pv, f) {
+      var a = altStrengthOf(f);
+      var slot = _has(pv, 'altSkill') ? 'altSkill' : _has(pv, 'altComp') ? 'altComp' : '';
+      if (!a || !slot || _ids(pv, slot, 'comp')[0] !== String(a.comp.id)) return false;
+      return pv.values[slot] === (slot === 'altSkill' ? a.skill : a.label);
+    },
+    // The marks spread thinly (spreadOf): three or more competencies with a
+    // level, most on one or two scored pieces (every one, for spreadAll).
+    spread: function (pv, f) {
+      var sp = spreadOf(f);
+      if (!sp || !_has(pv, 'spread')) return false;
+      if (_ids(pv, 'spread', 'comp').length !== sp.ids.length) return false;
+      return !_has(pv, 'spreadAll') || sp.all;
+    },
     // Competencies to build: each below the highest now.
     growthArea: function (pv, f) {
       var ids = _ids(pv, 'growthAreas', 'comp')
@@ -6708,6 +7248,25 @@ window.CommentBank = (function () {
               }),
         );
       }
+      // The best piece owning its title (the sample voice, Nov 4): the top
+      // piece, named as the facts name it, a quiz or test only where the
+      // frame says it scored highest, and what it shows the competency it
+      // scored highest on (bestPieceSkillOf), in its phrase or label.
+      if (_has(pv, 'piece')) {
+        var pw = _byId(f.work, _ids(pv, 'piece', 'work')[0]);
+        checks.push(!!pw && markRank(f, pw) === top && !!pv.values.piece && pv.values.piece === pieceTitle(pw));
+        if (_has(pv, 'pieceTest')) checks.push(!!pw && pieceIsTest(pw));
+        if (_has(pv, 'pieceWork')) checks.push(!!pw && !pieceIsTest(pw));
+        ['pieceSkill', 'pieceComp'].forEach(function (slot) {
+          if (!_has(pv, slot)) return;
+          var ps = pw ? bestPieceSkillOf(f, pw) : null;
+          checks.push(
+            !!ps &&
+              _ids(pv, slot, 'comp')[0] === String(ps.comp.id) &&
+              pv.values[slot] === (slot === 'pieceSkill' ? ps.skill : ps.label),
+          );
+        });
+      }
       ['assignment', 'seeWork'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
         var w = _byId(f.work, _ids(pv, slot, 'work')[0]);
@@ -6780,8 +7339,14 @@ window.CommentBank = (function () {
       // A sentence bound to one skill without naming it (a For the Family
       // sentence, `when.nextSkill`): that skill is the next step's.
       if (_has(pv, 'when.nextSkill') && !_has(pv, 'nextSkill')) {
-        var ns = nextSkillOf(f);
+        var ns = stepSkillOf(f);
         return !!ns && ns.key === pv.values['when.nextSkill'];
+      }
+      // A tentative next step from thin evidence (tentSkillOf): the same
+      // competency and wording.
+      if (_has(pv, 'tentStep')) {
+        var tn = tentSkillOf(f);
+        return !!tn && _ids(pv, 'tentStep', 'comp')[0] === String(tn.comp.id) && pv.values.tentStep === tn.text;
       }
       // The bank's next step at the student's level (levelStepOf).
       if (_has(pv, 'levelStep')) {
@@ -7065,7 +7630,14 @@ window.CommentBank = (function () {
      group first, then bank order. None when the part has no such sentence. */
   function _fallback(s, ctx, bank, used) {
     var cands = bank.sentences.filter(function (x) {
-      return x.part === s.part && Array.isArray(x.claims) && !x.claims.length && !used[x.id] && fits(x, ctx);
+      return (
+        x.generate !== false &&
+        x.part === s.part &&
+        Array.isArray(x.claims) &&
+        !x.claims.length &&
+        !used[x.id] &&
+        fits(x, ctx)
+      );
     });
     return (
       cands.find(function (x) {
@@ -7099,12 +7671,22 @@ window.CommentBank = (function () {
     return _has(pv, 'habitsExcellent') && (eff || {}).completes === CONSISTENTLY;
   }
 
+  /* fn() as if the course-set file had not loaded: the cluster wording. */
+  function _withoutSets(fn) {
+    var saved = window.BANK_SETS;
+    window.BANK_SETS = null;
+    try {
+      return fn();
+    } finally {
+      window.BANK_SETS = saved;
+    }
+  }
   function verify(d, f, picks, opts) {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
     var ctx = context(f, picks);
     var byId = {};
-    bank.sentences.forEach(function (s) {
+    bank.sentences.concat(ctx._extra || []).forEach(function (s) {
       byId[s.id] = s;
     });
     var used = {};
@@ -7137,13 +7719,30 @@ window.CommentBank = (function () {
       // A sentence the teacher kept is theirs, as written, and so is a class
       // line (support, closing, late work), and a sentence the bank has since
       // retired (RETIRED): not checked.
-      if (pv.kept || pv.classLine || (!byId[pv.sentenceId] && RETIRED[pv.sentenceId])) {
+      // A course-set sentence the student no longer has among their own
+      // is read back from the set file; before it loads, it stands as
+      // written.
+      if (!byId[pv.sentenceId] && /^set:/.test(pv.sentenceId)) {
+        var ss = setSentenceById(f, pv.sentenceId);
+        if (ss) byId[pv.sentenceId] = ss;
+      }
+      var unread = /^set:/.test(pv.sentenceId) && !byId[pv.sentenceId] && !window.BANK_SETS;
+      if (pv.kept || pv.classLine || unread || (!byId[pv.sentenceId] && RETIRED[pv.sentenceId])) {
         sentences.push(d.sentences[i]);
         out.push(pv);
         return;
       }
       var s = byId[pv.sentenceId];
       var failed = s ? _failed(s, pv, f, ctx) : ['unknown'];
+      // A sentence written in the cluster wording, before the course sets
+      // shipped or loaded (Nov 4), still holds when that wording does: a
+      // change of wording is not a change of marks.
+      if (failed.length && s && !/^set:/.test(s.id) && typeof window !== 'undefined' && window.BANK_SETS) {
+        var plain = _withoutSets(function () {
+          return _failed(s, pv, f, context(f, picks));
+        });
+        if (!plain.length) failed = plain;
+      }
       if (!failed.length) {
         sentences.push(d.sentences[i]);
         out.push(pv);
@@ -7176,6 +7775,11 @@ window.CommentBank = (function () {
      keeps one as written rather than having it swapped for a sentence the
      teacher didn't choose. */
   var RETIRED = {};
+  // Nov 4, the sample voice: the frames that read the same as another once
+  // their wording was fixed ("this term" → "so far", "is able to" → "can",
+  // "as his marks show" dropped): gr07 and gr08 (now gv91 and gv92), n1005
+  // (n1001), n1026 (n1007) and n1027 (n1013).
+  var RETIRED_SAMPLE_VOICE = ['gr07', 'gr08', 'n1005', 'n1026', 'n1027'];
   [
     'g01',
     'g03',
@@ -7224,6 +7828,9 @@ window.CommentBank = (function () {
     'hs36',
     'hs37',
   ].forEach(function (id) {
+    RETIRED[id] = true;
+  });
+  RETIRED_SAMPLE_VOICE.forEach(function (id) {
     RETIRED[id] = true;
   });
 
@@ -7732,6 +8339,19 @@ window.CommentBank = (function () {
     progressOf: progressOf,
     bestPieceOf: bestPieceOf,
     bestPieceSkillOf: bestPieceSkillOf,
+    highestFallbackOf: highestFallbackOf,
+    setEntry: setEntry,
+    isSensitive: isSensitive,
+    setSentencesFor: setSentencesFor,
+    setStrengthCompOf: setStrengthCompOf,
+    loadSets: loadSets,
+    altStrengthOf: altStrengthOf,
+    tentSkillOf: tentSkillOf,
+    stepSkillOf: stepSkillOf,
+    spreadOf: spreadOf,
+    plainLabel: plainLabel,
+    pieceTitle: pieceTitle,
+    CORE_ORDER: CORE_ORDER,
     compsOf: compsOf,
     topTieOf: topTieOf,
     topTieSkills: topTieSkills,

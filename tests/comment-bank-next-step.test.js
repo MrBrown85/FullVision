@@ -167,7 +167,10 @@ describe('the Next Step frames per skill', () => {
       comps: [thin('a', 'Evidence'), thin('b', 'Perspective')],
     });
     const ctx = CommentBank.context(f, {});
-    expect(ctx._nextSkill).toBe('');
+    // A tentative next step stands in (tentSkillOf, Colin Nov 4: marks
+    // spread thinly); the settled per-skill frames still need two pieces.
+    expect(ctx.nextSkill).toBe('');
+    expect(ctx.tentStep).not.toBe('');
     frames.forEach(s => expect(CommentBank.fits(s, ctx), s.id).toBe(false));
   });
 

@@ -337,6 +337,17 @@ export function checkComment(text, truth) {
             : expected.word || expected.cell;
         if (!ok) err('level', m[0], shown, sentence);
       });
+    } else if (!pieces.length && /\b(?:top|best) mark\b/i.test(plain)) {
+      // The course's top mark (the strength of last resort, Nov 4): the
+      // highest-marked piece's %, or its proficiency word.
+      const tops = [...truth.best].map(k => truth.work.get(k)).filter(Boolean);
+      levels.forEach(m => {
+        const ok =
+          m[1] != null
+            ? tops.some(w => w.pct != null && samePct(m[1], w.pct))
+            : tops.some(w => !!w.word && normLevel(m[2]) === normLevel(w.word).replace(/[+-]$/, ''));
+        if (!ok) err('number', m[0], 'the top mark', sentence);
+      });
     } else if (!pieces.length) {
       // A course % with no title beside it: the student's grade.
       levels.forEach(m => {
@@ -399,6 +410,11 @@ export function checkComment(text, truth) {
       if (said !== truth.standing) err('grade', m[0], truth.standing || 'no standing word', sentence);
     });
     take(/\b(?:is|are) (\w+) on the BC proficiency scale/g).forEach(m => {
+      if (m[1] !== truth.word) err('grade', m[0], truth.word || 'no proficiency word', sentence);
+    });
+    // The sample voice's grade sentence (Nov 4): "working at a Proficient
+    // level", "is at a Proficient level".
+    take(/\b(?:working at|is at) an? (Emerging|Developing|Proficient|Extending) level\b/g).forEach(m => {
       if (m[1] !== truth.word) err('grade', m[0], truth.word || 'no proficiency word', sentence);
     });
 

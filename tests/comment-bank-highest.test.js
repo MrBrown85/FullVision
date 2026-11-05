@@ -137,8 +137,12 @@ describe('the highest-marked skill (highestOf)', () => {
     expect(ctx.highestSkill).toBe('');
     expect(ctx._highestWord).toBe('');
     expect(CommentBank.stepPool('overall', ctx).filter(s => isHigh(s.id))).toEqual([]);
+    // The strength still comes (Colin, Nov 4: every part, every comment),
+    // from another route, never a highest-marked frame.
     const d = CommentBank.draft(ctx, { seed: 1 });
-    expect(d.sentences.find(x => x.step === 'overall')).toBeUndefined();
+    const o = d.sentences.find(x => x.step === 'overall');
+    expect(o).toBeTruthy();
+    expect(isHigh(o.id)).toBe(false);
   });
 
   it('leaves out the next step, even when it ties at the top, and says "highest" only with nothing above', () => {
@@ -242,10 +246,12 @@ describe('verify() for the highest-marked skill', () => {
 });
 
 describe('the highest-marked skill frames', () => {
-  it('has six or more structurally different frames for each proficiency word, for every kind of class', () => {
+  // Five for Extending and Developing since Nov 4: n1026 and n1027 read the
+  // same as n1007 and n1013 once "is able to" became "can".
+  it('has five or more structurally different frames for each proficiency word, for every kind of class', () => {
     WORDS.forEach(w => {
       const mine = frames.filter(s => s.when.highestWord === w);
-      expect(mine.length, w).toBeGreaterThanOrEqual(6);
+      expect(mine.length, w).toBeGreaterThanOrEqual(5);
       expect(new Set(mine.map(s => s.text)).size, w).toBe(mine.length);
       mine.forEach(s => {
         expect(s.group, s.id).toBe('Overall');
@@ -262,7 +268,7 @@ describe('the highest-marked skill frames', () => {
         expect(CommentLint.findings(s.text), s.id).toEqual([]);
       });
     });
-    expect(frames.length).toBe(25);
+    expect(frames.length).toBe(22);
   });
 
   it('binds the verb to the competency’s own word: can, learning to, beginning to', () => {

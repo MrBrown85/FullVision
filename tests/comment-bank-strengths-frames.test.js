@@ -176,7 +176,12 @@ describe('even results (evenComps)', () => {
       expect(ctx.evenResults).toBe('yes');
       expect(ctx._topSkill).toBe('');
       expect(CommentBank.nextStepOf(f.comps).id).toBe('d');
-      const d = CommentBank.draft(ctx, { seed: i, comments: comments.slice() });
+      // With the grade's even-marks frames left out, so the Overall step says
+      // the even marks (the sample voice joins them to the grade, Nov 4).
+      const gradeEven = COMMENT_BANK.sentences
+        .filter(s => s.group === 'Grade' && (s.needs || []).indexOf('evenResults') >= 0)
+        .map(s => s.id);
+      const d = CommentBank.draft(ctx, { seed: i, comments: comments.slice(), exclude: gradeEven });
       comments.push({ sid: 'st' + i, text: d.text });
       const row = d.sentences.find(x => x.step === 'overall');
       expect(row, 'student ' + i).toBeTruthy();
@@ -408,42 +413,49 @@ describe('the strengths frames per skill', () => {
 
 describe('the grade frames per proficiency word', () => {
   const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Grade' && s.when && s.when.grade === 'proficiency');
-  it('has ten frames per word beside the generic ones, each saying the word and "proficiency"', () => {
+  // The sample voice (Nov 4): the gv frames ("working at a Proficient
+  // level") are Generate's; the gr frames, reworded without the scale and
+  // "this term", stay in Browse Sentences.
+  it('has the gr frames per word in Browse and the sample-voice frames in Generate, each saying the word', () => {
     WORDS.forEach(w => {
       const mine = frames.filter(s => s.when.standing === w);
-      expect(mine.length, w).toBe(10);
+      expect(mine.filter(s => /^gr/.test(s.id)).length, w).toBe(10);
+      expect(mine.filter(s => /^gv/.test(s.id)).length, w).toBe(8);
       mine.forEach(s => {
         expect(s.text, s.id).toContain(w);
-        // Every frame names the scale or the student's proficiency, never "level".
-        expect(s.text, s.id).toMatch(/\bproficiency\b/);
-        expect(s.text, s.id).not.toMatch(/\blevel\b/i);
-        expect(s.claims).toEqual(['grade']);
-        // The scale's descriptor, as the report legend words it; Extending is
-        // never "beyond the course".
-        if (w === 'Extending') expect(s.text, s.id).not.toMatch(/beyond/i);
+        expect(s.text, s.id).not.toMatch(/proficiency scale|this term/);
+        expect(s.claims).toEqual((s.needs || []).indexOf('evenResults') >= 0 ? ['grade', 'evenResults'] : ['grade']);
+        expect(s.generate === false, s.id).toBe(/^gr/.test(s.id));
       });
-      const starts = mine.map(s => CommentLint.plain(s.text).split(/\s+/).slice(0, 3).join(' '));
+      const starts = mine
+        .filter(s => /^gr/.test(s.id))
+        .map(s => CommentLint.plain(s.text).split(/\s+/).slice(0, 3).join(' '));
       expect(new Set(starts).size, w).toBe(starts.length);
     });
     expect(frames.filter(s => !s.when.standing).length).toBeGreaterThanOrEqual(7);
   });
 
   WORDS.forEach(w =>
-    it(`${w}: the word's frames and the generic ones share the grade tier, fill and verify`, () => {
+    it(`${w}: Generate draws the word's sample-voice frames; every frame fills and verifies`, () => {
       const f = facts('science', [comp('a', 'Questioning', LEVEL[w])], { overall: LEVEL[w], standing: w });
       const ctx = CommentBank.context(f, {});
       const pool = CommentBank.stepPool('grade', ctx).map(s => s.id);
-      expect(pool).toContain('gr05');
-      frames.filter(s => s.when.standing === w).forEach(s => expect(pool, s.id).toContain(s.id));
+      expect(pool).not.toContain('gr05');
+      frames
+        .filter(s => s.when.standing === w && s.generate !== false && !(s.needs || []).length)
+        .forEach(s => expect(pool, s.id).toContain(s.id));
       WORDS.filter(x => x !== w).forEach(x =>
         frames.filter(s => s.when.standing === x).forEach(s => expect(pool, s.id).not.toContain(s.id)),
       );
       frames
-        .filter(s => s.when.standing === w)
+        .filter(s => s.when.standing === w && !(s.needs || []).length)
         .forEach(s => {
           const text = CommentBank.fill(s, ctx, { first: true });
           expect(text).not.toMatch(/[{}[\]]/);
           expect(text).toContain(w);
+          // A frame that runs past 20 words with this course name is left
+          // to the others (the length rule).
+          if (CommentRealiser.tooLong(text)) return;
           expect(verified(s, text, CommentBank.provenance(s, ctx), f, 'grade').replaced).toEqual([]);
         });
     }),

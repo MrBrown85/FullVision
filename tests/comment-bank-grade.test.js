@@ -1,7 +1,7 @@
 /**
  * Generate's grade sentence (plan PR 3a): in Letter and Both classes the
- * comment opens "{name} is earning {a|an} {letter} this term, which is
- * {standing} work." with the Letter Grades Order words, C- with its own
+ * comment opens "{name} has {a|an} {letter} in {course} so far, which is
+ * {standing} work." (the sample voice, Nov 4) with the Letter Grades Order words, C- with its own
  * sentences, "close to" the next letter only upward, within 2 points, with
  * 6+ scored pieces and no downward trend. Proficiency classes use the
  * proficiency word. IE takes the IE path (comment-bank-ie-goals.test.js);
@@ -12,7 +12,7 @@ import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
-const GRADE_IDS = ['gr01', 'gr02', 'gr03', 'gr04', 'gr05'];
+const GRADE_IDS = ['gv41', 'gv51', 'gv61', 'gv71', 'gv11'];
 const piece = (d, pct) => ({ id: 'p' + d, d: '2026-10-' + String(d).padStart(2, '0'), pct });
 const flat = (n, pct) => Array.from({ length: n }, (_, i) => piece(i + 1, pct));
 
@@ -58,22 +58,22 @@ const words = t => t.trim().split(/\s+/).length;
 describe('the grade sentences in the bank', () => {
   it('are worded per the plan, claim the grade, and stay within 20 words', () => {
     const ctx = CommentBank.context(letterFacts('B', 84.5), {});
-    expect(CommentBank.fill(byId('gr01'), { ...ctx, gradeNext: '' }, { first: true })).toBe(
-      'Noor is earning a B this term, which is very good work.',
+    expect(CommentBank.fill(byId('gv41'), { ...ctx, course: 'History 12', gradeNext: '' }, { first: true })).toBe(
+      'Noor has a B in History 12 so far, which is very good work.',
     );
-    expect(CommentBank.fill(byId('gr02'), ctx, { first: true })).toBe(
-      'Noor is earning a B this term, which is very good work and close to an A.',
+    expect(CommentBank.fill(byId('gv51'), { ...ctx, course: 'History 12' }, { first: true })).toBe(
+      'Noor has a B in History 12 so far, which is very good work and close to an A.',
     );
     GRADE_IDS.forEach(id => {
       expect(byId(id)).toMatchObject({ part: 'now', group: 'Grade', claims: ['grade'] });
-      expect(words(CommentBank.fill(byId(id), ctx)), id).toBeLessThanOrEqual(20);
+      expect(words(CommentBank.fill(byId(id), { ...ctx, course: 'History 12' })), id).toBeLessThanOrEqual(20);
     });
   });
 
   it('gives C- its own sentences, with the minimally acceptable wording', () => {
-    expect(byId('gr03').text).toBe('{He} [is|are] earning a C- this term, which is minimally acceptable work.');
-    expect(byId('gr04').text).toBe(
-      '{He} [is|are] earning a C- this term, which is minimally acceptable work and close to a C.',
+    expect(byId('gv61').text).toBe('{He} [has|have] a C- in {course} so far, which is minimally acceptable work.');
+    expect(byId('gv71').text).toBe(
+      '{He} [has|have] a C- in {course} so far, which is minimally acceptable work and close to a C.',
     );
   });
 });
@@ -171,28 +171,28 @@ describe('gradeOf', () => {
     const f = { ...letterFacts(null, null, [], 'proficiency'), overall: 3.1, standing: 'Proficient' };
     expect(CommentBank.gradeOf(f)).toEqual({ kind: 'proficiency', word: 'Proficient' });
     const ctx = CommentBank.context(f, {});
-    expect(CommentBank.fill(byId('gr05'), ctx, { first: true })).toBe(
-      'Noor is Proficient on the BC proficiency scale this term.',
+    expect(CommentBank.fill(byId('gv11'), { ...ctx, course: 'History 12' }, { first: true })).toBe(
+      'Noor is working at a Proficient level in History 12.',
     );
-    expect(GRADE_IDS.filter(id => CommentBank.fits(byId(id), ctx))).toEqual(['gr05']);
+    expect(GRADE_IDS.filter(id => CommentBank.fits(byId(id), ctx))).toEqual(['gv11']);
   });
 });
 
 describe('verify catches a wrong grade', () => {
   it('passes a true grade sentence and catches it once the letter changes', () => {
     const f = letterFacts('B', 80);
-    const d = one('gr01', CommentBank.context(f, {}));
+    const d = one('gv41', CommentBank.context(f, {}));
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     const lower = letterFacts('C+', 70);
-    expect(CommentBank.verify(d, lower, {}).replaced[0]).toMatchObject({ sentenceId: 'gr01' });
+    expect(CommentBank.verify(d, lower, {}).replaced[0]).toMatchObject({ sentenceId: 'gv41' });
     expect(CommentBank.verify(d, lower, {}).replaced[0].failed).toContain('grade');
   });
 
   it('catches a grade sentence filled with a letter the facts do not give', () => {
     const f = letterFacts('B', 80);
     const ctx = CommentBank.context(f, {});
-    const wrong = one('gr01', { ...ctx, gradeLetter: 'an A', gradeStanding: 'excellent' });
-    expect(wrong.text).toBe('Noor is earning an A this term, which is excellent work.');
+    const wrong = one('gv42', { ...ctx, gradeLetter: 'an A', gradeStanding: 'excellent' });
+    expect(wrong.text).toBe('Noor’s grade in so far is an A, which is excellent work.');
     const v = CommentBank.verify(wrong, f, {});
     expect(v.replaced[0].failed).toEqual(['slots', 'grade']);
     expect(v.text).not.toMatch(/an A/);
@@ -202,7 +202,7 @@ describe('verify catches a wrong grade', () => {
 
   it('catches "close to" once the gate no longer passes', () => {
     const f = letterFacts('B', 84.5);
-    const d = one('gr02', CommentBank.context(f, {}));
+    const d = one('gv51', CommentBank.context(f, {}));
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     expect(CommentBank.verify(d, letterFacts('B', 83.5), {}).replaced[0].failed).toContain('grade');
     expect(CommentBank.verify(d, letterFacts('B', 84.5, flat(5, 84.5)), {}).replaced[0].failed).toContain('grade');
@@ -212,14 +212,14 @@ describe('verify catches a wrong grade', () => {
 
   it('catches a C- sentence for a student who is now a C', () => {
     const f = letterFacts('C-', 55);
-    const d = one('gr03', CommentBank.context(f, {}));
+    const d = one('gv61', CommentBank.context(f, {}));
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     expect(CommentBank.verify(d, letterFacts('C', 61), {}).replaced[0].failed).toContain('grade');
   });
 
   it('catches a proficiency word that has changed', () => {
     const f = { ...letterFacts(null, null, [], 'proficiency'), overall: 3.1, standing: 'Proficient' };
-    const d = one('gr05', CommentBank.context(f, {}));
+    const d = one('gv11', CommentBank.context(f, {}));
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     const lower = { ...f, overall: 2.1, standing: 'Developing' };
     expect(CommentBank.verify(d, lower, {}).replaced[0].failed).toContain('grade');
@@ -348,7 +348,8 @@ describe('Generate in a Letter class', () => {
     const f = seed('proficiency', [3, 3, 3, 3]);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
     leads(d, 'proficiency', /Proficient/);
-    expect(d.sentences[0].text).toContain('proficiency');
+    expect(d.sentences[0].text).toMatch(/working at a Proficient level|at a Proficient level/);
+    expect(d.sentences[0].text).not.toMatch(/proficiency scale|this term/);
     expect(d.ids.slice(1).filter(claimsGrade)).toEqual([]);
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
   });
@@ -359,7 +360,7 @@ describe('Generate in a Letter class', () => {
     expect(CommentBank.gradeOf(f)).toEqual({ kind: 'ie' });
     for (let seedN = 1; seedN <= 10; seedN++) {
       const d = CommentBank.draft(CommentBank.context(f, {}), { seed: seedN });
-      expect(d.ids[0]).toBe('gr06');
+      expect(['gv81', 'gv82']).toContain(d.ids[0]);
       expect(d.ids.filter(id => GRADE_IDS.indexOf(id) >= 0)).toEqual([]);
     }
   });

@@ -139,7 +139,7 @@ describe('strengths are skills from the table, never a bare competency label', (
       const d = draftOf(f, { seed });
       const s = d.sentences.find(x => x.step === 'overall');
       expect(s, 'seed ' + seed).toBeTruthy();
-      expect(s.text).toMatch(/\bcan support each claim with evidence from a source\b/);
+      expect(s.text).toMatch(/\bsupport each claim with evidence from a source\b/);
       expect(s.text).not.toMatch(/\b(Evidence|Perspective|Significance)\b/);
       expect(d.replaced).toEqual([]);
     }
@@ -189,15 +189,16 @@ describe('strengths are skills from the table, never a bare competency label', (
 describe('the draft is the plan’s eight parts only', () => {
   const PLAN = [
     'grade',
-    // The habits part for families: two or three sentences (Nov 4).
+    'spread',
+    'growth',
+    'example',
+    'overall',
     'habits',
     'habitsMore',
     'habitsBuild',
     'attendance',
     'notHandedIn',
     'lateWork',
-    'overall',
-    'example',
     // Before the Next Step: never between it and its family line (#632).
     'languageGoals',
     'nextStep',
@@ -215,15 +216,17 @@ describe('the draft is the plan’s eight parts only', () => {
     expect(CommentBank.DRAFT_STEPS.map(s => s.key)).toEqual(PLAN);
     CommentBank.ANGLES.forEach(a => {
       a.order.forEach(k => expect(PLAN, a.id).toContain(k));
-      ['opening', 'growth', 'goWords'].forEach(k => expect(a.order, a.id).not.toContain(k));
+      ['opening', 'goWords'].forEach(k => expect(a.order, a.id).not.toContain(k));
+      // One order for every comment off the IE path (the sample voice, Nov 4).
+      if (a.id !== 'ie') expect(a.order, a.id).toBe(CommentBank.CORE_ORDER);
     });
   });
 
   it('drafts Tomas in the angle’s order with nothing else: grade, best piece, strengths, habits, not handed in, late work, next step, support, closing', () => {
     const d = draftOf(tomas());
-    // Strong handed-in work behind two pieces labelled Missing: the best
-    // piece leads. Eleven parts are true, so the family sentence and the
-    // attendance sentence are left out to keep nine.
+    // Strong handed-in work behind two pieces labelled Missing. Every part
+    // that is true is written, in the one order (Colin, Nov 4: nothing is
+    // trimmed; "longer is fine").
     expect(d.angle).toBe('hidden');
     expect(stepsOf(d)).toEqual([
       'grade',
@@ -231,10 +234,12 @@ describe('the draft is the plan’s eight parts only', () => {
       'overall',
       'habits',
       'habitsBuild',
+      'attendance',
       'notHandedIn',
       'lateWork',
       'nextStep',
       'support',
+      'home',
       'closer',
     ]);
     // The grade sentence, then the best piece with its note (in one of the
@@ -247,7 +252,7 @@ describe('the draft is the plan’s eight parts only', () => {
     expect(d.sentences[1].text).toContain('“What Does the Poster Show?”');
     expect(d.sentences[1].text).toContain('linked the poster to the Act.');
     expect(d.text).toContain('handing in each task by its due date, and sharing his ideas in class discussions.');
-    expect(d.text).not.toContain('missed three classes');
+    expect(d.text).toMatch(/three classes/);
     // One of the two-title Not Handed In frames (m01, m07-m11), both titles
     // quoted, with the class's late-work line right after it.
     expect(d.text).toContain('not handed in');
@@ -315,29 +320,19 @@ describe('the support line', () => {
    second sentence and the habits that would help are part of it). */
 const counted = d => d.sentences.filter(s => s.step !== 'habitsMore' && s.step !== 'habitsBuild').length;
 
-describe('six to nine sentences', () => {
-  it('never drafts more than nine: the family sentence goes first, then attendance, then the strengths', () => {
-    expect(CommentBank.MAX_SENTENCES).toBe(9);
-    // Eleven parts are true for Tomas, on any angle and seed.
+describe('six sentences or more, never trimmed', () => {
+  it('writes every part that is true, the family sentence and attendance included (Colin, Nov 4: "longer is fine")', () => {
     const excellent = tomas({ habits: { completes: 4, ready: 4, others: 4, part: 4, feedback: 4, devices: 4 } });
     [tomas(), excellent].forEach(f => {
       for (let seed = 1; seed <= 10; seed++) {
         const d = draftOf(f, { seed });
-        expect(counted(d), 'seed ' + seed).toBe(9);
+        expect(counted(d), 'seed ' + seed).toBeGreaterThan(9);
         expect(d.short).toBe(false);
-        expect(stepsOf(d)).not.toContain('home');
-        expect(stepsOf(d)).not.toContain('attendance');
-        expect(stepsOf(d)).toContain('overall');
-        expect(stepsOf(d)).toContain('closer');
+        ['home', 'attendance', 'overall', 'closer'].forEach(k => expect(stepsOf(d), 'seed ' + seed).toContain(k));
         expect(d.replaced).toEqual([]);
       }
     });
-    // With no attendance entered, ten parts: only the family sentence goes.
-    const d = draftOf(tomas({ absent: 0, late: 0 }));
-    expect(counted(d)).toBe(9);
-    expect(stepsOf(d)).not.toContain('home');
-    expect(stepsOf(d)).toContain('overall');
-    // With nothing missing either, eight parts fit, the family sentence among them.
+    // With nothing missing and no attendance, the rest is as it was.
     const fits = draftOf(
       tomas({
         absent: 0,
@@ -359,13 +354,11 @@ describe('six to nine sentences', () => {
     ]);
   });
 
-  it('keeps a sentence the teacher kept and the class’s lines when it trims', () => {
+  it('keeps a sentence the teacher kept and the class’s lines', () => {
     const mine = 'At home, you can ask him what a news story means for the people in it.';
     const d = draftOf(tomas(), { kept: { home: mine } });
-    expect(counted(d)).toBe(9);
     expect(d.sentences.find(s => s.step === 'home')).toMatchObject({ kept: true, text: mine });
-    expect(stepsOf(d)).not.toContain('attendance');
-    expect(stepsOf(d)).not.toContain('overall');
+    expect(stepsOf(d)).toContain('overall');
     expect(d.sentences.filter(s => s.classLine).map(s => s.step)).toEqual(['lateWork', 'support', 'closer']);
     expect(d.text).toMatch(/Extra help is at lunch on Tuesdays in \[Room\]\.$/);
   });
@@ -401,14 +394,20 @@ describe('six to nine sentences', () => {
     const d = draftOf(thin);
     expect(d.short).toBe(true);
     expect(d.sentences.length).toBeLessThan(6);
-    // The family line belongs to the Next Step sentence, so with no next
-    // step it is left out too (live run, Nov 1 2026).
-    expect(stepsOf(d)).toEqual(['grade', 'example']);
+    // Every comment has a next step and a family line (Colin, Nov 4): with
+    // no competency to draw one from, a generic science step that claims
+    // nothing, and a family line for any science class.
+    // The strength, with one competency and one piece: a skill at Proficient, or the course's top mark.
+    expect(stepsOf(d)).toEqual(['grade', 'example', 'overall', 'nextStep', 'home']);
     expect(d.sentences[0].text).toContain('Ines');
     expect(d.sentences[0].text).toContain('Proficient');
-    expect(d.sentences[1].text).toContain('“Energy Lab');
-    // Nothing was added to reach six: no habits sentence with no habit
-    // rated, no strengths below the gate, no next step on two pieces.
+    expect(d.sentences[1].text).toMatch(/[Tt]heir Energy Lab/);
+    expect(['oa01', 'oa02', 'oa03', 'oa04', 'oc01', 'oc02', 'oc03']).toContain(d.ids[2]);
+    const next = COMMENT_BANK.sentences.find(s => s.id === d.ids[3]);
+    expect(next.claims).toEqual([]);
+    expect(next.subjects).toEqual(['science']);
+    // Nothing else was added to reach six: no habits sentence with no habit
+    // rated, no strengths below the gate.
     expect(CommentBank.verify(d, thin, {}).text).toBe(d.text);
   });
 });

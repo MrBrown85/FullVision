@@ -229,13 +229,18 @@ describe('the habits part for families (Nov 4)', { timeout: 20000 }, () => {
   const BANNED =
     /work habits?|\bsix\b|\b(all|every|each) of (his|her|their) habits|excellent|\bgood\b|Consistently|Sometimes|Rarely|\brated\b/;
 
-  it('all Consistently: hf01, hf02, hf04, hf14-hf16, then hf21, hf22, hf27, hf28 for the rest', () => {
-    const lead = expectReachable(hab(all(4)), 'habits', ['hf01', 'hf02', 'hf04', 'hf14', 'hf15', 'hf16']);
+  // hf14 ("Each day"), hf16 ("reliably"), hf28 ("Each day") and hf36 ("For
+  // him, two habits would help most") were retired for the sample voice
+  // (Colin, Nov 4).
+  // hf04 ("Daily"), hf37 and hf38 ("More than anything") and hs15 ("Even
+  // so") are Browse only too (Nov 4: stiff openers).
+  it('all Consistently: hf01, hf02, hf15, then hf21, hf22, hf27 for the rest', () => {
+    const lead = expectReachable(hab(all(4)), 'habits', ['hf01', 'hf02', 'hf15']);
     Object.values(lead).forEach(t => {
       expect(t).toMatch(/hands in his work on time and comes to class ready to start\.$/);
       expect(t).not.toMatch(BANNED);
     });
-    const more = expectReachable(hab(all(4)), 'habitsMore', ['hf21', 'hf22', 'hf27', 'hf28']);
+    const more = expectReachable(hab(all(4)), 'habitsMore', ['hf21', 'hf22', 'hf27']);
     Object.values(more).forEach(t =>
       expect(t).toMatch(/listens to others, joins in class discussions, and uses feedback to improve his work\.$/),
     );
@@ -265,16 +270,10 @@ describe('the habits part for families (Nov 4)', { timeout: 20000 }, () => {
     Object.values(got).forEach(t => expect(t).toMatch(/comes to class ready and joins in group work/));
   });
 
-  it('one habit that would help: hf31-hf33, hf37; two: hf34-hf36, hf38, in the grid’s order', () => {
-    const one = expectReachable(hab({ ...all(4), feedback: 2 }), 'habitsBuild', ['hf31', 'hf32', 'hf33', 'hf37']);
+  it('one habit that would help: hf31-hf33; two: hf34, hf35, in the grid’s order', () => {
+    const one = expectReachable(hab({ ...all(4), feedback: 2 }), 'habitsBuild', ['hf31', 'hf32', 'hf33']);
     Object.values(one).forEach(t => expect(t).toMatch(/using feedback to improve his work/));
-    const two = expectReachable(
-      hab({ ...all(4), ready: 2, devices: 1 }),
-      'habitsBuild',
-      ['hf34', 'hf35', 'hf36', 'hf38'],
-      [],
-      26,
-    );
+    const two = expectReachable(hab({ ...all(4), ready: 2, devices: 1 }), 'habitsBuild', ['hf34', 'hf35'], [], 26);
     Object.values(two).forEach(t =>
       expect(t).toMatch(/getting started as soon as class begins, and keeping his phone and devices on his work/),
     );
@@ -319,15 +318,15 @@ describe('Strong Habits frames (the IE comment)', () => {
       grade: { ...facts().grade, basis: 'ie', ieAllowed: true, marked: { mine: 3, all: 8 } },
     });
 
-  it('hs11, hs13, hs15 name the habits rated Consistently, at most three, as a verb phrase after the student', () => {
+  it('hs11 and hs13 name the habits rated Consistently, at most three, as a verb phrase after the student', () => {
     const f = ie({ completes: 2, ready: 4, others: 4, part: 4, feedback: 2, devices: 3 });
     expect(CommentBank.reportPath(f)).toBe('ie');
-    const got = expectReachable(f, 'strongHabits', ['hs11', 'hs13', 'hs15']);
+    const got = expectReachable(f, 'strongHabits', ['hs11', 'hs13']);
     Object.values(got).forEach(t =>
       expect(t).toMatch(/\bhe comes to class ready to start, listens to others, and joins in class discussions\.$/i),
     );
     expect(got.hs13).toBe(
-      'This term, he comes to class ready to start, listens to others, and joins in class discussions.',
+      'As a rule, he comes to class ready to start, listens to others, and joins in class discussions.',
     );
   });
 

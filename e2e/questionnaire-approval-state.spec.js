@@ -23,16 +23,22 @@ async function go(page, student) {
 }
 const saved = (page, sid) => page.evaluate(s => getStudentTermRating('sci8', s, 'term-2') || {}, sid);
 
-/* Liam's Generate draft names his best piece this term; returns its title
-   and the whole sentence that names it. */
+/* Liam's Generate draft names his best piece; returns its title and the
+   whole sentence that names it (the sample voice, Nov 4: "He scored
+   highest on his Microscope Skills Check, which shows …"). */
 async function generateLiam(page) {
   await page.locator('#tq-generate').click();
-  await expect(page.locator('#tq-narrative')).toHaveValue(/best piece was “/);
+  const best = await page.evaluate(() => {
+    const st = getStudents('sci8').find(s => s.id === 'st4');
+    return CommentBank.bestPieceOf(CommentBank.facts('sci8', st, 'term-2')).title;
+  });
+  await expect(page.locator('#tq-narrative')).toHaveValue(new RegExp('his ' + best));
   const text = await page.locator('#tq-narrative').inputValue();
-  return {
-    best: text.match(/best piece was “(.+?)[.?!]?”/)[1],
-    sentence: text.match(/His best piece was “[^”]+”(?:,[^.?!]*[.?!])?/)[0],
-  };
+  const sentence = await page.evaluate(
+    ([t, b]) => CommentRealiser.sentences(t).find(x => x.indexOf(b) >= 0),
+    [text, best],
+  );
+  return { best, sentence };
 }
 
 /* That piece marked down in the gradebook: a level of 1, or 1 point. */

@@ -3398,6 +3398,17 @@ window.ReportQuestionnaire = (function () {
     return CommentRealiser.sentences(text);
   }
 
+  function _setSentence(id) {
+    if (!/^set:/.test(String(id || ''))) return null;
+    var st = _current();
+    if (!st) return null;
+    var ctx = _bankContext(_activeCourse, st, _facts(st));
+    return (
+      ((ctx && ctx._extra) || []).find(function (x) {
+        return x.id === id;
+      }) || null
+    );
+  }
   function _bankById(id) {
     var find = function (k) {
       return (
@@ -3407,8 +3418,13 @@ window.ReportQuestionnaire = (function () {
       );
     };
     // A sentence of the teacher's own drawn before its save landed is
-    // found under the server's id.
-    return find(id) || (window.PersonalBank && PersonalBank.currentId ? find(PersonalBank.currentId(id)) : null);
+    // found under the server's id; a course-set sentence among the current
+    // student's own (CommentBank.setSentencesFor).
+    return (
+      find(id) ||
+      (window.PersonalBank && PersonalBank.currentId ? find(PersonalBank.currentId(id)) : null) ||
+      _setSentence(id)
+    );
   }
 
   /* The rows of the comment on screen, per class, student and report: one
@@ -5753,6 +5769,7 @@ window.ReportQuestionnaire = (function () {
   /* The cases a bank sentence is for, within a part: one, or every case a
      frame with a slot can serve. */
   function browseCase(part, s) {
+    if (s.setCase) return [s.setCase];
     var when = s.when || {};
     var needs = s.needs || [];
     var has = function (k) {
@@ -5969,19 +5986,30 @@ window.ReportQuestionnaire = (function () {
     var q = String(opts.q || '')
       .trim()
       .toLowerCase();
-    var all = bank.sentences.filter(function (s) {
+    var inPart = function (s) {
       return !!p && p.steps.indexOf(CommentBank.stepOf(s)) >= 0;
-    });
+    };
+    // The course-set sentences for the student's own competencies (Nov 4),
+    // each under its competency's name.
+    var extra = ((ctx && ctx._extra) || []).filter(inPart);
+    var all = bank.sentences.filter(inPart).concat(extra);
     var fit = all.filter(function (s) {
       return CommentBank.fits(s, ctx);
     });
-    var cases = browseCases(pid);
+    var setCases = [];
+    extra.forEach(function (s) {
+      if (!setCases.some(c => c.id === s.setCase)) setCases.push({ id: s.setCase, label: s.setComp });
+    });
+    var cases = setCases.concat(browseCases(pid));
     var known = function (id) {
       return cases.some(function (c) {
         return c.id === id;
       });
     };
-    var own = (opts.own || browseOwn(pid, ctx)).filter(known);
+    var own = setCases
+      .map(c => c.id)
+      .concat(opts.own || browseOwn(pid, ctx))
+      .filter(known);
     var rows = [];
     all.forEach(function (s, i) {
       var ids = browseCase(pid, s).map(function (c) {

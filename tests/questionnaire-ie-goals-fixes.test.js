@@ -158,7 +158,7 @@ describe('2. The Language Goals row once the comment has sentences', () => {
     rate({
       reportingBasis: 'language_goals',
       narrative:
-        'This term, Noor is assessed in relation to her goals for English language proficiency. She explains causes and their effects clearly.',
+        'Noor is assessed in relation to her goals for English language proficiency. She explains causes and their effects clearly.',
     });
     let html = open();
     expect(html).toContain('id="tq-row-languageGoals"');

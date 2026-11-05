@@ -736,7 +736,7 @@ test.describe('the Sentences card', () => {
     await expect(best).toHaveCount(1);
     await expect(best).toHaveClass(/\bbest\b/);
     await expect(page.locator('#tq-sentences .qn-srow.best')).toHaveCount(1);
-    expect(bestText).toContain('where she kept a field journal with dated sketches');
+    expect(bestText).toContain('she kept a field journal with dated sketches');
     await expect(best.locator('.qn-req-source')).toContainText('· your note for the report');
     await expect(page.locator('#tq-marks .qn-mark.best')).toHaveText(bestText);
     await expect(page.locator('#tq-marks .qn-mark')).toHaveCount(1);
@@ -765,7 +765,8 @@ test.describe('the Sentences card', () => {
     await page.locator('[data-do="reset"]').click();
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
     await expect(page.locator('[data-do="reset"]')).toHaveCount(0);
-    await expect(box).toHaveValue(/^Cece is /);
+    // The grade sentence first, naming her (in whichever of its frames).
+    await expect(box).toHaveValue(/^(In Science 8, )?Cece(’s)? /);
   });
 
   test('Other Wording: up to three with the one in use ticked and its uses; a pick changes the comment; All N… opens Browse', async ({
@@ -933,10 +934,11 @@ test.describe('the Sentences card', () => {
     await open(page);
     await page.locator('#tq-generate').click();
     const box = page.locator('#tq-narrative');
-    const strengths = rowByLabel(page, 'Strengths');
+    const strengths = rowByLabel(page, 'Best Piece');
     await expect(strengths).toHaveCount(1);
     const gone = await strengths.locator('.qn-req-text').textContent();
-    // The strengths sentence deleted from the comment: its row goes.
+    // The best-piece sentence deleted from the comment: its row goes (the
+    // sample voice, Nov 4: Cece's strength is said in it).
     await box.evaluate((el, t) => {
       el.value = el.value.replace(' ' + t, '').replace(t, '');
       el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -962,7 +964,7 @@ test.describe('the Sentences card', () => {
     const p = await plus.boundingBox();
     expect(Math.abs(p.y + p.height / 2 - g.y)).toBeLessThan(2);
     expect(await boxes(page)).toEqual(before);
-    // The menu: Add Here, the Strengths part (the only one missing that
+    // The menu: Add Here, the Best Piece part (the only one missing that
     // fits), Write Your Own… and Browse Sentences…
     await plus.click();
     const menu = page.locator('#tq-add-menu');
@@ -970,7 +972,7 @@ test.describe('the Sentences card', () => {
     await expect(menu.locator('.qn-menu-head')).toHaveText('Add Here');
     const items = menu.locator('.qn-add-item');
     await expect(items).toHaveCount(1);
-    await expect(items.first().locator('.qn-add-part')).toHaveText('Strengths');
+    await expect(items.first().locator('.qn-add-part')).toHaveText('Best Piece');
     await expect(items.first().locator('.qn-menu-text')).not.toHaveText('');
     await expect(items.first().locator('.qn-menu-meta')).not.toHaveText('');
     await expect(items.first()).toBeFocused();
@@ -983,7 +985,7 @@ test.describe('the Sentences card', () => {
     // The row at that gap, tinted, "added just now"; the comment has the
     // sentence at the same place; the count moved.
     const added = rows(page).nth(2);
-    await expect(added.locator('.qn-req-label')).toHaveText('Strengths');
+    await expect(added.locator('.qn-req-label')).toHaveText('Best Piece');
     await expect(added).toHaveClass(/\badded\b/);
     await expect(added.locator('.qn-req-source')).toHaveText(/ · added just now$/);
     // The sentence is tinted in the comment too, like the best piece.
@@ -1042,24 +1044,24 @@ test.describe('the Sentences card', () => {
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
     expect(await rows(page).first().locator('.qn-req-text').textContent()).toBe(gradeWas);
     await expect(rowByLabel(page, 'Next Step')).toHaveCount(1);
-    // A Strengths sentence from the same sheet, with the strengths row gone,
-    // goes in at the gap: its Use says so.
+    // A Best Piece sentence from the same sheet, with the best-piece row
+    // gone, goes in at the gap: its Use says so.
     await page.keyboard.press('Escape');
-    const gone = await rowByLabel(page, 'Strengths').locator('.qn-req-text').textContent();
+    const gone = await rowByLabel(page, 'Best Piece').locator('.qn-req-text').textContent();
     await box.evaluate((el, t) => {
       el.value = el.value.replace(' ' + t, '').replace(t, '');
       el.dispatchEvent(new Event('input', { bubbles: true }));
     }, gone);
-    await expect(rowByLabel(page, 'Strengths')).toHaveCount(0);
+    await expect(rowByLabel(page, 'Best Piece')).toHaveCount(0);
     await gaps.last().locator('.qn-gap-add').click();
     await page.locator('#tq-add-menu [data-do="browseAt"]').click();
-    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Strengths');
+    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Best Piece');
     await expect(sheet.locator('.qn-browse-use:enabled').first()).toHaveAttribute(
       'title',
       'Puts this sentence in Cece’s comment, at the place you chose.',
     );
     await sheet.locator('.qn-browse-use:enabled').first().click();
-    await expect(rows(page).last().locator('.qn-req-label')).toHaveText('Strengths');
+    await expect(rows(page).last().locator('.qn-req-label')).toHaveText('Best Piece');
     await expect(rows(page)).toHaveCount(n + 1);
     await page.keyboard.press('Escape');
     // The keyboard focus on a menu item is filled like a hover.
@@ -1080,7 +1082,7 @@ test.describe('the Sentences card', () => {
     await expect(rowByLabel(page, 'Your Sentence')).toHaveCount(0);
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
     expect(await box.inputValue()).not.toContain('explained her lab results');
-    await expect(rowByLabel(page, 'Strengths')).toHaveCount(1);
+    await expect(rowByLabel(page, 'Best Piece')).toHaveCount(1);
   });
 
   test('Write Your Own… at a gap puts a typed row there; Browse Sentences… from a gap inserts with Use; the keyboard path', async ({
@@ -1125,20 +1127,20 @@ test.describe('the Sentences card', () => {
     expect(ReportQuestionnaireSentences(await box.inputValue())[2]).toBe(
       'Cece explained her lab results clearly to the class.',
     );
-    // Browse Sentences… from the last gap: a second Strengths sentence is
+    // Browse Sentences… from the last gap: a second Best Piece sentence is
     // added there; the first stays.
     const n = await rows(page).count();
     await gaps.last().locator('.qn-gap-add').click();
     await menu.locator('[data-do="browseAt"]').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
     await expect(sheet).toBeVisible();
-    await sheet.locator('[role="tab"]', { hasText: 'Strengths' }).click();
+    await sheet.locator('[role="tab"]', { hasText: 'Best Piece' }).click();
     const use = sheet.locator('.qn-browse-use:enabled').first();
     const pick = await use.locator('..').locator('.qn-browse-sentence').textContent();
     await use.click();
     await expect(rows(page)).toHaveCount(n + 1);
-    await expect(rowByLabel(page, 'Strengths')).toHaveCount(2);
-    expect((await rowByLabel(page, 'Strengths').last().locator('.qn-req-text').textContent()).slice(4)).toBe(
+    await expect(rowByLabel(page, 'Best Piece')).toHaveCount(2);
+    expect((await rowByLabel(page, 'Best Piece').last().locator('.qn-req-text').textContent()).slice(4)).toBe(
       pick.slice(4),
     );
     await page.keyboard.press('Escape');
@@ -1318,7 +1320,17 @@ test.describe('the Sentences card', () => {
     const fitCount = Number((await sheet.locator('#tq-browse-n').textContent()).split(' of ')[0]);
     await expect(rowsList).toHaveCount(fitCount);
     const ownGroup = sheet.locator('.qn-browse-group.own').first();
-    await expect(ownGroup.locator('.qn-browse-head-label')).toHaveText(/^Science/);
+    // Her own competencies' course-set sentences come first (Nov 4), each
+    // group under the competency's name; else the Science groups.
+    const names = await page.evaluate(() =>
+      CommentBank.facts(
+        'sci8',
+        getStudents('sci8').find(s => s.id === 'st1'),
+        'term-2',
+      ).comps.map(c => c.name),
+    );
+    const ownLabel = (await ownGroup.locator('.qn-browse-head-label').textContent()).trim();
+    expect(names.indexOf(ownLabel) >= 0 || /^Science/.test(ownLabel)).toBe(true);
     const use = ownGroup
       .locator('.qn-browse-row')
       .filter({ has: page.locator('.qn-browse-use:not([disabled])') })

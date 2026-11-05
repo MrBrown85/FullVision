@@ -46,16 +46,8 @@ describe('the best piece, Strongest and Growing agree everywhere', () => {
       const f = CommentBank.facts(cid, st, ReportBlocks.getTermId());
       const best = CommentBank.bestPieceOf(f);
       expect(RQ.bestPiece(f)).toBe(best);
-      if (best)
-        expect(CommentBank.context(f, {}).bestPiece).toBe(
-          CommentBank.bestPieceSentence({
-            title: best.title,
-            note: best.note,
-            name: f.name,
-            pronouns: f.pronouns,
-            onFile: f.pronounsOnFile,
-          }),
-        );
+      // The comment's best piece owns the same title (the sample voice).
+      if (best) expect(CommentBank.context(f, {}).piece).toContain(CommentRealiser.workTitle(best.title));
     });
   });
 

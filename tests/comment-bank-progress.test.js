@@ -7,7 +7,20 @@
  */
 import './setup.js';
 import { readFileSync } from 'fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+
+/* The cluster wording: these tests read data/bc-curriculum-comment.json, the
+   fallback for a competency whose course-set wording (shared/bank-sets.js)
+   has not loaded (Nov 4; tests/comment-bank-course-sets.test.js covers the
+   sets). */
+let savedSets;
+beforeAll(() => {
+  savedSets = window.BANK_SETS;
+  window.BANK_SETS = null;
+});
+afterAll(() => {
+  window.BANK_SETS = savedSets;
+});
 
 const comment = JSON.parse(readFileSync('data/bc-curriculum-comment.json', 'utf-8'));
 const THEY = { subj: 'they', obj: 'them', poss: 'their', refl: 'themselves' };
@@ -78,10 +91,10 @@ describe('progress in levels', () => {
     const pg1 = COMMENT_BANK.sentences.find(x => x.id === 'pg01');
     const pg2 = COMMENT_BANK.sentences.find(x => x.id === 'pg02');
     expect(CommentBank.fill(pg1, ctx)).toBe(
-      'They rose from Developing to Proficient in their ability to ' + comment['ss-evi'].phrase + '.',
+      'They rose from Developing to Proficient in how well they can ' + comment['ss-evi'].phrase + '.',
     );
     expect(CommentBank.fill(pg2, ctx)).toBe(
-      'They have reached Proficient in their ability to ' + comment['ss-evi'].phrase + ', up from Developing.',
+      'They have reached Proficient, up from Developing, where they must ' + comment['ss-evi'].phrase + '.',
     );
     const text = CommentBank.fill(pg1, ctx);
     const d = {

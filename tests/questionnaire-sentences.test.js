@@ -345,17 +345,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   it('insertChoices: only the parts missing from the comment, each with a sentence that fits; nothing Required', () => {
     const { d, ctx } = draftFor(cece());
     const rows = RQ.rowsFromDraft(d);
-    expect(rows.map(r => r.step)).toEqual(expect.arrayContaining(['grade', 'overall', 'example', 'nextStep']));
+    expect(rows.map(r => r.step)).toEqual(expect.arrayContaining(['grade', 'example', 'nextStep']));
     // Every part the draft could write is in it; the Demo class has no
     // habit ratings, nothing Missing, no support lines and no closing
-    // sentence, so nothing is offered.
+    // sentence, so nothing is offered. (Cece's strength is said in her best
+    // piece sentence, the sample voice, Nov 4.)
     expect(RQ.insertChoices(rows, ctx, { seed: 3 })).toEqual([]);
-    // Without the strengths and best-piece rows, those two parts are
-    // offered, each with a bank sentence that fits Cece in a step of that
-    // part, filled with no slot left.
-    const fewer = rows.filter(r => r.step !== 'overall' && r.step !== 'example');
+    // Without the best-piece row, that part is offered, with a bank
+    // sentence that fits Cece in a step of that part, filled with no slot
+    // left.
+    const fewer = rows.filter(r => r.step !== 'example');
     const choices = RQ.insertChoices(fewer, ctx, { seed: 3 });
-    expect(choices.map(c => c.part).sort()).toEqual(['bestPiece', 'strengths']);
+    expect(choices.map(c => c.part).sort()).toEqual(['bestPiece']);
     choices.forEach(c => {
       expect(RQ.partOf(c.step).id).toBe(c.part);
       expect(c.label).toBe(RQ.PARTS.find(p => p.id === c.part).label);
@@ -365,17 +366,16 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       expect(fewer.map(r => r.id)).not.toContain(c.id);
     });
     // Put in at a gap, the row is the sentence filled for Cece.
-    const strengths = choices.find(c => c.part === 'strengths');
+    const strengths = choices.find(c => c.part === 'bestPiece');
     const put = RQ.insertRow(fewer, RQ.rowFromSentence(strengths.s, ctx, strengths.step), 1);
     expect(put[1].step).toBe(strengths.step);
     expect(RQ.composeRows(put)).toContain(put[1].text);
     // A comment with only typed sentences: the grade is offered once, with
-    // the best piece, strengths and next step; never a second advising
-    // sentence.
+    // the best piece and next step; never a second advising sentence.
     const typedOnly = [RQ.typedRow('Cece explained her results.', 1)];
     const fresh = RQ.insertChoices(typedOnly, ctx, { seed: 3 });
     expect(fresh.filter(c => c.part === 'grade').length).toBe(1);
-    expect(fresh.map(c => c.part)).toEqual(expect.arrayContaining(['grade', 'bestPiece', 'strengths', 'nextStep']));
+    expect(fresh.map(c => c.part)).toEqual(expect.arrayContaining(['grade', 'bestPiece', 'nextStep']));
     expect(new Set(fresh.map(c => c.part)).size).toBe(fresh.length);
     expect(fresh.filter(c => !c.classLine && CommentBank.advises(c.s)).length).toBeLessThanOrEqual(1);
     // With a next step in the comment, no second one is offered.
@@ -391,8 +391,8 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     // Browse from a gap: the first part that can go in; with every drafted
     // part in, the first part with no row (Habits for Cece: nothing rated);
     // with every part in, Grade.
-    const fewer = rows.filter(r => r.step !== 'overall');
-    expect(RQ.gapPart(fewer, ctx, { seed: 3 })).toBe('strengths');
+    const fewer = rows.filter(r => r.step !== 'example');
+    expect(RQ.gapPart(fewer, ctx, { seed: 3 })).toBe('bestPiece');
     expect(RQ.gapPart(rows, ctx, { seed: 3 })).toBe('habits');
     const every = RQ.PARTS.map(p => ({ id: 'x:' + p.id, step: p.steps[0], text: 'X.' }));
     expect(RQ.gapPart(every, ctx, { seed: 3 })).toBe('grade');
@@ -680,8 +680,6 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(habits.slice(0, rated.length).every(id => /^cell:/.test(id))).toBe(true);
     expect(habits.some(id => /^sum:/.test(id))).toBe(true);
     expect(RQ.browseOwn('strengths', ctx)).toContain('fam:' + ctx._family);
-    // Cece's results are even (CommentBank.evenComps): her own case first.
-    expect(RQ.browseOwn('strengths', ctx)[0]).toBe('even:' + f.standing);
     expect(RQ.browseOwn('nextStep', ctx)).toContain('home:' + ctx._family);
     expect(RQ.browseOwn('bestPiece', ctx)).toEqual([ctx._bestNote ? 'note' : 'noNote']);
     // Grade, every sentence: the proficiency frames under each word,
@@ -690,7 +688,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const grade = RQ.browseList('grade', ctx, { fits: false });
     const frame = COMMENT_BANK.sentences.find(s => s.when && s.when.grade === 'proficiency');
     const under = grade.rows.filter(r => r.id === frame.id);
-    expect(under.map(r => r.case)).toEqual(['p:Extending', 'p:Proficient', 'p:Developing', 'p:Emerging']);
+    // Each grade frame is written for one proficiency word (the sample
+    // voice, Nov 4), so it is filed under that word alone.
+    expect(under.map(r => r.case)).toEqual(['p:' + frame.when.standing]);
     under.forEach(r => {
       expect(r.text).toContain(r.case.slice(2));
       expect(r.fits).toBe(r.case === 'p:' + f.standing);
@@ -729,9 +729,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const g0 = again.groups.find(g => g.id === full.id);
     expect(g0.rows.map(r => usage[r.id])).toEqual(g0.rows.map(r => usage[r.id]).sort((a, b) => a - b));
     // A search keeps only the groups with a match, empty cells included.
-    const q = RQ.browseList('grade', ctx, { fits: false, q: 'proficiency scale' });
+    const q = RQ.browseList('grade', ctx, { fits: false, q: 'marks close' });
     expect(q.rows.length).toBeGreaterThan(0);
-    expect(q.groups.every(g => g.rows.length && g.rows.every(r => /proficiency scale/i.test(r.text)))).toBe(true);
+    expect(q.groups.every(g => g.rows.length && g.rows.every(r => /marks close/i.test(r.text)))).toBe(true);
     expect(RQ.browseList('habits', ctx, { fits: false, q: 'zzzz' }).groups).toEqual([]);
   });
 
@@ -752,12 +752,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const homeS = COMMENT_BANK.sentences.find(s => s.id === home.id);
     if (homeS && homeS.when) expect(src(home)).toMatch(/ · (Emerging|Developing|Proficient|Extending)$/);
     else expect(src(home)).toBe('A general sentence. It states no fact about Cece.');
-    // Cece has no competency past the "strongest" gate; her results are
-    // even, so the strengths row names the competencies behind it. One by
-    // hand names the competency behind it.
-    const even = rows.find(r => r.step === 'overall');
-    expect(even).toBeTruthy();
-    expect(src(even)).toMatch(/^All six competencies at (Emerging|Developing|Proficient|Extending) · Overall /);
+    // A strengths row by hand names the competency behind it.
     const c = f.comps[0];
     expect(src({ step: 'overall', edited: false, prov: { factKeys: ['comp:' + c.id] } })).toBe(
       c.name + ' · ' + f.levelText(c.level),
@@ -795,7 +790,7 @@ describe('the card drawn for a Demo Mode student', () => {
   });
 
   it('labels only the best-piece sentence Best Piece; a Voice quote is Voice, another example Example', () => {
-    expect(RQ.rowLabel({ step: 'example', id: 'n36' }, null)).toBe('Best Piece');
+    expect(RQ.rowLabel({ step: 'example', id: 'bp01' }, null)).toBe('Best Piece');
     expect(RQ.rowLabel({ step: 'example', id: 'n31', s: { group: 'Examples From Work' } }, null)).toBe('Example');
     expect(RQ.rowLabel({ step: 'example', id: 'n50', s: { group: "In the Student's Words" } }, null)).toBe('Voice');
     expect(RQ.rowLabel({ step: 'grade', id: 'gr01' }, null)).toBe('Grade');

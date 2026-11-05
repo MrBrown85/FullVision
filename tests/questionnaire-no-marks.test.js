@@ -102,7 +102,7 @@ describe('Generate with no marks or one mark (Demo Mode, Science 8, Report 2)', 
     expect(RQ.approveBlockers(st)).toEqual(blockers);
   });
 
-  it('with one marked piece, drafts only what is true: the grade and the best piece, no lone family line', () => {
+  it('with one marked piece, drafts the grade, the best piece, a next step and its family line (Colin, Nov 4)', () => {
     const st = byName('Raj');
     const f = CommentBank.facts(cid, st, 'term-2');
     expect(f.grade.marked.mine).toBe(1);
@@ -112,7 +112,10 @@ describe('Generate with no marks or one mark (Demo Mode, Science 8, Report 2)', 
       const steps = draftFor(st, seed).sentences.map(x => x.step);
       expect(steps).toContain('grade');
       expect(steps).toContain('example');
-      expect(steps).not.toContain('home');
+      // Every comment has a next step and a family line: a generic one
+      // that claims nothing when no competency names one.
+      expect(steps).toContain('nextStep');
+      expect(steps).toContain('home');
     }
     RQ.tqGenerate();
     expect(box.value).toContain('Raj');

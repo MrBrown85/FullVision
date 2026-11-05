@@ -44,10 +44,9 @@ function one(id, ctx) {
   const text = CommentBank.fill(s, ctx);
   return { text, ids: [id], sentences: [{ id, part: s.part, text }], provenance: [CommentBank.provenance(s, ctx)] };
 }
-const highest = () =>
-  COMMENT_BANK.sentences.find(
-    s => /highest mark this term is \{assignment\}/.test(s.text) && s.claims.includes('bestPiece'),
-  );
+/* The best-piece frame that owns the title (the sample voice, Nov 4):
+   "{His} best piece is {piece}." */
+const highest = () => byId('bp03');
 
 describe('the best piece in a Letter class', () => {
   it('both pieces are proficiency 4, at 100% and 90%', () => {
@@ -73,11 +72,11 @@ describe('the best piece in a Letter class', () => {
     expect(CommentBank.verify(right, f, {}).replaced).toEqual([]);
     const treaty = f.work.find(w => w.title === 'Lesson 4: Treaty Debate');
     // The same sentence with only the piece changed: its title and its source.
-    const wrongCtx = { ...ctx, assignment: treaty.title };
+    const wrongCtx = { ...ctx, piece: 'Treaty Debate' };
     const wrong = one(s.id, wrongCtx);
-    wrong.provenance[0].sources = { ...wrong.provenance[0].sources, assignment: ['work:' + treaty.id] };
+    wrong.provenance[0].sources = { ...wrong.provenance[0].sources, piece: ['work:' + treaty.id] };
     expect(wrong.text).toContain('Treaty Debate');
-    expect(right.provenance[0].sources.assignment).toEqual(['work:' + f.work.find(w => w.title === ctx.assignment).id]);
+    expect(right.provenance[0].sources.piece).toEqual(['work:' + f.work.find(w => w.title === ctx.assignment).id]);
     const v = CommentBank.verify(wrong, f, {});
     expect(v.replaced[0]).toMatchObject({ sentenceId: s.id });
     expect(v.replaced[0].failed).toContain('bestPiece');
@@ -116,7 +115,7 @@ describe('the best piece’s mark on the Term Questionnaire (Step 4 group 2 #59)
       s,
       prov: Object.assign({}, CommentBank.provenance(s, ctx), {
         factKeys: ['work:' + treaty.id],
-        sources: { assignment: ['work:' + treaty.id] },
+        sources: { piece: ['work:' + treaty.id] },
       }),
     };
     expect(RQ.rowSource(row, cid, student, f, ctx)).toContain('Lesson 4: Treaty Debate · 90%');

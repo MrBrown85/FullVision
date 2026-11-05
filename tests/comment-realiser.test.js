@@ -342,7 +342,7 @@ describe('the draft passes through the realiser', () => {
     const r = CommentBank.realise(d.sentences, [d.sentences[1].id]);
     expect(r.sentences[0].id).toBe(d.sentences[1].id);
     expect(r.sentences[0].text).toMatch(new RegExp('\\b' + f.name + '\\b'));
-    expect(r.sentences[1].text).toMatch(/^She is /);
+    expect(r.sentences[1].text).toMatch(/^(She is |Her |In Science 8, she )/);
     expect(r.sentences.length).toBe(last + 1);
   });
 
@@ -354,12 +354,13 @@ describe('the draft passes through the realiser', () => {
       _grade: 'ie',
       _ieProblem: 'missing',
       name: 'Jack',
+      course: 'History 12',
       missingWork: 'One assignment is not handed in: “Map Quiz.”',
       ieDeadline: 'December 18',
     };
     const parts = CommentBank.requiredParts(ctx);
     expect(parts.map(p => p.text)).toEqual([
-      'Jack’s mark this term is IE, which means there is not yet enough evidence for a letter grade.',
+      'Jack’s grade in History 12 is IE so far: his marked work is not yet enough for a letter grade.',
       'One assignment is not handed in: “Map Quiz.”',
       'To earn a grade, he needs to submit the missing work.',
       'The deadline to replace this IE with a grade is December 18.',

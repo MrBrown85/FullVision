@@ -152,7 +152,7 @@ describe('bankStrength on a synthetic History 12 class', () => {
     r = CommentBank.bankStrength(cid, { termId });
   });
 
-  it('the habits part is not thin: the six {habitsStrong} frames fit every student rated all Consistently, six or more', () => {
+  it('the habits part is not thin: the three {habitsStrong} frames fit every student rated all Consistently, six or more', () => {
     const excellent = getStudents(cid).filter(st => {
       const f = CommentBank.facts(cid, st, termId);
       const rating = getStudentTermRating(cid, st.id, termId) || {};
@@ -163,7 +163,7 @@ describe('bankStrength on a synthetic History 12 class', () => {
     // A habits frame holds the student's own habits, so only students whose
     // habits read the same share it (bankStrength keys it by its text).
     excellent.forEach(st => {
-      expect(r.byStudent[st.id].habits).toMatchObject({ sentences: 6, thin: false });
+      expect(r.byStudent[st.id].habits).toMatchObject({ sentences: 3, thin: false });
       expect(r.byStudent[st.id].habits.students).toBeLessThanOrEqual(excellent.length);
     });
     expect(r.parts.find(p => p.step === 'habits').thin).toBe(false);
@@ -203,6 +203,13 @@ describe('nearIdentical sets aside the sentences every student gets', () => {
       n => n + '’s mark this term is IE, which means there is not yet enough evidence for a letter grade.',
       n => 'This term, ' + n + ' is assessed in relation to their goals for English language proficiency.',
       n => 'This term, ' + n + ' is assessed in relation to the goals in their IEP.',
+      // The sample voice's frames (Nov 4); the ones above are retired and
+      // still set aside in a saved comment.
+      n => n + ' has a B in History 12 so far, which is very good work.',
+      n => n + ' is working at a Proficient level in History 12.',
+      n => 'In History 12, ' + n + ' is working at an Extending level, with marks close across all of their work.',
+      n => n + '’s grade in History 12 is IE so far: their marked work is not yet enough for a letter grade.',
+      n => n + ' is assessed in relation to the goals in their IEP.',
     ];
     grades.forEach(g => {
       expect(pair(g), g('Noor')).toEqual([]);
