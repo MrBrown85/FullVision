@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 /* The Term Questionnaire's arrow keys (Nov 3 sweep, step 4 group 2 #53):
-   in a menu they move between its items, and on a Work Habits rating
-   between Rarely and Not Seen, one Tab stop per habit; neither opens
+   in a menu they move between its items, and on a Work Habits slider
+   between Rarely and Consistently, one Tab stop per habit; neither opens
    another student. Demo Mode, Science 8, Report 2. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -21,24 +21,35 @@ async function open(page, student = 'st1') {
 }
 const shown = page => page.locator('.qn').getAttribute('data-sid');
 
-test('arrow keys move between ratings and pick one, without changing the student', async ({ page }) => {
+test('a slider’s keys step, set and clear a rating, without changing the student', async ({ page }) => {
   await open(page);
   const sid = await shown(page);
-  const row = page.locator('.qn-habit-row[aria-label="Completes Work"]');
-  // One Tab stop per habit.
-  await expect(row.locator('.qn-radio[tabindex="0"]')).toHaveCount(1);
-  await row.locator('.qn-radio[data-value="1"]').click();
-  await expect(row.locator('.qn-radio[data-value="1"]')).toHaveAttribute('aria-checked', 'true');
+  const slider = page.locator('.qn-hs[data-habit="ready"]');
+  await expect(slider).toHaveAttribute('role', 'slider');
+  await expect(slider).toHaveAttribute('tabindex', '0');
+  await expect(slider).toHaveAttribute('aria-valuetext', 'Not rated');
+  await slider.focus();
   await page.keyboard.press('ArrowRight');
-  await expect(row.locator('.qn-radio[data-value="2"]')).toHaveAttribute('aria-checked', 'true');
-  await expect(row.locator('.qn-radio[data-value="2"]')).toBeFocused();
-  await expect(row.locator('.qn-radio[data-value="2"]')).toHaveAttribute('tabindex', '0');
-  await expect(row.locator('.qn-radio[data-value="1"]')).toHaveAttribute('tabindex', '-1');
+  await expect(slider).toHaveAttribute('aria-valuenow', '1');
+  await page.keyboard.press('ArrowRight');
+  await expect(slider).toHaveAttribute('aria-valuenow', '2');
+  await expect(slider).toBeFocused();
   await page.keyboard.press('ArrowDown');
-  await expect(row.locator('.qn-radio[data-value="3"]')).toHaveAttribute('aria-checked', 'true');
+  await expect(slider).toHaveAttribute('aria-valuenow', '1');
   await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await expect(slider).toHaveAttribute('aria-valuenow', '3');
   await page.keyboard.press('ArrowLeft');
-  await expect(row.locator('.qn-radio[data-value="1"]')).toHaveAttribute('aria-checked', 'true');
+  await expect(slider).toHaveAttribute('aria-valuenow', '2');
+  await page.keyboard.press('4');
+  await expect(slider).toHaveAttribute('aria-valuenow', '4');
+  await expect(slider).toHaveAttribute('aria-valuetext', 'Consistently');
+  await page.keyboard.press('Backspace');
+  await expect(slider).not.toHaveAttribute('aria-valuenow', /./);
+  await page.keyboard.press('3');
+  await page.keyboard.press('Delete');
+  await expect(slider).toHaveAttribute('aria-valuetext', 'Not rated');
+  expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({});
   expect(await shown(page)).toBe(sid);
 });
 

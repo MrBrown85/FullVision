@@ -479,27 +479,38 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(row.slice(0, 600)).not.toContain(fixed);
   });
 
-  it('shows Completes Work from the record on the grid until the teacher rates it (Step 4 group 3 #65)', () => {
+  it('shows Completes Work from the record on its slider until the teacher rates it (Step 4 group 3 #65)', () => {
     seed(['a9', 'a8']);
     const st = getStudents(CID).find(s => s.id === GAB.id);
     const auto = CommentBank.effectiveHabits({}, CommentBank.facts(CID, st, TERM).record).completes;
     expect(auto).toBeGreaterThan(0);
     const label = CommentBank.SCALE[auto - 1];
     let html = open();
-    expect(html).toContain('Completes Work<span class="qn-habit-src">From the Record</span>');
-    expect(html).toContain(
-      'aria-checked="true" tabindex="0" class="qn-radio on from-record" data-action="tqRate" data-habit="completes" data-value="' +
-        auto +
-        '"',
+    // The slider shows the record's rating, marked from the record, with
+    // the record's line under the habit; it does not count as rated.
+    expect(html).toMatch(
+      new RegExp(
+        'class="qn-hs set from-record" role="slider" tabindex="0" data-habit="completes" data-value="' +
+          auto +
+          '"[^>]*aria-valuenow="' +
+          auto +
+          '" aria-valuetext="' +
+          label +
+          ', from the assignment record"',
+      ),
     );
-    expect(html).toContain('aria-label="Completes Work: ' + label + ', from the record"');
-    // Rated by the teacher: the grid shows their rating, not the record.
+    expect(html).toMatch(
+      /<span class="qn-habit-note">From assignments: \d+ of \d+ handed in, \d+ late, \d+ missing<\/span>/,
+    );
+    expect(html).toContain('id="tq-rated">0 of 6 rated');
+    // Rated by the teacher: the slider shows their rating, not the record.
     upsertTermRating(CID, GAB.id, TERM, { habits: { completes: 4 } });
     html = open();
-    expect(html).not.toContain('From the Record');
-    expect(html).toContain(
-      'aria-checked="true" tabindex="0" class="qn-radio on" data-action="tqRate" data-habit="completes" data-value="4"',
+    expect(html).not.toContain('from-record');
+    expect(html).toMatch(
+      /class="qn-hs set" role="slider" tabindex="0" data-habit="completes" data-value="4"[^>]*aria-valuenow="4" aria-valuetext="Consistently"/,
     );
+    expect(html).toContain('id="tq-rated">1 of 6 rated');
   });
 
   it('saves the closing sentence for the class; approved comments keep the old one', () => {
