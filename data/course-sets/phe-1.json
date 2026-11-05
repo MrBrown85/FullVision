@@ -1,0 +1,3492 @@
+{
+ "phe-activity-health": {
+  "old": {
+   "phrase": "explain how being active affects health and fitness",
+   "next_steps": {
+    "emerging": "describe one way activity at school affects fitness",
+    "developing": "describe how activity at home or in the community affects health",
+    "proficient": "explain how activity across settings influences health and fitness"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-activity-health--phe-8-9",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.7",
+     "bc.phe9.cc.7"
+    ],
+    "ministry": "Describe how students’ participation in physical activities at school, at home, and in the community can influence their health and fitness",
+    "bands": {
+     "all": {
+      "phrase": "describe how activity at school, at home and in the community affects {his} health",
+      "next_steps": {
+       "emerging": "name one way being active at school helps {his} body",
+       "developing": "describe how activity at home and in the community adds to {his} fitness",
+       "proficient": "explain how activity in all three places together affects {his} health and fitness",
+       "extending": "explain how a change in {his} activity in one place would change {his} fitness"
+      },
+      "strength": [
+       "{He} can name the ways {he} [is|are] active at school, at home and in the community.",
+       "{He} [explains|explain] how a regular walk or a team practice adds to {his} fitness."
+      ],
+      "next": {
+       "developing": "{His} next step is to describe how activity at home can help {his} health as well as {his} fitness.",
+       "proficient": "Next, {he} can practise linking the time {he} [spends|spend] being active to how {he} [feels|feel] each day.",
+       "extending": "To go further, {he} can explain how a change to {his} weekly routine would affect {his} fitness."
+      },
+      "home": "On a walk together, ask {him} which places nearby make it easy to be active."
+     }
+    }
+   },
+   {
+    "id": "phe-activity-health--phe-10",
+    "courses": [
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe10.cc.22"
+    ],
+    "ministry": "Describe the relationships between physical activities, mental well-being, and overall health",
+    "bands": {
+     "all": {
+      "phrase": "describe how physical activity connects to {his} mental well-being and overall health",
+      "next_steps": {
+       "emerging": "name one way physical activity affects mood or stress",
+       "developing": "describe how activity affects both mental well-being and physical health",
+       "proficient": "explain how mental well-being and physical health affect each other through activity",
+       "extending": "use {his} own experience to explain the links between activity, mood and overall health"
+      },
+      "strength": [
+       "{He} [describes|describe] how being active can lower stress and improve {his} mood.",
+       "{He} [connects|connect] regular activity to sleep, energy and overall health."
+      ],
+      "next": {
+       "developing": "A good next step is to explain how mental well-being and physical health are linked.",
+       "proficient": "{He} [is|are] ready to describe how a change in activity could affect {his} mood over several weeks.",
+       "extending": "From here, {he} can practise explaining why the link between activity and well-being differs from person to person."
+      },
+      "home": "After a busy day, ask {him} whether moving around helps {him} feel calmer."
+     }
+    }
+   },
+   {
+    "id": "phe-activity-health--active-living-11",
+    "courses": [
+     "Active Living 11"
+    ],
+    "competency_ids": [
+     "bc.al11.cc.4"
+    ],
+    "ministry": "Describe the impact of various types of physical activities on health and mental well-being",
+    "bands": {
+     "all": {
+      "phrase": "describe how different types of physical activity affect health and mental well-being",
+      "next_steps": {
+       "emerging": "name the effect one type of activity has on {his} health",
+       "developing": "describe how two types of activity affect health in different ways",
+       "proficient": "practise explaining how one type of activity affects both physical health and mental well-being",
+       "extending": "compare several types of activity and explain which suit different health and well-being needs"
+      },
+      "strength": [
+       "{He} [explains|explain] how team, solo and outdoor activities each affect health in their own way.",
+       "{He} [describes|describe] the effect a type of activity has on {his} stress level."
+      ],
+      "next": {
+       "developing": "One skill to practise is explaining why one type of activity helps {his} mood more than another.",
+       "proficient": "Next, {he} can try choosing a type of activity to meet a specific health or well-being need.",
+       "extending": "{He} can now explain how mixing types of activity supports health and mental well-being together."
+      },
+      "home": "Ask {him} which type of activity leaves {him} feeling most relaxed, and why."
+     }
+    }
+   }
+  ]
+ },
+ "phe-activity-leadership": {
+  "old": {
+   "phrase": "lead physical activities and solve problems as they arise",
+   "next_steps": {
+    "emerging": "identify the skills an activity leader needs",
+    "developing": "lead part of an activity with clear instructions",
+    "proficient": "use problem-solving strategies while leading an activity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-activity-leadership--active-living-12",
+    "courses": [
+     "Active Living 12"
+    ],
+    "competency_ids": [
+     "bc.al12.cc.9"
+    ],
+    "ministry": "Demonstrate competencies and problem-solving strategies required for physical activity and recreation leadership",
+    "bands": {
+     "all": {
+      "phrase": "lead physical and recreational activities and solve problems as they arise",
+      "next_steps": {
+       "emerging": "name the skills a recreation leader needs and use one of them",
+       "developing": "give clear instructions when leading part of an activity",
+       "proficient": "solve problems that arise while leading, such as uneven teams or a crowded space",
+       "extending": "plan for likely problems before leading, and adjust the activity when they happen"
+      },
+      "strength": [
+       "{He} [gives|give] clear instructions and [makes|make] sure the group understands them.",
+       "When a problem arises during an activity, {he} [finds|find] a fair way to solve it."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise keeping the whole group moving while {he} [explains|explain] a task.",
+       "proficient": "A good habit to build is asking the group what worked after {he} [leads|lead] an activity.",
+       "extending": "To go further, {he} can practise changing an activity while it runs when it is not working for everyone."
+      },
+      "home": "Ask {him} how {he} would keep a group of younger children busy and safe at a park."
+     }
+    }
+   }
+  ]
+ },
+ "phe-activity-preferences": {
+  "old": {
+   "phrase": "describe preferred physical activities and why",
+   "next_steps": {
+    "emerging": "name physical activities that feel enjoyable",
+    "developing": "describe what makes a preferred activity enjoyable",
+    "proficient": "describe preferred activities by type, such as team or solo"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-activity-preferences--phe-8-9",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.5",
+     "bc.phe9.cc.5"
+    ],
+    "ministry": "Identify and describe preferred types of physical activity",
+    "bands": {
+     "all": {
+      "phrase": "name the types of physical activity {he} [likes|like] best and describe why",
+      "next_steps": {
+       "emerging": "name two physical activities {he} [enjoys|enjoy]",
+       "developing": "describe what {he} [likes|like] about a favourite activity",
+       "proficient": "sort {his} favourite activities by type, such as team, solo or outdoor",
+       "extending": "explain what {his} favourite types of activity have in common"
+      },
+      "strength": [
+       "{He} can name the physical activities {he} [enjoys|enjoy] most.",
+       "{He} [describes|describe] what makes an activity fun for {him}, such as playing with others."
+      ],
+      "next": {
+       "developing": "Next, {he} can try describing the feeling an activity gives {him}, not just naming it.",
+       "proficient": "{His} next step is to group {his} favourite activities into types and explain each type.",
+       "extending": "{He} [is|are] ready to explain how {his} preferences could help {him} stay active outside school."
+      },
+      "home": "Ask {him} which activity {he} would choose for a free afternoon, and why."
+     }
+    }
+   },
+   {
+    "id": "phe-activity-preferences--phe-10",
+    "courses": [
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe10.cc.5"
+    ],
+    "ministry": "Identify and participate in preferred types of physical activity",
+    "bands": {
+     "all": {
+      "phrase": "identify the types of physical activity {he} [prefers|prefer] and take part in them",
+      "next_steps": {
+       "emerging": "name one type of activity {he} [prefers|prefer] and take part in it",
+       "developing": "take part fully in a preferred type of activity each week",
+       "proficient": "explain why a preferred activity suits {him} and take part in it regularly",
+       "extending": "try a new type of activity and judge whether it belongs among {his} preferences"
+      },
+      "strength": [
+       "{He} [knows|know] which types of activity suit {him} and [joins|join] in with energy.",
+       "{He} [takes|take] part regularly in the activities {he} [prefers|prefer]."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to describe what {he} [gains|gain] from {his} preferred activities.",
+       "proficient": "It will help {him} to try a type of activity {he} [has|have] not chosen before.",
+       "extending": "From here, {he} can explain how {his} preferences might change as {his} life changes."
+      },
+      "home": "Ask {him} which activity {he} can picture {himself} doing ten years from now."
+     }
+    }
+   }
+  ]
+ },
+ "phe-activity-strategies": {
+  "old": {
+   "phrase": "refine strategies to take part well in activities",
+   "next_steps": {
+    "emerging": "identify which strategies work in a physical activity",
+    "developing": "refine a strategy through practice in an activity",
+    "proficient": "adjust a strategy to suit a different physical activity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-activity-strategies--active-living-12",
+    "courses": [
+     "Active Living 12"
+    ],
+    "competency_ids": [
+     "bc.al12.cc.7"
+    ],
+    "ministry": "Refine strategies to effectively participate in a variety of physical activities",
+    "bands": {
+     "all": {
+      "phrase": "refine {his} strategies to take part well in a variety of physical activities",
+      "next_steps": {
+       "emerging": "identify which strategies help {him} in one physical activity",
+       "developing": "change one part of a strategy after trying it in an activity",
+       "proficient": "adjust a strategy to suit a different physical activity",
+       "extending": "test and refine strategies across several activities and explain what changed"
+      },
+      "strength": [
+       "{He} [notices|notice] which strategies help {him} take part well in an activity.",
+       "{He} [adjusts|adjust] {his} approach when a strategy does not suit the activity."
+      ],
+      "next": {
+       "developing": "One skill to practise is saying why a strategy worked or did not work after each activity.",
+       "proficient": "{He} can now try using a strategy from one activity in a new one.",
+       "extending": "To go further, {he} can keep a short record of how {his} strategies change over several weeks."
+      },
+      "home": "Ask {him} what {he} [does|do] differently in a game or sport now than at the start of the year."
+     }
+    }
+   }
+  ]
+ },
+ "phe-body-systems": {
+  "old": {
+   "phrase": "explain how activities train muscles and the heart",
+   "next_steps": {
+    "emerging": "name activities that train the muscles or the heart",
+    "developing": "describe how one activity affects the cardiovascular system",
+    "proficient": "explain how different activities affect both body systems"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-body-systems--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.12",
+     "bc.fc12.cc.12"
+    ],
+    "ministry": "Identify and describe (11) or analyze (12) how different types of fitness activities influence the muscular system and the cardiovascular system",
+    "bands": {
+     "all": {
+      "phrase": "explain how different fitness activities affect the muscular and cardiovascular systems",
+      "next_steps": {
+       "emerging": "name fitness activities that mainly train the muscles or the heart",
+       "developing": "describe how one fitness activity affects the cardiovascular system",
+       "proficient": "analyze how a fitness activity affects both the muscles and the heart",
+       "extending": "compare how several fitness activities load each system and explain the differences"
+      },
+      "strength": [
+       "{He} can sort fitness activities into those that mainly train muscles and those that train the heart.",
+       "{He} [explains|explain] how a long, steady run changes heart rate over time."
+      ],
+      "next": {
+       "developing": "One habit to build is noting whether each exercise mainly trains the muscles or the heart, and why.",
+       "proficient": "Next, {he} can try analyzing why some activities train both systems at once.",
+       "extending": "{He} [is|are] ready to explain how changing the length or pace of an activity shifts which system it trains."
+      },
+      "home": "Ask {him} whether climbing stairs works {his} legs, {his} heart or both."
+     }
+    }
+   }
+  ]
+ },
+ "phe-bullying-responses": {
+  "old": {
+   "phrase": "explain ways to respond to bullying and discrimination",
+   "next_steps": {
+    "emerging": "name ways to respond to bullying",
+    "developing": "compare ways to respond to discrimination",
+    "proficient": "explain how a response can challenge stereotyping"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-bullying-responses--phe",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.14",
+     "bc.phe9.cc.13",
+     "bc.phe10.cc.15"
+    ],
+    "ministry": "Propose (8) or analyze (9, 10) strategies for responding to discrimination, stereotyping, and bullying",
+    "bands": {
+     "8-9": {
+      "phrase": "suggest and compare ways to respond to bullying, stereotyping and discrimination",
+      "next_steps": {
+       "emerging": "name safe ways to respond to bullying",
+       "developing": "suggest a response to discrimination and say why it could help",
+       "proficient": "compare two responses to bullying and explain which is safer",
+       "extending": "explain how a response can challenge a stereotype instead of repeating it"
+      },
+      "strength": [
+       "{He} can suggest safe ways to respond when someone is being bullied.",
+       "{He} [explains|explain] why telling a trusted adult can help stop bullying."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise suggesting a response to stereotyping as well as to bullying.",
+       "proficient": "A good next step is to compare two responses and say which keeps everyone safer.",
+       "extending": "{He} can now practise explaining how a response could change the way people think about a group."
+      },
+      "home": null
+     },
+     "10-12": {
+      "phrase": "analyze strategies for responding to discrimination, stereotyping and bullying",
+      "next_steps": {
+       "emerging": "describe one strategy for responding to discrimination",
+       "developing": "analyze who a response protects and what it might risk",
+       "proficient": "compare strategies and explain which fit different situations",
+       "extending": "analyze how a response can challenge the stereotypes behind bullying"
+      },
+      "strength": [
+       "{He} [analyzes|analyze] the strengths and risks of different ways to respond to discrimination.",
+       "{He} [considers|consider] the person targeted, the bystanders and the person causing harm."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise judging whether a response is safe for the person who is targeted.",
+       "proficient": "{He} [is|are] ready to analyze how the setting, such as online or in person, changes the best response.",
+       "extending": "To go further, {he} can explain how a response can address the stereotype behind a hurtful act."
+      },
+      "home": null
+     }
+    },
+    "sensitive": true,
+    "note": "Colin, Nov 5: sensitive health topic; no home line, never drafted on its own, Browse only."
+   }
+  ]
+ },
+ "phe-collaboration": {
+  "old": {
+   "phrase": "work with others during outdoor activities",
+   "next_steps": {
+    "emerging": "share one task with others in an outdoor activity",
+    "developing": "share tasks with others across outdoor activities",
+    "proficient": "collaborate with a larger group during an outdoor activity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-collaboration--outdoor-education",
+    "courses": [
+     "Outdoor Education 11",
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.10",
+     "bc.oded12.cc.9"
+    ],
+    "ministry": "Collaborate with others in a variety of outdoor activities",
+    "bands": {
+     "all": {
+      "phrase": "collaborate with others in a variety of outdoor activities",
+      "next_steps": {
+       "emerging": "do {his} part of a shared task in an outdoor activity",
+       "developing": "share tasks fairly with others across different outdoor activities",
+       "proficient": "help a group plan and divide the work of an outdoor activity",
+       "extending": "help a group solve a problem together when conditions change outdoors"
+      },
+      "strength": [
+       "{He} [does|do] {his} share of the work when the group is outdoors.",
+       "{He} [listens|listen] to others and [agrees|agree] on a plan before the group acts."
+      ],
+      "next": {
+       "developing": "{His} next step is to offer help when another group member needs it.",
+       "proficient": "One skill to practise is dividing the jobs in a group so each person has a fair role.",
+       "extending": "A useful next step is to help the group agree on a new plan when things change outdoors."
+      },
+      "home": "On your next walk or trip outside, let {him} share the planning with you."
+     }
+    }
+   }
+  ]
+ },
+ "phe-communication": {
+  "old": {
+   "phrase": "communicate and work with others on teams and trips",
+   "next_steps": {
+    "emerging": "share ideas and information with a team",
+    "developing": "work with team members toward a shared goal",
+    "proficient": "collaborate with others in the community on a shared project"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-communication--outdoor-education-12",
+    "courses": [
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded12.cc.14"
+    ],
+    "ministry": "Communicate and collaborate effectively with others on expeditions, on teams, and in the community",
+    "bands": {
+     "all": {
+      "phrase": "communicate and work with others on expeditions, on teams and in the community",
+      "next_steps": {
+       "emerging": "share ideas and information clearly with a team",
+       "developing": "work with a team toward a shared goal on an expedition",
+       "proficient": "keep a team informed of changes during an expedition",
+       "extending": "use the same communication skills with people in the community as on expeditions"
+      },
+      "strength": [
+       "{He} [shares|share] information with the team so everyone knows the plan on an expedition.",
+       "{He} [works|work] with team members and people in the community toward a shared goal."
+      ],
+      "next": {
+       "developing": "{He} can now try making sure each team member has heard and understood the plan.",
+       "proficient": "{His} next goal is to share updates with the team as soon as plans change during an expedition.",
+       "extending": "To grow further, {he} can practise working with people outside the team, such as community members."
+      },
+      "home": "Ask {him} how {his} team made decisions together on a recent trip or project."
+     }
+    }
+   }
+  ]
+ },
+ "phe-communication-skills": {
+  "old": {
+   "phrase": "communicate in ways that suit the situation",
+   "next_steps": {
+    "emerging": "use clear words when speaking with a group",
+    "developing": "choose how to communicate based on the listener",
+    "proficient": "adjust communication in new or challenging situations"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-communication-skills--outdoor-education-11",
+    "courses": [
+     "Outdoor Education 11"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.11"
+    ],
+    "ministry": "Use applicable communication skills when interacting with others",
+    "bands": {
+     "all": {
+      "phrase": "use communication skills that suit the situation when working with others outdoors",
+      "next_steps": {
+       "emerging": "speak clearly when giving information to a group",
+       "developing": "choose how to communicate based on who is listening",
+       "proficient": "adjust how {he} [communicates|communicate] when a situation is new or stressful",
+       "extending": "help others communicate clearly when a group is tired or stressed"
+      },
+      "strength": [
+       "{He} [chooses|choose] words and tone that suit the person {he} [is|are] speaking with.",
+       "{He} [gives|give] short, clear directions when the group needs to act together."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise listening fully before {he} [replies|reply] in a group.",
+       "proficient": "One skill to practise is staying calm and clear when a situation outdoors becomes stressful.",
+       "extending": "{He} [is|are] ready to help others share their ideas when a group discussion gets tense."
+      },
+      "home": "Ask {him} how {he} would explain the same plan to a young child and to an adult."
+     }
+    }
+   }
+  ]
+ },
+ "phe-community-health": {
+  "old": {
+   "phrase": "plan ways to promote health in the school community",
+   "next_steps": {
+    "emerging": "suggest one way to promote health at school",
+    "developing": "create a plan to promote well-being at school",
+    "proficient": "create strategies that promote health in the wider community"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-community-health--phe-8-9",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.16",
+     "bc.phe9.cc.15"
+    ],
+    "ministry": "Create strategies for promoting the health and well-being of the school and community",
+    "bands": {
+     "all": {
+      "phrase": "create strategies that help people at school and in the community stay healthy",
+      "next_steps": {
+       "emerging": "suggest one way to help people at school stay healthy",
+       "developing": "plan a simple strategy that promotes well-being at school",
+       "proficient": "create strategies that promote health in the school and the wider community",
+       "extending": "try explaining how {he} would tell if a strategy is helping people's health"
+      },
+      "strength": [
+       "{He} [suggests|suggest] practical ways to help students be more active at school.",
+       "{He} [thinks|think] about who a health idea would reach in the wider community."
+      ],
+      "next": {
+       "developing": "{His} next step is to make each health idea into a plan with clear steps.",
+       "proficient": "Next, {he} can try planning a strategy that would work for both the school and the community.",
+       "extending": "To go further, {he} can practise deciding how to tell whether a health strategy is working."
+      },
+      "home": "Ask {him} what one change would make your neighbourhood a healthier place to live."
+     }
+    }
+   }
+  ]
+ },
+ "phe-condition-monitoring": {
+  "old": {
+   "phrase": "watch weather and conditions during outdoor activities",
+   "next_steps": {
+    "emerging": "check the weather before an outdoor activity",
+    "developing": "check conditions regularly during an outdoor activity",
+    "proficient": "track changing conditions throughout an outdoor activity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-condition-monitoring--outdoor-education",
+    "courses": [
+     "Outdoor Education 11",
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.4",
+     "bc.oded12.cc.4"
+    ],
+    "ministry": "Monitor environmental conditions during outdoor activities",
+    "bands": {
+     "all": {
+      "phrase": "monitor the weather and other environmental conditions during outdoor activities",
+      "next_steps": {
+       "emerging": "check the weather and the ground before an outdoor activity starts",
+       "developing": "check conditions at regular times during an outdoor activity",
+       "proficient": "track changing conditions through a day and explain what each change means",
+       "extending": "predict how conditions may change and adjust the group's plan early"
+      },
+      "strength": [
+       "{He} [notices|notice] changes in wind, temperature and light during an outdoor activity.",
+       "{He} [tells|tell] the group when conditions change in a way that matters for safety."
+      ],
+      "next": {
+       "developing": "{He} can get into the habit of checking the sky and the temperature at each stop.",
+       "proficient": "{His} next step is to explain what a change in conditions means for the group's plan.",
+       "extending": "A good next step is to practise predicting changes in conditions from early signs, such as building clouds."
+      },
+      "home": "When you are outside together, ask {him} what the sky suggests about the weather later in the day."
+     }
+    }
+   }
+  ]
+ },
+ "phe-cultural-sensitivity": {
+  "old": {
+   "phrase": "respect the cultural importance of outdoor places",
+   "next_steps": {
+    "emerging": "describe why an outdoor location may be culturally important",
+    "developing": "describe local concerns about how an outdoor place is used",
+    "proficient": "use an outdoor location in ways that respect its importance"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-cultural-sensitivity--outdoor-education",
+    "courses": [
+     "Outdoor Education 11",
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.9",
+     "bc.oded12.cc.8"
+    ],
+    "ministry": "Demonstrate (and explain, 12) awareness of cultural and place-based sensitivities regarding the use of outdoor locations",
+    "bands": {
+     "all": {
+      "phrase": "use outdoor places in ways that respect their cultural and local importance",
+      "next_steps": {
+       "emerging": "describe why an outdoor place may matter to a culture or community",
+       "developing": "describe local concerns about how an outdoor place is used",
+       "proficient": "explain {his} choices on a trip in terms of a place's cultural importance",
+       "extending": "explain to others how the group can respect a place's cultural and local importance"
+      },
+      "strength": [
+       "{He} [describes|describe] why an outdoor place can hold cultural meaning, including for Indigenous peoples.",
+       "{He} [uses|use] outdoor places in ways that respect local concerns, such as staying on marked trails."
+      ],
+      "next": {
+       "developing": "Next, {he} can make a habit of asking whose land a place is and how it has been used.",
+       "proficient": "{He} [is|are] ready to explain how respect for a place shapes the choices a group makes there.",
+       "extending": "To go further, {he} can help others understand why a place matters to the people of the area."
+      },
+      "home": "Ask {him} what {he} [knows|know] about the history of a park or trail near your home."
+     }
+    }
+   }
+  ]
+ },
+ "phe-eating-performance": {
+  "old": {
+   "phrase": "explain how healthy eating affects health and performance",
+   "next_steps": {
+    "emerging": "identify links between eating and performance in activity",
+    "developing": "describe how healthy eating relates to overall health",
+    "proficient": "explain how eating, health and performance affect each other"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-eating-performance--fitness-conditioning-11",
+    "courses": [
+     "Fitness and Conditioning 11"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.3"
+    ],
+    "ministry": "Identify and describe the relationships between healthy eating, overall health, and performance in fitness activities",
+    "bands": {
+     "all": {
+      "phrase": "describe how healthy eating, overall health and fitness performance are connected",
+      "next_steps": {
+       "emerging": "identify one way eating affects performance in a fitness activity",
+       "developing": "describe how healthy eating relates to overall health",
+       "proficient": "explain how eating, health and performance affect one another",
+       "extending": "use what {he} [knows|know] about eating to explain changes in {his} own performance"
+      },
+      "strength": [
+       "{He} [explains|explain] how eating before a workout affects {his} energy during it.",
+       "{He} [connects|connect] eating habits over time to overall health, not just to one workout."
+      ],
+      "next": {
+       "developing": "It would help {him} to describe how overall health shapes performance in fitness activities.",
+       "proficient": "{His} next step is to practise explaining how eating, health and performance each affect the others.",
+       "extending": "From here, {he} can try linking {his} own eating patterns to changes in {his} workouts."
+      },
+      "home": "Ask {him} how the timing of a meal or snack changes the way {he} [feels|feel] during activity."
+     }
+    }
+   }
+  ]
+ },
+ "phe-eating-strategies": {
+  "old": {
+   "phrase": "plan strategies for healthy eating in different settings",
+   "next_steps": {
+    "emerging": "name one strategy that encourages healthy eating",
+    "developing": "suggest strategies for healthy eating at school or events",
+    "proficient": "adjust healthy eating strategies for different settings"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-eating-strategies--phe-8",
+    "courses": [
+     "Physical and Health Education 8"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.8"
+    ],
+    "ministry": "Develop strategies for promoting healthy eating choices in different settings",
+    "bands": {
+     "all": {
+      "phrase": "plan ways to make healthy eating choices easier in different settings",
+      "next_steps": {
+       "emerging": "name one strategy that encourages healthy eating",
+       "developing": "suggest healthy eating strategies for school, home or an event",
+       "proficient": "adjust a healthy eating strategy to suit a different setting",
+       "extending": "practise explaining why a strategy suits one setting and not another"
+      },
+      "strength": [
+       "{He} [suggests|suggest] simple ways to make healthy food choices easier at school.",
+       "{He} [thinks|think] about what makes healthy eating harder at events or when out with friends."
+      ],
+      "next": {
+       "developing": "Another useful step is to try a healthy eating strategy in one more setting, such as a sports event.",
+       "proficient": "It will help {him} to practise changing a strategy so it fits a busy day or a celebration.",
+       "extending": "{He} [is|are] ready to explain why some strategies work in one place and not in another."
+      },
+      "home": "When packing a lunch together, ask {him} which choice would give {him} energy for longest."
+     }
+    }
+   }
+  ]
+ },
+ "phe-emergency-response": {
+  "old": {
+   "phrase": "respond properly to emergencies outdoors",
+   "next_steps": {
+    "emerging": "identify when an outdoor situation is an emergency",
+    "developing": "describe the steps to take in an outdoor emergency",
+    "proficient": "practise emergency responses for several outdoor situations"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-emergency-response--outdoor-education",
+    "courses": [
+     "Outdoor Education 11",
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.12",
+     "bc.oded12.cc.10"
+    ],
+    "ministry": "Demonstrate appropriate responses to emergency situations during outdoor activities",
+    "bands": {
+     "all": {
+      "phrase": "respond in the right way to emergencies during outdoor activities",
+      "next_steps": {
+       "emerging": "identify when a situation during an outdoor activity is an emergency",
+       "developing": "describe the steps to follow in a common outdoor emergency",
+       "proficient": "rehearse the response to several different outdoor emergencies until each one comes easily",
+       "extending": "stay calm and guide others through an emergency response"
+      },
+      "strength": [
+       "{He} [recognizes|recognize] the signs that an outdoor situation has become an emergency.",
+       "{He} [follows|follow] the right steps in order during a practice emergency."
+      ],
+      "next": {
+       "developing": "One habit to build is saying each step of the emergency plan aloud before an outing begins.",
+       "proficient": "Next, {he} can practise responding to a different emergency each time the group trains.",
+       "extending": "To go further, {he} can practise taking charge of a group calmly in a practice emergency."
+      },
+      "home": "Ask {him} what your family should do first if someone is hurt on a walk or hike."
+     }
+    }
+   }
+  ]
+ },
+ "phe-event-planning": {
+  "old": {
+   "phrase": "plan and organize a safe recreational event",
+   "next_steps": {
+    "emerging": "help plan one part of a recreational event",
+    "developing": "organize what is needed to run an event",
+    "proficient": "plan and run a safe event from start to finish"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-event-planning--active-living",
+    "courses": [
+     "Active Living 11",
+     "Active Living 12"
+    ],
+    "competency_ids": [
+     "bc.al11.cc.7",
+     "bc.al12.cc.10"
+    ],
+    "ministry": "Develop and demonstrate skills needed to plan, organize, and safely participate in recreational events and other preferred physical activities",
+    "bands": {
+     "all": {
+      "phrase": "plan, organize and safely take part in recreational events and chosen activities",
+      "next_steps": {
+       "emerging": "help plan one part of a recreational event",
+       "developing": "organize the people, space and gear an event needs",
+       "proficient": "plan and run a safe event from start to finish",
+       "extending": "review an event afterward and change the plan for next time"
+      },
+      "strength": [
+       "{He} [plans|plan] the steps of an event, from timing to the space it needs.",
+       "{He} [thinks|think] ahead about safety when organizing a recreational activity."
+      ],
+      "next": {
+       "developing": "{His} next step is to make a checklist of what an event needs before it begins.",
+       "proficient": "A good habit to build is planning for safety at each stage of an event.",
+       "extending": "{He} can now practise reviewing an event afterward and naming what to change next time."
+      },
+      "home": "Ask {him} to plan a family game or walk, including how to keep it safe."
+     }
+    }
+   }
+  ]
+ },
+ "phe-exercise-technique": {
+  "old": {
+   "phrase": "use correct technique in fitness activities",
+   "next_steps": {
+    "emerging": "practise correct technique for one exercise",
+    "developing": "use correct technique in a variety of exercises",
+    "proficient": "adjust technique to suit different fitness activities"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-exercise-technique--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.10",
+     "bc.fc12.cc.10"
+    ],
+    "ministry": "Develop and demonstrate appropriate exercise techniques for a variety of fitness activities",
+    "bands": {
+     "all": {
+      "phrase": "use correct exercise technique across a variety of fitness activities",
+      "next_steps": {
+       "emerging": "practise the correct technique for one exercise",
+       "developing": "use correct technique in several different exercises",
+       "proficient": "adjust technique to suit different fitness activities and loads",
+       "extending": "hold correct technique as an exercise becomes harder or faster"
+      },
+      "strength": [
+       "{He} [uses|use] correct form, such as a straight back and controlled movement.",
+       "{He} [keeps|keep] {his} technique steady across a range of fitness activities."
+      ],
+      "next": {
+       "developing": "A useful next step is to practise checking {his} form with a partner as {he} [trains|train].",
+       "proficient": "{He} [is|are] ready to adjust {his} technique when an exercise changes, such as by adding weight.",
+       "extending": "To go further, {he} can coach a partner on correct technique and explain why it matters."
+      },
+      "home": "Ask {him} to show you the correct way to do a squat or a push-up."
+     }
+    }
+   }
+  ]
+ },
+ "phe-exertion-monitoring": {
+  "old": {
+   "phrase": "check effort levels and adjust them during activity",
+   "next_steps": {
+    "emerging": "use one method, such as heart rate, to check effort",
+    "developing": "adjust effort based on a heart rate or effort check",
+    "proficient": "check and adjust effort throughout a whole activity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-exertion-monitoring--phe-active-living",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10",
+     "Active Living 11",
+     "Active Living 12"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.3",
+     "bc.phe9.cc.3",
+     "bc.phe10.cc.3",
+     "bc.al11.cc.8",
+     "bc.al12.cc.8"
+    ],
+    "ministry": "Apply methods of monitoring and adjusting exertion levels in physical activity",
+    "bands": {
+     "8-9": {
+      "phrase": "check how hard {he} [is|are] working and change {his} effort to match",
+      "next_steps": {
+       "emerging": "use one way to check effort, such as counting {his} heart rate",
+       "developing": "change {his} effort after checking {his} heart rate or breathing",
+       "proficient": "check and adjust {his} effort at several points in an activity",
+       "extending": "choose the right effort level for each part of an activity and explain why"
+      },
+      "strength": [
+       "{He} can check {his} heart rate or breathing to tell how hard {he} [is|are] working.",
+       "{He} [changes|change] {his} pace after checking {his} effort."
+      ],
+      "next": {
+       "developing": "{His} next step is to check {his} effort at the start, middle and end of an activity.",
+       "proficient": "Next, {he} can practise noticing the signs that {he} [is|are] working too hard or not hard enough.",
+       "extending": "{He} can now try planning how hard to work during each part of a class activity."
+      },
+      "home": "During a game or walk together, ask {him} how {he} [knows|know] when it is time to rest."
+     },
+     "10-12": {
+      "phrase": "monitor {his} exertion and adjust it using methods such as heart rate",
+      "next_steps": {
+       "emerging": "use a method such as heart rate to check {his} exertion",
+       "developing": "adjust {his} exertion based on what {his} checks show",
+       "proficient": "hold {his} exertion in a target range for a whole activity",
+       "extending": "choose the monitoring method that suits each activity and explain the choice"
+      },
+      "strength": [
+       "{He} [uses|use] heart rate and a rating of effort to judge {his} exertion.",
+       "{He} [adjusts|adjust] {his} pace to stay in a target zone during a workout."
+      ],
+      "next": {
+       "developing": "A good next step is to use two methods of checking exertion and see whether they agree.",
+       "proficient": "One habit to build is checking {his} exertion often enough to hold it steady across a full session.",
+       "extending": "To go further, {he} can explain why different activities call for different exertion levels."
+      },
+      "home": "Ask {him} how {he} [decides|decide] when to work harder and when to rest during exercise."
+     }
+    }
+   },
+   {
+    "id": "phe-exertion-monitoring--outdoor-education-11",
+    "courses": [
+     "Outdoor Education 11"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.3"
+    ],
+    "ministry": "Monitor exertion levels and energy levels during outdoor activities",
+    "bands": {
+     "all": {
+      "phrase": "check {his} own exertion and energy levels during outdoor activities",
+      "next_steps": {
+       "emerging": "notice when {he} [is|are] tired or working hard outdoors",
+       "developing": "check {his} exertion and energy at set times during an outdoor activity",
+       "proficient": "adjust pace, food or rest based on {his} energy during an outdoor activity",
+       "extending": "plan {his} energy across a long outdoor day so it lasts to the end"
+      },
+      "strength": [
+       "{He} [notices|notice] when {his} energy is dropping during a long outdoor activity.",
+       "{He} [rests|rest], [eats|eat] or [drinks|drink] when {his} body needs it on the trail."
+      ],
+      "next": {
+       "developing": "{His} next goal is to check {his} energy before {he} [feels|feel] tired, not after.",
+       "proficient": "A useful next step is to practise matching {his} pace to the length of the outdoor activity.",
+       "extending": "{He} [is|are] ready to plan rest and food breaks to save energy for the end of a day outdoors."
+      },
+      "home": "On your next outing, ask {him} how {he} [paces|pace] {himself} on a long walk."
+     }
+    }
+   },
+   {
+    "id": "phe-exertion-monitoring--outdoor-education-12",
+    "courses": [
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded12.cc.3"
+    ],
+    "ministry": "Monitor exertion levels and energy levels of themselves and others",
+    "bands": {
+     "all": {
+      "phrase": "monitor exertion and energy levels in {himself} and in others during activities",
+      "next_steps": {
+       "emerging": "check {his} own exertion and energy during an activity",
+       "developing": "notice signs that another person in the group is tiring",
+       "proficient": "adjust the group's pace based on everyone's energy levels",
+       "extending": "plan rests and pace so the whole group has enough energy for the day"
+      },
+      "strength": [
+       "{He} [notices|notice] signs of tiredness in others, such as slowing or going quiet.",
+       "{He} [tracks|track] {his} own energy while also paying attention to the group."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to ask others how they feel at each rest stop.",
+       "proficient": "One skill to practise is changing the group's pace when one person's energy drops.",
+       "extending": "To go further, {he} can practise planning a day outdoors around the energy of the slowest member."
+      },
+      "home": "Ask {him} how {he} can tell when a friend or family member needs a rest."
+     }
+    }
+   }
+  ]
+ },
+ "phe-explaining-health": {
+  "old": {
+   "phrase": "explain why maintaining personal health matters",
+   "next_steps": {
+    "emerging": "describe what maintaining personal health involves",
+    "developing": "explain why one part of personal health matters",
+    "proficient": "explain how the parts of personal health connect"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-explaining-health--active-living-11",
+    "courses": [
+     "Active Living 11"
+    ],
+    "competency_ids": [
+     "bc.al11.cc.2"
+    ],
+    "ministry": "Explain the importance of maintaining personal health",
+    "bands": {
+     "all": {
+      "phrase": "explain why maintaining personal health matters",
+      "next_steps": {
+       "emerging": "describe what maintaining personal health involves",
+       "developing": "explain why one part of personal health, such as sleep, matters",
+       "proficient": "explain how the parts of personal health connect and affect each other",
+       "extending": "explain how habits now shape personal health in later life"
+      },
+      "strength": [
+       "{He} [explains|explain] why habits such as sleep, activity and eating matter for health.",
+       "{He} [describes|describe] how caring for health now helps {him} later in life."
+      ],
+      "next": {
+       "developing": "It will help {him} to explain how one part of health affects another, such as sleep and mood.",
+       "proficient": "Next, {he} can try giving reasons from {his} own life for why health matters.",
+       "extending": "From here, {he} can explain how maintaining health helps a person reach other goals."
+      },
+      "home": "Ask {him} which daily habit {he} [thinks|think] matters most for staying healthy."
+     }
+    }
+   }
+  ]
+ },
+ "phe-fitness-activity": {
+  "old": {
+   "phrase": "take part in activity that builds fitness",
+   "next_steps": {
+    "emerging": "take part in a daily physical activity",
+    "developing": "choose activities that target one part of fitness",
+    "proficient": "stay active over time to maintain fitness"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-fitness-activity--phe",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.6",
+     "bc.phe9.cc.6",
+     "bc.phe10.cc.7"
+    ],
+    "ministry": "Participate daily (8, 9) in physical activities designed to enhance and maintain health components of fitness",
+    "bands": {
+     "8-9": {
+      "phrase": "take part every day in activity that builds {his} heart, strength and flexibility",
+      "next_steps": {
+       "emerging": "take part fully in physical activity each day",
+       "developing": "choose activities that build one part of fitness, such as flexibility",
+       "proficient": "stay active over several weeks to maintain {his} fitness",
+       "extending": "plan a week of activity that covers each part of fitness"
+      },
+      "strength": [
+       "{He} [takes|take] part in physical activity every day with steady effort.",
+       "{He} [chooses|choose] activities that build strength, endurance or flexibility."
+      ],
+      "next": {
+       "developing": "Next, {he} can try a new activity that trains a different part of fitness.",
+       "proficient": "{He} can aim to stay active on days when there is no class activity.",
+       "extending": "{He} [is|are] ready to explain which part of fitness each of {his} activities builds."
+      },
+      "home": "Ask {him} to name an activity your family could do together that gets everyone moving."
+     },
+     "10-12": {
+      "phrase": "take part in activity that improves and maintains the health components of fitness",
+      "next_steps": {
+       "emerging": "take an active part in each fitness activity",
+       "developing": "choose activities that target one health component of fitness",
+       "proficient": "maintain {his} fitness by staying active over time",
+       "extending": "plan activity that balances all the health components of fitness"
+      },
+      "strength": [
+       "{He} [targets|target] health components of fitness, such as cardiovascular endurance.",
+       "{He} [stays|stay] active over time to maintain the fitness {he} [has|have] gained."
+      ],
+      "next": {
+       "developing": "A good next step is to name which component of fitness each activity improves.",
+       "proficient": "Next, {he} can practise setting a regular time each week to be active.",
+       "extending": "To go further, {he} can practise balancing endurance, strength and flexibility in one weekly plan."
+      },
+      "home": "Ask {him} which part of {his} fitness {he} would most like to improve this year."
+     }
+    }
+   },
+   {
+    "id": "phe-fitness-activity--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.1",
+     "bc.fc12.cc.1"
+    ],
+    "ministry": "Participate daily in physical activities designed to enhance and maintain health components of fitness",
+    "bands": {
+     "all": {
+      "phrase": "train daily to improve and maintain each health component of fitness",
+      "next_steps": {
+       "emerging": "take part in a daily fitness activity with steady effort",
+       "developing": "choose training that targets a specific health component of fitness",
+       "proficient": "maintain a daily training routine over several weeks",
+       "extending": "adjust {his} daily training so all components of fitness keep improving"
+      },
+      "strength": [
+       "{He} [trains|train] daily with effort that matches the goal of each session.",
+       "{He} [selects|select] exercises that target muscular strength, endurance or flexibility."
+      ],
+      "next": {
+       "developing": "{His} next step is to link each daily session to the fitness component it trains.",
+       "proficient": "{He} can get into the habit of training on a steady schedule, even on busy days.",
+       "extending": "From here, {he} can practise changing {his} routine when one component of fitness stops improving."
+      },
+      "home": "Ask {him} how {he} [fits|fit] daily training into a busy week."
+     }
+    }
+   }
+  ]
+ },
+ "phe-fitness-etiquette": {
+  "old": {
+   "phrase": "follow the expectations of each fitness setting",
+   "next_steps": {
+    "emerging": "follow the expectations of one fitness activity",
+    "developing": "adjust behaviour to suit each fitness setting",
+    "proficient": "model appropriate behaviour for others in fitness settings"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-fitness-etiquette--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.14",
+     "bc.fc12.cc.14"
+    ],
+    "ministry": "Demonstrate appropriate behaviours in different types of fitness activities and environments",
+    "bands": {
+     "all": {
+      "phrase": "behave in ways that suit each type of fitness activity and setting",
+      "next_steps": {
+       "emerging": "follow the expectations of one fitness setting, such as the weight room",
+       "developing": "adjust {his} behaviour to suit each fitness activity and space",
+       "proficient": "follow shared-space expectations, such as taking turns, without reminders",
+       "extending": "model the expected behaviour of each fitness setting for others"
+      },
+      "strength": [
+       "{He} [shares|share] equipment and space fairly in the weight room and gym.",
+       "{He} [adjusts|adjust] how {he} [acts|act] to suit a class, a team session or a public gym."
+      ],
+      "next": {
+       "developing": "{He} can make a habit of wiping and returning equipment after each use.",
+       "proficient": "One thing to practise is reading the expectations of a new fitness space before starting.",
+       "extending": "{He} [is|are] ready to help newer students learn the expectations of a fitness setting."
+      },
+      "home": "Ask {him} what the unwritten rules of a gym or a busy park are."
+     }
+    }
+   }
+  ]
+ },
+ "phe-fitness-goals": {
+  "old": {
+   "phrase": "use and reflect on strategies for a fitness goal",
+   "next_steps": {
+    "emerging": "identify strategies that help toward a fitness goal",
+    "developing": "apply a strategy toward a fitness goal",
+    "proficient": "compare how different strategies affected a fitness goal"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-fitness-goals--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.2",
+     "bc.fc12.cc.2"
+    ],
+    "ministry": "Identify, apply, and reflect on strategies used to pursue personal fitness goals",
+    "bands": {
+     "all": {
+      "phrase": "use strategies to pursue a personal fitness goal and reflect on how they worked",
+      "next_steps": {
+       "emerging": "identify strategies that could help toward a fitness goal",
+       "developing": "apply a chosen strategy toward a fitness goal over several weeks",
+       "proficient": "reflect on how each strategy affected progress toward a fitness goal",
+       "extending": "change strategies based on {his} reflections and track the effect on {his} goal"
+      },
+      "strength": [
+       "{He} [chooses|choose] strategies that fit {his} fitness goal, such as training at a set time.",
+       "{He} [reflects|reflect] on which strategies moved {him} closer to {his} goal and which did not."
+      ],
+      "next": {
+       "developing": "{He} can now practise keeping a log of each strategy {he} [uses|use] and how it went.",
+       "proficient": "A good next step is to compare what {he} planned with what happened, and explain the gap.",
+       "extending": "To go further, {he} can test one new strategy at a time so {he} can see its effect."
+      },
+      "home": "Ask {him} what has helped most in reaching a fitness goal this year."
+     }
+    }
+   }
+  ]
+ },
+ "phe-fitness-myths": {
+  "old": {
+   "phrase": "judge the claims of fitness myths and fads",
+   "next_steps": {
+    "emerging": "describe the claims a fitness fad makes",
+    "developing": "analyze whether a fitness claim is supported by evidence",
+    "proficient": "compare what different fitness myths and fads claim"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-fitness-myths--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.5",
+     "bc.fc12.cc.5"
+    ],
+    "ministry": "Analyze (and critique, 12) a variety of fitness myths and fads",
+    "bands": {
+     "all": {
+      "phrase": "analyze and critique the claims of fitness myths and fads",
+      "next_steps": {
+       "emerging": "describe the claim a fitness myth or fad makes",
+       "developing": "check whether a fitness claim is supported by evidence",
+       "proficient": "compare the claims of several fitness myths and fads",
+       "extending": "critique a fitness fad by weighing its evidence, risks and who profits from it"
+      },
+      "strength": [
+       "{He} [identifies|identify] what a fitness fad promises and what it would take to prove it.",
+       "{He} [asks|ask] who made a fitness claim, and why, before {he} [trusts|trust] it."
+      ],
+      "next": {
+       "developing": "One skill to practise is naming the evidence a fitness claim would need to be true.",
+       "proficient": "{His} next goal is to compare two fads and explain which claim has more evidence behind it.",
+       "extending": "From here, {he} can try explaining how a fad's marketing shapes what people believe about fitness."
+      },
+      "home": "Ask {him} what {he} [thinks|think] of a fitness claim you have both seen online."
+     }
+    }
+   }
+  ]
+ },
+ "phe-fitness-program": {
+  "old": {
+   "phrase": "create and follow a personal fitness program",
+   "next_steps": {
+    "emerging": "set goals for a personal fitness program",
+    "developing": "create a fitness program that fits personal goals",
+    "proficient": "follow a personal fitness program as planned"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-fitness-program--fitness-conditioning-11",
+    "courses": [
+     "Fitness and Conditioning 11"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.11"
+    ],
+    "ministry": "Create and implement a personalized fitness program",
+    "bands": {
+     "all": {
+      "phrase": "create a personal fitness program and follow it as planned",
+      "next_steps": {
+       "emerging": "set clear goals for a personal fitness program",
+       "developing": "create a fitness program that fits {his} goals and schedule",
+       "proficient": "follow {his} fitness program as planned over several weeks",
+       "extending": "adjust {his} program sensibly when {his} fitness or schedule changes"
+      },
+      "strength": [
+       "{He} [designs|design] a fitness program with exercises that match {his} goals.",
+       "{He} [follows|follow] {his} program with steady effort from week to week."
+      ],
+      "next": {
+       "developing": "{He} can try planning each week of {his} program before it starts.",
+       "proficient": "Next, {he} can practise tracking each session to see whether {he} [is|are] following the plan.",
+       "extending": "It will help {him} to adjust {his} program when a goal is reached or a week gets busy."
+      },
+      "home": "Ask {him} to show you one week of {his} fitness program and explain the choices."
+     }
+    }
+   },
+   {
+    "id": "phe-fitness-program--fitness-conditioning-12",
+    "courses": [
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc12.cc.11"
+    ],
+    "ministry": "Create, implement, and reflect on a personalized fitness program",
+    "bands": {
+     "all": {
+      "phrase": "create, follow and reflect on a personalized fitness program",
+      "next_steps": {
+       "emerging": "create a fitness program with goals that fit {him}",
+       "developing": "follow the program as planned and record each session",
+       "proficient": "reflect on how well the program worked and why",
+       "extending": "revise the program using {his} reflections and evidence from {his} records"
+      },
+      "strength": [
+       "{He} [plans|plan] a personalized program around clear goals and a realistic schedule.",
+       "{He} [reflects|reflect] on {his} records to judge how well {his} program worked."
+      ],
+      "next": {
+       "developing": "Over the coming weeks, {he} can practise recording each session in enough detail to reflect on later.",
+       "proficient": "{He} [is|are] ready to explain which parts of {his} program worked and which need to change.",
+       "extending": "To go further, {he} can use what {his} records show to plan the next version of {his} program."
+      },
+      "home": "Ask {him} what {he} would change in {his} fitness program after a month, and why."
+     }
+    }
+   }
+  ]
+ },
+ "phe-goal-reflection": {
+  "old": {
+   "phrase": "reflect on a healthy-living goal and the strategies used",
+   "next_steps": {
+    "emerging": "describe the progress made toward a healthy-living goal",
+    "developing": "explain which strategies helped progress toward a goal",
+    "proficient": "compare how well different strategies worked toward a goal"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-goal-reflection--phe",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.12",
+     "bc.phe9.cc.11",
+     "bc.phe10.cc.12"
+    ],
+    "ministry": "Reflect on outcomes of personal healthy-living goals and assess strategies used (8, 9) or the effectiveness of various strategies (10)",
+    "bands": {
+     "8-9": {
+      "phrase": "reflect on how {he} did with a healthy-living goal and which strategies helped",
+      "next_steps": {
+       "emerging": "describe what happened with a healthy-living goal",
+       "developing": "practise explaining which strategy helped most with a goal",
+       "proficient": "assess which strategies helped and which did not, with reasons",
+       "extending": "use what {he} learned to choose strategies for a new goal"
+      },
+      "strength": [
+       "{He} can describe how close {he} came to reaching a healthy-living goal.",
+       "{He} [names|name] the strategy that helped {him} most and [says|say] why."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain why a strategy did not help as much as {he} hoped.",
+       "proficient": "It will help {him} to give evidence, such as a log, for whether a strategy worked.",
+       "extending": "{He} can now try using what {he} learned from one goal to plan the next one."
+      },
+      "home": "Ask {him} what helped most with a goal {he} set this year, and what made it harder."
+     },
+     "10-12": {
+      "phrase": "reflect on healthy-living goal outcomes and judge how well each strategy worked",
+      "next_steps": {
+       "emerging": "describe the outcome of a healthy-living goal",
+       "developing": "assess whether a strategy helped {him} reach a goal",
+       "proficient": "weigh several strategies against each other using evidence from {his} progress",
+       "extending": "explain why a strategy worked in one goal and not in another"
+      },
+      "strength": [
+       "{He} [judges|judge] how well each strategy worked, using evidence from {his} progress.",
+       "{He} [explains|explain] the outcome of a goal openly, including what did not go as planned."
+      ],
+      "next": {
+       "developing": "A good next step is to measure progress during a goal, not just at the end.",
+       "proficient": "From here, {he} can practise ranking {his} strategies by how much each one helped.",
+       "extending": "To go further, {he} can explain why the same strategy may work for one person and not another."
+      },
+      "home": "Ask {him} which strategy {he} would keep and which {he} would drop for the next goal."
+     }
+    }
+   }
+  ]
+ },
+ "phe-health-decisions": {
+  "old": {
+   "phrase": "explain how health decisions support a healthy-living goal",
+   "next_steps": {
+    "emerging": "name the decisions that affect a healthy-living goal",
+    "developing": "explain how one decision supports a healthy-living goal",
+    "proficient": "analyze how several decisions together affect a goal"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-health-decisions--phe-10",
+    "courses": [
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe10.cc.13"
+    ],
+    "ministry": "Analyze how health-related decisions support the achievement of personal healthy-living goals",
+    "bands": {
+     "all": {
+      "phrase": "analyze how {his} health decisions help {him} reach a healthy-living goal",
+      "next_steps": {
+       "emerging": "name the decisions that affect a healthy-living goal",
+       "developing": "explain how one daily decision supports a healthy-living goal",
+       "proficient": "analyze how several decisions together help or hinder a goal",
+       "extending": "predict how a change in one decision would affect progress toward a goal"
+      },
+      "strength": [
+       "{He} [links|link] small daily decisions, such as bedtime, to progress on a healthy-living goal.",
+       "{He} [explains|explain] how some decisions support a goal while others make it harder."
+      ],
+      "next": {
+       "developing": "{His} next step is to name the daily decisions that matter most for {his} goal.",
+       "proficient": "Next, {he} can practise tracing how two decisions together affect a healthy-living goal.",
+       "extending": "{He} [is|are] ready to predict how changing one habit would shift progress toward {his} goal."
+      },
+      "home": "Ask {him} which everyday choice affects how {he} [feels|feel] the most."
+     }
+    }
+   },
+   {
+    "id": "phe-health-decisions--active-living-12",
+    "courses": [
+     "Active Living 12"
+    ],
+    "competency_ids": [
+     "bc.al12.cc.2"
+    ],
+    "ministry": "Demonstrate reasoned decision-making related to their personal health and well-being",
+    "bands": {
+     "all": {
+      "phrase": "make reasoned decisions about {his} personal health and well-being",
+      "next_steps": {
+       "emerging": "name the decisions that affect {his} health and well-being",
+       "developing": "explain the reasons behind a decision about {his} health",
+       "proficient": "weigh the likely effects of choices before making a health decision",
+       "extending": "try explaining how {he} [balances|balance] short-term wants against long-term health in a decision"
+      },
+      "strength": [
+       "{He} [gives|give] reasons for the decisions {he} [makes|make] about {his} health.",
+       "{He} [considers|consider] both short-term and long-term effects before making a health decision."
+      ],
+      "next": {
+       "developing": "Next, {he} can try listing the options before making a decision about {his} health.",
+       "proficient": "One habit to build is pausing to weigh the likely effects of a choice before acting.",
+       "extending": "To go further, {he} can practise explaining how {his} values shape {his} health decisions."
+      },
+      "home": "Ask {him} how {he} [decides|decide] between staying up late and getting enough sleep."
+     }
+    }
+   }
+  ]
+ },
+ "phe-health-messages": {
+  "old": {
+   "phrase": "judge health messages from different sources",
+   "next_steps": {
+    "emerging": "find who made a health message and why",
+    "developing": "explain how a health message tries to change behaviour",
+    "proficient": "compare health messages from different sources"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-health-messages--phe-8-9",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.10",
+     "bc.phe9.cc.9"
+    ],
+    "ministry": "Identify factors that influence health messages from a variety of sources, and analyze their influence on behaviour",
+    "bands": {
+     "all": {
+      "phrase": "explain what shapes health messages and how they affect people's behaviour",
+      "next_steps": {
+       "emerging": "find who made a health message and why they made it",
+       "developing": "explain how a health message tries to change what people do",
+       "proficient": "compare health messages from different sources, such as ads and health groups",
+       "extending": "explain how the maker's purpose shapes a health message and its effect"
+      },
+      "strength": [
+       "{He} can name who made a health message and what they want people to do.",
+       "{He} [explains|explain] how pictures and words in an ad try to change behaviour."
+      ],
+      "next": {
+       "developing": "{He} can make a habit of asking who made a health message and why.",
+       "proficient": "It will help {him} to practise comparing what two sources say about the same health topic.",
+       "extending": "A good next step is to explain how money or popularity can shape a health message."
+      },
+      "home": "When you see an ad for food or a drink, ask {him} what it wants you to believe."
+     }
+    }
+   },
+   {
+    "id": "phe-health-messages--phe-10",
+    "courses": [
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe10.cc.10"
+    ],
+    "ministry": "Analyze and explain how health messages might influence health and well-being",
+    "bands": {
+     "all": {
+      "phrase": "analyze and explain how health messages might influence health and well-being",
+      "next_steps": {
+       "emerging": "describe what a health message is asking people to do",
+       "developing": "explain how a health message might affect a person's health",
+       "proficient": "analyze how a message's source and purpose affect its influence",
+       "extending": "analyze how a health message could help one person and harm another"
+      },
+      "strength": [
+       "{He} [explains|explain] how a message about diet or exercise might change a person's habits.",
+       "{He} [analyzes|analyze] how a message could affect mental well-being as well as physical health."
+      ],
+      "next": {
+       "developing": "{He} can now try explaining how a health message might affect {his} own choices.",
+       "proficient": "{His} next goal is to analyze why one health message persuades people and another does not.",
+       "extending": "To go further, {he} can explain how one message could affect different people in different ways."
+      },
+      "home": "Ask {him} how a social media post about health could affect someone's well-being."
+     }
+    }
+   },
+   {
+    "id": "phe-health-messages--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.4",
+     "bc.fc12.cc.4"
+    ],
+    "ministry": "Analyze (and critique, 12) health messages from a variety of sources and describe their potential influences on health and well-being",
+    "bands": {
+     "all": {
+      "phrase": "analyze and critique health messages from a variety of sources",
+      "next_steps": {
+       "emerging": "describe the potential influence of one health message on health",
+       "developing": "compare health messages about fitness from different sources",
+       "proficient": "critique a health message by checking its evidence and its source",
+       "extending": "critique a health message and explain how it could affect different people in different ways"
+      },
+      "strength": [
+       "{He} [compares|compare] fitness and health messages from coaches, companies and health agencies.",
+       "{He} [describes|describe] how a health message could influence a person's training or eating."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise checking the evidence behind a health message before judging it.",
+       "proficient": "It would help {him} to explain how a message's source affects how far it can be trusted.",
+       "extending": "{He} [is|are] ready to critique a health message and suggest how to rewrite it so it matches the evidence."
+      },
+      "home": "Ask {him} which source of health advice {he} [trusts|trust] most, and why."
+     }
+    }
+   }
+  ]
+ },
+ "phe-healthy-choices": {
+  "old": {
+   "phrase": "explain what influences healthy choices and health effects",
+   "next_steps": {
+    "emerging": "name factors that influence healthy choices",
+    "developing": "explain how one factor influences a healthy choice",
+    "proficient": "assess the possible health effects of different choices"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-healthy-choices--phe-8",
+    "courses": [
+     "Physical and Health Education 8"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.9"
+    ],
+    "ministry": "Assess factors that influence healthy choices and their potential health effects",
+    "bands": {
+     "all": {
+      "phrase": "assess what influences healthy choices and what those choices do to health",
+      "next_steps": {
+       "emerging": "name factors, such as cost or friends, that influence healthy choices",
+       "developing": "explain how one factor influences a healthy choice",
+       "proficient": "assess the possible health effects of different choices",
+       "extending": "weigh several factors behind a choice and explain its likely health effects"
+      },
+      "strength": [
+       "{He} [names|name] factors that shape choices, such as cost, time and friends.",
+       "{He} [explains|explain] the possible health effects of a choice, such as skipping sleep."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain why a factor makes a healthy choice easier or harder.",
+       "proficient": "Next, {he} can try comparing the short-term and long-term effects of a choice.",
+       "extending": "A useful habit is asking which factor matters most before making a choice."
+      },
+      "home": "Ask {him} what most influences the snacks and drinks people {his} age choose."
+     }
+    }
+   },
+   {
+    "id": "phe-healthy-choices--phe-9",
+    "courses": [
+     "Physical and Health Education 9"
+    ],
+    "competency_ids": [
+     "bc.phe9.cc.8"
+    ],
+    "ministry": "Propose healthy choices that support lifelong health and well-being",
+    "bands": {
+     "all": {
+      "phrase": "suggest healthy choices that support health and well-being for life",
+      "next_steps": {
+       "emerging": "suggest one healthy choice and say how it helps",
+       "developing": "describe how a healthy choice supports lifelong health",
+       "proficient": "propose choices that support both physical health and well-being",
+       "extending": "explain how small choices now can add to health over a lifetime"
+      },
+      "strength": [
+       "{He} [suggests|suggest] healthy choices that a person could keep for many years.",
+       "{He} [explains|explain] how a choice such as daily activity supports lifelong well-being."
+      ],
+      "next": {
+       "developing": "{He} can now practise explaining why a choice would matter years from now.",
+       "proficient": "It will help {him} to suggest choices that support mental well-being as well as physical health.",
+       "extending": "To go further, {he} can explain how small choices add to health over a whole life."
+      },
+      "home": "Ask {him} which healthy habit {he} [hopes|hope] to keep as an adult."
+     }
+    }
+   }
+  ]
+ },
+ "phe-healthy-living-goals": {
+  "old": {
+   "phrase": "use strategies to work toward a healthy-living goal",
+   "next_steps": {
+    "emerging": "name a strategy that could help reach a healthy-living goal",
+    "developing": "apply a strategy toward a healthy-living goal",
+    "proficient": "use several strategies together toward a healthy-living goal"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-healthy-living-goals--phe",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.11",
+     "bc.phe9.cc.10",
+     "bc.phe10.cc.11"
+    ],
+    "ministry": "Identify and apply strategies to pursue personal healthy-living goals",
+    "bands": {
+     "8-9": {
+      "phrase": "choose and use strategies to work toward a healthy-living goal",
+      "next_steps": {
+       "emerging": "name a strategy that could help reach a healthy-living goal",
+       "developing": "use one strategy toward a healthy-living goal for a few weeks",
+       "proficient": "use several strategies together toward a healthy-living goal",
+       "extending": "change a strategy when it is not helping and try another"
+      },
+      "strength": [
+       "{He} [chooses|choose] a strategy that suits {his} healthy-living goal, such as a reminder.",
+       "{He} [uses|use] {his} chosen strategy regularly over several weeks."
+      ],
+      "next": {
+       "developing": "A useful next step is to practise using a strategy on most days, not just some.",
+       "proficient": "{He} [is|are] ready to try two strategies at once toward the same goal.",
+       "extending": "{His} next step is to notice when a strategy is not working and switch to another."
+      },
+      "home": "Ask {him} about a healthy-living goal {he} [has|have] set, and how you could help."
+     },
+     "10-12": {
+      "phrase": "identify and apply strategies that move {him} toward a healthy-living goal",
+      "next_steps": {
+       "emerging": "identify strategies that suit a healthy-living goal",
+       "developing": "apply a strategy toward a goal and track whether it is helping",
+       "proficient": "combine strategies that support each other toward one goal",
+       "extending": "plan for setbacks and choose strategies that keep progress steady"
+      },
+      "strength": [
+       "{He} [identifies|identify] strategies that fit {his} goal and {his} daily routine.",
+       "{He} [applies|apply] strategies over time and [tracks|track] whether they are helping."
+      ],
+      "next": {
+       "developing": "A good next step is to pick one measure to show whether a strategy is helping.",
+       "proficient": "From here, {he} can practise planning ahead for the days when a strategy is hard to follow.",
+       "extending": "To go further, {he} can explain why {he} chose each strategy for {his} goal."
+      },
+      "home": "Ask {him} what small step {he} could take this week toward a healthy-living goal."
+     }
+    }
+   }
+  ]
+ },
+ "phe-identity-change": {
+  "old": {
+   "phrase": "describe how change can affect a person's identity",
+   "next_steps": {
+    "emerging": "name kinds of transitions and changes people go through",
+    "developing": "describe how a transition can affect someone's identity",
+    "proficient": "explain how several changes together can shape identity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-identity-change--phe-8",
+    "courses": [
+     "Physical and Health Education 8"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.20"
+    ],
+    "ministry": "Explore and describe the impact of transition and change on identities",
+    "bands": {
+     "all": {
+      "phrase": "describe how changes and transitions can affect a person's identity",
+      "next_steps": {
+       "emerging": "name transitions people go through, such as starting at a new school",
+       "developing": "describe how one transition can affect someone's sense of who they are",
+       "proficient": "explain how several changes together can shape a person's identity",
+       "extending": "practise explaining why the same change can affect two people's identities differently"
+      },
+      "strength": [
+       "{He} can name changes people go through, such as moving or starting high school.",
+       "{He} [describes|describe] how a big change can affect the way a person sees themselves."
+      ],
+      "next": {
+       "developing": "{His} next step is to describe how a change might affect a person's interests or friendships.",
+       "proficient": "Next, {he} can try explaining how one change can lead to others in a person's life.",
+       "extending": "{He} [is|are] ready to explain why a change that is hard for one person may be easy for another."
+      },
+      "home": null
+     }
+    },
+    "sensitive": true,
+    "note": "Colin, Nov 5: sensitive health topic; no home line, never drafted on its own, Browse only."
+   }
+  ]
+ },
+ "phe-identity-factors": {
+  "old": {
+   "phrase": "describe factors that shape a person's identity",
+   "next_steps": {
+    "emerging": "name factors that can shape a person's identity",
+    "developing": "explain how social factors shape personal identity",
+    "proficient": "explain how cultural factors and social factors interact in identity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-identity-factors--phe",
+    "courses": [
+     "Physical and Health Education 9",
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe9.cc.19",
+     "bc.phe10.cc.21"
+    ],
+    "ministry": "Explore and describe factors that shape personal identities, including social and cultural factors",
+    "bands": {
+     "8-9": {
+      "phrase": "describe the social and cultural factors that shape who a person is",
+      "next_steps": {
+       "emerging": "name factors that can shape a person's identity, such as family",
+       "developing": "explain how a social factor, such as friends, shapes identity",
+       "proficient": "explain how cultural factors, such as language or traditions, shape identity",
+       "extending": "explain how social and cultural factors work together in one person's identity"
+      },
+      "strength": [
+       "{He} can name the people and groups that help shape a person's identity.",
+       "{He} [describes|describe] how culture, such as language or traditions, can shape who someone is."
+      ],
+      "next": {
+       "developing": "{He} can now try explaining how friends and family shape identity in different ways.",
+       "proficient": "A good next step is to describe how a cultural factor can shape a person's values.",
+       "extending": "To go further, {he} can explain how one identity can hold more than one culture."
+      },
+      "home": null
+     },
+     "10-12": {
+      "phrase": "explore and describe how social and cultural factors shape personal identity",
+      "next_steps": {
+       "emerging": "describe factors that shape personal identity",
+       "developing": "try explaining how social factors, such as media or community, shape identity",
+       "proficient": "explain how cultural and social factors interact in a person's identity",
+       "extending": "explain how a person's identity can shift as social and cultural factors change"
+      },
+      "strength": [
+       "{He} [explains|explain] how media, community and friendships shape the way people see themselves.",
+       "{He} [describes|describe] how cultural belonging and social pressures can pull identity in different directions."
+      ],
+      "next": {
+       "developing": "One skill to practise is explaining how one social factor shapes the way people present themselves.",
+       "proficient": "Next, {he} can practise explaining why the same factor shapes two people in different ways.",
+       "extending": "{He} [is|are] ready to explain how identity can shift when a person moves between communities."
+      },
+      "home": null
+     }
+    },
+    "sensitive": true,
+    "note": "Colin, Nov 5: sensitive health topic; no home line, never drafted on its own, Browse only."
+   }
+  ]
+ },
+ "phe-impact-reduction": {
+  "old": {
+   "phrase": "plan ways to reduce harm to the outdoors",
+   "next_steps": {
+    "emerging": "identify how an outdoor activity could affect the environment",
+    "developing": "plan ways to reduce the impact of an outdoor activity",
+    "proficient": "follow a plan to reduce impacts during an outdoor activity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-impact-reduction--outdoor-education",
+    "courses": [
+     "Outdoor Education 11",
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.8",
+     "bc.oded12.cc.7"
+    ],
+    "ministry": "Plan and implement ways to reduce potential impacts of outdoor activities on the local environment",
+    "bands": {
+     "all": {
+      "phrase": "plan and follow ways to reduce an outdoor activity's impact on the local environment",
+      "next_steps": {
+       "emerging": "identify how an outdoor activity could affect the local environment",
+       "developing": "plan ways to reduce the impact of an outdoor activity",
+       "proficient": "follow {his} plan to reduce impacts throughout an outdoor activity",
+       "extending": "help the group reduce its impact and explain why each step matters"
+      },
+      "strength": [
+       "{He} [plans|plan] ways to protect plants, water and wildlife before an outdoor trip.",
+       "{He} [packs|pack] all waste home and [stays|stay] on trails to reduce the group's impact."
+      ],
+      "next": {
+       "developing": "{His} next step is to list the likely impacts of each part of an outdoor activity.",
+       "proficient": "Next, {he} can make a habit of checking a site for impacts before the group leaves.",
+       "extending": "From here, {he} can practise explaining to others why each low-impact step matters."
+      },
+      "home": "Ask {him} how your family could leave a park or beach the way you found it."
+     }
+    }
+   }
+  ]
+ },
+ "phe-injury-prevention": {
+  "old": {
+   "phrase": "explain how proper technique prevents injury",
+   "next_steps": {
+    "emerging": "name the proper technique for one movement",
+    "developing": "connect a proper technique to the injury it prevents",
+    "proficient": "explain how technique prevents injury across several activities"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-injury-prevention--active-living-11",
+    "courses": [
+     "Active Living 11"
+    ],
+    "competency_ids": [
+     "bc.al11.cc.6"
+    ],
+    "ministry": "Explain how the use of proper techniques prevents injury",
+    "bands": {
+     "all": {
+      "phrase": "explain how using proper technique helps prevent injury",
+      "next_steps": {
+       "emerging": "name the proper technique for one movement",
+       "developing": "connect a proper technique to the injury it prevents",
+       "proficient": "explain how technique prevents injury across several activities",
+       "extending": "practise explaining how small errors in technique raise injury risk over time"
+      },
+      "strength": [
+       "{He} [explains|explain] how bending the knees when lifting protects the back.",
+       "{He} [connects|connect] proper landing technique to fewer knee and ankle injuries."
+      ],
+      "next": {
+       "developing": "{He} can try naming the injury each technique prevents as {he} [practises|practise] it.",
+       "proficient": "{His} next step is to name the right technique for each new activity before {he} [starts|start].",
+       "extending": "To go further, {he} can explain how tiredness can weaken technique and raise the risk of injury."
+      },
+      "home": "Ask {him} to show you the safe way to lift a heavy box."
+     }
+    }
+   },
+   {
+    "id": "phe-injury-prevention--active-living-12",
+    "courses": [
+     "Active Living 12"
+    ],
+    "competency_ids": [
+     "bc.al12.cc.3"
+    ],
+    "ministry": "Explain how proper technique and use of equipment reduces the chance of injury",
+    "bands": {
+     "all": {
+      "phrase": "explain how proper technique and use of equipment lower the chance of injury",
+      "next_steps": {
+       "emerging": "name the proper use of one piece of equipment",
+       "developing": "connect a technique or a piece of equipment to the injury risk it reduces",
+       "proficient": "explain how technique and equipment work together to reduce injury",
+       "extending": "assess an activity for injury risks and explain how technique and equipment lower them"
+      },
+      "strength": [
+       "{He} [explains|explain] how gear that fits, such as a helmet, reduces the chance of injury.",
+       "{He} [describes|describe] how technique and equipment together protect the body during an activity."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to explain why equipment must fit and be used as intended.",
+       "proficient": "One habit to build is checking equipment for wear before using it.",
+       "extending": "{He} [is|are] ready to judge the injury risks in a new activity and suggest ways to lower them."
+      },
+      "home": "Ask {him} what safety gear matters most for an activity your family enjoys."
+     }
+    }
+   }
+  ]
+ },
+ "phe-leadership-skills": {
+  "old": {
+   "phrase": "lead others in fitness activities",
+   "next_steps": {
+    "emerging": "lead one part of a fitness activity",
+    "developing": "use different leadership skills during fitness activities",
+    "proficient": "lead others in several types of fitness activities"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-leadership-skills--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.13",
+     "bc.fc12.cc.13"
+    ],
+    "ministry": "Demonstrate a variety of leadership skills in different types of fitness activities",
+    "bands": {
+     "all": {
+      "phrase": "use a variety of leadership skills in different types of fitness activities",
+      "next_steps": {
+       "emerging": "lead one part of a fitness activity, such as a warm-up",
+       "developing": "use different leadership skills, such as demonstrating and encouraging",
+       "proficient": "lead others through several types of fitness activities",
+       "extending": "adjust {his} leadership to suit the people and the type of fitness activity"
+      },
+      "strength": [
+       "{He} [leads|lead] warm-ups and drills with clear demonstrations.",
+       "{He} [encourages|encourage] others and [gives|give] useful feedback during a workout."
+      ],
+      "next": {
+       "developing": "{His} next step is to lead a full fitness activity from start to finish.",
+       "proficient": "{He} can now practise giving feedback on technique while leading a group.",
+       "extending": "To grow further, {he} can practise changing how {he} [leads|lead] for beginners and for experienced athletes."
+      },
+      "home": "Ask {him} how {he} would lead a family member through a short workout."
+     }
+    }
+   },
+   {
+    "id": "phe-leadership-skills--outdoor-education-12",
+    "courses": [
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded12.cc.13"
+    ],
+    "ministry": "Use applicable communication and outdoor leadership skills when interacting with others",
+    "bands": {
+     "all": {
+      "phrase": "use communication and outdoor leadership skills that suit the situation",
+      "next_steps": {
+       "emerging": "take a leadership role in one part of an outdoor activity",
+       "developing": "give clear directions to a group outdoors",
+       "proficient": "choose leadership and communication skills that suit the group and conditions",
+       "extending": "lead a group through changing outdoor conditions while keeping everyone informed"
+      },
+      "strength": [
+       "{He} [gives|give] clear directions that help a group travel safely outdoors.",
+       "{He} [listens|listen] to the group and [adjusts|adjust] {his} leadership to the conditions."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise sharing decisions with the group in a calm, clear voice.",
+       "proficient": "It would help {him} to invite the group's ideas before making a decision outdoors.",
+       "extending": "From here, {he} can practise leading when conditions change and the group is tired."
+      },
+      "home": "Ask {him} what makes someone easy to follow on a hike or outing."
+     }
+    }
+   }
+  ]
+ },
+ "phe-lifelong-activity": {
+  "old": {
+   "phrase": "explain how building skill keeps people active for life",
+   "next_steps": {
+    "emerging": "describe how skill in an activity has grown",
+    "developing": "explain how getting better at an activity builds confidence",
+    "proficient": "explain how skill and confidence encourage lifelong participation"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-lifelong-activity--phe-10-active-living",
+    "courses": [
+     "Physical and Health Education 10",
+     "Active Living 11",
+     "Active Living 12"
+    ],
+    "competency_ids": [
+     "bc.phe10.cc.8",
+     "bc.al11.cc.1",
+     "bc.al12.cc.1"
+    ],
+    "ministry": "Explain how developing competencies in physical activities can increase confidence and encourage lifelong participation in physical activities",
+    "bands": {
+     "all": {
+      "phrase": "explain how building skill in physical activities grows confidence and lifelong participation",
+      "next_steps": {
+       "emerging": "describe how {his} skill in an activity has grown",
+       "developing": "explain how improving at an activity builds {his} confidence",
+       "proficient": "explain how skill and confidence together keep people active for life",
+       "extending": "explain what keeps a person active for life as their interests change"
+      },
+      "strength": [
+       "{He} [describes|describe] how {his} skill in an activity has grown over the year.",
+       "{He} [explains|explain] how feeling sure of {himself} in an activity makes {him} want to continue."
+      ],
+      "next": {
+       "developing": "{His} next step is to give an example of how growing skill changed {his} confidence.",
+       "proficient": "One skill to practise is explaining why people tend to stay with an activity once they improve at it.",
+       "extending": "A good next step is to explain which activities {he} can see {himself} doing for life, and why."
+      },
+      "home": "Ask {him} which activity {he} would most like to keep doing as an adult."
+     }
+    }
+   },
+   {
+    "id": "phe-lifelong-activity--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.7",
+     "bc.fc12.cc.7"
+    ],
+    "ministry": "Explain how developing competencies in fitness and conditioning activities can increase confidence and encourage lifelong participation in physical activities",
+    "bands": {
+     "all": {
+      "phrase": "explain how growing skill in fitness training builds confidence to stay active for life",
+      "next_steps": {
+       "emerging": "describe how {his} skill in a fitness activity has improved",
+       "developing": "explain how improving in training builds {his} confidence",
+       "proficient": "explain how confidence from training leads to lifelong physical activity",
+       "extending": "explain how fitness skills carry over to keep a person active in other activities"
+      },
+      "strength": [
+       "{He} [describes|describe] the training skills {he} [has|have] gained, such as lifting with correct form.",
+       "{He} [explains|explain] how feeling sure in the weight room makes {him} more willing to stay active."
+      ],
+      "next": {
+       "developing": "{He} can make a habit of noting the skills {he} [gains|gain] from each block of training.",
+       "proficient": "{He} [is|are] ready to explain how confidence from training helps in other physical activities.",
+       "extending": "To go further, {he} can explain how fitness skills help a person keep active as an adult."
+      },
+      "home": "Ask {him} which part of training {he} can do now that felt hard at the start."
+     }
+    }
+   },
+   {
+    "id": "phe-lifelong-activity--outdoor-education",
+    "courses": [
+     "Outdoor Education 11",
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.6",
+     "bc.oded12.cc.6"
+    ],
+    "ministry": "Explain how developing competence in outdoor activities can increase confidence and encourage lifelong participation",
+    "bands": {
+     "all": {
+      "phrase": "explain how growing competence outdoors builds confidence and a lifelong interest",
+      "next_steps": {
+       "emerging": "describe how {his} skill in an outdoor activity has grown",
+       "developing": "try explaining how outdoor skills make {him} feel more sure outdoors",
+       "proficient": "explain how outdoor skill and confidence lead to lifelong participation",
+       "extending": "explain how outdoor skills could help {him} stay active outdoors as an adult"
+      },
+      "strength": [
+       "{He} [describes|describe] outdoor skills {he} [has|have] gained, such as reading a map.",
+       "{He} [explains|explain] how knowing what to do outdoors makes {him} want to go out more often."
+      ],
+      "next": {
+       "developing": "{His} next goal is to explain how one outdoor skill changed how {he} [feels|feel] on a trip.",
+       "proficient": "Next, {he} can try explaining how confidence outdoors makes new trips feel less risky.",
+       "extending": "From here, {he} can explain how outdoor skills make it easier to enjoy the outdoors for life."
+      },
+      "home": "Ask {him} which outdoor activity {he} would like to keep doing after high school."
+     }
+    }
+   }
+  ]
+ },
+ "phe-lifestyle-analysis": {
+  "old": {
+   "phrase": "explain how daily habits affect fitness performance",
+   "next_steps": {
+    "emerging": "identify lifestyle patterns that relate to fitness performance",
+    "developing": "explain how one lifestyle pattern affects performance",
+    "proficient": "analyze how several lifestyle patterns combine to affect performance"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-lifestyle-analysis--fitness-conditioning-12",
+    "courses": [
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc12.cc.3"
+    ],
+    "ministry": "Identify and analyze the relationships between lifestyle patterns and performance in fitness activities",
+    "bands": {
+     "all": {
+      "phrase": "analyze how lifestyle patterns, such as sleep and stress, affect fitness performance",
+      "next_steps": {
+       "emerging": "identify lifestyle patterns that relate to fitness performance",
+       "developing": "explain how one lifestyle pattern affects performance",
+       "proficient": "analyze how several lifestyle patterns combine to affect performance",
+       "extending": "use evidence from {his} own training to analyze a lifestyle pattern's effect"
+      },
+      "strength": [
+       "{He} [identifies|identify] patterns such as sleep, eating and screen time that affect training.",
+       "{He} [analyzes|analyze] how a stressful week can affect {his} workout results."
+      ],
+      "next": {
+       "developing": "{His} next step is to track one lifestyle pattern alongside {his} workout results.",
+       "proficient": "Next, {he} can practise explaining how two patterns, such as sleep and stress, affect each other.",
+       "extending": "To go further, {he} can use {his} training records to test whether a pattern affects performance."
+      },
+      "home": "Ask {him} how a short night of sleep changes the way {he} [trains|train] the next day."
+     }
+    }
+   }
+  ]
+ },
+ "phe-managing-change": {
+  "old": {
+   "phrase": "explain strategies for managing changes in adolescence",
+   "next_steps": {
+    "emerging": "name changes people go through during adolescence",
+    "developing": "create a strategy for managing an emotional or social change",
+    "proficient": "evaluate whether a strategy helps manage a change"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-managing-change--phe",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.19",
+     "bc.phe9.cc.18",
+     "bc.phe10.cc.20"
+    ],
+    "ministry": "Create and assess (8) or evaluate (9, 10) strategies for managing physical, emotional, and social changes during puberty and adolescence",
+    "bands": {
+     "8-9": {
+      "phrase": "create and assess ways to manage the changes of puberty and adolescence",
+      "next_steps": {
+       "emerging": "name physical, emotional and social changes during adolescence",
+       "developing": "create a strategy for managing an emotional or social change",
+       "proficient": "assess whether a strategy helps manage a change, and why",
+       "extending": "create strategies for physical, emotional and social changes and judge each one"
+      },
+      "strength": [
+       "{He} [describes|describe] physical, emotional and social changes that happen in adolescence.",
+       "{He} [suggests|suggest] practical ways to manage a change, such as talking to a trusted adult."
+      ],
+      "next": {
+       "developing": "Next, {he} can try creating a strategy for a social change, such as new friendships.",
+       "proficient": "{His} next step is to explain why a strategy would or would not help with a change.",
+       "extending": "{He} [is|are] ready to create strategies for different changes and judge which suit each one."
+      },
+      "home": null
+     },
+     "10-12": {
+      "phrase": "create and evaluate strategies for managing physical, emotional and social changes",
+      "next_steps": {
+       "emerging": "describe a strategy for managing a change in adolescence",
+       "developing": "create strategies for emotional and social changes",
+       "proficient": "evaluate how well a strategy helps manage a change, with reasons",
+       "extending": "evaluate strategies against each other and explain which suit different situations"
+      },
+      "strength": [
+       "{He} [creates|create] realistic strategies for managing stress, mood and changing relationships.",
+       "{He} [evaluates|evaluate] a strategy by asking whether it would help in a real situation."
+      ],
+      "next": {
+       "developing": "A good next step is to create strategies for physical changes as well as social ones.",
+       "proficient": "A useful next step is to name the evidence that shows whether a strategy is working.",
+       "extending": "To go further, {he} can explain why a strategy that suits one person may not suit another."
+      },
+      "home": null
+     }
+    },
+    "sensitive": true,
+    "note": "Colin, Nov 5: sensitive health topic; no home line, never drafted on its own, Browse only."
+   }
+  ]
+ },
+ "phe-motivational-factors": {
+  "old": {
+   "phrase": "explain what motivates people to be active",
+   "next_steps": {
+    "emerging": "identify factors that motivate participation in activity",
+    "developing": "explain how a motivational factor affects participation",
+    "proficient": "compare how different motivators affect participation over time"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-motivational-factors--phe-10-active-living-11",
+    "courses": [
+     "Physical and Health Education 10",
+     "Active Living 11"
+    ],
+    "competency_ids": [
+     "bc.phe10.cc.6",
+     "bc.al11.cc.3"
+    ],
+    "ministry": "Identify and explain motivational factors influencing participation in physical (PHE 10) or recreational (Active Living 11) activities",
+    "bands": {
+     "all": {
+      "phrase": "explain what motivates people to take part in physical and recreational activities",
+      "next_steps": {
+       "emerging": "identify factors that motivate people to be active, such as fun or friends",
+       "developing": "explain how one motivating factor affects whether a person takes part",
+       "proficient": "explain the difference between motivation from within and from outside a person",
+       "extending": "explain how motivating factors change over time and across a person's life"
+      },
+      "strength": [
+       "{He} [identifies|identify] what motivates {him} to take part, such as challenge, friends or fun.",
+       "{He} [explains|explain] how a motivating factor can lead a person to start or stop an activity."
+      ],
+      "next": {
+       "developing": "{He} can try naming which motivating factors matter most to {him} and why.",
+       "proficient": "{His} next step is to explain how rewards and enjoyment motivate people in different ways.",
+       "extending": "From here, {he} can explain how the reasons for being active can change from the teen years to adulthood."
+      },
+      "home": "Ask {him} what makes {him} want to be active on a day when {he} would rather stay home."
+     }
+    }
+   }
+  ]
+ },
+ "phe-movement-concepts": {
+  "old": {
+   "phrase": "use movement concepts and strategies in games",
+   "next_steps": {
+    "emerging": "use one strategy, such as moving to open space",
+    "developing": "use a planned strategy during a game",
+    "proficient": "apply a movement concept in a different activity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-movement-concepts--phe",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.2",
+     "bc.phe9.cc.2",
+     "bc.phe10.cc.2"
+    ],
+    "ministry": "Develop and apply (8, 9) or apply and refine (10) a variety of movement concepts and strategies in different physical activities",
+    "bands": {
+     "8-9": {
+      "phrase": "use movement ideas and game strategies, such as moving to open space",
+      "next_steps": {
+       "emerging": "use one strategy, such as moving to open space, during a game",
+       "developing": "plan a strategy and use it during a game or activity",
+       "proficient": "use the same movement concept in a different activity",
+       "extending": "explain why a strategy worked and change it for a new game"
+      },
+      "strength": [
+       "{He} [moves|move] to open space to support teammates during a game.",
+       "{He} [follows|follow] a plan {he} made with a partner, such as passing early."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise making a plan with a partner and testing it in a game.",
+       "proficient": "A good next step is to try a strategy from one game in a different game.",
+       "extending": "{He} can now try explaining why a strategy worked, using what happened in play."
+      },
+      "home": "When you play a game together, ask {him} what plan would help your side win."
+     },
+     "10-12": {
+      "phrase": "apply and refine movement concepts and strategies in different physical activities",
+      "next_steps": {
+       "emerging": "apply one movement concept, such as spacing, in an activity",
+       "developing": "refine a strategy after seeing how it works in play",
+       "proficient": "use the same movement concept across different types of activities",
+       "extending": "adjust strategies during play in response to opponents"
+      },
+      "strength": [
+       "{He} [applies|apply] concepts such as spacing and timing in different activities.",
+       "{He} [refines|refine] a strategy during play when it is not working."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain how a concept like spacing works in more than one activity.",
+       "proficient": "It will help {him} to practise reading opponents and adjusting the strategy while play continues.",
+       "extending": "To go further, {he} can practise designing a strategy and teaching it to a team."
+      },
+      "home": "Ask {him} how timing and space matter in a sport or game {he} [enjoys|enjoy]."
+     }
+    }
+   }
+  ]
+ },
+ "phe-movement-skills": {
+  "old": {
+   "phrase": "use movement skills in different activities",
+   "next_steps": {
+    "emerging": "practise one movement skill until it is steady",
+    "developing": "use a movement skill in a game or activity",
+    "proficient": "adapt movement skills to new environments and activities"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-movement-skills--phe",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.1",
+     "bc.phe9.cc.1",
+     "bc.phe10.cc.1"
+    ],
+    "ministry": "Develop, refine, and apply fundamental (8, 9) or refine and apply (10) movement skills in a variety of physical activities and environments",
+    "bands": {
+     "8-9": {
+      "phrase": "develop and use basic movement skills, such as throwing and balancing, in many activities",
+      "next_steps": {
+       "emerging": "practise one movement skill until it is steady",
+       "developing": "use a movement skill in a game or activity",
+       "proficient": "use movement skills in different places, such as the gym or the field",
+       "extending": "combine several movement skills smoothly in a game"
+      },
+      "strength": [
+       "{He} [throws|throw], [catches|catch] and [balances|balance] with growing control in activities.",
+       "{He} [uses|use] {his} movement skills in different places, such as the gym and the field."
+      ],
+      "next": {
+       "developing": "{He} can make a habit of practising a skill slowly before using it at game speed.",
+       "proficient": "Next, {he} can try using {his} movement skills in a new environment, such as outdoors.",
+       "extending": "{His} next goal is to combine two skills, such as catching and throwing, in one smooth motion."
+      },
+      "home": "Ask {him} to show you a movement skill {he} [has|have] improved this year."
+     },
+     "10-12": {
+      "phrase": "refine and apply movement skills in a variety of activities and environments",
+      "next_steps": {
+       "emerging": "refine one movement skill through focused practice",
+       "developing": "apply refined skills in a game or activity",
+       "proficient": "adapt movement skills to new environments and activities",
+       "extending": "refine complex skill combinations and use them under game pressure"
+      },
+      "strength": [
+       "{He} [refines|refine] {his} movement skills through focused, regular practice.",
+       "{He} [adapts|adapt] skills to new settings, such as a different surface or space."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to use feedback to refine one part of a skill at a time.",
+       "proficient": "{He} [is|are] ready to practise {his} skills in less familiar environments.",
+       "extending": "To go further, {he} can practise performing skill combinations at full game speed."
+      },
+      "home": "Ask {him} which movement skill {he} [is|are] refining right now, and how."
+     }
+    }
+   }
+  ]
+ },
+ "phe-muscle-training": {
+  "old": {
+   "phrase": "explain how to train the muscles a movement uses",
+   "next_steps": {
+    "emerging": "identify the main muscles used in a movement",
+    "developing": "describe how muscles produce a movement",
+    "proficient": "describe how to train the muscles used in several movements"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-muscle-training--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.8",
+     "bc.fc12.cc.8"
+    ],
+    "ministry": "Identify and describe how muscles produce movement in different parts of the body and how to train those muscles",
+    "bands": {
+     "all": {
+      "phrase": "describe how muscles produce movement and how to train them",
+      "next_steps": {
+       "emerging": "identify the main muscles used in a movement",
+       "developing": "describe how muscles work together to produce a movement",
+       "proficient": "describe how to train the muscles used in several movements",
+       "extending": "choose exercises that train the muscles a movement needs, and explain the choice"
+      },
+      "strength": [
+       "{He} [names|name] the main muscles that work in movements such as a squat or a row.",
+       "{He} [describes|describe] how muscles pull on bones to move a joint."
+      ],
+      "next": {
+       "developing": "{His} next step is to describe how muscles on each side of a joint work as a pair.",
+       "proficient": "Next, {he} can practise matching exercises to the muscles a sport or activity uses most.",
+       "extending": "To go further, {he} can explain why a balanced program trains opposing muscle groups."
+      },
+      "home": "Ask {him} which muscles {he} [uses|use] to climb stairs or carry groceries."
+     }
+    }
+   }
+  ]
+ },
+ "phe-outdoor-activities": {
+  "old": {
+   "phrase": "take part in a range of outdoor activities",
+   "next_steps": {
+    "emerging": "take an active part in one outdoor activity",
+    "developing": "take part in different kinds of outdoor activities",
+    "proficient": "try outdoor activities in new settings and conditions"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-outdoor-activities--outdoor-education-11",
+    "courses": [
+     "Outdoor Education 11"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.1"
+    ],
+    "ministry": "Participate in a variety of outdoor activities",
+    "bands": {
+     "all": {
+      "phrase": "take an active part in a variety of outdoor activities",
+      "next_steps": {
+       "emerging": "take an active part in one outdoor activity",
+       "developing": "take part fully in several different outdoor activities",
+       "proficient": "try outdoor activities in new settings and conditions",
+       "extending": "take part with steady effort in outdoor activities that are new or demanding"
+      },
+      "strength": [
+       "{He} [joins|join] each outdoor activity with energy, even in cool or wet weather.",
+       "{He} [tries|try] each type of outdoor activity the class offers, such as hiking."
+      ],
+      "next": {
+       "developing": "{He} can try saying yes to an outdoor activity {he} [has|have] not done before.",
+       "proficient": "One thing to practise is staying fully involved when an outdoor activity becomes tiring.",
+       "extending": "{His} next step is to take part in outdoor activities in harder conditions, such as rain or cold."
+      },
+      "home": "Plan a walk somewhere new together and ask {him} what {he} [notices|notice]."
+     }
+    }
+   },
+   {
+    "id": "phe-outdoor-activities--outdoor-education-12",
+    "courses": [
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded12.cc.1"
+    ],
+    "ministry": "Participate in and lead a variety of outdoor activities",
+    "bands": {
+     "all": {
+      "phrase": "take part in and lead a variety of outdoor activities",
+      "next_steps": {
+       "emerging": "take an active part in outdoor activities and help lead one part",
+       "developing": "lead a short outdoor activity for a small group",
+       "proficient": "lead a range of outdoor activities with clear plans",
+       "extending": "lead outdoor activities in changing conditions and adjust the plan as needed"
+      },
+      "strength": [
+       "{He} [takes|take] part fully in outdoor activities and [helps|help] lead parts of them.",
+       "{He} [leads|lead] a small group through an outdoor activity with a clear plan."
+      ],
+      "next": {
+       "developing": "A useful next step is to practise leading a whole outdoor activity, from the briefing to the wrap-up.",
+       "proficient": "A good next step is to lead a type of outdoor activity {he} [has|have] not led before.",
+       "extending": "To go further, {he} can practise leading when conditions change partway through an activity."
+      },
+      "home": "Ask {him} to lead your family on a short walk and choose the route."
+     }
+    }
+   }
+  ]
+ },
+ "phe-outdoor-preparation": {
+  "old": {
+   "phrase": "explain the food and other needs for outdoor activities",
+   "next_steps": {
+    "emerging": "list the food and water an outdoor activity needs",
+    "developing": "explain what is needed to prepare for an outdoor activity",
+    "proficient": "explain what is needed while taking part in an outdoor activity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-outdoor-preparation--outdoor-education",
+    "courses": [
+     "Outdoor Education 11",
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.5",
+     "bc.oded12.cc.5"
+    ],
+    "ministry": "Explain (analyze and explain, 12) nutritional considerations and other requirements for preparation for and participation in outdoor activities",
+    "bands": {
+     "all": {
+      "phrase": "explain the food, water and other needs for preparing for outdoor activities",
+      "next_steps": {
+       "emerging": "list the food and water an outdoor activity needs",
+       "developing": "practise explaining what to prepare before an outdoor activity, such as clothing",
+       "proficient": "explain what is needed while taking part in an outdoor activity",
+       "extending": "analyze how the length and conditions of an activity change its food and gear needs"
+      },
+      "strength": [
+       "{He} [explains|explain] how much food and water a day outdoors needs.",
+       "{He} [prepares|prepare] the right clothing and gear for the conditions expected."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain why some foods suit an outdoor activity and others do not.",
+       "proficient": "Next, {he} can try planning food and gear for each stage of an outdoor day.",
+       "extending": "{He} [is|are] ready to analyze how a longer trip or colder weather changes what the group needs."
+      },
+      "home": "Ask {him} what {he} would pack for a full day outside in the rain."
+     }
+    }
+   }
+  ]
+ },
+ "phe-outdoor-skills": {
+  "old": {
+   "phrase": "build and use skills for outdoor activities",
+   "next_steps": {
+    "emerging": "practise one skill needed for an outdoor activity",
+    "developing": "demonstrate several skills for outdoor activities",
+    "proficient": "develop new outdoor skills and use them in new settings"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-outdoor-skills--outdoor-education",
+    "courses": [
+     "Outdoor Education 11",
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.2",
+     "bc.oded12.cc.2"
+    ],
+    "ministry": "Develop and demonstrate a variety of skills for outdoor activities",
+    "bands": {
+     "all": {
+      "phrase": "develop and use a variety of skills for outdoor activities",
+      "next_steps": {
+       "emerging": "practise one skill needed for an outdoor activity",
+       "developing": "demonstrate several skills for outdoor activities",
+       "proficient": "develop new outdoor skills through practice and use them in new settings",
+       "extending": "combine outdoor skills to handle a full outdoor activity with little help"
+      },
+      "strength": [
+       "{He} [uses|use] outdoor skills such as reading a map and packing a bag.",
+       "{He} [practises|practise] new outdoor skills until {he} can use them with ease."
+      ],
+      "next": {
+       "developing": "{He} can make a habit of practising an outdoor skill before each trip.",
+       "proficient": "{His} next goal is to use {his} outdoor skills in an unfamiliar setting.",
+       "extending": "From here, {he} can practise teaching an outdoor skill to someone new."
+      },
+      "home": "Ask {him} which outdoor skill took the most practice to learn, and why."
+     }
+    }
+   }
+  ]
+ },
+ "phe-overcoming-barriers": {
+  "old": {
+   "phrase": "plan ways around barriers to being active",
+   "next_steps": {
+    "emerging": "identify a barrier that can limit participation in activity",
+    "developing": "plan one way to overcome a barrier to activity",
+    "proficient": "plan several ways to overcome barriers in different settings"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-overcoming-barriers--phe-10-active-living-11",
+    "courses": [
+     "Physical and Health Education 10",
+     "Active Living 11"
+    ],
+    "competency_ids": [
+     "bc.phe10.cc.9",
+     "bc.al11.cc.9"
+    ],
+    "ministry": "Plan ways to overcome potential barriers to participation in physical activities",
+    "bands": {
+     "all": {
+      "phrase": "plan ways to overcome barriers to taking part in physical activity",
+      "next_steps": {
+       "emerging": "identify a barrier that can limit participation, such as time or cost",
+       "developing": "plan one way to overcome a barrier to activity",
+       "proficient": "plan several ways to overcome barriers in different settings",
+       "extending": "plan for barriers before they happen and choose backup options"
+      },
+      "strength": [
+       "{He} [identifies|identify] barriers to being active, such as time, cost or transportation.",
+       "{He} [suggests|suggest] practical options, such as free activities close to home."
+      ],
+      "next": {
+       "developing": "{His} next step is to plan a way around the barrier that affects {him} most.",
+       "proficient": "Next, {he} can practise planning backup options for when a barrier appears.",
+       "extending": "{He} can now try planning ways around barriers that other people face, not just {his} own."
+      },
+      "home": "Ask {him} what makes it hardest to be active, and one way around it."
+     }
+    }
+   },
+   {
+    "id": "phe-overcoming-barriers--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.6",
+     "bc.fc12.cc.6"
+    ],
+    "ministry": "Plan ways to overcome potential barriers to participation in fitness and conditioning activities",
+    "bands": {
+     "all": {
+      "phrase": "plan ways to overcome barriers to fitness and conditioning activities",
+      "next_steps": {
+       "emerging": "identify barriers that could limit {his} fitness training",
+       "developing": "plan a way to keep training when a barrier arises",
+       "proficient": "plan training options for barriers such as injury, schedule or access to equipment",
+       "extending": "make a fitness plan that holds steady through common barriers"
+      },
+      "strength": [
+       "{He} [names|name] barriers to training, such as a busy schedule or no equipment.",
+       "{He} [plans|plan] options, such as body-weight workouts, for when a barrier arises."
+      ],
+      "next": {
+       "developing": "A good next step is to plan training for the weeks when {his} schedule is full.",
+       "proficient": "{He} [is|are] ready to adjust {his} fitness plan when a barrier such as a minor injury arises.",
+       "extending": "To go further, {he} can practise planning workouts that need no gym or equipment."
+      },
+      "home": "Ask {him} how {he} could train at home without any equipment."
+     }
+    }
+   },
+   {
+    "id": "phe-overcoming-barriers--active-living-12",
+    "courses": [
+     "Active Living 12"
+    ],
+    "competency_ids": [
+     "bc.al12.cc.6"
+    ],
+    "ministry": "Overcome potential barriers to participation in physical activities",
+    "bands": {
+     "all": {
+      "phrase": "overcome barriers to taking part in physical activity",
+      "next_steps": {
+       "emerging": "identify the barriers that limit {his} participation",
+       "developing": "use one strategy to stay active despite a barrier",
+       "proficient": "stay active through barriers by using several strategies",
+       "extending": "keep active over time by solving new barriers as they arise"
+      },
+      "strength": [
+       "{He} [finds|find] ways to stay active when time, cost or weather make it hard.",
+       "{He} [uses|use] strategies, such as fixed times, to keep active through a busy term."
+      ],
+      "next": {
+       "developing": "Next, {he} can try one new strategy each time a barrier stops {him} being active.",
+       "proficient": "{His} next goal is to stay active through a full season of changing barriers.",
+       "extending": "From here, {he} can practise helping others overcome a barrier to being active."
+      },
+      "home": "Ask {him} what {he} [does|do] to stay active when the week gets busy."
+     }
+    }
+   }
+  ]
+ },
+ "phe-promoting-well-being": {
+  "old": {
+   "phrase": "describe strategies that support mental well-being",
+   "next_steps": {
+    "emerging": "name strategies that support mental well-being",
+    "developing": "describe ways to support the mental well-being of others",
+    "proficient": "assess how well different well-being strategies work"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-promoting-well-being--phe",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.17",
+     "bc.phe9.cc.16",
+     "bc.phe10.cc.18"
+    ],
+    "ministry": "Describe and assess (8), analyze (9), or evaluate and explain (10) strategies for promoting mental well-being, for self and others",
+    "bands": {
+     "8-9": {
+      "phrase": "describe and assess ways to support mental well-being, for {himself} and others",
+      "next_steps": {
+       "emerging": "name strategies that support mental well-being",
+       "developing": "describe ways to support the mental well-being of others",
+       "proficient": "assess how well a well-being strategy works, and for whom",
+       "extending": "analyze why a strategy helps one person and not another"
+      },
+      "strength": [
+       "{He} [names|name] strategies that support well-being, such as rest, exercise and talking to someone.",
+       "{He} [describes|describe] ways to support a friend who is feeling sad or stressed."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain how a strategy helps {his} own well-being.",
+       "proficient": "It would help {him} to practise judging whether an idea for coping with stress would work in real life.",
+       "extending": "{He} [is|are] ready to analyze why a strategy suits some people and not others."
+      },
+      "home": null
+     },
+     "10-12": {
+      "phrase": "evaluate and explain strategies for promoting mental well-being",
+      "next_steps": {
+       "emerging": "describe a strategy that promotes mental well-being",
+       "developing": "explain how a strategy promotes mental well-being",
+       "proficient": "evaluate strategies using evidence of how well they work",
+       "extending": "evaluate strategies for different situations and explain which suit each"
+      },
+      "strength": [
+       "{He} [explains|explain] how strategies such as sleep, exercise and connection promote well-being.",
+       "{He} [evaluates|evaluate] well-being strategies by weighing evidence of how well they work."
+      ],
+      "next": {
+       "developing": "One skill to practise is explaining why a strategy works, not just naming it.",
+       "proficient": "Next, {he} can try evaluating which strategies suit short-term stress and which suit ongoing stress.",
+       "extending": "To go further, {he} can explain how a community can promote the well-being of its members."
+      },
+      "home": null
+     }
+    },
+    "sensitive": true,
+    "note": "Colin, Nov 5: sensitive health topic; no home line, never drafted on its own, Browse only."
+   }
+  ]
+ },
+ "phe-recreation": {
+  "old": {
+   "phrase": "take part in recreational activities in different places",
+   "next_steps": {
+    "emerging": "take part in one new recreational activity",
+    "developing": "take part in a variety of recreational activities",
+    "proficient": "try recreational activities in different environments"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-recreation--active-living-12",
+    "courses": [
+     "Active Living 12"
+    ],
+    "competency_ids": [
+     "bc.al12.cc.5"
+    ],
+    "ministry": "Engage in a variety of recreational activities in different environments",
+    "bands": {
+     "all": {
+      "phrase": "take part in a variety of recreational activities in different environments",
+      "next_steps": {
+       "emerging": "take part in one new recreational activity",
+       "developing": "take part in a variety of recreational activities",
+       "proficient": "try recreational activities in different environments, such as indoors, outdoors or in the community",
+       "extending": "find recreational activities in the community that {he} can continue after high school"
+      },
+      "strength": [
+       "{He} [joins|join] a range of recreational activities with steady effort.",
+       "{He} [takes|take] part in recreation both indoors and outdoors, at school and in the community."
+      ],
+      "next": {
+       "developing": "{He} can try a recreational activity in a setting {he} [has|have] not used before.",
+       "proficient": "{His} next step is to explore recreational options in the community beyond school.",
+       "extending": "A good next step is to choose activities {he} could continue on {his} own after graduation."
+      },
+      "home": "Ask {him} which free activity in your area {he} would like to try together."
+     }
+    }
+   }
+  ]
+ },
+ "phe-relationship-skills": {
+  "old": {
+   "phrase": "suggest strategies for building healthy relationships",
+   "next_steps": {
+    "emerging": "describe what a healthy relationship looks like",
+    "developing": "propose strategies for building healthy relationships",
+    "proficient": "explain how a strategy helps maintain a healthy relationship"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-relationship-skills--phe-8-9",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.15",
+     "bc.phe9.cc.14"
+    ],
+    "ministry": "Propose strategies for developing and maintaining healthy relationships",
+    "bands": {
+     "all": {
+      "phrase": "suggest ways to build and maintain healthy relationships",
+      "next_steps": {
+       "emerging": "describe what a healthy relationship looks like",
+       "developing": "suggest ways to build a healthy friendship",
+       "proficient": "explain how a strategy helps keep a relationship healthy over time",
+       "extending": "suggest strategies for different relationships, such as friends, family and teammates"
+      },
+      "strength": [
+       "{He} can describe signs of a healthy relationship, such as trust and respect.",
+       "{He} [suggests|suggest] ways to keep a friendship healthy, such as listening and keeping promises."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise explaining why trust matters in a relationship.",
+       "proficient": "{His} next step is to suggest strategies for keeping a relationship healthy when people disagree.",
+       "extending": "{He} [is|are] ready to explain how strategies differ for friends, family and teammates."
+      },
+      "home": "Ask {him} what makes someone a good friend."
+     }
+    }
+   },
+   {
+    "id": "phe-relationship-skills--phe-10",
+    "courses": [
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe10.cc.16"
+    ],
+    "ministry": "Develop skills for maintaining healthy relationships and responding to interpersonal conflict",
+    "bands": {
+     "all": {
+      "phrase": "use skills that maintain healthy relationships and respond to conflict",
+      "next_steps": {
+       "emerging": "describe a skill that helps maintain a healthy relationship",
+       "developing": "use a skill such as listening to respond to a disagreement",
+       "proficient": "respond to conflict with skills such as calm talk and compromise",
+       "extending": "try choosing a conflict skill to suit the situation and the person"
+      },
+      "strength": [
+       "{He} [uses|use] listening and clear, calm language when a disagreement arises.",
+       "{He} [knows|know] when to take a break from a conflict and return to it calmly."
+      ],
+      "next": {
+       "developing": "{He} can now practise using 'I' statements to explain {his} side of a disagreement.",
+       "proficient": "A next step for {him} is to practise finding a fair compromise when two people want different things.",
+       "extending": "To go further, {he} can practise helping two other people resolve a conflict calmly."
+      },
+      "home": "Ask {him} what helps two friends settle a disagreement fairly."
+     }
+    }
+   }
+  ]
+ },
+ "phe-risk-management": {
+  "old": {
+   "phrase": "assess and manage risks in outdoor activities",
+   "next_steps": {
+    "emerging": "identify the risks in an outdoor activity",
+    "developing": "manage risks as they arise during an activity",
+    "proficient": "assess risks across different types of outdoor activities"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-risk-management--outdoor-education",
+    "courses": [
+     "Outdoor Education 11",
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.14",
+     "bc.oded12.cc.12"
+    ],
+    "ministry": "Assess (11) or anticipate (12) and manage risks during different types of outdoor activities",
+    "bands": {
+     "all": {
+      "phrase": "assess, anticipate and manage risks during different types of outdoor activities",
+      "next_steps": {
+       "emerging": "identify the risks in an outdoor activity",
+       "developing": "manage risks as they arise during an outdoor activity",
+       "proficient": "assess risks across different types of outdoor activities before starting",
+       "extending": "anticipate risks before an activity and plan how the group will manage them"
+      },
+      "strength": [
+       "{He} [identifies|identify] risks such as cold, water or uneven ground before an activity.",
+       "{He} [takes|take] steps to manage a risk as soon as it arises."
+      ],
+      "next": {
+       "developing": "{His} next step is to rate each risk by how likely and how serious it is.",
+       "proficient": "One skill to practise is anticipating how a risk might change as conditions change.",
+       "extending": "{He} [is|are] ready to plan how the group would respond if a risk became an emergency."
+      },
+      "home": "Before a family outing, ask {him} what could go wrong and how to prepare."
+     }
+    }
+   }
+  ]
+ },
+ "phe-safe-participation": {
+  "old": {
+   "phrase": "take part safely and appropriately in activities",
+   "next_steps": {
+    "emerging": "identify the safety risks in an activity",
+    "developing": "act to reduce safety risks during an activity",
+    "proficient": "participate in ways that suit each activity and its setting"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-safe-participation--active-living-12",
+    "courses": [
+     "Active Living 12"
+    ],
+    "competency_ids": [
+     "bc.al12.cc.4"
+    ],
+    "ministry": "Demonstrate safe and appropriate participation in physical activities",
+    "bands": {
+     "all": {
+      "phrase": "take part in physical activities in safe and appropriate ways",
+      "next_steps": {
+       "emerging": "identify the safety risks in an activity",
+       "developing": "act to reduce safety risks during an activity",
+       "proficient": "take part in ways that suit each activity and its setting",
+       "extending": "help others take part safely and appropriately in an activity"
+      },
+      "strength": [
+       "{He} [follows|follow] safety rules and [uses|use] equipment as intended.",
+       "{He} [adjusts|adjust] how {he} [plays|play] to suit the activity, the space and the people."
+      ],
+      "next": {
+       "developing": "{He} can make a habit of scanning the space for hazards before an activity starts.",
+       "proficient": "Next, {he} can practise adjusting {his} play when the setting or group changes.",
+       "extending": "To go further, {he} can practise reminding others of safety expectations in a calm, friendly way."
+      },
+      "home": "Ask {him} what makes a game safe for everyone playing it."
+     }
+    }
+   }
+  ]
+ },
+ "phe-safety-fair-play": {
+  "old": {
+   "phrase": "play safely and fairly and lead others",
+   "next_steps": {
+    "emerging": "follow the safety rules of an activity",
+    "developing": "show fair play with teammates and opponents",
+    "proficient": "take a leadership role in a physical activity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-safety-fair-play--phe-active-living-11",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10",
+     "Active Living 11"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.4",
+     "bc.phe9.cc.4",
+     "bc.phe10.cc.4",
+     "bc.al11.cc.5"
+    ],
+    "ministry": "Develop and demonstrate (8, 9) or demonstrate (10, Active Living 11) safety, fair play, and leadership in physical activities",
+    "bands": {
+     "8-9": {
+      "phrase": "play safely and fairly, and lead others in physical activities",
+      "next_steps": {
+       "emerging": "follow the safety rules of an activity",
+       "developing": "show fair play with teammates and opponents",
+       "proficient": "take a leadership role, such as team captain, in a physical activity",
+       "extending": "help others play safely and fairly while leading a group"
+      },
+      "strength": [
+       "{He} [follows|follow] safety rules and [plays|play] fairly with teammates and opponents.",
+       "{He} [shakes|shake] hands, [accepts|accept] calls and [encourages|encourage] others during games."
+      ],
+      "next": {
+       "developing": "{He} can now practise staying calm and fair when a call goes against {his} team.",
+       "proficient": "{His} next step is to take a leadership role, such as leading a warm-up.",
+       "extending": "To go further, {he} can practise helping others settle a disagreement fairly during a game."
+      },
+      "home": "After a family game, ask {him} what fair play looked like."
+     },
+     "10-12": {
+      "phrase": "show safety, fair play and leadership in physical activities",
+      "next_steps": {
+       "emerging": "follow safety practices and rules in each activity",
+       "developing": "show fair play in competitive moments",
+       "proficient": "lead a group in a physical activity with attention to safety",
+       "extending": "model safety and fair play so others follow {his} example"
+      },
+      "strength": [
+       "{He} [shows|show] fair play even when a game is competitive.",
+       "{He} [leads|lead] by example, keeping play safe and including everyone."
+      ],
+      "next": {
+       "developing": "{He} can make a habit of naming the safety risks in an activity before it begins.",
+       "proficient": "A good next step is to lead a small group and make sure everyone is included.",
+       "extending": "From here, {he} can try coaching younger students on safe and fair play."
+      },
+      "home": "Ask {him} how {he} [responds|respond] when an opponent breaks the rules."
+     }
+    }
+   }
+  ]
+ },
+ "phe-safety-for-all": {
+  "old": {
+   "phrase": "take responsibility for personal safety and others' safety",
+   "next_steps": {
+    "emerging": "take steps to stay safe during an outdoor activity",
+    "developing": "take steps to help keep others safe outdoors",
+    "proficient": "plan for the safety of a whole group in an activity"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-safety-for-all--outdoor-education",
+    "courses": [
+     "Outdoor Education 11",
+     "Outdoor Education 12"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.13",
+     "bc.oded12.cc.11"
+    ],
+    "ministry": "Demonstrate responsibility for personal safety and the safety of others",
+    "bands": {
+     "all": {
+      "phrase": "take responsibility for {his} own safety and the safety of others outdoors",
+      "next_steps": {
+       "emerging": "take steps to keep {himself} safe during an outdoor activity",
+       "developing": "take steps to help keep others safe outdoors",
+       "proficient": "notice safety concerns for the group and respond to them",
+       "extending": "plan for the safety of a whole group during an outdoor activity"
+      },
+      "strength": [
+       "{He} [follows|follow] safety plans and [keeps|keep] {his} own gear in order.",
+       "{He} [notices|notice] when someone else is at risk and [acts|act] to help."
+      ],
+      "next": {
+       "developing": "{His} next step is to speak up when {he} [sees|see] a safety concern in the group.",
+       "proficient": "Next, {he} can practise making sure the whole group is together at each stop.",
+       "extending": "{He} [is|are] ready to help plan safety steps for the whole group before a trip."
+      },
+      "home": "Ask {him} how your family could stay safe on a walk after dark."
+     }
+    }
+   }
+  ]
+ },
+ "phe-safety-practices": {
+  "old": {
+   "phrase": "use safety practices that protect self and others",
+   "next_steps": {
+    "emerging": "follow the safety practices for one fitness activity",
+    "developing": "use safety practices that protect personal safety while training",
+    "proficient": "use safety practices that protect others during activities"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-safety-practices--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.15",
+     "bc.fc12.cc.15"
+    ],
+    "ministry": "Apply safety practices in different types of fitness activities, for themselves and others",
+    "bands": {
+     "all": {
+      "phrase": "apply safety practices in fitness activities that protect {himself} and others",
+      "next_steps": {
+       "emerging": "follow the safety practices for one fitness activity",
+       "developing": "use safety practices that protect {him} while training",
+       "proficient": "use safety practices that protect others, such as spotting a partner",
+       "extending": "apply safety practices across all types of fitness training without reminders"
+      },
+      "strength": [
+       "{He} [warms|warm] up first and [uses|use] loads {he} can control during training.",
+       "{He} [spots|spot] partners and [keeps|keep] walkways clear in the weight room."
+      ],
+      "next": {
+       "developing": "One habit to build is clearing the floor around {him} before each lift.",
+       "proficient": "It will help {him} to practise spotting a partner with clear signals and steady hands.",
+       "extending": "To go further, {he} can help others correct unsafe habits in a calm way."
+      },
+      "home": "Ask {him} what safety steps {he} [takes|take] before lifting weights."
+     }
+    }
+   }
+  ]
+ },
+ "phe-safety-strategies": {
+  "old": {
+   "phrase": "suggest ways to avoid or respond to unsafe situations",
+   "next_steps": {
+    "emerging": "name one way to stay safe in an unsafe situation",
+    "developing": "propose ways to respond to an unsafe situation",
+    "proficient": "explain how each strategy helps a person stay safe"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-safety-strategies--phe",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9",
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.13",
+     "bc.phe9.cc.12",
+     "bc.phe10.cc.14"
+    ],
+    "ministry": "Propose strategies for avoiding and/or responding to potentially unsafe, abusive, or exploitive (exploitative) situations",
+    "bands": {
+     "8-9": {
+      "phrase": "suggest ways to avoid or respond to unsafe or abusive situations",
+      "next_steps": {
+       "emerging": "name one way to stay safe in an unsafe situation",
+       "developing": "suggest ways to respond to an unsafe situation",
+       "proficient": "explain how each strategy helps a person stay safe",
+       "extending": "suggest strategies for unsafe situations online as well as in person"
+      },
+      "strength": [
+       "{He} can name trusted adults to tell when a situation feels unsafe.",
+       "{He} [suggests|suggest] clear ways to leave or refuse an unsafe situation."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise explaining why telling a trusted adult helps.",
+       "proficient": "A good next step is to explain how to recognize warning signs early.",
+       "extending": "{He} can now try suggesting strategies for staying safe online."
+      },
+      "home": null
+     },
+     "10-12": {
+      "phrase": "propose strategies for avoiding and responding to unsafe, abusive or exploitative situations",
+      "next_steps": {
+       "emerging": "describe a strategy for avoiding an unsafe situation",
+       "developing": "propose ways to respond to an unsafe or abusive situation",
+       "proficient": "explain how a strategy protects a person, and when to use it",
+       "extending": "propose strategies for less obvious forms of exploitation, such as pressure online"
+      },
+      "strength": [
+       "{He} [recognizes|recognize] warning signs of exploitation, such as pressure to keep secrets.",
+       "{He} [proposes|propose] realistic ways to refuse, leave and get help in an unsafe situation."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain why a strategy would work in a real situation.",
+       "proficient": "A useful next step is to practise matching strategies to situations online and in person.",
+       "extending": "To go further, {he} can explain how to support a friend who may be in an unsafe situation."
+      },
+      "home": null
+     }
+    },
+    "sensitive": true,
+    "note": "Colin, Nov 4: the abuse home line does not go in a report card. No home line; Generate never drafts from this set on its own; Browse only."
+   }
+  ]
+ },
+ "phe-self-knowledge": {
+  "old": {
+   "phrase": "describe personal strengths and areas for growth",
+   "next_steps": {
+    "emerging": "name one strength and give an example",
+    "developing": "explain an area for growth to work on",
+    "proficient": "explain how a strength can help with an area for growth"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-self-knowledge--outdoor-education-11",
+    "courses": [
+     "Outdoor Education 11"
+    ],
+    "competency_ids": [
+     "bc.oded11.cc.7"
+    ],
+    "ministry": "Understand their strengths and areas for growth",
+    "bands": {
+     "all": {
+      "phrase": "describe {his} strengths and areas for growth in outdoor activities",
+      "next_steps": {
+       "emerging": "name one strength and give an example from an outdoor activity",
+       "developing": "explain an area for growth {he} [wants|want] to improve",
+       "proficient": "try explaining how a strength can help with an area for growth",
+       "extending": "set a goal for an area for growth and track progress on trips"
+      },
+      "strength": [
+       "{He} can name {his} strengths outdoors and give examples from recent trips.",
+       "{He} [describes|describe] an area for growth plainly and without being hard on {himself}."
+      ],
+      "next": {
+       "developing": "{His} next step is to invite feedback from others about {his} strengths outdoors.",
+       "proficient": "Next, {he} can practise using a strength to help with an area {he} [wants|want] to grow.",
+       "extending": "{He} [is|are] ready to set a goal for one area for growth and track it over several trips."
+      },
+      "home": "Ask {him} what {he} [has|have] learned about {himself} on an outdoor trip."
+     }
+    }
+   }
+  ]
+ },
+ "phe-social-influences": {
+  "old": {
+   "phrase": "explain how social influences can affect health",
+   "next_steps": {
+    "emerging": "identify social influences that can affect health",
+    "developing": "explain how one social influence could affect health",
+    "proficient": "analyze how several social influences combine to affect health"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-social-influences--phe-10",
+    "courses": [
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe10.cc.17"
+    ],
+    "ministry": "Analyze the potential effects of social influences on health",
+    "bands": {
+     "all": {
+      "phrase": "analyze how social influences, such as friends and media, could affect health",
+      "next_steps": {
+       "emerging": "identify social influences that can affect health",
+       "developing": "explain how one social influence could affect health",
+       "proficient": "analyze how several social influences combine to affect health",
+       "extending": "analyze how a person can respond to a social influence to protect their health"
+      },
+      "strength": [
+       "{He} [identifies|identify] social influences on health, such as friends, family and media.",
+       "{He} [analyzes|analyze] how group pressure can lead to healthy or unhealthy choices."
+      ],
+      "next": {
+       "developing": "Next, {he} can try naming which social influence shapes {his} own daily habits most.",
+       "proficient": "{His} next goal is to analyze how two influences, such as friends and media, can pull in opposite directions.",
+       "extending": "To go further, {he} can explain how a person can use social influence to support healthy choices."
+      },
+      "home": "Ask {him} how friends shape what people {his} age eat, do and wear."
+     }
+    }
+   }
+  ]
+ },
+ "phe-substance-use-causes": {
+  "old": {
+   "phrase": "explain factors that can lead to substance use",
+   "next_steps": {
+    "emerging": "identify factors that can lead to substance use",
+    "developing": "explain how one factor can contribute to substance use",
+    "proficient": "explain how several factors interact in substance use"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-substance-use-causes--phe-10",
+    "courses": [
+     "Physical and Health Education 10"
+    ],
+    "competency_ids": [
+     "bc.phe10.cc.19"
+    ],
+    "ministry": "Explore factors contributing to substance use",
+    "bands": {
+     "all": {
+      "phrase": "explore the factors that can contribute to substance use",
+      "next_steps": {
+       "emerging": "identify factors that can lead to substance use",
+       "developing": "explain how one factor can contribute to substance use",
+       "proficient": "explain how personal, social and environmental factors interact in substance use",
+       "extending": "explain how support and healthy ways of coping can lower the risk of substance use"
+      },
+      "strength": [
+       "{He} [identifies|identify] factors that can contribute to substance use, such as stress or pressure from friends.",
+       "{He} [explains|explain] how easy access and the choices a person sees around them can affect substance use."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain how stress or curiosity can contribute to substance use.",
+       "proficient": "{He} [is|are] ready to explain how several factors together can raise the risk of substance use.",
+       "extending": "To go further, {he} can explain what lowers the risk of substance use, such as support from trusted people."
+      },
+      "home": null
+     }
+    },
+    "sensitive": true,
+    "note": "Colin, Nov 5: sensitive health topic; no home line, never drafted on its own, Browse only."
+   }
+  ]
+ },
+ "phe-supporting-others": {
+  "old": {
+   "phrase": "describe ways to support others with well-being concerns",
+   "next_steps": {
+    "emerging": "name a strategy that helps someone with a well-being problem",
+    "developing": "describe strategies that help others with substance use problems",
+    "proficient": "assess how useful a strategy is for helping someone"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-supporting-others--phe-8-9",
+    "courses": [
+     "Physical and Health Education 8",
+     "Physical and Health Education 9"
+    ],
+    "competency_ids": [
+     "bc.phe8.cc.18",
+     "bc.phe9.cc.17"
+    ],
+    "ministry": "Describe and assess (8) or assess and evaluate (9) strategies for managing problems related to mental well-being and substance use, for others",
+    "bands": {
+     "all": {
+      "phrase": "describe and assess ways to help others with mental well-being or substance use problems",
+      "next_steps": {
+       "emerging": "name a strategy that helps someone with a well-being problem",
+       "developing": "describe ways to help someone with a substance use problem",
+       "proficient": "assess how useful a strategy is for helping someone",
+       "extending": "evaluate which strategies suit different problems and when to involve a trusted adult"
+      },
+      "strength": [
+       "{He} [describes|describe] ways to support someone, such as listening and helping them find a trusted adult.",
+       "{He} [assesses|assess] whether a strategy would help the person or make things harder."
+      ],
+      "next": {
+       "developing": "{He} can now practise explaining when a problem is too big to handle alone.",
+       "proficient": "Next, {he} can try comparing two ways of helping a friend and choosing the safer one.",
+       "extending": "To go further, {he} can practise evaluating strategies for helping with substance use as well as mental well-being."
+      },
+      "home": null
+     }
+    },
+    "sensitive": true,
+    "note": "Colin, Nov 5: sensitive health topic; no home line, never drafted on its own, Browse only."
+   }
+  ]
+ },
+ "phe-training-styles": {
+  "old": {
+   "phrase": "explain how training styles affect fitness results",
+   "next_steps": {
+    "emerging": "name the results different training styles produce",
+    "developing": "describe how one training style affects fitness results",
+    "proficient": "compare training styles and the results each produces"
+   }
+  },
+  "sets": [
+   {
+    "id": "phe-training-styles--fitness-conditioning",
+    "courses": [
+     "Fitness and Conditioning 11",
+     "Fitness and Conditioning 12"
+    ],
+    "competency_ids": [
+     "bc.fc11.cc.9",
+     "bc.fc12.cc.9"
+    ],
+    "ministry": "Identify and describe the influences of different training styles on fitness results",
+    "bands": {
+     "all": {
+      "phrase": "describe how different training styles affect fitness results",
+      "next_steps": {
+       "emerging": "name the results different training styles produce",
+       "developing": "describe how one training style affects fitness results",
+       "proficient": "compare training styles and the results each produces",
+       "extending": "choose a training style to suit a goal and explain the expected results"
+      },
+      "strength": [
+       "{He} [describes|describe] how styles such as circuit or interval training affect fitness.",
+       "{He} [links|link] a training style to its results, such as gains in endurance or strength."
+      ],
+      "next": {
+       "developing": "{His} next step is to describe the results of a training style {he} [has|have] tried.",
+       "proficient": "Next, {he} can practise comparing two training styles for the same goal.",
+       "extending": "{He} [is|are] ready to choose a training style for a goal and explain {his} choice."
+      },
+      "home": "Ask {him} which way of training {he} [prefers|prefer], and what results {he} [notices|notice]."
+     }
+    }
+   }
+  ]
+ }
+}

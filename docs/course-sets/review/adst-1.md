@@ -1,0 +1,37 @@
+# Review: adst-1
+
+44 groups, 98 sets read (594 sentences plus phrases and next steps). 30 lines changed. No partition changes. Checker: clean (594 sentences).
+
+## Changes
+
+- adst-role-of-technology--automotive · strength.0: {He} can describe how a new technology, such as electric drive, is used in vehicles. → {He} can describe how a newer vehicle system works and how it changes the way vehicles are serviced. · electric drive is not named by the Ministry and not every Auto 11/12 or Engine and Drivetrain class studies it
+- adst-role-of-technology--metalwork · strength.0: {He} can describe how a technology such as computer-controlled cutting is used in metalwork. → {He} can describe how one newer technology is used to cut, shape or join metal. · computer-controlled cutting is not ordinary in Art Metal and Jewellery 12 or every Metalwork class
+- adst-safety-procedures--textiles-fashion · next_steps.emerging: apply the safety steps for sewing machines and irons → apply the safety steps for each textile tool and piece of equipment in use · sewing machines and irons are not ordinary in Fashion Industry 12
+- adst-safety-procedures--textiles-fashion · strength.0: {He} [uses|use] sewing machines, irons and cutting tools safely. → {He} [uses|use] textile tools and equipment safely, including sharp and hot tools. · same: Fashion Industry 12 may not use sewing machines or irons
+- adst-safety-procedures--textiles-fashion · next.developing: It would help {him} to check {his} space for pins, cords and hot tools before {he} [starts|start]. → It would help {him} to check {his} work space for hazards before {he} [starts|start]. · pins and cords assume a sewing room Fashion Industry 12 may not have
+- adst-safety-procedures--textiles-fashion · home: At home, ask {him} how to use an iron or scissors safely around others. → At home, ask {him} how to use scissors or other sharp tools safely around others. · drops the iron; scissors are ordinary everywhere
+- adst-prototype-form--food · next_steps.emerging: choose a form for a food prototype, such as a test batch → choose a form for a food prototype that suits what it must test · test batch said four times; kept in the strength, next step and home lines, where it is the food version of scale and ordinary in every food course
+- adst-production-tools--textiles · next.developing: A useful next step is to list every material an item needs before cutting begins. → A useful next step is to list every material an item needs before production begins. · set includes Fashion Industry 12, where cutting and sewing are not certain
+- adst-production-tools--textiles · next.proficient: {He} can now practise estimating how long each stage of sewing will take. → {He} can now practise estimating how long each stage of production will take. · same: sewing not ordinary in Fashion Industry 12
+- adst-progress-sharing--fashion-textiles-12 · strength.0: {He} [shows|show] a garment in progress to people who might collaborate on it. → {He} [shows|show] a piece in progress to people who might collaborate on it. · Textiles 12 work is not always a garment
+- adst-project-management--fashion-textiles · strength.1: {He} [divides|divide] the cutting, sewing and finishing fairly when working with a team. → {He} [divides|divide] production tasks fairly when working with a team. · cutting and sewing not ordinary in Fashion Industry 12
+- adst-safety-procedures--food-apply · strength.1: {He} [protects|protect] co-workers by keeping the kitchen clear and naming hazards aloud. → {He} [protects|protect] co-workers by keeping the kitchen clear and warning others of hazards. · naming hazards aloud is a routine the Ministry does not name
+- adst-safety-procedures--shop-10 · strength.0: {He} can explain how to use each shop tool or machine without risk of injury. → {He} can explain how to use each shop tool or machine safely. · "without risk of injury" overclaims
+- adst-plan-development--tourism · next_steps.extending: adjust a tourism plan so it works in busy and quiet seasons → adjust a tourism plan when a stage runs short of staff, time or money · seasons are invented; the Ministry asks for key stages and resources
+- adst-plan-development--tourism · next.extending: From here, {he} can practise planning for what could go wrong on the day of a tour. → From here, {he} can practise planning for what could go wrong on the day a service is delivered. · not every tourism product is a tour
+- adst-points-of-view--food-10 · strength.1: {He} [explains|explain] how a cook, a parent and a guest might see the same meal. → {He} [explains|explain] how the person cooking and the people eating might see the same meal differently. · "a parent" is an invented, odd example
+- adst-potential-customers--specialized-food-12 · home: At home, ask {him} who would buy a new snack {he} invented, and why. → At home, ask {him} who would buy a new snack {he} might invent, and why. · assumed the student had invented a snack
+- adst-procedure-changes--tools-materials · next_steps.extending: spot a problem early and change the procedure before it causes damage → spot a problem early and change the procedure before it causes bigger problems · "damage" does not fit Entrepreneurship and Marketing 10
+- adst-new-possibilities--evaluate-12 · strength.0: {He} can judge a new possibility against the goals of a project and explain the verdict. → {He} can judge a new possibility against the goals of a project and explain {his} reasons. · "verdict" is stylized
+- adst-point-of-view--shop-engineering · next_steps.emerging: state a point of view for a chosen design opportunity → name the user and the need in a point of view for a design · bare Ministry term; a parent cannot tell what a design "point of view" is
+- adst-point-of-view--shop-engineering · strength.0: {He} can state a point of view that sets the direction for a build. → {He} can state clearly who a design is for and what it must do for them. · same: says what a point of view is in plain words
+- adst-point-of-view--computing-media · strength.0: {He} can state a point of view that guides a program, website or media piece. → {He} can state who a program, website or media piece is for and what it must do for them. · same
+- adst-point-of-view--business-tourism · next_steps.emerging: state a point of view for a chosen business or marketing opportunity → state a point of view that names the customers an idea is for · same
+- adst-point-of-view--business-tourism · strength.0: {He} can state a point of view for a business, tourism or marketing idea. → {He} can state who a business, tourism or marketing idea is for and what it offers them. · same
+- adst-point-of-view--family-service · next_steps.emerging: state a point of view for a chosen service design opportunity → name the people served and their need in a point of view for a service · same
+- adst-point-of-view--family-service · strength.0: {He} can state a point of view for a service that helps a family, child or household. → {He} can state who a service is for, such as a family, child or household, and what it must do. · same
+
+## For Colin
+
+- "Critical feedback" (adst-critical-feedback phrases) is kept as the Ministry says it. The I Can statements say "honest feedback", but the app lint bans "honest" as an evaluative word. Some parents may read "critical" as negative.
+- adst-competing-factors is the approved sample; only its openings vary, and nothing in it was changed.

@@ -1,0 +1,3025 @@
+{
+ "math-concept-development": {
+  "old": {
+   "phrase": "explain how and why a math idea works",
+   "next_steps": {
+    "emerging": "make sense of a math idea through an example or story",
+    "developing": "explain how and why a math idea works",
+    "proficient": "use a math idea to investigate a new question"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-concept-development--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.8",
+     "bc.math9.cc.8",
+     "bc.fpc10.cc.6",
+     "bc.wpm10.cc.6",
+     "bc.fom11.cc.6",
+     "bc.hom11.cc.5",
+     "bc.pc11.cc.6",
+     "bc.wpm11.cc.6",
+     "bc.appm12.cc.6",
+     "bc.calc12.cc.6",
+     "bc.fom12.cc.6",
+     "bc.geom12.cc.7",
+     "bc.pc12.cc.6"
+    ],
+    "ministry": "Develop, demonstrate, and apply mathematical understanding through play, inquiry, and problem solving / Develop, demonstrate, and apply mathematical understanding through play, story, inquiry, and problem solving / Develop, demonstrate, and apply conceptual understanding of mathematical ideas through play, story, inquiry, and problem solving",
+    "bands": {
+     "8-9": {
+      "phrase": "explain how and why a math idea works, using play and problem solving",
+      "next_steps": {
+       "emerging": "make sense of a math idea by playing with examples",
+       "developing": "explain in words how a math idea works",
+       "proficient": "explain why a math idea works, not just how to use it",
+       "extending": "use a math idea to explore a new question"
+      },
+      "strength": [
+       "{He} [explains|explain] how a math idea works using {his} own examples.",
+       "{He} [uses|use] games and hands-on activities to make sense of new math ideas."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise saying in {his} own words why a method gives the right answer.",
+       "proficient": "Next, {he} can try changing one number in a problem to test whether the idea holds.",
+       "extending": "To go further, {he} can use a math idea to ask and answer a question of {his} own."
+      },
+      "home": "At home, ask {him} to teach you one new math idea from class and why it works."
+     },
+     "10-12": {
+      "phrase": "understand why math ideas work, using inquiry, story and problem solving",
+      "next_steps": {
+       "emerging": "connect a new math idea to an example or story that makes sense",
+       "developing": "practise explaining how and why a method works, step by step",
+       "proficient": "use a math idea to investigate a question that has no set method",
+       "extending": "explain how one idea links several methods or results"
+      },
+      "strength": [
+       "{He} [explains|explain] the reasoning behind a method instead of following its steps by rote.",
+       "{He} [uses|use] math ideas to investigate open questions as well as routine exercises."
+      ],
+      "next": {
+       "developing": "A good next step is to make a habit of asking why a formula works before using it.",
+       "proficient": "It will help {him} to test a new idea with {his} own examples to find where it breaks.",
+       "extending": "{He} [is|are] ready to explain how one math idea connects results that look different at first."
+      },
+      "home": "Ask {him} to explain a math idea from class as if you had never seen it."
+     }
+    }
+   },
+   {
+    "id": "math-concept-development--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.5",
+     "bc.cs12.cc.5"
+    ],
+    "ministry": "Develop, demonstrate, and apply conceptual understanding through experimentation, inquiry, and problem solving",
+    "bands": {
+     "all": {
+      "phrase": "explain how a computer science concept works by experimenting with it",
+      "next_steps": {
+       "emerging": "try a computer science concept on a small example and describe what happens",
+       "developing": "change one part of an experiment at a time and explain the result",
+       "proficient": "try using a computer science concept to investigate a question or solve a problem",
+       "extending": "plan experiments that test the limits of a computer science concept"
+      },
+      "strength": [
+       "{He} [tests|test] a new computing idea by changing a small piece of code and watching the result.",
+       "{He} can explain why a computer science concept works, not just what it does."
+      ],
+      "next": {
+       "developing": "From here, {he} can predict what a change to the code will do before running it.",
+       "proficient": "{His} next step is to keep a record of each experiment and what it showed.",
+       "extending": "{His} next goal is to design an experiment to find where a concept stops working."
+      },
+      "home": "At home, ask {him} to explain one computing idea from class and how {he} tested it."
+     }
+    }
+   },
+   {
+    "id": "math-concept-development--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.6"
+    ],
+    "ministry": "Develop, demonstrate, and apply conceptual understanding of statistical ideas through play, story, inquiry, and research",
+    "bands": {
+     "all": {
+      "phrase": "explain how and why a statistical idea works, using inquiry and research",
+      "next_steps": {
+       "emerging": "connect a statistical idea to a familiar example or story",
+       "developing": "explain what a statistic tells about a set of data",
+       "proficient": "use a statistical idea to investigate a question of interest",
+       "extending": "practise explaining when a statistical idea fits a question and when it misleads"
+      },
+      "strength": [
+       "{He} can explain what a summary number says about a whole set of data.",
+       "{He} [uses|use] statistical ideas to investigate questions through {his} own inquiry."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise explaining a result in words a family member would follow.",
+       "proficient": "A good next step is to test a statistical idea on a small set of data before applying it widely.",
+       "extending": "To go further, {he} can judge when a statistical idea fits a question and when it could mislead."
+      },
+      "home": "Ask {him} what a number in a news story or an ad tells you, and what it hides."
+     }
+    }
+   }
+  ]
+ },
+ "math-consequences-of-math": {
+  "old": {
+   "phrase": "explain how math has shaped cultures and societies",
+   "next_steps": {
+    "emerging": "describe one way math has changed how people live",
+    "developing": "explain how math has shaped a culture's traditions",
+    "proficient": "explain how math has affected political decisions"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-consequences-of-math--history-of-math",
+    "courses": [
+     "History of Mathematics 11"
+    ],
+    "competency_ids": [
+     "bc.hom11.cc.16"
+    ],
+    "ministry": "Reflect on the consequences of mathematics culturally, socially, and politically",
+    "bands": {
+     "all": {
+      "phrase": "reflect on how mathematics has shaped cultures, societies and political decisions",
+      "next_steps": {
+       "emerging": "describe one way mathematics has changed how people live together",
+       "developing": "explain how mathematics has shaped a culture's beliefs or traditions",
+       "proficient": "connect a mathematical idea to the social and political changes it brought",
+       "extending": "weigh the helpful and harmful consequences of a mathematical idea for a society"
+      },
+      "strength": [
+       "{He} can explain how a mathematical idea changed the way people lived and worked.",
+       "{He} [links|link] developments in mathematics to the beliefs and traditions of a culture."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise giving a specific example for each consequence {he} [names|name].",
+       "proficient": "From here, {he} can ask who gained and who lost when a society adopted a mathematical idea.",
+       "extending": "{He} [is|are] ready to trace how one mathematical idea has affected decisions made by governments."
+      },
+      "home": "At home, ask {him} how daily life would change without numbers or measuring."
+     }
+    }
+   }
+  ]
+ },
+ "math-creating-algorithms": {
+  "old": {
+   "phrase": "create and analyze algorithms to solve problems",
+   "next_steps": {
+    "emerging": "follow an algorithm step by step and explain each step",
+    "developing": "create an algorithm to solve a problem",
+    "proficient": "write a second algorithm that solves the problem another way"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-creating-algorithms--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.1",
+     "bc.cs12.cc.1"
+    ],
+    "ministry": "Develop flexible thinking to analyze and create algorithms / Develop fluent, flexible, and strategic thinking to analyze and create algorithms",
+    "bands": {
+     "all": {
+      "phrase": "analyze and create algorithms, and find more than one way to solve a problem",
+      "next_steps": {
+       "emerging": "follow an algorithm step by step and explain what each step does",
+       "developing": "create an algorithm that solves a problem from start to finish",
+       "proficient": "write a second algorithm that solves the same problem a different way",
+       "extending": "choose the algorithm strategy that suits a problem and explain the choice"
+      },
+      "strength": [
+       "{He} can trace an algorithm step by step and explain how it reaches its result.",
+       "{He} [writes|write] more than one algorithm for a problem and [compares|compare] how they work."
+      ],
+      "next": {
+       "developing": "{His} next step is to test {his} algorithm on unusual inputs to find where it fails.",
+       "proficient": "Next, {he} can compare two algorithms for the same problem by how many steps each one takes.",
+       "extending": "{His} next goal is to explain which algorithm strategy suits a problem, and why."
+      },
+      "home": "Ask {him} to list the steps of a daily routine so exactly that anyone could repeat them."
+     }
+    }
+   }
+  ]
+ },
+ "math-estimation": {
+  "old": {
+   "phrase": "estimate answers and work flexibly with numbers",
+   "next_steps": {
+    "emerging": "estimate an answer before calculating it",
+    "developing": "solve the same calculation in more than one way",
+    "proficient": "choose the number strategy that suits each problem"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-estimation--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12",
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.3",
+     "bc.math9.cc.3",
+     "bc.fpc10.cc.3",
+     "bc.wpm10.cc.3",
+     "bc.fom11.cc.3",
+     "bc.pc11.cc.3",
+     "bc.wpm11.cc.3",
+     "bc.appm12.cc.3",
+     "bc.calc12.cc.3",
+     "bc.fom12.cc.3",
+     "bc.geom12.cc.4",
+     "bc.pc12.cc.3",
+     "bc.stat12.cc.3"
+    ],
+    "ministry": "Estimate reasonably / Estimate reasonably and demonstrate fluent, flexible, and strategic thinking about number",
+    "bands": {
+     "8-9": {
+      "phrase": "make a reasonable estimate and use it to check an answer",
+      "next_steps": {
+       "emerging": "make a rough estimate before solving a problem",
+       "developing": "round numbers to make a quick estimate",
+       "proficient": "use an estimate to decide whether an answer makes sense",
+       "extending": "learn to explain why an estimate is close enough for the situation"
+      },
+      "strength": [
+       "{He} [makes|make] a quick estimate before {he} [starts|start] a calculation.",
+       "{He} [uses|use] {his} estimate to catch answers that do not make sense."
+      ],
+      "next": {
+       "developing": "A good next step is to make a habit of estimating first and comparing the estimate with the answer.",
+       "proficient": "It will help {him} to practise choosing friendly numbers that make estimating faster.",
+       "extending": "To go further, {he} can explain how close an estimate needs to be in different situations."
+      },
+      "home": "When you are out together, ask {him} to estimate a total or a travel time."
+     },
+     "10-12": {
+      "phrase": "estimate reasonably and work with numbers in flexible, strategic ways",
+      "next_steps": {
+       "emerging": "estimate an answer before calculating and compare the two",
+       "developing": "do the same calculation in more than one way",
+       "proficient": "choose a number strategy that suits the problem",
+       "extending": "explain why one number strategy is faster or more reliable for a problem"
+      },
+      "strength": [
+       "{He} [checks|check] each answer against a reasonable estimate before going to the next step.",
+       "{He} [chooses|choose] a number strategy that suits the problem, such as rounding or breaking numbers apart."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise doing a calculation two ways to confirm the result.",
+       "proficient": "{His} next step is to decide when an estimate is enough and when an exact answer is needed.",
+       "extending": "{He} [is|are] ready to explain why {he} chose one number strategy over another."
+      },
+      "home": "At home, ask {him} how {he} would quickly estimate a bill shared among several people."
+     }
+    }
+   }
+  ]
+ },
+ "math-first-peoples-views": {
+  "old": {
+   "phrase": "connect First Peoples knowledge and practices to math",
+   "next_steps": {
+    "emerging": "describe a First Peoples practice that uses math",
+    "developing": "use First Peoples knowledge to explore a math concept",
+    "proficient": "explain how a First Peoples worldview connects to math"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-first-peoples-views--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.18",
+     "bc.math9.cc.18",
+     "bc.fpc10.cc.18",
+     "bc.wpm10.cc.18",
+     "bc.fom11.cc.18",
+     "bc.hom11.cc.18",
+     "bc.pc11.cc.18",
+     "bc.wpm11.cc.18",
+     "bc.appm12.cc.18",
+     "bc.calc12.cc.18",
+     "bc.fom12.cc.18",
+     "bc.geom12.cc.19",
+     "bc.pc12.cc.18"
+    ],
+    "ministry": "Incorporate First Peoples worldviews and perspectives to make connections to mathematical concepts (Mathematics 8 and 9) / Incorporate First Peoples worldviews, perspectives, knowledge, and practices to make connections with mathematical concepts (Grades 10–12)",
+    "bands": {
+     "8-9": {
+      "phrase": "use Indigenous worldviews and perspectives to make connections to math ideas",
+      "next_steps": {
+       "emerging": "describe how an Indigenous perspective connects to a math idea",
+       "developing": "practise using an Indigenous perspective to explore a math idea",
+       "proficient": "explain how an Indigenous worldview connects to math",
+       "extending": "make connections between Indigenous perspectives and several math ideas"
+      },
+      "strength": [
+       "{He} can explain how an Indigenous way of seeing the world connects to a math idea.",
+       "{He} [listens|listen] to Indigenous perspectives and [uses|use] them to explore math concepts."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise finding the math in an Indigenous story or tradition shared in class.",
+       "proficient": "A good next step is to explain in {his} own words how an Indigenous perspective adds to a math idea.",
+       "extending": "{His} next goal is to connect one Indigenous perspective to more than one math concept."
+      },
+      "home": "At home, ask {him} to share an Indigenous perspective on math that {he} heard in class."
+     },
+     "10-12": {
+      "phrase": "connect Indigenous knowledge, practices and worldviews with mathematical concepts",
+      "next_steps": {
+       "emerging": "describe an Indigenous practice that uses mathematical thinking",
+       "developing": "use Indigenous knowledge and practices to explore a mathematical concept",
+       "proficient": "learn to explain how Indigenous worldviews and perspectives connect to mathematics",
+       "extending": "explain how an Indigenous practice and another method each make sense of the same problem"
+      },
+      "strength": [
+       "{He} [identifies|identify] the mathematics within Indigenous practices shared in class.",
+       "{He} [explains|explain] how Indigenous knowledge offers another way to understand a mathematical concept."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise describing the mathematical thinking inside an Indigenous practice.",
+       "proficient": "From here, {he} can explain how an Indigenous worldview shapes the way a problem is understood.",
+       "extending": "To go further, {he} can connect Indigenous knowledge to concepts across different parts of the course."
+      },
+      "home": "At home, ask {him} how an Indigenous practice from class uses measuring, counting or patterns."
+     }
+    },
+    "note": "Calculus 12's Ministry wording (bc.calc12.cc.18) says \"computer science concepts\", which looks copied from Computer Science 11 and 12; it is written here as math, like the other math courses."
+   },
+   {
+    "id": "math-first-peoples-views--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.17",
+     "bc.cs12.cc.17"
+    ],
+    "ministry": "Incorporate First Peoples worldviews, perspectives, knowledge, and practices to make connections with computer science concepts",
+    "bands": {
+     "all": {
+      "phrase": "connect Indigenous knowledge, practices and worldviews with computer science concepts",
+      "next_steps": {
+       "emerging": "describe an Indigenous practice that involves patterns, steps or instructions",
+       "developing": "use Indigenous knowledge and practices to explore a computer science concept",
+       "proficient": "explain how Indigenous worldviews and perspectives connect to computer science",
+       "extending": "practise using an Indigenous perspective to question how a technology is designed and used"
+      },
+      "strength": [
+       "{He} [connects|connect] Indigenous knowledge and practices to computing ideas such as patterns and step-by-step instructions.",
+       "{He} can explain how an Indigenous worldview offers another way to think about technology."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise naming the computing idea inside an Indigenous practice shared in class.",
+       "proficient": "Next, {he} can explain how an Indigenous perspective could shape the way a program is designed.",
+       "extending": "{He} [is|are] ready to use Indigenous worldviews to ask who a technology serves and how."
+      },
+      "home": "Ask {him} to describe the steps in an Indigenous practice from class, and how they connect to programming."
+     }
+    }
+   },
+   {
+    "id": "math-first-peoples-views--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.18"
+    ],
+    "ministry": "Incorporate First Peoples worldviews, perspectives, knowledge, and practices to make connections with statistical concepts",
+    "bands": {
+     "all": {
+      "phrase": "connect Indigenous knowledge, practices and worldviews with statistical concepts",
+      "next_steps": {
+       "emerging": "describe an Indigenous practice that involves gathering or sharing information",
+       "developing": "use Indigenous knowledge and practices to explore a statistical concept",
+       "proficient": "learn to explain how Indigenous worldviews and perspectives connect to statistics",
+       "extending": "consider how Indigenous perspectives shape what data is gathered and how it is used"
+      },
+      "strength": [
+       "{He} can explain how Indigenous knowledge connects to ideas about data and variation.",
+       "{He} [considers|consider] Indigenous perspectives on who data is about and how it should be used."
+      ],
+      "next": {
+       "developing": "A good next step is to practise linking a statistical concept to an Indigenous practice shared in class.",
+       "proficient": "It will help {him} to explain how an Indigenous perspective adds to the meaning of a set of data.",
+       "extending": "{His} next goal is to explain how Indigenous worldviews could change the way a statistical study is planned."
+      },
+      "home": "At home, ask {him} what {he} learned in class about Indigenous views on gathering and using data."
+     }
+    }
+   }
+  ]
+ },
+ "math-geometric-vocabulary": {
+  "old": {
+   "phrase": "use geometry vocabulary in class discussions",
+   "next_steps": {
+    "emerging": "use one geometry term correctly in a discussion",
+    "developing": "explain thinking to others with precise geometry language",
+    "proficient": "use geometry language to question or extend others' ideas"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-geometric-vocabulary--geometry",
+    "courses": [
+     "Geometry 12"
+    ],
+    "competency_ids": [
+     "bc.geom12.cc.14"
+    ],
+    "ministry": "Use geometric vocabulary and language to contribute to discussions in the classroom",
+    "bands": {
+     "all": {
+      "phrase": "use geometric vocabulary and language to contribute to class discussions",
+      "next_steps": {
+       "emerging": "use one geometric term correctly when sharing an idea",
+       "developing": "practise using exact geometric language to explain thinking to others",
+       "proficient": "use geometric terms to ask questions about other people's ideas",
+       "extending": "use geometric language to state a claim and its conditions exactly"
+      },
+      "strength": [
+       "{He} [uses|use] geometric terms correctly when {he} [explains|explain] an idea in discussion.",
+       "{He} [describes|describe] figures with exact language, so others can follow {his} reasoning."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise replacing everyday words with the geometric term that fits.",
+       "proficient": "{His} next step is to use exact terms when responding to another person's idea in discussion.",
+       "extending": "To go further, {he} can state the conditions of a geometric claim in exact language."
+      },
+      "home": "At home, ask {him} to describe the shape of an object using the words from class."
+     }
+    }
+   }
+  ]
+ },
+ "math-historical-symbols": {
+  "old": {
+   "phrase": "use historical math symbols to explore ideas",
+   "next_steps": {
+    "emerging": "explain what one historical math symbol represents",
+    "developing": "use a historical symbol system to work a problem",
+    "proficient": "compare a historical symbol system with modern notation"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-historical-symbols--history-of-math",
+    "courses": [
+     "History of Mathematics 11"
+    ],
+    "competency_ids": [
+     "bc.hom11.cc.11"
+    ],
+    "ministry": "Use historical symbolic representations to explore mathematics",
+    "bands": {
+     "all": {
+      "phrase": "use historical symbols and notations to explore mathematical ideas",
+      "next_steps": {
+       "emerging": "explain what one historical mathematical symbol represents",
+       "developing": "try using a historical symbol system to solve a problem",
+       "proficient": "compare a historical notation with modern notation for the same idea",
+       "extending": "explain what a historical notation made easy or hard for the people using it"
+      },
+      "strength": [
+       "{He} can explain what a historical mathematical symbol stands for and how it was used.",
+       "{He} [solves|solve] problems using a historical notation in place of modern symbols."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise translating between a historical notation and modern symbols.",
+       "proficient": "A good next step is to explain what a historical notation shows about how its users thought.",
+       "extending": "{He} [is|are] ready to judge which tasks a historical notation made easier and which it made harder."
+      },
+      "home": "Ask {him} to show you how a number was written in another time or place."
+     }
+    }
+   }
+  ]
+ },
+ "math-justification": {
+  "old": {
+   "phrase": "explain and justify math ideas and decisions",
+   "next_steps": {
+    "emerging": "explain a math decision with one reason",
+    "developing": "justify a math decision with clear reasons",
+    "proficient": "justify a math idea in more than one way"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-justification--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.12",
+     "bc.math9.cc.12",
+     "bc.fpc10.cc.11",
+     "bc.wpm10.cc.11",
+     "bc.fom11.cc.11",
+     "bc.hom11.cc.10",
+     "bc.pc11.cc.11",
+     "bc.wpm11.cc.11",
+     "bc.appm12.cc.11",
+     "bc.calc12.cc.11",
+     "bc.fom12.cc.11",
+     "bc.pc12.cc.11"
+    ],
+    "ministry": "Explain and justify mathematical ideas and decisions / Explain and justify mathematical ideas and decisions in many ways",
+    "bands": {
+     "8-9": {
+      "phrase": "explain and justify math ideas and decisions with reasons",
+      "next_steps": {
+       "emerging": "practise explaining a math decision with one reason",
+       "developing": "give a reason for each step in a solution",
+       "proficient": "justify a math idea with an example and a reason",
+       "extending": "explain why an answer must be true, not just that it works"
+      },
+      "strength": [
+       "{He} can explain the reason behind each choice {he} [makes|make] in a solution.",
+       "{He} [uses|use] examples to show why a math idea makes sense."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise giving a reason for every step {he} [writes|write].",
+       "proficient": "From here, {he} can explain {his} thinking so that someone else could check it.",
+       "extending": "{His} next goal is to show why an idea works for every case, not just one example."
+      },
+      "home": "At home, ask {him} to explain how {he} knew an answer was right."
+     },
+     "10-12": {
+      "phrase": "explain and justify math ideas and decisions in more than one way",
+      "next_steps": {
+       "emerging": "justify a math decision with a clear reason",
+       "developing": "explain a math idea with both words and a diagram",
+       "proficient": "justify a math idea in more than one way",
+       "extending": "choose the form of justification that suits the audience"
+      },
+      "strength": [
+       "{He} [justifies|justify] {his} decisions with reasons tied to the mathematics.",
+       "{He} [explains|explain] one idea with words, symbols and diagrams."
+      ],
+      "next": {
+       "developing": "{His} next step is to make a habit of stating the reason behind each decision in a solution.",
+       "proficient": "Next, {he} can practise justifying one result two ways, such as with symbols and with a diagram.",
+       "extending": "To go further, {he} can explain which justification would convince a doubtful reader, and why."
+      },
+      "home": "Ask {him} to convince you that a math answer from class is correct."
+     }
+    }
+   },
+   {
+    "id": "math-justification--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.10",
+     "bc.cs12.cc.10"
+    ],
+    "ministry": "Explain and justify mathematical ideas and decisions in many ways / Explain and justify computer science ideas and decisions in many ways",
+    "bands": {
+     "all": {
+      "phrase": "explain and justify computer science and math decisions in more than one way",
+      "next_steps": {
+       "emerging": "give a reason for one decision in a program or solution",
+       "developing": "learn to explain why each part of a solution is needed",
+       "proficient": "justify a design decision two ways, such as by tracing and by testing the code",
+       "extending": "defend a solution by explaining the choices that were not made"
+      },
+      "strength": [
+       "{He} can explain why {he} chose each step in a program or solution.",
+       "{He} [supports|support] {his} decisions with test results and clear reasoning."
+      ],
+      "next": {
+       "developing": "A good next step is to practise writing a short reason beside each key decision in {his} code.",
+       "proficient": "It will help {him} to justify a decision with both a test result and an explanation of the logic.",
+       "extending": "{He} [is|are] ready to explain why {he} rejected other approaches to a problem."
+      },
+      "home": "At home, ask {him} why {he} built a recent program the way {he} did."
+     }
+    }
+   },
+   {
+    "id": "math-justification--geometry",
+    "courses": [
+     "Geometry 12"
+    ],
+    "competency_ids": [
+     "bc.geom12.cc.12"
+    ],
+    "ministry": "Explain, justify, and evaluate geometric ideas and decisions in many ways",
+    "bands": {
+     "all": {
+      "phrase": "explain, justify and evaluate geometric ideas and decisions in many ways",
+      "next_steps": {
+       "emerging": "explain a geometric idea using a labelled diagram",
+       "developing": "justify a geometric decision with reasons based on properties",
+       "proficient": "justify a geometric idea in more than one way",
+       "extending": "evaluate whether a geometric argument holds and explain why"
+      },
+      "strength": [
+       "{He} [justifies|justify] geometric claims with properties of the figures involved.",
+       "{He} [evaluates|evaluate] a geometric argument and [explains|explain] where it holds or fails."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise naming the property that supports each step of an argument.",
+       "proficient": "{His} next step is to justify a geometric result with both a diagram and a written argument.",
+       "extending": "{His} next goal is to evaluate another person's geometric argument and suggest how to repair it."
+      },
+      "home": "Ask {him} how {he} would prove that two triangles match exactly in shape and size."
+     }
+    }
+   },
+   {
+    "id": "math-justification--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.11"
+    ],
+    "ministry": "Explain and justify statistical ideas and decisions in many ways",
+    "bands": {
+     "all": {
+      "phrase": "explain and justify statistical ideas and decisions in many ways",
+      "next_steps": {
+       "emerging": "give a reason for one choice made in a statistical study",
+       "developing": "explain a statistical decision with reasons drawn from the data",
+       "proficient": "justify a statistical idea in more than one way",
+       "extending": "defend a statistical conclusion against reasonable doubts"
+      },
+      "strength": [
+       "{He} [explains|explain] why {he} chose a type of graph or summary for {his} data.",
+       "{He} [justifies|justify] {his} conclusions with evidence from the data."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise linking each conclusion to the numbers that support it.",
+       "proficient": "A good next step is to justify one finding two ways, such as with a graph and a summary number.",
+       "extending": "To go further, {he} can answer the doubts a reader might raise about {his} conclusion."
+      },
+      "home": "At home, ask {him} what evidence would change {his} mind about a claim in the news."
+     }
+    }
+   }
+  ]
+ },
+ "math-logical-reasoning": {
+  "old": {
+   "phrase": "use reasoning and tools to explore math ideas",
+   "next_steps": {
+    "emerging": "explore a math idea with a tool or technology",
+    "developing": "use reasoning to explain why a math idea works",
+    "proficient": "apply reasoning to a math idea in an unfamiliar problem"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-logical-reasoning--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.2",
+     "bc.math9.cc.2",
+     "bc.fpc10.cc.2",
+     "bc.wpm10.cc.2",
+     "bc.fom11.cc.2",
+     "bc.pc11.cc.2",
+     "bc.wpm11.cc.2",
+     "bc.appm12.cc.2",
+     "bc.calc12.cc.2",
+     "bc.fom12.cc.2",
+     "bc.geom12.cc.3",
+     "bc.pc12.cc.2"
+    ],
+    "ministry": "Use reasoning and logic to explore, analyze, and apply mathematical ideas / Explore, analyze, and apply mathematical ideas using reason, technology, and other tools",
+    "bands": {
+     "8-9": {
+      "phrase": "use reasoning and logic to explore, analyze and apply math ideas",
+      "next_steps": {
+       "emerging": "practise explaining one step of reasoning in a solution",
+       "developing": "use logic to decide whether a math statement is true",
+       "proficient": "use reasoning to analyze why a math idea works",
+       "extending": "apply a math idea to a problem that looks new"
+      },
+      "strength": [
+       "{He} [uses|use] logic to decide whether a math statement is always true.",
+       "{He} [plans|plan] the steps of a solution so each one makes sense."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise checking that each step makes sense after the one before.",
+       "proficient": "From here, {he} can test a math statement with examples that might prove it wrong.",
+       "extending": "{He} [is|are] ready to use reasoning to explain why a pattern must continue."
+      },
+      "home": "At home, ask {him} to explain the thinking behind a move in a puzzle or game."
+     },
+     "10-12": {
+      "phrase": "explore, analyze and apply math ideas using reasoning, technology and other tools",
+      "next_steps": {
+       "emerging": "explore a math idea with a tool or technology",
+       "developing": "try using reasoning to explain what a tool or technology shows",
+       "proficient": "apply reasoning and technology to an unfamiliar problem",
+       "extending": "judge when a tool helps and when reasoning alone is needed"
+      },
+      "strength": [
+       "{He} [uses|use] technology to explore a math idea, then [reasons|reason] about what it shows.",
+       "{He} [analyzes|analyze] why a method works before using it on an unfamiliar problem."
+      ],
+      "next": {
+       "developing": "{His} next step is to make a habit of predicting a result before checking it with a tool.",
+       "proficient": "Next, {he} can explain why a tool's result makes sense, using reasoning as well.",
+       "extending": "{His} next goal is to decide which tool suits a problem and when reasoning by hand is faster."
+      },
+      "home": "Ask {him} how {he} would know if a calculator gave a wrong answer."
+     }
+    }
+   },
+   {
+    "id": "math-logical-reasoning--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.2",
+     "bc.cs12.cc.2"
+    ],
+    "ministry": "Explore, analyze, and apply mathematical ideas and computer science concepts using reason, technology, and other tools",
+    "bands": {
+     "all": {
+      "phrase": "explore, analyze and apply math and computer science ideas using reasoning and tools",
+      "next_steps": {
+       "emerging": "explore a computer science concept using a tool or technology",
+       "developing": "use reasoning to analyze how a math idea works inside a program",
+       "proficient": "apply math ideas and computer science concepts together to solve a problem",
+       "extending": "reason about a program's behaviour before running it"
+      },
+      "strength": [
+       "{He} [uses|use] reasoning to analyze how math and computer science ideas work together.",
+       "{He} [explores|explore] computing concepts with technology and [applies|apply] them to solve problems."
+      ],
+      "next": {
+       "developing": "A good next step is to practise tracing a program by hand to reason about what it does.",
+       "proficient": "It will help {him} to explain the math behind a computing solution, step by step.",
+       "extending": "To go further, {he} can predict the behaviour of code from its logic, then test the prediction."
+      },
+      "home": "At home, ask {him} how a computer might decide the order of a list of names."
+     }
+    }
+   },
+   {
+    "id": "math-logical-reasoning--history-of-math",
+    "courses": [
+     "History of Mathematics 11"
+    ],
+    "competency_ids": [
+     "bc.hom11.cc.2"
+    ],
+    "ministry": "Explore, analyze, and apply historical mathematical ideas using reason, technology, and other tools",
+    "bands": {
+     "all": {
+      "phrase": "explore, analyze and apply historical math ideas using reasoning and tools",
+      "next_steps": {
+       "emerging": "explore a historical math idea with a tool or model",
+       "developing": "use reasoning to explain how a historical math method works",
+       "proficient": "apply a historical math idea to solve a problem",
+       "extending": "analyze why a historical method worked and where it had limits"
+      },
+      "strength": [
+       "{He} can explain the reasoning behind a mathematical method used in the past.",
+       "{He} [applies|apply] historical math ideas to solve problems, using tools from the period or today."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise retracing the steps of a historical method to see why it works.",
+       "proficient": "{His} next step is to use a historical method on a new problem and compare it with a modern one.",
+       "extending": "{He} [is|are] ready to analyze what tools and ideas made a historical method possible."
+      },
+      "home": "Ask {him} how people solved a math problem before calculators existed."
+     }
+    }
+   },
+   {
+    "id": "math-logical-reasoning--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.2"
+    ],
+    "ministry": "Explore, analyze, and apply statistical ideas using reason, technology, and other tools",
+    "bands": {
+     "all": {
+      "phrase": "explore, analyze and apply statistical ideas using reasoning, technology and other tools",
+      "next_steps": {
+       "emerging": "explore a set of data with a tool or technology",
+       "developing": "practise using reasoning to explain what a statistical tool shows",
+       "proficient": "apply statistical ideas to solve a problem using data",
+       "extending": "judge whether a statistical result from technology makes sense"
+      },
+      "strength": [
+       "{He} [explores|explore] data with technology and [explains|explain] the patterns {he} [finds|find].",
+       "{He} [applies|apply] statistical ideas to solve problems with real data."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise describing what a graph or summary shows before drawing a conclusion.",
+       "proficient": "A good next step is to check whether a result from technology fits what the data suggests.",
+       "extending": "{His} next goal is to explain the assumptions behind a statistical tool before trusting its result."
+      },
+      "home": "At home, ask {him} how {he} would decide whether a survey result can be trusted."
+     }
+    }
+   }
+  ]
+ },
+ "math-making-connections": {
+  "old": {
+   "phrase": "connect math to other subjects and interests",
+   "next_steps": {
+    "emerging": "connect a math idea to an everyday interest",
+    "developing": "connect a math concept to another subject",
+    "proficient": "connect several math concepts to explain one situation"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-making-connections--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.16",
+     "bc.math9.cc.16",
+     "bc.fpc10.cc.16",
+     "bc.wpm10.cc.16",
+     "bc.fom11.cc.16",
+     "bc.hom11.cc.15",
+     "bc.pc11.cc.16",
+     "bc.wpm11.cc.16",
+     "bc.appm12.cc.16",
+     "bc.calc12.cc.16",
+     "bc.fom12.cc.16",
+     "bc.geom12.cc.17",
+     "bc.pc12.cc.16"
+    ],
+    "ministry": "Connect mathematical concepts to each other and to other areas and personal interests / Connect mathematical concepts with each other, other areas, and personal interests / Connect mathematical concepts with each other, with other areas, and with personal interests",
+    "bands": {
+     "8-9": {
+      "phrase": "connect math ideas to each other, other subjects and personal interests",
+      "next_steps": {
+       "emerging": "connect a math idea to something used every day",
+       "developing": "connect a math idea to another subject",
+       "proficient": "connect two math ideas to each other and explain the link",
+       "extending": "use several connected math ideas to explain one situation"
+      },
+      "strength": [
+       "{He} [connects|connect] math ideas to {his} own hobbies and interests.",
+       "{He} can explain how two math ideas are related."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise asking where a new math idea is used in other subjects.",
+       "proficient": "From here, {he} can explain how a new idea links to one {he} already [knows|know].",
+       "extending": "To go further, {he} can combine ideas from different parts of math to explain one situation."
+      },
+      "home": "At home, ask {him} where {he} [sees|see] math in a hobby or interest."
+     },
+     "10-12": {
+      "phrase": "connect mathematical concepts with each other, other areas and personal interests",
+      "next_steps": {
+       "emerging": "connect a mathematical concept to a personal interest",
+       "developing": "connect a mathematical concept to another subject or area",
+       "proficient": "explain how two mathematical concepts are connected",
+       "extending": "use links between several concepts to solve a problem in another area"
+      },
+      "strength": [
+       "{He} [connects|connect] new concepts to ones {he} learned earlier in math.",
+       "{He} [explains|explain] how mathematical concepts apply in other subjects and areas of life."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise linking each new concept to one from an earlier course.",
+       "proficient": "Next, {he} can explain how a concept from class is used in a field {he} [cares|care] about.",
+       "extending": "{He} [is|are] ready to use connections between concepts to choose a method for an unfamiliar problem."
+      },
+      "home": "Ask {him} which careers {he} [thinks|think] use the math from this course."
+     }
+    }
+   },
+   {
+    "id": "math-making-connections--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.15",
+     "bc.cs12.cc.15"
+    ],
+    "ministry": "Connect mathematical and computer science concepts with each other, other areas, and personal interests",
+    "bands": {
+     "all": {
+      "phrase": "connect math and computer science concepts with each other, other areas and interests",
+      "next_steps": {
+       "emerging": "connect a computer science concept to a personal interest",
+       "developing": "explain how a math concept is used in a computer science idea",
+       "proficient": "connect math and computer science concepts to another subject",
+       "extending": "combine math and computing ideas to solve a problem from another area"
+      },
+      "strength": [
+       "{He} can explain how a math concept is used inside a computing idea.",
+       "{He} [connects|connect] computer science concepts to {his} own interests and to other subjects."
+      ],
+      "next": {
+       "developing": "A good next step is to practise naming the math behind each computing idea {he} [uses|use].",
+       "proficient": "It will help {him} to explain how a computing idea could help with a problem in another subject.",
+       "extending": "{His} next goal is to apply computing and math ideas together to a problem {he} [cares|care] about."
+      },
+      "home": "At home, ask {him} how computers are part of a job or hobby {he} [finds|find] interesting."
+     }
+    }
+   },
+   {
+    "id": "math-making-connections--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.16"
+    ],
+    "ministry": "Connect statistical concepts with each other, other areas, and personal interests",
+    "bands": {
+     "all": {
+      "phrase": "connect statistical concepts with each other, other areas and personal interests",
+      "next_steps": {
+       "emerging": "connect a statistical concept to a personal interest",
+       "developing": "connect a statistical concept to another subject or area",
+       "proficient": "learn to explain how two statistical concepts are connected",
+       "extending": "practise using statistical concepts together to study a question from another field"
+      },
+      "strength": [
+       "{He} [connects|connect] statistical concepts to questions {he} [cares|care] about outside school.",
+       "{He} can explain how statistical ideas such as centre and spread are related."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise asking what statistics could add to a question in another subject.",
+       "proficient": "{His} next step is to explain how one statistical concept depends on another.",
+       "extending": "To go further, {he} can use statistics to explore a question that matters to {him}."
+      },
+      "home": "Ask {him} what {he} would want to measure about a hobby or interest."
+     }
+    }
+   }
+  ]
+ },
+ "math-math-communication": {
+  "old": {
+   "phrase": "show math thinking in more than one way",
+   "next_steps": {
+    "emerging": "show the thinking behind one answer",
+    "developing": "explain math thinking in more than one way",
+    "proficient": "choose a way to show thinking that suits the problem"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-math-communication--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.13",
+     "bc.math9.cc.13"
+    ],
+    "ministry": "Communicate mathematical thinking in many ways",
+    "bands": {
+     "all": {
+      "phrase": "communicate math thinking in many ways, such as words, pictures and numbers",
+      "next_steps": {
+       "emerging": "show the thinking behind one answer",
+       "developing": "show math thinking in two ways, such as words and a picture",
+       "proficient": "choose the way of showing thinking that suits the problem",
+       "extending": "explain how different ways of showing the same thinking connect"
+      },
+      "strength": [
+       "{He} [shows|show] {his} thinking with words, pictures and numbers.",
+       "{He} [chooses|choose] a way to show {his} thinking that fits the problem."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise showing each step so a reader can follow {his} thinking.",
+       "proficient": "A good next step is to try showing one solution in two different ways.",
+       "extending": "{He} [is|are] ready to explain which way of showing an answer suits a problem, and why."
+      },
+      "home": "At home, ask {him} to draw a quick sketch that explains {his} answer to a problem."
+     }
+    }
+   }
+  ]
+ },
+ "math-math-vocabulary": {
+  "old": {
+   "phrase": "use math vocabulary in class discussions",
+   "next_steps": {
+    "emerging": "use one math term correctly in a discussion",
+    "developing": "respond to classmates' ideas using math language",
+    "proficient": "explain thinking to others with precise math language"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-math-vocabulary--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.11",
+     "bc.math9.cc.11",
+     "bc.fpc10.cc.13",
+     "bc.wpm10.cc.13",
+     "bc.fom11.cc.13",
+     "bc.hom11.cc.12",
+     "bc.pc11.cc.13",
+     "bc.wpm11.cc.13",
+     "bc.appm12.cc.13",
+     "bc.calc12.cc.13",
+     "bc.fom12.cc.13",
+     "bc.pc12.cc.13"
+    ],
+    "ministry": "Use mathematical vocabulary and language to contribute to mathematical discussions / Use mathematical vocabulary and language to contribute to discussions in the classroom",
+    "bands": {
+     "8-9": {
+      "phrase": "use math words and language to share ideas in math discussions",
+      "next_steps": {
+       "emerging": "use one math word correctly when sharing an idea",
+       "developing": "use math words when responding to someone else's idea",
+       "proficient": "explain thinking to others using the correct math words",
+       "extending": "try using math language to ask a question that adds to a discussion"
+      },
+      "strength": [
+       "{He} [uses|use] math words correctly when {he} [shares|share] ideas in a discussion.",
+       "{He} [responds|respond] to other people's ideas using math language."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise using the new math words from each lesson when {he} [speaks|speak].",
+       "proficient": "From here, {he} can explain {his} thinking aloud using the exact math terms.",
+       "extending": "{His} next goal is to ask questions in discussion that use math language to test an idea."
+      },
+      "home": "At home, ask {him} to teach you one new math word and what it means."
+     },
+     "10-12": {
+      "phrase": "use mathematical vocabulary and language to contribute to class discussions",
+      "next_steps": {
+       "emerging": "use one mathematical term correctly in a class discussion",
+       "developing": "respond to another person's idea using mathematical language",
+       "proficient": "practise explaining reasoning in discussion with exact mathematical language",
+       "extending": "use mathematical language to question or extend another person's idea"
+      },
+      "strength": [
+       "{He} [contributes|contribute] to class discussions using correct mathematical terms.",
+       "{He} [responds|respond] to other people's reasoning with exact mathematical language."
+      ],
+      "next": {
+       "developing": "{His} next step is to make a habit of naming the concept {he} [is|are] using when {he} [speaks|speak].",
+       "proficient": "Next, {he} can practise restating another person's idea in exact mathematical terms.",
+       "extending": "To go further, {he} can use mathematical language to raise a question about another person's reasoning."
+      },
+      "home": "Ask {him} to explain a mathematical term from class in everyday words."
+     }
+    }
+   },
+   {
+    "id": "math-math-vocabulary--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.12",
+     "bc.cs12.cc.12"
+    ],
+    "ministry": "Use computer science and mathematical vocabulary and language to contribute to discussions in the classroom",
+    "bands": {
+     "all": {
+      "phrase": "use computer science and math vocabulary to contribute to class discussions",
+      "next_steps": {
+       "emerging": "try using one computer science term correctly in a class discussion",
+       "developing": "respond to another person's idea using computer science and math language",
+       "proficient": "explain a solution in discussion with exact computing terms",
+       "extending": "use computer science language to question or extend another person's idea"
+      },
+      "strength": [
+       "{He} [uses|use] computer science terms correctly when discussing code and solutions.",
+       "{He} [describes|describe] how {his} code works using exact computing terms."
+      ],
+      "next": {
+       "developing": "A good next step is to practise naming the computing concept behind each part of {his} solution.",
+       "proficient": "It will help {him} to explain {his} code to others using the correct technical terms.",
+       "extending": "{He} [is|are] ready to use exact computing language to suggest a change to another person's solution."
+      },
+      "home": "Ask {him} which computer science words from class would confuse a newcomer, and what they mean."
+     }
+    }
+   }
+  ]
+ },
+ "math-mental-math": {
+  "old": {
+   "phrase": "use mental math strategies to calculate",
+   "next_steps": {
+    "emerging": "use one mental math strategy, such as doubling",
+    "developing": "show the steps of a mental math strategy",
+    "proficient": "choose a mental math strategy that suits the numbers"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-mental-math--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.4",
+     "bc.math9.cc.4"
+    ],
+    "ministry": "Demonstrate and apply mental math strategies",
+    "bands": {
+     "all": {
+      "phrase": "use mental math strategies to calculate without writing",
+      "next_steps": {
+       "emerging": "use one mental math strategy, such as doubling or rounding",
+       "developing": "show the steps of a mental math strategy",
+       "proficient": "choose a mental math strategy that suits the numbers",
+       "extending": "explain why one mental math strategy is faster for some numbers"
+      },
+      "strength": [
+       "{He} [calculates|calculate] in {his} head using strategies such as doubling and halving.",
+       "{He} can show the steps of a mental math strategy {he} used."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise one new mental math strategy until it feels quick.",
+       "proficient": "{His} next step is to try solving the same problem with two mental strategies.",
+       "extending": "{His} next goal is to explain how {he} [chooses|choose] a strategy based on the numbers in a problem."
+      },
+      "home": "When you are out together, ask {him} to total a few prices in {his} head."
+     }
+    }
+   }
+  ]
+ },
+ "math-modelling-in-context": {
+  "old": {
+   "phrase": "use math to model a real situation",
+   "next_steps": {
+    "emerging": "identify the numbers that matter in a real situation",
+    "developing": "build a math model of a real situation",
+    "proficient": "explain how well a model represents a real situation"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-modelling-in-context--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.6",
+     "bc.math9.cc.6",
+     "bc.fpc10.cc.4",
+     "bc.wpm10.cc.4",
+     "bc.fom11.cc.4",
+     "bc.pc11.cc.4",
+     "bc.wpm11.cc.4",
+     "bc.appm12.cc.4",
+     "bc.calc12.cc.4",
+     "bc.fom12.cc.4",
+     "bc.geom12.cc.5",
+     "bc.pc12.cc.4"
+    ],
+    "ministry": "Model mathematics in contextualized experiences / Model with mathematics in situational contexts",
+    "bands": {
+     "8-9": {
+      "phrase": "use math to model a real situation and explain the model",
+      "next_steps": {
+       "emerging": "identify the numbers that matter in a real situation",
+       "developing": "practise using math, such as a table or equation, to model a real situation",
+       "proficient": "learn to explain how a model represents the situation",
+       "extending": "change a model when the situation changes and explain why"
+      },
+      "strength": [
+       "{He} [picks|pick] the numbers that matter in a real situation.",
+       "{He} [explains|explain] how {his} model, such as a table or drawing, matches the situation."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise writing what each number in a model stands for.",
+       "proficient": "A good next step is to check whether a model's answer makes sense in the real situation.",
+       "extending": "To go further, {he} can try changing one part of the situation to see how the model changes."
+      },
+      "home": "At home, ask {him} to use math to plan something real, such as a trip or a meal."
+     },
+     "10-12": {
+      "phrase": "model real situations with mathematics and judge how well the model fits",
+      "next_steps": {
+       "emerging": "identify the quantities that matter in a situation",
+       "developing": "build a mathematical model of a real situation",
+       "proficient": "explain how well a model represents a situation and where it has limits",
+       "extending": "refine a model by testing it against real information"
+      },
+      "strength": [
+       "{He} [builds|build] mathematical models that match the key features of a real situation.",
+       "{He} [explains|explain] what each part of a model means in the situation."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise stating the assumptions a model makes about the situation.",
+       "proficient": "From here, {he} can test a model's predictions against real values and explain any gap.",
+       "extending": "{He} [is|are] ready to explain which model fits a situation more closely, and why."
+      },
+      "home": "Ask {him} how {he} would use math to predict how much paint a room would need."
+     }
+    }
+   },
+   {
+    "id": "math-modelling-in-context--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.3",
+     "bc.cs12.cc.3"
+    ],
+    "ministry": "Model with mathematics in situational contexts",
+    "bands": {
+     "all": {
+      "phrase": "use mathematics to model real situations when solving computing problems",
+      "next_steps": {
+       "emerging": "identify the quantities a program would need to model a situation",
+       "developing": "express a real situation as a mathematical model a program could use",
+       "proficient": "explain how a model in code represents the real situation",
+       "extending": "test a model against real cases and refine the code or the math"
+      },
+      "strength": [
+       "{He} [describes|describe] a real situation with a mathematical model that a program can use.",
+       "{He} [explains|explain] how each variable in {his} code stands for something in the situation."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise listing the assumptions a model makes before writing any code.",
+       "proficient": "Next, {he} can compare a program's output with real cases to test the model.",
+       "extending": "{His} next goal is to explain the limits of a model and how they affect a program's results."
+      },
+      "home": "At home, ask {him} what a computer would need to know to predict travel time."
+     }
+    }
+   },
+   {
+    "id": "math-modelling-in-context--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.4"
+    ],
+    "ministry": "Model with statistics in situational contexts",
+    "bands": {
+     "all": {
+      "phrase": "use statistics to model real situations and explain what the model shows",
+      "next_steps": {
+       "emerging": "identify the variables that matter in a real situation",
+       "developing": "use statistics to model a real situation",
+       "proficient": "practise explaining how a statistical model represents the situation",
+       "extending": "judge how well a statistical model fits and where it misleads"
+      },
+      "strength": [
+       "{He} [uses|use] data to build a statistical model of a real situation.",
+       "{He} [explains|explain] what a statistical model predicts and how much the prediction can be trusted."
+      ],
+      "next": {
+       "developing": "A good next step is to practise stating which variable a model predicts, and from what.",
+       "proficient": "It will help {him} to check how closely a model's predictions match the real data.",
+       "extending": "To go further, {he} can explain where a statistical model breaks down, and why."
+      },
+      "home": "Ask {him} how {he} would use data to predict something in daily life, such as the weather."
+     }
+    }
+   }
+  ]
+ },
+ "math-offering-ideas": {
+  "old": {
+   "phrase": "share untested ideas in class discussion",
+   "next_steps": {
+    "emerging": "share thinking in class when unsure of the answer",
+    "developing": "offer a new or untested idea in a discussion",
+    "proficient": "build on a classmate's idea with a new one"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-offering-ideas--math",
+    "courses": [
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12",
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.fpc10.cc.14",
+     "bc.wpm10.cc.14",
+     "bc.fom11.cc.14",
+     "bc.hom11.cc.13",
+     "bc.pc11.cc.14",
+     "bc.wpm11.cc.14",
+     "bc.appm12.cc.14",
+     "bc.calc12.cc.14",
+     "bc.fom12.cc.14",
+     "bc.geom12.cc.15",
+     "bc.pc12.cc.14",
+     "bc.stat12.cc.14"
+    ],
+    "ministry": "Take risks when offering ideas in classroom discourse",
+    "bands": {
+     "all": {
+      "phrase": "take risks by offering new or untested ideas in class discussion",
+      "next_steps": {
+       "emerging": "share thinking in class even when unsure of the answer",
+       "developing": "offer a new or untested idea in a discussion",
+       "proficient": "explain the reasoning behind an untested idea when sharing it",
+       "extending": "offer an idea that challenges the usual approach to a problem"
+      },
+      "strength": [
+       "{He} [shares|share] {his} thinking in class even when {he} [is|are] unsure of the answer.",
+       "{He} [offers|offer] new ideas in discussion and [explains|explain] the reasoning behind them."
+      ],
+      "next": {
+       "developing": "From here, {he} can make a habit of sharing a partial idea instead of waiting for a full answer.",
+       "proficient": "{His} next step is to practise inviting others to question an idea {he} [has|have] shared.",
+       "extending": "{He} [is|are] ready to suggest an unusual approach and explain what it might reveal."
+      },
+      "home": "At home, ask {him} about an idea {he} shared in class that {he} [was|were] unsure of."
+     }
+    }
+   },
+   {
+    "id": "math-offering-ideas--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.13",
+     "bc.cs12.cc.13"
+    ],
+    "ministry": "Take risks when offering ideas in classroom discourse",
+    "bands": {
+     "all": {
+      "phrase": "take risks by sharing untested ideas about code and solutions in discussion",
+      "next_steps": {
+       "emerging": "share a possible solution in class even when unsure it works",
+       "developing": "offer an untested idea for solving a programming problem",
+       "proficient": "explain the thinking behind an untested idea and how to test it",
+       "extending": "propose an unusual approach to a computing problem and discuss its trade-offs"
+      },
+      "strength": [
+       "{He} [suggests|suggest] possible solutions in class before knowing whether they will work.",
+       "{He} [offers|offer] untested ideas about code and [invites|invite] others to help test them."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise describing a half-formed idea for a solution during discussion.",
+       "proficient": "A good next step is to suggest a way to test each idea {he} [shares|share].",
+       "extending": "{His} next goal is to propose an approach that others have not tried, and explain its risks."
+      },
+      "home": "Ask {him} about a computing idea {he} tried that did not work, and what it taught {him}."
+     }
+    }
+   }
+  ]
+ },
+ "math-persistent-solving": {
+  "old": {
+   "phrase": "keep working on a hard problem",
+   "next_steps": {
+    "emerging": "try a second approach when a first one does not work",
+    "developing": "keep working on a problem through several attempts",
+    "proficient": "work on a challenging problem until it is solved"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-persistent-solving--math",
+    "courses": [
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.fpc10.cc.9",
+     "bc.wpm10.cc.9",
+     "bc.fom11.cc.9",
+     "bc.hom11.cc.8",
+     "bc.pc11.cc.9",
+     "bc.wpm11.cc.9",
+     "bc.appm12.cc.9",
+     "bc.calc12.cc.9",
+     "bc.fom12.cc.9",
+     "bc.geom12.cc.10",
+     "bc.pc12.cc.9"
+    ],
+    "ministry": "Solve problems with persistence and a positive disposition",
+    "bands": {
+     "all": {
+      "phrase": "solve challenging problems with persistence and a willing attitude",
+      "next_steps": {
+       "emerging": "try a second approach when the first does not work",
+       "developing": "keep trying a problem through several attempts",
+       "proficient": "approach a challenging problem calmly and with interest",
+       "extending": "stay with a hard problem over time and learn from each attempt"
+      },
+      "strength": [
+       "{He} [tries|try] a new approach when {his} first attempt does not work.",
+       "{He} [approaches|approach] challenging problems calmly and with interest."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise writing what {he} [knows|know] before deciding a problem is too hard.",
+       "proficient": "From here, {he} can make a habit of trying one more approach before seeking help.",
+       "extending": "To go further, {he} can return to an unsolved problem on another day with fresh ideas."
+      },
+      "home": "At home, ask {him} about a hard problem {he} solved and what helped {him} keep trying."
+     }
+    }
+   },
+   {
+    "id": "math-persistent-solving--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.8",
+     "bc.cs12.cc.8"
+    ],
+    "ministry": "Solve problems with persistence and a positive disposition",
+    "bands": {
+     "all": {
+      "phrase": "solve programming problems with persistence and a willing attitude",
+      "next_steps": {
+       "emerging": "try a second approach when code does not work the first time",
+       "developing": "keep testing and fixing a program through several attempts",
+       "proficient": "approach a difficult bug calmly and with curiosity",
+       "extending": "stay with a hard computing problem and learn from each failed attempt"
+      },
+      "strength": [
+       "{He} [keeps|keep] testing and fixing {his} code when the first version does not work.",
+       "{He} [meets|meet] errors in a program calmly and [treats|treat] them as clues."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise using each error message as a guide before changing code.",
+       "proficient": "Next, {he} can make a habit of testing one small change at a time.",
+       "extending": "{He} [is|are] ready to break a large problem into smaller parts and solve them one by one."
+      },
+      "home": "Ask {him} about a time {his} code would not work and what {he} did next."
+     }
+    }
+   }
+  ]
+ },
+ "math-place-based-problems": {
+  "old": {
+   "phrase": "solve problems tied to local places, stories and cultures",
+   "next_steps": {
+    "emerging": "solve a problem connected to a local place",
+    "developing": "solve a problem linked to local First Peoples practices",
+    "proficient": "solve problems that connect several cultures or perspectives"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-place-based-problems--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.10",
+     "bc.math9.cc.10",
+     "bc.fpc10.cc.10",
+     "bc.wpm10.cc.10",
+     "bc.fom11.cc.10",
+     "bc.hom11.cc.9",
+     "bc.pc11.cc.10",
+     "bc.wpm11.cc.10",
+     "bc.appm12.cc.10",
+     "bc.calc12.cc.10",
+     "bc.fom12.cc.10",
+     "bc.geom12.cc.11",
+     "bc.pc12.cc.10"
+    ],
+    "ministry": "Engage in problem-solving experiences that are connected to place, story, cultural practices, and perspectives relevant to local First Peoples communities, the local community, and other cultures / Engage in problem-solving experiences connected with place, story, cultural practices, and perspectives relevant to local First Peoples communities, the local community, and other cultures / Engage in problem-solving experiences connected with place, story and cultural practices, including local First Peoples",
+    "bands": {
+     "8-9": {
+      "phrase": "solve problems connected to local places, stories, cultures and Indigenous communities",
+      "next_steps": {
+       "emerging": "solve a problem connected to a local place or story",
+       "developing": "solve a problem linked to local Indigenous practices or perspectives",
+       "proficient": "solve problems connected to the local community and other cultures",
+       "extending": "learn to explain how the place or culture behind a problem shapes its solution"
+      },
+      "strength": [
+       "{He} [solves|solve] math problems connected to local places and stories.",
+       "{He} [uses|use] math to explore practices from local Indigenous communities and other cultures."
+      ],
+      "next": {
+       "developing": "A good next step is to practise explaining what a problem has to do with the place behind it.",
+       "proficient": "It will help {him} to describe how a cultural practice uses math in its own way.",
+       "extending": "{His} next goal is to explain how knowing the place or story changes the way {he} [solves|solve] a problem."
+      },
+      "home": "At home, ask {him} where {he} [sees|see] math in your neighbourhood or family traditions."
+     },
+     "10-12": {
+      "phrase": "solve problems connected with place, story, cultural practices and Indigenous perspectives",
+      "next_steps": {
+       "emerging": "solve a problem connected with a local place or story",
+       "developing": "solve a problem linked to local Indigenous practices and perspectives",
+       "proficient": "solve problems connected with the local community and other cultures",
+       "extending": "explain how a culture's perspective shapes the way a problem is solved"
+      },
+      "strength": [
+       "{He} [uses|use] mathematics to answer questions that matter to {his} community and its cultures.",
+       "{He} [respects|respect] the perspectives of local Indigenous communities when solving problems connected to them."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise naming the cultural context of a problem before solving it.",
+       "proficient": "{His} next step is to explain how a cultural practice from class uses math to solve a real problem.",
+       "extending": "To go further, {he} can explain how a local story or tradition adds meaning to a mathematical solution."
+      },
+      "home": "Ask {him} how math is part of a tradition in your family or community."
+     }
+    }
+   },
+   {
+    "id": "math-place-based-problems--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.9",
+     "bc.cs12.cc.9"
+    ],
+    "ministry": "Engage in problem-solving experiences connected with place, story, cultural practices, and perspectives relevant to local First Peoples communities, the local community, and other cultures",
+    "bands": {
+     "all": {
+      "phrase": "solve computing problems connected with place, story, culture and Indigenous perspectives",
+      "next_steps": {
+       "emerging": "solve a computing problem connected with a local place or story",
+       "developing": "solve a computing problem linked to local Indigenous practices and perspectives",
+       "proficient": "design a solution that serves the local community or another culture",
+       "extending": "explain how a community's perspective shapes the design of a computing solution"
+      },
+      "strength": [
+       "{He} [builds|build] computing solutions for problems tied to local places and stories.",
+       "{He} [considers|consider] local Indigenous perspectives when designing a solution for a community."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise asking what a community needs before designing a solution.",
+       "proficient": "A good next step is to explain how {his} solution fits the needs and values of its community.",
+       "extending": "{He} [is|are] ready to explain how a story or cultural practice changed the design of {his} program."
+      },
+      "home": "At home, ask {him} how a program could help solve a problem in your community."
+     }
+    }
+   }
+  ]
+ },
+ "math-place-based-thinking": {
+  "old": {
+   "phrase": "use statistics to answer questions about local communities",
+   "next_steps": {
+    "emerging": "use data to answer a question about a local place",
+    "developing": "use statistical thinking on a question about a local community",
+    "proficient": "use data to explore cultural practices and perspectives"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-place-based-thinking--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.10"
+    ],
+    "ministry": "Engage in statistical thinking to answer questions connected with place, story, cultural practices, and perspectives relevant to local First Peoples communities, the local community, and other cultures",
+    "bands": {
+     "all": {
+      "phrase": "use statistical thinking to answer questions about place, story, culture and community",
+      "next_steps": {
+       "emerging": "use data to answer a question about a local place",
+       "developing": "practise using statistical thinking to answer a question about the local community",
+       "proficient": "use data to explore cultural practices and perspectives",
+       "extending": "use statistical thinking on a question that matters to local Indigenous communities"
+      },
+      "strength": [
+       "{He} [uses|use] data to answer questions about {his} local community and other cultures.",
+       "{He} [considers|consider] the people and places behind the data {he} [examines|examine]."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise linking each finding to the place or community it describes.",
+       "proficient": "From here, {he} can ask who the data is about and who should help decide how it is used.",
+       "extending": "{His} next goal is to explain how a story or cultural perspective adds meaning to a statistical result."
+      },
+      "home": "At home, ask {him} what question {he} would want data to answer about your community."
+     }
+    }
+   }
+  ]
+ },
+ "math-problem-exploration": {
+  "old": {
+   "phrase": "explore problems with curiosity and creative approaches",
+   "next_steps": {
+    "emerging": "ask a curious question about a problem",
+    "developing": "try a creative approach to a problem",
+    "proficient": "pursue a question that comes up while exploring a problem"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-problem-exploration--math",
+    "courses": [
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12",
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.fpc10.cc.5",
+     "bc.wpm10.cc.5",
+     "bc.fom11.cc.5",
+     "bc.hom11.cc.3",
+     "bc.pc11.cc.5",
+     "bc.wpm11.cc.5",
+     "bc.appm12.cc.5",
+     "bc.calc12.cc.5",
+     "bc.fom12.cc.5",
+     "bc.geom12.cc.6",
+     "bc.pc12.cc.5",
+     "bc.stat12.cc.5"
+    ],
+    "ministry": "Think creatively and with curiosity and wonder when exploring problems",
+    "bands": {
+     "all": {
+      "phrase": "explore problems creatively, with curiosity and wonder",
+      "next_steps": {
+       "emerging": "ask a curious question about a problem",
+       "developing": "try a new or unusual approach to a problem",
+       "proficient": "pursue a question that arises while exploring a problem",
+       "extending": "extend a problem by asking what happens when its conditions change"
+      },
+      "strength": [
+       "{He} [asks|ask] curious questions about the problems {he} [explores|explore].",
+       "{He} [tries|try] unusual approaches instead of using the first method {he} [thinks|think] of."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise writing one question {he} [wonders|wonder] about before starting a problem.",
+       "proficient": "Next, {he} can pursue a question that arises while solving, even when it is not required.",
+       "extending": "To go further, {he} can invent a new problem by changing the conditions of one {he} solved."
+      },
+      "home": "At home, ask {him} about a math question {he} [wonders|wonder] about."
+     }
+    }
+   },
+   {
+    "id": "math-problem-exploration--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.4",
+     "bc.cs12.cc.4"
+    ],
+    "ministry": "Think creatively and with curiosity and wonder when exploring problems",
+    "bands": {
+     "all": {
+      "phrase": "explore computing problems creatively, with curiosity and wonder",
+      "next_steps": {
+       "emerging": "ask a curious question about how a program or system works",
+       "developing": "try an unusual approach to a programming problem",
+       "proficient": "pursue a question that arises while building a solution",
+       "extending": "extend a program to explore what else it could do"
+      },
+      "strength": [
+       "{He} [wonders|wonder] how programs and systems work and [asks|ask] questions to learn more.",
+       "{He} [tries|try] unusual ways to solve programming problems."
+      ],
+      "next": {
+       "developing": "A good next step is to make a habit of asking what one changed line of code will do.",
+       "proficient": "It will help {him} to explore a side question {he} [has|have] about a program, then share what {he} found.",
+       "extending": "{He} [is|are] ready to add a feature to a program to see what becomes possible."
+      },
+      "home": "Ask {him} what {he} would like to make a computer do, and why."
+     }
+    }
+   }
+  ]
+ },
+ "math-puzzles-games": {
+  "old": {
+   "phrase": "use thinking strategies to solve puzzles and play games",
+   "next_steps": {
+    "emerging": "use one strategy, such as working backward, in a puzzle",
+    "developing": "explain the strategy used to solve a puzzle or win a game",
+    "proficient": "develop a new strategy when a familiar one does not work"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-puzzles-games--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12",
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.1",
+     "bc.math9.cc.1",
+     "bc.fpc10.cc.1",
+     "bc.wpm10.cc.1",
+     "bc.fom11.cc.1",
+     "bc.pc11.cc.1",
+     "bc.wpm11.cc.1",
+     "bc.appm12.cc.1",
+     "bc.calc12.cc.1",
+     "bc.fom12.cc.1",
+     "bc.geom12.cc.1",
+     "bc.pc12.cc.1",
+     "bc.stat12.cc.1"
+    ],
+    "ministry": "Use logic and patterns to solve puzzles and play games / Develop thinking strategies to solve puzzles and play games",
+    "bands": {
+     "8-9": {
+      "phrase": "use logic and patterns to solve puzzles and play games",
+      "next_steps": {
+       "emerging": "spot a pattern that helps solve a puzzle",
+       "developing": "try using logic to choose a good move in a game",
+       "proficient": "practise explaining how a pattern or rule helped solve a puzzle",
+       "extending": "make up a puzzle that uses a pattern for someone else to solve"
+      },
+      "strength": [
+       "{He} [spots|spot] patterns that help {him} solve puzzles.",
+       "{He} [uses|use] logic to plan moves when playing a math game."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise explaining the pattern {he} [notices|notice] in a puzzle.",
+       "proficient": "{His} next step is to try working backward from the goal of a puzzle.",
+       "extending": "{His} next goal is to create a puzzle of {his} own and test it on someone else."
+      },
+      "home": "Ask {him} to share a riddle or puzzle and explain how to solve it."
+     },
+     "10-12": {
+      "phrase": "develop thinking strategies to solve puzzles and play games",
+      "next_steps": {
+       "emerging": "use one strategy, such as working backward, on a puzzle",
+       "developing": "explain the strategy used to solve a puzzle or win a game",
+       "proficient": "develop a new strategy when a familiar one does not work",
+       "extending": "explain why a strategy works across a whole family of puzzles"
+      },
+      "strength": [
+       "{He} [develops|develop] strategies for puzzles, such as working backward or testing cases.",
+       "{He} can explain why a game strategy works and when it fails."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise naming the strategy {he} [uses|use] at each stage of a puzzle.",
+       "proficient": "A good next step is to try adapting a strategy from one puzzle to a different one.",
+       "extending": "To go further, {he} can explain how a winning strategy could be proved to work every time."
+      },
+      "home": "Ask {him} to teach you a strategy for a game your family plays."
+     }
+    }
+   },
+   {
+    "id": "math-puzzles-games--history-of-math",
+    "courses": [
+     "History of Mathematics 11"
+    ],
+    "competency_ids": [
+     "bc.hom11.cc.1"
+    ],
+    "ministry": "Develop thinking strategies to solve historical puzzles and play games",
+    "bands": {
+     "all": {
+      "phrase": "develop thinking strategies to solve historical puzzles and play games",
+      "next_steps": {
+       "emerging": "use one strategy to try a historical puzzle",
+       "developing": "learn to explain the strategy used to solve a historical puzzle or game",
+       "proficient": "compare a modern strategy with one people used in the past",
+       "extending": "explain what a historical puzzle shows about the mathematics of its time"
+      },
+      "strength": [
+       "{He} [solves|solve] historical puzzles by testing strategies and adjusting them.",
+       "{He} can explain how people in the past might have approached a puzzle or game."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise describing each strategy {he} [tries|try] on a historical puzzle.",
+       "proficient": "From here, {he} can solve a historical puzzle two ways, one old and one modern.",
+       "extending": "{He} [is|are] ready to explain what a historical game reveals about how people thought about math."
+      },
+      "home": "At home, ask {him} to share an old puzzle from class and how to solve it."
+     }
+    }
+   }
+  ]
+ },
+ "math-question-strategies": {
+  "old": {
+   "phrase": "choose methods that fit a statistics question",
+   "next_steps": {
+    "emerging": "choose a method that fits a statistics question",
+    "developing": "try more than one approach to the same statistics question",
+    "proficient": "explore statistics questions in both abstract and real-life settings"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-question-strategies--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.8"
+    ],
+    "ministry": "Apply flexible and strategic approaches to explore statistical questions in abstract and situational contexts",
+    "bands": {
+     "all": {
+      "phrase": "use flexible approaches to explore statistical questions in abstract and real-life settings",
+      "next_steps": {
+       "emerging": "choose a method that fits a statistical question",
+       "developing": "try more than one approach to the same statistical question",
+       "proficient": "explore statistical questions in both abstract and real-life settings",
+       "extending": "explain why one approach suits a statistical question more than another"
+      },
+      "strength": [
+       "{He} [chooses|choose] a method that fits the statistical question {he} [is|are] exploring.",
+       "{He} [tries|try] more than one approach and [compares|compare] what each one shows."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise matching each type of question to a method that suits it.",
+       "proficient": "Next, {he} can move between a real-life question and the abstract statistics behind it.",
+       "extending": "{His} next goal is to explain what each approach reveals that the others miss."
+      },
+      "home": "Ask {him} how {he} would use data to answer an everyday question, such as when a store is busiest."
+     }
+    }
+   }
+  ]
+ },
+ "math-reflection": {
+  "old": {
+   "phrase": "reflect on the thinking used to solve a problem",
+   "next_steps": {
+    "emerging": "describe the steps used to solve a problem",
+    "developing": "describe how thinking changed while solving a problem",
+    "proficient": "explain why thinking changed while solving a problem"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-reflection--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.15",
+     "bc.math9.cc.15",
+     "bc.fpc10.cc.15",
+     "bc.wpm10.cc.15",
+     "bc.fom11.cc.15",
+     "bc.hom11.cc.14",
+     "bc.pc11.cc.15",
+     "bc.wpm11.cc.15",
+     "bc.appm12.cc.15",
+     "bc.calc12.cc.15",
+     "bc.fom12.cc.15",
+     "bc.pc12.cc.15"
+    ],
+    "ministry": "Reflect on mathematical thinking",
+    "bands": {
+     "8-9": {
+      "phrase": "reflect on the thinking used to solve a problem",
+      "next_steps": {
+       "emerging": "describe the steps used to solve a problem",
+       "developing": "describe how thinking changed while solving a problem",
+       "proficient": "practise explaining why thinking changed while solving a problem",
+       "extending": "try using reflection on one problem to plan the approach to the next"
+      },
+      "strength": [
+       "{He} can describe the steps {he} took to solve a problem.",
+       "{He} [notices|notice] when {his} thinking changes partway through a problem."
+      ],
+      "next": {
+       "developing": "A good next step is to practise writing one sentence about what helped after each problem.",
+       "proficient": "It will help {him} to explain what made {him} change {his} plan during a problem.",
+       "extending": "To go further, {he} can use what {he} [notices|notice] about {his} thinking to plan the next problem."
+      },
+      "home": "At home, ask {him} which part of a math problem made {him} stop and think."
+     },
+     "10-12": {
+      "phrase": "reflect on mathematical thinking and how it changes while solving",
+      "next_steps": {
+       "emerging": "describe the thinking used to solve a problem",
+       "developing": "explain how and why thinking changed while solving a problem",
+       "proficient": "judge which parts of an approach worked and which did not",
+       "extending": "use reflection to choose approaches for new types of problems"
+      },
+      "strength": [
+       "{He} [reflects|reflect] on the approach {he} used and what {he} would change.",
+       "{He} [explains|explain] how and why {his} thinking shifted during a problem."
+      ],
+      "next": {
+       "developing": "From here, {he} can make a habit of noting where {his} thinking changed in a solution.",
+       "proficient": "{His} next step is to judge which step in an approach mattered most, and why.",
+       "extending": "{He} [is|are] ready to use reflection on past solutions to plan how to approach a new type of problem."
+      },
+      "home": "Ask {him} what {he} would do differently on a recent math problem."
+     }
+    }
+   },
+   {
+    "id": "math-reflection--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.14",
+     "bc.cs12.cc.14"
+    ],
+    "ministry": "Reflect on mathematical and computational thinking",
+    "bands": {
+     "all": {
+      "phrase": "reflect on mathematical and computational thinking used to solve a problem",
+      "next_steps": {
+       "emerging": "describe the steps of thinking used to write a solution",
+       "developing": "explain how thinking changed while designing or fixing a program",
+       "proficient": "judge which parts of a computational approach worked and why",
+       "extending": "use reflection on past programs to plan the design of a new one"
+      },
+      "strength": [
+       "{He} [reflects|reflect] on the computational thinking behind {his} programs.",
+       "{He} can explain how {his} plan for a solution changed while coding."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise noting what each bug taught {him} about {his} plan.",
+       "proficient": "A good next step is to explain which design choice made a program easier or harder to fix.",
+       "extending": "{His} next goal is to use lessons from earlier programs to plan a new solution before coding."
+      },
+      "home": "At home, ask {him} what {he} would change about a program {he} wrote."
+     }
+    }
+   },
+   {
+    "id": "math-reflection--geometry",
+    "courses": [
+     "Geometry 12"
+    ],
+    "competency_ids": [
+     "bc.geom12.cc.16"
+    ],
+    "ministry": "Reflect on geometric thinking",
+    "bands": {
+     "all": {
+      "phrase": "reflect on the geometric thinking used to solve a problem",
+      "next_steps": {
+       "emerging": "describe the geometric thinking used to solve a problem",
+       "developing": "practise explaining how a diagram changed the thinking about a problem",
+       "proficient": "judge which geometric approach worked and why",
+       "extending": "try using reflection to choose a geometric approach for a new problem"
+      },
+      "strength": [
+       "{He} [reflects|reflect] on the geometric reasoning {he} used in a solution.",
+       "{He} can describe how a diagram or construction changed {his} thinking."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise noting which property or diagram helped at each step.",
+       "proficient": "From here, {he} can explain why one geometric approach led to a solution faster than another.",
+       "extending": "To go further, {he} can use what {he} [learns|learn] from one proof to plan the next."
+      },
+      "home": "Ask {him} how drawing a picture helps {him} think about a shape problem."
+     }
+    }
+   },
+   {
+    "id": "math-reflection--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.15"
+    ],
+    "ministry": "Reflect on statistical thinking",
+    "bands": {
+     "all": {
+      "phrase": "reflect on the statistical thinking used to answer a question",
+      "next_steps": {
+       "emerging": "describe the statistical thinking used in an investigation",
+       "developing": "explain how thinking changed while working with data",
+       "proficient": "judge which choices in an investigation affected its result",
+       "extending": "use reflection to plan a new investigation"
+      },
+      "strength": [
+       "{He} [reflects|reflect] on the choices {he} made while analyzing data.",
+       "{He} can explain how {his} thinking about a question changed as {he} examined the data."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise noting each choice made in an investigation and why.",
+       "proficient": "Next, {he} can explain how a different choice of data might have changed the result.",
+       "extending": "{He} [is|are] ready to use reflection on one investigation to design the next."
+      },
+      "home": "At home, ask {him} what surprised {him} in the data {he} examined in class."
+     }
+    }
+   }
+  ]
+ },
+ "math-representation": {
+  "old": {
+   "phrase": "show math ideas with objects, pictures and symbols",
+   "next_steps": {
+    "emerging": "show a math idea with objects or a picture",
+    "developing": "show the same idea with objects, pictures and symbols",
+    "proficient": "explain how the different forms of an idea connect"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-representation--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.14",
+     "bc.math9.cc.14",
+     "bc.fpc10.cc.12",
+     "bc.wpm10.cc.12",
+     "bc.fom11.cc.12",
+     "bc.pc11.cc.12",
+     "bc.wpm11.cc.12",
+     "bc.appm12.cc.12",
+     "bc.calc12.cc.12",
+     "bc.fom12.cc.12",
+     "bc.geom12.cc.13",
+     "bc.pc12.cc.12"
+    ],
+    "ministry": "Represent mathematical ideas in concrete, pictorial, and symbolic forms",
+    "bands": {
+     "8-9": {
+      "phrase": "show math ideas with objects, pictures and symbols",
+      "next_steps": {
+       "emerging": "show a math idea with objects or a picture",
+       "developing": "show the same idea with objects, pictures and symbols",
+       "proficient": "explain how the different forms of an idea connect",
+       "extending": "choose the form that shows an idea most clearly and explain why"
+      },
+      "strength": [
+       "{He} [shows|show] math ideas with objects, drawings and symbols.",
+       "{He} can match a picture of an idea to the symbols that describe it."
+      ],
+      "next": {
+       "developing": "A good next step is to practise drawing a picture before writing the symbols for a problem.",
+       "proficient": "It will help {him} to explain how each part of a picture matches the symbols.",
+       "extending": "{His} next goal is to choose which form shows an idea most clearly, and say why."
+      },
+      "home": "At home, ask {him} to show a math idea from class using things around the house."
+     },
+     "10-12": {
+      "phrase": "represent mathematical ideas in concrete, pictorial and symbolic forms",
+      "next_steps": {
+       "emerging": "represent a mathematical idea with a model or a diagram",
+       "developing": "represent one idea in concrete, pictorial and symbolic forms",
+       "proficient": "practise explaining how the forms of one idea connect to each other",
+       "extending": "move flexibly between forms to solve a problem"
+      },
+      "strength": [
+       "{He} [represents|represent] mathematical ideas with models, diagrams and symbols.",
+       "{He} [translates|translate] between a diagram and symbols to solve problems."
+      ],
+      "next": {
+       "developing": "From here, {he} can make a habit of sketching a diagram before writing any symbols.",
+       "proficient": "{His} next step is to explain what each form of an idea makes easier to see.",
+       "extending": "To go further, {he} can choose the form of an idea that makes a hard problem simpler."
+      },
+      "home": "Ask {him} to sketch a diagram of a math idea and explain it to you."
+     }
+    }
+   },
+   {
+    "id": "math-representation--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.11",
+     "bc.cs12.cc.11"
+    ],
+    "ministry": "Represent computer science ideas in concrete, pictorial, symbolic, and pseudocode forms / Represent computer science ideas in concrete, pictorial, and symbolic forms",
+    "bands": {
+     "all": {
+      "phrase": "represent computer science ideas with models, diagrams, symbols and pseudocode",
+      "next_steps": {
+       "emerging": "represent a computer science idea with a model or a picture",
+       "developing": "represent an idea with a diagram and with pseudocode",
+       "proficient": "explain how a diagram, pseudocode and code for one idea connect",
+       "extending": "choose the form that makes a computing idea easiest to understand"
+      },
+      "strength": [
+       "{He} [plans|plan] solutions with diagrams and pseudocode before writing code.",
+       "{He} [represents|represent] computing ideas with physical models, pictures and symbols."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise writing pseudocode before starting a program.",
+       "proficient": "A good next step is to check that a diagram and the code for an idea match step by step.",
+       "extending": "{He} [is|are] ready to explain why one representation of an idea is clearer for a reader."
+      },
+      "home": "At home, ask {him} to draw a diagram that shows how a program from class works."
+     }
+    }
+   },
+   {
+    "id": "math-representation--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.12"
+    ],
+    "ministry": "Represent statistical ideas in concrete, pictorial, and symbolic forms",
+    "bands": {
+     "all": {
+      "phrase": "represent statistical ideas in concrete, pictorial and symbolic forms",
+      "next_steps": {
+       "emerging": "represent a statistical idea with objects or a picture",
+       "developing": "represent the same data with a picture and with symbols",
+       "proficient": "explain how the forms of a statistical idea connect",
+       "extending": "choose the form that shows a statistical idea most fairly"
+      },
+      "strength": [
+       "{He} [represents|represent] data with physical models, graphs and symbols.",
+       "{He} can explain how a graph and a formula describe the same statistical idea."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise showing one set of data in two different forms.",
+       "proficient": "From here, {he} can explain what each form of a statistical idea makes visible.",
+       "extending": "{His} next goal is to choose a representation that shows data fairly, and explain the choice."
+      },
+      "home": "Ask {him} to sketch a quick graph of something easy to track, such as the weather for a week."
+     }
+    }
+   }
+  ]
+ },
+ "math-research-questions": {
+  "old": {
+   "phrase": "keep exploring a research question when answers are unclear",
+   "next_steps": {
+    "emerging": "keep exploring a research question after a first try",
+    "developing": "keep exploring a research question when the answer is unclear",
+    "proficient": "take on a challenging research question with several approaches"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-research-questions--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.9"
+    ],
+    "ministry": "Explore research questions with persistence and a positive disposition",
+    "bands": {
+     "all": {
+      "phrase": "explore research questions with persistence and a willing attitude",
+      "next_steps": {
+       "emerging": "keep exploring a question when a first attempt gives no answer",
+       "developing": "keep investigating a question when the answer is unclear",
+       "proficient": "approach a challenging question calmly and with interest",
+       "extending": "pursue a hard question through several rounds of inquiry"
+      },
+      "strength": [
+       "{He} [keeps|keep] exploring a research question when the answer is not clear right away.",
+       "{He} [approaches|approach] challenging questions with interest instead of frustration."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise listing what {he} [knows|know] so far when an inquiry stalls.",
+       "proficient": "Next, {he} can try a new source of data when the first one does not answer the question.",
+       "extending": "To go further, {he} can refine a question after each round of inquiry instead of starting over."
+      },
+      "home": "At home, ask {him} about a question {he} [is|are] investigating and what {he} [has|have] tried."
+     }
+    }
+   }
+  ]
+ },
+ "math-solution-strategies": {
+  "old": {
+   "phrase": "choose and adapt strategies to solve problems",
+   "next_steps": {
+    "emerging": "choose a strategy that suits a problem",
+    "developing": "apply a chosen strategy through to a solution",
+    "proficient": "change approach when a problem calls for it"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-solution-strategies--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.7",
+     "bc.math9.cc.7",
+     "bc.fpc10.cc.8",
+     "bc.wpm10.cc.8",
+     "bc.fom11.cc.8",
+     "bc.hom11.cc.7",
+     "bc.pc11.cc.8",
+     "bc.wpm11.cc.8",
+     "bc.appm12.cc.8",
+     "bc.calc12.cc.8",
+     "bc.fom12.cc.8",
+     "bc.geom12.cc.9",
+     "bc.pc12.cc.8"
+    ],
+    "ministry": "Apply multiple strategies to solve problems in both abstract and contextualized situations / Apply flexible and strategic approaches to solve problems",
+    "bands": {
+     "8-9": {
+      "phrase": "use more than one strategy to solve problems, both abstract and real-life",
+      "next_steps": {
+       "emerging": "use one strategy from start to finish to solve a problem",
+       "developing": "solve a problem with a second strategy",
+       "proficient": "solve both number problems and real-life problems with different strategies",
+       "extending": "learn to explain which strategy suits a problem and why"
+      },
+      "strength": [
+       "{He} can solve the same problem using two or more strategies.",
+       "{He} [uses|use] math to solve real-life problems as well as number problems."
+      ],
+      "next": {
+       "developing": "A good next step is to try solving each problem a second way to check {his} answer.",
+       "proficient": "It will help {him} to practise choosing a strategy before starting, and explaining the choice.",
+       "extending": "{He} [is|are] ready to compare two strategies and explain which works faster for a problem."
+      },
+      "home": "At home, ask {him} to show you two ways to solve the same math problem."
+     },
+     "10-12": {
+      "phrase": "apply flexible and strategic approaches to solve problems",
+      "next_steps": {
+       "emerging": "choose a strategy that suits the problem",
+       "developing": "apply a chosen strategy through to a solution",
+       "proficient": "change approach when a problem calls for it",
+       "extending": "combine strategies to solve problems with several parts"
+      },
+      "strength": [
+       "{He} [chooses|choose] a strategy that suits each problem and [applies|apply] it to a solution.",
+       "{He} [changes|change] {his} approach when a problem calls for it."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise planning a strategy before beginning a calculation.",
+       "proficient": "{His} next step is to make a habit of asking whether a different approach would be faster.",
+       "extending": "{His} next goal is to combine strategies to solve multi-step problems."
+      },
+      "home": "Ask {him} how {he} [decides|decide] where to start a hard math problem."
+     }
+    }
+   },
+   {
+    "id": "math-solution-strategies--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.7",
+     "bc.cs12.cc.7"
+    ],
+    "ministry": "Apply flexible and strategic approaches to solve problems",
+    "bands": {
+     "all": {
+      "phrase": "apply flexible and strategic approaches to solve programming problems",
+      "next_steps": {
+       "emerging": "choose a strategy that suits a programming problem",
+       "developing": "apply a chosen approach until the program works",
+       "proficient": "change approach when a program or problem calls for it",
+       "extending": "combine strategies, such as splitting a problem into parts, to solve complex problems"
+      },
+      "strength": [
+       "{He} [breaks|break] a programming problem into smaller parts and [solves|solve] each one.",
+       "{He} [switches|switch] approach when a first solution does not work."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise planning the parts of a solution before writing code.",
+       "proficient": "A good next step is to try two approaches to a problem and compare them.",
+       "extending": "To go further, {he} can choose an approach by weighing how fast and how simple each one is."
+      },
+      "home": "At home, ask {him} how {he} would split a big chore into smaller steps."
+     }
+    }
+   }
+  ]
+ },
+ "math-spatial-reasoning": {
+  "old": {
+   "phrase": "use spatial reasoning to explore shapes",
+   "next_steps": {
+    "emerging": "move or change a figure to see what happens",
+    "developing": "change a figure to test an idea about its shape",
+    "proficient": "explain how a shape's properties hold as it moves or changes"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-spatial-reasoning--geometry",
+    "courses": [
+     "Geometry 12"
+    ],
+    "competency_ids": [
+     "bc.geom12.cc.2"
+    ],
+    "ministry": "Engage in spatial reasoning in a dynamic environment",
+    "bands": {
+     "all": {
+      "phrase": "use spatial reasoning while moving and changing geometric figures",
+      "next_steps": {
+       "emerging": "move or change a figure to see what happens",
+       "developing": "change a figure to test an idea about its shape",
+       "proficient": "explain which properties hold as a figure moves or changes",
+       "extending": "practise using what stays the same under change to predict a new result"
+      },
+      "strength": [
+       "{He} [moves|move] and [changes|change] figures to test ideas about their properties.",
+       "{He} [notices|notice] which features of a figure stay the same as it changes."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise predicting what will happen before moving a figure.",
+       "proficient": "From here, {he} can explain why a property holds no matter how the figure changes.",
+       "extending": "{He} [is|are] ready to use what stays fixed under change to form and test a conjecture."
+      },
+      "home": "Ask {him} to describe how a shadow changes shape as an object turns."
+     }
+    }
+   }
+  ]
+ },
+ "math-statistical-language": {
+  "old": {
+   "phrase": "use statistics vocabulary in class discussions",
+   "next_steps": {
+    "emerging": "use one statistics term correctly in a discussion",
+    "developing": "explain thinking to others with precise statistics language",
+    "proficient": "use statistics language to question others' claims about data"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-statistical-language--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.13"
+    ],
+    "ministry": "Use statistical vocabulary and language to contribute to discussions in the classroom",
+    "bands": {
+     "all": {
+      "phrase": "use statistical vocabulary and language to contribute to class discussions",
+      "next_steps": {
+       "emerging": "use one statistical term correctly in a discussion",
+       "developing": "explain thinking to others with exact statistical language",
+       "proficient": "use statistical language to question claims about data",
+       "extending": "try using statistical language to state a conclusion and its limits"
+      },
+      "strength": [
+       "{He} [uses|use] statistical terms correctly when {he} [shares|share] ideas in discussion.",
+       "{He} [questions|question] claims about data using exact statistical language."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise using the statistical terms from class when describing data.",
+       "proficient": "Next, {he} can state the limits of a conclusion in exact statistical terms.",
+       "extending": "{His} next goal is to use statistical language to question how another person's data was gathered."
+      },
+      "home": "Ask {him} which statistics words from class people often use loosely in everyday talk."
+     }
+    }
+   }
+  ]
+ },
+ "math-strategy-critique": {
+  "old": {
+   "phrase": "judge historical strategies for solving math problems",
+   "next_steps": {
+    "emerging": "describe a strategy people in the past used in math",
+    "developing": "critique one historical strategy for a math problem",
+    "proficient": "compare the strengths and limits of several historical strategies"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-strategy-critique--history-of-math",
+    "courses": [
+     "History of Mathematics 11"
+    ],
+    "competency_ids": [
+     "bc.hom11.cc.4"
+    ],
+    "ministry": "Critique multiple strategies used to solve mathematical problems throughout history",
+    "bands": {
+     "all": {
+      "phrase": "critique strategies used to solve mathematical problems throughout history",
+      "next_steps": {
+       "emerging": "describe a strategy people in the past used to solve a math problem",
+       "developing": "critique one historical strategy for a math problem",
+       "proficient": "compare the strengths and limits of past strategies for the same problem",
+       "extending": "practise explaining why a historical strategy was replaced, or why it lasted"
+      },
+      "strength": [
+       "{He} can describe how people in the past solved a math problem and judge the method.",
+       "{He} [compares|compare] the strengths and limits of historical strategies for the same problem."
+      ],
+      "next": {
+       "developing": "A good next step is to practise naming one strength and one limit of each historical strategy.",
+       "proficient": "It will help {him} to test a historical strategy on a new problem to judge its limits.",
+       "extending": "To go further, {he} can explain what a historical strategy reveals about the tools of its time."
+      },
+      "home": "Ask {him} how people might have measured distance or time long ago."
+     }
+    }
+   }
+  ]
+ },
+ "math-supporting-choices": {
+  "old": {
+   "phrase": "use math to give reasons for a choice",
+   "next_steps": {
+    "emerging": "show the numbers behind a choice",
+    "developing": "use a calculation to give a reason for a choice",
+    "proficient": "compare options with math to support a choice"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-supporting-choices--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.17",
+     "bc.math9.cc.17"
+    ],
+    "ministry": "Use mathematical arguments to support personal choices",
+    "bands": {
+     "all": {
+      "phrase": "use math to give reasons for a personal choice",
+      "next_steps": {
+       "emerging": "show the numbers behind a choice",
+       "developing": "use a calculation to give a reason for a choice",
+       "proficient": "compare options with math to support a choice",
+       "extending": "explain which numbers matter most when making a choice"
+      },
+      "strength": [
+       "{He} [uses|use] calculations to explain why {he} made a choice.",
+       "{He} [compares|compare] options with numbers before deciding."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise showing the calculation behind each choice {he} [makes|make].",
+       "proficient": "{His} next step is to compare two options using the same type of calculation.",
+       "extending": "{He} [is|are] ready to explain when the numbers do not tell the whole story about a choice."
+      },
+      "home": "When you make a choice together, such as which size to buy, ask {him} to use math to decide."
+     }
+    }
+   }
+  ]
+ },
+ "math-testing-conjectures": {
+  "old": {
+   "phrase": "use tools to explore patterns and test ideas",
+   "next_steps": {
+    "emerging": "use a tool to explore a pattern",
+    "developing": "create a pattern with a tool or technology",
+    "proficient": "test a conjecture about a pattern and explain the result"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-testing-conjectures--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.5",
+     "bc.math9.cc.5"
+    ],
+    "ministry": "Use tools or technology to explore and create patterns and relationships, and test conjectures",
+    "bands": {
+     "all": {
+      "phrase": "use tools or technology to explore patterns and test ideas about them",
+      "next_steps": {
+       "emerging": "use a tool to explore a pattern",
+       "developing": "create a pattern with a tool or technology",
+       "proficient": "test a prediction about a pattern and explain the result",
+       "extending": "explain why a pattern works, after testing it many times"
+      },
+      "strength": [
+       "{He} [uses|use] tools to explore patterns and relationships between numbers.",
+       "{He} [checks|check] whether a pattern continues by testing more examples."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise writing a prediction before testing a pattern.",
+       "proficient": "A good next step is to test a prediction with examples that might break it.",
+       "extending": "{His} next goal is to explain why a pattern holds, not just that it does."
+      },
+      "home": "At home, ask {him} to spot a pattern, such as in house numbers, and predict the next one."
+     }
+    }
+   }
+  ]
+ },
+ "math-using-mistakes": {
+  "old": {
+   "phrase": "use mistakes to improve the next attempt",
+   "next_steps": {
+    "emerging": "find where a mistake happened in a solution",
+    "developing": "correct a mistake and explain what went wrong",
+    "proficient": "use a mistake to choose a better approach next time"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-using-mistakes--math",
+    "courses": [
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Geometry 12",
+     "Pre-calculus 12",
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.fpc10.cc.17",
+     "bc.wpm10.cc.17",
+     "bc.fom11.cc.17",
+     "bc.hom11.cc.17",
+     "bc.pc11.cc.17",
+     "bc.wpm11.cc.17",
+     "bc.appm12.cc.17",
+     "bc.calc12.cc.17",
+     "bc.fom12.cc.17",
+     "bc.geom12.cc.18",
+     "bc.pc12.cc.17",
+     "bc.stat12.cc.17"
+    ],
+    "ministry": "Use mistakes as opportunities to advance learning",
+    "bands": {
+     "all": {
+      "phrase": "use mistakes as chances to learn and improve the next attempt",
+      "next_steps": {
+       "emerging": "find where a mistake happened in a solution",
+       "developing": "correct a mistake and explain what went wrong",
+       "proficient": "try using a mistake to choose a more suitable approach next time",
+       "extending": "spot patterns in past mistakes and plan how to avoid them"
+      },
+      "strength": [
+       "{He} [finds|find] where {his} thinking went wrong and [corrects|correct] it.",
+       "{He} [uses|use] {his} mistakes to improve the next attempt at a problem."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise explaining in writing what caused each mistake.",
+       "proficient": "From here, {he} can keep a list of {his} common errors and check new work against it.",
+       "extending": "To go further, {he} can use patterns in past mistakes to plan how {he} [checks|check] new work."
+      },
+      "home": "At home, ask {him} about a mistake that helped {him} understand something new."
+     }
+    }
+   },
+   {
+    "id": "math-using-mistakes--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.16",
+     "bc.cs12.cc.16"
+    ],
+    "ministry": "Use mistakes as opportunities to advance learning",
+    "bands": {
+     "all": {
+      "phrase": "use errors and bugs as chances to learn and improve a program",
+      "next_steps": {
+       "emerging": "find where an error happens in a program",
+       "developing": "fix an error and explain what caused it",
+       "proficient": "use a past bug to choose a more reliable approach in new code",
+       "extending": "test code in ways designed to catch mistakes early"
+      },
+      "strength": [
+       "{He} [tracks|track] errors to their cause and [fixes|fix] them.",
+       "{He} [treats|treat] bugs as chances to learn how {his} code really works."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise describing the cause of each bug before fixing it.",
+       "proficient": "Next, {he} can keep notes on bugs {he} [has|have] fixed to avoid repeating them.",
+       "extending": "{He} [is|are] ready to write tests that catch likely mistakes before they cause problems."
+      },
+      "home": "Ask {him} about a bug {he} fixed and what it taught {him}."
+     }
+    }
+   }
+  ]
+ },
+ "math-visualization": {
+  "old": {
+   "phrase": "use visuals to show math ideas and relationships",
+   "next_steps": {
+    "emerging": "draw a simple visual of a math concept",
+    "developing": "create a visual that illustrates a math concept",
+    "proficient": "use visuals to show how math ideas relate"
+   }
+  },
+  "sets": [
+   {
+    "id": "math-visualization--math",
+    "courses": [
+     "Mathematics 8",
+     "Mathematics 9",
+     "Foundations of Mathematics and Pre-calculus 10",
+     "Workplace Mathematics 10",
+     "Foundations of Mathematics 11",
+     "History of Mathematics 11",
+     "Pre-calculus 11",
+     "Workplace Mathematics 11",
+     "Apprenticeship Mathematics 12",
+     "Calculus 12",
+     "Foundations of Mathematics 12",
+     "Pre-calculus 12"
+    ],
+    "competency_ids": [
+     "bc.math8.cc.9",
+     "bc.math9.cc.9",
+     "bc.fpc10.cc.7",
+     "bc.wpm10.cc.7",
+     "bc.fom11.cc.7",
+     "bc.hom11.cc.6",
+     "bc.pc11.cc.7",
+     "bc.wpm11.cc.7",
+     "bc.appm12.cc.7",
+     "bc.calc12.cc.7",
+     "bc.fom12.cc.7",
+     "bc.pc12.cc.7"
+    ],
+    "ministry": "Visualize to explore mathematical concepts / Visualize to explore and illustrate mathematical concepts and relationships",
+    "bands": {
+     "8-9": {
+      "phrase": "use pictures and mental images to explore math ideas",
+      "next_steps": {
+       "emerging": "draw a simple picture of a math idea",
+       "developing": "create a visual to explore a math idea",
+       "proficient": "use a visual to explain how a math idea works",
+       "extending": "practise using a visual to discover something new about a math idea"
+      },
+      "strength": [
+       "{He} [draws|draw] pictures to help {him} make sense of math ideas.",
+       "{He} can picture a problem in {his} mind before solving it."
+      ],
+      "next": {
+       "developing": "A good next step is to practise sketching a quick picture at the start of each problem.",
+       "proficient": "It will help {him} to try using a different type of visual for the same idea.",
+       "extending": "{His} next goal is to use a visual to explain an idea to someone who finds it hard."
+      },
+      "home": "At home, ask {him} to draw a picture that explains a math idea from class."
+     },
+     "10-12": {
+      "phrase": "visualize to explore and illustrate mathematical concepts and relationships",
+      "next_steps": {
+       "emerging": "create a visual of a mathematical concept",
+       "developing": "create a visual that illustrates how a concept works",
+       "proficient": "use visuals to show how mathematical ideas are related",
+       "extending": "use a visual to discover a relationship and explain it"
+      },
+      "strength": [
+       "{He} [creates|create] visuals that illustrate how a mathematical concept works.",
+       "{He} [uses|use] graphs and diagrams to show how ideas are related."
+      ],
+      "next": {
+       "developing": "From here, {he} can make a habit of sketching a visual before solving a problem.",
+       "proficient": "{His} next step is to use one visual to show how two concepts relate.",
+       "extending": "To go further, {he} can use a visual to spot a relationship, then explain it with symbols."
+      },
+      "home": "Ask {him} to sketch how two quantities in daily life are related, such as time and distance."
+     }
+    }
+   },
+   {
+    "id": "math-visualization--computer-science",
+    "courses": [
+     "Computer Science 11",
+     "Computer Science 12"
+    ],
+    "competency_ids": [
+     "bc.cs11.cc.6",
+     "bc.cs12.cc.6"
+    ],
+    "ministry": "Visualize to explore and illustrate computer science concepts and relationships",
+    "bands": {
+     "all": {
+      "phrase": "visualize to explore and illustrate computer science concepts and relationships",
+      "next_steps": {
+       "emerging": "draw a simple visual of a computer science concept",
+       "developing": "create a visual that shows how a computing process works",
+       "proficient": "try using visuals to show how computer science ideas are related",
+       "extending": "use a visual to find a problem in a program's logic"
+      },
+      "strength": [
+       "{He} [draws|draw] diagrams that show how data moves through a program.",
+       "{He} [uses|use] visuals to show how parts of a computing system are related."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise sketching the flow of a program before coding it.",
+       "proficient": "A good next step is to use one diagram to show how two computing ideas connect.",
+       "extending": "{He} [is|are] ready to use a visual of a program's logic to find a hidden error."
+      },
+      "home": "At home, ask {him} to sketch how information moves when {he} [sends|send] a message."
+     }
+    }
+   },
+   {
+    "id": "math-visualization--geometry",
+    "courses": [
+     "Geometry 12"
+    ],
+    "competency_ids": [
+     "bc.geom12.cc.8"
+    ],
+    "ministry": "Visualize to explore and illustrate geometric concepts and relationships",
+    "bands": {
+     "all": {
+      "phrase": "visualize to explore and illustrate geometric concepts and relationships",
+      "next_steps": {
+       "emerging": "sketch a figure to explore a geometric concept",
+       "developing": "create a visual that illustrates a geometric relationship",
+       "proficient": "use visuals to show how geometric ideas are related",
+       "extending": "practise using a visual to discover a geometric relationship and test it"
+      },
+      "strength": [
+       "{He} [sketches|sketch] figures that make geometric relationships easy to see.",
+       "{He} can picture how a shape will look from another angle."
+      ],
+      "next": {
+       "developing": "It will help {him} to practise labelling every part of a figure {he} [sketches|sketch].",
+       "proficient": "From here, {he} can use a single diagram to show how several geometric ideas connect.",
+       "extending": "{His} next goal is to use a visual to form a conjecture about a figure, then test it."
+      },
+      "home": "Ask {him} to describe how a room would look from above."
+     }
+    }
+   },
+   {
+    "id": "math-visualization--statistics",
+    "courses": [
+     "Statistics 12"
+    ],
+    "competency_ids": [
+     "bc.stat12.cc.7"
+    ],
+    "ministry": "Visualize to explore and illustrate variation within and between variables",
+    "bands": {
+     "all": {
+      "phrase": "visualize to explore and show variation within and between variables",
+      "next_steps": {
+       "emerging": "make a simple graph of one variable",
+       "developing": "create a visual that shows variation within a variable",
+       "proficient": "use visuals to show variation between two variables",
+       "extending": "choose the visual that shows a relationship between variables most fairly"
+      },
+      "strength": [
+       "{He} [creates|create] graphs that show how much a variable varies.",
+       "{He} [uses|use] visuals to show how two variables change together."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise describing what a graph shows about the spread of the data.",
+       "proficient": "Next, {he} can try two types of graph for the same data and compare them.",
+       "extending": "To go further, {he} can explain how the design of a graph can hide or reveal variation."
+      },
+      "home": "At home, ask {him} what a graph in the news shows and what it might leave out."
+     }
+    }
+   }
+  ]
+ }
+}

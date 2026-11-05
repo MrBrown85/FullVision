@@ -1,0 +1,37 @@
+# Review: arts-5
+
+Sets read: 90 (46 groups, 546 sentences). Lines changed: 25. Partition unchanged. Checker: clean (546 sentences).
+
+Examples beyond the Ministry wording were kept where they are ordinary for every course in the set: posture, breaks and listening volume (Instrumental/Contemporary Music, Composition & Production), focus and lighting, portrait or landscape (Photography), set, costume and lighting (Theatre Production), editing or camera work (Film & Television), rest and water (Choral Music 10), voice or movement (Theatre Company). Cut: crests (Graphic Arts), sketchbook (Studio Arts), artist statement, a written score (Contemporary Music).
+
+## Changes
+
+- arts-revising-work--visual-arts-9 · phrase: revise, analyze and record art work as it develops → revise, analyze and record artwork as it develops · spelling: artwork is one word, as in the rest of the batch
+- arts-safe-practice--visual-media-arts · home: At home, ask {him} which studio tool needs the most care and why. → At home, ask {him} which art tool or material needs the most care and why. · "studio tool" does not fit Media Arts or Graphic Arts
+- arts-script-innovation--directing-script-development · next.extending: In the coming term, {he} can build the habit of writing several versions of a scene and comparing them. → {He} can build the habit of writing several versions of a scene and comparing them. · dropped "In the coming term"; grades are year to date
+- arts-self-others-place--visual-media-arts · next_steps.emerging: show respect for others' art work and ideas in the studio → show respect for others' artwork and ideas in the studio · spelling: artwork
+- arts-self-others-place--photography · next.extending: It would help {him} to weigh the respect owed to a place before sharing images of it. → It would help {him} to think about how the people of a place would feel before sharing images of it. · "the respect owed to a place" is abstract read aloud
+- arts-self-others-place--dance-technique-performance · home: At home, ask {him} what {he} [owes|owe] to the other dancers in a piece. → At home, ask {him} how {he} [helps|help] the other dancers in a piece do their best. · "what he owes" reads oddly to a parent
+- arts-skills-conventions--theatre-company-11-12 · home: At home, ask {him} to explain a theatre word {he} learned this term. → At home, ask {him} to explain a theatre word {he} [uses|use] in rehearsal. · dropped "this term"
+- arts-social-impact--directing-script-development · next.proficient: A good next step is to study how writers and directors have used a script to challenge a society. → A good next step is to practise explaining how a script's choices could change what an audience believes. · was a content task (study other writers); now a skill
+- arts-specialized-language--music-10-instrumental-11 · next.extending: Next, {he} can practise interpreting a score's markings and explaining them to others. → Next, {he} can practise using music terms to explain how {he} would interpret a piece. · a written score is not ordinary in Contemporary Music; the Ministry wording is about terms
+- arts-story-narrative--drama-directing-film-musical-theatre · home: At home, ask {him} about a story your family tells and who is allowed to tell it. → At home, ask {him} why some stories need permission before they are retold. · asked families who may tell their own stories; now gentle and about the skill
+- arts-technical-vocabulary--dance-choreography-10 · next.proficient: In the coming term, {he} can build fuller rehearsal notes using dance terms. → Next, {he} can practise keeping fuller rehearsal notes in dance terms. · dropped "In the coming term"; "build notes" was unclear
+- arts-technical-vocabulary--dance-company · strength.1: {He} [gives|give] critical responses to compositions that use the right dance terms. → {He} [uses|use] the right dance terms when {he} [gives|give] a critical response to a composition. · ambiguous: read as if the compositions used the terms
+- arts-theatre-experiences--theatre-company-10 · home: At home, ask {him} which theatre activity this term surprised {him} most. → At home, ask {him} which theatre activity surprised {him} most. · dropped "this term"
+- arts-theatre-repertoire--theatre-company-10 · home: At home, ask {him} what new theatre skill {he} tried this term. → At home, ask {him} what new theatre skill {he} tried most recently. · dropped "this term"
+- arts-using-feedback--film-television · next.extending: In the coming term, {he} can build the habit of explaining how feedback shaped each new edit. → {He} can build the habit of explaining how feedback shaped each new edit. · dropped "In the coming term"
+- arts-voice-style--directing-script-development · next_steps.developing: explore a directing style that is new → try a directing style not used before · "a style that is new" was incomplete
+- arts-voice-style--directing-script-development · next_steps.proficient: write or direct from a perspective other than {his} own → write or direct a scene from an unfamiliar perspective · next-step phrases carry no pronoun slots elsewhere
+- arts-ways-of-knowing--visual-arts · next.extending: A useful habit for {him} is reflecting in a sketchbook on how {his} art connects to where {he} [lives|live]. → A useful habit for {him} is reflecting in sketches or notes on how {his} art connects to where {he} [lives|live]. · a sketchbook is a routine the Ministry does not name
+- arts-ways-of-knowing--visual-arts · home: At home, ask {him} about an Indigenous artist {he} [has|have] learned about this term. → When you pass public art together, ask {him} what it shows about the land and people of this place. · dropped "this term"; the first rewrite repeated the Graphic Arts home line
+- arts-ways-of-knowing--graphic-arts · strength.0: {He} can explain why some symbols and crests should not be used in a design without permission. → {He} can explain why some Indigenous symbols should not be used in a design without permission. · crests belong to some Nations only, not ordinary for every Graphic Arts class
+- arts-ways-of-knowing--dance · home: At home, ask {him} what dances from your family's culture teach. → At home, ask {him} what a dance {he} [has|have] learned can teach about a culture. · assumed every family has dances from its culture
+- arts-ways-of-knowing--dance-conditioning · home: At home, ask {him} about a way of moving or exercising that is part of your family's culture. → At home, ask {him} about a way of moving or exercising {he} [has|have] learned from another culture. · assumed a family movement tradition
+- arts-words-action--directing-script-development · next.extending: In the coming term, {he} can make a habit of cutting lines when action can carry the meaning. → {He} can make a habit of cutting lines when action can carry the meaning. · dropped "In the coming term"
+- arts-works-in-context--visual-arts · next.developing: Next, {he} can try explaining the context behind a piece in an artist statement. → Next, {he} can try explaining in writing the context behind a piece. · an artist statement is a set product, not a skill
+- arts-works-in-context--photography · home: At home, ask {him} to take a photo that says something about your family. → At home, ask {him} what a photo of your street would say about the place and its history. · needed a camera; the first rewrite repeated the strength line
+
+## For Colin
+
+Nothing to decide.

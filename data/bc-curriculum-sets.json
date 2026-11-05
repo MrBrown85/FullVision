@@ -1,5 +1,5 @@
 {
- "_sets": "Per-course-set wording (reports/bank-build/out-sets, written and reviewed for Colin, Nov 4): each competency id points to its set and grade band. Built by scripts/build-course-sets.mjs; do not edit by hand.",
+ "_sets": "Per-course-set wording (data/course-sets, written and reviewed for Colin, Nov 4): each competency id points to its set and grade band. Built by scripts/build-course-sets.mjs; do not edit by hand.",
  "sets": {
   "adst-artistic-application--culinary-arts-12|all": {
    "group": "adst-artistic-application",

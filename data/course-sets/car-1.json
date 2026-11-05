@@ -1,0 +1,2775 @@
+{
+  "car-capstone": {
+    "old": {
+      "phrase": "design, build and present a capstone project",
+      "next_steps": {
+        "emerging": "design a capstone plan that shows key learning",
+        "developing": "assemble capstone pieces into a finished whole",
+        "proficient": "present a capstone so an audience follows the learning journey"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-capstone--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.13"
+        ],
+        "ministry": "Design, assemble, and present a capstone",
+        "bands": {
+          "all": {
+            "phrase": "design, assemble and present a capstone project that represents learning so far",
+            "next_steps": {
+              "emerging": "choose a capstone focus and list the pieces it will need",
+              "developing": "build a timeline so each capstone piece is ready in time",
+              "proficient": "make a habit of checking each piece against the capstone's purpose",
+              "extending": "shape the presentation so an audience can follow how the learning grew"
+            },
+            "strength": [
+              "{He} [designs|design] a capstone project that connects to what {he} [has|have] learned.",
+              "{He} [presents|present] {his} capstone so an audience can follow its main ideas."
+            ],
+            "next": {
+              "developing": "{His} next step is to plan the order of {his} capstone pieces before assembling them.",
+              "proficient": "Next, {he} can practise linking each part of {his} capstone to its main purpose.",
+              "extending": "To go further, {he} can practise adjusting {his} presentation to answer an audience's questions."
+            },
+            "home": "At home, ask {him} to explain what {his} capstone says about {his} learning."
+          }
+        }
+      }
+    ]
+  },
+  "car-career-exploration": {
+    "old": {
+      "phrase": "explore career options and reflect on what was learned",
+      "next_steps": {
+        "emerging": "explore one career-life option of interest",
+        "developing": "describe what was learned from career-life exploration",
+        "proficient": "evaluate how useful each part of career exploration was"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-career-exploration--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.11"
+        ],
+        "ministry": "Engage in, reflect on, and evaluate career-life exploration",
+        "bands": {
+          "all": {
+            "phrase": "explore career-life options, reflect on what was learned and judge how useful it was",
+            "next_steps": {
+              "emerging": "note one thing that stood out after each career-life exploration",
+              "developing": "describe what each exploration taught about personal interests",
+              "proficient": "judge how useful each exploration was and give reasons",
+              "extending": "use those judgements to decide which options to explore next"
+            },
+            "strength": [
+              "{He} [explores|explore] career-life options that connect to {his} own interests.",
+              "{He} [describes|describe] what each exploration taught {him} about a possible path."
+            ],
+            "next": {
+              "developing": "One thing to try is writing a few lines after each exploration about what {he} learned.",
+              "proficient": "{He} [is|are] ready to judge which explorations were most useful and explain why.",
+              "extending": "A good next step is to use what {he} [has|have] learned to choose the next options to explore."
+            },
+            "home": "Ask {him} which career-life activity this year surprised {him} most, and why."
+          }
+        }
+      }
+    ]
+  },
+  "car-career-influences": {
+    "old": {
+      "phrase": "explain what shapes career choices",
+      "next_steps": {
+        "emerging": "ask someone what shaped a career choice",
+        "developing": "explain how community needs can shape a career choice",
+        "proficient": "compare how different influences shape career choices"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-career-influences--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.10",
+          "bc.caree9.cc.10"
+        ],
+        "ministry": "Question self and others about the role of family expectations and traditions, and of community needs in career choices",
+        "bands": {
+          "all": {
+            "phrase": "ask questions about how family, traditions and community needs shape career choices",
+            "next_steps": {
+              "emerging": "ask one adult what shaped a career choice",
+              "developing": "ask questions about both family traditions and community needs",
+              "proficient": "compare the answers different people give about what shaped their careers",
+              "extending": "explain how family and community might shape personal career choices"
+            },
+            "strength": [
+              "{He} [asks|ask] people questions about what shaped their career choices.",
+              "{He} [thinks|think] about how {his} own family and community might shape {his} choices."
+            ],
+            "next": {
+              "developing": "A useful habit for {him} is asking a second question when someone shares a career story.",
+              "proficient": "{He} can build the habit of comparing what different people say about their career choices.",
+              "extending": "{He} would benefit from explaining which influences matter most in {his} own career thinking."
+            },
+            "home": "Share with {him} how you or a relative chose a job or career."
+          }
+        }
+      }
+    ]
+  },
+  "car-career-research": {
+    "old": {
+      "phrase": "research careers and sort them into clusters",
+      "next_steps": {
+        "emerging": "find information about one career using a research method",
+        "developing": "describe two careers that are unfamiliar and how they connect",
+        "proficient": "sort careers into clusters by the skills they need"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-career-research--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.11",
+          "bc.caree9.cc.11"
+        ],
+        "ministry": "Apply a variety of research skills to expand their knowledge of diverse career possibilities and understand career clusters",
+        "bands": {
+          "all": {
+            "phrase": "use different research skills to learn about new careers and group them into clusters",
+            "next_steps": {
+              "emerging": "use one trusted source to find facts about a career",
+              "developing": "try a new way to find career information, such as an interview",
+              "proficient": "sort careers into clusters by the skills they share",
+              "extending": "explain how careers in one cluster connect and differ"
+            },
+            "strength": [
+              "{He} [uses|use] more than one way to find information about careers.",
+              "{He} [sorts|sort] careers into clusters based on the skills they need."
+            ],
+            "next": {
+              "developing": "{His} next step is to practise checking career facts in a second source.",
+              "proficient": "Next, {he} can practise explaining why two careers belong in the same cluster.",
+              "extending": "To go further, {he} can compare how two careers in one cluster differ day to day."
+            },
+            "home": "Ask {him} to tell you about a career {he} learned about that surprised {him}."
+          }
+        }
+      }
+    ]
+  },
+  "car-collaboration": {
+    "old": {
+      "phrase": "work respectfully with others to solve problems",
+      "next_steps": {
+        "emerging": "share an idea in a group and listen to others",
+        "developing": "respond respectfully to others' ideas in group work",
+        "proficient": "include everyone's ideas when a group solves a problem"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-collaboration--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.4",
+          "bc.caree9.cc.4"
+        ],
+        "ministry": "Demonstrate respect, collaboration, and inclusivity in working with others to solve problems",
+        "bands": {
+          "all": {
+            "phrase": "work with others to solve problems, showing respect and including everyone",
+            "next_steps": {
+              "emerging": "share one idea in a group and listen to the others",
+              "developing": "respond to others' ideas with respect, even when disagreeing",
+              "proficient": "invite quieter group members to add their ideas",
+              "extending": "help a group combine different ideas into one solution"
+            },
+            "strength": [
+              "{He} [listens|listen] to others' ideas and [responds|respond] with respect in group work.",
+              "{He} [makes|make] sure everyone in {his} group has a chance to share."
+            ],
+            "next": {
+              "developing": "One thing to try is saying back a group member's idea before adding {his} own.",
+              "proficient": "{He} [is|are] ready to invite quieter group members into the problem solving.",
+              "extending": "A good next step is to help {his} group pull different ideas into one plan."
+            },
+            "home": "Ask {him} about a time {his} group solved a problem together."
+          }
+        }
+      }
+    ]
+  },
+  "car-community-care": {
+    "old": {
+      "phrase": "help care for coworkers and the community",
+      "next_steps": {
+        "emerging": "take one step to help a coworker or the community",
+        "developing": "follow practices that keep work safe and healthy",
+        "proficient": "plan a contribution that helps the wider community"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-community-care--work-placement",
+        "courses": [
+          "Youth Work in Trades 11",
+          "Work Experience 12A",
+          "Work Experience 12B",
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.7",
+          "bc.wex12a.cc.10",
+          "bc.wex12b.cc.10",
+          "bc.ywt12.cc.7"
+        ],
+        "ministry": "Contribute to (and, in Youth Work in Trades 12, describe) care of self, others, and community",
+        "bands": {
+          "all": {
+            "phrase": "take steps to care for self, coworkers and the community at a work placement",
+            "next_steps": {
+              "emerging": "take one step to help a coworker or the community",
+              "developing": "follow habits at a placement that keep self and others healthy",
+              "proficient": "describe how personal actions at work care for self, others and community",
+              "extending": "plan a contribution that helps the wider community beyond the placement"
+            },
+            "strength": [
+              "{He} [looks|look] out for the people {he} [works|work] with at {his} placement.",
+              "{He} [takes|take] care of {his} own health and energy during work shifts."
+            ],
+            "next": {
+              "developing": "One thing to try is noticing one way {he} could help a coworker each shift.",
+              "proficient": "{He} [is|are] ready to describe how {his} actions at work care for {himself}, others and the community.",
+              "extending": "To go further, {he} can plan a way to give back to the community beyond {his} placement."
+            },
+            "home": "Ask {him} how {he} [takes|take] care of {himself} after a long shift."
+          }
+        }
+      }
+    ]
+  },
+  "car-curriculum-choices": {
+    "old": {
+      "phrase": "explain how course choices can shape a career path",
+      "next_steps": {
+        "emerging": "name a course that connects to a career of interest",
+        "developing": "explain how course choices can affect a career path",
+        "proficient": "explain how activities outside class can shape a career path"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-curriculum-choices--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.8",
+          "bc.caree9.cc.8"
+        ],
+        "ministry": "Recognize the influence of curriculum choices and co-curricular activities on career paths",
+        "bands": {
+          "all": {
+            "phrase": "explain how course choices and activities outside class can shape a career path",
+            "next_steps": {
+              "emerging": "name a course that connects to a career of interest",
+              "developing": "explain how one course choice could open a career path",
+              "proficient": "connect an activity outside class, such as a club or team, to a career path",
+              "extending": "plan course and activity choices that keep several career paths open"
+            },
+            "strength": [
+              "{He} [explains|explain] how the courses {he} [chooses|choose] can lead to different careers.",
+              "{He} [connects|connect] activities outside class, such as clubs or sports, to possible career paths."
+            ],
+            "next": {
+              "developing": "From here, {he} can practise naming the courses a career of interest would need.",
+              "proficient": "It would help {him} to explain how a club, team or hobby builds skills for a career.",
+              "extending": "{He} can now plan course choices that keep more than one career path open."
+            },
+            "home": "Ask {him} which course next year {he} [is|are] most curious about, and why."
+          }
+        }
+      }
+    ]
+  },
+  "car-decision-making": {
+    "old": {
+      "phrase": "use a decision-making strategy on a real problem",
+      "next_steps": {
+        "emerging": "use one decision-making step, such as listing options",
+        "developing": "apply a decision-making strategy to a real-life problem",
+        "proficient": "adjust a strategy when the situation changes"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-decision-making--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.13",
+          "bc.caree9.cc.13"
+        ],
+        "ministry": "Apply decision-making strategies to a life, work, or community problem and adjust the strategies to adapt to new situations",
+        "bands": {
+          "all": {
+            "phrase": "use decision-making strategies on real problems and adjust them when things change",
+            "next_steps": {
+              "emerging": "list the choices before making a decision",
+              "developing": "weigh the pros and cons of each choice before deciding",
+              "proficient": "adjust a strategy when a new problem is different from the last",
+              "extending": "choose the strategy that fits each type of problem and explain why"
+            },
+            "strength": [
+              "{He} [lists|list] choices and [thinks|think] about what might happen with each one.",
+              "{He} [changes|change] {his} plan when a problem turns out differently than expected."
+            ],
+            "next": {
+              "developing": "The next goal is for {him} to weigh the pros and cons before {he} [decides|decide].",
+              "proficient": "{He} could practise using the same strategy on a work or community problem.",
+              "extending": "A useful habit for {him} is checking whether a decision worked and what {he} would change."
+            },
+            "home": "Ask {him} to help weigh the choices in a small family decision, such as weekend plans."
+          }
+        }
+      }
+    ]
+  },
+  "car-exploring-interests": {
+    "old": {
+      "phrase": "connect personal interests to work placement options",
+      "next_steps": {
+        "emerging": "name a personal area of interest for a work placement",
+        "developing": "assess strengths and skills when exploring placements",
+        "proficient": "match interests and skills to specific placement options"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-exploring-interests--work-experience-12a",
+        "courses": [
+          "Work Experience 12A"
+        ],
+        "competency_ids": [
+          "bc.wex12a.cc.2"
+        ],
+        "ministry": "Assess knowledge of self and identify personal areas of interest to explore options for work placement",
+        "bands": {
+          "all": {
+            "phrase": "assess personal strengths and interests to explore work placement options",
+            "next_steps": {
+              "emerging": "name one area of interest to explore in a placement",
+              "developing": "list personal strengths and skills that suit possible placements",
+              "proficient": "match interests and skills to specific placement options",
+              "extending": "explain why a chosen placement fits personal strengths and interests"
+            },
+            "strength": [
+              "{He} [assesses|assess] {his} strengths and skills when exploring work placements.",
+              "{He} [identifies|identify] areas of interest {he} would like a placement to include."
+            ],
+            "next": {
+              "developing": "A good next step is to match each interest to a type of placement that suits it.",
+              "proficient": "From here, {he} can practise explaining why a placement option fits {his} skills.",
+              "extending": "It would help {him} to compare two placements against {his} interests before choosing."
+            },
+            "home": "Ask {him} what type of workplace {he} would most like to try, and why."
+          }
+        }
+      },
+      {
+        "id": "car-exploring-interests--work-experience-12b",
+        "courses": [
+          "Work Experience 12B"
+        ],
+        "competency_ids": [
+          "bc.wex12b.cc.2"
+        ],
+        "ministry": "Assess knowledge of self and prior work experience, and identify personal areas of interest to explore options for work placement",
+        "bands": {
+          "all": {
+            "phrase": "use prior work experience and self-knowledge to choose new placement options",
+            "next_steps": {
+              "emerging": "name one thing a past job or placement showed about personal skills",
+              "developing": "use lessons from past work to narrow placement options",
+              "proficient": "connect what prior work showed to the next placement choice",
+              "extending": "choose a placement that builds a skill past work showed needs more practice"
+            },
+            "strength": [
+              "{He} [uses|use] what {his} prior work experience showed about {his} skills to guide {his} choices.",
+              "{He} [connects|connect] {his} interests to placements that go beyond what {he} [has|have] done before."
+            ],
+            "next": {
+              "developing": "{He} can now practise naming what a past job taught {him} about the work {he} [enjoys|enjoy].",
+              "proficient": "The next goal is for {him} to explain how past work shapes {his} next placement choice.",
+              "extending": "{He} could choose a placement that tests a skill {his} past work did not use."
+            },
+            "home": "Ask {him} which tasks at a past job felt most rewarding, and why."
+          }
+        }
+      }
+    ]
+  },
+  "car-goal-setting": {
+    "old": {
+      "phrase": "set a realistic goal and keep working toward it",
+      "next_steps": {
+        "emerging": "set one realistic learning goal with a clear step",
+        "developing": "keep working toward a goal when it gets hard",
+        "proficient": "adjust a plan after a setback and keep going"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-goal-setting--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.7",
+          "bc.caree9.cc.7"
+        ],
+        "ministry": "Set and achieve realistic learning goals with perseverance and resilience",
+        "bands": {
+          "all": {
+            "phrase": "set realistic learning goals and keep working toward them when things get hard",
+            "next_steps": {
+              "emerging": "set one small learning goal with a clear first step",
+              "developing": "break a goal into steps and check progress each week",
+              "proficient": "make a new plan after a setback instead of stopping",
+              "extending": "set goals that are challenging but realistic and track them over time"
+            },
+            "strength": [
+              "{He} [sets|set] learning goals that are realistic and clear.",
+              "{He} [keeps|keep] trying when a goal gets hard and [adjusts|adjust] {his} plan after a setback."
+            ],
+            "next": {
+              "developing": "A next step for {him} is to break each goal into small weekly steps.",
+              "proficient": "{He} would benefit from writing a backup plan before a setback happens.",
+              "extending": "{His} next step is to set a goal that is challenging and realistic at the same time."
+            },
+            "home": "Ask {him} about a goal {he} [is|are] working toward and how it is going."
+          }
+        }
+      }
+    ]
+  },
+  "car-graduation-planning": {
+    "old": {
+      "phrase": "weigh personal and outside factors when planning after graduation",
+      "next_steps": {
+        "emerging": "list the internal and external factors that affect a plan",
+        "developing": "explain how two factors shape a post-graduation choice",
+        "proficient": "use an analysis of factors to justify a post-graduation plan"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-graduation-planning--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.2"
+        ],
+        "ministry": "Analyze internal and external factors to inform personal career-life choices for post-graduation planning",
+        "bands": {
+          "all": {
+            "phrase": "analyze personal and outside factors to inform career-life choices after graduation",
+            "next_steps": {
+              "emerging": "list the internal and external factors that apply to personal plans",
+              "developing": "explain how one internal and one external factor shape a choice",
+              "proficient": "weigh several factors against each other when making a post-graduation choice",
+              "extending": "build a post-graduation plan that allows for the factors most likely to change"
+            },
+            "strength": [
+              "{He} [names|name] the internal factors, such as {his} interests and values, that shape {his} choices.",
+              "{He} [considers|consider] outside factors, such as cost or location, when planning for life after graduation."
+            ],
+            "next": {
+              "developing": "From here, {he} can practise explaining how each factor affects {his} post-graduation plan.",
+              "proficient": "It would help {him} to weigh factors that pull {his} plan in different directions.",
+              "extending": "{He} can now test {his} plan by asking what would change if one factor shifted."
+            },
+            "home": "Talk with {him} about what matters most to {him} in a plan after graduation."
+          }
+        }
+      }
+    ]
+  },
+  "car-hours-documentation": {
+    "old": {
+      "phrase": "keep an accurate record of work experience hours",
+      "next_steps": {
+        "emerging": "record work hours after each shift",
+        "developing": "keep an ongoing, accurate record of work hours",
+        "proficient": "organize records to show all required hours clearly"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-hours-documentation--work-experience",
+        "courses": [
+          "Work Experience 12A",
+          "Work Experience 12B"
+        ],
+        "competency_ids": [
+          "bc.wex12a.cc.12",
+          "bc.wex12b.cc.12"
+        ],
+        "ministry": "Document work experience to demonstrate required hours",
+        "bands": {
+          "all": {
+            "phrase": "keep an ongoing record of work experience that shows the required hours",
+            "next_steps": {
+              "emerging": "record work hours after each shift",
+              "developing": "make a habit of updating the hours record every week",
+              "proficient": "organize records so the required hours are easy to confirm",
+              "extending": "add a short note of tasks done to each entry in the record"
+            },
+            "strength": [
+              "{He} [records|record] {his} hours after each shift so the record stays complete.",
+              "{He} [keeps|keep] {his} hours organized, so it is easy to see what is done and what remains."
+            ],
+            "next": {
+              "developing": "A useful habit for {him} is updating {his} hours record on the same day each week.",
+              "proficient": "{He} can build the habit of checking {his} totals against the required hours.",
+              "extending": "{He} would benefit from adding a short note about the tasks done on each shift."
+            },
+            "home": "Ask {him} how many placement hours {he} [has|have] left and how {he} [plans|plan] to finish them."
+          }
+        }
+      }
+    ]
+  },
+  "car-job-search": {
+    "old": {
+      "phrase": "use job search and interview skills",
+      "next_steps": {
+        "emerging": "find a job posting that fits current skills",
+        "developing": "prepare answers to common interview questions",
+        "proficient": "adapt a résumé and interview answers to a specific job"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-job-search--work-experience-12a",
+        "courses": [
+          "Work Experience 12A"
+        ],
+        "competency_ids": [
+          "bc.wex12a.cc.3"
+        ],
+        "ministry": "Apply job search and interview skills",
+        "bands": {
+          "all": {
+            "phrase": "use job search skills to find suitable jobs and answer interview questions",
+            "next_steps": {
+              "emerging": "find a job posting that fits current skills",
+              "developing": "prepare answers to common interview questions",
+              "proficient": "match a résumé to the needs of a specific posting",
+              "extending": "practise interview answers with someone and adjust them after feedback"
+            },
+            "strength": [
+              "{He} [finds|find] job postings that fit {his} skills and interests.",
+              "In interviews, {he} [gives|give] specific stories from work or school to support {his} answers."
+            ],
+            "next": {
+              "developing": "{His} next step is to prepare short answers to common interview questions.",
+              "proficient": "Next, {he} can practise matching {his} résumé to the needs of each posting.",
+              "extending": "To go further, {he} can practise interviews with someone and use their feedback."
+            },
+            "home": "Offer to ask {him} a few practice interview questions at home."
+          }
+        }
+      },
+      {
+        "id": "car-job-search--work-experience-12b",
+        "courses": [
+          "Work Experience 12B"
+        ],
+        "competency_ids": [
+          "bc.wex12b.cc.3"
+        ],
+        "ministry": "Refine job search and interview skills",
+        "bands": {
+          "all": {
+            "phrase": "refine job search and interview skills so each application fits the job",
+            "next_steps": {
+              "emerging": "review a past application and name one thing to change",
+              "developing": "search in more than one place for jobs that fit",
+              "proficient": "tailor each résumé and cover letter to a specific job",
+              "extending": "reflect after each interview and sharpen answers for the next one"
+            },
+            "strength": [
+              "{He} [refines|refine] {his} job search to focus on postings that fit {his} goals.",
+              "{He} [improves|improve] {his} interview answers by reflecting on past interviews."
+            ],
+            "next": {
+              "developing": "One thing to try is searching more than one source for jobs that suit {him}.",
+              "proficient": "{He} [is|are] ready to tailor each application to the employer {he} [is|are] applying to.",
+              "extending": "A good next step is to note what worked after each interview and change what did not."
+            },
+            "home": "Ask {him} what {he} would say if an interviewer asked about {his} strengths."
+          }
+        }
+      }
+    ]
+  },
+  "car-learning-approaches": {
+    "old": {
+      "phrase": "use preferred ways of learning and ask for support",
+      "next_steps": {
+        "emerging": "name a way of learning that works well",
+        "developing": "apply a preferred learning approach to a new task",
+        "proficient": "use knowledge of learning approaches to ask for needed support"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-learning-approaches--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.10"
+        ],
+        "ministry": "Identify and apply preferred approaches to learning for ongoing career-life development and self-advocacy",
+        "bands": {
+          "all": {
+            "phrase": "identify and apply preferred ways of learning, and speak up for what helps",
+            "next_steps": {
+              "emerging": "name one way of learning that works and when it helps",
+              "developing": "try a preferred way of learning on an unfamiliar type of task",
+              "proficient": "explain to a teacher which approach helps and what support is needed",
+              "extending": "adapt learning approaches to fit settings beyond school, such as work"
+            },
+            "strength": [
+              "{He} [knows|know] which ways of learning help {him} most and [uses|use] them on new tasks.",
+              "{He} [speaks|speak] up about what helps {him} learn when a task is hard."
+            ],
+            "next": {
+              "developing": "The next goal is for {him} to try {his} preferred approach on a task that is new to {him}.",
+              "proficient": "{He} could practise telling a teacher which specific support matches how {he} [learns|learn].",
+              "extending": "A useful habit for {him} is choosing a learning approach that suits each new work or community setting."
+            },
+            "home": "Ask {him} how {he} [likes|like] to learn something new, such as a recipe or a game."
+          }
+        }
+      }
+    ]
+  },
+  "car-learning-highlights": {
+    "old": {
+      "phrase": "reflect on learning experiences and share highlights",
+      "next_steps": {
+        "emerging": "describe one learning experience from in or out of school",
+        "developing": "reflect on growth using examples from experiences",
+        "proficient": "share learning highlights with an audience, with clear examples"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-learning-highlights--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.12"
+        ],
+        "ministry": "Reflect on experiences in school and out of school, assess development in the Core Competencies, and share highlights of their learning journey",
+        "bands": {
+          "all": {
+            "phrase": "reflect on learning in and out of school, assess Core Competency growth and share highlights",
+            "next_steps": {
+              "emerging": "describe one experience in or out of school and what it taught",
+              "developing": "connect an experience to growth in one Core Competency",
+              "proficient": "use examples from several experiences to show Core Competency growth",
+              "extending": "choose and present highlights that show how learning has grown over time"
+            },
+            "strength": [
+              "{He} [reflects|reflect] on experiences both in and out of school to show what {he} learned.",
+              "{He} [uses|use] examples to explain {his} growth in the Core Competencies, such as communication."
+            ],
+            "next": {
+              "developing": "{He} can try linking each experience to one Core Competency.",
+              "proficient": "{He} would benefit from choosing a few examples that show growth clearly over time.",
+              "extending": "{His} next step is to shape {his} highlights for a specific audience, such as family or a future employer."
+            },
+            "home": "Ask {him} to share one moment from this year that {he} [is|are] proud of."
+          }
+        }
+      }
+    ]
+  },
+  "car-mentorship": {
+    "old": {
+      "phrase": "work with a mentor on career-life plans",
+      "next_steps": {
+        "emerging": "describe advice from a mentor about career-life plans",
+        "developing": "use a mentor's advice in career-life exploration",
+        "proficient": "explain how working with a mentor shaped a career-life plan"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-mentorship--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.5"
+        ],
+        "ministry": "Collaborate with a mentor to inform career-life development and exploration",
+        "bands": {
+          "all": {
+            "phrase": "work with a mentor and use the mentor's advice to guide career-life exploration",
+            "next_steps": {
+              "emerging": "describe one piece of advice a mentor has given",
+              "developing": "use a mentor's advice to plan one step in career-life exploration",
+              "proficient": "prepare questions before meeting a mentor and use the answers in planning",
+              "extending": "explain how working with a mentor changed a career-life plan, with examples"
+            },
+            "strength": [
+              "{He} [prepares|prepare] questions before meeting with {his} mentor about career-life plans.",
+              "{He} [uses|use] {his} mentor's advice when deciding what to explore."
+            ],
+            "next": {
+              "developing": "Next, {he} can practise noting {his} mentor's advice right after each meeting.",
+              "proficient": "To go further, {he} can ask {his} mentor to challenge the parts of {his} plan {he} [is|are] unsure about.",
+              "extending": "One thing to try is explaining to {his} mentor how the mentor's advice changed {his} plan."
+            },
+            "home": "Ask {him} to share the most useful thing {his} mentor told {him}."
+          }
+        }
+      }
+    ]
+  },
+  "car-networking": {
+    "old": {
+      "phrase": "use networks to find resources for life after graduation",
+      "next_steps": {
+        "emerging": "connect with one person in an education or work network",
+        "developing": "use a network to find a resource for after graduation",
+        "proficient": "build relationships in networks that support plans after graduation"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-networking--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.6"
+        ],
+        "ministry": "Engage with personal, education, and employment networks to cultivate post-graduation resources and social capital",
+        "bands": {
+          "all": {
+            "phrase": "connect with personal, education and work networks to build support for life after graduation",
+            "next_steps": {
+              "emerging": "name people in personal, school and work networks who could help",
+              "developing": "contact one person in a network about a post-graduation option",
+              "proficient": "keep in regular contact with people whose support fits post-graduation plans",
+              "extending": "grow a network across personal, education and work settings and use it in planning"
+            },
+            "strength": [
+              "{He} [connects|connect] with people in {his} personal, school and work networks.",
+              "{He} [uses|use] {his} networks to find resources, such as programs or job openings, for after graduation."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to contact one new person who knows about a path {he} [is|are] considering.",
+              "proficient": "A good next step is to keep regular contact with the people in {his} network.",
+              "extending": "From here, {he} can practise thanking contacts and sharing updates, so relationships last."
+            },
+            "home": "Help {him} list the adults {he} [knows|know] who work in a field that interests {him}."
+          }
+        }
+      }
+    ]
+  },
+  "car-networks-mentors": {
+    "old": {
+      "phrase": "use mentors and resources to explore careers",
+      "next_steps": {
+        "emerging": "name a mentor or resource for exploring careers",
+        "developing": "explain how a mentor can help with career exploration",
+        "proficient": "use advice from a mentor to explore a career"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-networks-mentors--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.9",
+          "bc.caree9.cc.9"
+        ],
+        "ministry": "Appreciate the value of a network of resources and mentors to assist with career exploration",
+        "bands": {
+          "all": {
+            "phrase": "explain how mentors and other resources can help with exploring careers",
+            "next_steps": {
+              "emerging": "name one person or resource that could help explore a career",
+              "developing": "explain how a mentor could help with career exploration",
+              "proficient": "use advice from a mentor or resource to explore a career",
+              "extending": "build a small network of people and resources for career questions"
+            },
+            "strength": [
+              "{He} [names|name] people and resources in {his} life who can help {him} explore careers.",
+              "{He} [explains|explain] how a mentor can help someone choose a path."
+            ],
+            "next": {
+              "developing": "Next, {he} can practise preparing two or three questions to ask a mentor.",
+              "proficient": "To go further, {he} can use a mentor's advice to plan how to explore a career.",
+              "extending": "One thing to try is keeping a short list of people {he} could ask about careers."
+            },
+            "home": "Tell {him} about someone who helped you learn about work when you were younger."
+          }
+        }
+      }
+    ]
+  },
+  "car-new-experiences": {
+    "old": {
+      "phrase": "try new experiences and suggest new ideas from them",
+      "next_steps": {
+        "emerging": "try one volunteer or new learning experience",
+        "developing": "describe a need noticed during a new experience",
+        "proficient": "suggest a new idea to meet a need"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-new-experiences--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.12",
+          "bc.caree9.cc.12"
+        ],
+        "ministry": "Explore volunteer and other new learning experiences that stimulate entrepreneurial and innovative thinking",
+        "bands": {
+          "all": {
+            "phrase": "try volunteer and new learning experiences and suggest new ideas for needs noticed",
+            "next_steps": {
+              "emerging": "try one volunteer or new learning experience",
+              "developing": "describe a need noticed during a new experience",
+              "proficient": "suggest a new idea that could meet a need",
+              "extending": "test whether an idea would meet the need and improve it"
+            },
+            "strength": [
+              "{He} [tries|try] new learning experiences, such as volunteering, with an open mind.",
+              "{He} [notices|notice] needs around {him} and [suggests|suggest] new ideas to meet them."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to describe one need {he} [notices|notice] during a new experience.",
+              "proficient": "A good next step is to explain who {his} idea would help and how.",
+              "extending": "From here, {he} can practise asking others whether {his} idea would help."
+            },
+            "home": "Ask {him} what {he} would change about your neighbourhood if {he} could."
+          }
+        }
+      }
+    ]
+  },
+  "car-pathway-reflection": {
+    "old": {
+      "phrase": "reflect on how work experience connects to future paths",
+      "next_steps": {
+        "emerging": "record what was done and learned during work experience",
+        "developing": "reflect regularly on work experience throughout the placement",
+        "proficient": "explain how work experience connects to current and future pathways"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-pathway-reflection--work-experience",
+        "courses": [
+          "Work Experience 12A",
+          "Work Experience 12B"
+        ],
+        "competency_ids": [
+          "bc.wex12a.cc.13",
+          "bc.wex12b.cc.13"
+        ],
+        "ministry": "Engage in ongoing reflection and documentation of work experience as it relates to current and future pathways",
+        "bands": {
+          "all": {
+            "phrase": "reflect on and document work experience and connect it to current and future pathways",
+            "next_steps": {
+              "emerging": "note what was done and learned after each placement shift",
+              "developing": "reflect at regular points through the whole placement",
+              "proficient": "explain how the placement connects to current and future pathways",
+              "extending": "use reflections to adjust future pathway plans, with examples"
+            },
+            "strength": [
+              "{He} [documents|document] {his} work experience regularly through {his} placement.",
+              "{He} [explains|explain] how {his} placement connects to the paths {he} [is|are] considering."
+            ],
+            "next": {
+              "developing": "From here, {he} can practise writing a short reflection after each week of placement.",
+              "proficient": "It would help {him} to link each reflection to a pathway {he} [is|are] considering.",
+              "extending": "{He} can now use {his} reflections to decide whether a pathway fits {his} plans."
+            },
+            "home": "Ask {him} whether {his} placement has changed what {he} [wants|want] to do after school."
+          }
+        }
+      }
+    ]
+  },
+  "car-perspectives-on-work": {
+    "old": {
+      "phrase": "explain how different kinds of work help a community",
+      "next_steps": {
+        "emerging": "describe how one kind of work helps the community",
+        "developing": "explain a view on work with reasons and examples",
+        "proficient": "compare different views on how work contributes to society"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-perspectives-on-work--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.5",
+          "bc.caree9.cc.5"
+        ],
+        "ministry": "Recognize and explore diverse perspectives on how work contributes to our community and society",
+        "bands": {
+          "all": {
+            "phrase": "explore different views on how work helps the community and society",
+            "next_steps": {
+              "emerging": "describe how one job helps the community",
+              "developing": "explain one view on work with a reason and an example",
+              "proficient": "compare two different views on why work matters",
+              "extending": "explain how a type of work that is often overlooked helps society"
+            },
+            "strength": [
+              "{He} [describes|describe] how different jobs help people in the community.",
+              "When {he} [shares|share] a view on why work matters, {he} [supports|support] it with examples."
+            ],
+            "next": {
+              "developing": "It would help {him} to explore a view on work that differs from {his} own.",
+              "proficient": "{He} can now practise comparing two views on what makes work valuable.",
+              "extending": "The next goal is for {him} to explain how a less noticed job helps society."
+            },
+            "home": "Ask {him} which job in your community {he} [thinks|think] matters most, and why."
+          }
+        }
+      }
+    ]
+  },
+  "car-plan-refinement": {
+    "old": {
+      "phrase": "update a trade training plan as skills grow",
+      "next_steps": {
+        "emerging": "describe how career skills in a trade have grown",
+        "developing": "refine a training plan based on progress",
+        "proficient": "name the next skills a training plan should focus on"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-plan-refinement--youth-work-in-trades-12",
+        "courses": [
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt12.cc.12"
+        ],
+        "ministry": "Recognize career skills progression and refine their trade-specific training plan",
+        "bands": {
+          "all": {
+            "phrase": "recognize growth in trade skills and refine the trade training plan to match",
+            "next_steps": {
+              "emerging": "describe one trade skill that has grown during training",
+              "developing": "update the training plan based on progress so far",
+              "proficient": "name the next skills the training plan should focus on",
+              "extending": "set new targets in the plan that match the skills the trade will need next"
+            },
+            "strength": [
+              "{He} [recognizes|recognize] how {his} trade skills have grown over {his} training.",
+              "{He} [updates|update] {his} training plan to match the progress {he} [has|have] made."
+            ],
+            "next": {
+              "developing": "The next goal is for {him} to compare {his} trade skills now with when {he} started.",
+              "proficient": "{He} could practise choosing which skills {his} training plan should focus on next.",
+              "extending": "A useful habit for {him} is reviewing {his} plan with {his} employer as {his} skills grow."
+            },
+            "home": "Ask {him} which trade skill {he} [has|have] improved most since starting."
+          }
+        }
+      }
+    ]
+  },
+  "car-preferred-futures": {
+    "old": {
+      "phrase": "explore possible futures with creative thinking",
+      "next_steps": {
+        "emerging": "describe one possible future in education or work",
+        "developing": "explore education and work options that fit a preferred future",
+        "proficient": "use creative thinking to map several possible futures"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-preferred-futures--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.9"
+        ],
+        "ministry": "Explore possibilities for preferred personal and education/employment futures, using creative and innovative thinking",
+        "bands": {
+          "all": {
+            "phrase": "think creatively to explore possible futures in personal life, education and work",
+            "next_steps": {
+              "emerging": "describe one possible future in education or work",
+              "developing": "explore education and work options that fit a preferred future",
+              "proficient": "imagine several different futures and compare what each would need",
+              "extending": "combine different interests to imagine a new but realistic future"
+            },
+            "strength": [
+              "{He} [imagines|imagine] several possible futures for {himself} in work, school and personal life.",
+              "{He} [explores|explore] education and work options that fit the future {he} [wants|want]."
+            ],
+            "next": {
+              "developing": "It would help {him} to picture more than one future before choosing a favourite.",
+              "proficient": "{He} can now try mixing two interests to imagine a future {he} had not considered.",
+              "extending": "The next goal is for {him} to test a new idea by checking what it would really take."
+            },
+            "home": "Ask {him} to describe a day in {his} life ten years from now."
+          }
+        }
+      }
+    ]
+  },
+  "car-problem-solving": {
+    "old": {
+      "phrase": "reflect on how problems were solved at work",
+      "next_steps": {
+        "emerging": "describe a problem at a placement and how it was solved",
+        "developing": "explain how a strategy worked when solving a problem alone",
+        "proficient": "compare strategies used alone and with others at work"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-problem-solving--work-placement",
+        "courses": [
+          "Youth Work in Trades 11",
+          "Work Experience 12A",
+          "Work Experience 12B",
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.11",
+          "bc.wex12a.cc.14",
+          "bc.wex12b.cc.14",
+          "bc.ywt12.cc.11"
+        ],
+        "ministry": "Reflect on independent and collaborative problem-solving strategies implemented, specific to the work placement",
+        "bands": {
+          "all": {
+            "phrase": "reflect on how problems were solved alone and with others at a work placement",
+            "next_steps": {
+              "emerging": "describe a problem at the placement and how it was solved",
+              "developing": "explain how a strategy worked when solving a problem alone",
+              "proficient": "compare strategies used alone with those used with coworkers",
+              "extending": "choose when to solve a problem alone and when to involve others, and explain why"
+            },
+            "strength": [
+              "{He} [reflects|reflect] on the strategies {he} [uses|use] to solve problems at {his} placement.",
+              "{He} [explains|explain] how {he} worked with coworkers to solve a problem."
+            ],
+            "next": {
+              "developing": "A next step for {him} is to describe which step of a strategy made it work.",
+              "proficient": "{He} would benefit from comparing a problem {he} solved alone with one solved as a team.",
+              "extending": "{His} next step is to decide when a problem needs others and when {he} can solve it alone."
+            },
+            "home": "Ask {him} about a problem at {his} placement and how {he} solved it."
+          }
+        }
+      }
+    ]
+  },
+  "car-profile-creation": {
+    "old": {
+      "phrase": "create and improve personal and public profiles",
+      "next_steps": {
+        "emerging": "create a simple profile that presents skills and goals",
+        "developing": "critique a profile and name changes that would improve it",
+        "proficient": "explain how a profile supports self-advocacy for a goal"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-profile-creation--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.7"
+        ],
+        "ministry": "Create and critique personal and public profiles for self-advocacy and marketing purposes",
+        "bands": {
+          "all": {
+            "phrase": "create and critique personal and public profiles that present skills and goals to others",
+            "next_steps": {
+              "emerging": "build a simple profile that names skills and goals",
+              "developing": "critique a profile and name two changes that would make it stronger",
+              "proficient": "shape a profile for a specific audience, such as an employer or program",
+              "extending": "keep personal and public profiles current and matched to each goal"
+            },
+            "strength": [
+              "{He} [creates|create] profiles that present {his} skills, experience and goals to others.",
+              "{He} [critiques|critique] {his} own profiles and [names|name] changes that would make them stronger."
+            ],
+            "next": {
+              "developing": "{He} could practise asking someone else to critique {his} profile and using their feedback.",
+              "proficient": "A useful habit for {him} is matching each profile to the audience who will see it.",
+              "extending": "{He} can build the habit of explaining how {his} profiles help {him} speak up for {himself}."
+            },
+            "home": "Ask {him} what an employer would learn about {him} from {his} profile."
+          }
+        }
+      }
+    ]
+  },
+  "car-public-identity": {
+    "old": {
+      "phrase": "explain how a public image can affect job chances",
+      "next_steps": {
+        "emerging": "list what others can see about a person online",
+        "developing": "explain how an online post could affect a job search",
+        "proficient": "compare how public identity could affect different kinds of work"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-public-identity--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.3",
+          "bc.caree9.cc.3"
+        ],
+        "ministry": "Recognize the impact of personal public identity in the world of work",
+        "bands": {
+          "all": {
+            "phrase": "explain how a personal public identity, online and offline, can affect job chances",
+            "next_steps": {
+              "emerging": "list what others can see about a person online and offline",
+              "developing": "explain how one post or action could affect a job search",
+              "proficient": "make a habit of thinking about how an employer might see a post",
+              "extending": "make choices that build a public identity that supports future work"
+            },
+            "strength": [
+              "{He} [identifies|identify] what others can see about {him} online and offline.",
+              "{He} [explains|explain] how a public identity can help or hurt someone's job chances."
+            ],
+            "next": {
+              "developing": "{He} could practise pausing before posting to ask how an employer might see it.",
+              "proficient": "A useful habit for {him} is checking what {his} public identity says about {him}.",
+              "extending": "{He} can try making choices that shape the public identity {he} [wants|want]."
+            },
+            "home": "Ask {him} what {he} would want an employer to notice about {him} someday."
+          }
+        }
+      }
+    ]
+  },
+  "car-purpose-community": {
+    "old": {
+      "phrase": "connect personal interests to needs in the community",
+      "next_steps": {
+        "emerging": "name a community need that a career meets",
+        "developing": "ask a worker how a job meets a community need",
+        "proficient": "link a career choice to a local or global need"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-purpose-community--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.2",
+          "bc.caree9.cc.2"
+        ],
+        "ministry": "Question self and others about how individual purposes and passions can support the needs of the local and global community when considering career choices",
+        "bands": {
+          "all": {
+            "phrase": "ask questions about how personal passions and purpose can meet community needs",
+            "next_steps": {
+              "emerging": "name a passion and a community need it could help",
+              "developing": "ask someone how their passion helps their community",
+              "proficient": "link a career choice to a local or global need",
+              "extending": "explain how one passion could serve both local and global needs"
+            },
+            "strength": [
+              "{He} [asks|ask] {himself} how {his} passions could help {his} community.",
+              "{He} [links|link] career choices to local and global needs."
+            ],
+            "next": {
+              "developing": "{He} would benefit from asking adults how their passions shaped the work they do.",
+              "proficient": "{His} next step is to connect a career {he} [likes|like] to a need in {his} community.",
+              "extending": "Next, {he} can practise explaining how one career could help people both nearby and around the world."
+            },
+            "home": "Ask {him} what problem in the world {he} would most like to help solve."
+          }
+        }
+      }
+    ]
+  },
+  "car-respectful-work": {
+    "old": {
+      "phrase": "work respectfully toward a shared goal",
+      "next_steps": {
+        "emerging": "do a fair share of a group task",
+        "developing": "work respectfully with others to reach a shared goal",
+        "proficient": "make contributions that move a team toward its goal"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-respectful-work--work-placement",
+        "courses": [
+          "Youth Work in Trades 11",
+          "Work Experience 12A",
+          "Work Experience 12B",
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.5",
+          "bc.wex12a.cc.11",
+          "bc.wex12b.cc.11",
+          "bc.ywt12.cc.5"
+        ],
+        "ministry": "Develop skills to work respectfully and constructively, both independently and with others, to achieve common goals",
+        "bands": {
+          "all": {
+            "phrase": "work with respect, both alone and with others, toward a common goal",
+            "next_steps": {
+              "emerging": "do a fair share of a shared task",
+              "developing": "work with others with respect while moving a task toward its goal",
+              "proficient": "make contributions that move the team toward the common goal",
+              "extending": "help a team stay focused on its goal when people disagree"
+            },
+            "strength": [
+              "{He} [completes|complete] {his} part of a team task without needing reminders.",
+              "{He} [treats|treat] coworkers with respect while working toward shared goals."
+            ],
+            "next": {
+              "developing": "Next, {he} can practise checking how {his} part fits the team's goal.",
+              "proficient": "To go further, {he} can offer ideas that move the team closer to its goal.",
+              "extending": "One thing to try is helping the team agree on next actions when views differ."
+            },
+            "home": "Ask {him} what makes a team at work or school run smoothly."
+          }
+        }
+      }
+    ]
+  },
+  "car-risk-identification": {
+    "old": {
+      "phrase": "identify the safety risks of a workplace before starting",
+      "next_steps": {
+        "emerging": "find information on workplace safety before a placement",
+        "developing": "identify the main safety risks at a placement site",
+        "proficient": "determine the safety risks using several sources of information"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-risk-identification--work-placement",
+        "courses": [
+          "Youth Work in Trades 11",
+          "Work Experience 12A",
+          "Work Experience 12B",
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.8",
+          "bc.wex12a.cc.6",
+          "bc.wex12b.cc.6",
+          "bc.ywt12.cc.8"
+        ],
+        "ministry": "Access information and ideas on workplace safety prior to work placement to determine workplace safety risks",
+        "bands": {
+          "all": {
+            "phrase": "find workplace safety information before a placement and use it to identify risks",
+            "next_steps": {
+              "emerging": "find information on workplace safety before a placement starts",
+              "developing": "identify the main safety risks at a placement site",
+              "proficient": "use more than one source to judge the risks of a workplace",
+              "extending": "rank risks at a placement and plan how to reduce the most serious ones"
+            },
+            "strength": [
+              "{He} [finds|find] information about workplace safety before {his} placement begins.",
+              "{He} [uses|use] that information to identify the safety risks at {his} work site."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to ask an employer about the main risks before {his} first shift.",
+              "proficient": "A good next step is to check safety information from more than one source.",
+              "extending": "From here, {he} can practise ranking risks by how serious they are."
+            },
+            "home": "Ask {him} what safety risks {he} [expects|expect] at {his} placement."
+          }
+        }
+      }
+    ]
+  },
+  "car-safe-interactions": {
+    "old": {
+      "phrase": "interact respectfully, safely and inclusively in many settings",
+      "next_steps": {
+        "emerging": "use respectful language in a career-life setting",
+        "developing": "include others in interactions across career-life settings",
+        "proficient": "reflect on interactions and adjust them for new settings"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-safe-interactions--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.8"
+        ],
+        "ministry": "Demonstrate and reflect on inclusive, respectful, and safe interactions in multiple career-life contexts",
+        "bands": {
+          "all": {
+            "phrase": "interact safely and with respect in career-life settings, include others and reflect on it",
+            "next_steps": {
+              "emerging": "use language that shows respect in one career-life setting",
+              "developing": "invite others into conversations and group tasks in new settings",
+              "proficient": "reflect after an interaction on what went well and what to change",
+              "extending": "adjust how to interact for each setting, such as school, work or community"
+            },
+            "strength": [
+              "{He} [makes|make] room for others to share ideas in group and work settings.",
+              "{He} [reflects|reflect] on {his} interactions and [changes|change] how {he} [acts|act] when something goes wrong."
+            ],
+            "next": {
+              "developing": "{He} would benefit from noticing who has not been heard and inviting them to share.",
+              "proficient": "{His} next step is to check with others after a group task about how the interaction went for them.",
+              "extending": "Next, {he} can practise adjusting how {he} [speaks|speak] and [acts|act] in each new career-life setting."
+            },
+            "home": "Ask {him} how {he} [makes|make] a new person feel included at school or work."
+          }
+        }
+      }
+    ]
+  },
+  "car-safety-procedures": {
+    "old": {
+      "phrase": "follow legal and site safety procedures at work",
+      "next_steps": {
+        "emerging": "identify the safety procedures a work site requires",
+        "developing": "follow site safety procedures during each task",
+        "proficient": "build safety procedures into everyday work routines"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-safety-procedures--work-placement",
+        "courses": [
+          "Youth Work in Trades 11",
+          "Work Experience 12A",
+          "Work Experience 12B",
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.9",
+          "bc.wex12a.cc.7",
+          "bc.wex12b.cc.7",
+          "bc.ywt12.cc.9"
+        ],
+        "ministry": "Identify, demonstrate, and incorporate provincially legislated safety and site-specific work-site safety procedures while at the work placement",
+        "bands": {
+          "all": {
+            "phrase": "identify and follow BC and work-site safety procedures as part of everyday tasks",
+            "next_steps": {
+              "emerging": "name the safety procedures BC law and the work site require",
+              "developing": "practise following site safety procedures in every task",
+              "proficient": "make safety procedures part of each task without being reminded",
+              "extending": "explain the reason behind each procedure to a new worker"
+            },
+            "strength": [
+              "{He} [identifies|identify] the safety procedures required by BC law and by {his} work site.",
+              "{He} [makes|make] safety procedures part of how {he} [does|do] {his} everyday tasks."
+            ],
+            "next": {
+              "developing": "It would help {him} to review the site's safety procedures before each new task.",
+              "proficient": "{He} can now practise following safety steps without needing a reminder.",
+              "extending": "The next goal is for {him} to explain why each safety procedure exists."
+            },
+            "home": "Ask {him} which safety rule at {his} work site {he} [thinks|think] matters most."
+          }
+        }
+      }
+    ]
+  },
+  "car-self-assessment": {
+    "old": {
+      "phrase": "name personal strengths and skills, with examples",
+      "next_steps": {
+        "emerging": "name one strength and give an example of it",
+        "developing": "use a self-assessment to describe strengths and skills",
+        "proficient": "reflect on what likes and preferences show about strengths and skills"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-self-assessment--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.1",
+          "bc.caree9.cc.1"
+        ],
+        "ministry": "Use self-assessment and reflection to develop awareness of their strengths, preferences, and skills",
+        "bands": {
+          "all": {
+            "phrase": "use self-assessment and reflection to name personal strengths, likes and skills",
+            "next_steps": {
+              "emerging": "practise naming one strength with an example of it",
+              "developing": "use a self-assessment to describe strengths and skills",
+              "proficient": "explain what personal likes show about strengths",
+              "extending": "use reflection to spot new strengths and skills over time"
+            },
+            "strength": [
+              "{He} [names|name] {his} strengths and [gives|give] examples that show them.",
+              "{He} [reflects|reflect] on what {he} [likes|like] to do and why."
+            ],
+            "next": {
+              "developing": "One thing to try is giving an example from home or school for each strength.",
+              "proficient": "{He} [is|are] ready to explain how the things {he} [enjoys|enjoy] connect to {his} skills.",
+              "extending": "To go further, {he} can compare {his} self-assessments over time to see how {he} [has|have] grown."
+            },
+            "home": "Tell {him} one strength you see in {him} and give an example."
+          }
+        }
+      }
+    ]
+  },
+  "car-skill-development": {
+    "old": {
+      "phrase": "make a plan to build work skills",
+      "next_steps": {
+        "emerging": "name the work skills to develop or refine",
+        "developing": "write a plan with steps to build one skill",
+        "proficient": "track progress on a skill plan and revise it"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-skill-development--work-experience-12a",
+        "courses": [
+          "Work Experience 12A"
+        ],
+        "competency_ids": [
+          "bc.wex12a.cc.5"
+        ],
+        "ministry": "Develop a plan to address skill development and refinement",
+        "bands": {
+          "all": {
+            "phrase": "identify work skills that need growth and plan how to build and refine them",
+            "next_steps": {
+              "emerging": "name the work skills that need developing or refining",
+              "developing": "write a plan with steps to build one skill",
+              "proficient": "set ways to measure progress in each skill plan",
+              "extending": "plan skill growth that matches the needs of a future job"
+            },
+            "strength": [
+              "{He} [identifies|identify] which of {his} work skills need to grow.",
+              "{He} [develops|develop] a plan with steps to build and refine those skills."
+            ],
+            "next": {
+              "developing": "{He} could practise breaking a skill plan into steps {he} can do each week.",
+              "proficient": "A useful habit for {him} is deciding how {he} will know a skill has improved.",
+              "extending": "A next step for {him} is to match {his} skill plan to the needs of a future job."
+            },
+            "home": "Ask {him} which work skill {he} most [wants|want] to improve this year."
+          }
+        }
+      },
+      {
+        "id": "car-skill-development--work-experience-12b",
+        "courses": [
+          "Work Experience 12B"
+        ],
+        "competency_ids": [
+          "bc.wex12b.cc.5"
+        ],
+        "ministry": "Implement a plan to address skill development and refinement",
+        "bands": {
+          "all": {
+            "phrase": "follow a skill plan at work to build and refine needed skills",
+            "next_steps": {
+              "emerging": "take one step from a skill plan during a shift",
+              "developing": "follow the skill plan regularly and note progress",
+              "proficient": "adjust the plan when a step is not helping a skill grow",
+              "extending": "show evidence that the plan has refined each target skill"
+            },
+            "strength": [
+              "{He} [follows|follow] {his} skill plan at work and [notes|note] the progress {he} [makes|make].",
+              "{He} [adjusts|adjust] {his} plan when a step is not helping a skill improve."
+            ],
+            "next": {
+              "developing": "{He} would benefit from checking off each step of {his} plan as {he} [completes|complete] it.",
+              "proficient": "{His} next step is to collect evidence, such as employer feedback, that shows each skill growing.",
+              "extending": "Next, {he} can practise explaining how {his} plan has refined each skill, with examples."
+            },
+            "home": "Ask {him} which work skill has grown most since {his} plan began."
+          }
+        }
+      }
+    ]
+  },
+  "car-skill-progression": {
+    "old": {
+      "phrase": "show growth in the skills a work placement needs",
+      "next_steps": {
+        "emerging": "name the skills a work placement requires",
+        "developing": "compare skill levels at the start of placement and now",
+        "proficient": "show progress in placement skills with specific examples"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-skill-progression--work-experience",
+        "courses": [
+          "Work Experience 12A",
+          "Work Experience 12B"
+        ],
+        "competency_ids": [
+          "bc.wex12a.cc.9",
+          "bc.wex12b.cc.9"
+        ],
+        "ministry": "Demonstrate progression of skills learned specific to the work placement",
+        "bands": {
+          "all": {
+            "phrase": "show progress in the skills a work placement requires, from the start until now",
+            "next_steps": {
+              "emerging": "name the specific skills the placement requires",
+              "developing": "compare skill levels at the start of the placement and now",
+              "proficient": "show progress in each skill with specific examples",
+              "extending": "use feedback from a supervisor to show how skills have grown"
+            },
+            "strength": [
+              "{He} [identifies|identify] the specific skills {his} work placement requires.",
+              "{He} [shows|show] how {his} skills have grown since the start of {his} placement."
+            ],
+            "next": {
+              "developing": "One thing to try is noting {his} level in each skill at the start and end of each month.",
+              "proficient": "{He} [is|are] ready to give a specific example of progress for each placement skill.",
+              "extending": "To go further, {he} can use {his} supervisor's feedback to explain which skills grew most."
+            },
+            "home": "Ask {him} what {he} can do now at {his} placement that {he} could not do at the start."
+          }
+        }
+      }
+    ]
+  },
+  "car-skills-assessment": {
+    "old": {
+      "phrase": "assess transferable skills, using evidence from experience",
+      "next_steps": {
+        "emerging": "name transferable skills, with an example of each",
+        "developing": "use evidence from experience to assess transferable skills",
+        "proficient": "explain why each skill is a strength or needs refining"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-skills-assessment--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.3"
+        ],
+        "ministry": "Assess personal transferable skills, and identify strengths and those skills that require further refinement",
+        "bands": {
+          "all": {
+            "phrase": "assess transferable skills with evidence and name strengths and skills to refine",
+            "next_steps": {
+              "emerging": "name transferable skills and give one example of each",
+              "developing": "use evidence from experience to rate each transferable skill",
+              "proficient": "explain why each skill is a strength or needs refining, with examples",
+              "extending": "set a plan to refine the skills that matter most for future goals"
+            },
+            "strength": [
+              "{He} [names|name] transferable skills, such as teamwork or problem solving, and [gives|give] an example of each.",
+              "{He} [sorts|sort] {his} skills into strengths and skills that need more practice."
+            ],
+            "next": {
+              "developing": "One thing to try is pairing each skill with a time {he} used it.",
+              "proficient": "{He} [is|are] ready to explain why a skill is a strength, using evidence from more than one setting.",
+              "extending": "To go further, {he} can plan how to refine the skills that matter most for {his} goals."
+            },
+            "home": "Ask {him} which of {his} skills would help in almost any job, and where {he} learned it."
+          }
+        }
+      }
+    ]
+  },
+  "car-trade-skills": {
+    "old": {
+      "phrase": "use trade skills at a work placement",
+      "next_steps": {
+        "emerging": "match placement tasks to the skills in a training plan",
+        "developing": "apply the skills from a training plan during placement tasks",
+        "proficient": "apply trade skills to new tasks at a work placement"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-trade-skills--youth-work-in-trades-11",
+        "courses": [
+          "Youth Work in Trades 11"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.2"
+        ],
+        "ministry": "Apply trade-specific skills in the work placement, as defined in the training plan",
+        "bands": {
+          "all": {
+            "phrase": "apply the trade skills from the training plan to tasks at a work placement",
+            "next_steps": {
+              "emerging": "match placement tasks to the skills in the training plan",
+              "developing": "apply training-plan skills during matching placement tasks",
+              "proficient": "use trade skills on tasks without step-by-step help",
+              "extending": "apply trade skills to new or less familiar tasks at the placement"
+            },
+            "strength": [
+              "{He} [applies|apply] the trade skills named in {his} training plan at {his} placement.",
+              "{He} [recognizes|recognize] which of {his} placement duties match the goals in {his} training plan."
+            ],
+            "next": {
+              "developing": "A good next step is to name which training-plan skill each new task uses.",
+              "proficient": "From here, {he} can practise using trade skills on tasks with less guidance.",
+              "extending": "It would help {him} to apply {his} trade skills in unfamiliar situations at the placement."
+            },
+            "home": "Ask {him} to describe a trade task {he} did this week, step by step."
+          }
+        }
+      },
+      {
+        "id": "car-trade-skills--youth-work-in-trades-12",
+        "courses": [
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt12.cc.2"
+        ],
+        "ministry": "Further develop and apply trade-specific skills while working, as defined in the training plan, and demonstrate progression of learning",
+        "bands": {
+          "all": {
+            "phrase": "develop trade skills further at work and show how they have progressed over time",
+            "next_steps": {
+              "emerging": "name a trade skill that has grown since starting the training plan",
+              "developing": "keep a record of trade skills as they progress",
+              "proficient": "show progress in trade skills with examples from different tasks",
+              "extending": "attempt more complex trade tasks that need skills from across the plan"
+            },
+            "strength": [
+              "{He} [handles|handle] more complex trade work as {his} training continues.",
+              "{He} [shows|show] how {his} trade skills have progressed over time, with examples."
+            ],
+            "next": {
+              "developing": "{He} can now keep a record that shows how each trade skill progresses.",
+              "proficient": "The next goal is for {him} to show progress with examples from several types of tasks.",
+              "extending": "{He} could practise trade skills on complex tasks that combine several parts of {his} plan."
+            },
+            "home": "Ask {him} which part of {his} trade feels easier now than it did when {he} started."
+          }
+        }
+      }
+    ]
+  },
+  "car-training-plan": {
+    "old": {
+      "phrase": "plan trade training with a teacher and employer",
+      "next_steps": {
+        "emerging": "list the trade skills to include in a training plan",
+        "developing": "work with a teacher and employer to draft a training plan",
+        "proficient": "set clear goals and timelines in a trade training plan"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-training-plan--youth-work-in-trades",
+        "courses": [
+          "Youth Work in Trades 11",
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.1",
+          "bc.ywt12.cc.1"
+        ],
+        "ministry": "Collaborate with teacher and employer to develop a trade-specific training plan",
+        "bands": {
+          "all": {
+            "phrase": "work with a teacher and employer to build a trade-specific training plan",
+            "next_steps": {
+              "emerging": "list the trade skills to include in a training plan",
+              "developing": "share ideas with the teacher and employer when drafting the plan",
+              "proficient": "set clear goals and timelines for each skill in the plan",
+              "extending": "propose changes to the plan and explain the reasons for them"
+            },
+            "strength": [
+              "{He} [works|work] with {his} teacher and employer to build {his} training plan.",
+              "{He} [identifies|identify] the trade-specific skills {his} plan should include."
+            ],
+            "next": {
+              "developing": "A useful habit for {him} is bringing questions to each planning meeting.",
+              "proficient": "{He} can build the habit of setting a goal and a timeline for each skill.",
+              "extending": "{He} would benefit from suggesting changes to {his} plan and explaining why."
+            },
+            "home": "Ask {him} what skills {his} training plan says {he} will learn this year."
+          }
+        }
+      }
+    ]
+  },
+  "car-transferable-skills": {
+    "old": {
+      "phrase": "name placement skills that transfer to other jobs",
+      "next_steps": {
+        "emerging": "name one skill used at a work placement",
+        "developing": "explain how a placement skill could be used in another job",
+        "proficient": "show how several placement skills transfer to different jobs"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-transferable-skills--identify",
+        "courses": [
+          "Youth Work in Trades 11",
+          "Work Experience 12A"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.3",
+          "bc.wex12a.cc.4"
+        ],
+        "ministry": "Identify transferrable skills specific to the work placement",
+        "bands": {
+          "all": {
+            "phrase": "identify the placement skills that could transfer to other jobs",
+            "next_steps": {
+              "emerging": "name one skill used at the work placement",
+              "developing": "explain how a placement skill could help in another job",
+              "proficient": "identify several transferable skills and the jobs they suit",
+              "extending": "sort placement skills by how widely they would transfer"
+            },
+            "strength": [
+              "{He} [names|name] the skills {he} [uses|use] at {his} work placement.",
+              "{He} [explains|explain] how a placement skill, such as teamwork, could help in other jobs."
+            ],
+            "next": {
+              "developing": "{His} next step is to name a second job where a placement skill would help.",
+              "proficient": "Next, {he} can practise naming the transferable skills hidden in everyday tasks.",
+              "extending": "To go further, {he} can sort {his} placement skills into those that transfer widely and those that do not."
+            },
+            "home": "Ask {him} which placement skill would help {him} at home or with friends."
+          }
+        }
+      },
+      {
+        "id": "car-transferable-skills--apply-and-reflect",
+        "courses": [
+          "Work Experience 12B"
+        ],
+        "competency_ids": [
+          "bc.wex12b.cc.4"
+        ],
+        "ministry": "Identify, apply, and reflect on transferrable skills specific to the work placement",
+        "bands": {
+          "all": {
+            "phrase": "identify, apply and reflect on transferable skills during a work placement",
+            "next_steps": {
+              "emerging": "name a transferable skill and one task where it is used",
+              "developing": "apply a transferable skill to a new placement task on purpose",
+              "proficient": "reflect on how a placement skill could serve in other jobs",
+              "extending": "use reflections to choose which transferable skills to grow next"
+            },
+            "strength": [
+              "{He} [applies|apply] transferable skills, such as communication, to tasks at {his} placement.",
+              "{He} [reflects|reflect] on how skills from {his} placement could serve {him} in future work."
+            ],
+            "next": {
+              "developing": "One thing to try is choosing one transferable skill to use on purpose each shift.",
+              "proficient": "{He} [is|are] ready to reflect on which skills helped most in a recent task.",
+              "extending": "A good next step is to use those reflections to decide which skills to develop next."
+            },
+            "home": "Ask {him} how a skill {he} [uses|use] at work could help in a different job."
+          }
+        }
+      },
+      {
+        "id": "car-transferable-skills--use-in-trades",
+        "courses": [
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt12.cc.3"
+        ],
+        "ministry": "Use transferrable skills specific to the work placement",
+        "bands": {
+          "all": {
+            "phrase": "use transferable skills at a trade placement and explain where else they apply",
+            "next_steps": {
+              "emerging": "use one transferable skill, such as communication, during a task",
+              "developing": "use transferable skills on purpose across different trade tasks",
+              "proficient": "explain how a trade placement skill could be used in other jobs",
+              "extending": "use transferable skills to adapt quickly to unfamiliar tasks"
+            },
+            "strength": [
+              "{He} [uses|use] transferable skills, such as problem solving, in {his} trade work.",
+              "{He} [describes|describe] how a skill from {his} trade could be used in a different field."
+            ],
+            "next": {
+              "developing": "From here, {he} can practise using one transferable skill in every type of task {he} [does|do].",
+              "proficient": "It would help {him} to explain how {his} trade skills could help in a job outside the trade.",
+              "extending": "{He} can now practise adapting {his} transferable skills to tasks that are unfamiliar."
+            },
+            "home": "Ask {him} which skill from {his} trade would help {him} in any workplace."
+          }
+        }
+      }
+    ]
+  },
+  "car-using-strengths": {
+    "old": {
+      "phrase": "find new ways to use personal strengths and skills",
+      "next_steps": {
+        "emerging": "name a strength and one way to use it at work",
+        "developing": "try an approach someone suggests for using a strength",
+        "proficient": "find original ways to use strengths in a work setting"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-using-strengths--work-experience-12a",
+        "courses": [
+          "Work Experience 12A"
+        ],
+        "competency_ids": [
+          "bc.wex12a.cc.1"
+        ],
+        "ministry": "Identify novel and guided approaches to utilize personal strengths, preferences, and skills",
+        "bands": {
+          "all": {
+            "phrase": "identify new and suggested ways to use personal strengths, preferences and skills",
+            "next_steps": {
+              "emerging": "name a strength and one way to use it at work",
+              "developing": "identify an approach someone suggests for using a strength",
+              "proficient": "think of a new way to use a strength at work",
+              "extending": "identify ways of working that fit personal preferences and strengths together"
+            },
+            "strength": [
+              "{He} [identifies|identify] new ways of {his} own to use {his} strengths at work.",
+              "{He} [considers|consider] approaches others suggest for using {his} skills."
+            ],
+            "next": {
+              "developing": "The next goal is for {him} to ask a supervisor how {he} could use a strength at work.",
+              "proficient": "{He} could practise thinking of two ways to use a skill on the same task.",
+              "extending": "A useful habit for {him} is noticing which ways of working fit {his} preferences."
+            },
+            "home": "Ask {him} to describe a task at work that made good use of {his} strengths."
+          }
+        }
+      },
+      {
+        "id": "car-using-strengths--work-experience-12b",
+        "courses": [
+          "Work Experience 12B"
+        ],
+        "competency_ids": [
+          "bc.wex12b.cc.1"
+        ],
+        "ministry": "Apply novel and guided approaches to utilize personal strengths, preferences, and skills",
+        "bands": {
+          "all": {
+            "phrase": "apply new and suggested ways to use personal strengths, preferences and skills at work",
+            "next_steps": {
+              "emerging": "try one suggested way of using a strength during a shift",
+              "developing": "apply a new, self-chosen approach for using a strength",
+              "proficient": "judge which approaches helped personal strengths show at work",
+              "extending": "combine suggested and self-chosen approaches to fit each task"
+            },
+            "strength": [
+              "{He} [follows|follow] advice from others on how to use {his} strengths at work.",
+              "{He} [tries|try] new ways of {his} own to put {his} skills to use."
+            ],
+            "next": {
+              "developing": "{He} can try an approach {he} [has|have] chosen {himself}, alongside the ones others suggest.",
+              "proficient": "{He} would benefit from judging which approaches helped {his} strengths most.",
+              "extending": "{His} next step is to choose the approach that fits each task and explain why."
+            },
+            "home": "Ask {him} about a time at work when a strength of {his} helped get a job done."
+          }
+        }
+      }
+    ]
+  },
+  "car-wellness-strategies": {
+    "old": {
+      "phrase": "explore and judge strategies that support well-being",
+      "next_steps": {
+        "emerging": "name one strategy for social, physical or financial well-being",
+        "developing": "explore strategies in more than one area of well-being",
+        "proficient": "evaluate whether personal strategies help maintain well-being"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-wellness-strategies--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.4"
+        ],
+        "ministry": "Explore and evaluate personal strategies, including social, physical, and financial, to maintain well-being",
+        "bands": {
+          "all": {
+            "phrase": "explore and evaluate social, physical and financial strategies for staying well",
+            "next_steps": {
+              "emerging": "name one social, physical or financial strategy for well-being",
+              "developing": "try strategies from more than one area of well-being",
+              "proficient": "judge whether each strategy helps and change the ones that do not",
+              "extending": "build a balanced set of strategies across social, physical and financial well-being"
+            },
+            "strength": [
+              "{He} [explores|explore] social and physical strategies, such as staying connected and staying active.",
+              "{He} [considers|consider] financial strategies, such as budgeting, as part of {his} well-being."
+            ],
+            "next": {
+              "developing": "A good next step is to try one strategy from each area for a few weeks.",
+              "proficient": "From here, {he} can practise judging whether a strategy helps by noticing how {he} [feels|feel].",
+              "extending": "It would help {him} to balance {his} strategies across social, physical and financial well-being."
+            },
+            "home": "Ask {him} what helps {him} feel balanced during a busy week."
+          }
+        }
+      }
+    ]
+  },
+  "car-work-placements": {
+    "old": {
+      "phrase": "research work placements that fit a chosen trade",
+      "next_steps": {
+        "emerging": "research one work placement option in a trade",
+        "developing": "compare two work placement options",
+        "proficient": "choose a placement that fits personal goals and explain why"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-work-placements--youth-work-in-trades-11",
+        "courses": [
+          "Youth Work in Trades 11"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.4"
+        ],
+        "ministry": "Explore work placement opportunities",
+        "bands": {
+          "all": {
+            "phrase": "explore and compare work placement opportunities in a chosen trade",
+            "next_steps": {
+              "emerging": "find one work placement option in a chosen trade",
+              "developing": "compare two placement options by what each offers",
+              "proficient": "choose a placement that fits personal goals and explain why",
+              "extending": "weigh several placements against training needs and long-term goals"
+            },
+            "strength": [
+              "{He} [explores|explore] work placement opportunities in {his} chosen trade.",
+              "{He} [compares|compare] placement options to find one that fits {his} goals."
+            ],
+            "next": {
+              "developing": "Next, {he} can practise listing what each placement option offers before comparing.",
+              "proficient": "To go further, {he} can explain how a placement option would support {his} training.",
+              "extending": "One thing to try is weighing placements against both {his} training needs and long-term goals."
+            },
+            "home": "Ask {him} which trade or workplace {he} would most like to try first."
+          }
+        }
+      },
+      {
+        "id": "car-work-placements--youth-work-in-trades-12",
+        "courses": [
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt12.cc.4"
+        ],
+        "ministry": "Explore further work placement opportunities to enhance potential futures",
+        "bands": {
+          "all": {
+            "phrase": "explore further placement opportunities that widen future options in the trade",
+            "next_steps": {
+              "emerging": "name one further placement that could add to trade experience",
+              "developing": "compare placements by how each could shape future options",
+              "proficient": "choose a further placement that fits future goals and explain why",
+              "extending": "plan a series of placements that build toward a long-term trade goal"
+            },
+            "strength": [
+              "{He} [explores|explore] further placements that could widen {his} future options.",
+              "{He} [connects|connect] each placement option to the future {he} [wants|want] in {his} trade."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to compare placements by the future options each could create.",
+              "proficient": "A good next step is to explain how a new placement would add to {his} trade experience.",
+              "extending": "From here, {he} can practise planning a series of placements toward a long-term goal."
+            },
+            "home": "Ask {him} where {he} would like {his} trade to lead in five years."
+          }
+        }
+      }
+    ]
+  },
+  "car-work-reflection": {
+    "old": {
+      "phrase": "reflect on work experience to find strengths and goals",
+      "next_steps": {
+        "emerging": "keep a regular record of work experience",
+        "developing": "identify the employability skills used at a placement",
+        "proficient": "name the work skills to develop next and explain why"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-work-reflection--youth-work-in-trades",
+        "courses": [
+          "Youth Work in Trades 11",
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.10",
+          "bc.ywt12.cc.10"
+        ],
+        "ministry": "Engage in ongoing reflection and documentation of work experience to identify strengths, employability skills, and areas for future development",
+        "bands": {
+          "all": {
+            "phrase": "reflect on and record work experience to find strengths, employability skills and growth areas",
+            "next_steps": {
+              "emerging": "keep a regular record of work experience",
+              "developing": "identify the employability skills used at the placement",
+              "proficient": "name work skills to develop next and explain why",
+              "extending": "use the record to track growth and set new targets"
+            },
+            "strength": [
+              "{He} [keeps|keep] a regular record of {his} work experience.",
+              "{He} [identifies|identify] the employability skills {he} [uses|use], such as arriving on time."
+            ],
+            "next": {
+              "developing": "It would help {him} to note one strength {he} showed after each shift.",
+              "proficient": "{He} can now practise naming the skills {he} [wants|want] to develop next and why.",
+              "extending": "The next goal is for {him} to use {his} record to track growth over the placement."
+            },
+            "home": "Ask {him} what {he} [does|do] best at {his} placement."
+          }
+        }
+      }
+    ]
+  },
+  "car-workplace-ethics": {
+    "old": {
+      "phrase": "describe workplace ethics, etiquette and cultural sensitivity",
+      "next_steps": {
+        "emerging": "name the workplace etiquette expected at a placement",
+        "developing": "explain how workplace ethics guide choices at work",
+        "proficient": "show cultural sensitivity in interactions with coworkers"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-workplace-ethics--work-placement",
+        "courses": [
+          "Youth Work in Trades 11",
+          "Work Experience 12A",
+          "Work Experience 12B",
+          "Youth Work in Trades 12"
+        ],
+        "competency_ids": [
+          "bc.ywt11.cc.6",
+          "bc.wex12a.cc.8",
+          "bc.wex12b.cc.8",
+          "bc.ywt12.cc.6"
+        ],
+        "ministry": "Demonstrate knowledge (Youth Work in Trades 11, Work Experience 12A) or understanding (Work Experience 12B, Youth Work in Trades 12) of cultural sensitivity, workplace ethics and etiquette",
+        "bands": {
+          "all": {
+            "phrase": "show cultural sensitivity and follow workplace ethics and etiquette at a placement",
+            "next_steps": {
+              "emerging": "name the workplace etiquette expected at the placement",
+              "developing": "explain how workplace ethics guide a choice at work",
+              "proficient": "show cultural sensitivity in everyday interactions with coworkers",
+              "extending": "handle an ethical question at work and explain the reasoning"
+            },
+            "strength": [
+              "{He} [follows|follow] the etiquette expected at {his} work placement.",
+              "{He} [shows|show] cultural sensitivity in how {he} [treats|treat] the people {he} [works|work] with."
+            ],
+            "next": {
+              "developing": "{He} could practise explaining how workplace ethics guide a choice {he} made.",
+              "proficient": "A useful habit for {him} is noticing how the people {he} [works|work] with prefer to communicate.",
+              "extending": "A next step for {him} is to think through an ethical question at work and explain {his} reasoning."
+            },
+            "home": "Ask {him} what good manners look like at {his} workplace."
+          }
+        }
+      }
+    ]
+  },
+  "car-workplace-safety": {
+    "old": {
+      "phrase": "follow safety steps and explain why they matter",
+      "next_steps": {
+        "emerging": "name the safety risks in a work space",
+        "developing": "follow each safety step while working",
+        "proficient": "explain why each safety rule protects workers"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-workplace-safety--career-education",
+        "courses": [
+          "Career Education 8",
+          "Career Education 9"
+        ],
+        "competency_ids": [
+          "bc.caree8.cc.6",
+          "bc.caree9.cc.6"
+        ],
+        "ministry": "Demonstrate safety skills and appreciate the importance of workplace safety",
+        "bands": {
+          "all": {
+            "phrase": "use safety skills while working and explain why workplace safety matters",
+            "next_steps": {
+              "emerging": "name the safety risks in a work space",
+              "developing": "make a habit of following each safety step while working",
+              "proficient": "explain how each safety rule protects workers",
+              "extending": "spot new risks in a work space and suggest ways to reduce them"
+            },
+            "strength": [
+              "{He} [follows|follow] safety steps while {he} [works|work].",
+              "{He} [explains|explain] why safety rules protect people at work."
+            ],
+            "next": {
+              "developing": "A good next step is to name the risks in a space before starting a task.",
+              "proficient": "From here, {he} can practise explaining the reason behind each safety rule {he} [follows|follow].",
+              "extending": "It would help {him} to suggest a safer way to do a task when {he} [sees|see] a risk."
+            },
+            "home": "Ask {him} to name one safety risk in your kitchen and how to avoid it."
+          }
+        }
+      }
+    ]
+  },
+  "car-worldview-influence": {
+    "old": {
+      "phrase": "explain how a worldview shapes values and choices",
+      "next_steps": {
+        "emerging": "describe a perspective that shapes a personal choice",
+        "developing": "explain how a worldview shapes values and actions",
+        "proficient": "explain how a worldview shapes the future a person prefers"
+      }
+    },
+    "sets": [
+      {
+        "id": "car-worldview-influence--career-life-connections",
+        "courses": [
+          "Career-Life Connections"
+        ],
+        "competency_ids": [
+          "bc.clc12.cc.1"
+        ],
+        "ministry": "Recognize personal worldviews and perspectives, and consider their influence on values, actions, and preferred futures",
+        "bands": {
+          "all": {
+            "phrase": "describe personal worldviews and explain how they shape values, actions and preferred futures",
+            "next_steps": {
+              "emerging": "describe one belief or perspective that shapes a personal choice",
+              "developing": "explain how a worldview connects to values and everyday actions",
+              "proficient": "trace how a worldview shapes the future a person wants",
+              "extending": "consider how a different worldview could lead to different choices"
+            },
+            "strength": [
+              "{He} [describes|describe] {his} own worldviews and perspectives in clear terms.",
+              "{He} [explains|explain] how {his} values guide the choices {he} [makes|make] each day."
+            ],
+            "next": {
+              "developing": "{He} can now practise naming a value behind one of {his} recent choices.",
+              "proficient": "The next goal is for {him} to explain how {his} worldview shapes the future {he} [wants|want].",
+              "extending": "{He} could explore how a person with a different worldview might choose a different path."
+            },
+            "home": "Ask {him} which family value matters most to {him}, and why."
+          }
+        }
+      }
+    ]
+  },
+  "cle-balance-strategies": {
+    "old": {
+      "phrase": "use strategies to balance school, work and personal time",
+      "next_steps": {
+        "emerging": "name one strategy for balancing school and work",
+        "developing": "use a planning strategy, such as a weekly schedule, to balance time",
+        "proficient": "explain how a strategy affected balance and adjust it"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-balance-strategies--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.10"
+        ],
+        "ministry": "Practise effective strategies for healthy school/work/life balance",
+        "bands": {
+          "all": {
+            "phrase": "practise strategies that keep school, work and personal life in healthy balance",
+            "next_steps": {
+              "emerging": "name one strategy for balancing school, work and personal time",
+              "developing": "use a planning strategy, such as a weekly schedule, for a few weeks",
+              "proficient": "notice how a strategy affects balance and adjust it",
+              "extending": "plan ahead for busy weeks so balance holds when demands rise"
+            },
+            "strength": [
+              "{He} [uses|use] strategies, such as planning {his} week, to balance school and other demands.",
+              "{He} [explains|explain] how a strategy {he} [has|have] practised affected {his} balance."
+            ],
+            "next": {
+              "developing": "{He} can now try one balance strategy for a few weeks and note what changes.",
+              "proficient": "The next goal is for {him} to adjust a strategy when it stops working.",
+              "extending": "{He} could plan ahead for weeks when school, work and family needs all rise at once."
+            },
+            "home": "Ask {him} which part of the week feels busiest and what might help."
+          }
+        }
+      }
+    ]
+  },
+  "cle-career-challenges": {
+    "old": {
+      "phrase": "find strategies for career-life challenges and opportunities",
+      "next_steps": {
+        "emerging": "name one challenge or opportunity in career-life planning",
+        "developing": "list possible strategies for a career-life challenge",
+        "proficient": "apply a strategy to a challenge and judge how it worked"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-career-challenges--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.8"
+        ],
+        "ministry": "Identify career-life challenges and opportunities, and generate and apply strategies",
+        "bands": {
+          "all": {
+            "phrase": "identify career-life challenges and opportunities, then generate and apply strategies for them",
+            "next_steps": {
+              "emerging": "name one challenge or opportunity in career-life planning",
+              "developing": "list several possible strategies before choosing one",
+              "proficient": "apply a strategy to a challenge and judge how it worked",
+              "extending": "spot the opportunity inside a challenge and plan a strategy for it"
+            },
+            "strength": [
+              "{He} [identifies|identify] challenges and opportunities in {his} career-life planning.",
+              "{He} [generates|generate] several possible strategies before choosing one to try."
+            ],
+            "next": {
+              "developing": "A useful habit for {him} is thinking of two or three strategies before choosing one.",
+              "proficient": "{He} can try judging how well a strategy worked after using it.",
+              "extending": "{He} would benefit from naming the opportunity that a career-life challenge can open."
+            },
+            "home": "Ask {him} about a challenge in {his} plans after school and one way {he} might handle it."
+          }
+        }
+      }
+    ]
+  },
+  "cle-career-life-choices": {
+    "old": {
+      "phrase": "explore how career choices and community affect each other",
+      "next_steps": {
+        "emerging": "talk with a community member about a career-life choice",
+        "developing": "explain how a community member's ideas shape a choice",
+        "proficient": "explain how a career-life choice can affect others in the community"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-career-life-choices--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.5"
+        ],
+        "ministry": "Collaborate with supportive community members to explore the reciprocal influences of career-life choices",
+        "bands": {
+          "all": {
+            "phrase": "work with community members to explore how career-life choices and community shape each other",
+            "next_steps": {
+              "emerging": "talk with one community member about a career-life choice",
+              "developing": "explain how a community member's ideas shape a personal choice",
+              "proficient": "explain how a career-life choice can affect others and the community",
+              "extending": "trace the two-way influence between a choice and the community, with examples"
+            },
+            "strength": [
+              "{He} [works|work] with community members to learn how they made their career-life choices.",
+              "{He} [explains|explain] how a choice {he} [makes|make] can affect others in {his} community."
+            ],
+            "next": {
+              "developing": "{His} next step is to explain how a community member's ideas have shaped {his} thinking.",
+              "proficient": "Next, {he} can practise tracing how one choice affects family, friends and community.",
+              "extending": "To go further, {he} can explain how {his} community shapes {his} choices and how {his} choices shape it."
+            },
+            "home": "Tell {him} how a work choice you made affected the people around you."
+          }
+        }
+      }
+    ]
+  },
+  "cle-career-life-plans": {
+    "old": {
+      "phrase": "create a flexible plan for career-life learning",
+      "next_steps": {
+        "emerging": "create a first profile for a career-life plan",
+        "developing": "develop a flexible plan with clear next steps",
+        "proficient": "adjust a plan when career-life choices change"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-career-life-plans--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.12"
+        ],
+        "ministry": "Develop preliminary profiles and flexible plans for career-life learning journeys",
+        "bands": {
+          "all": {
+            "phrase": "create a first profile and a flexible plan for career-life learning",
+            "next_steps": {
+              "emerging": "create a simple profile of interests, strengths and goals",
+              "developing": "build a plan with clear steps for the next year or two",
+              "proficient": "keep a plan flexible by including more than one option",
+              "extending": "revise a plan when choices or interests change and explain why"
+            },
+            "strength": [
+              "{He} [creates|create] a profile that names {his} interests, strengths and goals.",
+              "{He} [builds|build] a career-life plan with clear steps and room to change."
+            ],
+            "next": {
+              "developing": "One thing to try is adding a second option to {his} plan in case {his} interests shift.",
+              "proficient": "{He} [is|are] ready to review {his} plan regularly and update it as {he} [learns|learn].",
+              "extending": "A good next step is to explain how {his} profile and plan connect to each other."
+            },
+            "home": "Ask {him} what {his} plan looks like for the next two years."
+          }
+        }
+      }
+    ]
+  },
+  "cle-career-life-roles": {
+    "old": {
+      "phrase": "reflect on roles, growth and early career-life plans",
+      "next_steps": {
+        "emerging": "describe roles taken on at school or in the community",
+        "developing": "reflect on growth in career-life learning",
+        "proficient": "connect reflections on growth to a preferred pathway"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-career-life-roles--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.11"
+        ],
+        "ministry": "Explore and reflect on career-life roles, personal growth, and initial planning for preferred career-life pathways",
+        "bands": {
+          "all": {
+            "phrase": "reflect on personal roles and growth, and begin planning a preferred career-life pathway",
+            "next_steps": {
+              "emerging": "describe the roles held at school, at home or in the community",
+              "developing": "reflect on how personal growth shows in those roles",
+              "proficient": "connect growth in a role to a preferred pathway",
+              "extending": "use reflections on roles and growth to adjust early pathway plans"
+            },
+            "strength": [
+              "{He} [describes|describe] the roles {he} [plays|play] at school, at home and in the community.",
+              "{He} [reflects|reflect] on how {he} [has|have] grown and what that means for {his} plans."
+            ],
+            "next": {
+              "developing": "From here, {he} can practise naming a skill each role has helped {him} build.",
+              "proficient": "It would help {him} to connect the growth {he} [sees|see] to a pathway {he} [prefers|prefer].",
+              "extending": "{He} can now use what {he} [learns|learn] from each role to adjust {his} pathway plans."
+            },
+            "home": "Ask {him} which role {he} [plays|play], at home or elsewhere, has taught {him} the most."
+          }
+        }
+      }
+    ]
+  },
+  "cle-digital-footprints": {
+    "old": {
+      "phrase": "identify the risks and benefits of a digital footprint",
+      "next_steps": {
+        "emerging": "list what a digital footprint can show others",
+        "developing": "explain one risk and one benefit of a digital footprint",
+        "proficient": "explain how risks and benefits differ for personal and public footprints"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-digital-footprints--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.2"
+        ],
+        "ministry": "Identify risks and appreciate benefits associated with personal and public digital footprints",
+        "bands": {
+          "all": {
+            "phrase": "identify the risks and benefits of personal and public digital footprints",
+            "next_steps": {
+              "emerging": "list what a digital footprint can show others",
+              "developing": "explain one risk and one benefit of a public footprint",
+              "proficient": "explain how risks and benefits differ for personal and public footprints",
+              "extending": "practise making online choices that limit risks and build benefits"
+            },
+            "strength": [
+              "{He} [identifies|identify] the risks a public digital footprint can create.",
+              "{He} [describes|describe] how a digital footprint can open opportunities, such as showing {his} skills."
+            ],
+            "next": {
+              "developing": "The next goal is for {him} to name a benefit of a digital footprint as well as a risk.",
+              "proficient": "{He} could practise explaining how a personal footprint and a public one differ.",
+              "extending": "A useful habit for {him} is pausing to weigh risks and benefits before posting."
+            },
+            "home": "Ask {him} what {he} would want an employer to find if they looked {him} up online."
+          }
+        }
+      }
+    ]
+  },
+  "cle-employment-networks": {
+    "old": {
+      "phrase": "use personal and work networks to explore opportunities",
+      "next_steps": {
+        "emerging": "name people who could share information about careers",
+        "developing": "explain how an employment network can lead to opportunities",
+        "proficient": "use a network to find a specific career-life opportunity"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-employment-networks--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.3"
+        ],
+        "ministry": "Consider the role of personal and employment networks in exploring career-life opportunities",
+        "bands": {
+          "all": {
+            "phrase": "explain how personal and employment networks can lead to career-life opportunities",
+            "next_steps": {
+              "emerging": "name people who could share information about careers",
+              "developing": "explain how an employment network can lead to an opportunity",
+              "proficient": "use a personal or employment network to explore one opportunity",
+              "extending": "map a network and plan how to grow it in a field of interest"
+            },
+            "strength": [
+              "{He} [identifies|identify] people in {his} personal network who connect {him} to career-life options.",
+              "{He} [explains|explain] how knowing people in a field can lead to work opportunities."
+            ],
+            "next": {
+              "developing": "{He} can try asking someone in {his} network about their work.",
+              "proficient": "{He} would benefit from using {his} network to explore one opportunity in depth.",
+              "extending": "{His} next step is to map {his} network and plan how to widen it."
+            },
+            "home": "Tell {him} about a job or chance that came to you through someone you knew."
+          }
+        }
+      }
+    ]
+  },
+  "cle-learning-connections": {
+    "old": {
+      "phrase": "connect learning experiences to possible career-life paths",
+      "next_steps": {
+        "emerging": "describe a learning experience from inside or outside school",
+        "developing": "name possible and preferred career-life pathways",
+        "proficient": "explain how a learning experience points toward a pathway"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-learning-connections--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.9"
+        ],
+        "ministry": "Explore and connect experiential learning both inside and outside of school with possible and preferred career-life pathways",
+        "bands": {
+          "all": {
+            "phrase": "connect hands-on learning in and out of school to possible and preferred pathways",
+            "next_steps": {
+              "emerging": "describe a hands-on learning experience from inside or outside school",
+              "developing": "name possible and preferred career-life pathways",
+              "proficient": "explain how a learning experience points toward a pathway",
+              "extending": "seek experiences that test whether a preferred pathway fits"
+            },
+            "strength": [
+              "{He} [describes|describe] hands-on learning {he} [has|have] done both in and out of school.",
+              "{He} [connects|connect] what {he} [learns|learn] from experience to possible career-life pathways."
+            ],
+            "next": {
+              "developing": "Next, {he} can practise naming what each experience taught {him} about work {he} might enjoy.",
+              "proficient": "To go further, {he} can explain which experiences point toward {his} preferred pathway and why.",
+              "extending": "One thing to try is choosing a new experience that tests whether a pathway fits {him}."
+            },
+            "home": "Ask {him} which experience outside school has taught {him} the most about work."
+          }
+        }
+      }
+    ]
+  },
+  "cle-mentorship": {
+    "old": {
+      "phrase": "use a mentor's advice in career exploration",
+      "next_steps": {
+        "emerging": "describe advice a mentor gave about career-life options",
+        "developing": "apply one piece of a mentor's advice to a plan",
+        "proficient": "explain how a mentor's guidance changed a career-life plan"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-mentorship--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.4"
+        ],
+        "ministry": "Apply a mentor’s guidance in career-life exploration",
+        "bands": {
+          "all": {
+            "phrase": "apply a mentor's guidance when exploring career-life options",
+            "next_steps": {
+              "emerging": "describe advice a mentor gave about career-life options",
+              "developing": "apply one piece of a mentor's advice to a plan",
+              "proficient": "explain how a mentor's guidance changed a choice",
+              "extending": "weigh a mentor's advice against other information before acting"
+            },
+            "strength": [
+              "{He} [listens|listen] to a mentor's guidance and [uses|use] it when exploring options.",
+              "{He} [describes|describe] how a mentor's advice shaped a choice {he} made."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to try one piece of {his} mentor's advice and see how it goes.",
+              "proficient": "A good next step is to explain how a mentor's guidance changed {his} thinking.",
+              "extending": "From here, {he} can practise weighing a mentor's advice against what {he} [learns|learn] elsewhere."
+            },
+            "home": "Ask {him} what advice {he} [has|have] been given about work that {he} [agrees|agree] with."
+          }
+        }
+      }
+    ]
+  },
+  "cle-public-profiles": {
+    "old": {
+      "phrase": "explain how personal and public profiles affect opportunities",
+      "next_steps": {
+        "emerging": "describe what a personal profile shows about someone",
+        "developing": "explain how a public profile can open or limit opportunities",
+        "proficient": "compare how personal and public profiles affect different opportunities"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-public-profiles--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.1"
+        ],
+        "ministry": "Examine the influences of personal and public profiles on career-life opportunities",
+        "bands": {
+          "all": {
+            "phrase": "examine how personal and public profiles can open or limit career-life opportunities",
+            "next_steps": {
+              "emerging": "describe what a personal profile shows about someone",
+              "developing": "explain how a public profile can open or limit an opportunity",
+              "proficient": "compare how personal and public profiles affect different opportunities",
+              "extending": "judge which parts of a profile help most for a chosen goal"
+            },
+            "strength": [
+              "{He} [examines|examine] how a profile can affect the opportunities a person is offered.",
+              "{He} [explains|explain] the difference between a personal profile and a public one."
+            ],
+            "next": {
+              "developing": "It would help {him} to give an example of a profile detail that could limit an opportunity.",
+              "proficient": "{He} can now compare how the same profile might look to an employer and to a friend.",
+              "extending": "The next goal is for {him} to decide which parts of a profile matter most for a goal."
+            },
+            "home": "Ask {him} what a profile should say about a person applying for a first job."
+          }
+        }
+      }
+    ]
+  },
+  "cle-safe-interactions": {
+    "old": {
+      "phrase": "interact respectfully, safely and inclusively with others",
+      "next_steps": {
+        "emerging": "use respectful language with others in group settings",
+        "developing": "include others in interactions in career-life settings",
+        "proficient": "interact safely and respectfully in new or unfamiliar settings"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-safe-interactions--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.7"
+        ],
+        "ministry": "Demonstrate inclusive, respectful, and safe interactions in diverse career-life environments",
+        "bands": {
+          "all": {
+            "phrase": "interact safely and with respect, and include others, in different career-life settings",
+            "next_steps": {
+              "emerging": "use words that show respect in group settings",
+              "developing": "include others in conversations and tasks in career-life settings",
+              "proficient": "interact safely and with respect in a new or unfamiliar setting",
+              "extending": "notice when someone is left out or unsafe and respond"
+            },
+            "strength": [
+              "{He} [speaks|speak] to others with respect at school and in other career-life settings.",
+              "{He} [includes|include] others in group tasks and conversations."
+            ],
+            "next": {
+              "developing": "{He} could practise inviting someone new to join a task or conversation.",
+              "proficient": "A useful habit for {him} is thinking about safety and respect when entering a new setting.",
+              "extending": "{He} can build the habit of speaking up when someone is left out or unsafe."
+            },
+            "home": "Ask {him} what makes a workplace or team feel safe to {him}."
+          }
+        }
+      }
+    ]
+  },
+  "cle-sharing-strengths": {
+    "old": {
+      "phrase": "present personal strengths and accomplishments clearly",
+      "next_steps": {
+        "emerging": "name a strength and give an example that shows it",
+        "developing": "present an accomplishment so its value is clear",
+        "proficient": "tailor how strengths are presented to a specific audience"
+      }
+    },
+    "sets": [
+      {
+        "id": "cle-sharing-strengths--career-life-education",
+        "courses": [
+          "Career-Life Education"
+        ],
+        "competency_ids": [
+          "bc.cle10.cc.6"
+        ],
+        "ministry": "Communicate with the intent to highlight personal strengths, talents, accomplishments, and abilities",
+        "bands": {
+          "all": {
+            "phrase": "communicate in ways that highlight personal strengths, talents and accomplishments",
+            "next_steps": {
+              "emerging": "practise naming a strength with an example that shows it",
+              "developing": "describe an accomplishment so its value is clear",
+              "proficient": "choose the examples that best show a strength to an audience",
+              "extending": "tailor how strengths are presented for a specific audience, such as an employer"
+            },
+            "strength": [
+              "{He} [gives|give] examples that show {his} talents to an audience.",
+              "{He} [presents|present] {his} accomplishments so their value is clear to others."
+            ],
+            "next": {
+              "developing": "{He} would benefit from pairing each strength {he} [names|name] with a short story that shows it.",
+              "proficient": "{His} next step is to choose the examples that fit what an audience wants to know.",
+              "extending": "Next, {he} can practise changing how {he} [presents|present] {his} strengths for different audiences, such as an employer."
+            },
+            "home": "Ask {him} to describe an accomplishment from this year in two or three sentences."
+          }
+        }
+      }
+    ]
+  }
+}

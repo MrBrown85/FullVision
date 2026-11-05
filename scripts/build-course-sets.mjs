@@ -10,7 +10,7 @@
  * "competency_ids", "courses", "ministry", "sensitive"?, "bands": { "all" |
  * "8-9" | "10-12": { phrase, next_steps: { emerging, developing,
  * proficient, extending }, strength: [2], next: { developing, proficient,
- * extending }, home } } } ] } } (reports/bank-build/WRITE-BRIEF.md).
+ * extending }, home } } } ] } } (docs/course-sets/WRITE-BRIEF.md).
  *
  * Checks, and fails on any: every competency id in
  * data/bc-curriculum-ican.json lands in exactly one set and no set names an
@@ -25,18 +25,15 @@
  * { "<competency id>": "<set id>|<band>" } }, the band being "all", or
  * "8-9" / "10-12" by the competency's course grade.
  *
- * Usage: node scripts/build-course-sets.mjs <out-sets dir> [--no-bank]
+ * Usage: node scripts/build-course-sets.mjs [<dir>] [--no-bank]
+ *   <dir>      the batch files (default data/course-sets, the source of truth)
  *   --no-bank  write the data file only. */
 import { readdirSync, readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 import { execFileSync } from 'child_process';
 
 const root = resolve(new URL('..', import.meta.url).pathname);
-const dir = process.argv.slice(2).find(a => !a.startsWith('--'));
-if (!dir) {
-  console.error('Usage: node scripts/build-course-sets.mjs <out-sets dir> [--no-bank]');
-  process.exit(2);
-}
+const dir = process.argv.slice(2).find(a => !a.startsWith('--')) || resolve(root, 'data/course-sets');
 
 const ican = JSON.parse(readFileSync(resolve(root, 'data/bc-curriculum-ican.json'), 'utf-8'));
 const ids = Object.keys(ican).filter(k => !k.startsWith('_'));
@@ -132,7 +129,7 @@ if (errors.length) {
 }
 const out = {
   _sets:
-    'Per-course-set wording (reports/bank-build/out-sets, written and reviewed for Colin, Nov 4): each competency id points to its set and grade band. Built by scripts/build-course-sets.mjs; do not edit by hand.',
+    'Per-course-set wording (data/course-sets, written and reviewed for Colin, Nov 4): each competency id points to its set and grade band. Built by scripts/build-course-sets.mjs; do not edit by hand.',
   sets,
   competencies,
 };

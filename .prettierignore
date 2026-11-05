@@ -14,3 +14,6 @@ docs/plans/*.html
 data/bc-curriculum-*.json
 shared/bank-proficiency.js
 shared/bank-core-competencies.js
+
+# Course-set wording: the source files (data/course-sets) are JSON as written; build output above
+data/course-sets/

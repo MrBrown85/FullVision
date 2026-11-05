@@ -1,0 +1,3705 @@
+{
+  "arts-revising-work": {
+    "old": {
+      "phrase": "revise and document work to improve its presentation",
+      "next_steps": {
+        "emerging": "find one thing to improve in a piece",
+        "developing": "revise a piece to improve its presentation",
+        "proficient": "document creative work and experiences in different ways"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-revising-work--arts-education-9",
+        "courses": [
+          "Arts Education 9"
+        ],
+        "competency_ids": [
+          "bc.arts9.cc.10"
+        ],
+        "ministry": "Revise, refine, analyze, and document creative works and experiences to enhance presentation and/or performance in a variety of ways",
+        "bands": {
+          "all": {
+            "phrase": "revise and record a piece to improve how it is presented or performed",
+            "next_steps": {
+              "emerging": "name one change that would improve a piece before it is shared",
+              "developing": "make the change and say what it improved in the presentation",
+              "proficient": "try more than one way to record a piece and its progress",
+              "extending": "explain how each revision changed the way a piece was presented or performed"
+            },
+            "strength": [
+              "{He} can find the part of a piece that needs more work before it is shown.",
+              "{He} [keeps|keep] a record of how {his} piece changed from the first try to the last."
+            ],
+            "next": {
+              "developing": "{His} next step is to practise asking what an audience will notice first in {his} piece.",
+              "proficient": "Next, {he} can practise recording each stage of a piece in a different way, such as notes or photos.",
+              "extending": "To go further, {he} can practise explaining why one revision mattered more than the others."
+            },
+            "home": "At home, ask {him} what {he} would change about a recent piece if {he} had more time."
+          }
+        }
+      },
+      {
+        "id": "arts-revising-work--dance-9",
+        "courses": [
+          "Dance 9"
+        ],
+        "competency_ids": [
+          "bc.dance9.cc.12"
+        ],
+        "ministry": "Revise, refine, analyze, and document creative works and experiences to enhance presentation in a variety of ways",
+        "bands": {
+          "all": {
+            "phrase": "revise and record a dance to improve how it is presented",
+            "next_steps": {
+              "emerging": "name one moment in a dance that needs changing before it is shown",
+              "developing": "change a section of a dance and explain what the change improved",
+              "proficient": "keep a record of a dance's changes in more than one way",
+              "extending": "analyze how revisions to a dance changed what the audience sees"
+            },
+            "strength": [
+              "{He} can spot a moment in a dance that needs to be changed before it is presented.",
+              "{He} [tries|try] a section of a dance several ways and [keeps|keep] the version that works."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to note each change {he} [makes|make] to a dance and the reason for it.",
+              "proficient": "A good next step is to practise recording a dance in a new way, such as drawings or written notes.",
+              "extending": "One thing to practise is judging whether a revision makes a dance easier for an audience to follow."
+            },
+            "home": "At home, ask {him} to show you one move from a dance and how {he} changed it."
+          }
+        }
+      },
+      {
+        "id": "arts-revising-work--drama-9",
+        "courses": [
+          "Drama 9"
+        ],
+        "competency_ids": [
+          "bc.drama9.cc.11"
+        ],
+        "ministry": "Revise, refine, analyze, and document performance pieces and experiences to enhance presentation in a variety of ways",
+        "bands": {
+          "all": {
+            "phrase": "revise and record a drama piece to improve how it is presented",
+            "next_steps": {
+              "emerging": "name one line or moment in a scene that needs to change",
+              "developing": "rehearse a scene with a change and say what it improved",
+              "proficient": "keep notes on a script to show how a scene changed in rehearsal",
+              "extending": "analyze which revisions changed a performance the most for the audience"
+            },
+            "strength": [
+              "{He} can say what is not working in a scene and suggest a change.",
+              "{He} [marks|mark] changes on {his} script so {he} can rehearse the new version."
+            ],
+            "next": {
+              "developing": "Next, {he} can make a habit of rehearsing a scene once with each change {he} [tries|try].",
+              "proficient": "It would help {him} to record {his} performance pieces in more than one way, like notes and simple stage drawings.",
+              "extending": "From here, {he} can practise analyzing how a change in one scene affects the whole piece."
+            },
+            "home": "At home, ask {him} to act out one moment from a scene two ways and say which works."
+          }
+        }
+      },
+      {
+        "id": "arts-revising-work--music-9",
+        "courses": [
+          "Music 9"
+        ],
+        "competency_ids": [
+          "bc.music9.cc.11"
+        ],
+        "ministry": "Revise, refine, analyze, and document musical experiences to enhance learning",
+        "bands": {
+          "all": {
+            "phrase": "revise, analyze and record musical experiences to improve learning",
+            "next_steps": {
+              "emerging": "name one thing to improve after playing or singing a piece",
+              "developing": "change one part of how a piece is played or sung and notice the result",
+              "proficient": "keep a record of musical experiences in more than one way",
+              "extending": "analyze notes on past rehearsals to decide what to practise next"
+            },
+            "strength": [
+              "{He} can say what went wrong in a passage and what to change next time.",
+              "{He} [writes|write] about {his} rehearsals and performances to track what {he} [is|are] learning."
+            ],
+            "next": {
+              "developing": "A useful habit for {him} is noting one thing that improved after each rehearsal.",
+              "proficient": "As a next step, {he} can try recording a rehearsal and listening for one thing to fix.",
+              "extending": "{His} goal now is to use {his} notes on past rehearsals to plan what to practise."
+            },
+            "home": "At home, ask {him} what {he} [is|are] learning in music and what is getting easier."
+          }
+        }
+      },
+      {
+        "id": "arts-revising-work--visual-arts-9",
+        "courses": [
+          "Visual Arts 9"
+        ],
+        "competency_ids": [
+          "bc.visart9.cc.12"
+        ],
+        "ministry": "Revise, refine, analyze, and document creative works and experiences",
+        "bands": {
+          "all": {
+            "phrase": "revise, analyze and record artwork as it develops",
+            "next_steps": {
+              "emerging": "name one part of an artwork to change",
+              "developing": "revise an artwork and explain what the change does",
+              "proficient": "keep a record of an artwork's stages, such as sketches and notes",
+              "extending": "analyze a set of revisions to decide which choices worked"
+            },
+            "strength": [
+              "{He} can study {his} artwork and name the part that needs more attention.",
+              "{He} [saves|save] sketches and early versions, so the steps of {his} work are easy to see."
+            ],
+            "next": {
+              "developing": "The next skill for {him} is explaining why {he} [makes|make] each change to an artwork.",
+              "proficient": "Next, {he} can build a habit of dating and labelling each stage of {his} work.",
+              "extending": "{He} can now practise analyzing early sketches to see which ideas led to the finished piece."
+            },
+            "home": "At home, ask {him} to show you a sketch and describe how the finished piece changed."
+          }
+        }
+      }
+    ]
+  },
+  "arts-safe-practice": {
+    "old": {
+      "phrase": "use materials, tools and space safely",
+      "next_steps": {
+        "emerging": "explain how to use a tool safely",
+        "developing": "use materials and tools safely and responsibly",
+        "proficient": "keep a work space safe and ready for others"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-safe-practice--visual-media-arts",
+        "courses": [
+          "Art Studio 10",
+          "Media Arts 10",
+          "Studio Arts 2D 10",
+          "Studio Arts 3D 10",
+          "Art Studio 11",
+          "Graphic Arts 11",
+          "Media Arts 11",
+          "Studio Arts 2D 11",
+          "Studio Arts 3D 11",
+          "Art Studio 12",
+          "Graphic Arts 12",
+          "Media Arts 12",
+          "Studio Arts 2D 12",
+          "Studio Arts 3D 12"
+        ],
+        "competency_ids": [
+          "bc.artstudio10.cc.6",
+          "bc.media10.cc.6",
+          "bc.sa2d10.cc.7",
+          "bc.sa3d10.cc.6",
+          "bc.artstudio11.cc.21",
+          "bc.garts11.cc.24",
+          "bc.meda11.cc.24",
+          "bc.sa2d11.cc.22",
+          "bc.sa3d11.cc.23",
+          "bc.artstudio12.cc.24",
+          "bc.garts12.cc.24",
+          "bc.meda12.cc.24",
+          "bc.sa2d12.cc.22",
+          "bc.sa3d12.cc.23"
+        ],
+        "ministry": "Demonstrate safe and responsible use of materials, tools, and work space",
+        "bands": {
+          "all": {
+            "phrase": "use art materials, tools and work space safely and responsibly",
+            "next_steps": {
+              "emerging": "explain the safe way to use a tool before starting",
+              "developing": "follow safe steps with materials and tools without reminders",
+              "proficient": "leave a work space safe and ready for the next person",
+              "extending": "spot a safety risk in the studio and fix or report it"
+            },
+            "strength": [
+              "{He} [handles|handle] tools and materials the way {he} [was|were] shown, and [stores|store] them after use.",
+              "{He} [keeps|keep] {his} work area clear so others can move and work safely."
+            ],
+            "next": {
+              "developing": "A further step is to check that each tool is in safe condition before {he} [uses|use] it.",
+              "proficient": "With more practice, {he} can plan the safe steps for a new material before trying it.",
+              "extending": "{He} would benefit from noticing hazards in a shared space and telling others how to avoid them."
+            },
+            "home": "At home, ask {him} which art tool or material needs the most care and why."
+          }
+        }
+      },
+      {
+        "id": "arts-safe-practice--photography",
+        "courses": [
+          "Photography 10",
+          "Photography 11",
+          "Photography 12"
+        ],
+        "competency_ids": [
+          "bc.photo10.cc.6",
+          "bc.photo11.cc.21",
+          "bc.photo12.cc.21"
+        ],
+        "ministry": "Demonstrate safe and responsible use of materials, tools, and work space / Demonstrate safe and responsible use of materials, equipment, and work space / Demonstrate safe and responsible use of materials equipment, and work space",
+        "bands": {
+          "all": {
+            "phrase": "use photography materials, equipment and work space safely and responsibly",
+            "next_steps": {
+              "emerging": "explain the safe way to handle photography equipment",
+              "developing": "handle equipment and materials safely in every shoot without reminders",
+              "proficient": "return equipment and leave the work space ready for the next photographer",
+              "extending": "explain the safety steps for equipment and space to someone new to them"
+            },
+            "strength": [
+              "{He} [carries|carry], [uses|use] and [returns|return] photography equipment in the way {he} [was|were] taught.",
+              "{He} [thinks|think] about the safety of {his} surroundings when {he} [chooses|choose] where to take photos."
+            ],
+            "next": {
+              "developing": "Over time, {he} can make a routine of checking equipment for damage before and after use.",
+              "proficient": "{His} next step is to plan the safety needs of a location before a shoot.",
+              "extending": "Next, {he} can practise showing others the safe way to use shared equipment."
+            },
+            "home": "When you are out together, ask {him} how {he} would take a photo there safely."
+          }
+        }
+      },
+      {
+        "id": "arts-safe-practice--musical-theatre",
+        "courses": [
+          "Musical Theatre 10",
+          "Musical Theatre 11",
+          "Musical Theatre 12"
+        ],
+        "competency_ids": [
+          "bc.mtheatre10.cc.19",
+          "bc.mtheatre11.cc.21",
+          "bc.mtheatre12.cc.23"
+        ],
+        "ministry": "Apply practices that ensure safe learning, rehearsal, and performance environment / Apply practices that ensure safe learning, rehearsal, and performance environments",
+        "bands": {
+          "all": {
+            "phrase": "follow practices that keep musical theatre rehearsals and performances safe",
+            "next_steps": {
+              "emerging": "name the safety practices used in rehearsal",
+              "developing": "follow safety practices in rehearsal without being reminded",
+              "proficient": "speak up about a safety concern in rehearsal or on stage",
+              "extending": "help build habits that keep the whole cast safe"
+            },
+            "strength": [
+              "{He} [follows|follow] the safety practices of the rehearsal room, even when a scene gets busy.",
+              "{He} [moves|move] with care on stage so that other performers can work safely."
+            ],
+            "next": {
+              "developing": "To go further, {he} can practise noticing safety risks in a scene before rehearsal begins.",
+              "proficient": "{He} [is|are] ready to remind others of safe practices in a calm, helpful way.",
+              "extending": "A good next step is to suggest safety practices that suit a new scene or dance number."
+            },
+            "home": "At home, ask {him} what the cast does to keep everyone safe in rehearsal."
+          }
+        }
+      },
+      {
+        "id": "arts-safe-practice--theatre-production",
+        "courses": [
+          "Theatre Production 11",
+          "Theatre Production 12"
+        ],
+        "competency_ids": [
+          "bc.thprod11.cc.19",
+          "bc.thprod12.cc.19"
+        ],
+        "ministry": "Apply safe practices and procedures in rehearsal and performance environments",
+        "bands": {
+          "all": {
+            "phrase": "follow safe practices and procedures backstage in rehearsal and performance",
+            "next_steps": {
+              "emerging": "explain the safety procedure for a backstage task",
+              "developing": "follow safety procedures in rehearsal and performance every time",
+              "proficient": "check that a backstage area is safe before a rehearsal or show",
+              "extending": "teach a safety procedure to a new crew member"
+            },
+            "strength": [
+              "{He} [follows|follow] safety procedures for backstage tasks during rehearsals and shows.",
+              "{He} [speaks|speak] up when {he} [notices|notice] something unsafe on stage or backstage."
+            ],
+            "next": {
+              "developing": "One thing to practise is checking the stage and backstage for hazards before each rehearsal.",
+              "proficient": "Before trying a new backstage task, {he} can practise reviewing its safety steps.",
+              "extending": "It would help {him} to explain safety procedures to newer crew members."
+            },
+            "home": "At home, ask {him} which backstage job needs the most care, and what keeps it safe."
+          }
+        }
+      }
+    ]
+  },
+  "arts-safety-protocols": {
+    "old": {
+      "phrase": "follow safety rules in film and television work",
+      "next_steps": {
+        "emerging": "identify the safety protocols for a task before starting",
+        "developing": "use production equipment safely by following procedures",
+        "proficient": "follow safety protocols in every part of production"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-safety-protocols--film-television",
+        "courses": [
+          "Film & Television 11",
+          "Film & Television 12"
+        ],
+        "competency_ids": [
+          "bc.ftvt11.cc.25",
+          "bc.ftvt12.cc.26"
+        ],
+        "ministry": "Adhere to safety protocols and procedures in all aspects of film and television production",
+        "bands": {
+          "all": {
+            "phrase": "follow safety protocols in every part of film and television production",
+            "next_steps": {
+              "emerging": "name the safety steps for a production task before starting",
+              "developing": "follow safety procedures during every shoot without reminders",
+              "proficient": "check a location or set for hazards before filming begins",
+              "extending": "plan safety protocols for a whole production and share them with the crew"
+            },
+            "strength": [
+              "{He} [follows|follow] safety procedures when handling and moving production equipment.",
+              "{He} [thinks|think] about the safety of cast and crew when planning a shot."
+            ],
+            "next": {
+              "developing": "From here, {he} can practise checking a filming location for hazards before the crew arrives.",
+              "proficient": "A useful habit for {him} is reviewing the safety plan with the crew at the start of each shoot.",
+              "extending": "A helpful next step is to write safety steps into the production plan for a whole project."
+            },
+            "home": "At home, ask {him} what could go wrong on a film set and how the crew prevents it."
+          }
+        }
+      }
+    ]
+  },
+  "arts-script-innovation": {
+    "old": {
+      "phrase": "bring creative ideas to writing and directing",
+      "next_steps": {
+        "emerging": "bring an original idea to a script",
+        "developing": "try a new way of writing a script",
+        "proficient": "try a new way of directing a scene"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-script-innovation--directing-script-development",
+        "courses": [
+          "Directing and Script Development 11",
+          "Directing and Script Development 12"
+        ],
+        "competency_ids": [
+          "bc.dsd11.cc.5",
+          "bc.dsd12.cc.6"
+        ],
+        "ministry": "Demonstrate creativity and innovation through scriptwriting and directing",
+        "bands": {
+          "all": {
+            "phrase": "bring new ideas to scriptwriting and directing",
+            "next_steps": {
+              "emerging": "suggest one new idea for a script or scene",
+              "developing": "develop a new idea into a scene that can be staged",
+              "proficient": "try an unexpected directing choice and judge how it works",
+              "extending": "find a fresh way to write and stage a familiar type of scene"
+            },
+            "strength": [
+              "{He} [writes|write] scenes with ideas and situations that surprise an audience.",
+              "As a director, {he} [tries|try] staging choices that go beyond the obvious one."
+            ],
+            "next": {
+              "developing": "{His} goal now is to test a new idea in rehearsal before deciding to keep it.",
+              "proficient": "The next skill for {him} is shaping a new idea so it serves the whole script.",
+              "extending": "{He} can build the habit of writing several versions of a scene and comparing them."
+            },
+            "home": "At home, ask {him} to describe a scene {he} wrote and the idea behind it."
+          }
+        }
+      }
+    ]
+  },
+  "arts-selection-design": {
+    "old": {
+      "phrase": "analyze how a piece of music is built",
+      "next_steps": {
+        "emerging": "describe the choices a composer made in a selection",
+        "developing": "analyze how the parts of a selection fit together",
+        "proficient": "reflect on how a selection's design shapes its performance"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-selection-design--choral-music-11",
+        "courses": [
+          "Choral Music 11"
+        ],
+        "competency_ids": [
+          "bc.chor11.cc.10"
+        ],
+        "ministry": "Analyze and reflect on the design of musical selections",
+        "bands": {
+          "all": {
+            "phrase": "analyze and reflect on how choral pieces are designed",
+            "next_steps": {
+              "emerging": "describe one choice a composer made in a choral piece",
+              "developing": "explain how the parts of a choral piece fit together",
+              "proficient": "reflect on how a piece's design shapes the way the choir sings it",
+              "extending": "compare the design of two choral pieces and explain what each asks of singers"
+            },
+            "strength": [
+              "{He} can explain how the voice parts in a choral piece are arranged.",
+              "{He} [notices|notice] where a piece repeats or changes, and what that does for the singers."
+            ],
+            "next": {
+              "developing": "{He} can now practise marking the sections of a piece in {his} music.",
+              "proficient": "A further step is to explain how the words and the music of a piece work together.",
+              "extending": "With more practice, {he} can use what {he} [learns|learn] about a piece's design to shape {his} singing."
+            },
+            "home": "At home, ask {him} to hum a line from a choir piece and explain where it fits."
+          }
+        }
+      }
+    ]
+  },
+  "arts-self-audience": {
+    "old": {
+      "phrase": "stay aware of the audience while performing",
+      "next_steps": {
+        "emerging": "reflect on personal choices as a performer",
+        "developing": "describe how performance choices affect the audience",
+        "proficient": "adjust a performance in response to the audience"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-self-audience--musical-theatre-10",
+        "courses": [
+          "Musical Theatre 10"
+        ],
+        "competency_ids": [
+          "bc.mtheatre10.cc.9"
+        ],
+        "ministry": "Develop an awareness of self and audience",
+        "bands": {
+          "all": {
+            "phrase": "build awareness of self as a performer and of the audience",
+            "next_steps": {
+              "emerging": "describe personal habits as a performer on stage",
+              "developing": "notice how performance choices affect the audience",
+              "proficient": "adjust a performance in response to the audience",
+              "extending": "use awareness of self and audience to shape a whole performance"
+            },
+            "strength": [
+              "{He} can describe {his} own habits on stage and how they help a scene.",
+              "{He} [notices|notice] how an audience reacts to a song or scene."
+            ],
+            "next": {
+              "developing": "{He} would benefit from asking what an audience sees and hears from each part of the stage.",
+              "proficient": "Over time, {he} can learn to adjust timing when an audience laughs or reacts.",
+              "extending": "{His} next step is to practise keeping a character steady while responding to the audience."
+            },
+            "home": "At home, ask {him} how it feels to perform for an audience and what {he} [notices|notice] about them."
+          }
+        }
+      }
+    ]
+  },
+  "arts-self-care-practice": {
+    "old": {
+      "phrase": "use self-care habits that prevent performance injury",
+      "next_steps": {
+        "emerging": "identify self-care practices that prevent injury",
+        "developing": "practise one self-care habit before performing",
+        "proficient": "practise self-care across rehearsals and performances"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-self-care-practice--choral-music",
+        "courses": [
+          "Choral Music 11",
+          "Choral Music 12"
+        ],
+        "competency_ids": [
+          "bc.chor11.cc.24",
+          "bc.chor12.cc.24"
+        ],
+        "ministry": "Identify and practise self-care to prevent performance-related injury / Evaluate and practise self-care to prevent performance-related injury",
+        "bands": {
+          "all": {
+            "phrase": "identify and practise self-care that protects against injury from singing",
+            "next_steps": {
+              "emerging": "name self-care habits that protect a singer from injury",
+              "developing": "practise one self-care habit before and after each rehearsal",
+              "proficient": "evaluate which self-care habits help most during long rehearsals",
+              "extending": "adjust self-care to the demands of each piece and performance"
+            },
+            "strength": [
+              "{He} can name the signs of strain in a singer and what to do about them.",
+              "{He} [rests|rest] and [cares|care] for {himself} during long rehearsals so {he} can keep singing."
+            ],
+            "next": {
+              "developing": "Next, {he} can practise noticing early signs of strain and resting before they grow.",
+              "proficient": "To go further, {he} can practise judging which self-care habits help {his} singing most.",
+              "extending": "{He} [is|are] ready to plan self-care around a busy concert schedule."
+            },
+            "home": "At home, ask {him} what singers do to protect themselves from injury."
+          }
+        }
+      },
+      {
+        "id": "arts-self-care-practice--instrumental-contemporary-music",
+        "courses": [
+          "Contemporary Music 10",
+          "Instrumental Music 10",
+          "Contemporary Music 11",
+          "Instrumental Music 11",
+          "Contemporary Music 12",
+          "Instrumental Music 12"
+        ],
+        "competency_ids": [
+          "bc.cmusic10.cc.22",
+          "bc.instmus10.cc.22",
+          "bc.cmusic11.cc.24",
+          "bc.instmus11.cc.23",
+          "bc.cmusic12.cc.26",
+          "bc.instmus12.cc.27"
+        ],
+        "ministry": "Practise appropriate self-care to prevent performance-related injury / Identify and practise appropriate self-care to prevent performance-related injury / Evaluate and practise appropriate self-care to prevent performance-related injury / Evaluate and practice appropriate self-care to prevent performance-related injury",
+        "bands": {
+          "all": {
+            "phrase": "identify and practise self-care that prevents injury from playing and performing",
+            "next_steps": {
+              "emerging": "name self-care habits that prevent playing injuries",
+              "developing": "use self-care habits in every rehearsal and every practice session",
+              "proficient": "evaluate which self-care habits help during long practice sessions",
+              "extending": "plan self-care that fits a heavy rehearsal and performance load"
+            },
+            "strength": [
+              "{He} [knows|know] how posture, breaks and warm-ups help prevent injury while playing.",
+              "{He} [takes|take] breaks when {he} [feels|feel] strain instead of playing through it."
+            ],
+            "next": {
+              "developing": "A good next step is to make self-care part of the routine of every practice session.",
+              "proficient": "One thing to practise is noticing how small habits affect {his} body after a long rehearsal.",
+              "extending": "After each performance, {he} can practise reviewing which self-care habits helped."
+            },
+            "home": "Ask {him} to show you how {he} [sits|sit] or [stands|stand] to play without strain."
+          }
+        }
+      },
+      {
+        "id": "arts-self-care-practice--composition-production",
+        "courses": [
+          "Composition & Production 11",
+          "Composition & Production 12"
+        ],
+        "competency_ids": [
+          "bc.comp_prod11.cc.21",
+          "bc.cp12.cc.21"
+        ],
+        "ministry": "Identify and practise self-care to prevent performance-related injury",
+        "bands": {
+          "all": {
+            "phrase": "identify and practise self-care during long sessions of composing and producing",
+            "next_steps": {
+              "emerging": "name the self-care needs of long composing and producing sessions",
+              "developing": "take planned breaks during long composing and producing sessions",
+              "proficient": "protect hearing by keeping listening levels safe",
+              "extending": "evaluate self-care habits and change the ones that are not helping"
+            },
+            "strength": [
+              "{He} [takes|take] breaks during long sessions of writing and producing music.",
+              "{He} [keeps|keep] listening levels at a safe volume to protect {his} hearing."
+            ],
+            "next": {
+              "developing": "It would help {him} to set a reminder to rest {his} eyes, ears and body during long sessions.",
+              "proficient": "From here, {he} can practise checking {his} posture and volume as {he} [works|work].",
+              "extending": "A useful habit for {him} is judging which self-care steps protect {him} most over a whole project."
+            },
+            "home": "At home, encourage {him} to take short breaks when making music for a long time."
+          }
+        }
+      }
+    ]
+  },
+  "arts-self-others-place": {
+    "old": {
+      "phrase": "show respect for self, others and place",
+      "next_steps": {
+        "emerging": "show respect for others' work",
+        "developing": "show respect for personal ideas and work",
+        "proficient": "care for the places where creating happens"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-self-others-place--visual-media-arts",
+        "courses": [
+          "Art Studio 10",
+          "Media Arts 10",
+          "Studio Arts 2D 10",
+          "Studio Arts 3D 10",
+          "Art Studio 11",
+          "Graphic Arts 11",
+          "Media Arts 11",
+          "Studio Arts 2D 11",
+          "Studio Arts 3D 11",
+          "Art Studio 12",
+          "Graphic Arts 12",
+          "Media Arts 12",
+          "Studio Arts 2D 12",
+          "Studio Arts 3D 12"
+        ],
+        "competency_ids": [
+          "bc.artstudio10.cc.12",
+          "bc.media10.cc.14",
+          "bc.sa2d10.cc.14",
+          "bc.sa3d10.cc.12",
+          "bc.sa3d12.cc.13",
+          "bc.artstudio11.cc.14",
+          "bc.garts11.cc.16",
+          "bc.meda11.cc.15",
+          "bc.sa2d11.cc.14",
+          "bc.sa3d11.cc.15",
+          "bc.artstudio12.cc.16",
+          "bc.garts12.cc.16",
+          "bc.meda12.cc.15",
+          "bc.sa2d12.cc.14"
+        ],
+        "ministry": "Demonstrate respect for self, others, and place / Demonstrate awareness of self, others, and place through art making / Demonstrate awareness of self, others, and place through 2D artistic works / Demonstrate awareness of self, others, and place through 3D artistic works / Demonstrate respect for self, others, and place through art making",
+        "bands": {
+          "all": {
+            "phrase": "show respect for self, others and place through art making",
+            "next_steps": {
+              "emerging": "show respect for others' artwork and ideas in the studio",
+              "developing": "value personal ideas and work as much as the work of others",
+              "proficient": "think about how a piece affects the people and places it shows",
+              "extending": "make art choices that honour the people and places connected to the work"
+            },
+            "strength": [
+              "{He} [gives|give] other artists' work and ideas the same care {he} [wants|want] for {his} own.",
+              "{He} [considers|consider] how {his} art making affects the people and places around {him}."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to name the place or community that shapes a piece {he} [makes|make].",
+              "proficient": "A good next step is to ask how the people shown in {his} work would feel about it.",
+              "extending": "To go further, {he} can practise choosing materials and images that respect the land and its people."
+            },
+            "home": "At home, ask {him} which place in your community {he} would most like to make art about."
+          }
+        }
+      },
+      {
+        "id": "arts-self-others-place--photography",
+        "courses": [
+          "Photography 10",
+          "Photography 11",
+          "Photography 12"
+        ],
+        "competency_ids": [
+          "bc.photo10.cc.11",
+          "bc.photo11.cc.13",
+          "bc.photo12.cc.13"
+        ],
+        "ministry": "Demonstrate respect for self, others, and place / Demonstrate awareness of self, others, and place through photography / Demonstrate respect for self, others, and place through photography",
+        "bands": {
+          "all": {
+            "phrase": "show respect for self, others and place through photography",
+            "next_steps": {
+              "emerging": "ask permission before photographing a person",
+              "developing": "explain how a photo of a person or place could affect them",
+              "proficient": "make photo choices that respect the people and places in the frame",
+              "extending": "decide when not to take or share a photo out of respect"
+            },
+            "strength": [
+              "{He} [asks|ask] people for permission before {he} [takes|take] or [shares|share] their photo.",
+              "{He} [thinks|think] about how {his} photos show a place and the people who live there."
+            ],
+            "next": {
+              "developing": "{His} next step is to practise explaining why {he} chose to show a person or place a certain way.",
+              "proficient": "One thing to practise is thinking about how a photo might look to the people in it.",
+              "extending": "It would help {him} to think about how the people of a place would feel before sharing images of it."
+            },
+            "home": "When you take family photos, ask {him} what makes a photo fair to the people in it."
+          }
+        }
+      },
+      {
+        "id": "arts-self-others-place--dance-foundations-choreography",
+        "courses": [
+          "Dance Choreography 10",
+          "Dance Foundations 10",
+          "Dance Foundations 11",
+          "Dance Foundations 12"
+        ],
+        "competency_ids": [
+          "bc.dance10.cc.13",
+          "bc.dchore10.cc.15",
+          "bc.dfound11.cc.14",
+          "bc.dfound12.cc.14"
+        ],
+        "ministry": "Demonstrate respect for self, others, audience, and place",
+        "bands": {
+          "all": {
+            "phrase": "show respect for self, other dancers, the audience and place",
+            "next_steps": {
+              "emerging": "show respect for other dancers in the studio",
+              "developing": "respect personal limits and ideas while dancing",
+              "proficient": "make dance choices that respect the audience and the space",
+              "extending": "show respect for the places and cultures connected to a dance"
+            },
+            "strength": [
+              "{He} [gives|give] other dancers space, attention and encouragement in the studio.",
+              "{He} [respects|respect] {his} own body by working within safe limits."
+            ],
+            "next": {
+              "developing": "From here, {he} can practise thinking about how a dance will feel to the people watching it.",
+              "proficient": "A useful habit for {him} is learning the place and culture a dance belongs to before performing it.",
+              "extending": "Next, {he} can try making choices that respect the audience, the dancers and the space at once."
+            },
+            "home": "At home, ask {him} how the dancers in {his} class look after each other."
+          }
+        }
+      },
+      {
+        "id": "arts-self-others-place--dance-technique-performance",
+        "courses": [
+          "Dance Technique and Performance 10",
+          "Dance Technique and Performance 11",
+          "Dance Technique and Performance 12"
+        ],
+        "competency_ids": [
+          "bc.dtep10.cc.14",
+          "bc.dance11.cc.15",
+          "bc.dance12.cc.14"
+        ],
+        "ministry": "Demonstrate awareness of personal and social responsibility toward self, others, audience, and place",
+        "bands": {
+          "all": {
+            "phrase": "take personal and social responsibility toward self, others, audience and place in dance",
+            "next_steps": {
+              "emerging": "name what responsibility to other dancers looks like in rehearsal",
+              "developing": "take responsibility for personal choices in rehearsal and performance",
+              "proficient": "explain how a dancer's choices affect the group, the audience and the space",
+              "extending": "show social responsibility by supporting the dance group and the wider community"
+            },
+            "strength": [
+              "{He} [arrives|arrive] ready to work and [takes|take] responsibility for {his} part in a piece.",
+              "{He} can explain how {his} choices as a dancer affect the group and the audience."
+            ],
+            "next": {
+              "developing": "{His} goal now is to notice how {his} energy in rehearsal affects the other dancers.",
+              "proficient": "The next skill for {him} is thinking about what a performance asks of the audience and the space.",
+              "extending": "Next, {he} can build habits that support the wider dance community, not just {his} own group."
+            },
+            "home": "At home, ask {him} how {he} [helps|help] the other dancers in a piece do their best."
+          }
+        }
+      },
+      {
+        "id": "arts-self-others-place--dance-conditioning",
+        "courses": [
+          "Dance Conditioning 11",
+          "Dance Conditioning 12"
+        ],
+        "competency_ids": [
+          "bc.dcond11.cc.11",
+          "bc.dcond12.cc.13"
+        ],
+        "ministry": "Demonstrate awareness of personal and social responsibility toward self, others, and place / Reflect on personal and social responsibility toward self, others, and place",
+        "bands": {
+          "all": {
+            "phrase": "reflect on personal and social responsibility toward self, others and place in conditioning",
+            "next_steps": {
+              "emerging": "name one way to show responsibility to others during conditioning",
+              "developing": "train within safe limits to care for personal health",
+              "proficient": "reflect on how personal choices in conditioning affect others and the space",
+              "extending": "reflect on and improve personal and group habits in conditioning sessions"
+            },
+            "strength": [
+              "{He} [trains|train] within {his} own limits and [respects|respect] the limits of others.",
+              "{He} [shares|share] the space fairly and [helps|help] keep it safe during conditioning."
+            ],
+            "next": {
+              "developing": "{He} can now practise reflecting on how {his} effort supports the group.",
+              "proficient": "A further step is to set personal goals that respect {his} own body's needs.",
+              "extending": "With more practice, {he} can reflect on how {his} habits affect others in the studio and beyond."
+            },
+            "home": "At home, ask {him} how {he} [knows|know] when to push and when to rest."
+          }
+        }
+      }
+    ]
+  },
+  "arts-self-reflection": {
+    "old": {
+      "phrase": "use reflection and audience awareness to refine ideas",
+      "next_steps": {
+        "emerging": "use self-reflection to identify what to change",
+        "developing": "refine an idea by reflecting on work and audience",
+        "proficient": "adjust an idea to suit its intended audience"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-self-reflection--drama-12",
+        "courses": [
+          "Drama 12"
+        ],
+        "competency_ids": [
+          "bc.drama12.cc.11"
+        ],
+        "ministry": "Use self-reflection and awareness of audience to refine ideas",
+        "bands": {
+          "all": {
+            "phrase": "use self-reflection and awareness of audience to refine dramatic ideas",
+            "next_steps": {
+              "emerging": "reflect on one idea and say what to change",
+              "developing": "refine an idea after reflecting on how it played in rehearsal",
+              "proficient": "adjust an idea to suit the audience it is meant for",
+              "extending": "use reflection and audience response together to reshape a whole piece"
+            },
+            "strength": [
+              "{He} [reflects|reflect] on {his} own ideas and can say which ones are working in a scene.",
+              "{He} [shapes|shape] {his} ideas with a clear sense of who will be watching."
+            ],
+            "next": {
+              "developing": "{He} would benefit from writing a short reflection after each rehearsal.",
+              "proficient": "Over time, {he} can practise testing an idea on a small audience before refining it.",
+              "extending": "{His} next step is to practise weighing audience reactions against {his} own aims for a piece."
+            },
+            "home": "At home, ask {him} who {his} latest drama piece is for and what {he} [wants|want] them to feel."
+          }
+        }
+      }
+    ]
+  },
+  "arts-sharing-responding": {
+    "old": {
+      "phrase": "share creative work and respond to others' work",
+      "next_steps": {
+        "emerging": "share a creative work with an audience",
+        "developing": "respond to the creative work of others",
+        "proficient": "respond to others' work with specific comments"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-sharing-responding--theatre-company",
+        "courses": [
+          "Theatre Company 10",
+          "Theatre Company 11",
+          "Theatre Company 12"
+        ],
+        "competency_ids": [
+          "bc.thco10.cc.11",
+          "bc.thco11.cc.11",
+          "bc.thco12.cc.11"
+        ],
+        "ministry": "Share and respond to creative works / Share and respond to theatre productions / Share, analyze, and respond to creative works",
+        "bands": {
+          "all": {
+            "phrase": "share theatre work and analyze and respond to the productions of others",
+            "next_steps": {
+              "emerging": "share a piece of theatre work with an audience",
+              "developing": "respond to another group's production with a specific comment",
+              "proficient": "analyze a production and explain why its choices work",
+              "extending": "give and use responses that help a theatre company improve its work"
+            },
+            "strength": [
+              "{He} [shares|share] {his} theatre work openly and [listens|listen] to how others respond.",
+              "When {he} [watches|watch] a production, {he} can name a specific moment and explain {his} reaction."
+            ],
+            "next": {
+              "developing": "Next, {he} can practise linking each response to a moment in the production.",
+              "proficient": "To go further, {he} can practise analyzing why a production's choices worked for its audience.",
+              "extending": "{He} [is|are] ready to give responses that a company can use in its next rehearsal."
+            },
+            "home": "At home, ask {him} about a show {he} [has|have] seen and the moment {he} [remembers|remember] most."
+          }
+        }
+      }
+    ]
+  },
+  "arts-skills-conventions": {
+    "old": {
+      "phrase": "build theatre skills, terms and conventions through performance",
+      "next_steps": {
+        "emerging": "use theatre vocabulary while preparing a performance",
+        "developing": "apply theatre conventions in a performance",
+        "proficient": "develop theatre skills across several presentations or performances"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-skills-conventions--theatre-company-11-12",
+        "courses": [
+          "Theatre Company 11",
+          "Theatre Company 12"
+        ],
+        "competency_ids": [
+          "bc.thco11.cc.2",
+          "bc.thco12.cc.2"
+        ],
+        "ministry": "Develop vocabulary, skills, and conventions through presentation or performance / Refine vocabulary, skills, and conventions through presentation or performance",
+        "bands": {
+          "all": {
+            "phrase": "develop and refine theatre vocabulary, skills and conventions through performance",
+            "next_steps": {
+              "emerging": "use theatre vocabulary while preparing a performance",
+              "developing": "use theatre conventions on purpose in a presentation",
+              "proficient": "refine theatre skills from one performance to the next",
+              "extending": "choose and combine conventions to suit the needs of a production"
+            },
+            "strength": [
+              "{He} [uses|use] theatre terms correctly when talking about a scene or rehearsal.",
+              "{He} [uses|use] theatre conventions on purpose to shape what the audience sees."
+            ],
+            "next": {
+              "developing": "A good next step is to name the convention behind each staging choice {he} [makes|make].",
+              "proficient": "One thing to practise is refining one skill, such as voice or movement, across several performances.",
+              "extending": "{He} can also make a habit of choosing conventions that fit the style of a production."
+            },
+            "home": "At home, ask {him} to explain a theatre word {he} [uses|use] in rehearsal."
+          }
+        }
+      }
+    ]
+  },
+  "arts-skills-techniques": {
+    "old": {
+      "phrase": "refine skills and techniques in media art",
+      "next_steps": {
+        "emerging": "practise one technique used in media art",
+        "developing": "refine techniques used to create media artworks",
+        "proficient": "strengthen skills by creating and revising media artworks"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-skills-techniques--media-arts",
+        "courses": [
+          "Media Arts 10",
+          "Media Arts 11",
+          "Media Arts 12"
+        ],
+        "competency_ids": [
+          "bc.media10.cc.5",
+          "bc.meda11.cc.6",
+          "bc.meda12.cc.6"
+        ],
+        "ministry": "Develop and refine skills and techniques in creating media artwork / Refine skills and techniques in creating media artworks",
+        "bands": {
+          "all": {
+            "phrase": "develop and refine skills and techniques for creating media artworks",
+            "next_steps": {
+              "emerging": "practise one technique used in media art",
+              "developing": "refine a technique after testing it in a draft",
+              "proficient": "choose techniques on purpose to suit a media artwork's idea",
+              "extending": "combine several refined techniques to create a finished media artwork"
+            },
+            "strength": [
+              "{He} [tests|test] a media arts technique in drafts until it does what {he} [wants|want].",
+              "{He} can explain which techniques {he} used in a media artwork and why."
+            ],
+            "next": {
+              "developing": "It would help {him} to practise one technique several times before using it in a finished piece.",
+              "proficient": "From here, {he} can practise matching each technique to the idea {he} [wants|want] to show.",
+              "extending": "A useful habit for {him} is keeping notes on which techniques worked and why."
+            },
+            "home": "At home, ask {him} to show you a media artwork and explain how {he} made one part of it."
+          }
+        }
+      }
+    ]
+  },
+  "arts-social-impact": {
+    "old": {
+      "phrase": "explain how the arts affect cultures and societies",
+      "next_steps": {
+        "emerging": "explain one way an art form affects a culture",
+        "developing": "use examples to show how the arts affect people",
+        "proficient": "compare how the arts affect different cultures and societies"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-social-impact--dance",
+        "courses": [
+          "Dance Foundations 10"
+        ],
+        "competency_ids": [
+          "bc.dance10.cc.22"
+        ],
+        "ministry": "Explore ways in which dance impacts cultures and societies",
+        "bands": {
+          "all": {
+            "phrase": "explore how dance affects cultures and societies",
+            "next_steps": {
+              "emerging": "name one way dance matters in a culture",
+              "developing": "explain how a dance form shapes the community it belongs to",
+              "proficient": "compare how dance affects two different cultures or societies",
+              "extending": "explain how dance can change ideas or bring people together in a society"
+            },
+            "strength": [
+              "{He} can explain how dance is part of celebrations, ceremonies or daily life in a culture.",
+              "{He} [connects|connect] a dance form to the community that created it."
+            ],
+            "next": {
+              "developing": "Next, {he} can try asking what a dance means to the people who perform it.",
+              "proficient": "{His} goal now is to compare the role of dance in two societies.",
+              "extending": "The next skill for {him} is explaining how dance has helped change a society's ideas."
+            },
+            "home": "At home, ask {him} about a dance from your family's culture or one {he} [has|have] seen."
+          }
+        }
+      },
+      {
+        "id": "arts-social-impact--musical-theatre",
+        "courses": [
+          "Musical Theatre 10"
+        ],
+        "competency_ids": [
+          "bc.mtheatre10.cc.18"
+        ],
+        "ministry": "Explore ways in which musical theatre impacts society",
+        "bands": {
+          "all": {
+            "phrase": "explore how musical theatre affects society",
+            "next_steps": {
+              "emerging": "name one idea about society that a musical raises",
+              "developing": "explain how a musical can change how people think about an issue",
+              "proficient": "connect a musical's message to events or attitudes in society",
+              "extending": "explain how musical theatre both reflects and shapes society"
+            },
+            "strength": [
+              "{He} can name the social issue a musical raises and who it affects.",
+              "{He} [explains|explain] how the songs and story of a musical can shift what an audience believes."
+            ],
+            "next": {
+              "developing": "Next, {he} can build the habit of asking what a musical says about the time it was written.",
+              "proficient": "{He} can now practise linking a musical's message to attitudes in society today.",
+              "extending": "A further step is to explain how audiences have responded to a musical and why."
+            },
+            "home": "At home, ask {him} what a favourite musical says about the world."
+          }
+        }
+      },
+      {
+        "id": "arts-social-impact--drama",
+        "courses": [
+          "Theatre Company 10",
+          "Drama 11",
+          "Drama 12"
+        ],
+        "competency_ids": [
+          "bc.thco10.cc.16",
+          "bc.drama11.cc.22",
+          "bc.drama12.cc.23"
+        ],
+        "ministry": "Explore ways in which drama impacts cultures and society / Explore the impacts of dramatic works on culture and society / Examine the impacts of dramatic works on culture and society",
+        "bands": {
+          "all": {
+            "phrase": "examine how dramatic works affect culture and society",
+            "next_steps": {
+              "emerging": "name an issue a play raises about society",
+              "developing": "explain how a dramatic work affected the audience of its time",
+              "proficient": "examine how a play can challenge or reinforce a culture's beliefs",
+              "extending": "examine how dramatic works have changed the way a society sees an issue"
+            },
+            "strength": [
+              "{He} can explain how a play reflects the beliefs of its time and culture.",
+              "{He} [connects|connect] the choices in a dramatic work to their effect on an audience and society."
+            ],
+            "next": {
+              "developing": "With more practice, {he} can explain how a play might be received by different audiences.",
+              "proficient": "{He} would benefit from asking who a play speaks for and who it leaves out.",
+              "extending": "Over time, {he} can examine how a play's effect on society has changed across generations."
+            },
+            "home": "At home, ask {him} which play, film or show has changed the way {he} [thinks|think] about something."
+          }
+        }
+      },
+      {
+        "id": "arts-social-impact--theatre-production",
+        "courses": [
+          "Theatre Production 10"
+        ],
+        "competency_ids": [
+          "bc.thprod10.cc.18"
+        ],
+        "ministry": "Explore ways in which theatre production can impact culture and society",
+        "bands": {
+          "all": {
+            "phrase": "explore how theatre production can affect culture and society",
+            "next_steps": {
+              "emerging": "name one way a theatre production reaches its community",
+              "developing": "explain how set, costume or lighting choices shape a production's message",
+              "proficient": "explore how a production's design choices can affect a community",
+              "extending": "explain how theatre production choices can shape what a society values"
+            },
+            "strength": [
+              "{He} can explain how design choices in a production help carry its message to an audience.",
+              "{He} [considers|consider] how a production brings people together in the community."
+            ],
+            "next": {
+              "developing": "{His} next step is to ask how a design choice might be seen by different groups in the community.",
+              "proficient": "Next, {he} can practise linking production choices to the culture a show reflects.",
+              "extending": "To go further, {he} can practise explaining how theatre spaces and productions serve a community."
+            },
+            "home": "At home, ask {him} what a local theatre or community event adds to your area."
+          }
+        }
+      },
+      {
+        "id": "arts-social-impact--directing-script-development",
+        "courses": [
+          "Directing and Script Development 11",
+          "Directing and Script Development 12"
+        ],
+        "competency_ids": [
+          "bc.dsd11.cc.19",
+          "bc.dsd12.cc.20"
+        ],
+        "ministry": "Explore impacts of scriptwriting and directing on culture and society / Examine impacts of scriptwriting and directing on culture and society",
+        "bands": {
+          "all": {
+            "phrase": "examine how scriptwriting and directing affect culture and society",
+            "next_steps": {
+              "emerging": "name an issue in society that a script could address",
+              "developing": "explain how a writer's or director's choices shape an audience's view",
+              "proficient": "examine how scripts and directing choices can change public attitudes",
+              "extending": "write or direct with a planned effect on culture or society in mind"
+            },
+            "strength": [
+              "{He} can explain how a script's point of view shapes the way an audience sees an issue.",
+              "{He} [considers|consider] who in society is shown, and how, in the scripts {he} [writes|write]."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to ask what effect {his} directing choices might have beyond the theatre.",
+              "proficient": "A good next step is to practise explaining how a script's choices could change what an audience believes.",
+              "extending": "One thing to practise is planning the effect {he} [wants|want] a script to have on its audience."
+            },
+            "home": "At home, ask {him} what message {he} would most want a script of {his} to send."
+          }
+        }
+      }
+    ]
+  },
+  "arts-somatic-approaches": {
+    "old": {
+      "phrase": "explain how conditioning supports dance skills",
+      "next_steps": {
+        "emerging": "explain how body conditioning supports technical skills",
+        "developing": "explain how somatic approaches support expressive skills",
+        "proficient": "explore how conditioning and somatic approaches connect in dance"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-somatic-approaches--dance-technique-performance",
+        "courses": [
+          "Dance Technique and Performance 11",
+          "Dance Technique and Performance 12"
+        ],
+        "competency_ids": [
+          "bc.dance11.cc.4",
+          "bc.dance12.cc.4"
+        ],
+        "ministry": "Explore the relationship between body conditioning and somatic approaches to technical and expressive skills / Demonstrate the relationship between body conditioning and somatic approaches on technical and expressive skills",
+        "bands": {
+          "all": {
+            "phrase": "connect body conditioning and body-awareness practices to technique and expression",
+            "next_steps": {
+              "emerging": "explain how strength and flexibility support a technical skill",
+              "developing": "explain how body-awareness practices support expression in dance",
+              "proficient": "use conditioning and body awareness together to improve a movement",
+              "extending": "show how conditioning and body awareness shape both technique and expression in performance"
+            },
+            "strength": [
+              "{He} can explain how conditioning helps {him} hold and control a movement.",
+              "{He} [uses|use] body-awareness practices to move with more ease and expression."
+            ],
+            "next": {
+              "developing": "Next, {he} can make a habit of noticing how {his} body feels during a technical exercise.",
+              "proficient": "It would help {him} to connect a specific conditioning exercise to a skill it supports.",
+              "extending": "From here, {he} can practise showing how body awareness changes the expression in a phrase of dance."
+            },
+            "home": "At home, ask {him} what {he} [notices|notice] in {his} body when a movement feels right."
+          }
+        }
+      },
+      {
+        "id": "arts-somatic-approaches--dance-conditioning-12",
+        "courses": [
+          "Dance Conditioning 12"
+        ],
+        "competency_ids": [
+          "bc.dcond12.cc.8"
+        ],
+        "ministry": "Demonstrate understanding of the relationship between body conditioning and somatic approaches to technical and expressive skills",
+        "bands": {
+          "all": {
+            "phrase": "explain and demonstrate how conditioning and somatic practices support dance skills",
+            "next_steps": {
+              "emerging": "describe what body conditioning and somatic, or body-awareness, practices each do for a dancer",
+              "developing": "explain how a conditioning exercise supports a technical skill",
+              "proficient": "demonstrate how a somatic practice supports expressive movement",
+              "extending": "design a conditioning plan that includes somatic practices for a dance goal"
+            },
+            "strength": [
+              "{He} can explain the difference between training the body and building awareness of it.",
+              "{He} [links|link] each conditioning exercise to the dance skill it supports."
+            ],
+            "next": {
+              "developing": "A useful habit for {him} is naming the skill each exercise is meant to build.",
+              "proficient": "As a next step, {he} can try adding a somatic practice to a conditioning routine and noting the effect.",
+              "extending": "{His} goal now is to explain how somatic work changes the way {he} [performs|perform]."
+            },
+            "home": "At home, ask {him} to show you an exercise {he} [does|do] in conditioning and what it helps."
+          }
+        }
+      }
+    ]
+  },
+  "arts-specialization": {
+    "old": {
+      "phrase": "apply production skills in a chosen specialty",
+      "next_steps": {
+        "emerging": "choose moving-image elements that suit a specialty",
+        "developing": "follow moving-image conventions in a specialty",
+        "proficient": "apply a full range of moving-image skills in a specialty"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-specialization--film-television-12",
+        "courses": [
+          "Film & Television 12"
+        ],
+        "competency_ids": [
+          "bc.ftvt12.cc.4"
+        ],
+        "ministry": "Apply moving-image elements, conventions, and skills in an area of personal specialization",
+        "bands": {
+          "all": {
+            "phrase": "apply film elements, conventions and skills in a chosen specialty",
+            "next_steps": {
+              "emerging": "choose an area of film and television to specialize in",
+              "developing": "apply the conventions of a chosen specialty in a project",
+              "proficient": "refine the skills of a specialty across several projects",
+              "extending": "use a specialty to solve problems in a full production"
+            },
+            "strength": [
+              "{He} [has|have] chosen an area of film and television to focus on and can explain why.",
+              "{He} [applies|apply] the conventions of {his} specialty, such as editing or camera work, in {his} projects."
+            ],
+            "next": {
+              "developing": "The next skill for {him} is using the terms and conventions of {his} specialty with ease.",
+              "proficient": "Next, {he} can build depth in {his} specialty by refining one skill per project.",
+              "extending": "{He} can now practise sharing what {he} [knows|know] about {his} specialty with the rest of the crew."
+            },
+            "home": "At home, ask {him} which job on a film crew {he} would choose and why."
+          }
+        }
+      },
+      {
+        "id": "arts-specialization--theatre-production-12",
+        "courses": [
+          "Theatre Production 12"
+        ],
+        "competency_ids": [
+          "bc.thprod12.cc.3"
+        ],
+        "ministry": "Specialize in materials, props, processes, technologies, or other areas of personal interest",
+        "bands": {
+          "all": {
+            "phrase": "specialize in an area of theatre production, such as props or technology",
+            "next_steps": {
+              "emerging": "choose an area of theatre production to specialize in",
+              "developing": "learn the materials and processes of a chosen area",
+              "proficient": "use a specialty to solve a problem in a production",
+              "extending": "set and meet personal goals that deepen a theatre production specialty"
+            },
+            "strength": [
+              "{He} [focuses|focus] on one area of theatre production and [builds|build] know-how in it.",
+              "{He} can explain the materials and processes {he} [uses|use] in {his} specialty."
+            ],
+            "next": {
+              "developing": "A further step is to test a new material or process in {his} chosen area.",
+              "proficient": "With more practice, {he} can solve production problems using the methods of {his} specialty.",
+              "extending": "{He} would benefit from teaching a process from {his} specialty to newer crew members."
+            },
+            "home": "At home, ask {him} which backstage job {he} [enjoys|enjoy] most and what it involves."
+          }
+        }
+      }
+    ]
+  },
+  "arts-specialized-language": {
+    "old": {
+      "phrase": "use music vocabulary to share ideas",
+      "next_steps": {
+        "emerging": "use one music term correctly",
+        "developing": "choose the right musical term when discussing music",
+        "proficient": "use music vocabulary throughout spoken and written work"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-specialized-language--music-10-instrumental-11",
+        "courses": [
+          "Choral Music 10",
+          "Contemporary Music 10",
+          "Instrumental Music 10",
+          "Instrumental Music 11"
+        ],
+        "competency_ids": [
+          "bc.chorus10.cc.14",
+          "bc.cmusic10.cc.14",
+          "bc.instmus10.cc.14",
+          "bc.instmus11.cc.15"
+        ],
+        "ministry": "Use discipline-specific language to communicate ideas / Use discipline-specific language to communicate and interpret ideas",
+        "bands": {
+          "all": {
+            "phrase": "use music terms to communicate and interpret musical ideas",
+            "next_steps": {
+              "emerging": "use one music term correctly when talking about a piece",
+              "developing": "choose the right music term to describe what is heard",
+              "proficient": "use music vocabulary to explain and interpret ideas in speech and writing",
+              "extending": "use music vocabulary to give and discuss interpretations of a piece"
+            },
+            "strength": [
+              "{He} [uses|use] music terms correctly when describing tempo, dynamics or style.",
+              "{He} can explain a musical idea in words that other musicians understand."
+            ],
+            "next": {
+              "developing": "Over time, {he} can practise using music terms in rehearsal instead of general words.",
+              "proficient": "{His} next step is to use music vocabulary to explain how a passage should be played or sung.",
+              "extending": "Next, {he} can practise using music terms to explain how {he} would interpret a piece."
+            },
+            "home": "At home, ask {him} to teach you one music word and what it means."
+          }
+        }
+      }
+    ]
+  },
+  "arts-story-narrative": {
+    "old": {
+      "phrase": "explain how stories share First Peoples perspectives",
+      "next_steps": {
+        "emerging": "describe the values a First Peoples story expresses",
+        "developing": "explain the role stories play in sharing perspectives",
+        "proficient": "explain the protocols for who may share an oral story"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-story-narrative--drama-directing-film-musical-theatre",
+        "courses": [
+          "Directing and Script Development 11",
+          "Drama 11",
+          "Film & Television 11",
+          "Musical Theatre 11",
+          "Directing and Script Development 12",
+          "Drama 12",
+          "Film & Television 12",
+          "Musical Theatre 12"
+        ],
+        "competency_ids": [
+          "bc.drama11.cc.19",
+          "bc.dsd11.cc.16",
+          "bc.ftvt11.cc.21",
+          "bc.mtheatre11.cc.15",
+          "bc.drama12.cc.20",
+          "bc.dsd12.cc.17",
+          "bc.ftvt12.cc.21",
+          "bc.mtheatre12.cc.17"
+        ],
+        "ministry": "Explore the role of story and narrative in expressing First Peoples perspectives, values, and beliefs, including protocols related to ownership of First Peoples oral texts / Analyze the role of story and narrative in expressing First Peoples perspectives, values, and beliefs, including protocols related to ownership of First Peoples oral texts / Analyze the role of story and narrative in expressing First Peoples perspectives, values, and beliefs, including protocols related to the ownership of First Peoples oral texts",
+        "bands": {
+          "all": {
+            "phrase": "explain how Indigenous stories carry perspectives and values, and who may share them",
+            "next_steps": {
+              "emerging": "describe the values an Indigenous story expresses",
+              "developing": "explain the role a story plays in passing on Indigenous perspectives and beliefs",
+              "proficient": "explain the protocols for who may share or adapt an oral story",
+              "extending": "analyze how a performance or film can honour a story's ownership and meaning"
+            },
+            "strength": [
+              "{He} can explain the values and beliefs that an Indigenous story passes on.",
+              "{He} [knows|know] that some oral stories belong to a family or Nation and need permission to share."
+            ],
+            "next": {
+              "developing": "To go further, {he} can practise asking whose story it is before using it in {his} work.",
+              "proficient": "{He} [is|are] ready to explain how a story's form shapes the perspective it shares.",
+              "extending": "A good next step is to analyze how a stage or screen version respects a story's protocols."
+            },
+            "home": "At home, ask {him} why some stories need permission before they are retold."
+          }
+        }
+      }
+    ]
+  },
+  "arts-story-values": {
+    "old": {
+      "phrase": "explain the story and values in music",
+      "next_steps": {
+        "emerging": "describe the story a piece of music tells",
+        "developing": "identify the values a piece of music shows",
+        "proficient": "explain how a piece of music reflects a personal voice"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-story-values--choral-music-10",
+        "courses": [
+          "Choral Music 10"
+        ],
+        "competency_ids": [
+          "bc.chorus10.cc.7"
+        ],
+        "ministry": "Explore music that demonstrates personal voice, story, and values",
+        "bands": {
+          "all": {
+            "phrase": "explore choral music that shows personal voice, story and values",
+            "next_steps": {
+              "emerging": "describe the story a choral piece tells",
+              "developing": "name the values a choral piece expresses through its words and music",
+              "proficient": "explain how a choral piece shows the voice of its writer or singers",
+              "extending": "connect a choral piece's story and values to the way the choir sings it"
+            },
+            "strength": [
+              "{He} can describe the story and feelings in the words of a choral piece.",
+              "{He} [connects|connect] the values in a song to the way the choir performs it."
+            ],
+            "next": {
+              "developing": "One thing to practise is asking what a songwriter believes, based on the words and music.",
+              "proficient": "Next, {he} can make a habit of linking a song's story to how {he} [sings|sing] each phrase.",
+              "extending": "It would help {him} to explore choral pieces that reflect {his} own story and values."
+            },
+            "home": "At home, ask {him} what a piece from choir is about and how it makes {him} feel."
+          }
+        }
+      },
+      {
+        "id": "arts-story-values--contemporary-instrumental-music-10",
+        "courses": [
+          "Contemporary Music 10",
+          "Instrumental Music 10"
+        ],
+        "competency_ids": [
+          "bc.cmusic10.cc.7",
+          "bc.instmus10.cc.7"
+        ],
+        "ministry": "Explore music that reflects personal voice, story, and values",
+        "bands": {
+          "all": {
+            "phrase": "explore music that reflects personal voice, story and values",
+            "next_steps": {
+              "emerging": "describe the story or feeling behind a piece of music",
+              "developing": "identify the values a piece of music reflects",
+              "proficient": "explain how a piece of music reflects the voice of its maker",
+              "extending": "explain how personal voice and values can shape the way a piece is played"
+            },
+            "strength": [
+              "{He} can explain what a piece of music says about the person who wrote it.",
+              "{He} [hears|hear] the story or feeling in an instrumental piece, even without words."
+            ],
+            "next": {
+              "developing": "From here, {he} can practise naming the choices that make a piece feel personal.",
+              "proficient": "A useful habit for {him} is asking what values a composer or band shows through their music.",
+              "extending": "Next, {he} can try bringing {his} own voice to how {he} [plays|play] a piece."
+            },
+            "home": "At home, ask {him} which song best tells the story of who {he} [is|are]."
+          }
+        }
+      }
+    ]
+  },
+  "arts-structure-form": {
+    "old": {
+      "phrase": "analyze how sound, image and form convey meaning",
+      "next_steps": {
+        "emerging": "analyze how sound conveys meaning in a scene",
+        "developing": "analyze how movement in a shot conveys meaning",
+        "proficient": "analyze how structure and form shape a moving image's meaning"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-structure-form--film-television",
+        "courses": [
+          "Film & Television 11",
+          "Film & Television 12"
+        ],
+        "competency_ids": [
+          "bc.ftvt11.cc.12",
+          "bc.ftvt12.cc.12"
+        ],
+        "ministry": "Analyze the ways in which moving images convey meaning through movement, sound, image, structure, and form",
+        "bands": {
+          "all": {
+            "phrase": "analyze how moving images use movement, sounds, images, structure and form to make meaning",
+            "next_steps": {
+              "emerging": "describe how one shot uses movement or sounds to create a feeling",
+              "developing": "analyze how the images and sounds in a scene work together",
+              "proficient": "analyze how the structure of a film shapes its meaning",
+              "extending": "compare how two moving-image works use form to convey a similar idea"
+            },
+            "strength": [
+              "{He} can explain how camera movement in a shot affects what the viewer feels.",
+              "{He} [notices|notice] how music, sounds and editing shape the meaning of a scene."
+            ],
+            "next": {
+              "developing": "{His} goal now is to explain how the order of scenes changes a film's meaning.",
+              "proficient": "The next skill for {him} is analyzing how a film's form fits its message.",
+              "extending": "As a next step, {he} can build {his} analysis by comparing the same idea in two moving-image works."
+            },
+            "home": "While watching something together, ask {him} why the director chose a certain shot or song."
+          }
+        }
+      }
+    ]
+  },
+  "arts-style-analysis": {
+    "old": {
+      "phrase": "analyze music styles to guide musical choices",
+      "next_steps": {
+        "emerging": "identify the features that define a music style",
+        "developing": "analyze a style of music to guide a choice",
+        "proficient": "explain how a style shaped a musical decision"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-style-analysis--music-10-12",
+        "courses": [
+          "Choral Music 10",
+          "Contemporary Music 10",
+          "Instrumental Music 10",
+          "Choral Music 11",
+          "Contemporary Music 11",
+          "Instrumental Music 11",
+          "Contemporary Music 12",
+          "Instrumental Music 12"
+        ],
+        "competency_ids": [
+          "bc.chorus10.cc.11",
+          "bc.cmusic10.cc.11",
+          "bc.instmus10.cc.11",
+          "bc.chor11.cc.12",
+          "bc.cmusic11.cc.11",
+          "bc.instmus11.cc.11",
+          "bc.cmusic12.cc.12",
+          "bc.instmus12.cc.13"
+        ],
+        "ministry": "Analyze styles of music to inform musical decisions",
+        "bands": {
+          "all": {
+            "phrase": "analyze styles of music to inform musical decisions",
+            "next_steps": {
+              "emerging": "identify the features that define a style of music",
+              "developing": "analyze a style of music to guide one performing choice",
+              "proficient": "explain how a style shaped a musical decision in rehearsal or performance",
+              "extending": "compare styles and choose techniques that suit each one"
+            },
+            "strength": [
+              "{He} can name the features of a music style, such as its rhythm, instruments or form.",
+              "{He} [uses|use] what {he} [knows|know] about a style to choose how to play or sing a passage."
+            ],
+            "next": {
+              "developing": "{He} can now practise naming the style of a piece before deciding how to perform it.",
+              "proficient": "A further step is to compare recordings of one style and note the choices performers make.",
+              "extending": "With more practice, {he} can explain how a mix of styles in one piece affects {his} choices."
+            },
+            "home": "At home, ask {him} what makes one style of music different from another."
+          }
+        }
+      }
+    ]
+  },
+  "arts-style-technique": {
+    "old": {
+      "phrase": "refine skills and techniques from different styles",
+      "next_steps": {
+        "emerging": "use a technique from one artistic style",
+        "developing": "refine skills by revising and improving work",
+        "proficient": "describe how a technique from a style was refined"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-style-technique--visual-arts",
+        "courses": [
+          "Art Studio 10",
+          "Studio Arts 2D 10",
+          "Studio Arts 3D 10",
+          "Art Studio 11",
+          "Studio Arts 2D 11",
+          "Studio Arts 3D 11",
+          "Art Studio 12",
+          "Studio Arts 2D 12",
+          "Studio Arts 3D 12"
+        ],
+        "competency_ids": [
+          "bc.artstudio10.cc.5",
+          "bc.sa2d10.cc.6",
+          "bc.sa3d10.cc.5",
+          "bc.artstudio11.cc.5",
+          "bc.artstudio12.cc.5",
+          "bc.sa2d11.cc.4",
+          "bc.sa3d11.cc.6",
+          "bc.sa2d12.cc.4",
+          "bc.sa3d12.cc.6"
+        ],
+        "ministry": "Develop and refine artistic skills in a variety of styles and movements / Develop and refine artistic skills and techniques in a range of styles and movements / Refine artistic skills from a variety of styles / Refine artistic skills and techniques from a variety of styles",
+        "bands": {
+          "all": {
+            "phrase": "develop and refine art skills and techniques from a variety of styles and movements",
+            "next_steps": {
+              "emerging": "use a technique from one artistic style",
+              "developing": "refine a technique from a style through practice and revision",
+              "proficient": "choose techniques from several styles to suit an artwork's purpose",
+              "extending": "combine techniques from different art movements in a single, unified work"
+            },
+            "strength": [
+              "{He} can use techniques drawn from more than one art style or movement.",
+              "{He} [refines|refine] a technique through repeated practice until {he} can control it."
+            ],
+            "next": {
+              "developing": "{He} would benefit from studying how artists of one movement used a technique.",
+              "proficient": "Over time, {he} can practise using a new style's techniques in sketches before a final piece.",
+              "extending": "{His} next step is to explain why {he} chose techniques from a certain style for a work."
+            },
+            "home": "At home, ask {him} which art style {he} [is|are] learning and what makes it recognizable."
+          }
+        }
+      },
+      {
+        "id": "arts-style-technique--photography",
+        "courses": [
+          "Photography 10",
+          "Photography 11",
+          "Photography 12"
+        ],
+        "competency_ids": [
+          "bc.photo10.cc.5",
+          "bc.photo11.cc.6",
+          "bc.photo12.cc.6"
+        ],
+        "ministry": "Develop and refine photographic skills and techniques in a range of styles and genres / Develop and refine photographic skills and techniques related to a range of styles and genres / Refine photographic skills and techniques related to various styles and genres",
+        "bands": {
+          "all": {
+            "phrase": "develop and refine photographic skills and techniques across styles and genres",
+            "next_steps": {
+              "emerging": "use one photographic technique on purpose",
+              "developing": "refine a technique by taking and reviewing several versions of a photo",
+              "proficient": "match techniques to the style or genre of a photograph",
+              "extending": "work across genres and refine techniques to suit each one"
+            },
+            "strength": [
+              "{He} [controls|control] photographic techniques, such as focus and lighting, to suit an image.",
+              "{He} can name the genre of a photo, such as portrait or landscape, and its conventions."
+            ],
+            "next": {
+              "developing": "Next, {he} can practise taking several frames of one subject to refine a technique.",
+              "proficient": "To go further, {he} can practise matching {his} techniques to the genre {he} [is|are] working in.",
+              "extending": "{He} [is|are] ready to try a genre that is new to {him} and adapt {his} techniques."
+            },
+            "home": "At home, ask {him} which type of photo {he} [likes|like] taking most and why."
+          }
+        }
+      },
+      {
+        "id": "arts-style-technique--graphic-arts",
+        "courses": [
+          "Graphic Arts 11",
+          "Graphic Arts 12"
+        ],
+        "competency_ids": [
+          "bc.garts11.cc.6",
+          "bc.garts12.cc.6"
+        ],
+        "ministry": "Develop skills and techniques related to a variety of styles and technologies / Refine skills and techniques related to various styles and technologies",
+        "bands": {
+          "all": {
+            "phrase": "develop and refine graphic arts skills across styles and technologies",
+            "next_steps": {
+              "emerging": "use one graphic arts technique with a chosen tool or technology",
+              "developing": "refine a technique by testing it in more than one style",
+              "proficient": "choose the technology that best suits a graphic artwork's style",
+              "extending": "move between styles and technologies with control"
+            },
+            "strength": [
+              "{He} [uses|use] the tools and technologies of graphic arts to work in more than one style.",
+              "{He} [refines|refine] {his} techniques by trying the same design in different styles."
+            ],
+            "next": {
+              "developing": "A good next step is to learn one new technology and test it in a short design.",
+              "proficient": "One thing to practise is explaining why a style and a technology suit each other.",
+              "extending": "Next, {he} can make a habit of refining a design in two styles before choosing one."
+            },
+            "home": "At home, ask {him} what {he} [notices|notice] about the style of a sign or package you see."
+          }
+        }
+      },
+      {
+        "id": "arts-style-technique--media-arts-12",
+        "courses": [
+          "Media Arts 12"
+        ],
+        "competency_ids": [
+          "bc.meda12.cc.3"
+        ],
+        "ministry": "Refine skills and techniques from various styles and genres",
+        "bands": {
+          "all": {
+            "phrase": "refine media arts skills and techniques from various styles and genres",
+            "next_steps": {
+              "emerging": "identify the techniques that define a media arts genre",
+              "developing": "refine a technique from a chosen style in a media artwork",
+              "proficient": "adapt techniques from several genres to suit a media artwork",
+              "extending": "blend styles and genres with purpose in a finished media artwork"
+            },
+            "strength": [
+              "{He} can identify the techniques that give a media arts genre its look and feel.",
+              "{He} [refines|refine] techniques from different styles until they serve {his} idea."
+            ],
+            "next": {
+              "developing": "It would help {him} to practise one genre's techniques in short studies.",
+              "proficient": "From here, {he} can practise adapting a technique from one genre to another.",
+              "extending": "A useful habit for {him} is noting which style choices make a media work feel unified."
+            },
+            "home": "At home, ask {him} which film, game or video style {he} would like to try in {his} work."
+          }
+        }
+      }
+    ]
+  },
+  "arts-styles-genres": {
+    "old": {
+      "phrase": "perform pieces from many styles and genres",
+      "next_steps": {
+        "emerging": "identify the features of one style or genre",
+        "developing": "perform pieces from more than one style",
+        "proficient": "perform a wide range of styles and explain each one's features"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-styles-genres--choral-instrumental-music",
+        "courses": [
+          "Choral Music 10",
+          "Instrumental Music 10",
+          "Choral Music 11",
+          "Instrumental Music 11",
+          "Choral Music 12",
+          "Instrumental Music 12"
+        ],
+        "competency_ids": [
+          "bc.chorus10.cc.4",
+          "bc.instmus10.cc.4",
+          "bc.chor11.cc.5",
+          "bc.instmus11.cc.5",
+          "bc.chor12.cc.5",
+          "bc.instmus12.cc.5"
+        ],
+        "ministry": "Study and perform a variety of musical styles and genres / Explore diverse musical genres in performance or study",
+        "bands": {
+          "all": {
+            "phrase": "study and perform music from a variety of styles and genres",
+            "next_steps": {
+              "emerging": "identify the features of one musical style or genre",
+              "developing": "perform pieces from more than one style",
+              "proficient": "adjust performing choices to fit each style or genre",
+              "extending": "perform a wide range of genres and explain what each one asks of a musician"
+            },
+            "strength": [
+              "{He} can identify the features of several musical styles and genres.",
+              "{He} [changes|change] the way {he} [plays|play] or [sings|sing] to suit the style of each piece."
+            ],
+            "next": {
+              "developing": "{He} can also try a genre {he} [has|have] not performed before.",
+              "proficient": "{His} goal now is to explain how a genre's history shapes the way it is performed.",
+              "extending": "The next skill for {him} is moving between styles within one performance with control."
+            },
+            "home": "At home, ask {him} which genre of music {he} [enjoys|enjoy] performing most."
+          }
+        }
+      },
+      {
+        "id": "arts-styles-genres--dance-technique-performance",
+        "courses": [
+          "Dance Technique and Performance 10",
+          "Dance Technique and Performance 11",
+          "Dance Technique and Performance 12"
+        ],
+        "competency_ids": [
+          "bc.dtep10.cc.2",
+          "bc.dance11.cc.2",
+          "bc.dance12.cc.2"
+        ],
+        "ministry": "Explore specific or a variety of genres or styles from historical and contemporary cultures",
+        "bands": {
+          "all": {
+            "phrase": "explore dance genres and styles from historical and contemporary cultures",
+            "next_steps": {
+              "emerging": "describe the features of one dance genre or style",
+              "developing": "perform movement from a genre and explain where it began",
+              "proficient": "compare dance styles from historical and contemporary cultures",
+              "extending": "explain how a dance style has changed from its origins to today"
+            },
+            "strength": [
+              "{He} can describe the movement features of dance styles from different cultures and times.",
+              "{He} [adapts|adapt] {his} technique to suit the style of each genre {he} [learns|learn]."
+            ],
+            "next": {
+              "developing": "Next, {he} can build {his} range by learning a style from a different culture or time.",
+              "proficient": "{He} can now practise explaining the culture and history behind a dance style.",
+              "extending": "A further step is to trace how one dance genre has changed over time."
+            },
+            "home": "At home, ask {him} to show you a step from a dance style and say where it began."
+          }
+        }
+      }
+    ]
+  },
+  "arts-symbolism-imagery": {
+    "old": {
+      "phrase": "use symbols and imagery to share ideas",
+      "next_steps": {
+        "emerging": "interpret the ideas in an image",
+        "developing": "compose a work that uses a symbol to share an idea",
+        "proficient": "expand an idea by adding imagery or elements"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-symbolism-imagery--arts-dance-drama",
+        "courses": [
+          "Arts Education 9",
+          "Dance 9",
+          "Drama 9",
+          "Drama 10"
+        ],
+        "competency_ids": [
+          "bc.arts9.cc.9",
+          "bc.dance9.cc.11",
+          "bc.drama9.cc.10",
+          "bc.drama10.cc.15"
+        ],
+        "ministry": "Compose, interpret, and expand ideas using symbolism, imagery, and elements / Compose, interpret, and expand ideas using symbolism and imagery",
+        "bands": {
+          "8-9": {
+            "phrase": "use symbols, images and arts elements to create and expand ideas",
+            "next_steps": {
+              "emerging": "say what a symbol in a dance, drama or artwork might mean",
+              "developing": "use a symbol or image to show an idea in a piece",
+              "proficient": "expand an idea by adding images or arts elements",
+              "extending": "explain how symbols and images work together to deepen an idea"
+            },
+            "strength": [
+              "{He} can explain what a symbol might mean in a dance, scene or artwork.",
+              "{He} [uses|use] an image or gesture to stand for a bigger idea in {his} work."
+            ],
+            "next": {
+              "developing": "With more practice, {he} can choose symbols that an audience will understand.",
+              "proficient": "{He} would benefit from trying more than one symbol for the same idea.",
+              "extending": "Over time, {he} can explain how a symbol changes meaning as a piece goes on."
+            },
+            "home": "At home, ask {him} what a colour or object could stand for in a story."
+          },
+          "10-12": {
+            "phrase": "compose, interpret and expand ideas in drama using symbolism and imagery",
+            "next_steps": {
+              "emerging": "interpret the meaning of a symbol in a scene",
+              "developing": "compose a scene that uses a symbol to carry an idea",
+              "proficient": "expand an idea in a scene through layered imagery",
+              "extending": "shape a whole drama piece around a set of connected symbols and images"
+            },
+            "strength": [
+              "{He} can interpret the symbols and images a playwright uses in a scene.",
+              "{He} [uses|use] props, gesture or staging as symbols to carry meaning."
+            ],
+            "next": {
+              "developing": "{His} next step is to test whether an audience reads {his} symbols the way {he} [intends|intend].",
+              "proficient": "Next, {he} can practise building imagery through repeated words, gestures or objects.",
+              "extending": "To go further, {he} can practise changing a symbol's meaning over the course of a scene."
+            },
+            "home": "At home, ask {him} what symbol {he} would use on stage to show a feeling like hope."
+          }
+        }
+      }
+    ]
+  },
+  "arts-symbolism-metaphor": {
+    "old": {
+      "phrase": "use symbols and metaphor to express ideas",
+      "next_steps": {
+        "emerging": "interpret the meaning of a symbol in an artwork",
+        "developing": "compose a piece that uses a symbol for an idea",
+        "proficient": "use design strategies to expand an idea"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-symbolism-metaphor--visual-arts-9",
+        "courses": [
+          "Visual Arts 9"
+        ],
+        "competency_ids": [
+          "bc.visart9.cc.11"
+        ],
+        "ministry": "Compose, interpret, and expand ideas using symbolism, metaphor, and design strategies",
+        "bands": {
+          "all": {
+            "phrase": "use symbols, metaphor and design strategies to create and expand ideas in art",
+            "next_steps": {
+              "emerging": "interpret the meaning of a symbol in an artwork",
+              "developing": "create a piece that uses a symbol or metaphor for an idea",
+              "proficient": "use design strategies, such as contrast or repetition, to expand an idea",
+              "extending": "explain how symbols, metaphor and design choices work together in a piece"
+            },
+            "strength": [
+              "{He} can explain what a symbol or visual metaphor in an artwork might mean.",
+              "{He} [uses|use] design choices, such as placement or contrast, to make an idea stand out."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to try a visual metaphor that shows one thing as another.",
+              "proficient": "A good next step is to plan a piece with sketches that test different symbols.",
+              "extending": "One thing to practise is explaining how {his} design choices help a viewer understand a metaphor."
+            },
+            "home": "At home, ask {him} what object {he} would draw to show a feeling."
+          }
+        }
+      }
+    ]
+  },
+  "arts-symbols-elements": {
+    "old": {
+      "phrase": "use symbols and elements to express meaning",
+      "next_steps": {
+        "emerging": "interpret one symbol in a work of art",
+        "developing": "use a symbol to express meaning in a piece",
+        "proficient": "explain how elements and symbols work together to communicate"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-symbols-elements--arts-education-8",
+        "courses": [
+          "Arts Education 8"
+        ],
+        "competency_ids": [
+          "bc.arts8.cc.11"
+        ],
+        "ministry": "Interpret and communicate ideas using symbols and elements to express meaning through the arts",
+        "bands": {
+          "all": {
+            "phrase": "use symbols and arts elements to share meaning",
+            "next_steps": {
+              "emerging": "say what one symbol in a piece of art might mean",
+              "developing": "use a symbol to show an idea in a piece",
+              "proficient": "explain how a symbol and an element, like colour or rhythm, share meaning together",
+              "extending": "plan a piece where symbols and elements work together to show an idea"
+            },
+            "strength": [
+              "{He} can say what a symbol in a piece of art, music or drama might mean.",
+              "{He} [chooses|choose] colours, shapes or movements to help show an idea."
+            ],
+            "next": {
+              "developing": "Next, {he} can make a habit of explaining why {he} picked each symbol.",
+              "proficient": "It would help {him} to try two different elements for the same idea.",
+              "extending": "From here, {he} can practise interpreting the symbols in other people's art."
+            },
+            "home": "At home, ask {him} what a sign or logo you see often is meant to say."
+          }
+        }
+      }
+    ]
+  },
+  "arts-technical-skills": {
+    "old": {
+      "phrase": "refine dance skills and performance",
+      "next_steps": {
+        "emerging": "refine one technical skill in dance",
+        "developing": "refine how dance concepts are applied in movement",
+        "proficient": "make changes that strengthen a whole dance performance"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-technical-skills--dance-technique-performance",
+        "courses": [
+          "Dance Technique and Performance 10",
+          "Dance Technique and Performance 11",
+          "Dance Technique and Performance 12"
+        ],
+        "competency_ids": [
+          "bc.dtep10.cc.11",
+          "bc.dance11.cc.12",
+          "bc.dance12.cc.11"
+        ],
+        "ministry": "Refine dance concepts and technical skills / Refine dance concepts, technical skills, and performance",
+        "bands": {
+          "all": {
+            "phrase": "refine dance concepts, technical skills and performance",
+            "next_steps": {
+              "emerging": "refine one technical skill in dance through practice",
+              "developing": "apply dance concepts, such as space and energy, with more control",
+              "proficient": "refine technique and performance qualities across a whole piece",
+              "extending": "set technical goals and track how they improve a performance"
+            },
+            "strength": [
+              "{He} [repeats|repeat] a technical skill with attention until it is controlled.",
+              "{He} [uses|use] dance concepts like space, time and energy to shape {his} movement."
+            ],
+            "next": {
+              "developing": "A useful habit for {him} is choosing one technical correction to focus on each class.",
+              "proficient": "A helpful next step is to keep technique steady while adding performance energy.",
+              "extending": "{His} goal now is to refine the small details that make a whole performance clear."
+            },
+            "home": "At home, ask {him} which dance skill {he} [is|are] refining and how it is going."
+          }
+        }
+      }
+    ]
+  },
+  "arts-technical-vocabulary": {
+    "old": {
+      "phrase": "use dance vocabulary to describe and respond to dance",
+      "next_steps": {
+        "emerging": "use technical terms to describe a dance performance",
+        "developing": "record dance experiences using technical vocabulary",
+        "proficient": "use technical terms to support an opinion of a dance"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-technical-vocabulary--dance-choreography-10",
+        "courses": [
+          "Dance Choreography 10"
+        ],
+        "competency_ids": [
+          "bc.dchore10.cc.16"
+        ],
+        "ministry": "Use technical vocabulary to describe, document, and respond to rehearsal processes, compositions, and performances",
+        "bands": {
+          "all": {
+            "phrase": "use technical dance vocabulary to describe, record and respond to choreography",
+            "next_steps": {
+              "emerging": "use technical terms to describe a dance composition",
+              "developing": "record rehearsal processes using technical vocabulary",
+              "proficient": "respond to a composition or performance using the right technical terms",
+              "extending": "use technical vocabulary to explain choreographic choices and give feedback"
+            },
+            "strength": [
+              "{He} [uses|use] technical terms to describe how a composition is built.",
+              "{He} [records|record] choreography and rehearsal notes in dance vocabulary."
+            ],
+            "next": {
+              "developing": "The next skill for {him} is naming the choreographic devices in a composition.",
+              "proficient": "Next, {he} can practise keeping fuller rehearsal notes in dance terms.",
+              "extending": "{He} can now practise using technical terms to give feedback on another dancer's choreography."
+            },
+            "home": "At home, ask {him} to explain one dance word {he} [uses|use] when making choreography."
+          }
+        }
+      },
+      {
+        "id": "arts-technical-vocabulary--dance-company",
+        "courses": [
+          "Dance Company 10",
+          "Dance Company 11"
+        ],
+        "competency_ids": [
+          "bc.dcomp10.cc.18",
+          "bc.dcomp11.cc.15"
+        ],
+        "ministry": "Use technical vocabulary to describe, document, and respond critically to rehearsals, compositions, and performances / Expand and apply technical vocabulary to describe, document, and respond critically to rehearsals, compositions, and performances",
+        "bands": {
+          "all": {
+            "phrase": "use technical vocabulary to describe, document and respond critically to company work",
+            "next_steps": {
+              "emerging": "describe a rehearsal or performance using technical terms",
+              "developing": "document company rehearsals in technical language",
+              "proficient": "respond critically to a performance using technical vocabulary",
+              "extending": "expand technical vocabulary and apply it to give critical feedback"
+            },
+            "strength": [
+              "{He} [describes|describe] rehearsals and performances of the dance company in technical language.",
+              "{He} [uses|use] the right dance terms when {he} [gives|give] a critical response to a composition."
+            ],
+            "next": {
+              "developing": "A further step is to keep a rehearsal record that uses technical terms throughout.",
+              "proficient": "With more practice, {he} can support a critical response with examples from the performance.",
+              "extending": "{He} would benefit from adding new technical terms to {his} vocabulary each rehearsal."
+            },
+            "home": "At home, ask {him} how {he} would describe {his} company's latest performance to a dancer."
+          }
+        }
+      },
+      {
+        "id": "arts-technical-vocabulary--dance-technique-performance",
+        "courses": [
+          "Dance Technique and Performance 10",
+          "Dance Technique and Performance 11",
+          "Dance Technique and Performance 12"
+        ],
+        "competency_ids": [
+          "bc.dtep10.cc.16",
+          "bc.dance11.cc.17",
+          "bc.dance12.cc.16"
+        ],
+        "ministry": "Use technical vocabulary to describe, document, and respond to dance experiences and performances / Use technical vocabulary to describe, document, and respond critically to dance experiences and performances",
+        "bands": {
+          "all": {
+            "phrase": "use technical vocabulary to describe, document and respond critically to dance",
+            "next_steps": {
+              "emerging": "use technical terms to describe a dance experience",
+              "developing": "document dance experiences with technical vocabulary",
+              "proficient": "use technical terms to support a critical response to a performance",
+              "extending": "write critical responses that use technical vocabulary to compare performances"
+            },
+            "strength": [
+              "{He} [uses|use] technical terms to describe the movement in a performance.",
+              "{He} [writes|write] about {his} dance experiences using the vocabulary of technique."
+            ],
+            "next": {
+              "developing": "Over time, {he} can practise documenting each class with the terms {he} [learns|learn].",
+              "proficient": "{His} next step is to use technical terms to explain {his} opinion of a performance.",
+              "extending": "Next, {he} can practise comparing two performances in technical language."
+            },
+            "home": "At home, ask {him} to describe a dance {he} [enjoys|enjoy] using the words {he} [has|have] learned."
+          }
+        }
+      }
+    ]
+  },
+  "arts-theatre-creation": {
+    "old": {
+      "phrase": "explore and create musical theatre",
+      "next_steps": {
+        "emerging": "explore musical theatre performances to find ideas",
+        "developing": "try different ways to perform a musical theatre piece",
+        "proficient": "create a musical theatre performance from explored ideas"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-theatre-creation--musical-theatre-10",
+        "courses": [
+          "Musical Theatre 10"
+        ],
+        "competency_ids": [
+          "bc.mtheatre10.cc.1"
+        ],
+        "ministry": "Explore and create musical theatre performances",
+        "bands": {
+          "all": {
+            "phrase": "explore and create musical theatre performances",
+            "next_steps": {
+              "emerging": "explore musical theatre songs and scenes to find ideas",
+              "developing": "try different ways to stage a song or scene",
+              "proficient": "create a short musical theatre performance from explored ideas",
+              "extending": "combine song, dance and acting into a musical theatre piece with a clear purpose"
+            },
+            "strength": [
+              "{He} [explores|explore] songs, scenes and characters to find ideas for a performance.",
+              "{He} [combines|combine] singing, movement and acting when creating a musical theatre piece."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to test several ways of staging one song before choosing.",
+              "proficient": "A good next step is to shape explored ideas into a short scene with a song.",
+              "extending": "One thing to practise is deciding what a song adds to the story of a scene."
+            },
+            "home": "At home, ask {him} which musical {he} would most like to perform in and why."
+          }
+        }
+      }
+    ]
+  },
+  "arts-theatre-experiences": {
+    "old": {
+      "phrase": "take part in different theatre experiences",
+      "next_steps": {
+        "emerging": "describe what was noticed in a theatre experience",
+        "developing": "take part in different kinds of theatre experiences",
+        "proficient": "explain what a range of theatre experiences showed"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-theatre-experiences--theatre-company-10",
+        "courses": [
+          "Theatre Company 10"
+        ],
+        "competency_ids": [
+          "bc.thco10.cc.5"
+        ],
+        "ministry": "Explore a range of theatre experiences",
+        "bands": {
+          "all": {
+            "phrase": "explore a range of theatre experiences",
+            "next_steps": {
+              "emerging": "describe what stood out in a theatre experience",
+              "developing": "take part in different types of theatre experiences",
+              "proficient": "explain what different theatre experiences have shown about theatre",
+              "extending": "connect a range of theatre experiences to choices in personal work"
+            },
+            "strength": [
+              "{He} [takes|take] part willingly in different types of theatre activity.",
+              "{He} can describe what {he} learned from a theatre experience and how it felt."
+            ],
+            "next": {
+              "developing": "{He} can also make a habit of trying a theatre role {he} [has|have] not tried before.",
+              "proficient": "It would help {him} to reflect on what each new theatre experience teaches {him}.",
+              "extending": "From here, {he} can practise using what {he} [learns|learn] in one experience in the next."
+            },
+            "home": "At home, ask {him} which theatre activity surprised {him} most."
+          }
+        }
+      }
+    ]
+  },
+  "arts-theatre-performance": {
+    "old": {
+      "phrase": "rehearse and perform musical theatre",
+      "next_steps": {
+        "emerging": "rehearse a musical theatre piece",
+        "developing": "perform a part in a musical theatre work",
+        "proficient": "perform a musical theatre piece from start to finish"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-theatre-performance--musical-theatre",
+        "courses": [
+          "Musical Theatre 10",
+          "Musical Theatre 11",
+          "Musical Theatre 12"
+        ],
+        "competency_ids": [
+          "bc.mtheatre10.cc.2",
+          "bc.mtheatre11.cc.2",
+          "bc.mtheatre12.cc.2"
+        ],
+        "ministry": "Rehearse and perform theatrical works / Rehearse and perform musical theatre",
+        "bands": {
+          "all": {
+            "phrase": "rehearse and perform musical theatre works",
+            "next_steps": {
+              "emerging": "learn lines, songs and movement for a part",
+              "developing": "use rehearsal time to refine a part in a musical",
+              "proficient": "perform a part with focus from the start of a show to the end",
+              "extending": "shape a performance so singing, acting and dance tell one story"
+            },
+            "strength": [
+              "{He} [comes|come] to rehearsal prepared with {his} lines, music and movement.",
+              "{He} [performs|perform] {his} part with focus and energy in front of an audience."
+            ],
+            "next": {
+              "developing": "A useful habit for {him} is noting each director's note and using it at the next rehearsal.",
+              "proficient": "As a next step, {he} can try keeping {his} character alive during songs and dance breaks.",
+              "extending": "{His} goal now is to connect each song to what {his} character wants."
+            },
+            "home": "At home, ask {him} to sing or act a short part of the show {he} [is|are] rehearsing."
+          }
+        }
+      }
+    ]
+  },
+  "arts-theatre-repertoire": {
+    "old": {
+      "phrase": "use theatre skills, terms and conventions",
+      "next_steps": {
+        "emerging": "use theatre vocabulary to describe choices",
+        "developing": "use theatre skills and conventions in a performance",
+        "proficient": "try a wider range of theatre conventions and skills"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-theatre-repertoire--theatre-company-10",
+        "courses": [
+          "Theatre Company 10"
+        ],
+        "competency_ids": [
+          "bc.thco10.cc.1"
+        ],
+        "ministry": "Explore and demonstrate a repertoire of theatre vocabulary, skills, and conventions, through presentation or performance",
+        "bands": {
+          "all": {
+            "phrase": "explore and use a range of theatre vocabulary, skills and conventions in performance",
+            "next_steps": {
+              "emerging": "name the theatre conventions used in a scene",
+              "developing": "use a few theatre skills and conventions in a presentation",
+              "proficient": "draw on a wider range of skills and conventions in performance",
+              "extending": "choose from a full range of conventions to fit each scene's purpose"
+            },
+            "strength": [
+              "{He} can name and explain several theatre conventions and when to use them.",
+              "{He} [tries|try] new theatre skills in front of an audience instead of the same ones each time."
+            ],
+            "next": {
+              "developing": "The next skill for {him} is using theatre vocabulary when giving and taking direction.",
+              "proficient": "Next, {he} can build a wider range by trying one new convention in each presentation.",
+              "extending": "{He} can now practise explaining why a convention suits the scene {he} [is|are] in."
+            },
+            "home": "At home, ask {him} what new theatre skill {he} tried most recently."
+          }
+        }
+      }
+    ]
+  },
+  "arts-thoughts-emotions": {
+    "old": {
+      "phrase": "express thoughts and emotions through graphic art",
+      "next_steps": {
+        "emerging": "express a thought through a graphic artwork",
+        "developing": "express an emotion through a graphic artwork",
+        "proficient": "choose visual elements that show a thought or emotion"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-thoughts-emotions--graphic-arts-11",
+        "courses": [
+          "Graphic Arts 11"
+        ],
+        "competency_ids": [
+          "bc.garts11.cc.17"
+        ],
+        "ministry": "Express thoughts and emotions through graphic artworks",
+        "bands": {
+          "all": {
+            "phrase": "express thoughts and emotions through graphic artworks",
+            "next_steps": {
+              "emerging": "express a thought in a graphic artwork",
+              "developing": "use colour, type or image to show an emotion in a design",
+              "proficient": "choose visual elements on purpose to communicate a thought or feeling",
+              "extending": "create graphic artworks that carry a clear emotion to a viewer"
+            },
+            "strength": [
+              "{He} [uses|use] colour, type and layout to show a feeling in a graphic artwork.",
+              "{He} can explain the thought behind a graphic design and the emotion it aims to create."
+            ],
+            "next": {
+              "developing": "A further step is to test whether viewers feel the emotion {he} [intends|intend].",
+              "proficient": "With more practice, {he} can choose fonts and colours that match the mood of an idea.",
+              "extending": "{He} would benefit from sketching several layouts that show the same emotion in different ways."
+            },
+            "home": "At home, ask {him} what feeling a poster or ad you see is trying to create."
+          }
+        }
+      },
+      {
+        "id": "arts-thoughts-emotions--studio-arts-2d-11",
+        "courses": [
+          "Studio Arts 2D 11"
+        ],
+        "competency_ids": [
+          "bc.sa2d11.cc.15"
+        ],
+        "ministry": "Express thoughts and emotions through 2D artistic works",
+        "bands": {
+          "all": {
+            "phrase": "express thoughts and emotions through 2D artistic works",
+            "next_steps": {
+              "emerging": "express a feeling in a drawing, painting or print",
+              "developing": "use line, colour and composition to show an emotion",
+              "proficient": "choose 2D materials and methods that suit a thought or feeling",
+              "extending": "create a series of 2D works that develops a thought or emotion"
+            },
+            "strength": [
+              "{He} [uses|use] line, colour and mark-making to show emotion in {his} 2D work.",
+              "{He} can talk about the thought or memory behind a drawing or painting."
+            ],
+            "next": {
+              "developing": "Over time, {he} can practise matching {his} choice of medium to the feeling {he} [wants|want] to show.",
+              "proficient": "{His} next step is to explore how composition can make a viewer feel calm or tense.",
+              "extending": "Next, {he} can practise developing one emotion across a set of related works."
+            },
+            "home": "At home, ask {him} which of {his} drawings or paintings shows the strongest feeling."
+          }
+        }
+      }
+    ]
+  },
+  "arts-training-methods": {
+    "old": {
+      "phrase": "show ways to train muscles and the heart",
+      "next_steps": {
+        "emerging": "demonstrate one way to train the muscular system",
+        "developing": "demonstrate ways to train the cardiovascular system",
+        "proficient": "demonstrate ways to train both systems in a routine"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-training-methods--dance-conditioning",
+        "courses": [
+          "Dance Conditioning 11",
+          "Dance Conditioning 12"
+        ],
+        "competency_ids": [
+          "bc.dcond11.cc.3",
+          "bc.dcond12.cc.3"
+        ],
+        "ministry": "Demonstrate ways to train the muscular and cardiovascular systems",
+        "bands": {
+          "all": {
+            "phrase": "demonstrate ways to train the muscular and cardiovascular systems",
+            "next_steps": {
+              "emerging": "demonstrate one exercise that trains the muscles",
+              "developing": "demonstrate ways to train the heart and lungs for dance",
+              "proficient": "combine muscular and cardiovascular training in a routine",
+              "extending": "design a training routine and explain how each part supports dancing"
+            },
+            "strength": [
+              "{He} can demonstrate exercises that build muscular strength and endurance.",
+              "{He} [explains|explain] how cardiovascular training helps {him} dance longer with control."
+            ],
+            "next": {
+              "developing": "To go further, {he} can practise explaining which muscles an exercise trains.",
+              "proficient": "{He} [is|are] ready to plan a routine that balances strength and endurance training.",
+              "extending": "A good next step is to track how a training routine changes {his} dancing over several weeks."
+            },
+            "home": "At home, ask {him} to show you one conditioning exercise and the muscles it works."
+          }
+        }
+      }
+    ]
+  },
+  "arts-using-critique": {
+    "old": {
+      "phrase": "choose which critique suggestions to use",
+      "next_steps": {
+        "emerging": "explain the purpose of a critique",
+        "developing": "choose which critique suggestions to apply",
+        "proficient": "give reasons for applying or setting aside a suggestion"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-using-critique--visual-media-arts-photography-11",
+        "courses": [
+          "Art Studio 11",
+          "Graphic Arts 11",
+          "Media Arts 11",
+          "Photography 11",
+          "Studio Arts 2D 11",
+          "Studio Arts 3D 11"
+        ],
+        "competency_ids": [
+          "bc.artstudio11.cc.8",
+          "bc.garts11.cc.10",
+          "bc.meda11.cc.8",
+          "bc.photo11.cc.8",
+          "bc.sa2d11.cc.8",
+          "bc.sa3d11.cc.9"
+        ],
+        "ministry": "Understand the purpose of a critique and choose when to apply suggestions",
+        "bands": {
+          "all": {
+            "phrase": "understand the purpose of a critique and choose when to apply suggestions",
+            "next_steps": {
+              "emerging": "explain the purpose of a critique",
+              "developing": "choose which critique suggestions to apply to a piece",
+              "proficient": "give reasons for applying or setting aside a suggestion",
+              "extending": "weigh critique suggestions against the intent of a piece"
+            },
+            "strength": [
+              "{He} [listens|listen] to critique openly and [notes|note] the suggestions {he} [hears|hear].",
+              "{He} can explain why {he} used one suggestion and set another aside."
+            ],
+            "next": {
+              "developing": "One thing to practise is asking a follow-up question when a suggestion is unclear.",
+              "proficient": "A helpful next step is to test a suggestion in a small study first.",
+              "extending": "It would help {him} to explain how a critique changed the direction of a piece."
+            },
+            "home": "At home, ask {him} about a suggestion {he} received for a piece and whether {he} used it."
+          }
+        }
+      }
+    ]
+  },
+  "arts-using-experience": {
+    "old": {
+      "phrase": "draw on experiences to improve a theatre production",
+      "next_steps": {
+        "emerging": "choose an experience that connects to a production",
+        "developing": "draw on an experience to refine one part of a production",
+        "proficient": "draw on several experiences to refine a whole production"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-using-experience--theatre-company-11-12",
+        "courses": [
+          "Theatre Company 11",
+          "Theatre Company 12"
+        ],
+        "competency_ids": [
+          "bc.thco11.cc.10",
+          "bc.thco12.cc.10"
+        ],
+        "ministry": "Draw on personal experiences to refine theatre productions / Reflect on personal experiences to develop and refine theatre productions",
+        "bands": {
+          "all": {
+            "phrase": "draw on personal experiences to develop and refine theatre productions",
+            "next_steps": {
+              "emerging": "choose a personal experience that connects to a production",
+              "developing": "use an experience to refine one part of a production",
+              "proficient": "reflect on several experiences to shape a role or scene",
+              "extending": "reflect on experience to guide choices across a whole production"
+            },
+            "strength": [
+              "{He} [draws|draw] on {his} own experiences to make a character's feelings believable.",
+              "{He} [reflects|reflect] on events in {his} own life to shape choices in a scene."
+            ],
+            "next": {
+              "developing": "From here, {he} can practise choosing which experiences to share and which to keep private.",
+              "proficient": "A useful habit for {him} is noting experiences that connect to the themes of a production.",
+              "extending": "Next, {he} can try using reflection to guide design and staging, not just acting."
+            },
+            "home": "At home, ask {him} how a memory or experience helped {him} play a role."
+          }
+        }
+      }
+    ]
+  },
+  "arts-using-feedback": {
+    "old": {
+      "phrase": "combine feedback from others to improve a video",
+      "next_steps": {
+        "emerging": "note constructive feedback on a draft",
+        "developing": "use constructive feedback to refine moving images",
+        "proficient": "combine feedback from different people to decide what to change"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-using-feedback--film-television",
+        "courses": [
+          "Film & Television 11",
+          "Film & Television 12"
+        ],
+        "competency_ids": [
+          "bc.ftvt11.cc.11",
+          "bc.ftvt12.cc.11"
+        ],
+        "ministry": "Receive and synthesize constructive feedback to refine moving images / Receive, provide, and synthesize constructive feedback to develop and refine moving images",
+        "bands": {
+          "all": {
+            "phrase": "give, receive and combine constructive feedback to refine moving images",
+            "next_steps": {
+              "emerging": "note the constructive feedback given on a draft",
+              "developing": "use feedback to refine one part of a film",
+              "proficient": "combine feedback from different people to decide what to change",
+              "extending": "give constructive feedback and combine responses to refine a whole production"
+            },
+            "strength": [
+              "{He} [takes|take] feedback on a draft and [uses|use] it to improve an edit.",
+              "{He} [gives|give] other filmmakers specific, useful comments on their work."
+            ],
+            "next": {
+              "developing": "{His} goal now is to sort feedback into what to change and what to keep.",
+              "proficient": "The next skill for {him} is finding the pattern when several viewers give different feedback.",
+              "extending": "{He} can build the habit of explaining how feedback shaped each new edit."
+            },
+            "home": "At home, ask {him} about the most useful feedback {he} [has|have] had on a film."
+          }
+        }
+      }
+    ]
+  },
+  "arts-viewing-creating": {
+    "old": {
+      "phrase": "view and create moving images",
+      "next_steps": {
+        "emerging": "view a variety of moving images",
+        "developing": "create original moving images",
+        "proficient": "explore new ways to make moving images"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-viewing-creating--film-television",
+        "courses": [
+          "Film & Television 11",
+          "Film & Television 12"
+        ],
+        "competency_ids": [
+          "bc.ftvt11.cc.1",
+          "bc.ftvt12.cc.1"
+        ],
+        "ministry": "Explore, view, and create moving images",
+        "bands": {
+          "all": {
+            "phrase": "explore, view and create moving images",
+            "next_steps": {
+              "emerging": "view a range of moving images and describe them",
+              "developing": "create moving images to test an idea",
+              "proficient": "explore new ways to make moving images",
+              "extending": "use viewing to inform new and personal approaches to filmmaking"
+            },
+            "strength": [
+              "{He} [views|view] many types of film and video and can talk about what {he} [sees|see].",
+              "{He} [creates|create] moving images that show {his} own ideas."
+            ],
+            "next": {
+              "developing": "{He} can now practise noting techniques {he} [sees|see] in films and trying them in {his} own work.",
+              "proficient": "A further step is to try a form of moving image {he} [has|have] not made before.",
+              "extending": "With more practice, {he} can explain how what {he} [views|view] shapes the moving images {he} [makes|make]."
+            },
+            "home": "When you watch a show together, ask {him} how {he} would film one scene differently."
+          }
+        }
+      }
+    ]
+  },
+  "arts-vocal-care": {
+    "old": {
+      "phrase": "use the voice safely to avoid injury",
+      "next_steps": {
+        "emerging": "name habits that protect the voice",
+        "developing": "use the voice safely when performing",
+        "proficient": "show voice-care habits across rehearsals and performances"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-vocal-care--choral-music-10",
+        "courses": [
+          "Choral Music 10"
+        ],
+        "competency_ids": [
+          "bc.chorus10.cc.21"
+        ],
+        "ministry": "Demonstrate safe care for and use of the voice to prevent performance-related injury",
+        "bands": {
+          "all": {
+            "phrase": "care for and use the voice safely to prevent injury",
+            "next_steps": {
+              "emerging": "name habits that protect the voice",
+              "developing": "use the voice safely in rehearsal and performance",
+              "proficient": "notice signs of vocal strain and adjust",
+              "extending": "keep voice-care habits through busy rehearsal and concert periods"
+            },
+            "strength": [
+              "{He} [warms|warm] up {his} voice before singing and [avoids|avoid] straining it.",
+              "{He} [knows|know] the habits that keep a voice healthy, such as rest and drinking water."
+            ],
+            "next": {
+              "developing": "{He} would benefit from noticing when {his} voice feels tired and resting it.",
+              "proficient": "Over time, {he} can make voice care part of {his} daily routine and not just rehearsal.",
+              "extending": "{His} next step is to plan how to protect {his} voice during a busy concert season."
+            },
+            "home": "At home, ask {him} what singers do to look after their voices."
+          }
+        }
+      }
+    ]
+  },
+  "arts-voice-style": {
+    "old": {
+      "phrase": "explore voices and styles in scripts and directing",
+      "next_steps": {
+        "emerging": "explore a different voice in a script",
+        "developing": "explore a different style of directing",
+        "proficient": "explore several perspectives in scriptwriting and directing"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-voice-style--directing-script-development",
+        "courses": [
+          "Directing and Script Development 11",
+          "Directing and Script Development 12"
+        ],
+        "competency_ids": [
+          "bc.dsd11.cc.2",
+          "bc.dsd12.cc.2"
+        ],
+        "ministry": "Explore a variety of voices, styles, and perspectives in scriptwriting and directing / Intentionally select voices, styles, and perspectives in scriptwriting and directing",
+        "bands": {
+          "all": {
+            "phrase": "explore and select voices, styles and perspectives in scriptwriting and directing",
+            "next_steps": {
+              "emerging": "try writing a scene in a different character's voice",
+              "developing": "try a directing style not used before",
+              "proficient": "write or direct a scene from an unfamiliar perspective",
+              "extending": "choose voice, style and perspective on purpose to suit a script's aim"
+            },
+            "strength": [
+              "{He} [writes|write] characters whose voices are distinct from one another.",
+              "{He} [explores|explore] different directing styles to see how each changes a scene."
+            ],
+            "next": {
+              "developing": "Next, {he} can practise telling the same scene from another character's perspective.",
+              "proficient": "To go further, {he} can practise explaining why a style fits the story {he} [is|are] telling.",
+              "extending": "{He} [is|are] ready to choose a perspective on purpose and keep it steady through a script."
+            },
+            "home": "At home, ask {him} whose point of view {he} would like to write a story from."
+          }
+        }
+      }
+    ]
+  },
+  "arts-warm-up-cool-down": {
+    "old": {
+      "phrase": "show warm-up and cool-down routines for rehearsals",
+      "next_steps": {
+        "emerging": "demonstrate a warm-up before rehearsal",
+        "developing": "demonstrate a cool-down after rehearsal",
+        "proficient": "demonstrate warm-ups and cool-downs suited to each performance"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-warm-up-cool-down--dance-company",
+        "courses": [
+          "Dance Company 11",
+          "Dance Company 12"
+        ],
+        "competency_ids": [
+          "bc.dcomp11.cc.10",
+          "bc.dcomp12.cc.11"
+        ],
+        "ministry": "Demonstrate warm-up and cool-down procedures for rehearsals and performances",
+        "bands": {
+          "all": {
+            "phrase": "demonstrate warm-up and cool-down procedures for rehearsals and performances",
+            "next_steps": {
+              "emerging": "demonstrate a warm-up before rehearsal",
+              "developing": "demonstrate a cool-down after rehearsal or performance",
+              "proficient": "adjust warm-ups and cool-downs to suit each rehearsal or show",
+              "extending": "lead the company in a warm-up and explain each part"
+            },
+            "strength": [
+              "{He} [warms|warm] up fully before dancing and [cools|cool] down after.",
+              "{He} can explain what each part of a warm-up prepares the body to do."
+            ],
+            "next": {
+              "developing": "A good next step is to explain why a cool-down matters as much as a warm-up.",
+              "proficient": "One thing to practise is matching a warm-up to the demands of the piece being rehearsed.",
+              "extending": "{He} can also make a habit of leading a short warm-up for the company."
+            },
+            "home": "At home, ask {him} to show you part of the company's warm-up."
+          }
+        }
+      }
+    ]
+  },
+  "arts-ways-of-knowing": {
+    "old": {
+      "phrase": "explore First Peoples and local knowledge through the arts",
+      "next_steps": {
+        "emerging": "connect local cultural knowledge to a creative work",
+        "developing": "explore First Peoples perspectives through creative work",
+        "proficient": "use creative work to explore a different way of knowing"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-ways-of-knowing--visual-arts",
+        "courses": [
+          "Art Studio 10",
+          "Studio Arts 2D 10",
+          "Studio Arts 3D 10",
+          "Art Studio 11",
+          "Studio Arts 2D 11",
+          "Studio Arts 3D 11",
+          "Art Studio 12",
+          "Studio Arts 2D 12",
+          "Studio Arts 3D 12"
+        ],
+        "competency_ids": [
+          "bc.artstudio10.cc.15",
+          "bc.sa2d10.cc.17",
+          "bc.sa3d10.cc.15",
+          "bc.artstudio11.cc.18",
+          "bc.artstudio12.cc.20",
+          "bc.sa2d11.cc.18",
+          "bc.sa3d11.cc.19",
+          "bc.sa3d12.cc.19",
+          "bc.sa2d12.cc.18"
+        ],
+        "ministry": "Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge through artistic works / Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge through 2D artistic works / Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge through 3D artistic works / Explore First Peoples perspectives, knowledge, and protocols; other ways of knowing, and local cultural knowledge through artistic works / Explore First Peoples perspectives, knowledge, protocols; other ways of knowing, and local cultural knowledge through 2D artistic works / Explore First Peoples perspectives, knowledge, and protocols; other ways of knowing, and local cultural knowledge through 3D artistic works / Explore First Peoples perspectives, knowledge, and protocols; other ways of knowing, and local cultural knowledge through 2D artistic works",
+        "bands": {
+          "all": {
+            "phrase": "explore Indigenous perspectives, other ways of knowing and local cultural knowledge through art",
+            "next_steps": {
+              "emerging": "name one way an artwork can share local cultural knowledge",
+              "developing": "explain what an Indigenous artist's work shows about place and knowledge",
+              "proficient": "follow protocols when Indigenous knowledge or designs inform an artwork",
+              "extending": "reflect through art making on how different ways of knowing shape understanding"
+            },
+            "strength": [
+              "{He} can explain how an Indigenous artist's work connects to land, family or community.",
+              "{He} [respects|respect] protocols and [avoids|avoid] using designs that belong to a family or Nation."
+            ],
+            "next": {
+              "developing": "It would help {him} to ask whose knowledge an artwork draws on before {he} [responds|respond] to it.",
+              "proficient": "From here, {he} can practise explaining how a local artist's work reflects the place it was made.",
+              "extending": "A useful habit for {him} is reflecting in sketches or notes on how {his} art connects to where {he} [lives|live]."
+            },
+            "home": "When you pass public art together, ask {him} what it shows about the land and people of this place."
+          }
+        }
+      },
+      {
+        "id": "arts-ways-of-knowing--graphic-arts",
+        "courses": [
+          "Graphic Arts 11",
+          "Graphic Arts 12"
+        ],
+        "competency_ids": [
+          "bc.garts11.cc.20",
+          "bc.garts12.cc.20"
+        ],
+        "ministry": "Explore First Peoples perspectives, knowledge, and protocols; other ways of knowing, and local cultural knowledge through graphic arts",
+        "bands": {
+          "all": {
+            "phrase": "explore Indigenous perspectives, protocols and local knowledge through graphic arts",
+            "next_steps": {
+              "emerging": "name a protocol that applies to using Indigenous imagery in design",
+              "developing": "explain how Indigenous graphic artists share knowledge through design",
+              "proficient": "make design choices that respect protocols for cultural images and symbols",
+              "extending": "explain how other ways of knowing can shape the message of a graphic work"
+            },
+            "strength": [
+              "{He} can explain why some Indigenous symbols should not be used in a design without permission.",
+              "{He} [notices|notice] how Indigenous designers bring their own knowledge into posters, logos and layouts."
+            ],
+            "next": {
+              "developing": "Next, {he} can try asking who has the right to use an image before adding it to a design.",
+              "proficient": "{His} goal now is to connect a design to local cultural knowledge that stays true to its source.",
+              "extending": "The next skill for {him} is explaining how a design reflects a way of knowing other than {his} own."
+            },
+            "home": "At home, ask {him} what {he} [has|have] learned about who may use certain Indigenous symbols."
+          }
+        }
+      },
+      {
+        "id": "arts-ways-of-knowing--media-arts",
+        "courses": [
+          "Media Arts 10",
+          "Media Arts 11",
+          "Media Arts 12"
+        ],
+        "competency_ids": [
+          "bc.media10.cc.16",
+          "bc.meda11.cc.18",
+          "bc.meda12.cc.18"
+        ],
+        "ministry": "Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge through media arts / Explore First Peoples perspectives, knowledge, and protocols; other ways of knowing, and local cultural knowledge through media arts / Examine First Peoples perspectives, knowledge, and protocols; other ways of knowing, and local cultural knowledge through media arts",
+        "bands": {
+          "all": {
+            "phrase": "explore and examine Indigenous perspectives, protocols and local knowledge through media arts",
+            "next_steps": {
+              "emerging": "describe how a media artwork shares Indigenous knowledge",
+              "developing": "explain the protocols for recording or sharing cultural knowledge in media",
+              "proficient": "examine how Indigenous media artists use technology to share their perspectives",
+              "extending": "make media arts choices that respect protocols and other ways of knowing"
+            },
+            "strength": [
+              "{He} can describe how Indigenous media artists use video, images and digital tools to share their perspectives.",
+              "{He} [understands|understand] that recording or sharing cultural knowledge needs permission."
+            ],
+            "next": {
+              "developing": "Next, {he} can build the habit of naming the knowledge holders behind media {he} [uses|use].",
+              "proficient": "{He} can now practise examining how a media work shapes the way a culture is seen.",
+              "extending": "A further step is to judge whether a media work tells a community's story on its own terms."
+            },
+            "home": "At home, ask {him} how media can share a community's stories with respect."
+          }
+        }
+      },
+      {
+        "id": "arts-ways-of-knowing--photography",
+        "courses": [
+          "Photography 10",
+          "Photography 11",
+          "Photography 12"
+        ],
+        "competency_ids": [
+          "bc.photo10.cc.14",
+          "bc.photo11.cc.16",
+          "bc.photo12.cc.16"
+        ],
+        "ministry": "Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through photography / Explore First Peoples perspectives, knowledge, and protocols; other ways of knowing, and local cultural knowledge through photography",
+        "bands": {
+          "all": {
+            "phrase": "explore Indigenous perspectives, protocols and local knowledge through photography",
+            "next_steps": {
+              "emerging": "explain why permission matters when photographing people, places or ceremonies",
+              "developing": "explain how Indigenous photographers show their communities",
+              "proficient": "follow protocols when photographing land, people or cultural events",
+              "extending": "use photography to reflect on local cultural knowledge and other ways of knowing"
+            },
+            "strength": [
+              "{He} can explain why some places, objects and ceremonies should not be photographed without permission.",
+              "{He} [notices|notice] how Indigenous photographers show their own communities from the inside."
+            ],
+            "next": {
+              "developing": "With more practice, {he} can explain how a photograph can honour or misrepresent a community.",
+              "proficient": "{He} would benefit from asking about local protocols before photographing a cultural place or event.",
+              "extending": "Over time, {he} can reflect on how {his} photos of the land show what {he} [has|have] learned."
+            },
+            "home": "When you are outside together, ask {him} what {he} [knows|know] about the history of that land."
+          }
+        }
+      },
+      {
+        "id": "arts-ways-of-knowing--dance",
+        "courses": [
+          "Dance Choreography 10",
+          "Dance Company 10",
+          "Dance Foundations 10",
+          "Dance Technique and Performance 10",
+          "Dance Choreography 11",
+          "Dance Company 11",
+          "Dance Foundations 11",
+          "Dance Technique and Performance 11",
+          "Dance Choreography 12",
+          "Dance Company 12",
+          "Dance Foundations 12",
+          "Dance Technique and Performance 12"
+        ],
+        "competency_ids": [
+          "bc.dance10.cc.21",
+          "bc.dchore10.cc.23",
+          "bc.dcomp10.cc.22",
+          "bc.dtep10.cc.21",
+          "bc.dance11.cc.22",
+          "bc.dchore11.cc.20",
+          "bc.dfound11.cc.22",
+          "bc.dcomp11.cc.19",
+          "bc.dance12.cc.21",
+          "bc.dchore12.cc.21",
+          "bc.dcomp12.cc.21",
+          "bc.dfound12.cc.23"
+        ],
+        "ministry": "Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through movement and dance / Explore First Peoples’ perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through movement and dance",
+        "bands": {
+          "all": {
+            "phrase": "explore Indigenous perspectives and local cultural knowledge through movement and dance",
+            "next_steps": {
+              "emerging": "describe what a dance can teach about a culture's knowledge",
+              "developing": "explain how Indigenous dance connects movement to land, story and community",
+              "proficient": "respect protocols about which dances may be shared or performed by others",
+              "extending": "reflect through movement on how other ways of knowing shape understanding"
+            },
+            "strength": [
+              "{He} can explain how movement and dance carry knowledge in Indigenous cultures.",
+              "{He} [understands|understand] that some dances belong to a family or community and are not for others to perform."
+            ],
+            "next": {
+              "developing": "{His} next step is to ask what a dance means to the community it belongs to.",
+              "proficient": "Next, {he} can practise connecting a dance's movements to the land and story behind them.",
+              "extending": "To go further, {he} can practise expressing in movement how land and place shape what {he} [knows|know]."
+            },
+            "home": "At home, ask {him} what a dance {he} [has|have] learned can teach about a culture."
+          }
+        }
+      },
+      {
+        "id": "arts-ways-of-knowing--dance-conditioning",
+        "courses": [
+          "Dance Conditioning 11",
+          "Dance Conditioning 12"
+        ],
+        "competency_ids": [
+          "bc.dcond11.cc.14",
+          "bc.dcond12.cc.17"
+        ],
+        "ministry": "Explore cultural perspectives, ways of knowing, and movements to enhance dance conditioning activities / Examine cultural perspectives, protocols, ways of knowing, and movements to enhance dance conditioning activities",
+        "bands": {
+          "all": {
+            "phrase": "use cultural perspectives, ways of knowing and movements to enrich dance conditioning",
+            "next_steps": {
+              "emerging": "name a movement practice from another culture that builds strength or balance",
+              "developing": "explain how a cultural movement practice could support conditioning",
+              "proficient": "add movements from other cultures to conditioning with respect for their protocols",
+              "extending": "examine how different ways of knowing about the body change a conditioning plan"
+            },
+            "strength": [
+              "{He} can describe how movement practices from different cultures build strength, balance or breath.",
+              "{He} [respects|respect] the cultural meaning of a movement when using it in conditioning."
+            ],
+            "next": {
+              "developing": "{He} [is|are] ready to ask where a movement practice began and what it means.",
+              "proficient": "A good next step is to explain how a cultural view of the body shapes a training choice.",
+              "extending": "One thing to practise is checking protocols before adding a cultural movement to a routine."
+            },
+            "home": "At home, ask {him} about a way of moving or exercising {he} [has|have] learned from another culture."
+          }
+        }
+      },
+      {
+        "id": "arts-ways-of-knowing--drama-theatre-company",
+        "courses": [
+          "Drama 10",
+          "Theatre Company 10",
+          "Drama 11",
+          "Theatre Company 11",
+          "Drama 12",
+          "Theatre Company 12"
+        ],
+        "competency_ids": [
+          "bc.drama10.cc.19",
+          "bc.thco10.cc.15",
+          "bc.drama11.cc.23",
+          "bc.drama12.cc.24",
+          "bc.thco11.cc.15",
+          "bc.thco12.cc.16"
+        ],
+        "ministry": "Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through dramatic works / Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through theatre productions",
+        "bands": {
+          "all": {
+            "phrase": "explore Indigenous perspectives and local cultural knowledge through dramatic works",
+            "next_steps": {
+              "emerging": "describe what a dramatic work shows about Indigenous perspectives",
+              "developing": "explain how a play by an Indigenous writer shares knowledge and values",
+              "proficient": "respect protocols when a story or teaching shapes a scene",
+              "extending": "reflect through drama on how other ways of knowing shape understanding"
+            },
+            "strength": [
+              "{He} can explain what a play or scene by an Indigenous writer shows about community and land.",
+              "{He} [approaches|approach] stories and teachings in drama with respect for where they began."
+            ],
+            "next": {
+              "developing": "Next, {he} can make a habit of asking whose story a scene tells before performing it.",
+              "proficient": "It would help {him} to explain how local cultural knowledge shapes the meaning of a scene.",
+              "extending": "From here, {he} can practise using drama to explore a way of knowing other than {his} own."
+            },
+            "home": "At home, ask {him} about a play or scene that taught {him} something about this place."
+          }
+        }
+      },
+      {
+        "id": "arts-ways-of-knowing--theatre-production",
+        "courses": [
+          "Theatre Production 10",
+          "Theatre Production 11",
+          "Theatre Production 12"
+        ],
+        "competency_ids": [
+          "bc.thprod10.cc.17",
+          "bc.thprod11.cc.18",
+          "bc.thprod12.cc.18"
+        ],
+        "ministry": "Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through theatre production",
+        "bands": {
+          "all": {
+            "phrase": "explore Indigenous perspectives and local knowledge through theatre production",
+            "next_steps": {
+              "emerging": "describe how design in a production can reflect local cultural knowledge",
+              "developing": "explain how Indigenous perspectives can shape sets, costumes or lighting",
+              "proficient": "follow protocols when cultural objects, images or designs are used on stage",
+              "extending": "plan production choices that reflect other ways of knowing and respect their sources"
+            },
+            "strength": [
+              "{He} can explain how a set or costume can reflect the land and culture of a story.",
+              "{He} [checks|check] whether a cultural object or design may be used before it goes on stage."
+            ],
+            "next": {
+              "developing": "A useful habit for {him} is asking who to consult before using a cultural design in a production.",
+              "proficient": "{He} can also try explaining how a design choice honours the knowledge it draws on.",
+              "extending": "{His} goal now is to reflect on how other ways of knowing could change the way a show is built."
+            },
+            "home": "At home, ask {him} how a set or costume can tell the story of a place."
+          }
+        }
+      },
+      {
+        "id": "arts-ways-of-knowing--musical-theatre",
+        "courses": [
+          "Musical Theatre 10",
+          "Musical Theatre 11",
+          "Musical Theatre 12"
+        ],
+        "competency_ids": [
+          "bc.mtheatre10.cc.15",
+          "bc.mtheatre11.cc.18",
+          "bc.mtheatre12.cc.20"
+        ],
+        "ministry": "Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through theatrical works / Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through musical theatre",
+        "bands": {
+          "all": {
+            "phrase": "explore Indigenous perspectives and local knowledge through musical theatre",
+            "next_steps": {
+              "emerging": "describe how song and story share knowledge in an Indigenous work",
+              "developing": "explain how music, movement and words carry a culture's perspective",
+              "proficient": "respect protocols about songs and stories that belong to a community",
+              "extending": "reflect through musical theatre on how other ways of knowing shape understanding"
+            },
+            "strength": [
+              "{He} can explain how songs in a musical theatre work can carry Indigenous perspectives.",
+              "{He} [knows|know] that some songs have owners and need permission before they are performed."
+            ],
+            "next": {
+              "developing": "The next skill for {him} is connecting the music of a piece to the community it honours.",
+              "proficient": "Next, {he} can build respect for protocols into every choice about songs and staging.",
+              "extending": "{He} can now practise reflecting on how a way of knowing changes the story a musical tells."
+            },
+            "home": "At home, ask {him} what a song can teach that a speech cannot."
+          }
+        }
+      },
+      {
+        "id": "arts-ways-of-knowing--directing-script-development",
+        "courses": [
+          "Directing and Script Development 11",
+          "Directing and Script Development 12"
+        ],
+        "competency_ids": [
+          "bc.dsd11.cc.20",
+          "bc.dsd12.cc.21"
+        ],
+        "ministry": "Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through scriptwriting and directing",
+        "bands": {
+          "all": {
+            "phrase": "explore Indigenous perspectives and local knowledge through scriptwriting and directing",
+            "next_steps": {
+              "emerging": "describe how an Indigenous script shares knowledge and perspectives",
+              "developing": "explain how directing choices can honour Indigenous perspectives in a script",
+              "proficient": "follow protocols before including a story or teaching in a script",
+              "extending": "write and direct in ways that respect other ways of knowing"
+            },
+            "strength": [
+              "{He} can explain how an Indigenous playwright's script reflects community, land and history.",
+              "{He} [seeks|seek] permission and guidance before bringing a cultural story into {his} writing."
+            ],
+            "next": {
+              "developing": "A further step is to ask how a director can share a perspective without speaking for a community.",
+              "proficient": "With more practice, {he} can explain how local knowledge shapes the setting and voice of a script.",
+              "extending": "{He} would benefit from reflecting on how {his} own worldview shapes the scripts {he} [writes|write]."
+            },
+            "home": "At home, ask {him} what {he} [has|have] learned about telling stories that belong to others."
+          }
+        }
+      },
+      {
+        "id": "arts-ways-of-knowing--film-television",
+        "courses": [
+          "Film & Television 11",
+          "Film & Television 12"
+        ],
+        "competency_ids": [
+          "bc.ftvt11.cc.24",
+          "bc.ftvt12.cc.25"
+        ],
+        "ministry": "Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through film and television productions / Explore First Peoples perspectives and knowledge, other ways of knowing, and local cultural knowledge to gain understanding through film and television",
+        "bands": {
+          "all": {
+            "phrase": "explore Indigenous perspectives and local knowledge through film and television",
+            "next_steps": {
+              "emerging": "describe how an Indigenous film shares knowledge and perspectives",
+              "developing": "explain how Indigenous filmmakers tell their own stories on screen",
+              "proficient": "follow protocols when filming people, places or cultural events",
+              "extending": "make film choices that reflect other ways of knowing and respect their sources"
+            },
+            "strength": [
+              "{He} can explain how Indigenous filmmakers show their communities in their own voices.",
+              "{He} [seeks|seek] consent before filming people, places or events with cultural meaning."
+            ],
+            "next": {
+              "developing": "Over time, {he} can practise noticing whose voice a documentary or film centres.",
+              "proficient": "{His} next step is to explain how camera and editing choices can respect a community's story.",
+              "extending": "Next, {he} can practise reflecting on how other ways of knowing shape what {he} [films|film]."
+            },
+            "home": "At home, ask {him} about a film by an Indigenous filmmaker {he} would recommend."
+          }
+        }
+      }
+    ]
+  },
+  "arts-wider-connections": {
+    "old": {
+      "phrase": "connect with people through the arts",
+      "next_steps": {
+        "emerging": "use creative work to connect with people in the community",
+        "developing": "use creative work to connect with people across the region",
+        "proficient": "use creative work to connect with people around the world"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-wider-connections--music",
+        "courses": [
+          "Choral Music 10",
+          "Contemporary Music 10",
+          "Instrumental Music 10",
+          "Contemporary Music 12"
+        ],
+        "competency_ids": [
+          "bc.chorus10.cc.19",
+          "bc.cmusic10.cc.19",
+          "bc.instmus10.cc.19",
+          "bc.cmusic12.cc.22"
+        ],
+        "ministry": "Make connections with others on a local, regional, and global scale through music / Make connections through music on local, national, or global scales",
+        "bands": {
+          "all": {
+            "phrase": "make connections with others locally, nationally and globally through music",
+            "next_steps": {
+              "emerging": "share music with people in the school or local community",
+              "developing": "connect with musicians or audiences beyond the school",
+              "proficient": "explain how music links communities across a region or country",
+              "extending": "use music to build connections with people around the world"
+            },
+            "strength": [
+              "{He} [uses|use] music to connect with audiences in the school and local community.",
+              "{He} can explain how a piece of music links people from different places."
+            ],
+            "next": {
+              "developing": "To go further, {he} can practise finding chances to perform for new audiences.",
+              "proficient": "{He} [is|are] ready to explore how musicians in other countries share their work.",
+              "extending": "A good next step is to explain what a piece of music from far away means to {him}."
+            },
+            "home": "At home, share a song that matters to your family and ask {him} to share one in return."
+          }
+        }
+      },
+      {
+        "id": "arts-wider-connections--composition-production-12",
+        "courses": [
+          "Composition & Production 12"
+        ],
+        "competency_ids": [
+          "bc.cp12.cc.18"
+        ],
+        "ministry": "Make connections through music composition and production on local, national, or global scales",
+        "bands": {
+          "all": {
+            "phrase": "make connections locally, nationally and globally through composing and producing music",
+            "next_steps": {
+              "emerging": "share a composition with a local audience",
+              "developing": "share produced music with listeners beyond the school",
+              "proficient": "collaborate with other composers or producers across distances",
+              "extending": "explain how composing and producing music can connect people worldwide"
+            },
+            "strength": [
+              "{He} [shares|share] the music {he} [composes|compose] and [produces|produce] with listeners outside the classroom.",
+              "{He} [collaborates|collaborate] with other musicians to create pieces together."
+            ],
+            "next": {
+              "developing": "One thing to practise is asking listeners in different places how a track affects them.",
+              "proficient": "Next, {he} can make a habit of collaborating with musicians outside {his} usual circle.",
+              "extending": "It would help {him} to explain how {his} productions draw on music from other parts of the world."
+            },
+            "home": "At home, ask {him} who {he} [hopes|hope] will hear the music {he} [makes|make]."
+          }
+        }
+      },
+      {
+        "id": "arts-wider-connections--visual-arts",
+        "courses": [
+          "Art Studio 11",
+          "Studio Arts 2D 11",
+          "Studio Arts 3D 11",
+          "Art Studio 12",
+          "Studio Arts 2D 12",
+          "Studio Arts 3D 12"
+        ],
+        "competency_ids": [
+          "bc.artstudio11.cc.20",
+          "bc.sa2d11.cc.21",
+          "bc.sa3d11.cc.22",
+          "bc.artstudio12.cc.23",
+          "bc.sa2d12.cc.21",
+          "bc.sa3d12.cc.22"
+        ],
+        "ministry": "Connect with others on a local, regional, or national scale through visual arts / Connect with others on a local, regional, or national scale through 2D artistic works / Connect with others on a local, regional, or national scale through 3D artistic works / Connect with others on a local, national, or global scale through visual arts / Connect with others on a local, national, or global scale through 2D artistic works / Connect with others on a local, national, or global scale through 3D artistic works",
+        "bands": {
+          "all": {
+            "phrase": "connect with others locally, nationally and globally through visual art",
+            "next_steps": {
+              "emerging": "share an artwork with people in the local community",
+              "developing": "explain how an artwork could speak to a regional or national audience",
+              "proficient": "plan artworks that connect with audiences beyond the school",
+              "extending": "use art making to join a national or global conversation"
+            },
+            "strength": [
+              "{He} [makes|make] artworks that speak to people in {his} community.",
+              "{He} can explain how a painting or sculpture can reach people in other provinces and countries."
+            ],
+            "next": {
+              "developing": "From here, {he} can practise thinking about who will see an artwork before making it.",
+              "proficient": "A useful habit for {him} is sharing finished pieces with viewers outside the classroom.",
+              "extending": "A helpful next step is to create work that responds to an issue people face in many countries."
+            },
+            "home": "At home, ask {him} which artwork {he} would show to someone across the country and why."
+          }
+        }
+      },
+      {
+        "id": "arts-wider-connections--graphic-arts",
+        "courses": [
+          "Graphic Arts 11",
+          "Graphic Arts 12"
+        ],
+        "competency_ids": [
+          "bc.garts11.cc.23",
+          "bc.garts12.cc.23"
+        ],
+        "ministry": "Connect with others on a local, regional, or national scale through graphic artworks / Connect on a local, national, or global scale through graphic artworks",
+        "bands": {
+          "all": {
+            "phrase": "connect with others locally, nationally and globally through graphic artworks",
+            "next_steps": {
+              "emerging": "design a graphic artwork for a local audience",
+              "developing": "adapt a design so it speaks to a wider audience",
+              "proficient": "explain how graphic design carries messages across regions and cultures",
+              "extending": "create graphic work that connects with a national or global audience"
+            },
+            "strength": [
+              "{He} [designs|design] posters and graphics that connect with people in the community.",
+              "{He} can explain how a design might be read differently in another country."
+            ],
+            "next": {
+              "developing": "{His} goal now is to test a design with viewers from outside {his} own circle.",
+              "proficient": "The next skill for {him} is adapting symbols and words so a design works across cultures.",
+              "extending": "Next, {he} can build designs for causes that matter beyond {his} community."
+            },
+            "home": "At home, ask {him} what a design would need to work for people around the world."
+          }
+        }
+      },
+      {
+        "id": "arts-wider-connections--media-arts",
+        "courses": [
+          "Media Arts 11",
+          "Media Arts 12"
+        ],
+        "competency_ids": [
+          "bc.meda11.cc.23",
+          "bc.meda12.cc.23"
+        ],
+        "ministry": "Connect with others on a local, regional, or national scale through media arts / Connect with others on a local, national, or global scale through media arts",
+        "bands": {
+          "all": {
+            "phrase": "connect with others locally, nationally and globally through media arts",
+            "next_steps": {
+              "emerging": "share a media artwork with a local audience",
+              "developing": "share media work with an audience beyond the community",
+              "proficient": "explain how media arts reach and connect audiences across distances",
+              "extending": "create media artworks that start conversations with distant audiences"
+            },
+            "strength": [
+              "{He} [shares|share] media artworks in ways that reach people outside the school.",
+              "{He} can explain how online media lets artists connect across the country and the world."
+            ],
+            "next": {
+              "developing": "{He} can now practise thinking about how viewers elsewhere might respond to {his} media work.",
+              "proficient": "A further step is to collaborate with media artists in another community.",
+              "extending": "With more practice, {he} can shape a media work for a national or global audience."
+            },
+            "home": "At home, ask {him} how {he} would share a media project with people far away."
+          }
+        }
+      },
+      {
+        "id": "arts-wider-connections--photography",
+        "courses": [
+          "Photography 11",
+          "Photography 12"
+        ],
+        "competency_ids": [
+          "bc.photo11.cc.20",
+          "bc.photo12.cc.20"
+        ],
+        "ministry": "Connect with others on a local, regional, and national scale through photography / Connect with others on a local, national, and global scale through photography",
+        "bands": {
+          "all": {
+            "phrase": "connect with others locally, nationally and globally through photography",
+            "next_steps": {
+              "emerging": "share photographs with people in the local community",
+              "developing": "explain how a photo series could speak to people in other regions",
+              "proficient": "use photography to connect with audiences across the country",
+              "extending": "create photographs that link local stories to national or global issues"
+            },
+            "strength": [
+              "{He} [takes|take] photos that show {his} community to people who live elsewhere.",
+              "{He} can explain how a photograph can connect people who have never met."
+            ],
+            "next": {
+              "developing": "{He} would benefit from sharing a photo series with an audience beyond the school.",
+              "proficient": "Over time, {he} can practise telling a local story in photos that people far away understand.",
+              "extending": "{His} next step is to connect {his} photography to an issue people share around the world."
+            },
+            "home": "At home, ask {him} which photo of your area {he} would send to someone far away."
+          }
+        }
+      },
+      {
+        "id": "arts-wider-connections--film-television-12",
+        "courses": [
+          "Film & Television 12"
+        ],
+        "competency_ids": [
+          "bc.ftvt12.cc.22"
+        ],
+        "ministry": "Make connections through moving images on local, regional, national, and global scales",
+        "bands": {
+          "all": {
+            "phrase": "make connections locally, regionally, nationally and globally through moving images",
+            "next_steps": {
+              "emerging": "share a moving-image work with a local audience",
+              "developing": "make a film that speaks to viewers in other regions",
+              "proficient": "explain how films connect audiences across countries and cultures",
+              "extending": "create moving images that connect local stories with global audiences"
+            },
+            "strength": [
+              "{He} [makes|make] films that share local people and places with a wider audience.",
+              "{He} can explain how a film from another country connects with viewers here."
+            ],
+            "next": {
+              "developing": "Next, {he} can practise planning a film with a specific audience outside the school in mind.",
+              "proficient": "To go further, {he} can practise shaping a film so viewers who speak other languages can follow it.",
+              "extending": "{He} [is|are] ready to find ways to share {his} films with audiences beyond Canada."
+            },
+            "home": "At home, ask {him} which film from another country {he} would recommend to you."
+          }
+        }
+      }
+    ]
+  },
+  "arts-words-action": {
+    "old": {
+      "phrase": "explore ideas through words and action on stage",
+      "next_steps": {
+        "emerging": "explore an idea through the words in a script",
+        "developing": "explore an idea through action on stage",
+        "proficient": "combine words and action to develop an idea"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-words-action--directing-script-development",
+        "courses": [
+          "Directing and Script Development 11",
+          "Directing and Script Development 12"
+        ],
+        "competency_ids": [
+          "bc.dsd11.cc.7",
+          "bc.dsd12.cc.8"
+        ],
+        "ministry": "Explore ideas through words and action / Communicate and interpret ideas through words and action",
+        "bands": {
+          "all": {
+            "phrase": "communicate and interpret ideas through words and action in scripts and staging",
+            "next_steps": {
+              "emerging": "explore an idea through the words in a script",
+              "developing": "explore an idea through action on stage",
+              "proficient": "combine words and action to communicate an idea",
+              "extending": "interpret a script's ideas and show them through both dialogue and staging"
+            },
+            "strength": [
+              "{He} [writes|write] dialogue that carries an idea and leaves space for action.",
+              "As a director, {he} [uses|use] movement and staging to show what the words leave unsaid."
+            ],
+            "next": {
+              "developing": "A good next step is to try showing an idea through action instead of telling it in words.",
+              "proficient": "One thing to practise is interpreting a line several ways and staging each one.",
+              "extending": "{He} can make a habit of cutting lines when action can carry the meaning."
+            },
+            "home": "At home, ask {him} to show you a feeling without words, then say it in one line."
+          }
+        }
+      }
+    ]
+  },
+  "arts-work-environments": {
+    "old": {
+      "phrase": "explain how writing and directing work is organized",
+      "next_steps": {
+        "emerging": "explore what is expected of directors in one setting",
+        "developing": "explore how work is organized in different settings",
+        "proficient": "compare expectations across scriptwriting and directing settings"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-work-environments--directing-script-development",
+        "courses": [
+          "Directing and Script Development 11",
+          "Directing and Script Development 12"
+        ],
+        "competency_ids": [
+          "bc.dsd11.cc.21",
+          "bc.dsd12.cc.22"
+        ],
+        "ministry": "Explore the expectations and structures that exist in various scriptwriting and directing environments / Examine the expectations and structures that exist in various scriptwriting and directing environments",
+        "bands": {
+          "all": {
+            "phrase": "examine the expectations and structures of scriptwriting and directing workplaces",
+            "next_steps": {
+              "emerging": "describe what is expected of a director in one setting",
+              "developing": "explain how work is organized in a theatre or film setting",
+              "proficient": "compare expectations across scriptwriting and directing settings",
+              "extending": "examine how roles, schedules and teamwork differ across professional settings"
+            },
+            "strength": [
+              "{He} can explain the roles and duties of writers and directors in a production.",
+              "{He} [describes|describe] how a rehearsal or writing room is organized and who leads it."
+            ],
+            "next": {
+              "developing": "It would help {him} to explain how a director's job changes between theatre, film and television.",
+              "proficient": "From here, {he} can practise working within the deadlines and structures of a real production.",
+              "extending": "A useful habit for {him} is comparing the expectations of different writing and directing workplaces."
+            },
+            "home": "At home, ask {him} what job in theatre or film {he} would like and what it involves."
+          }
+        }
+      }
+    ]
+  },
+  "arts-works-in-context": {
+    "old": {
+      "phrase": "create art that draws on culture and history",
+      "next_steps": {
+        "emerging": "create a piece that connects to a personal experience",
+        "developing": "create a piece that draws on a culture",
+        "proficient": "create a piece that draws on a time in history"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-works-in-context--visual-arts",
+        "courses": [
+          "Art Studio 10",
+          "Studio Arts 2D 10",
+          "Studio Arts 3D 10",
+          "Studio Arts 3D 11",
+          "Studio Arts 3D 12"
+        ],
+        "competency_ids": [
+          "bc.artstudio10.cc.16",
+          "bc.sa2d10.cc.16",
+          "bc.sa3d10.cc.14",
+          "bc.sa3d11.cc.18",
+          "bc.sa3d12.cc.18"
+        ],
+        "ministry": "Create artistic works that demonstrate personal, cultural, and historical contexts / Create artistic works that reflect personal, cultural, and historical contexts",
+        "bands": {
+          "all": {
+            "phrase": "create artworks that reflect personal, cultural and historical contexts",
+            "next_steps": {
+              "emerging": "create a piece that connects to a personal experience",
+              "developing": "create a piece that draws on a culture and explain the link",
+              "proficient": "create a piece that responds to a time in history",
+              "extending": "combine personal, cultural and historical contexts in one artwork"
+            },
+            "strength": [
+              "{He} [makes|make] artworks that connect to {his} own life and experiences.",
+              "{He} can explain how a culture or time in history shaped one of {his} pieces."
+            ],
+            "next": {
+              "developing": "Next, {he} can try explaining in writing the context behind a piece.",
+              "proficient": "{His} goal now is to show how history and culture shape {his} choices of image and material.",
+              "extending": "The next skill for {him} is weaving several contexts together so each adds meaning."
+            },
+            "home": "At home, ask {him} which piece of {his} art says the most about {his} life."
+          }
+        }
+      },
+      {
+        "id": "arts-works-in-context--photography",
+        "courses": [
+          "Photography 10",
+          "Photography 11",
+          "Photography 12"
+        ],
+        "competency_ids": [
+          "bc.photo10.cc.13",
+          "bc.photo11.cc.15",
+          "bc.photo12.cc.15"
+        ],
+        "ministry": "Create photographs that demonstrate personal, cultural, social, environmental, and historical contexts / Create photographs that reflect personal, cultural, social, environmental, and historical contexts",
+        "bands": {
+          "all": {
+            "phrase": "create photographs that reflect personal, cultural, social, environmental and historical contexts",
+            "next_steps": {
+              "emerging": "take a photo that connects to a personal experience",
+              "developing": "create photos that show a social or environmental issue",
+              "proficient": "explain the cultural or historical context of a photo series",
+              "extending": "combine several contexts in a photo series with a clear message"
+            },
+            "strength": [
+              "{He} [takes|take] photos that say something about {his} life, culture or surroundings.",
+              "{He} can explain the social or environmental context behind a photograph."
+            ],
+            "next": {
+              "developing": "Next, {he} can build a photo series around one social or environmental issue.",
+              "proficient": "{He} can now practise linking a photo to the history of the place it shows.",
+              "extending": "A further step is to show how personal and social contexts meet in a single image."
+            },
+            "home": "At home, ask {him} what a photo of your street would say about the place and its history."
+          }
+        }
+      }
+    ]
+  },
+  "arts-writing-directing": {
+    "old": {
+      "phrase": "write and direct for an audience or message",
+      "next_steps": {
+        "emerging": "write a script for an intended audience",
+        "developing": "write a script that carries an intended message",
+        "proficient": "make directing choices that suit an audience or message"
+      }
+    },
+    "sets": [
+      {
+        "id": "arts-writing-directing--directing-script-development",
+        "courses": [
+          "Directing and Script Development 11",
+          "Directing and Script Development 12"
+        ],
+        "competency_ids": [
+          "bc.dsd11.cc.6",
+          "bc.dsd12.cc.7"
+        ],
+        "ministry": "Write and direct for an intended audience or with an intended message",
+        "bands": {
+          "all": {
+            "phrase": "write and direct for an intended audience or message",
+            "next_steps": {
+              "emerging": "name the audience or message a script is meant for",
+              "developing": "write a scene that carries an intended message",
+              "proficient": "make directing choices that suit an audience or message",
+              "extending": "shape both script and staging so they serve one audience and message"
+            },
+            "strength": [
+              "{He} [writes|write] with a clear sense of who the audience is.",
+              "{He} [makes|make] directing choices that help carry the message of a script."
+            ],
+            "next": {
+              "developing": "With more practice, {he} can test a scene on a small audience to see if the message is understood.",
+              "proficient": "{He} would benefit from stating the message of a script in one sentence before rehearsals.",
+              "extending": "Over time, {he} can practise adjusting a script for a different audience without losing its message."
+            },
+            "home": "At home, ask {him} who {he} [writes|write] scripts for and what {he} [wants|want] them to take away."
+          }
+        }
+      }
+    ]
+  }
+}
