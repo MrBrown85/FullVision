@@ -19,6 +19,8 @@ labels:
   - Save
   - Save and Add Another
   - Import Roster
+  - Download Template
+  - Choose File
   - 'Import Roster: Review Changes'
   - Columns in This File
   - Import
@@ -48,11 +50,12 @@ shots:
 
 ## Import a Roster
 
-A roster file is a CSV file with a header row. Columns are matched by their headings, such as Last Name, First Name and Student Number, in any order. The [roster template](/roster-template.csv) shows every column the import reads.
+A roster file is a CSV file with a header row and one row per student. Columns are matched by their headings, in any order.
 
-1. On the **Students** tab, choose **Import Roster** and select the roster file.
-2. **Import Roster: Review Changes** lists what the file will add or change. Students are matched by student number, then by name. Under **Columns in This File**, correct any column that was matched to the wrong field.
-3. Untick any student who should not be imported, then choose **Import**. Nothing changes until **Import** is chosen.
+1. On the **Students** tab, choose **Import Roster**. The panel lists every column the import reads. **Download Template** saves a sample file.
+2. Choose **Choose File**, then select the roster file.
+3. **Import Roster: Review Changes** lists what the file will add or change. Students are matched by student number, then by name. Under **Columns in This File**, correct any column that was matched to the wrong field.
+4. Untick any student who should not be imported, then choose **Import**. Nothing changes until **Import** is chosen.
 
 Students in the class but not in the file are listed under **In Your Class, Not in This File**. They stay enrolled unless ticked.
 

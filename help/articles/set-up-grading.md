@@ -41,7 +41,7 @@ shots:
 1. Open **Class Management** from the Dashboard, select the class, then open the **Grading** tab.
 2. Under **Grading System**, choose **Proficiency**, **Letter** or **Both**. Proficiency shows a level from Emerging to Extending. Letter shows a letter grade and percent. Both shows proficiency day to day and the letter grade and percent on reports.
 3. Under **Competency Proficiency**, choose a **Calculation Method**. Each method shows its result for the same example scores. If the change moves any student's grade, choose **Change Method** to confirm it.
-4. **Folders Count as One** is on by default: each folder is averaged first and counts as one competency in the overall grade. Turn it off to count every competency separately.
+4. **Folders Count as One** is on for a one-course class and off for a combined class. When it is on, each folder is averaged first and counts as one competency in the overall proficiency. Turn it off to count every competency separately.
 5. For a Letter or Both class, add **Categories** under **Course Percentage** with **+ Add Category**, set weights that total 100%, then choose **Save Categories**.
 
 ![The Grading tab with Proficiency selected and the Calculation Method list](img/set-up-grading.jpg 'The Grading tab.')

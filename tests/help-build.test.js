@@ -8,7 +8,14 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'fs';
 import { join, resolve, dirname } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
-import { build, markdown, parseFrontMatter, readArticles } from '../scripts/build-help.mjs';
+import {
+  build,
+  markdown,
+  parseFrontMatter,
+  readArticles,
+  readShortcuts,
+  shortcutsMarkdown,
+} from '../scripts/build-help.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 let out;
@@ -75,6 +82,24 @@ describe('help site build', () => {
       expect(html.startsWith('<article class="help-article">')).toBe(true);
       expect(html).not.toMatch(/<html|<script|<style|login\.html/);
     }
+  });
+});
+
+describe('Keyboard Shortcuts', () => {
+  it('lists every shortcut the app declares, once shared/constants.js has them', () => {
+    const list = readShortcuts();
+    const page = readFileSync(join(out, 'fragments', 'keyboard-shortcuts.html'), 'utf-8');
+    if (!list) return; // the list arrives with the in-app shortcut sheet
+    for (const s of list) expect(page, s.action).toContain(s.action);
+  });
+
+  it('writes Ctrl for Control, ⌘ only when there is no Ctrl form, and Esc', () => {
+    expect(
+      shortcutsMarkdown([
+        { context: 'Criterion Comment', action: 'Save and Next', keys: 'Meta+Enter Control+Enter' },
+        { context: 'Help', action: 'Close Help', keys: 'Escape' },
+      ]),
+    ).toBe('## Criterion Comment\n\n- Save and Next: Ctrl+Enter\n\n## Help\n\n- Close Help: Esc');
   });
 });
 
