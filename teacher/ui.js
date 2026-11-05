@@ -281,7 +281,7 @@ const DEMO_MENU_TEXT = 'A sample Science 8 class. Nothing is saved to an account
 function demoPillHTML() {
   if (typeof isDemoMode !== 'function' || !isDemoMode()) return '';
   return `<div class="tb-demo-menu">
-      <button type="button" class="tb-demo-pill" data-action="toggleDemoMenu" aria-expanded="false" aria-haspopup="dialog" aria-controls="tb-demo-panel">Demo Mode${DEMO_CHEVRON_SVG}</button>
+      <button type="button" class="tb-demo-pill" data-action="toggleDemoMenu" aria-expanded="false" aria-haspopup="dialog" aria-controls="tb-demo-panel" aria-label="Demo Mode">Demo<span class="tb-demo-pill-more"> Mode</span>${DEMO_CHEVRON_SVG}</button>
       <div class="tb-demo-panel" id="tb-demo-panel" role="dialog" aria-labelledby="tb-demo-title" hidden>
         <div class="tb-demo-head">
           <h2 class="tb-demo-title" id="tb-demo-title">${DEMO_MENU_TITLE}</h2>
@@ -320,9 +320,605 @@ document.addEventListener('keydown', function (e) {
   e.preventDefault();
 });
 
+/* ── Help panel ──────────────────────────────────────────────
+   The Help button (between the sync dot and the account button) opens a
+   400px panel beside the page: #page-layout gains it as a last column, so
+   the page narrows, as with the roster, and the top bar is never covered.
+   The panel lists the help site's articles for this page and Getting
+   Started, searches titles and summaries, and shows an article inside the
+   panel. Articles come from the help site: /help/index.json
+   ([{slug, title, section, pages, summary, video, demo}]) and
+   /help/fragments/<slug>.html. Open or closed is remembered per device. */
+const HELP_ICON_SVG =
+  '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><path d="M6.2 6.2a1.9 1.9 0 0 1 3.6.7c0 1.3-1.8 1.6-1.8 2.7"/><circle cx="8" cy="11.6" r="0.4" fill="currentColor"/></svg>';
+const HELP_SEARCH_SVG =
+  '<svg aria-hidden="true" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="6" cy="6" r="4.5"/><path d="M9.5 9.5L13 13"/></svg>';
+const HELP_OPEN_KEY = 'td-help-open';
+const HELP_LOAD_ERROR = 'Help articles could not be loaded.';
+let _helpOpen = false;
+try {
+  _helpOpen = localStorage.getItem(HELP_OPEN_KEY) === '1';
+} catch (e) {
+  _helpOpen = false;
+}
+let _helpIndex = null; // the article list, once loaded
+let _helpIndexState = 'idle'; // idle | loading | ready | error
+let _helpSlug = null; // the article shown, or null for the list
+let _helpQuery = '';
+
+// html-safe: the icon is fixed markup.
+function helpButtonHTML() {
+  return `<button type="button" class="tb-help-btn${_helpOpen ? ' is-open' : ''}" data-action="toggleHelp" aria-expanded="${_helpOpen ? 'true' : 'false'}" aria-controls="help-panel" aria-label="Help">${HELP_ICON_SVG}<span class="tb-help-label">Help</span></button>`;
+}
+
+/* The open page: its name for the section heading, and the addresses an
+   article's `pages` may list for it. */
+function _helpPage() {
+  var path = (location && location.pathname) || '/dashboard';
+  var params = new URLSearchParams((location && location.search) || '');
+  if (path === '/dashboard' && params.get('manage') && params.get('manage') !== 'starters') {
+    return { name: 'Class Management', routes: ['/class-management', '/dashboard?manage'] };
+  }
+  var names = {
+    '/dashboard': 'Dashboard',
+    '/assignments': 'Assignments',
+    '/student': 'Student',
+    '/gradebook': 'Gradebook',
+    '/observations': 'Observations',
+    '/observations/starters': 'Observations',
+    '/reports': 'Reports',
+  };
+  var route = path === '/observations/starters' ? '/observations' : path;
+  return { name: names[path] || 'Dashboard', routes: [names[path] ? route : '/dashboard'] };
+}
+
+function _helpLoadIndex() {
+  if (_helpIndexState === 'loading' || _helpIndexState === 'ready') return;
+  _helpIndexState = 'loading';
+  fetch('/help/index.json', { cache: 'no-cache' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('help index ' + r.status);
+      return r.json();
+    })
+    .then(function (list) {
+      if (!Array.isArray(list)) throw new Error('help index is not a list');
+      _helpIndex = list.filter(function (a) {
+        return a && typeof a.slug === 'string' && typeof a.title === 'string';
+      });
+      _helpIndexState = 'ready';
+      _helpRenderBody();
+    })
+    .catch(function (err) {
+      console.warn('Help index could not be loaded:', err);
+      _helpIndexState = 'error';
+      _helpRenderBody();
+    });
+}
+
+function _helpArticle(slug) {
+  return (_helpIndex || []).find(function (a) {
+    return a.slug === slug;
+  });
+}
+// Titles compare with straight and curly apostrophes alike (What's New).
+function _helpSameTitle(a, b) {
+  return String(a).replace(/’/g, "'") === String(b).replace(/’/g, "'");
+}
+function _helpArticleTitled(title) {
+  return (_helpIndex || []).find(function (a) {
+    return _helpSameTitle(a.title, title);
+  });
+}
+
+// html-safe: titles and slugs are escaped.
+function _helpRowsHTML(list) {
+  return list
+    .map(function (a) {
+      return (
+        '<button type="button" class="help-row" data-action="helpOpenArticle" data-slug="' +
+        esc(a.slug) +
+        '"><span class="help-row-title">' +
+        esc(a.title) +
+        '</span>' +
+        (a.video ? '<span class="help-chip">Video</span>' : '') +
+        '<span class="help-chev" aria-hidden="true">›</span></button>'
+      );
+    })
+    .join('');
+}
+
+// html-safe: the heading and rows are escaped.
+function _helpSectionHTML(heading, list) {
+  if (!list.length) return '';
+  return (
+    '<section class="help-section"><h3 class="help-section-title">' +
+    esc(heading) +
+    '</h3><div class="help-list">' +
+    _helpRowsHTML(list) +
+    '</div></section>'
+  );
+}
+
+/* Glossary, Keyboard Shortcuts, What's New and Report a Problem. Report a
+   Problem appears once its form exists (window.openReportProblem). */
+// html-safe: fixed labels; slugs are escaped.
+function _helpBoxHTML() {
+  function articleCell(title, slug) {
+    var a = _helpArticle(slug) || _helpArticleTitled(title);
+    return a
+      ? '<button type="button" class="help-box-cell" data-action="helpOpenArticle" data-slug="' +
+          esc(a.slug) +
+          '">' +
+          esc(title) +
+          '</button>'
+      : '<a class="help-box-cell" href="/help" target="_blank" rel="noopener">' + esc(title) + '</a>';
+  }
+  var cells = [
+    articleCell('Glossary', 'glossary'),
+    '<button type="button" class="help-box-cell" data-action="openKeyboardShortcuts" aria-keyshortcuts="?">Keyboard Shortcuts</button>',
+    articleCell('What’s New', 'whats-new'),
+  ];
+  if (typeof window.openReportProblem === 'function') {
+    cells.push(
+      '<button type="button" class="help-box-cell help-box-report" data-action="openReportProblem">Report a Problem</button>',
+    );
+  }
+  return '<div class="help-box">' + cells.join('') + '</div>';
+}
+
+// html-safe: every part is built by the escaping helpers above or is fixed text.
+function _helpHomeHTML() {
+  var list = _helpIndex || [];
+  if (_helpQuery) {
+    var words = _helpQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    var hits = list.filter(function (a) {
+      var hay = (a.title + ' ' + (a.summary || '')).toLowerCase();
+      return words.every(function (w) {
+        return hay.indexOf(w) >= 0;
+      });
+    });
+    return hits.length
+      ? _helpSectionHTML('Search Results', hits)
+      : '<p class="help-note">No articles match the search.</p>';
+  }
+  var page = _helpPage();
+  // The page's own articles; Getting Started has its own list below.
+  var onPage = list.filter(function (a) {
+    return (
+      a.section !== 'Getting Started' &&
+      Array.isArray(a.pages) &&
+      a.pages.some(function (p) {
+        return page.routes.indexOf(p) >= 0;
+      })
+    );
+  });
+  var started = list.filter(function (a) {
+    return (
+      a.section === 'Getting Started' && !_helpSameTitle(a.title, 'Glossary') && !_helpSameTitle(a.title, 'What’s New')
+    );
+  });
+  return (
+    _helpSectionHTML(page.name, onPage) +
+    _helpSectionHTML('Getting Started', started) +
+    '<div class="help-spacer"></div>' +
+    _helpBoxHTML() +
+    '<a class="help-all-link" href="/help" target="_blank" rel="noopener">All Help Articles</a>'
+  );
+}
+
+function _helpRenderBody() {
+  var body = document.getElementById('help-body');
+  if (!body) return;
+  var search = document.getElementById('help-search-row');
+  if (_helpIndexState === 'error') {
+    if (search) search.hidden = true;
+    // html-safe: HELP_LOAD_ERROR is a fixed sentence.
+    body.innerHTML = '<p class="help-note">' + HELP_LOAD_ERROR + '</p>';
+    return;
+  }
+  if (search) search.hidden = !!_helpSlug;
+  if (_helpIndexState !== 'ready') {
+    body.innerHTML = '';
+    return;
+  }
+  if (_helpSlug) {
+    _helpRenderArticle(body, _helpSlug);
+    return;
+  }
+  // html-safe: _helpHomeHTML escapes every title, slug and heading.
+  body.innerHTML = _helpHomeHTML();
+  // Screen readers hear how a search came out.
+  var status = document.getElementById('help-status');
+  if (status) {
+    var n = body.querySelectorAll('.help-row').length;
+    status.textContent = !_helpQuery
+      ? ''
+      : n === 0
+        ? 'No articles match the search.'
+        : n === 1
+          ? '1 article found.'
+          : n + ' articles found.';
+  }
+}
+
+/* An article inside the panel: Back, the help site's fragment, and Open in
+   Help Site. The fragment is the help site's own built page section; it is
+   parsed, and anything that could run (scripts, frames, on* handlers,
+   javascript: links) is dropped before it is shown. Relative links and
+   pictures resolve against /help/. */
+function _helpRenderArticle(body, slug) {
+  var a = _helpArticle(slug);
+  body.innerHTML =
+    '<button type="button" class="help-back" data-action="helpBack"><span aria-hidden="true">‹</span> Back</button>' +
+    '<div class="help-article-wrap" id="help-article" aria-busy="true"></div>' +
+    '<a class="help-all-link" href="/help/' +
+    esc(slug) +
+    '" target="_blank" rel="noopener">Open in Help Site</a>';
+  var holder = document.getElementById('help-article');
+  fetch('/help/fragments/' + encodeURIComponent(slug) + '.html', { cache: 'no-cache' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('help fragment ' + r.status);
+      return r.text();
+    })
+    .then(function (html) {
+      if (_helpSlug !== slug || !holder.isConnected) return;
+      holder.removeAttribute('aria-busy');
+      // The help site's fragment is one <article class="help-article">;
+      // anything else is put in one, so it shows on the same card.
+      var nodes = _helpCleanFragment(html);
+      var root =
+        nodes.length === 1 && nodes[0].classList && nodes[0].classList.contains('help-article') ? nodes[0] : null;
+      if (!root) {
+        root = document.createElement('article');
+        root.className = 'help-article';
+        root.replaceChildren.apply(root, nodes);
+      }
+      if (a && !root.querySelector('h1, h2')) {
+        var h = document.createElement('h1');
+        h.textContent = a.title;
+        root.prepend(h);
+      }
+      holder.replaceChildren(root);
+    })
+    .catch(function (err) {
+      console.warn('Help article could not be loaded:', err);
+      if (_helpSlug !== slug || !holder.isConnected) return;
+      holder.removeAttribute('aria-busy');
+      var p = document.createElement('p');
+      p.className = 'help-note';
+      p.textContent = 'The article could not be loaded.';
+      holder.replaceChildren(p);
+    });
+}
+
+/* Only the tags and attributes a help article uses are kept; anything
+   else (scripts, frames, SVG, forms, on* handlers, styles) is dropped. */
+const HELP_TAGS = {
+  ARTICLE: 1,
+  SECTION: 1,
+  DIV: 1,
+  SPAN: 1,
+  P: 1,
+  H1: 1,
+  H2: 1,
+  H3: 1,
+  H4: 1,
+  OL: 1,
+  UL: 1,
+  LI: 1,
+  STRONG: 1,
+  B: 1,
+  EM: 1,
+  I: 1,
+  CODE: 1,
+  KBD: 1,
+  BR: 1,
+  HR: 1,
+  A: 1,
+  IMG: 1,
+  FIGURE: 1,
+  FIGCAPTION: 1,
+  BLOCKQUOTE: 1,
+  TABLE: 1,
+  THEAD: 1,
+  TBODY: 1,
+  TR: 1,
+  TH: 1,
+  TD: 1,
+  VIDEO: 1,
+  SOURCE: 1,
+};
+const HELP_ATTRS = {
+  class: 1,
+  id: 1,
+  href: 1,
+  src: 1,
+  alt: 1,
+  title: 1,
+  width: 1,
+  height: 1,
+  colspan: 1,
+  rowspan: 1,
+  controls: 1,
+  poster: 1,
+  loading: 1,
+  type: 1,
+};
+function _helpCleanUrl(value) {
+  var url;
+  try {
+    url = new URL(value, location.origin + '/help/');
+  } catch (e) {
+    return null;
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:' && url.protocol !== 'mailto:') return null;
+  return url.origin === location.origin ? url.pathname + url.search + url.hash : url.href;
+}
+function _helpCleanFragment(html) {
+  var doc = new DOMParser().parseFromString(String(html), 'text/html');
+  (function clean(parent) {
+    Array.prototype.slice.call(parent.children).forEach(function (el) {
+      if (!HELP_TAGS[el.tagName]) {
+        el.remove();
+        return;
+      }
+      Array.prototype.slice.call(el.attributes).forEach(function (attr) {
+        var name = attr.name.toLowerCase();
+        if (!HELP_ATTRS[name]) {
+          el.removeAttribute(attr.name);
+        } else if (name === 'href' || name === 'src' || name === 'poster') {
+          var url = _helpCleanUrl(attr.value);
+          if (url === null) el.removeAttribute(attr.name);
+          else el.setAttribute(attr.name, url);
+        }
+      });
+      if (el.tagName === 'A' && el.getAttribute('href')) {
+        el.setAttribute('target', '_blank');
+        el.setAttribute('rel', 'noopener');
+      }
+      clean(el);
+    });
+  })(doc.body);
+  return Array.prototype.slice
+    .call(doc.body.childNodes)
+    .filter(function (n) {
+      return n.nodeType === 1 || (n.nodeType === 3 && n.textContent.trim());
+    })
+    .map(function (n) {
+      return document.importNode(n, true);
+    });
+}
+
+// html-safe: the icons and labels are fixed markup.
+function _helpPanelHTML() {
+  return `<div class="help-head">
+      <div class="help-head-row">
+        <h2 class="help-title" id="help-title">Help</h2>
+        <button type="button" class="help-close" data-action="closeHelp" aria-label="Close Help" aria-keyshortcuts="Escape">×</button>
+      </div>
+      <label class="help-search" id="help-search-row">${HELP_SEARCH_SVG}<input type="search" id="help-search" placeholder="Search Help" aria-label="Search Help" autocomplete="off"></label>
+    </div>
+    <p class="help-sr-only" id="help-status" role="status"></p>
+    <div class="help-body" id="help-body"></div>`;
+}
+
+/* Draws or removes the panel to match _helpOpen, and refreshes the list
+   for the open page. */
+function _helpSync() {
+  var layout = document.getElementById('page-layout');
+  if (!layout || typeof layout.appendChild !== 'function') return;
+  var panel = document.getElementById('help-panel');
+  if (!_helpOpen) {
+    if (panel && typeof panel.remove === 'function') panel.remove();
+    return;
+  }
+  if (!panel) {
+    panel = document.createElement('aside');
+    panel.id = 'help-panel';
+    panel.className = 'help-panel';
+    panel.setAttribute('aria-labelledby', 'help-title');
+    // html-safe: _helpPanelHTML is fixed markup.
+    panel.innerHTML = _helpPanelHTML();
+    layout.appendChild(panel);
+    var input = panel.querySelector('#help-search');
+    input.value = _helpQuery;
+    input.addEventListener('input', function () {
+      _helpQuery = input.value.trim();
+      _helpSlug = null;
+      _helpRenderBody();
+    });
+  }
+  _helpLoadIndex();
+  // An open article stays as it is (scroll and focus too) when the teacher
+  // moves to another page to follow its steps.
+  if (!_helpSlug || !document.getElementById('help-article')) _helpRenderBody();
+}
+
+function setHelpOpen(open, focusButton) {
+  _helpOpen = !!open;
+  try {
+    localStorage.setItem(HELP_OPEN_KEY, _helpOpen ? '1' : '0');
+  } catch (e) {
+    /* the choice lasts for this page only */
+  }
+  document.querySelectorAll('[data-action="toggleHelp"]').forEach(function (btn) {
+    btn.classList.toggle('is-open', _helpOpen);
+    btn.setAttribute('aria-expanded', _helpOpen ? 'true' : 'false');
+  });
+  _helpSync();
+  if (_helpOpen) {
+    var input = document.getElementById('help-search');
+    if (input && !_helpSlug) input.focus();
+  } else if (focusButton) {
+    var btn = document.querySelector('[data-action="toggleHelp"]');
+    if (btn) btn.focus();
+  }
+}
+
+function _helpOpenArticle(slug) {
+  _helpSlug = slug;
+  _helpRenderBody();
+  var back = document.querySelector('#help-body .help-back');
+  if (back) back.focus();
+}
+
+// A link inside an article to another help article opens it in the panel.
+document.addEventListener('click', function (e) {
+  var link = e.target.closest && e.target.closest('#help-article a[href^="/help/"]');
+  if (!link || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+  var slug = link
+    .getAttribute('href')
+    .replace(/^\/help\//, '')
+    .replace(/[?#].*$/, '');
+  if (!_helpArticle(slug)) return;
+  e.preventDefault();
+  _helpOpenArticle(slug);
+});
+
+/* Escape closes the panel when the focus is in it (or on nothing), and no
+   dialog is open over the page. */
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape' || !_helpOpen) return;
+  if (document.querySelector('.confirm-overlay, [aria-modal="true"], .tb-demo-menu.open, .tb-user-menu.open')) return;
+  var panel = document.getElementById('help-panel');
+  var active = document.activeElement;
+  var inPanel = panel && active && panel.contains(active);
+  var onButton = active && active.matches && active.matches('[data-action="toggleHelp"]');
+  if (!inPanel && !onButton && active && active !== document.body) return;
+  e.preventDefault();
+  setHelpOpen(false, true);
+});
+
+/* ── Keyboard Shortcuts sheet ─────────────────────────────────
+   Every shortcut in KEYBOARD_SHORTCUTS (shared/constants.js), grouped by
+   where it works, in the Where These Appear modal's chrome. Opens from the
+   Help panel and from ? when no field has the focus. */
+function _isMacKeyboard() {
+  var p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || navigator.userAgent;
+  return /mac|iphone|ipad/i.test(p || '');
+}
+
+/* The key names to show for one aria-keyshortcuts value: the ⌘ form on a
+   Mac, the Ctrl form elsewhere. */
+function shortcutKeys(value, mac) {
+  var alts = String(value).split(' ').filter(Boolean);
+  var pick =
+    alts.find(function (a) {
+      return mac ? a.indexOf('Meta') >= 0 : a.indexOf('Meta') < 0;
+    }) || alts[0];
+  var names = { Control: 'Ctrl', Meta: '⌘', Escape: 'Esc' };
+  return pick.split('+').map(function (k) {
+    return names[k] || k;
+  });
+}
+
+// html-safe: every label comes from KEYBOARD_SHORTCUTS and is escaped.
+function _shortcutsBodyHTML(mac) {
+  var groups = [];
+  KEYBOARD_SHORTCUTS.forEach(function (s) {
+    var g = groups.find(function (x) {
+      return x.context === s.context;
+    });
+    if (!g) groups.push((g = { context: s.context, rows: [] }));
+    g.rows.push(s);
+  });
+  return groups
+    .map(function (g) {
+      return (
+        '<section class="kbd-group"><h3 class="kbd-group-title">' +
+        esc(g.context) +
+        '</h3><dl class="kbd-list">' +
+        g.rows
+          .map(function (s) {
+            return (
+              '<div class="kbd-row"><dt>' +
+              esc(s.action) +
+              '</dt><dd>' +
+              shortcutKeys(s.keys, mac)
+                .map(function (k) {
+                  return '<kbd>' + esc(k) + '</kbd>';
+                })
+                .join('<span class="kbd-plus" aria-hidden="true">+</span>') +
+              '</dd></div>'
+            );
+          })
+          .join('') +
+        '</dl></section>'
+      );
+    })
+    .join('');
+}
+
+function openKeyboardShortcuts() {
+  if (document.getElementById('kbd-sheet')) return;
+  var trigger = document.activeElement;
+  var overlay = document.createElement('div');
+  overlay.className = 'confirm-overlay cm-help-overlay';
+  overlay.id = 'kbd-sheet';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'kbd-sheet-title');
+  // html-safe: _shortcutsBodyHTML escapes every label; the rest is fixed markup.
+  overlay.innerHTML =
+    '<div class="cm-help-card kbd-card">' +
+    '<div class="cm-help-head">' +
+    '<h2 class="cm-help-title" id="kbd-sheet-title">Keyboard Shortcuts</h2>' +
+    '<button type="button" class="cm-help-close" aria-label="Close">×</button>' +
+    '</div>' +
+    '<div class="kbd-body">' +
+    _shortcutsBodyHTML(_isMacKeyboard()) +
+    '</div></div>';
+  document.body.appendChild(overlay);
+  var closeBtn = overlay.querySelector('.cm-help-close');
+  function close() {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey, true);
+    try {
+      if (trigger && typeof trigger.focus === 'function') trigger.focus();
+    } catch (e) {
+      /* the trigger may be gone */
+    }
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    } else if (e.key === 'Tab') {
+      // The close button is the only control: the focus stays on it.
+      e.preventDefault();
+      closeBtn.focus();
+    }
+  }
+  closeBtn.addEventListener('click', close);
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) close();
+  });
+  document.addEventListener('keydown', onKey, true);
+  closeBtn.focus();
+}
+
+// ? opens the sheet when no field has the focus and nothing is open over the page.
+document.addEventListener('keydown', function (e) {
+  if (e.key !== '?' || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+  var t = document.activeElement;
+  if (
+    t &&
+    t.closest &&
+    t.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"]')
+  )
+    return;
+  if (document.querySelector('.confirm-overlay, [aria-modal="true"]')) return;
+  e.preventDefault();
+  openKeyboardShortcuts();
+});
+
 // html-safe: TB_PAGES, OFFLINE_BANNER_COPY and the icons are fixed; the only caller (router.js) passes no rightHTML.
 function renderDock(activePage, rightHTML) {
   _ensureSyncStatusUI();
+  // The router draws the dock on every route change; the Help panel then
+  // shows the new page's articles.
+  setTimeout(_helpSync, 0);
   const ap = activePage === 'student' ? 'dashboard' : activePage;
   const seg = TB_PAGES.map(
     p =>
@@ -353,7 +949,7 @@ function renderDock(activePage, rightHTML) {
     <div class="tb-group tb-center">
       <div class="seg tb-seg">${seg}</div>
     </div>
-    <div class="tb-group tb-right">${rightHTML || ''}<div class="tb-sync" role="status" aria-label="Sync status" data-action="retry-sync-dot"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>${userMenu}</div>
+    <div class="tb-group tb-right">${rightHTML || ''}<div class="tb-sync" role="status" aria-label="Sync status" data-action="retry-sync-dot"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>${helpButtonHTML()}${userMenu}</div>
   </nav>`;
 }
 
@@ -1692,6 +2288,24 @@ document.addEventListener('click', function (e) {
       showConfirm('Unsent Changes', window.leaveDemoUnsentText(res.unsent), 'Leave Demo Mode', 'danger', function () {
         window.leaveDemoMode(href, { force: true });
       });
+    },
+    toggleHelp: function () {
+      setHelpOpen(!_helpOpen);
+    },
+    closeHelp: function () {
+      setHelpOpen(false, true);
+    },
+    helpOpenArticle: function () {
+      _helpOpenArticle(el.dataset.slug);
+    },
+    helpBack: function () {
+      _helpSlug = null;
+      _helpRenderBody();
+      var input = document.getElementById('help-search');
+      if (input) input.focus();
+    },
+    openKeyboardShortcuts: function () {
+      openKeyboardShortcuts();
     },
     toggleDemoMenu: function () {
       _setDemoMenu(!el.parentElement.classList.contains('open'));

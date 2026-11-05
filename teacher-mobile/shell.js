@@ -964,6 +964,8 @@
             (_activeTab === 'students'
               ? '<button class="m-btn-primary" style="background:var(--surface);color:var(--text);border:1px solid var(--border)" data-action="m-open-widget-editor">Customize Card</button>'
               : '') +
+            // Help opens the help site in a new tab.
+            '<a class="m-btn-primary m-help-link" href="/help" target="_blank" rel="noopener">Help</a>' +
             '<button class="m-btn-primary" style="background:var(--surface);color:var(--text);border:1px solid var(--border)" data-action="m-switch-desktop">Switch to Desktop</button>' +
             '<button class="m-btn-primary" style="background:none;color:var(--score-1);border:none;margin-top:4px" data-action="m-sign-out">Sign Out</button>' +
             versionBlock +
