@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /* Phone grading keeps its place. A score, ± or clear tapped low on a long
-   rubric (or on a competency in Tags view) used to scroll the student's
+   rubric (or on a competency in Competencies view) used to scroll the student's
    card back to the top, as did the redraw after a save synced. Demo Mode,
    Science 8: the Science Fair Proposal's rubric is padded to eight
    criteria so the card scrolls. Also: the card's foot clears the tab bar,
@@ -75,11 +75,11 @@ test.describe('Phone grading card', () => {
     expect(await cardTop(page)).toBe(top);
   });
 
-  test('competency scores in Tags view', async ({ page }) => {
+  test('competency scores in Competencies view', async ({ page }) => {
     await openLongRubric(page);
-    await page.getByRole('button', { name: 'Tags', exact: true }).click();
+    await page.getByRole('button', { name: 'Competencies', exact: true }).click();
     await expect(card(page).locator('.m-score-group').first()).toBeVisible();
-    // Short Tags lists don't scroll; give the card room to scroll.
+    // Short competency lists don't scroll; give the card room to scroll.
     await card(page).evaluate(el => {
       const pad = document.createElement('div');
       pad.style.height = '1200px';

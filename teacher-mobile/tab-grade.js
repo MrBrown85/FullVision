@@ -1204,7 +1204,7 @@ window.MGrade = (function () {
       assessment.id +
       '" aria-pressed="' +
       !rubricOn +
-      '">Tags</button>' +
+      '">Competencies</button>' +
       '<button class="m-seg-btn' +
       (rubricOn ? ' m-seg-active' : '') +
       '" data-action="m-grade-view" data-view="rubric" data-aid="' +

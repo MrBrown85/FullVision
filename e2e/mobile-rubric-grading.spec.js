@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /* Phone grading by rubric criterion (Rubric Bank plan §5, PR 10). An
    assessment with a rubric of its own opens in Rubric view: one row per
    criterion, saved under each of its competencies, as on the desktop.
-   Tags | Rubric switches back to competency rows. An Advanced Rubric's
+   Competencies | Rubric switches back to competency rows. An Advanced Rubric's
    criterion has a Checks button that opens its checkboxes; ticking every
    box of a level writes that level. Runs in Demo Mode on Science 8: the
    Science Fair Proposal uses the Experimental Design Rubric (Standard), the
@@ -43,7 +43,7 @@ async function openLab(page, makeAdvanced, title = 'Chemical Reactions Lab') {
 const firstCard = page => page.locator('.m-swiper-card').first();
 
 test.describe('Phone grading by rubric criterion', () => {
-  test('a rubric assessment opens by criterion; Tags switches to competencies', async ({ page }) => {
+  test('a rubric assessment opens by criterion; Competencies switches back', async ({ page }) => {
     await openLab(page, false, 'Science Fair Proposal');
     const card = firstCard(page);
     await expect(page.getByRole('button', { name: 'Rubric', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -68,7 +68,7 @@ test.describe('Phone grading by rubric criterion', () => {
     expect(new Set(saved).size).toBe(1);
     expect(saved[0]).toBe(Number(target));
 
-    await page.getByRole('button', { name: 'Tags', exact: true }).click();
+    await page.getByRole('button', { name: 'Competencies', exact: true }).click();
     await expect(firstCard(page).locator('.m-crit-group')).toHaveCount(0);
     await expect(firstCard(page).locator('.m-score-group').first()).toBeVisible();
   });

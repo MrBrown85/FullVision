@@ -992,6 +992,7 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
       </div>${_sidebarTermNote(cid)}
     </div>
     <div id="gb-roster-list" role="list">${_sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick)}</div>
+    <div id="gb-roster-legend" class="sb-legend" aria-label="Key" hidden></div>
   </aside>`;
   // Auto-fill badges after caller mounts this HTML
   setTimeout(function () {
@@ -1094,15 +1095,58 @@ document.addEventListener(
 );
 
 /* The grade beside each name, as the class is set to grade
-   (studentRosterBadges): proficiency code (EXT, PRF, DEV, EMG, IC), letter
+   (studentRosterBadges): proficiency code (EXT, PRF, DEV, EMG, IE), letter
    and %, or both. */
 // html-safe: colours come from PROF_COLORS / PROF_TINT; title and text go through esc.
 function _sidebarGradeBadge(part) {
-  // IC has no level colour; the level-0 grey (#bbb) is too faint to read as text.
+  // IE has no level colour; the level-0 grey (#bbb) is too faint to read as text.
   var color = part.level ? PROF_COLORS[part.level] || PROF_COLORS[0] : 'var(--text-2)';
   var tint = PROF_TINT[part.level] || 'transparent';
   var title = part.title ? ` title="${esc(part.title)}"` : '';
   return `<span class="student-row-prof" style="color:${color};background:${tint}"${title}>${esc(part.text)}</span>`;
+}
+
+/* What each proficiency code beside a name means: its tooltip, and the key
+   under the roster. IE is BC's Insufficient Evidence: nothing scored yet. */
+const ROSTER_CODE_NAMES = (function () {
+  const names = {};
+  [4, 3, 2, 1].forEach(function (lv) {
+    names[PROF_CODES[lv]] = PROF_LABELS[lv];
+  });
+  names[PROF_CODES[0]] = 'Insufficient Evidence';
+  return names;
+})();
+
+/* The key under the roster, while the codes show beside the names (not in a
+   Letter class, under Show: Percentage or None, with no students, or while a
+   page marks the roster for its own job). */
+// html-safe: codes and names come from ROSTER_CODE_NAMES; colours from PROF_COLORS / PROF_TINT.
+function _fillRosterLegend(cid) {
+  const el = document.getElementById('gb-roster-legend');
+  if (!el) return;
+  const show = _rosterShowMode(cid);
+  const on =
+    !_sidebarAnnotator &&
+    show !== 'none' &&
+    show !== 'percent' &&
+    courseGradeMode(cid) !== 'letter' &&
+    getStudents(cid).length > 0;
+  el.hidden = !on;
+  if (!on) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = [4, 3, 2, 1, 0]
+    .map(function (lv) {
+      const code = PROF_CODES[lv];
+      return (
+        '<span class="sb-legend-item">' +
+        _sidebarGradeBadge({ text: code, level: lv }) +
+        esc(ROSTER_CODE_NAMES[code]) +
+        '</span>'
+      );
+    })
+    .join('');
 }
 
 /* After a score changes: redraw only the grade beside one student (`sid`),
@@ -1134,6 +1178,8 @@ function _sidebarBadgesHtml(cid, sid) {
   var show = _rosterShowMode(cid);
   if (show === 'none') return '';
   var badges = studentRosterBadges(cid, sid);
+  if (badges.prof && ROSTER_CODE_NAMES[badges.prof.text])
+    badges.prof = Object.assign({}, badges.prof, { title: ROSTER_CODE_NAMES[badges.prof.text] });
   var letter = badges.letter;
   if (letter && show !== 'both') {
     letter = Object.assign({}, letter, { text: show === 'percent' ? letter.pct : letter.grade || letter.pct });
@@ -1147,6 +1193,7 @@ function _sidebarBadgesHtml(cid, sid) {
 /** Fill sidebar grade badges asynchronously after sidebar is mounted. */
 function fillSidebarBadges(cid) {
   requestAnimationFrame(function () {
+    _fillRosterLegend(cid);
     if (_sidebarAnnotator) {
       applySidebarAnnotations();
       return;
@@ -1170,6 +1217,7 @@ function setSidebarAnnotator(fn) {
   const had = !!_sidebarAnnotator;
   _sidebarAnnotator = fn || null;
   applySidebarAnnotations();
+  _fillRosterLegend(typeof activeCourse !== 'undefined' ? activeCourse : getActiveCourse());
   if (had && !_sidebarAnnotator)
     fillSidebarBadges(typeof activeCourse !== 'undefined' ? activeCourse : getActiveCourse());
 }

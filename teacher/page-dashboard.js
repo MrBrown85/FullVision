@@ -423,8 +423,7 @@ window.PageDashboard = (function () {
       actionItems.push({
         text:
           uncoveredTags.length +
-          ' learning standard' +
-          (uncoveredTags.length !== 1 ? 's' : '') +
+          (uncoveredTags.length !== 1 ? ' competencies' : ' competency') +
           ' not yet assessed (' +
           secNames.join(', ') +
           ')',
