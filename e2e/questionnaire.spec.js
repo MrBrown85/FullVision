@@ -64,6 +64,8 @@ async function overflow(page) {
     document.querySelectorAll('.qn *, #gb-sidebar *, .report-toolbar *').forEach(el => {
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || el.offsetParent === null) return;
+      // A line cut on purpose (a Work Habits name) ends in an ellipsis.
+      if (cs.textOverflow === 'ellipsis' && cs.overflowX === 'hidden' && el.title === el.textContent) return;
       if (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1 && !['auto', 'scroll'].includes(cs.overflowX)) {
         out.push((el.id || el.className || el.tagName) + ': ' + (el.textContent || '').trim().slice(0, 30));
       }
@@ -308,8 +310,20 @@ test('Work Habits: a rating saves in place and the count follows; nothing redraw
   expect(fit.width).toBe(236);
   fit.off.forEach(d => expect(d).toBeLessThan(1));
   await expect(page.locator('.qn-habit-desc').nth(5)).toHaveText(
-    'Puts the phone away when asked, and uses devices for learning, not as a distraction.',
+    'Phone away when asked; devices for learning, not distraction.',
   );
+  // Each description is one line and, in the 470 px column, whole (no
+  // ellipsis); a name is one line, cut with its full text in its title.
+  const lines = await page.evaluate(() => ({
+    cut: [...document.querySelectorAll('.qn-habit-desc')]
+      .filter(el => el.scrollWidth > el.clientWidth)
+      .map(el => el.textContent),
+    tall: [...document.querySelectorAll('.qn-habit-name, .qn-habit-desc')].filter(
+      el => el.getBoundingClientRect().height > 20,
+    ).length,
+    titled: [...document.querySelectorAll('.qn-habit-name')].every(el => el.title === el.textContent),
+  }));
+  expect(lines).toEqual({ cut: [], tall: 0, titled: true });
   // The chosen stop clicked again clears the habit.
   await page.locator('.qn-hs-stop[data-habit="part"][data-value="4"]').click();
   await expect(slider).not.toHaveAttribute('aria-valuenow', /./);

@@ -1016,30 +1016,12 @@ window.ReportQuestionnaire = (function () {
     return CommentBank.SCALE[v - 1] + (fromRecord ? ', from the assignment record' : '');
   }
 
-  /* "From assignments: 18 of 20 handed in, 1 late, 1 missing", from the
-     comment's record (facts().record); '' with no assignments. */
-  function _recordLine(rec) {
-    if (!rec || !rec.total) return '';
-    return (
-      'From assignments: ' +
-      rec.handed +
-      ' of ' +
-      rec.total +
-      ' handed in, ' +
-      rec.late +
-      ' late, ' +
-      rec.missing +
-      ' missing'
-    );
-  }
-
-  // html-safe: habit names, descriptions, the record line and scale headings esc()'d; keys and values are fixed
+  // html-safe: habit names, descriptions and scale headings esc()'d; keys and values are fixed
   function _habitsHtml(cid, f) {
     var stored = (getStudentTermRating(cid, f.sid, getTermId()) || {}).habits || {};
     var auto = CommentBank.effectiveHabits(stored, f.record, f);
     var rows = CommentBank.HABITS.map(function (h) {
       var cur = _sliderValue(stored, auto, h.key);
-      var note = h.key === 'completes' ? _recordLine(f.record) : '';
       var dots = '';
       // A dot under each column of the scale, and over each column a clear
       // stop that takes the click (the pointer handler snaps to the
@@ -1050,14 +1032,11 @@ window.ReportQuestionnaire = (function () {
         stops += `<span class="qn-hs-stop" style="--i:${i}" data-habit="${h.key}" data-value="${i + 1}"></span>`;
       }
       return `<div class="qn-habit-row" data-habit-row="${h.key}">
-        <div class="qn-habit-text">
-          <span class="qn-habit-name" id="tq-habit-${h.key}">${esc(h.name)}</span>
-          <span class="qn-habit-desc">${esc(h.desc || h.hint)}</span>
-          ${note ? `<span class="qn-habit-note">${esc(note)}</span>` : ''}
-        </div>
-        <div class="qn-hs${cur.v ? ' set' : ''}${cur.fromRecord ? ' from-record' : ''}" role="slider" tabindex="0" data-habit="${h.key}" data-value="${cur.v}" style="--at:${Math.max(0, cur.v - 1)}" aria-labelledby="tq-habit-${h.key}" aria-valuemin="1" aria-valuemax="${HS_STOPS}"${cur.v ? ` aria-valuenow="${cur.v}"` : ''} aria-valuetext="${esc(_sliderText(cur.v, cur.fromRecord))}">
+        <span class="qn-habit-name" id="tq-habit-${h.key}" title="${esc(h.name)}">${esc(h.name)}</span>
+        <div class="qn-hs${cur.v ? ' set' : ''}${cur.fromRecord ? ' from-record' : ''}" role="slider" tabindex="0" data-habit="${h.key}" data-value="${cur.v}" style="--at:${Math.max(0, cur.v - 1)}" aria-labelledby="tq-habit-${h.key}" aria-describedby="tq-habit-desc-${h.key}" aria-valuemin="1" aria-valuemax="${HS_STOPS}"${cur.v ? ` aria-valuenow="${cur.v}"` : ''} aria-valuetext="${esc(_sliderText(cur.v, cur.fromRecord))}">
           <div class="qn-hs-track" aria-hidden="true"><span class="qn-hs-rail"></span>${dots}<span class="qn-hs-fill"></span><span class="qn-hs-thumb"></span>${stops}</div>
         </div>
+        <span class="qn-habit-desc" id="tq-habit-desc-${h.key}" title="${esc(h.desc || h.hint)}">${esc(h.desc || h.hint)}</span>
       </div>`;
     }).join('');
     return `<div class="qn-card qn-habits">
