@@ -172,7 +172,7 @@ describe('Reports questionnaire in a Letter class', () => {
     const text = bankSentences().join(' ');
     // Was (tqAutoNarrative): "Academically, Noor is working at a proficient
     // level, with strong results in cause and consequence."
-    expect(text).toContain('Noor is earning a B this term, which is very good work.');
+    expect(text).toContain('Noor has a B in Socials 9 so far, which is very good work.');
     // One piece per competency is below the "strongest" evidence gate (plan
     // PR 6), so no sentence names a strongest competency.
     expect(text).not.toContain('Cause and Consequence');
@@ -181,6 +181,6 @@ describe('Reports questionnaire in a Letter class', () => {
 
   it('keeps the proficiency wording in a Proficiency class', () => {
     seed('proficiency');
-    expect(bankSentences()).toContain('Noor is Proficient on the BC proficiency scale this term.');
+    expect(bankSentences()).toContain('Noor is working at a Proficient level in Socials 9.');
   });
 });

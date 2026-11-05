@@ -354,12 +354,13 @@ describe('the draft passes through the realiser', () => {
       _grade: 'ie',
       _ieProblem: 'missing',
       name: 'Jack',
+      course: 'History 12',
       missingWork: 'One assignment is not handed in: “Map Quiz.”',
       ieDeadline: 'December 18',
     };
     const parts = CommentBank.requiredParts(ctx);
     expect(parts.map(p => p.text)).toEqual([
-      'Jack’s mark this term is IE, which means there is not yet enough evidence for a letter grade.',
+      'Jack’s grade in History 12 is IE so far: his marked work is not yet enough for a letter grade.',
       'One assignment is not handed in: “Map Quiz.”',
       'To earn a grade, he needs to submit the missing work.',
       'The deadline to replace this IE with a grade is December 18.',

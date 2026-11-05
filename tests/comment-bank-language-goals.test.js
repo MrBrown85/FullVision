@@ -150,9 +150,7 @@ describe('the line in the comment', () => {
         'She can read a text aloud in English; the next step is answering a question about what it says.',
       );
       expect(d.text).toContain(got.text);
-      expect(d.sentences[0].text).toBe(
-        'This term, Noor is assessed in relation to her goals for English language proficiency.',
-      );
+      expect(d.sentences[0].text).toBe('Noor is assessed in relation to her goals for English language proficiency.');
       // Before the support line and the closing, after the next step.
       const steps = d.sentences.map(x => x.step);
       expect(steps.indexOf('languageGoals')).toBeGreaterThan(steps.indexOf('grade'));

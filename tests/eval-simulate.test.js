@@ -102,7 +102,7 @@ describe('simulate', () => {
     });
     // The grade sentences for a letter, a proficiency word and the goals
     // are all used somewhere.
-    ['gr01', 'gr05', 'gr07', 'gr08'].forEach(id => expect(r.neverPicked.map(s => s.id)).not.toContain(id));
+    ['gv41', 'gv11', 'gv91', 'gv92'].forEach(id => expect(r.neverPicked.map(s => s.id)).not.toContain(id));
   });
 
   it('lists the over-picked sentences: in more comments of one class than the crowded mark, never a fixed part', () => {

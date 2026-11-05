@@ -397,7 +397,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     // but the grade sentence, which every student gets (set aside).
     const twin = Object.assign({}, comments[0], { sid: 'twin' });
     const n = twin.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/).length;
-    expect(twin.text).toMatch(/on the BC proficiency scale this term/);
+    expect(twin.text).toMatch(/is working at an? \w+ level|\w+ level\b/);
     const flagged = CommentBank.nearIdentical([comments[0], twin]);
     expect(flagged).toHaveLength(n - 1 >= 5 ? 1 : 0);
     if (n - 1 >= 5) expect(flagged[0].shared).toBe(n - 1);

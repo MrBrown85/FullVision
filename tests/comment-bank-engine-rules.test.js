@@ -139,7 +139,9 @@ describe('strengths are skills from the table, never a bare competency label', (
       const d = draftOf(f, { seed });
       const s = d.sentences.find(x => x.step === 'overall');
       expect(s, 'seed ' + seed).toBeTruthy();
-      expect(s.text).toMatch(/\bcan support each claim with evidence from a source\b/);
+      // The strength on its own (the best piece has a note, no skill):
+      // "His marks are highest in work that asks him to …" (Nov 4).
+      expect(s.text).toMatch(/\bto support each claim with evidence from a source\b/);
       expect(s.text).not.toMatch(/\b(Evidence|Perspective|Significance)\b/);
       expect(d.replaced).toEqual([]);
     }
@@ -189,15 +191,16 @@ describe('strengths are skills from the table, never a bare competency label', (
 describe('the draft is the plan’s eight parts only', () => {
   const PLAN = [
     'grade',
-    // The habits part for families: two or three sentences (Nov 4).
+    'spread',
+    'growth',
+    'example',
+    'overall',
     'habits',
     'habitsMore',
     'habitsBuild',
     'attendance',
     'notHandedIn',
     'lateWork',
-    'overall',
-    'example',
     // Before the Next Step: never between it and its family line (#632).
     'languageGoals',
     'nextStep',
@@ -215,7 +218,9 @@ describe('the draft is the plan’s eight parts only', () => {
     expect(CommentBank.DRAFT_STEPS.map(s => s.key)).toEqual(PLAN);
     CommentBank.ANGLES.forEach(a => {
       a.order.forEach(k => expect(PLAN, a.id).toContain(k));
-      ['opening', 'growth', 'goWords'].forEach(k => expect(a.order, a.id).not.toContain(k));
+      ['opening', 'goWords'].forEach(k => expect(a.order, a.id).not.toContain(k));
+      // One order for every comment off the IE path (the sample voice, Nov 4).
+      if (a.id !== 'ie') expect(a.order, a.id).toBe(CommentBank.CORE_ORDER);
     });
   });
 
@@ -401,14 +406,18 @@ describe('six to nine sentences', () => {
     const d = draftOf(thin);
     expect(d.short).toBe(true);
     expect(d.sentences.length).toBeLessThan(6);
-    // The family line belongs to the Next Step sentence, so with no next
-    // step it is left out too (live run, Nov 1 2026).
-    expect(stepsOf(d)).toEqual(['grade', 'example']);
+    // Every comment has a next step and a family line (Colin, Nov 4): with
+    // no competency to draw one from, a generic science step that claims
+    // nothing, and a family line for any science class.
+    expect(stepsOf(d)).toEqual(['grade', 'example', 'nextStep', 'home']);
     expect(d.sentences[0].text).toContain('Ines');
     expect(d.sentences[0].text).toContain('Proficient');
-    expect(d.sentences[1].text).toContain('“Energy Lab');
-    // Nothing was added to reach six: no habits sentence with no habit
-    // rated, no strengths below the gate, no next step on two pieces.
+    expect(d.sentences[1].text).toMatch(/[Tt]heir Energy Lab/);
+    const next = COMMENT_BANK.sentences.find(s => s.id === d.ids[2]);
+    expect(next.claims).toEqual([]);
+    expect(next.subjects).toEqual(['science']);
+    // Nothing else was added to reach six: no habits sentence with no habit
+    // rated, no strengths below the gate.
     expect(CommentBank.verify(d, thin, {}).text).toBe(d.text);
   });
 });

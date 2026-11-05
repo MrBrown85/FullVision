@@ -46,23 +46,16 @@ describe('the reworded frames', () => {
       {},
     );
     const fill = id => CommentBank.fill(byId(id), ctx, { first: true });
-    expect(fill('gr55')).toBe(
-      'Liam’s work meets what Science 9 expects, which is Proficient on the BC proficiency scale.',
-    );
-    expect(fill('gr57')).toBe(
-      'Liam’s work this term earns Proficient on the proficiency scale for its complete understanding of the course.',
-    );
-    expect(fill('gr58')).toBe(
-      'The BC proficiency scale calls Liam’s work in Science 9 Proficient, which means a complete understanding.',
-    );
     expect(fill('hl013')).toBe(
       'Liam completes some tasks by the due date, and they can make a plan to finish the others on time.',
     );
     expect(byId('hl094').text).toBe(
       'In some pieces {his} revisions follow the feedback; next comes using feedback on every piece.',
     );
-    ['gr47', 'gr48', 'gr55', 'gr57', 'gr58', 'gr67', 'gr68', 'gr77', 'gr78'].forEach(id =>
-      expect(byId(id), id).toMatchObject({ group: 'Grade', claims: ['grade'], when: { grade: 'proficiency' } }),
-    );
+    // The reworded grade frames (gr47-gr78) were retired for the sample
+    // voice (Nov 4): none of the grade frames names the scale.
+    COMMENT_BANK.sentences
+      .filter(s => s.group === 'Grade')
+      .forEach(s => expect(s.text, s.id).not.toMatch(/proficiency scale|this term|calls/));
   });
 });

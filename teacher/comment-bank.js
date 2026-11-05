@@ -3297,44 +3297,154 @@ window.CommentBank = (function () {
     return w ? { comp: x.comp, key: x.key, skill: x.skill, word: w } : null;
   }
 
-  /* The skill a best piece with no teacher note shows (Colin, 2026-11-02):
-     of the competencies from the BC bank the piece was scored on at
-     Proficient or above, the highest-scored (the first in report order on
-     a tie), in its cluster's phrase. One sentence per skill: never a skill
-     the comment can name elsewhere (the strengths, a tie at the top, even
-     results, the highest-marked skill, the next step), by SKILLS key, and
-     only while the sentence stays within 20 words. { comp, key, skill } or
-     null; null with a note, which says what the piece shows itself. */
+  /* What a best piece with no teacher note shows (Colin, 2026-11-02; the
+     sample voice, Nov 4): the competency the piece scored highest on at
+     Proficient or above, even with one mark; on a tie the strongest
+     competency, then report order. Never a skill the comment names
+     elsewhere (the next step, a tentative next step, progress), by key.
+     Named by its skill phrase (skillFor: the bank's, else the table's),
+     else by its own label in plain words (plainLabel). { comp, key, skill }
+     or { comp, key, label }; null with a note, which says what the piece
+     shows itself, or when no competency qualifies. */
+  var PIECE_SKILL_WORDS = 11;
   function bestPieceSkillOf(f, w) {
     if (!w || reportNoteText(w.note)) return null;
     var taken = {};
-    [strengthSkills(f), topTieSkills(f), evenSkills(f), highestSkills(f), [nextSkillOf(f)], [progressOf(f)]].forEach(
-      function (xs) {
-        (xs || []).forEach(function (x) {
-          if (x) taken[x.key] = true;
-        });
-      },
-    );
+    [nextSkillOf(f), tentSkillOf(f), progressOf(f)].forEach(function (x) {
+      if (x) taken[x.key] = true;
+    });
+    var strong = strengthSkills(f)[0];
     var pick = null;
     var pickV = 0;
     (f.comps || []).forEach(function (c) {
       var sc = (c.scores || []).find(function (x) {
         return x.id === w.id;
       });
-      var e = sc && c.bankId ? bankEntry(c.bankId) : null;
-      if (!e || taken[e.key] || !(Math.round(Number(sc.v)) >= 3) || !(Number(sc.v) > pickV)) return;
-      pick = { comp: c, key: e.key, skill: e.phrase };
-      pickV = Number(sc.v);
+      if (!sc || !(Math.round(Number(sc.v)) >= 3)) return;
+      var sk = skillFor(f, c);
+      var key = sk ? sk.key : 'label:' + c.id;
+      if (taken[key]) return;
+      var v = Number(sc.v);
+      var better = !pick || v > pickV || (v === pickV && strong && strong.comp === c && pick.comp !== c);
+      if (!better) return;
+      if (sk && R.wordCount(sk.skill) <= PIECE_SKILL_WORDS) pick = { comp: c, key: key, skill: sk.skill };
+      else {
+        var label = plainLabel(c.name);
+        pick = label ? { comp: c, key: key, label: label } : null;
+      }
+      pickV = pick ? v : pickV;
     });
-    if (!pick) return null;
-    var text = bestPieceSentence({
-      title: w.title,
-      skill: pick.skill,
-      name: f.name,
-      pronouns: f.pronouns,
-      onFile: f.pronounsOnFile,
+    return pick;
+  }
+
+  /* A competency's own label as a comment can say it inside a sentence:
+     lower case except names and initialisms ("Questioning and Predicting"
+     → "questioning and predicting"; "Indigenous Perspectives" keeps its
+     capital). '' for a label that reads as curriculum wording rather than
+     a name: a sentence, or longer than six words. */
+  var KEEP_CAPS =
+    /^(Indigenous|First|Peoples|Canada|Canadian|Canadians|BC|British|Columbia|English|French|Spanish|Mandarin|Punjabi|Japanese|German|Latin|Aboriginal|Métis|Inuit|Earth|I)$/;
+  function plainLabel(name) {
+    var t = String(name || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[.:;]+$/, '');
+    if (!t || /[.:;?!]/.test(t) || t.split(' ').length > 6) return '';
+    return t
+      .split(' ')
+      .map(function (w) {
+        if (KEEP_CAPS.test(w) || /^[A-Z0-9]{2,}$/.test(w) || !/^[A-Z][a-z’'-]*$/.test(w)) return w;
+        return w.toLowerCase();
+      })
+      .join(' ');
+  }
+
+  /* The best piece's title as a comment names it after "her" (the frames
+     own it: "her Biodiversity Field Journal"), the lesson number dropped.
+     A title that would not read as a name there (one that opens with "The"
+     or "A", holds a colon, a question, quotation marks or brackets, or runs
+     past eight words) is quoted: "her “Thinking It Through: A Changing
+     Worldview”". '' with no title. */
+  var TEST_TITLE = /\b(quiz|quizzes|test|tests|exam|check)\b/i;
+  function _ownsTitle(t) {
+    return /^[A-Z0-9]/.test(t) && !/[:;?!“”"()]/.test(t) && !/^(the|a|an)\s/i.test(t) && t.split(/\s+/).length <= 8;
+  }
+  function pieceTitle(w) {
+    var t = w ? workTitle(w.title).replace(/\.+$/, '') : '';
+    return !t || _ownsTitle(t) ? t : R.quoteTitle(t);
+  }
+  /* Whether a piece is a quiz, test or check by its title: it "scored
+     highest", never "is her best piece". */
+  function pieceIsTest(w) {
+    return !!w && TEST_TITLE.test(workTitle(w.title));
+  }
+
+  /* The strength said on its own (Overall), when the best piece shows none:
+     the competency with the highest level now, strictly above every other
+     (so "highest" holds), of two or more with a level, and not the next
+     step's. Named by its skill phrase, else its plain label. { comp, key,
+     skill } or { comp, key, label }, or null. */
+  function highestFallbackOf(f) {
+    var xs = (f.comps || [])
+      .filter(function (c) {
+        return c.level > 0;
+      })
+      .slice()
+      .sort(function (a, b) {
+        return tenths(b.level) - tenths(a.level);
+      });
+    if (xs.length < 2 || !(tenths(xs[0].level) > tenths(xs[1].level))) return null;
+    var c = xs[0];
+    var step = nextStepOf(f.comps) || (tentSkillOf(f) || {}).comp;
+    if (step === c) return null;
+    var sk = skillFor(f, c);
+    if (sk && R.wordCount(sk.skill) <= PIECE_SKILL_WORDS) return { comp: c, key: sk.key, skill: sk.skill };
+    var label = plainLabel(c.name);
+    return label ? { comp: c, key: 'label:' + c.id, label: label } : null;
+  }
+
+  /* The next step when no competency has the 2+ pieces a settled one needs
+     (Colin, Nov 4: marks spread thinly): the lowest competency with a
+     scored piece, of two or more, said tentatively. Its bank step at its
+     level when it came from the bank, else the table's skill; null when
+     neither names it (a generic next step stands in). { comp, key, text }. */
+  function tentSkillOf(f) {
+    if (nextStepOf(f.comps)) return null;
+    var xs = (f.comps || []).filter(function (c) {
+      return c.level > 0 && (c.scores || []).length >= 1;
     });
-    return R.tooLong(text) ? null : pick;
+    if (xs.length < 2) return null;
+    var low = xs.reduce(function (m, c) {
+      return tenths(c.level) < tenths(m.level) ? c : m;
+    }, xs[0]);
+    var sk = skillFor(f, low);
+    if (!sk) return null;
+    var text = sk.steps ? sk.steps[word(low.level)] || sk.skill : sk.skill;
+    return text ? { comp: low, key: sk.key, skill: sk.skill, text: text } : null;
+  }
+  /* The skill the comment's next step is about: the settled one, else the
+     tentative one. The family line follows it. */
+  function stepSkillOf(f) {
+    return nextSkillOf(f) || tentSkillOf(f);
+  }
+
+  /* Whether the marks are spread thinly (Colin, Nov 4): three or more
+     competencies with a level, most of them on one or two scored pieces.
+     { all: every one is, ids } or null. */
+  function spreadOf(f) {
+    var xs = (f.comps || []).filter(function (c) {
+      return c.level > 0;
+    });
+    var thin = xs.filter(function (c) {
+      return (c.scores || []).length <= 2;
+    });
+    if (xs.length < 3 || thin.length * 2 <= xs.length) return null;
+    return {
+      all: thin.length === xs.length,
+      ids: xs.map(function (c) {
+        return c.id;
+      }),
+    };
   }
 
   /* The work this term, best first: the one rule for "best piece" that the
@@ -3804,7 +3914,19 @@ window.CommentBank = (function () {
     // The skill the best piece shows, said when it has no note
     // (bestPieceSkillOf).
     var topPieceSkill = top ? bestPieceSkillOf(f, top) : null;
-    var topSkillText = topPieceSkill ? topPieceSkill.skill : '';
+    var topSkillText = topPieceSkill ? topPieceSkill.skill || '' : '';
+    // The best piece owning its title, and whether it is a quiz or test
+    // (the sample voice, Nov 4).
+    var pieceName = top ? pieceTitle(top) : '';
+    var pieceTest = !!pieceName && pieceIsTest(top);
+    // The strength said on its own, only when the best piece shows no skill
+    // (a teacher's note says what the piece shows, not a skill) and no
+    // growth or even marks say one (highestFallbackOf).
+    var hiFall = !topPieceSkill && !prog && !evenNow.length ? highestFallbackOf(f) : null;
+    // The tentative next step from thin evidence (tentSkillOf), and the
+    // marks spread thinly (spreadOf).
+    var tent = tentSkillOf(f);
+    var spread = spreadOf(f);
     var weak = low[0] && top && tenths(low[0].v) < tenths(top.v) ? low[0] : null;
     // Titles in quotes, the lesson number dropped (the realiser's rule).
     var the = function (w) {
@@ -3953,6 +4075,16 @@ window.CommentBank = (function () {
       assignment: keys('work', [top]),
       level: keys('work', [top]),
       bestPiece: keys('work', [top]).concat(keys('comp', [topPieceSkill && topPieceSkill.comp])),
+      piece: keys('work', [top]),
+      pieceWork: keys('work', [top]),
+      pieceTest: keys('work', [top]),
+      pieceSkill: keys('work', [top]).concat(keys('comp', [topPieceSkill && topPieceSkill.comp])),
+      pieceComp: keys('work', [top]).concat(keys('comp', [topPieceSkill && topPieceSkill.comp])),
+      hiSkill: keys('comp', [hiFall && hiFall.comp]),
+      hiComp: keys('comp', [hiFall && hiFall.comp]),
+      tentStep: keys('comp', [tent && tent.comp]),
+      spread: keys('comp', spread ? spread.ids : []),
+      spreadAll: keys('comp', spread ? spread.ids : []),
       assignment2: keys('work', [weak]),
       level2: keys('work', [weak]),
       strongWorks: keys('work', best.slice(0, 2)),
@@ -4059,7 +4191,7 @@ window.CommentBank = (function () {
       _path: reportPath(f),
       // The next step's skill key (SKILLS), for the frames written for one
       // skill (`when.nextSkill`); '' when there is no next step.
-      _nextSkill: next ? next.key : '',
+      _nextSkill: next ? next.key : tent ? tent.key : '',
       // The strongest skill's key (SKILLS), for the per-skill strengths
       // frames (`when.strongSkill`); '' below the "strongest" gate.
       _strongSkill: strongSkills[0] ? strongSkills[0].key : '',
@@ -4187,6 +4319,24 @@ window.CommentBank = (function () {
             onFile: f.pronounsOnFile,
           })
         : '',
+      // The best piece's title, which the frames own ("{his} {piece}": "her
+      // Biodiversity Field Journal"), so a change of pronouns is not a
+      // change of marks. pieceWork
+      // or pieceTest ('yes') picks the frames that call it a best piece or
+      // say it scored highest; pieceSkill (a skill phrase) or pieceComp (a
+      // competency's plain label) is what it shows (bestPieceSkillOf).
+      piece: pieceName,
+      pieceWork: pieceName && !pieceTest ? 'yes' : '',
+      pieceTest: pieceTest ? 'yes' : '',
+      pieceSkill: topPieceSkill && topPieceSkill.skill ? topPieceSkill.skill : '',
+      pieceComp: topPieceSkill && topPieceSkill.label ? topPieceSkill.label : '',
+      // The strength on its own (highestFallbackOf), by skill or label.
+      hiSkill: hiFall && hiFall.skill ? hiFall.skill : '',
+      hiComp: hiFall && hiFall.label ? hiFall.label : '',
+      // The tentative next step (tentSkillOf), and the marks spread thinly.
+      tentStep: tent ? tent.text : '',
+      spread: spread ? 'yes' : '',
+      spreadAll: spread && spread.all ? 'yes' : '',
       assignment2: weak ? weak.title : '',
       level2: weak ? workMark(f, weak) : '',
       strongWorks: list(best.slice(0, 2).map(the)),
@@ -4772,18 +4922,29 @@ window.CommentBank = (function () {
     return h || 1;
   }
 
-  /* The draft's steps, the plan's eight parts and nothing else: the grade
-     sentence (gradeOf; none for IE, F or no marks), the habits (two or three
-     sentences for families, then attendance when entered, then the work not handed in
-     and the late-work line), the best piece, the strengths (overall), the
-     next step with the support line and one thing the family can do, and
-     the closing sentence. Each step takes at most one sentence (the habits
-     part is three steps: habits, habitsMore, habitsBuild). A step that
-     `says` a fact (the grade) keeps every later sentence claiming it out.
-     The angle (angle()) sets which steps run and in what order; this is
-     the order with no story to tell. */
+  /* The draft's steps, in the order every comment off the IE path takes
+     (the sample voice, Nov 4): the grade sentence (gradeOf; none for F or
+     no marks), how much evidence there is, growth or even marks, the best
+     piece and what it shows, the strength on its own when the best piece
+     shows none, the habits (two or three sentences for families, then
+     attendance when entered, then the work not handed in and the late-work
+     line), the next step with the support line and one thing the family
+     can do, and the closing sentence. Each step takes at most one sentence
+     (the habits part is three steps: habits, habitsMore, habitsBuild). A
+     step that `says` a fact (the grade) keeps every later sentence claiming
+     it out. The IE comment runs its own steps (ANGLES). */
   var DRAFT_STEPS = [
     { key: 'grade', part: 'now', groups: ['Grade'], says: 'grade' },
+    // The sample voice (Colin, Nov 4): every comment has the same parts in
+    // the same order, as the six approved samples do. After the grade, a
+    // sentence that the picture rests on one or two pieces per skill
+    // (spreadOf), growth in levels or even marks (Growth, Even Marks), the
+    // best piece owning its title with what it shows, and the strength on
+    // its own only when the best piece shows none (Overall).
+    { key: 'spread', part: 'now', groups: ['How Much Evidence'] },
+    { key: 'growth', part: 'now', groups: ['Growth', 'Even Marks'] },
+    { key: 'example', part: 'now', groups: ['Examples From Work'] },
+    { key: 'overall', part: 'now', groups: ['Overall'] },
     // The habits part for families (habitPlan, Nov 4): what the student
     // does, a second sentence for more of it, and the habits that would
     // help. Generate drafts only the Habits in Class frames here (and the
@@ -4797,25 +4958,19 @@ window.CommentBank = (function () {
     // (plan PR 8): only for a student with work not handed in.
     { key: 'notHandedIn', part: 'habits', groups: ['Not Handed In'], says: 'notHandedIn' },
     { key: 'lateWork', part: 'habits', line: 'lateLine', after: 'notHandedIn' },
-    // The strengths (plan part 3): one or two skills from the table.
-    // The first strength at its level now, for a bank competency
-    // (strengthNow), else one or two skills from the table; the teacher's
-    // own sentences and the story's frames stay in (preferSoft).
-    { key: 'overall', part: 'now', groups: ['Overall'], prefer: 'strengthNow', preferSoft: true },
-    // The best piece (plan part 2): the one sentence of Examples From Work.
-    { key: 'example', part: 'now', groups: ['Examples From Work'] },
     // The Language Goals line (plan PR 3b): a template the teacher picked,
     // filled for the student; empty off the language-goals path. Before the
     // Next Step sentence, never between it and its family line (#632).
     { key: 'languageGoals', part: 'go', line: 'languageGoalLine', template: true },
-    // One skill from the table when there is one (`prefer`); never a
-    // sentence that names a bare competency label (`never`).
+    // The bank's step at the student's level first, then the table's skill,
+    // then a tentative step from thin evidence (tentSkillOf); with none, a
+    // generic step that claims nothing. Never a sentence that names a bare
+    // competency label (`never`).
     {
       key: 'nextStep',
       part: 'go',
       groups: ['Next Step'],
-      // The bank's step at the student's level first, then the table's skill.
-      prefer: ['levelStep', 'nextSkill'],
+      prefer: ['levelStep', 'nextSkill', 'tentStep'],
       never: ['focus', 'focusLow', 'growthAreas', 'rise', 'fall'],
     },
     // The teacher's support line for this student, one thing the family can
@@ -4837,7 +4992,7 @@ window.CommentBank = (function () {
   var SAYS = { grade: true, notHandedIn: true };
 
   /* Facts a draft states once, by topic. */
-  var NO_REPEAT = { nextStep: 'nextStep' };
+  var NO_REPEAT = { nextStep: 'nextStep', evenResults: 'even' };
 
   /* A sentence that gives the student a next step: a Next Step sentence
      (the group the Next Step step draws from) or one flagged `advises:
@@ -4938,6 +5093,15 @@ window.CommentBank = (function () {
   var NEW_DAYS = 14; // joined two weeks or more after the class began
   var THIN = 3; // fewer scored pieces than this is too little to judge
 
+  /* The order every comment off the IE path takes (the sample voice,
+     Colin, Nov 4: "what was the point of the plan if you're going to
+     change it?"). The story only decides which facts a part states (the
+     growth for a climb, say); it never moves or drops a part. The grade
+     comes first (_sequence), and the class's lines go in by
+     _withClassSteps. The IE comment keeps its own path, with the best
+     piece after the problem (the sample for an IE). */
+  var CORE_ORDER = ['spread', 'growth', 'example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'];
+
   var ANGLES = [
     {
       // The mark is IE (calc.js, under 50% before the course ends, or the
@@ -4949,7 +5113,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.ie;
       },
-      order: ['ieProblem', 'strongHabits', 'iePlan', 'ieDeadline', 'ieMeeting'],
+      order: ['ieProblem', 'example', 'strongHabits', 'iePlan', 'ieDeadline', 'ieMeeting'],
     },
     {
       // Too few scored pieces to say much: the habits and one example.
@@ -4958,7 +5122,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.scored < THIN;
       },
-      order: ['habits', 'attendance', 'example', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // Joined the class two weeks or more after it began, during this
@@ -4968,7 +5132,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.joinedLate;
       },
-      order: ['habits', 'attendance', 'example', 'overall', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // Strong handed-in work behind a grade pulled down by work labelled
@@ -4978,7 +5142,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.missing >= 2 && a.missing * 5 >= a.total && a.strongWork;
       },
-      order: ['example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // The marks climbed over the term, past the "improved" gate
@@ -4988,7 +5152,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.climb;
       },
-      order: ['example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // The marks slid over the term, by the same trend (slid()): the best
@@ -4998,7 +5162,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.slide;
       },
-      order: ['example', 'habits', 'attendance', 'overall', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // Strong in one skill (past the "strongest" gate), weak in another a
@@ -5009,7 +5173,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.split;
       },
-      order: ['overall', 'example', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // Good marks, with two or more habits rated Sometimes or Rarely: the
@@ -5019,7 +5183,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.growing >= 2 && a.good;
       },
-      order: ['example', 'habits', 'attendance', 'overall', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // An A or B (or Proficient and up), nothing missing, no slide: the
@@ -5029,7 +5193,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.high && !a.missing && !a.slide;
       },
-      order: ['example', 'overall', 'habits', 'attendance', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // A C or C- (or below Proficient): what is working leads.
@@ -5038,7 +5202,7 @@ window.CommentBank = (function () {
       when: function (a) {
         return a.low;
       },
-      order: ['example', 'habits', 'attendance', 'overall', 'nextStep', 'home', 'closer'],
+      order: CORE_ORDER,
     },
     {
       // No story stands out: the steps in their usual order.
@@ -5047,13 +5211,7 @@ window.CommentBank = (function () {
       when: function () {
         return true;
       },
-      order: DRAFT_STEPS.slice(1)
-        .filter(function (s) {
-          return !s.ie;
-        })
-        .map(function (s) {
-          return s.key;
-        }),
+      order: CORE_ORDER,
     },
   ];
 
@@ -5302,6 +5460,12 @@ window.CommentBank = (function () {
     // Progress in levels is as specific as the where-now frames
     // (`when.strengthWord`): the two share the Overall step's tier.
     if (ctx.progressSkill && needs.indexOf('progressSkill') >= 0) n++;
+    // What the best piece shows, when the facts give it, comes before the
+    // bare best piece; the grade with even marks before the grade alone
+    // (the sample voice, Nov 4). A frame that runs long falls to the next
+    // tier.
+    if ((ctx.pieceSkill && needs.indexOf('pieceSkill') >= 0) || (ctx.pieceComp && needs.indexOf('pieceComp') >= 0)) n++;
+    if (s.group === 'Grade' && ctx.evenResults && needs.indexOf('evenResults') >= 0) n++;
     // Two for a story, so a frame written for the student's story comes
     // before one written for the strongest skill (`when.strongSkill`, bank
     // n6xx-n7xx), which comes before a general one.
@@ -5518,6 +5682,7 @@ window.CommentBank = (function () {
     return n;
   }
 
+  var SO_FAR = /\bso far\b/i;
   /* One pass of the draft over the steps in `seq`. usage: { sentence id:
      classmates } (classUsage()); exclude: { sentence id: true }. */
   function _compose(ctx, bank, seq, kept, seed, usage, exclude) {
@@ -5675,10 +5840,13 @@ window.CommentBank = (function () {
         var dup = quotes.some(function (q) {
           return sofar.indexOf(q) >= 0;
         });
+        // "So far" at most once a comment off the IE path (the sample
+        // voice, Nov 4: the grade is year to date).
+        var twice = ctx._path !== 'ie' && SO_FAR.test(t) && SO_FAR.test(sofar);
         return {
           s: s,
           t: t,
-          dup: dup ? 1 : 0,
+          dup: dup || twice ? 1 : 0,
           // A sentence over 20 words as realised (a quoted title as one),
           // after {strengths} has fallen back to one skill (ctxFor), is
           // not offered (the realiser's length rule, 2026-11-01).
@@ -5690,6 +5858,11 @@ window.CommentBank = (function () {
           // a sentence that does not start like the one before it.
           general: s.subjects ? 0 : 1,
           repeats: repeatsLast(t, last) || (HABIT_PART_STEPS[key] && _sameHabitWords(s, out)) ? 1 : 0,
+          // A habits frame that repeats the habits sentence's own word
+          // ("always" twice) goes after every frame that does not, before
+          // the opening-word rule (Nov 4: with "Each day" and "reliably"
+          // retired, "always" could open both habits sentences).
+          sameWords: HABIT_PART_STEPS[key] && _sameHabitWords(s, out) ? 1 : 0,
           // A step that says a fact (the grade, the work not handed in)
           // draws no random number, so the rest of the draft's mix is as it
           // was; its frames are mixed by a hash of the seed and the id
@@ -5743,7 +5916,9 @@ window.CommentBank = (function () {
           .filter(fresh);
       if (!scored.length) return;
       scored.sort(function (a, b) {
-        return a.used - b.used || a.general - b.general || a.repeats - b.repeats || a.r - b.r;
+        return (
+          a.used - b.used || a.general - b.general || a.sameWords - b.sameWords || a.repeats - b.repeats || a.r - b.r
+        );
       });
       var pick = scored[0];
       taken[pick.s.id] = true;
@@ -5838,7 +6013,7 @@ window.CommentBank = (function () {
      `short: true` for the screen to show. Nothing is ever padded. */
   var MAX_SENTENCES = 9;
   var MIN_SENTENCES = 6;
-  var DROP_FIRST = ['home', 'attendance', 'overall'];
+  var DROP_FIRST = ['spread', 'attendance', 'growth', 'home', 'overall'];
   /* A draft's sentences as the plan counts them: the habits part's second
      sentence and the habits that would help are part of its one. */
   function _counted(sentences) {
@@ -6114,7 +6289,7 @@ window.CommentBank = (function () {
      best-piece forms, the skill-table sentence), class lines are the
      teacher's own text, and the IE path's Required parts are set. What is
      left is what a teacher can widen with sentences of their own. */
-  var FIXED_STEPS = { grade: true, attendance: true, notHandedIn: true, example: true, nextStep: true };
+  var FIXED_STEPS = { grade: true, spread: true, attendance: true, notHandedIn: true, example: true, nextStep: true };
   function _strengthSteps() {
     return DRAFT_STEPS.filter(function (s) {
       return !!s.groups && !s.line && !s.ie && !s.says && !FIXED_STEPS[s.key];
@@ -6323,7 +6498,9 @@ window.CommentBank = (function () {
   }
   function _gradeSentences(bank) {
     var step = DRAFT_STEPS[0];
-    return bank.sentences.filter(function (s) {
+    // With the grade frames the bank retired (Nov 4), so a saved comment
+    // that holds one still has its grade sentence set aside.
+    return bank.sentences.concat(bank.retired || []).filter(function (s) {
       return s.part === step.part && step.groups.indexOf(s.group) >= 0;
     });
   }
@@ -6620,6 +6797,22 @@ window.CommentBank = (function () {
       if (_has(pv, 'evenWord')) checks.push(!!now && !!f.standing && f.standing === now && v.evenWord === now);
       return checks.length > 0 && checks.every(Boolean);
     },
+    // The strength said on its own (highestFallbackOf): the same
+    // competency, strictly highest now, in its phrase or plain label.
+    highest: function (pv, f) {
+      var h = highestFallbackOf(f);
+      var slot = _has(pv, 'hiSkill') ? 'hiSkill' : _has(pv, 'hiComp') ? 'hiComp' : '';
+      if (!h || !slot || _ids(pv, slot, 'comp')[0] !== String(h.comp.id)) return false;
+      return pv.values[slot] === (slot === 'hiSkill' ? h.skill : h.label);
+    },
+    // The marks spread thinly (spreadOf): three or more competencies with a
+    // level, most on one or two scored pieces (every one, for spreadAll).
+    spread: function (pv, f) {
+      var sp = spreadOf(f);
+      if (!sp || !_has(pv, 'spread')) return false;
+      if (_ids(pv, 'spread', 'comp').length !== sp.ids.length) return false;
+      return !_has(pv, 'spreadAll') || sp.all;
+    },
     // Competencies to build: each below the highest now.
     growthArea: function (pv, f) {
       var ids = _ids(pv, 'growthAreas', 'comp')
@@ -6708,6 +6901,25 @@ window.CommentBank = (function () {
               }),
         );
       }
+      // The best piece owning its title (the sample voice, Nov 4): the top
+      // piece, named as the facts name it, a quiz or test only where the
+      // frame says it scored highest, and what it shows the competency it
+      // scored highest on (bestPieceSkillOf), in its phrase or label.
+      if (_has(pv, 'piece')) {
+        var pw = _byId(f.work, _ids(pv, 'piece', 'work')[0]);
+        checks.push(!!pw && markRank(f, pw) === top && !!pv.values.piece && pv.values.piece === pieceTitle(pw));
+        if (_has(pv, 'pieceTest')) checks.push(!!pw && pieceIsTest(pw));
+        if (_has(pv, 'pieceWork')) checks.push(!!pw && !pieceIsTest(pw));
+        ['pieceSkill', 'pieceComp'].forEach(function (slot) {
+          if (!_has(pv, slot)) return;
+          var ps = pw ? bestPieceSkillOf(f, pw) : null;
+          checks.push(
+            !!ps &&
+              _ids(pv, slot, 'comp')[0] === String(ps.comp.id) &&
+              pv.values[slot] === (slot === 'pieceSkill' ? ps.skill : ps.label),
+          );
+        });
+      }
       ['assignment', 'seeWork'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
         var w = _byId(f.work, _ids(pv, slot, 'work')[0]);
@@ -6780,8 +6992,14 @@ window.CommentBank = (function () {
       // A sentence bound to one skill without naming it (a For the Family
       // sentence, `when.nextSkill`): that skill is the next step's.
       if (_has(pv, 'when.nextSkill') && !_has(pv, 'nextSkill')) {
-        var ns = nextSkillOf(f);
+        var ns = stepSkillOf(f);
         return !!ns && ns.key === pv.values['when.nextSkill'];
+      }
+      // A tentative next step from thin evidence (tentSkillOf): the same
+      // competency and wording.
+      if (_has(pv, 'tentStep')) {
+        var tn = tentSkillOf(f);
+        return !!tn && _ids(pv, 'tentStep', 'comp')[0] === String(tn.comp.id) && pv.values.tentStep === tn.text;
       }
       // The bank's next step at the student's level (levelStepOf).
       if (_has(pv, 'levelStep')) {
@@ -7176,6 +7394,579 @@ window.CommentBank = (function () {
      keeps one as written rather than having it swapped for a sentence the
      teacher didn't choose. */
   var RETIRED = {};
+  var RETIRED_SAMPLE_VOICE = [
+    'hf14',
+    'hf16',
+    'hf28',
+    'hf36',
+    'gr01',
+    'gr02',
+    'gr03',
+    'gr04',
+    'gr05',
+    'gr06',
+    'gr07',
+    'gr08',
+    'gr09',
+    'gr10',
+    'gr11',
+    'gr12',
+    'gr13',
+    'gr14',
+    'gr15',
+    'gr16',
+    'gr17',
+    'gr18',
+    'gr19',
+    'gr20',
+    'gr21',
+    'gr22',
+    'gr23',
+    'gr24',
+    'gr25',
+    'gr26',
+    'gr27',
+    'gr28',
+    'gr29',
+    'gr30',
+    'gr31',
+    'gr32',
+    'gr33',
+    'gr34',
+    'gr35',
+    'gr36',
+    'gr37',
+    'gr38',
+    'gr39',
+    'gr40',
+    'gr41',
+    'gr42',
+    'gr43',
+    'gr44',
+    'gr45',
+    'gr46',
+    'gr47',
+    'gr48',
+    'gr49',
+    'gr50',
+    'gr51',
+    'gr52',
+    'gr53',
+    'gr54',
+    'gr55',
+    'gr56',
+    'gr57',
+    'gr58',
+    'gr59',
+    'gr60',
+    'gr61',
+    'gr62',
+    'gr63',
+    'gr64',
+    'gr65',
+    'gr66',
+    'gr67',
+    'gr68',
+    'gr69',
+    'gr70',
+    'gr71',
+    'gr72',
+    'gr73',
+    'gr74',
+    'gr75',
+    'gr76',
+    'gr77',
+    'gr78',
+    'n36',
+    'n361',
+    'n362',
+    'n363',
+    'n364',
+    'n365',
+    'n366',
+    'n367',
+    'n372',
+    'n373',
+    'n374',
+    'n375',
+    'n376',
+    'n377',
+    'n378',
+    'n379',
+    'n380',
+    'n381',
+    'pg01',
+    'pg02',
+    'wn01',
+    'wn02',
+    'wn03',
+    'wn04',
+    'wn05',
+    'wn06',
+    'wn07',
+    'wn08',
+    'wn09',
+    'ls03',
+    'ls04',
+    'ls05',
+    'n411',
+    'n413',
+    'n414',
+    'n415',
+    'n431',
+    'n432',
+    'n434',
+    'n435',
+    'n442',
+    'n443',
+    'n501',
+    'n502',
+    'n503',
+    'n504',
+    'n505',
+    'n506',
+    'n507',
+    'n508',
+    'n509',
+    'n510',
+    'n511',
+    'n512',
+    'n513',
+    'n514',
+    'n515',
+    'n516',
+    'n517',
+    'n518',
+    'n519',
+    'n520',
+    'n521',
+    'n522',
+    'n523',
+    'n524',
+    'n525',
+    'n526',
+    'n527',
+    'n528',
+    'n529',
+    'n530',
+    'n531',
+    'n532',
+    'n533',
+    'n534',
+    'n535',
+    'n536',
+    'n537',
+    'n538',
+    'n601',
+    'n602',
+    'n603',
+    'n604',
+    'n605',
+    'n606',
+    'n607',
+    'n608',
+    'n609',
+    'n610',
+    'n611',
+    'n612',
+    'n613',
+    'n614',
+    'n615',
+    'n616',
+    'n617',
+    'n618',
+    'n619',
+    'n620',
+    'n621',
+    'n622',
+    'n623',
+    'n624',
+    'n625',
+    'n626',
+    'n627',
+    'n628',
+    'n629',
+    'n630',
+    'n631',
+    'n632',
+    'n633',
+    'n634',
+    'n635',
+    'n636',
+    'n637',
+    'n638',
+    'n639',
+    'n640',
+    'n641',
+    'n642',
+    'n643',
+    'n644',
+    'n645',
+    'n646',
+    'n647',
+    'n648',
+    'n649',
+    'n650',
+    'n651',
+    'n652',
+    'n653',
+    'n654',
+    'n655',
+    'n656',
+    'n657',
+    'n658',
+    'n659',
+    'n660',
+    'n661',
+    'n662',
+    'n663',
+    'n664',
+    'n665',
+    'n666',
+    'n667',
+    'n668',
+    'n669',
+    'n670',
+    'n671',
+    'n672',
+    'n673',
+    'n674',
+    'n675',
+    'n676',
+    'n677',
+    'n678',
+    'n679',
+    'n680',
+    'n681',
+    'n682',
+    'n683',
+    'n684',
+    'n685',
+    'n686',
+    'n687',
+    'n688',
+    'n689',
+    'n690',
+    'n691',
+    'n692',
+    'n693',
+    'n694',
+    'n695',
+    'n696',
+    'n697',
+    'n698',
+    'n699',
+    'n700',
+    'n701',
+    'n702',
+    'n703',
+    'n704',
+    'n705',
+    'n706',
+    'n707',
+    'n708',
+    'n709',
+    'n710',
+    'n711',
+    'n712',
+    'n713',
+    'n714',
+    'n715',
+    'n716',
+    'n717',
+    'n718',
+    'n719',
+    'n720',
+    'n721',
+    'n722',
+    'n723',
+    'n724',
+    'n725',
+    'n726',
+    'n727',
+    'n728',
+    'n729',
+    'n730',
+    'n731',
+    'n732',
+    'n733',
+    'n734',
+    'n735',
+    'n736',
+    'n737',
+    'n738',
+    'n739',
+    'n740',
+    'n741',
+    'n742',
+    'n743',
+    'n744',
+    'n745',
+    'n746',
+    'n747',
+    'n748',
+    'n749',
+    'n750',
+    'n751',
+    'n752',
+    'n753',
+    'n754',
+    'n755',
+    'n756',
+    'n757',
+    'n758',
+    'n759',
+    'n760',
+    'n761',
+    'n762',
+    'n763',
+    'n764',
+    'n765',
+    'n766',
+    'n767',
+    'n768',
+    'n769',
+    'n770',
+    'n771',
+    'n772',
+    'n773',
+    'n774',
+    'n775',
+    'n776',
+    'n777',
+    'n778',
+    'n779',
+    'n780',
+    'n781',
+    'n782',
+    'n783',
+    'n784',
+    'n785',
+    'n786',
+    'n787',
+    'n788',
+    'n789',
+    'n790',
+    'n791',
+    'n792',
+    'n793',
+    'n794',
+    'n795',
+    'n796',
+    'n797',
+    'n798',
+    'n799',
+    'n800',
+    'n801',
+    'n802',
+    'n803',
+    'n804',
+    'n805',
+    'n806',
+    'n807',
+    'n808',
+    'n809',
+    'n810',
+    'n811',
+    'n812',
+    'n813',
+    'n814',
+    'n815',
+    'n816',
+    'n817',
+    'n818',
+    'n819',
+    'n820',
+    'n821',
+    'n822',
+    'n823',
+    'n824',
+    'n825',
+    'n826',
+    'n827',
+    'n828',
+    'n829',
+    'n830',
+    'n831',
+    'n832',
+    'n833',
+    'n834',
+    'n835',
+    'n836',
+    'n837',
+    'n838',
+    'n839',
+    'n840',
+    'n841',
+    'n842',
+    'n843',
+    'n844',
+    'n845',
+    'n846',
+    'n847',
+    'n848',
+    'n849',
+    'n850',
+    'n851',
+    'n852',
+    'n853',
+    'n854',
+    'n855',
+    'n856',
+    'n857',
+    'n858',
+    'n859',
+    'n860',
+    'n861',
+    'n862',
+    'n863',
+    'n864',
+    'n865',
+    'n866',
+    'n867',
+    'n868',
+    'n869',
+    'n870',
+    'n871',
+    'n872',
+    'n873',
+    'n874',
+    'n875',
+    'n876',
+    'n877',
+    'n878',
+    'n879',
+    'n880',
+    'n881',
+    'n882',
+    'n883',
+    'n884',
+    'n885',
+    'n886',
+    'n887',
+    'n888',
+    'n889',
+    'n890',
+    'n891',
+    'n892',
+    'n893',
+    'n894',
+    'n895',
+    'n896',
+    'n897',
+    'n898',
+    'n899',
+    'n900',
+    'n901',
+    'n902',
+    'n903',
+    'n904',
+    'n905',
+    'n906',
+    'n907',
+    'n908',
+    'n909',
+    'n910',
+    'n911',
+    'n912',
+    'n913',
+    'n914',
+    'n915',
+    'n916',
+    'n917',
+    'n918',
+    'n919',
+    'n920',
+    'n921',
+    'n922',
+    'n923',
+    'n924',
+    'n925',
+    'n926',
+    'n927',
+    'n928',
+    'n929',
+    'n930',
+    'n931',
+    'n932',
+    'n933',
+    'n934',
+    'n935',
+    'n936',
+    'n937',
+    'n938',
+    'n939',
+    'n940',
+    'n941',
+    'n942',
+    'n943',
+    'n944',
+    'n945',
+    'n946',
+    'n947',
+    'n948',
+    'n949',
+    'n950',
+    'n951',
+    'n952',
+    'n953',
+    'n954',
+    'n955',
+    'n956',
+    'n957',
+    'n958',
+    'n959',
+    'n960',
+    'n961',
+    'n962',
+    'n963',
+    'n964',
+    'n965',
+    'n966',
+    'n967',
+    'n968',
+    'n969',
+    'n970',
+    'n971',
+    'n972',
+    'n973',
+    'n974',
+    'n975',
+    'n976',
+    'n977',
+    'n1001',
+    'n1002',
+    'n1003',
+    'n1004',
+    'n1005',
+    'n1006',
+    'n1007',
+    'n1008',
+    'n1009',
+    'n1010',
+    'n1011',
+    'n1013',
+    'n1014',
+    'n1015',
+    'n1016',
+    'n1017',
+    'n1018',
+    'n1019',
+    'n1020',
+    'n1021',
+    'n1022',
+    'n1023',
+    'n1025',
+    'n1026',
+    'n1027',
+    'scr01',
+    'scr02',
+    'scr03',
+    'scr04',
+    'scr05',
+    'scr06',
+    'scn01',
+  ];
   [
     'g01',
     'g03',
@@ -7224,6 +8015,17 @@ window.CommentBank = (function () {
     'hs36',
     'hs37',
   ].forEach(function (id) {
+    RETIRED[id] = true;
+  });
+  // Nov 4, the sample voice (Colin approved six sample comments as the
+  // spec): every grade frame ("on the BC proficiency scale", "calls",
+  // "this term" for a year-to-date grade), every best-piece frame (titles
+  // quoted, "this term", "the piece with his highest mark"), every Overall
+  // strength frame ("is able to", "ability to", "as his marks show",
+  // "skill by skill"), the Next Step openers "After this term's work",
+  // "One thing he can try next is to" and "To keep growing", and the habits
+  // openers "Each day", "reliably" and "For him, two habits would help most".
+  RETIRED_SAMPLE_VOICE.forEach(function (id) {
     RETIRED[id] = true;
   });
 
@@ -7732,6 +8534,13 @@ window.CommentBank = (function () {
     progressOf: progressOf,
     bestPieceOf: bestPieceOf,
     bestPieceSkillOf: bestPieceSkillOf,
+    highestFallbackOf: highestFallbackOf,
+    tentSkillOf: tentSkillOf,
+    stepSkillOf: stepSkillOf,
+    spreadOf: spreadOf,
+    plainLabel: plainLabel,
+    pieceTitle: pieceTitle,
+    CORE_ORDER: CORE_ORDER,
     compsOf: compsOf,
     topTieOf: topTieOf,
     topTieSkills: topTieSkills,

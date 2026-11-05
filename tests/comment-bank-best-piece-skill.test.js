@@ -1,10 +1,10 @@
 /**
- * The best piece with no teacher note names the skill it shows (Colin,
- * 2026-11-02): "Her best piece was “Task 2,” which shows she can …", in the
- * phrase of a bank competency it was scored Proficient or above on. One
- * sentence per skill: never a skill the comment can name elsewhere (the
- * strengths, the next step and the other strength routes), and only within
- * 20 words. A note says what the piece shows itself.
+ * The best piece with no teacher note says what it shows (Colin, 2026-11-02;
+ * the sample voice, Nov 4): "Their Task 2 is their best piece so far, and it
+ * shows they can …", from the competency the piece scored highest on at
+ * Proficient or above, even with one mark, in its skill phrase (the bank's,
+ * else the table's) or its own label in plain words. Never the next step's
+ * skill. A note says what the piece shows itself.
  */
 import './setup.js';
 import { readFileSync } from 'fs';
@@ -81,68 +81,81 @@ const withWork = (levels, bank = true, title = 'Task') => {
 };
 
 describe('the best piece names its skill', () => {
-  it('names a skill no other sentence can, from a bank competency scored Proficient or above', () => {
-    // Evidence is the strength and Significance the next step: the piece
-    // shows Perspective.
+  it('names the competency the piece scored highest on, Proficient or above', () => {
+    // Evidence is scored highest on the piece (and is the strength).
     const f = withWork([3.8, 3, 2]);
     const top = CommentBank.bestPieceOf(f);
     const sk = CommentBank.bestPieceSkillOf(f, top);
-    expect(sk.comp.id).toBe('c2');
-    expect(sk.skill).toBe(CommentBank.skillFor(f, f.comps[1]).skill);
+    expect(sk.comp.id).toBe('c1');
+    expect(sk.skill).toBe(CommentBank.skillFor(f, f.comps[0]).skill);
     const ctx = CommentBank.context(f, {});
-    expect(ctx.bestPiece).toBe('Their best piece was “Task 2”, which shows they can ' + sk.skill + '.');
+    expect(ctx.piece).toBe('Task 2');
+    expect(ctx.pieceSkill).toBe(sk.skill);
+    expect(ctx.pieceComp).toBe('');
   });
 
-  it('names none when every skill on the piece is taken, below Proficient, or the class is not linked', () => {
-    // Perspective below Proficient on the piece.
+  it('names none below Proficient; an unlinked class names the table’s skill, else the label', () => {
     expect(
-      CommentBank.bestPieceSkillOf(withWork([3.8, 2.4, 1.6]), CommentBank.bestPieceOf(withWork([3.8, 2.4, 1.6]))),
+      CommentBank.bestPieceSkillOf(withWork([2.4, 2.4, 1.6]), CommentBank.bestPieceOf(withWork([2.4, 2.4, 1.6]))),
     ).toBeNull();
     const plain = withWork([3.8, 3, 2], false);
-    expect(CommentBank.bestPieceSkillOf(plain, CommentBank.bestPieceOf(plain))).toBeNull();
-    expect(CommentBank.context(plain, {}).bestPiece).toBe('Their best piece was “Task 2.”');
+    expect(CommentBank.bestPieceSkillOf(plain, CommentBank.bestPieceOf(plain)).skill).toBe(
+      CommentBank.skillOf('socials', 'Evidence').skill,
+    );
+    // Labels no table row matches: the label itself, in plain words.
+    const own = withWork([3.8, 3, 2], false);
+    own.comps = own.comps.map((c, i) => ({ ...c, name: ['Reasoning and Argument', 'Ethics', 'Worldviews'][i] }));
+    const sk = CommentBank.bestPieceSkillOf(own, CommentBank.bestPieceOf(own));
+    expect(sk).toMatchObject({ label: 'reasoning and argument' });
+    expect(CommentBank.context(own, {}).pieceComp).toBe('reasoning and argument');
   });
 
-  it('names none when the only Proficient skill on the piece is one the comment names already', () => {
-    // Perspective is now the strength alongside Evidence (both half a step
-    // over Significance): both are taken.
-    const f = withWork([3.6, 3.6, 2]);
-    expect(CommentBank.bestPieceSkillOf(f, CommentBank.bestPieceOf(f))).toBeNull();
+  it('never names the next step’s skill: the next highest on the piece instead', () => {
+    // All three level: the next step is Evidence (report order), so the
+    // piece shows Perspective.
+    const f = withWork([3, 3, 3]);
+    expect(CommentBank.nextSkillOf(f).comp.id).toBe('c1');
+    expect(CommentBank.bestPieceSkillOf(f, CommentBank.bestPieceOf(f)).comp.id).toBe('c2');
   });
 
   it('leaves the skill to the teacher’s note when there is one', () => {
     const f = withWork([3.8, 3, 2]);
     f.work[2].note = 'compared two accounts of the strike';
     expect(CommentBank.bestPieceSkillOf(f, f.work[2])).toBeNull();
-    expect(CommentBank.context(f, {}).bestPiece).toBe(
-      'Their best piece was “Task 2”, where they compared two accounts of the strike.',
-    );
+    expect(CommentBank.context(f, {}).bestNote).toBe('compared two accounts of the strike');
   });
 
-  it('stays within 20 words for every cluster’s phrase (a title counts as one word)', () => {
+  it('has a frame within 20 words for every cluster phrase of nine words or fewer, with a three-word title', () => {
+    const frames = COMMENT_BANK.sentences.filter(s => (s.needs || []).indexOf('pieceSkill') >= 0);
     Object.keys(comment)
       .filter(k => !k.startsWith('_'))
       .forEach(k => {
-        const t = CommentBank.bestPieceSentence({
-          title: 'A Long Title About the Strike',
-          skill: comment[k].phrase,
+        if (CommentRealiser.wordCount(comment[k].phrase) > 9) return;
+        const ctx = {
+          _p: THEY,
           name: 'Noor',
-        });
-        expect(CommentRealiser.tooLong(t), k).toBe(false);
+          piece: 'Strike Essay',
+          pieceWork: 'yes',
+          pieceTest: 'yes',
+          pieceSkill: comment[k].phrase,
+        };
+        const fit = frames.filter(s => !CommentRealiser.tooLong(CommentBank.fill(s, ctx)));
+        expect(fit.length, k).toBeGreaterThan(0);
       });
   });
 
   it('verifies, and is flagged once the piece no longer shows that skill', () => {
     const f = withWork([3.8, 3, 2]);
     const ctx = CommentBank.context(f, {});
-    const s = COMMENT_BANK.sentences.find(x => x.id === 'n36');
+    const s = COMMENT_BANK.sentences.find(x => x.id === 'bp12');
     const d = {
       text: CommentBank.fill(s, ctx),
-      sentences: [{ id: 'n36', step: 'example', text: CommentBank.fill(s, ctx) }],
+      sentences: [{ id: 'bp12', step: 'example', text: CommentBank.fill(s, ctx) }],
       provenance: [CommentBank.provenance(s, ctx)],
     };
+    expect(d.text).toBe('Their best piece is their Task 2; it shows they can ' + ctx.pieceSkill + '.');
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
-    const lower = withWork([3.8, 2.4, 2]);
-    expect(CommentBank.verify(d, lower, {}).replaced.map(x => x.sentenceId)).toContain('n36');
+    const lower = withWork([2.4, 2.4, 2]);
+    expect(CommentBank.verify(d, lower, {}).replaced.map(x => x.sentenceId)).toContain('bp12');
   });
 });

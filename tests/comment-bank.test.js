@@ -91,10 +91,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1707 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1707);
+  it('has 1227 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(1227);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1707);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1227);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -119,13 +119,13 @@ describe('the bank', () => {
     const at = (key, lvl) => COMMENT_BANK.sentences.filter(s => s.when && s.when[key] === lvl);
     const gone = ['Openings', 'Growth This Term', "In the Student's Words", 'Looking Ahead', 'Work to Revisit'];
     COMMENT_BANK.sentences.forEach(s => expect(gone, s.id).not.toContain(s.group));
-    // The best piece: the plan's sentence n36, and the frames around the
-    // same title and note (bank expansion, Nov 1), each claiming it.
+    // The best piece owning its title (the sample voice, Nov 4), each
+    // frame claiming it.
     const examples = COMMENT_BANK.sentences.filter(s => s.group === 'Examples From Work');
-    expect(examples.map(s => s.id)).toContain('n36');
+    expect(examples.map(s => s.id)).toContain('bp01');
     examples.forEach(s => {
       expect(s.claims, s.id).toEqual(['bestPiece']);
-      expect(s.needs, s.id).toContain(s.id === 'n36' ? 'bestPiece' : 'assignment');
+      expect(s.needs, s.id).toContain('piece');
     });
     expect(
       COMMENT_BANK.sentences.some(s =>
@@ -154,7 +154,7 @@ describe('the bank', () => {
       ).toEqual([]),
     );
     ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w =>
-      expect(at('standing', w).filter(s => s.group === 'Grade').length, w).toBe(10),
+      expect(at('standing', w).filter(s => s.group === 'Grade').length, w).toBe(5),
     );
   });
 
@@ -239,6 +239,19 @@ describe('the bank', () => {
       progressFrom: 'improved',
       progressTo: 'improved',
       progressSkill: 'improved',
+      // The sample voice (Nov 4): the best piece owning its title and what
+      // it shows, the strength on its own, the tentative next step and the
+      // marks spread thinly.
+      piece: 'bestPiece',
+      pieceWork: 'bestPiece',
+      pieceTest: 'bestPiece',
+      pieceSkill: 'bestPiece',
+      pieceComp: 'bestPiece',
+      hiSkill: 'highest',
+      hiComp: 'highest',
+      tentStep: 'nextStep',
+      spread: 'spread',
+      spreadAll: 'spread',
       habitsExcellent: 'habits',
       habitsGood: 'habits',
       habitsAllSeen: 'habits',
@@ -481,9 +494,9 @@ describe('focusOptions', () => {
 describe('fits', () => {
   it('does not offer a sentence with a missing slot', () => {
     const ctx = fullContext(P.she);
-    const n36 = COMMENT_BANK.sentences.find(s => s.id === 'n36');
-    expect(CommentBank.fits(n36, ctx)).toBe(true);
-    expect(CommentBank.fits(n36, { ...ctx, bestPiece: '' })).toBe(false);
+    const bp03 = COMMENT_BANK.sentences.find(s => s.id === 'bp03');
+    expect(CommentBank.fits(bp03, { ...ctx, piece: 'Lab', pieceWork: 'yes' })).toBe(true);
+    expect(CommentBank.fits(bp03, { ...ctx, piece: '', pieceWork: 'yes' })).toBe(false);
     const h60 = COMMENT_BANK.sentences.find(s => s.id === 'h60');
     expect(CommentBank.fits(h60, { ...ctx, attendance: '' })).toBe(false);
   });
@@ -633,20 +646,20 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // from the record (Nov 4), so no habits frame fits. Before, the record's
   // Consistently fitted eight: the three Strong Habits frames (hs11, hs13,
   // hs15) and five Habit Ratings frames for Completes Work.
-  it('knows the Demo class is Science from its name, and offers Cece 69 sentences (0, 40, 4, 25)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 47 sentences (0, 14, 8, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 40, 4, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(69);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 14, 8, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(47);
   });
 
-  it('offers Jasper 70 (0, 40, 5, 25), by the name he goes by', () => {
+  it('offers Jasper 48 (0, 14, 9, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
     // Overall: every competency is Proficient as the report grades it
     // (2.9 to 3.3), so the even-results frames fit (Nov 3).
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 40, 5, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(70);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 14, 9, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(48);
     expect(ctx.name).toBe('Jas');
     // Nothing fell from Extending since Report 1's year to date (it fell
     // four times inside Term 2's own trend, which Generate no longer
@@ -762,13 +775,13 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     ]);
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
     // The Demo class has no closing sentence or support lines set, so the
-    // comment leaves those out (plan PR 8): the grade, the best piece, the
-    // habits, the strengths (Cece's results are even: evenComps), the next
-    // step and the family sentence; six as the plan counts them (the habits
-    // part is one, in two sentences), so not flagged short, never padded.
-    expect(sentences.length).toBe(7);
-    expect(d.sentences.some(x => x.step === 'overall')).toBe(true);
-    expect(d.short).toBe(false);
+    // comment leaves those out (plan PR 8): the grade, the best piece with
+    // what it shows (the sample voice, Nov 4: the strength is said there),
+    // the habits, the next step and the family sentence; five as the plan
+    // counts them (the habits part is one, in two sentences), never padded.
+    expect(sentences.length).toBe(6);
+    expect(d.sentences.some(x => x.step === 'overall')).toBe(false);
+    expect(d.sentences.find(x => x.step === 'example').text).toMatch(/shows she can /);
     expect(d.text).not.toMatch(/[{}[\]]/);
     expect(d.sentences[0].text).toContain('Cece');
     // The course is named wherever the story opens with it.
@@ -855,14 +868,14 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const f = CommentBank.facts(cid, st, 'term-2');
     const ctx = CommentBank.context(f, {});
     const top = f.work.slice().sort((a, b) => b.v - a.v || b.d.localeCompare(a.d))[0];
-    const n36 = CommentBank.provenance(byId('n36'), ctx);
-    expect(n36).toMatchObject({
-      sentenceId: 'n36',
+    const bp03 = CommentBank.provenance(byId('bp03'), ctx);
+    expect(bp03).toMatchObject({
+      sentenceId: 'bp03',
       claims: ['bestPiece'],
       factKeys: ['work:' + top.id],
-      values: { bestPiece: ctx.bestPiece },
+      values: { piece: ctx.piece, pieceWork: 'yes' },
     });
-    expect(ctx.bestPiece).toContain('“' + top.title);
+    expect(ctx.piece).toBe(top.title);
     // Cece has no competency past the "improved" gate (half a step since
     // Report 1); Mateo's Scientific Communication is, once it rose from
     // Developing at Report 1.
@@ -926,11 +939,11 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   it('drops a best-piece sentence once that work is no longer the best (no no-claim sentence in its part)', () => {
     const f = cece();
     const ctx = CommentBank.context(f, {});
-    const d = one('n36', ctx);
-    const top = d.provenance[0].sources.bestPiece[0].slice(5);
+    const d = one('bp03', ctx);
+    const top = d.provenance[0].sources.piece[0].slice(5);
     const lower = { ...f, work: f.work.map(w => (w.id === top ? { ...w, v: 1 } : w)) };
     const v = CommentBank.verify(d, lower, {});
-    expect(v.replaced).toEqual([{ sentenceId: 'n36', failed: ['slots', 'bestPiece'], by: null }]);
+    expect(v.replaced).toEqual([{ sentenceId: 'bp03', failed: ['slots', 'bestPiece'], by: null }]);
     expect(v.text).toBe('');
     expect(v.provenance).toEqual([]);
   });

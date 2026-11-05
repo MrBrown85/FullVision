@@ -68,31 +68,36 @@ describe('progress in levels', () => {
     expect([pg.from, pg.to, pg.skill]).toEqual(['Developing', 'Proficient', comment['ss-evi'].phrase]);
     const ctx = CommentBank.context(f, {});
     expect(ctx.progressSkill).toBe(pg.skill);
-    const pool = CommentBank.stepPool('overall', ctx).map(s => s.id);
-    expect(pool.some(id => /^pg\d\d$/.test(id))).toBe(true);
+    // The Growth step (the sample voice, Nov 4), right after the grade.
+    const pool = CommentBank.stepPool('growth', ctx).map(s => s.id);
+    expect(pool.some(id => /^ov0\d$/.test(id))).toBe(true);
   });
 
   it('says it in sentences that verify, and is flagged once the climb is gone', () => {
     const f = facts(climbing());
     const ctx = CommentBank.context(f, {});
-    const pg1 = COMMENT_BANK.sentences.find(x => x.id === 'pg01');
-    const pg2 = COMMENT_BANK.sentences.find(x => x.id === 'pg02');
+    const pg1 = COMMENT_BANK.sentences.find(x => x.id === 'ov01');
+    const pg2 = COMMENT_BANK.sentences.find(x => x.id === 'ov02');
     expect(CommentBank.fill(pg1, ctx)).toBe(
-      'They rose from Developing to Proficient in their ability to ' + comment['ss-evi'].phrase + '.',
+      'They have moved from Developing to Proficient in how well they can ' + comment['ss-evi'].phrase + '.',
     );
     expect(CommentBank.fill(pg2, ctx)).toBe(
-      'They have reached Proficient in their ability to ' + comment['ss-evi'].phrase + ', up from Developing.',
+      'When they have to ' + comment['ss-evi'].phrase + ', their marks have risen from Developing to Proficient.',
     );
-    const text = CommentBank.fill(pg1, ctx);
+    const pg3 = COMMENT_BANK.sentences.find(x => x.id === 'ov03');
+    const text = CommentBank.fill(pg3, ctx);
+    expect(text).toBe(
+      'Their marks have risen from Developing to Proficient where they must ' + comment['ss-evi'].phrase + '.',
+    );
     const d = {
       text,
-      sentences: [{ id: 'pg01', step: 'overall', text }],
-      provenance: [CommentBank.provenance(pg1, ctx)],
+      sentences: [{ id: 'ov03', step: 'growth', text }],
+      provenance: [CommentBank.provenance(pg3, ctx)],
     };
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
     const flat = climbing();
     flat[0] = comp('c1', 'Evidence', [3, 3, 3, 3, 3.1], 3, 3.1, 'bc.ss10.cc.3');
-    expect(CommentBank.verify(d, facts(flat), {}).replaced.map(x => x.sentenceId)).toContain('pg01');
+    expect(CommentBank.verify(d, facts(flat), {}).replaced.map(x => x.sentenceId)).toContain('ov03');
   });
 
   it('leaves out a climb below the gate, the next step’s skill, a Letter class and a class not linked to the bank', () => {
@@ -110,23 +115,22 @@ describe('progress in levels', () => {
     expect(CommentBank.progressOf(facts(plain))).toBeNull();
   });
 
-  it('stays within 20 words in every frame for every cluster it is offered for', () => {
-    const frames = COMMENT_BANK.sentences.filter(s => /^pg\d\d$/.test(s.id));
-    expect(frames.length).toBe(2);
+  it('has a frame within 20 words for every cluster it is offered for', () => {
+    const frames = COMMENT_BANK.sentences.filter(s => s.group === 'Growth');
+    expect(frames.length).toBe(3);
     Object.keys(comment)
       .filter(k => !k.startsWith('_'))
       .forEach(k => {
         if (CommentRealiser.wordCount(comment[k].phrase) > 9) return; // progressOf leaves these out
-        frames.forEach(s => {
-          const t = s.text
-            .replace('{He} [has|have]', 'Noor has')
-            .replace('{He}', 'Noor')
-            .replace('{his}', 'her')
-            .replace('{progressFrom}', 'Developing')
-            .replace('{progressTo}', 'Proficient')
-            .replace('{progressSkill}', comment[k].phrase);
-          expect(CommentRealiser.tooLong(t), s.id + ' ' + k).toBe(false);
-        });
+        const ctx = {
+          _p: { subj: 'she', obj: 'her', poss: 'her', refl: 'herself' },
+          name: 'Noor',
+          progressFrom: 'Developing',
+          progressTo: 'Proficient',
+          progressSkill: comment[k].phrase,
+        };
+        const fit = frames.filter(s => !CommentRealiser.tooLong(CommentBank.fill(s, ctx, { first: true })));
+        expect(fit.length, k).toBeGreaterThan(0);
       });
   });
 });

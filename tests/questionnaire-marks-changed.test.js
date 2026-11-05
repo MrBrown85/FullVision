@@ -530,13 +530,13 @@ describe('the Sentences rows recover from the record (recoverRows)', () => {
   beforeEach(seed);
   it('takes the record’s ids and Edited marks, where matching the bank alone would not', () => {
     const { f, ctx, rows } = drafted();
-    const at = rows.findIndex(r => r.step === 'overall');
+    const at = rows.findIndex(r => r.step === 'example');
     rows[at] = Object.assign({}, rows[at], { text: 'Her source work is careful.', edited: true });
     const meta = CommentBank.draftMeta(rows, f);
     const text = RQ.composeRows(rows);
     const exact = RQ.recoverRows(text, ctx, meta);
     expect(exact.map(r => r.id)).toEqual(meta.sentences.map(x => x.id));
-    expect(exact[at]).toMatchObject({ edited: true, step: 'overall', text: 'Her source work is careful.' });
+    expect(exact[at]).toMatchObject({ edited: true, step: 'example', text: 'Her source work is careful.' });
     expect(exact.find(r => r.step === 'closer')).toMatchObject({ classLine: true, id: 'class:closer' });
     // Without the record nothing says the teacher wrote it: the Earlier
     // Comment's, which Generate replaces.

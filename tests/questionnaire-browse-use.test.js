@@ -143,9 +143,9 @@ describe('Use on a sentence that does not fit', () => {
 describe('Use adds, never swaps', () => {
   beforeEach(seed);
 
-  it('a second Strengths sentence goes in after the first, and the comment grows', () => {
+  it('a second Best Piece sentence goes in after the first, and the comment grows', () => {
     const c = ctx();
-    const fits = RQ.browseList('strengths', c, {}).rows.filter(r => r.fits);
+    const fits = RQ.browseList('bestPiece', c, {}).rows.filter(r => r.fits);
     expect(fits.length).toBeGreaterThan(1);
     upsertTermRating(CID, PRI.id, TERM, { narrative: '' });
     open();

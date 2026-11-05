@@ -229,13 +229,16 @@ describe('the habits part for families (Nov 4)', { timeout: 20000 }, () => {
   const BANNED =
     /work habits?|\bsix\b|\b(all|every|each) of (his|her|their) habits|excellent|\bgood\b|Consistently|Sometimes|Rarely|\brated\b/;
 
-  it('all Consistently: hf01, hf02, hf04, hf14-hf16, then hf21, hf22, hf27, hf28 for the rest', () => {
-    const lead = expectReachable(hab(all(4)), 'habits', ['hf01', 'hf02', 'hf04', 'hf14', 'hf15', 'hf16']);
+  // hf14 ("Each day"), hf16 ("reliably"), hf28 ("Each day") and hf36 ("For
+  // him, two habits would help most") were retired for the sample voice
+  // (Colin, Nov 4).
+  it('all Consistently: hf01, hf02, hf04, hf15, then hf21, hf22, hf27 for the rest', () => {
+    const lead = expectReachable(hab(all(4)), 'habits', ['hf01', 'hf02', 'hf04', 'hf15']);
     Object.values(lead).forEach(t => {
       expect(t).toMatch(/hands in his work on time and comes to class ready to start\.$/);
       expect(t).not.toMatch(BANNED);
     });
-    const more = expectReachable(hab(all(4)), 'habitsMore', ['hf21', 'hf22', 'hf27', 'hf28']);
+    const more = expectReachable(hab(all(4)), 'habitsMore', ['hf21', 'hf22', 'hf27']);
     Object.values(more).forEach(t =>
       expect(t).toMatch(/listens to others, joins in class discussions, and uses feedback to improve his work\.$/),
     );
@@ -265,13 +268,13 @@ describe('the habits part for families (Nov 4)', { timeout: 20000 }, () => {
     Object.values(got).forEach(t => expect(t).toMatch(/comes to class ready and joins in group work/));
   });
 
-  it('one habit that would help: hf31-hf33, hf37; two: hf34-hf36, hf38, in the grid’s order', () => {
+  it('one habit that would help: hf31-hf33, hf37; two: hf34, hf35, hf38, in the grid’s order', () => {
     const one = expectReachable(hab({ ...all(4), feedback: 2 }), 'habitsBuild', ['hf31', 'hf32', 'hf33', 'hf37']);
     Object.values(one).forEach(t => expect(t).toMatch(/using feedback to improve his work/));
     const two = expectReachable(
       hab({ ...all(4), ready: 2, devices: 1 }),
       'habitsBuild',
-      ['hf34', 'hf35', 'hf36', 'hf38'],
+      ['hf34', 'hf35', 'hf38'],
       [],
       26,
     );
@@ -360,7 +363,7 @@ describe('the frames and the lint', () => {
     const mine = COMMENT_BANK.sentences.filter(s =>
       /^(hs(1[3-9]|[23]\d)|hf\d\d|h(6[1-9]|7\d)|m(0[2-9]|1\d|2[01]))$/.test(s.id),
     );
-    expect(mine).toHaveLength(73);
+    expect(mine).toHaveLength(69);
     mine.forEach(s => {
       expect(s.part, s.id).toBe('habits');
       expect(

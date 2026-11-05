@@ -188,11 +188,15 @@ describe('the angle shapes the draft', () => {
     });
   });
 
-  it('leads with the story: the best piece for a climb and for a strong term (no growth sentence: not a plan part)', () => {
-    const climb = CommentBank.angle(FIXTURES.climb, {});
-    expect(climb.lead).toBe('example');
-    expect(CommentBank.angle(FIXTURES.strength, {}).lead).toBe('example');
-    expect(CommentBank.angle(FIXTURES.hidden, {}).lead).toBe('example');
+  it('takes one order for every story off the IE path; the IE comment leads with its problem (the sample voice, Nov 4)', () => {
+    ['climb', 'strength', 'hidden'].forEach(id => {
+      const a = CommentBank.angle(FIXTURES[id], {});
+      expect(
+        a.order.filter(k => CommentBank.CORE_ORDER.indexOf(k) >= 0),
+        id,
+      ).toEqual(CommentBank.CORE_ORDER.filter(k => a.order.indexOf(k) >= 0));
+      expect(a.order.indexOf('example'), id).toBeLessThan(a.order.indexOf('habits'));
+    });
     expect(CommentBank.angle(FIXTURES.ie, {}).lead).toBe('ieProblem');
   });
 });
@@ -303,7 +307,12 @@ describe('the Generate Comment button (Demo Mode, Science 8)', () => {
     const order = steps.slice().reverse();
     const mine = 'Noor’s lab notebook is careful and complete.';
     const d2 = CommentBank.draft(ctx, { seed: 9, order, kept: { [d1.sentences[1].id]: mine }, previous: d1.text });
-    expect(d2.sentences.map(s => s.step)).toEqual(order.filter(k => d2.sentences.some(s => s.step === k)));
+    // The teacher's order over the steps it names; a step it does not name
+    // (even marks said on their own, once the grade frame differs) keeps
+    // its own place.
+    expect(d2.sentences.map(s => s.step).filter(k => order.indexOf(k) >= 0)).toEqual(
+      order.filter(k => d2.sentences.some(s => s.step === k)),
+    );
     expect(d2.sentences.find(s => s.kept).text).toBe(mine);
     expect(d2.text).not.toBe(d1.text);
   });

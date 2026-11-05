@@ -88,7 +88,7 @@ describe('points work in a Letter class', () => {
     expect(ctx.assignment).toBe('Primary Source Analysis');
     expect(ctx.level).toBe('90%');
     expect(CommentBank.fill(marked, ctx)).toContain('reached 90%.');
-    expect(CommentBank.fill(byId('n36'), ctx)).toContain('“Primary Source Analysis');
+    expect(CommentBank.fill(byId('bp03'), ctx)).toContain('Primary Source Analysis');
   });
 
   it('is checked by verify(): the right % passes, the level as a % is replaced', () => {
