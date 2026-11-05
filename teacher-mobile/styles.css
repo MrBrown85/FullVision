@@ -1932,7 +1932,9 @@ body.fv-switching-course::after {
   flex: 0 0 100%;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  padding: 16px;
+  /* The tab bar sits over the card's foot: clear it, or the Overall Comment
+     can never scroll into view. */
+  padding: 16px 16px calc(65px + env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
 }
 
@@ -2190,6 +2192,29 @@ body.fv-switching-course::after {
 .m-mod-btn:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* A rubric criterion's comment, under its ± row. */
+.m-crit-comment {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  min-height: 44px;
+  padding: 11px 12px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  resize: none;
+  overflow: hidden;
+  outline: none;
+}
+.m-crit-comment:focus {
+  box-shadow: 0 0 0 2px var(--active);
 }
 
 /* Status toggles */

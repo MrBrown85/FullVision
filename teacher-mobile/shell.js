@@ -473,6 +473,7 @@
         desc: JSON.parse(raw),
         scrollTop: c ? c.scrollTop : 0,
         gradeIndex: MGrade.getCurrentIndex ? MGrade.getCurrentIndex() : 0,
+        cardScrolls: MGrade.getCardScrolls ? MGrade.getCardScrolls() : null,
       });
     }
     return state;
@@ -514,6 +515,7 @@
     if (desc.kind === 'swiper') {
       MGrade.setupSwiper(_cid, desc.aid);
       MGrade.jumpToStudent(p.gradeIndex, true);
+      if (MGrade.setCardScrolls) MGrade.setCardScrolls(p.cardScrolls);
     }
     var content = screen.querySelector('.m-screen-content');
     if (content) content.scrollTop = p.scrollTop;
