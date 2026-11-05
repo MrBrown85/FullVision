@@ -2742,6 +2742,33 @@ window.PageAssignments = (function () {
           esc(CATEGORY_REQUIRED_HINT) +
           '</p>') +
       '</div>' +
+      // Evidence Type beside Category, where it was before More Options
+      // (Colin, Nov 4).
+      '<div class="af-field">' +
+      '<label class="af-label" for="af-evidence">Evidence Type</label>' +
+      '<select class="af-input" id="af-evidence">' +
+      // An evidence type from elsewhere (a quiz, lab or project) keeps its
+      // own option, so editing never changes it.
+      ['written', 'observation', 'audio', 'video', 'photo', 'conversation']
+        .concat(
+          evidence && ['written', 'observation', 'audio', 'video', 'photo', 'conversation'].indexOf(evidence) < 0
+            ? [evidence]
+            : [],
+        )
+        .map(function (t) {
+          return (
+            '<option value="' +
+            esc(t) +
+            '"' +
+            (t === evidence ? ' selected' : '') +
+            '>' +
+            esc(t[0].toUpperCase() + t.slice(1)) +
+            '</option>'
+          );
+        })
+        .join('') +
+      '</select>' +
+      '</div>' +
       '<div class="af-field">' +
       '<label class="af-label">Module</label>' +
       '<select class="af-input" id="af-module">' +
@@ -2775,6 +2802,113 @@ window.PageAssignments = (function () {
       '</div>';
     html += '</section>';
 
+    // Competencies above Scoring, as a short field: the chosen ones as chips
+    // and Choose Competencies, which opens the list in a window. Every way
+    // to score tags them, and the field stays small and in one place
+    // whichever scoring is chosen (Colin, Nov 4).
+    var lm = getLearningMap(cid);
+    var compGroups = (lm && lm.competencyGroups) || [];
+    html +=
+      '<section class="af-card af-card-competencies" data-view="' +
+      _compView() +
+      '">' +
+      '<div class="af-card-head">' +
+      '<span class="af-card-title">Competencies</span>' +
+      '</div>' +
+      '<div class="af-comp-summary">' +
+      '<span class="af-comp-chosen" id="af-comp-chosen"></span>' +
+      (sections.length
+        ? '<button type="button" class="af-comp-choose" id="af-comp-choose" data-action="openCompPicker" aria-haspopup="dialog">+ Choose Competencies</button>'
+        : '') +
+      '</div>' +
+      '<p class="af-comp-rubric-note" id="af-comp-rubric-note" hidden>From the rubric\u2019s criteria. To change them, edit the rubric.</p>' +
+      // The list, in a window over the form while choosing.
+      '<div class="af-comp-overlay" id="af-comp-dialog" hidden>' +
+      '<div class="af-comp-dialog" role="dialog" aria-modal="true" aria-labelledby="af-comp-dialog-title">' +
+      '<div class="af-comp-dialog-head">' +
+      '<h3 class="af-comp-dialog-title" id="af-comp-dialog-title">Choose Competencies</h3>' +
+      '<span class="af-comp-count" id="af-comp-count"></span>' +
+      (sections.length
+        ? '<span class="af-comp-tools">' +
+          '<input class="af-input af-comp-find" id="af-comp-find" type="search" autocomplete="off" placeholder="Type a code or words" aria-label="Find a competency">' +
+          '<span class="seg af-comp-view" role="group" aria-label="Show competencies as">' +
+          '<button type="button" class="seg-btn" data-action="setCompView" data-view="codes">Codes</button>' +
+          '<button type="button" class="seg-btn" data-action="setCompView" data-view="list">List</button>' +
+          '</span></span>'
+        : '') +
+      '</div>' +
+      '<div class="af-comp-dialog-body">' +
+      _compPickerHtml(cid, assess, sections, compGroups) +
+      '<div class="af-field af-comp-list">' +
+      '<div class="af-tags-container">';
+    if (compGroups.length > 0) {
+      // Build grouped + ungrouped lists
+      var _afGroupMap = {};
+      compGroups.forEach(function (g) {
+        _afGroupMap[g.id] = { group: g, secs: [] };
+      });
+      var _afUngrouped = [];
+      sections.forEach(function (sec) {
+        if (sec.groupId && _afGroupMap[sec.groupId]) _afGroupMap[sec.groupId].secs.push(sec);
+        else _afUngrouped.push(sec);
+      });
+      compGroups.forEach(function (g) {
+        var gi = _afGroupMap[g.id];
+        if (gi.secs.length === 0) return;
+        html +=
+          '<div class="af-list-group"><label class="af-list-group-head">' +
+          _afGroupBox(gi.secs, g.name) +
+          '<span class="af-list-group-name">' +
+          esc(g.name) +
+          '</span></label>';
+        gi.secs.forEach(function (sec) {
+          html += _afTagRow(sec, selTags);
+        });
+        html += '</div>';
+      });
+      _afUngrouped.forEach(function (sec) {
+        html += _afTagRow(sec, selTags);
+      });
+    } else {
+      // No groups — flat list
+      sections.forEach(function (sec) {
+        html += _afTagRow(sec, selTags);
+      });
+    }
+    html +=
+      '</div></div></div>' +
+      '<div class="af-comp-dialog-foot">' +
+      '<button type="button" class="btn btn-ghost" data-action="cancelCompPicker">Cancel</button>' +
+      '<button type="button" class="btn btn-primary" data-action="closeCompPicker">Done</button>' +
+      '</div>' +
+      '</div></div>' +
+      _untaggedNote(cid, selTags.length > 0);
+
+    // Core Competencies
+    var selCC = assess ? assess.coreCompetencyIds || [] : [];
+    html +=
+      '<div class="af-field">' + '<label class="af-label">Core Competencies</label>' + '<div class="af-cc-chips">';
+    CORE_COMPETENCIES.forEach(function (cc) {
+      var sel = selCC.includes(cc.id);
+      html +=
+        '<button type="button" class="af-cc-chip' +
+        (sel ? ' active' : '') +
+        '" data-cc="' +
+        cc.id +
+        '" aria-pressed="' +
+        sel +
+        '"' +
+        ' style="--cc-color:' +
+        cc.color +
+        '" data-af-tip="core" data-action="toggleActive">' +
+        '<span class="af-cc-dot" style="background:' +
+        cc.color +
+        '"></span>' +
+        esc(cc.label) +
+        '</button>';
+    });
+    html += '</div></div></section>';
+
     // Scoring mode, then its settings
     html +=
       '<section class="af-card af-card-scoring">' +
@@ -2795,8 +2929,6 @@ window.PageAssignments = (function () {
             '<div class="af-mode-item">' +
             '<button type="button" class="af-mode-card af-scoremode-btn" role="radio" aria-checked="' +
             (scoreMode === m.mode) +
-            '" aria-describedby="af-mode-tip-' +
-            m.mode +
             '" data-mode="' +
             m.mode +
             '" data-action="setScoreMode">' +
@@ -2804,16 +2936,6 @@ window.PageAssignments = (function () {
             '<span>' +
             m.label +
             '</span></button>' +
-            '<div class="af-mode-tip" role="tooltip" id="af-mode-tip-' +
-            m.mode +
-            '">' +
-            '<div class="af-mode-tip-pic" aria-hidden="true">' +
-            m.picture() +
-            '</div>' +
-            '<div class="af-mode-tip-text">' +
-            m.tip +
-            '</div>' +
-            '</div>' +
             '</div>'
           );
         })
@@ -2838,7 +2960,7 @@ window.PageAssignments = (function () {
       '>Words Correct, Errors and Maze are entered at the Beginning, Middle and End of Year, and their levels are worked out on the Grade 8 goals. It counts toward no grade and needs no category.</p>' +
       '<p class="af-dibels-note" id="af-comp-note"' +
       (scoreMode === 'competencies' ? '' : ' hidden') +
-      '>Each competency you tag below is scored Emerging to Extending, with + and \u2212. No rubric is needed.</p>' +
+      '>Each competency you tag above is scored Emerging to Extending, with + and \u2212. No rubric is needed.</p>' +
       '<p class="af-category-hint" id="af-comp-hint"' +
       (scoreMode === 'competencies' && !(assess && (assess.tagIds || []).length) ? '' : ' hidden') +
       '>' +
@@ -2850,6 +2972,9 @@ window.PageAssignments = (function () {
     var rubricsList = getRubrics(cid);
     var selRubricId = assess ? assess.rubricId || '' : '';
     html +=
+      // The Competency Rubric: how the tagged competencies are scored, the
+      // Competencies tab's own grid, above the rubric starts (Colin, Nov 4).
+      '<div id="af-tag-rubric"></div>' +
       '<div class="af-field af-rubric-field" id="af-rubric-wrap"' +
       (scoreMode === 'proficiency' ? '' : ' hidden') +
       '>' +
@@ -2920,90 +3045,6 @@ window.PageAssignments = (function () {
       '</div>' +
       '</section>';
 
-    // Tags — grouped by competency group
-    var lm = getLearningMap(cid);
-    var compGroups = (lm && lm.competencyGroups) || [];
-    html +=
-      '<section class="af-card af-card-competencies" data-view="' +
-      _compView() +
-      '">' +
-      '<div class="af-card-head">' +
-      '<span class="af-card-title">Competencies</span>' +
-      '<span class="af-comp-chosen" id="af-comp-chosen"></span>' +
-      (sections.length
-        ? '<span class="af-comp-tools">' +
-          '<input class="af-input af-comp-find" id="af-comp-find" type="search" autocomplete="off" placeholder="Type a code or words" aria-label="Find a competency">' +
-          '<span class="seg af-comp-view" role="group" aria-label="Show competencies as">' +
-          '<button type="button" class="seg-btn" data-action="setCompView" data-view="codes">Codes</button>' +
-          '<button type="button" class="seg-btn" data-action="setCompView" data-view="list">List</button>' +
-          '</span></span>'
-        : '') +
-      '</div>' +
-      '<p class="af-comp-rubric-note" id="af-comp-rubric-note" hidden>From the rubric\u2019s criteria. To change them, edit the rubric.</p>' +
-      _compPickerHtml(cid, assess, sections, compGroups) +
-      '<div class="af-field af-comp-list">' +
-      '<div class="af-tags-container">';
-    if (compGroups.length > 0) {
-      // Build grouped + ungrouped lists
-      var _afGroupMap = {};
-      compGroups.forEach(function (g) {
-        _afGroupMap[g.id] = { group: g, secs: [] };
-      });
-      var _afUngrouped = [];
-      sections.forEach(function (sec) {
-        if (sec.groupId && _afGroupMap[sec.groupId]) _afGroupMap[sec.groupId].secs.push(sec);
-        else _afUngrouped.push(sec);
-      });
-      compGroups.forEach(function (g) {
-        var gi = _afGroupMap[g.id];
-        if (gi.secs.length === 0) return;
-        html +=
-          '<div class="af-list-group"><label class="af-list-group-head">' +
-          _afGroupBox(gi.secs, g.name) +
-          '<span class="af-list-group-name">' +
-          esc(g.name) +
-          '</span></label>';
-        gi.secs.forEach(function (sec) {
-          html += _afTagRow(sec, selTags);
-        });
-        html += '</div>';
-      });
-      _afUngrouped.forEach(function (sec) {
-        html += _afTagRow(sec, selTags);
-      });
-    } else {
-      // No groups — flat list
-      sections.forEach(function (sec) {
-        html += _afTagRow(sec, selTags);
-      });
-    }
-    html += '</div></div>' + _untaggedNote(cid, selTags.length > 0) + '<div id="af-tag-rubric"></div>';
-
-    // Core Competencies
-    var selCC = assess ? assess.coreCompetencyIds || [] : [];
-    html +=
-      '<div class="af-field">' + '<label class="af-label">Core Competencies</label>' + '<div class="af-cc-chips">';
-    CORE_COMPETENCIES.forEach(function (cc) {
-      var sel = selCC.includes(cc.id);
-      html +=
-        '<button type="button" class="af-cc-chip' +
-        (sel ? ' active' : '') +
-        '" data-cc="' +
-        cc.id +
-        '" aria-pressed="' +
-        sel +
-        '"' +
-        ' style="--cc-color:' +
-        cc.color +
-        '" data-af-tip="core" data-action="toggleActive">' +
-        '<span class="af-cc-dot" style="background:' +
-        cc.color +
-        '"></span>' +
-        esc(cc.label) +
-        '</button>';
-    });
-    html += '</div></div></section>';
-
     // Students: individual, pair or group, and who it's assigned to.
     html +=
       '<section class="af-card af-card-students">' +
@@ -3031,48 +3072,6 @@ window.PageAssignments = (function () {
       '</div>' +
       '<div id="collab-panel-mount"></div>' +
       '</section>';
-
-    // More Options: Evidence Type, open when it isn't Written.
-    var moreOpen = !!(evidence && evidence !== 'written');
-    html +=
-      '<section class="af-card af-card-more">' +
-      '<button type="button" class="af-more-toggle" data-action="toggleMoreOptions" aria-expanded="' +
-      moreOpen +
-      '" aria-controls="af-more-body">' +
-      '<span class="af-card-title">More Options</span>' +
-      '<span class="af-more-hint">Evidence Type</span>' +
-      '<svg class="af-more-chev" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>' +
-      '</button>' +
-      '<div class="af-more-body" id="af-more-body"' +
-      (moreOpen ? '' : ' hidden') +
-      '>';
-    html +=
-      '<div class="af-field">' +
-      '<label class="af-label">Evidence Type</label>' +
-      '<select class="af-input" id="af-evidence">' +
-      // An evidence type from elsewhere (a quiz, lab or project) keeps its
-      // own option, so editing never changes it.
-      ['written', 'observation', 'audio', 'video', 'photo', 'conversation']
-        .concat(
-          evidence && ['written', 'observation', 'audio', 'video', 'photo', 'conversation'].indexOf(evidence) < 0
-            ? [evidence]
-            : [],
-        )
-        .map(function (t) {
-          return (
-            '<option value="' +
-            esc(t) +
-            '"' +
-            (t === evidence ? ' selected' : '') +
-            '>' +
-            esc(t[0].toUpperCase() + t.slice(1)) +
-            '</option>'
-          );
-        })
-        .join('') +
-      '</select>' +
-      '</div>';
-    html += '</div></section>';
 
     // Actions, in a footer that stays at the bottom of the window while the
     // form is in view, with what the work counts toward beside them.
@@ -3158,7 +3157,7 @@ window.PageAssignments = (function () {
      way it always was (scoreMode 'proficiency', no rubricId). Only the form
      tells it from Rubric; what is saved and the grade math are the same. */
   var COMPETENCIES_NEED_TAG_HINT =
-    'Tag at least one competency below. Each one you tag is what students are scored on.';
+    'Tag at least one competency above. Each one you tag is what students are scored on.';
   function _storedScoreMode(mode) {
     return mode === 'competencies' ? 'proficiency' : mode || 'proficiency';
   }
@@ -3187,7 +3186,7 @@ window.PageAssignments = (function () {
     if (!_refreshCompHint()) return true;
     var card = document.querySelector('.af-card-competencies');
     if (card && card.scrollIntoView) card.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    var first = document.querySelector('.af-card-competencies .af-code, .af-card-competencies .af-tag-cb');
+    var first = document.getElementById('af-comp-choose');
     if (first) first.focus({ preventScroll: true });
     return false;
   }
@@ -3200,92 +3199,34 @@ window.PageAssignments = (function () {
     return w + 'x';
   }
 
-  // The ways to score an assessment, as cards with an icon each. On
-  // hover or keyboard focus each shows a tooltip: a picture of how its scores
-  // are entered, built from the grading screens' own pieces, and a sentence.
+  // The ways to score an assessment, as cards with an icon each. No hover
+  // preview: it covered the rubric editor (Colin, Nov 4).
   var SCORE_MODE_CARDS = [
     {
       mode: 'proficiency',
       // Proficiency work on a rubric of its own; with no rubric it is
       // Competencies below (Colin, Nov 3). The 1–4 scale is proficiency.
       label: 'Rubric',
-      tip: 'Score with a rubric, Emerging to Extending.',
-      picture: function () {
-        return [1, 2, 3, 4]
-          .map(function (level) {
-            return (
-              '<span class="af-tip-level"><span class="gb-score-val s' +
-              level +
-              '">' +
-              level +
-              '</span><span class="af-tip-level-code">' +
-              PROF_CODES[level] +
-              '</span></span>'
-            );
-          })
-          .join('');
-      },
       icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 16v-3"/><path d="M8 16v-6"/><path d="M12 16v-9"/><path d="M16 16V4"/></svg>',
     },
     {
       mode: 'points',
       label: 'Points',
-      tip: 'Enter a score out of Max Points.',
-      picture: function () {
-        return (
-          '<span class="af-tip-pts-box">17</span><span class="af-tip-pts-max">/ 20</span>' +
-          '<span class="af-tip-pts-pct">85%</span>'
-        );
-      },
       icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3 6 17"/><path d="M14 3l-2 14"/><path d="M3.5 7.5h13"/><path d="M3 12.5h13"/></svg>',
     },
     {
       mode: 'complete',
       label: 'Complete/Incomplete',
-      tip: 'Mark the work done or not done. Complete counts as full marks.',
-      picture: function () {
-        return (
-          '<span class="ldg-seg"><span class="cmp-btn cmp-complete active">\u2713 Complete</span>' +
-          '<span class="cmp-btn cmp-incomplete">\u2717 Incomplete</span></span>'
-        );
-      },
       icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m6.8 10.2 2.2 2.2 4.2-4.6"/></svg>',
     },
     {
       mode: 'competencies',
       label: 'Competencies',
-      tip: 'Score each competency you tag, Emerging to Extending, with + and \u2212. No rubric is needed.',
-      picture: function () {
-        var rows = [
-          ['1', 3, 'P'],
-          ['2', 2, 'D+'],
-        ]
-          .map(function (row) {
-            return (
-              '<span class="af-tip-comp-row"><span class="af-tip-comp-name">Competency ' +
-              row[0] +
-              '</span><span class="gb-score-val s' +
-              row[1] +
-              '">' +
-              row[2] +
-              '</span></span>'
-            );
-          })
-          .join('');
-        return '<span class="af-tip-comp">' + rows + '</span>';
-      },
       icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5.5h8"/><path d="M3 10h8"/><path d="M3 14.5h8"/><circle cx="15.5" cy="5.5" r="1.4"/><circle cx="15.5" cy="10" r="1.4"/><circle cx="15.5" cy="14.5" r="1.4"/></svg>',
     },
     {
       mode: 'dibels',
       label: 'DIBELS 8 Benchmark',
-      tip: 'Enter raw Oral Reading Fluency and Maze scores at the beginning, middle and end of the year. Accuracy and levels are worked out. It counts toward no grade.',
-      picture: function () {
-        return (
-          '<span class="af-tip-pts-box">147</span><span class="af-tip-pts-max">words</span>' +
-          '<span class="dbl-chip l4">Above</span>'
-        );
-      },
       icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h5a2 2 0 0 1 2 2V16a1.5 1.5 0 0 0-1.5-1.5H3z"/><path d="M17 4.5h-5a2 2 0 0 0-2 2V16a1.5 1.5 0 0 1 1.5-1.5H17z"/></svg>',
     },
   ];
@@ -3554,7 +3495,7 @@ window.PageAssignments = (function () {
     var t = e.target;
     var inForm = t && t.closest && t.closest('#new-assess-form');
     if (!inForm && t !== document.body) return;
-    if (document.querySelector('.confirm-overlay, #rubric-modal')) return;
+    if (document.querySelector('.confirm-overlay, #rubric-modal') || _compPickerOpen()) return;
     if (window.RubricBank && RubricBank.isOpen()) return;
     e.preventDefault();
     if (_afTipSource) return _hideAfTip();
@@ -4603,16 +4544,24 @@ window.PageAssignments = (function () {
     var pop = document.querySelector('.af-ge-card .af-ge-menu, .af-ge-card .af-ge-picker');
     var foot = document.querySelector('#new-assess-form > .af-actions');
     if (!pop || !foot) return;
-    var over = pop.getBoundingClientRect().bottom - (foot.getBoundingClientRect().top - 8);
+    var overBy = function () {
+      return pop.getBoundingClientRect().bottom - (foot.getBoundingClientRect().top - 8);
+    };
+    var over = overBy();
     if (over <= 0) return;
+    var scrolled = false;
     for (var el = pop.parentElement; el && el !== document.body; el = el.parentElement) {
       var oy = getComputedStyle(el).overflowY;
       if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) {
         el.scrollTop += over;
-        return;
+        scrolled = true;
+        break;
       }
     }
-    window.scrollBy(0, over);
+    if (!scrolled) window.scrollBy(0, over);
+    // Near the end of the form the footer moves up with the page, so no
+    // scroll clears it: the picker opens above its button instead.
+    if (overBy() > 0 && pop.classList.contains('af-ge-picker')) pop.classList.add('is-up');
   }
   // A click outside an open ··· menu or picker closes it, as Esc does.
   function _blankOutside(e) {
@@ -5309,6 +5258,93 @@ window.PageAssignments = (function () {
       return 'list';
     }
   }
+  /* Choose Competencies: the list in a window over the form (Colin, Nov 4,
+     option A). Done keeps the ticks; Cancel or Escape puts back the ones the
+     window opened with. */
+  var _compPickerStart = null;
+  function _compTicks() {
+    return Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
+      return cb.value;
+    });
+  }
+  function _setCompTick(cb, on) {
+    if (cb.checked === on) return;
+    cb.checked = on;
+    onTagChange(cb, cb.dataset.section);
+  }
+  function _compPickerOpen() {
+    var o = document.getElementById('af-comp-dialog');
+    return !!(o && !o.hidden);
+  }
+  function openCompPicker() {
+    var overlay = document.getElementById('af-comp-dialog');
+    if (!overlay || !overlay.hidden) return;
+    _hideAfTip();
+    _compPickerStart = _compTicks();
+    overlay.hidden = false;
+    overlay.onkeydown = _compPickerKey;
+    var find = document.getElementById('af-comp-find');
+    if (find) find.focus();
+  }
+  // Esc is Cancel (a search with text clears first); Tab stays in the window.
+  function _compPickerKey(e) {
+    if (e.key === 'Escape' && !e.isComposing) {
+      if (e.target && e.target.id === 'af-comp-find' && e.target.value) return;
+      e.preventDefault();
+      closeCompPicker(true);
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    var box = e.currentTarget.querySelector('.af-comp-dialog');
+    var items = Array.from(
+      box.querySelectorAll('button, input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+    ).filter(function (n) {
+      return !n.disabled && n.offsetParent !== null;
+    });
+    if (!items.length) return;
+    var first = items[0];
+    var last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+  function closeCompPicker(restore) {
+    var overlay = document.getElementById('af-comp-dialog');
+    if (!overlay || overlay.hidden) return;
+    if (restore && _compPickerStart) {
+      var keep = _compPickerStart;
+      document.querySelectorAll('.af-tag-cb').forEach(function (cb) {
+        _setCompTick(cb, keep.indexOf(cb.value) >= 0);
+      });
+      _syncCodes();
+    }
+    _compPickerStart = null;
+    var find = document.getElementById('af-comp-find');
+    if (find && find.value) {
+      find.value = '';
+      _filterComps('');
+    }
+    _hideAfTip();
+    overlay.hidden = true;
+    var back = document.getElementById('af-comp-choose');
+    if (back) back.focus({ preventScroll: true });
+  }
+  // A chip's ✕: untick that competency.
+  function _removeComp(tagId) {
+    var cb = Array.from(document.querySelectorAll('.af-tag-cb')).find(function (x) {
+      return x.value === tagId;
+    });
+    if (!cb || cb.disabled) return;
+    _setCompTick(cb, false);
+    _syncCodes();
+    var next = document.querySelector('#af-comp-chosen .af-comp-chip-x') || document.getElementById('af-comp-choose');
+    if (next) next.focus({ preventScroll: true });
+  }
+
   function setCompView(view) {
     var card = document.querySelector('.af-card-competencies');
     if (!card) return;
@@ -5442,18 +5478,30 @@ window.PageAssignments = (function () {
       head.innerHTML = chosen
         .map(function (t) {
           var tag = getTagById(cid, t);
+          var code = (tag && tag.code) || t;
           return (
             '<span class="af-comp-chip" tabindex="0" data-af-tip="comp" data-tag="' +
             esc(t) +
             '"><b>' +
-            esc((tag && tag.code) || t) +
+            esc(code) +
             '</b>' +
             esc((tag && (tag.label || tag.shortName)) || '') +
+            (fromRubric
+              ? ''
+              : '<button type="button" class="af-comp-chip-x" data-action="removeComp" data-tag="' +
+                esc(t) +
+                '" aria-label="' +
+                esc('Remove ' + code) +
+                '"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>') +
             '</span>'
           );
         })
         .join('');
     }
+    var count = document.getElementById('af-comp-count');
+    if (count) count.textContent = chosen.length ? chosen.length + ' chosen' : 'None chosen';
+    var choose = document.getElementById('af-comp-choose');
+    if (choose) choose.hidden = fromRubric;
     card.querySelectorAll('.af-comp-view .seg-btn').forEach(function (b) {
       var on = b.dataset.view === card.dataset.view;
       b.classList.toggle('active', on);
@@ -8739,13 +8787,14 @@ window.PageAssignments = (function () {
           blankOnly: other,
         });
       },
+      // A new form opens on the Blank Rubric draft; the rubric chosen in the
+      // bank takes its place, as Choose a Rubric does inside the form.
       useInNew: function (rid) {
         showNewForm();
-        var dd = document.getElementById('af-rubric');
-        if (dd) {
-          dd.value = rid;
-          onRubricSelect(rid);
-        }
+        if (!document.getElementById('af-rubric')) return;
+        setScoreMode('proficiency');
+        _useRubricInForm(rid, true);
+        _renderRubricView();
       },
       goToAssessment: function (aid) {
         openCopyIn(activeCourse, aid);
@@ -10935,11 +10984,17 @@ window.PageAssignments = (function () {
       setCompView: function () {
         setCompView(el.dataset.view);
       },
-      toggleMoreOptions: function () {
-        var body = document.getElementById('af-more-body');
-        if (!body) return;
-        body.hidden = !body.hidden;
-        el.setAttribute('aria-expanded', String(!body.hidden));
+      openCompPicker: function () {
+        openCompPicker();
+      },
+      closeCompPicker: function () {
+        closeCompPicker(false);
+      },
+      cancelCompPicker: function () {
+        closeCompPicker(true);
+      },
+      removeComp: function () {
+        _removeComp(el.dataset.tag);
       },
       collabCheckAll: function () {
         collabCheckAll();

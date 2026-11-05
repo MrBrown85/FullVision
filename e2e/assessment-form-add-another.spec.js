@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openCompPicker, closeCompPicker } from './helpers.js';
 
 /* Create and Add Another (redesign PR 11, 2026-11-02): saves, then a fresh
    form keeps Classes, Module, Scoring, Max Points, Factor and the dates; the
@@ -34,7 +35,9 @@ test('saves, then reopens keeping the shared settings', async ({ page }) => {
   await page.selectOption('#af-weight', '2');
   await page.fill('#af-date-assigned', '2026-11-03');
   await page.fill('#af-due', '2026-11-05');
+  await openCompPicker(page);
   await page.locator('.af-code[data-tag="QP3"]').click();
+  await closeCompPicker(page);
   await page.locator('[data-action="saveAndAddAnother"]').click();
 
   const made = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Lab Quiz 1'));

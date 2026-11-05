@@ -124,6 +124,11 @@ test.describe('Rubric Bank', () => {
     await bank.getByRole('button', { name: 'Use in New Assessment' }).click();
     await expect(bank).toHaveCount(0);
     await expect(page.locator('#af-rubric')).toHaveValue('rubric-001');
+    // The form shows the chosen rubric under Rubric scoring, not the Blank draft.
+    await expect(page.locator('.af-scoremode-btn[data-mode="proficiency"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#af-rubric-view .af-rubric-card-name')).toHaveText('Lab Report Rubric');
+    await expect(page.locator('#af-rubric-view .rb-cell').first()).toHaveText('Explains why');
+    await expect(page.locator('#af-ge-name, #af-rubric-view [role="tablist"]')).toHaveCount(0);
   });
 
   test('a Used In chip opens that assessment', async ({ page }) => {
@@ -578,5 +583,49 @@ test.describe('Rubric Bank, renaming a linked rubric', () => {
     await offer.getByRole('button', { name: 'Only this class' }).click();
     expect(await page.evaluate(() => getRubricById('sci9', 'rubric-lab-9').name)).toBe('Lab Report Rubric');
     await expect(bank.locator('.rb-title')).toHaveText('Renamed Here');
+  });
+});
+
+test.describe('Rubric Bank: an Advanced rubric in a new assessment', () => {
+  const ADV = {
+    id: 'rubric-adv',
+    name: 'Discussion Rubric',
+    style: 'advanced',
+    criteria: [
+      {
+        id: 'crit-talk',
+        name: 'Individual Discussion',
+        tagIds: ['QAP'],
+        weight: 1,
+        levels: { 4: '', 3: '', 2: '', 1: '' },
+        checks: [
+          { id: 'k4a', level: 4, label: 'Contributes often', displayOrder: 0 },
+          { id: 'k3a', level: 3, label: 'Listens actively', displayOrder: 0 },
+        ],
+      },
+    ],
+  };
+
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await page.addInitScript(
+      ({ rubrics, cid }) => {
+        localStorage.setItem('gb-rubrics-' + cid, JSON.stringify(rubrics));
+      },
+      { rubrics: [ADV], cid: TEST_COURSE.id },
+    );
+    await gotoApp(page, '/dashboard');
+  });
+
+  test('Use in New Assessment loads it with its checkboxes', async ({ page }) => {
+    const bank = await openBank(page);
+    await bank.getByRole('button', { name: 'Use in New Assessment' }).click();
+    await expect(bank).toHaveCount(0);
+    await expect(page.locator('#af-rubric')).toHaveValue('rubric-adv');
+    await expect(page.locator('.af-scoremode-btn[data-mode="proficiency"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#af-rubric-view .af-rubric-card-name')).toHaveText('Discussion Rubric');
+    await expect(page.locator('#af-rubric-view .rb-cell-check')).toHaveText(['Contributes often', 'Listens actively']);
   });
 });
