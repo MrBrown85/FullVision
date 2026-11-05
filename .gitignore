@@ -33,3 +33,8 @@ playwright-report/
 # Playwright CLI scratch (per-run session dumps)
 .playwright-cli/
 schema-snapshot.live.sql
+
+# The help site's built pages (scripts/build-help.mjs); the Markdown is the source
+help/*.html
+help/fragments/
+help/index.json

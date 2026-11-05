@@ -129,6 +129,19 @@
   to = "/teacher/app.html"
   status = 200
 
+# The help site. scripts/build-help.mjs writes help/<slug>.html; these give
+# each page an address without .html. A real file (index.json, img/…) is
+# served as it is, since these rules don't force.
+[[redirects]]
+  from = "/help"
+  to = "/help/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/help/:slug"
+  to = "/help/:slug.html"
+  status = 200
+
 # Legacy URL redirects
 [[redirects]]
   from = "/app.html"
