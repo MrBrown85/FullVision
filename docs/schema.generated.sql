@@ -954,6 +954,23 @@ table public.subject (rls on)
   CREATE UNIQUE INDEX subject_pkey ON public.subject USING btree (id)
   CREATE TRIGGER course_sync_cursor_subject_gradebook AFTER INSERT OR DELETE OR UPDATE ON public.subject FOR EACH ROW EXECUTE FUNCTION public._touch_course_sync_cursor_from_trigger('gradebook', 'course')
   policy subject_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
+table public.support_report (rls on)
+  id uuid not null default gen_random_uuid()
+  teacher_id uuid not null default auth.uid()
+  page text not null default ''::text
+  message text not null
+  browser text
+  app_version text
+  created_at timestamp with time zone not null default now()
+  constraint support_report_app_version_check CHECK ((char_length(app_version) <= 100))
+  constraint support_report_browser_check CHECK ((char_length(browser) <= 300))
+  constraint support_report_message_check CHECK (((char_length(message) <= 5000) AND (btrim(message) <> ''::text)))
+  constraint support_report_page_check CHECK ((char_length(page) <= 200))
+  constraint support_report_pkey PRIMARY KEY (id)
+  constraint support_report_teacher_id_fkey FOREIGN KEY (teacher_id) REFERENCES public.teacher(id) ON DELETE CASCADE
+  CREATE INDEX support_report_created_at_idx ON public.support_report USING btree (created_at DESC)
+  CREATE UNIQUE INDEX support_report_pkey ON public.support_report USING btree (id)
+  policy support_report_insert_own for insert to authenticated with check ((teacher_id = ( SELECT auth.uid() AS uid)))
 table public.tag (rls on)
   id uuid not null default gen_random_uuid()
   section_id uuid not null
@@ -1293,6 +1310,7 @@ function public.set_rubric_check(p_enrollment_id uuid, p_assessment_id uuid, p_c
 function public.set_rubric_printed(p_enrollment_id uuid, p_assessment_id uuid, p_hash text, p_printed_at timestamp with time zone, p_idempotency_key uuid) returns boolean
 function public.set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text) returns uuid
 function public.soft_delete_teacher() returns void
+function public.submit_support_report(p_page text, p_message text, p_browser text, p_app_version text, p_idempotency_key uuid) returns uuid security definer
 function public.toggle_report_block(p_course_id uuid, p_block_key text, p_enabled boolean) returns void
 function public.update_assessment(p_id uuid, p_patch jsonb, p_tag_ids uuid[]) returns void
 function public.update_course(p_course_id uuid, p_patch jsonb) returns void

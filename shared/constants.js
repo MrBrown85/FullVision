@@ -1064,6 +1064,7 @@ const FV_IDEMPOTENT_RPCS = {
   save_score_report_note: true,
   set_questionnaire_on: true,
   set_rubric_printed: true,
+  submit_support_report: true,
   update_phone_report: true,
   upsert_category: true,
   upsert_competency_group: true,

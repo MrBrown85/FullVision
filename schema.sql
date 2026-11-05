@@ -737,6 +737,21 @@ create table comment_template (
   updated_at  timestamptz not null default now()
 );
 
+-- Report a Problem (20261105_support_report). Written only through
+-- submit_support_report (SECURITY DEFINER, idempotent); teachers have no table
+-- privileges and can read none back. RLS: insert-own policy as a backstop.
+-- The attached fields are the page's name, the build and the browser; never
+-- student data.
+create table support_report (
+  id           uuid        primary key default gen_random_uuid(),
+  teacher_id   uuid        not null default auth.uid() references teacher(id) on delete cascade,
+  page         text        not null default '',                       -- <= 200 chars, e.g. Gradebook or Help site
+  message      text        not null,                                  -- 1..5000 chars, not blank
+  browser      text,                                                  -- <= 300 chars, e.g. Chrome 131 on macOS
+  app_version  text,                                                  -- <= 100 chars: the deploy's commit id
+  created_at   timestamptz not null default now()
+);
+
 -- ─── Extensions + cron ──────────────────────────────────────────────────────
 -- pg_cron enabled (migration fullvision_v2_enable_pg_cron).
 -- Job `fv_retention_cleanup_daily` runs at 03:17 UTC calling fv_retention_cleanup().
