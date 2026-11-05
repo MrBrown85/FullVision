@@ -1320,7 +1320,17 @@ test.describe('the Sentences card', () => {
     const fitCount = Number((await sheet.locator('#tq-browse-n').textContent()).split(' of ')[0]);
     await expect(rowsList).toHaveCount(fitCount);
     const ownGroup = sheet.locator('.qn-browse-group.own').first();
-    await expect(ownGroup.locator('.qn-browse-head-label')).toHaveText(/^Science/);
+    // Her own competencies' course-set sentences come first (Nov 4), each
+    // group under the competency's name; else the Science groups.
+    const names = await page.evaluate(() =>
+      CommentBank.facts(
+        'sci8',
+        getStudents('sci8').find(s => s.id === 'st1'),
+        'term-2',
+      ).comps.map(c => c.name),
+    );
+    const ownLabel = (await ownGroup.locator('.qn-browse-head-label').textContent()).trim();
+    expect(names.indexOf(ownLabel) >= 0 || /^Science/.test(ownLabel)).toBe(true);
     const use = ownGroup
       .locator('.qn-browse-row')
       .filter({ has: page.locator('.qn-browse-use:not([disabled])') })

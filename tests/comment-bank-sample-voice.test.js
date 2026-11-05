@@ -175,8 +175,16 @@ describe('thin evidence (Moon, Nov 4): every part is written', () => {
       expect(['nt01', 'nt02', 'nt03']).toContain(next.id);
       expect(next.text).toContain(tn.text);
       expect(next.text).toMatch(/^(A next step|One possible next step|For now, a next step)/);
-      const home = byId(d.ids[stepsOf(d).indexOf('home')]);
-      expect(home).toBeTruthy();
+      // The family line is the next step's course set's own (Nov 4).
+      const home = d.sentences.find(x => x.step === 'home');
+      expect(home.id).toBe('set:c2:h');
+      expect(home.text).toBe(
+        CommentRealiser.render(
+          CommentRealiser.tokens(CommentBank.setEntry('bc.ss10.cc.6').home),
+          { name: 'Moon', p: { subj: 'she', obj: 'her', poss: 'her', refl: 'herself' } },
+          { named: true },
+        ),
+      );
       expect(d.replaced).toEqual([]);
     }
     // A second piece on Perspective: the next step is settled, and the

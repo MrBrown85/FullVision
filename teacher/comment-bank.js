@@ -1173,13 +1173,61 @@ window.CommentBank = (function () {
     };
   }
 
-  /* The skill a comment names a competency by: the bank's phrase for its
+  /* The per-course-set wording for a competency from the BC bank (Colin,
+     Nov 4: "each set of courses gets its own wording";
+     data/bc-curriculum-sets.json, shipped as shared/bank-sets.js and loaded
+     late): its set's phrase, next steps by level, two strength sentences,
+     next-step sentences by level and home line, for the competency's own
+     grade band. A sensitive set (abuse and exploitation) is never drafted
+     from (isSensitive). null when the id has no set or the file has not
+     loaded. */
+  function setEntry(bankId) {
+    var b = typeof window !== 'undefined' ? window.BANK_SETS : null;
+    var i = b && b.ids && bankId ? b.ids[bankId] : null;
+    var r = i != null && b.rows ? b.rows[i] : null;
+    if (!r) return null;
+    return {
+      key: r[0],
+      phrase: r[1],
+      steps: { Emerging: r[2], Developing: r[3], Proficient: r[4], Extending: r[5] },
+      strength: [r[6], r[7]],
+      next: { Developing: r[8], Proficient: r[9], Extending: r[10] },
+      home: r[11] || '',
+      sensitive: !!r[12],
+    };
+  }
+  function isSensitive(c) {
+    var e = c && c.bankId ? setEntry(c.bankId) : null;
+    return !!(e && e.sensitive);
+  }
+  /* Starts loading shared/bank-sets.js once, after the page is up: Generate
+     uses the cluster wording until it lands. */
+  var _setsLoading = false;
+  function loadSets() {
+    if (_setsLoading || typeof window === 'undefined' || window.BANK_SETS) return;
+    if (typeof document === 'undefined' || !document.head || !document.createElement) return;
+    _setsLoading = true;
+    var el = document.createElement('script');
+    el.src = '/shared/bank-sets.js';
+    el.async = true;
+    el.onerror = function () {
+      _setsLoading = false;
+    };
+    document.head.appendChild(el);
+  }
+
+  /* The skill a comment names a competency by: its course set's phrase
+     (setEntry) first, then the bank's phrase for its
      cluster when it came from the bank (Colin, 2026-11-02: one phrase per
      cluster, by bank id), else the table's skill for its label (skillOf),
      for classes not re-linked to the bank. { key, name, skill, steps? } or
      null. */
   function skillFor(f, c) {
-    if (!c) return null;
+    if (!c || isSensitive(c)) return null;
+    var se = c.bankId ? setEntry(c.bankId) : null;
+    // A course set's own key, so no line written for a table skill (a
+    // History frame for an Ethics competency) is bound to it.
+    if (se) return { key: 'set:' + se.key, name: c.name, skill: se.phrase, steps: se.steps, set: se };
     var e = c.bankId ? bankEntry(c.bankId) : null;
     if (e) return { key: e.key, name: c.name, skill: e.phrase, steps: e.steps };
     return skillOf(f.family, c.name);
@@ -2462,6 +2510,7 @@ window.CommentBank = (function () {
      report's end (Colin, 2026-11-03), with the term's own movement for the
      trend. Reads no DOM. */
   function facts(cid, student, termId) {
+    loadSets();
     var sid = student.id;
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
     var assessments = getAssessments(cid) || [];
@@ -3178,6 +3227,8 @@ window.CommentBank = (function () {
     var low = null;
     (comps || []).forEach(function (c) {
       if (!(c.level > 0) || (c.scores || []).length < NEXT_STEP_PIECES || strong.indexOf(c) >= 0) return;
+      // Never a sensitive set's competency (Colin, Nov 4): the next one.
+      if (isSensitive(c)) return;
       if (!low || c.level < low.level) low = c;
     });
     return low;
@@ -3274,7 +3325,8 @@ window.CommentBank = (function () {
     var next = nextSkillOf(f);
     var pick = null;
     (f.comps || []).forEach(function (c) {
-      var e = c.bankId ? bankEntry(c.bankId) : null;
+      var sk = c.bankId ? skillFor(f, c) : null;
+      var e = sk ? { key: sk.key, phrase: sk.skill } : null;
       if (!e || (next && next.key === e.key)) return;
       // Start and now on one footing (the last report's level and the level
       // now, or the term's trend), and the level reached must be the one
@@ -3322,7 +3374,7 @@ window.CommentBank = (function () {
       var sc = (c.scores || []).find(function (x) {
         return x.id === w.id;
       });
-      if (!sc || !(Math.round(Number(sc.v)) >= 3)) return;
+      if (!sc || !(Math.round(Number(sc.v)) >= 3) || isSensitive(c)) return;
       var sk = skillFor(f, c);
       var key = sk ? sk.key : 'label:' + c.id;
       if (taken[key]) return;
@@ -3330,7 +3382,11 @@ window.CommentBank = (function () {
       var better = !pick || v > pickV || (v === pickV && strong && strong.comp === c && pick.comp !== c);
       if (!better) return;
       if (sk && R.wordCount(sk.skill) <= PIECE_SKILL_WORDS) pick = { comp: c, key: key, skill: sk.skill };
+      else if (sk && c.bankId) return;
       else {
+        // The label only for a competency with no wording of its own (a
+        // class not linked to the bank): "her skill in predictions" reads
+        // badly for a linked one whose phrase runs long.
         var label = plainLabel(c.name);
         pick = label ? { comp: c, key: key, label: label } : null;
       }
@@ -3407,8 +3463,10 @@ window.CommentBank = (function () {
   /* A competency as a strength frame names it: its skill phrase, else its
      plain label. null with neither. */
   function _namedComp(f, c) {
+    if (isSensitive(c)) return null;
     var sk = skillFor(f, c);
     if (sk && R.wordCount(sk.skill) <= PIECE_SKILL_WORDS) return { comp: c, key: sk.key, skill: sk.skill };
+    if (sk && c.bankId) return null;
     var label = plainLabel(c.name);
     return label ? { comp: c, key: 'label:' + c.id, label: label } : null;
   }
@@ -3445,7 +3503,7 @@ window.CommentBank = (function () {
   function tentSkillOf(f) {
     if (nextStepOf(f.comps)) return null;
     var xs = (f.comps || []).filter(function (c) {
-      return c.level > 0 && (c.scores || []).length >= 1;
+      return c.level > 0 && (c.scores || []).length >= 1 && !isSensitive(c);
     });
     if (xs.length < 2) return null;
     var low = xs.reduce(function (m, c) {
@@ -3864,6 +3922,123 @@ window.CommentBank = (function () {
   /* Every value a bank sentence can ask for, from the facts and the
      teacher's picks { habits, focus, ican }. An empty value means the
      sentences that need it are not offered. */
+  /* The course-set sentences for one student's competencies (Colin, Nov
+     4): for each competency from a course set (not a sensitive one), its
+     two strength sentences while it is at Proficient or above, its next-step
+     sentence at the level it is at now, and its home line. Each needs its
+     own slot (sets_, setn_, seth_ and the competency id), which the context
+     fills with the set's key (and the level for a next step), so verify()
+     proves the competency, its set and its level. Generate drafts only the
+     ones for the competency the comment names (`browse` false): the
+     strength for the strength's competency (setStrengthCompOf), the next
+     step for the settled next step's, the home line for the next step's;
+     Browse Sentences offers every one under its competency's name. */
+  var SET_NEXT = { Emerging: 'Developing', Developing: 'Developing', Proficient: 'Proficient', Extending: 'Extending' };
+  function _setLevel(c) {
+    return SET_NEXT[word(c.level)] || '';
+  }
+  function setStrengthCompOf(f) {
+    var ok = function (c) {
+      return !!c && !!c.bankId && !!setEntry(c.bankId) && !isSensitive(c) && Math.round(c.level) >= 3;
+    };
+    var first = strengthSkills(f)[0];
+    if (first && ok(first.comp)) return first.comp;
+    // Else the highest competency at Proficient or above that is not the
+    // next step's or the one the best piece shows (its sentences say what
+    // it looks like in the work, whatever its phrase's length).
+    var step = nextStepOf(f.comps) || (tentSkillOf(f) || {}).comp;
+    var piece = _pieceSkill(f);
+    var pick = null;
+    (f.comps || []).forEach(function (c) {
+      if (!ok(c) || c === step || (piece && piece.comp === c)) return;
+      if (!pick || tenths(c.level) > tenths(pick.level)) pick = c;
+    });
+    return pick;
+  }
+  function setSentencesFor(f) {
+    var out = [];
+    var strong = setStrengthCompOf(f);
+    var next = nextSkillOf(f);
+    var step = stepSkillOf(f);
+    (f.comps || []).forEach(function (c) {
+      var e = c.bankId ? setEntry(c.bankId) : null;
+      if (!e || !(c.level > 0)) return;
+      var tag = String(c.id);
+      // A sensitive set's sentences are Browse only, and it has no home
+      // line (Colin, Nov 4).
+      var only = e.sensitive;
+      var label = String(c.name || '');
+      if (Math.round(c.level) >= 3)
+        e.strength.forEach(function (t, i) {
+          out.push({
+            id: 'set:' + tag + ':s' + i,
+            part: 'now',
+            group: 'Overall',
+            text: t,
+            needs: ['sets_' + tag],
+            claims: ['setStrength'],
+            setCase: 'comp:' + label,
+            setComp: label,
+            specific: 1,
+            browse: only || !strong || strong !== c,
+            src: 'set ' + e.key,
+          });
+        });
+      var lv = _setLevel(c);
+      if (lv && e.next[lv])
+        out.push({
+          id: 'set:' + tag + ':n',
+          part: 'go',
+          group: 'Next Step',
+          text: e.next[lv],
+          needs: ['setn_' + tag],
+          claims: ['setNext'],
+          setCase: 'comp:' + label,
+          setComp: label,
+          browse: only || !next || next.comp !== c,
+          src: 'set ' + e.key,
+        });
+      if (e.home && !only)
+        out.push({
+          id: 'set:' + tag + ':h',
+          part: 'how',
+          group: 'For the Family',
+          text: e.home,
+          needs: ['seth_' + tag],
+          claims: ['setHome'],
+          setCase: 'comp:' + label + ':home',
+          setComp: label + ' · For the Family',
+          specific: 1,
+          browse: !step || step.comp !== c,
+          src: 'set ' + e.key,
+        });
+    });
+    return out;
+  }
+  /* A saved course-set sentence by its id ("set:<competency id>:s0"), for a
+     comment whose student no longer has it among their own: the same slot
+     and claim, so verify() says what changed. null when the set file has
+     not loaded or the competency has no set. */
+  function setSentenceById(f, id) {
+    var m = String(id || '').match(/^set:(.+):(s0|s1|n|h)$/);
+    if (!m) return null;
+    var c = _byId((f && f.comps) || [], m[1]);
+    var e = c && c.bankId ? setEntry(c.bankId) : null;
+    if (!e) return null;
+    var kind = m[2].charAt(0);
+    var text = kind === 's' ? e.strength[Number(m[2].charAt(1))] : kind === 'n' ? e.next[_setLevel(c)] : e.home;
+    var slot = (kind === 's' ? 'sets_' : kind === 'n' ? 'setn_' : 'seth_') + c.id;
+    return {
+      id: id,
+      part: kind === 's' ? 'now' : kind === 'n' ? 'go' : 'how',
+      group: kind === 's' ? 'Overall' : kind === 'n' ? 'Next Step' : 'For the Family',
+      text: text || '',
+      needs: [slot],
+      claims: [kind === 's' ? 'setStrength' : kind === 'n' ? 'setNext' : 'setHome'],
+      browse: true,
+    };
+  }
+
   function context(f, picks) {
     picks = picks || {};
     var p = f.pronouns;
@@ -4211,8 +4386,30 @@ window.CommentBank = (function () {
     var absentN = Math.floor(Number(f.absent)) || 0;
     var att = attendanceSlots(f.absent, f.late);
     var ms = missingN > 0 ? missingSlots(f.notHandedIn) : { title: '', titles: '', many: '', group: '' };
+    // The course-set sentences and their slots (setSentencesFor).
+    var setExtra = setSentencesFor(f);
+    var setSlots = {};
+    (f.comps || []).forEach(function (c) {
+      var e = c.bankId ? setEntry(c.bankId) : null;
+      if (!e) return;
+      var k = 'comp:' + c.id;
+      if (Math.round(c.level) >= 3) {
+        setSlots['sets_' + c.id] = e.key;
+        factsOf['sets_' + c.id] = [k];
+      }
+      if (_setLevel(c)) {
+        setSlots['setn_' + c.id] = e.key + '|' + _setLevel(c);
+        factsOf['setn_' + c.id] = [k];
+      }
+      if (e.home && !e.sensitive) {
+        setSlots['seth_' + c.id] = e.key;
+        factsOf['seth_' + c.id] = [k];
+      }
+    });
 
-    return {
+    return Object.assign(setSlots, {
+      // The course-set sentences for this student (setSentencesFor).
+      _extra: setExtra,
       // The facts and picks this context was built from, so draft() can
       // pick the story (angle) and verify the draft before returning it.
       _f: f,
@@ -4460,7 +4657,7 @@ window.CommentBank = (function () {
       missingCount: missingN > 0 ? String(missingN) : '',
       absentCount: absentN > 0 ? String(absentN) : '',
       standingWord: f.standing || '',
-    };
+    });
   }
 
   /* What the attendance sentence says after "{He} has": "missed three
@@ -5462,9 +5659,25 @@ window.CommentBank = (function () {
     });
   }
   function _bankSentence(bank, id) {
-    return bank.sentences.find(function (x) {
-      return x.id === id;
-    });
+    return (
+      bank.sentences.find(function (x) {
+        return x.id === id;
+      }) || _setSentenceNamed(id)
+    );
+  }
+  /* A course-set sentence by id, as a kept sentence's step reads it: its
+     part and group are fixed by its kind. */
+  function _setSentenceNamed(id) {
+    var m = String(id || '').match(/^set:.+:(s0|s1|n|h)$/);
+    if (!m) return undefined;
+    var k = m[1].charAt(0);
+    return {
+      id: id,
+      part: k === 's' ? 'now' : k === 'n' ? 'go' : 'how',
+      group: k === 's' ? 'Overall' : k === 'n' ? 'Next Step' : 'For the Family',
+      text: '',
+      claims: [],
+    };
   }
   function _kept(kept, bank) {
     var out = {};
@@ -5514,6 +5727,10 @@ window.CommentBank = (function () {
     // the other routes.
     if (s.group === 'Grade' && ctx.evenResults && needs.indexOf('evenResults') >= 0) n++;
     if (s.afterEven) n++;
+    // A course set's own sentence for the strength or the home line comes
+    // first (Colin, Nov 4: the student's own competency's wording first),
+    // until a classmate has it: then it takes its turn with the others.
+    if (s.specific && !(_usageNow[s.id] > 0)) n += s.specific;
     // Two for a story, so a frame written for the student's story comes
     // before one written for the strongest skill (`when.strongSkill`, bank
     // n6xx-n7xx), which comes before a general one.
@@ -5575,6 +5792,8 @@ window.CommentBank = (function () {
     var soft =
       step.preferSoft &&
       (s.mine ||
+        // A course set's own sentence (Nov 4) stays in too.
+        /^set:/.test(s.id) ||
         (s.needs || []).some(function (k) {
           return STORY_SLOTS.indexOf(k) >= 0 || k === 'progressSkill';
         }));
@@ -5732,10 +5951,25 @@ window.CommentBank = (function () {
   }
 
   var SO_FAR = /\bso far\b/i;
+  /* The course-set sentences Generate may draft for this student. */
+  function _draftExtra(ctx) {
+    return ((ctx && ctx._extra) || []).filter(function (s) {
+      return !s.browse;
+    });
+  }
   var SHOW_TWICE = /\bshow(?:s|n|ing)?\b.*\bshow(?:s|n|ing)?\b/i;
   /* One pass of the draft over the steps in `seq`. usage: { sentence id:
      classmates } (classUsage()); exclude: { sentence id: true }. */
+  var _usageNow = {};
   function _compose(ctx, bank, seq, kept, seed, usage, exclude) {
+    _usageNow = usage || {};
+    try {
+      return _composeNow(ctx, bank, seq, kept, seed, usage, exclude);
+    } finally {
+      _usageNow = {};
+    }
+  }
+  function _composeNow(ctx, bank, seq, kept, seed, usage, exclude) {
     var rand = _rng(seed);
     var byKey = {};
     DRAFT_STEPS.forEach(function (s) {
@@ -5773,7 +6007,7 @@ window.CommentBank = (function () {
     var nextFires =
       seq.indexOf('nextStep') >= 0 &&
       (!!kept.nextStep ||
-        bank.sentences.some(function (s) {
+        bank.sentences.concat(_draftExtra(ctx)).some(function (s) {
           return s.generate !== false && !exclude[s.id] && _stepFits(s, byKey.nextStep, ctx);
         }));
     seq.forEach(function (key, at) {
@@ -5829,7 +6063,7 @@ window.CommentBank = (function () {
       // in the first's place (theirs says the habits their way).
       if (key === 'habitsMore' && (!got.habits || said.habitsOwn)) return;
       if (key === 'habitsBuild' && said.habitsOwn) return;
-      var cands = bank.sentences.filter(function (s) {
+      var cands = bank.sentences.concat(_draftExtra(ctx)).filter(function (s) {
         // Browse only (`generate: false`, the sample voice, Nov 4): the
         // teacher can choose it; Generate never does.
         if (s.generate === false) return false;
@@ -6107,7 +6341,7 @@ window.CommentBank = (function () {
     // once more, so each part takes another of its frames where one fits
     // (Colin, Nov 4: a second press should change more than a sentence).
     var usage = classUsage(
-      bank,
+      { parts: bank.parts, sentences: bank.sentences.concat((ctx && ctx._extra) || []) },
       (opts.comments || []).concat(previous ? [{ sid: '\u0000previous', text: previous }] : []),
       cid,
       sid,
@@ -6690,6 +6924,17 @@ window.CommentBank = (function () {
     return (f.record && f.record.missing) || 0;
   }
 
+  function _setClaim(pv, f, prefix, want) {
+    var slot = Object.keys(pv.values || {}).find(function (k) {
+      return k.indexOf(prefix) === 0;
+    });
+    if (!slot) return false;
+    var c = _byId(f.comps, slot.slice(prefix.length));
+    var e = c && c.bankId ? setEntry(c.bankId) : null;
+    if (!e) return false;
+    var w = want(c, e);
+    return !!w && pv.values[slot] === w;
+  }
   var CLAIMS = {
     // The overall standing: the letter, the proficiency word, or what the
     // work shows overall.
@@ -6878,6 +7123,26 @@ window.CommentBank = (function () {
       var slot = _has(pv, 'hiSkill') ? 'hiSkill' : _has(pv, 'hiComp') ? 'hiComp' : '';
       if (!h || !slot || _ids(pv, slot, 'comp')[0] !== String(h.comp.id)) return false;
       return pv.values[slot] === (slot === 'hiSkill' ? h.skill : h.label);
+    },
+    // A course set's strength sentence: the competency is from that set,
+    // not a sensitive one, and at Proficient or above now.
+    setStrength: function (pv, f) {
+      return _setClaim(pv, f, 'sets_', function (c, e) {
+        return Math.round(c.level) >= 3 ? e.key : null;
+      });
+    },
+    // Its next-step sentence: the same set, at the level the competency is
+    // at now.
+    setNext: function (pv, f) {
+      return _setClaim(pv, f, 'setn_', function (c, e) {
+        return _setLevel(c) ? e.key + '|' + _setLevel(c) : null;
+      });
+    },
+    // Its home line: the same set, which has one.
+    setHome: function (pv, f) {
+      return _setClaim(pv, f, 'seth_', function (c, e) {
+        return e.home && !e.sensitive ? e.key : null;
+      });
     },
     // Another skill at Proficient or above (altStrengthOf): the same
     // competency, still there, in its phrase or label.
@@ -7406,12 +7671,22 @@ window.CommentBank = (function () {
     return _has(pv, 'habitsExcellent') && (eff || {}).completes === CONSISTENTLY;
   }
 
+  /* fn() as if the course-set file had not loaded: the cluster wording. */
+  function _withoutSets(fn) {
+    var saved = window.BANK_SETS;
+    window.BANK_SETS = null;
+    try {
+      return fn();
+    } finally {
+      window.BANK_SETS = saved;
+    }
+  }
   function verify(d, f, picks, opts) {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
     var ctx = context(f, picks);
     var byId = {};
-    bank.sentences.forEach(function (s) {
+    bank.sentences.concat(ctx._extra || []).forEach(function (s) {
       byId[s.id] = s;
     });
     var used = {};
@@ -7444,13 +7719,30 @@ window.CommentBank = (function () {
       // A sentence the teacher kept is theirs, as written, and so is a class
       // line (support, closing, late work), and a sentence the bank has since
       // retired (RETIRED): not checked.
-      if (pv.kept || pv.classLine || (!byId[pv.sentenceId] && RETIRED[pv.sentenceId])) {
+      // A course-set sentence the student no longer has among their own
+      // is read back from the set file; before it loads, it stands as
+      // written.
+      if (!byId[pv.sentenceId] && /^set:/.test(pv.sentenceId)) {
+        var ss = setSentenceById(f, pv.sentenceId);
+        if (ss) byId[pv.sentenceId] = ss;
+      }
+      var unread = /^set:/.test(pv.sentenceId) && !byId[pv.sentenceId] && !window.BANK_SETS;
+      if (pv.kept || pv.classLine || unread || (!byId[pv.sentenceId] && RETIRED[pv.sentenceId])) {
         sentences.push(d.sentences[i]);
         out.push(pv);
         return;
       }
       var s = byId[pv.sentenceId];
       var failed = s ? _failed(s, pv, f, ctx) : ['unknown'];
+      // A sentence written in the cluster wording, before the course sets
+      // shipped or loaded (Nov 4), still holds when that wording does: a
+      // change of wording is not a change of marks.
+      if (failed.length && s && !/^set:/.test(s.id) && typeof window !== 'undefined' && window.BANK_SETS) {
+        var plain = _withoutSets(function () {
+          return _failed(s, pv, f, context(f, picks));
+        });
+        if (!plain.length) failed = plain;
+      }
       if (!failed.length) {
         sentences.push(d.sentences[i]);
         out.push(pv);
@@ -8048,6 +8340,11 @@ window.CommentBank = (function () {
     bestPieceOf: bestPieceOf,
     bestPieceSkillOf: bestPieceSkillOf,
     highestFallbackOf: highestFallbackOf,
+    setEntry: setEntry,
+    isSensitive: isSensitive,
+    setSentencesFor: setSentencesFor,
+    setStrengthCompOf: setStrengthCompOf,
+    loadSets: loadSets,
     altStrengthOf: altStrengthOf,
     tentSkillOf: tentSkillOf,
     stepSkillOf: stepSkillOf,

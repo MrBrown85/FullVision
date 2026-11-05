@@ -231,6 +231,7 @@ load('shared/comment-bank.js');
 load('teacher/comment-realiser.js');
 load('teacher/comment-lint.js');
 load('shared/bank-comment.js');
+load('shared/bank-sets.js');
 load('teacher/comment-bank.js');
 load('teacher/comment-personal.js');
 load('teacher/report-questionnaire.js');

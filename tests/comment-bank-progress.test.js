@@ -7,7 +7,20 @@
  */
 import './setup.js';
 import { readFileSync } from 'fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll } from 'vitest';
+
+/* The cluster wording: these tests read data/bc-curriculum-comment.json, the
+   fallback for a competency whose course-set wording (shared/bank-sets.js)
+   has not loaded (Nov 4; tests/comment-bank-course-sets.test.js covers the
+   sets). */
+let savedSets;
+beforeAll(() => {
+  savedSets = window.BANK_SETS;
+  window.BANK_SETS = null;
+});
+afterAll(() => {
+  window.BANK_SETS = savedSets;
+});
 
 const comment = JSON.parse(readFileSync('data/bc-curriculum-comment.json', 'utf-8'));
 const THEY = { subj: 'they', obj: 'them', poss: 'their', refl: 'themselves' };
