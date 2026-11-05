@@ -14,3 +14,8 @@ docs/plans/*.html
 data/bc-curriculum-*.json
 shared/bank-proficiency.js
 shared/bank-core-competencies.js
+
+# The help site's built pages (scripts/build-help.mjs), not committed
+help/*.html
+help/fragments/
+help/index.json
