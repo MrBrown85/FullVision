@@ -111,16 +111,19 @@ describe('missing work so far this year', () => {
       expect(ctx.missingTitle).toContain(a.title);
     }));
 
-  it('keeps it in the total as missing, so Completes Work weighs it', () => {
+  it('keeps it in the total as missing; Completes Work stays the teacher’s own rating', () => {
     const before = facts().record;
     withTerm1Missing(() => {
-      const rec = facts().record;
+      const f = facts();
+      const rec = f.record;
       expect(rec.total).toBe(before.total);
       expect(rec.missing).toBe(1);
       expect(rec.handed).toBe(before.handed - 1);
-      expect(CommentBank.completesFromRecord(rec)).toBe(2);
+      // Nothing is rated from the record (Nov 4): the Not Handed In part
+      // says it instead.
+      expect(CommentBank.effectiveHabits({}, rec, f)).toEqual({});
+      expect(CommentBank.context(f, {}).missingWork).toBeTruthy();
     });
-    expect(CommentBank.completesFromRecord(before)).toBe(4);
   });
 
   it('offers no missing-work sentence that says "this term" for it', () =>

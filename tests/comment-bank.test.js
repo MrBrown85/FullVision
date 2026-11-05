@@ -506,17 +506,12 @@ describe('fits', () => {
   });
 });
 
-describe('Completes Work from the record', () => {
-  it('follows the plan’s rule until the teacher picks', () => {
-    const c = CommentBank.completesFromRecord;
-    expect(c({ total: 22, handed: 22, late: 0, missing: 0 })).toBe(4);
-    expect(c({ total: 22, handed: 22, late: 1, missing: 0 })).toBe(3);
-    expect(c({ total: 22, handed: 22, late: 3, missing: 0 })).toBe(2);
-    expect(c({ total: 22, handed: 21, late: 0, missing: 1 })).toBe(2);
-    expect(c({ total: 22, handed: 19, late: 0, missing: 3 })).toBe(1);
-    expect(c({ total: 0, handed: 0, late: 0, missing: 0 })).toBeUndefined();
+describe('Completes Work is only what the teacher rated (Colin, Nov 4)', () => {
+  it('never comes from the assignment record: blank stays blank', () => {
+    expect(CommentBank.completesFromRecord).toBeUndefined();
     const rec = { total: 5, handed: 5, late: 0, missing: 0 };
-    expect(CommentBank.effectiveHabits({}, rec)).toEqual({ completes: 4 });
+    expect(CommentBank.effectiveHabits({}, rec)).toEqual({});
+    expect(CommentBank.effectiveHabits(undefined)).toEqual({});
     expect(CommentBank.effectiveHabits({ completes: 2, part: 5, kind: 3 }, rec)).toEqual({ completes: 2, part: 5 });
   });
 });
@@ -634,24 +629,24 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  // The habits part: Completes Work from the record is the one strong
-  // habit, so the three Strong Habits frames (hs11, hs13, hs15) and the
-  // five Habit Ratings frames for Completes Work at Consistently fit. The
-  // record alone gives no habits part for families (nothing rated).
-  it('knows the Demo class is Science from its name, and offers Cece 77 sentences (8, 40, 4, 25)', () => {
+  // The habits part: nothing is rated, and Completes Work no longer comes
+  // from the record (Nov 4), so no habits frame fits. Before, the record's
+  // Consistently fitted eight: the three Strong Habits frames (hs11, hs13,
+  // hs15) and five Habit Ratings frames for Completes Work.
+  it('knows the Demo class is Science from its name, and offers Cece 69 sentences (0, 40, 4, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([8, 40, 4, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(77);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 40, 4, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(69);
   });
 
-  it('offers Jasper 78 (8, 40, 5, 25), by the name he goes by', () => {
+  it('offers Jasper 70 (0, 40, 5, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
     // Overall: every competency is Proficient as the report grades it
     // (2.9 to 3.3), so the even-results frames fit (Nov 3).
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([8, 40, 5, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(78);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 40, 5, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(70);
     expect(ctx.name).toBe('Jas');
     // Nothing fell from Extending since Report 1's year to date (it fell
     // four times inside Term 2's own trend, which Generate no longer
@@ -659,13 +654,17 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(ctx.fellCount).toBe('');
   });
 
-  it('reads Completes Work from the record, and a pick overrides it', () => {
+  it('leaves Completes Work blank until the teacher rates it, whatever the record says', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
     const f = CommentBank.facts(cid, st, 'term-2');
-    // The record is the year to date as of Report 2's end (Colin, 2026-11-03).
+    // The record is the year to date as of Report 2's end (Colin, 2026-11-03):
+    // all handed in, none late, yet nothing is rated from it (Nov 4).
     expect(f.record).toEqual({ total: 37, handed: 37, late: 0, missing: 0 });
-    expect(CommentBank.context(f, {})._habits).toEqual({ completes: 4 });
+    expect(CommentBank.context(f, {})._habits).toEqual({});
     expect(CommentBank.context(f, { habits: { completes: 2 } })._habits).toEqual({ completes: 2 });
+    // The draft names no habit when none is rated.
+    const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
+    expect(d.sentences.some(x => /^habits/.test(x.step))).toBe(false);
   });
 
   it('counts only work labelled Missing, whatever its due date', () => {
@@ -733,7 +732,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
-    expect(habits.fit).toBe(3 + 6 + 5);
+    // Only the attendance frames: nothing is rated, and Completes Work no
+    // longer comes from the record (Nov 4; it added 3 + 5 habit frames).
+    expect(habits.fit).toBe(6);
     // The attendance frames for both counts (plan, Sentence grammar: both
     // halves said, the exact counts): h60 and the five both-count frames.
     const att = habits.rows.filter(r => r.group === 'Attendance');
@@ -879,8 +880,20 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       claims: ['improved'],
     };
     expect(CommentBank.provenance(rose, mctx).factKeys).toEqual(['comp:SC']);
-    // Only Completes Work is rated (from the record): the IE strengths name it.
-    expect(CommentBank.provenance(byId('hs11'), ctx).factKeys).toEqual(['habit:completes']);
+    // Completes Work rated Consistently by the teacher: the IE strengths
+    // name it. Unrated, it is not a fact (nothing from the record, Nov 4).
+    expect(CommentBank.provenance(byId('hs11'), ctx).factKeys).toEqual([]);
+    const rated = CommentBank.context(
+      CommentBank.facts(
+        cid,
+        getStudents(cid).find(s => s.firstName === 'Cece'),
+        'term-2',
+      ),
+      {
+        habits: { completes: 4 },
+      },
+    );
+    expect(CommentBank.provenance(byId('hs11'), rated).factKeys).toEqual(['habit:completes']);
     const steady = {
       id: 'x-steady',
       part: 'now',

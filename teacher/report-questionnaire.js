@@ -1001,27 +1001,22 @@ window.ReportQuestionnaire = (function () {
     }).length;
   }
 
-  /* The rating a habit's slider shows: { v, fromRecord }. A saved rating
-     from 1 to 4; else Completes Work as the assignment record has it
-     (CommentBank.effectiveHabits), as the comment uses it, until the
-     teacher picks; else 0, blank. */
-  function _sliderValue(stored, auto, key) {
+  /* The rating a habit's slider shows: the teacher's saved rating, 1 to 4,
+     else 0, blank (an old Not Seen shows blank). Nothing from the
+     assignment record (Nov 4: blank means blank). */
+  function _sliderValue(stored, key) {
     var s = Number(stored[key]);
-    if (s >= 1 && s <= HS_STOPS) return { v: s, fromRecord: false };
-    if (stored[key] == null && auto[key] >= 1 && auto[key] <= HS_STOPS) return { v: auto[key], fromRecord: true };
-    return { v: 0, fromRecord: false };
+    return s >= 1 && s <= HS_STOPS ? s : 0;
   }
-  function _sliderText(v, fromRecord) {
-    if (!v) return 'Not rated';
-    return CommentBank.SCALE[v - 1] + (fromRecord ? ', from the assignment record' : '');
+  function _sliderText(v) {
+    return v ? CommentBank.SCALE[v - 1] : 'Not rated';
   }
 
   // html-safe: habit names, descriptions and scale headings esc()'d; keys and values are fixed
   function _habitsHtml(cid, f) {
     var stored = (getStudentTermRating(cid, f.sid, getTermId()) || {}).habits || {};
-    var auto = CommentBank.effectiveHabits(stored, f.record, f);
     var rows = CommentBank.HABITS.map(function (h) {
-      var cur = _sliderValue(stored, auto, h.key);
+      var cur = _sliderValue(stored, h.key);
       var dots = '';
       // A dot under each column of the scale, and over each column a clear
       // stop that takes the click (the pointer handler snaps to the
@@ -1033,7 +1028,7 @@ window.ReportQuestionnaire = (function () {
       }
       return `<div class="qn-habit-row" data-habit-row="${h.key}">
         <span class="qn-habit-name" id="tq-habit-${h.key}" title="${esc(h.name)}">${esc(h.name)}</span>
-        <div class="qn-hs${cur.v ? ' set' : ''}${cur.fromRecord ? ' from-record' : ''}" role="slider" tabindex="0" data-habit="${h.key}" data-value="${cur.v}" style="--at:${Math.max(0, cur.v - 1)}" aria-labelledby="tq-habit-${h.key}" aria-describedby="tq-habit-desc-${h.key}" aria-valuemin="1" aria-valuemax="${HS_STOPS}"${cur.v ? ` aria-valuenow="${cur.v}"` : ''} aria-valuetext="${esc(_sliderText(cur.v, cur.fromRecord))}">
+        <div class="qn-hs${cur ? ' set' : ''}" role="slider" tabindex="0" data-habit="${h.key}" data-value="${cur}" style="--at:${Math.max(0, cur - 1)}" aria-labelledby="tq-habit-${h.key}" aria-describedby="tq-habit-desc-${h.key}" aria-valuemin="1" aria-valuemax="${HS_STOPS}"${cur ? ` aria-valuenow="${cur}"` : ''} aria-valuetext="${esc(_sliderText(cur))}">
           <div class="qn-hs-track" aria-hidden="true"><span class="qn-hs-rail"></span>${dots}<span class="qn-hs-fill"></span><span class="qn-hs-thumb"></span>${stops}</div>
         </div>
         <span class="qn-habit-desc" id="tq-habit-desc-${h.key}" title="${esc(h.desc || h.hint)}">${esc(h.desc || h.hint)}</span>
@@ -1055,26 +1050,23 @@ window.ReportQuestionnaire = (function () {
 
   /* A slider drawn at a stop (1 to 4) or blank (0), without saving: while
      it is dragged, and after a rating is saved. */
-  function _paintSlider(el, v, fromRecord) {
+  function _paintSlider(el, v) {
     if (!el) return;
     el.classList.toggle('set', v > 0);
-    el.classList.toggle('from-record', !!fromRecord && v > 0);
     el.style.setProperty('--at', String(Math.max(0, v - 1)));
     el.dataset.value = String(v);
     if (v > 0) el.setAttribute('aria-valuenow', String(v));
     else el.removeAttribute('aria-valuenow');
-    el.setAttribute('aria-valuetext', _sliderText(v, fromRecord));
+    el.setAttribute('aria-valuetext', _sliderText(v));
   }
 
-  /* The habit's slider drawn from what is saved (and the record). */
+  /* The habit's slider drawn from what is saved. */
   function _syncSlider(key) {
     var st = _current();
     var el = document.querySelector('.qn-hs[data-habit="' + key + '"]');
     if (!st || !el) return;
-    var f = _facts(st);
     var stored = (getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).habits || {};
-    var cur = _sliderValue(stored, CommentBank.effectiveHabits(stored, f.record, f), key);
-    _paintSlider(el, cur.v, cur.fromRecord);
+    _paintSlider(el, _sliderValue(stored, key));
   }
 
   /* The stop (1 to 4) nearest a point across a slider's track. The track
@@ -1113,12 +1105,11 @@ window.ReportQuestionnaire = (function () {
       var key = el.dataset.habit;
       var startX = e.clientX;
       var before = Number(el.dataset.value) || 0;
-      var fromRecord = el.classList.contains('from-record');
       var moved = false;
       var move = function (ev) {
         if (!moved && Math.abs(ev.clientX - startX) < 4) return;
         moved = true;
-        _paintSlider(el, _stopAt(el, ev.clientX), false);
+        _paintSlider(el, _stopAt(el, ev.clientX));
       };
       var up = function (ev) {
         document.removeEventListener('pointermove', move);
@@ -1128,13 +1119,13 @@ window.ReportQuestionnaire = (function () {
         var saved = _savedRating(key);
         if (!moved && stop === saved) tqRate(key, 0);
         else if (stop !== saved) tqRate(key, stop);
-        else _paintSlider(el, before, fromRecord);
+        else _paintSlider(el, before);
       };
       var cancel = function () {
         document.removeEventListener('pointermove', move);
         document.removeEventListener('pointerup', up);
         document.removeEventListener('pointercancel', cancel);
-        _paintSlider(el, before, fromRecord);
+        _paintSlider(el, before);
       };
       document.addEventListener('pointermove', move);
       document.addEventListener('pointerup', up);
@@ -1905,20 +1896,14 @@ window.ReportQuestionnaire = (function () {
 
   /* Where the Work Habits come from for the student on screen: "Your six
      ratings" only once the teacher has rated all six; else how many so
-     far, and Completes Work from the record while it is unrated. */
+     far. Only the habits the teacher rates are used. */
   function _habitsInfo(cid, st) {
     if (!st) return SCREEN_SOURCES[1][1];
     var f = _facts(st);
     var n = Object.keys(_ratedByYou(cid, st, f)).length;
     if (n === CommentBank.HABITS.length) return SCREEN_SOURCES[1][1];
     var so = n ? CommentBank.numberWords(n) + ' of six so far' : 'none yet';
-    var record = !!_habitsOf(cid, st, f).completes && !_ratedByYou(cid, st, f).completes;
-    return (
-      'Rated by you, Rarely to Consistently: ' +
-      so +
-      '.' +
-      (record ? ' Until you rate it, Completes Work comes from the assignment record.' : '')
-    );
+    return 'Rated by you, Rarely to Consistently: ' + so + '. Only the habits you rate are used.';
   }
 
   var INFO_ID = 'tq-info-overlay';
@@ -4809,16 +4794,13 @@ window.ReportQuestionnaire = (function () {
     });
     return h ? h.name : k;
   }
+  /* The teacher's own habit ratings for the student this report
+     (CommentBank.effectiveHabits: nothing from the assignment record). */
   function _habitsOf(cid, student, f) {
-    return CommentBank.effectiveHabits(
-      (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits,
-      f.record,
-      f,
-    );
+    return CommentBank.effectiveHabits((getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits);
   }
   /* The habits the teacher rated for the student this report (Not Seen
-     included), as { key: true }; Completes Work from the record is not
-     one of them (CommentBank.effectiveHabits). */
+     included), as { key: true }. */
   function _ratedByYou(cid, student, f) {
     var stored = (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits || {};
     var out = {};
@@ -4828,49 +4810,20 @@ window.ReportQuestionnaire = (function () {
     });
     return out;
   }
-  /* "From the record: Completes Work, Sometimes": a habit the teacher has
-     not rated, read from the assignment record. */
-  function _fromRecord(k, habits) {
-    return 'From the record: ' + _habitName(k) + ', ' + CommentBank.SCALE[habits[k] - 1];
-  }
-  /* The habits sentence's source line: what the teacher rated ("Collaborates
-     rated Sometimes", "All six rated Consistently") and, apart, what came
-     from the record, never one called the other. */
+  /* The habits sentence's source line: what the teacher rated ("Works With
+     Others rated Sometimes", "All six rated Consistently"). */
   function _habitsSource(cid, student, f) {
     var habits = _habitsOf(cid, student, f);
     var h = CommentBank.habitSummary(habits);
-    var mine = _ratedByYou(cid, student, f);
     var rated = function (k) {
-      return mine[k] ? _habitName(k) + ' rated ' + CommentBank.SCALE[habits[k] - 1] : _fromRecord(k, habits);
-    };
-    var yours = function (ks) {
-      return ks.filter(function (k) {
-        return mine[k];
-      });
-    };
-    var record = function (ks) {
-      return ks
-        .filter(function (k) {
-          return !mine[k];
-        })
-        .map(function (k) {
-          return _fromRecord(k, habits);
-        });
+      return _habitName(k) + ' rated ' + CommentBank.SCALE[habits[k] - 1];
     };
     if (h.excellent || h.good) {
       var how = h.excellent ? ' rated Consistently' : ' rated Usually or Consistently';
-      var n = yours(h.seen).length;
-      var from = record(h.seen);
-      if (!from.length) return 'All ' + CommentBank.numberWords(n) + how;
-      return [n ? _cap(CommentBank.numberWords(n)) + how : ''].concat(from).filter(Boolean).join(' · ');
+      return 'All ' + CommentBank.numberWords(h.seen.length) + how;
     }
     if (h.build.length) return h.build.map(rated).join(' · ');
-    if (h.strong.length) {
-      var strong = yours(h.strong);
-      return (strong.length ? [strong.map(_habitName).join(', ') + ' rated Consistently'] : [])
-        .concat(record(h.strong))
-        .join(' · ');
-    }
+    if (h.strong.length) return h.strong.map(_habitName).join(', ') + ' rated Consistently';
     return 'From your Work Habits ratings';
   }
 
@@ -4899,12 +4852,8 @@ window.ReportQuestionnaire = (function () {
       return w ? w.title + ' · ' + _pieceMark(cid, f, w) : '';
     }
     if ((m = k.match(/^habit:(.+)$/))) {
-      var hs = _habitsOf(cid, student, f);
-      var v = hs[m[1]];
-      if (!v) return '';
-      return _ratedByYou(cid, student, f)[m[1]]
-        ? _habitName(m[1]) + ' rated ' + CommentBank.SCALE[v - 1]
-        : _fromRecord(m[1], hs);
+      var v = _habitsOf(cid, student, f)[m[1]];
+      return v ? _habitName(m[1]) + ' rated ' + CommentBank.SCALE[v - 1] : '';
     }
     if (/^confidence:/.test(k)) return first + '’s self-assessment';
     if (k === 'voice.goal') return 'From ' + first + '’s goal check-in';
@@ -7251,8 +7200,6 @@ window.ReportQuestionnaire = (function () {
     var first = _first(student);
     var habits = CommentBank.effectiveHabits(
       (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits,
-      f.record,
-      f,
     );
     var lines = CommentBank.supportChecklist(cid, f.family);
     var on = lines.filter(function (l) {
@@ -7301,8 +7248,6 @@ window.ReportQuestionnaire = (function () {
     var first = _first(student);
     var habits = CommentBank.effectiveHabits(
       (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits,
-      f.record,
-      f,
     );
     var any = ((f.classLines && f.classLines.support) || []).length > 0;
     var choice = CommentBank.supportChoice(f, habits);

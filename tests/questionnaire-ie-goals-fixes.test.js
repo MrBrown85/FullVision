@@ -13,9 +13,10 @@
  *    today to {last school day}.", the Deadline sentence is withheld on
  *    screen, in print and in Generate, and the calendar opens on today's
  *    month with the focus in it.
- * 6. On the IE path with work that has no mark yet, Completes Work is never
- *    filled from the record: only the teacher's ratings print, and verify()
- *    rejects a "completes work on time" claim the record gave.
+ * 6. On the IE path with work that has no mark yet, Completes Work is only
+ *    ever the teacher's rating (nothing comes from the record since Nov 4),
+ *    and verify() rejects a "completes work on time" claim once the rating
+ *    is taken away.
  * 11. The calendar note names the last day that can be picked, the school
  *    year's ("on or before June 30") in every term; the calendar and
  *    Approve use that one range; the arrow keys in the open calendar never
@@ -413,8 +414,8 @@ describe('6. Completes Work on a thin IE comment', () => {
     rate({ reportingBasis: 'ie', ieDeadline: '2026-12-18' });
     const f = factsNow();
     expect(CommentBank.ieProblemOf(f)).toBe('marks');
-    // The record alone would say Consistently.
-    expect(CommentBank.completesFromRecord(f.record)).toBe(4);
+    // The record is all handed in, but nothing is rated from it (Nov 4).
+    expect(f.record.handed).toBe(f.record.total);
     expect(CommentBank.effectiveHabits(undefined, f.record, f)).toEqual({});
     expect(CommentBank.context(f, {})._habits).toEqual({});
     for (let n = 1; n <= 6; n++) expect(onTime(draftNow(n)), 'seed ' + n).toEqual([]);

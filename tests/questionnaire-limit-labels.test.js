@@ -292,37 +292,36 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
   });
 
   describe('8. the habits source lines and the ⓘ sheet', () => {
-    it('Completes Work from the record says so, not “rated” (nothing rated by the teacher)', () => {
+    it('an unrated Completes Work is not a source: no “From the record” line (nothing rated by the teacher)', () => {
       const st = byName('Tyler');
       upsertTermRating(cid, st.id, term(), { habits: {} });
       const f = factsOf(st);
       const ctx = CommentBank.context(f, {});
-      const habits = CommentBank.effectiveHabits({}, f.record);
-      expect(habits.completes).toBeTruthy();
-      const word = CommentBank.SCALE[habits.completes - 1];
+      // The record has work in it, yet nothing is rated from it (Nov 4).
+      expect(f.record.total).toBeGreaterThan(0);
+      expect(CommentBank.effectiveHabits({}, f.record)).toEqual({});
       const src = RQ.rowSource({ step: 'habits', edited: false, prov: null }, cid, st, f, ctx);
-      expect(src).toBe('From the record: Completes Work, ' + word);
-      expect(src).not.toMatch(/rated/);
-      // A sentence resting on the rating names its source the same way.
+      expect(src).toBe('From your Work Habits ratings');
+      expect(src).not.toMatch(/record/);
+      // A sentence naming the habit has no source for it while it is blank.
       const row = { step: 'example', edited: false, prov: { factKeys: ['habit:completes'] } };
-      expect(RQ.rowSource(row, cid, st, f, ctx)).toContain('From the record: Completes Work, ' + word);
+      expect(RQ.rowSource(row, cid, st, f, ctx)).not.toMatch(/From the record|Completes Work/);
     });
 
-    it('what the teacher rated stays “rated”; the record is named apart', () => {
+    it('what the teacher rated is “rated”; an unrated habit is left out', () => {
       const st = byName('Tyler');
       const f = factsOf(st);
       const ctx = CommentBank.context(f, {});
       const src = () => RQ.rowSource({ step: 'habits', edited: false, prov: null }, cid, st, f, ctx);
-      // Five rated Consistently, Completes Work from the record.
+      // Five rated Consistently, Completes Work blank: the line counts the
+      // five the teacher rated and never names Completes Work.
       const keys = CommentBank.HABITS.map(h => h.key).filter(k => k !== 'completes');
       const mine = {};
       keys.forEach(k => (mine[k] = 4));
       expect(Object.keys(mine).length).toBe(5);
       upsertTermRating(cid, st.id, term(), { habits: mine });
-      const rec = CommentBank.effectiveHabits(mine, f.record).completes;
-      if (rec === 4) expect(src()).toBe('Five rated Consistently · From the record: Completes Work, Consistently');
-      else expect(src()).toContain('From the record: Completes Work, ' + CommentBank.SCALE[rec - 1]);
-      expect(src()).not.toMatch(/^All six/);
+      expect(src()).toBe('All five rated Consistently');
+      expect(src()).not.toMatch(/record|Completes Work|^All six/);
       // All six rated by the teacher: the mockup's line.
       upsertTermRating(cid, st.id, term(), { habits: Object.assign({ completes: 4 }, mine) });
       expect(src()).toBe('All six rated Consistently');
@@ -339,7 +338,8 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
       let o = sheet();
       expect(o.innerHTML).not.toContain('Your six ratings');
       expect(o.innerHTML).toContain('Rated by you, Rarely to Consistently: none yet.');
-      expect(o.innerHTML).toContain('Until you rate it, Completes Work comes from the assignment record.');
+      expect(o.innerHTML).toContain('Only the habits you rate are used.');
+      expect(o.innerHTML).not.toContain('assignment record');
       RQ.tqCloseInfo();
       const [a, b] = CommentBank.HABITS.map(h => h.key).filter(k => k !== 'completes');
       upsertTermRating(cid, st.id, term(), { habits: { [a]: 3, [b]: 4 } });

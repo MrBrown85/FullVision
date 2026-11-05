@@ -479,36 +479,32 @@ describe('the class settings (report_config) and the review screen', () => {
     expect(row.slice(0, 600)).not.toContain(fixed);
   });
 
-  it('shows Completes Work from the record on its slider until the teacher rates it (Step 4 group 3 #65)', () => {
+  it('leaves Completes Work blank until the teacher rates it; clearing returns it to blank (Step 4 group 3 #65, Nov 4)', () => {
     seed(['a9', 'a8']);
     const st = getStudents(CID).find(s => s.id === GAB.id);
-    const auto = CommentBank.effectiveHabits({}, CommentBank.facts(CID, st, TERM).record).completes;
-    expect(auto).toBeGreaterThan(0);
-    const label = CommentBank.SCALE[auto - 1];
+    // The record has work in it, but nothing is rated from it.
+    expect(CommentBank.facts(CID, st, TERM).record.total).toBeGreaterThan(0);
+    expect(CommentBank.effectiveHabits({}, CommentBank.facts(CID, st, TERM).record)).toEqual({});
+    const blank =
+      /class="qn-hs" role="slider" tabindex="0" data-habit="completes" data-value="0"[^>]*aria-valuemax="4" aria-valuetext="Not rated"/;
     let html = open();
-    // The slider shows the record's rating, marked from the record (no
-    // record line under the habit); it does not count as rated.
-    expect(html).toMatch(
-      new RegExp(
-        'class="qn-hs set from-record" role="slider" tabindex="0" data-habit="completes" data-value="' +
-          auto +
-          '"[^>]*aria-valuenow="' +
-          auto +
-          '" aria-valuetext="' +
-          label +
-          ', from the assignment record"',
-      ),
-    );
+    expect(html).toMatch(blank);
+    expect(html).not.toContain('from-record');
+    expect(html).not.toContain('from the assignment record');
     expect(html).not.toContain('From assignments:');
     expect(html).toContain('id="tq-rated">0 of 6 rated');
-    // Rated by the teacher: the slider shows their rating, not the record.
+    // Rated by the teacher: the slider shows their rating.
     upsertTermRating(CID, GAB.id, TERM, { habits: { completes: 4 } });
     html = open();
-    expect(html).not.toContain('from-record');
     expect(html).toMatch(
       /class="qn-hs set" role="slider" tabindex="0" data-habit="completes" data-value="4"[^>]*aria-valuenow="4" aria-valuetext="Consistently"/,
     );
     expect(html).toContain('id="tq-rated">1 of 6 rated');
+    // Cleared: blank again, not the record's guess.
+    upsertTermRating(CID, GAB.id, TERM, { habits: {} });
+    html = open();
+    expect(html).toMatch(blank);
+    expect(html).toContain('id="tq-rated">0 of 6 rated');
   });
 
   it('saves the closing sentence for the class; approved comments keep the old one', () => {

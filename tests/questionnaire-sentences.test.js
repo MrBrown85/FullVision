@@ -510,7 +510,10 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   });
 
   it('browseList: the part’s sentences, least used first, with how many fit; Fits leaves the rest out', () => {
-    const { ctx } = draftFor(cece());
+    // Completes Work rated by the teacher, so some habits sentences fit
+    // (nothing comes from the record any more, Nov 4).
+    const ctx = CommentBank.context(CommentBank.facts(cid, cece(), 'term-2'), { habits: { completes: 4 } });
+    expect(RQ.browseList('habits', CommentBank.context(CommentBank.facts(cid, cece(), 'term-2'), {})).fit).toBe(0);
     const usage = {};
     const all = RQ.browseList('habits', ctx, { fits: false, usage });
     expect(all.total).toBeGreaterThan(all.fit);

@@ -1903,42 +1903,27 @@ window.CommentBank = (function () {
     return v > 0 ? PROF_LABELS[Math.max(1, Math.min(4, Math.round(v)))] || '' : '';
   }
 
-  /* Completes Work from the assignment record, until the teacher picks: all
-     in, none late or missing is Consistently; more than two missing is
-     Rarely; any missing or more than two late is Sometimes; else Usually.
-     Nothing with no record. */
-  function completesFromRecord(rec) {
-    if (!rec || !(rec.total > 0)) return undefined;
-    if (rec.handed === rec.total && !rec.late && !rec.missing) return CONSISTENTLY;
-    if (rec.missing > 2) return 1;
-    if (rec.missing || rec.late > 2) return 2;
-    return 3;
-  }
-
-  /* Whether the record can say anything about Completes Work: not on the
-     IE path while the student has work with no mark yet, since that work
-     is part of the IE problem and the record cannot tell whether it came
-     in on time. */
+  /* Whether the student is on the IE path with work that has no mark yet:
+     that work is part of the IE problem, so no on-time claim may stand
+     beside it unless the teacher rated Completes Work. */
   function _unmarkedIe(f) {
     if (!f || reportPath(f) !== 'ie') return false;
     var m = (f.grade && f.grade.marked) || {};
     return m.all > 0 && (m.mine || 0) < m.all;
   }
 
-  /* The habits a sentence is matched against: the teacher's, with Completes
-     Work from the record while the teacher has not picked it (never on the
-     IE path while work has no mark yet: only the teacher's ratings there).
-     `f`: the facts, when known. */
-  function effectiveHabits(stored, rec, f) {
+  /* The habits a sentence is matched against: the teacher's own ratings,
+     Rarely to Consistently (an old Not Seen kept as it was saved). Nothing
+     comes from the assignment record any more (Colin, Nov 4: a Completes
+     Work slider that fell back to the record's guess when cleared looked
+     stuck; blank means blank, and the comment's Not Handed In part already
+     says what the record shows). */
+  function effectiveHabits(stored) {
     var out = {};
     HABITS.forEach(function (h) {
       var v = stored && Number(stored[h.key]);
       if (v >= 1 && v <= NOT_SEEN) out[h.key] = v;
     });
-    if (!('completes' in out) && !_unmarkedIe(f)) {
-      var auto = completesFromRecord(rec);
-      if (auto) out.completes = auto;
-    }
     return out;
   }
 
@@ -2072,9 +2057,8 @@ window.CommentBank = (function () {
      and the kind of class: { lead, more, help, ie }. lead and more are {
      slot, keys } or null; help is the habits that would help (keys, the
      grid's order); ie is the habits the IE comment names as strong.
-     rated: the teacher's own ratings (effectiveHabits without the record);
-     with none rated, Completes Work from the record alone gives no
-     strength sentence, as before (only the habit that would help). */
+     rated: the teacher's own ratings (effectiveHabits); with none rated
+     there is no strength sentence (only the habit that would help). */
   function habitPlan(habits, family, rated) {
     habits = habits || {};
     var any =
@@ -3739,7 +3723,7 @@ window.CommentBank = (function () {
   function context(f, picks) {
     picks = picks || {};
     var p = f.pronouns;
-    var habits = effectiveHabits(picks.habits || f.habits, f.record, f);
+    var habits = effectiveHabits(picks.habits || f.habits);
     var withLevels = f.comps.filter(function (c) {
       return c.start > 0 && c.now > 0;
     });
@@ -3872,7 +3856,7 @@ window.CommentBank = (function () {
     // The habits part for families (habitPlan): its slots, their facts
     // (the habits each names) and their tokens; '' for a slot the plan
     // does not fill.
-    var hplan = habitPlan(habits, f.family || '', effectiveHabits(picks.habits || f.habits, null));
+    var hplan = habitPlan(habits, f.family || '', effectiveHabits(picks.habits || f.habits));
     var strongThree = hplan.ie;
     var hslot = {};
     var hslotKeys = {};
@@ -4066,8 +4050,8 @@ window.CommentBank = (function () {
       _picks: picks,
       _p: p,
       _habits: habits,
-      // The teacher's own ratings, without Completes Work from the record.
-      _rated: effectiveHabits(picks.habits || f.habits, null),
+      // The teacher's own ratings.
+      _rated: effectiveHabits(picks.habits || f.habits),
       _standing: f.standing || '',
       _family: f.family || '',
       _grade: gr ? gr.kind : '',
@@ -4947,8 +4931,8 @@ window.CommentBank = (function () {
      tells, from the facts alone. Each story sets which steps run, their
      order and which leads; the grade sentence always comes first. Only
      facts FullVision has: the scored pieces and their % (calc.js), the
-     levels per competency, the work labelled Missing, the habit ratings
-     (Completes Work from the record until rated), and the enrolment date.
+     levels per competency, the work labelled Missing, the teacher's habit
+     ratings, and the enrolment date.
      The lowest tier that holds wins; inside a tier, the story used least in
      the class, then this order. "Angle" is never shown. */
   var NEW_DAYS = 14; // joined two weeks or more after the class began
@@ -5079,7 +5063,7 @@ window.CommentBank = (function () {
     var pieces = g.pieces || [];
     var work = f.work || [];
     var rec = f.record || {};
-    var habits = effectiveHabits((picks && picks.habits) || f.habits, rec, f);
+    var habits = effectiveHabits((picks && picks.habits) || f.habits);
     var letterMode = g.mode === 'letter' || g.mode === 'both';
     var level = Number(f.overall) || 0;
     // Strong in one skill (the "strongest" gate) and a full proficiency
@@ -6886,9 +6870,9 @@ window.CommentBank = (function () {
               }),
           );
       });
-      // On the IE path, never "completes work on time" from the record
-      // beside work not handed in or with no mark yet: the comment's own
-      // problem says otherwise. Only the teacher's rating says it there.
+      // On the IE path, never "completes work on time" beside work not
+      // handed in or with no mark yet unless the teacher rated Completes
+      // Work: the comment's own problem says otherwise.
       if (
         reportPath(f) === 'ie' &&
         !(ctx._rated || {}).completes &&
@@ -7645,7 +7629,6 @@ window.CommentBank = (function () {
     HABITS: HABITS,
     NOT_SEEN: NOT_SEEN,
     USED_BY: USED_BY,
-    completesFromRecord: completesFromRecord,
     effectiveHabits: effectiveHabits,
     habitSummary: habitSummary,
     habitCellFits: habitCellFits,
