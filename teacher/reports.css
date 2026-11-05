@@ -6924,3 +6924,49 @@ body.qn-roster #gb-sidebar .student-row-note {
     max-width: 100%;
   }
 }
+
+/* At a Glance's Next step chooser (inputs plan, item 7): the skill is a
+   button that opens the three choices and Let Generate Choose. */
+.qno-glance.qn-pop-open {
+  overflow: visible;
+}
+.qno-glance .qn-fact-body {
+  position: relative;
+}
+.qn-next-pick {
+  align-self: flex-start;
+  max-width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--link);
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.qn-next-pick::after {
+  content: ' ▾';
+}
+.qn-next-pick:hover,
+.qn-next-pick.on {
+  background: var(--overlay-hover);
+}
+.qn-next-pick:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-next-menu {
+  top: calc(100% + 4px);
+  left: 0;
+  right: auto;
+  width: 320px;
+  max-width: 320px;
+}
+/* The Studied row's Edit and Remove. */
+.qn-line-btns {
+  flex: none;
+  display: flex;
+  gap: 6px;
+}

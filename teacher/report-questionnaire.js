@@ -1253,10 +1253,12 @@ window.ReportQuestionnaire = (function () {
           moved = d;
         }
       });
+    // The teacher's own pick (rating.focusSectionId) when Generate takes it.
+    var mine = CommentBank.nextSkillOf(f);
     return {
       comps: comps,
       strongest: strongest,
-      next: CommentBank.nextStepOf(comps),
+      next: mine && mine.chosen ? mine.comp : CommentBank.nextStepOf(comps),
       change: moved >= 0.05 ? move : null,
     };
   }
@@ -1266,6 +1268,43 @@ window.ReportQuestionnaire = (function () {
     return `<div class="qn-fact">
         <span class="qn-fact-label">${label}</span>
         <div class="qn-fact-body"><span>${esc(c.name)}</span><span class="qn-muted">${esc(fig)}</span></div>
+        <span class="qn-level" data-level="${_levelStep(c.level)}">${esc(f.levelText(c.level))}</span>
+      </div>`;
+  }
+
+  /* The next step's choices (CommentBank.nextStepChoices) as menu items,
+     then Let Generate Choose: in At a Glance's chooser and at the top of
+     the Next Step row's Other Wording menu (from 'row', with its index). */
+  // html-safe: competency names and figures esc()'d; ids esc()'d
+  function _nextChoicesHtml(cid, f, from, i) {
+    var mine = CommentBank.nextSkillOf(f);
+    var picked = !!(mine && mine.chosen);
+    var at = from === 'row' ? ' data-from="row" data-row="' + i + '"' : ' data-from="glance"';
+    var item = function (sec, text, meta, on, tip) {
+      return `<button type="button" role="menuitemradio" aria-checked="${on}" class="qn-menu-item qn-skill-pick${on ? ' on' : ''}" data-action="tqLine" data-do="chooseNext" data-sec="${esc(sec)}"${at} title="${esc(tip)}"><span class="qn-menu-mark" aria-hidden="true">${on ? '✓' : ''}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(text)}</span>${meta ? `<span class="qn-menu-meta">${esc(meta)}</span>` : ''}</span></button>`;
+    };
+    return (
+      CommentBank.nextStepChoices(f)
+        .map(function (c) {
+          var meta = [formatLevel(cid, c.level), _plural(c.pieces, 'piece', 'pieces')];
+          if (c.engine) meta.push('Generate’s pick');
+          return item(c.id, c.name, meta.join(' · '), !!c.chosen, 'Make ' + c.name + ' the next step in this comment.');
+        })
+        .join('') + item('', 'Let Generate Choose', '', !picked, 'Generate picks the next step from the scores.')
+    );
+  }
+
+  /* At a Glance's Next step row: the skill as a button that opens the
+     chooser. */
+  // html-safe: the competency name, figures and level esc()'d
+  function _glanceNextHtml(cid, f, c, fig) {
+    if (!CommentBank.nextStepChoices(f).length) return _glanceSkillHtml(cid, f, 'Next step', c, fig);
+    var menu = _nextMenu
+      ? `<div class="qn-menu qn-next-menu" role="menu" aria-label="Which skill is the next step" id="tq-next-menu"><span class="qn-menu-head">Which Skill</span>${_nextChoicesHtml(cid, f, 'glance')}</div>`
+      : '';
+    return `<div class="qn-fact">
+        <span class="qn-fact-label">Next step</span>
+        <div class="qn-fact-body"><button type="button" class="qn-next-pick${_nextMenu ? ' on' : ''}" id="tq-next-btn" data-action="tqLine" data-do="nextMenu" aria-haspopup="menu" aria-expanded="${_nextMenu}" title="Pick the skill the comment’s next step names.">${esc(c.name)}</button><span class="qn-muted">${esc(fig)}</span>${menu}</div>
         <span class="qn-level" data-level="${_levelStep(c.level)}">${esc(f.levelText(c.level))}</span>
       </div>`;
   }
@@ -1291,7 +1330,7 @@ window.ReportQuestionnaire = (function () {
     };
     var skills = '';
     if (rows.strongest) skills += _glanceSkillHtml(cid, f, 'Strongest', rows.strongest, withChange(rows.strongest));
-    if (rows.next) skills += _glanceSkillHtml(cid, f, 'Next step', rows.next, withChange(rows.next));
+    if (rows.next) skills += _glanceNextHtml(cid, f, rows.next, withChange(rows.next));
     if (rows.change)
       skills += _glanceSkillHtml(
         cid,
@@ -1308,7 +1347,7 @@ window.ReportQuestionnaire = (function () {
       ? 'So far this year · change since the ' + f.lastReport.label + ' report'
       : 'So far this year';
     var n = rows.comps.length;
-    return `<div class="qn-card qn-glance qno-glance">
+    return `<div class="qn-card qn-glance qno-glance${_nextMenu ? ' qn-pop-open' : ''}">
       <div class="qn-card-top"><span class="qn-card-title">At a Glance</span><span class="qn-sub">${esc(sub)}</span></div>
       <div class="qn-band">Skills</div>
       ${skills || '<div class="qn-fact"><span class="qn-muted">No scores so far this year</span></div>'}
@@ -4616,8 +4655,13 @@ window.ReportQuestionnaire = (function () {
       })
       .join('');
     var low = part.label.toLowerCase();
+    // The Next Step row re-aims here too: which skill, then the wording.
+    var skills =
+      row.step === 'nextStep' && CommentBank.nextStepChoices(_facts(student)).length
+        ? `<span class="qn-menu-head">Which Skill</span>${_nextChoicesHtml(cid, _facts(student), 'row', i)}<div class="qn-menu-sep" role="separator"></div>`
+        : '';
     return `<div class="qn-menu qn-wording" role="menu" aria-label="Other ways to say the ${esc(low)} sentence" id="tq-wording-menu">
-      <span class="qn-menu-head">Other ways to say this</span>
+      ${skills}<span class="qn-menu-head">Other ways to say this</span>
       ${mine}${others}
       <div class="qn-menu-sep" role="separator"></div>
       <button type="button" role="menuitem" class="qn-menu-add qn-menu-all" data-action="tqSentences" data-do="all" data-row="${i}" title="Opens Browse Sentences on ${esc(part.label)}: every sentence that fits ${esc(first)}.">All ${_plural(_fitCount(part, ctx), esc(low) + ' sentence', esc(low) + ' sentences')}…</button>
@@ -4840,7 +4884,9 @@ window.ReportQuestionnaire = (function () {
     keys.forEach(function (k) {
       var w;
       if (next && k === 'comp:' + next.comp.id)
-        w = 'Weakest skill: ' + next.comp.name + ', ' + _plural((next.comp.scores || []).length, 'piece', 'pieces');
+        w = next.chosen
+          ? 'Chosen by you · ' + next.comp.name + ' · ' + _plural((next.comp.scores || []).length, 'piece', 'pieces')
+          : 'Weakest skill: ' + next.comp.name + ', ' + _plural((next.comp.scores || []).length, 'piece', 'pieces');
       else w = _factWords(k, cid, student, f, ctx);
       if (w && bits.indexOf(w) < 0) bits.push(w);
     });
@@ -4944,6 +4990,7 @@ window.ReportQuestionnaire = (function () {
     if (row.step === 'support') return _supportRowHtml(cid, student, f, handle, i);
     if (row.step === 'languageGoals') return _langRowHtml(cid, student, f, handle, i);
     if (row.step === 'closer') return _closingRowHtml(cid, handle, i);
+    if (row.step === 'studied') return _studiedRowHtml(cid, handle, i);
     if (_isRequired(row.step, path))
       return _requiredRowHtml(
         cid,
@@ -5333,6 +5380,13 @@ window.ReportQuestionnaire = (function () {
             });
       items.splice(pos < 0 ? items.length : pos, 0, { unit: [{ step: step, placeholder: true }], i: -1 });
     });
+    // The Studied row, a class line that is never a sentence of its own,
+    // just above Support; on the IE path, where Support follows the
+    // Deadline, above Closing.
+    var supAt = items.findIndex(function (it) {
+      return leadOf(it) === (ie ? 'closer' : 'support');
+    });
+    items.splice(supAt < 0 ? items.length : supAt, 0, { unit: [{ step: 'studied', placeholder: true }], i: -1 });
     // After each row of the comment, the gap where a sentence can be put in
     // (the InsertRows mockup): its index is how many rows come before it.
     return items
@@ -6394,7 +6448,11 @@ window.ReportQuestionnaire = (function () {
         _limitOpen = false;
         _syncRequired();
         if (!open)
-          _focusSel(what === 'options' ? '#tq-options-menu .qn-menu-item' : '#tq-wording-menu .qn-menu-item.on');
+          _focusSel(
+            what === 'options'
+              ? '#tq-options-menu .qn-menu-item'
+              : '#tq-wording-menu .qn-menu-item.on:not(.qn-skill-pick)',
+          );
         else _focusSel('#tq-sentences [data-row="' + i + '"] [data-do="' + what + '"]');
         return;
       }
@@ -7062,6 +7120,7 @@ window.ReportQuestionnaire = (function () {
   var _lineEdit = null; // 'closing', 'late' or 'own' while its box is open
   var _supportMenu = false;
   var _langMenu = false; // the Language Goals row's menu
+  var _nextMenu = false; // At a Glance's Next step chooser
 
   function _courseName(cid) {
     return (typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name) || 'this class';
@@ -7335,17 +7394,55 @@ window.ReportQuestionnaire = (function () {
     </div>`;
   }
 
+  /* What the class studied this report (inputs plan, item 6): one line per
+     class and report term, saved in commentSettings.studied[termId]. Not a
+     sentence of its own: Generate may use it inside one sentence. Shown on
+     every student's card, above Support. */
+  function _studiedLine(cid) {
+    return String((CommentBank.classSettings(cid).studied || {})[getTermId()] || '').trim();
+  }
+  function _studiedRowHtml(cid, handle, i) {
+    var course = _courseName(cid);
+    var line = _studiedLine(cid);
+    handle = handle || '';
+    if (_lineEdit === 'studied')
+      return `<div class="qn-req-row qn-line-row" id="tq-row-studied"${_rowAttr(i)}>
+        ${handle}<div class="qn-req-part"><span class="qn-req-label">Studied</span></div>
+        <div class="qn-req-body qn-line-edit-body">
+          <input type="text" class="qn-line-input" id="tq-line-studied" data-tq-line-input="studied" maxlength="90" placeholder="This report, we studied cells and ecosystems." aria-label="What ${esc(course)} studied this report" title="One line about what the class studied this report." value="${esc(line)}">
+          <span class="qn-req-source">For this report in ${esc(course)}. Generate may use it in one sentence of each new comment. Leave it empty to leave it out.</span>
+          <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqLine" data-do="cancel" title="Keeps the studied line as it was.">Cancel</button><button type="button" class="qn-line-save" data-action="tqLine" data-do="saveStudied" title="Saves this line for every comment in ${esc(course)} this report.">Save for Class</button></div>
+        </div>
+      </div>`;
+    if (!line)
+      return `<div class="qn-req-row qn-line-row" id="tq-row-studied"${_rowAttr(i)}>
+        ${handle}<div class="qn-req-part"><span class="qn-req-label">Studied</span></div>
+        <div class="qn-req-body"><span class="qn-line-empty">No studied line for this report.</span></div>
+        <button type="button" class="qn-line-choose" data-action="tqLine" data-do="editStudied" title="Write one line about what ${esc(course)} studied this report.">Add One…</button>
+      </div>`;
+    return `<div class="qn-req-row qn-line-row" id="tq-row-studied"${_rowAttr(i)}>
+      ${handle}<div class="qn-req-part"><span class="qn-req-label">Studied</span></div>
+      <div class="qn-req-body">
+        <span class="qn-req-text">${esc(line)}</span>
+        <span class="qn-req-source">For this report in ${esc(course)}</span>
+      </div>
+      <div class="qn-line-btns"><button type="button" class="qn-line-choose" data-action="tqLine" data-do="editStudied" title="Change the studied line for ${esc(course)} this report.">Edit</button><button type="button" class="qn-line-choose" data-action="tqLine" data-do="removeStudied" title="Takes the studied line out for ${esc(course)} this report.">Remove</button></div>
+    </div>`;
+  }
+
   /* The rows for the class's lines, in the comment's order. On the IE
      path the Support row is drawn among the Required rows (_requiredRows),
-     so only the closing row is added here. */
+     so only the studied and closing rows are added here. */
   function _classRowsHtml(cid, student, f) {
     var ie = CommentBank.reportPath(f) === 'ie';
     var rows = '';
     if (!ie && f.notHandedIn && f.notHandedIn.count > 0)
       rows += _missingRowHtml(cid, f, '', undefined, _previewSteps(cid, student, f).notHandedIn);
     if (CommentBank.reportPath(f) === 'language_goals') rows += _langRowHtml(cid, student, f);
-    if (!ie) rows += _supportRowHtml(cid, student, f);
-    return rows + _closingRowHtml(cid);
+    if (!ie) rows += _studiedRowHtml(cid) + _supportRowHtml(cid, student, f);
+    // On the IE path Support follows the Deadline (the IEPath mockup), so
+    // the Studied row goes above Closing.
+    return rows + (ie ? _studiedRowHtml(cid) : '') + _closingRowHtml(cid);
   }
 
   /* After a class line changes: the comment on screen, when it is still
@@ -7455,7 +7552,7 @@ window.ReportQuestionnaire = (function () {
     var termId = getTermId();
     var cs = CommentBank.classSettings(_activeCourse);
     // The lines as the comment had them, before a save changes one.
-    var before = /^save|^pick/.test(what) ? _bankContext(_activeCourse, st, _facts(st, true)) : null;
+    var before = /^save|^pick|^remove/.test(what) ? _bankContext(_activeCourse, st, _facts(st, true)) : null;
     switch (what) {
       case 'limitMenu':
         _limitOpen = !_limitOpen;
@@ -7552,6 +7649,45 @@ window.ReportQuestionnaire = (function () {
         _redrawLines(null);
         _focusSel('#tq-row-closing button');
         return;
+      case 'editStudied':
+        _lineEdit = 'studied';
+        _supportMenu = false;
+        _langMenu = false;
+        _nextMenu = false;
+        _redrawLines('tq-line-studied');
+        return;
+      case 'saveStudied':
+      case 'removeStudied': {
+        var studied = Object.assign({}, cs.studied);
+        var said = what === 'saveStudied' ? _lineValue('studied').slice(0, 90) : '';
+        if (said) studied[termId] = said;
+        else delete studied[termId];
+        _saveSettings({ studied: studied });
+        _lineEdit = null;
+        _afterStudied(before);
+        _redrawLines(null);
+        _focusSel('#tq-row-studied button');
+        return;
+      }
+      case 'nextMenu':
+        _nextMenu = !_nextMenu;
+        _wording = null;
+        _supportMenu = false;
+        _langMenu = false;
+        _limitOpen = false;
+        _redrawLines(_nextMenu ? null : 'tq-next-btn');
+        if (_nextMenu) _focusAny(['#tq-next-menu .qn-menu-item.on', '#tq-next-menu .qn-menu-item']);
+        return;
+      case 'chooseNext': {
+        var sec = el && el.dataset && el.dataset.sec ? String(el.dataset.sec) : null;
+        var fromRow = el && el.dataset && el.dataset.from === 'row' ? Number(el.dataset.row) : null;
+        upsertTermRating(_activeCourse, st.id, termId, { focusSectionId: sec });
+        _nextMenu = false;
+        _wording = null;
+        _redrawLines(null);
+        _focusSel(fromRow != null ? '#tq-sentences [data-row="' + fromRow + '"] [data-do="wording"]' : '#tq-next-btn');
+        return;
+      }
       case 'editLate':
         _lineEdit = 'late';
         _supportMenu = false;
@@ -7579,11 +7715,34 @@ window.ReportQuestionnaire = (function () {
               ? '#tq-lang-menu .qn-menu-add'
               : was === 'closing'
                 ? '#tq-row-closing button'
-                : null,
+                : was === 'studied'
+                  ? '#tq-row-studied button'
+                  : null,
         );
         return;
       }
     }
+  }
+
+  /* After the studied line changes: a new or changed line goes where the
+     old one was said, in every comment not yet approved, and the draft on
+     screen, still Generate's, is drafted again (as the closing line). A
+     line taken out is never cut from a sentence, which would leave it
+     broken: only the draft on screen, still Generate's, is drafted again. */
+  function _afterStudied(before) {
+    var st = _current();
+    if (!st || !before) return;
+    var after = _bankContext(_activeCourse, st, _facts(st, true));
+    if (before.studied === after.studied) return;
+    if (after.studied) {
+      _swapLine(before.studied, after.studied, true);
+      return;
+    }
+    var key = _activeCourse + '|' + st.id + '|' + getTermId();
+    var r = getStudentTermRating(_activeCourse, st.id, getTermId()) || {};
+    var text = plainComment(r.narrative || '');
+    var last = _lastDraft[key];
+    if (!r.approvedAt && text && last && text.trim() === last.text.trim()) _redraft(st);
   }
 
   /* After a save: the line as it was against the line now, in the comment
@@ -7694,6 +7853,7 @@ window.ReportQuestionnaire = (function () {
     return (
       _supportMenu ||
       _langMenu ||
+      _nextMenu ||
       _limitOpen ||
       !!_lineEdit ||
       !!_wording ||
@@ -7715,6 +7875,10 @@ window.ReportQuestionnaire = (function () {
     if (_langMenu && !target.closest('#tq-lang-menu, #tq-row-languageGoals [data-do="langMenu"]')) {
       _langMenu = false;
       if (_lineEdit === 'ownLang') _lineEdit = null;
+      redraw = true;
+    }
+    if (_nextMenu && !target.closest('#tq-next-menu, #tq-next-btn')) {
+      _nextMenu = false;
       redraw = true;
     }
     if (_limitOpen && !target.closest('#tq-limit, #tq-count-btn')) {
@@ -7758,6 +7922,11 @@ window.ReportQuestionnaire = (function () {
       _focusGap(gap);
       return true;
     }
+    if (_nextMenu) {
+      _nextMenu = false;
+      _redrawLines('tq-next-btn');
+      return true;
+    }
     if (_wording) {
       var at = _wording.index;
       _wording = null;
@@ -7792,9 +7961,11 @@ window.ReportQuestionnaire = (function () {
             : '#tq-row-support [data-do="supportMenu"]'
           : was === 'closing'
             ? '#tq-row-closing button'
-            : was === 'late'
-              ? '#tq-row-missing button'
-              : null,
+            : was === 'studied'
+              ? '#tq-row-studied button'
+              : was === 'late'
+                ? '#tq-row-missing button'
+                : null,
     );
     return true;
   }
@@ -7808,7 +7979,15 @@ window.ReportQuestionnaire = (function () {
   }
   /* Return in a line's box saves it. */
   function _saveFromKey(which) {
-    tqLine(which === 'own' ? 'saveOwn' : which === 'closing' ? 'saveClosing' : 'saveLate');
+    tqLine(
+      which === 'own'
+        ? 'saveOwn'
+        : which === 'closing'
+          ? 'saveClosing'
+          : which === 'studied'
+            ? 'saveStudied'
+            : 'saveLate',
+    );
   }
 
   /* ── The drawer (Questionnaire glance plan, steps 3 and 5) ───

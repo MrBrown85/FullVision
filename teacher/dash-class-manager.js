@@ -116,6 +116,9 @@ window.DashClassManager = (function () {
   // Cards whose Levels are open for Write Your Own, by section id.
   var _cmLevelsEdit = {};
   var _cmLevelsBankAsked = false;
+  // Cards whose Comment Wording is open for Write Your Own, by section id.
+  var _cmCommentEdit = {};
+  var _cmCommentBankAsked = false;
   var _cmIcanDrag = null;
 
   // The same code the gradebook heads the column with.
@@ -348,7 +351,7 @@ window.DashClassManager = (function () {
       '">' +
       '</div>' +
       '</div>' +
-      _cmLevelsHtml(sec, tag) +
+      _cmWordingPairHtml(sec, tag) +
       // Where the statements print today: reports show the first one.
       (icans.length
         ? '<div class="cm-std-shown"><span class="cm-std-shown-label">Shown in:</span>' +
@@ -9437,6 +9440,194 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
+  /* Levels and, beside it, Comment Wording (inputs plan, item 9): side by
+     side on a wide card, stacked when narrow. */
+  function _cmWordingPairHtml(sec, tag) {
+    var comment = _cmCommentHtml(sec, tag);
+    var levels = _cmLevelsHtml(sec, tag);
+    return comment ? '<div class="cm-std-wording-pair">' + levels + comment + '</div>' : levels;
+  }
+
+  var _CM_COMMENT_GROUPS = [
+    { kind: 'area', label: 'Skill Area' },
+    { kind: 'at', label: 'Strength' },
+    { kind: 'next', label: 'Next Step' },
+    { kind: 'home', label: 'At Home' },
+  ];
+  var _CM_THEY = { he: 'they', his: 'their', him: 'them' };
+  // A bank string as a reader sees it: the student slots said as "them",
+  // a [does|do] choice as its second form.
+  function _cmCommentSay(t) {
+    return String(t || '')
+      .replace(/\{(he|his|him)\}/gi, function (m, w) {
+        var r = _CM_THEY[w.toLowerCase()];
+        return w.charAt(0) === w.charAt(0).toUpperCase() ? r.charAt(0).toUpperCase() + r.slice(1) : r;
+      })
+      .replace(/\[[^|\]]*\|([^\]]*)\]/g, '$1')
+      .trim();
+  }
+  /* The strings of a bank competency's comment wording, in the panel's
+     order: { kind, level, word, bank (as said), bankRaw, own }. null for a
+     competency without a bank id, or while the bank hasn't loaded. */
+  function _cmCommentRows(tag) {
+    if (!tag || !tag.bank_id || !window.CommentBank || !CommentBank.bankEntry || !window.CompetencyWording) return null;
+    var e = CommentBank.bankEntry(tag.bank_id);
+    if (!e) return null;
+    // The level words (1 Emerging … 4 Extending), as the bank's steps are keyed.
+    var words = [''].concat(Object.keys(e.steps));
+    var rows = [{ kind: 'area', level: 1, word: '', bankRaw: e.area }];
+    [2, 3, 4].forEach(function (l) {
+      rows.push({ kind: 'at', level: l, word: words[l], bankRaw: (e.forms.at[words[l]] || [])[0] });
+    });
+    [1, 2, 3, 4].forEach(function (l) {
+      rows.push({ kind: 'next', level: l, word: words[l], bankRaw: e.steps[words[l]] });
+    });
+    [1, 2].forEach(function (l) {
+      rows.push({ kind: 'home', level: l, word: '', bankRaw: e.home[l - 1] });
+    });
+    var own = {};
+    return rows.map(function (r) {
+      if (!own[r.kind]) own[r.kind] = getCompetencyDescriptor(CompetencyWording.commentKey(tag, r.kind)) || {};
+      r.bankRaw = String(r.bankRaw || '').trim();
+      r.bank = _cmCommentSay(r.bankRaw);
+      r.own = String(own[r.kind][r.level] || '').trim();
+      return r;
+    });
+  }
+
+  /* The card's Comment Wording: the words a generated comment says this
+     skill in (the area, the strength at each level, the next step from each
+     level, two prompts for home), read-only, the teacher's own else the
+     bank's. Write Your Own opens one field per string. Only competencies
+     from the bank have it: without a bank id there is no wording to start
+     from, and the comment uses the skill table's. */
+  function _cmCommentHtml(sec, tag) {
+    if (!tag || !tag.bank_id || !window.CompetencyWording) return '';
+    var rows = _cmCommentRows(tag);
+    if (!rows) {
+      if (!window.BANK_COMMENT && !_cmCommentBankAsked && CompetencyWording.loadBank) {
+        _cmCommentBankAsked = true;
+        CompetencyWording.loadBank().then(function (ok) {
+          if (ok) renderClassManager();
+        });
+      }
+      return '';
+    }
+    var editing = _cmCommentEdit[sec.id] || null;
+    var head =
+      '<div class="cm-std-section-head"><span class="cm-label cm-std-section-label" id="cm-std-comment-label-' +
+      sec.id +
+      '">Comment Wording</span>' +
+      (editing
+        ? ''
+        : '<button type="button" class="cm-std-link" data-action="cmCommentEdit" data-secid="' +
+          sec.id +
+          '">Write Your Own</button>') +
+      '</div>';
+    var groups = _CM_COMMENT_GROUPS.map(function (g) {
+      var inGroup = rows.filter(function (r) {
+        return r.kind === g.kind;
+      });
+      var items = inGroup
+        .map(function (r, i) {
+          var k = r.kind + ':' + r.level;
+          var rowCls = r.word ? 'cm-cw-row' : 'cm-cw-row cm-cw-row-plain';
+          var word = r.word ? '<span class="cm-cw-word">' + esc(r.word) + '</span>' : '';
+          if (editing) {
+            if (!(k in editing.base)) editing.base[k] = r.own || r.bank;
+            var val = k in editing.drafts ? editing.drafts[k] : editing.base[k];
+            var name = g.label + (r.word ? ', ' + r.word : inGroup.length > 1 ? ' ' + (i + 1) : '');
+            return (
+              '<label class="' +
+              rowCls.replace('cm-cw-row', 'cm-cw-edit-row') +
+              '">' +
+              word +
+              '<textarea class="cm-textarea cm-cw-input" rows="2" aria-label="' +
+              esc(name) +
+              '" data-kind="' +
+              r.kind +
+              '" data-level="' +
+              r.level +
+              '" data-secid="' +
+              sec.id +
+              '" data-stop-prop="true" data-action-input="cmCommentDraft">' +
+              esc(val) +
+              '</textarea></label>'
+            );
+          }
+          var text = r.own || r.bank;
+          return (
+            '<div class="' +
+            rowCls +
+            '" data-kind="' +
+            r.kind +
+            '" data-level="' +
+            r.level +
+            '">' +
+            word +
+            '<span class="cm-cw-text">' +
+            (text ? esc(_cmCommentSay(text)) : '<span class="cm-cw-none">No wording yet.</span>') +
+            (r.own ? '<span class="cm-cw-own">Your wording</span>' : '') +
+            '</span></div>'
+          );
+        })
+        .join('');
+      return '<div class="cm-cw-group"><span class="cm-cw-group-label">' + esc(g.label) + '</span>' + items + '</div>';
+    });
+    var body = editing
+      ? '<div class="cm-cw-edit">' +
+        groups.join('') +
+        '<p class="cm-cw-hint">Leave a line empty to use the bank’s wording.</p>' +
+        '<div class="cm-cw-actions"><button type="button" class="btn btn-ghost" data-action="cmCommentCancel" data-secid="' +
+        sec.id +
+        '">Cancel</button><button type="button" class="btn btn-primary" data-action="cmCommentSave" data-secid="' +
+        sec.id +
+        '">Save</button></div></div>'
+      : '<div class="cm-cw-list">' + groups.join('') + '</div>';
+    return (
+      '<div class="cm-std-comment" aria-labelledby="cm-std-comment-label-' + sec.id + '">' + head + body + '</div>'
+    );
+  }
+
+  function cmCommentEdit(secId) {
+    var entry = _cmStdEntry(secId);
+    if (!entry) return;
+    _cmCommentEdit[entry.sec.id] = { drafts: {}, base: {} };
+    renderClassManager();
+    requestAnimationFrame(function () {
+      var el = document.querySelector('#cm-std-' + entry.sec.id + ' .cm-cw-input');
+      if (el) el.focus();
+    });
+  }
+  function cmCommentCancel(secId) {
+    delete _cmCommentEdit[_currentId('section', secId)];
+    delete _cmCommentEdit[secId];
+    renderClassManager();
+  }
+  function cmCommentDraft(secId, kind, level, val) {
+    var form = _cmCommentEdit[secId] || _cmCommentEdit[_currentId('section', secId)];
+    if (form) form.drafts[kind + ':' + level] = val;
+  }
+  /* Saves each string the teacher changed: as their own, or, emptied or
+     put back to the bank's, as the bank's again. A string left as it was
+     filled saves nothing. */
+  function cmCommentSave(secId) {
+    var entry = _cmStdEntry(secId);
+    var form = entry && _cmCommentEdit[entry.sec.id];
+    if (!form) return;
+    (_cmCommentRows(entry.tag) || []).forEach(function (r) {
+      var k = r.kind + ':' + r.level;
+      if (!(k in form.drafts)) return;
+      var text = String(form.drafts[k] || '').trim();
+      if (text === String(form.base[k] || '').trim()) return;
+      if (text === r.bank || text === r.bankRaw) text = '';
+      if (text === r.own) return;
+      CompetencyWording.saveCommentWording(entry.tag, r.kind, r.level, text);
+    });
+    delete _cmCommentEdit[entry.sec.id];
+    renderClassManager();
+  }
+
   function cmStdEditWording(secId) {
     var entry = _cmStdEntry(secId);
     if (!entry) return;
@@ -9835,6 +10026,15 @@ window.DashClassManager = (function () {
       cmLevelsSave: function () {
         cmLevelsSave(el.dataset.secid);
       },
+      cmCommentEdit: function () {
+        cmCommentEdit(el.dataset.secid);
+      },
+      cmCommentCancel: function () {
+        cmCommentCancel(el.dataset.secid);
+      },
+      cmCommentSave: function () {
+        cmCommentSave(el.dataset.secid);
+      },
       cmStdRestoreWording: function () {
         cmStdRestoreWording(el.dataset.secid);
       },
@@ -9943,6 +10143,10 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionInput === 'cmStdCodeLive') {
       cmStdCodeLive(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionInput === 'cmCommentDraft') {
+      cmCommentDraft(el.dataset.secid, el.dataset.kind, Number(el.dataset.level), el.value);
       return true;
     }
     if (el.dataset.actionInput === 'cmLevelsDraft') {

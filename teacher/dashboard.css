@@ -5308,16 +5308,53 @@ a.dash-ins-name:hover {
 /* Where a competency's I Can statements print */
 /* A competency's Levels (Nov 2 mockup, batch 2): read-only descriptors and
    next steps, or the four fields of Write Your Own. */
-.cm-std-levels {
+.cm-std-levels,
+.cm-std-comment {
   margin-top: 16px;
 }
-.cm-levels-list {
+/* Levels and Comment Wording side by side on a wide card, stacked when
+   narrow (inputs plan, item 9). */
+.cm-std-wording-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 0 16px;
+  align-items: start;
+}
+.cm-cw-group + .cm-cw-group {
+  margin-top: 4px;
+}
+.cm-cw-group-label {
+  display: block;
+  padding-top: 8px;
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.cm-cw-row.cm-cw-row-plain,
+.cm-cw-edit-row.cm-cw-row-plain {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cm-cw-own {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.cm-cw-none {
+  color: var(--text-2);
+}
+.cm-levels-list,
+.cm-cw-list {
   padding: 4px 12px;
   border-radius: var(--radius-sm);
   background: var(--bg);
 }
 .cm-level-row,
-.cm-levels-edit-row {
+.cm-levels-edit-row,
+.cm-cw-row,
+.cm-cw-edit-row {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
   gap: 12px;
@@ -5325,11 +5362,13 @@ a.dash-ins-name:hover {
   font-family: var(--font-base);
   font-size: var(--text-sm);
 }
-.cm-levels-word {
+.cm-levels-word,
+.cm-cw-word {
   font-weight: 600;
   color: var(--text);
 }
-.cm-level-desc {
+.cm-level-desc,
+.cm-cw-text {
   line-height: 1.4;
   color: var(--text);
 }
@@ -5338,20 +5377,24 @@ a.dash-ins-name:hover {
   margin-top: 2px;
   color: var(--text-2);
 }
-.cm-levels-edit-row {
+.cm-levels-edit-row,
+.cm-cw-edit-row {
   align-items: start;
 }
-.cm-levels-input {
+.cm-levels-input,
+.cm-cw-input {
   width: 100%;
   min-height: 52px;
 }
-.cm-levels-hint {
+.cm-levels-hint,
+.cm-cw-hint {
   margin: 4px 0 0;
   font-family: var(--font-base);
   font-size: var(--text-sm);
   color: var(--text-2);
 }
-.cm-levels-actions {
+.cm-levels-actions,
+.cm-cw-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;

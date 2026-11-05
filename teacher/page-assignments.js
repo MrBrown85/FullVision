@@ -1656,6 +1656,7 @@ window.PageAssignments = (function () {
                 : '';
             })()
           : '') +
+        _cardEvidenceBadge(a) +
         _cardScoringBadges(a) +
         (a.coreCompetencyIds || [])
           .map(function (ccId) {
@@ -1957,6 +1958,17 @@ window.PageAssignments = (function () {
 
   function _chipTipAttrs(name, text) {
     return ' tabindex="0" data-chip-tip="' + esc(text) + '" data-chip-tip-name="' + esc(name) + '"';
+  }
+
+  /* The card names the kind of work only when it isn't Written, so the
+     Assignments page stays calm (plan item 8). */
+  function _cardEvidenceBadge(a) {
+    var v = a.evidenceType;
+    if (!v || v === 'written') return '';
+    var label = _evidenceLabel(v);
+    return (
+      '<span class="evidence-badge"' + _chipTipAttrs(label, 'The kind of work this is.') + '>' + esc(label) + '</span>'
+    );
   }
 
   /* The card's scoring and Factor (Nov 3 sweep): how the work is scored,
@@ -2615,6 +2627,155 @@ window.PageAssignments = (function () {
     );
   }
 
+  /* ── Evidence: the kind of work (plan item 8, Nov 4) ─────────
+     A row of chips under the Category row: Lab, Test, Quiz, Project,
+     Presentation, Written, Other. A new assessment's kind follows its title
+     and scoring until the teacher taps a chip; work being edited shows what
+     it has. A kind from before the chips (Observation, Video) keeps a chip
+     of its own, so editing never changes it. */
+  var EVIDENCE_KINDS = [
+    { value: 'lab', label: 'Lab' },
+    { value: 'test', label: 'Test' },
+    { value: 'quiz', label: 'Quiz' },
+    { value: 'project', label: 'Project' },
+    { value: 'presentation', label: 'Presentation' },
+    { value: 'written', label: 'Written' },
+    { value: 'other', label: 'Other' },
+  ];
+  function _evidenceLabel(v) {
+    var k = EVIDENCE_KINDS.find(function (x) {
+      return x.value === v;
+    });
+    return k ? k.label : v ? String(v)[0].toUpperCase() + String(v).slice(1) : '';
+  }
+  /* The kind a title names: the last of Lab, Test, Quiz, Project, Proposal
+     or Presentation in it ("Lab Safety Quiz" is a quiz), as a whole word.
+     Complete/Incomplete work is Written; anything else is Written. */
+  function _guessEvidenceType(title, scoreMode) {
+    if (scoreMode === 'complete') return 'written';
+    var words = {
+      lab: 'lab',
+      labs: 'lab',
+      test: 'test',
+      tests: 'test',
+      quiz: 'quiz',
+      quizzes: 'quiz',
+      project: 'project',
+      projects: 'project',
+      proposal: 'project',
+      proposals: 'project',
+      presentation: 'presentation',
+      presentations: 'presentation',
+    };
+    var found = 'written';
+    String(title || '')
+      .toLowerCase()
+      .split(/[^a-z]+/)
+      .forEach(function (w) {
+        if (Object.prototype.hasOwnProperty.call(words, w)) found = words[w];
+      });
+    return found;
+  }
+  // html-safe: labels are ours or go through esc; values through esc
+  function _evidenceFieldHtml(evidence, picked) {
+    var kinds = EVIDENCE_KINDS.slice();
+    if (
+      evidence &&
+      !kinds.some(function (k) {
+        return k.value === evidence;
+      })
+    )
+      kinds.push({ value: evidence, label: _evidenceLabel(evidence) });
+    var anyOn = kinds.some(function (k) {
+      return k.value === evidence;
+    });
+    return (
+      '<div class="af-field af-evidence-field">' +
+      '<span class="af-label" id="af-evidence-label">Evidence</span>' +
+      '<input type="hidden" id="af-evidence" value="' +
+      esc(evidence || '') +
+      '" data-picked="' +
+      (picked ? '1' : '') +
+      '">' +
+      '<div class="af-evidence-chips" role="radiogroup" aria-labelledby="af-evidence-label">' +
+      kinds
+        .map(function (k, i) {
+          var on = k.value === evidence;
+          return (
+            '<button type="button" class="af-evidence-chip" role="radio" aria-checked="' +
+            on +
+            '" tabindex="' +
+            (on || (!anyOn && i === 0) ? '0' : '-1') +
+            '" data-evidence="' +
+            esc(k.value) +
+            '" data-action="setEvidence">' +
+            esc(k.label) +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '</div>'
+    );
+  }
+  // Chooses a chip; byTeacher stops the title from changing it after.
+  function _setEvidence(value, byTeacher) {
+    var input = document.getElementById('af-evidence');
+    if (!input || !value) return;
+    var chips = Array.from(document.querySelectorAll('.af-evidence-chip'));
+    if (
+      !chips.some(function (c) {
+        return c.dataset.evidence === value;
+      })
+    ) {
+      // A kind from another class or from before the chips gets its own chip.
+      var wrap = document.querySelector('.af-evidence-chips');
+      if (!wrap) return;
+      var add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'af-evidence-chip';
+      add.setAttribute('role', 'radio');
+      add.dataset.evidence = value;
+      add.dataset.action = 'setEvidence';
+      add.textContent = _evidenceLabel(value);
+      wrap.appendChild(add);
+      chips.push(add);
+    }
+    input.value = value;
+    if (byTeacher) input.dataset.picked = '1';
+    chips.forEach(function (c) {
+      var on = c.dataset.evidence === value;
+      c.setAttribute('aria-checked', on ? 'true' : 'false');
+      c.tabIndex = on ? 0 : -1;
+    });
+  }
+  // Follows the title and scoring until the teacher taps a chip.
+  function _guessEvidenceInForm() {
+    var input = document.getElementById('af-evidence');
+    if (!input || input.dataset.picked) return;
+    _setEvidence(_guessEvidenceType((document.getElementById('af-title') || {}).value, _formMode()), false);
+  }
+  // ← → ↑ ↓ Home End move the choice along the chips, as radios do.
+  function _evidenceKeydown(e) {
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains('af-evidence-chip')) return;
+    var keys = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1, Home: 'first', End: 'last' };
+    if (!(e.key in keys)) return;
+    var chips = Array.from(document.querySelectorAll('.af-evidence-chip'));
+    var i = chips.indexOf(t);
+    var step = keys[e.key];
+    var next =
+      step === 'first'
+        ? chips[0]
+        : step === 'last'
+          ? chips[chips.length - 1]
+          : chips[(i + step + chips.length) % chips.length];
+    if (!next) return;
+    e.preventDefault();
+    _setEvidence(next.dataset.evidence, true);
+    next.focus();
+  }
+
   // html-safe: titles, descriptions, names and dates through esc; colours through cssColor or constants; ids are ours
   function renderAssessForm(cid, assess) {
     // Blank Rubric is open on a new assessment (Colin, Nov 2).
@@ -2628,7 +2789,9 @@ window.PageAssignments = (function () {
     var dueDate = assess ? assess.dueDate || '' : '';
     var categoryId = _getAssessmentCategoryId(assess);
     var selTags = assess ? assess.tagIds || [] : [];
-    var evidence = assess ? assess.evidenceType : 'written';
+    // Work being edited keeps the kind it has, even none; a new one starts
+    // at Written and follows its title until a chip is tapped.
+    var evidence = assess ? assess.evidenceType || '' : 'written';
     var description = assess ? assess.description || '' : '';
     var moduleId = assess ? assess.moduleId || '' : '';
     var collaboration = assess ? assess.collaboration || 'individual' : 'individual';
@@ -2772,7 +2935,8 @@ window.PageAssignments = (function () {
       DUE_BEFORE_ASSIGNED_HINT +
       '</p>' +
       '</div>' +
-      '</div>';
+      '</div>' +
+      _evidenceFieldHtml(evidence, isEdit);
     html += '</section>';
 
     // Scoring mode, then its settings
@@ -3032,48 +3196,6 @@ window.PageAssignments = (function () {
       '<div id="collab-panel-mount"></div>' +
       '</section>';
 
-    // More Options: Evidence Type, open when it isn't Written.
-    var moreOpen = !!(evidence && evidence !== 'written');
-    html +=
-      '<section class="af-card af-card-more">' +
-      '<button type="button" class="af-more-toggle" data-action="toggleMoreOptions" aria-expanded="' +
-      moreOpen +
-      '" aria-controls="af-more-body">' +
-      '<span class="af-card-title">More Options</span>' +
-      '<span class="af-more-hint">Evidence Type</span>' +
-      '<svg class="af-more-chev" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3l5 5-5 5"/></svg>' +
-      '</button>' +
-      '<div class="af-more-body" id="af-more-body"' +
-      (moreOpen ? '' : ' hidden') +
-      '>';
-    html +=
-      '<div class="af-field">' +
-      '<label class="af-label">Evidence Type</label>' +
-      '<select class="af-input" id="af-evidence">' +
-      // An evidence type from elsewhere (a quiz, lab or project) keeps its
-      // own option, so editing never changes it.
-      ['written', 'observation', 'audio', 'video', 'photo', 'conversation']
-        .concat(
-          evidence && ['written', 'observation', 'audio', 'video', 'photo', 'conversation'].indexOf(evidence) < 0
-            ? [evidence]
-            : [],
-        )
-        .map(function (t) {
-          return (
-            '<option value="' +
-            esc(t) +
-            '"' +
-            (t === evidence ? ' selected' : '') +
-            '>' +
-            esc(t[0].toUpperCase() + t.slice(1)) +
-            '</option>'
-          );
-        })
-        .join('') +
-      '</select>' +
-      '</div>';
-    html += '</div></section>';
-
     // Actions, in a footer that stays at the bottom of the window while the
     // form is in view, with what the work counts toward beside them.
     html +=
@@ -3151,6 +3273,7 @@ window.PageAssignments = (function () {
       if (node) node.hidden = !show[id];
     });
     _syncCodes();
+    _guessEvidenceInForm();
   }
 
   /* Competencies is the form's name for proficiency work with no rubric:
@@ -3525,6 +3648,7 @@ window.PageAssignments = (function () {
     if (t.id === 'af-due' || t.id === 'af-date-assigned') _refreshDueHint();
     // A title clears the "Title is required" state as soon as it's typed.
     if (t.id === 'af-title' && t.value.trim()) t.removeAttribute('aria-invalid');
+    if (t.id === 'af-title') _guessEvidenceInForm();
     if (t.id === 'af-maxpoints') {
       t.style.border = '';
       t.removeAttribute('aria-invalid');
@@ -6165,6 +6289,10 @@ window.PageAssignments = (function () {
       var ids = srcCid === cid ? a.tagIds || [] : AssessmentCopy.mapTags(srcCid, cid, a.tagIds).ids;
       _tickExactly(ids.join(','));
     }
+    // The past work's kind comes with it and stays put while the title is
+    // edited; work with none is guessed from its title.
+    if (a.evidenceType) _setEvidence(a.evidenceType, true);
+    else _guessEvidenceInForm();
     var cc = a.coreCompetencyIds || [];
     document.querySelectorAll('.af-cc-chip').forEach(function (chip) {
       var on = cc.indexOf(chip.dataset.cc) >= 0;
@@ -10935,11 +11063,8 @@ window.PageAssignments = (function () {
       setCompView: function () {
         setCompView(el.dataset.view);
       },
-      toggleMoreOptions: function () {
-        var body = document.getElementById('af-more-body');
-        if (!body) return;
-        body.hidden = !body.hidden;
-        el.setAttribute('aria-expanded', String(!body.hidden));
+      setEvidence: function () {
+        _setEvidence(el.dataset.evidence, true);
       },
       collabCheckAll: function () {
         collabCheckAll();
@@ -12848,6 +12973,7 @@ window.PageAssignments = (function () {
     _addDocListener('input', _formInput);
     _addDocListener('change', _formInput);
     _addDocListener('keydown', _compKeydown);
+    _addDocListener('keydown', _evidenceKeydown);
     _addDocListener('keydown', _formEscape);
     _addDocListener('input', _compInput);
     _addDocListener('mouseover', _codeHover);
