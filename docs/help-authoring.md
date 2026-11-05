@@ -60,6 +60,8 @@ shots: # optional: pictures for scripts/help-shots.mjs
 
 Sections, in nav order: Getting Started, Class Management, Assignments, Gradebook, Observations, Reports, Student Page and Student Voice, Phone App, Privacy and Your Data, and Reference (Glossary, What's New and the other standing pages, listed under the line at the foot of the nav).
 
+Keyboard Shortcuts (`generated: keyboard-shortcuts`) is drawn from `KEYBOARD_SHORTCUTS` in `shared/constants.js`, the list the app's own shortcut sheet shows, followed by the article's own Markdown (keys the app shows only as on-screen hints). A shortcut with an `aria-keyshortcuts` goes in that constant, not in the article.
+
 The summary opens the article. Search Help matches the title, summary, labels, headings and keywords.
 
 Try It in Demo Mode, like the header's Try Demo Mode, opens `/login.html?demo=1` for a visitor. Demo Mode replaces the data on the device, so a signed-in teacher is sent to the sign-in page instead, which asks first, and someone already in Demo Mode goes straight to the article's `demo` route. The splash page uses the same rule.

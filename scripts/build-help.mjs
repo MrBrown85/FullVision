@@ -139,7 +139,7 @@ export function inline(text) {
   return s;
 }
 
-export function markdown(md) {
+export function markdown(md, { narrow = new Set() } = {}) {
   const lines = md.replace(/\r\n/g, '\n').split('\n');
   const out = [];
   let i = 0;
@@ -170,7 +170,7 @@ export function markdown(md) {
       // The picture opens full size; on a phone it scrolls sideways at a readable size.
       const src = esc(imgSrc(im[2]));
       out.push(
-        `<figure><div class="pic"><a href="${src}"><img src="${src}" alt="${esc(im[1])}" loading="lazy" /></a></div>${cap}</figure>`,
+        `<figure${narrow.has(im[2].replace(/^.*\//, '')) ? ' class="narrow"' : ''}><div class="pic"><a href="${src}"><img src="${src}" alt="${esc(im[1])}" loading="lazy" /></a></div>${cap}</figure>`,
       );
       i++;
     } else if (isOl(line) || isUl(line)) {
@@ -238,16 +238,57 @@ export function readArticle(file) {
     length: meta.length || '',
     demo: meta.demo || '',
     keywords: meta.keywords || [],
+    generated: meta.generated || '',
     next: meta.next || [],
     shots: meta.shots || [],
     body: m[2],
   };
 }
 
+/* ── Keyboard Shortcuts from the app's own list ─────────────
+   The in-app shortcut sheet and the help page read one list,
+   KEYBOARD_SHORTCUTS in shared/constants.js ([{context, action, keys}], keys
+   as in aria-keyshortcuts). An article with `generated: keyboard-shortcuts`
+   starts with it, followed by its own Markdown. */
+
+export function readShortcuts(file = join(ROOT, 'shared', 'constants.js')) {
+  if (!existsSync(file)) return null;
+  const m = readFileSync(file, 'utf-8').match(/const KEYBOARD_SHORTCUTS = (\[[\s\S]*?\]);/);
+  if (!m) return null;
+  return new Function('return ' + m[1])();
+}
+
+function keyName(keys) {
+  // "Meta+Enter Control+Enter" → the Control one; the page says ⌘ stands in for Ctrl.
+  const all = String(keys).split(/\s+/).filter(Boolean);
+  const pick = all.find(k => !/\bMeta\b/.test(k)) || all[0] || '';
+  return pick
+    .replace(/\bControl\b/g, 'Ctrl')
+    .replace(/\bMeta\b/g, '⌘')
+    .replace(/\bEscape\b/g, 'Esc');
+}
+
+export function shortcutsMarkdown(list) {
+  const groups = new Map();
+  for (const s of list) {
+    if (!groups.has(s.context)) groups.set(s.context, []);
+    groups.get(s.context).push(s);
+  }
+  return [...groups]
+    .map(([context, rows]) => `## ${context}\n\n` + rows.map(r => `- ${r.action}: ${keyName(r.keys)}`).join('\n'))
+    .join('\n\n');
+}
+
 export function readArticles(dir = ARTICLES) {
+  const shortcuts = readShortcuts();
   const list = readdirSync(dir)
     .filter(f => f.endsWith('.md'))
-    .map(f => readArticle(join(dir, f)));
+    .map(f => readArticle(join(dir, f)))
+    .map(a =>
+      a.generated === 'keyboard-shortcuts' && shortcuts && shortcuts.length
+        ? { ...a, body: shortcutsMarkdown(shortcuts) + '\n\n' + a.body }
+        : a,
+    );
   list.sort((a, b) => SECTIONS.indexOf(a.section) - SECTIONS.indexOf(b.section) || a.order - b.order);
   const slugs = new Set(list.map(a => a.slug));
   for (const a of list) {
@@ -292,7 +333,15 @@ export function articleBody(a, bySlug, { fragment = false } = {}) {
       a.next.map(s => `<a href="/help/${s}">${esc(bySlug[s].title)}</a>`).join('') +
       `</div></div>`
     : '';
-  return `<p class="lead">${inline(a.summary)}</p>\n` + video + '\n' + markdown(a.body) + '\n' + next;
+  return (
+    `<p class="lead">${inline(a.summary)}</p>\n` +
+    video +
+    '\n' +
+    // A phone-sized picture (a shot narrower than 600px) is shown at phone size.
+    markdown(a.body, { narrow: new Set(a.shots.filter(s => Number(s.width) < 600).map(s => s.file)) }) +
+    '\n' +
+    next
+  );
 }
 
 const LOGO =
@@ -363,6 +412,7 @@ h1 { margin: 0; font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; font
 .card figure .pic { display: block; }
 .card figure .pic a { display: block; }
 .card figcaption { font-size: 14px; color: #58585d; }
+.card figure.narrow { max-width: 320px; }
 .card dl { margin: 0; display: flex; flex-direction: column; gap: 14px; font-size: 17px; line-height: 1.5; }
 .next { margin-top: 8px; padding: 16px 20px; border-radius: 12px; background: #f2f2f4; display: flex; flex-direction: column; gap: 6px; }
 .next-h { font-size: 15px; font-weight: 600; }
@@ -397,6 +447,7 @@ h1 { margin: 0; font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; font
   .toc { grid-template-columns: minmax(0, 1fr); }
   .card figure .pic { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; padding: 1px; }
   .card figure .pic img { width: 960px; max-width: none; }
+  .card figure.narrow .pic img { width: 100%; max-width: 320px; }
 }
 @media (max-width: 620px) {
   .cta-demo { display: none; }

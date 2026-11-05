@@ -3,7 +3,7 @@
  *
  * Every entry in an article's `labels` front matter must appear in the app's
  * source exactly, as a whole string or element text (after a quote or ">",
- * before a quote, "<", ":" or "…"), so "Save" is not found inside "Save
+ * before a quote, "<", ":", "…" or a ▾ or › mark), so "Save" is not found inside "Save
  * Categories". Every **bold** phrase in its steps must be one of its labels.
  * Rename a button and this fails until the help article is updated.
  */
@@ -46,7 +46,7 @@ const source = sourceFiles()
 const articles = readArticles();
 const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const onScreen = label =>
-  new RegExp('(^|[>\'"`]\\s*)' + reEsc(String(label)) + '(\\s*[<\'"`:…]|\\s*$)', 'm').test(source);
+  new RegExp('(^|[>\'"`]\\s*)' + reEsc(String(label)) + '(\\s*[<\'"`:…▾›]|\\s*$)', 'm').test(source);
 
 describe('help articles quote real labels', () => {
   it('has articles', () => {
