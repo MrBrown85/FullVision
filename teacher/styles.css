@@ -55,6 +55,9 @@
   --link: #0066cc;
   --link-inverse: #5ca9ff;
   --late: #ff9500;
+  /* The Demo Mode pill: amber, dark text. */
+  --demo-pill-bg: #ffe2b8;
+  --demo-pill-text: #5c3600;
   --priority: #ff3b30;
   --priority-light: rgba(255, 59, 48, 0.08);
 
@@ -459,6 +462,154 @@ body.offline-active #app-dock {
 }
 .tb-user-signout:hover {
   background: var(--priority-light);
+}
+
+/* ── Demo Mode pill and its panel (Demo Mode only) ─────────── */
+.tb-demo-menu {
+  position: relative;
+  margin-left: 8px;
+}
+.tb-demo-pill {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--demo-pill-bg);
+  color: var(--demo-pill-text);
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tb-demo-pill:hover {
+  filter: brightness(0.97);
+}
+.tb-demo-pill:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.tb-demo-panel {
+  position: absolute;
+  top: calc(100% + 17px);
+  left: -2px;
+  width: 320px;
+  box-sizing: border-box;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px var(--divider-strong),
+    0 10px 30px rgba(0, 0, 0, 0.18);
+  z-index: 1000;
+  text-align: left;
+}
+.tb-demo-panel[hidden] {
+  display: none;
+}
+.tb-demo-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tb-demo-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text);
+}
+.tb-demo-text {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.45;
+  color: var(--text);
+}
+.tb-demo-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tb-demo-btn {
+  height: 36px;
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-decoration: none;
+}
+.tb-demo-btn.btn-ghost {
+  background: var(--surface-2);
+}
+.tb-demo-btn.btn-ghost:hover {
+  filter: brightness(0.96);
+}
+.tb-demo-rule {
+  height: 0.5px;
+  background: var(--divider-strong);
+}
+.tb-demo-reset {
+  height: 32px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  text-align: left;
+  cursor: pointer;
+}
+.tb-demo-reset:hover {
+  background: var(--overlay-hover);
+}
+
+/* The phone app's pill sits after the class name in each tab's first
+   screen; a tap opens the Demo Mode sheet (teacher-mobile/shell.js). */
+.m-demo-pill {
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+/* The Reset button of the phone's in-sheet confirm, red like the
+   desktop's danger confirm. */
+.m-btn-primary.m-demo-reset-confirm {
+  background: var(--priority);
+}
+.m-demo-sheet {
+  padding: 8px 0 16px;
+  text-align: left;
+}
+.m-demo-title {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+.m-demo-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.m-demo-rule {
+  height: 1px;
+  margin: 16px 0 8px;
+  background: var(--divider-strong);
+}
+.m-demo-reset {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 17px;
+  text-align: left;
+  cursor: pointer;
 }
 
 /* Toolbar separator */
@@ -2937,6 +3088,8 @@ body.offline-active #app-dock {
     --priority: #ff453a;
     --priority-light: rgba(255, 69, 58, 0.18);
     --late: #ff9f0a;
+    --demo-pill-bg: rgba(255, 159, 10, 0.24);
+    --demo-pill-text: #ffc266;
     --score-0: #636366;
     --score-1: #ff453a;
     --score-2: #ff9f0a;

@@ -521,6 +521,72 @@
     if (content) content.scrollTop = p.scrollTop;
   }
 
+  /* ── Demo Mode pill ─────────────────────────────────────────
+     In Demo Mode each tab's first screen shows the amber Demo Mode pill
+     after the class name, as on the desktop top bar. A tap opens a sheet
+     with the same items as the desktop panel. */
+  var DEMO_PILL_HTML =
+    '<button type="button" class="tb-demo-pill m-demo-pill" data-action="m-demo-menu" aria-haspopup="dialog">Demo Mode' +
+    '<svg aria-hidden="true" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5l3 3 3-3"/></svg>' +
+    '</button>';
+
+  function _addDemoPill(screen) {
+    if (!screen || typeof isDemoMode !== 'function' || !isDemoMode()) return;
+    var inner = screen.querySelector('.m-nav-bar-inner');
+    if (!inner || inner.querySelector('.m-demo-pill')) return;
+    var title = inner.querySelector('.m-nav-bar-title-inline');
+    // html-safe: DEMO_PILL_HTML is fixed markup.
+    if (title) title.insertAdjacentHTML('beforebegin', DEMO_PILL_HTML);
+  }
+
+  var DEMO_SECONDARY_STYLE = 'background:var(--surface-2);color:var(--text);border:none';
+
+  function _demoSheetHtml() {
+    return '<div class="m-demo-sheet" role="dialog" aria-labelledby="m-demo-title">' + _demoSheetInnerHtml() + '</div>';
+  }
+
+  // signOut stopped because changes have not reached the server: say so,
+  // in the sheet, with Leave Demo Mode (deletes them) and Cancel.
+  function _demoUnsentConfirmHtml(n, href) {
+    return (
+      '<h2 class="m-demo-title" id="m-demo-title">Unsent Changes</h2>' +
+      '<p class="m-demo-text">' +
+      MC.esc(window.leaveDemoUnsentText(n)) +
+      '</p>' +
+      '<button class="m-btn-primary m-demo-reset-confirm" data-action="m-demo-leave-confirm" data-href="' +
+      MC.esc(href) +
+      '">Leave Demo Mode</button>' +
+      '<button class="m-btn-primary" style="' +
+      DEMO_SECONDARY_STYLE +
+      ';margin-top:8px" data-action="m-demo-reset-cancel">Cancel</button>'
+    );
+  }
+
+  function _demoResetConfirmHtml() {
+    return (
+      '<h2 class="m-demo-title" id="m-demo-title">Reset Demo Data</h2>' +
+      '<p class="m-demo-text">All classes are deleted and the sample Science 8 class is restored. This cannot be undone.</p>' +
+      '<button class="m-btn-primary m-demo-reset-confirm" data-action="m-demo-reset-confirm">Reset</button>' +
+      '<button class="m-btn-primary" style="' +
+      DEMO_SECONDARY_STYLE +
+      ';margin-top:8px" data-action="m-demo-reset-cancel">Cancel</button>'
+    );
+  }
+
+  function _demoSheetInnerHtml() {
+    var secondary = DEMO_SECONDARY_STYLE;
+    return (
+      '<h2 class="m-demo-title" id="m-demo-title">Demo Mode</h2>' +
+      '<p class="m-demo-text">A sample Science 8 class. Nothing is saved to an account.</p>' +
+      '<button class="m-btn-primary" data-action="m-demo-signup">Create an Account</button>' +
+      '<button class="m-btn-primary" style="' +
+      secondary +
+      ';margin-top:8px" data-action="m-demo-signin">Sign In</button>' +
+      '<div class="m-demo-rule"></div>' +
+      '<button class="m-demo-reset" data-action="m-demo-reset">Reset Demo Data</button>'
+    );
+  }
+
   function _renderTab(tab) {
     // Clean up previous tab's resources
     if (MStudents.destroyCardStack) MStudents.destroyCardStack();
@@ -541,6 +607,7 @@
     // html-safe: html is MStudents.renderList, MObserve.renderFeed or MGrade.renderPicker, each checked to escape its text.
     stack.innerHTML = html;
     _navStacks[tab].push(tab);
+    _addDemoPill(stack.querySelector('.m-screen'));
 
     // Apply any persisted filters to the freshly-mounted Grade list.
     // renderPicker loads _filters from LocalStorage into module state, but
@@ -926,6 +993,51 @@
                 },
               );
             }
+          });
+        }
+        return;
+      }
+
+      if (action === 'm-demo-menu') {
+        MC.presentSheet(_demoSheetHtml());
+        return;
+      }
+      // Create an Account and Sign In leave Demo Mode first: a teacher who
+      // entered it while signed in is signed out (shared/data.js).
+      if (action === 'm-demo-signup' || action === 'm-demo-signin') {
+        var demoHref = action === 'm-demo-signup' ? '/login.html#signup' : '/login.html';
+        var leaveSheet = target.closest('.m-demo-sheet');
+        window.leaveDemoMode(demoHref).then(function (res) {
+          if (!res || !res.unsent || !leaveSheet) return;
+          // html-safe: _demoUnsentConfirmHtml escapes the href and builds the rest from fixed text and a count.
+          leaveSheet.innerHTML = _demoUnsentConfirmHtml(res.unsent, demoHref);
+        });
+        return;
+      }
+      if (action === 'm-demo-leave-confirm') {
+        MC.dismissSheet();
+        window.leaveDemoMode(target.getAttribute('data-href'), { force: true });
+        return;
+      }
+      // Reset Demo Data asks first, inside the sheet, as the desktop's
+      // confirm does; Reset runs it and reloads the sample class.
+      if (action === 'm-demo-reset') {
+        var demoSheet = target.closest('.m-demo-sheet');
+        // html-safe: _demoResetConfirmHtml is fixed markup.
+        if (demoSheet) demoSheet.innerHTML = _demoResetConfirmHtml();
+        return;
+      }
+      if (action === 'm-demo-reset-cancel') {
+        var cancelSheet = target.closest('.m-demo-sheet');
+        // html-safe: _demoSheetInnerHtml is fixed markup.
+        if (cancelSheet) cancelSheet.innerHTML = _demoSheetInnerHtml();
+        return;
+      }
+      if (action === 'm-demo-reset-confirm') {
+        MC.dismissSheet();
+        if (typeof resetDemoData === 'function') {
+          resetDemoData().then(function () {
+            window.location.reload();
           });
         }
         return;

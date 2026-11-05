@@ -13659,3 +13659,67 @@ window.loadSeedIfNeeded = function () {
     if (typeof seedIfNeeded === 'function') seedIfNeeded();
   });
 };
+
+/* Reset Demo Data: every class goes back to the sample Science 8 class.
+   Demo Mode only, since it deletes every class before reseeding. The
+   desktop account menu, the desktop Demo Mode pill and the phone's Demo
+   Mode sheet all run this. */
+window.resetDemoData = async function () {
+  if (typeof isDemoMode !== 'function' || !isDemoMode()) return;
+  await Promise.all(
+    Object.keys(COURSES).map(function (cid) {
+      return deleteCourseData(cid);
+    }),
+  );
+  Object.keys(COURSES).forEach(function (cid) {
+    delete COURSES[cid];
+  });
+  Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
+  saveCourses(COURSES);
+  await window.loadSeedIfNeeded();
+};
+
+/* Leave Demo Mode for the sign-in page (href: /login.html, or
+   /login.html#signup for Create an Account). A teacher can enter Demo Mode
+   while signed in (the zero-class screen's Open Demo Mode), and the sign-in
+   page sends a live session straight back into the app, still in Demo Mode.
+   So this always goes through signOut(): it ends any session, wipes the
+   device as Sign Out does (demo data, flags, outbox, report copies), tells
+   other tabs, and opens href. Resolves { unsent } when signOut's check for
+   unsent changes stops it; repeat calls while one runs do nothing. */
+var _leavingDemo = false;
+window.leaveDemoMode = async function (href, opts) {
+  opts = opts || {};
+  if (_leavingDemo) return;
+  var sb = typeof getSupabase === 'function' ? getSupabase() : null;
+  if (!sb || typeof signOut !== 'function') {
+    // Local development with no Supabase: only demo data is on the device.
+    try {
+      Object.keys(localStorage)
+        .filter(function (k) {
+          return k.indexOf('gb-') === 0;
+        })
+        .forEach(function (k) {
+          localStorage.removeItem(k);
+        });
+    } catch (e) {
+      /* nothing stored */
+    }
+    window.location.href = href;
+    return;
+  }
+  _leavingDemo = true;
+  try {
+    var res = await signOut({ force: !!opts.force, redirect: href });
+    return res;
+  } finally {
+    _leavingDemo = false;
+  }
+};
+
+/* The words for signOut's unsent-changes stop when leaving Demo Mode. */
+window.leaveDemoUnsentText = function (n) {
+  return n === 1
+    ? '1 change has not reached the server. Leaving Demo Mode signs out and deletes it.'
+    : n + ' changes have not reached the server. Leaving Demo Mode signs out and deletes them.';
+};
