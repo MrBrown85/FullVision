@@ -9082,7 +9082,7 @@
    "next": {
     "developing": "One thing to practise is matching each skill to a dish where {he} used it.",
     "proficient": "Next, {he} can practise rating {his} service skills after each service, not just {his} cooking.",
-    "extending": "{He} can now set a goal for the cookery skill {he} most wants to raise, and track it."
+    "extending": "{He} can now set a goal for the cookery skill {he} most [wants|want] to raise, and track it."
    },
    "home": "You could ask {him} which kitchen skill {he} [feels|feel] sure of and which one {he} [wants|want] to practise."
   },
@@ -18117,7 +18117,7 @@
    },
    "strength": [
     "{He} [applies|apply] rehearsal feedback to improve {his} performance skills.",
-    "{He} [keeps|keep] track of rehearsal notes and shows the changes in the next run."
+    "{He} [keeps|keep] track of rehearsal notes and [shows|show] the changes in the next run."
    ],
    "next": {
     "developing": "A useful habit for {him} is to review rehearsal notes before the next rehearsal begins.",
@@ -20239,7 +20239,7 @@
    },
    "strength": [
     "{He} [chooses|choose] arts elements on purpose to create a mood in {his} work.",
-    "{He} [plans|plan] the effect {he} [wants|want] and then picks the principles that will help."
+    "{He} [plans|plan] the effect {he} [wants|want] and then [picks|pick] the principles that will help."
    ],
    "next": {
     "developing": "{His} next step is to practise naming the mood {he} [wants|want] before {he} [starts|start] a piece.",
@@ -21297,7 +21297,7 @@
     "proficient": "A good next step is to use musical terms in the notes {he} [keeps|keep] about {his} production choices.",
     "extending": "To go further, {he} can use musical vocabulary to give feedback on another person's composition."
    },
-   "home": "Ask {him} to explain one word {he} [uses|use] when {he} [composes|compose] or produces music."
+   "home": "Ask {him} to explain one word {he} [uses|use] when {he} [composes|compose] or [produces|produce] music."
   },
   "arts-musical-vocabulary--instrumental-11-12|all": {
    "group": "arts-musical-vocabulary",
@@ -21308,7 +21308,7 @@
    "phrase": "use musical vocabulary to respond to music and describe its context",
    "next_steps": {
     "emerging": "use the right term to describe one thing {he} [hears|hear] in a piece",
-    "developing": "use musical terms to respond to a performance {he} [plays|play] in or hears",
+    "developing": "use musical terms to respond to a performance {he} [plays|play] in or [hears|hear]",
     "proficient": "use musical vocabulary to describe the time and place behind a piece",
     "extending": "use musical terms to explain how a piece's context shapes the way it is played"
    },
@@ -21498,7 +21498,7 @@
     "extending": "judge which changes made a performance piece work and explain why"
    },
    "strength": [
-    "{He} [tests|test] {his} ideas for a scene in rehearsal and keeps the ones that work.",
+    "{He} [tests|test] {his} ideas for a scene in rehearsal and [keeps|keep] the ones that work.",
     "{He} can use {his} voice and body to make a performance piece easier to follow."
    ],
    "next": {
@@ -21759,7 +21759,7 @@
    },
    "strength": [
     "{He} can show which part of a script connects to one of {his} experiences.",
-    "{He} [reflects|reflect] on how {his} own life shaped the scenes {he} [writes|write] and directs."
+    "{He} [reflects|reflect] on how {his} own life shaped the scenes {he} [writes|write] and [directs|direct]."
    ],
    "next": {
     "developing": "One thing to practise is noting the experience behind each choice in a script.",
@@ -21782,7 +21782,7 @@
    },
    "strength": [
     "{He} can connect {his} own experiences to films and television shows.",
-    "{He} [links|link] one experience to several productions and explains each link."
+    "{He} [links|link] one experience to several productions and [explains|explain] each link."
    ],
    "next": {
     "developing": "It would help {him} to name the moment in a production that connects to {his} life.",
@@ -21825,14 +21825,14 @@
     "emerging": "explain one insight {he} gained from listening to music",
     "developing": "describe how composing or performing music shaped {his} thinking",
     "proficient": "share insights that connect {his} listening, composing and performing",
-    "extending": "explain how an insight changed the way {he} [composes|compose] or produces"
+    "extending": "explain how an insight changed the way {he} [composes|compose] or [produces|produce]"
    },
    "strength": [
     "{He} can explain what {he} learned about music from listening closely to a piece.",
     "{He} [describes|describe] how composing or performing music has changed {his} thinking."
    ],
    "next": {
-    "developing": "A useful habit for {him} is noting one insight each time {he} [composes|compose] or performs.",
+    "developing": "A useful habit for {him} is noting one insight each time {he} [composes|compose] or [performs|perform].",
     "proficient": "One thing to practise is linking an insight from listening to a choice in {his} own music.",
     "extending": "A good next step is to share how an insight changed the way {he} [produces|produce] music."
    },
@@ -22048,7 +22048,7 @@
     "extending": "explain how {his} voice and values shape {his} performance of a song"
    },
    "strength": [
-    "{He} [expresses|express] {his} own point of view through the songs {he} [plays|play] and studies.",
+    "{He} [expresses|express] {his} own point of view through the songs {he} [plays|play] and [studies|study].",
     "{He} can explain which of {his} values come through in {his} music."
    ],
    "next": {
@@ -22612,7 +22612,7 @@
    },
    "strength": [
     "{He} [uses|use] {his} imagination and observation to develop ideas for a production.",
-    "{He} [plans|plan] and creates production work both on {his} own and with a team."
+    "{He} [plans|plan] and [creates|create] production work both on {his} own and with a team."
    ],
    "next": {
     "developing": "One habit to build is asking questions that lead to new ideas for a production.",
@@ -22681,7 +22681,7 @@
     "extending": "choose the props, processes and technologies that best serve a production"
    },
    "strength": [
-    "{He} [tries|try] different props and technologies and judges how useful each one is.",
+    "{He} [tries|try] different props and technologies and [judges|judge] how useful each one is.",
     "{He} can explain what makes a prop or piece of technology useful on stage."
    ],
    "next": {
@@ -22803,7 +22803,7 @@
     "extending": "give feedback that helps another artist improve a piece"
    },
    "strength": [
-    "{He} [gives|give] feedback in a critique and listens to feedback on {his} own work.",
+    "{He} [gives|give] feedback in a critique and [listens|listen] to feedback on {his} own work.",
     "{He} can explain why a critique works best when both sides take part."
    ],
    "next": {
@@ -22877,7 +22877,7 @@
    },
    "strength": [
     "{He} [uses|use] rehearsal time to fix technical problems in {his} playing or singing.",
-    "{He} [tests|test] and refines {his} musical choices during rehearsals."
+    "{He} [tests|test] and [refines|refine] {his} musical choices during rehearsals."
    ],
    "next": {
     "developing": "It would help {him} to arrive at rehearsal with one technical goal in mind.",
@@ -22900,7 +22900,7 @@
    },
    "strength": [
     "{He} [uses|use] rehearsal to refine {his} dance technique.",
-    "{He} [analyzes|analyze] {his} own dancing in rehearsal and makes changes."
+    "{He} [analyzes|analyze] {his} own dancing in rehearsal and [makes|make] changes."
    ],
    "next": {
     "developing": "From here, {he} can practise naming one thing to fix after each run of a dance.",
@@ -23029,7 +23029,7 @@
     "extending": "reflect on how {his} own musical skills have grown within the ensemble"
    },
    "strength": [
-    "{He} [reflects|reflect] on group rehearsals and suggests what the ensemble should practise next.",
+    "{He} [reflects|reflect] on group rehearsals and [suggests|suggest] what the ensemble should practise next.",
     "{He} can explain how rehearsing together changed a group performance."
    ],
    "next": {
@@ -23075,7 +23075,7 @@
     "extending": "explain how {he} solved a problem in {his} work and what {he} learned"
    },
    "strength": [
-    "{He} [stays|stay] focused and keeps working at each stage of an artwork.",
+    "{He} [stays|stay] focused and [keeps|keep] working at each stage of an artwork.",
     "{He} [tries|try] different solutions when {he} [meets|meet] a problem in a piece."
    ],
    "next": {
@@ -23127,7 +23127,7 @@
    },
    "strength": [
     "{He} [makes|make] {his} own artistic choices as {he} [develops|develop] a piece.",
-    "{He} [stays|stay] engaged with a piece when a problem arises and tries new solutions."
+    "{He} [stays|stay] engaged with a piece when a problem arises and [tries|try] new solutions."
    ],
    "next": {
     "developing": "One habit to build is recording the solutions {he} [tries|try] as {he} [works|work].",
@@ -23243,7 +23243,7 @@
     "extending": "build a set of resources {he} can return to for future projects"
    },
    "strength": [
-    "{He} [gathers|gather] resources that help {him} make choices when {he} [composes|compose] and produces.",
+    "{He} [gathers|gather] resources that help {him} make choices when {he} [composes|compose] and [produces|produce].",
     "{He} can show how a resource shaped a piece {he} composed or produced."
    ],
    "next": {
@@ -23251,7 +23251,7 @@
     "proficient": "The next skill for {him} is explaining which resource guided each production choice.",
     "extending": "To go further, {he} can practise organizing {his} resources so they are easy to find later."
    },
-   "home": "Ask {him} what {he} [listens|listen] to or looks at for ideas when {he} [composes|compose]."
+   "home": "Ask {him} what {he} [listens|listen] to or [looks|look] at for ideas when {he} [composes|compose]."
   },
   "arts-respect-for-all--grade-9|all": {
    "group": "arts-respect-for-all",
@@ -23300,7 +23300,7 @@
    ],
    "next": {
     "developing": "One thing to practise is giving other musicians feedback that is specific and fair.",
-    "proficient": "Next, {he} can practise showing the audience respect through how {he} [prepares|prepare] and performs.",
+    "proficient": "Next, {he} can practise showing the audience respect through how {he} [prepares|prepare] and [performs|perform].",
     "extending": "The next skill for {him} is helping the ensemble listen to one another in rehearsal."
    },
    "home": "Ask {him} what audience members do at a concert to show respect for the performers."
@@ -23348,7 +23348,7 @@
    },
    "strength": [
     "{He} [responds|respond] to the work of company members with respect.",
-    "{He} [prepares|prepare] {his} own theatre work with care and presents it with respect for the audience."
+    "{He} [prepares|prepare] {his} own theatre work with care and [presents|present] it with respect for the audience."
    ],
    "next": {
     "developing": "{His} next step is to practise giving company members notes that help them improve.",
@@ -23371,7 +23371,7 @@
    },
    "strength": [
     "{He} can respond to a work of art using what {he} [knows|know] about the world.",
-    "{He} [connects|connect] works of art to real events or ideas and explains the link."
+    "{He} [connects|connect] works of art to real events or ideas and [explains|explain] the link."
    ],
    "next": {
     "developing": "A useful habit for {him} is asking what a work of art reminds {him} of in the world.",
@@ -23872,7 +23872,7 @@
    },
    "strength": [
     "{He} [acts|act] responsibly toward {himself} and others when the choir rehearses and performs.",
-    "{He} [listens|listen] to other singers with respect and gives feedback that helps them grow."
+    "{He} [listens|listen] to other singers with respect and [gives|give] feedback that helps them grow."
    ],
    "next": {
     "developing": "{His} next step is to practise arriving with {his} part learned so rehearsal time is shared fairly.",
@@ -23895,7 +23895,7 @@
    },
    "strength": [
     "{He} [evaluates|evaluate] how {his} choices in choral music affect {himself} and others.",
-    "{He} [shows|show] responsibility to the choir through how {he} [prepares|prepare] and performs."
+    "{He} [shows|show] responsibility to the choir through how {he} [prepares|prepare] and [performs|perform]."
    ],
    "next": {
     "developing": "{He} [is|are] ready to ask how the words and history of a piece might affect an audience.",
@@ -23919,7 +23919,7 @@
    },
    "strength": [
     "{He} [takes|take] responsibility for {his} part so the ensemble can rehearse well.",
-    "{He} [listens|listen] to other players and responds to their music with respect."
+    "{He} [listens|listen] to other players and [responds|respond] to their music with respect."
    ],
    "next": {
     "developing": "It would help {him} to make a habit of caring for {his} instrument and the rehearsal space.",
@@ -23963,7 +23963,7 @@
     "emerging": "choose song content that respects the people who will hear it",
     "developing": "act responsibly toward {himself} and {his} bandmates when rehearsing",
     "proficient": "respond to the contemporary music of others with respect",
-    "extending": "explain how the songs {he} [creates|create] and performs affect listeners and {his} community"
+    "extending": "explain how the songs {he} [creates|create] and [performs|perform] affect listeners and {his} community"
    },
    "strength": [
     "{He} [considers|consider] how the words and themes of a song affect the people who hear it.",
@@ -24006,7 +24006,7 @@
    ],
    "phrase": "evaluate and show responsibility when creating, performing and responding to music",
    "next_steps": {
-    "emerging": "show responsibility in how {he} [creates|create] and shares music",
+    "emerging": "show responsibility in how {he} [creates|create] and [shares|share] music",
     "developing": "evaluate how {his} music-making choices affect {himself} and others",
     "proficient": "respond to the music of others with respect and specific feedback",
     "extending": "judge how {his} compositions might affect different listeners and explain {his} choices"
@@ -24190,18 +24190,18 @@
     "emerging": "think about who could be affected by a media piece {he} [makes|make]",
     "developing": "view the media art of others with an open and fair mind",
     "proficient": "respond to the media art of others with respect",
-    "extending": "judge how the media {he} [creates|create] and shares could affect others"
+    "extending": "judge how the media {he} [creates|create] and [shares|share] could affect others"
    },
    "strength": [
     "{He} [thinks|think] about how the media {he} [creates|create] could affect the people who see it.",
-    "{He} [views|view] and responds to others' media art with fairness and respect."
+    "{He} [views|view] and [responds|respond] to others' media art with fairness and respect."
    ],
    "next": {
     "developing": "{His} next step is to practise asking whether {he} [has|have] the right to use each image {he} [includes|include].",
-    "proficient": "A useful habit for {him} is pausing to think before {he} [shares|share] or comments on media.",
+    "proficient": "A useful habit for {him} is pausing to think before {he} [shares|share] or [comments|comment] on media.",
     "extending": "To go further, {he} can practise explaining how {his} media choices show care for {his} audience."
    },
-   "home": "Ask {him} what {he} [thinks|think] about before {he} [posts|post] or shares an image online."
+   "home": "Ask {him} what {he} [thinks|think] about before {he} [posts|post] or [shares|share] an image online."
   },
   "arts-revising-work--arts-education-9|all": {
    "group": "arts-revising-work",
@@ -27302,7 +27302,7 @@
     "proficient": "A useful habit for {him} is deciding how {he} will know a skill has improved.",
     "extending": "A next step for {him} is to match {his} skill plan to the needs of a future job."
    },
-   "home": "Ask {him} which work skill {he} most wants to improve this year."
+   "home": "Ask {him} which work skill {he} most [wants|want] to improve this year."
   },
   "car-skill-development--work-experience-12b|all": {
    "group": "car-skill-development",
@@ -39927,7 +39927,7 @@
     "extending": "help a group divide the work so everyone has a role"
    },
    "strength": [
-    "{He} [shares|share] ideas while {his} group [plans|plan] a project.",
+    "{He} [shares|share] ideas while {his} group plans a project.",
     "{He} [adds|add] to other people's ideas to make the group's plan more complete."
    ],
    "next": {
@@ -40433,7 +40433,7 @@
    "phrase": "stay curious about a science topic or problem of personal interest over time",
    "next_steps": {
     "emerging": "ask questions about a science topic of interest",
-    "developing": "keep exploring one science topic over several weeks",
+    "developing": "keep asking follow-up questions about a science idea worth exploring",
     "proficient": "keep a record of questions and new learning about a topic",
     "extending": "use new answers to ask harder questions about a topic"
    },
@@ -40458,7 +40458,7 @@
    "phrase": "show sustained curiosity about a scientific topic or problem of personal interest",
    "next_steps": {
     "emerging": "practise noting questions about a topic as they arise",
-    "developing": "pursue one scientific question across several weeks",
+    "developing": "follow a scientific question with new questions as the evidence builds",
     "proficient": "make a habit of following the new questions an answer raises",
     "extending": "develop a personal inquiry that grows more focused over time"
    },
