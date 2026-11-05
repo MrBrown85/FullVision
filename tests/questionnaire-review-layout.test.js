@@ -168,11 +168,14 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(html).toContain('Student Dashboard ›');
     expect(html).toContain('data-href="/student?id=' + st.id + '&course=' + cid + '"');
     expect(html).toContain('Work Habits');
-    expect((html.match(/role="radio"/g) || []).length).toBe(30);
-    expect(html).toContain('Comes Ready, Uses Class Time');
+    expect((html.match(/role="slider"/g) || []).length).toBe(6);
+    expect(html).not.toContain('role="radio"');
+    expect(html).not.toContain('Not Seen');
+    expect(html).toContain('<span class="qn-habit-name" id="tq-habit-ready">Comes Ready and Uses Class Time</span>');
+    CommentBank.HABITS.forEach(h => expect(html).toContain('<span class="qn-habit-desc">' + h.desc + '</span>'));
     expect(html).toContain('At a Glance');
-    expect(html).toContain('Best piece');
-    expect(html).toContain('<span class="qn-fact-label">Missing</span>');
+    expect(html).toContain('Best Piece');
+    expect(html).toContain('<span class="qn-fact-label">Missing and Late</span>');
     expect(html).toContain('Cece’s Voice');
     expect(html).toContain('Questionnaires ›');
     expect(html).toContain('Teacher Comment');
@@ -188,6 +191,31 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(html).not.toContain('What FullVision Has');
     expect(html).not.toContain('Save and Next');
     expect(html).not.toContain('MyEd');
+  });
+
+  it('a habit saved as Not Seen shows blank and is not counted; clearing takes it out of the saved map', () => {
+    const st = cece();
+    RQ.tqStudentIndex = RQ.getTqStudents().findIndex(s => s.id === st.id);
+    const term = ReportBlocks.getTermId();
+    const before = (getStudentTermRating(cid, st.id, term) || {}).habits;
+    upsertTermRating(cid, st.id, term, { habits: { part: CommentBank.NOT_SEEN, others: 3 } });
+    try {
+      const html = RQ.renderTermQuestionnaire(cid);
+      expect(html).toMatch(
+        /class="qn-hs" role="slider" tabindex="0" data-habit="part" data-value="0"[^>]*aria-valuetext="Not rated"/,
+      );
+      expect(html).toMatch(/data-habit="others" data-value="3"[^>]*aria-valuenow="3"/);
+      expect(html).toContain('id="tq-rated">1 of 6 rated');
+      // Nothing is on the page to draw in place.
+      globalThis.document.querySelector = () => null;
+      RQ.tqRate('others', 0);
+      expect(getStudentTermRating(cid, st.id, term).habits).toEqual({ part: CommentBank.NOT_SEEN });
+      RQ.tqRate('part', 2);
+      expect(getStudentTermRating(cid, st.id, term).habits).toEqual({ part: 2 });
+    } finally {
+      delete globalThis.document.querySelector;
+      upsertTermRating(cid, st.id, term, { habits: before || {} });
+    }
   });
 
   it('a student with nothing from the phone shows Goal · Not set yet only', () => {

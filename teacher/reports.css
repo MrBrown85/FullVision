@@ -3928,64 +3928,153 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 12.5px;
 }
 
-/* Work Habits: the radio grid */
+/* Work Habits (Colin, Nov 4): each habit's name and what it means on the
+   left, a slider with four stops on the right, a little over half the row.
+   The stops sit 44px in from each end of the track so Rarely and
+   Consistently are never cut; the track, the dots and the labels share
+   that inset (--hs-in), and --at is the chosen stop, 0 to 3. */
 .qn-habits {
-  padding: 12px 14px;
+  padding: 12px 14px 4px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  container-type: inline-size;
 }
-/* A scale label wider than its share (wider fonts on Linux) widens its
-   column instead of spilling out of it; the name column gives way. */
-.qn-habit-head,
+.qn-habits .qn-card-top {
+  padding-bottom: 6px;
+}
 .qn-habit-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.9fr) repeat(5, minmax(max-content, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 20px;
   align-items: center;
-}
-.qn-habit-head {
-  font-size: 11px;
-  color: var(--text-2);
-  text-align: center;
-}
-.qn-habit-row {
-  padding: 4px 0;
+  padding: 12px 0;
   border-top: 1px solid var(--qn-hairline);
 }
-.qn-habit-name {
-  font-size: var(--text-sm);
+.qn-habit-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
-/* Completes Work as the assignment record has it, until the teacher picks. */
-.qn-habit-src {
-  display: block;
-  font-size: 12px;
+.qn-habit-name {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.qn-habit-desc {
+  font-size: 14px;
+  line-height: 1.4;
   color: var(--text-2);
 }
-.qn-habit-cell {
-  display: flex;
-  justify-content: center;
+.qn-habit-note {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--text-3);
 }
-.qn-radio {
-  display: block;
-  width: 16px;
-  height: 16px;
+/* In the 470 px column (the student list shown) the slider beside the
+   words would be about 220 px, too narrow for the four labels: there the
+   slider goes under the words, full width. Side by side from a 560 px row,
+   as when the list is hidden. */
+@container (max-width: 559px) {
+  .qn-habit-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+.qn-hs {
+  --hs-in: 44px;
+  --hs-step: calc((100% - 2 * var(--hs-in)) / 3);
+  position: relative;
+  min-width: 0;
+  padding: 4px 0;
   border-radius: 8px;
-  box-sizing: border-box;
-  padding: 0;
-  border: 1.5px solid var(--border-2);
-  background: var(--surface);
   cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
-.qn-radio:hover {
-  border-color: var(--active);
+.qn-hs:focus {
+  outline: none;
 }
-.qn-radio.on {
-  background: var(--active);
-  border: 5px solid #cfe4ff;
-}
-.qn-radio:focus-visible {
+.qn-hs:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 2px;
+}
+.qn-hs-track {
+  position: relative;
+  height: 24px;
+}
+.qn-hs-rail,
+.qn-hs-fill {
+  position: absolute;
+  top: 8px;
+  height: 8px;
+  border-radius: 4px;
+}
+.qn-hs-rail {
+  left: 0;
+  right: 0;
+  background: var(--surface-2);
+}
+.qn-hs-fill {
+  left: var(--hs-in);
+  width: calc(var(--hs-step) * var(--at, 0));
+  background: var(--active);
+  display: none;
+}
+.qn-hs-dot {
+  position: absolute;
+  top: 10px;
+  left: calc(var(--hs-in) + var(--hs-step) * var(--i) - 2px);
+  width: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border-2);
+}
+.qn-hs-thumb {
+  position: absolute;
+  top: 0;
+  left: calc(var(--hs-in) + var(--hs-step) * var(--at, 0) - 12px);
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: var(--active);
+  border: 3px solid var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  display: none;
+}
+.qn-hs.set .qn-hs-fill,
+.qn-hs.set .qn-hs-thumb {
+  display: block;
+}
+/* Completes Work as the assignment record has it, until the teacher picks:
+   a hollow thumb and a pale fill. */
+.qn-hs.from-record .qn-hs-fill {
+  opacity: 0.35;
+}
+.qn-hs.from-record .qn-hs-thumb {
+  background: var(--surface);
+  border: 3px solid var(--active);
+}
+.qn-hs-labels {
+  position: relative;
+  height: 18px;
+  margin-top: 4px;
+}
+.qn-hs-label {
+  position: absolute;
+  top: 0;
+  left: calc(var(--hs-in) + var(--hs-step) * var(--i));
+  transform: translateX(-50%);
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.qn-hs-label.on {
+  font-weight: 500;
+  color: var(--text);
 }
 
 /* At a Glance */
@@ -4091,6 +4180,135 @@ body.qn-roster #gb-sidebar .student-row-note {
    three skill rows, three work rows and a foot that opens every skill. */
 .qno-glance .qn-fact {
   align-items: center;
+}
+/* A row that opens in place (Colin, Nov 4): the competency's name and its
+   own wording, the figure on the right, a chevron; opened, the pieces
+   behind the figure, each title opening the grader. */
+.qno-glance .qn-glance-row {
+  display: block;
+  padding: 0;
+}
+.qn-glance-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.qn-glance-toggle:hover {
+  background: var(--bg);
+}
+.qn-glance-toggle:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.qn-glance-toggle .qn-fact-label {
+  padding-top: 2px;
+}
+.qn-glance-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.qn-glance-wording {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+.qn-glance-fig {
+  flex: none;
+  max-width: 40%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-top: 2px;
+  text-align: right;
+}
+.qn-glance-fig .qn-level {
+  width: auto;
+  white-space: nowrap;
+}
+.qn-glance-extra {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.qn-best-mark {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.qn-best-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin-top: 2px;
+}
+.qn-best-links .qn-card-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12.5px;
+}
+.qn-chev {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin: 6px 2px 0 0;
+  border-right: 1.5px solid var(--text-3);
+  border-bottom: 1.5px solid var(--text-3);
+  transform: rotate(45deg);
+}
+.qn-glance-toggle[aria-expanded='true'] .qn-chev {
+  margin-top: 9px;
+  transform: rotate(-135deg);
+}
+.qn-glance-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 14px 10px 116px;
+}
+.qn-glance-list[hidden] {
+  display: none;
+}
+.qn-glance-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 0;
+  border-top: 1px solid var(--qn-hairline);
+  font-size: var(--text-sm);
+}
+.qn-glance-piece {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.qn-glance-mark {
+  flex: none;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.qn-glance-mark.missing {
+  color: var(--score-1);
+}
+.qn-glance-mark.late {
+  color: var(--score-2-text);
 }
 .qno-foot {
   display: flex;
@@ -6810,7 +7028,7 @@ body.qn-roster #gb-sidebar .student-row-note {
    together left of their radios, Times Late was cut off, and each
    sentence's text was squeezed between its label and Options. Under
    600 px the grade goes under the name, a habit's name goes above its
-   five radios, Attendance wraps, and a sentence's label sits above its
+   slider, Attendance wraps, and a sentence's label sits above its
    text. */
 @media (max-width: 600px) {
   .qn {
@@ -6832,20 +7050,8 @@ body.qn-roster #gb-sidebar .student-row-note {
   .qn-grade-sub {
     white-space: normal;
   }
-  .qn-habit-head,
-  .qn-habit-row {
-    grid-template-columns: repeat(5, minmax(max-content, 1fr));
-    column-gap: 4px;
-  }
-  .qn-habit-head > span:first-child {
-    display: none;
-  }
-  .qn-habit-head > span {
-    white-space: nowrap;
-  }
-  .qn-habit-name {
-    grid-column: 1 / -1;
-    padding-bottom: 4px;
+  .qn-glance-list {
+    padding-left: 14px;
   }
   .qn-att {
     flex-wrap: wrap;

@@ -987,86 +987,212 @@ window.ReportQuestionnaire = (function () {
 
   /* ── Work Habits ─────────────────────────────────────────── */
 
-  /* The names and hints on the grid, as the mockup words them. */
-  var HABIT_LABELS = { ready: 'Comes Ready, Uses Class Time' };
-  var SCALE_TIPS = {
-    Rarely: 'Rarely: hardly ever this term',
-    Sometimes: 'Sometimes: some of the time, not most',
-    Usually: 'Usually: most of the time',
-    Consistently: 'Consistently: almost every time',
-    'Not Seen': 'Not Seen: no chance to see it yet. The comment leaves it out.',
-  };
+  /* Work Habits: each habit's name and what it means, always in view, and
+     a slider with four stops, Rarely to Consistently (Colin, Nov 4: the
+     radios were hard to hit in a rush and the hints hid in a tooltip). A
+     habit left blank was not seen; a Not Seen saved before shows blank. */
+  var HS_STOPS = 4;
 
+  /* How many habits are rated Rarely to Consistently. */
   function _ratedCount(habits) {
     return CommentBank.HABITS.filter(function (h) {
-      return habits && habits[h.key] != null;
+      var v = habits && Number(habits[h.key]);
+      return v >= 1 && v <= HS_STOPS;
     }).length;
   }
 
-  // html-safe: habit names, hints and scale labels esc()'d; keys and values are fixed
+  /* The rating a habit's slider shows: { v, fromRecord }. A saved rating
+     from 1 to 4; else Completes Work as the assignment record has it
+     (CommentBank.effectiveHabits), as the comment uses it, until the
+     teacher picks; else 0, blank. */
+  function _sliderValue(stored, auto, key) {
+    var s = Number(stored[key]);
+    if (s >= 1 && s <= HS_STOPS) return { v: s, fromRecord: false };
+    if (stored[key] == null && auto[key] >= 1 && auto[key] <= HS_STOPS) return { v: auto[key], fromRecord: true };
+    return { v: 0, fromRecord: false };
+  }
+  function _sliderText(v, fromRecord) {
+    if (!v) return 'Not rated';
+    return CommentBank.SCALE[v - 1] + (fromRecord ? ', from the assignment record' : '');
+  }
+
+  /* "From assignments: 18 of 20 handed in, 1 late, 1 missing", from the
+     comment's record (facts().record); '' with no assignments. */
+  function _recordLine(rec) {
+    if (!rec || !rec.total) return '';
+    return (
+      'From assignments: ' +
+      rec.handed +
+      ' of ' +
+      rec.total +
+      ' handed in, ' +
+      rec.late +
+      ' late, ' +
+      rec.missing +
+      ' missing'
+    );
+  }
+
+  // html-safe: habit names, descriptions, the record line and scale labels esc()'d; keys and values are fixed
   function _habitsHtml(cid, f) {
     var stored = (getStudentTermRating(cid, f.sid, getTermId()) || {}).habits || {};
-    var head = CommentBank.SCALE.map(function (label) {
-      return `<span title="${esc(SCALE_TIPS[label] || label)}">${esc(label)}</span>`;
-    }).join('');
-    // Completes Work starts from the assignment record (Term Questionnaire
-    // 14) until the teacher picks a rating: the grid shows that rating, as
-    // the comment uses it, marked From the Record.
     var auto = CommentBank.effectiveHabits(stored, f.record, f);
     var rows = CommentBank.HABITS.map(function (h) {
-      var fromRecord = stored[h.key] == null && auto[h.key] != null;
-      var v = fromRecord ? auto[h.key] : stored[h.key];
-      var name = HABIT_LABELS[h.key] || h.name;
-      // One Tab stop per habit: the picked rating, else the first; the
-      // arrow keys move between the ratings (_arrowRadio).
-      var stop = v >= 1 && v <= CommentBank.SCALE.length ? v : 1;
-      var opts = CommentBank.SCALE.map(function (label, i) {
-        var val = i + 1;
-        var on = v === val;
-        var tip =
-          (SCALE_TIPS[label] || label) +
-          (on && fromRecord ? ' From the assignment record; pick a rating to change it.' : '');
-        return `<span class="qn-habit-cell"><button type="button" role="radio" aria-checked="${on}" tabindex="${val === stop ? 0 : -1}" class="qn-radio${on ? ' on' : ''}${on && fromRecord ? ' from-record' : ''}" data-action="tqRate" data-habit="${h.key}" data-value="${val}" aria-label="${esc(name + ': ' + label + (on && fromRecord ? ', from the record' : ''))}" title="${esc(tip)}"></button></span>`;
-      }).join('');
-      return `<div class="qn-habit-row" role="radiogroup" aria-label="${esc(name)}">
-        <span class="qn-habit-name" title="${esc(h.hint)}">${esc(name)}${fromRecord ? '<span class="qn-habit-src">From the Record</span>' : ''}</span>${opts}
+      var cur = _sliderValue(stored, auto, h.key);
+      var note = h.key === 'completes' ? _recordLine(f.record) : '';
+      var labels = CommentBank.SCALE.slice(0, HS_STOPS)
+        .map(function (label, i) {
+          return `<span class="qn-hs-label${cur.v === i + 1 ? ' on' : ''}" style="--i:${i}" data-habit="${h.key}" data-value="${i + 1}">${esc(label)}</span>`;
+        })
+        .join('');
+      var dots = '';
+      for (var i = 0; i < HS_STOPS; i++) dots += `<span class="qn-hs-dot" style="--i:${i}"></span>`;
+      return `<div class="qn-habit-row" data-habit-row="${h.key}">
+        <div class="qn-habit-text">
+          <span class="qn-habit-name" id="tq-habit-${h.key}">${esc(h.name)}</span>
+          <span class="qn-habit-desc">${esc(h.desc || h.hint)}</span>
+          ${note ? `<span class="qn-habit-note">${esc(note)}</span>` : ''}
+        </div>
+        <div class="qn-hs${cur.v ? ' set' : ''}${cur.fromRecord ? ' from-record' : ''}" role="slider" tabindex="0" data-habit="${h.key}" data-value="${cur.v}" style="--at:${Math.max(0, cur.v - 1)}" aria-labelledby="tq-habit-${h.key}" aria-valuemin="1" aria-valuemax="${HS_STOPS}"${cur.v ? ` aria-valuenow="${cur.v}"` : ''} aria-valuetext="${esc(_sliderText(cur.v, cur.fromRecord))}">
+          <div class="qn-hs-track"><span class="qn-hs-rail"></span>${dots}<span class="qn-hs-fill"></span><span class="qn-hs-thumb"></span></div>
+          <div class="qn-hs-labels">${labels}</div>
+        </div>
       </div>`;
     }).join('');
     return `<div class="qn-card qn-habits">
       <div class="qn-card-top"><span class="qn-card-title">Work Habits</span><span class="qn-sub" id="tq-rated">${_ratedCount(stored)} of 6 rated</span></div>
-      <div class="qn-habit-head"><span></span>${head}</div>
       ${rows}
     </div>`;
   }
 
-  /* A habit picked on the grid: saved with the others (the whole map); the
-     grid, the count and the comment's habits sentence change in place,
-     nothing else redraws. */
+  /* A slider drawn at a stop (1 to 4) or blank (0), without saving: while
+     it is dragged, and after a rating is saved. */
+  function _paintSlider(el, v, fromRecord) {
+    if (!el) return;
+    el.classList.toggle('set', v > 0);
+    el.classList.toggle('from-record', !!fromRecord && v > 0);
+    el.style.setProperty('--at', String(Math.max(0, v - 1)));
+    el.dataset.value = String(v);
+    if (v > 0) el.setAttribute('aria-valuenow', String(v));
+    else el.removeAttribute('aria-valuenow');
+    el.setAttribute('aria-valuetext', _sliderText(v, fromRecord));
+    Array.prototype.forEach.call(el.querySelectorAll('.qn-hs-label'), function (l) {
+      l.classList.toggle('on', Number(l.dataset.value) === v);
+    });
+  }
+
+  /* The habit's slider drawn from what is saved (and the record). */
+  function _syncSlider(key) {
+    var st = _current();
+    var el = document.querySelector('.qn-hs[data-habit="' + key + '"]');
+    if (!st || !el) return;
+    var f = _facts(st);
+    var stored = (getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).habits || {};
+    var cur = _sliderValue(stored, CommentBank.effectiveHabits(stored, f.record, f), key);
+    _paintSlider(el, cur.v, cur.fromRecord);
+  }
+
+  /* The stop (1 to 4) nearest a point across a slider's track; the stops
+     sit 44 px in from each end, and a point past an end stop takes it. */
+  var HS_INSET = 44;
+  function _stopAt(el, x) {
+    var track = el.querySelector('.qn-hs-track') || el;
+    var r = track.getBoundingClientRect();
+    var span = r.width - 2 * HS_INSET;
+    if (!(span > 0)) return 1;
+    var at = Math.round(((x - r.left - HS_INSET) / span) * (HS_STOPS - 1));
+    return Math.max(0, Math.min(HS_STOPS - 1, at)) + 1;
+  }
+  /* The rating the teacher saved for a habit, 1 to 4, else 0. */
+  function _savedRating(key) {
+    var st = _current();
+    var stored = (st && (getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).habits) || {};
+    var v = Number(stored[key]);
+    return v >= 1 && v <= HS_STOPS ? v : 0;
+  }
+
+  /* Pressing on a slider: a click snaps to the nearest stop (the chosen
+     stop again clears the habit); a drag moves between the stops and
+     saves where it is let go. */
+  var _hsWired = false;
+  function _wireSliders() {
+    if (_hsWired || typeof document === 'undefined' || !document.addEventListener) return;
+    _hsWired = true;
+    document.addEventListener('pointerdown', function (e) {
+      var el = e.target && e.target.closest && e.target.closest('.qn-hs');
+      if (!el || e.button !== 0) return;
+      e.preventDefault();
+      el.focus();
+      var key = el.dataset.habit;
+      var startX = e.clientX;
+      var before = Number(el.dataset.value) || 0;
+      var fromRecord = el.classList.contains('from-record');
+      var moved = false;
+      var move = function (ev) {
+        if (!moved && Math.abs(ev.clientX - startX) < 4) return;
+        moved = true;
+        _paintSlider(el, _stopAt(el, ev.clientX), false);
+      };
+      var up = function (ev) {
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+        document.removeEventListener('pointercancel', cancel);
+        var stop = _stopAt(el, ev.clientX);
+        var saved = _savedRating(key);
+        if (!moved && stop === saved) tqRate(key, 0);
+        else if (stop !== saved) tqRate(key, stop);
+        else _paintSlider(el, before, fromRecord);
+      };
+      var cancel = function () {
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', up);
+        document.removeEventListener('pointercancel', cancel);
+        _paintSlider(el, before, fromRecord);
+      };
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', up);
+      document.addEventListener('pointercancel', cancel);
+    });
+  }
+
+  /* A key on a focused slider: ← → (and ↓ ↑) step, Home and End go to the
+     ends, 1 to 4 set, Delete or Backspace clears. True when it was one. */
+  function _sliderKey(el, e) {
+    var key = el.dataset.habit;
+    var v = Number(el.dataset.value) || 0;
+    var next = null;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') next = Math.max(1, v - 1);
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') next = v ? Math.min(HS_STOPS, v + 1) : 1;
+    else if (e.key === 'Home') next = 1;
+    else if (e.key === 'End') next = HS_STOPS;
+    else if (/^[1-4]$/.test(e.key)) next = Number(e.key);
+    else if (e.key === 'Delete' || e.key === 'Backspace') next = 0;
+    else return false;
+    e.preventDefault();
+    if (next !== _savedRating(key)) tqRate(key, next);
+    return true;
+  }
+
+  /* A habit rated on its slider, or cleared (0): saved with the others
+     (the whole map); a cleared habit is taken out of it. The slider, the
+     count and the comment's habits sentence change in place, nothing else
+     redraws. */
   function tqRate(key, value) {
     var st = _current();
     if (!st) return;
     tqSaveCurrentIfNeeded();
     var termId = getTermId();
     var habits = Object.assign({}, (getStudentTermRating(_activeCourse, st.id, termId) || {}).habits || {});
-    habits[key] = Number(value);
+    var v = Number(value) || 0;
+    if (v >= 1 && v <= HS_STOPS) habits[key] = v;
+    else delete habits[key];
     upsertTermRating(_activeCourse, st.id, termId, { habits: habits });
-    document.querySelectorAll('.qn-radio[data-habit="' + key + '"]').forEach(function (b) {
-      var on = Number(b.dataset.value) === Number(value);
-      b.classList.toggle('on', on);
-      b.classList.remove('from-record');
-      b.setAttribute('aria-checked', String(on));
-      b.setAttribute('aria-label', String(b.getAttribute('aria-label') || '').replace(/, from the record$/, ''));
-      b.tabIndex = on ? 0 : -1;
-    });
-    var src = document.querySelector('.qn-habit-row [data-habit="' + key + '"]');
-    var nameCell = src && src.closest && src.closest('.qn-habit-row');
-    var tag = nameCell && nameCell.querySelector('.qn-habit-src');
-    if (tag) tag.remove();
+    _facts(st, true);
+    _syncSlider(key);
     var rated = document.getElementById('tq-rated');
     if (rated) rated.textContent = _ratedCount(habits) + ' of 6 rated';
     var chip = document.getElementById('tq-empty-rated');
     if (chip) chip.textContent = _ratedCount(habits) + ' of 6 habits rated';
-    _facts(st, true);
     _redrawHabits(st);
   }
 
@@ -1124,18 +1250,19 @@ window.ReportQuestionnaire = (function () {
   /* ── At a Glance ─────────────────────────────────────────── */
 
   /* Under the best piece: its Note for the Report, or when it has none
-     Add one, which opens the grader on that piece for this student. */
+     a link to add one, which opens the grader on that piece for this
+     student. */
   function _reportNoteNudge(best) {
     if (!best || !best.id) return '';
     var note = String(best.note || '').trim();
     // With a note: "Note for the report: “…”" (the LayoutE mockup).
     if (note) return `<span class="qn-muted qn-note-line">Note for the report: “${esc(note)}”</span>`;
-    return `<span class="qn-muted qn-note-nudge">No note for the report yet · <button type="button" class="qn-card-link qn-note-add" data-action="tqAddReportNote" data-aid="${esc(best.id)}" title="Opens the grader on this piece. Write one line about what the student did, for the comment.">Add one</button></span>`;
+    return `<button type="button" class="qn-card-link qn-note-add" data-action="tqAddReportNote" data-aid="${esc(best.id)}" title="Opens the grader on this piece. Write one line about what the student did, for the comment.">Add a note for the report ›</button>`;
   }
 
-  /* Add one: the grader on the best piece, this student only. Closing it
-     reads the facts again, so the note shows in the comment's sentence. */
-  function tqAddReportNote(aid) {
+  /* The grader on one piece, this student only. Closing it reads the
+     facts again, so a new mark or note shows here and in the comment. */
+  function tqOpenGrader(aid) {
     var st = _current();
     if (!st || !aid || !window.PageAssignments || !PageAssignments.openGrader) return;
     PageAssignments.openGrader(_activeCourse, aid, st.id, {
@@ -1145,6 +1272,23 @@ window.ReportQuestionnaire = (function () {
         rerender();
       },
     });
+  }
+  /* Add a note for the report: the grader on the best piece. */
+  function tqAddReportNote(aid) {
+    tqOpenGrader(aid);
+  }
+
+  /* Which At a Glance rows are open (Strongest, Next Step, Biggest
+     Change, Missing and Late), kept as the teacher moves between
+     students. */
+  var _glanceOpen = {};
+  /* A row opened or closed in place; nothing else redraws. */
+  function tqGlanceToggle(row) {
+    _glanceOpen[row] = !_glanceOpen[row];
+    var btn = document.querySelector('.qn-glance-toggle[data-row="' + row + '"]');
+    var list = document.getElementById('tq-glance-' + row);
+    if (btn) btn.setAttribute('aria-expanded', String(!!_glanceOpen[row]));
+    if (list) list.hidden = !_glanceOpen[row];
   }
 
   /* The best piece in the year to date, by the comment's rule (CommentBank.bestPieceOf),
@@ -1259,16 +1403,87 @@ window.ReportQuestionnaire = (function () {
     };
   }
 
-  // html-safe: competency names, figures and words esc()'d; labels are fixed words
-  function _glanceSkillHtml(cid, f, label, c, fig) {
-    return `<div class="qn-fact">
-        <span class="qn-fact-label">${label}</span>
-        <div class="qn-fact-body"><span>${esc(c.name)}</span><span class="qn-muted">${esc(fig)}</span></div>
-        <span class="qn-level" data-level="${_levelStep(c.level)}">${esc(f.levelText(c.level))}</span>
+  /* A competency's own wording, as its card in Class Management shows it:
+     the learning map's wording for it (its tag's text), else its first I
+     Can statement; '' with neither. */
+  function _compWording(sections, c) {
+    var sec = (sections || []).find(function (x) {
+      return String(x.id) === String(c.id);
+    });
+    var tag =
+      (sec &&
+        (sec.tags || []).find(function (t) {
+          return String(t.text || '').trim();
+        })) ||
+      null;
+    if (tag) return String(tag.text).trim();
+    return (c.iCans && c.iCans[0]) || '';
+  }
+
+  /* The pieces under an opened row: each title opens the grader on it, and
+     its mark or status sits on the right. */
+  // html-safe: ids, titles and marks esc()'d
+  function _glanceListHtml(row, items) {
+    return `<ul class="qn-glance-list" id="tq-glance-${row}"${_glanceOpen[row] ? '' : ' hidden'}>${items
+      .map(function (it) {
+        return `<li><button type="button" class="qn-card-link qn-glance-piece" data-action="tqOpenGrader" data-aid="${esc(it.id)}" title="Opens the grader on this piece.">${esc(it.title || 'Untitled')}</button><span class="qn-glance-mark${it.cls ? ' ' + it.cls : ''}">${esc(it.mark)}</span></li>`;
+      })
+      .join('')}</ul>`;
+  }
+
+  /* A row that opens in place: the label, the body, the figure on the
+     right and a chevron; under it the pieces. */
+  // html-safe: the body, figure and list are built escaped by the callers; row and label are fixed words
+  function _glanceRowHtml(row, label, body, fig, list) {
+    var open = !!_glanceOpen[row];
+    return `<div class="qn-fact qn-glance-row">
+        <button type="button" class="qn-glance-toggle" data-action="tqGlanceToggle" data-row="${row}" aria-expanded="${open}" aria-controls="tq-glance-${row}">
+          <span class="qn-fact-label">${label}</span>
+          <span class="qn-fact-body">${body}</span>
+          <span class="qn-glance-fig">${fig}</span>
+          <span class="qn-chev" aria-hidden="true"></span>
+        </button>
+        ${list}
       </div>`;
   }
 
-  // html-safe: competency names, titles, notes, marks, figures and missing work esc()'d; labels are fixed words
+  /* A skill row: the competency's name and wording, its figure and piece
+     count on the right (with the change since the earlier report under
+     them), and the pieces behind the figure (compsOf's scores, calc.js),
+     each with the competency's mark on it. */
+  // html-safe: competency names, wording, figures, titles and marks esc()'d; row and label are fixed words
+  function _glanceSkillHtml(cid, f, sections, row, label, c, extra) {
+    var wording = _compWording(sections, c);
+    var body = `<span class="qn-glance-name">${esc(c.name)}</span>${wording ? `<span class="qn-glance-wording">${esc(wording)}</span>` : ''}`;
+    var fig = `<span class="qn-level" data-level="${_levelStep(c.level)}">${esc(formatLevel(cid, c.level) + ' · ' + _pieces(c))}</span>${extra ? `<span class="qn-glance-extra">${esc(extra)}</span>` : ''}`;
+    var items = (c.scores || []).map(function (sc) {
+      return { id: sc.id, title: sc.title, mark: formatLevel(cid, sc.v) };
+    });
+    return _glanceRowHtml(row, label, body, fig, _glanceListHtml(row, items));
+  }
+
+  function _dateOf(a) {
+    return (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date) || '';
+  }
+  /* The work labelled Missing and the work handed in late, in the year to
+     date as of the report's end, by the comment's record's rule
+     (CommentBank.facts: Missing is status NS; Late is a scored or marked
+     piece with status LATE), oldest first. */
+  function missingAndLate(cid, sid) {
+    var out = [];
+    (getAssessments(cid) || []).forEach(function (a) {
+      if (!assessmentInYearToDate(cid, a)) return;
+      var cell = assessmentCellValue(cid, sid, a);
+      if (cell.status === 'NS') out.push({ id: a.id, title: a.title || '', d: _dateOf(a), missing: true });
+      else if (cell.late && ['level', 'points', 'complete'].indexOf(cell.kind) >= 0)
+        out.push({ id: a.id, title: a.title || '', d: _dateOf(a), missing: false });
+    });
+    return out.sort(function (x, y) {
+      return String(x.d).localeCompare(String(y.d)) || String(x.title).localeCompare(String(y.title));
+    });
+  }
+
+  // html-safe: competency names, wording, titles, notes, marks and figures esc()'d; labels are fixed words
   function _glanceHtml(cid, student, f) {
     var best = bestPiece(f);
     // The best piece's mark as the comment prints it: in a Letter class,
@@ -1279,29 +1494,60 @@ window.ReportQuestionnaire = (function () {
         ? CommentBank.workMark(f, best)
         : formatLevel(cid, best.v)
       : '';
-    // Missing and Late: the comment's record, the year to date as of the
-    // report's end (facts().notHandedIn, the Missing Work block's rule).
-    var missing = (f.notHandedIn && f.notHandedIn.titles) || [];
-    var late = (f.record && f.record.late) || 0;
+    var sections = ReportBlocks.reportSections(cid);
     var rows = glanceRows(f);
-    var withChange = function (c) {
-      return [formatLevel(cid, c.level), _pieces(c), glanceChange(cid, f, c)].filter(Boolean).join(' · ');
+    // Under the figure: the proficiency word outside a Letter class, and
+    // the change since the earlier report.
+    var extra = function (c) {
+      return [courseGradeMode(cid) === 'letter' ? '' : f.levelText(c.level), glanceChange(cid, f, c)]
+        .filter(Boolean)
+        .join(' · ');
     };
     var skills = '';
-    if (rows.strongest) skills += _glanceSkillHtml(cid, f, 'Strongest', rows.strongest, withChange(rows.strongest));
-    if (rows.next) skills += _glanceSkillHtml(cid, f, 'Next step', rows.next, withChange(rows.next));
+    if (rows.strongest)
+      skills += _glanceSkillHtml(cid, f, sections, 'strongest', 'Strongest', rows.strongest, extra(rows.strongest));
+    if (rows.next) skills += _glanceSkillHtml(cid, f, sections, 'next', 'Next Step', rows.next, extra(rows.next));
     if (rows.change)
       skills += _glanceSkillHtml(
         cid,
         f,
-        'Biggest change',
+        sections,
+        'change',
+        'Biggest Change',
         rows.change,
-        formatLevel(cid, _levelThen(f, rows.change)) +
-          ' → ' +
-          formatLevel(cid, rows.change.level) +
-          ' · ' +
-          _pieces(rows.change),
+        formatLevel(cid, _levelThen(f, rows.change)) + ' → ' + formatLevel(cid, rows.change.level),
       );
+    // Missing and Late: the comment's record, the year to date as of the
+    // report's end (facts().notHandedIn and facts().record, the Missing
+    // Work block's rule).
+    var ml = missingAndLate(cid, student.id);
+    var nMissing = ml.filter(function (x) {
+      return x.missing;
+    }).length;
+    var nLate = ml.length - nMissing;
+    var mlCount = [nMissing ? nMissing + ' missing' : '', nLate ? nLate + ' late' : ''].filter(Boolean).join(' · ');
+    var mlRow = ml.length
+      ? _glanceRowHtml(
+          'missing',
+          'Missing and Late',
+          `<span>${esc(mlCount)}</span>`,
+          `<span class="qn-count">${ml.length}</span>`,
+          _glanceListHtml(
+            'missing',
+            ml.map(function (x) {
+              return {
+                id: x.id,
+                title: x.title,
+                mark: x.missing ? 'Missing' : 'Late',
+                cls: x.missing ? 'missing' : 'late',
+              };
+            }),
+          ),
+        )
+      : `<div class="qn-fact">
+        <span class="qn-fact-label">Missing and Late</span>
+        <div class="qn-fact-body"><span class="qn-muted">None so far this year</span></div>
+      </div>`;
     var sub = f.lastReport
       ? 'So far this year · change since the ' + f.lastReport.label + ' report'
       : 'So far this year';
@@ -1312,34 +1558,19 @@ window.ReportQuestionnaire = (function () {
       ${skills || '<div class="qn-fact"><span class="qn-muted">No scores so far this year</span></div>'}
       <div class="qn-band">Work</div>
       <div class="qn-fact qn-best">
-        <span class="qn-fact-label">Best piece</span>
-        <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(bestMark)}</span>${_reportNoteNudge(best)}` : '<span class="qn-muted">No marked work yet</span>'}</div>
+        <span class="qn-fact-label">Best Piece</span>
+        ${
+          best
+            ? `<div class="qn-fact-body"><span class="qn-glance-name">${esc(best.title)}</span><span class="qn-best-links"><button type="button" class="qn-card-link" data-action="tqOpenGrader" data-aid="${esc(best.id)}" title="Opens the grader on this piece.">Open in Grader ›</button>${_reportNoteNudge(best)}</span></div>
+        <span class="qn-glance-fig"><span class="qn-best-mark">${esc(bestMark)}</span></span>`
+            : '<div class="qn-fact-body"><span class="qn-muted">No marked work yet</span></div>'
+        }
       </div>
-      <div class="qn-fact">
-        <span class="qn-fact-label">Missing</span>
-        <div class="qn-fact-body">${
-          missing.length
-            ? missing
-                .map(function (t) {
-                  return `<span>${esc(t)}</span>`;
-                })
-                .join('')
-            : '<span class="qn-muted">None so far this year</span>'
-        }</div>
-        ${missing.length ? `<span class="qn-count">${missing.length}</span>` : ''}
-      </div>
-      <div class="qn-fact">
-        <span class="qn-fact-label">Late</span>
-        <div class="qn-fact-body">${
-          late
-            ? `<span>${late === 1 ? '1 piece' : late + ' pieces'}</span>`
-            : '<span class="qn-muted">None so far this year</span>'
-        }</div>
-      </div>
+      ${mlRow}
       ${
         n
           ? `<div class="qno-foot qno-glance-foot">
-        <button type="button" class="qn-card-link qno-view-all" data-action="tqOpenSkills" aria-haspopup="dialog">View All ${n} Skills</button>
+        <button type="button" class="qn-card-link qno-view-all" data-action="tqOpenSkills" aria-haspopup="dialog">View All ${n} Skills ›</button>
       </div>`
           : ''
       }
@@ -3140,7 +3371,12 @@ window.ReportQuestionnaire = (function () {
     { id: 'grade', label: 'Grade', steps: ['grade'] },
     { id: 'bestPiece', label: 'Best Piece', word: 'best piece', steps: ['example'] },
     { id: 'strengths', label: 'Strengths', word: 'strength', steps: ['opening', 'overall', 'growth'] },
-    { id: 'habits', label: 'Habits', word: 'habit', steps: ['habits', 'attendance', 'strongHabits'] },
+    {
+      id: 'habits',
+      label: 'Habits',
+      word: 'habit',
+      steps: ['habits', 'habitsMore', 'habitsBuild', 'attendance', 'strongHabits'],
+    },
     { id: 'notHandedIn', label: 'Not Handed In', steps: ['notHandedIn', 'lateWork'] },
     { id: 'nextStep', label: 'Next Step', word: 'next step', steps: ['nextStep', 'goWords', 'home'] },
     { id: 'support', label: 'Support', steps: ['support'] },
@@ -4434,6 +4670,7 @@ window.ReportQuestionnaire = (function () {
      row (one habit at one rating, `habit` and `level`), only that cell's
      other frames; on the summary row, the summary's frames and any cell
      frame whose rating matches. */
+  var FAMILY_HABIT_GROUPS = { 'Habits in Class': 1, 'More Habits in Class': 1, 'Habits That Would Help': 1 };
   function alternatives(row, ctx, usage, taken, bank) {
     var step = row.step ? _stepDef(row.step) : null;
     if (!step || step.line || !row.s) return [];
@@ -4450,6 +4687,9 @@ window.ReportQuestionnaire = (function () {
       .filter(function (s) {
         if (s.id === row.id || s.part !== step.part || step.groups.indexOf(s.group) < 0) return false;
         if (cell && (s.habit !== cell.habit || s.level !== cell.level)) return false;
+        // A sentence of the habits part for families: only its own group's
+        // frames (the same slot fits), never a one-habit Habit Ratings frame.
+        if (FAMILY_HABIT_GROUPS[row.s.group] && s.group !== row.s.group) return false;
         if (taken[s.id] || !CommentBank.fits(s, ctx) || claims(s) !== same) return false;
         if (step.prefer && ctx[step.prefer] && (s.needs || []).indexOf(step.prefer) < 0) return false;
         if (
@@ -4599,7 +4839,7 @@ window.ReportQuestionnaire = (function () {
     var h = CommentBank.HABITS.find(function (x) {
       return x.key === k;
     });
-    return HABIT_LABELS[k] || (h ? h.name : k);
+    return h ? h.name : k;
   }
   function _habitsOf(cid, student, f) {
     return CommentBank.effectiveHabits(
@@ -4739,7 +4979,7 @@ window.ReportQuestionnaire = (function () {
     if (row.edited) return 'Edited by you · kept when you regenerate';
     if (row.step === 'attendance') return 'From Attendance above · new';
     if (row.step === 'grade') return _gradeSource(cid, f);
-    if (row.step === 'habits' || row.step === 'strongHabits') return _habitsSource(cid, student, f);
+    if (/^(habits|habitsMore|habitsBuild|strongHabits)$/.test(row.step || '')) return _habitsSource(cid, student, f);
     var keys = ((row.prov && row.prov.factKeys) || []).slice();
     var bits = [];
     var next = row.step === 'nextStep' ? CommentBank.nextSkillOf(f) : null;
@@ -8179,6 +8419,7 @@ window.ReportQuestionnaire = (function () {
     _measureObs();
     syncApprove();
     _wireDrag();
+    _wireSliders();
     _wireSelAdd();
     // The teacher's own sentences in the bank (plan PR 10), and the
     // suggestions again after Later.
@@ -8282,9 +8523,13 @@ window.ReportQuestionnaire = (function () {
       tqCopyNarrative();
       return;
     }
-    // In a menu the arrow keys move between its items, and on a Work
-    // Habits rating between Rarely and Not Seen; neither changes the
-    // student (Nov 3 sweep: Down in Other Wording opened the next one).
+    // On a Work Habits slider its keys step, set and clear the rating;
+    // none of them changes the student.
+    if (t && t.classList && t.classList.contains('qn-hs') && !e.altKey && !e.metaKey && !e.ctrlKey) {
+      if (_sliderKey(t, e) || /^(Arrow(Up|Down|Left|Right)|Home|End)$/.test(e.key)) return;
+    }
+    // In a menu the arrow keys move between its items; they never change
+    // the student (Nov 3 sweep: Down in Other Wording opened the next one).
     if (
       t &&
       t.closest &&
@@ -8293,13 +8538,6 @@ window.ReportQuestionnaire = (function () {
       !e.ctrlKey &&
       /^(Arrow(Up|Down|Left|Right)|Home|End)$/.test(e.key)
     ) {
-      if (t.getAttribute && t.getAttribute('role') === 'radio' && t.closest('[role="radiogroup"]')) {
-        if (t.classList && t.classList.contains('qn-radio')) {
-          e.preventDefault();
-          _arrowRadio(t.closest('[role="radiogroup"]'), t, e.key);
-        }
-        return;
-      }
       var menu = t.closest('[role="menu"]');
       if (menu && !t.closest('input[type="text"], textarea')) {
         if (/^(Arrow(Up|Down)|Home|End)$/.test(e.key)) {
@@ -8342,23 +8580,6 @@ window.ReportQuestionnaire = (function () {
     if (at < 0) next = key === 'ArrowUp' || key === 'End' ? items.length - 1 : 0;
     items[next].focus();
   }
-  /* A Work Habits rating moved by an arrow key, Home or End: the next
-     rating is picked and takes the focus (a radio group's keys). */
-  function _arrowRadio(group, t, key) {
-    var radios = Array.prototype.slice.call(group.querySelectorAll('[role="radio"]'));
-    var at = radios.indexOf(t);
-    if (at < 0 || !radios.length) return;
-    var back = key === 'ArrowUp' || key === 'ArrowLeft';
-    var next =
-      key === 'Home' ? 0 : key === 'End' ? radios.length - 1 : (at + (back ? -1 : 1) + radios.length) % radios.length;
-    var b = radios[next];
-    tqRate(b.dataset.habit, b.dataset.value);
-    var now = document.querySelector(
-      '.qn-radio[data-habit="' + b.dataset.habit + '"][data-value="' + b.dataset.value + '"]',
-    );
-    if (now) now.focus();
-  }
-
   /* ── Namespace ──────────────────────────────────────────── */
   return {
     configure: configure,
@@ -8381,6 +8602,9 @@ window.ReportQuestionnaire = (function () {
     noMarkedWork: noMarkedWork,
     attendanceValue: attendanceValue,
     tqAddReportNote: tqAddReportNote,
+    tqOpenGrader: tqOpenGrader,
+    tqGlanceToggle: tqGlanceToggle,
+    missingAndLate: missingAndLate,
     tqSelectStudent: tqSelectStudent,
     tqSetBasis: tqSetBasis,
     tqSetCheck: tqSetCheck,

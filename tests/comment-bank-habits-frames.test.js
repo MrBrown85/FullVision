@@ -1,6 +1,7 @@
 /**
  * The habits-part frames grown 2026-11-01 (Colin: "too little variation"):
- * Work Habits (hs16-hs37), Strong Habits (hs13-hs15), Attendance
+ * Work Habits (hs16-hs37, replaced Nov 4 by the habits part for families,
+ * hf01-hf38), Strong Habits (hs13, hs15), Attendance
  * (h61-h78) and Not Handed In (m02-m21). Every frame of a case is
  * reachable (selection picks each one for some seed), fills with no slot
  * left, holds the exact facts, verifies against them and fails verify()
@@ -84,13 +85,13 @@ function picks(f, step, n, exclude) {
   }
   return out;
 }
-function expectReachable(f, step, want, exclude) {
+function expectReachable(f, step, want, exclude, most) {
   const got = picks(f, step, 0, exclude);
   want.forEach(id => expect(Object.keys(got), id + ' never picked').toContain(id));
   Object.keys(got).forEach(id => {
     expect(want, id + ' picked outside its case').toContain(id);
     expect(got[id], id).not.toMatch(/[{}[\]]/);
-    expect(CommentRealiser.wordCount(got[id]), id + ': ' + got[id]).toBeLessThanOrEqual(20);
+    expect(CommentRealiser.wordCount(got[id]), id + ': ' + got[id]).toBeLessThanOrEqual(most || 20);
   });
   return got;
 }
@@ -223,99 +224,91 @@ describe('Attendance frames', { timeout: 20000 }, () => {
 });
 
 // Each case drafts the comment many times: slow on CI's machines.
-describe('Work Habits frames', { timeout: 20000 }, () => {
+describe('the habits part for families (Nov 4)', { timeout: 20000 }, () => {
   const hab = habits => facts({ habits });
+  const BANNED =
+    /work habits?|\bsix\b|\b(all|every|each) of (his|her|their) habits|excellent|\bgood\b|Consistently|Sometimes|Rarely|\brated\b/;
 
-  it('excellent: hs01, hs02, hs17, hs18, hs20, hs21, never a habit name', () => {
-    const got = expectReachable(hab(all(4)), 'habits', ['hs01', 'hs02', 'hs17', 'hs18', 'hs20', 'hs21']);
-    Object.values(got).forEach(t => expect(t).not.toMatch(/Usually|to build|class time|feedback/));
-  });
-
-  it('good: hs03, hs04, hs23-hs27', () => {
-    const got = expectReachable(hab({ ...all(3), part: 4 }), 'habits', ['hs03', 'hs04'].concat(ids(23, 27, 'hs')));
-    Object.values(got).forEach(t => expect(t).not.toMatch(/excellent|to build/));
-  });
-
-  it('one habit to build: hs05-hs07, hs28-hs33, named only through the summary slot; then the Habit Ratings frames for that habit', () => {
-    // Once every summary frame is in a classmate's comment, the habits step
-    // draws the Habit Ratings frames for the one habit rated below Usually
-    // (hl091-hl095: Uses Feedback at Sometimes), which name it too. A
-    // Sometimes frame names a thing to do (advises), so only when the
-    // comment has no Next Step sentence: with one, the summary frames alone.
-    const cells = COMMENT_BANK.sentences
-      .filter(s => s.group === 'Habit Ratings' && s.habit === 'feedback' && s.level === 2)
-      .map(s => s.id);
-    const nextSteps = COMMENT_BANK.sentences.filter(s => s.group === 'Next Step').map(s => s.id);
-    expectReachable(hab({ ...all(4), feedback: 2 }), 'habits', ids(5, 7, 'hs').concat(ids(28, 33, 'hs')));
-    const got = expectReachable(
-      hab({ ...all(4), feedback: 2 }),
-      'habits',
-      ids(5, 7, 'hs').concat(ids(28, 33, 'hs'), cells),
-      nextSteps,
-    );
-    Object.entries(got).forEach(([id, t]) => {
-      expect(t, id).not.toMatch(/excellent|good|class time|others|taking part|devices|completing/);
-      if (/^hs/.test(id)) {
-        expect(t, id).toMatch(/using feedback/i);
-        expect(t, id).not.toMatch(/ and /);
-      } else
-        expect(
-          COMMENT_BANK.sentences.find(s => s.id === id),
-          id,
-        ).toMatchObject({ habit: 'feedback', level: 2 });
+  it('all Consistently: hf01, hf02, hf04, hf14-hf16, then hf21, hf22, hf27, hf28 for the rest', () => {
+    const lead = expectReachable(hab(all(4)), 'habits', ['hf01', 'hf02', 'hf04', 'hf14', 'hf15', 'hf16']);
+    Object.values(lead).forEach(t => {
+      expect(t).toMatch(/hands in his work on time and comes to class ready to start\.$/);
+      expect(t).not.toMatch(BANNED);
     });
-    expect(got.hs32).toBe('Using feedback is the work habit to build.');
-  });
-
-  it('two habits to build: hs08-hs10, hs34-hs37, the lower first', () => {
-    const got = expectReachable(
-      hab({ ...all(4), ready: 2, devices: 1 }),
-      'habits',
-      ids(8, 10, 'hs').concat(ids(34, 37, 'hs')),
+    const more = expectReachable(hab(all(4)), 'habitsMore', ['hf21', 'hf22', 'hf27', 'hf28']);
+    Object.values(more).forEach(t =>
+      expect(t).toMatch(/listens to others, joins in class discussions, and uses feedback to improve his work\.$/),
     );
-    Object.values(got).forEach(t => expect(t).toMatch(/using devices well and using class time well/i));
   });
 
-  it('every frame reads in PE and Arts through habitWords, under 20 words with the longest phrases', () => {
+  it('all Usually: hf05-hf07, hf17, then hf24-hf26, hf29, hf30', () => {
+    const lead = expectReachable(hab(all(3)), 'habits', ['hf05', 'hf06', 'hf07', 'hf17']);
+    Object.values(lead).forEach(t => expect(t).toMatch(/hands in his work on time and comes to class ready to start/));
+    const more = expectReachable(hab(all(3)), 'habitsMore', ['hf24', 'hf25', 'hf26', 'hf29', 'hf30']);
+    Object.values(more).forEach(t =>
+      expect(t).toMatch(/works well with others in a group and joins in class discussions/),
+    );
+  });
+
+  it('Usually beside a habit that would help: hf08-hf10, hf18, hf19', () => {
+    const got = expectReachable(hab({ ...all(3), feedback: 2 }), 'habits', ['hf08', 'hf09', 'hf10', 'hf18', 'hf19']);
+    Object.values(got).forEach(t => expect(t).not.toMatch(/feedback/));
+  });
+
+  it('nothing above Sometimes: hf11-hf13, hf20, at most two habits', () => {
+    const got = expectReachable(hab({ ...all(2), completes: 1, feedback: 1 }), 'habits', [
+      'hf11',
+      'hf12',
+      'hf13',
+      'hf20',
+    ]);
+    Object.values(got).forEach(t => expect(t).toMatch(/comes to class ready and joins in group work/));
+  });
+
+  it('one habit that would help: hf31-hf33, hf37; two: hf34-hf36, hf38, in the grid’s order', () => {
+    const one = expectReachable(hab({ ...all(4), feedback: 2 }), 'habitsBuild', ['hf31', 'hf32', 'hf33', 'hf37']);
+    Object.values(one).forEach(t => expect(t).toMatch(/using feedback to improve his work/));
+    const two = expectReachable(
+      hab({ ...all(4), ready: 2, devices: 1 }),
+      'habitsBuild',
+      ['hf34', 'hf35', 'hf36', 'hf38'],
+      [],
+      26,
+    );
+    Object.values(two).forEach(t =>
+      expect(t).toMatch(/getting started as soon as class begins, and keeping his phone and devices on his work/),
+    );
+  });
+
+  it('reads in PE and Arts in their own words', () => {
     ['pe', 'arts'].forEach(family => {
-      const two = picks(facts({ family, habits: { ...all(4), completes: 1, others: 2 } }), 'habits');
+      const two = picks(facts({ family, habits: { ...all(4), completes: 1, others: 2 } }), 'habitsBuild');
       Object.values(two).forEach(t => {
         expect(t).not.toMatch(/hand/i);
-        expect(CommentRealiser.wordCount(t), family + ': ' + t).toBeLessThanOrEqual(20);
+        expect(CommentRealiser.wordCount(t), family + ': ' + t).toBeLessThanOrEqual(26);
       });
       if (family === 'pe') Object.values(two).forEach(t => expect(t).toMatch(/taking a full part in every activity/i));
       if (family === 'arts') Object.values(two).forEach(t => expect(t).toMatch(/completing his work/i));
+      const strong = picks(facts({ family, habits: all(4) }), 'habits');
+      if (family === 'pe') Object.values(strong).forEach(t => expect(t).toMatch(/takes a full part in every activity/));
+      if (family === 'arts') Object.values(strong).forEach(t => expect(t).toMatch(/completes his work/));
     });
   });
 
   it('a frame fails verify() once a rating changes', () => {
-    expectVerifies(hab(all(4)), 'habits', hab({ ...all(4), part: 3 }));
-    expectVerifies(hab({ ...all(4), feedback: 2 }), 'habits', hab({ ...all(4), feedback: 3 }));
+    expectVerifies(hab(all(4)), 'habits', hab({ ...all(4), completes: 3 }));
+    expectVerifies(hab(all(4)), 'habitsMore', hab({ ...all(4), part: 3 }));
+    expectVerifies(hab({ ...all(4), feedback: 2 }), 'habitsBuild', hab({ ...all(4), feedback: 3 }));
   });
 
-  it('"all six" and "every one" frames need every habit rated (habitsAllSeen): a Not Seen habit leaves hs01/hs02 (hs03/hs04) only', () => {
-    const notSeen = hab({ ...all(4), devices: 5 });
-    expect(ctxOf(notSeen).habitsExcellent).toBe('yes');
-    expect(ctxOf(notSeen).habitsAllSeen).toBe('');
-    expect(Object.keys(picks(notSeen, 'habits')).sort()).toEqual(['hs01', 'hs02']);
-    const goodNotSeen = hab({ ...all(3), part: 4, others: 5 });
-    expect(Object.keys(picks(goodNotSeen, 'habits')).sort()).toEqual(['hs03', 'hs04']);
-    // Drafted with all six rated, a frame fails verify() once one is Not Seen.
-    const ctx = ctxOf(hab(all(4)));
-    let found = 0;
-    for (let seed = 1; seed <= 40; seed++) {
-      const d = CommentBank.draft(ctx, { seed });
-      const s = d.sentences.find(x => x.step === 'habits');
-      if (!/^hs(17|18|20|21)$/.test(s.id)) continue;
-      found++;
-      expect(CommentBank.verify(d, hab(all(4)), {}).replaced).toEqual([]);
-      const v = CommentBank.verify(d, notSeen, {});
-      expect(
-        v.replaced.map(r => r.sentenceId),
-        s.id,
-      ).toContain(s.id);
-    }
-    expect(found).toBeGreaterThan(0);
+  it('a blank habit is never named: one left out reads as unrated (Nov 4, no Not Seen)', () => {
+    const blank = hab({ completes: 4, ready: 4, others: 4, part: 4, feedback: 4 });
+    const lead = picks(blank, 'habits');
+    const more = picks(blank, 'habitsMore');
+    Object.values(lead)
+      .concat(Object.values(more))
+      .forEach(t => expect(t).not.toMatch(/phone|devices/));
+    expect(Object.keys(lead).length).toBeGreaterThan(0);
   });
 });
 
@@ -326,32 +319,36 @@ describe('Strong Habits frames (the IE comment)', () => {
       grade: { ...facts().grade, basis: 'ie', ieAllowed: true, marked: { mine: 3, all: 8 } },
     });
 
-  it('hs11, hs13-hs15 name the habits rated Consistently, at most three, as a verb phrase after the student', () => {
+  it('hs11, hs13, hs15 name the habits rated Consistently, at most three, as a verb phrase after the student', () => {
     const f = ie({ completes: 2, ready: 4, others: 4, part: 4, feedback: 2, devices: 3 });
     expect(CommentBank.reportPath(f)).toBe('ie');
-    const got = expectReachable(f, 'strongHabits', ['hs11', 'hs13', 'hs14', 'hs15']);
+    const got = expectReachable(f, 'strongHabits', ['hs11', 'hs13', 'hs15']);
     Object.values(got).forEach(t =>
-      expect(t).toMatch(/\bhe comes to class ready, works well with others and takes part\.$/i),
+      expect(t).toMatch(/\bhe comes to class ready to start, listens to others, and joins in class discussions\.$/i),
     );
-    expect(got.hs13).toBe('This term, he comes to class ready, works well with others and takes part.');
-    expect(got.hs15).toBe('Among his strengths, he comes to class ready, works well with others and takes part.');
+    expect(got.hs13).toBe(
+      'This term, he comes to class ready to start, listens to others, and joins in class discussions.',
+    );
   });
 
   it('the phrase agrees with singular they, and is they/them with no pronouns on file', () => {
     const they = { ...ie({ ...all(2), ready: 4 }), pronouns: THEY };
-    expect(ctxOf(they).strongHabits).toBe('come to class ready');
+    expect(ctxOf(they).strongHabits).toBe('come to class ready to start');
     // No pronouns on file: they/them (#596), through the realiser.
     const named = { ...ie({ ...all(2), ready: 4 }), pronouns: THEY, pronounsOnFile: false };
-    expect(ctxOf(named).strongHabits).toBe('come to class ready');
+    expect(ctxOf(named).strongHabits).toBe('come to class ready to start');
     const d = CommentBank.draft(ctxOf(named), { seed: 2 });
     const s = d.sentences.find(x => x.step === 'strongHabits');
-    expect(s.text).toMatch(/\bthey come to class ready\.$/i);
+    expect(s.text).toMatch(/\bthey come to class ready to start\.$/i);
     expect(s.text).not.toMatch(/Gabriel|\bhe\b/);
   });
 
-  it('all six Consistently is hs12, and the frames fail verify() once a strong habit drops', () => {
+  it('all six Consistently names three of them, never "work habits are excellent"; fails verify() once one drops', () => {
     const got = picks(ie(all(4)), 'strongHabits');
-    expect(Object.keys(got)).toEqual(['hs12']);
+    Object.values(got).forEach(t => {
+      expect(t).toMatch(/hands in his work on time, comes to class ready to start, and listens to others\.$/);
+      expect(t).not.toMatch(/excellent|work habits/);
+    });
     const f = ie({ ...all(2), ready: 4, others: 4 });
     expectVerifies(f, 'strongHabits', ie({ ...all(2), ready: 4, others: 3 }));
   });
@@ -361,15 +358,27 @@ describe('the frames and the lint', () => {
   it('every new frame is in its part and group, claims its fact and needs only slots the context builds', () => {
     const ctx = ctxOf(facts({ absent: 2, late: 1, habits: { ...all(4), part: 2 } }));
     const mine = COMMENT_BANK.sentences.filter(s =>
-      /^(hs(1[3-9]|[23]\d)|h(6[1-9]|7\d)|m(0[2-9]|1\d|2[01]))$/.test(s.id),
+      /^(hs(1[3-9]|[23]\d)|hf\d\d|h(6[1-9]|7\d)|m(0[2-9]|1\d|2[01]))$/.test(s.id),
     );
-    expect(mine).toHaveLength(57);
+    expect(mine).toHaveLength(73);
     mine.forEach(s => {
       expect(s.part, s.id).toBe('habits');
-      expect(['Work Habits', 'Strong Habits', 'Attendance', 'Not Handed In'], s.id).toContain(s.group);
+      expect(
+        [
+          'Habits in Class',
+          'More Habits in Class',
+          'Habits That Would Help',
+          'Strong Habits',
+          'Attendance',
+          'Not Handed In',
+        ],
+        s.id,
+      ).toContain(s.group);
       expect(s.claims, s.id).toEqual([
         {
-          'Work Habits': 'habits',
+          'Habits in Class': 'habits',
+          'More Habits in Class': 'habits',
+          'Habits That Would Help': 'habits',
           'Strong Habits': 'habits',
           Attendance: 'attendance',
           'Not Handed In': 'notHandedIn',
@@ -386,6 +395,9 @@ describe('the frames and the lint', () => {
     const cases = [
       facts({ habits: all(4) }),
       facts({ habits: { ...all(3), part: 4 } }),
+      facts({ habits: all(3) }),
+      facts({ habits: { ...all(3), feedback: 2 } }),
+      facts({ habits: { ...all(2), completes: 1, feedback: 1 } }),
       facts({ habits: { ...all(4), feedback: 2 } }),
       facts({ habits: { ...all(4), ready: 2, devices: 1 } }),
       facts({ habits: { completes: 2, ready: 4, others: 4, part: 4, feedback: 2, devices: 3 }, grade: ie }),
@@ -399,8 +411,8 @@ describe('the frames and the lint', () => {
         notHandedIn: { count: 15, titles: ['Current Events: Week 1'], groups: [{ name: 'Current Events', count: 6 }] },
       }),
     ];
-    // hs01/hs02 and hs03/hs04 (plan PR 7) share a start; no other pair does.
-    const allowed = ['hs01|hs02', 'hs03|hs04'];
+    // No pair shares a start.
+    const allowed = [];
     cases.forEach(f => {
       const ctx = ctxOf(f);
       const seen = {};

@@ -21,59 +21,108 @@ window.CommentBank = (function () {
   var CONSISTENTLY = 4;
   var NOT_SEEN = 5;
 
-  /* The six habits: the name and hint on the scale, and how the habits
-     sentence says it: `build` as the habit to build ("completing work on
-     time"), `does` and `do` as a strength ("comes to class ready", "they
-     come to class ready"). {his} is filled with the student's pronoun.
-     Other kinds of class say Completes Work their own way (habitWords). */
+  /* The six habits: the name and hint on the scale, and how a sentence
+     says it. `build`, `does` and `do` are the short forms the older
+     sentences and the support lines use ("completing work on time",
+     "comes to class ready"). `say` is what the habits part of a comment
+     says to a family (Colin, Nov 4: families never see the six ratings, so
+     the comment names what the student does, from the hint, never the
+     habit's label or its rating): `well` at Consistently, `usual` at
+     Usually (after "usually" or before "most days"), `some` at Sometimes
+     (after "Some days"), and `help` as a habit that would help. A `say`
+     form is a template: [one|many] is the verb, agreeing with the student
+     before it (the realiser), and {his} the student's pronoun. Other kinds
+     of class say Completes Work their own way (habitWords, habitSay). */
   var HABITS = [
     {
       key: 'completes',
       name: 'Completes Work',
       hint: 'Hands in assignments, complete and on time',
+      desc: 'Hands in assignments complete and on time, and finishes the work set during class.',
       build: 'completing work on time',
       does: 'completes work on time',
       do: 'complete work on time',
+      say: {
+        well: '[hands|hand] in {his} work on time',
+        usual: '[hands|hand] in {his} work on time',
+        some: '[hands|hand] in {his} work on time',
+        help: 'handing in each task by its due date',
+      },
     },
     {
       key: 'ready',
       name: 'Comes Ready and Uses Class Time',
       hint: 'Brings materials, starts tasks, stays on task',
+      desc: 'Brings materials, starts tasks without a reminder, and stays on task to the end of the period.',
       build: 'using class time well',
       does: 'comes to class ready',
       do: 'come to class ready',
+      say: {
+        well: '[comes|come] to class ready to start',
+        usual: '[comes|come] to class ready to start',
+        some: '[comes|come] to class ready',
+        help: 'getting started as soon as class begins',
+      },
     },
     {
       key: 'others',
       name: 'Works With Others',
       hint: 'Listens, shares the work, helps classmates',
+      desc: 'Listens to classmates, does a fair share of group work, and helps others when they are stuck.',
       build: 'working well with others',
       does: 'works well with others',
       do: 'work well with others',
+      say: {
+        well: '[listens|listen] to others',
+        usual: '[works|work] well with others in a group',
+        some: '[joins|join] in group work',
+        help: 'doing {his} share in group work',
+      },
     },
     {
       key: 'part',
       name: 'Takes Part',
       hint: 'Asks questions, adds to discussions',
+      desc: 'Asks questions, adds ideas to class discussions, and joins in activities.',
       build: 'taking part in class',
       does: 'takes part',
       do: 'take part',
+      say: {
+        well: '[joins|join] in class discussions',
+        usual: '[joins|join] in class discussions',
+        some: '[asks|ask] questions in class',
+        help: 'sharing {his} ideas in class discussions',
+      },
     },
     {
       key: 'feedback',
       name: 'Uses Feedback',
       hint: 'Revises work, keeps going, asks for help',
+      desc: 'Revises work after feedback, keeps going when a task is hard, and asks for help.',
       build: 'using feedback',
       does: 'uses feedback',
       do: 'use feedback',
+      say: {
+        well: '[uses|use] feedback to improve {his} work',
+        usual: '[uses|use] feedback to improve {his} work',
+        some: '[uses|use] feedback to improve {his} work',
+        help: 'using feedback to improve {his} work',
+      },
     },
     {
       key: 'devices',
       name: 'Uses Devices Well',
       hint: 'Phone away when asked, devices for learning, not a distraction',
+      desc: 'Puts the phone away when asked, and uses devices for learning, not as a distraction.',
       build: 'using devices well',
       does: 'uses devices well',
       do: 'use devices well',
+      say: {
+        well: '[keeps|keep] {his} phone and devices on {his} work',
+        usual: '[keeps|keep] {his} phone and devices on {his} work',
+        some: '[keeps|keep] {his} phone and devices on {his} work',
+        help: 'keeping {his} phone and devices on {his} work',
+      },
     },
   ];
 
@@ -86,10 +135,22 @@ window.CommentBank = (function () {
         build: 'taking a full part in every activity',
         does: 'takes a full part in every activity',
         do: 'take a full part in every activity',
+        well: '[takes|take] a full part in every activity',
+        usual: '[takes|take] a full part in every activity',
+        some: '[takes|take] a full part in the activity',
+        help: 'taking a full part in every activity',
       },
     },
     arts: {
-      completes: { build: 'completing {his} work', does: 'completes {his} work', do: 'complete {his} work' },
+      completes: {
+        build: 'completing {his} work',
+        does: 'completes {his} work',
+        do: 'complete {his} work',
+        well: '[completes|complete] {his} work',
+        usual: '[completes|complete] {his} work',
+        some: '[completes|complete] {his} work',
+        help: 'completing {his} work',
+      },
     },
   };
   /* A habit's phrase in one form (build, does, do) for a kind of class, with
@@ -101,6 +162,16 @@ window.CommentBank = (function () {
     var fam = (HABIT_FAMILY_WORDS[family] || {})[key];
     var t = (fam && fam[form]) || (h && h[form]) || '';
     return t.replace(/\{his\}/g, (p && p.poss) || 'their');
+  }
+  /* A habit's family wording in one `say` form (well, usual, some, help)
+     for a kind of class, as a template ([one|many] verb, {his}). */
+  var SAY_FORMS = ['well', 'usual', 'some', 'help'];
+  function habitSay(key, form, family) {
+    var h = HABITS.find(function (x) {
+      return x.key === key;
+    });
+    var fam = (HABIT_FAMILY_WORDS[family] || {})[key];
+    return (fam && fam[form]) || (h && h.say && h.say[form]) || '';
   }
 
   /* The kind of class, for the bank's subject wording: one of adst, arts,
@@ -1872,10 +1943,11 @@ window.CommentBank = (function () {
   }
 
   /* What the habits sentence says (plan PR 7), from the ratings in force
-     (effectiveHabits), Not Seen and unrated habits left out:
-     - excellent: all six have a rating and every one seen is Consistently;
-     - good: all six have a rating, none Sometimes or Rarely, not all
-       Consistently;
+     (effectiveHabits), Not Seen and unrated habits left out (Nov 4: the
+     questionnaire no longer offers Not Seen; a blank habit is not seen,
+     and an old Not Seen counts as unrated, so nothing needs all six):
+     - excellent: every habit rated is Consistently;
+     - good: none Sometimes or Rarely, not all Consistently;
      - build: the one or two to build, rated Sometimes or Rarely, lowest
        first, ties in the grid's order (more than two: the two lowest);
      - strong: the habits rated Consistently, in the grid's order;
@@ -1889,9 +1961,6 @@ window.CommentBank = (function () {
     var seen = HABITS.filter(function (h) {
       return habits[h.key] >= 1 && habits[h.key] < NOT_SEEN;
     });
-    var allRated = HABITS.every(function (h) {
-      return habits[h.key] >= 1 && habits[h.key] <= NOT_SEEN;
-    });
     var weak = seen
       .filter(function (h) {
         return habits[h.key] <= 2;
@@ -1902,54 +1971,204 @@ window.CommentBank = (function () {
     var strong = seen.filter(function (h) {
       return habits[h.key] === CONSISTENTLY;
     });
-    var excellent = allRated && seen.length > 0 && strong.length === seen.length;
+    var excellent = seen.length > 0 && strong.length === seen.length;
     return {
       excellent: excellent,
-      good: allRated && seen.length > 0 && !weak.length && !excellent,
+      good: seen.length > 0 && !weak.length && !excellent,
       build: weak.slice(0, 2).map(key),
       strong: strong.map(key),
       seen: seen.map(key),
     };
   }
 
-  /* The IE comment's habits sentence: the habits rated Consistently (keys,
-     at most three, the grid's order) as one sentence, "He comes to class
-     ready, takes part and works well with others." They/them when no
-     pronouns are on file. '' with none. As tokens for the
-     realiser (strengthsTokens), the verb agreeing with whoever starts it. */
+  /* The IE comment's habits sentence: the habits rated Consistently that
+     habitPlan names (`ie`: at most three, the grid's order) as one
+     sentence in the family wording, "He hands in his work on time, comes
+     to class ready to start, and joins in class discussions." They/them
+     when no pronouns are on file. '' with none. As tokens for the
+     realiser (strengthsTokens), the verbs agreeing with whoever starts it. */
   function strengthsTokens(f, ks) {
     if (!ks || !ks.length) return null;
-    var p = f.pronouns || { subj: 'they', poss: 'their' };
-    var phrases = function (form) {
-      return list(
-        ks.map(function (k) {
-          return habitWords(k, form, f.family || '', p);
-        }),
-      );
-    };
-    return [{ ref: 'subj' }, ' ', { verb: [phrases('does'), phrases('do')] }, '.'];
+    return [{ ref: 'subj' }, ' '].concat(habitListTokens(ks, 'well', f.family || ''), ['.']);
   }
   function strengthsSentence(f, ks) {
     var toks = strengthsTokens(f, ks);
     return toks ? R.render(toks, _whoOfFacts(f), { named: true }) : '';
   }
   /* The same strong habits as a verb phrase after the student, for the
-     Strong Habits frames (bank hs13-hs16): "{He} {strongHabits}." gives
-     "He comes to class ready, takes part and works well with others." The
-     tokens hold both verb forms, agreeing with the mention before them;
-     the string is the form for this student's pronouns. */
+     Strong Habits frames (bank hs13, hs15): "This term, {he}
+     {strongHabits}." The tokens hold both verb forms, agreeing with the
+     mention before them; the string is the form for this student's
+     pronouns. */
   function strongHabitsTokens(f, ks) {
     var toks = strengthsTokens(f, ks);
-    return toks ? [toks[2]] : null;
+    return toks ? toks.slice(2, -1) : null;
   }
   function strongHabitsPhrase(f, ks) {
-    var toks = strongHabitsTokens(f, ks);
-    if (!toks) return '';
-    // Rendered by the realiser after the student as subject, so its
-    // pronoun rule (they/them with none on file) and verb agreement
-    // decide the form; the subject is then dropped.
-    return R.render([{ ref: 'subj' }, ' ', toks[0]], _whoOfFacts(f), { named: true }).replace(/^\S+\s+/, '');
+    return _habitListText(strongHabitsTokens(f, ks), f);
   }
+  /* ── The habits part for families (Colin, Nov 4) ───────────────────── */
+
+  /* Families never see the questionnaire's six ratings, so the habits
+     part says what the student does, in the words of each habit's hint
+     (HABITS `say`), never a habit's label, "six", a verdict on the
+     habits or a rating word. Two or three sentences in its place:
+     - what the student does at Consistently, then a second sentence for
+       what they do at Usually ("usually", "most days"); one level alone
+       with four or more habits says them in two sentences, getting the
+       work done (Completes Work, Comes Ready, Uses Devices) then the rest
+       (working with others, taking part, using feedback);
+     - when nothing is rated Usually or Consistently, what they do at
+       Sometimes ("Some days …", at most two);
+     - when a habit is rated Sometimes or Rarely, one sentence naming the
+       one or two that would help most (habitSummary's build: the two
+       lowest), in the grid's order; the strengths are then one sentence,
+       the highest level the student has.
+     A strength sentence names at most three habits, in the grid's order,
+     and no more words than HABIT_LIST_WORDS, so every frame stays within
+     20 words; a habit that would run past it is left out (Uses Devices,
+     the longest and last, goes first). Not every habit is named: the
+     sentences read as sentences, never a list of six. */
+  var HABIT_LIST_WORDS = 17;
+  var HABIT_SOME_MOST = 2;
+  var HABIT_IE_WORDS = 16;
+  var HABIT_GETS_WORK_DONE = { completes: true, ready: true, devices: true };
+  // The slots the habits part fills, the rating each names a habit at, and
+  // its step: the first sentence (habits), the second (habitsMore) and the
+  // habits that would help (habitsBuild).
+  var HABIT_SLOTS = {
+    habitsStrong: { at: [CONSISTENTLY], form: 'well' },
+    habitsUsually: { at: [3], form: 'usual' },
+    habitsSteady: { at: [3], form: 'usual' },
+    habitsSomeDays: { at: [2], form: 'some' },
+    habitsStrongMore: { at: [CONSISTENTLY], form: 'well' },
+    habitsUsuallyMore: { at: [3], form: 'usual' },
+    habitHelpOne: { at: [1, 2], form: 'help' },
+    habitsHelpTwo: { at: [1, 2], form: 'help' },
+  };
+  function _plainWords(t) {
+    return R.wordCount(
+      String(t)
+        .replace(/\{\w+\}/g, 'X')
+        .replace(/\[([^|\]]*)\|[^\]]*\]/g, '$1'),
+    );
+  }
+  /* Of some habit keys (the grid's order), the ones a sentence names: at
+     most `most`, within `words` words as a list ("A and B", "A, B, and C"). */
+  function _habitsThatFit(keys, form, family, most, words) {
+    var out = [];
+    var n = 0;
+    keys.forEach(function (k) {
+      if (out.length >= most) return;
+      var w = _plainWords(habitSay(k, form, family));
+      var total = n + w + (out.length >= 1 ? 1 : 0);
+      if (total > words) return;
+      out.push(k);
+      n += w;
+    });
+    return out;
+  }
+  /* What the habits part says, from the ratings in force (effectiveHabits)
+     and the kind of class: { lead, more, help, ie }. lead and more are {
+     slot, keys } or null; help is the habits that would help (keys, the
+     grid's order); ie is the habits the IE comment names as strong.
+     rated: the teacher's own ratings (effectiveHabits without the record);
+     with none rated, Completes Work from the record alone gives no
+     strength sentence, as before (only the habit that would help). */
+  function habitPlan(habits, family, rated) {
+    habits = habits || {};
+    var any =
+      rated === undefined ||
+      HABITS.some(function (h) {
+        return rated[h.key] >= 1 && rated[h.key] < NOT_SEEN;
+      });
+    family = family || '';
+    var sum = habitSummary(habits);
+    var at = function (l) {
+      return HABITS.filter(function (h) {
+        return habits[h.key] === l;
+      }).map(function (h) {
+        return h.key;
+      });
+    };
+    var l4 = at(CONSISTENTLY);
+    var l3 = at(3);
+    var help = HABITS.map(function (h) {
+      return h.key;
+    }).filter(function (k) {
+      return sum.build.indexOf(k) >= 0;
+    });
+    var put = function (slot, keys) {
+      var def = HABIT_SLOTS[slot];
+      var most = slot === 'habitsSomeDays' ? HABIT_SOME_MOST : 3;
+      var ks = _habitsThatFit(keys, def.form, family, most, HABIT_LIST_WORDS);
+      return ks.length ? { slot: slot, keys: ks } : null;
+    };
+    var lead = null;
+    var more = null;
+    if (!any) {
+      // Nothing the teacher rated: no strength sentence.
+    } else if (help.length) {
+      if (l4.length) lead = put('habitsStrong', l4);
+      else if (l3.length) lead = put('habitsSteady', l3);
+      else {
+        var some = at(2).filter(function (k) {
+          return help.indexOf(k) < 0;
+        });
+        if (some.length) lead = put('habitsSomeDays', some);
+      }
+    } else if (l4.length && l3.length) {
+      lead = put('habitsStrong', l4);
+      more = put('habitsUsuallyMore', l3);
+    } else if (l4.length || l3.length) {
+      var one = l4.length ? l4 : l3;
+      var first = l4.length ? 'habitsStrong' : 'habitsUsually';
+      var second = l4.length ? 'habitsStrongMore' : 'habitsUsuallyMore';
+      var done = one.filter(function (k) {
+        return HABIT_GETS_WORK_DONE[k];
+      });
+      var rest = one.filter(function (k) {
+        return !HABIT_GETS_WORK_DONE[k];
+      });
+      if (one.length >= 4 && done.length && rest.length) {
+        lead = put(first, done);
+        more = put(second, rest);
+      } else lead = put(first, one);
+    }
+    return {
+      lead: lead,
+      more: more,
+      help: help.length <= 2 ? help : help.slice(0, 2),
+      ie: _habitsThatFit(l4, 'well', family, 3, HABIT_IE_WORDS),
+    };
+  }
+  /* The plan's part that fills a slot: { slot, keys } or null. */
+  function _planPart(plan, slot) {
+    if (plan.lead && plan.lead.slot === slot) return plan.lead;
+    if (plan.more && plan.more.slot === slot) return plan.more;
+    if (slot === 'habitHelpOne' && plan.help.length === 1) return { slot: slot, keys: plan.help };
+    if (slot === 'habitsHelpTwo' && plan.help.length === 2) return { slot: slot, keys: plan.help };
+    return null;
+  }
+  /* Habits in one `say` form as the realiser's tokens, a list in the
+     approved wording: "A and B", "A, B, and C"; the habits that would help
+     "A, and B" (Colin, Nov 4). */
+  function habitListTokens(keys, form, family) {
+    var out = [];
+    (keys || []).forEach(function (k, i) {
+      if (i) out.push(i < keys.length - 1 ? ', ' : keys.length > 2 || form === 'help' ? ', and ' : ' and ');
+      out.push.apply(out, R.tokens(habitSay(k, form, family)));
+    });
+    return out;
+  }
+  /* The same as text for this student: the verbs agree with their
+     pronouns (they/them with none on file), as the realiser puts it after
+     the student as subject. */
+  function _habitListText(toks, f) {
+    if (!toks || !toks.length) return '';
+    return R.render([{ ref: 'subj' }, ' '].concat(toks), _whoOfFacts(f), { named: true }).replace(/^\S+\s+/, '');
+  }
+
   /* Who a comment is about, for the realiser: { name, p, onFile }. */
   function _whoOfFacts(f) {
     return { name: f.name, p: f.pronouns, onFile: !!f.pronounsOnFile };
@@ -3650,7 +3869,21 @@ window.CommentBank = (function () {
     var buildWords = hsum.build.map(function (k) {
       return hword(k, 'build');
     });
-    var strongThree = hsum.strong.slice(0, 3);
+    // The habits part for families (habitPlan): its slots, their facts
+    // (the habits each names) and their tokens; '' for a slot the plan
+    // does not fill.
+    var hplan = habitPlan(habits, f.family || '', effectiveHabits(picks.habits || f.habits, null));
+    var strongThree = hplan.ie;
+    var hslot = {};
+    var hslotKeys = {};
+    var hslotToks = {};
+    Object.keys(HABIT_SLOTS).forEach(function (slot) {
+      var part = _planPart(hplan, slot);
+      var toks = part ? habitListTokens(part.keys, HABIT_SLOTS[slot].form, f.family || '') : null;
+      hslot[slot] = toks ? _habitListText(toks, f) : '';
+      hslotKeys[slot] = part ? part.keys : [];
+      hslotToks[slot] = toks;
+    });
     var conf = f.confidence;
     var selfStrong = conf.length > 1 && conf[0].c >= 3 ? conf[0] : null;
     var selfLow = conf.length > 1 && conf[conf.length - 1].c <= 2 ? conf[conf.length - 1] : null;
@@ -3760,6 +3993,16 @@ window.CommentBank = (function () {
       habitsToBuild: habitKeys(hsum.build),
       habitStrengths: habitKeys(strongThree),
       strongHabits: habitKeys(strongThree),
+      habitsStrong: habitKeys(hslotKeys.habitsStrong),
+      habitsUsually: habitKeys(hslotKeys.habitsUsually),
+      habitsSteady: habitKeys(hslotKeys.habitsSteady),
+      habitsSomeDays: habitKeys(hslotKeys.habitsSomeDays),
+      habitsStrongMore: habitKeys(hslotKeys.habitsStrongMore),
+      habitsUsuallyMore: habitKeys(hslotKeys.habitsUsuallyMore),
+      habitHelpOne: habitKeys(hslotKeys.habitHelpOne),
+      habitsHelpTwo: habitKeys(hslotKeys.habitsHelpTwo),
+      habitsUsuallyShort: habitKeys(hslotKeys.habitsUsually),
+      habitsUsuallyMoreShort: habitKeys(hslotKeys.habitsUsuallyMore),
       attendance: ['attendance.absent', 'attendance.late'],
       // The attendance frames (bank h61-h78): the classes missed, the times
       // late, and whether only one of the two is entered.
@@ -3870,8 +4113,16 @@ window.CommentBank = (function () {
       _habitAlone: hsum.build.length === 1 ? hsum.build[0] : '',
       _toks: {
         bestPiece: top ? bestPieceTokens({ title: top.title, note: top.note, skill: topSkillText }) : null,
-        habitStrengths: hsum.excellent ? null : strengthsTokens(f, strongThree),
-        strongHabits: hsum.excellent ? null : strongHabitsTokens(f, strongThree),
+        habitStrengths: strengthsTokens(f, strongThree),
+        strongHabits: strongHabitsTokens(f, strongThree),
+        habitsStrong: hslotToks.habitsStrong,
+        habitsUsually: hslotToks.habitsUsually,
+        habitsSteady: hslotToks.habitsSteady,
+        habitsSomeDays: hslotToks.habitsSomeDays,
+        habitsStrongMore: hslotToks.habitsStrongMore,
+        habitsUsuallyMore: hslotToks.habitsUsuallyMore,
+        habitHelpOne: hslotToks.habitHelpOne,
+        habitsHelpTwo: hslotToks.habitsHelpTwo,
       },
       name: f.name,
       course: f.course,
@@ -3996,8 +4247,24 @@ window.CommentBank = (function () {
       habitsAllSeen: hsum.seen.length === HABITS.length ? 'yes' : '',
       habitToBuild: buildWords.length === 1 ? buildWords[0] : '',
       habitsToBuild: buildWords.length === 2 ? list(buildWords) : '',
-      habitStrengths: hsum.excellent ? '' : strengthsSentence(f, strongThree),
-      strongHabits: hsum.excellent ? '' : strongHabitsPhrase(f, strongThree),
+      habitStrengths: strengthsSentence(f, strongThree),
+      strongHabits: strongHabitsPhrase(f, strongThree),
+      // The habits part for families (habitPlan): each a list of what the
+      // student does, after the student as subject ("hands in her work on
+      // time and comes to class ready to start"), or of the habits that
+      // would help ("getting started as soon as class begins, and …").
+      habitsStrong: hslot.habitsStrong,
+      habitsUsually: hslot.habitsUsually,
+      habitsSteady: hslot.habitsSteady,
+      habitsSomeDays: hslot.habitsSomeDays,
+      habitsStrongMore: hslot.habitsStrongMore,
+      habitsUsuallyMore: hslot.habitsUsuallyMore,
+      habitHelpOne: hslot.habitHelpOne,
+      habitsHelpTwo: hslot.habitsHelpTwo,
+      // The Usually lists of one or two habits: only those take "most
+      // days" at the end, where a third would leave it unclear.
+      habitsUsuallyShort: hslot.habitsUsually && hslotKeys.habitsUsually.length <= 2 ? 'yes' : '',
+      habitsUsuallyMoreShort: hslot.habitsUsuallyMore && hslotKeys.habitsUsuallyMore.length <= 2 ? 'yes' : '',
       // "missed three classes and been late once", either half left out
       // when its field is empty or zero (plan, Sentence grammar).
       attendance: attendanceText(f.absent, f.late),
@@ -4147,6 +4414,13 @@ window.CommentBank = (function () {
   }
   function sentenceTokens(s, ctx) {
     return _tokensRaw(s, ctxFor(s, ctx));
+  }
+  /* Whether a sentence as filled runs past its words: 20 (the realiser's
+     rule), or the sentence's own `maxWords` (the two habits that would
+     help, in the wording Colin approved, Nov 4). */
+  function _tooLongFor(s, text) {
+    var most = (s && s.maxWords) || 0;
+    return most ? R.wordCount(text) > most : R.tooLong(text);
   }
 
   /* The context one sentence is filled from (the realiser's length rule,
@@ -4515,19 +4789,25 @@ window.CommentBank = (function () {
   }
 
   /* The draft's steps, the plan's eight parts and nothing else: the grade
-     sentence (gradeOf; none for IE, F or no marks), the habits (one summary
-     sentence, then attendance when entered, then the work not handed in
+     sentence (gradeOf; none for IE, F or no marks), the habits (two or three
+     sentences for families, then attendance when entered, then the work not handed in
      and the late-work line), the best piece, the strengths (overall), the
      next step with the support line and one thing the family can do, and
-     the closing sentence. Each step takes at most one sentence. A step that
+     the closing sentence. Each step takes at most one sentence (the habits
+     part is three steps: habits, habitsMore, habitsBuild). A step that
      `says` a fact (the grade) keeps every later sentence claiming it out.
      The angle (angle()) sets which steps run and in what order; this is
      the order with no story to tell. */
   var DRAFT_STEPS = [
     { key: 'grade', part: 'now', groups: ['Grade'], says: 'grade' },
-    // The summary sentence, or (habitCellFits) a Habit Ratings frame for
-    // the one habit rated below Usually.
-    { key: 'habits', part: 'habits', groups: ['Work Habits', 'Habit Ratings'] },
+    // The habits part for families (habitPlan, Nov 4): what the student
+    // does, a second sentence for more of it, and the habits that would
+    // help. Generate drafts only the Habits in Class frames here (and the
+    // teacher's own); Work Habits and Habit Ratings stay this step's for
+    // the teacher's own sentences and Browse Sentences.
+    { key: 'habits', part: 'habits', groups: ['Habits in Class', 'Work Habits', 'Habit Ratings'] },
+    { key: 'habitsMore', part: 'habits', groups: ['More Habits in Class'] },
+    { key: 'habitsBuild', part: 'habits', groups: ['Habits That Would Help'] },
     { key: 'attendance', part: 'habits', groups: ['Attendance'] },
     // The work labelled Missing, then the class's late-work line after it
     // (plan PR 8): only for a student with work not handed in.
@@ -4877,7 +5157,23 @@ window.CommentBank = (function () {
       .sort(function (x, y) {
         return (uses[x.id] || 0) - (uses[y.id] || 0) || ANGLES.indexOf(x) - ANGLES.indexOf(y);
       })[0];
-    return { id: pick.id, order: _withClassSteps(pick.order, pick.id === 'ie'), lead: pick.order[0] };
+    return {
+      id: pick.id,
+      order: _withClassSteps(_withHabitSteps(pick.order), pick.id === 'ie'),
+      lead: pick.order[0],
+    };
+  }
+  /* The habits part's later sentences (habitsMore, habitsBuild) go right
+     after its first wherever a story puts the habits. */
+  var HABIT_PART_STEPS = { habits: true, habitsMore: true, habitsBuild: true };
+  function _withHabitSteps(order) {
+    var out = [];
+    (order || []).forEach(function (k) {
+      if (k === 'habitsMore' || k === 'habitsBuild') return;
+      out.push(k);
+      if (k === 'habits') out.push('habitsMore', 'habitsBuild');
+    });
+    return out;
   }
 
   /* The stories told in each class this session, per student, for the
@@ -4940,7 +5236,7 @@ window.CommentBank = (function () {
      the closing sentence last. The IE story states its own problem and
      plan, so it takes no late-work line; its support line comes before
      the meeting sentence (the IEPath mockup). */
-  var HABIT_KEYS = ['habits', 'strongHabits', 'attendance'];
+  var HABIT_KEYS = ['habits', 'habitsMore', 'habitsBuild', 'strongHabits', 'attendance'];
   function _withClassSteps(order, ie) {
     var seq = (order || []).slice();
     var at = function (keys) {
@@ -5070,7 +5366,10 @@ window.CommentBank = (function () {
       })
     )
       return false;
-    if (step.key === 'habits' && s.habit && !habitCellFits(s, ctx)) return false;
+    // A Habit Ratings frame (one habit at one rating) is never drafted: the
+    // habits part says the student's habits together (habitPlan, Nov 4).
+    // Other Wording and Browse Sentences still offer it.
+    if (step.key === 'habits' && s.habit && !s.mine) return false;
     // The first preferred slot the context has: a sentence must use it.
     var pref = [].concat(step.prefer || []).find(function (k) {
       return !!ctx[k];
@@ -5174,6 +5473,67 @@ window.CommentBank = (function () {
     return out;
   }
 
+  /* Whether a habits frame repeats a word of the habits sentence before it
+     ("most days" twice, "always" twice): such a frame comes after the
+     others at equal use. */
+  var HABIT_FRAME_WORDS = /\b(usually|most days|often|always|each day|this term|some days|also)\b/gi;
+  function _sameHabitWords(s, out) {
+    var prev = String((out && out[out.length - 1]) || '').toLowerCase();
+    var mine = String(s.text).toLowerCase().match(HABIT_FRAME_WORDS) || [];
+    return mine.some(function (w) {
+      return w !== 'also' && prev.indexOf(w) >= 0;
+    });
+  }
+
+  /* The old habits sentence's draws (Nov 4). Before the habits part for
+     families, the habits step (and the IE comment's strong habits) drew
+     one random number for each frame of its tier; the steps after it
+     draw from the same stream. So that the rest of a comment comes out as
+     it did for the same seed, the habits steps draw as many: the old
+     Work Habits frames that would have fitted (by the old summary, which
+     needed all six rated), the one weak habit's Habit Ratings frames when
+     the step could take them, and on the IE path hs11 and hs13-hs15, or
+     hs12 when all were Consistently. The new frames are then picked by
+     their own number (seed and id), drawing nothing. */
+  var OLD_HABIT_STEPS = { habits: true, strongHabits: true };
+  var OLD_HABIT_FRAMES = {
+    excellent: ['hs01', 'hs02'],
+    excellentAll: ['hs17', 'hs18', 'hs20', 'hs21'],
+    good: ['hs03', 'hs04'],
+    goodAll: ['hs23', 'hs24', 'hs25', 'hs26', 'hs27'],
+    one: ['hs05', 'hs06', 'hs07', 'hs28', 'hs29', 'hs30', 'hs31', 'hs32', 'hs33'],
+    two: ['hs08', 'hs09', 'hs10', 'hs34', 'hs35', 'hs36', 'hs37'],
+    strong: ['hs11', 'hs13', 'hs14', 'hs15'],
+    strongAll: ['hs12'],
+  };
+  function _oldHabitDraws(key, ctx, bank, exclude, advising) {
+    var h = ctx._habits || {};
+    var sum = habitSummary(h);
+    var allRated = HABITS.every(function (x) {
+      return h[x.key] >= 1 && h[x.key] <= NOT_SEEN;
+    });
+    var excellent = allRated && sum.excellent;
+    var good = allRated && sum.good;
+    var allSeen = sum.seen.length === HABITS.length;
+    var ids = [];
+    if (key === 'strongHabits') {
+      if (excellent) ids = OLD_HABIT_FRAMES.strongAll;
+      else if (sum.strong.length) ids = OLD_HABIT_FRAMES.strong;
+    } else if (excellent) ids = OLD_HABIT_FRAMES.excellent.concat(allSeen ? OLD_HABIT_FRAMES.excellentAll : []);
+    else if (good) ids = OLD_HABIT_FRAMES.good.concat(allSeen ? OLD_HABIT_FRAMES.goodAll : []);
+    else if (sum.build.length === 1) ids = OLD_HABIT_FRAMES.one;
+    else if (sum.build.length === 2) ids = OLD_HABIT_FRAMES.two;
+    var n = ids.filter(function (id) {
+      return !exclude[id];
+    }).length;
+    if (key === 'habits' && sum.build.length === 1 && !advising) {
+      n += bank.sentences.filter(function (s) {
+        return !s.mine && s.habit === sum.build[0] && !exclude[s.id] && fits(s, ctx);
+      }).length;
+    }
+    return n;
+  }
+
   /* One pass of the draft over the steps in `seq`. usage: { sentence id:
      classmates } (classUsage()); exclude: { sentence id: true }. */
   function _compose(ctx, bank, seq, kept, seed, usage, exclude) {
@@ -5265,6 +5625,11 @@ window.CommentBank = (function () {
         got[key] = true;
         return;
       }
+      // The habits part's second sentence follows its first; neither it nor
+      // the habits that would help follow a sentence of the teacher's own
+      // in the first's place (theirs says the habits their way).
+      if (key === 'habitsMore' && (!got.habits || said.habitsOwn)) return;
+      if (key === 'habitsBuild' && said.habitsOwn) return;
       var cands = bank.sentences.filter(function (s) {
         if (taken[s.id] || !_stepFits(s, step, ctx)) return false;
         // A fact the draft already states (the growing habits, the goal, the
@@ -5289,7 +5654,13 @@ window.CommentBank = (function () {
           return false;
         return true;
       });
-      if (!cands.length) return;
+      // The random numbers the old habits sentence drew (_oldHabitDraws), so
+      // the rest of the comment comes out as it did for the same seed.
+      var oldDraws = function (n) {
+        for (var dn = 0; dn < n; dn++) rand();
+      };
+      var oldShared = OLD_HABIT_STEPS[key] ? _oldHabitDraws(key, ctx, bank, exclude, said.advice || nextFires) : 0;
+      if (!cands.length) return oldDraws(oldShared);
       // Most specific wins: only the top tier is kept.
       var tier = _topTier(cands, ctx).filter(function (s) {
         return !exclude[s.id];
@@ -5327,20 +5698,27 @@ window.CommentBank = (function () {
           // A sentence over 20 words as realised (a quoted title as one),
           // after {strengths} has fallen back to one skill (ctxFor), is
           // not offered (the realiser's length rule, 2026-11-01).
-          long: R.tooLong(t) ? 1 : 0,
+          long: _tooLongFor(s, t) ? 1 : 0,
           // Exhaust before repeat: a sentence no classmate has comes before
           // any a classmate has, the least used next.
           used: usage[s.id] || 0,
           // At equal use, wording written for this kind of class first, then
           // a sentence that does not start like the one before it.
           general: s.subjects ? 0 : 1,
-          repeats: repeatsLast(t, last) ? 1 : 0,
+          repeats: repeatsLast(t, last) || (HABIT_PART_STEPS[key] && _sameHabitWords(s, out)) ? 1 : 0,
           // A step that says a fact (the grade, the work not handed in)
           // draws no random number, so the rest of the draft's mix is as it
           // was; its frames are mixed by a hash of the seed and the id
           // instead, so a tie never falls to the bank's order (2026-11-01:
           // the Not Handed In frames m02-m21 were otherwise never picked).
-          r: step.says ? seedFor(seed + ':' + s.id) : rand(),
+          // The habits part's frames draw no random numbers either (Nov 4),
+          // so its two or three sentences leave the rest of the mix as it
+          // was; each frame's own number comes from the seed and its id.
+          r: step.says
+            ? seedFor(seed + ':' + s.id)
+            : HABIT_PART_STEPS[key] || key === 'strongHabits'
+              ? _rng(seedFor(seed + ':' + s.id))()
+              : rand(),
         };
       };
       // A quotation already in the draft is out: now that every title is
@@ -5353,6 +5731,14 @@ window.CommentBank = (function () {
       var fresh = function (x) {
         return !x.dup && !x.long;
       };
+      if (OLD_HABIT_STEPS[key])
+        oldDraws(
+          tier.length && tier[0].mine
+            ? tier.filter(function (s) {
+                return !exclude[s.id];
+              }).length
+            : oldShared,
+        );
       var scored = tier.map(score).filter(fresh);
       var lower = cands.filter(function (s) {
         return !exclude[s.id] && !s.mine && tier.indexOf(s) < 0;
@@ -5382,6 +5768,7 @@ window.CommentBank = (function () {
       });
       if (step.says) said[step.says] = true;
       if (advises(pick.s)) said.advice = true;
+      if (key === 'habits' && pick.s.group !== 'Habits in Class') said.habitsOwn = true;
       out.push(pick.t);
       sentences.push({
         id: pick.s.id,
@@ -5410,9 +5797,11 @@ window.CommentBank = (function () {
     // sentence goes first, then attendance (the plan's optional last part),
     // then the strengths. A sentence the teacher kept and the class's
     // lines stay.
+    // The habits part counts as one sentence here (Nov 4: it grew from one
+    // sentence to two or three, and the rest of the comment stays as it was).
     DROP_FIRST.forEach(function (key) {
-      if (sentences.length <= MAX_SENTENCES) return;
-      for (var i = sentences.length - 1; i >= 0 && sentences.length > MAX_SENTENCES; i--) {
+      if (_counted(sentences) <= MAX_SENTENCES) return;
+      for (var i = sentences.length - 1; i >= 0 && _counted(sentences) > MAX_SENTENCES; i--) {
         if (sentences[i].step !== key || sentences[i].kept || sentences[i].classLine) continue;
         sentences.splice(i, 1);
         prov.splice(i, 1);
@@ -5466,6 +5855,13 @@ window.CommentBank = (function () {
   var MAX_SENTENCES = 9;
   var MIN_SENTENCES = 6;
   var DROP_FIRST = ['home', 'attendance', 'overall'];
+  /* A draft's sentences as the plan counts them: the habits part's second
+     sentence and the habits that would help are part of its one. */
+  function _counted(sentences) {
+    return (sentences || []).filter(function (x) {
+      return x.step !== 'habitsMore' && x.step !== 'habitsBuild';
+    }).length;
+  }
   function draft(ctx, opts) {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
@@ -5477,7 +5873,10 @@ window.CommentBank = (function () {
     var story = f ? angle(f, ctx._picks, { uses: opts.angleUses || (tally ? _usesFor(cid, sid) : {}) }) : null;
     var kept = _kept(opts.kept, bank);
     var seq = _sequence(
-      _withClassSteps(story ? story.order : ANGLES[ANGLES.length - 1].order, !!story && story.id === 'ie'),
+      _withClassSteps(
+        story ? story.order : _withHabitSteps(ANGLES[ANGLES.length - 1].order),
+        !!story && story.id === 'ie',
+      ),
       Object.keys(kept),
       _orderSteps(opts.order, bank),
     );
@@ -5550,7 +5949,7 @@ window.CommentBank = (function () {
     }
     d.angle = story ? story.id : null;
     d.seed = seed;
-    d.short = d.sentences.length < MIN_SENTENCES;
+    d.short = _counted(d.sentences) < MIN_SENTENCES;
     return d;
   }
 
@@ -5568,12 +5967,13 @@ window.CommentBank = (function () {
      its place; a habits sentence the draft had none of goes where the
      story puts it, and one that no longer fits is left out. Returns the
      draft's shape plus habits: { before, after }, the old and new habits
-     sentences ('' for none); null without a draft. opts: { comments,
+     part (its two or three sentences joined by a space; '' for none); null
+     without a draft. opts: { comments,
      exclude, bank } as for draft(), and steps: the steps drawn again
      (the habits sentence's by default; ATTENDANCE_STEPS after the
      Attendance card changes, which draws the attendance sentence again
      the same way). */
-  var HABIT_STEPS = { habits: true, strongHabits: true };
+  var HABIT_STEPS = { habits: true, habitsMore: true, habitsBuild: true, strongHabits: true };
   var ATTENDANCE_STEPS = { attendance: true };
   function redrawHabits(ctx, prev, opts) {
     opts = opts || {};
@@ -5597,35 +5997,41 @@ window.CommentBank = (function () {
       kept: kept,
       order: order,
     });
-    // Only the habits sentence is taken from the new draft, with how many of
-    // the kept sentences come before it.
-    var nu = null;
-    var keptBefore = 0;
+    // Only the redrawn steps' sentences are taken from the new draft (the
+    // habits part is two or three of them, together), with how many of
+    // the kept sentences come before the first.
+    var nu = [];
+    var keptBefore = -1;
+    var seenKept = 0;
     d.sentences.forEach(function (x, i) {
-      if (nu) return;
-      if (steps[x.step]) nu = { s: x, p: d.provenance[i] };
-      else if (x.kept) keptBefore++;
+      if (steps[x.step]) {
+        if (keptBefore < 0) keptBefore = seenKept;
+        nu.push({ s: x, p: d.provenance[i] });
+      } else if (x.kept) seenKept++;
     });
-    var was = old.find(function (x) {
+    var was = old.filter(function (x) {
       return steps[x.step];
     });
     var sentences = [];
     var prov = [];
     var count = 0;
+    var placed = false;
     var put = function () {
-      if (!nu) return;
-      sentences.push(nu.s);
-      prov.push(nu.p);
-      nu.placed = true;
+      if (placed) return;
+      placed = true;
+      nu.forEach(function (n) {
+        sentences.push(n.s);
+        prov.push(n.p);
+      });
     };
     old.forEach(function (x, i) {
       if (steps[x.step]) return put();
-      if (nu && !nu.placed && !was && count === keptBefore) put();
+      if (nu.length && !was.length && count === keptBefore) put();
       sentences.push(x);
       prov.push((prev.provenance || [])[i]);
       count++;
     });
-    if (nu && !nu.placed) put();
+    put();
     // The story and this student's record stay the draft's own.
     if (f && f.cid != null && f.sid != null) {
       if (told !== undefined) _told[f.cid][f.sid] = told;
@@ -5652,7 +6058,18 @@ window.CommentBank = (function () {
       replaced: d.replaced,
       angle: prev.angle,
       seed: prev.seed,
-      habits: { before: was ? was.text : '', after: nu ? nu.s.text : '' },
+      habits: {
+        before: was
+          .map(function (x) {
+            return x.text;
+          })
+          .join(' '),
+        after: nu
+          .map(function (n) {
+            return n.s.text;
+          })
+          .join(' '),
+      },
     };
   }
 
@@ -5746,7 +6163,7 @@ window.CommentBank = (function () {
     var out = {};
     _strengthSteps().forEach(function (s) {
       out[s.key] = tops.every(function (x) {
-        return _withClassSteps(x.order, x.id === 'ie').indexOf(s.key) >= 0;
+        return _withClassSteps(_withHabitSteps(x.order), x.id === 'ie').indexOf(s.key) >= 0;
       });
     });
     return out;
@@ -5801,8 +6218,10 @@ window.CommentBank = (function () {
         if (!k.sure[step.key]) return null;
         var set = {};
         var n = 0;
+        // The habits part's frames hold the student's own habits, so two
+        // students share one only when it reads the same for both.
         stepPool(step, k.ctx, bank).forEach(function (s) {
-          set[s.id] = true;
+          set[HABIT_PART_STEPS[step.key] ? s.id + '|' + fill(s, k.ctx) : s.id] = true;
           n++;
         });
         return n ? { set: set, n: n } : null;
@@ -6447,10 +6866,26 @@ window.CommentBank = (function () {
       if (_has(pv, 'habitsAllSeen')) checks.push(sum.seen.length === HABITS.length);
       if (_has(pv, 'habitToBuild')) checks.push(sum.build.length === 1 && named('habitToBuild', [1, 2], sum.build));
       if (_has(pv, 'habitsToBuild')) checks.push(sum.build.length === 2 && named('habitsToBuild', [1, 2], sum.build));
-      if (_has(pv, 'habitStrengths'))
-        checks.push(!sum.excellent && named('habitStrengths', [CONSISTENTLY], sum.strong.slice(0, 3)));
-      if (_has(pv, 'strongHabits'))
-        checks.push(!sum.excellent && named('strongHabits', [CONSISTENTLY], sum.strong.slice(0, 3)));
+      // The habits part for families and the IE comment's strong habits:
+      // each habit named is at the rating its slot says (HABIT_SLOTS:
+      // Consistently, Usually, Sometimes, or Sometimes or Rarely for the
+      // habits that would help), and they are the ones habitPlan names for
+      // today's ratings (the help: habitSummary's one or two to build).
+      var plan = habitPlan(eff, f.family || '', ctx._rated || {});
+      if (_has(pv, 'habitStrengths')) checks.push(named('habitStrengths', [CONSISTENTLY], plan.ie));
+      if (_has(pv, 'strongHabits')) checks.push(named('strongHabits', [CONSISTENTLY], plan.ie));
+      Object.keys(HABIT_SLOTS).forEach(function (slot) {
+        if (!_has(pv, slot)) return;
+        var part = _planPart(plan, slot);
+        checks.push(!!part && named(slot, HABIT_SLOTS[slot].at, part.keys));
+        if (part && HABIT_SLOTS[slot].form === 'help')
+          checks.push(
+            part.keys.length === sum.build.length &&
+              part.keys.every(function (k) {
+                return sum.build.indexOf(k) >= 0;
+              }),
+          );
+      });
       // On the IE path, never "completes work on time" from the record
       // beside work not handed in or with no mark yet: the comment's own
       // problem says otherwise. Only the teacher's rating says it there.
@@ -6625,7 +7060,7 @@ window.CommentBank = (function () {
     var own = Object.prototype.hasOwnProperty;
     var out = [];
     ctx = ctxFor(s, _asNamed(pv, ctx));
-    if (R.tooLong(fill(s, ctx))) out.push('length');
+    if (_tooLongFor(s, fill(s, ctx))) out.push('length');
     var stale =
       !_fitsSlots(s, ctx, { story: false }) ||
       Object.keys(pv.values || {}).some(function (k) {
@@ -6751,9 +7186,11 @@ window.CommentBank = (function () {
   }
 
   /* Bank sentences retired since a draft could have used them (Nov 2: the
-     Next Step frames that named a bare label or quoted an I Can). A saved
-     draft keeps one as written rather than having it swapped for a
-     sentence the teacher didn't choose. */
+     Next Step frames that named a bare label or quoted an I Can; Nov 4:
+     the Work Habits summary frames and the IE frames that said "work
+     habits", replaced by the habits part for families). A saved draft
+     keeps one as written rather than having it swapped for a sentence the
+     teacher didn't choose. */
   var RETIRED = {};
   [
     'g01',
@@ -6771,6 +7208,37 @@ window.CommentBank = (function () {
     'g219',
     'g221',
     'g223',
+    'hs01',
+    'hs02',
+    'hs03',
+    'hs04',
+    'hs05',
+    'hs06',
+    'hs07',
+    'hs08',
+    'hs09',
+    'hs10',
+    'hs12',
+    'hs14',
+    'hs17',
+    'hs18',
+    'hs20',
+    'hs21',
+    'hs23',
+    'hs24',
+    'hs25',
+    'hs26',
+    'hs27',
+    'hs28',
+    'hs29',
+    'hs30',
+    'hs31',
+    'hs32',
+    'hs33',
+    'hs34',
+    'hs35',
+    'hs36',
+    'hs37',
   ].forEach(function (id) {
     RETIRED[id] = true;
   });
@@ -7183,6 +7651,10 @@ window.CommentBank = (function () {
     habitCellFits: habitCellFits,
     advises: advises,
     habitWords: habitWords,
+    habitSay: habitSay,
+    SAY_FORMS: SAY_FORMS,
+    habitPlan: habitPlan,
+    HABIT_SLOTS: HABIT_SLOTS,
     facts: facts,
     notHandedIn: notHandedIn,
     focusOptions: focusOptions,

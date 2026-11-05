@@ -1,8 +1,8 @@
 /**
  * At a Glance and the Note for the Report (Generate plan, PR 7): when the
- * best piece has no note, "No note for the report yet · Add one", and Add
- * one opens the grader on that piece for the student on screen. Demo Mode
- * (Science 8, Report 2).
+ * best piece has no note, "Add a note for the report ›", which opens the
+ * grader on that piece for the student on screen, as Open in Grader and
+ * each piece's title do. Demo Mode (Science 8, Report 2).
  */
 import './setup.js';
 import { readFileSync } from 'fs';
@@ -45,9 +45,8 @@ describe('At a Glance: the note for the report', () => {
     const st = cece();
     const best = RQ.bestPiece(CommentBank.facts(cid, st, 'term-2'));
     const html = show(st);
-    expect(html).toContain('No note for the report yet · ');
     expect(html).toContain('data-action="tqAddReportNote" data-aid="' + best.id + '"');
-    expect(html).toContain('>Add one</button>');
+    expect(html).toContain('>Add a note for the report ›</button>');
   });
 
   it('shows the note under the best piece once it has one', () => {
@@ -56,20 +55,22 @@ describe('At a Glance: the note for the report', () => {
     saveScoreReportNote(cid, st.id, best.id, 'kept a field journal with dated sketches');
     try {
       const html = show(st);
-      expect(html).not.toContain('No note for the report yet');
+      expect(html).not.toContain('Add a note for the report');
       expect(html).toContain('Note for the report: “kept a field journal with dated sketches”');
     } finally {
       saveScoreReportNote(cid, st.id, best.id, '');
     }
   });
 
-  it('Add one opens the grader on that piece for this student only', () => {
+  it('Add a note and Open in Grader open the grader on that piece for this student only', () => {
     const st = cece();
     show(st);
     const calls = [];
     window.PageAssignments = { openGrader: (...args) => calls.push(args), graderOpen: () => false };
     RQ.tqAddReportNote('assess-x');
-    expect(calls).toHaveLength(1);
+    RQ.tqOpenGrader('assess-y');
+    expect(calls).toHaveLength(2);
+    expect(calls[1].slice(0, 3)).toEqual([cid, 'assess-y', st.id]);
     expect(calls[0].slice(0, 3)).toEqual([cid, 'assess-x', st.id]);
     expect(calls[0][3].studentIds).toEqual([st.id]);
     expect(typeof calls[0][3].onClose).toBe('function');
@@ -88,5 +89,7 @@ describe('At a Glance: the note for the report', () => {
   it('is wired to the reports page', () => {
     const src = readFileSync('teacher/page-reports.js', 'utf-8');
     expect(src).toContain('RQ.tqAddReportNote(el.dataset.aid)');
+    expect(src).toContain('RQ.tqOpenGrader(el.dataset.aid)');
+    expect(src).toContain('RQ.tqGlanceToggle(el.dataset.row)');
   });
 });

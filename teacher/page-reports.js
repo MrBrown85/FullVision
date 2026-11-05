@@ -1928,6 +1928,14 @@ window.PageReports = (function () {
       tqAddReportNote: function () {
         RQ.tqAddReportNote(el.dataset.aid);
       },
+      // At a Glance: a piece's title or Open in Grader, and a row that
+      // opens to list its pieces.
+      tqOpenGrader: function () {
+        RQ.tqOpenGrader(el.dataset.aid);
+      },
+      tqGlanceToggle: function () {
+        RQ.tqGlanceToggle(el.dataset.row);
+      },
       // At a Glance's View All Skills, and the drawer's ✕.
       tqOpenSkills: function () {
         RQ.tqOpenSkills(el);

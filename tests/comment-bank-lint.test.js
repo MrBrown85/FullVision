@@ -60,6 +60,21 @@ function texts() {
       ),
     ),
   );
+  // The habits part for families (Nov 4): every `say` form, as a strength
+  // after the student or as a habit that would help.
+  CommentBank.SAY_FORMS.forEach(form =>
+    ['', 'pe', 'arts'].forEach(fam =>
+      CommentBank.HABITS.forEach(h =>
+        out.push({
+          id: 'habit ' + h.key + '.say.' + form + (fam ? '.' + fam : ''),
+          text:
+            (form === 'help' ? 'What would help {him} most is ' : '{He} ') +
+            CommentBank.habitSay(h.key, form, fam) +
+            '.',
+        }),
+      ),
+    ),
+  );
   Object.entries(CommentBank.EVIDENCE).forEach(([k, t]) => out.push({ id: 'evidence ' + k, text: t }));
   return out;
 }

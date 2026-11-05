@@ -285,13 +285,50 @@ test('Work Habits: a rating saves in place and the count follows; nothing redraw
   await expect(page.locator('#tq-rated')).toHaveText('0 of 6 rated');
   const grid = page.locator('.qn-habits');
   await grid.evaluate(el => (el.__mark = 'same'));
-  const part = page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]');
-  await part.click();
-  await expect(part).toHaveAttribute('aria-checked', 'true');
+  const slider = page.locator('.qn-hs[data-habit="part"]');
+  await page.locator('.qn-hs-label[data-habit="part"][data-value="4"]').click();
+  await expect(slider).toHaveAttribute('aria-valuenow', '4');
+  await expect(slider).toHaveAttribute('aria-valuetext', 'Consistently');
+  await expect(page.locator('.qn-hs-label.on[data-habit="part"]')).toHaveText('Consistently');
   await expect(page.locator('#tq-rated')).toHaveText('1 of 6 rated');
   expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({ part: 4 });
   expect(await grid.evaluate(el => el.__mark)).toBe('same');
-  await expect(page.locator('.qn-habit-name').nth(1)).toHaveText('Comes Ready, Uses Class Time');
+  await expect(page.locator('.qn-habit-name').nth(1)).toHaveText('Comes Ready and Uses Class Time');
+  await expect(page.locator('.qn-habit-desc').nth(5)).toHaveText(
+    'Puts the phone away when asked, and uses devices for learning, not as a distraction.',
+  );
+  // The chosen stop clicked again clears the habit.
+  await page.locator('.qn-hs-label[data-habit="part"][data-value="4"]').click();
+  await expect(slider).not.toHaveAttribute('aria-valuenow', /./);
+  await expect(page.locator('#tq-rated')).toHaveText('0 of 6 rated');
+  expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({});
+});
+
+test('Work Habits: the track snaps to the nearest stop, past the ends too, and a drag moves between stops', async ({
+  page,
+}) => {
+  await open(page);
+  const slider = page.locator('.qn-hs[data-habit="others"]');
+  const track = await slider.locator('.qn-hs-track').boundingBox();
+  const y = track.y + track.height / 2;
+  // Past the left end stop: Rarely.
+  await page.mouse.click(track.x + 6, y);
+  await expect(slider).toHaveAttribute('aria-valuenow', '1');
+  // Past the right end stop: Consistently.
+  await page.mouse.click(track.x + track.width - 6, y);
+  await expect(slider).toHaveAttribute('aria-valuenow', '4');
+  // A little right of the second stop: Sometimes.
+  const step = (track.width - 88) / 3;
+  await page.mouse.click(track.x + 44 + step + 10, y);
+  await expect(slider).toHaveAttribute('aria-valuenow', '2');
+  // Dragged from Sometimes to the third stop: Usually, saved once let go.
+  await page.mouse.move(track.x + 44 + step, y);
+  await page.mouse.down();
+  await page.mouse.move(track.x + 44 + step * 1.5, y, { steps: 4 });
+  await page.mouse.move(track.x + 44 + step * 2, y, { steps: 4 });
+  await page.mouse.up();
+  await expect(slider).toHaveAttribute('aria-valuenow', '3');
+  expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({ others: 3 });
 });
 
 test('At a Glance: the year so far, the best piece and View All Skills', async ({ page }) => {
@@ -306,17 +343,33 @@ test('At a Glance: the year so far, the best piece and View All Skills', async (
       next: rows.next.name,
       change: rows.change ? rows.change.name : null,
       comps: rows.comps.length,
+      pieces: rows.strongest.scores.length,
     };
   });
-  const labels = ['Strongest', 'Next step'].concat(expected.change ? ['Biggest change'] : []);
-  await expect(page.locator('.qno-glance .qn-fact-label')).toHaveText(labels.concat(['Best piece', 'Missing', 'Late']));
+  const labels = ['Strongest', 'Next Step'].concat(expected.change ? ['Biggest Change'] : []);
+  await expect(page.locator('.qno-glance .qn-fact-label')).toHaveText(
+    labels.concat(['Best Piece', 'Missing and Late']),
+  );
   await expect(page.locator('.qno-glance .qn-fact').nth(0)).toContainText(expected.strongest);
   await expect(page.locator('.qno-glance .qn-fact').nth(1)).toContainText(expected.next);
   await expect(page.locator('.qn-best .qn-fact-body')).toContainText(expected.best);
   await expect(page.locator('.qno-glance .qn-sub')).toHaveText('So far this year · change since the Term 1 report');
   await expect(page.locator('.qno-glance [data-action="tqOpenSkills"]')).toHaveText(
-    'View All ' + expected.comps + ' Skills',
+    'View All ' + expected.comps + ' Skills ›',
   );
+  // Strongest opens in place to the pieces behind its figure; a title opens
+  // the grader on that piece.
+  const toggle = page.locator('.qn-glance-toggle[data-row="strongest"]');
+  const list = page.locator('#tq-glance-strongest');
+  await expect(list).toBeHidden();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(list.locator('li')).toHaveCount(expected.pieces);
+  await toggle.click();
+  await expect(list).toBeHidden();
+  await toggle.click();
+  await list.locator('.qn-glance-piece').first().click();
+  await expect(page.locator('#grader-overlay')).toBeVisible();
 });
 
 test('Cece’s Voice: the answers, the private one marked, a quoted answer says In the comment', async ({ page }) => {
@@ -403,7 +456,7 @@ test.describe('checks and approval', () => {
     await expect(page.locator('#tq-empty-rated')).toHaveText('0 of 6 habits rated');
     // No count or Copy under it.
     await expect(page.locator('#tq-comment-foot')).toBeHidden();
-    await page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]').click();
+    await page.locator('.qn-hs-label[data-habit="part"][data-value="4"]').click();
     await expect(page.locator('#tq-empty-rated')).toHaveText('1 of 6 habits rated');
     // Clicking it puts the cursor in the box; typing hides it.
     await page.locator('#tq-empty').click();
@@ -489,7 +542,7 @@ test.describe('checks and approval', () => {
     // shared). Noor's comment is then a copy of its first six sentences,
     // so the two share exactly five whatever the bank drafts.
     for (const key of await page.evaluate(() => CommentBank.HABITS.map(h => h.key))) {
-      await page.locator(`[data-action="tqRate"][data-habit="${key}"][data-value="4"]`).click();
+      await page.locator(`.qn-hs-label[data-habit="${key}"][data-value="4"]`).click();
     }
     await page.locator('#tq-att-absences').fill('3');
     await page.locator('#tq-att-absences').press('Tab');
@@ -573,7 +626,7 @@ test.describe('on a 1366 × 768 laptop', () => {
 
 test('end to end: rate, generate, approve, move on, and the report prints it', async ({ page }) => {
   await open(page);
-  await page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]').click();
+  await page.locator('.qn-hs-label[data-habit="part"][data-value="4"]').click();
   await page.locator('#tq-generate').click();
   const draft = await page.locator('#tq-narrative').inputValue();
   await page.locator('#tq-approve-next').click();
@@ -691,12 +744,13 @@ test.describe('the Sentences card', () => {
     page,
   }) => {
     await open(page);
-    // Six habits rated, so the comment has a habits sentence with alternatives.
+    // Six habits rated, so the comment has a habits part with alternatives
+    // (two sentences, each its own Habits row; the first is used here).
     for (const key of await page.evaluate(() => CommentBank.HABITS.map(h => h.key))) {
-      await page.locator(`[data-action="tqRate"][data-habit="${key}"][data-value="4"]`).click();
+      await page.locator(`.qn-hs-label[data-habit="${key}"][data-value="4"]`).click();
     }
     await page.locator('#tq-generate').click();
-    const home = rowByLabel(page, 'Habits');
+    const home = rowByLabel(page, 'Habits').first();
     await home.locator('[data-do="wording"]').click();
     const menu = page.locator('#tq-wording-menu');
     await expect(menu).toBeVisible();
@@ -1130,9 +1184,9 @@ test.describe('the Sentences card', () => {
     // Cece's habits: five Consistently, Uses Feedback Sometimes, so the
     // Habits part has her own cases.
     for (const k of ['completes', 'ready', 'others', 'part', 'devices']) {
-      await page.locator(`[data-action="tqRate"][data-habit="${k}"][data-value="4"]`).click();
+      await page.locator(`.qn-hs-label[data-habit="${k}"][data-value="4"]`).click();
     }
-    await page.locator('[data-action="tqRate"][data-habit="feedback"][data-value="2"]').click();
+    await page.locator('.qn-hs-label[data-habit="feedback"][data-value="2"]').click();
     await page.locator('#tq-browse-btn').click();
     const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
     await expect(sheet).toBeVisible();
@@ -1209,10 +1263,11 @@ test.describe('the Sentences card', () => {
       expect(Number(await g.locator('.qn-browse-head-n').textContent())).toBeGreaterThanOrEqual(4);
     }
     const ownHeads = sheet.locator('.qn-browse-group.own .qn-browse-head');
-    // After Cece's own cases: the other cells, then the summary.
+    // After Cece's own cases (the habits part for families among them, under
+    // Summary): the other cells, then the IE comment's Strong Habits.
     const rest = labels.slice(await ownHeads.count());
     expect(rest.slice(0, 18).every(l => / · (Consistently|Usually|Sometimes|Rarely)$/.test(l))).toBe(true);
-    expect(rest[18]).toMatch(/^Summary/);
+    expect(rest[18]).toMatch(/^Strong Habits/);
     await expect(ownHeads.first().locator('.qn-browse-head-label')).toHaveText('Completes Work · Consistently');
     await expect(ownHeads.nth(4).locator('.qn-browse-head-label')).toHaveText('Uses Feedback · Sometimes');
     for (const h of await ownHeads.all()) await expect(h).toHaveAttribute('aria-expanded', 'true');
@@ -1293,23 +1348,6 @@ test.describe('the Sentences card', () => {
   });
 });
 
-/* The bank's frames for excellent work habits (needs habitsExcellent), as
-   one pattern over their realised forms: a pronoun or name slot matches a
-   word, a [one|many] verb either form. */
-async function excellentFrames(page) {
-  const texts = await page.evaluate(() =>
-    COMMENT_BANK.sentences.filter(s => (s.needs || []).indexOf('habitsExcellent') >= 0).map(s => s.text),
-  );
-  const alts = texts.map(t =>
-    t
-      .replace(/[.*+?^$()|[\]\\]/g, '\\$&')
-      .replace(/\{\w+\}/g, '[^ ]+')
-      .replace(/\\\[([^|\]]*)\\\|([^\]]*)\\\]/g, '(?:$1|$2)'),
-  );
-  expect(alts.length).toBeGreaterThan(1);
-  return new RegExp(alts.join('|'));
-}
-
 /* The Sentences card follows the comment without another Generate Comment
    (plan PR 11a: a rating redraws only the habits sentence; the States
    mockup's "Attendance entered" board shows the Attendance row). */
@@ -1320,14 +1358,17 @@ test('a rating adds the Habits row and attendance adds and removes its row, with
   await page.locator('#tq-generate').click();
   await expect(rowByLabel('Habits')).toHaveCount(0);
   for (const k of ['completes', 'ready', 'others', 'part', 'feedback', 'devices']) {
-    await page.locator(`[data-action="tqRate"][data-habit="${k}"][data-value="4"]`).click();
+    await page.locator(`.qn-hs-label[data-habit="${k}"][data-value="4"]`).click();
   }
-  // All six rated Consistently: the habits sentence is one of the bank's
-  // excellent frames, whichever the seed picks.
-  const excellent = await excellentFrames(page);
+  // All six rated Consistently: the habits part for families, what Cece
+  // does in two sentences, whichever frames the seed picks (Nov 4).
+  const excellent = /hands in her work on time and comes to class ready to start\./;
   await expect(page.locator('#tq-narrative')).toHaveValue(excellent);
-  await expect(rowByLabel('Habits')).toHaveCount(1);
-  await expect(rowByLabel('Habits').locator('.qn-req-text')).toHaveText(excellent);
+  await expect(page.locator('#tq-narrative')).toHaveValue(
+    /listens to others, joins in class discussions, and uses feedback/,
+  );
+  await expect(rowByLabel('Habits')).toHaveCount(2);
+  await expect(rowByLabel('Habits').first().locator('.qn-req-text')).toHaveText(excellent);
 
   await page.locator('#tq-att-absences').fill('3');
   await page.locator('#tq-att-absences').press('Tab');
@@ -1350,7 +1391,7 @@ test('a rating adds the Habits row and attendance adds and removes its row, with
   await expect(page.locator('#tq-att-note')).toHaveText('Optional. Left out until entered.');
   await expect(page.locator('#tq-narrative')).not.toHaveValue(/three classes/);
   await expect(rowByLabel('Attendance')).toHaveCount(0);
-  await expect(rowByLabel('Habits')).toHaveCount(1);
+  await expect(rowByLabel('Habits')).toHaveCount(2);
 });
 
 /* Approve and Next opens the next student not yet approved, round to the
