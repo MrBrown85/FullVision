@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openCompPicker, closeCompPicker } from './helpers.js';
 
 /* The rubric in the assessment form (redesign PR 6, 2026-11-02): a chosen
    rubric is a card with its wording; with none, four ways to start one;
@@ -62,7 +63,9 @@ test('a chosen rubric is a card with its wording; Pick Another Rubric changes it
 
 test('the Competency Rubric shows the wording of each level for the chosen ones', async ({ page }) => {
   await openForm(page);
+  await openCompPicker(page);
   await page.locator('.af-code[data-tag="QP3"]').click();
+  await closeCompPicker(page);
   const want = await page.evaluate(async () => {
     await CompetencyWording.loadBank();
     return CompetencyWording.levelWording(getTagById('sci8', 'QP3'), 3).text;
@@ -76,7 +79,9 @@ test('the Competency Rubric shows the wording of each level for the chosen ones'
 
 test('Edit My Wording keeps the teacher’s own words for a level', async ({ page }) => {
   await openForm(page);
+  await openCompPicker(page);
   await page.locator('.af-code[data-tag="QP3"]').click();
+  await closeCompPicker(page);
   await page.locator('[data-action="editMyWording"]').click();
   const box = page.locator('.af-wording-card textarea[data-tag="QP3"][data-level="3"]');
   await box.fill('Asks a clear question that an investigation can answer.');
@@ -90,8 +95,10 @@ test('Use This Rubric makes the Competency Rubric this assessment’s rubric, sa
   await openForm(page);
   await page.fill('#af-title', 'Density Lab');
   await page.selectOption('#af-category', 'sci8-cat-labs');
+  await openCompPicker(page);
   await page.locator('.af-code[data-tag="QP3"]').click();
   await page.locator('.af-code[data-tag="PA4"]').click();
+  await closeCompPicker(page);
   const card = page.locator('#af-tag-rubric .af-tag-rubric-card');
   await expect(card.locator('.af-tag-rubric-note')).toContainText('Use This Rubric makes it a rubric');
   const n = await page.evaluate(() => getRubrics('sci8').length);

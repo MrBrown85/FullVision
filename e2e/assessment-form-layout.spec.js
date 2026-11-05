@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openCompPicker, closeCompPicker } from './helpers.js';
 
 // These tests use the Codes chips; List is the default since Nov 2.
 test.beforeEach(async ({ page }) => {
@@ -32,11 +33,13 @@ for (const [width, height] of [
     // No heading on a new assessment (Nov 2): the form is plainly that.
     await expect(form.locator('.af-heading')).toHaveCount(0);
     const titles = await form.locator('.af-card .af-card-title').allTextContents();
-    expect(titles).toEqual(['Scoring', 'Competencies', 'Students', 'More Options']);
+    // Competencies above Scoring; no More Options (Colin, Nov 4).
+    expect(titles).toEqual(['Competencies', 'Scoring', 'Students']);
     await expect(form.locator('.af-card-what #af-title')).toBeVisible();
-    // Category, Module, Date Assigned and Due Date share one row.
+    // Category, Evidence Type, Module, Date Assigned and Due Date share one row.
     const row = form.locator('.af-row-what');
     await expect(row.locator('#af-category')).toBeVisible();
+    await expect(row.locator('#af-evidence')).toBeVisible();
     await expect(row.locator('#af-module')).toBeVisible();
     await expect(row.locator('#af-date-assigned')).toBeVisible();
     await expect(row.locator('#af-due')).toBeVisible();
@@ -47,7 +50,7 @@ for (const [width, height] of [
   });
 }
 
-test('Description sits under the title; More Options holds Evidence Type', async ({ page }) => {
+test('Description sits under the title; Evidence Type sits beside Category', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await openForm(page);
   // Under the title, in What It Is (teachers preferred it there, Nov 2).
@@ -55,11 +58,14 @@ test('Description sits under the title; More Options holds Evidence Type', async
   const [t, d] = await Promise.all([page.locator('#af-title').boundingBox(), page.locator('#af-desc').boundingBox()]);
   expect(d.y).toBeGreaterThan(t.y);
   expect(d.y - (t.y + t.height)).toBeLessThan(60);
-  const toggle = page.locator('.af-more-toggle');
-  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-  await expect(page.locator('#af-evidence')).toBeHidden();
-  await toggle.click();
-  await expect(page.locator('#af-evidence')).toBeVisible();
+  // Evidence Type is back where it was before More Options (Colin, Nov 4).
+  await expect(page.locator('.af-more-toggle, .af-card-more')).toHaveCount(0);
+  const [c, e] = await Promise.all([
+    page.locator('#af-category').boundingBox(),
+    page.locator('#af-evidence').boundingBox(),
+  ]);
+  expect(Math.abs(e.y - c.y)).toBeLessThan(2);
+  expect(e.x).toBeGreaterThan(c.x + c.width);
 });
 
 test('a new assessment saves its fields from the cards as before', async ({ page }) => {
@@ -67,9 +73,10 @@ test('a new assessment saves its fields from the cards as before', async ({ page
   await openForm(page);
   await page.fill('#af-title', 'Card Layout Check');
   await page.selectOption('#af-category', 'sci8-cat-labs');
+  await openCompPicker(page);
   await page.locator('.af-code[data-tag=\"QP3\"]').click();
+  await closeCompPicker(page);
   await page.fill('#af-desc', 'A short description.');
-  await page.locator('.af-more-toggle').click();
   await page.selectOption('#af-evidence', 'video');
   await page.locator('[data-action="saveNewAssess"]').click();
   const saved = await page.evaluate(() => getAssessments('sci8').find(a => a.title === 'Card Layout Check'));

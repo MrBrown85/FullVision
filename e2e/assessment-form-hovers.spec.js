@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openCompPicker, closeCompPicker } from './helpers.js';
 
 /* The assessment form's hover-overs (redesign PR 13, 2026-11-02): a
    chosen competency, a Codes folder, the rubric, the Factor and a Core
@@ -24,7 +25,9 @@ const tip = page => page.locator('#gb-tooltip');
 
 test('a chosen competency: wording, I Can, source and how often it has been scored', async ({ page }) => {
   await openForm(page);
+  await openCompPicker(page);
   await page.locator('.af-code[data-tag="QP3"]').click();
+  await closeCompPicker(page);
   const want = await page.evaluate(() => {
     const t = getTagById('sci8', 'QP3');
     const n = getAssessments('sci8').filter(a => (a.tagIds || []).includes('QP3')).length;
@@ -41,6 +44,7 @@ test('a chosen competency: wording, I Can, source and how often it has been scor
 
 test('a folder lists each competency with its count', async ({ page }) => {
   await openForm(page);
+  await openCompPicker(page);
   const group = page.locator('.af-codes-group-name').first();
   const ids = (await group.getAttribute('data-tags')).split(',');
   await group.hover();

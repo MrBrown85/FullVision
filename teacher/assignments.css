@@ -639,124 +639,13 @@
 .af-mode-card[aria-checked='true'] svg {
   color: #fff;
 }
-/* Each card's tooltip: a picture and a sentence, below the card on hover
-   (after a short pause) or keyboard focus. */
+/* Each card sits in an item of the mode grid. */
 .af-mode-item {
   position: relative;
   display: flex;
 }
 .af-mode-item .af-mode-card {
   flex: 1;
-}
-.af-mode-tip {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: var(--z-popover);
-  width: 260px;
-  box-sizing: border-box;
-  padding: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-md);
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transition:
-    opacity var(--duration-micro) ease,
-    visibility 0s linear var(--duration-micro);
-}
-.af-mode-item:last-child .af-mode-tip {
-  left: auto;
-  right: 0;
-}
-@media (hover: hover) {
-  .af-mode-item:hover .af-mode-tip {
-    opacity: 1;
-    visibility: visible;
-    transition-delay: 400ms;
-  }
-}
-.af-mode-card:focus-visible + .af-mode-tip {
-  opacity: 1;
-  visibility: visible;
-  transition-delay: 0s;
-}
-.af-mode-tip-pic {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  height: 72px;
-  margin-bottom: 8px;
-  background: var(--bg);
-  border-radius: 6px;
-}
-.af-mode-tip-text {
-  font-size: var(--text-sm);
-  line-height: 1.4;
-  color: var(--text);
-}
-.af-tip-level {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-.af-tip-level-code {
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  color: var(--text-2);
-}
-.af-tip-pts-box {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  width: 56px;
-  height: 30px;
-  box-sizing: border-box;
-  padding: 0 10px;
-  font-weight: 600;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.af-tip-pts-max {
-  margin-left: -2px;
-  font-family: var(--font-mono);
-  font-size: var(--text-base);
-  color: var(--text-2);
-}
-.af-tip-pts-pct {
-  font-size: var(--text-base);
-  font-weight: 600;
-  color: var(--text);
-}
-.af-mode-tip-pic .cmp-btn {
-  cursor: default;
-}
-/* Competencies: a competency a row, each with its level. */
-.af-tip-comp {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.af-tip-comp-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  width: 170px;
-}
-.af-tip-comp-row .gb-score-val {
-  width: 34px;
-  height: 26px;
-}
-.af-tip-comp-name {
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--text);
 }
 @media (max-width: 560px) {
   .af-mode-cards {
@@ -1250,7 +1139,7 @@
 }
 .af-row-what {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 .af-row-what > .af-field {
@@ -1277,55 +1166,6 @@
 }
 .af-card-scoring .af-rubric-field {
   margin-top: 4px;
-}
-.af-more-toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  margin: -16px;
-  padding: 16px;
-  width: calc(100% + 32px);
-  border: 0;
-  border-radius: var(--radius);
-  background: transparent;
-  font-family: var(--font-base);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-.af-more-toggle:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: -2px;
-}
-.af-more-hint {
-  flex: 1;
-  font-size: var(--text-sm);
-  color: var(--text-2);
-}
-.af-more-chev {
-  color: var(--text-2);
-  transition: transform var(--duration-fast, 0.15s) ease;
-}
-.af-more-toggle[aria-expanded='true'] .af-more-chev {
-  transform: rotate(90deg);
-}
-.af-more-body {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: 12px;
-  margin-top: 28px;
-}
-.af-more-body[hidden] {
-  display: none;
-}
-.af-more-body > .af-field {
-  margin-bottom: 0;
-}
-@media (max-width: 760px) {
-  .af-more-body {
-    grid-template-columns: 1fr;
-  }
 }
 /* Scoring card (redesign PR 2): mode cards sized to their labels, Factor at
    the row's end, then only what the mode needs. */
@@ -1401,12 +1241,127 @@
 .af-card-competencies .af-card-head {
   align-items: center;
 }
-.af-comp-chosen {
+/* The field: the chosen competencies as chips, then Choose Competencies
+   (Colin, Nov 4). The list itself is in the window below. */
+.af-comp-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  flex: 1 1 200px;
-  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.af-comp-chosen {
+  display: contents;
+}
+.af-comp-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: -4px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.af-comp-chip-x:hover {
+  background: var(--overlay-pressed);
+  color: var(--text);
+}
+.af-comp-chip-x:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 0;
+}
+.af-comp-choose {
+  height: 32px;
+  padding: 0 12px;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--active);
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.af-comp-choose:hover {
+  background: var(--divider-subtle);
+}
+.af-comp-choose:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.af-comp-choose[hidden] {
+  display: none;
+}
+.af-card-competencies .af-comp-rubric-note {
+  margin: -8px 0 16px;
+}
+/* Choose Competencies: the list in a window over the form and the top
+   bar, with the shared hover tip (#gb-tooltip) over it so the list's tips
+   still show. */
+.af-comp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-popover) + 2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.af-comp-overlay[hidden] {
+  display: none;
+}
+body:has(.af-comp-overlay:not([hidden])) #gb-tooltip {
+  z-index: calc(var(--z-popover) + 3);
+}
+.af-comp-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(1000px, 100%);
+  max-height: 100%;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.af-comp-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--divider);
+}
+.af-comp-dialog-title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+.af-comp-count {
+  color: var(--text-2);
+  font-size: var(--text-base);
+  white-space: nowrap;
+}
+.af-comp-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 20px;
+}
+.af-comp-dialog-body .af-comp-list {
+  margin-bottom: 0;
+}
+.af-comp-dialog-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--divider);
 }
 .af-comp-chip {
   display: inline-flex;
@@ -1927,6 +1882,9 @@
   line-height: 1.35;
 }
 #af-tag-rubric:not(:empty) {
+  margin-top: 14px;
+}
+#af-tag-rubric:not(:empty) + .af-rubric-field:not([hidden]) {
   margin-top: 14px;
 }
 .af-tag-rubric-note {
@@ -5087,27 +5045,44 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
 
 /* ── One assessment in several classes (assessment-copy.js) ── */
 
-/* Classes row on the form: this class fixed, the others as toggle chips */
+/* Classes row on the form: this class fixed, every other class a toggle
+   chip, all the same width in even columns of four (Colin, Nov 4). */
 .af-copy-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
+@media (max-width: 900px) {
+  .af-copy-chips {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 .af-copy-chip {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
+  gap: 8px;
+  min-width: 0;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 0 14px;
   font-family: var(--font-base);
   font-size: var(--text-base);
   font-weight: 500;
+  text-align: left;
   border: 1.5px solid transparent;
   border-radius: var(--radius-sm);
   background: var(--divider-subtle);
   color: var(--text-2);
   cursor: pointer;
-  transition: all 0.12s;
+  transition:
+    background-color 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.af-copy-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .af-copy-chip-mark {
@@ -5160,68 +5135,61 @@ body:has(#page-layout.sidebar-hidden) .rsg-descriptor-bar {
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
-.af-copy-more {
-  font-size: var(--text-md);
-}
-.af-copy-more summary {
-  cursor: pointer;
-  color: var(--text-2);
-  padding: 6px 4px;
-  list-style: none;
-}
-.af-copy-more summary::before {
-  content: '\25B8 ';
-}
-.af-copy-more[open] summary::before {
-  content: '\25BE ';
-}
-.af-copy-more .af-copy-chips {
-  padding: 4px 0 2px;
-}
+/* Dates: the app's segmented control, labels on one line, with the
+   per-class rows lined up under it in the same columns. */
 .af-copy-dates-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-  font-size: var(--text-md);
+  gap: 12px;
+  margin-top: 14px;
 }
 .af-copy-dates-bar[hidden] {
   display: none;
 }
-.af-copy-dates-label {
-  color: var(--text-2);
+.af-copy-dates-label,
+.af-copy-date-name {
+  width: 200px;
+  flex-shrink: 0;
+  font-size: var(--text-md);
   font-weight: 600;
-}
-.af-copy-dates-mode {
-  display: inline-flex;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 #af-copy-dates {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 10px;
 }
 #af-copy-dates:empty {
   display: none;
 }
 .af-copy-date-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 14px;
+  gap: 12px;
   font-size: var(--text-md);
-}
-.af-copy-date-name {
-  min-width: 140px;
-  font-weight: 600;
 }
 .af-copy-date-row label {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  color: var(--text-2);
 }
 .af-copy-date-row .af-input {
-  width: auto;
+  width: 170px;
+}
+@media (max-width: 600px) {
+  .af-copy-dates-bar,
+  .af-copy-date-row {
+    flex-wrap: wrap;
+  }
+  .af-copy-dates-label,
+  .af-copy-date-name {
+    width: 100%;
+  }
 }
 
 /* "Also in Block B" on an assessment card */
@@ -8216,7 +8184,8 @@ button.grader-member-name {
   display: flex;
   gap: 16px;
 }
-.af-ge-foot .af-ge-picker {
+.af-ge-foot .af-ge-picker,
+.af-ge-picker.is-up {
   top: auto;
   bottom: calc(100% + 4px);
 }
