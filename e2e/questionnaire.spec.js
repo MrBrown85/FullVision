@@ -294,7 +294,7 @@ test('Work Habits: a rating saves in place and the count follows; nothing redraw
   await expect(page.locator('#tq-rated')).toHaveText('1 of 6 rated');
   expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({ part: 4 });
   expect(await grid.evaluate(el => el.__mark)).toBe('same');
-  await expect(page.locator('.qn-habit-name').nth(1)).toHaveText('Comes Ready and Uses Class Time');
+  await expect(page.locator('.qn-habit-name').nth(1)).toHaveText('Comes Ready, Uses Class Time');
   // The compact grid: the scale's words head four columns, each stop under
   // its word; the rating area is 236 px.
   const fit = await page.evaluate(() => {

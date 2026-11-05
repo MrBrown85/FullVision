@@ -51,7 +51,7 @@ window.CommentBank = (function () {
     },
     {
       key: 'ready',
-      name: 'Comes Ready and Uses Class Time',
+      name: 'Comes Ready, Uses Class Time',
       hint: 'Brings materials, starts tasks, stays on task',
       desc: 'Brings materials, starts without a reminder, and stays on task.',
       build: 'using class time well',

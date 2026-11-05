@@ -1230,7 +1230,7 @@ window.PersonalBank = (function () {
   }
   function _habitName(k) {
     var h = window.CommentBank && CommentBank.HABITS.find(x => x.key === k);
-    return k === 'ready' ? 'Comes Ready, Uses Class Time' : h ? h.name : k;
+    return h ? h.name : k;
   }
   /* When a template is offered, in plain words: "Offered when Evidence is
      a strength, in Socials classes". */

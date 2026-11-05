@@ -639,7 +639,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       'Completes Work · Usually',
       'Completes Work · Sometimes',
       'Completes Work · Rarely',
-      'Comes Ready and Uses Class Time · Consistently',
+      'Comes Ready, Uses Class Time · Consistently',
     ]);
     expect(RQ.browseCases('habits').findIndex(c => c.id === 'sum:excellent')).toBe(24);
     // Not handed in: one title, two, a count, a count and a group; the

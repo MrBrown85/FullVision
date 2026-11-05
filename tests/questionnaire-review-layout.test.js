@@ -172,7 +172,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(html).not.toContain('role="radio"');
     expect(html).not.toContain('Not Seen');
     expect(html).toContain(
-      '<span class="qn-habit-name" id="tq-habit-ready" title="Comes Ready and Uses Class Time">Comes Ready and Uses Class Time</span>',
+      '<span class="qn-habit-name" id="tq-habit-ready" title="Comes Ready, Uses Class Time">Comes Ready, Uses Class Time</span>',
     );
     CommentBank.HABITS.forEach(h =>
       expect(html).toContain(
