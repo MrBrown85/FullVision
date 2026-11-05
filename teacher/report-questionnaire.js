@@ -1033,20 +1033,22 @@ window.ReportQuestionnaire = (function () {
     );
   }
 
-  // html-safe: habit names, descriptions, the record line and scale labels esc()'d; keys and values are fixed
+  // html-safe: habit names, descriptions, the record line and scale headings esc()'d; keys and values are fixed
   function _habitsHtml(cid, f) {
     var stored = (getStudentTermRating(cid, f.sid, getTermId()) || {}).habits || {};
     var auto = CommentBank.effectiveHabits(stored, f.record, f);
     var rows = CommentBank.HABITS.map(function (h) {
       var cur = _sliderValue(stored, auto, h.key);
       var note = h.key === 'completes' ? _recordLine(f.record) : '';
-      var labels = CommentBank.SCALE.slice(0, HS_STOPS)
-        .map(function (label, i) {
-          return `<span class="qn-hs-label${cur.v === i + 1 ? ' on' : ''}" style="--i:${i}" data-habit="${h.key}" data-value="${i + 1}">${esc(label)}</span>`;
-        })
-        .join('');
       var dots = '';
-      for (var i = 0; i < HS_STOPS; i++) dots += `<span class="qn-hs-dot" style="--i:${i}"></span>`;
+      // A dot under each column of the scale, and over each column a clear
+      // stop that takes the click (the pointer handler snaps to the
+      // nearest stop wherever the press lands).
+      var stops = '';
+      for (var i = 0; i < HS_STOPS; i++) {
+        dots += `<span class="qn-hs-dot" style="--i:${i}"></span>`;
+        stops += `<span class="qn-hs-stop" style="--i:${i}" data-habit="${h.key}" data-value="${i + 1}"></span>`;
+      }
       return `<div class="qn-habit-row" data-habit-row="${h.key}">
         <div class="qn-habit-text">
           <span class="qn-habit-name" id="tq-habit-${h.key}">${esc(h.name)}</span>
@@ -1054,13 +1056,20 @@ window.ReportQuestionnaire = (function () {
           ${note ? `<span class="qn-habit-note">${esc(note)}</span>` : ''}
         </div>
         <div class="qn-hs${cur.v ? ' set' : ''}${cur.fromRecord ? ' from-record' : ''}" role="slider" tabindex="0" data-habit="${h.key}" data-value="${cur.v}" style="--at:${Math.max(0, cur.v - 1)}" aria-labelledby="tq-habit-${h.key}" aria-valuemin="1" aria-valuemax="${HS_STOPS}"${cur.v ? ` aria-valuenow="${cur.v}"` : ''} aria-valuetext="${esc(_sliderText(cur.v, cur.fromRecord))}">
-          <div class="qn-hs-track"><span class="qn-hs-rail"></span>${dots}<span class="qn-hs-fill"></span><span class="qn-hs-thumb"></span></div>
-          <div class="qn-hs-labels">${labels}</div>
+          <div class="qn-hs-track" aria-hidden="true"><span class="qn-hs-rail"></span>${dots}<span class="qn-hs-fill"></span><span class="qn-hs-thumb"></span>${stops}</div>
         </div>
       </div>`;
     }).join('');
     return `<div class="qn-card qn-habits">
       <div class="qn-card-top"><span class="qn-card-title">Work Habits</span><span class="qn-sub" id="tq-rated">${_ratedCount(stored)} of 6 rated</span></div>
+      <div class="qn-habit-head" aria-hidden="true"><span></span><span class="qn-habit-scale">${CommentBank.SCALE.slice(
+        0,
+        HS_STOPS,
+      )
+        .map(function (label) {
+          return `<span>${esc(label)}</span>`;
+        })
+        .join('')}</span></div>
       ${rows}
     </div>`;
   }
@@ -1076,9 +1085,6 @@ window.ReportQuestionnaire = (function () {
     if (v > 0) el.setAttribute('aria-valuenow', String(v));
     else el.removeAttribute('aria-valuenow');
     el.setAttribute('aria-valuetext', _sliderText(v, fromRecord));
-    Array.prototype.forEach.call(el.querySelectorAll('.qn-hs-label'), function (l) {
-      l.classList.toggle('on', Number(l.dataset.value) === v);
-    });
   }
 
   /* The habit's slider drawn from what is saved (and the record). */
@@ -1092,15 +1098,17 @@ window.ReportQuestionnaire = (function () {
     _paintSlider(el, cur.v, cur.fromRecord);
   }
 
-  /* The stop (1 to 4) nearest a point across a slider's track; the stops
-     sit 44 px in from each end, and a point past an end stop takes it. */
-  var HS_INSET = 44;
+  /* The stop (1 to 4) nearest a point across a slider's track. The track
+     spans the four columns of the scale over it, each stop at the middle
+     of its column (half a column in from each end); a point past an end
+     stop takes it. */
   function _stopAt(el, x) {
     var track = el.querySelector('.qn-hs-track') || el;
     var r = track.getBoundingClientRect();
-    var span = r.width - 2 * HS_INSET;
+    var inset = r.width / (2 * HS_STOPS);
+    var span = r.width - 2 * inset;
     if (!(span > 0)) return 1;
-    var at = Math.round(((x - r.left - HS_INSET) / span) * (HS_STOPS - 1));
+    var at = Math.round(((x - r.left - inset) / span) * (HS_STOPS - 1));
     return Math.max(0, Math.min(HS_STOPS - 1, at)) + 1;
   }
   /* The rating the teacher saved for a habit, 1 to 4, else 0. */
@@ -1403,23 +1411,6 @@ window.ReportQuestionnaire = (function () {
     };
   }
 
-  /* A competency's own wording, as its card in Class Management shows it:
-     the learning map's wording for it (its tag's text), else its first I
-     Can statement; '' with neither. */
-  function _compWording(sections, c) {
-    var sec = (sections || []).find(function (x) {
-      return String(x.id) === String(c.id);
-    });
-    var tag =
-      (sec &&
-        (sec.tags || []).find(function (t) {
-          return String(t.text || '').trim();
-        })) ||
-      null;
-    if (tag) return String(tag.text).trim();
-    return (c.iCans && c.iCans[0]) || '';
-  }
-
   /* The pieces under an opened row: each title opens the grader on it, and
      its mark or status sits on the right. */
   // html-safe: ids, titles and marks esc()'d
@@ -1447,14 +1438,14 @@ window.ReportQuestionnaire = (function () {
       </div>`;
   }
 
-  /* A skill row: the competency's name and wording, its figure and piece
-     count on the right (with the change since the earlier report under
-     them), and the pieces behind the figure (compsOf's scores, calc.js),
-     each with the competency's mark on it. */
-  // html-safe: competency names, wording, figures, titles and marks esc()'d; row and label are fixed words
-  function _glanceSkillHtml(cid, f, sections, row, label, c, extra) {
-    var wording = _compWording(sections, c);
-    var body = `<span class="qn-glance-name">${esc(c.name)}</span>${wording ? `<span class="qn-glance-wording">${esc(wording)}</span>` : ''}`;
+  /* A skill row: the competency's name (no wording: the teacher knows it;
+     Colin, Nov 4), its figure and piece count on the right (with the
+     change since the earlier report under them), and the pieces behind
+     the figure (compsOf's scores, calc.js), each with the competency's
+     mark on it. */
+  // html-safe: competency names, figures, titles and marks esc()'d; row and label are fixed words
+  function _glanceSkillHtml(cid, f, row, label, c, extra) {
+    var body = `<span class="qn-glance-name">${esc(c.name)}</span>`;
     var fig = `<span class="qn-level" data-level="${_levelStep(c.level)}">${esc(formatLevel(cid, c.level) + ' · ' + _pieces(c))}</span>${extra ? `<span class="qn-glance-extra">${esc(extra)}</span>` : ''}`;
     var items = (c.scores || []).map(function (sc) {
       return { id: sc.id, title: sc.title, mark: formatLevel(cid, sc.v) };
@@ -1483,7 +1474,7 @@ window.ReportQuestionnaire = (function () {
     });
   }
 
-  // html-safe: competency names, wording, titles, notes, marks and figures esc()'d; labels are fixed words
+  // html-safe: competency names, titles, notes, marks and figures esc()'d; labels are fixed words
   function _glanceHtml(cid, student, f) {
     var best = bestPiece(f);
     // The best piece's mark as the comment prints it: in a Letter class,
@@ -1494,7 +1485,6 @@ window.ReportQuestionnaire = (function () {
         ? CommentBank.workMark(f, best)
         : formatLevel(cid, best.v)
       : '';
-    var sections = ReportBlocks.reportSections(cid);
     var rows = glanceRows(f);
     // Under the figure: the proficiency word outside a Letter class, and
     // the change since the earlier report.
@@ -1505,13 +1495,12 @@ window.ReportQuestionnaire = (function () {
     };
     var skills = '';
     if (rows.strongest)
-      skills += _glanceSkillHtml(cid, f, sections, 'strongest', 'Strongest', rows.strongest, extra(rows.strongest));
-    if (rows.next) skills += _glanceSkillHtml(cid, f, sections, 'next', 'Next Step', rows.next, extra(rows.next));
+      skills += _glanceSkillHtml(cid, f, 'strongest', 'Strongest', rows.strongest, extra(rows.strongest));
+    if (rows.next) skills += _glanceSkillHtml(cid, f, 'next', 'Next Step', rows.next, extra(rows.next));
     if (rows.change)
       skills += _glanceSkillHtml(
         cid,
         f,
-        sections,
         'change',
         'Biggest Change',
         rows.change,

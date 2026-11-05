@@ -3928,66 +3928,83 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 12.5px;
 }
 
-/* Work Habits (Colin, Nov 4): each habit's name and what it means on the
-   left, a slider with four stops on the right, a little over half the row.
-   The stops sit 44px in from each end of the track so Rarely and
-   Consistently are never cut; the track, the dots and the labels share
-   that inset (--hs-in), and --at is the chosen stop, 0 to 3. */
+/* Work Habits, compact (Colin, Nov 4, option A): the scale's four words
+   head four equal columns over a 236 px rating area; each habit is one row,
+   its name and what it means on the left and a small slider on the right
+   whose stops sit under the column words (half a column in from each end:
+   --hs-in), --at the chosen stop, 0 to 3. The rating area stays 236 px at
+   every width; the words take what is left. */
 .qn-habits {
+  --hs-w: 236px;
   padding: 12px 14px 4px;
   display: flex;
   flex-direction: column;
-  container-type: inline-size;
 }
 .qn-habits .qn-card-top {
-  padding-bottom: 6px;
+  padding-bottom: 4px;
 }
+.qn-habits .qn-card-title {
+  font-size: 15px;
+  font-weight: 500;
+}
+.qn-habit-head,
 .qn-habit-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) var(--hs-w);
+  column-gap: 10px;
   align-items: center;
-  padding: 12px 0;
+}
+.qn-habit-scale {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.qn-habit-scale > span {
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+/* "Consistently" is a few px wider than its 59 px column: it ends at the
+   column's right edge and runs into the gap beside Usually instead of past
+   the card's edge. */
+.qn-habit-scale > span:last-child {
+  justify-content: flex-end;
+}
+.qn-habit-row {
+  padding: 7px 0;
   border-top: 1px solid var(--qn-hairline);
+}
+.qn-habit-head + .qn-habit-row {
+  margin-top: 3px;
 }
 .qn-habit-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
   min-width: 0;
 }
 .qn-habit-name {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.3;
 }
-.qn-habit-desc {
-  font-size: 14px;
-  line-height: 1.4;
+.qn-habit-desc,
+.qn-habit-note {
+  font-size: 11.5px;
+  line-height: 1.35;
   color: var(--text-2);
 }
 .qn-habit-note {
-  margin-top: 2px;
-  font-size: 12.5px;
   color: var(--text-3);
 }
-/* In the 470 px column (the student list shown) the slider beside the
-   words would be about 220 px, too narrow for the four labels: there the
-   slider goes under the words, full width. Side by side from a 560 px row,
-   as when the list is hidden. */
-@container (max-width: 559px) {
-  .qn-habit-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-  }
-}
 .qn-hs {
-  --hs-in: 44px;
-  --hs-step: calc((100% - 2 * var(--hs-in)) / 3);
+  --hs-in: 12.5%;
+  --hs-step: 25%;
   position: relative;
   min-width: 0;
-  padding: 4px 0;
-  border-radius: 8px;
+  padding: 3px 0;
+  border-radius: 6px;
   cursor: pointer;
   touch-action: none;
   user-select: none;
@@ -3998,18 +4015,18 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-hs:focus-visible {
   outline: 2px solid var(--active);
-  outline-offset: 2px;
+  outline-offset: 1px;
 }
 .qn-hs-track {
   position: relative;
-  height: 24px;
+  height: 18px;
 }
 .qn-hs-rail,
 .qn-hs-fill {
   position: absolute;
-  top: 8px;
-  height: 8px;
-  border-radius: 4px;
+  top: 6.5px;
+  height: 5px;
+  border-radius: 2.5px;
 }
 .qn-hs-rail {
   left: 0;
@@ -4024,25 +4041,33 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-hs-dot {
   position: absolute;
-  top: 10px;
-  left: calc(var(--hs-in) + var(--hs-step) * var(--i) - 2px);
-  width: 4px;
-  height: 4px;
-  border-radius: 2px;
+  top: 6px;
+  left: calc(var(--hs-in) + var(--hs-step) * var(--i) - 3px);
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
   background: var(--border-2);
 }
 .qn-hs-thumb {
   position: absolute;
   top: 0;
-  left: calc(var(--hs-in) + var(--hs-step) * var(--at, 0) - 12px);
-  width: 24px;
-  height: 24px;
+  left: calc(var(--hs-in) + var(--hs-step) * var(--at, 0) - 9px);
+  width: 18px;
+  height: 18px;
   box-sizing: border-box;
-  border-radius: 12px;
+  border-radius: 9px;
   background: var(--active);
-  border: 3px solid var(--surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   display: none;
+}
+/* Over each column, a clear stop that takes the click. */
+.qn-hs-stop {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: calc(var(--hs-step) * var(--i));
+  width: var(--hs-step);
 }
 .qn-hs.set .qn-hs-fill,
 .qn-hs.set .qn-hs-thumb {
@@ -4055,26 +4080,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .qn-hs.from-record .qn-hs-thumb {
   background: var(--surface);
-  border: 3px solid var(--active);
-}
-.qn-hs-labels {
-  position: relative;
-  height: 18px;
-  margin-top: 4px;
-}
-.qn-hs-label {
-  position: absolute;
-  top: 0;
-  left: calc(var(--hs-in) + var(--hs-step) * var(--i));
-  transform: translateX(-50%);
-  font-size: 12.5px;
-  line-height: 18px;
-  color: var(--text-2);
-  white-space: nowrap;
-}
-.qn-hs-label.on {
-  font-weight: 500;
-  color: var(--text);
+  border: 2px solid var(--active);
 }
 
 /* At a Glance */
@@ -4216,11 +4222,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-weight: 500;
   color: var(--text);
   overflow-wrap: anywhere;
-}
-.qn-glance-wording {
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--text-2);
 }
 .qn-glance-fig {
   flex: none;
@@ -7027,8 +7028,8 @@ body.qn-roster #gb-sidebar .student-row-note {
    58 px beside the grade and ran into it, the Work Habits labels ran
    together left of their radios, Times Late was cut off, and each
    sentence's text was squeezed between its label and Options. Under
-   600 px the grade goes under the name, a habit's name goes above its
-   slider, Attendance wraps, and a sentence's label sits above its
+   600 px the grade goes under the name, a habit's name and words go above
+   its slider, Attendance wraps, and a sentence's label sits above its
    text. */
 @media (max-width: 600px) {
   .qn {
@@ -7052,6 +7053,21 @@ body.qn-roster #gb-sidebar .student-row-note {
   }
   .qn-glance-list {
     padding-left: 14px;
+  }
+  /* The words take the row; the scale and each slider keep their 236 px,
+     on the right under them. */
+  .qn-habit-head,
+  .qn-habit-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 6px;
+  }
+  .qn-habit-head > span:first-child {
+    display: none;
+  }
+  .qn-habit-scale,
+  .qn-hs {
+    width: var(--hs-w);
+    justify-self: end;
   }
   .qn-att {
     flex-wrap: wrap;
