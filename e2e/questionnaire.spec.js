@@ -1463,6 +1463,9 @@ test('Write Your Own: saved from Browse Sentences, shown as Yours, used, and sti
   page,
 }) => {
   await open(page);
+  // Completes Work rated, so the Habits part has cases for Cece (nothing
+  // comes from the assignment record, Nov 4).
+  await page.locator('.qn-hs-stop[data-habit="completes"][data-value="4"]').click();
   await page.locator('#tq-generate').click();
   await page.locator('#tq-browse-btn').click();
   const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });

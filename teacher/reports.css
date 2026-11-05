@@ -4032,8 +4032,11 @@ body.qn-roster #gb-sidebar .student-row-note {
   border-radius: 2.5px;
 }
 .qn-hs-rail {
-  left: 0;
-  right: 0;
+  /* From the Rarely stop to the Consistently stop and no further: grey past
+     either end read as more scale (Colin, Nov 4). The whole row still
+     takes the click (.qn-hs-stop). */
+  left: calc(var(--hs-in) - 2.5px);
+  right: calc(var(--hs-in) - 2.5px);
   background: var(--surface-2);
 }
 .qn-hs-fill {
@@ -4076,16 +4079,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-hs.set .qn-hs-thumb {
   display: block;
 }
-/* Completes Work as the assignment record has it, until the teacher picks:
-   a hollow thumb and a pale fill. */
-.qn-hs.from-record .qn-hs-fill {
-  opacity: 0.35;
-}
-.qn-hs.from-record .qn-hs-thumb {
-  background: var(--surface);
-  border: 2px solid var(--active);
-}
-
 /* At a Glance */
 .qn-glance .qn-card-top {
   padding: 12px 14px 10px;
