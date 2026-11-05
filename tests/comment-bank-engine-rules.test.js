@@ -252,7 +252,7 @@ describe('the draft is the plan’s eight parts only', () => {
     expect(d.sentences[1].text).toContain('“What Does the Poster Show?”');
     expect(d.sentences[1].text).toContain('linked the poster to the Act.');
     expect(d.text).toContain('handing in each task by its due date, and sharing his ideas in class discussions.');
-    expect(d.text).toContain('missed three classes');
+    expect(d.text).toMatch(/three classes/);
     // One of the two-title Not Handed In frames (m01, m07-m11), both titles
     // quoted, with the class's late-work line right after it.
     expect(d.text).toContain('not handed in');

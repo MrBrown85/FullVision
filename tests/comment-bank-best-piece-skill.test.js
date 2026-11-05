@@ -112,11 +112,12 @@ describe('the best piece names its skill', () => {
   });
 
   it('never names the next step’s skill: the next highest on the piece instead', () => {
-    // All three level: the next step is Evidence (report order), so the
-    // piece shows Perspective.
-    const f = withWork([3, 3, 3]);
+    // Evidence is the next step and Perspective the strength (both named
+    // elsewhere), so the piece shows Significance.
+    const f = withWork([3, 3.6, 3.1]);
     expect(CommentBank.nextSkillOf(f).comp.id).toBe('c1');
-    expect(CommentBank.bestPieceSkillOf(f, CommentBank.bestPieceOf(f)).comp.id).toBe('c2');
+    expect(CommentBank.strengthSkills(f)[0].comp.id).toBe('c2');
+    expect(CommentBank.bestPieceSkillOf(f, CommentBank.bestPieceOf(f)).comp.id).toBe('c3');
   });
 
   it('leaves the skill to the teacher’s note when there is one', () => {

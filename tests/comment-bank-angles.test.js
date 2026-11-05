@@ -247,7 +247,10 @@ describe('the Generate Comment button (Demo Mode, Science 8)', () => {
     const first = CommentBank.draft(ctx, { seed: 11 });
     const again = CommentBank.draft(ctx, { seed: 11, previous: first.text });
     expect(again.text).not.toBe(first.text);
-    expect(again.seed).not.toBe(11);
+    // The sentences on screen count as used once more (Colin, Nov 4), so
+    // a press changes more than one sentence where other frames fit.
+    const changed = again.sentences.filter(x => first.sentences.every(y => y.text !== x.text));
+    expect(changed.length).toBeGreaterThan(2);
     expect(again.angle).toBe(first.angle);
   });
 

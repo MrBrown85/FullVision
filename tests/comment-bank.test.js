@@ -651,20 +651,20 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   // from the record (Nov 4), so no habits frame fits. Before, the record's
   // Consistently fitted eight: the three Strong Habits frames (hs11, hs13,
   // hs15) and five Habit Ratings frames for Completes Work.
-  it('knows the Demo class is Science from its name, and offers Cece 95 sentences (0, 62, 8, 25)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 91 sentences (0, 58, 8, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 62, 8, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(95);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 58, 8, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(91);
   });
 
-  it('offers Jasper 98 (0, 64, 9, 25), by the name he goes by', () => {
+  it('offers Jasper 94 (0, 60, 9, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
     // Overall: every competency is Proficient as the report grades it
     // (2.9 to 3.3), so the even-results frames fit (Nov 3).
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 64, 9, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(98);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([0, 60, 9, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(94);
     expect(ctx.name).toBe('Jas');
     // Nothing fell from Extending since Report 1's year to date (it fell
     // four times inside Term 2's own trend, which Generate no longer

@@ -3311,7 +3311,7 @@ window.CommentBank = (function () {
     if (!w || reportNoteText(w.note)) return null;
     var taken = {};
     [nextSkillOf(f), tentSkillOf(f), progressOf(f)]
-      .concat(strengthSkills(f), topTieSkills(f), highestSkills(f))
+      .concat(strengthSkills(f), topTieSkills(f), evenSkills(f), highestSkills(f))
       .forEach(function (x) {
         if (x) taken[x.key] = true;
       });
@@ -3362,18 +3362,19 @@ window.CommentBank = (function () {
   }
 
   /* The best piece's title as a comment names it after "her" (the frames
-     own it: "her Biodiversity Field Journal"), the lesson number dropped.
-     A title that would not read as a name there (one that opens with "The"
-     or "A", holds a colon, a question, quotation marks or brackets, or runs
-     past eight words) is quoted: "her “Thinking It Through: A Changing
-     Worldview”". '' with no title. */
+     own it: "her Biodiversity Field Journal"), the lesson number dropped and
+     no quotation marks (Colin, Nov 4: "her Thinking It Through: A Changing
+     Worldview"). A leading "The", "A" or "An" goes ("her Outsiders Essay");
+     a title with its own question mark, exclamation mark or quotation marks
+     reads as "her work “…”". '' with no title. */
   var TEST_TITLE = /\b(quiz|quizzes|test|tests|exam|check)\b/i;
-  function _ownsTitle(t) {
-    return /^[A-Z0-9]/.test(t) && !/[:;?!“”"()]/.test(t) && !/^(the|a|an)\s/i.test(t) && t.split(/\s+/).length <= 8;
-  }
   function pieceTitle(w) {
     var t = w ? workTitle(w.title).replace(/\.+$/, '') : '';
-    return !t || _ownsTitle(t) ? t : R.quoteTitle(t);
+    if (!t) return '';
+    if (/[?!“”"]/.test(t)) return 'work ' + R.quoteTitle(t);
+    return t.replace(/^(the|a|an)\s+(?=\S)/i, '').replace(/^[a-z]/, function (c) {
+      return c.toUpperCase();
+    });
   }
   /* Whether a piece is a quiz, test or check by its title: it "scored
      highest", never "is her best piece". */
@@ -5506,12 +5507,13 @@ window.CommentBank = (function () {
     if (ctx.progressSkill && needs.indexOf('progressSkill') >= 0) n++;
     // What the best piece shows, when the facts give it, comes before the
     // bare best piece (the sample voice, Nov 4). A frame that runs long
-    // falls to the next tier. The grade frames with even marks rotate with
-    // the others: when one is drafted, the Overall step says another
-    // strength instead of the even marks again.
+    // falls to the next tier.
     if ((ctx.pieceSkill && needs.indexOf('pieceSkill') >= 0) || (ctx.pieceComp && needs.indexOf('pieceComp') >= 0)) n++;
-    // The course's highest mark is the strength of last resort.
-    if (s.group === 'Overall' && needs.indexOf('level') >= 0 && needs.indexOf('assignment') >= 0) n--;
+    // The grade with even marks joined, as the sample has it, before the
+    // grade alone; the strength after it, in an even competency, before
+    // the other routes.
+    if (s.group === 'Grade' && ctx.evenResults && needs.indexOf('evenResults') >= 0) n++;
+    if (s.afterEven) n++;
     // Two for a story, so a frame written for the student's story comes
     // before one written for the strongest skill (`when.strongSkill`, bank
     // n6xx-n7xx), which comes before a general one.
@@ -5730,6 +5732,7 @@ window.CommentBank = (function () {
   }
 
   var SO_FAR = /\bso far\b/i;
+  var SHOW_TWICE = /\bshow(?:s|n|ing)?\b.*\bshow(?:s|n|ing)?\b/i;
   /* One pass of the draft over the steps in `seq`. usage: { sentence id:
      classmates } (classUsage()); exclude: { sentence id: true }. */
   function _compose(ctx, bank, seq, kept, seed, usage, exclude) {
@@ -5831,8 +5834,10 @@ window.CommentBank = (function () {
         // teacher can choose it; Generate never does.
         if (s.generate === false) return false;
         if (taken[s.id] || !_stepFits(s, step, ctx)) return false;
-        // Even marks said by the grade sentence are not said again.
+        // Even marks said by the grade sentence are not said again; the
+        // frames written to follow it (`afterEven`) need it said.
         if (said.even && s.when && s.when.evenWord) return false;
+        if (s.afterEven && !said.even) return false;
         // A fact the draft already states (the growing habits, the goal, the
         // competency that rose) is not said twice.
         if (
@@ -5896,6 +5901,9 @@ window.CommentBank = (function () {
         // voice, Nov 4: the grade is year to date).
         // On the IE path its Required parts keep their own wording.
         var twice = !(ctx._path === 'ie' && step.ie) && SO_FAR.test(t) && SO_FAR.test(sofar);
+        // A frame whose own "show" meets a skill that starts with it ("she
+        // has shown that she can show data patterns") reads badly.
+        if (SHOW_TWICE.test(t)) twice = true;
         return {
           s: s,
           t: t,
@@ -6095,7 +6103,15 @@ window.CommentBank = (function () {
       _orderSteps(opts.order, bank),
     );
     var previous = String(opts.previous == null ? '' : opts.previous).trim();
-    var usage = classUsage(bank, opts.comments, cid, sid);
+    // Another press: the sentences of the comment on screen count as used
+    // once more, so each part takes another of its frames where one fits
+    // (Colin, Nov 4: a second press should change more than a sentence).
+    var usage = classUsage(
+      bank,
+      (opts.comments || []).concat(previous ? [{ sid: '\u0000previous', text: previous }] : []),
+      cid,
+      sid,
+    );
     var exclude = {};
     (opts.exclude || []).forEach(function (id) {
       exclude[id] = true;
@@ -6364,7 +6380,9 @@ window.CommentBank = (function () {
     if (!def || !def.groups) return [];
     return _topTier(
       (bank || COMMENT_BANK).sentences.filter(function (s) {
-        return s.generate !== false && _stepFits(s, def, ctx);
+        // A frame that follows the grade's even marks (`afterEven`) fits
+        // only inside a draft that has them.
+        return s.generate !== false && !s.afterEven && _stepFits(s, def, ctx);
       }),
       ctx,
     );

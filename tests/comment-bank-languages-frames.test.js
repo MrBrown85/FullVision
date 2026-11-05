@@ -119,7 +119,12 @@ describe('the languages Overall frames', () => {
       });
       // The draft gets a languages even frame: the untagged ones carry the
       // skill and run past 20 words here.
-      const d = CommentBank.draft(ctx, { seed: 2 });
+      // With the grade's even-marks frames left out, so the Overall step says
+      // the even marks (the sample voice joins them to the grade, Nov 4).
+      const gradeEven = COMMENT_BANK.sentences
+        .filter(s => s.group === 'Grade' && (s.needs || []).indexOf('evenResults') >= 0)
+        .map(s => s.id);
+      const d = CommentBank.draft(ctx, { seed: 2, exclude: gradeEven });
       const ov = d.sentences.find(x => x.step === 'overall');
       expect(ov).toBeTruthy();
       expect(even.map(s => s.id)).toContain(ov.id);

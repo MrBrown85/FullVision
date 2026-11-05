@@ -176,7 +176,12 @@ describe('even results (evenComps)', () => {
       expect(ctx.evenResults).toBe('yes');
       expect(ctx._topSkill).toBe('');
       expect(CommentBank.nextStepOf(f.comps).id).toBe('d');
-      const d = CommentBank.draft(ctx, { seed: i, comments: comments.slice() });
+      // With the grade's even-marks frames left out, so the Overall step says
+      // the even marks (the sample voice joins them to the grade, Nov 4).
+      const gradeEven = COMMENT_BANK.sentences
+        .filter(s => s.group === 'Grade' && (s.needs || []).indexOf('evenResults') >= 0)
+        .map(s => s.id);
+      const d = CommentBank.draft(ctx, { seed: i, comments: comments.slice(), exclude: gradeEven });
       comments.push({ sid: 'st' + i, text: d.text });
       const row = d.sentences.find(x => x.step === 'overall');
       expect(row, 'student ' + i).toBeTruthy();
@@ -420,7 +425,7 @@ describe('the grade frames per proficiency word', () => {
         expect(s.text, s.id).toContain(w);
         expect(s.text, s.id).not.toMatch(/proficiency scale|this term/);
         expect(s.claims).toEqual((s.needs || []).indexOf('evenResults') >= 0 ? ['grade', 'evenResults'] : ['grade']);
-        expect(s.generate === false, s.id).toBe(/^gr/.test(s.id) || /^gv\d[45]$/.test(s.id));
+        expect(s.generate === false, s.id).toBe(/^gr/.test(s.id));
       });
       const starts = mine
         .filter(s => /^gr/.test(s.id))
@@ -437,7 +442,7 @@ describe('the grade frames per proficiency word', () => {
       const pool = CommentBank.stepPool('grade', ctx).map(s => s.id);
       expect(pool).not.toContain('gr05');
       frames
-        .filter(s => s.when.standing === w && s.generate !== false)
+        .filter(s => s.when.standing === w && s.generate !== false && !(s.needs || []).length)
         .forEach(s => expect(pool, s.id).toContain(s.id));
       WORDS.filter(x => x !== w).forEach(x =>
         frames.filter(s => s.when.standing === x).forEach(s => expect(pool, s.id).not.toContain(s.id)),

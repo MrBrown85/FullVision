@@ -94,13 +94,11 @@ describe('thin evidence (Moon, Nov 4): every part is written', () => {
     for (let seed = 1; seed <= 6; seed++) {
       const d = draftOf(f, seed);
       const steps = stepsOf(d);
-      ['grade', 'example', 'overall', 'habits', 'nextStep', 'home'].forEach(k =>
-        expect(steps, 'seed ' + seed).toContain(k),
-      );
+      ['grade', 'example', 'habits', 'nextStep', 'home'].forEach(k => expect(steps, 'seed ' + seed).toContain(k));
       // The strength: what the best piece shows, by its competency's label.
       const ex = d.sentences.find(x => x.step === 'example');
       expect(ex.text, 'seed ' + seed).toMatch(/reasoning and argument/);
-      expect(ex.text).toContain('“Thinking It Through: A Changing Worldview”');
+      expect(ex.text).toContain('her Thinking It Through: A Changing Worldview');
       // The next step is tentative: Ethical Judgment, the lowest on one
       // piece, by the table's Socials skill (a class not linked to the bank).
       expect(['nt01', 'nt02', 'nt03']).toContain(d.ids[steps.indexOf('nextStep')]);
@@ -227,9 +225,18 @@ describe('the sample shape in Demo Mode (Science 8, Report 2)', () => {
         steps.forEach(
           (k, j) => j && expect(order.indexOf(k), st.firstName).toBeGreaterThan(order.indexOf(steps[j - 1])),
         );
-        ['grade', 'example', 'overall', 'habits', 'nextStep', 'home'].forEach(k =>
+        ['grade', 'example', 'habits', 'nextStep', 'home'].forEach(k =>
           expect(steps, st.firstName + ' seed ' + seed).toContain(k),
         );
+        // A strength in every comment: its own sentence, what the best
+        // piece shows, growth, or even marks joined to the grade.
+        const ex = d.sentences.find(x => x.step === 'example');
+        const strength =
+          steps.indexOf('overall') >= 0 ||
+          steps.indexOf('growth') >= 0 ||
+          /shows (she|he|they) can|skill in/.test(ex.text) ||
+          /marks close/.test(d.sentences[0].text);
+        expect(strength, d.text).toBe(true);
         // Grade, best piece and strength wording off the retired list; the
         // habits frames keep "This term" (a term's ratings).
         d.sentences
@@ -253,14 +260,40 @@ describe('the sample shape in Demo Mode (Science 8, Report 2)', () => {
       /her [A-Z][\w ]+ is her best piece|best piece (so far )?is her [A-Z]|scored highest on her [A-Z]/i,
     );
     expect(ex.text).not.toMatch(/[“”]/);
+    // No two sentences name the same competency: the best piece, the
+    // strength and the next step each rest on their own.
+    getStudents(cid).forEach(st => {
+      const dd = CommentBank.draft(CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {}), { seed: 1 });
+      const compsOf = step => {
+        const i = dd.sentences.findIndex(x => x.step === step);
+        const pv = i >= 0 ? dd.provenance[i] : null;
+        const out = new Set();
+        Object.keys((pv && pv.sources) || {}).forEach(k =>
+          pv.sources[k].forEach(
+            x =>
+              /^comp:/.test(x) &&
+              ['piece', 'evenResults', 'evenWord', 'even', 'highestTop', 'split', 'spread', 'spreadAll'].indexOf(k) <
+                0 &&
+              out.add(x),
+          ),
+        );
+        return out;
+      };
+      const a = compsOf('example');
+      const b = compsOf('overall');
+      const c = compsOf('nextStep');
+      [...a].forEach(x => expect(b.has(x) || c.has(x), st.firstName + ' ' + x).toBe(false));
+      [...b].forEach(x => expect(c.has(x), st.firstName + ' ' + x).toBe(false));
+    });
   });
 
   it('a quiz, test or check scored highest; other work is the best piece', () => {
     expect(CommentBank.pieceTitle({ title: 'Lesson 4: Treaty Debate' })).toBe('Treaty Debate');
     expect(CommentBank.pieceTitle({ title: 'Thinking It Through: A Changing Worldview' })).toBe(
-      '“Thinking It Through: A Changing Worldview”',
+      'Thinking It Through: A Changing Worldview',
     );
-    expect(CommentBank.pieceTitle({ title: 'The Outsiders Essay' })).toBe('“The Outsiders Essay”');
+    expect(CommentBank.pieceTitle({ title: 'The Outsiders Essay' })).toBe('Outsiders Essay');
+    expect(CommentBank.pieceTitle({ title: 'What Does the Poster Show?' })).toBe('work “What Does the Poster Show?”');
     const liam = getStudents(cid).find(s => s.firstName === 'Liam');
     const f = CommentBank.facts(cid, liam, 'term-2');
     const ctx = CommentBank.context(f, {});
