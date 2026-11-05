@@ -115,7 +115,12 @@ test.describe('Phone grading card', () => {
 
   test('a criterion comment saves and survives a score tap', async ({ page }) => {
     await openLongRubric(page);
-    const box = () => card(page).locator('.m-crit-group').nth(1).locator('.m-crit-comment');
+    const group = () => card(page).locator('.m-crit-group').nth(1);
+    const box = () => group().locator('.m-crit-comment');
+    // No empty boxes: each criterion shows a Comment button instead.
+    await expect(card(page).locator('.m-crit-comment:visible')).toHaveCount(0);
+    await group().getByRole('button', { name: 'Comment' }).click();
+    await expect(box()).toBeFocused();
     await box().fill('Name the variable you change.');
     await box().blur();
     const saved = () =>
@@ -129,6 +134,15 @@ test.describe('Phone grading card', () => {
     expect(await saved()).toBe('Name the variable you change.');
     await card(page).locator('.m-crit-group').nth(1).locator('.m-score-btn[data-score="2"]').click();
     await expect(box()).toHaveValue('Name the variable you change.');
+    await expect(box()).toBeVisible();
+    await expect(group().getByRole('button', { name: 'Comment' })).toBeHidden();
     expect(await saved()).toBe('Name the variable you change.');
+
+    // Emptied, it clears and goes back behind its button.
+    await box().fill('');
+    await box().blur();
+    await expect(box()).toBeHidden();
+    await expect(group().getByRole('button', { name: 'Comment' })).toBeVisible();
+    expect(await saved()).toBe('');
   });
 });

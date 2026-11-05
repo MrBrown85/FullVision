@@ -4170,6 +4170,15 @@ body.fv-switching-course::after {
   justify-content: space-between;
   gap: 10px;
 }
+.m-crit-tools {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+.m-crit-comment[hidden],
+.m-crit-comment-btn[hidden] {
+  display: none;
+}
 .m-crit-name {
   min-width: 0;
   font-weight: 600;
@@ -4181,7 +4190,8 @@ body.fv-switching-course::after {
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6);
 }
 /* An Advanced Rubric's Checks button and the checklist under the row. */
-.m-checks-btn {
+.m-checks-btn,
+.m-crit-comment-btn {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
@@ -4369,7 +4379,8 @@ body.fv-switching-course::after {
 .m-scard-btn,
 .m-card-all,
 .m-seg-btn,
-.m-checks-btn {
+.m-checks-btn,
+.m-crit-comment-btn {
   min-height: 44px;
 }
 .m-card-all {

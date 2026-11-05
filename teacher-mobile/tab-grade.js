@@ -1318,7 +1318,10 @@ window.MGrade = (function () {
       '<div class="m-score-tag-label m-crit-label"><span class="m-crit-name">' +
       MC.esc(crit.name || 'Criterion') +
       '</span>' +
+      '<span class="m-crit-tools">' +
+      _critCommentBtnHtml(cid, st.id, assessment.id, crit) +
       checksBtn +
+      '</span>' +
       '</div>' +
       '<div class="m-score-btns" role="radiogroup" aria-label="Score for ' +
       MC.esc(crit.name || 'criterion') +
@@ -1341,11 +1344,14 @@ window.MGrade = (function () {
   }
 
   /* The criterion's comment (rubric_score.comment), as the desktop's speech
-     bubble: it prints under the criterion on the rubric handout. One line
-     that grows as the teacher types; it saves like the Overall Comment. */
+     bubble: it prints under the criterion on the rubric handout. Hidden
+     behind a Comment button until there is one, so a rubric with many
+     criteria doesn't fill with empty boxes. One line that grows as the
+     teacher types; it saves like the Overall Comment. */
   function _critCommentHtml(cid, sid, aid, crit) {
+    var text = getRubricCriterionComment(cid, sid, aid, crit);
     return (
-      '<textarea class="m-crit-comment" rows="1" maxlength="500" placeholder="Comment" aria-label="Comment on ' +
+      '<textarea class="m-crit-comment" rows="1" maxlength="500" aria-label="Comment on ' +
       MC.esc(crit.name || 'criterion') +
       '" data-sid="' +
       sid +
@@ -1353,10 +1359,47 @@ window.MGrade = (function () {
       aid +
       '" data-critid="' +
       crit.id +
-      '">' +
-      MC.esc(getRubricCriterionComment(cid, sid, aid, crit)) +
+      '"' +
+      (text ? '' : ' hidden') +
+      '>' +
+      MC.esc(text) +
       '</textarea>'
     );
+  }
+
+  // html-safe: fixed markup; sid, aid and critId are ids.
+  function _critCommentBtnHtml(cid, sid, aid, crit) {
+    var has = !!getRubricCriterionComment(cid, sid, aid, crit);
+    return (
+      '<button class="m-crit-comment-btn"' +
+      (has ? ' hidden' : '') +
+      ' data-action="m-grade-crit-comment" data-sid="' +
+      sid +
+      '" data-aid="' +
+      aid +
+      '" data-critid="' +
+      crit.id +
+      '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Comment</button>'
+    );
+  }
+
+  // Comment tapped: show the criterion's box and put the cursor in it.
+  function openCritComment(btn) {
+    var group = btn.closest('.m-crit-group');
+    var box = group && group.querySelector('.m-crit-comment');
+    if (!box) return;
+    box.hidden = false;
+    btn.hidden = true;
+    box.focus();
+  }
+
+  // Left empty: back behind its button.
+  function _closeEmptyCritComment(el) {
+    if (el.value.trim()) return;
+    el.hidden = true;
+    var group = el.closest('.m-crit-group');
+    var btn = group && group.querySelector('.m-crit-comment-btn');
+    if (btn) btn.hidden = false;
   }
 
   function _fitCritComment(el) {
@@ -1842,7 +1885,10 @@ window.MGrade = (function () {
     });
     swiper.addEventListener('focusout', function (e) {
       if (e.target.classList.contains('m-overall-comment')) return _saveOverallComment(cid, e.target);
-      if (e.target.classList.contains('m-crit-comment')) return _saveCritComment(cid, e.target);
+      if (e.target.classList.contains('m-crit-comment')) {
+        _saveCritComment(cid, e.target);
+        return _closeEmptyCritComment(e.target);
+      }
       if (!e.target.classList.contains('m-pts-input')) return;
       selectOnUp = null;
       commitPointsInput(cid, e.target);
@@ -2246,6 +2292,7 @@ window.MGrade = (function () {
     setCriterionMod: setCriterionMod,
     setGradeView: setGradeView,
     toggleChecklist: toggleChecklist,
+    openCritComment: openCritComment,
     tickCheck: tickCheck,
     setStatus: setStatus,
     adjustPointsScore: adjustPointsScore,

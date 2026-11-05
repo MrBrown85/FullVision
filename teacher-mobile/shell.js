@@ -1245,6 +1245,11 @@
         return;
       }
 
+      if (action === 'm-grade-crit-comment') {
+        MGrade.openCritComment(target);
+        return;
+      }
+
       if (action === 'm-grade-tick') {
         MGrade.tickCheck(
           _cid,
