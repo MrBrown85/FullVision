@@ -6,14 +6,11 @@
  *
  * - A cell has at least four frames that differ in structure.
  * - A frame fits only at its rating, and verify() fails it at any other.
- * - Generate drafts a cell frame only when exactly one habit is rated below
- *   Usually: that habit's frames share the summary's tier and rotate with
- *   it, least used first, and every one names that habit. A Sometimes or
- *   Rarely frame names a thing to do (advises), so while the Next Step step
- *   will give the comment its one next step, the habits step takes the
- *   summary and the frame stays in Other Wording and Browse Sentences.
- * - Other Wording on a cell row offers only that cell's frames; on the
- *   summary row, cell frames whose rating matches are eligible.
+ * - Generate never drafts a cell frame (Nov 4): the habits part for
+ *   families says the student's habits together (hf01-hf38). The cell
+ *   frames stay in Other Wording and Browse Sentences.
+ * - Other Wording on a cell row offers only that cell's frames; on a row of
+ *   the habits part for families, only that part's frames.
  * - A rating change still redraws the habits sentence (#586).
  * - The taxonomy fields (habit, level, skill, standing) match `when`.
  */
@@ -28,7 +25,8 @@ const LEVELS = [1, 2, 3, 4];
 const all = v => Object.fromEntries(KEYS.map(k => [k, v]));
 const cells = () => COMMENT_BANK.sentences.filter(s => s.group === 'Habit Ratings');
 const cell = (habit, level) => cells().filter(s => s.habit === habit && s.level === level);
-const summaries = () => COMMENT_BANK.sentences.filter(s => s.group === 'Work Habits');
+const FAMILY = ['Habits in Class', 'More Habits in Class', 'Habits That Would Help'];
+const summaries = () => COMMENT_BANK.sentences.filter(s => FAMILY.indexOf(s.group) >= 0);
 /* The Next Step frames, excluded where a cell frame is to be drafted: with
    a next step in the comment, the habits step takes the summary. */
 const nextSteps = () => COMMENT_BANK.sentences.filter(s => s.group === 'Next Step').map(s => s.id);
@@ -207,160 +205,41 @@ describe('the Habit Ratings cells', () => {
 });
 
 describe('Generate and the Habit Ratings frames', () => {
-  const drafted = (habits, comments, seed) =>
-    habitsRow(CommentBank.draft(ctxFor(habits), { seed: seed || 1, comments: comments || [], exclude: nextSteps() }));
-  /* The habits sentence of n classmates with the same ratings, drafted in
-     turn with each draft a classmate's comment (exhaust before repeat). */
-  const overClass = (habits, n) => {
-    const comments = [];
-    const rows = [];
-    for (let i = 1; i <= n; i++) {
-      const d = CommentBank.draft(ctxFor(habits, { sid: 'cell-s' + i }), {
-        seed: i,
-        comments: comments.slice(),
-        exclude: nextSteps(),
-      });
-      comments.push({ sid: 'cell-s' + i, text: d.text });
-      rows.push(habitsRow(d));
-    }
-    return rows;
-  };
-
-  it('keeps the summary sentence as the only pick at Usually and Consistently', () => {
+  it('never drafts a cell frame, at any rating, with or without a next step, even once the habits part’s frames are used', () => {
     KEYS.forEach(habit =>
-      [3, 4].forEach(level => {
-        for (let seed = 1; seed <= 4; seed++) {
-          const row = drafted({ ...all(4), [habit]: level }, [], seed);
-          expect(row, habit + ' ' + level).toBeTruthy();
-          expect(row.id, habit + ' ' + level + ' seed ' + seed).toMatch(/^hs/);
-        }
-      }),
-    );
-  });
-
-  it('with one habit below Usually and a next step in the comment, the habits step takes the summary; the cell frames stay in Other Wording and Browse', () => {
-    KEYS.forEach(habit =>
-      [1, 2].forEach(level => {
+      LEVELS.forEach(level => {
         const habits = { ...all(4), [habit]: level };
-        const ctx = ctxFor(habits, withNext);
-        const comments = summariesUsed(ctx);
-        for (let seed = 1; seed <= 3; seed++) {
-          const d = CommentBank.draft(ctx, { seed, comments });
-          expect(
-            d.sentences.some(x => x.step === 'nextStep'),
-            habit + ' ' + level,
-          ).toBe(true);
-          const row = habitsRow(d);
-          expect(row, habit + ' ' + level).toBeTruthy();
-          expect(row.id, habit + ' ' + level).toMatch(/^hs/);
-          // One advising sentence: the Next Step step's.
-          const advising = d.sentences.filter(x =>
-            CommentBank.advises(COMMENT_BANK.sentences.find(s => s.id === x.id)),
-          );
-          expect(
-            advising.map(x => x.step),
-            habit + ' ' + level,
-          ).toEqual(['nextStep']);
-          const usage = {};
-          summaries().forEach(s => (usage[s.id] = 1));
-          const alts = RQ.alternatives(
-            { id: row.id, step: 'habits', s: COMMENT_BANK.sentences.find(s => s.id === row.id), text: row.text },
-            ctx,
-            usage,
-            {},
-          );
-          expect(alts.length, habit + ' ' + level).toBe(2);
-          alts.forEach(s => {
-            expect(s.group, s.id).toBe('Habit Ratings');
-            expect(CommentBank.fits(s, ctx), s.id).toBe(true);
-          });
+        [ctxFor(habits), ctxFor(habits, withNext)].forEach(ctx => {
+          const comments = summariesUsed(ctx);
+          for (let seed = 1; seed <= 3; seed++) {
+            const d = CommentBank.draft(ctx, { seed, comments });
+            d.sentences
+              .filter(x => /^habits/.test(x.step))
+              .forEach(x => expect(x.id, habit + ' ' + level + ' seed ' + seed).toMatch(/^hf/));
+            expect(
+              d.ids.some(id => /^hl/.test(id)),
+              habit + ' ' + level,
+            ).toBe(false);
+          }
+          // The cell frames stay in Browse Sentences.
           const browse = RQ.browseList('habits', ctx, { fits: true }).rows.map(r => r.id);
           cell(habit, level).forEach(s => expect(browse, s.id).toContain(s.id));
-        }
-      }),
-    );
-  });
-
-  it('with one habit below Usually and no next step, that habit’s cell frames share the summary’s tier and rotate with it from the first student', () => {
-    KEYS.forEach(habit =>
-      [1, 2].forEach(level => {
-        const habits = { ...all(4), [habit]: level };
-        const ctx = ctxFor(habits);
-        const pool = summaries()
-          .filter(s => CommentBank.fits(s, ctx))
-          .map(s => s.id)
-          .concat(cell(habit, level).map(s => s.id));
-        const rows = overClass(habits, pool.length);
-        const ids = rows.map(r => r.id);
-        // Exhaust before repeat over both sets: every frame once before any twice.
-        expect(ids.slice().sort(), habit + ' ' + level).toEqual(pool.slice().sort());
-        // A cell frame comes before the summary frames alone could run out.
-        expect(
-          ids.slice(0, pool.length - cell(habit, level).length).some(id => /^hl/.test(id)),
-          habit + ' ' + level,
-        ).toBe(true);
-        rows.forEach(r => {
-          const s = COMMENT_BANK.sentences.find(x => x.id === r.id);
-          if (s.habit) expect([s.habit, s.level], r.id).toEqual([habit, level]);
-          expect(r.text, r.id).not.toMatch(/[{}[\]]/);
         });
       }),
     );
   });
 
-  it('never drafts a cell frame when no habit, or two, are rated below Usually', () => {
-    [
-      all(4),
-      { ...all(4), ready: 3 },
-      { ...all(4), feedback: 2, devices: 1 },
-      { ...all(3), part: 2, others: 2 },
-    ].forEach(habits => {
-      const ctx = ctxFor(habits);
-      const comments = summariesUsed(ctx);
-      for (let seed = 1; seed <= 4; seed++) {
-        const row = drafted(habits, comments, seed);
-        if (row) expect(row.id, JSON.stringify(habits)).not.toMatch(/^hl/);
-      }
-    });
-  });
-
-  it('verify() fails a cell frame at any other rating', () => {
-    const habits = { ...all(4), feedback: 2 };
-    const f = facts({ habits });
-    const d = CommentBank.draft(CommentBank.context(f, {}), {
-      seed: 1,
-      comments: summariesUsed(ctxFor(habits)),
-      exclude: nextSteps(),
-    });
-    const row = habitsRow(d);
-    expect(row.id).toMatch(/^hl/);
-    expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
-    [1, 3, 4, 5].forEach(lv => {
-      const v = CommentBank.verify(d, facts({ habits: { ...all(4), feedback: lv } }), {});
-      const mine = v.replaced.find(r => r.sentenceId === row.id);
-      expect(mine, 'feedback ' + lv).toBeTruthy();
-      expect(mine.failed).toContain('habits');
-    });
-  });
-
-  it('a rating change redraws a cell frame as the habits sentence, and nothing else (#586)', () => {
-    const habits = { ...all(4), feedback: 2 };
-    const prev = CommentBank.draft(ctxFor(habits), {
-      seed: 1,
-      comments: summariesUsed(ctxFor(habits)),
-      exclude: nextSteps(),
-    });
-    expect(habitsRow(prev).id).toMatch(/^hl/);
+  it('a rating change redraws the habits part, and nothing else (#586)', () => {
+    const prev = CommentBank.draft(ctxFor({ ...all(4), feedback: 2 }), { seed: 1, exclude: nextSteps() });
     const d = CommentBank.redrawHabits(ctxFor({ ...all(4), devices: 1 }), prev);
-    expect(d.habits.before).toBe(habitsRow(prev).text);
-    expect(d.habits.after).toMatch(/using devices well/);
+    expect(d.habits.after).toMatch(/keeping his phone and devices on his work\.$/);
     expect(d.sentences.map(x => x.step)).toEqual(prev.sentences.map(x => x.step));
     expect(d.text).toBe(prev.text.replace(d.habits.before, d.habits.after));
   });
 });
 
 describe('Other Wording and the Habit Ratings frames', () => {
-  const rowOf = s => ({ id: s.id, step: 'habits', s, text: s.text });
+  const rowOf = s => ({ id: s.id, step: CommentBank.stepOf(s), s, text: s.text });
 
   it('on a cell row offers only that cell’s other frames', () => {
     KEYS.forEach(habit =>
@@ -378,16 +257,17 @@ describe('Other Wording and the Habit Ratings frames', () => {
     );
   });
 
-  it('on the summary row, a cell frame whose rating matches is eligible once the summary frames are used', () => {
+  it('on a row of the habits part for families, offers only that part’s frames, never a cell frame', () => {
     const ctx = ctxFor({ ...all(4), part: 2 });
-    const usage = {};
-    summaries().forEach(s => (usage[s.id] = 1));
-    const row = summaries().find(s => CommentBank.fits(s, ctx));
-    const alts = RQ.alternatives(rowOf(row), ctx, usage, {});
-    expect(alts).toHaveLength(2);
-    alts.forEach(s => {
-      expect(s.group).toBe('Habit Ratings');
-      expect(CommentBank.fits(s, ctx)).toBe(true);
+    FAMILY.forEach(group => {
+      const row = summaries().find(s => s.group === group && CommentBank.fits(s, ctx));
+      if (!row) return;
+      const alts = RQ.alternatives(rowOf(row), ctx, {}, {});
+      expect(alts.length, group).toBeGreaterThan(0);
+      alts.forEach(s => {
+        expect(s.group).toBe(group);
+        expect(CommentBank.fits(s, ctx)).toBe(true);
+      });
     });
   });
 });
@@ -396,11 +276,9 @@ describe('one next step a comment (advises)', () => {
   const adv = {
     id: 'zz-adv',
     part: 'habits',
-    group: 'Habit Ratings',
-    text: 'The next step for {him} is one thing.',
-    when: { feedback: 2 },
-    habit: 'feedback',
-    level: 2,
+    group: 'Habits That Would Help',
+    text: 'The next step for {him} is {habitHelpOne}.',
+    needs: ['habitHelpOne'],
     claims: ['habits'],
     advises: true,
     src: 'new',
@@ -418,7 +296,7 @@ describe('one next step a comment (advises)', () => {
   const bank = () => ({ parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([adv, next]) });
   const exclude = () =>
     summaries()
-      .concat(cell('feedback', 2))
+      .filter(s => s.group === 'Habits That Would Help')
       .map(s => s.id);
   const advising = d => d.sentences.filter(x => CommentBank.advises(bank().sentences.find(s => s.id === x.id)));
 
@@ -438,7 +316,12 @@ describe('one next step a comment (advises)', () => {
     expect(d.sentences.some(x => x.step === 'nextStep')).toBe(true);
     expect(d.ids).not.toContain('zz-adv');
     expect(advising(d)).toHaveLength(1);
-    const first = CommentBank.draft(ctx, { seed: 1, bank: bank(), exclude: exclude(), order: ['nextStep', 'habits'] });
+    const first = CommentBank.draft(ctx, {
+      seed: 1,
+      bank: bank(),
+      exclude: exclude(),
+      order: ['nextStep', 'habits', 'habitsBuild'],
+    });
     expect(first.sentences.some(x => x.step === 'nextStep')).toBe(true);
     expect(first.ids).not.toContain('zz-adv');
     expect(advising(first)).toHaveLength(1);
@@ -451,7 +334,7 @@ describe('one next step a comment (advises)', () => {
         ['zz-next'],
         COMMENT_BANK.sentences.filter(s => s.group === 'Next Step').map(s => s.id),
       ),
-      order: ['nextStep', 'habits'],
+      order: ['nextStep', 'habits', 'habitsBuild'],
     });
     expect(alone.ids).toContain('zz-adv');
     expect(advising(alone)).toHaveLength(1);

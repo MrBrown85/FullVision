@@ -72,6 +72,16 @@ function fullContext(p, habits) {
     absentOnly: 'yes',
     lateOnly: 'yes',
     strongHabits: 'comes to class ready',
+    habitsStrong: 'hands in her work on time and comes to class ready to start',
+    habitsUsually: 'joins in class discussions',
+    habitsUsuallyShort: 'yes',
+    habitsSteady: 'works well with others in a group',
+    habitsSomeDays: 'comes to class ready',
+    habitsStrongMore: 'listens to others',
+    habitsUsuallyMore: 'joins in class discussions',
+    habitsUsuallyMoreShort: 'yes',
+    habitHelpOne: 'using feedback to improve her work',
+    habitsHelpTwo: 'using feedback to improve her work, and sharing her ideas in class discussions',
     missingTitle: '“Energy Lab”',
     missingTitles: '“Energy Lab” and “Poster”',
     missingMany: 'yes',
@@ -81,10 +91,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 1702 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(1702);
+  it('has 1707 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(1707);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1702);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(1707);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -236,6 +246,16 @@ describe('the bank', () => {
       habitsToBuild: 'habits',
       habitStrengths: 'habits',
       strongHabits: 'habits',
+      habitsStrong: 'habits',
+      habitsUsually: 'habits',
+      habitsUsuallyShort: 'habits',
+      habitsSteady: 'habits',
+      habitsSomeDays: 'habits',
+      habitsStrongMore: 'habits',
+      habitsUsuallyMore: 'habits',
+      habitsUsuallyMoreShort: 'habits',
+      habitHelpOne: 'habits',
+      habitsHelpTwo: 'habits',
       absent: 'attendance',
       attendance: 'attendance',
       late: 'attendance',
@@ -376,9 +396,9 @@ describe('fill', () => {
   });
 
   it('puts a habit phrase in as the context gives it', () => {
-    const hs08 = COMMENT_BANK.sentences.find(s => s.id === 'hs08');
-    expect(CommentBank.fill(hs08, fullContext(P.he))).toBe(
-      'His work habits to build are using feedback and taking part in class.',
+    const hf34 = COMMENT_BANK.sentences.find(s => s.id === 'hf34');
+    expect(CommentBank.fill(hf34, fullContext(P.he))).toBe(
+      'Two habits would help him most: using feedback to improve her work, and sharing her ideas in class discussions.',
     );
   });
 });
@@ -420,7 +440,15 @@ describe('fill takes values as written', () => {
     expect(CommentBank.context({ ...f, family: 'pe' }, {}).habitToBuild).toBe('taking a full part in every activity');
     expect(CommentBank.context(f, {}).habitToBuild).toBe('completing work on time');
     const strong = { ...f, family: 'arts', pronounsOnFile: true, habits: { completes: 4, feedback: 4 } };
-    expect(CommentBank.context(strong, {}).habitStrengths).toBe('She completes her work and uses feedback.');
+    expect(CommentBank.context(strong, {}).habitStrengths).toBe(
+      'She completes her work and uses feedback to improve her work.',
+    );
+    // The habits part for families says the same in the class's words.
+    expect(CommentBank.context(strong, {}).habitsStrong).toBe(
+      'completes her work and uses feedback to improve her work',
+    );
+    expect(CommentBank.context({ ...f, family: 'arts' }, {}).habitHelpOne).toBe('completing her work');
+    expect(CommentBank.context({ ...f, family: 'pe' }, {}).habitHelpOne).toBe('taking a full part in every activity');
   });
 });
 
@@ -607,22 +635,23 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   };
 
   // The habits part: Completes Work from the record is the one strong
-  // habit, so the four Strong Habits frames (hs11, hs13-hs15) fit, and the
-  // five Habit Ratings frames for Completes Work at Consistently.
-  it('knows the Demo class is Science from its name, and offers Cece 78 sentences (9, 40, 4, 25)', () => {
+  // habit, so the three Strong Habits frames (hs11, hs13, hs15) and the
+  // five Habit Ratings frames for Completes Work at Consistently fit. The
+  // record alone gives no habits part for families (nothing rated).
+  it('knows the Demo class is Science from its name, and offers Cece 77 sentences (8, 40, 4, 25)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 4, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(78);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([8, 40, 4, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(77);
   });
 
-  it('offers Jasper 79 (9, 40, 5, 25), by the name he goes by', () => {
+  it('offers Jasper 78 (8, 40, 5, 25), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
     // Overall: every competency is Proficient as the report grades it
     // (2.9 to 3.3), so the even-results frames fit (Nov 3).
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 5, 25]);
-    expect(CommentBank.fitCount(ctx)).toBe(79);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([8, 40, 5, 25]);
+    expect(CommentBank.fitCount(ctx)).toBe(78);
     expect(ctx.name).toBe('Jas');
     // Nothing fell from Extending since Report 1's year to date (it fell
     // four times inside Term 2's own trend, which Generate no longer
@@ -704,7 +733,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
-    expect(habits.fit).toBe(4 + 6 + 5);
+    expect(habits.fit).toBe(3 + 6 + 5);
     // The attendance frames for both counts (plan, Sentence grammar: both
     // halves said, the exact counts): h60 and the five both-count frames.
     const att = habits.rows.filter(r => r.group === 'Attendance');
@@ -723,17 +752,20 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const rated = { completes: 4, ready: 3, others: 4, part: 2, feedback: 4, devices: 3 };
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), { habits: rated });
     const d = CommentBank.draft(ctx, { seed: 1 });
-    expect(d.sentences.filter(x => x.step === 'habits').map(x => x.text)).toEqual([
-      // Takes Part is the one habit rated below Usually: the summary frame
-      // or a Habit Ratings frame for it names it.
-      expect.stringMatching(/tak(e|es|ing) part|discussion|question/i),
+    // The habits part for families (Nov 4): what she does at Consistently,
+    // then Takes Part, the one habit rated below Usually, as the habit that
+    // would help.
+    expect(d.sentences.filter(x => /^habits/.test(x.step)).map(x => x.text)).toEqual([
+      expect.stringMatching(/hands in her work on time, listens to others, and uses feedback to improve her work\.$/),
+      expect.stringMatching(/sharing her ideas in class discussions\.$/),
     ]);
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
     // The Demo class has no closing sentence or support lines set, so the
     // comment leaves those out (plan PR 8): the grade, the best piece, the
     // habits, the strengths (Cece's results are even: evenComps), the next
-    // step and the family sentence; six, so not flagged short, never padded.
-    expect(sentences.length).toBe(6);
+    // step and the family sentence; six as the plan counts them (the habits
+    // part is one, in two sentences), so not flagged short, never padded.
+    expect(sentences.length).toBe(7);
     expect(d.sentences.some(x => x.step === 'overall')).toBe(true);
     expect(d.short).toBe(false);
     expect(d.text).not.toMatch(/[{}[\]]/);

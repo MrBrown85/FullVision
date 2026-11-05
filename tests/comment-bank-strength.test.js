@@ -152,17 +152,20 @@ describe('bankStrength on a synthetic History 12 class', () => {
     r = CommentBank.bankStrength(cid, { termId });
   });
 
-  it('the habits part is not thin: the six "excellent" frames fit every student rated all Consistently, six or more', () => {
+  it('the habits part is not thin: the six {habitsStrong} frames fit every student rated all Consistently, six or more', () => {
     const excellent = getStudents(cid).filter(st => {
       const f = CommentBank.facts(cid, st, termId);
       const rating = getStudentTermRating(cid, st.id, termId) || {};
       const ctx = CommentBank.context(f, { habits: rating.habits || {} });
-      return CommentBank.reportPath(f) !== 'ie' && ctx.habitsExcellent;
+      return CommentBank.reportPath(f) !== 'ie' && ctx.habitsExcellent && !!ctx.habitsStrong;
     });
     expect(excellent.length).toBeGreaterThanOrEqual(6);
-    excellent.forEach(st =>
-      expect(r.byStudent[st.id].habits).toEqual({ sentences: 6, students: excellent.length, thin: false }),
-    );
+    // A habits frame holds the student's own habits, so only students whose
+    // habits read the same share it (bankStrength keys it by its text).
+    excellent.forEach(st => {
+      expect(r.byStudent[st.id].habits).toMatchObject({ sentences: 6, thin: false });
+      expect(r.byStudent[st.id].habits.students).toBeLessThanOrEqual(excellent.length);
+    });
     expect(r.parts.find(p => p.step === 'habits').thin).toBe(false);
   });
 

@@ -3140,7 +3140,12 @@ window.ReportQuestionnaire = (function () {
     { id: 'grade', label: 'Grade', steps: ['grade'] },
     { id: 'bestPiece', label: 'Best Piece', word: 'best piece', steps: ['example'] },
     { id: 'strengths', label: 'Strengths', word: 'strength', steps: ['opening', 'overall', 'growth'] },
-    { id: 'habits', label: 'Habits', word: 'habit', steps: ['habits', 'attendance', 'strongHabits'] },
+    {
+      id: 'habits',
+      label: 'Habits',
+      word: 'habit',
+      steps: ['habits', 'habitsMore', 'habitsBuild', 'attendance', 'strongHabits'],
+    },
     { id: 'notHandedIn', label: 'Not Handed In', steps: ['notHandedIn', 'lateWork'] },
     { id: 'nextStep', label: 'Next Step', word: 'next step', steps: ['nextStep', 'goWords', 'home'] },
     { id: 'support', label: 'Support', steps: ['support'] },
@@ -4434,6 +4439,7 @@ window.ReportQuestionnaire = (function () {
      row (one habit at one rating, `habit` and `level`), only that cell's
      other frames; on the summary row, the summary's frames and any cell
      frame whose rating matches. */
+  var FAMILY_HABIT_GROUPS = { 'Habits in Class': 1, 'More Habits in Class': 1, 'Habits That Would Help': 1 };
   function alternatives(row, ctx, usage, taken, bank) {
     var step = row.step ? _stepDef(row.step) : null;
     if (!step || step.line || !row.s) return [];
@@ -4450,6 +4456,9 @@ window.ReportQuestionnaire = (function () {
       .filter(function (s) {
         if (s.id === row.id || s.part !== step.part || step.groups.indexOf(s.group) < 0) return false;
         if (cell && (s.habit !== cell.habit || s.level !== cell.level)) return false;
+        // A sentence of the habits part for families: only its own group's
+        // frames (the same slot fits), never a one-habit Habit Ratings frame.
+        if (FAMILY_HABIT_GROUPS[row.s.group] && s.group !== row.s.group) return false;
         if (taken[s.id] || !CommentBank.fits(s, ctx) || claims(s) !== same) return false;
         if (step.prefer && ctx[step.prefer] && (s.needs || []).indexOf(step.prefer) < 0) return false;
         if (
@@ -4739,7 +4748,7 @@ window.ReportQuestionnaire = (function () {
     if (row.edited) return 'Edited by you · kept when you regenerate';
     if (row.step === 'attendance') return 'From Attendance above · new';
     if (row.step === 'grade') return _gradeSource(cid, f);
-    if (row.step === 'habits' || row.step === 'strongHabits') return _habitsSource(cid, student, f);
+    if (/^(habits|habitsMore|habitsBuild|strongHabits)$/.test(row.step || '')) return _habitsSource(cid, student, f);
     var keys = ((row.prov && row.prov.factKeys) || []).slice();
     var bits = [];
     var next = row.step === 'nextStep' ? CommentBank.nextSkillOf(f) : null;

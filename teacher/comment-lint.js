@@ -440,7 +440,18 @@ window.CommentLint = (function () {
   // The plan's own Not Handed In wording (Sentence grammar: "One assignment
   // is not handed in"), a participle the bank's frames repeat; "hand in"
   // as a verb ("needs to hand in the work") stays banned.
-  var PLAN_PHRASES = [/\bnot handed in\b/gi];
+  // The habits part for families (Colin, Nov 4) says Completes Work and
+  // Comes Ready in the words he approved, from the habit's own hint
+  // ("Hands in assignments"): "hands in her work on time", "handing in
+  // each task by its due date", "getting started as soon as class
+  // begins". Only these exact phrases pass; any other "hand in" or "get
+  // started" stays banned.
+  var PLAN_PHRASES = [
+    /\bnot handed in\b/gi,
+    /\bhands? in (X|his|her|their) work on time\b/gi,
+    /\bhanding in each task by its due date\b/gi,
+    /\bgetting started as soon as class begins\b/gi,
+  ];
 
   function findings(text) {
     var out = [];
