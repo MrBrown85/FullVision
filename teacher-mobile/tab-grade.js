@@ -683,6 +683,7 @@ window.MGrade = (function () {
     swiper.innerHTML = tmp.querySelector('#m-swiper').innerHTML;
     // html-safe: copied from the checked renderSwiper markup above
     strip.innerHTML = tmp.querySelector('#m-thumb-strip').innerHTML;
+    _fitCritComments(swiper);
     var total = strip.querySelectorAll('.m-thumb').length;
     jumpToStudent(Math.min(idx, total - 1), true);
   }
@@ -1317,7 +1318,10 @@ window.MGrade = (function () {
       '<div class="m-score-tag-label m-crit-label"><span class="m-crit-name">' +
       MC.esc(crit.name || 'Criterion') +
       '</span>' +
+      '<span class="m-crit-tools">' +
+      _critCommentBtnHtml(cid, st.id, assessment.id, crit) +
       checksBtn +
+      '</span>' +
       '</div>' +
       '<div class="m-score-btns" role="radiogroup" aria-label="Score for ' +
       MC.esc(crit.name || 'criterion') +
@@ -1334,8 +1338,91 @@ window.MGrade = (function () {
       _modBtnsHtml(state.mixed ? 0 : state.level, state.mod) +
       '</div>' +
       (open ? _checklistHtml(cid, st.id, assessment.id, crit, state) : '') +
+      _critCommentHtml(cid, st.id, assessment.id, crit) +
       '</div>'
     );
+  }
+
+  /* The criterion's comment (rubric_score.comment), as the desktop's speech
+     bubble: it prints under the criterion on the rubric handout. Hidden
+     behind a Comment button until there is one, so a rubric with many
+     criteria doesn't fill with empty boxes. One line that grows as the
+     teacher types; it saves like the Overall Comment. */
+  function _critCommentHtml(cid, sid, aid, crit) {
+    var text = getRubricCriterionComment(cid, sid, aid, crit);
+    return (
+      '<textarea class="m-crit-comment" rows="1" maxlength="500" aria-label="Comment on ' +
+      MC.esc(crit.name || 'criterion') +
+      '" data-sid="' +
+      sid +
+      '" data-aid="' +
+      aid +
+      '" data-critid="' +
+      crit.id +
+      '"' +
+      (text ? '' : ' hidden') +
+      '>' +
+      MC.esc(text) +
+      '</textarea>'
+    );
+  }
+
+  // html-safe: fixed markup; sid, aid and critId are ids.
+  function _critCommentBtnHtml(cid, sid, aid, crit) {
+    var has = !!getRubricCriterionComment(cid, sid, aid, crit);
+    return (
+      '<button class="m-crit-comment-btn"' +
+      (has ? ' hidden' : '') +
+      ' data-action="m-grade-crit-comment" data-sid="' +
+      sid +
+      '" data-aid="' +
+      aid +
+      '" data-critid="' +
+      crit.id +
+      '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>Comment</button>'
+    );
+  }
+
+  // Comment tapped: show the criterion's box and put the cursor in it.
+  function openCritComment(btn) {
+    var group = btn.closest('.m-crit-group');
+    var box = group && group.querySelector('.m-crit-comment');
+    if (!box) return;
+    box.hidden = false;
+    btn.hidden = true;
+    box.focus();
+  }
+
+  // Left empty: back behind its button.
+  function _closeEmptyCritComment(el) {
+    if (el.value.trim()) return;
+    el.hidden = true;
+    var group = el.closest('.m-crit-group');
+    var btn = group && group.querySelector('.m-crit-comment-btn');
+    if (btn) btn.hidden = false;
+  }
+
+  function _fitCritComment(el) {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }
+
+  function _fitCritComments(root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('.m-crit-comment').forEach(function (el) {
+      if (el.value) _fitCritComment(el);
+    });
+  }
+
+  function _saveCritComment(cid, el) {
+    var key = el.dataset.sid + ':' + el.dataset.aid + ':' + el.dataset.critid;
+    clearTimeout(_commentTimers[key]);
+    delete _commentTimers[key];
+    var found = _findCriterion(cid, el.dataset.aid, el.dataset.critid);
+    if (!found) return;
+    var text = el.value.trim();
+    if (text === getRubricCriterionComment(cid, el.dataset.sid, el.dataset.aid, found.crit)) return;
+    saveRubricCriterionComment(cid, el.dataset.sid, el.dataset.aid, el.dataset.critid, text);
   }
 
   /* Redraw one student's card in place after a criterion change. */
@@ -1351,7 +1438,14 @@ window.MGrade = (function () {
     var unit = _swiperUnits(cid, assessment).find(function (u) {
       return u.st.id === sid;
     });
+    // The card is its own vertical scroller: keep its place, or every tap on
+    // a lower criterion jumps back to the top.
+    var top = card.scrollTop;
     card.outerHTML = _renderStudentCard(cid, st, assessment, getScores(cid), getAssignmentStatuses(cid), unit);
+    var fresh = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
+    if (!fresh) return;
+    _fitCritComments(fresh);
+    fresh.scrollTop = top;
   }
 
   /* Write one level (and ±) under every key of a criterion, undoable as one. */
@@ -1437,6 +1531,7 @@ window.MGrade = (function () {
         return _renderStudentCard(cid, u.st, assessment, scores, statuses, u);
       })
       .join('');
+    _fitCritComments(swiper);
     swiper.scrollLeft = left;
   }
 
@@ -1726,6 +1821,7 @@ window.MGrade = (function () {
       return tag && tag.bank_id;
     });
     if (hasBank && window.CompetencyWording) CompetencyWording.loadBank();
+    _fitCritComments(swiper);
 
     // Points field: tapping selects the number so typing replaces it; Done
     // or tapping away saves. The tap's mouseup would put the caret back, so
@@ -1789,12 +1885,26 @@ window.MGrade = (function () {
     });
     swiper.addEventListener('focusout', function (e) {
       if (e.target.classList.contains('m-overall-comment')) return _saveOverallComment(cid, e.target);
+      if (e.target.classList.contains('m-crit-comment')) {
+        _saveCritComment(cid, e.target);
+        return _closeEmptyCritComment(e.target);
+      }
       if (!e.target.classList.contains('m-pts-input')) return;
       selectOnUp = null;
       commitPointsInput(cid, e.target);
     });
     // The Overall Comment saves as the teacher types and when they leave it.
     swiper.addEventListener('input', function (e) {
+      if (e.target.classList.contains('m-crit-comment')) {
+        var box = e.target;
+        _fitCritComment(box);
+        var ckey = box.dataset.sid + ':' + box.dataset.aid + ':' + box.dataset.critid;
+        clearTimeout(_commentTimers[ckey]);
+        _commentTimers[ckey] = setTimeout(function () {
+          _saveCritComment(cid, box);
+        }, 800);
+        return;
+      }
       if (!e.target.classList.contains('m-overall-comment')) return;
       var el = e.target;
       var key = el.dataset.sid + ':' + el.dataset.aid;
@@ -2182,6 +2292,7 @@ window.MGrade = (function () {
     setCriterionMod: setCriterionMod,
     setGradeView: setGradeView,
     toggleChecklist: toggleChecklist,
+    openCritComment: openCritComment,
     tickCheck: tickCheck,
     setStatus: setStatus,
     adjustPointsScore: adjustPointsScore,
@@ -2196,6 +2307,20 @@ window.MGrade = (function () {
     backToGroup: backToGroup,
     getCurrentIndex: function () {
       return _currentIdx;
+    },
+    // Each student card scrolls on its own; a redraw puts them back.
+    getCardScrolls: function () {
+      var tops = {};
+      document.querySelectorAll('#m-swiper .m-swiper-card').forEach(function (c) {
+        if (c.scrollTop) tops[c.getAttribute('data-sid')] = c.scrollTop;
+      });
+      return tops;
+    },
+    setCardScrolls: function (tops) {
+      document.querySelectorAll('#m-swiper .m-swiper-card').forEach(function (c) {
+        var top = tops && tops[c.getAttribute('data-sid')];
+        if (top) c.scrollTop = top;
+      });
     },
   };
 })();
