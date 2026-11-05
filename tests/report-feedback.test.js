@@ -312,7 +312,7 @@ describe('forStudent: what a card carries', () => {
   it('a Tag Rubric: a row per competency with the general wording and the competency comment', () => {
     const item = byId(F.forStudent(CID, ST)).tags;
     expect(item.kind).toBe('tags');
-    expect(item.rubric.name).toBe('Tag Rubric');
+    expect(item.rubric.name).toBe('Competency Rubric');
     expect(item.rubric.rows.map(r => r.name)).toEqual(['Questioning', 'Planning']);
     expect(item.rubric.rows[0]).toMatchObject({ level: 3, comment: '', checks: null });
     expect(item.rubric.rows[0].levels[3]).toBe(RubricPrint.GENERAL_LEVELS[3]);

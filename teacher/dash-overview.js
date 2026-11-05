@@ -248,7 +248,7 @@ window.DashOverview = (function () {
       opts.tagsWithEvidence +
       ' of ' +
       opts.allTags.length +
-      ' standards assessed</div>';
+      ' competencies assessed</div>';
     return html + '</section>';
   }
 

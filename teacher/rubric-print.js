@@ -255,7 +255,7 @@
         return { id: tid, name: tag.label || tag.name || tag.code || '', tagIds: [tid], levels: levels };
       })
       .filter(Boolean);
-    return criteria.length ? { id: 'tags', name: 'Tag Rubric', kind: 'tags', criteria: criteria } : null;
+    return criteria.length ? { id: 'tags', name: 'Competency Rubric', kind: 'tags', criteria: criteria } : null;
   }
 
   // The assessment's own rubric, else its Tag or General Rubric.

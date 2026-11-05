@@ -5035,6 +5035,54 @@ a.dash-ins-name:hover {
   display: flex;
   gap: 8px;
 }
+/* The key under the roster: each proficiency code beside a name, and its
+   word. Drawn like the gradebook's key under the grid. */
+.sb-legend {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--divider-subtle);
+  font-family: var(--font-base);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.sb-legend[hidden] {
+  display: none;
+}
+.sb-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.sb-legend-item:last-child {
+  grid-column: 1 / -1;
+}
+
+/* Import Roster's format panel, shown before the file picker */
+.cm-import-format {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cm-import-format .cm-section-title {
+  margin-bottom: 2px;
+}
+.cm-import-format .cm-hint {
+  margin: 0;
+  line-height: 1.45;
+}
+.cm-import-format .cm-import-buttons {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.cm-import-format a.cm-action-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
 /* Keep a copy first, in the permanent-delete dialog */
 .cm-keep-copy {
   display: flex;

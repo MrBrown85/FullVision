@@ -452,7 +452,7 @@ describe('Tag and General Rubrics', () => {
 
   it('builds a Tag Rubric from the competencies, with the general wording', () => {
     const r = RubricPrint.defaultRubric(CID, getAssessments(CID)[0]);
-    expect(r.name).toBe('Tag Rubric');
+    expect(r.name).toBe('Competency Rubric');
     expect(r.criteria.map(c => c.name)).toEqual(['Questioning', 'Planning']);
     expect(r.criteria[0].levels[3]).toBe(RubricPrint.GENERAL_LEVELS[3]);
     expect(RubricPrint.GENERAL_LEVELS[1]).toBe(

@@ -101,6 +101,7 @@ window.DashClassManager = (function () {
 
   // Import preview
   var cmPendingImport = null;
+  var cmImportFormatOpen = false; // Import Roster's format panel, before the file picker
 
   // Relink
   var cmRelinkCid = null;
@@ -2009,9 +2010,49 @@ window.DashClassManager = (function () {
     Router.navigate('/student?course=' + encodeURIComponent(cid) + '&id=' + encodeURIComponent(sid));
   }
 
+  /* Import Roster first shows what the file needs (cmImportFormatHtml);
+     Choose File opens the picker. With a review already open it goes
+     straight to the picker, as before. */
   function cmImportRoster() {
+    if (cmPendingImport) {
+      cmChooseRosterFile();
+      return;
+    }
+    cmImportFormatOpen = true;
+    renderClassManager();
+    var choose = document.querySelector('[data-action="cmChooseRosterFile"]');
+    if (choose) choose.focus();
+  }
+
+  function cmChooseRosterFile() {
     var el = document.getElementById('cm-csv-input');
     if (el) el.click();
+  }
+
+  function cmCloseImportFormat() {
+    cmImportFormatOpen = false;
+    renderClassManager();
+    var btn = document.querySelector('[data-action="cmImportRoster"]');
+    if (btn) btn.focus();
+  }
+
+  /* The format the reader below takes: a header row, columns named as in
+     ROSTER_HEADER_ALIASES, in any order. roster-template.csv has them all. */
+  function cmImportFormatHtml() {
+    return (
+      '<div class="cm-section cm-import-format" role="region" aria-labelledby="cm-import-format-title">' +
+      '<div class="cm-section-title" id="cm-import-format-title">Import Roster</div>' +
+      '<p class="cm-hint">The file is a CSV file with a header row and one row per student.</p>' +
+      '<p class="cm-hint">Name columns: Last Name and First Name, or Full Name (read as Last, First or First Last).</p>' +
+      '<p class="cm-hint">Other columns: Preferred Name, Pronouns, Student Number, Date of Birth (year first, as 2012-05-15), Student Email, Parent Email, Parent Email 2, Designations (BC letter codes), ELL (Yes or blank).</p>' +
+      '<p class="cm-hint">Columns can be in any order. Columns with other names are ignored. MyEducation BC column names, such as Legal Surname and Pupil #, are recognized.</p>' +
+      '<div class="cm-import-buttons">' +
+      '<button type="button" class="cm-action-btn" data-action="cmCloseImportFormat">Cancel</button>' +
+      '<a class="cm-action-btn" href="/roster-template.csv" download="roster-template.csv">Download Template</a>' +
+      '<button type="button" class="btn btn-primary" data-action="cmChooseRosterFile">Choose File</button>' +
+      '</div>' +
+      '</div>'
+    );
   }
 
   /* ── Import Roster: reading the file ────────────────────────
@@ -2291,6 +2332,7 @@ window.DashClassManager = (function () {
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function (e) {
+      cmImportFormatOpen = false;
       var table = rosterImportTable(e.target.result);
       var read = rosterRowsFromTable(table);
       cmShowImportPreview(read.rows, file.name, table, read.skipped);
@@ -3181,7 +3223,7 @@ window.DashClassManager = (function () {
       '</div>' +
       '</div>' +
       '<div id="cm-import-preview">' +
-      (cmPendingImport ? _cmRenderImportReview(cid) : '') +
+      (cmPendingImport ? _cmRenderImportReview(cid) : cmImportFormatOpen ? cmImportFormatHtml() : '') +
       '</div>';
     var rosterHtml = students.length ? _cmRosterHtml(cid) : '';
     // Add/Edit student form
@@ -5042,7 +5084,7 @@ window.DashClassManager = (function () {
       html += _cwRenderGradingRows(anyFolder);
     } else {
       html +=
-        '<div class="cm-section"><div class="cw-empty-msg">Custom class \u2014 no curriculum data. You can add sections and tags manually after creation.</div></div>';
+        '<div class="cm-section"><div class="cw-empty-msg">This class has no BC curriculum. Folders and competencies can be added in the Competencies tab after the class is created.</div></div>';
     }
 
     html +=
@@ -5365,6 +5407,7 @@ window.DashClassManager = (function () {
     if (cid !== cmSelectedCourse) {
       // A review or a selection belongs to its class.
       cmPendingImport = null;
+      cmImportFormatOpen = false;
       if (cmCompReview && cmCompReview.kind === 'file') cmCompReview = null;
       cmCompSelect = false;
       cmCompSelected = {};
@@ -7021,15 +7064,8 @@ window.DashClassManager = (function () {
             html += '<div class="cm-field"><label class="cm-label">Courses</label><div class="cw-course-list">';
             courses.forEach(function (c) {
               var sel = cwSelectedTags.includes(c.short_tag) ? ' selected' : '';
-              var fullCourse = CURRICULUM_INDEX[c.short_tag];
-              var compCount = 0,
-                catCount = 0;
-              if (fullCourse && fullCourse.categories) {
-                catCount = fullCourse.categories.length;
-                fullCourse.categories.forEach(function (cat) {
-                  compCount += (cat.competencies || []).length;
-                });
-              }
+              // Counted and named as the New Class wizard's course rows.
+              var counts = _cwCourseCounts([c.short_tag]);
               html +=
                 '<div class="cw-course-item' +
                 sel +
@@ -7048,10 +7084,10 @@ window.DashClassManager = (function () {
                 esc(c.short_tag) +
                 '</span>' +
                 '<span class="cw-course-count">' +
-                catCount +
-                ' Categories \u00B7 ' +
-                compCount +
-                ' Standards</span>' +
+                counts.competencies +
+                (counts.competencies === 1 ? ' Competency' : ' Competencies') +
+                (counts.folders ? ' \u00B7 ' + counts.folders + (counts.folders === 1 ? ' Folder' : ' Folders') : '') +
+                '</span>' +
                 '</div>';
             });
             html += '</div></div>';
@@ -9740,6 +9776,12 @@ window.DashClassManager = (function () {
       cmImportRoster: function () {
         cmImportRoster();
       },
+      cmChooseRosterFile: function () {
+        cmChooseRosterFile();
+      },
+      cmCloseImportFormat: function () {
+        cmCloseImportFormat();
+      },
       cmConfirmImport: function () {
         cmConfirmImport();
       },
@@ -10394,6 +10436,7 @@ window.DashClassManager = (function () {
       _cmGuardiansReady = {};
       _cmGuardiansLoading = {};
       cmPendingImport = null;
+      cmImportFormatOpen = false;
       cmCompSelect = false;
       cmCompSelected = {};
       cmCompReview = null;

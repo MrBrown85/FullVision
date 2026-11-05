@@ -8445,7 +8445,7 @@ window.PageAssignments = (function () {
     if (extraTagObjs.length > 0) {
       html +=
         '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">' +
-        '<div style="font-size:0.75rem;color:var(--text-3);font-weight:600;margin-bottom:6px">Additional Tags (not in rubric)</div>';
+        '<div style="font-size:0.75rem;color:var(--text-3);font-weight:600;margin-bottom:6px">Competencies Not in the Rubric</div>';
       // The group's name and members strip are drawn once, above.
       _groupStripOff = true;
       try {
