@@ -13723,3 +13723,18 @@ window.leaveDemoUnsentText = function (n) {
     ? '1 change has not reached the server. Leaving Demo Mode signs out and deletes it.'
     : n + ' changes have not reached the server. Leaving Demo Mode signs out and deletes them.';
 };
+
+/* Report a Problem (teacher/ui.js): one report to submit_support_report
+   (migrations/20261105_support_report.sql). It goes through the outbox like
+   every write (and counts on the sync dot until it lands), so a report
+   written offline is sent when the device is back online. The fields are the teacher's text and what the form shows as
+   attached: the page's name, the build and the browser. Never student data. */
+window.submitSupportReport = function (report) {
+  report = report || {};
+  return _rpcOrNoop('submit_support_report', {
+    p_page: String(report.page || '').slice(0, 200),
+    p_message: String(report.message || '').slice(0, 5000),
+    p_browser: report.browser ? String(report.browser).slice(0, 300) : null,
+    p_app_version: report.appVersion ? String(report.appVersion).slice(0, 100) : null,
+  });
+};

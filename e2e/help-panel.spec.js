@@ -102,7 +102,7 @@ test('the Help button sits between the sync dot and the account button; the rest
 });
 
 // The bar's three groups never overlap, from a narrow window up.
-for (const width of [700, 768, 820, 900, 1024, 1280]) {
+for (const width of [700, 768, 820, 860, 900, 960, 1001, 1024, 1280]) {
   test(`at ${width} wide the top bar's groups do not overlap`, async ({ page }) => {
     await page.setViewportSize({ width, height: 800 });
     await page.addInitScript(() => localStorage.setItem('td-mobile-pref', 'desktop'));
@@ -304,6 +304,20 @@ test.describe('narrow window', () => {
     expect(Math.round(p.x + p.width)).toBe(700);
     expect(p.width).toBeLessThanOrEqual(400);
     expect(Math.round(p.y)).toBe(Math.round(dock.y + dock.height));
+  });
+});
+
+test.describe('desktop app at phone width', () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+  test('Help is in the account menu', async ({ page }) => {
+    await serveHelp(page);
+    await page.addInitScript(() => localStorage.setItem('td-mobile-pref', 'desktop'));
+    await openDemo(page);
+    await expect(page.locator('[data-action="toggleHelp"]')).toBeHidden();
+    await page.getByRole('button', { name: 'Account menu' }).click();
+    await page.locator('.tb-user-dropdown').getByRole('button', { name: 'Help', exact: true }).click();
+    await expect(page.locator('#help-panel')).toBeVisible();
+    await expect(page.locator('.tb-user-dropdown')).toBeHidden();
   });
 });
 

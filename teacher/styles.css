@@ -463,6 +463,25 @@ body.offline-active #app-dock {
 .tb-user-signout:hover {
   background: var(--priority-light);
 }
+/* A plain item in the account menu (Report a Problem). */
+.tb-user-item {
+  display: block;
+  white-space: nowrap;
+  width: 100%;
+  padding: 7px 12px;
+  text-align: left;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text);
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.tb-user-item:hover {
+  background: var(--overlay-hover);
+}
 
 /* ── Demo Mode pill and its panel (Demo Mode only) ─────────── */
 .tb-demo-menu {
@@ -954,10 +973,64 @@ body.offline-active #app-dock {
   white-space: nowrap;
   border: 0;
 }
-/* Until Report a Problem joins the box, its third cell spans the row. */
-.help-box-cell:nth-child(3):last-child {
-  grid-column: span 2;
-  border-right: 0;
+/* ── Report a Problem (Where These Appear chrome) ──────────── */
+.report-card {
+  width: 520px;
+}
+.report-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 24px 20px;
+  border-top: 0.5px solid var(--divider-medium);
+}
+.report-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.report-message {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 132px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  line-height: 1.45;
+  resize: vertical;
+}
+.report-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.report-attached {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.report-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.report-spacer {
+  flex: 1;
+}
+.report-demo-note {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.report-done {
+  margin: 0;
+  font-size: var(--text-md);
 }
 
 /* The phone Settings sheet's Help link, drawn like its other buttons. */
@@ -3374,11 +3447,11 @@ body.offline-active #app-dock {
 /* ── Top tabs on a phone ───────────────────────────────────
    The five tabs don't fit beside the sidebar button, sync dot and account
    button at phone width, and the centred row ran under both ends. Under
-   800 px (600 px before the Demo Mode pill and Help button took room in
-   the bar) the tabs sit between them and scroll sideways on their own (the
+   880 px (600 px before the Demo Mode pill and Help button took room in
+   the bar; the margin allows for wider fonts than a Mac's) the tabs sit between them and scroll sideways on their own (the
    open tab is scrolled into view, router.js); the account button shows
    its icon only. */
-@media (max-width: 800px) {
+@media (max-width: 880px) {
   .tb-group.tb-center {
     position: static;
     transform: none;
@@ -3422,10 +3495,10 @@ body.offline-active #app-dock {
   }
 }
 
-/* Under 900 px the centred tabs would reach the Demo Mode pill and the Help
+/* Under 1000 px the centred tabs would reach the Demo Mode pill and the Help
    button: the pill reads Demo and Help is its icon alone (both keep their
    full names for screen readers). */
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
   .tb-demo-pill-more,
   .tb-help-label {
     display: none;
@@ -3436,11 +3509,17 @@ body.offline-active #app-dock {
     padding: 0;
   }
 }
+/* Under 600 px (the desktop app on a phone, by choice) the tabs need every
+   pixel: Help moves into the account menu. */
+.tb-user-help {
+  display: none;
+}
 @media (max-width: 600px) {
   .tb-help-btn {
-    width: auto;
-    min-width: 44px;
-    min-height: 44px;
+    display: none;
+  }
+  .tb-user-help {
+    display: block;
   }
 }
 
