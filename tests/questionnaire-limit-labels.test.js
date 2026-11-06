@@ -163,7 +163,7 @@ describe('the character limit and the habits labels (Demo Mode, Science 8)', () 
         expect(RQ.approveBlockers(st), st.firstName).not.toContain('limit');
       });
       setLimit(null);
-    });
+    }, 20000); // Generate runs the whole comment engine; GitHub runners are slower than a Mac.
   });
 
   describe('7. the limit box', () => {

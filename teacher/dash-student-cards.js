@@ -2,11 +2,32 @@
 window.DashStudentCards = (function () {
   'use strict';
 
-  var trendIcon = {
-    up: '<span style="color:var(--score-3);font-size:0.9375rem">&#x2191;</span>',
-    down: '<span style="color:var(--score-1);font-size:0.9375rem">&#x2193;</span>',
-    flat: '<span style="color:var(--text-3);font-size:0.9375rem">&#x2192;</span>',
+  // The trend arrow beside the grade badge, with what it means.
+  var TREND = {
+    up: { glyph: '&#x2191;', color: 'var(--score-3)', label: 'Rising: later work scores higher than earlier work' },
+    down: { glyph: '&#x2193;', color: 'var(--score-1)', label: 'Falling: later work scores lower than earlier work' },
+    flat: { glyph: '&#x2192;', color: 'var(--text-3)', label: 'Steady' },
   };
+  function trendHtml(trend) {
+    var t = TREND[trend] || TREND.flat;
+    return (
+      '<span class="dash-card-trend" data-trend="' +
+      (TREND[trend] ? trend : 'flat') +
+      '" role="img" aria-label="' +
+      esc(t.label) +
+      '" title="' +
+      esc(t.label) +
+      '" style="color:' +
+      t.color +
+      '">' +
+      t.glyph +
+      '</span>'
+    );
+  }
+
+  // With this many columns or fewer the strip draws labelled chips; with
+  // more, thin bars.
+  var CHIP_MAX = 8;
 
   var GLYPHS = { 1: '○', 2: '◐', 3: '●', 4: '◆' };
 
@@ -90,7 +111,152 @@ window.DashStudentCards = (function () {
     );
   }
 
-  function renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags) {
+  /* One column's value for one student, as the Curricular Competencies card
+     reads it (competencyDistribution). */
+  function _colValue(cid, sid, col) {
+    return col.which.groupId
+      ? getGroupProficiency(cid, sid, col.which.groupId)
+      : getSectionProficiency(cid, sid, col.which.sectionId);
+  }
+
+  /* What a chip's pop-up says: the column's full name, the level (with its
+     word in a Proficiency or Both class) or "Not assessed yet", and for a
+     folder how many of its competencies have evidence and, when it isn't
+     counted as one, folderAverageNote. */
+  function stripTipLines(cid, sid, col, value, secById) {
+    var sec = !col.which.groupId && secById[col.which.sectionId];
+    var lines = [sec ? standardTitle(sec) : col.title];
+    if (value > 0) {
+      var word = levelWord(cid, value);
+      lines.push(formatLevel(cid, value) + (word ? ' ' + word : ''));
+    } else {
+      lines.push('Not assessed yet');
+    }
+    if (col.which.groupId) {
+      var withEvidence = col.sectionIds.filter(function (secId) {
+        return getSectionEvidenceCount(cid, sid, secId) > 0;
+      }).length;
+      lines.push(withEvidence + ' of ' + col.sectionIds.length + ' competencies with evidence');
+      // How the folder counts (folderAverageNote), when it isn't counted as one.
+      if (col.note) lines.push(col.note);
+    }
+    return lines;
+  }
+
+  function _tipHtml(lines) {
+    return (
+      '<span class="dist-tip" aria-hidden="true"><span class="dist-tip-title">' +
+      esc(lines[0]) +
+      '</span>' +
+      lines
+        .slice(1)
+        .map(function (l) {
+          return '<span class="dist-tip-name">' + esc(l) + '</span>';
+        })
+        .join('') +
+      '</span>'
+    );
+  }
+
+  /* The strip: one segment per column of DashInsights.columns, tinted by the
+     student's level on it. Up to CHIP_MAX columns each is a chip with its
+     code; more are thin bars. `focusKey` outlines one column and dims the
+     rest. data-student-tab: the student page tab a click here opens. */
+  function stripHtml(cid, sid, cols, focusKey, secById) {
+    var chips = cols.length <= CHIP_MAX;
+    var html =
+      '<div class="dash-card-strip' +
+      (chips ? ' is-chips' : '') +
+      (focusKey ? ' has-focus' : '') +
+      '" data-student-tab="comps">';
+    cols.forEach(function (col) {
+      var value = _colValue(cid, sid, col);
+      var r = value > 0 ? Math.max(1, Math.min(4, Math.round(value))) : 0;
+      var lines = stripTipLines(cid, sid, col, value, secById);
+      var label = lines[0] + ': ' + lines.slice(1).join('. ');
+      // The level's colours (and a text colour that reads on it in each
+      // theme) come from .dash-card-seg.lv-N in dashboard.css.
+      var cls = 'dash-card-seg' + (r ? ' lv-' + r : ' is-none') + (focusKey === col.key ? ' is-focus' : '');
+      if (chips) {
+        html +=
+          '<button type="button" class="' +
+          cls +
+          '" data-key="' +
+          esc(col.key) +
+          '" aria-label="' +
+          esc(label) +
+          '">' +
+          esc(DashInsights.columnCode(cid, col)) +
+          _tipHtml(lines) +
+          '</button>';
+      } else {
+        html +=
+          '<span class="' +
+          cls +
+          '" data-key="' +
+          esc(col.key) +
+          '" role="img" aria-label="' +
+          esc(label) +
+          '">' +
+          _tipHtml(lines) +
+          '</span>';
+      }
+    });
+    return html + '</div>';
+  }
+
+  /* How many of the student's competencies (tags) have no scored work, as
+     getCompletionPct counts them. */
+  function unassessedCount(cid, sid) {
+    return getAllTags(cid).filter(function (t) {
+      return !getTagScores(cid, sid, t.id).some(function (sc) {
+        return sc && Number(sc.score) > 0;
+      });
+    }).length;
+  }
+
+  /* The footer's right side: with a column in focus, the student's level on
+     it; otherwise "N not assessed" when some competency has no scored work. */
+  function footerRightHtml(cid, sid, focusCol) {
+    if (focusCol) {
+      var value = _colValue(cid, sid, focusCol);
+      var r = value > 0 ? Math.max(1, Math.min(4, Math.round(value))) : 0;
+      return (
+        '<span class="dash-card-focus"' +
+        (r ? ' style="color:var(--score-' + r + '-text)"' : '') +
+        '>' +
+        esc(focusCol.label + ': ' + levelText(cid, value, 'Not assessed yet')) +
+        '</span>'
+      );
+    }
+    var n = unassessedCount(cid, sid);
+    if (!n) return '';
+    return (
+      '<span class="dash-card-unassessed" title="' +
+      esc(n + (n === 1 ? ' competency has' : ' competencies have') + ' no scored work yet') +
+      '">' +
+      n +
+      ' not assessed</span>'
+    );
+  }
+
+  /* opts.focusKey: a column key (DashInsights.columns) the page is focused
+     on; opts.rule: the saved Who Needs Help rule, for the focus border. */
+  function renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags, opts) {
+    opts = opts || {};
+    var cols = DashInsights.columns(cid);
+    var secById = {};
+    getSections(cid).forEach(function (sec) {
+      secById[sec.id] = sec;
+    });
+    var focusCol =
+      (opts.focusKey &&
+        cols.filter(function (c) {
+          return c.key === opts.focusKey;
+        })[0]) ||
+      null;
+    var focusKey = focusCol ? focusCol.key : '';
+    var rule = DashInsights.readRule(opts.rule);
     var html = '<div class="dash-section">';
     if (students.length === 0 && allStudents.length === 0) {
       html +=
@@ -112,7 +278,6 @@ window.DashStudentCards = (function () {
         var grade = studentGradeSummary(cid, st.id);
         var op = grade.level;
         var flagged = isStudentFlagged(cid, st.id);
-        var pct = getCompletionPct(cid, st.id);
 
         // Work labelled Missing, whatever its due date.
         var missingCount = assessments.filter(function (a) {
@@ -150,9 +315,12 @@ window.DashStudentCards = (function () {
 
         var obsText = obsLineHtml(obsSummary(getStudentQuickObs(cid, st.id), getTodayStr(), getActiveTerm(cid)));
 
+        var focusBelow =
+          focusCol && DashInsights.isBelowRule(cid, focusCol, st.id, _colValue(cid, st.id, focusCol), rule);
         html +=
           '<div class="dash-card' +
           (flagged ? ' flagged' : '') +
+          (focusBelow ? ' is-focus-below' : '') +
           '" data-action="goToStudent" data-sid="' +
           st.id +
           '" data-course="' +
@@ -174,7 +342,9 @@ window.DashStudentCards = (function () {
           st.id +
           '&course=' +
           cid +
-          '" data-stop-prop="true">' +
+          '" data-stop-prop="true" title="' +
+          esc(displayNameWithLast(st)) +
+          '">' +
           esc(displayNameWithLast(st)) +
           '</a>' +
           ((st.designations || []).length > 0
@@ -205,12 +375,9 @@ window.DashStudentCards = (function () {
               })()
             : '') +
           '</div>' +
-          (st.pronouns || st.studentNumber
-            ? '<div class="dash-card-sub">' +
-              (st.pronouns ? '<span class="dash-card-pronouns">' + esc(st.pronouns) + '</span>' : '') +
-              (st.studentNumber ? '<span class="dash-card-stunum">#' + esc(st.studentNumber) + '</span>' : '') +
-              '</div>'
-            : '') +
+          // No pronouns or student number here (Colin, Nov 5): the card is
+          // the name, and a long name wraps to a second line instead of
+          // being cut off.
           '</div>' +
           '<span class="dash-card-badge' +
           (op ? '' : ' is-none') +
@@ -224,6 +391,34 @@ window.DashStudentCards = (function () {
           (prof && GLYPHS[op] ? GLYPHS[op] + ' ' : '') +
           esc(grade.text || '\u2014') +
           '</span>' +
+          trendHtml(trend) +
+          '</div>';
+
+        html += stripHtml(cid, st.id, cols, focusKey, secById);
+
+        // The footer: the flag at the bottom left (plan F.6), the
+        // observation line, then Missing and the right-hand note.
+        var flagLabel = flagged ? 'Unflag student' : 'Flag student';
+        html +=
+          '<div class="dash-card-footer">' +
+          '<button type="button" class="dash-flag-btn' +
+          (flagged ? ' is-on' : '') +
+          '" data-action="toggleFlag" data-cid="' +
+          cid +
+          '" data-sid="' +
+          st.id +
+          '" data-stop-prop="true" title="' +
+          flagLabel +
+          '" aria-label="' +
+          flagLabel +
+          '" aria-pressed="' +
+          flagged +
+          '">' +
+          (flagged ? '\u2691' : '\u2690') +
+          '</button>' +
+          '<div class="dash-card-obs" data-student-tab="evidence">' +
+          obsText +
+          '</div>' +
           (missingCount > 0
             ? '<span class="dash-card-missing" title="' +
               missingCount +
@@ -231,72 +426,7 @@ window.DashStudentCards = (function () {
               missingCount +
               '</span>'
             : '') +
-          '<button class="dash-flag-btn' +
-          (flagged ? ' is-on' : '') +
-          '" data-action="toggleFlag" data-cid="' +
-          cid +
-          '" data-sid="' +
-          st.id +
-          '" data-stop-prop="true" title="Flag student" aria-label="Flag student" aria-pressed="' +
-          flagged +
-          '">' +
-          (flagged ? '\u2691' : '\u2690') +
-          '</button>' +
-          '</div>';
-
-        // One segment per competency (or group), tinted by its proficiency;
-        // its name and value are the tooltip. Evidence coverage and the trend
-        // close the line. data-student-tab: the student page tab a click here
-        // opens.
-        var parts = [];
-        var grouped = getGroupedSections(cid);
-        if (grouped.groups.length > 0) {
-          grouped.groups.forEach(function (gi) {
-            if (gi.sections.length === 0) return;
-            parts.push({
-              title: gi.group.name,
-              value: getGroupProficiency(cid, st.id, gi.group.id),
-              note: folderAverageNote(cid, gi.group),
-            });
-          });
-          grouped.ungrouped.forEach(function (sec) {
-            parts.push({ title: standardTitle(sec), value: getSectionProficiency(cid, st.id, sec.id) });
-          });
-        } else {
-          sections.forEach(function (sec) {
-            parts.push({ title: standardTitle(sec), value: getSectionProficiency(cid, st.id, sec.id) });
-          });
-        }
-        html += '<div class="dash-card-strip" data-student-tab="comps">';
-        parts.forEach(function (part) {
-          var r = part.value > 0 ? Math.max(1, Math.min(4, Math.round(part.value))) : 0;
-          var tip =
-            part.title +
-            ': ' +
-            (r ? formatLevel(cid, part.value) + (prof ? ' ' + PROF_LABELS[r] : '') : 'not yet assessed') +
-            (part.note ? '\n' + part.note : '');
-          html +=
-            '<span class="dash-card-seg" role="img" aria-label="' +
-            esc(tip) +
-            '" title="' +
-            esc(tip) +
-            '" style="background:' +
-            (r ? 'var(--score-' + r + ')' : 'var(--divider-medium)') +
-            '"></span>';
-        });
-        html +=
-          '<span class="dash-card-meta" title="Evidence coverage">' +
-          pct +
-          '%' +
-          trendIcon[trend] +
-          '</span>' +
-          '</div>';
-
-        html +=
-          '<div class="dash-card-footer">' +
-          '<div class="dash-card-obs" data-student-tab="evidence">' +
-          obsText +
-          '</div>' +
+          footerRightHtml(cid, st.id, focusCol) +
           '</div>';
 
         html += '</div>';
@@ -311,5 +441,7 @@ window.DashStudentCards = (function () {
     renderStudentCards: renderStudentCards,
     obsSummary: obsSummary,
     obsWhenText: obsWhenText,
+    stripTipLines: stripTipLines,
+    CHIP_MAX: CHIP_MAX,
   };
 })();

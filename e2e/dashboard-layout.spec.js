@@ -1,9 +1,9 @@
 /**
- * The class dashboard's boxes (docs/DECISIONS.md, "Class dashboard
- * (2026-10-26)"): the top bar, then Needs Attention beside Curricular and
- * Core Competencies and as tall as the two of them, its list scrolling
- * inside, then Observations; every box 12px from the next, across and down.
- * Demo Mode, Science 8.
+ * The class dashboard's boxes (docs/plans/dashboard-cards-plan.md, part F):
+ * the top bar, then Curricular and Core Competencies side by side at one
+ * height (stacked below 900 px), then the students, then Observations;
+ * every box 12px from the next. The Needs Attention card is gone; the top
+ * bar's Missing and Late opens the gradebook. Demo Mode, Science 8.
  */
 import { test, expect } from '@playwright/test';
 
@@ -12,74 +12,144 @@ test.use({ viewport: { width: 1440, height: 900 } });
 async function openDashboard(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
-  await page.locator('#dash-na-card').waitFor();
+  await page.locator('.dash-comp-card .dash-comp-row').first().waitFor();
 }
 
-for (const width of [1440, 1200]) {
-  test(`at ${width}px Needs Attention is as tall as the competency cards and scrolls inside`, async ({ page }) => {
+// Draws a pair of views without the menu (the menu is tested elsewhere).
+async function showViews(page, comp, core) {
+  await page.evaluate(
+    ([comp, core]) => {
+      localStorage.setItem('fv-dash-comp-view:sci8', comp);
+      localStorage.setItem('fv-dash-core-view:sci8', core);
+      PageDashboard.render();
+    },
+    [comp, core],
+  );
+  await expect(page.locator('.dash-comp-card')).toHaveAttribute('data-view', comp);
+}
+
+function measure(page) {
+  return page.evaluate(() => {
+    const a = document.querySelector('.dash-comp-card').getBoundingClientRect();
+    const b = document.querySelector('.dash-core-card').getBoundingClientRect();
+    const main = document.getElementById('main');
+    return {
+      compH: Math.round(a.height),
+      coreH: Math.round(b.height),
+      sideBySide: Math.abs(a.top - b.top) < 1 && b.left > a.right,
+      docX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      mainX: main.scrollWidth - main.clientWidth,
+    };
+  });
+}
+
+test('there is no Needs Attention card', async ({ page }) => {
+  await openDashboard(page);
+  await expect(page.locator('#dash-na-card, .dash-na-row, [data-action="naFilter"]')).toHaveCount(0);
+});
+
+for (const width of [1440, 1280, 1024]) {
+  test(`at ${width}px the competency cards share one height in every view, and nothing scrolls sideways`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 900 });
     await openDashboard(page);
-    const m = await page.evaluate(() => {
-      var na = document.querySelector('#dash-na-card').getBoundingClientRect();
-      var side = document.querySelector('.dash-overview-side').getBoundingClientRect();
-      var list = document.querySelector('.dash-na-list');
-      return {
-        top: Math.round(na.top - side.top),
-        bottom: Math.round(na.bottom - side.bottom),
-        scrolls: list.scrollHeight > list.clientHeight,
-        rows: document.querySelectorAll('.dash-na-row:not(.is-class)').length,
-      };
-    });
-    expect(m.top).toBe(0);
-    expect(m.bottom).toBe(0);
-    expect(m.rows).toBeGreaterThan(5);
-    expect(m.scrolls).toBe(true);
+    for (const comp of ['avg', 'mix', 'below', 'trend']) {
+      for (const core of ['self', 'evidence']) {
+        await showViews(page, comp, core);
+        const m = await measure(page);
+        expect(m.sideBySide, `${comp}/${core}`).toBe(true);
+        expect(m.compH, `${comp}/${core}`).toBe(m.coreH);
+        expect(m.compH).toBeGreaterThanOrEqual(300);
+        expect(m.docX, `sideways at ${width} ${comp}/${core}`).toBeLessThanOrEqual(0);
+        expect(m.mainX, `sideways at ${width} ${comp}/${core}`).toBeLessThanOrEqual(0);
+      }
+    }
   });
 }
 
-test('below 1100px the competency cards go under Needs Attention, which keeps a height', async ({ page }) => {
-  await page.setViewportSize({ width: 1024, height: 900 });
+test('below 900px the competency cards stack, each at least 300px', async ({ page }) => {
+  await page.setViewportSize({ width: 800, height: 900 });
   await openDashboard(page);
   const m = await page.evaluate(() => {
-    var na = document.querySelector('#dash-na-card').getBoundingClientRect();
-    var side = document.querySelector('.dash-overview-side').getBoundingClientRect();
-    return { stacked: side.top >= na.bottom, height: na.height };
+    const a = document.querySelector('.dash-comp-card').getBoundingClientRect();
+    const b = document.querySelector('.dash-core-card').getBoundingClientRect();
+    return { stacked: b.top >= a.bottom, a: a.height, b: b.height };
   });
   expect(m.stacked).toBe(true);
-  expect(m.height).toBeGreaterThan(200);
+  expect(m.a).toBeGreaterThanOrEqual(300);
+  expect(m.b).toBeGreaterThanOrEqual(300);
 });
 
-test('the filters, "N Below" and the Missing and Late cell pick who Needs Attention shows', async ({ page }) => {
+test("the class's competency codes are unique, on the cards and in Needs Support", async ({ page }) => {
   await openDashboard(page);
-  const card = page.locator('#dash-na-card');
-  const rows = card.locator('.dash-na-row:not(.is-class)');
-  const all = await rows.count();
-  await card.locator('[data-action="naFilter"][data-filter="nostr"]').click();
-  await expect(card.locator('[data-filter="nostr"]')).toHaveAttribute('aria-pressed', 'true');
-  const nostr = await rows.count();
-  expect(nostr).toBeLessThan(all);
-  expect(await card.locator('.dash-na-diamond').count()).toBe(nostr);
-  // A competency's "N Below" shows its students and a chip to clear it.
-  const below = page.locator('.dash-mix-below[data-key]').first();
-  const n = Number(await below.locator('b').textContent());
-  await below.click();
-  await expect(rows).toHaveCount(n);
-  await expect(card.locator('.dash-na-compchip')).toBeVisible();
-  await card.locator('.dash-na-compchip').click();
-  await expect(card.locator('[data-filter="nostr"]')).toHaveAttribute('aria-pressed', 'true');
-  await card.locator('[data-filter="all"]').click();
-  await expect(rows).toHaveCount(all);
+  await showViews(page, 'below', 'self');
+  const codes = await page.evaluate(() => Object.values(DashInsights.columnCodes('sci8')));
+  expect(new Set(codes).size).toBe(codes.length);
+  await expect(page.locator('.dash-comp-card .dash-comp-code')).toHaveText(codes);
+  const chips = await page
+    .locator('.dash-grid .dash-card')
+    .first()
+    .locator('button.dash-card-seg')
+    .evaluateAll(els => els.map(el => el.firstChild.textContent));
+  expect(chips).toEqual(codes);
 });
 
-test("a row's buttons show on hover without moving anything", async ({ page }) => {
+test('Missing and Late opens the gradebook', async ({ page }) => {
   await openDashboard(page);
-  const row = page.locator('.dash-na-row:not(.is-class)').first();
-  const before = await row.boundingBox();
-  const act = row.locator('.dash-na-act');
-  expect(await act.evaluate(el => getComputedStyle(el).opacity)).toBe('0');
+  // Something missing (new work with no score), so the cell is a link.
+  await page.evaluate(() => {
+    const today = getTodayStr();
+    saveAssessments(
+      'sci8',
+      getAssessments('sci8').concat([{ id: 'zz-missing', title: 'Late Lab', date: today, dueDate: today, tagIds: [] }]),
+    );
+    const st = getStudents('sci8')[0];
+    const statuses = Object.assign({}, getAssignmentStatuses('sci8'));
+    statuses[st.id + ':zz-missing'] = 'NS';
+    saveAssignmentStatuses('sci8', statuses);
+    PageDashboard.render();
+  });
+  const cell = page.locator('.dash-glance-missing');
+  await expect(cell).toHaveAttribute('data-href', '/gradebook?course=sci8');
+  await cell.click();
+  await expect(page).toHaveURL(/\/gradebook\?course=sci8/);
+});
+
+test('pointing at a competency lights its chip on every student card, and only then', async ({ page }) => {
+  await openDashboard(page);
+  await showViews(page, 'avg', 'self');
+  const row = page.locator('.dash-comp-card .dash-comp-row').nth(1);
+  const key = await row.getAttribute('data-key');
+  const cards = await page.locator('.dash-grid > .dash-card').count();
+  const lit = page.locator('.dash-grid .dash-card-seg.is-lit');
   await row.hover();
-  await expect.poll(() => act.evaluate(el => getComputedStyle(el).opacity)).toBe('1');
-  expect(await row.boundingBox()).toEqual(before);
+  await expect(lit).toHaveCount(cards);
+  expect(await lit.evaluateAll(els => els.every(el => el.dataset.key))).toBe(true);
+  expect(new Set(await lit.evaluateAll(els => els.map(el => el.dataset.key)))).toEqual(new Set([key]));
+  // An outline only: no card re-sorted, no chip faded.
+  await expect(page.locator('.dash-card-strip.has-focus')).toHaveCount(0);
+  await page.locator('.dash-students-title').hover();
+  await expect(lit).toHaveCount(0);
+  // With the competency filter set, pointing lights nothing.
+  await row.click();
+  await expect(page.locator('.dash-comp-chip')).toBeVisible();
+  await page.locator('.dash-comp-card .dash-comp-row').nth(2).hover();
+  await expect(lit).toHaveCount(0);
+});
+
+test('a student card has the flag at its foot and the full name in a title', async ({ page }) => {
+  await openDashboard(page);
+  const card = page.locator('.dash-grid > .dash-card').first();
+  await expect(card.locator('.dash-card-header .dash-flag-btn')).toHaveCount(0);
+  const flag = card.locator('.dash-card-footer > .dash-flag-btn');
+  await expect(flag).toHaveAttribute('aria-label', 'Flag student');
+  const box = await flag.boundingBox();
+  expect(Math.round(box.width)).toBe(22);
+  await flag.click();
+  await expect(card.locator('.dash-card-footer > .dash-flag-btn')).toHaveAttribute('aria-label', 'Unflag student');
+  const name = card.locator('.dash-card-name');
+  await expect(name).toHaveAttribute('title', (await name.textContent()).trim());
 });
 
 test('every box on the dashboard is 12px from the next', async ({ page }) => {

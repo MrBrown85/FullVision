@@ -105,7 +105,7 @@ describe('Who Needs Help', () => {
   });
 });
 
-describe('Needs Attention', () => {
+describe('the attention model (the competency filter and Needs Support read it)', () => {
   const OVERALL = { s1: 1.7, s2: 2.1, s3: 3.8, s4: 2.5 };
   beforeEach(() => {
     saved.getStudentQuickObs = globalThis.getStudentQuickObs;
@@ -133,43 +133,29 @@ describe('Needs Attention', () => {
     expect(m.counts).toEqual({ all: 3, below: 3, notobs: 0, nostr: 0, missing: 0 });
     expect(DashInsights.belowCounts(m)).toEqual({ 's:q': 2, 's:p': 3, 's:c': 2 });
   });
-
-  it('says how many competencies are below and the lowest, and links the gradebook', () => {
-    const html = DashInsights.attentionCardHtml(CID, model({ below: 3, min: 3 }), {});
-    expect(html).toContain('Below Proficient on <b>3</b> of 3');
-    expect(html).toContain('Lowest');
-    expect(html).toContain('/gradebook?course=' + CID + '&students=s1');
-    expect(html).toContain('Below Proficient · At Least 3 Scores');
-  });
-
-  it("shows one competency's students when its count is picked", () => {
-    const html = DashInsights.attentionCardHtml(CID, model({ below: 3, min: 3 }), { comp: 's:p' });
-    expect(html).toContain('3 students');
-    expect(html).toContain('&students=s4&section=p');
-    expect(html).toContain('dash-na-compchip');
-  });
-
-  it('says so when nobody is below the rule', () => {
-    PROF.s1.p = 3;
-    const html = DashInsights.attentionCardHtml(CID, model({ below: 2, min: 3 }), { filter: 'below' });
-    PROF.s1.p = 1;
-    expect(html).toContain('Every scored student is at Developing or above.');
-  });
-
-  it('puts the class Next Steps above the students', () => {
-    const html = DashInsights.attentionCardHtml(CID, model({ below: 3, min: 3 }), {
-      classItems: [{ text: '2 core competencies not yet tagged', link: '/assignments', linkText: 'Tag' }],
-    });
-    expect(html.indexOf('2 core competencies not yet tagged')).toBeLessThan(html.indexOf('Raj Venkatesh'));
-  });
 });
 
 describe('the Missing and Late cell', () => {
   it('says so at zero and counts each kind otherwise', () => {
-    expect(DashInsights.missingGlanceHtml([])).toContain('Nothing is missing or late.');
-    const html = DashInsights.missingGlanceHtml([{ kind: 'ns' }, { kind: 'late' }, { kind: 'late' }]);
+    expect(DashInsights.missingGlanceHtml([], CID)).toContain('Nothing is missing or late.');
+    const html = DashInsights.missingGlanceHtml([{ kind: 'ns' }, { kind: 'late' }, { kind: 'late' }], CID);
     expect(html).toContain('<b>1</b> Missing · <b>2</b> Late</span>');
     expect(html).not.toContain('Past Due');
+  });
+
+  it('opens the gradebook when anything is missing or late, and is plain text at zero (plan F.8)', () => {
+    const html = DashInsights.missingGlanceHtml([{ kind: 'ns' }], CID);
+    expect(html).toMatch(/^<a class="dash-glance-cell dash-glance-missing" role="link" tabindex="0"/);
+    expect(html).toContain('data-href="/gradebook?course=' + CID + '"');
+    expect(html).not.toContain('naFilter');
+    expect(DashInsights.missingGlanceHtml([], CID)).toMatch(/^<div class="dash-glance-cell dash-glance-missing">/);
+  });
+
+  it('the Needs Attention card is gone; its model and rule stay', () => {
+    expect(DashInsights.attentionCardHtml).toBeUndefined();
+    ['attentionModel', 'belowLists', 'readRule', 'isBelowRule'].forEach(name =>
+      expect(typeof DashInsights[name]).toBe('function'),
+    );
   });
 });
 
