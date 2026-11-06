@@ -1119,6 +1119,28 @@ window.PageGradebook = (function () {
     );
   }
 
+  /* The class's overall at the foot of the Overall column, in the Class
+     Average row (a CSL reviewer, Nov 5: "Is it possible to get an overall
+     class average?"). The mean of every student's Overall, worked out and
+     written by calc.js (classGradeSummary), as the dashboard's top bar shows
+     it; over the whole class, whoever a search leaves on screen. */
+  function _classOverallHtml(cid, cls) {
+    var ids = (_averageStudents || getStudents(cid)).map(function (s) {
+      return s.id;
+    });
+    var sum = ids.length ? classGradeSummary(cid, ids) : null;
+    if (!sum || !sum.text) return '';
+    return (
+      '<span class="' +
+      cls +
+      ' gb-class-overall" style="color:' +
+      (PROF_COLORS[sum.level] || PROF_COLORS[0]) +
+      '" title="The average of every student’s Overall">' +
+      esc(sum.text) +
+      '</span>'
+    );
+  }
+
   /* A student's name in the grid's left column: a link to their page. */
   /* Whether a student's grade shows a reporting basis (IE, or No Letter
      Grade for goals) for the term in view. That row keeps the name whole and
@@ -1468,8 +1490,11 @@ window.PageGradebook = (function () {
         '</span>' +
         '</div>';
     });
-    // Stats row header
-    html += '<div class="gb-grid-rowhead gb-grid-rowhead-comp gb-grid-rowhead-stats">Class Average</div>';
+    // Stats row header, with the class's own Overall at the foot of that column
+    html +=
+      '<div class="gb-grid-rowhead gb-grid-rowhead-comp gb-grid-rowhead-stats">Class Average' +
+      _classOverallHtml(cid, 'gb-grid-rowhead-overall') +
+      '</div>';
     html += '</div>';
 
     // Q4: Data cells — score grid
@@ -1828,7 +1853,10 @@ window.PageGradebook = (function () {
         '</span>' +
         '</div>';
     });
-    html += '<div class="gb-grid-rowhead gb-grid-rowhead-stats gb-scores-stats-head">Class Average</div>';
+    html +=
+      '<div class="gb-grid-rowhead gb-grid-rowhead-stats gb-scores-stats-head">Class Average' +
+      _classOverallHtml(cid, 'gb-grid-rowhead-grade') +
+      '</div>';
     html += '</div>';
 
     // Q4: Data cells (bottom-right, scrolls both ways — drives the others)
