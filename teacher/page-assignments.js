@@ -6742,10 +6742,8 @@ window.PageAssignments = (function () {
       var sum = counted.reduce(function (x, y) {
         return x + y;
       }, 0);
-      var mid =
-        sorted.length % 2
-          ? sorted[(sorted.length - 1) / 2]
-          : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+      // calc.js's median, so this line and Class Results agree.
+      var mid = medianOf(counted);
       html += '<span>Average <b>' + Math.round(((sum / counted.length) * 100) / max) + '%</b></span>';
       if (stats)
         stats.innerHTML =

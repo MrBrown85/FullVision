@@ -2954,8 +2954,498 @@ function _previewOverallChange(cid, target, field, value) {
   return { changed: changed, total: students.length, example: example };
 }
 
+/* ── Class Results ─────────────────────────────────────────────
+   The numbers behind the Class Average's hover card and the Class Results
+   panel (docs/plans/class-results-plan.md; Colin, 2026-11-05). Each takes
+   the gradebook's whole roster, and counts a student exactly as the Class
+   Average does (columnCountedValue, COLUMN_STATUS_RULES): in a Letter class
+   Missing is 0, in a Proficiency or Both class it is left out, Excused is
+   always left out. None of them compares a group of students (a designation,
+   ELL) with the class: a designation is only ever a tag beside a name. */
+
+/* The middle of a list of numbers (the mean of the two middle ones for an
+   even count); null for an empty list. The Assignments page's Median uses
+   it too, so the two can't disagree. */
+function medianOf(list) {
+  var sorted = (list || [])
+    .filter(function (v) {
+      return v != null && isFinite(Number(v));
+    })
+    .map(Number)
+    .sort(function (x, y) {
+      return x - y;
+    });
+  if (!sorted.length) return null;
+  var mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/* What each counted student has in one column, lowest first, with the
+   median, lowest and highest. A level column gives { value } per student (a
+   level, 0 for a Letter class's Missing); points work read as points gives
+   { value: earned, possible, pct }. Null when nobody counts. */
+function classColumnSpread(cid, students, col) {
+  var a = col && col.assessment;
+  if (!a) return null;
+  var asPoints = isPointsScored(a) && col.measure !== 'level';
+  var values = [];
+  (students || []).forEach(function (s) {
+    var v = columnCountedValue(cid, s.id, col);
+    if (!v) return;
+    if (asPoints)
+      values.push({
+        sid: s.id,
+        value: v.earned,
+        possible: v.possible,
+        pct: v.possible > 0 ? (v.earned / v.possible) * 100 : 0,
+      });
+    else values.push({ sid: s.id, value: v.value });
+  });
+  if (!values.length) return null;
+  values.sort(function (x, y) {
+    return x.value - y.value;
+  });
+  return {
+    values: values,
+    median: medianOf(
+      values.map(function (v) {
+        return v.value;
+      }),
+    ),
+    low: values[0].value,
+    high: values[values.length - 1].value,
+    count: values.length,
+    points: asPoints,
+  };
+}
+
+// A counted value's band, 1–4: a level rounded, or points through the
+// class's Points to Proficiency table. A Letter class's Missing (0) is 1.
+function _spreadBand(cid, v, asPoints) {
+  var level = asPoints ? pointsToProf(v.value, v.possible, getGradingScale(cid)) : Math.round(v.value);
+  return Math.max(1, Math.min(4, level || 1));
+}
+
+/* How many counted students sit at each level on one column, from the
+   rounded level of what they count for (classColumnSpread). { counts: {1..4},
+   ids: {1..4: [sid]}, scored }. */
+function classColumnLevelCounts(cid, students, col) {
+  var counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  var ids = { 1: [], 2: [], 3: [], 4: [] };
+  var spread = classColumnSpread(cid, students, col);
+  if (spread)
+    spread.values.forEach(function (v) {
+      var band = _spreadBand(cid, v, spread.points);
+      counts[band]++;
+      ids[band].push(v.sid);
+    });
+  return { counts: counts, ids: ids, scored: spread ? spread.count : 0 };
+}
+
+/* The four levels in the order the class draws them (levelOrderFor), each
+   with its name for a legend or a bar ("Proficient"), whatever the
+   grading style: [{ level, label }]. */
+function levelBands(cid) {
+  return levelOrderFor(cid).map(function (level) {
+    return { level: level, label: PROF_LABELS[level] };
+  });
+}
+
+// One row of a results grid from each student's level on it (null: not
+// scored), banded by the rounded level.
+function _gridRow(students, levelOf) {
+  var counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  var ids = { 1: [], 2: [], 3: [], 4: [] };
+  var total = 0;
+  var n = 0;
+  (students || []).forEach(function (s) {
+    var v = levelOf(s.id);
+    if (v == null || !(v > 0)) return;
+    var band = Math.max(1, Math.min(4, Math.round(v)));
+    counts[band]++;
+    ids[band].push(s.id);
+    total += v;
+    n++;
+  });
+  return { counts: counts, ids: ids, avg: n ? total / n : null, count: n };
+}
+
+/* A rubric assessment's results by criterion: one row per criterion in the
+   rubric's order, each student's level on it from rubricCriterionLevel
+   (Missing and Excused leave a student out). Null with no rubric. */
+function classRubricGrid(cid, students, assessment) {
+  var rubric = _assessmentRubric(cid, assessment);
+  if (!rubric || !(rubric.criteria || []).length) return null;
+  var criteria = rubric.criteria.slice().sort(function (x, y) {
+    return (Number(x.displayOrder) || 0) - (Number(y.displayOrder) || 0);
+  });
+  return {
+    rows: criteria
+      .filter(function (c) {
+        return c && c.id;
+      })
+      .map(function (c) {
+        var row = _gridRow(students, function (sid) {
+          return rubricCriterionLevel(cid, sid, assessment, c);
+        });
+        row.id = c.id;
+        row.kind = 'criterion';
+        row.name = c.name || c.label || '';
+        return row;
+      }),
+  };
+}
+
+/* An assessment's results by competency: one row per row of its
+   Competencies view (rubricCompetencyRowKeys). On rubric work a student's
+   mark is competencyLevelFromCriteria's (several criteria that disagree give
+   the lowest); a criterion that feeds no competency is its own row. On other
+   work it is the student's score on that competency. Missing and Excused
+   leave a student out. Null when the work scores no competency. */
+function classCompetencyGrid(cid, students, assessment) {
+  if (!assessment || isPointsScored(assessment) || isDibelsScored(assessment)) return null;
+  var keys = rubricCompetencyRowKeys(cid, assessment).filter(function (k) {
+    return !isUnlinkedTag(k);
+  });
+  if (!keys.length) return null;
+  var rubric = _assessmentRubric(cid, assessment);
+  var critById = {};
+  ((rubric && rubric.criteria) || []).forEach(function (c) {
+    if (c && c.id) critById[c.id] = c;
+  });
+  function out(sid) {
+    var st = getAssignmentStatus(cid, sid, assessment.id);
+    return st === 'NS' || st === 'EXC';
+  }
+  return {
+    rows: keys.map(function (key) {
+      var crit = critById[key];
+      var row = _gridRow(students, function (sid) {
+        if (out(sid)) return null;
+        if (crit) return rubricCriterionLevel(cid, sid, assessment, crit);
+        if (rubric) {
+          var m = competencyLevelFromCriteria(cid, sid, assessment, key);
+          return m ? scoreModValue({ score: m.score, mod: m.mod }) : null;
+        }
+        var entry = (getScores(cid)[sid] || []).find(function (e) {
+          return e.assessmentId === assessment.id && e.tagId === key;
+        });
+        return entry && entry.score > 0 ? scoreModValue(entry) : null;
+      });
+      row.id = key;
+      row.kind = crit ? 'criterion' : 'competency';
+      row.name = crit ? crit.name || crit.label || '' : '';
+      return row;
+    }),
+  };
+}
+
+/* Who has what on one assessment: Missing, Excused and Late (Late keeps its
+   score), the students with nothing yet (unmarked), and how many are
+   scored (Late included). Each list holds student ids in roster order. */
+function classColumnStatusCounts(cid, students, assessment) {
+  var res = { scored: 0, total: (students || []).length, missing: [], excused: [], late: [], unmarked: [] };
+  (students || []).forEach(function (s) {
+    var status = getAssignmentStatus(cid, s.id, assessment.id);
+    if (status === 'NS') return res.missing.push(s.id);
+    if (status === 'EXC') return res.excused.push(s.id);
+    if (status === 'LATE') res.late.push(s.id);
+    var cell = assessmentCellValue(cid, s.id, assessment);
+    if (cell.kind === 'none' || (cell.kind === 'dibels' && !cell.dibels)) res.unmarked.push(s.id);
+    else res.scored++;
+  });
+  return res;
+}
+
+/* Of the students scored on an assessment, who has written feedback on it:
+   an overall comment, or a comment on any rubric criterion. Observations
+   are not feedback here. { withComment: [sid], without: [sid] }. */
+function classFeedbackCounts(cid, students, assessment) {
+  var res = { withComment: [], without: [] };
+  (students || []).forEach(function (s) {
+    var status = getAssignmentStatus(cid, s.id, assessment.id);
+    if (status === 'NS' || status === 'EXC') return;
+    var cell = assessmentCellValue(cid, s.id, assessment);
+    if (cell.kind === 'none' || (cell.kind === 'dibels' && !cell.dibels)) return;
+    var has =
+      !!String(getScoreComment(cid, s.id, assessment.id) || '').trim() ||
+      (getScores(cid)[s.id] || []).some(function (e) {
+        return e && e.assessmentId === assessment.id && String(e.critNote || '').trim();
+      });
+    (has ? res.withComment : res.without).push(s.id);
+  });
+  return res;
+}
+
+// What kind of score a piece takes, for comparing like with like.
+function _scoreKind(a) {
+  if (isDibelsScored(a)) return 'dibels';
+  if (isCompletionScored(a)) return 'complete';
+  if (isPointsScored(a)) return 'points';
+  return 'level';
+}
+
+/* The `n` pieces before this one in its category (or with no category,
+   when it has none) that are scored the same way (points, levels or
+   Complete/Incomplete) and have a Class Average, newest first:
+   [{ assessment, average (classColumnAverage), text }]. Null when there are
+   none, and for DIBELS. */
+function earlierInCategory(cid, assessment, n) {
+  if (!assessment || isDibelsScored(assessment)) return null;
+  var limit = n == null ? 3 : n;
+  var date = _assessmentDate(assessment);
+  if (!date) return null;
+  var cat = assessment.categoryId || assessment.category_id || null;
+  var kind = _scoreKind(assessment);
+  var students = typeof getStudents === 'function' ? getStudents(cid) : [];
+  var out = (getAssessments(cid) || [])
+    .filter(function (x) {
+      var d = _assessmentDate(x);
+      return (
+        x.id !== assessment.id &&
+        (x.categoryId || x.category_id || null) === cat &&
+        _scoreKind(x) === kind &&
+        d &&
+        d < date
+      );
+    })
+    .sort(function (x, y) {
+      return _assessmentDate(y).localeCompare(_assessmentDate(x));
+    })
+    .map(function (x) {
+      var avg = classColumnAverage(cid, students, { assessment: x });
+      return avg ? { assessment: x, average: avg, text: classColumnAverageText(cid, x, avg) } : null;
+    })
+    .filter(Boolean)
+    .slice(0, limit);
+  return out.length ? out : null;
+}
+
+/* A points piece's scores in bands of `bandSize` points (default a tenth
+   of its most, at least 1), for the Score Spread chart, lowest first. Each
+   band is { lo, hi, ids, byLevel: {1..4: [sid]} }, the level from the
+   class's Points to Proficiency table; the last band runs to the most (and
+   holds extra credit). levelRanges names the points each level takes, from
+   that table: { 1: 'under 25', 2: '25–32', … }. Null with no maximum. */
+function pointsBands(cid, students, assessment, bandSize) {
+  var max = Number(assessment && assessment.maxPoints) || 0;
+  if (!(max > 0) || isCompletionScored(assessment)) return null;
+  var size = bandSize > 0 ? bandSize : Math.max(1, Math.round(max / 10));
+  var count = Math.max(1, Math.floor(max / size));
+  var scale = getGradingScale(cid);
+  var bands = [];
+  for (var i = 0; i < count; i++) {
+    bands.push({
+      lo: i * size,
+      hi: i === count - 1 ? max : i * size + size - 1,
+      ids: [],
+      byLevel: { 1: [], 2: [], 3: [], 4: [] },
+    });
+  }
+  var spread = classColumnSpread(cid, students, { assessment: assessment });
+  ((spread && spread.values) || []).forEach(function (v) {
+    var at = Math.min(count - 1, Math.max(0, Math.floor(v.value / size)));
+    bands[at].ids.push(v.sid);
+    bands[at].byLevel[_spreadBand(cid, v, true)].push(v.sid);
+  });
+  var starts = {};
+  ((scale && scale.boundaries) || DEFAULT_GRADING_SCALE.boundaries).forEach(function (b) {
+    var p = Math.ceil((Number(b.min) / 100) * max - 1e-9);
+    if (starts[b.proficiency] == null || p < starts[b.proficiency]) starts[b.proficiency] = p;
+  });
+  var levelRanges = {};
+  [1, 2, 3, 4].forEach(function (level) {
+    if (starts[level] == null) return;
+    var next = null;
+    [1, 2, 3, 4].forEach(function (l) {
+      if (starts[l] != null && starts[l] > starts[level] && (next == null || starts[l] < next)) next = starts[l];
+    });
+    var hi = next == null ? max : next - 1;
+    levelRanges[level] =
+      starts[level] <= 0 && next != null
+        ? 'under ' + formatPoints(next)
+        : formatPoints(starts[level]) + (hi > starts[level] ? '–' + formatPoints(hi) : '');
+  });
+  return { size: size, bands: bands, levelRanges: levelRanges, max: max };
+}
+
+/* A Complete/Incomplete piece: who is Complete, Incomplete, unmarked,
+   Missing and Excused, and its Class Average % (Missing as 0, Excused left
+   out, as getClassPointsAverage counts it; null when nobody counts). */
+function completionCounts(cid, students, assessment) {
+  var res = { complete: [], incomplete: [], unmarked: [], missing: [], excused: [], pct: null };
+  (students || []).forEach(function (s) {
+    var status = getAssignmentStatus(cid, s.id, assessment.id);
+    if (status === 'NS') return res.missing.push(s.id);
+    if (status === 'EXC') return res.excused.push(s.id);
+    var mark = getCompletionMark(cid, s.id, assessment.id);
+    if (mark === 'complete') res.complete.push(s.id);
+    else if (mark === 'incomplete') res.incomplete.push(s.id);
+    else res.unmarked.push(s.id);
+  });
+  var avg = getClassPointsAverage(cid, students, assessment);
+  res.pct = avg ? avg.pct : null;
+  return res;
+}
+
+// DIBELS support levels, lowest first.
+var DIBELS_RANK = { intensive: 1, strategic: 2, core: 3, above: 4 };
+
+/* A DIBELS benchmark's reading levels (Oral Reading Fluency) for the class,
+   per window: { periods: { boy|moy|eoy: { counts, ids, tested,
+   medianWrc, medianAccuracy (null when no errors are entered) } },
+   rows: { sid: { boy|moy|eoy: { wrc, accuracy, level } } }, latest (the
+   last window anyone was tested in, or null), previous (the tested window
+   before it), moved: { up, same, down: [{ sid, from, to }] } between those
+   two }. Missing and Excused students are left out. */
+function dibelsClassResults(cid, students, assessment) {
+  var periods = {};
+  var rows = {};
+  DIBELS_PERIODS.forEach(function (p) {
+    periods[p] = {
+      counts: { intensive: 0, strategic: 0, core: 0, above: 0 },
+      ids: { intensive: [], strategic: [], core: [], above: [] },
+      tested: 0,
+      medianWrc: null,
+      medianAccuracy: null,
+    };
+  });
+  var wrcs = {};
+  var accs = {};
+  (students || []).forEach(function (s) {
+    var status = getAssignmentStatus(cid, s.id, assessment.id);
+    if (status === 'NS' || status === 'EXC') return;
+    DIBELS_PERIODS.forEach(function (p) {
+      var row = getDibelsScore(cid, s.id, assessment.id, p);
+      if (!row || row.orfWrc == null) return;
+      var level = dibelsLevel('orf', p, row.orfWrc);
+      if (!level) return;
+      var acc = dibelsAccuracy(row.orfWrc, row.orfErrors);
+      if (!rows[s.id]) rows[s.id] = {};
+      rows[s.id][p] = { wrc: row.orfWrc, accuracy: acc, level: level };
+      periods[p].counts[level]++;
+      periods[p].ids[level].push(s.id);
+      periods[p].tested++;
+      (wrcs[p] = wrcs[p] || []).push(row.orfWrc);
+      if (acc != null) (accs[p] = accs[p] || []).push(acc);
+    });
+  });
+  var tested = DIBELS_PERIODS.filter(function (p) {
+    periods[p].medianWrc = medianOf(wrcs[p] || []);
+    periods[p].medianAccuracy = medianOf(accs[p] || []);
+    return periods[p].tested > 0;
+  });
+  var latest = tested.length ? tested[tested.length - 1] : null;
+  var previous = tested.length > 1 ? tested[tested.length - 2] : null;
+  var moved = { up: [], same: [], down: [] };
+  if (latest && previous)
+    Object.keys(rows).forEach(function (sid) {
+      var now = rows[sid][latest];
+      var before = rows[sid][previous];
+      if (!now || !before) return;
+      var d = DIBELS_RANK[now.level] - DIBELS_RANK[before.level];
+      moved[d > 0 ? 'up' : d < 0 ? 'down' : 'same'].push({ sid: sid, from: before.level, to: now.level });
+    });
+  return { periods: periods, rows: rows, latest: latest, previous: previous, moved: moved };
+}
+
+/* Roughly how much of the course % one assessment carries as the class is
+   set up, for the line under the Class Results title ("12% of the course
+   grade"): its category's weight over the weights of the categories that
+   hold counted work, times its share of the category (its points, or its
+   Factor in an Average of Percentages category, over the category's). A
+   class with no categories shares by points alone. A whole percent, or
+   null when the class shows no % or the work counts toward no grade. Each
+   student's real share moves with what they have handed in. */
+function assessmentCourseShare(cid, assessment) {
+  var worth = assessmentCourseWorth(cid, assessment);
+  if (!worth || (worth.kind !== 'points' && worth.kind !== 'percent')) return null;
+  var own = worth.kind === 'points' ? worth.points : worth.factor;
+  var counted = _scopedAssessments(cid).filter(function (x) {
+    return !isDibelsScored(x) && countsTowardGrades(cid, x);
+  });
+  var catOf = function (x) {
+    return x.categoryId || x.category_id || null;
+  };
+  var categories = (getCategories(cid) || []).filter(function (c) {
+    return (
+      Number(c.weight || 0) > 0 &&
+      counted.some(function (x) {
+        return catOf(x) === c.id;
+      })
+    );
+  });
+  var cat = catOf(assessment);
+  var mates = counted.filter(function (x) {
+    return categories.length ? catOf(x) === cat : true;
+  });
+  var total = 0;
+  mates.forEach(function (x) {
+    var w = assessmentCourseWorth(cid, x);
+    if (w && w.kind === worth.kind) total += worth.kind === 'points' ? w.points : w.factor;
+  });
+  if (!(total > 0) || !(own > 0)) return null;
+  var catShare = 1;
+  if (categories.length) {
+    var weightSum = 0;
+    var mine = 0;
+    categories.forEach(function (c) {
+      weightSum += Number(c.weight || 0);
+      if (c.id === cat) mine = Number(c.weight || 0);
+    });
+    if (!(weightSum > 0) || !(mine > 0)) return null;
+    catShare = mine / weightSum;
+  }
+  return Math.round(catShare * (own / total) * 100);
+}
+
+/* A figure from classColumnSpread as the class reads it: points as
+   "38/50", a level through formatColumnAverageLevel ("86%", "3.0",
+   "3.0 · 75%"). */
+function classSpreadText(cid, assessment, value, points) {
+  if (value == null) return '—';
+  if (points)
+    return formatPoints(Math.round(value * 10) / 10) + '/' + formatPoints(Number(assessment.maxPoints) || 100);
+  return formatColumnAverageLevel(cid, value);
+}
+
+/* A spread's lowest to highest as the class reads it: "63–100%" in a
+   Letter class, "1.0–4.0" in a Proficiency or Both class, "18–50/50" for
+   points. */
+function classSpreadRangeText(cid, assessment, spread) {
+  if (!spread) return '—';
+  if (spread.points)
+    return (
+      formatPoints(Math.round(spread.low * 10) / 10) +
+      '–' +
+      formatPoints(Math.round(spread.high * 10) / 10) +
+      '/' +
+      formatPoints(Number(assessment.maxPoints) || 100)
+    );
+  if (courseGradeMode(cid) === 'letter')
+    return (
+      formatColumnAverageLevel(cid, spread.low).replace('%', '') + '–' + formatColumnAverageLevel(cid, spread.high)
+    );
+  return levelFigure(spread.low, '0.0') + '–' + levelFigure(spread.high);
+}
+
 /* ── Namespace ──────────────────────────────────────────────── */
 window.Calc = {
+  medianOf,
+  classColumnSpread,
+  classColumnLevelCounts,
+  levelBands,
+  classRubricGrid,
+  classCompetencyGrid,
+  classColumnStatusCounts,
+  classFeedbackCounts,
+  earlierInCategory,
+  pointsBands,
+  completionCounts,
+  dibelsClassResults,
+  classSpreadText,
+  classSpreadRangeText,
+  assessmentCourseShare,
   calcMethodExample,
   getRecentScoreLimit,
   getFoldersCountAsOne,
