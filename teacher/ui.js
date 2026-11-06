@@ -983,7 +983,7 @@ function openReportProblem(opts) {
       });
     } else if (act === 'copy') {
       var copy = (text.value.trim() ? text.value.trim() + '\n\n' : '') + _reportAttachedText(page, build);
-      _copyTextToClipboard(copy).then(function (ok) {
+      copyTextToClipboard(copy).then(function (ok) {
         if (!ok) return;
         b.textContent = 'Copied';
         setTimeout(function () {
@@ -1307,17 +1307,7 @@ function _copySessionExpiredDraft() {
   if (!_sessionExpiredCopyDraft) return Promise.resolve(false);
   var text = (_sessionExpiredCopyDraft() || '').trim();
   if (!text) return Promise.resolve(false);
-  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-    return navigator.clipboard.writeText(text).then(
-      function () {
-        return true;
-      },
-      function () {
-        return false;
-      },
-    );
-  }
-  return Promise.resolve(false);
+  return copyTextToClipboard(text);
 }
 
 function _showSessionExpiredDraftToast() {
@@ -1546,6 +1536,9 @@ function renderBreadcrumb(parentLabel, parentHref, currentLabel, parentAction) {
   );
 }
 
+const _STU_EMAIL_COPY_ICON =
+  '<svg class="stu-email-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><path d="M8 4V2.7A1.2 1.2 0 0 0 6.8 1.5H2.7A1.2 1.2 0 0 0 1.5 2.7v4.1A1.2 1.2 0 0 0 2.7 8H4"/></svg>';
+
 function renderStudentHeader(cid, sid, opts) {
   opts = opts || {};
   const course = COURSES[cid];
@@ -1586,8 +1579,8 @@ function renderStudentHeader(cid, sid, opts) {
   if (hasIep) tags += `<span class="sh-tag sh-tag-iep">IEP</span>`;
   if (hasMod) tags += `<span class="sh-tag sh-tag-mod">Modified</span>`;
 
-  // One line under the name: pronouns, student number and email (each
-  // copies on a click), birthday.
+  // One line under the name: pronouns, student number (copies on a click),
+  // birthday, email (copies on a click; no mailto, Colin 2026-11-05).
   const meta = [];
   if (student.pronouns) meta.push(`<span>${esc(student.pronouns)}</span>`);
   if (student.studentNumber)
@@ -1597,7 +1590,7 @@ function renderStudentHeader(cid, sid, opts) {
   if (student.dateOfBirth) meta.push(`<span title="Birthday">${formatDate(student.dateOfBirth)}</span>`);
   if (student.email)
     meta.push(
-      `<button type="button" class="sh-copy" data-action="copy-student-field" data-copy="${esc(student.email)}" title="Copy email" aria-label="Email ${esc(student.email)}, copy">${esc(student.email)}</button>`,
+      `<button type="button" class="stu-email-copy" data-action="copy-student-email" data-copy="${esc(student.email)}" title="Copy email address" aria-label="Copy ${esc(student.email)}"><span class="stu-email-text" title="${esc(student.email)}">${esc(student.email)}</span>${_STU_EMAIL_COPY_ICON}<span class="stu-email-copied">Copied</span></button>`,
     );
 
   let html = `<div class="student-header-top">`;
@@ -2628,15 +2621,18 @@ document.addEventListener('click', function (e) {
     case 'copy-student-field':
       _handleCopyStudentField(btn);
       break;
+    case 'copy-student-email':
+      copyStudentEmail(btn);
+      break;
   }
 });
 
-/* The header's student number or email: a click copies it, and the button
-   says Copied for a moment. */
+/* The header's student number: a click copies it, and the button says
+   Copied for a moment. */
 function _handleCopyStudentField(btn) {
   var text = btn.dataset.copy;
   if (!text) return;
-  _copyTextToClipboard(text).then(function (ok) {
+  copyTextToClipboard(text).then(function (ok) {
     if (!ok) return;
     var original = btn.textContent;
     btn.textContent = 'Copied!';
@@ -2646,8 +2642,44 @@ function _handleCopyStudentField(btn) {
   });
 }
 
-function _copyTextToClipboard(text) {
-  if (navigator.clipboard && window.isSecureContext) {
+/* The header's email: a click copies it and the icon becomes Copied for
+   1.5 s. Where the browser won't copy, the address is selected instead so
+   the teacher can copy it by hand. Resolves to whether it copied. */
+function copyStudentEmail(btn) {
+  var text = btn && btn.dataset.copy;
+  if (!text) return Promise.resolve(false);
+  return copyTextToClipboard(text).then(function (ok) {
+    if (ok) {
+      btn.classList.add('is-copied');
+      clearTimeout(btn._copiedTimer);
+      btn._copiedTimer = setTimeout(function () {
+        btn.classList.remove('is-copied');
+      }, 1500);
+    } else {
+      _selectNodeText(btn.querySelector('.stu-email-text'));
+    }
+    return ok;
+  });
+}
+
+function _selectNodeText(node) {
+  if (!node) return;
+  try {
+    var sel = window.getSelection && window.getSelection();
+    if (!sel || !document.createRange) return;
+    var range = document.createRange();
+    range.selectNodeContents(node);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  } catch (e) {
+    /* nothing to select with */
+  }
+}
+
+/* Copies text to the clipboard. Resolves to true when it copied, false when
+   the browser has no clipboard or refused. */
+function copyTextToClipboard(text) {
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
     return navigator.clipboard.writeText(text).then(
       function () {
         return true;
@@ -2661,19 +2693,20 @@ function _copyTextToClipboard(text) {
 }
 
 function _execCommandCopy(text) {
+  var ta = null;
   try {
-    var ta = document.createElement('textarea');
+    ta = document.createElement('textarea');
     ta.value = text;
     ta.setAttribute('readonly', '');
     ta.style.position = 'fixed';
     ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.select();
-    var ok = document.execCommand('copy');
-    document.body.removeChild(ta);
-    return ok;
+    return !!document.execCommand('copy');
   } catch (e) {
     return false;
+  } finally {
+    if (ta && ta.parentNode) ta.parentNode.removeChild(ta);
   }
 }
 
@@ -2744,4 +2777,7 @@ window.UI = {
   refreshSyncStatusUI,
   retrySyncQueue,
   queueSessionExpiredRetry,
+  copyTextToClipboard,
+  copyStudentEmail,
 };
+window.copyTextToClipboard = copyTextToClipboard;
