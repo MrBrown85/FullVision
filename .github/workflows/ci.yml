@@ -117,10 +117,10 @@ jobs:
 
   # Browser tests against dist/ served with the production CSP
   # (scripts/e2e-server.mjs) and a fake Supabase (e2e/helpers.js). They run
-  # on every pull request and again after a merge to main (2026-11-05). Four
-  # runners with four workers each (playwright.config.js) take about four
-  # minutes; two runners with two workers took about twelve, which is why
-  # they once ran on main only. Not a required check: a red run shows on the
+  # on every pull request and again after a merge to main (2026-11-05). Eight
+  # runners with four workers each (playwright.config.js, 2026-11-06); four
+  # took five to six minutes, two runners with two workers about twelve,
+  # which is why they once ran on main only. Not a required check: a red run shows on the
   # PR before merging but doesn't block it.
   e2e:
     runs-on: ubuntu-latest
@@ -137,7 +137,7 @@ jobs:
       # every failing spec.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
 
     steps:
       - name: Check out repository
@@ -157,7 +157,7 @@ jobs:
 
       # Playwright's --shard cuts the test list into contiguous blocks, which
       # put all of report-studio.spec.js (half the run's time) in one shard:
-      # 4 minutes against 10 with two shards. Each shard takes every fourth
+      # 4 minutes against 10 with two shards. Each shard takes every nth
       # test location (file:line) instead, so slow files split evenly. Tests
       # made on one line (a loop) stay together. The count check fails the
       # shard if its locations select more or fewer tests than the list holds.
