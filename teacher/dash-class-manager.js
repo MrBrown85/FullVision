@@ -2757,7 +2757,7 @@ window.DashClassManager = (function () {
   }
 
   /* `tab` opens the manager on that tab (a link from another page). */
-  // tab: a Class Management tab, or 'new' for the New Class wizard. cid: a
+  // tab: a Class Settings tab, or 'new' for the New Class wizard. cid: a
   // class to show other than the open one (from the address's &class=).
   function openClassManager(tab, cid) {
     classManagerOpen = true;
@@ -2777,7 +2777,7 @@ window.DashClassManager = (function () {
     _cmFollowLoads();
   }
 
-  /* Class Management's own address, kept in step as it changes, so a reload
+  /* Class Settings' own address, kept in step as it changes, so a reload
      or Back returns to the same tab and class (or the New Class wizard):
      /dashboard?manage=grading&class=… . The dashboard opens it from there. */
   function _cmSyncUrl() {
@@ -2787,7 +2787,7 @@ window.DashClassManager = (function () {
     if (cmMode !== 'create' && cmSelectedCourse && cmSelectedCourse !== _activeCourse && COURSES[cmSelectedCourse])
       url += '&class=' + encodeURIComponent(cmSelectedCourse);
     Router.setUrl(url);
-    document.title = 'FullVision \u2014 Class Management';
+    document.title = 'FullVision \u2014 Class Settings';
   }
 
   function closeClassManager() {
@@ -2946,7 +2946,7 @@ window.DashClassManager = (function () {
 
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
-    // Class Management reads the year so far for every class: its previews
+    // Class Settings reads the year so far for every class: its previews
     // (calculation method, Folders Count as One) and Check With a Student
     // never count as of a report left in view on the Reports page.
     if (typeof setActiveTerm === 'function') {
@@ -2963,14 +2963,14 @@ window.DashClassManager = (function () {
         ? 'New Class'
         : cmSelectedCourse && COURSES[cmSelectedCourse]
           ? COURSES[cmSelectedCourse].name
-          : 'Class Management';
-    // Class Management belongs to the dashboard: its toolbar is a breadcrumb
+          : 'Class Settings';
+    // Class Settings belongs to the dashboard: its toolbar is a breadcrumb
     // back to it in place of the dashboard's own toolbar.
     var toolbarMount = document.getElementById('page-toolbar-mount');
     if (toolbarMount) {
       toolbarMount.innerHTML =
         '<div class="page-toolbar dash-toolbar cm-toolbar">' +
-        renderBreadcrumb('Dashboard', '/dashboard', 'Class Management', 'closeClassManager') +
+        renderBreadcrumb('Dashboard', '/dashboard', 'Class Settings', 'closeClassManager') +
         '<span class="dash-toolbar-spacer"></span>' +
         // The tabbed view names the class in its own header.
         (cmMode === 'create' || cmRelinkStep > 0
@@ -2980,7 +2980,7 @@ window.DashClassManager = (function () {
     }
 
     // The class list takes the student list's place beside the page; the
-    // dashboard puts the roster back when Class Management closes.
+    // dashboard puts the roster back when Class Settings closes.
     var sideMount = document.getElementById('sidebar-mount');
     if (sideMount) {
       sideMount.removeAttribute('data-cid');
@@ -10099,7 +10099,7 @@ window.DashClassManager = (function () {
   }
 
   /* A switch, checkbox, radio or menu changed with the keyboard keeps the
-     focus: most changes redraw Class Management, which made the control a
+     focus: most changes redraw Class Settings, which made the control a
      new element and dropped the focus to the page. Until the next click or
      change, a redraw that leaves the focus nowhere gives it back to the same
      control (by id, else by its data attributes), including the redraws

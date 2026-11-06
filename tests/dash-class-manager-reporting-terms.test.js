@@ -1,5 +1,5 @@
 /**
- * The reporting terms editor in Class Management (docs/DECISIONS.md,
+ * The reporting terms editor in Class Settings (docs/DECISIONS.md,
  * "Reporting periods"). Presets fill the rows, edits stay local until Save,
  * Save is refused while rows overlap or are incomplete, and Demo Mode saves
  * without a server call.

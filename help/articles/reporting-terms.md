@@ -1,6 +1,6 @@
 ---
 title: Reporting Terms
-section: Class Management
+section: Class Settings
 order: 1
 summary: Reporting terms divide a class's school year into report periods. Each term ends on its report date, and a report shows the year to date as of that date.
 checked: 2026-11-05
@@ -8,7 +8,7 @@ pages:
   - /dashboard
 demo: /dashboard
 labels:
-  - Class Management
+  - Class Settings
   - Reporting Terms
   - School
   - Replace With This School’s Dates
@@ -32,7 +32,7 @@ shots:
   - file: reporting-terms.jpg
     route: /dashboard
     steps:
-      - click role=button[name="Class Management"]
+      - click role=button[name="Class Settings"]
       - click main >> text="Reporting Terms" >> nth=0
       - select main >> select.cm-term-school-select | Salish Secondary
       - click role=button[name="Replace With This School’s Dates"]
@@ -41,7 +41,7 @@ shots:
 
 ## Use a School's Dates
 
-1. Open **Class Management** from the Dashboard, select the class, then open the **Reporting Terms** tab.
+1. Open **Class Settings** from the Dashboard, select the class, then open the **Reporting Terms** tab.
 2. Choose the school under **School**. Its term dates are listed under the menu.
 3. Choose **Replace With This School’s Dates**. A class with no terms shows **Use This School’s Dates** instead.
 4. Under **This Class Runs**, choose **Full Year**, **Semester 1** or **Semester 2**. A semester class keeps only that semester's terms, with the school's report numbers.

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-/* Class Management's competency card (Nov 2 mockup, batch 2): a read-only
+/* Class Settings' competency card (Nov 2 mockup, batch 2): a read-only
    Levels section with each descriptor and next step, and Write Your Own,
    which saves the teacher's wording to the descriptor bank printed rubrics
    read. Demo Mode, Science 8, on Data Patterns (PA4) from the curriculum
@@ -13,7 +13,7 @@ async function open(page) {
   // The demo class seeds after the curriculum bank loads.
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(() => RubricPrint.loadBankLevels());
-  await page.locator('button', { hasText: 'Class Management' }).first().click();
+  await page.locator('button', { hasText: 'Class Settings' }).first().click();
   await page
     .locator('button', { hasText: /^Competencies/ })
     .first()
@@ -83,7 +83,7 @@ test('a competency with no bank wording shows the general wording as the printed
     _competencyDescriptors = null;
     return tag.label;
   });
-  await page.locator('button', { hasText: 'Class Management' }).first().click();
+  await page.locator('button', { hasText: 'Class Settings' }).first().click();
   await page
     .locator('button', { hasText: /^Competencies/ })
     .first()

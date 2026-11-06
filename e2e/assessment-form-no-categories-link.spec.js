@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /* Nov 3 sweep (step 4 group 3 #24): a class with no categories said only
    "No grading categories configured for this course yet.", with no way to
-   add them. Add Categories opens Class Management's Grading tab, asking
+   add them. Add Categories opens Class Settings' Grading tab, asking
    first when the form has something typed. Demo Mode, Science 8 with its
    categories taken away. */
 test.use({ viewport: { width: 1440, height: 900 } });

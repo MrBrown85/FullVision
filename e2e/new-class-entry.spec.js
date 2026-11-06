@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-/* New Class is easy to find: a button at the top of Class Management's class
+/* New Class is easy to find: a button at the top of Class Settings' class
    list, and the last choice in the sidebar's class picker. Demo Mode. */
 
 async function enterDemo(page) {
@@ -21,7 +21,7 @@ test('The class picker offers New Class, which opens the wizard', async ({ page 
   expect(await page.evaluate(() => getActiveCourse())).toBe('sci8');
 });
 
-test('Class Management shows New Class as a button at the top of the class list', async ({ page }) => {
+test('Class Settings shows New Class as a button at the top of the class list', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await enterDemo(page);
   await page.locator('[data-action="openClassManager"]').first().click();

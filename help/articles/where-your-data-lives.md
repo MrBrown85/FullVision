@@ -9,7 +9,7 @@ pages:
 demo: /dashboard
 labels:
   - Sign Out
-  - Class Management
+  - Class Settings
   - Class Actions
   - Download Class Backup
   - Restore from Backup
@@ -23,7 +23,7 @@ shots:
   - file: where-your-data-lives.jpg
     route: /dashboard
     steps:
-      - click role=button[name="Class Management"]
+      - click role=button[name="Class Settings"]
       - click role=button[name=/Class Actions/]
     clip: 252,104,1176,300
 ---
@@ -46,14 +46,14 @@ When an error occurs, it sends a report to Sentry, which stores reports in Germa
 
 A class backup is a file that holds one class's students, competencies, assessments, scores, comments and observations. Questionnaires are not included. It is saved on the computer, not in FullVision.
 
-1. Open **Class Management** from the Dashboard and select the class.
+1. Open **Class Settings** from the Dashboard and select the class.
 2. Choose **Class Actions**, then **Download Class Backup**. The browser saves the class as a .json file.
 
-![The Class Actions menu in Class Management with Download Class Backup](img/where-your-data-lives.jpg 'Class Actions in Class Management. Download Class Backup saves the class as a file.')
+![The Class Actions menu in Class Settings with Download Class Backup](img/where-your-data-lives.jpg 'Class Actions in Class Settings. Download Class Backup saves the class as a file.')
 
 ## Restore a Class From a Backup
 
-1. In **Class Management**, choose **Restore from Backup** at the foot of the class list.
+1. In **Class Settings**, choose **Restore from Backup** at the foot of the class list.
 2. Under **Backup File**, choose the saved file. The window shows how many students and assessments it holds and when it was saved.
 3. Check the **Class Name**, then choose **Restore**. The backup becomes a new class. Other classes do not change.
 

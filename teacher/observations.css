@@ -439,7 +439,7 @@
 .obs-card-dims {
   display: contents;
 }
-/* A tag: a chip on other screens (Class Management starters), plain text
+/* A tag: a chip on other screens (Class Settings starters), plain text
    with its dot on the card. */
 .obs-card-dim {
   display: inline-flex;
@@ -512,7 +512,7 @@
 }
 
 /* Text pills on other screens (the Assignments comment popover, the
-   questionnaire, Class Management starters, the evidence drawer). The
+   questionnaire, Class Settings starters, the evidence drawer). The
    feed card does not use them. */
 .obs-pill {
   display: inline-flex;

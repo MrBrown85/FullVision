@@ -12,7 +12,7 @@ pages:
   - /dashboard
 demo: /dashboard
 labels:
-  - Class Management
+  - Class Settings
   - Students
   - Add Student
   - First Name
@@ -32,7 +32,7 @@ shots:
   - file: add-your-students.jpg
     route: /dashboard
     steps:
-      - click role=button[name="Class Management"]
+      - click role=button[name="Class Settings"]
       - click main >> text=/^Students/
       - click role=button[name="Add Student"]
     height: 1200
@@ -41,7 +41,7 @@ shots:
 
 ## Add One Student
 
-1. Open **Class Management** from the Dashboard, select the class, then open the **Students** tab. A new class opens on this tab.
+1. Open **Class Settings** from the Dashboard, select the class, then open the **Students** tab. A new class opens on this tab.
 2. Choose **Add Student**.
 3. Enter a **First Name** and any other details. Only the first name is required.
 4. Choose **Save and Add Another**, or press Enter, to save and start the next student. Choose **Save** to save and close the form.

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-/* Class Management > Reporting Terms: picking a school previews its dates,
+/* Class Settings > Reporting Terms: picking a school previews its dates,
    and Cancel or leaving the tab puts the menu back on the class's school.
    Demo Mode, with Grandview Heights' terms saved on the class. */
 

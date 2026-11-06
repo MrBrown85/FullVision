@@ -165,7 +165,7 @@ describe('pronouns changed after the comment was written (Demo Mode, Science 8, 
     const mine = 'He helped clean up after the lab.';
     const { text: before } = approvedFor(st, mine);
     reload();
-    // Class Management or the Student Dashboard changes the pronouns.
+    // Class Settings or the Student Dashboard changes the pronouns.
     st.pronouns = 'she/her';
     try {
       reload();

@@ -50,7 +50,7 @@ shots: # optional: pictures for scripts/help-shots.mjs
   - file: add-your-students.jpg
     route: /dashboard
     steps:
-      - click role=button[name="Class Management"]
+      - click role=button[name="Class Settings"]
       - click main >> text=/^Students/
       - click role=button[name="Add Student"]
     clip: 252,252,1176,548 # x,y,width,height in CSS pixels; or selector: <css>
@@ -58,7 +58,7 @@ shots: # optional: pictures for scripts/help-shots.mjs
 ---
 ```
 
-Sections, in nav order: Getting Started, Class Management, Assignments, Gradebook, Observations, Reports, Student Page and Student Voice, Phone App, Privacy and Your Data, and Reference (Glossary, What's New and the other standing pages, listed under the line at the foot of the nav).
+Sections, in nav order: Getting Started, Class Settings, Assignments, Gradebook, Observations, Reports, Student Page and Student Voice, Phone App, Privacy and Your Data, and Reference (Glossary, What's New and the other standing pages, listed under the line at the foot of the nav).
 
 Keyboard Shortcuts (`generated: keyboard-shortcuts`) is drawn from `KEYBOARD_SHORTCUTS` in `shared/constants.js`, the list the app's own shortcut sheet shows, followed by the article's own Markdown (keys the app shows only as on-screen hints). A shortcut with an `aria-keyshortcuts` goes in that constant, not in the article.
 
@@ -80,7 +80,7 @@ Help is written in textbook register: neutral, precise and short, in the words a
 
 - Open with a one- or two-sentence definition in the third person: "A class is built from one or more BC curriculum courses."
 - Steps are imperative and quote labels word for word: "Select a **Grade**, a **Subject** and one or more **Courses**, then choose **Next**."
-- State conditions plainly ("If a class already exists, …"). Use the passive where the actor is obvious ("These can be changed later in Class Management.").
+- State conditions plainly ("If a class already exists, …"). Use the passive where the actor is obvious ("These can be changed later in Class Settings.").
 - No "you", "let's" or "we", no questions, exclamations, reassurance or filler.
 - One picture per article, one Next box. No email address anywhere: the footer's Report a Problem link opens the form in the app.
 - Student names come only from the Demo Mode sample class (`shared/seed-data.js`).

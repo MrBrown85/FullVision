@@ -357,7 +357,7 @@ function _helpPage() {
   var path = (location && location.pathname) || '/dashboard';
   var params = new URLSearchParams((location && location.search) || '');
   if (path === '/dashboard' && params.get('manage') && params.get('manage') !== 'starters') {
-    return { name: 'Class Management', routes: ['/class-management', '/dashboard?manage'] };
+    return { name: 'Class Settings', routes: ['/class-management', '/dashboard?manage'] };
   }
   var names = {
     '/dashboard': 'Dashboard',
@@ -1524,7 +1524,7 @@ function segSelect(btn) {
 }
 
 /* ── Breadcrumb ────────────────────────────────────────────────
-   Screens that belong to the dashboard (a student page, Class Management)
+   Screens that belong to the dashboard (a student page, Class Settings)
    keep "Dashboard" lit in the top nav and show where they are at the left
    of their toolbar: "Dashboard › Mei Wong". The first part links back.
    parentAction is a data-action for screens that close in place. */

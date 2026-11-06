@@ -8,7 +8,7 @@ pages:
   - /dashboard
 demo: /dashboard
 labels:
-  - Class Management
+  - Class Settings
   - Grading
   - Grading System
   - Proficiency
@@ -30,7 +30,7 @@ shots:
   - file: set-up-grading.jpg
     route: /dashboard
     steps:
-      - click role=button[name="Class Management"]
+      - click role=button[name="Class Settings"]
       - click main >> text="Grading" >> nth=0
     height: 1100
     clip: 252,256,1176,764
@@ -38,7 +38,7 @@ shots:
 
 ## Steps
 
-1. Open **Class Management** from the Dashboard, select the class, then open the **Grading** tab.
+1. Open **Class Settings** from the Dashboard, select the class, then open the **Grading** tab.
 2. Under **Grading System**, choose **Proficiency**, **Letter** or **Both**. Proficiency shows a level from Emerging to Extending. Letter shows a letter grade and percent. Both shows proficiency day to day and the letter grade and percent on reports.
 3. Under **Competency Proficiency**, choose a **Calculation Method**. Each method shows its result for the same example scores. If the change moves any student's grade, choose **Change Method** to confirm it.
 4. **Folders Count as One** is on for a one-course class and off for a combined class. When it is on, each folder is averaged first and counts as one competency in the overall proficiency. Turn it off to count every competency separately.

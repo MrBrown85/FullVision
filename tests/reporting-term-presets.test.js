@@ -2,7 +2,7 @@
  * Surrey secondary schools' reporting periods as presets
  * (shared/reporting-term-presets.js; docs/DECISIONS.md "Reporting periods").
  * Grandview Heights is the default: a new class starts with its terms, and
- * the Class Management editor fills rows from any listed school.
+ * the Class Settings editor fills rows from any listed school.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -100,7 +100,7 @@ describe('the preset data', () => {
   });
 });
 
-describe('Class Management uses the presets', () => {
+describe('Class Settings uses the presets', () => {
   const CID = 'course-school-preset';
   var originals;
   var rpcCalls;

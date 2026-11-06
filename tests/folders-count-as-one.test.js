@@ -256,7 +256,7 @@ describe('Copy Grading Setup', () => {
   });
 });
 
-describe('in Class Management', () => {
+describe('in Class Settings', () => {
   var confirms;
   var originalConfirm;
   var originalGetElementById;

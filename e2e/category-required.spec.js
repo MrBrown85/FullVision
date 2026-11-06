@@ -180,7 +180,7 @@ test('adding categories leaves older work with no category until the teacher pic
       }),
     );
   });
-  await page.locator('button', { hasText: 'Class Management' }).first().click();
+  await page.locator('button', { hasText: 'Class Settings' }).first().click();
   await page
     .locator('button', { hasText: /^Grading/ })
     .first()

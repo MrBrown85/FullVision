@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, gotoApp } from './helpers.js';
 
-/* A teacher's first run of Class Management: the zero-class screen, the New
+/* A teacher's first run of Class Settings: the zero-class screen, the New
    Class wizard's Next button, a required Class Name, and landing on Students
    after Create Class. */
 

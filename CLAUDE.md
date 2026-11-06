@@ -59,7 +59,7 @@ Demo Mode (`login.html` → Try Demo Mode, or `/login.html?demo=1`) runs local-o
 ## Current state (2026-11-02)
 
 - Grading compliance with Schoology/Teams (`docs/grading-compliance-plan.md`): Phase 1 and Phase 2 are implemented and live.
-- Course soft-delete with 30-day purge is live. Removing a student withdraws them (`migrations/20261019_withdraw_students.sql`); permanent delete is a second step from the Withdrawn list in Class Management.
+- Course soft-delete with 30-day purge is live. Removing a student withdraws them (`migrations/20261019_withdraw_students.sql`); permanent delete is a second step from the Withdrawn list in Class Settings.
 - Reports: the Term Questionnaire with its Comment Bank and Generate, and Progress Reports on Page Studio. Students answer questionnaires and read phone reports on the student page (`s/`).
 - Grades display only through `calc.js` and its helpers in `constants.js` (`formatLevel`, `scoreLevelText`, `BC_LETTER_BANDS`, `PROF_LABELS`); `tests/grade-format-guard.test.js` enforces it. Text goes into HTML only through `esc` in `shared/html.js`; `npm run audit:html` fails on a new unproven innerHTML site.
 - The curriculum bank was rebuilt from the Ministry's files (Nov 2). New classes import from it through the New Class wizard; older classes change only when a teacher runs Re-link. Folders Count as One and Each Course Counts Equally are Grading tab switches.

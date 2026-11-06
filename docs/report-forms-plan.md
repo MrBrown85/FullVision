@@ -76,7 +76,7 @@ Revised 2026-10-20, evening. Colin opened Edit Layout on his own class and found
 
 Applied 2026-10-20 to gradebook-prod: `migrations/20261020_report_template.sql`, `20261020_report_issue.sql`, `20261020_guardian.sql`. Each was first run on a local Postgres 17 stand-in (`migrations/local-test/`, 46 checks, as Supabase branching needs the Pro plan); that run caught a form check that passed when `front` was missing. Client wrappers: `v2.saveReportTemplate` / `listReportTemplates` / `deleteReportTemplate`, `v2.createReportIssue` / `listReportIssues` / `getReportIssue` / `deleteReportIssue`, `v2.upsertGuardian` / `deleteGuardian` / `listCourseGuardians`. The library and Issue Reports now use these rows: `ReportSheets.syncTemplates` / `saveTemplate` / `removeTemplate` and `ReportIssues.sync` / `issue` / `load` / `remove` write through to the server and keep the device copies (localStorage `gb-report-templates`; IndexedDB `fv-report-issues` plus the `gb-report-issues-<cid>` index, each entry carrying `serverId`) as the Demo Mode and offline cache. The Reports page refreshes both from the server when it opens and when the class changes; a copy the device does not hold is fetched on demand. The Students tab reads and edits `guardian` (2026-10-24); nothing sends to it until the district policy check.
 
-- `guardian` table with consent; roster import column; Class Management editing.
+- `guardian` table with consent; roster import column; Class Settings editing.
 - Family view-by-link page with the birth-date check; SES in `ca-central-1`; queue, delivery log, bounce handling.
 - Send as the second output of Issue; the Send view (recipients table, composer, preview).
 - Assessment emails from the graded rubric; PDF attachments last.

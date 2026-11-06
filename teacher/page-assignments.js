@@ -9426,7 +9426,7 @@ window.PageAssignments = (function () {
     var html = any
       ? '<div class="copy-review-note">Each competency you pick becomes a criterion. Its descriptors are drafted from the competency\u2019s I-can statements, or use your own wording if you have rewritten them in an earlier rubric; change any of them before you save.</div>' +
         chips
-      : '<div class="copy-review-note">This class has no competencies yet. Add them in Class Management first.</div>';
+      : '<div class="copy-review-note">This class has no competencies yet. Add them in Class Settings first.</div>';
     function updateOk(root) {
       var n = root.querySelectorAll('[data-pick-tag][aria-pressed="true"]').length;
       var ok = root.querySelector('[data-copy-ok]');
@@ -10615,7 +10615,7 @@ window.PageAssignments = (function () {
       cancelAssessForm: function () {
         cancelAssessForm();
       },
-      // A class with no categories: Class Management's Grading tab.
+      // A class with no categories: Class Settings' Grading tab.
       afAddCategories: function () {
         var cid = activeCourse;
         cancelAssessForm(function () {

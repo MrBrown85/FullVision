@@ -2,7 +2,7 @@
  * Rubric Levels: a class decides whether the four levels run Extending →
  * Emerging (the default) or Emerging → Extending on every scoring card and
  * printed rubric (migrations/20261022_course_level_order.sql). The setting
- * is in Class Management, Grading tab, under Grading System.
+ * is in Class Settings, Grading tab, under Grading System.
  */
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
@@ -102,11 +102,11 @@ test.describe('Rubric Levels', () => {
     expect(await cardOrder(page)).toEqual({ header: DESC, row: DESC });
     expect(await printedHeads(page)).toEqual(DESC);
 
-    // Class Management → Grading → Rubric Levels.
+    // Class Settings → Grading → Rubric Levels.
     await page.evaluate(() => {
       window.Router.navigate('/dashboard');
     });
-    await page.getByRole('button', { name: 'Class Management' }).first().click();
+    await page.getByRole('button', { name: 'Class Settings' }).first().click();
     await page.locator('[data-action="cmSetTab"][data-tab="grading"]').click();
     const control = page.locator('#cm-level-order');
     await expect(control).toBeVisible();

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-/* The Questionnaires tab in Class Management (docs/STUDENT-VOICE-PLAN.md,
+/* The Questionnaires tab in Class Settings (docs/STUDENT-VOICE-PLAN.md,
    PR 5). Demo Mode, Science 8: About Me shows who has answered, an edited
    question survives a reload, and Print QR Slips builds one slip per
    student, each with its own QR code. */
@@ -35,7 +35,7 @@ test('About Me shows who answered, turns off and on, saves an edited question, a
   const first = card.getByLabel('Question 1', { exact: true });
   await first.fill('What name do you go by?');
   await first.blur();
-  // A reload comes back to Class Management on the Questionnaires tab.
+  // A reload comes back to Class Settings on the Questionnaires tab.
   await page.reload();
   await expect(page.getByRole('tab', { name: /Questionnaires/ })).toHaveAttribute('aria-selected', 'true');
   await page.locator('[data-card="about-me"]').getByRole('button', { name: 'Show Questions' }).click();

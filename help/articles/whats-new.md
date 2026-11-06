@@ -3,8 +3,11 @@ title: What's New
 section: Reference
 order: 3
 summary: What's New lists changes to FullVision by release date, newest first.
+keywords:
+  - Class Management
 checked: 2026-11-05
 labels:
+  - Class Settings
   - Help
   - Open in Help Site
   - Keyboard Shortcuts
@@ -29,6 +32,10 @@ next:
   - add-your-students
 ---
 
+## Nov 5, 2026: Class Settings
+
+The Class Management button on the Dashboard is now **Class Settings**. It opens the same screen, with the same tabs.
+
 ## Nov 5, 2026: Help Button and Keyboard Shortcuts
 
 A **Help** button at the top right opens a panel beside the page. It lists the help pages for that page and for Getting Started, searches them, and shows a page in the panel; **Open in Help Site** opens it in full. **Keyboard Shortcuts**, in the panel or with the ? key, lists the app's keyboard shortcuts. On a phone, Help is in the Settings sheet.
@@ -47,7 +54,7 @@ Help pages at fullvision.ca/help explain each task step by step, starting with [
 
 ## Nov 5, 2026: Setting Up a First Class
 
-With no classes yet, Class Management shows two cards: **Create a Class** and **Try Demo Mode**. **Open Demo Mode** asks before it replaces the data on the device. A new class opens on its **Students** tab, and **Save and Add Another** keeps the Add Student form open for the next student. In the New Class wizard, **Next** stays in place when a course is ticked, and the class cannot be created without a **Class Name**.
+With no classes yet, Class Settings shows two cards: **Create a Class** and **Try Demo Mode**. **Open Demo Mode** asks before it replaces the data on the device. A new class opens on its **Students** tab, and **Save and Add Another** keeps the Add Student form open for the next student. In the New Class wizard, **Next** stays in place when a course is ticked, and the class cannot be created without a **Class Name**.
 
 ## Nov 5, 2026: Sensitive Health Topics in Report Comments
 
