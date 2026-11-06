@@ -3991,19 +3991,32 @@ window.DashClassManager = (function () {
     );
   }
 
-  /* Points and Proficiency, both ways. Points to Proficiency: the percent a
-     points score needs for each proficiency; the lowest takes everything
-     below the one above it. Counts As: the percent each step (1 to 4, with
-     + and −) is worth in the course % (docs/DECISIONS.md, "Proficiency
-     percents"). A step with no value of its own sits a third of the way
-     between its whole levels and is shown that way. */
+  /* Points and Proficiency as one 0–100% ruler (Colin, 2026-11-06: the old
+     two-column grid didn't speak for itself). Behind it, Points to
+     Proficiency: four bands split where each proficiency starts, with a
+     handle at each start. Above it, Counts As: a marker for every step (1 to
+     4 with + and −) at the percent it counts as in the course %
+     (docs/DECISIONS.md, "Proficiency percents" and "Counts As by step"). A
+     step with no value of its own sits a third of the way between its whole
+     levels and is drawn there. Picking a marker or handle opens one line to
+     type its percent; Left and Right nudge it; a drag moves it. */
   var _cmPtsError = null;
-  var CM_PTS_LOCKED_HINT = 'A student at this level on every assessment would show as ';
-  // Each level's Counts As boxes: −, the level, + (no 4+ or 1−).
-  var CM_STEP_SLOTS = { 4: ['4-', '4', null], 3: ['3-', '3', '3+'], 2: ['2-', '2', '2+'], 1: [null, '1', '1+'] };
+  // The marker or handle picked: { cid, kind: 'step', key: '3+' } or
+  // { cid, kind: 'edge', level: 2–4 } (where that proficiency starts).
+  var _cmPtsPick = null;
+  // What was typed when it was refused, shown back in the box.
+  var _cmPtsTyped = null;
+  // Markers closer than this (in % of the ruler) go on two rows: a pill's
+  // width on the narrowest ruler (.cm-pts-ruler's min-width, 420px).
+  var CM_PTS_CLOSE = 7.6;
+  var CM_PTS_TICKS = [0, 25, 50, 75, 100];
 
   function _cmStepId(key) {
     return key.replace('+', 'p').replace('-', 'm');
+  }
+  // 2- reads 2−.
+  function _cmStepLabel(key) {
+    return key.replace('-', '−');
   }
   // Every step's percent, keyed as COUNTS_AS_STEPS.
   function _cmStepValues(scale) {
@@ -4018,84 +4031,223 @@ window.DashClassManager = (function () {
     var p = scale && scale.percents;
     return !!p && p[key] != null && p[key] !== '';
   }
+  // The percents a save writes: every whole level, and each + or − that has
+  // a value of its own.
+  function _cmOwnPercents(scale) {
+    var saved = _cmStepValues(scale);
+    var out = {};
+    COUNTS_AS_STEPS.forEach(function (step) {
+      if (step.key.length === 1 || _cmHasOwnStep(scale, step.key)) out[step.key] = saved[step.key];
+    });
+    return out;
+  }
+  // Where each proficiency starts on a points score: { 1: 0, 2: 50, 3: 73, 4: 86 }.
+  function _cmStarts(scale) {
+    var at = { 1: 0 };
+    ((scale && scale.boundaries) || DEFAULT_GRADING_SCALE.boundaries).forEach(function (row) {
+      if (row.proficiency > 1) at[row.proficiency] = Number(row.min) || 0;
+    });
+    return at;
+  }
   // One decimal at most: 91.7, 86.
   function _cmPctText(v) {
     return String(Math.round(v * 10) / 10);
   }
+  function _cmPtsLeft(v) {
+    return Math.max(0, Math.min(100, v)) + '%';
+  }
+
+  // Row 0 or 1 for each marker, lowest first: one too close to the last
+  // marker on the top row drops to the second.
+  function _cmPtsRows(values) {
+    var last = [-Infinity, -Infinity];
+    return values.map(function (v) {
+      var row = v - last[0] >= CM_PTS_CLOSE ? 0 : v - last[1] >= CM_PTS_CLOSE ? 1 : last[0] <= last[1] ? 0 : 1;
+      last[row] = v;
+      return row;
+    });
+  }
+
+  function _cmPtsPicked(cid) {
+    return _cmPtsPick && _cmPtsPick.cid === cid ? _cmPtsPick : null;
+  }
+  function _cmPtsSame(a, b) {
+    return !!a && !!b && a.kind === b.kind && (a.kind === 'step' ? a.key === b.key : a.level === b.level);
+  }
+  function _cmPtsPickId(p) {
+    return p.kind === 'step' ? 'cm-pts-step-' + _cmStepId(p.key) : 'cm-pts-edge-' + p.level;
+  }
+  // The marker or handle a button stands for, or null.
+  function _cmPtsFromEl(cid, el) {
+    var d = (el && el.dataset) || {};
+    if (d.kind === 'step') {
+      var ok = COUNTS_AS_STEPS.some(function (s) {
+        return s.key === d.key;
+      });
+      return ok ? { cid: cid, kind: 'step', key: d.key } : null;
+    }
+    var level = parseInt(d.level, 10);
+    return d.kind === 'edge' && level >= 2 && level <= 4 ? { cid: cid, kind: 'edge', level: level } : null;
+  }
+  function _cmPtsValue(cid, p) {
+    var scale = getGradingScale(cid);
+    return p.kind === 'step' ? _cmStepValues(scale)[p.key] : _cmStarts(scale)[p.level];
+  }
+  // How far a drag can take it: between its neighbours.
+  function _cmPtsRange(cid, p) {
+    var scale = getGradingScale(cid);
+    if (p.kind === 'edge') {
+      var at = _cmStarts(scale);
+      return [at[p.level - 1] + 1, p.level === 4 ? 99 : at[p.level + 1] - 1];
+    }
+    var list = countsAsStepPercents(scale.percents);
+    var i = COUNTS_AS_STEPS.findIndex(function (s) {
+      return s.key === p.key;
+    });
+    var lo = i > 0 ? list[i - 1] + 0.1 : 0;
+    var hi = i < list.length - 1 ? list[i + 1] - 0.1 : 100;
+    return [Math.ceil(lo * 10) / 10, Math.floor(hi * 10) / 10];
+  }
 
   function _cmRenderPointsScale(cid) {
     var scale = getGradingScale(cid);
-    var b = scale.boundaries;
     var steps = _cmStepValues(scale);
-    var rows = b
-      .map(function (row, i) {
-        var name = PROF_LABELS[row.proficiency];
-        var input =
-          i === b.length - 1
-            ? '<span class="cm-pts-below">Below ' + b[i - 1].min + '%</span>'
-            : '<input class="cm-input cm-pts-min" type="number" min="1" max="99" id="cm-pts-min-' +
-              i +
-              '" data-idx="' +
-              i +
-              '" value="' +
-              row.min +
-              '" data-action-change="cmPointsScale" aria-label="' +
-              name +
-              ' starts at this percent"><span class="cm-pts-unit">% and up</span>';
-        // The level a student at this level everywhere would read back as.
-        var readsAs = pointsToProf(steps[String(row.proficiency)], 100, scale);
-        var warn =
-          readsAs !== row.proficiency
-            ? '<span class="cm-pts-warn" title="' +
-              CM_PTS_LOCKED_HINT +
-              PROF_LABELS[readsAs] +
-              '.">Shows as ' +
-              PROF_LABELS[readsAs] +
-              '</span>'
-            : '';
-        var counts = CM_STEP_SLOTS[row.proficiency]
-          .map(function (key) {
-            if (!key) return '<span class="cm-pts-slot"></span>';
-            var text = _cmPctText(steps[key]);
-            var sign = key.slice(-1) === '+' ? ' Plus' : key.slice(-1) === '-' ? ' Minus' : '';
-            return (
-              '<input class="cm-input cm-pts-pct cm-pts-slot" type="number" min="0" max="100" step="0.1" id="cm-pts-pct-' +
-              _cmStepId(key) +
-              '" value="' +
-              text +
-              '"' +
-              (_cmHasOwnStep(scale, key) ? '' : ' data-derived="' + text + '"') +
-              ' data-action-change="cmPointsScale" aria-label="' +
-              name +
-              sign +
-              ' counts as this percent">'
-            );
-          })
-          .join('');
+    var at = _cmStarts(scale);
+    var pick = _cmPtsPicked(cid);
+    // The scale's own legend: each band and handle names its proficiency.
+    var names = {};
+    [1, 2, 3, 4].forEach(function (l) {
+      names[l] = PROF_LABELS[l];
+    });
+    var values = COUNTS_AS_STEPS.map(function (s) {
+      return steps[s.key];
+    });
+    var rows = _cmPtsRows(values);
+    var markers = COUNTS_AS_STEPS.map(function (s, i) {
+      var key = s.key;
+      var v = values[i];
+      var on = !!pick && pick.kind === 'step' && pick.key === key;
+      var name = _cmStepLabel(key) + ' counts as ' + _cmPctText(v) + '%';
+      // A whole level that reads back as another level is flagged, not
+      // blocked (DECISIONS, "Proficiency percents"): its marker sits over
+      // that level's band, and its name says so.
+      if (key.length === 1) {
+        var readsAs = pointsToProf(v, 100, scale);
+        if (readsAs !== Number(key)) name += ', which shows as ' + names[readsAs];
+      }
+      return (
+        '<div class="cm-pts-marker lv-' +
+        key.charAt(0) +
+        (rows[i] ? ' is-low' : '') +
+        (on ? ' is-on' : '') +
+        '" data-key="' +
+        esc(key) +
+        '" style="left:' +
+        _cmPtsLeft(v) +
+        '">' +
+        '<button type="button" class="cm-pts-pill' +
+        (on ? ' is-on' : '') +
+        '" id="cm-pts-step-' +
+        _cmStepId(key) +
+        '" data-action="cmPtsPick" data-kind="step" data-key="' +
+        esc(key) +
+        '" aria-pressed="' +
+        on +
+        '" aria-label="' +
+        esc(name) +
+        '" title="' +
+        esc(name) +
+        '">' +
+        esc(_cmStepLabel(key)) +
+        '</button><span class="cm-pts-stem" aria-hidden="true"></span></div>'
+      );
+    }).join('');
+    var cuts = [0, at[2], at[3], at[4], 100];
+    var bands = [1, 2, 3, 4]
+      .map(function (l) {
         return (
-          '<div class="cm-pts-row"><span class="cm-pts-name">' +
-          name +
-          '</span><span class="cm-pts-cell">' +
-          input +
-          '</span><span class="cm-pts-cell">' +
-          counts +
-          warn +
-          '</span></div>'
+          '<span class="cm-pts-band lv-' +
+          l +
+          '" data-lv="' +
+          l +
+          '" style="width:' +
+          Math.max(0, cuts[l] - cuts[l - 1]) +
+          '%">' +
+          esc(names[l]) +
+          '</span>'
         );
       })
       .join('');
+    var edges = [2, 3, 4]
+      .map(function (l) {
+        var on = !!pick && pick.kind === 'edge' && pick.level === l;
+        var name = names[l] + ' starts at ' + at[l] + '%';
+        return (
+          '<div class="cm-pts-edge' +
+          (on ? ' is-on' : '') +
+          '" data-level="' +
+          l +
+          '" style="left:' +
+          _cmPtsLeft(at[l]) +
+          '"><span class="cm-pts-edge-line" aria-hidden="true"></span>' +
+          '<button type="button" class="cm-pts-handle' +
+          (on ? ' is-on' : '') +
+          '" id="cm-pts-edge-' +
+          l +
+          '" data-action="cmPtsPick" data-kind="edge" data-level="' +
+          l +
+          '" aria-pressed="' +
+          on +
+          '" aria-label="' +
+          esc(name) +
+          '" title="' +
+          esc(name) +
+          '">' +
+          esc(at[l] + '%') +
+          '</button></div>'
+        );
+      })
+      .join('');
+    var ticks = CM_PTS_TICKS.map(function (t) {
+      return '<span style="left:' + t + '%">' + t + '%</span>';
+    }).join('');
+    var edit = '';
+    if (pick) {
+      var isStep = pick.kind === 'step';
+      var value = _cmPtsTyped != null ? _cmPtsTyped : isStep ? _cmPctText(steps[pick.key]) : String(at[pick.level]);
+      edit =
+        '<label class="cm-pts-edit-label" for="cm-pts-input"><span class="cm-pts-edit-name">' +
+        esc(isStep ? _cmStepLabel(pick.key) : names[pick.level]) +
+        '</span> ' +
+        (isStep ? 'counts as' : 'starts at') +
+        '</label>' +
+        '<input class="cm-input cm-pts-input" type="number" id="cm-pts-input" ' +
+        (isStep ? 'min="0" max="100" step="0.1"' : 'min="1" max="99" step="1"') +
+        ' value="' +
+        esc(value) +
+        '" data-action-change="cmPointsScale" data-action-input="cmPtsLive"' +
+        (_cmPtsError ? ' aria-invalid="true" aria-describedby="cm-pts-error"' : '') +
+        '><span class="cm-pts-unit">%</span>';
+    }
     return (
       '<div class="cm-pts-scale">' +
-      '<div class="cm-recent-text"><span class="cm-label">Points and Proficiency</span>' +
-      '<span class="cm-hint">A points score becomes a proficiency by its percent. Each proficiency, with its + and −, counts as a percent in the course %.</span></div>' +
-      '<div class="cm-pts-rows">' +
-      '<div class="cm-pts-row cm-pts-head"><span class="cm-pts-name"></span>' +
-      '<span class="cm-pts-cell">Points to Proficiency</span><span class="cm-pts-cell">Counts As (%)</span></div>' +
-      '<div class="cm-pts-row cm-pts-head cm-pts-subhead"><span class="cm-pts-name"></span><span class="cm-pts-cell"></span>' +
-      '<span class="cm-pts-cell"><span class="cm-pts-slot">−</span><span class="cm-pts-slot">Level</span><span class="cm-pts-slot">+</span></span></div>' +
-      rows +
+      '<span class="cm-label" id="cm-pts-label">Points and Proficiency</span>' +
+      '<div class="cm-pts-scroll"><div class="cm-pts-ruler' +
+      (rows.indexOf(1) >= 0 ? ' is-two-rows' : '') +
+      '" id="cm-pts-ruler" role="group" aria-labelledby="cm-pts-label">' +
+      markers +
+      '<div class="cm-pts-bands" aria-hidden="true">' +
+      bands +
       '</div>' +
-      (_cmPtsError ? '<div class="cm-pts-error" role="alert">' + esc(_cmPtsError) + '</div>' : '') +
+      edges +
+      '<div class="cm-pts-ticks" aria-hidden="true">' +
+      ticks +
+      '</div>' +
+      '</div></div>' +
+      '<div class="cm-pts-edit">' +
+      edit +
+      '</div>' +
+      (_cmPtsError ? '<div class="cm-pts-error" id="cm-pts-error" role="alert">' + esc(_cmPtsError) + '</div>' : '') +
       '<div class="cm-pts-actions">' +
       '<button type="button" class="cm-action-btn" data-action="cmPointsScaleBc">BC Letter Bands</button>' +
       '<button type="button" class="cm-action-btn" data-action="cmPointsScaleMatch">Match Columns</button>' +
@@ -4166,49 +4318,217 @@ window.DashClassManager = (function () {
     );
   }
 
-  function cmSavePointsScale() {
-    if (!cmSelectedCourse) return;
-    var cid = cmSelectedCourse;
+  /* Saves one marker's or handle's percent, typed, nudged or dragged, with
+     the rules the old boxes had: a whole level always has a value; a + or −
+     keeps its own, or is left in between when it is cleared or still shows
+     its in-between value; each step counts for more than the one below;
+     each proficiency starts higher than the one below it. */
+  function _cmPtsSave(cid, pick, raw) {
     var scale = getGradingScale(cid);
     var saved = _cmStepValues(scale);
-    var boundaries = DEFAULT_GRADING_SCALE.boundaries.map(function (db, i) {
-      var inp = document.getElementById('cm-pts-min-' + i);
-      return {
-        min: inp ? Math.max(0, Math.min(99, parseInt(inp.value, 10) || 0)) : 0,
-        proficiency: db.proficiency,
-      };
-    });
-    // A whole level always has a value. A + or − keeps its own value, or is
-    // left out (a third of the way between its levels) while it still shows
-    // that in-between value or is cleared.
-    var percents = {};
-    COUNTS_AS_STEPS.forEach(function (step) {
-      var key = step.key;
-      var whole = key.length === 1;
-      var inp = document.getElementById('cm-pts-pct-' + _cmStepId(key));
-      if (!inp) {
-        if (whole || _cmHasOwnStep(scale, key)) percents[key] = saved[key];
+    var at = _cmStarts(scale);
+    var percents = _cmOwnPercents(scale);
+    var text = String(raw == null ? '' : raw).trim();
+    var v = parseFloat(text);
+    _cmPtsPick = Object.assign({}, pick, { cid: cid });
+    function refuse(msg) {
+      _cmPtsError = msg;
+      _cmPtsTyped = text;
+      renderClassManager();
+    }
+    if (pick.kind === 'edge') {
+      // Blank or not a number: back to what is saved.
+      if (!isFinite(v)) {
+        _cmPtsError = null;
+        _cmPtsTyped = null;
+        renderClassManager();
         return;
       }
-      var raw = String(inp.value == null ? '' : inp.value).trim();
-      if (!whole && (raw === '' || (inp.dataset && raw === inp.dataset.derived))) return;
-      var v = parseFloat(raw);
-      if (isFinite(v)) percents[key] = Math.round(Math.max(0, Math.min(100, v)) * 10) / 10;
-      else if (whole) percents[key] = saved[key];
-    });
-    var ladder = countsAsStepPercents(percents);
-    if (
-      !ladder.every(function (v, i) {
-        return i === 0 || v > ladder[i - 1];
-      })
-    ) {
-      _cmPtsError = 'Each step must count for more than the one below it.';
-      renderClassManager();
-      return;
+      at[pick.level] = Math.max(0, Math.min(99, parseInt(text, 10) || 0));
+      if (!(at[2] > at[1] && at[3] > at[2] && at[4] > at[3]))
+        return refuse('Each proficiency must start higher than the one below it.');
+    } else {
+      var whole = pick.key.length === 1;
+      if (text === '' || !isFinite(v)) {
+        if (whole || text !== '') {
+          _cmPtsError = null;
+          _cmPtsTyped = null;
+          renderClassManager();
+          return;
+        }
+        delete percents[pick.key];
+      } else {
+        var r = Math.round(Math.max(0, Math.min(100, v)) * 10) / 10;
+        if (!whole && !_cmHasOwnStep(scale, pick.key) && _cmPctText(r) === _cmPctText(saved[pick.key]))
+          delete percents[pick.key];
+        else percents[pick.key] = r;
+      }
+      var ladder = countsAsStepPercents(percents);
+      if (
+        !ladder.every(function (x, i) {
+          return i === 0 || x > ladder[i - 1];
+        })
+      )
+        return refuse('Each step must count for more than the one below it.');
     }
+    var boundaries = DEFAULT_GRADING_SCALE.boundaries.map(function (db) {
+      return { min: db.proficiency === 1 ? 0 : at[db.proficiency], proficiency: db.proficiency };
+    });
     _cmPtsError = null;
+    _cmPtsTyped = null;
+    var before = JSON.stringify([_cmStarts(scale), _cmOwnPercents(scale)]);
+    if (before === JSON.stringify([at, percents])) return renderClassManager();
     // Labels saved before the scale moved here are kept as they were.
     _cmApplyPointsScale(cid, { boundaries: boundaries, percents: percents, labels: scale.labels || null });
+  }
+
+  // The box under the scale changed (typed, then Enter or leaving it).
+  function cmSavePointsScale(el) {
+    if (!cmSelectedCourse) return;
+    var pick = _cmPtsPicked(cmSelectedCourse);
+    if (!pick || !el) return;
+    _cmPtsSave(cmSelectedCourse, pick, el.value);
+  }
+
+  // A marker or handle clicked: it is picked, or, picked already, let go.
+  var _cmPtsDragEnd = 0;
+  function cmPtsPick(el) {
+    if (!cmSelectedCourse) return;
+    // The click that ends a drag: the drag has picked it already.
+    if (Date.now() - _cmPtsDragEnd < 500) return;
+    var p = _cmPtsFromEl(cmSelectedCourse, el);
+    if (!p) return;
+    var was = _cmPtsPicked(cmSelectedCourse);
+    _cmPtsPick = _cmPtsSame(was, p) ? null : p;
+    _cmPtsError = null;
+    _cmPtsTyped = null;
+    _cmKeepFocusSel = '#' + _cmPtsPickId(p);
+    renderClassManager();
+  }
+
+  /* Keys on the scale: Left and Right nudge a marker by 0.1 (Shift: 1) and
+     a handle by 1 (Shift: 5) and save; Enter in the box saves; Escape lets
+     go and puts the focus back on what was picked. */
+  function _cmPtsKeydown(e) {
+    var el = e.target;
+    var cid = cmSelectedCourse;
+    if (!cid || !el || !el.closest || !el.closest('.cm-pts-scale')) return false;
+    var pick = _cmPtsPicked(cid);
+    if (e.key === 'Escape' && pick) {
+      e.preventDefault();
+      _cmPtsPick = null;
+      _cmPtsError = null;
+      _cmPtsTyped = null;
+      _cmKeepFocusSel = '#' + _cmPtsPickId(pick);
+      renderClassManager();
+      return true;
+    }
+    if (el.id === 'cm-pts-input' && e.key === 'Enter' && !e.isComposing) {
+      e.preventDefault();
+      if (!pick) return true;
+      _cmKeepFocusSel = '#cm-pts-input';
+      _cmPtsSave(cid, pick, el.value);
+      return true;
+    }
+    var btn = el.closest('[data-action="cmPtsPick"]');
+    if (!btn || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.altKey || e.metaKey || e.ctrlKey) return false;
+    var p = _cmPtsFromEl(cid, btn);
+    if (!p) return false;
+    e.preventDefault();
+    var by = p.kind === 'edge' ? (e.shiftKey ? 5 : 1) : e.shiftKey ? 1 : 0.1;
+    var next = Math.round((_cmPtsValue(cid, p) + (e.key === 'ArrowRight' ? by : -by)) * 10) / 10;
+    _cmKeepFocusSel = '#' + _cmPtsPickId(p);
+    _cmPtsSave(cid, p, String(next));
+    return true;
+  }
+
+  /* While typing or dragging, the marker or handle (and the bands either
+     side of a handle) move before anything is saved. */
+  function _cmPtsPreview(p, v, fromInput) {
+    var ruler = document.getElementById('cm-pts-ruler');
+    if (!ruler || !ruler.querySelector || typeof CSS === 'undefined' || !CSS.escape) return;
+    if (p.kind === 'step') {
+      var m = ruler.querySelector('.cm-pts-marker[data-key="' + CSS.escape(p.key) + '"]');
+      if (m) m.style.left = _cmPtsLeft(v);
+    } else {
+      var edge = ruler.querySelector('.cm-pts-edge[data-level="' + p.level + '"]');
+      if (!edge) return;
+      edge.style.left = _cmPtsLeft(v);
+      var handle = edge.querySelector('.cm-pts-handle');
+      if (handle) handle.textContent = v + '%';
+      var cuts = [0];
+      [2, 3, 4].forEach(function (l) {
+        var e2 = ruler.querySelector('.cm-pts-edge[data-level="' + l + '"]');
+        cuts.push(e2 ? parseFloat(e2.style.left) || 0 : 0);
+      });
+      cuts.push(100);
+      [1, 2, 3, 4].forEach(function (l) {
+        var band = ruler.querySelector('.cm-pts-band[data-lv="' + l + '"]');
+        if (band) band.style.width = Math.max(0, cuts[l] - cuts[l - 1]) + '%';
+      });
+    }
+    var inp = document.getElementById('cm-pts-input');
+    if (inp && !fromInput && _cmPtsSame(_cmPtsPicked(cmSelectedCourse), p)) inp.value = String(v);
+  }
+
+  function cmPtsLive(el) {
+    var p = cmSelectedCourse && _cmPtsPicked(cmSelectedCourse);
+    var v = parseFloat(el.value);
+    if (p && isFinite(v)) _cmPtsPreview(p, Math.max(0, Math.min(100, v)), true);
+  }
+
+  /* Dragging a marker or handle along the ruler: it snaps to 0.1 (a handle
+     to 1), stays between its neighbours, and saves when let go. A press
+     that doesn't move is a click. */
+  var _cmPtsDrag = null;
+  function _initCmPtsDrag() {
+    _addDocListener('pointerdown', function (e) {
+      if (e.button !== 0 || !cmSelectedCourse) return;
+      var btn = e.target.closest && e.target.closest('.cm-pts-ruler [data-action="cmPtsPick"]');
+      var ruler = btn && btn.closest('.cm-pts-ruler');
+      var p = btn && _cmPtsFromEl(cmSelectedCourse, btn);
+      if (!p || !ruler) return;
+      var range = _cmPtsRange(cmSelectedCourse, p);
+      _cmPtsDrag = {
+        cid: cmSelectedCourse,
+        pick: p,
+        pointer: e.pointerId,
+        rect: ruler.getBoundingClientRect(),
+        x0: e.clientX,
+        moved: false,
+        value: _cmPtsValue(cmSelectedCourse, p),
+        lo: range[0],
+        hi: range[1],
+      };
+      try {
+        btn.setPointerCapture(e.pointerId);
+      } catch (err) {
+        // No capture: the drag still follows the document's pointer events.
+      }
+    });
+    _addDocListener('pointermove', function (e) {
+      var d = _cmPtsDrag;
+      if (!d || e.pointerId !== d.pointer || !d.rect.width) return;
+      if (!d.moved && Math.abs(e.clientX - d.x0) < 4) return;
+      d.moved = true;
+      e.preventDefault();
+      var snap = d.pick.kind === 'edge' ? 1 : 0.1;
+      var v = Math.round(((e.clientX - d.rect.left) / d.rect.width) * 100 * (1 / snap)) / (1 / snap);
+      d.value = Math.max(d.lo, Math.min(d.hi, v));
+      _cmPtsPreview(d.pick, d.value);
+    });
+    function end(e) {
+      var d = _cmPtsDrag;
+      if (!d || e.pointerId !== d.pointer) return;
+      _cmPtsDrag = null;
+      if (!d.moved) return;
+      _cmPtsDragEnd = Date.now();
+      if (e.type === 'pointercancel' || d.cid !== cmSelectedCourse) return renderClassManager();
+      _cmKeepFocusSel = '#' + _cmPtsPickId(d.pick);
+      _cmPtsSave(d.cid, d.pick, String(d.value));
+    }
+    _addDocListener('pointerup', end);
+    _addDocListener('pointercancel', end);
   }
 
   function cmMatchPointsScale() {
@@ -4216,6 +4536,7 @@ window.DashClassManager = (function () {
     var cid = cmSelectedCourse;
     var scale = getGradingScale(cid);
     _cmPtsError = null;
+    _cmPtsTyped = null;
     _cmApplyPointsScale(cid, {
       boundaries: scale.boundaries,
       percents: _cmMatchedPercents(scale.boundaries),
@@ -4229,6 +4550,7 @@ window.DashClassManager = (function () {
     var cid = cmSelectedCourse;
     var scale = getGradingScale(cid);
     _cmPtsError = null;
+    _cmPtsTyped = null;
     _cmApplyPointsScale(cid, {
       boundaries: scale.boundaries,
       percents: Object.assign({}, BC_LETTER_BAND_PERCENTS),
@@ -4239,6 +4561,7 @@ window.DashClassManager = (function () {
   function cmResetPointsScale() {
     if (!cmSelectedCourse) return;
     _cmPtsError = null;
+    _cmPtsTyped = null;
     // Saved, not deleted: other devices only take a scale the server has.
     _cmApplyPointsScale(cmSelectedCourse, structuredClone(DEFAULT_GRADING_SCALE));
   }
@@ -9842,6 +10165,9 @@ window.DashClassManager = (function () {
       cmPointsScaleBc: function () {
         cmBcPointsScale();
       },
+      cmPtsPick: function () {
+        cmPtsPick(el);
+      },
       cmCatSave: function () {
         cmCatSave();
       },
@@ -10057,6 +10383,10 @@ window.DashClassManager = (function () {
       blockOtherInput(el);
       return true;
     }
+    if (el.dataset.actionInput === 'cmPtsLive') {
+      cmPtsLive(el);
+      return true;
+    }
     if (el.dataset.actionInput === 'cmDecaySlider') {
       cmUpdateDecay(el.value);
       return true;
@@ -10219,7 +10549,7 @@ window.DashClassManager = (function () {
       return true;
     }
     if (el.dataset.actionChange === 'cmPointsScale') {
-      cmSavePointsScale();
+      cmSavePointsScale(el);
       return true;
     }
     if (el.dataset.actionChange === 'cmStdGroup') {
@@ -10254,6 +10584,7 @@ window.DashClassManager = (function () {
       return true;
     }
     if (_cmRosterKeydown(e)) return true;
+    if (_cmPtsKeydown(e)) return true;
     // A course row in New Class or Re-link ticks with Space or Enter, and
     // keeps the focus through the redraw so the next row is one Tab away.
     if (
@@ -10422,6 +10753,7 @@ window.DashClassManager = (function () {
     initDrag: function () {
       _initCmStdDrag();
       _initCmCatDrag();
+      _initCmPtsDrag();
     },
     destroy: _removeAllListeners,
     resetState: function () {
@@ -10430,6 +10762,9 @@ window.DashClassManager = (function () {
       cmTab = 'details';
       cmSelectedCourse = _activeCourse;
       _activeCourseChanged = false;
+      _cmPtsPick = null;
+      _cmPtsError = null;
+      _cmPtsTyped = null;
       cmEditingStudentId = null;
       cmRosterQuery = '';
       _cmGuardiansLoaded = {};
