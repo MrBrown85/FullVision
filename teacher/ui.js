@@ -1167,7 +1167,7 @@ function renderDock(activePage, rightHTML) {
       <span class="tb-user-name" id="tb-user-name"></span>
     </button>
     <div class="tb-user-dropdown">
-      <button class="tb-user-item tb-user-help" data-action="openHelpFromMenu">Help</button><button class="tb-user-item" data-action="openReportProblem">Report a Problem</button>${resetDemo}<button class="tb-user-signout" data-action="signOut">Sign Out</button>
+      <button class="tb-user-item tb-user-help" data-action="openHelpFromMenu">Help</button><button class="tb-user-item" data-action="openReportProblem">Report a Problem</button><button class="tb-user-item" data-action="exportAllData">Download All My Data</button>${resetDemo}<button class="tb-user-signout" data-action="signOut">Sign Out</button>
     </div>
   </div>`;
 
@@ -2532,6 +2532,16 @@ document.addEventListener('click', function (e) {
     },
     openReportProblem: function () {
       openReportProblem();
+    },
+    // Download All My Data: one Excel file with every class (teacher/export-all.js).
+    exportAllData: function () {
+      var menu = el.closest('.tb-user-menu');
+      if (menu) {
+        menu.classList.remove('open');
+        var b = menu.querySelector('.tb-user-btn');
+        if (b) b.setAttribute('aria-expanded', 'false');
+      }
+      if (window.ExportAll) ExportAll.run();
     },
     // Under 600 px Help is in the account menu (styles.css).
     openHelpFromMenu: function () {

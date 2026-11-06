@@ -546,3 +546,14 @@ Context: every merge to `main` deployed the site, so ten merged pull requests co
 1. **Netlify deploys the `production` branch, not `main`** (Colin, 2026-11-06). `main` stays the branch every pull request merges into and that CI tests; merging there costs nothing. `production` holds what fullvision.ca runs.
 2. **A release is one pull request from `main` into `production`.** One deploy carries every merge since the last release. Release when Colin says to: at once for a bug teachers are hitting, otherwise batched.
 3. The `netlify.toml` ignore rule is unchanged: only the production context builds, and that context is now the `production` branch. Branches other than `production` are not deployed at all (Netlify's allowed branches).
+
+## Download All My Data (2026-11-06)
+
+Context: a teacher could export one class's scores as a CSV and print reports, but the writing (feedback, observations, report comments, questionnaire answers, goals) had no way out. Colin: no teacher should be trapped in the app, and the file has to make sense when it is opened.
+
+1. **One button, one file.** Download All My Data in the account menu saves one Excel workbook for every class that isn't deleted: Contents, Summary, a gradebook sheet per class, then Rubric Levels, Feedback, Observations, Reports, Questionnaires, Goals & Reflections and Grade Overrides. A sheet with nothing on it is left out.
+2. **Grades as shown.** Every figure comes from `calc.js` (`assessmentCellValue`, `studentGradeSummary`, `classColumnAverageText`, `formatLevel`) and follows the class's grading style. Missing and Excused are written in full; a late piece says so after its score.
+3. **Organized, if dense.** Headers and the student column are frozen, every header has a filter, long text wraps at 60 characters, dates are real dates, rows run class by class and then by last name, and no internal id appears.
+4. **Read-only.** There is no import from this file. Restoring a class is Class Settings → Class Actions → Download Class Backup and Restore from Backup, which carry one class as data.
+5. **Withdrawn students** are on the Summary sheet, marked. Their records stay behind Download Records in Class Settings, which already exists for them.
+6. **ExcelJS** (`vendor/exceljs.min.js`, MIT) writes the styles; it loads only when the button is clicked. `tests/export-all.test.js` fails when a new per-class reader in `shared/data.js` is neither exported nor listed with a reason.
