@@ -825,7 +825,7 @@ window.AssessmentCopy = (function () {
           (patch.scoreMode === 'points' && patch.maxPoints != null ? ' out of ' + patch.maxPoints : ''),
       );
     }
-    if ('weight' in patch) out.push('Factor → ' + (patch.weight || 1) + 'x');
+    if ('weight' in patch) out.push('Factor → ' + formatFactor(patch.weight));
     if ('evidenceType' in patch) out.push('Evidence type → ' + (patch.evidenceType || 'none'));
     if ('categoryId' in patch) {
       var cat = (getCategories(dstCid) || []).find(function (c) {

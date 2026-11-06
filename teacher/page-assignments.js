@@ -1979,9 +1979,12 @@ window.PageAssignments = (function () {
       (kind ? '<span class="score-badge"' + _chipTipAttrs(kind, tip) + '>' + esc(kind) + '</span>' : '') +
       (factor !== 1 && mode !== 'dibels'
         ? '<span class="score-badge"' +
-          _chipTipAttrs('Factor ' + factor + 'x', 'Counts ' + factor + ' times as much as work at Factor 1x.') +
+          _chipTipAttrs(
+            'Factor ' + formatFactor(factor),
+            'Counts ' + formatPoints(factor) + ' times as much as work at Factor 1\u00d7.',
+          ) +
           '>' +
-          esc('Factor ' + factor + 'x') +
+          esc('Factor ' + formatFactor(factor)) +
           '</span>'
         : '')
     );
@@ -2257,21 +2260,23 @@ window.PageAssignments = (function () {
       };
     }
     if (kind === 'factor') {
-      var w = parseFloat(el.value) || 1;
+      var w = FactorField.read(el);
       var pct = courseShowsLetterGrades(COURSES[cid]) ? ' and the course %' : '';
       var how =
         w === 1
-          ? 'Counts once toward each competency it scores' + pct + '. 2x counts it twice; 0.5x counts it half.'
+          ? 'Counts once toward each competency it scores' +
+            pct +
+            '. 2\u00d7 counts it twice; 0.5\u00d7 counts it half.'
           : w === 2
             ? 'Counts twice toward each competency it scores' + pct + '.'
             : w === 0.5
               ? 'Counts half toward each competency it scores' + pct + '.'
-              : 'Counts ' + w + 'x toward each competency it scores' + pct + '.';
+              : 'Counts ' + formatFactor(w) + ' toward each competency it scores' + pct + '.';
       return {
         dark: true,
         html:
           '<div class="gb-code-tip"><strong>' +
-          esc('Factor ' + _factorLabel(w)) +
+          esc('Factor ' + formatFactor(w)) +
           '</strong><div class="gb-code-tip-group">' +
           esc(how) +
           '</div></div>',
@@ -2942,13 +2947,7 @@ window.PageAssignments = (function () {
       (scoreMode === 'dibels' ? ' hidden' : '') +
       '>' +
       '<label class="af-label" for="af-weight">Factor</label>' +
-      '<select class="af-input" id="af-weight" data-af-tip="factor">' +
-      _factorChoices(weight)
-        .map(function (w) {
-          return '<option value="' + w + '"' + (w === weight ? ' selected' : '') + '>' + _factorLabel(w) + '</option>';
-        })
-        .join('') +
-      '</select>' +
+      FactorField.fieldHtml(weight) +
       '</div>' +
       '</div>' +
       '<p class="af-dibels-note" id="af-dibels-note"' +
@@ -3029,14 +3028,19 @@ window.PageAssignments = (function () {
       '</div>' +
       '</div>' +
       '<div class="af-counts-as" id="af-counts-as" aria-live="polite">' +
-      esc(
-        _countsAsText(cid, {
-          categoryId: needsPick ? '' : categoryId,
-          rubricId: assess ? assess.rubricId || '' : '',
-          scoreMode: scoreMode,
-          maxPoints: maxPoints,
-          weight: weight,
-        }),
+      FactorField.barHtml(
+        needsPick && categoryRequired(cid, { scoreMode: _storedScoreMode(scoreMode) })
+          ? null
+          : assessmentCategoryShare(cid, {
+              id: assess ? assess.id : null,
+              title: assess ? assess.title || '' : '',
+              categoryId: needsPick ? '' : categoryId,
+              rubricId: assess && scoreMode === 'proficiency' ? assess.rubricId || '' : '',
+              scoreMode: _storedScoreMode(scoreMode),
+              maxPoints: maxPoints,
+              weight: weight,
+            }),
+        assess ? assess.title || '' : '',
       ) +
       '</div>' +
       '</section>';
@@ -3187,14 +3191,6 @@ window.PageAssignments = (function () {
     return false;
   }
 
-  // The Factor menu's words: the multiplier, and what the common ones mean.
-  function _factorLabel(w) {
-    if (w === 1) return '1x (Normal)';
-    if (w === 2) return '2x (Counts Double)';
-    if (w === 0.5) return '0.5x (Counts Half)';
-    return w + 'x';
-  }
-
   // The ways to score an assessment, as cards with an icon each. No hover
   // preview: it covered the rubric editor (Colin, Nov 4).
   var SCORE_MODE_CARDS = [
@@ -3227,17 +3223,8 @@ window.PageAssignments = (function () {
     },
   ];
 
-  // The Factor list, with an assessment's own Factor kept if it isn't on it.
-  function _factorChoices(current) {
-    var list = [0.5, 1, 1.5, 2, 3, 4, 5];
-    if (current > 0 && list.indexOf(current) < 0) list.push(current);
-    return list.sort(function (a, b) {
-      return a - b;
-    });
-  }
-
   /* What an assessment is worth in the course %, in a sentence, for the
-     line under its scoring in the form and under the grader's title:
+     line under the grader's title (the form shows the share bar):
      "Counts as 20 points in Current Events (5 criteria)." Empty when the
      class shows no % or the work counts toward no grade. */
   function _countsAsText(cid, a) {
@@ -3250,11 +3237,11 @@ window.PageAssignments = (function () {
     if (w.kind === 'percent') {
       return w.factor === 1
         ? 'Counts as one assessment' + where + ', the same as every other.'
-        : 'Counts ' + w.factor + ' times' + where + ' (Factor ' + w.factor + 'x).';
+        : 'Counts ' + formatPoints(w.factor) + ' times' + where + ' (Factor ' + formatFactor(w.factor) + ').';
     }
     var parts = [];
     if (w.criteria) parts.push(w.criteria + (w.criteria === 1 ? ' criterion' : ' criteria'));
-    if (w.factor !== 1) parts.push(formatPoints(w.base) + ' points, Factor ' + w.factor + 'x');
+    if (w.factor !== 1) parts.push(formatPoints(w.base) + ' points, Factor ' + formatFactor(w.factor));
     return (
       'Counts as ' +
       formatPoints(w.points) +
@@ -3274,7 +3261,9 @@ window.PageAssignments = (function () {
     return null;
   }
 
-  // The form's Counts As line, from what the form says now.
+  /* The form's share bar, from what the form says now: this assessment's
+     part of its category as the course % counts it, live as the Factor,
+     points, rubric or category change. */
   function _refreshFormCountsAs() {
     _refreshCountsToward();
     var line = document.getElementById('af-counts-as');
@@ -3282,11 +3271,14 @@ window.PageAssignments = (function () {
     var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     // The Category field's hint already says why work with none is short.
     if (_refreshCategoryHint()) {
-      line.textContent = '';
+      FactorField.renderBar(line, null);
       return;
     }
     var rid = mode === 'proficiency' ? (document.getElementById('af-rubric') || {}).value || '' : '';
-    line.textContent = _countsAsText(activeCourse, {
+    var title = ((document.getElementById('af-title') || {}).value || '').trim();
+    var info = assessmentCategoryShare(activeCourse, {
+      id: _editingAssessId,
+      title: title,
       categoryId: (document.getElementById('af-category') || {}).value || '',
       rubricId: rid,
       rubric: mode === 'proficiency' ? _formDraftRubric(rid) : null,
@@ -3294,6 +3286,7 @@ window.PageAssignments = (function () {
       maxPoints: parseFloat((document.getElementById('af-maxpoints') || {}).value) || 0,
       weight: _formAssessWeight(),
     });
+    FactorField.renderBar(line, info, title);
   }
   /* Shows the Category field's hint while scored work in a class with
      categories has none chosen; true when it shows. A choice clears the
@@ -3467,6 +3460,11 @@ window.PageAssignments = (function () {
       t.removeAttribute('aria-invalid');
       _syncMaxPointsPicks();
     }
+    // Factor: typing keeps a good value; leaving the box shows what saves.
+    if (t.id === 'af-weight') {
+      if (e.type === 'change') FactorField.settle(t);
+      else FactorField.track(t);
+    }
   }
   // The Max Points quick pick that matches the box is lit; none when none does.
   function _syncMaxPointsPicks() {
@@ -3518,10 +3516,11 @@ window.PageAssignments = (function () {
     save.click();
   }
 
-  // The Factor applies to every kind of scoring; blank, 0 or less is 1.
+  /* The Factor applies to every kind of scoring: the stored one while the
+     box shows it, else what was typed, 0.1 to 10 to one decimal
+     (FactorField.read). */
   function _formAssessWeight() {
-    var factor = parseFloat((document.getElementById('af-weight') || {}).value);
-    return factor > 0 ? factor : 1;
+    return FactorField.read(document.getElementById('af-weight'));
   }
 
   /* A proficiency score only counts through a competency: an assessment with
@@ -6194,9 +6193,7 @@ window.PageAssignments = (function () {
     setScoreMode(mode);
     var mp = document.getElementById('af-maxpoints');
     if (mp && mode === 'points') mp.value = a.maxPoints || 100;
-    var w = document.getElementById('af-weight');
-    var wv = String(a.weight != null ? a.weight : 1);
-    if (w && w.querySelector('option[value="' + CSS.escape(wv) + '"]')) w.value = wv;
+    FactorField.set(document.getElementById('af-weight'), getAssessmentWeight(a));
     // Rubric first: it decides the competencies while it's chosen.
     _useRubricInForm('');
     var rubric = mode === 'proficiency' && a.rubricId ? getRubricById(srcCid, a.rubricId) : null;
@@ -6268,7 +6265,7 @@ window.PageAssignments = (function () {
       module: val('af-module'),
       mode: val('af-scoremode') || 'proficiency',
       maxPoints: val('af-maxpoints'),
-      weight: val('af-weight'),
+      weight: String(_formAssessWeight()),
       assigned: val('af-date-assigned'),
       due: val('af-due'),
     };
@@ -6284,7 +6281,7 @@ window.PageAssignments = (function () {
     set('af-module', keep.module);
     set('af-maxpoints', keep.maxPoints);
     _syncMaxPointsPicks();
-    set('af-weight', keep.weight);
+    FactorField.set(document.getElementById('af-weight'), keep.weight);
     set('af-date-assigned', keep.assigned);
     set('af-due', keep.due);
     var assignedEl = document.getElementById('af-date-assigned');
@@ -11081,6 +11078,9 @@ window.PageAssignments = (function () {
       },
       toggleCritTag: function () {
         toggleCritTag(parseInt(el.dataset.index, 10), el.dataset.tagid);
+      },
+      stepFactor: function () {
+        FactorField.stepIn(document.getElementById('af-weight'), Number(el.dataset.dir));
       },
       setMaxPoints: function () {
         var mp = document.getElementById('af-maxpoints');

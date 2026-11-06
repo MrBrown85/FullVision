@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /* The assessment form's Scoring card (redesign PR 2, 2026-11-02): Factor at
-   the end of the mode row in plain words; each mode shows only what it
+   the end of the mode row, a stepper that takes any value (2026-11-06); each mode shows only what it
    needs (Rubric for Proficiency, Max Points for Points); choices are kept
    across mode switches until save; Points saves no rubric. Demo Mode,
    Science 8. */
@@ -32,12 +32,17 @@ async function openForm(page) {
   await expect(page.locator('#af-title')).toBeVisible();
 }
 
-test('Factor sits on the mode row with plain words', async ({ page }) => {
+test('Factor sits on the mode row as a stepper', async ({ page }) => {
   await openForm(page);
   const head = page.locator('.af-card-scoring .af-card-head');
   await expect(head.locator('#af-weight')).toBeVisible();
-  await expect(head.locator('#af-weight option:checked')).toHaveText('1x (Normal)');
-  await expect(head.locator('#af-weight option[value="2"]')).toHaveText('2x (Counts Double)');
+  await expect(head.locator('#af-weight')).toHaveValue('1');
+  await head.getByRole('button', { name: 'Raise the factor' }).click();
+  await expect(head.locator('#af-weight')).toHaveValue('1.5');
+  await head.getByRole('button', { name: 'Lower the factor' }).click();
+  await head.getByRole('button', { name: 'Lower the factor' }).click();
+  await head.getByRole('button', { name: 'Lower the factor' }).click();
+  await expect(head.locator('#af-weight')).toHaveValue('0.1');
 });
 
 test('each mode shows only what it needs', async ({ page }) => {
