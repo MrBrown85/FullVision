@@ -63,7 +63,7 @@ A **Help** button at the top right opens a panel beside the page. It lists the h
 
 ## Nov 5, 2026: Roster Import and Codes
 
-**Import Roster** first lists the columns a roster file can hold, with **Download Template** and **Choose File**. A key under the student list explains its codes; hovering over IE shows Insufficient Evidence. Screens that called a competency a standard or a tag now say competency.
+**Import Roster** first lists the columns a roster file can hold, with **Download Template** and **Choose File**. Hovering over a code beside a student's name, such as IE, shows what it means. Screens that called a competency a standard or a tag now say competency.
 
 ## Nov 5, 2026: Demo Mode Label
 
