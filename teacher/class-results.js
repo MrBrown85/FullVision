@@ -1586,10 +1586,14 @@ window.ClassResults = (function () {
     _dismissMenu();
     var panel = _panel();
     var from = _state && _state.from;
+    var aid = _state && _state.aid;
     _state = null;
     _otherToken++;
     if (panel) panel.remove();
     _markOpener();
+    // A redraw replaces the cell that opened the panel: its new copy takes the focus.
+    if (restoreFocus && from && !from.isConnected && aid)
+      from = document.querySelector('[data-action="classResults"][data-aid="' + CSS.escape(aid) + '"]');
     if (restoreFocus && from && from.isConnected && typeof from.focus === 'function')
       from.focus({ preventScroll: true });
   }
