@@ -3,8 +3,11 @@
   publish = "dist"
   # Only main deploys. PR and branch builds are skipped (exit 0 = skip) to
   # save Netlify build credits; PRs are still tested by GitHub CI (Colin,
-  # 2026-11-03).
-  ignore = "if [ \"$CONTEXT\" = \"production\" ]; then exit 1; else exit 0; fi"
+  # 2026-11-03). A merge to main that changes nothing the site is built from
+  # (CI, tests, docs, the repo's own notes) is skipped too: git diff --quiet
+  # exits 0 when only those paths changed, 1 when anything else did, and
+  # 128 on an error, which builds (2026-11-06).
+  ignore = 'if [ "$CONTEXT" != "production" ]; then exit 0; fi; git diff --quiet "$CACHED_COMMIT_REF" "$COMMIT_REF" -- . ":(exclude).github" ":(exclude)docs" ":(exclude)e2e" ":(exclude)e2e-real" ":(exclude)tests" ":(exclude)CLAUDE.md" ":(exclude)README.md" ":(exclude)codex.md"'
 
 # Sentry build plugin config:
 # - skipSetCommits: the default sentry-cli `releases set-commits` step fails
