@@ -102,6 +102,6 @@ test('a competency outside the rubric doesn’t draw the members strip twice', a
   await page.goto('/assignments?course=sci8');
   await page.locator(`[data-action="toggleAssess"][data-aid="${aid}"]`).click();
   const card = page.locator(`#ac-${aid}`);
-  await expect(card).toContainText('Additional Tags');
+  await expect(card).toContainText('Competencies Not in the Rubric');
   await expect(card.locator('.rsg-group-members')).toHaveCount(2);
 });

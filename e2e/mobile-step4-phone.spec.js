@@ -94,8 +94,9 @@ function pointsNow(page) {
   });
 }
 
-// Group 2 #35: clearing a points score offers Undo; nonsense and Escape keep it.
-test('clearing a points score offers Undo; Escape and nonsense keep it', async ({ page }) => {
+// Group 2 #35: emptying the box clears a points score with no toast; nonsense
+// and Escape keep it.
+test('emptying the box clears a points score; Escape and nonsense keep it', async ({ page }) => {
   await openAssessment(page, 'Data Reading Quiz');
   const box = page.locator('#m-screen-grade-swiper .m-pts-input').first();
   const before = await pointsNow(page);
@@ -114,11 +115,7 @@ test('clearing a points score offers Undo; Escape and nonsense keep it', async (
   await box.fill('');
   await box.blur();
   expect(await pointsNow(page)).toBeNull();
-  const toast = page.locator('#m-toast');
-  await expect(toast).toContainText('Score cleared');
-  await toast.locator('[data-action="m-toast-undo"]').click();
-  expect(await pointsNow(page)).toBe(before);
-  await expect(box).toHaveValue(String(before));
+  await expect(page.locator('#m-toast')).not.toContainText('Score cleared');
 });
 
 // Group 2 #36: a filter from the sheet covers the whole list, not just Recent.

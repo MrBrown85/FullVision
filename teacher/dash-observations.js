@@ -859,7 +859,7 @@ window.DashObservations = (function () {
         state,
         students.length,
         '<div class="dash-ob2-flags"><span class="dash-ob2-clear">This class has no curricular competencies yet. ' +
-          '<button type="button" class="dash-ob2-linkbtn" data-action="openClassManager">Class Management →</button>' +
+          '<button type="button" class="dash-ob2-linkbtn" data-action="openClassManager">Class Settings →</button>' +
           '</span></div>',
       );
     }

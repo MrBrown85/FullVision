@@ -2588,7 +2588,7 @@ window.PageGradebook = (function () {
       (categories.length === 0
         ? '<div class="gb-add-field"><div style="font-size:0.875rem;color:var(--text-3)">No grading categories are configured for this course yet.</div></div>'
         : '') +
-      '<div class="gb-add-field"><label>Standards <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>' +
+      '<div class="gb-add-field"><label>Competencies <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>' +
       '<div class="gb-add-tags">' +
       sections
         .map(function (sec) {

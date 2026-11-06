@@ -53,13 +53,13 @@ test.describe('Class blocks', () => {
     ]);
   });
 
-  test('a block chosen in Class Management shows in the picker', async ({ page }) => {
+  test('a block chosen in Class Settings shows in the picker', async ({ page }) => {
     await seedClasses(page, [
       { id: PHIL_A, name: 'Philosophy 12' },
       { id: PHIL_B, name: 'Philosophy 12' },
     ]);
     await gotoApp(page, '/dashboard');
-    await page.getByRole('button', { name: 'Class Management' }).first().click();
+    await page.getByRole('button', { name: 'Class Settings' }).first().click();
     const picker = page.locator('#cm-block');
     await expect(picker).toBeVisible();
     await picker.getByRole('radio', { name: 'A', exact: true }).click();
@@ -76,7 +76,7 @@ test.describe('Class blocks', () => {
   test('Duplicate Class asks for the block and keeps the name', async ({ page }) => {
     await seedClasses(page, [{ id: PHIL_A, name: 'Philosophy 12', block: 'A' }]);
     await gotoApp(page, '/dashboard');
-    await page.getByRole('button', { name: 'Class Management' }).first().click();
+    await page.getByRole('button', { name: 'Class Settings' }).first().click();
     await page.getByRole('button', { name: /Class Actions/ }).click();
     await page.getByRole('menuitem', { name: 'Duplicate Class' }).click();
     const dialog = page.getByRole('dialog', { name: /Duplicate/ });

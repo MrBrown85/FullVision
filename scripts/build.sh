@@ -20,6 +20,12 @@ cp -r assets dist/
 # The student phone page (fullvision.ca/s/#CODE)
 cp -r s dist/
 
+# The help site (fullvision.ca/help): pages built from help/articles/*.md.
+# The built pages aren't in the repo; only the Markdown and pictures are.
+node scripts/build-help.mjs
+mkdir -p dist/help
+cp -r help/img help/fragments help/*.html help/index.json dist/help/
+
 # Future portals (copy if they exist)
 [ -d student ] && cp -r student dist/ || true
 [ -d parent ] && cp -r parent dist/ || true

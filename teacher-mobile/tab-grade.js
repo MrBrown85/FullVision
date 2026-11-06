@@ -903,88 +903,104 @@ window.MGrade = (function () {
     }
     var ptsTagLines = '';
     var ptsTid = null;
-    (isCompletionScored(assessment) || rubric ? [] : scoreTagIds(assessment, cid)).forEach(function (tid, tagIdx) {
-      var tag = getTagById(cid, tid);
-      var sec = getSectionForTag(cid, tid);
-      var key = tag ? null : scoreKeyInfo(cid, assessment, tid);
-      var tagLabel = tag
-        ? tag.label || tag.name || tag.shortName || tag.code || ''
-        : key
-          ? key.label
-          : 'No longer in the learning map';
-      var tagColor = sec ? sec.color : '#888';
+    // Rubric work lists the competencies its criteria feed, as the desktop's
+    // Competencies view does (rubricCompetencyRowKeys).
+    (isCompletionScored(assessment) || rubric ? [] : rubricCompetencyRowKeys(cid, assessment)).forEach(
+      function (tid, tagIdx) {
+        var tag = getTagById(cid, tid);
+        var sec = getSectionForTag(cid, tid);
+        var key = tag ? null : scoreKeyInfo(cid, assessment, tid);
+        var tagLabel = tag
+          ? tag.label || tag.name || tag.shortName || tag.code || ''
+          : key
+            ? key.label
+            : 'No longer in the learning map';
+        var tagColor = sec ? sec.color : '#888';
 
-      // Current score for this tag
-      var existing = stScores.filter(function (s) {
-        return s.assessmentId === assessment.id && s.tagId === tid;
-      });
-      var current = existing.length ? existing[existing.length - 1].score : null;
-      var currentMod = existing.length ? normalizeScoreMod(current, existing[existing.length - 1].mod) : 0;
+        // Current score for this tag; on rubric work, a competency shows the
+        // level of the criteria that feed it.
+        var rowState = _rubricRowState(cid, st.id, assessment, tid);
+        var existing = rowState
+          ? []
+          : stScores.filter(function (s) {
+              return s.assessmentId === assessment.id && s.tagId === tid;
+            });
+        var current = rowState ? rowState.level || null : existing.length ? existing[existing.length - 1].score : null;
+        var currentMod = rowState
+          ? rowState.mod
+          : existing.length
+            ? normalizeScoreMod(current, existing[existing.length - 1].mod)
+            : 0;
+        var currentMixed = !!(rowState && rowState.mixed);
 
-      if (isPoints && assessment.maxPoints) {
-        // Points mode: one score for the assessment, drawn after the loop
-        // under every competency it assesses.
-        ptsTagLines +=
-          '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' +
-          cssColor(tagColor) +
-          '"></span>' +
-          MC.esc(tagLabel) +
-          '</div>';
-        if (ptsTid === null) ptsTid = tid;
-      } else {
-        // Proficiency mode — levels 1-4 only. 'No Evidence' (stored as 0) is
-        // reachable by tapping the currently-active level to toggle it off;
-        // that state renders as "no button active," matching both the fresh
-        // ungraded state AND a deliberate No-Evidence choice, which the
-        // graded-count / calc / report layers already treat identically
-        // (all use `score > 0`).
-        var btns = '';
-        // In the class's Rubric Levels order, like the desktop card.
-        levelOrderFor(cid).forEach(function (level) {
-          var active = current !== null && Math.round(current) === level ? ' m-score-active' : '';
-          btns +=
-            '<button class="m-score-btn' +
-            active +
-            '" data-action="m-grade-score" data-score="' +
-            level +
-            '" data-sid="' +
+        if (isPoints && assessment.maxPoints) {
+          // Points mode: one score for the assessment, drawn after the loop
+          // under every competency it assesses.
+          ptsTagLines +=
+            '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' +
+            cssColor(tagColor) +
+            '"></span>' +
+            MC.esc(tagLabel) +
+            '</div>';
+          if (ptsTid === null) ptsTid = tid;
+        } else {
+          // Proficiency mode — levels 1-4 only. 'No Evidence' (stored as 0) is
+          // reachable by tapping the currently-active level to toggle it off;
+          // that state renders as "no button active," matching both the fresh
+          // ungraded state AND a deliberate No-Evidence choice, which the
+          // graded-count / calc / report layers already treat identically
+          // (all use `score > 0`).
+          var btns = '';
+          // In the class's Rubric Levels order, like the desktop card.
+          levelOrderFor(cid).forEach(function (level) {
+            var active =
+              current !== null && Math.round(current) === level
+                ? ' m-score-active' + (currentMixed ? ' m-score-mixed' : '')
+                : '';
+            btns +=
+              '<button class="m-score-btn' +
+              active +
+              '" data-action="m-grade-score" data-score="' +
+              level +
+              '" data-sid="' +
+              st.id +
+              '" data-aid="' +
+              assessment.id +
+              '" data-tid="' +
+              tid +
+              '" aria-label="' +
+              level +
+              ', ' +
+              PROF_LABELS[level] +
+              '">' +
+              level +
+              '</button>';
+          });
+          tagGroups +=
+            '<div class="m-score-group">' +
+            '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' +
+            cssColor(tagColor) +
+            '"></span>' +
+            MC.esc(tagLabel) +
+            '</div>' +
+            '<div class="m-score-btns" role="radiogroup" aria-label="Score for ' +
+            MC.esc(tagLabel) +
+            '">' +
+            btns +
+            '</div>' +
+            '<div class="m-score-mods" data-sid="' +
             st.id +
             '" data-aid="' +
             assessment.id +
             '" data-tid="' +
             tid +
-            '" aria-label="' +
-            level +
-            ', ' +
-            PROF_LABELS[level] +
             '">' +
-            level +
-            '</button>';
-        });
-        tagGroups +=
-          '<div class="m-score-group">' +
-          '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' +
-          cssColor(tagColor) +
-          '"></span>' +
-          MC.esc(tagLabel) +
-          '</div>' +
-          '<div class="m-score-btns" role="radiogroup" aria-label="Score for ' +
-          MC.esc(tagLabel) +
-          '">' +
-          btns +
-          '</div>' +
-          '<div class="m-score-mods" data-sid="' +
-          st.id +
-          '" data-aid="' +
-          assessment.id +
-          '" data-tid="' +
-          tid +
-          '">' +
-          _modBtnsHtml(current, currentMod) +
-          '</div>' +
-          '</div>';
-      }
-    });
+            _modBtnsHtml(currentMixed ? 0 : current, currentMod) +
+            '</div>' +
+            '</div>';
+        }
+      },
+    );
 
     if (ptsTid !== null) {
       var rawScore = getPointsScore(cid, st.id, assessment.id);
@@ -1204,7 +1220,7 @@ window.MGrade = (function () {
       assessment.id +
       '" aria-pressed="' +
       !rubricOn +
-      '">Tags</button>' +
+      '">Competencies</button>' +
       '<button class="m-seg-btn' +
       (rubricOn ? ' m-seg-active' : '') +
       '" data-action="m-grade-view" data-view="rubric" data-aid="' +
@@ -1450,8 +1466,12 @@ window.MGrade = (function () {
 
   /* Write one level (and ±) under every key of a criterion, undoable as one. */
   function _writeCriterion(cid, sid, found, level, mod) {
-    var aid = found.assessment.id;
-    var keys = rubricCriterionScoreKeys(found.crit);
+    _writeKeys(cid, sid, found.assessment, rubricCriterionScoreKeys(found.crit), level, mod);
+  }
+
+  /* Write one level (and ±) under several score keys, undoable as one. */
+  function _writeKeys(cid, sid, assessment, keys, level, mod) {
+    var aid = assessment.id;
     var prev = keys.map(function (tid) {
       var e = _currentEntry(cid, sid, aid, tid);
       return { tid: tid, prev: e ? [JSON.parse(JSON.stringify(e))] : [] };
@@ -1465,13 +1485,44 @@ window.MGrade = (function () {
         aid,
         tid,
         level,
-        found.assessment.date || courseToday(cid),
-        scoreTypeFor(found.assessment),
+        assessment.date || courseToday(cid),
+        scoreTypeFor(assessment),
         '',
         mod || 0,
       );
     });
     clearProfCache();
+  }
+
+  /* A competency row on rubric work is scored through the criteria that
+     feed it, as on the desktop: it shows their level (one level, or the
+     lowest marked mixed, with no ±), and a level set on it goes to each of
+     them. Null for any other row, which is scored on its own. */
+  function _rubricRowState(cid, sid, assessment, tid) {
+    if (!_ownRubric(cid, assessment)) return null;
+    var crits = rubricCriteriaForTag(cid, assessment, tid);
+    if (!crits.length) return null;
+    var lv = competencyLevelFromCriteria(cid, sid, assessment, tid, crits);
+    if (!lv) return { level: 0, mod: 0, mixed: false };
+    return { level: lv.score, mod: lv.mixed ? 0 : lv.mod, mixed: !!lv.mixed };
+  }
+
+  function _setRubricRowScore(cid, sid, assessment, tid, state, level) {
+    var cleared = state.level === level && !state.mixed;
+    _writeKeys(cid, sid, assessment, rubricRowScoreKeys(cid, assessment, tid), cleared ? 0 : level, 0);
+    MC.haptic();
+    _refreshCard(cid, sid, assessment.id);
+    _updateThumbGraded(cid, assessment.id);
+  }
+
+  // Tapping the active + or − again clears it.
+  function _setRubricRowMod(cid, sid, assessment, tid, state, mod) {
+    if (!(state.level > 0) || state.mixed) return;
+    var next = state.mod === mod ? 0 : mod;
+    if (normalizeScoreMod(state.level, next) !== next) return;
+    _writeKeys(cid, sid, assessment, rubricRowScoreKeys(cid, assessment, tid), state.level, next);
+    MC.haptic();
+    _refreshCard(cid, sid, assessment.id);
   }
 
   /* A level tapped on a criterion; tapping the active one clears it. */
@@ -1484,14 +1535,6 @@ window.MGrade = (function () {
     MC.haptic();
     _refreshCard(cid, sid, aid);
     _updateThumbGraded(cid, aid);
-    if (cleared) {
-      MC.showToast('Score cleared', {
-        onUndo: function () {
-          undoLastScore();
-        },
-        duration: 5000,
-      });
-    }
   }
 
   // Tapping the active + or − again clears it.
@@ -1599,6 +1642,11 @@ window.MGrade = (function () {
 
   // Tapping the active + or − again clears it.
   function setScoreMod(cid, sid, aid, tid, mod) {
+    var rowAssessment = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    var rowState = rowAssessment ? _rubricRowState(cid, sid, rowAssessment, tid) : null;
+    if (rowState) return _setRubricRowMod(cid, sid, rowAssessment, tid, rowState, mod);
     var e = _currentEntry(cid, sid, aid, tid);
     if (!e || !(e.score > 0)) return;
     var next = normalizeScoreMod(e.score, e.mod) === mod ? 0 : mod;
@@ -1626,6 +1674,11 @@ window.MGrade = (function () {
 
   /* ── Score a student (auto-save) ────────────────────────────── */
   function setScore(cid, sid, aid, tid, score) {
+    var rowAssessment = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    var rowState = rowAssessment ? _rubricRowState(cid, sid, rowAssessment, tid) : null;
+    if (rowState) return _setRubricRowScore(cid, sid, rowAssessment, tid, rowState, score);
     var allScores = getScores(cid);
     var stScores = allScores[sid] || [];
 
@@ -1638,8 +1691,8 @@ window.MGrade = (function () {
 
     // Toggle off: tapping the already-active level clears the score.
     // Score stored as 0 ('no score' to calculators; all level buttons become
-    // inactive because none of them has data-score="0"). The existing
-    // undo entry (captured above) restores the prior score on undo.
+    // inactive because none of them has data-score="0"). Tapping the level
+    // again puts it back.
     var existing = prevEntries[prevEntries.length - 1];
     var cleared = existing && existing.score === score;
     if (cleared) score = 0;
@@ -1675,19 +1728,8 @@ window.MGrade = (function () {
     // Update thumbnail graded state
     _updateThumbGraded(cid, aid);
 
-    // Feedback. Routine saves are silent — the button filling with the
-    // score-level color plus haptic is enough confirmation, and toasting
-    // on every tap turns 100+ grading actions into a flashing noise bar.
-    // Only the toggle-off "cleared" path gets a toast, because that's the
-    // one case where the teacher might want an immediate undo.
-    if (cleared) {
-      MC.showToast('Score cleared', {
-        onUndo: function () {
-          undoLastScore();
-        },
-        duration: 5000,
-      });
-    }
+    // Saves are silent, clearing included: the buttons show the result and
+    // a toast over the card got in the way (Colin, 2026-11-05).
   }
 
   function setStatus(cid, sid, aid, status) {
@@ -2161,20 +2203,6 @@ window.MGrade = (function () {
     setPointsScore(cid, sid, aid, raw);
     clearProfCache();
     _updateThumbGraded(cid, aid);
-    // Emptying the box clears the score; Undo puts it back, as a level does.
-    if (raw == null && prev != null) {
-      MC.showToast('Score cleared', {
-        onUndo: function () {
-          setPointsScore(cid, sid, aid, prev);
-          clearProfCache();
-          var box = document.getElementById(inp.id) || inp;
-          box.value = formatPoints(prev);
-          _updatePointsPct(sid, aid, prev, max);
-          _updateThumbGraded(cid, aid);
-        },
-        duration: 5000,
-      });
-    }
   }
 
   /* ── Press and hold a level (Nov 2 mockup, batch 2) ──────────────

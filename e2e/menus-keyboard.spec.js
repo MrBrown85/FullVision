@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-/* Keyboard in the account menu and Class Management's switches. Demo Mode. */
+/* Keyboard in the account menu and Class Settings' switches. Demo Mode. */
 
 async function enterDemo(page) {
   await page.goto('/login.html');
@@ -20,7 +20,7 @@ test('Escape closes the account menu and puts the focus on its button', async ({
   await expect(btn).toBeFocused();
 });
 
-test('A Class Management switch keeps the focus after Space, through its question', async ({ page }) => {
+test('A Class Settings switch keeps the focus after Space, through its question', async ({ page }) => {
   await enterDemo(page);
   await page.locator('[data-action="openClassManager"]').first().click();
   await page.getByRole('tab', { name: /^Grading/ }).click();
@@ -39,7 +39,7 @@ test('A Class Management switch keeps the focus after Space, through its questio
   await expect(sw()).toBeFocused();
 });
 
-test('A Class Management menu keeps the focus after a change with no question', async ({ page }) => {
+test('A Class Settings menu keeps the focus after a change with no question', async ({ page }) => {
   await enterDemo(page);
   await page.locator('[data-action="openClassManager"]').first().click();
   await page.getByRole('tab', { name: /^Grading/ }).click();

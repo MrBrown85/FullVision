@@ -101,6 +101,7 @@ window.DashClassManager = (function () {
 
   // Import preview
   var cmPendingImport = null;
+  var cmImportFormatOpen = false; // Import Roster's format panel, before the file picker
 
   // Relink
   var cmRelinkCid = null;
@@ -1318,7 +1319,9 @@ window.DashClassManager = (function () {
     });
   }
 
-  function cmSaveStudent() {
+  /* Save closes the form; Save and Add Another (and Enter in a field) keeps
+     it open, empty, with the focus in First Name for the next student. */
+  function cmSaveStudent(another) {
     if (!cmSelectedCourse) return;
     var firstName = (document.getElementById('cm-add-first')?.value || '').trim();
     var lastName = (document.getElementById('cm-add-last')?.value || '').trim();
@@ -1383,10 +1386,15 @@ window.DashClassManager = (function () {
     saveStudents(cmSelectedCourse, students);
     cmCancelStudent();
     renderClassManager();
-    // A new student leaves the form open with the focus in First Name, so a
-    // roster can be typed one student after another without the mouse.
-    if (adding) {
+    // Save and Add Another leaves the form open with the focus in First Name,
+    // so a roster can be typed one student after another without the mouse.
+    if (adding && another) {
       cmShowAddStudent(((preferred || firstName) + ' ' + lastName).trim());
+      return;
+    }
+    if (adding) {
+      var addBtn = document.querySelector('.cm-roster-add');
+      if (addBtn) addBtn.focus();
       return;
     }
     requestAnimationFrame(function () {
@@ -2002,9 +2010,49 @@ window.DashClassManager = (function () {
     Router.navigate('/student?course=' + encodeURIComponent(cid) + '&id=' + encodeURIComponent(sid));
   }
 
+  /* Import Roster first shows what the file needs (cmImportFormatHtml);
+     Choose File opens the picker. With a review already open it goes
+     straight to the picker, as before. */
   function cmImportRoster() {
+    if (cmPendingImport) {
+      cmChooseRosterFile();
+      return;
+    }
+    cmImportFormatOpen = true;
+    renderClassManager();
+    var choose = document.querySelector('[data-action="cmChooseRosterFile"]');
+    if (choose) choose.focus();
+  }
+
+  function cmChooseRosterFile() {
     var el = document.getElementById('cm-csv-input');
     if (el) el.click();
+  }
+
+  function cmCloseImportFormat() {
+    cmImportFormatOpen = false;
+    renderClassManager();
+    var btn = document.querySelector('[data-action="cmImportRoster"]');
+    if (btn) btn.focus();
+  }
+
+  /* The format the reader below takes: a header row, columns named as in
+     ROSTER_HEADER_ALIASES, in any order. roster-template.csv has them all. */
+  function cmImportFormatHtml() {
+    return (
+      '<div class="cm-section cm-import-format" role="region" aria-labelledby="cm-import-format-title">' +
+      '<div class="cm-section-title" id="cm-import-format-title">Import Roster</div>' +
+      '<p class="cm-hint">The file is a CSV file with a header row and one row per student.</p>' +
+      '<p class="cm-hint">Name columns: Last Name and First Name, or Full Name (read as Last, First or First Last).</p>' +
+      '<p class="cm-hint">Other columns: Preferred Name, Pronouns, Student Number, Date of Birth (year first, as 2012-05-15), Student Email, Parent Email, Parent Email 2, Designations (BC letter codes), ELL (Yes or blank).</p>' +
+      '<p class="cm-hint">Columns can be in any order. Columns with other names are ignored. MyEducation BC column names, such as Legal Surname and Pupil #, are recognized.</p>' +
+      '<div class="cm-import-buttons">' +
+      '<button type="button" class="cm-action-btn" data-action="cmCloseImportFormat">Cancel</button>' +
+      '<a class="cm-action-btn" href="/roster-template.csv" download="roster-template.csv">Download Template</a>' +
+      '<button type="button" class="btn btn-primary" data-action="cmChooseRosterFile">Choose File</button>' +
+      '</div>' +
+      '</div>'
+    );
   }
 
   /* ── Import Roster: reading the file ────────────────────────
@@ -2284,6 +2332,7 @@ window.DashClassManager = (function () {
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function (e) {
+      cmImportFormatOpen = false;
       var table = rosterImportTable(e.target.result);
       var read = rosterRowsFromTable(table);
       cmShowImportPreview(read.rows, file.name, table, read.skipped);
@@ -2708,7 +2757,7 @@ window.DashClassManager = (function () {
   }
 
   /* `tab` opens the manager on that tab (a link from another page). */
-  // tab: a Class Management tab, or 'new' for the New Class wizard. cid: a
+  // tab: a Class Settings tab, or 'new' for the New Class wizard. cid: a
   // class to show other than the open one (from the address's &class=).
   function openClassManager(tab, cid) {
     classManagerOpen = true;
@@ -2728,7 +2777,7 @@ window.DashClassManager = (function () {
     _cmFollowLoads();
   }
 
-  /* Class Management's own address, kept in step as it changes, so a reload
+  /* Class Settings' own address, kept in step as it changes, so a reload
      or Back returns to the same tab and class (or the New Class wizard):
      /dashboard?manage=grading&class=… . The dashboard opens it from there. */
   function _cmSyncUrl() {
@@ -2738,7 +2787,7 @@ window.DashClassManager = (function () {
     if (cmMode !== 'create' && cmSelectedCourse && cmSelectedCourse !== _activeCourse && COURSES[cmSelectedCourse])
       url += '&class=' + encodeURIComponent(cmSelectedCourse);
     Router.setUrl(url);
-    document.title = 'FullVision \u2014 Class Management';
+    document.title = 'FullVision \u2014 Class Settings';
   }
 
   function closeClassManager() {
@@ -2833,9 +2882,71 @@ window.DashClassManager = (function () {
     });
   }
 
+  function _cmIsDemo() {
+    return typeof isDemoMode === 'function' && isDemoMode();
+  }
+
+  /* The first screen for a teacher with no classes: create one, or try
+     Demo Mode. Demo Mode already has a class, so a demo teacher
+     who deletes every class sees only Create a Class. */
+  function _cmEmptyStateHtml() {
+    var create =
+      '<section class="cm-empty-card" aria-labelledby="cm-empty-create">' +
+      '<h2 class="cm-empty-card-title" id="cm-empty-create">Create a Class</h2>' +
+      '<p class="cm-empty-card-text">Build a class from BC curriculum courses, then add students.</p>' +
+      '<button type="button" class="btn btn-primary cm-empty-card-btn" data-action="cmStartCreate">Create a Class</button>' +
+      '</section>';
+    var demo = _cmIsDemo()
+      ? ''
+      : '<section class="cm-empty-card" aria-labelledby="cm-empty-demo">' +
+        '<h2 class="cm-empty-card-title" id="cm-empty-demo">Try Demo Mode</h2>' +
+        '<p class="cm-empty-card-text">A sample Science 8 class with 27 students. Nothing is saved to your account.</p>' +
+        '<button type="button" class="btn btn-ghost cm-empty-card-btn" data-action="cmOpenDemoMode">Open Demo Mode</button>' +
+        '</section>';
+    return (
+      '<div class="cm-empty cm-first-run">' +
+      '<h1 class="cm-empty-title">No classes yet</h1>' +
+      '<div class="cm-empty-cards">' +
+      create +
+      demo +
+      '</div>' +
+      '<a class="cm-empty-help" href="/help/create-a-class">Getting Started Guide</a>' +
+      '</div>'
+    );
+  }
+
+  /* Demo Mode runs on this device only. Entering it from the login page
+     clears this device's FullVision data (login-auth.js), so say what happens
+     first, including any change not yet sent to the account. */
+  function cmOpenDemoMode() {
+    var unsent = 0;
+    try {
+      var q = window.v2Queue;
+      if (q && typeof q.stats === 'function') {
+        var s = q.stats();
+        unsent = Number(s.queued || 0) + Number(s.deadLettered || 0);
+      }
+    } catch (e) {
+      unsent = 0;
+    }
+    var message =
+      'Demo Mode opens a sample Science 8 class on this device and clears the FullVision data stored on it. ' +
+      'Classes saved to your account are not changed. ' +
+      'To return to your account, choose Sign Out in the account menu, then sign in.';
+    if (unsent > 0)
+      message +=
+        ' ' +
+        unsent +
+        (unsent === 1 ? ' change on this device has' : ' changes on this device have') +
+        ' not been sent to your account and will be lost.';
+    showConfirm('Open Demo Mode', message, 'Open Demo Mode', 'primary', function () {
+      window.location.href = '/login.html?demo=1';
+    });
+  }
+
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
-    // Class Management reads the year so far for every class: its previews
+    // Class Settings reads the year so far for every class: its previews
     // (calculation method, Folders Count as One) and Check With a Student
     // never count as of a report left in view on the Reports page.
     if (typeof setActiveTerm === 'function') {
@@ -2852,14 +2963,14 @@ window.DashClassManager = (function () {
         ? 'New Class'
         : cmSelectedCourse && COURSES[cmSelectedCourse]
           ? COURSES[cmSelectedCourse].name
-          : 'Class Management';
-    // Class Management belongs to the dashboard: its toolbar is a breadcrumb
+          : 'Class Settings';
+    // Class Settings belongs to the dashboard: its toolbar is a breadcrumb
     // back to it in place of the dashboard's own toolbar.
     var toolbarMount = document.getElementById('page-toolbar-mount');
     if (toolbarMount) {
       toolbarMount.innerHTML =
         '<div class="page-toolbar dash-toolbar cm-toolbar">' +
-        renderBreadcrumb('Dashboard', '/dashboard', 'Class Management', 'closeClassManager') +
+        renderBreadcrumb('Dashboard', '/dashboard', 'Class Settings', 'closeClassManager') +
         '<span class="dash-toolbar-spacer"></span>' +
         // The tabbed view names the class in its own header.
         (cmMode === 'create' || cmRelinkStep > 0
@@ -2869,7 +2980,7 @@ window.DashClassManager = (function () {
     }
 
     // The class list takes the student list's place beside the page; the
-    // dashboard puts the roster back when Class Management closes.
+    // dashboard puts the roster back when Class Settings closes.
     var sideMount = document.getElementById('sidebar-mount');
     if (sideMount) {
       sideMount.removeAttribute('data-cid');
@@ -2878,12 +2989,7 @@ window.DashClassManager = (function () {
 
     // Empty state
     if (courseIds.length === 0 && cmMode !== 'create') {
-      html +=
-        '<div class="cm-empty">' +
-        '<div class="cm-empty-title">No classes yet</div>' +
-        '<div class="cm-empty-text">Create your first class to get started with your gradebook.</div>' +
-        '<button class="btn btn-primary" data-action="cmStartCreate" style="margin-top:16px">Create a Class</button>' +
-        '</div>';
+      html += _cmEmptyStateHtml();
       document.getElementById('main').innerHTML = html;
       return;
     }
@@ -3117,7 +3223,7 @@ window.DashClassManager = (function () {
       '</div>' +
       '</div>' +
       '<div id="cm-import-preview">' +
-      (cmPendingImport ? _cmRenderImportReview(cid) : '') +
+      (cmPendingImport ? _cmRenderImportReview(cid) : cmImportFormatOpen ? cmImportFormatHtml() : '') +
       '</div>';
     var rosterHtml = students.length ? _cmRosterHtml(cid) : '';
     // Add/Edit student form
@@ -3184,6 +3290,7 @@ window.DashClassManager = (function () {
       '<div class="cm-field" style="grid-column:1/-1;display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">' +
       '<span class="cm-hint" id="cm-add-status" role="status" aria-live="polite" style="margin-right:auto;align-self:center"></span>' +
       '<button class="btn btn-ghost" data-action="cmCancelStudent" style="padding:6px 10px;font-size:0.8125rem">Cancel</button>' +
+      '<button class="btn btn-ghost" id="cm-save-another-btn" data-action="cmSaveStudentAndAnother" style="padding:6px 14px;font-size:0.8125rem">Save and Add Another</button>' +
       '<button class="btn btn-primary" id="cm-save-btn" data-action="cmSaveStudent" style="padding:6px 14px;font-size:0.8125rem">Save</button>' +
       '</div>' +
       '</div>' +
@@ -4344,7 +4451,7 @@ window.DashClassManager = (function () {
   }
 
   function renderCwStep1() {
-    var html = '<div class="cm-detail-inner" style="display:block">';
+    var html = '<div class="cm-detail-inner cw-wizard">';
     html += renderCwStepBar();
 
     if (!cwCurriculumLoaded && !cwLoadError) {
@@ -4496,7 +4603,7 @@ window.DashClassManager = (function () {
      Ministry order with their full wording, all ticked to start. A Ministry
      folder is a heading with its figure and Select All / Clear. */
   function renderCwCompetencies() {
-    var html = '<div class="cm-detail-inner" style="display:block">' + renderCwStepBar();
+    var html = '<div class="cm-detail-inner cw-wizard">' + renderCwStepBar();
     html +=
       '<div class="cw-cc-intro">The BC curriculum expects every competency to be taught. Untick only what you won\u2019t assess in this class.</div>';
     var total = 0;
@@ -4754,14 +4861,18 @@ window.DashClassManager = (function () {
     var grading = cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: preGrade });
     var calc = cwStep2Calc || _cmDefaultCalcMethod();
 
-    var html = '<div class="cm-detail-inner" style="display:block">';
+    var html = '<div class="cm-detail-inner cw-wizard">';
     html += renderCwStepBar();
 
     html +=
       '<div class="cm-section"><div class="cm-section-title">Class Details</div>' +
       '<div class="cm-field"><label class="cm-label" for="cm-new-name">Class Name</label><input class="cm-input" id="cm-new-name" value="' +
       esc(preName) +
-      '" placeholder="e.g. English 10" autofocus></div>' +
+      '" placeholder="e.g. English 10" required aria-describedby="cm-new-name-hint" data-action-input="cwNameInput" autofocus>' +
+      // Next waits for a name, so a slip can't make a class called Untitled.
+      '<div class="cm-hint" id="cm-new-name-hint"' +
+      (preName.trim() ? ' hidden' : '') +
+      '>Enter a Class Name to continue.</div></div>' +
       '<div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
       blockPickerHtml('cm-new-block', cwStep2Block) +
       '</div>' +
@@ -4857,13 +4968,15 @@ window.DashClassManager = (function () {
     html +=
       '<div class="cw-footer">' +
       _cwCancelBtn() +
-      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3">Next</button></div>';
+      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3"' +
+      (preName.trim() ? '' : ' disabled') +
+      '>Next</button></div>';
     html += '</div>';
     return html;
   }
 
   function renderCwStep3() {
-    var html = '<div class="cm-detail-inner" style="display:block">';
+    var html = '<div class="cm-detail-inner cw-wizard">';
     html += renderCwStepBar();
 
     var className = document.getElementById('cm-new-name')?.value || cwGetPreName();
@@ -4971,13 +5084,15 @@ window.DashClassManager = (function () {
       html += _cwRenderGradingRows(anyFolder);
     } else {
       html +=
-        '<div class="cm-section"><div class="cw-empty-msg">Custom class \u2014 no curriculum data. You can add sections and tags manually after creation.</div></div>';
+        '<div class="cm-section"><div class="cw-empty-msg">This class has no BC curriculum. Folders and competencies can be added in the Competencies tab after the class is created.</div></div>';
     }
 
     html +=
       '<div class="cw-footer">' +
       _cwCancelBtn() +
-      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate">Create Class</button></div>';
+      '<button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate"' +
+      (className.trim() ? '' : ' disabled') +
+      '>Create Class</button></div>';
     html += '</div>';
     return html;
   }
@@ -5134,7 +5249,17 @@ window.DashClassManager = (function () {
     };
   }
 
+  // Class Details: Next comes on once the class has a name.
+  function cwNameInput(el) {
+    var named = !!(el.value || '').trim();
+    var next = document.querySelector('[data-action="cwGoToStep3"]');
+    if (next) next.disabled = !named;
+    var hint = document.getElementById('cm-new-name-hint');
+    if (hint) hint.hidden = named;
+  }
+
   function cwGoToStep3() {
+    if (!(document.getElementById('cm-new-name')?.value || '').trim()) return;
     cwStep2Name = document.getElementById('cm-new-name')?.value || '';
     cwStep2Block = readBlockPicker('cm-new-block');
     cwStep2Span = (document.querySelector('#cm-cg-span .cm-seg-btn.active') || {}).dataset?.val || 'full';
@@ -5263,6 +5388,8 @@ window.DashClassManager = (function () {
 
     cmSelectedCourse = course.id;
     cmMode = 'edit';
+    // A new class has no students yet, so it opens where they are added.
+    cmTab = 'students';
     _activeCourse = course.id;
     _activeCourseChanged = true;
     setActiveCourse(course.id);
@@ -5280,6 +5407,7 @@ window.DashClassManager = (function () {
     if (cid !== cmSelectedCourse) {
       // A review or a selection belongs to its class.
       cmPendingImport = null;
+      cmImportFormatOpen = false;
       if (cmCompReview && cmCompReview.kind === 'file') cmCompReview = null;
       cmCompSelect = false;
       cmCompSelected = {};
@@ -6936,15 +7064,8 @@ window.DashClassManager = (function () {
             html += '<div class="cm-field"><label class="cm-label">Courses</label><div class="cw-course-list">';
             courses.forEach(function (c) {
               var sel = cwSelectedTags.includes(c.short_tag) ? ' selected' : '';
-              var fullCourse = CURRICULUM_INDEX[c.short_tag];
-              var compCount = 0,
-                catCount = 0;
-              if (fullCourse && fullCourse.categories) {
-                catCount = fullCourse.categories.length;
-                fullCourse.categories.forEach(function (cat) {
-                  compCount += (cat.competencies || []).length;
-                });
-              }
+              // Counted and named as the New Class wizard's course rows.
+              var counts = _cwCourseCounts([c.short_tag]);
               html +=
                 '<div class="cw-course-item' +
                 sel +
@@ -6963,10 +7084,10 @@ window.DashClassManager = (function () {
                 esc(c.short_tag) +
                 '</span>' +
                 '<span class="cw-course-count">' +
-                catCount +
-                ' Categories \u00B7 ' +
-                compCount +
-                ' Standards</span>' +
+                counts.competencies +
+                (counts.competencies === 1 ? ' Competency' : ' Competencies') +
+                (counts.folders ? ' \u00B7 ' + counts.folders + (counts.folders === 1 ? ' Folder' : ' Folders') : '') +
+                '</span>' +
                 '</div>';
             });
             html += '</div></div>';
@@ -9607,6 +9728,9 @@ window.DashClassManager = (function () {
       cmStartCreate: function () {
         cmStartCreate();
       },
+      cmOpenDemoMode: function () {
+        cmOpenDemoMode();
+      },
       cmCancelCreate: function () {
         cmCancelCreate();
       },
@@ -9641,13 +9765,22 @@ window.DashClassManager = (function () {
         cmCloseAddStudent();
       },
       cmSaveStudent: function () {
-        cmSaveStudent();
+        cmSaveStudent(false);
+      },
+      cmSaveStudentAndAnother: function () {
+        cmSaveStudent(true);
       },
       cmShowAddStudent: function () {
         cmShowAddStudent();
       },
       cmImportRoster: function () {
         cmImportRoster();
+      },
+      cmChooseRosterFile: function () {
+        cmChooseRosterFile();
+      },
+      cmCloseImportFormat: function () {
+        cmCloseImportFormat();
       },
       cmConfirmImport: function () {
         cmConfirmImport();
@@ -9912,6 +10045,10 @@ window.DashClassManager = (function () {
   }
 
   function handleInput(el) {
+    if (el.dataset.actionInput === 'cwNameInput') {
+      cwNameInput(el);
+      return true;
+    }
     if (el.dataset.actionInput === 'cmRosterSearch') {
       cmRosterSearch(el.value);
       return true;
@@ -9962,7 +10099,7 @@ window.DashClassManager = (function () {
   }
 
   /* A switch, checkbox, radio or menu changed with the keyboard keeps the
-     focus: most changes redraw Class Management, which made the control a
+     focus: most changes redraw Class Settings, which made the control a
      new element and dropped the focus to the page. Until the next click or
      change, a redraw that leaves the focus nowhere gives it back to the same
      control (by id, else by its data attributes), including the redraws
@@ -10163,7 +10300,7 @@ window.DashClassManager = (function () {
     if (!el || el.tagName !== 'INPUT' || el.type === 'checkbox') return false;
     if (!el.closest || !el.closest('#cm-add-student-form')) return false;
     e.preventDefault();
-    cmSaveStudent();
+    cmSaveStudent(true);
     return true;
   }
 
@@ -10299,6 +10436,7 @@ window.DashClassManager = (function () {
       _cmGuardiansReady = {};
       _cmGuardiansLoading = {};
       cmPendingImport = null;
+      cmImportFormatOpen = false;
       cmCompSelect = false;
       cmCompSelected = {};
       cmCompReview = null;

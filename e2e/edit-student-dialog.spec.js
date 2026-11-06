@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /* The student page's Edit Student dialog, layout B (Colin, 2026-10-29): the
    name, school record, contact and language support on the left, every
    designation on the right as a row that turns blue when chosen. It has the
-   Class Management roster's fields, Parent Email and Parent Email 2
+   Class Settings roster's fields, Parent Email and Parent Email 2
    included. Runs in Demo Mode on Cece Adeyemi (st1) in Science 8. */
 
 test.use({ viewport: { width: 1280, height: 1100 } });

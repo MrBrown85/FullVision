@@ -1064,6 +1064,7 @@ const FV_IDEMPOTENT_RPCS = {
   save_score_report_note: true,
   set_questionnaire_on: true,
   set_rubric_printed: true,
+  submit_support_report: true,
   update_phone_report: true,
   upsert_category: true,
   upsert_competency_group: true,
@@ -1083,3 +1084,19 @@ const FV_IDEMPOTENT_RPCS = {
    background (docs/class-loading-plan.md, Phase 4). false loads every class
    from the server first, as before. */
 const FV_CACHE_FIRST = true;
+
+/* Every keyboard shortcut the app declares through aria-keyshortcuts, one
+   row each: where it works, what it does, and the aria-keyshortcuts value
+   word for word (alternatives separated by spaces: Control for Windows,
+   Meta for the Mac's ⌘). The Help panel's Keyboard Shortcuts sheet and the
+   help site's Keyboard Shortcuts article are both built from this list, and
+   tests/keyboard-shortcuts.test.js fails when an aria-keyshortcuts in the
+   app is missing here. */
+const KEYBOARD_SHORTCUTS = [
+  { context: 'Any Page', action: 'Show Keyboard Shortcuts', keys: '?' },
+  { context: 'Help', action: 'Close Help', keys: 'Escape' },
+  { context: 'New Assessment', action: 'Create and Add Another', keys: 'Control+Shift+Enter Meta+Shift+Enter' },
+  { context: 'Grading With a Rubric', action: 'Comment on the Selected Criterion', keys: 'C' },
+  { context: 'Comment on a Criterion', action: 'Save', keys: 'Enter' },
+  { context: 'Comment on a Criterion', action: 'Save and Next Criterion or Student', keys: 'Meta+Enter Control+Enter' },
+];

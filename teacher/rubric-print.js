@@ -169,7 +169,7 @@
      wording. { text, ready }: ready is false while a bank competency's
      wording hasn't loaded (loadBankLevels), so a caller can ask again. */
   function levelWording(tag, level, skipOwn) {
-    // skipOwn: the wording the teacher's own replaces (Class Management's Write Your Own).
+    // skipOwn: the wording the teacher's own replaces (Class Settings' Write Your Own).
     // The one rule lives in CompetencyWording, which the hovers and the phone read too.
     if (window.CompetencyWording) return CompetencyWording.levelWording(tag, level, skipOwn);
     var own = (!skipOwn && _ownLevels(tag)) || {};
@@ -255,7 +255,7 @@
         return { id: tid, name: tag.label || tag.name || tag.code || '', tagIds: [tid], levels: levels };
       })
       .filter(Boolean);
-    return criteria.length ? { id: 'tags', name: 'Tag Rubric', kind: 'tags', criteria: criteria } : null;
+    return criteria.length ? { id: 'tags', name: 'Competency Rubric', kind: 'tags', criteria: criteria } : null;
   }
 
   // The assessment's own rubric, else its Tag or General Rubric.

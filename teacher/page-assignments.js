@@ -567,25 +567,7 @@ window.PageAssignments = (function () {
   // whole-rubric competency has no row: its level is worked out from the
   // criteria, so setting it would overwrite them.
   function _scoreTagObjs(cid, a) {
-    var keys = scoreTagIds(a, cid);
-    var comps = rubricCompetencyIds(cid, a);
-    if (comps.length) {
-      var rubric = getRubricById(cid, a.rubricId);
-      var whole = rubricWholeTagIds(cid, a);
-      keys = comps
-        .filter(function (t) {
-          return whole.indexOf(t) < 0;
-        })
-        .concat(
-          ((rubric && rubric.criteria) || [])
-            .filter(function (c) {
-              return c && c.id && !(c.tagIds || []).length;
-            })
-            .map(function (c) {
-              return c.id;
-            }),
-        );
-    }
+    var keys = rubricCompetencyRowKeys(cid, a);
     var tagObjs = keys
       .map(function (key) {
         return scoreKeyInfo(cid, a, key);
@@ -1345,13 +1327,7 @@ window.PageAssignments = (function () {
     var a = getAssessments(cid).find(function (x) {
       return x.id === aid;
     });
-    if (a && rubricWholeTagIds(cid, a).indexOf(tagId) >= 0) return [];
-    var crits = _tagCriteria(cid, aid, tagId);
-    return crits.length
-      ? crits.map(function (c) {
-          return c.id;
-        })
-      : [tagId];
+    return a ? rubricRowScoreKeys(cid, a, tagId) : [tagId];
   }
   function _setTagScore(cid, sid, aid, tagId, value, mod) {
     _tagScoreKeys(cid, aid, tagId).forEach(function (key) {
@@ -7343,9 +7319,9 @@ window.PageAssignments = (function () {
   }
 
   /* A click on the chosen level clears it. A misclick is put right from the
-     toast (or Cmd+Z while it is up), as the phone's "Score cleared" does:
-     Undo puts back the level and its + or −, unless it was scored again
-     since (Nov 3 sweep). */
+     toast (or Cmd+Z while it is up): Undo puts back the level and its + or
+     −, unless it was scored again since (Nov 3 sweep). The phone clears
+     with no toast (Nov 5). */
   function _offerClearUndo(cid, before) {
     var after = structuredClone(getScores(cid));
     _showFillUndo('Score cleared', function () {
@@ -8445,7 +8421,7 @@ window.PageAssignments = (function () {
     if (extraTagObjs.length > 0) {
       html +=
         '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">' +
-        '<div style="font-size:0.75rem;color:var(--text-3);font-weight:600;margin-bottom:6px">Additional Tags (not in rubric)</div>';
+        '<div style="font-size:0.75rem;color:var(--text-3);font-weight:600;margin-bottom:6px">Competencies Not in the Rubric</div>';
       // The group's name and members strip are drawn once, above.
       _groupStripOff = true;
       try {
@@ -9450,7 +9426,7 @@ window.PageAssignments = (function () {
     var html = any
       ? '<div class="copy-review-note">Each competency you pick becomes a criterion. Its descriptors are drafted from the competency\u2019s I-can statements, or use your own wording if you have rewritten them in an earlier rubric; change any of them before you save.</div>' +
         chips
-      : '<div class="copy-review-note">This class has no competencies yet. Add them in Class Management first.</div>';
+      : '<div class="copy-review-note">This class has no competencies yet. Add them in Class Settings first.</div>';
     function updateOk(root) {
       var n = root.querySelectorAll('[data-pick-tag][aria-pressed="true"]').length;
       var ok = root.querySelector('[data-copy-ok]');
@@ -10639,7 +10615,7 @@ window.PageAssignments = (function () {
       cancelAssessForm: function () {
         cancelAssessForm();
       },
-      // A class with no categories: Class Management's Grading tab.
+      // A class with no categories: Class Settings' Grading tab.
       afAddCategories: function () {
         var cid = activeCourse;
         cancelAssessForm(function () {

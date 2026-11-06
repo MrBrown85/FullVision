@@ -1,5 +1,5 @@
 /**
- * Class Management's Grading tab. Each calculation method shows its result on
+ * Class Settings' Grading tab. Each calculation method shows its result on
  * the same example scores, the % shows as the class rounds it, and switching
  * the method says how many students it moves before it changes anything.
  */
@@ -130,7 +130,7 @@ describe('switching the calculation method', () => {
     expect(COURSES[CID].calcMethod).toBe('highest');
   });
 
-  it('Class Management shows the year so far, even when opened over a report in view (Colin, 2026-11-03)', () => {
+  it('Class Settings shows the year so far, even when opened over a report in view (Colin, 2026-11-03)', () => {
     // Most Recent: Amara's last score is the 4 on Oct 3. As of a report
     // ending Oct 2 it would be her 2.
     _cache.courseConfigs[CID] = {

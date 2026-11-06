@@ -17,7 +17,7 @@ window.DashOverview = (function () {
       '<select class="class-picker dash-course-select" data-action="dashSwitchCourse" aria-label="Select course">' +
       courseOptions +
       '</select>' +
-      '<button class="tb-action-btn tb-action-secondary" data-action="openClassManager">Class Management</button>' +
+      '<button class="tb-action-btn tb-action-secondary" data-action="openClassManager">Class Settings</button>' +
       '<div class="dash-toolbar-spacer"></div>' +
       '<span class="dash-toolbar-label">' +
       students.length +
@@ -248,7 +248,7 @@ window.DashOverview = (function () {
       opts.tagsWithEvidence +
       ' of ' +
       opts.allTags.length +
-      ' standards assessed</div>';
+      ' competencies assessed</div>';
     return html + '</section>';
   }
 

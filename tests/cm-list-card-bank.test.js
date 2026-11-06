@@ -1,5 +1,5 @@
 /**
- * Class Management's competency list and card for a class built from the
+ * Class Settings' competency list and card for a class built from the
  * rebuilt bank (curriculum bank stage 4, PR 5): competencies outside
  * folders sit in Ministry order among the folders, each row shows its
  * wording's first line, and the card's source line names the course and

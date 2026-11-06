@@ -6,7 +6,7 @@
 .page-layout:not(.sidebar-hidden) .dash-course-select {
   display: none;
 }
-/* Class Management puts its class list where the student list goes
+/* Class Settings puts its class list where the student list goes
    (renderClassManager). It shows even when the student list is
    collapsed, so the sidebar button has nothing to do there. */
 #page-layout:has(.cm-toolbar) #sidebar-mount {
@@ -1760,7 +1760,7 @@ a.dash-ins-name:hover {
   border-color: var(--text-3);
   color: var(--text);
 }
-/* Class Management is settings, so it is a secondary (outline) button:
+/* Class Settings is settings, so it is a secondary (outline) button:
    solid blue is kept for a screen's main action (docs/DECISIONS.md). */
 .dash-toolbar-spacer {
   flex: 1;
@@ -2841,7 +2841,7 @@ a.dash-ins-name:hover {
   flex: 1;
 }
 
-/* Class Management segments (.seg) sit in a narrow column: they wrap
+/* Class Settings segments (.seg) sit in a narrow column: they wrap
    onto a second row instead of pushing the last segment out of view. */
 .cm-seg {
   flex-wrap: wrap;
@@ -3235,6 +3235,22 @@ a.dash-ins-name:hover {
   gap: 10px;
   justify-content: flex-end;
   margin-top: 16px;
+}
+/* The New Class wizard fills the pane, and its Cancel / Back / Next row sits
+   at the foot of it on every step. A short step keeps the row there too, so
+   ticking a course never moves Next. */
+.cm-detail-inner.cw-wizard {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+/* The auto margin takes the place of the footer's own 16px, so the last box
+   above it keeps that space when the step runs long. */
+.cw-wizard > .cw-footer {
+  margin-top: auto;
+}
+.cw-wizard > :nth-last-child(2) {
+  margin-bottom: 16px;
 }
 /* Back and Next stay in view at the foot of a long step (Choose
    Competencies runs to thousands of pixels). */
@@ -4438,6 +4454,71 @@ a.dash-ins-name:hover {
   line-height: 1.4;
 }
 
+/* The first screen with no classes: two cards side by side, under the
+   heading, near the top of the page. */
+.cm-empty.cm-first-run {
+  justify-content: flex-start;
+  padding: 112px 20px 40px;
+}
+.cm-first-run .cm-empty-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+.cm-empty-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+.cm-empty-card {
+  width: 360px;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.1),
+    0 2px 6px rgba(0, 0, 0, 0.06);
+  text-align: left;
+}
+.cm-empty-card-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.cm-empty-card-text {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: 1.45;
+  color: var(--text);
+}
+.cm-empty-card-btn {
+  align-self: flex-start;
+  margin-top: 12px;
+  min-height: 36px;
+  padding: 0 18px;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.cm-empty-help {
+  margin-top: 24px;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--active);
+  text-decoration: none;
+}
+.cm-empty-help:hover {
+  filter: brightness(0.8);
+}
+
 .cm-sec-color-dot {
   flex-shrink: 0;
   position: relative;
@@ -4953,6 +5034,54 @@ a.dash-ins-name:hover {
 .cm-import-buttons {
   display: flex;
   gap: 8px;
+}
+/* The key under the roster: each proficiency code beside a name, and its
+   word. Drawn like the gradebook's key under the grid. */
+.sb-legend {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+  padding: 10px 16px 12px;
+  border-top: 1px solid var(--divider-subtle);
+  font-family: var(--font-base);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.sb-legend[hidden] {
+  display: none;
+}
+.sb-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.sb-legend-item:last-child {
+  grid-column: 1 / -1;
+}
+
+/* Import Roster's format panel, shown before the file picker */
+.cm-import-format {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cm-import-format .cm-section-title {
+  margin-bottom: 2px;
+}
+.cm-import-format .cm-hint {
+  margin: 0;
+  line-height: 1.45;
+}
+.cm-import-format .cm-import-buttons {
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.cm-import-format a.cm-action-btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
 }
 /* Keep a copy first, in the permanent-delete dialog */
 .cm-keep-copy {
@@ -6248,7 +6377,7 @@ label.cm-cr-row {
   }
 }
 
-/* Class Management below 1024 px: the student list's width is 0 there, so
+/* Class Settings below 1024 px: the student list's width is 0 there, so
    the class list kept 1 px and New Class and Restore Class from Backup
    couldn't be reached (Nov 3 sweep). It keeps its own width on a tablet
    and, on a phone, sits above the class as a short list of its own. */

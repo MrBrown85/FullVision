@@ -45,7 +45,7 @@ describe('class manager — remove student', () => {
   var main;
   var originalGetElementById;
 
-  // The page Class Management last rendered (the test document is a stub).
+  // The page Class Settings last rendered (the test document is a stub).
   function page() {
     return main.innerHTML;
   }

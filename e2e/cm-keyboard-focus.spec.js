@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-/* Class Management redraws itself when a box is ticked. Keyboard focus must
+/* Class Settings redraws itself when a box is ticked. Keyboard focus must
    come back to the box that was ticked, or a keyboard user is sent to the top
    of the page after every tick: Competencies select mode, and the Re-link and
    CSV review (its checkboxes and Keep Mine / Use the Curriculum Version

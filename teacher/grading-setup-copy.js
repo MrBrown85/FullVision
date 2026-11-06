@@ -1,7 +1,7 @@
 /* grading-setup-copy.js — one class's grading setup in another class.
  *
  * A teacher with several sections sets up grading once and copies it, as
- * Teams' "Import settings" does. "Copy grading setup…" in Class Management
+ * Teams' "Import settings" does. "Copy grading setup…" in Class Settings
  * copies to other classes or imports from one; "Copy from another class"
  * beside the categories imports the categories alone.
  *
@@ -142,7 +142,7 @@ window.GradingSetupCopy = (function () {
     };
   }
 
-  // A category's Calculation, as Class Management names it.
+  // A category's Calculation, as Class Settings names it.
   var _CALC_MODE_LABELS = { points: 'Total Points', percent: 'Average of Percentages' };
 
   /* ── Categories ────────────────────────────────────────────── */
@@ -226,7 +226,7 @@ window.GradingSetupCopy = (function () {
     if (reordered) lines.push('Put the categories in the same order.');
     var same = !lines.length;
     // Work with no category only moves when the list changes; otherwise
-    // Class Management already offers to move it.
+    // Class Settings already offers to move it.
     if (!same && uncategorized)
       lines.push(
         _plural(uncategorized, 'assessment has', 'assessments have') +
@@ -397,7 +397,7 @@ window.GradingSetupCopy = (function () {
       var ids = _landedIds(dstCid, rows);
       // Signed in, a category the server hasn't saved has no id to point
       // work at yet (offline, or the save was refused). Leave the work where
-      // it is; Class Management offers the move once the list lands.
+      // it is; Class Settings offers the move once the list lands.
       var writes = typeof _writesEnabled === 'function' && _writesEnabled() && _isUuid(dstCid);
       if (writes && !ids.every(_isUuid)) return;
       var target = function (idx) {

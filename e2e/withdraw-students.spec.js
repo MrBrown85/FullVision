@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, TEST_LEARNING_MAP } from './helpers.js';
 
 /* Removing a student withdraws them (docs/DECISIONS.md, "Students are removed
-   by withdrawal, not deletion"). Class Management lists withdrawn students
+   by withdrawal, not deletion"). Class Settings lists withdrawn students
    with Re-enrol and the permanent delete, the second step. The class and
    students have server-shaped ids, so the writes reach the fake server. */
 
@@ -209,7 +209,7 @@ test.describe('Withdraw students', () => {
     expect((await rpcCalls(page, 'delete_withdrawn_student'))[0].p_enrollment_id).toBe(ALICE);
     expect(await rpcCalls(page, 'delete_student')).toHaveLength(0);
 
-    // A reload comes back to Class Management on the Students tab.
+    // A reload comes back to Class Settings on the Students tab.
     await page.reload();
     await page.waitForSelector('#dock-mount nav');
     await expect(page.getByRole('tab', { name: /^Students/ })).toHaveAttribute('aria-selected', 'true');

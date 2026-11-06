@@ -17,3 +17,8 @@ shared/bank-core-competencies.js
 
 # Course-set wording: the source files (data/course-sets) are JSON as written; build output above
 data/course-sets/
+
+# The help site's built pages (scripts/build-help.mjs), not committed
+help/*.html
+help/fragments/
+help/index.json

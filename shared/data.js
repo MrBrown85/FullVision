@@ -1412,7 +1412,7 @@ function _revalidateActiveClass() {
    Boot loads the class the teacher opens with; preloadClasses then loads the
    rest in the background, one at a time, so a class's roster, settings and
    competencies are on the page before the teacher opens it (the class
-   picker, Class Management, copying between classes). loadClass shares one
+   picker, Class Settings, copying between classes). loadClass shares one
    load per class, so a class picked while it is preloading waits for that
    same load. In Demo Mode and local-only use every class is already on this
    device. */
@@ -8982,7 +8982,7 @@ var _studentDispatchQueue = {}; // cid → Promise of the last diff being dispat
 /* Diff arr vs prev and translate to canonical RPC calls.
    - student.id matching UUID → already enrolled → update_enrollment + update_student
    - student.id local (uid) → new → enroll_student → patches local cache id to canonical
-   - prev student missing from arr → withdraw_student (Class Management
+   - prev student missing from arr → withdraw_student (Class Settings
      withdraws through withdrawStudent, which keeps the baseline in step) */
 function _persistStudentsToCanonical(cid, prev, arr) {
   var sb = getSupabase();
@@ -9272,7 +9272,7 @@ function saveCategories(cid, arr) {
 /* A category's Calculation (category.calc_mode): 'percent' averages each
    assessment's percent, 'points' (the default, and anything unset) pools
    points earned and possible. Takes a cache row (calcMode) or a server or
-   Class Management row (calc_mode). */
+   Class Settings row (calc_mode). */
 function categoryCalcMode(category) {
   var mode = category && (category.calcMode || category.calc_mode);
   return mode === 'percent' ? 'percent' : 'points';
@@ -12598,7 +12598,7 @@ function _studentWriteId(cid, sid) {
   return _isPendingLocalId(sid) ? sid : null;
 }
 
-/* Withdraw: the remove action in Class Management. Returns the entry (for
+/* Withdraw: the remove action in Class Settings. Returns the entry (for
    Undo), or null when the student isn't on the roster. */
 function withdrawStudent(cid, sid) {
   var students = getStudents(cid);
@@ -13657,5 +13657,84 @@ window.loadSeedIfNeeded = function () {
   });
   return Promise.all([script, bank]).then(function () {
     if (typeof seedIfNeeded === 'function') seedIfNeeded();
+  });
+};
+
+/* Reset Demo Data: every class goes back to the sample Science 8 class.
+   Demo Mode only, since it deletes every class before reseeding. The
+   desktop account menu, the desktop Demo Mode pill and the phone's Demo
+   Mode sheet all run this. */
+window.resetDemoData = async function () {
+  if (typeof isDemoMode !== 'function' || !isDemoMode()) return;
+  await Promise.all(
+    Object.keys(COURSES).map(function (cid) {
+      return deleteCourseData(cid);
+    }),
+  );
+  Object.keys(COURSES).forEach(function (cid) {
+    delete COURSES[cid];
+  });
+  Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
+  saveCourses(COURSES);
+  await window.loadSeedIfNeeded();
+};
+
+/* Leave Demo Mode for the sign-in page (href: /login.html, or
+   /login.html#signup for Create an Account). A teacher can enter Demo Mode
+   while signed in (the zero-class screen's Open Demo Mode), and the sign-in
+   page sends a live session straight back into the app, still in Demo Mode.
+   So this always goes through signOut(): it ends any session, wipes the
+   device as Sign Out does (demo data, flags, outbox, report copies), tells
+   other tabs, and opens href. Resolves { unsent } when signOut's check for
+   unsent changes stops it; repeat calls while one runs do nothing. */
+var _leavingDemo = false;
+window.leaveDemoMode = async function (href, opts) {
+  opts = opts || {};
+  if (_leavingDemo) return;
+  var sb = typeof getSupabase === 'function' ? getSupabase() : null;
+  if (!sb || typeof signOut !== 'function') {
+    // Local development with no Supabase: only demo data is on the device.
+    try {
+      Object.keys(localStorage)
+        .filter(function (k) {
+          return k.indexOf('gb-') === 0;
+        })
+        .forEach(function (k) {
+          localStorage.removeItem(k);
+        });
+    } catch (e) {
+      /* nothing stored */
+    }
+    window.location.href = href;
+    return;
+  }
+  _leavingDemo = true;
+  try {
+    var res = await signOut({ force: !!opts.force, redirect: href });
+    return res;
+  } finally {
+    _leavingDemo = false;
+  }
+};
+
+/* The words for signOut's unsent-changes stop when leaving Demo Mode. */
+window.leaveDemoUnsentText = function (n) {
+  return n === 1
+    ? '1 change has not reached the server. Leaving Demo Mode signs out and deletes it.'
+    : n + ' changes have not reached the server. Leaving Demo Mode signs out and deletes them.';
+};
+
+/* Report a Problem (teacher/ui.js): one report to submit_support_report
+   (migrations/20261105_support_report.sql). It goes through the outbox like
+   every write (and counts on the sync dot until it lands), so a report
+   written offline is sent when the device is back online. The fields are the teacher's text and what the form shows as
+   attached: the page's name, the build and the browser. Never student data. */
+window.submitSupportReport = function (report) {
+  report = report || {};
+  return _rpcOrNoop('submit_support_report', {
+    p_page: String(report.page || '').slice(0, 200),
+    p_message: String(report.message || '').slice(0, 5000),
+    p_browser: report.browser ? String(report.browser).slice(0, 300) : null,
+    p_app_version: report.appVersion ? String(report.appVersion).slice(0, 100) : null,
   });
 };
