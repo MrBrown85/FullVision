@@ -514,3 +514,14 @@ Replaces "Playwright runs on main after each merge, not on PRs." That rule came 
 2. **Four shards, every fourth test location each** (`.github/workflows/ci.yml`), so the slow files still split evenly.
 3. **The e2e job runs on every pull request** as well as on main. It is not a required check: a red run shows on the PR before merging, but a flaky test doesn't block a merge. `test-and-format` stays the only required check.
 4. **The repo stays public** (Colin, 2026-11-05): Actions minutes are free, so the extra runners cost nothing. Outside pull requests need Colin's approval before CI runs on them.
+
+## Dashboard cards (2026-11-05)
+
+Colin's CSL reviewer (Nov 5) couldn't tell what the student cards' bars meant or that the Curricular Competencies card's percentages were class averages. Plan at [`plans/dashboard-cards-plan.md`](plans/dashboard-cards-plan.md); mockups on the private canvas it names.
+
+1. **A student card's strip is one chip per folder (or competency), with its code**, when the class has eight columns or fewer; more than that keeps thin bars. Pointing at a chip shows the full name and level at once; the trend arrow sits by the grade; "N not assessed" shows only when a competency has no evidence. A long name wraps to a second line; pronouns and the student number stay on the student page.
+2. **A card's views sit behind a view menu beside its title** (`DashOverview.viewMenuHtml`): a small pill naming the view, a menu with a one-line hint per view, the pick remembered per class on this device. No explanatory footers; the menu's hints and the row pop-ups carry that. The Curricular Competencies card offers Class Average, Level Mix, Needs Support and Change, in every grading style, each in the form its question needs (bars, a table of counts, one row per student, a monthly line); the Core Competencies card offers Self-Assessment and Evidence, and no menu until a student has self-assessed.
+3. **Clicking a competency filters the page instead of leaving it**: the student cards sort weakest first on it, that chip stands out, a chip above the cards clears it, and the bar offers Record an Observation for the students below and a named link into the gradebook. Point to preview, click to filter, a named link to leave.
+4. **Students' self-ratings never use the level colours.** They have their own light-to-dark blue (`--self-1..4`), so a "Beginning" is a student's honest word, not a red mark. Level Mix uses the level badge pairs (`--score-N-bg` / `--score-N-text`) that the rest of the app uses.
+5. **Motion only where something moved**: cards slide to their new places when the filter or sort changes, a view switch crossfades, pop-ups appear at once, and nothing moves under `prefers-reduced-motion`.
+6. **One PR for the whole batch** (Colin, Nov 5): Netlify credits are scarce and only merges to main deploy, so this set of changes landed as one merge rather than rule 8's one PR per change.
