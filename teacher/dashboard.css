@@ -346,12 +346,16 @@ button.dash-glance-cell:disabled {
   display: inline-flex;
 }
 /* The title, the view pill and the link don't all fit on one line at phone
-   width; the pill and the link wrap under the title rather than widening
-   the card and the column beside it (e2e/phone-width-desktop-pages.spec.js). */
-.dash-comp-card .dash-section-title,
-.dash-core-card .dash-section-title {
-  flex-wrap: wrap;
-  row-gap: 4px;
+   width; there the pill and the link wrap under the title rather than
+   widening the card and the column beside it
+   (e2e/phone-width-desktop-pages.spec.js). Wider, the row stays one line
+   (the link shortens instead), so the card keeps one height in every view. */
+@media (max-width: 600px) {
+  .dash-comp-card .dash-section-title,
+  .dash-core-card .dash-section-title {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
 }
 .dash-view-btn {
   display: inline-flex;
