@@ -7,6 +7,7 @@ keywords:
   - Class Management
 checked: 2026-11-05
 labels:
+  - Download All My Data
   - Class Results
   - View Class Results
   - Class Average
@@ -39,6 +40,10 @@ next:
   - create-a-class
   - add-your-students
 ---
+
+## Nov 6, 2026: Download All My Data
+
+**Download All My Data** in the account menu saves one Excel file with every class: a Summary, a gradebook sheet per class, and sheets for rubric levels, feedback, observations, reports, questionnaires and goals.
 
 ## Nov 6, 2026: Class Results
 
