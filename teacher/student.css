@@ -3554,3 +3554,54 @@ button.stu-bd-row:focus-visible {
     padding: 7px 12px;
   }
 }
+
+/* ── Header email: copies on a click (no mailto) ─────────────── */
+/* Same 13px grey as the rest of the header's line; a long address ends in an
+   ellipsis and shows in full on hover. The icon becomes Copied for 1.5 s. */
+.stu-email-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 1px 4px;
+  margin: 0 -4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: copy;
+}
+.stu-email-copy:hover {
+  background: var(--overlay-hover);
+  color: var(--link);
+}
+.stu-email-copy:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.stu-email-text {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stu-email-icon {
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+.stu-email-copy:hover .stu-email-icon {
+  color: inherit;
+}
+.stu-email-copied {
+  display: none;
+  color: var(--score-3-text);
+  font-weight: 500;
+}
+.stu-email-copy.is-copied .stu-email-icon {
+  display: none;
+}
+.stu-email-copy.is-copied .stu-email-copied {
+  display: inline;
+}
