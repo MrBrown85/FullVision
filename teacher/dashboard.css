@@ -345,6 +345,14 @@ button.dash-glance-cell:disabled {
   position: relative;
   display: inline-flex;
 }
+/* The title, the view pill and the link don't all fit on one line at phone
+   width; the pill and the link wrap under the title rather than widening
+   the card and the column beside it (e2e/phone-width-desktop-pages.spec.js). */
+.dash-comp-card .dash-section-title,
+.dash-core-card .dash-section-title {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
 .dash-view-btn {
   display: inline-flex;
   align-items: center;
@@ -753,7 +761,9 @@ button.dash-glance-cell:disabled {
 }
 .dash-comp-cell.is-empty {
   background: var(--overlay-hover);
-  color: var(--text-3);
+  /* --text-2, not --text-3: the dark theme's --text-3 on this cell is 4.0:1
+     (e2e/contrast.spec.js wants 4.5). */
+  color: var(--text-2);
   cursor: default;
 }
 button.dash-comp-cell:hover {
