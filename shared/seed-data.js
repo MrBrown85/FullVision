@@ -1642,7 +1642,7 @@ function seedIfNeeded() {
     // gradebook show Missing, Excused, Late and Unmarked work: on a lab
     // rubric, a quiz and a Complete/Incomplete check.
     const SCI8_STATUSES = {
-      sci8a1: { 5: 'NS', 14: 'EXC', 3: 'LATE' },
+      sci8a4: { 5: 'NS', 14: 'EXC', 3: 'LATE' },
       sci8q1: { 17: 'NS', 2: 'EXC', 6: 'LATE' },
       sci8q4: { 11: 'NS', 5: null },
     };
@@ -2783,6 +2783,16 @@ function seedIfNeeded() {
           assessmentTitle: 'Mid-Year Lab Skills Check',
           text: 'Mei helped calibrate the equipment during the lab skills check and explained the process to two classmates. Natural leader in the lab.',
           dims: ['collaboration', 'engagement'],
+          sentiment: 'strength',
+          context: 'small-group',
+        },
+        {
+          sid: 'st2',
+          date: '2025-11-14',
+          assessmentId: 'sci8a4',
+          assessmentTitle: 'KMT & States of Matter Lab',
+          text: 'Noor explained why the ice stayed at 0 °C while it melted, using the particle model. Strong link from the data to the theory.',
+          dims: ['curiosity'],
           sentiment: 'strength',
           context: 'small-group',
         },

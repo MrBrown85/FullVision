@@ -1906,7 +1906,8 @@ a.dash-ins-name:hover {
 }
 .dash-card-missing {
   font-size: var(--text-xs);
-  color: var(--priority);
+  /* --priority is 3.6:1 on white; small text needs 4.5:1. */
+  color: var(--score-1-text);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }

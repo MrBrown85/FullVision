@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /* Class Results (docs/plans/class-results-plan.md): the Class Average card
-   and the panel, in Demo Mode's Science 8. sci8a1 is a lab rubric with a
+   and the panel, in Demo Mode's Science 8. sci8a4 is a lab rubric with a
    Missing, an Excused and a Late cell; sci8q1 a points quiz; sci8q4 a
    Complete/Incomplete check. */
 test.use({ viewport: { width: 1440, height: 900 } });
@@ -11,14 +11,14 @@ async function openGradebook(page) {
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(() => window.Router.navigate('/gradebook?course=sci8'));
-  await page.waitForSelector('#gb-data .gb-stats-row td[data-aid="sci8a1"]');
+  await page.waitForSelector('#gb-data .gb-stats-row td[data-aid="sci8a4"]');
 }
 
 const avgCell = (page, aid) => page.locator(`#gb-data .gb-stats-row td[data-aid="${aid}"]`);
 
 test('the Class Average card shows on hover and the panel opens on a click', async ({ page }) => {
   await openGradebook(page);
-  const cell = avgCell(page, 'sci8a1');
+  const cell = avgCell(page, 'sci8a4');
   await cell.scrollIntoViewIfNeeded();
   await cell.hover();
   const tip = page.locator('#gb-tooltip.gb-tip-avg');
@@ -30,7 +30,7 @@ test('the Class Average card shows on hover and the panel opens on a click', asy
   await cell.click();
   const panel = page.locator('#class-results');
   await expect(panel).toBeVisible();
-  await expect(page.locator('#cr-title')).toHaveText('Cell Microscope Lab');
+  await expect(page.locator('#cr-title')).toHaveText('KMT & States of Matter Lab');
   await expect(tip).toBeHidden();
   await expect(panel).toContainText('Below Proficient');
 
@@ -75,7 +75,7 @@ test('points, Complete/Incomplete and Help panel rules', async ({ page }) => {
   // Help and Class Results share the side of the page.
   await page.evaluate(() => setHelpOpen(true));
   await expect(panel).toHaveCount(0);
-  await page.evaluate(() => ClassResults.open('sci8', 'sci8a1'));
+  await page.evaluate(() => ClassResults.open('sci8', 'sci8a4'));
   await expect(page.locator('#help-panel')).toHaveCount(0);
 });
 

@@ -8473,6 +8473,20 @@ button.grader-member-name {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--text);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cr-card-btn:hover {
+  background: rgba(118, 118, 128, 0.2);
 }
 .cr-card-btn.cr-is-open {
   box-shadow: inset 0 0 0 2px var(--active);

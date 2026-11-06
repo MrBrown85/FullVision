@@ -6702,7 +6702,7 @@ window.PageAssignments = (function () {
   }
   function _classResultsButtonHtml(cid, a) {
     return (
-      '<button type="button" class="rubric-print-btn cr-card-btn"' +
+      '<button type="button" class="cr-card-btn"' +
       _classResultsAttrs(cid, a.id) +
       '>' +
       _CLASS_RESULTS_ICON +
