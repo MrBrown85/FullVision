@@ -396,65 +396,230 @@ button.dash-glance-cell:disabled {
   border-radius: 4px;
 }
 
-/* Core Competencies: one row each, its count of tagged assessments, and
-   their titles on hover. */
+/* The view menu (DashOverview.viewMenuHtml): a pill naming the view in use
+   beside a card's title, and a menu of the views with a hint under each.
+   Shared by every card with views. */
+.dash-view-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.dash-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--divider-medium);
+  border-radius: 12px;
+  background: var(--overlay-hover);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dash-view-btn:hover,
+.dash-view-btn[aria-expanded='true'] {
+  background: var(--overlay-pressed);
+}
+.dash-view-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.dash-view-btn svg {
+  flex-shrink: 0;
+  color: var(--text-2);
+}
+.dash-view-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: var(--z-fab);
+  width: 290px;
+  max-width: calc(100vw - 32px);
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+}
+.dash-view-menu[hidden] {
+  display: none;
+}
+.dash-view-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-family: var(--font-base);
+  text-align: left;
+  cursor: pointer;
+}
+.dash-view-item.is-on {
+  background: color-mix(in srgb, var(--active) 8%, transparent);
+}
+.dash-view-item:hover,
+.dash-view-item:focus-visible {
+  background: var(--overlay-hover);
+  outline: none;
+}
+.dash-view-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--active);
+}
+.dash-view-tick {
+  font-size: var(--text-sm);
+  color: var(--active);
+}
+.dash-view-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.dash-view-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.dash-view-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-2);
+  white-space: normal;
+}
+
+/* Core Competencies (DashOverview.coreCardHtml): Self-Assessment, one
+   square per student in the self-assessment blues (--self-1 … --self-4,
+   never the level colours); Evidence, one per tagged assessment (dark) and
+   observation (light). Rows in their groups beside a thin bar, no lines.
+   Every row is 28 px and the title row 24 px, so the card keeps one height
+   in every view and state. */
+.page-dashboard .dash-core-head {
+  min-height: 24px;
+  margin-bottom: 6px;
+  white-space: nowrap;
+}
 .dash-core-sub {
   font-size: var(--text-sm);
   font-weight: 400;
   color: var(--text-2);
 }
+.dash-core-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.dash-core-gbar {
+  flex: none;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--divider-medium);
+}
+.dash-core-rows {
+  flex: 1;
+  min-width: 0;
+}
 .dash-core-row {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 222px) 64px;
   align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  border-top: 1px solid var(--divider-subtle);
+  gap: 12px;
+  height: 28px;
+  margin: 0 -8px;
+  padding: 0 8px;
+  border-radius: 4px;
   font-family: var(--font-base);
   font-size: var(--text-base);
   color: var(--text);
 }
+.dash-core-row:hover {
+  background: var(--overlay-hover);
+}
 .dash-core-row:hover .dist-tip {
   display: block;
 }
-.dash-core-row.is-unassessed {
-  color: var(--text-2);
-}
-.dash-core-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.dash-core-row.is-unassessed .dash-core-dot {
-  box-shadow: inset 0 0 0 1.5px var(--border);
-}
 .dash-core-name {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.dash-core-count {
-  font-size: var(--text-sm);
+.dash-core-row.is-empty .dash-core-name {
   color: var(--text-2);
+}
+.dash-core-squares {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 12px;
+  min-width: 0;
+  overflow: hidden;
+}
+.dash-core-sq {
+  flex: 1 1 0;
+  min-width: 2px;
+  max-width: 6px;
+  height: 12px;
+  border-radius: 1.5px;
+  background: var(--divider-medium);
+}
+.dash-core-sq.is-self-1 {
+  background: var(--self-1);
+}
+.dash-core-sq.is-self-2 {
+  background: var(--self-2);
+}
+.dash-core-sq.is-self-3 {
+  background: var(--self-3);
+}
+.dash-core-sq.is-self-4 {
+  background: var(--self-4);
+}
+.dash-core-sq.is-work {
+  background: var(--text-2);
+}
+.dash-core-sq.is-obs {
+  background: var(--divider-heavy);
+}
+.dash-core-val {
+  text-align: right;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-/* Assessment titles run long: the card grows to fit them and wraps past
-   its cap instead of running out of the box. */
-.dash-core-row .dist-tip {
-  left: 24px;
+.dash-core-val.is-amber {
+  color: var(--score-2-text);
+}
+/* Under the row at the right; names and titles run long, so it wraps. */
+.dash-core-row .dash-core-tip {
+  left: auto;
+  right: 0;
   transform: none;
   top: 100%;
   margin-top: 2px;
   width: max-content;
-  max-width: min(360px, calc(100vw - 48px));
+  min-width: 200px;
+  max-width: min(320px, calc(100vw - 48px));
   white-space: normal;
 }
-.dash-core-row .dist-tip-name {
+.dash-core-tip .dist-tip-name {
   line-height: 1.4;
-  padding: 2px 0;
+  padding: 1px 0;
+}
+.dash-core-tip-line {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text);
+}
+.dash-core-tip-line.is-quiet {
+  margin-top: 2px;
+  color: var(--text-2);
 }
 
 /* ── Class insights (dash-insights.js) ─────────────────────── */

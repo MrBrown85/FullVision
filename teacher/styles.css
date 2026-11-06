@@ -21,6 +21,14 @@
   --score-4-bg: #dbeafe;
   --score-4-text: #1e40af;
 
+  /* Students' own Core Competency steps (Beginning, Growing, Confident,
+     Leading: CONFIDENCE_LABELS), light to dark blue. Never the level
+     colours: a student's "Beginning" is honest, not a low grade. */
+  --self-1: #bfd6f6;
+  --self-2: #7fadea;
+  --self-3: #3c7fd6;
+  --self-4: #174f9c;
+
   /* The Note observation type: yellow, beside the three proficiency colours
      the other types use. Solid blocks, tabs and marks fill with --obs-note
      and take --obs-note-on text (white on yellow fails contrast). Yellow
@@ -3637,6 +3645,11 @@ body.offline-active #app-dock {
     --score-3-text: #4ade80;
     --score-4-bg: rgba(10, 132, 255, 0.2);
     --score-4-text: #64b5f6;
+    /* Dim to bright on the dark surface, so the higher step still stands out more. */
+    --self-1: #2b4a72;
+    --self-2: #3f72b5;
+    --self-3: #5b9cf0;
+    --self-4: #9cc8ff;
     --obs-note: #ffd60a;
     --obs-note-on: #1d1d1f;
     --obs-note-text: #ffd60a;

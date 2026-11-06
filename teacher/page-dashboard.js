@@ -38,6 +38,21 @@ window.PageDashboard = (function () {
   var naFilter = 'all';
   var naComp = null;
 
+  /* The cards' view menus (DashOverview.viewMenuHtml): the one open, by its
+     id, and each menu's setter, which records the pick before the page
+     re-renders. Core Competencies registers 'core'; Curricular Competencies
+     registers 'comp'. */
+  var openMenu = null;
+  var _viewSetters = {};
+  // Core Competencies: Self-Assessment or Evidence, per class on this device.
+  var CORE_VIEW_KEY = 'fv-dash-core-view:';
+  _viewSetters.core = function (key) {
+    _writePref(CORE_VIEW_KEY + activeCourse, key === 'evidence' ? 'evidence' : 'self');
+  };
+  // Classes whose questionnaire answers have been asked for (StudentVoice),
+  // so the card asks once and re-renders once when they arrive.
+  var _voiceAsked = {};
+
   function _readPref(key) {
     try {
       return localStorage.getItem(key);
@@ -391,17 +406,45 @@ window.PageDashboard = (function () {
       });
     });
 
-    // Recent observations
+    // Recent observations, and those tagged with each Core Competency
+    // (an observation's dims hold 'cc:<id>').
     var weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     var weekAgoStr = weekAgo.toISOString().slice(0, 10);
     var recentObsCount = 0;
+    var ccObs = {};
     allStudents.forEach(function (s) {
       var obs = getStudentQuickObs(cid, s.id);
       recentObsCount += obs.filter(function (o) {
         return o.date >= weekAgoStr;
       }).length;
+      obs.forEach(function (o) {
+        (o.dims || []).forEach(function (d) {
+          if (typeof d === 'string' && d.indexOf('cc:') === 0) ccObs[d.slice(3)] = (ccObs[d.slice(3)] || 0) + 1;
+        });
+      });
     });
+
+    // Core Competency self-assessments this term (shared/core-self.js). The
+    // students' own come with the questionnaire answers: ask for them once
+    // and draw again when they arrive.
+    if (typeof StudentVoice !== 'undefined' && StudentVoice.load && !StudentVoice.loaded(cid) && !_voiceAsked[cid]) {
+      _voiceAsked[cid] = true;
+      StudentVoice.load(cid).then(
+        function () {
+          if (activeCourse === cid && document.querySelector('.dash-core-card')) render();
+        },
+        function () {
+          /* no answers: the teacher-entered steps still show */
+        },
+      );
+    }
+    var coreSelf = coreSelfRatings(
+      cid,
+      allStudents.map(function (s) {
+        return s.id;
+      }),
+    );
 
     // Action items
     var actionItems = [];
@@ -514,6 +557,9 @@ window.PageDashboard = (function () {
       assessedCCs: assessedCCs,
       ccCounts: ccCounts,
       ccAssessments: ccAssessments,
+      ccObs: ccObs,
+      coreSelf: coreSelf,
+      coreView: _readPref(CORE_VIEW_KEY + cid) === 'evidence' ? 'evidence' : 'self',
       actionItems: actionItems,
       obs: _obsState(),
       classChange: classGradeChange(
@@ -557,6 +603,7 @@ window.PageDashboard = (function () {
       '</div>';
 
     _hidePop();
+    openMenu = null;
     // html-safe: checked builders in dash-overview, dash-insights, dash-student-cards and dash-observations escape every name, title and label; colours are fixed score variables.
     document.getElementById('main').innerHTML = html;
     _afterObsRender(null, 0);
@@ -956,6 +1003,8 @@ window.PageDashboard = (function () {
   function _handleClick(e) {
     // A click outside the open segment list closes it.
     if (mixPop && !e.target.closest('#dash-mix-pop, .dash-mix-seg')) _closeMixPop();
+    // A click outside the open view menu (and not on its pill) closes it.
+    if (openMenu && !e.target.closest('.dash-view-menu, .dash-view-btn')) _closeViewMenu();
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
@@ -1006,6 +1055,14 @@ window.PageDashboard = (function () {
         var pop = document.getElementById('dash-mix-pop');
         var first = pop && pop.querySelector('a, button');
         if (first) first.focus();
+      },
+      viewMenu: function () {
+        var id = el.dataset.menu;
+        if (openMenu === id) _closeViewMenu();
+        else _openViewMenu(id);
+      },
+      viewPick: function () {
+        _pickView(el.dataset.menu, el.dataset.view);
       },
       mixClose: function () {
         var was = _closeMixPop();
@@ -1110,6 +1167,7 @@ window.PageDashboard = (function () {
   }
 
   function _handleKeydown(e) {
+    if (_viewMenuKeydown(e)) return;
     if (e.key === 'Escape' && mixPop) {
       var was = _closeMixPop();
       var seg = document.querySelector('.dash-mix-seg[data-key="' + was.key + '"][data-level="' + was.level + '"]');
@@ -1118,6 +1176,98 @@ window.PageDashboard = (function () {
     }
     if (_obsKeydown(e)) return;
     CM.handleKeydown(e);
+  }
+
+  /* ── View menus (DashOverview.viewMenuHtml) ─────────────── */
+  function _menuEl(id) {
+    return document.getElementById('dash-view-menu-' + id);
+  }
+  function _menuBtn(id) {
+    return document.getElementById('dash-view-btn-' + id);
+  }
+  function _menuItems(id) {
+    var menu = _menuEl(id);
+    return menu ? Array.prototype.slice.call(menu.querySelectorAll('[role="menuitemradio"]')) : [];
+  }
+
+  // Opens a menu (closing any other) with focus on the view in use.
+  function _openViewMenu(id) {
+    if (openMenu && openMenu !== id) _closeViewMenu();
+    var menu = _menuEl(id);
+    var btn = _menuBtn(id);
+    if (!menu || !btn) return;
+    menu.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    openMenu = id;
+    var items = _menuItems(id);
+    var on = items.filter(function (it) {
+      return it.getAttribute('aria-checked') === 'true';
+    })[0];
+    if (on || items[0]) (on || items[0]).focus();
+  }
+
+  // Closes the open menu; with refocus, focus goes back to its pill.
+  function _closeViewMenu(refocus) {
+    var id = openMenu;
+    openMenu = null;
+    if (!id) return;
+    var menu = _menuEl(id);
+    var btn = _menuBtn(id);
+    if (menu) menu.hidden = true;
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'false');
+      if (refocus) btn.focus();
+    }
+  }
+
+  // A pick: the menu's setter records it, the page draws it, focus returns
+  // to the pill (drawn anew, now naming the view).
+  function _pickView(id, key) {
+    openMenu = null;
+    if (_viewSetters[id]) _viewSetters[id](key);
+    render();
+    var btn = _menuBtn(id);
+    if (btn) btn.focus();
+  }
+
+  /* Escape closes the open menu; arrow keys, Home and End move between its
+     items; Enter picks. Down or Up on a closed pill opens it. */
+  function _viewMenuKeydown(e) {
+    var t = e.target;
+    if (!openMenu) {
+      var pill = t && t.closest && t.closest('.dash-view-btn');
+      if (pill && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault();
+        _openViewMenu(pill.dataset.menu);
+        return true;
+      }
+      return false;
+    }
+    var id = openMenu;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      _closeViewMenu(true);
+      return true;
+    }
+    if (e.key === 'Tab') {
+      _closeViewMenu();
+      return false;
+    }
+    var items = _menuItems(id);
+    var i = items.indexOf(document.activeElement);
+    var next = null;
+    if (e.key === 'ArrowDown') next = items[i < 0 ? 0 : (i + 1) % items.length];
+    else if (e.key === 'ArrowUp') next = items[i < 0 ? items.length - 1 : (i - 1 + items.length) % items.length];
+    else if (e.key === 'Home') next = items[0];
+    else if (e.key === 'End') next = items[items.length - 1];
+    else if ((e.key === 'Enter' || e.key === ' ') && i >= 0) {
+      e.preventDefault();
+      _pickView(id, items[i].dataset.view);
+      return true;
+    } else return false;
+    e.preventDefault();
+    if (next) next.focus();
+    return true;
   }
 
   /* ── init / destroy ─────────────────────────────────────── */
@@ -1138,6 +1288,7 @@ window.PageDashboard = (function () {
     mixPop = null;
     naFilter = 'all';
     naComp = null;
+    openMenu = null;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
 

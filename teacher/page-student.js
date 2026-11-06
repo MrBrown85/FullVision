@@ -2701,10 +2701,11 @@ window.PageStudent = (function () {
     var picked = document.querySelector('input[name="core-level-' + coreId + '"]:checked');
     var text = document.getElementById('core-text-' + coreId);
     var goal = document.getElementById('core-goal-' + coreId);
-    var tk = _coreTermKeys({
-      cid: activeCourse,
-      term: typeof getActiveTerm === 'function' ? getActiveTerm(activeCourse) : null,
-    });
+    var tk = coreSelfTerm(
+      activeCourse,
+      _coreTerm,
+      typeof getActiveTerm === 'function' ? getActiveTerm(activeCourse) : null,
+    );
     saveCoreSelfAssessment(
       activeCourse,
       studentId,
@@ -2724,30 +2725,12 @@ window.PageStudent = (function () {
      Core Competencies). The work tagged with each is evidence to point to. */
   var CORE_STEPS = [1, 2, 3, 4];
 
-  function _coreTermKeys(ctx) {
-    var terms = typeof getReportingTerms === 'function' ? getReportingTerms(ctx.cid) : [];
-    if (!terms.length) return { terms: [], key: '' };
-    var pick = terms.find(function (t) {
-      return t.ordinal === _coreTerm;
-    });
-    if (!pick && ctx.term)
-      pick = terms.find(function (t) {
-        return t.ordinal === ctx.term.ordinal;
-      });
-    if (!pick) {
-      var today = typeof getTodayStr === 'function' ? getTodayStr() : new Date().toISOString().slice(0, 10);
-      pick =
-        terms.find(function (t) {
-          return t.starts_on <= today && today <= t.ends_on;
-        }) || terms[terms.length - 1];
-    }
-    return { terms: terms, pick: pick, key: 'T' + pick.ordinal };
-  }
-
   function _coreSelfHtml(ctx, inSection) {
     var cid = ctx.cid;
     var first = displayNameFirst(ctx.student);
-    var tk = _coreTermKeys(ctx);
+    // The term picked here, else the term in view, else today's
+    // (shared/core-self.js; the dashboard's Core Competencies card reads the same).
+    var tk = coreSelfTerm(cid, _coreTerm, ctx.term);
     var mine = ((typeof getCoreSelf === 'function' ? getCoreSelf(cid)[studentId] : null) || {})[tk.key] || {};
     // What the student gave in that term's questionnaire, where you haven't
     // entered anything yourself.

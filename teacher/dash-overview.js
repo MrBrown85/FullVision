@@ -252,37 +252,256 @@ window.DashOverview = (function () {
     return html + '</section>';
   }
 
-  /* Core Competencies: each with how many assessments are tagged with it,
-     and their titles on hover. */
+  /* ── The view menu ─────────────────────────────────────────
+     One pill-and-menu for every dashboard card that has views (Core
+     Competencies registers 'core', Curricular Competencies 'comp'):
+
+       viewMenuHtml({ id, label, views: [{ key, label, hint }], current })
+
+     id: a short key, unique on the page. label: what the menu picks, for
+     screen readers ("Core Competencies view"). views: in menu order; hint is
+     the plain sentence under the name. current: the key in use (the first
+     view when it matches none). The menu is drawn closed.
+
+     page-dashboard.js runs it: data-action="viewMenu" data-menu=id on the
+     pill opens and closes it; data-action="viewPick" data-menu=id
+     data-view=key on an item calls the setter the page registered as
+     _viewSetters[id](key), re-renders and puts focus back on the pill.
+     Arrow keys, Home and End move between the items, Enter picks, Escape and
+     a click outside close it. */
+  var VIEW_CARET =
+    '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3.5l3 3 3-3"/></svg>';
+
+  function viewMenuHtml(o) {
+    var views = o.views || [];
+    var cur =
+      views.filter(function (v) {
+        return v.key === o.current;
+      })[0] || views[0];
+    if (!cur) return '';
+    var id = String(o.id);
+    var html =
+      '<span class="dash-view-wrap">' +
+      '<button type="button" class="dash-view-btn" id="dash-view-btn-' +
+      esc(id) +
+      '" aria-haspopup="menu" aria-expanded="false" aria-controls="dash-view-menu-' +
+      esc(id) +
+      '" aria-label="' +
+      esc((o.label ? o.label + ': ' : '') + cur.label) +
+      '" data-action="viewMenu" data-menu="' +
+      esc(id) +
+      '">' +
+      '<span>' +
+      esc(cur.label) +
+      '</span>' +
+      VIEW_CARET +
+      '</button>' +
+      '<div class="dash-view-menu" id="dash-view-menu-' +
+      esc(id) +
+      '" role="menu" aria-label="' +
+      esc(o.label || '') +
+      '" hidden>';
+    views.forEach(function (v) {
+      var on = v === cur;
+      html +=
+        '<button type="button" class="dash-view-item' +
+        (on ? ' is-on' : '') +
+        '" role="menuitemradio" aria-checked="' +
+        on +
+        '" tabindex="-1" data-action="viewPick" data-menu="' +
+        esc(id) +
+        '" data-view="' +
+        esc(v.key) +
+        '">' +
+        '<span class="dash-view-tick" aria-hidden="true">' +
+        (on ? '✓' : '') +
+        '</span>' +
+        '<span class="dash-view-text"><span class="dash-view-name">' +
+        esc(v.label) +
+        '</span>' +
+        (v.hint ? '<span class="dash-view-hint">' + esc(v.hint) + '</span>' : '') +
+        '</span></button>';
+    });
+    return html + '</div></span>';
+  }
+
+  /* ── Core Competencies ──────────────────────────────────────
+     Two views (docs/plans/dashboard-cards-plan.md, part C):
+     Self-Assessment, one square per student in a light-to-dark blue for the
+     step they gave this term (their view, never a grade), grey for those who
+     haven't; and Evidence, one square per assessment (dark) and per
+     observation (light) tagged with it. With no self-assessment in the class
+     this term there is only Evidence, and the link sets up a reflection.
+     Rows sit in their groups (Communication, Thinking, Personal & Social)
+     beside a thin bar; the card is the same height in every view.
+
+     opts: cid, allStudents, ccCounts and ccAssessments (tagged assessments),
+     ccObs (tagged observations per core id), coreSelf (coreSelfRatings in
+     shared/core-self.js) and coreView ('self' or 'evidence'). */
+  var CORE_VIEWS = [
+    { key: 'self', label: 'Self-Assessment', hint: 'How students rated themselves this term' },
+    { key: 'evidence', label: 'Evidence', hint: 'Work and observations tagged with each' },
+  ];
+  var CORE_TIP_NAMES = 8;
+  var CORE_TIP_TITLES = 10;
+
+  function coreView(opts) {
+    var hasSelf = !!(opts.coreSelf && opts.coreSelf.any);
+    return hasSelf && opts.coreView !== 'evidence' ? 'self' : 'evidence';
+  }
+
+  function _coreGroups() {
+    var groups = [];
+    CORE_COMPETENCIES.forEach(function (cc) {
+      var g = groups[groups.length - 1];
+      if (!g || g.name !== cc.group) groups.push((g = { name: cc.group, items: [] }));
+      g.items.push(cc);
+    });
+    return groups;
+  }
+
+  function _coreSquare(cls, title) {
+    return '<span class="dash-core-sq ' + cls + '" title="' + esc(title) + '"></span>';
+  }
+
+  function _coreSelfRow(cc, students, ratings) {
+    var n = students.length;
+    var byLevel = { 1: [], 2: [], 3: [], 4: [] };
+    var notYet = [];
+    students.forEach(function (s) {
+      var lv = ratings[s.id];
+      if (byLevel[lv]) byLevel[lv].push(s);
+      else notYet.push(s);
+    });
+    var k = n - notYet.length;
+    var squares = '';
+    [4, 3, 2, 1].forEach(function (lv) {
+      byLevel[lv].forEach(function (s) {
+        squares += _coreSquare('is-self-' + lv, displayName(s) + ': ' + CONFIDENCE_LABELS[lv]);
+      });
+    });
+    notYet.forEach(function (s) {
+      squares += _coreSquare('is-none', displayName(s) + ': not yet');
+    });
+    var mix = [4, 3, 2, 1]
+      .map(function (lv) {
+        return CONFIDENCE_LABELS[lv] + ' ' + byLevel[lv].length;
+      })
+      .join(' · ');
+    var names = notYet.slice(0, CORE_TIP_NAMES).map(displayName).join(', ');
+    var more = notYet.length - CORE_TIP_NAMES;
+    var notYetLine = notYet.length ? 'Not yet: ' + names + (more > 0 ? ', +' + more + ' more' : '') : '';
+    return {
+      squares: squares,
+      value: k + ' of ' + n,
+      amber: k * 3 < n * 2,
+      empty: false,
+      label: cc.label + ': ' + k + ' of ' + n + ' have self-assessed. ' + mix,
+      tip:
+        '<div class="dash-core-tip-line">' +
+        esc(mix) +
+        '</div>' +
+        (notYetLine ? '<div class="dash-core-tip-line is-quiet">' + esc(notYetLine) + '</div>' : ''),
+    };
+  }
+
+  function _coreEvidenceRow(cc, opts) {
+    var titles = (opts.ccAssessments && opts.ccAssessments[cc.id]) || [];
+    var nA = (opts.ccCounts && opts.ccCounts[cc.id]) || titles.length;
+    var nO = (opts.ccObs && opts.ccObs[cc.id]) || 0;
+    var total = nA + nO;
+    var squares = '';
+    for (var i = 0; i < nA; i++) squares += _coreSquare('is-work', titles[i] || 'Assessment');
+    for (var j = 0; j < nO; j++) squares += _coreSquare('is-obs', 'Observation');
+    var obsLine = nO ? nO + ' observation' + (nO === 1 ? '' : 's') : '';
+    var tip;
+    if (!total)
+      tip = '<div class="dash-core-tip-line is-quiet">Tag work in Assignments, or an observation with + Add Tag</div>';
+    else {
+      var more = titles.length - CORE_TIP_TITLES;
+      tip =
+        titles
+          .slice(0, CORE_TIP_TITLES)
+          .map(function (t) {
+            return '<div class="dist-tip-name">' + esc(t) + '</div>';
+          })
+          .join('') +
+        (more > 0 ? '<div class="dash-core-tip-line is-quiet">+' + more + ' more</div>' : '') +
+        (obsLine ? '<div class="dash-core-tip-line is-quiet">' + esc(obsLine) + '</div>' : '');
+    }
+    var parts = [];
+    if (nA) parts.push(nA + ' assessment' + (nA === 1 ? '' : 's'));
+    if (obsLine) parts.push(obsLine);
+    return {
+      squares: squares,
+      value: total ? String(total) : 'None yet',
+      amber: !total,
+      empty: !total,
+      label: cc.label + ': ' + (parts.length ? parts.join(' and ') + ' tagged' : 'nothing tagged yet'),
+      tip: tip,
+    };
+  }
+
   function coreCardHtml(opts) {
+    var cid = opts.cid;
+    var hasSelf = !!(opts.coreSelf && opts.coreSelf.any);
+    var view = coreView(opts);
+    var href =
+      view === 'evidence' && hasSelf
+        ? '/assignments?course=' + cid
+        : '/dashboard?course=' + cid + '&manage=questionnaires';
+    var linkText = !hasSelf ? 'Set Up a Reflection →' : view === 'self' ? 'Questionnaires →' : 'Assignments →';
     var html =
       '<section class="dash-overview-section dash-core-card" aria-labelledby="dash-core-title">' +
-      '<div class="dash-section-title"><span id="dash-core-title">Core Competencies</span>' +
-      '<span class="dash-core-sub">Assessments Tagged</span></div><div class="dash-core-list">';
-    CORE_COMPETENCIES.forEach(function (cc) {
-      var count = opts.ccCounts[cc.id] || 0;
-      var names = (opts.ccAssessments[cc.id] || [])
-        .map(function (n) {
-          return '<div class="dist-tip-name">' + esc(n) + '</div>';
-        })
-        .join('');
+      '<div class="dash-section-title dash-core-head"><span id="dash-core-title">Core Competencies</span>' +
+      (hasSelf
+        ? viewMenuHtml({ id: 'core', label: 'Core Competencies view', views: CORE_VIEWS, current: view })
+        : '<span class="dash-core-sub">Evidence</span>') +
+      '<a role="link" tabindex="0" data-href="' +
+      esc(href) +
+      '">' +
+      esc(linkText) +
+      '</a></div>' +
+      '<div class="dash-core-list dash-core-' +
+      view +
+      '">';
+    var students = typeof sortStudents === 'function' ? sortStudents(opts.allStudents || [], 'lastName') : [];
+    _coreGroups().forEach(function (g) {
       html +=
-        '<div class="dash-core-row' +
-        (count ? '' : ' is-unassessed') +
-        '">' +
-        '<span class="dash-core-dot" style="' +
-        (count ? 'background:' + cc.color : '') +
-        '"></span>' +
-        '<span class="dash-core-name">' +
-        esc(cc.label) +
-        '</span>' +
-        '<span class="dash-core-count">' +
-        (count || '\u2014') +
-        '</span>' +
-        (count
-          ? '<div class="dist-tip"><div class="dist-tip-title">' + esc(cc.label) + '</div>' + names + '</div>'
-          : '') +
-        '</div>';
+        '<div class="dash-core-group" role="group" aria-label="' +
+        esc(g.name) +
+        '"><span class="dash-core-gbar" title="' +
+        esc(g.name) +
+        '" aria-hidden="true"></span><div class="dash-core-rows">';
+      g.items.forEach(function (cc) {
+        var row =
+          view === 'self' ? _coreSelfRow(cc, students, opts.coreSelf.byCore[cc.id] || {}) : _coreEvidenceRow(cc, opts);
+        html +=
+          '<div class="dash-core-row' +
+          (row.empty ? ' is-empty' : '') +
+          '" data-core="' +
+          esc(cc.id) +
+          '">' +
+          '<span class="dash-core-name">' +
+          esc(cc.label) +
+          '</span>' +
+          '<span class="dash-core-squares" role="img" aria-label="' +
+          esc(row.label) +
+          '">' +
+          row.squares +
+          '</span>' +
+          '<span class="dash-core-val' +
+          (row.amber ? ' is-amber' : '') +
+          '">' +
+          esc(row.value) +
+          '</span>' +
+          '<div class="dist-tip dash-core-tip"><div class="dist-tip-title">' +
+          esc(cc.label + ' · ' + g.name) +
+          '</div>' +
+          row.tip +
+          '</div></div>';
+      });
+      html += '</div></div>';
     });
     return html + '</div></section>';
   }
@@ -418,6 +637,9 @@ window.DashOverview = (function () {
     studentControlsHtml: studentControlsHtml,
     renderOverviewPanel: renderOverviewPanel,
     glanceHtml: glanceHtml,
+    viewMenuHtml: viewMenuHtml,
+    coreCardHtml: coreCardHtml,
+    coreView: coreView,
     renderBirthdayWidget: renderBirthdayWidget,
     obsWeekStart: obsWeekStart,
     obsCoverageWeeks: obsCoverageWeeks,

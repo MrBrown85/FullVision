@@ -28,6 +28,7 @@ const PRECACHE_URLS = [
   '/shared/calc.js',
   '/shared/rubric-draft.js',
   '/shared/rubric-checks.js',
+  '/shared/core-self.js',
   // Teacher desktop
   '/teacher/app.html',
   '/teacher/styles.css?v=3',

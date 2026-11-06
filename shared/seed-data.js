@@ -1993,7 +1993,7 @@ function seedIfNeeded() {
           sid: 'st1',
           date: '2025-10-15',
           text: 'Cece asked clarifying questions during the lab demo that showed she was thinking ahead about data collection.',
-          dims: ['curiosity', 'engagement'],
+          dims: ['curiosity', 'engagement', 'cc:CT'],
           sentiment: 'strength',
           context: 'whole-class',
         },
@@ -2001,7 +2001,7 @@ function seedIfNeeded() {
           sid: 'st1',
           date: '2025-11-22',
           text: "Took initiative organizing her group's materials for the KMT lab without being asked.",
-          dims: ['selfRegulation', 'collaboration'],
+          dims: ['selfRegulation', 'collaboration', 'cc:COL', 'cc:PAR'],
           sentiment: 'strength',
           context: 'small-group',
         },
@@ -2049,7 +2049,7 @@ function seedIfNeeded() {
           sid: 'st2',
           date: '2026-03-10',
           text: 'Noor mentored two classmates through the lab skills check. Her explanations are patient and technically precise.',
-          dims: ['collaboration', 'respect'],
+          dims: ['collaboration', 'respect', 'cc:SAR'],
           sentiment: 'strength',
           context: 'small-group',
         },
@@ -2065,7 +2065,7 @@ function seedIfNeeded() {
           sid: 'st3',
           date: '2026-01-22',
           text: 'Sam is starting to participate more in group discussions \u2014 offered two ideas during the brainstorm today.',
-          dims: ['engagement', 'collaboration'],
+          dims: ['engagement', 'collaboration', 'cc:COL'],
           sentiment: 'growth',
           context: 'small-group',
         },
@@ -2169,7 +2169,7 @@ function seedIfNeeded() {
           sid: 'st6',
           date: '2025-10-31',
           text: 'Ethan rushed through the poster without checking rubric criteria. Quality suffered because of pacing.',
-          dims: ['selfRegulation'],
+          dims: ['selfRegulation', 'cc:PAR'],
           sentiment: 'concern',
           context: 'independent',
         },
@@ -2193,7 +2193,7 @@ function seedIfNeeded() {
           sid: 'st7',
           date: '2025-12-05',
           text: 'Contributed a creative visual to the plate tectonics group presentation that clearly communicated subduction zones.',
-          dims: ['curiosity', 'collaboration'],
+          dims: ['curiosity', 'collaboration', 'cc:COL'],
           sentiment: 'strength',
           context: 'small-group',
         },
@@ -2217,7 +2217,7 @@ function seedIfNeeded() {
           sid: 'st8',
           date: '2025-12-08',
           text: 'Fatima independently looked up primary sources for her disease research poster. Self-directed learning at its best.',
-          dims: ['curiosity', 'selfRegulation'],
+          dims: ['curiosity', 'selfRegulation', 'cc:CT'],
           sentiment: 'strength',
           context: 'independent',
         },
@@ -2265,7 +2265,7 @@ function seedIfNeeded() {
           sid: 'st9',
           date: '2026-03-10',
           text: 'Priya organized a peer study session before the lab skills check. She made sure struggling students felt comfortable asking questions.',
-          dims: ['collaboration', 'respect'],
+          dims: ['collaboration', 'respect', 'cc:COL', 'cc:SAR'],
           sentiment: 'strength',
           context: 'small-group',
         },
@@ -2345,7 +2345,7 @@ function seedIfNeeded() {
           sid: 'st11',
           date: '2026-03-19',
           text: 'Ines consistently follows safety procedures without reminders and helps peers remember theirs. Reliable lab partner.',
-          dims: ['selfRegulation', 'respect'],
+          dims: ['selfRegulation', 'respect', 'cc:PAR'],
           sentiment: 'strength',
           context: 'small-group',
         },
@@ -2393,7 +2393,7 @@ function seedIfNeeded() {
           sid: 'st13',
           date: '2025-10-14',
           text: 'Led group discussion on vaccine research with confidence and clarity. Other students were visibly engaged.',
-          dims: ['engagement', 'collaboration'],
+          dims: ['engagement', 'collaboration', 'cc:COL'],
           sentiment: 'strength',
           context: 'discussion',
         },
@@ -2433,7 +2433,7 @@ function seedIfNeeded() {
           sid: 'st14',
           date: '2026-01-20',
           text: "Sofia noticed a pattern in the periodic table that I hadn't highlighted yet \u2014 asked about it during class discussion.",
-          dims: ['curiosity'],
+          dims: ['curiosity', 'cc:CT'],
           sentiment: 'strength',
           context: 'whole-class',
         },
@@ -2505,7 +2505,7 @@ function seedIfNeeded() {
           sid: 'st16',
           date: '2026-03-05',
           text: "Aiden peer-reviewed a classmate's lab report and gave specific, constructive feedback. Surprising maturity.",
-          dims: ['collaboration', 'respect'],
+          dims: ['collaboration', 'respect', 'cc:SAR'],
           sentiment: 'strength',
           context: 'small-group',
         },
@@ -2521,7 +2521,7 @@ function seedIfNeeded() {
           sid: 'st17',
           date: '2025-12-19',
           text: "Olivia's data analysis project was thorough and well-organized. Her graphs communicated the story clearly.",
-          dims: ['engagement', 'selfRegulation'],
+          dims: ['engagement', 'selfRegulation', 'cc:PAR'],
           sentiment: 'strength',
           context: 'independent',
         },
@@ -2537,7 +2537,7 @@ function seedIfNeeded() {
           sid: 'st17',
           date: '2026-03-17',
           text: 'Olivia volunteered to demonstrate proper pipetting technique for the class. Clear and confident.',
-          dims: ['engagement', 'collaboration'],
+          dims: ['engagement', 'collaboration', 'cc:COL'],
           sentiment: 'strength',
           context: 'whole-class',
         },
@@ -2609,7 +2609,7 @@ function seedIfNeeded() {
           sid: 'st19',
           date: '2026-02-06',
           text: 'Maya worked patiently with a partner who needed extra support during the energy transfer lab. Natural teacher.',
-          dims: ['collaboration', 'respect'],
+          dims: ['collaboration', 'respect', 'cc:COL'],
           sentiment: 'strength',
           context: 'small-group',
         },
@@ -2641,7 +2641,7 @@ function seedIfNeeded() {
           sid: 'st20',
           date: '2026-03-05',
           text: 'Completed the ecosystem essay early and used the extra time to add a diagram that strengthened her argument. Self-directed.',
-          dims: ['selfRegulation', 'engagement'],
+          dims: ['selfRegulation', 'engagement', 'cc:PAR'],
           sentiment: 'strength',
           context: 'independent',
         },
@@ -2713,7 +2713,7 @@ function seedIfNeeded() {
           sid: 'st22',
           date: '2026-02-20',
           text: 'Darius made a connection between energy transfer and cooking that showed practical understanding of the concept.',
-          dims: ['curiosity'],
+          dims: ['curiosity', 'cc:CT'],
           sentiment: 'strength',
           context: 'whole-class',
         },
@@ -2765,7 +2765,7 @@ function seedIfNeeded() {
           assessmentId: 'sci8a10',
           assessmentTitle: 'Mid-Year Lab Skills Check',
           text: 'Mei helped calibrate the equipment during the lab skills check and explained the process to two classmates. Natural leader in the lab.',
-          dims: ['collaboration', 'engagement'],
+          dims: ['collaboration', 'engagement', 'cc:COL'],
           sentiment: 'strength',
           context: 'small-group',
         },
@@ -2805,7 +2805,7 @@ function seedIfNeeded() {
           sid: 'st24',
           date: '2026-03-19',
           text: "Caleb's lab skills have steadily improved. He's more careful with measurements and his technique is becoming reliable.",
-          dims: ['resilience', 'selfRegulation'],
+          dims: ['resilience', 'selfRegulation', 'cc:PAR'],
           sentiment: 'growth',
           context: 'independent',
         },
@@ -2829,7 +2829,7 @@ function seedIfNeeded() {
           sid: 'st25',
           date: '2026-01-28',
           text: 'Anisa helped organize a peer study group for the atomic theory quiz. Other students appreciated her leadership.',
-          dims: ['collaboration', 'respect'],
+          dims: ['collaboration', 'respect', 'cc:SAR'],
           sentiment: 'strength',
           context: 'small-group',
         },
@@ -2861,7 +2861,7 @@ function seedIfNeeded() {
           sid: 'st26',
           date: '2025-12-05',
           text: 'Leo contributed well to the plate tectonics group presentation when given a specific, concrete task.',
-          dims: ['collaboration', 'engagement'],
+          dims: ['collaboration', 'engagement', 'cc:COL'],
           sentiment: 'growth',
           context: 'small-group',
         },
@@ -2885,7 +2885,7 @@ function seedIfNeeded() {
           sid: 'st26',
           date: '2026-03-10',
           text: 'Leo helped clean up the lab without being asked and made sure all equipment was stored correctly. Showing more responsibility.',
-          dims: ['respect', 'selfRegulation'],
+          dims: ['respect', 'selfRegulation', 'cc:PAR'],
           sentiment: 'growth',
           context: 'whole-class',
         },
@@ -3600,6 +3600,35 @@ function seedIfNeeded() {
     });
     localStorage.setItem('gb-questionnaires-sci8', JSON.stringify([about, refl, goal]));
     localStorage.setItem('gb-responses-sci8', JSON.stringify(responses));
+  })();
+
+  // ── Core Competency self-assessments this term (Demo Mode) ──
+  // The steps Science 8 gave on their Term 2 reflection sheets, as the demo
+  // teacher entered them: most of the class on Communicating, Collaborating
+  // and Critical & Reflective Thinking, fewer on the rest, so the
+  // dashboard's Self-Assessment view shows full rows and amber ones (under
+  // two thirds). Seeded once per device, like the questionnaires, so a demo
+  // seeded before these existed gets them too. Term 2 is always the current
+  // term in the demo (it runs from December to the end of the school year).
+  (function seedCoreSelf() {
+    if (!COURSES.sci8 || typeof saveCoreSelfAssessment !== 'function') return;
+    if (localStorage.getItem('gb-core-self-sci8') != null) return;
+    // How many of the 27 have given a step on each, in CORE_COMPETENCIES order.
+    var HOW_MANY = { COM: 21, COL: 19, CT: 13, CRT: 22, PPI: 16, PAR: 18, SAR: 11 };
+    // Mostly Growing and Confident, a few Beginning and Leading.
+    var STEPS = [2, 3, 3, 2, 3, 4, 1, 3, 2, 4, 3, 2, 3];
+    CORE_COMPETENCIES.forEach(function (cc, i) {
+      var who = STIDS.map(function (sid, n) {
+        return { sid: sid, n: n, order: (n * 7 + i * 11) % STIDS.length };
+      })
+        .sort(function (a, b) {
+          return a.order - b.order;
+        })
+        .slice(0, HOW_MANY[cc.id] || 0);
+      who.forEach(function (w) {
+        saveCoreSelfAssessment('sci8', w.sid, 'T2', cc.id, { level: STEPS[(w.n * 5 + i * 3) % STEPS.length] });
+      });
+    });
   })();
 
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
