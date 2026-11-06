@@ -865,7 +865,7 @@ window.PageAssignments = (function () {
       var seg = order
         .map(function (lv) {
           var on = state.level === lv;
-          return (
+          var btn =
             '<button type="button" class="grdl-level' +
             (on ? ' is-on l' + lv : '') +
             '" data-action="graderLevel" data-critid="' +
@@ -876,8 +876,10 @@ window.PageAssignments = (function () {
             on +
             '">' +
             PROF_LABELS[lv] +
-            '</button>'
-          );
+            '</button>';
+          return on
+            ? _graderPickHtml(btn, lv, state.level, state.mod, 'data-action="graderMod" data-critid="' + crit.id + '"')
+            : btn;
         })
         .join('');
       var codes = _rubricCodesHtml(cid, crit);
@@ -899,7 +901,6 @@ window.PageAssignments = (function () {
         '<div class="grsp-controls"><div class="grdl-seg" role="group" aria-label="Level">' +
         seg +
         '</div>' +
-        _graderStepperHtml(state.level, state.mod, 'data-action="graderMod" data-critid="' + crit.id + '"') +
         '</div>' +
         (state.level ? '' : '<span class="grdt-not-scored">' + _NOT_SCORED_ICON + 'Not Scored</span>') +
         '</div>' +
@@ -1379,6 +1380,19 @@ window.PageAssignments = (function () {
       '>+</button></span>'
     );
   }
+  // The chosen level holds its − | +, as a chosen rubric tile does, so the
+  // fine-tune sits on the level it changes and picking moves nothing else.
+  function _graderPickHtml(levelBtn, colour, level, mod, attrs, mixed) {
+    return (
+      '<span class="grdl-pick l' +
+      colour +
+      (mixed ? ' mixed' : '') +
+      '">' +
+      levelBtn +
+      _graderStepperHtml(level, mod, attrs) +
+      '</span>'
+    );
+  }
   function _levelCardsHtml(cid, a, tagObjs, st) {
     var order = levelOrderFor(cid);
     // Feedback per competency lives on tag_score, which rubric work doesn't use.
@@ -1393,7 +1407,7 @@ window.PageAssignments = (function () {
           var seg = order
             .map(function (lv) {
               var on = state.level === lv;
-              return (
+              var btn =
                 '<button type="button" class="grdl-level' +
                 (on ? ' is-on l' + lv + (state.mixed ? ' mixed' : '') : '') +
                 '" data-action="graderTagLevel" data-tag="' +
@@ -1403,9 +1417,18 @@ window.PageAssignments = (function () {
                 '" aria-pressed="' +
                 on +
                 '">' +
-                (on ? scoreLevelText(lv, state.mod) : PROF_LABELS[lv]) +
-                '</button>'
-              );
+                PROF_LABELS[lv] +
+                '</button>';
+              return on
+                ? _graderPickHtml(
+                    btn,
+                    lv,
+                    state.mixed ? 0 : state.level,
+                    state.mod,
+                    'data-action="graderTagMod" data-tag="' + esc(t.id) + '"',
+                    state.mixed,
+                  )
+                : btn;
             })
             .join('');
           return (
@@ -1425,11 +1448,6 @@ window.PageAssignments = (function () {
             '<div class="grdl-controls"><div class="grdl-seg" role="group" aria-label="Level">' +
             seg +
             '</div>' +
-            _graderStepperHtml(
-              state.mixed ? 0 : state.level,
-              state.mod,
-              'data-action="graderTagMod" data-tag="' + esc(t.id) + '"',
-            ) +
             '</div>' +
             (withNotes ? _tagNoteHtml(cid, a.id, st.id, t.id) : '') +
             '</section>'

@@ -6825,29 +6825,80 @@ button.grader-member-name {
     rgba(255, 255, 255, 0.2) 5px
   );
 }
-.grdl-stepper {
+/* The chosen level and its − | + share one coloured segment, as on a
+   chosen rubric tile. The name gives way before the signs do. */
+.grdl-pick {
+  flex: 1 1 0;
   display: flex;
   align-items: center;
-  padding: 2px;
-  border-radius: 10px;
-  background: rgba(118, 118, 128, 0.14);
+  min-width: max-content;
+  border-radius: 8px;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.grdl-pick.l4 {
+  background: var(--score-4);
+}
+.grdl-pick.l3 {
+  background: var(--score-3);
+}
+.grdl-pick.l2 {
+  background: var(--score-2);
+}
+.grdl-pick.l1 {
+  background: var(--score-1);
+}
+.grdl-pick.mixed {
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 3px,
+    rgba(255, 255, 255, 0.2) 3px,
+    rgba(255, 255, 255, 0.2) 5px
+  );
+}
+.grdl-pick > .grdl-level.is-on {
+  flex: 1 1 auto;
+  padding: 0 4px 0 12px;
+  background: transparent;
+  box-shadow: none;
+}
+.grdl-stepper {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
 }
 .grdl-stepper button {
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
-  color: var(--text);
+  color: #fff;
   font: inherit;
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1;
   cursor: pointer;
 }
+.grdl-stepper button:hover:not(:disabled):not(.is-on) {
+  background: rgba(255, 255, 255, 0.18);
+}
 .grdl-stepper button.is-on {
-  background: var(--surface);
+  background: #fff;
   font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+.grdl-pick.l4 .grdl-stepper button.is-on {
+  color: var(--score-4);
+}
+.grdl-pick.l3 .grdl-stepper button.is-on {
+  color: var(--score-3);
+}
+.grdl-pick.l2 .grdl-stepper button.is-on {
+  color: var(--score-2);
+}
+.grdl-pick.l1 .grdl-stepper button.is-on {
+  color: var(--score-1);
 }
 .grdl-stepper button:disabled {
   opacity: 0.35;
@@ -6855,8 +6906,12 @@ button.grader-member-name {
 }
 .grdl-stepper-sep {
   width: 1px;
-  height: 16px;
-  background: rgba(60, 60, 67, 0.25);
+  height: 12px;
+  background: rgba(255, 255, 255, 0.5);
+}
+.grdl-stepper button.is-on + .grdl-stepper-sep,
+.grdl-stepper-sep:has(+ button.is-on) {
+  visibility: hidden;
 }
 .grdp-entry {
   display: flex;
@@ -7365,6 +7420,13 @@ button.grader-member-name {
   height: 28px;
   padding: 0 11px;
   font-size: var(--text-sm);
+}
+.grsp-controls .grdl-pick {
+  flex: none;
+}
+.grsp-controls .grdl-stepper button {
+  width: 22px;
+  height: 22px;
 }
 .grsp-standard .grdt-not-scored {
   align-self: center;
