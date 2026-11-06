@@ -54,7 +54,7 @@ Sample for approval, Humanities 8 (ELA 8 by Headings + SS 8):
 
 - **Create and Communicate (CR, 7 competencies), three statements within the grade 8 cap of 14 words:** I can plan, write, revise and edit texts using Canadian spelling, grammar and punctuation (CR2–CR4) · I can choose a form and genre that fit my audience, purpose and message (CR6) · I can exchange ideas, tell stories aloud and turn information into original texts (CR1, CR5, CR7)
 - **Comprehend and Connect (CP, 13 competencies), five statements within the cap:** I can make sense of texts and combine ideas from sources I judge reliable (CP1–CP3) · I can explain how form, structure and literary devices shape a text's meaning (CP4, CP10, CP11) · I can respond to texts personally, creatively and critically, connecting them to my world (CP5, CP8, CP9) · I can explain how culture, values and language shape a text's perspectives and identities (CP6, CP7) · I can describe how First Peoples stories carry perspectives and who may share them (CP12, CP13)
-- **Social Studies 8 has no Ministry headings.** Its 8 competencies are the inquiry process and the historical thinking concepts, each already one column, and keep their own I Can statements. Humanities 8 by Headings is 10 columns (CP, CR, INQ, SIG1, SIG2, EVI, CHG, CAU, PER, ETH), and Each Course Counts Equally makes CP and CR half the overall.
+- **Social Studies 8 has no Ministry headings.** Its 8 competencies are the inquiry process and the historical thinking concepts, each already one column, and keep their own I Can statements. Humanities 8 by Headings is 10 columns (CP, CR, INQ, SIG1, SIG2, EVI, CHG, CAU, PER, ETH), and Each Course Counts Equally makes CP and CR half the overall. No FullVision grouping is added (Colin, 2026-11-05): a class's column count follows the Ministry's headings for its courses, so a big combined course has more columns than Statistics 12's four.
 
 Three statements of 14 words can't cover Comprehend and Connect's 13 competencies without going vague, which is why big headings take up to five.
 
@@ -121,7 +121,6 @@ Help: a section in `help/articles/create-a-class.md`, "Grade by Headings", with 
 
 1. Approve heading-as-competency over a display mode.
 2. The Statistics 12 and Humanities 8 I Can samples above.
-3. Whether Social Studies 8–9 gets a FullVision grouping (for example Inquiry and Historical Thinking) to cut Humanities 8 below 10 columns. It isn't the Ministry's, so the default is no.
-4. Nested courses (ADST and 62 others): folders (9 columns in ADST 8) or the top organizer (3).
-5. Build Phase 4 now, or wait until a teacher with scores asks; and its merge rule.
-6. Phases 1 and 2 as one merge or two.
+3. Nested courses (ADST and 62 others): folders (9 columns in ADST 8) or the top organizer (3).
+4. Build Phase 4 now, or wait until a teacher with scores asks; and its merge rule.
+5. Phases 1 and 2 as one merge or two.
