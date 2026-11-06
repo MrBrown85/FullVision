@@ -50,7 +50,13 @@ Sample for approval, Statistics 12:
 - **Communicating and Representing:** I can explain and justify my statistical decisions in more than one way · I can represent a statistical idea with materials, pictures and symbols · I can use statistical vocabulary to share my ideas in class discussion, even when I am unsure
 - **Connecting and Reflecting:** I can reflect on my statistical thinking and use my mistakes to improve my next attempt · I can connect statistical ideas to each other, to other subjects and to my own interests · I can connect statistics to First Peoples worldviews, perspectives, knowledge and practices
 
-**The hard case:** 142 headings hold seven or more competencies (ELA's Comprehend and Connect has 13; Arts' Explore and Create up to 9). At grade 8, three statements of 14 words must cover 13 skills, which pushes toward vague wording. Colin decides: keep three and group related skills, or allow a fourth statement for headings of seven or more.
+Sample for approval, Humanities 8 (ELA 8 by Headings + SS 8):
+
+- **Create and Communicate (CR, 7 competencies), three statements within the grade 8 cap of 14 words:** I can plan, write, revise and edit texts using Canadian spelling, grammar and punctuation (CR2–CR4) · I can choose a form and genre that fit my audience, purpose and message (CR6) · I can exchange ideas, tell stories aloud and turn information into original texts (CR1, CR5, CR7)
+- **Comprehend and Connect (CP, 13 competencies) can't fit in three statements of 14 words.** It needs either five at 14 words: I can make sense of texts and combine ideas from sources I judge reliable (CP1–CP3) · I can explain how form, structure and literary devices shape a text's meaning (CP4, CP10, CP11) · I can respond to texts personally, creatively and critically, connecting them to my world (CP5, CP8, CP9) · I can explain how culture, values and language shape a text's perspectives and identities (CP6, CP7) · I can describe how First Peoples stories carry perspectives and who may share them (CP12, CP13). Or three at up to 21 words: I can make sense of written, oral and visual texts and combine ideas from sources I judge reliable (CP1–CP3) · I can explain how a text's form, structure, devices and language shape its meaning, message and identities (CP4, CP7, CP10, CP11) · I can respond to texts personally and critically, connecting their perspectives to my world and to First Peoples stories and protocols (CP5, CP6, CP8, CP9, CP12, CP13)
+- **Social Studies 8 has no Ministry headings.** Its 8 competencies are the inquiry process and the historical thinking concepts, each already one column, and keep their own I Can statements. Humanities 8 by Headings is 10 columns (CP, CR, INQ, SIG1, SIG2, EVI, CHG, CAU, PER, ETH), and Each Course Counts Equally makes CP and CR half the overall.
+
+**The hard case is the 142 headings with seven or more competencies** (ELA's Comprehend and Connect has 13; Arts' Explore and Create up to 9). Recommendation: keep two or three statements and let these headings run to 22 words at every grade, so coverage holds without a fourth statement; the cost is longer sentences for grade 8 readers.
 
 ### What Folders Count as One means afterwards
 
@@ -114,7 +120,8 @@ Help: a section in `help/articles/create-a-class.md`, "Grade by Headings", with 
 ## For Colin to decide
 
 1. Approve heading-as-competency over a display mode.
-2. The Statistics 12 I Can sample above, and three or four statements for headings of seven or more competencies.
-3. Nested courses (ADST and 62 others): folders (9 columns in ADST 8) or the top organizer (3).
-4. Build Phase 4 now, or wait until a teacher with scores asks; and its merge rule.
-5. Phases 1 and 2 as one merge or two.
+2. The Statistics 12 and Humanities 8 I Can samples above, and for headings of seven or more competencies: three statements up to 22 words (recommended), or up to five within the grade cap.
+3. Whether Social Studies 8–9 gets a FullVision grouping (for example Inquiry and Historical Thinking) to cut Humanities 8 below 10 columns. It isn't the Ministry's, so the default is no.
+4. Nested courses (ADST and 62 others): folders (9 columns in ADST 8) or the top organizer (3).
+5. Build Phase 4 now, or wait until a teacher with scores asks; and its merge rule.
+6. Phases 1 and 2 as one merge or two.
