@@ -6,7 +6,7 @@ Plan for Colin's approval, 2026-11-05. Mockups: the private canvas "FullVision: 
 
 A CSL-expert teacher, Nov 5: "is there a way to make the select just 'Reasoning and Modelling' instead of the specific ones listed below (in stats 12 I was looking at). It keeps my gradebook less busy to only have 4 or 5 competencies per class."
 
-Statistics 12 has 18 competencies under four Ministry headings (Reasoning and Modelling 5, Understanding and Solving 5, Communicating and Representing 4, Connecting and Reflecting 4). Folders Count as One already makes the overall count each heading once, but she still tags, scores, reads and prints 18. She wants to assess four things, so the class should have four things.
+Statistics 12 has 18 competencies under four Ministry headings (Reasoning and Modelling 5, Understanding and Solving 5, Communicating and Representing 4, Connecting and Reflecting 4). FullVision already reports at the heading level: the wizard puts the 18 competencies in four folders named for the headings, Folders Count as One (on by default) counts each folder once in the overall, and the printed report's As Graded rows print one row per folder. What stays at 18 is the input: each assessment is tagged with specific competencies, each tagged competency is scored per student, and the gradebook shows a column for each. A test tagged RM1–RM5 is five levels per student and five columns. Headings change that side. She wants to assess four things, so the class should have four things.
 
 ## Recommendation
 
