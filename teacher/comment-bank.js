@@ -8149,6 +8149,15 @@ window.CommentBank = (function () {
     (v.replaced || []).forEach(function (r) {
       var i = at[r.sentenceId];
       if (i == null) return;
+      // Over 20 words is not a mark that changed: a long sentence the
+      // teacher picked from Other Wording or Browse Sentences still says
+      // what is true (Nov 6: "it is true!"). The length count flags it.
+      if (
+        (r.failed || []).every(function (k) {
+          return k === 'length';
+        })
+      )
+        return;
       var now = _nowTrue(list, i, byId[r.sentenceId], f, ctx, bank);
       if (now.text === list[i].text) return;
       changes.push({ i: i, kind: 'marks', before: list[i].text, after: now.text, id: now.id });
