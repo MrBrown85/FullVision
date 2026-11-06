@@ -514,3 +514,15 @@ Replaces "Playwright runs on main after each merge, not on PRs." That rule came 
 2. **Four shards, every fourth test location each** (`.github/workflows/ci.yml`), so the slow files still split evenly.
 3. **The e2e job runs on every pull request** as well as on main. It is not a required check: a red run shows on the PR before merging, but a flaky test doesn't block a merge. `test-and-format` stays the only required check.
 4. **The repo stays public** (Colin, 2026-11-05): Actions minutes are free, so the extra runners cost nothing. Outside pull requests need Colin's approval before CI runs on them.
+
+## Class Results (2026-11-06)
+
+Context: Colin wanted the gradebook's Class Average to answer "how did the class do on this piece, and who needs follow-up". Plan in [`plans/class-results-plan.md`](plans/class-results-plan.md); approved mockups on the Class Average Hover canvas (claude.ai artifact, private).
+
+1. **No designation-group statistics** (Colin, 2026-11-05). No statistic anywhere compares ELL, or any BC designation, with the class or with other students. A designation shows only as a tag beside a student's name.
+2. **A hover card and a panel** (Colin, 2026-11-05). Hovering or focusing a Class Average shows the spread (how many scored, the level counts, median and range, Missing, Excused and Late). Selecting it, View Class Results in the column menu, or the Assignments page's Class Results button opens the Class Results panel beside the page, as the Help panel opens; one of the two is open at a time.
+3. **One layout per scoring mode** (Colin, 2026-11-05): rubric and competency work gets a results grid by criterion or competency; points work a Score Spread (bars, donut or dots); Complete/Incomplete a ring with Unmarked, Mark Missing and Mark Excused; DIBELS its reading levels by window and who moved. The panel is as tall as its content.
+4. **Students count as the Class Average counts them** (`columnCountedValue`): Missing is 0 in a Letter class and left out in a Proficiency or Both class; Excused is always left out. Every figure comes from `calc.js` (`classColumnSpread` and the helpers beside it); the Assignments ledger's median and the panel's come from the same `medianOf`.
+5. **Colour means a proficiency level, nothing else** (Colin, 2026-11-05). Other Classes, Earlier in <Category> and Feedback Written are neutral grey. No grey explainer lines, no standard deviation, no email or messaging, and no trend chart for rubric work beyond Earlier in <Category>.
+6. **Other Classes uses the link copies already carry** (`copy_group`, `AssessmentCopy.findCopies`). Work made with Duplicate in the same class is new work, not a copy, and is not listed. No database change.
+7. **One pull request, one merge**, for Netlify's deploy credits.

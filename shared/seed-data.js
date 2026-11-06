@@ -1638,7 +1638,24 @@ function seedIfNeeded() {
         65, 76, 53, 67, 67, 42, 57, 68, 77, 65, 59, 42, 75, 64, 44, 42, 58, 39, 65, 62, 66, 53, 75, 56, 67, 44, 62,
       ],
     };
+    // A few cells with nothing in them, so Class Results and the
+    // gradebook show Missing, Excused, Late and Unmarked work: on a lab
+    // rubric, a quiz and a Complete/Incomplete check.
+    const SCI8_STATUSES = {
+      sci8a4: { 5: 'NS', 14: 'EXC', 3: 'LATE' },
+      sci8q1: { 17: 'NS', 2: 'EXC', 6: 'LATE' },
+      sci8q4: { 11: 'NS', 5: null },
+    };
+    const sci8Statuses = {};
+    Object.keys(SCI8_STATUSES).forEach(aid => {
+      Object.keys(SCI8_STATUSES[aid]).forEach(idx => {
+        const status = SCI8_STATUSES[aid][idx];
+        if (status !== 'LATE') sci8ScoreMap[aid][idx] = 0;
+        if (status) sci8Statuses[STIDS[idx] + ':' + aid] = status;
+      });
+    });
     saveScores('sci8', current(buildScores(STIDS, sci8SeedAssessments, sci8ScoreMap, sci8Rubrics)));
+    saveAssignmentStatuses('sci8', sci8Statuses);
 
     // Score-level notes (assignment-level comments). These edit the saved,
     // already-shifted scores, so they are saved as they are.
@@ -2768,6 +2785,36 @@ function seedIfNeeded() {
           dims: ['collaboration', 'engagement'],
           sentiment: 'strength',
           context: 'small-group',
+        },
+        {
+          sid: 'st2',
+          date: '2025-11-14',
+          assessmentId: 'sci8a4',
+          assessmentTitle: 'KMT & States of Matter Lab',
+          text: 'Noor explained why the ice stayed at 0 °C while it melted, using the particle model. Strong link from the data to the theory.',
+          dims: ['curiosity'],
+          sentiment: 'strength',
+          context: 'small-group',
+        },
+        {
+          sid: 'st6',
+          date: '2025-09-26',
+          assessmentId: 'sci8q1',
+          assessmentTitle: 'Cell Structure Quiz',
+          text: 'Mixed up the cell wall and the cell membrane on the diagram questions. We went over the labelled diagram together.',
+          dims: ['selfRegulation'],
+          sentiment: 'concern',
+          context: 'independent',
+        },
+        {
+          sid: 'st12',
+          date: '2025-09-29',
+          assessmentId: 'sci8q1',
+          assessmentTitle: 'Cell Structure Quiz',
+          text: 'Used the review sheet before the quiz and labelled every organelle correctly. A real step up from the pre-test.',
+          dims: ['selfRegulation', 'resilience'],
+          sentiment: 'growth',
+          context: 'independent',
         },
         {
           sid: 'st24',

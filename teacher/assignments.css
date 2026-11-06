@@ -8466,3 +8466,46 @@ button.grader-member-name {
     visibility: hidden;
   }
 }
+
+/* Class Results (teacher/class-results.js): the card header's button and
+   the class line's link under the scores. */
+.cr-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--text);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.cr-card-btn:hover {
+  background: rgba(118, 118, 128, 0.2);
+}
+.cr-card-btn.cr-is-open {
+  box-shadow: inset 0 0 0 2px var(--active);
+}
+.cr-ldg-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--active);
+  text-align: left;
+  cursor: pointer;
+}
+.ldg-tally .cr-ldg-link {
+  width: auto;
+  margin-left: 4px;
+}
+.cr-ldg-link:hover {
+  text-decoration: underline;
+}

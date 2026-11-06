@@ -23,7 +23,7 @@ const EXEMPT = new Set(['shared/calc.js', 'shared/constants.js', 'shared/comment
 const OWN_WORDS = new Set(['shared/phone-report-view.js', 's/student.js']);
 
 const TO_FIXED_1 = {
-  'teacher/page-gradebook.js': 4,
+  'teacher/page-gradebook.js': 1,
   'teacher/student-overrides.js': 1,
   'teacher/ui.js': 1,
 };

@@ -9,6 +9,13 @@ pages:
 demo: /gradebook
 labels:
   - Class Average
+  - View Class Results
+  - Class Results
+  - Grade This Assessment
+  - Below Proficient
+  - Record an Observation
+  - Other Classes
+  - Feedback Written
   - Needs a Category
   - Complete
   - Incomplete
@@ -49,6 +56,8 @@ Hover over a name to see the course grade, each category's grade and each compet
 Each column is an assessment, newest on the left, with its date under the title. Points work also shows its total, such as "Out of 10". **Needs a Category** under a title means the class has categories and this assessment has none yet. Select a title to open the column's menu.
 
 The **Class Average** row at the foot of the grid averages each column.
+
+Hover over a Class Average to see how the class did: how many are scored, how many sit at each level, the median and range, and how many are Missing, Excused or Late. Select it, or choose **View Class Results** in the column's menu, to open **Class Results** beside the grid. It shows the same figures with the results for each rubric criterion or competency (select a number to list those students), the students **Below Proficient** with **Record an Observation** for them, who is Missing, how many have written feedback, the observations linked to the work, the same assessment in your **Other Classes**, and earlier work in the same category. Points work shows its scores as bars, a donut or dots; Complete/Incomplete work lists who is unmarked, with Mark Missing and Mark Excused. **Grade This Assessment** opens the grader. The Assignments page has a **Class Results** button on each assessment.
 
 ## What a Cell Shows
 
