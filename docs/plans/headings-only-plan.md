@@ -10,7 +10,7 @@ Statistics 12 has 18 competencies under four Ministry headings (Reasoning and Mo
 
 ## Recommendation
 
-**A per-course choice in the New Class wizard, Grade By: Competencies | Headings. Under Headings, each Ministry heading becomes one ordinary competency.** It carries its own bank id, a code from the heading's stem (RM, UND, CM, CN), its competencies' Ministry wording as its wording, and two or three I Can statements written for it that name the skills its competencies assess. No display mode, no hidden rows, no grade math change, no database migration for the first three phases.
+**A per-course choice in the New Class wizard, Grade By: Competencies | Headings. Under Headings, each Ministry heading becomes one ordinary competency.** It carries its own bank id, a code from the heading's stem (RM, UND, CM, CN), its competencies' Ministry wording as its wording, and two to five I Can statements written for it that name the skills its competencies assess. No display mode, no hidden rows, no grade math change, no database migration for the first three phases.
 
 ### Why this and not a display mode
 
@@ -34,14 +34,14 @@ A display mode keeps the busy part, 18 tags on every assessment, and scores one 
 
 ### The heading's I Can statements (Colin, 2026-11-05)
 
-Two or three per heading, written from that course's own competencies, never generic heading words: Statistics 12's Reasoning and Modelling talks about statistical models and estimation, Mathematics 8's about mathematical ones. The rules:
+Two or three per heading, and up to five for the 142 headings with seven or more competencies (Colin, 2026-11-05), written from that course's own competencies, never generic heading words: Statistics 12's Reasoning and Modelling talks about statistical models and estimation, Mathematics 8's about mathematical ones. The rules:
 
 1. **Together they name every skill the heading's competencies assess.** Each statement records the competency ids it covers (`covers: [...]`), and CI fails a heading with an uncovered competency.
 2. **In the course's context.** Written from the Ministry wording and the competencies' own I Can statements, keeping their subject words (variables, data, First Peoples communities), so a student reads what they actually do in that course.
 3. **The competency I Can rules apply:** "I can" and a lower-case word, no end punctuation, the banned words, the word cap (14 at grade 8, 17 at 9–10, 22 at 11–12), and a hash of the competencies' Ministry text so a revision flags the heading.
-4. **Written as the bank's were:** one exemplar per heading name and subject (56) for Colin to approve, every other course adapted from it, changing only what its competencies change, then an independent review. 1,035 headings, about 2,600 statements, in `data/bc-curriculum-heading-ican.json`.
+4. **Written as the bank's were:** one exemplar per heading name and subject (56) for Colin to approve, every other course adapted from it, changing only what its competencies change, then an independent review. 1,035 headings, about 3,000 statements, in `data/bc-curriculum-heading-ican.json`.
 
-The rubric draft takes at most three I Can statements, so a heading's criterion draws from all of them. The heading's comment phrase, descriptors and course sets are then written from these statements, as the competencies' were from theirs.
+The rubric draft takes at most three I Can statements, so for a heading of four or five it takes the first three; One per Competency in It covers the rest. The heading's comment phrase, descriptors and course sets are then written from these statements, as the competencies' were from theirs.
 
 Sample for approval, Statistics 12:
 
@@ -53,10 +53,10 @@ Sample for approval, Statistics 12:
 Sample for approval, Humanities 8 (ELA 8 by Headings + SS 8):
 
 - **Create and Communicate (CR, 7 competencies), three statements within the grade 8 cap of 14 words:** I can plan, write, revise and edit texts using Canadian spelling, grammar and punctuation (CR2–CR4) · I can choose a form and genre that fit my audience, purpose and message (CR6) · I can exchange ideas, tell stories aloud and turn information into original texts (CR1, CR5, CR7)
-- **Comprehend and Connect (CP, 13 competencies) can't fit in three statements of 14 words.** It needs either five at 14 words: I can make sense of texts and combine ideas from sources I judge reliable (CP1–CP3) · I can explain how form, structure and literary devices shape a text's meaning (CP4, CP10, CP11) · I can respond to texts personally, creatively and critically, connecting them to my world (CP5, CP8, CP9) · I can explain how culture, values and language shape a text's perspectives and identities (CP6, CP7) · I can describe how First Peoples stories carry perspectives and who may share them (CP12, CP13). Or three at up to 21 words: I can make sense of written, oral and visual texts and combine ideas from sources I judge reliable (CP1–CP3) · I can explain how a text's form, structure, devices and language shape its meaning, message and identities (CP4, CP7, CP10, CP11) · I can respond to texts personally and critically, connecting their perspectives to my world and to First Peoples stories and protocols (CP5, CP6, CP8, CP9, CP12, CP13)
+- **Comprehend and Connect (CP, 13 competencies), five statements within the cap:** I can make sense of texts and combine ideas from sources I judge reliable (CP1–CP3) · I can explain how form, structure and literary devices shape a text's meaning (CP4, CP10, CP11) · I can respond to texts personally, creatively and critically, connecting them to my world (CP5, CP8, CP9) · I can explain how culture, values and language shape a text's perspectives and identities (CP6, CP7) · I can describe how First Peoples stories carry perspectives and who may share them (CP12, CP13)
 - **Social Studies 8 has no Ministry headings.** Its 8 competencies are the inquiry process and the historical thinking concepts, each already one column, and keep their own I Can statements. Humanities 8 by Headings is 10 columns (CP, CR, INQ, SIG1, SIG2, EVI, CHG, CAU, PER, ETH), and Each Course Counts Equally makes CP and CR half the overall.
 
-**The hard case is the 142 headings with seven or more competencies** (ELA's Comprehend and Connect has 13; Arts' Explore and Create up to 9). Recommendation: keep two or three statements and let these headings run to 22 words at every grade, so coverage holds without a fourth statement; the cost is longer sentences for grade 8 readers.
+Three statements of 14 words can't cover Comprehend and Connect's 13 competencies without going vague, which is why big headings take up to five.
 
 ### What Folders Count as One means afterwards
 
@@ -109,7 +109,7 @@ Help: a section in `help/articles/create-a-class.md`, "Grade by Headings", with 
 
 ## Build plan
 
-**Phase 1: headings in the bank and the wizard.** The heading I Can statements are written and approved first (data only, no app change), then land with this phase. Derive script and lock file, `build-curriculum-bank.mjs` emits `heading`, `buildLearningMapFromTags(tags, { headings })`, the Grade By control, Includes rows, column preview, Review and Folders row wording, `_cmBankPlace` for heading ids. Tests: every multi-competency folder has a unique heading id and code; the lock file holds; every heading has two or three I Can statements that pass the I Can checks and cover each of its competencies; Stats 12 builds 4 sections, no groups, wording and I Cans as specified; Humanities 8 mixes 2 headings with SS 8; ADST 8 nested; a headings class's overall equals the plain mean of its headings with Folders Count as One on and off; Generate's output for a heading class equals the same class with `bank_id` null; e2e: wizard Stats 12 by Headings → 4 gradebook columns, 4 dashboard chips; Demo Mode: the wizard builds Science 8 by Headings (6 columns), and the seed class is unchanged.
+**Phase 1: headings in the bank and the wizard.** The heading I Can statements are written and approved first (data only, no app change), then land with this phase. Derive script and lock file, `build-curriculum-bank.mjs` emits `heading`, `buildLearningMapFromTags(tags, { headings })`, the Grade By control, Includes rows, column preview, Review and Folders row wording, `_cmBankPlace` for heading ids. Tests: every multi-competency folder has a unique heading id and code; the lock file holds; every heading has two or three I Can statements (up to five with seven or more competencies) that pass the I Can checks and cover each of its competencies; Stats 12 builds 4 sections, no groups, wording and I Cans as specified; Humanities 8 mixes 2 headings with SS 8; ADST 8 nested; a headings class's overall equals the plain mean of its headings with Folders Count as One on and off; Generate's output for a heading class equals the same class with `bank_id` null; e2e: wizard Stats 12 by Headings → 4 gradebook columns, 4 dashboard chips; Demo Mode: the wizard builds Science 8 by Headings (6 columns), and the seed class is unchanged.
 
 **Phase 2: Class Settings, Re-link, rubric, Browse.** The Competencies tab's switch and its evidence check, Includes on the card, heading-aware Re-link and name matching, One per Competency in It, Browse's sentences under a heading, the Proficiency block's hint, the help section. Tests: switching both ways with no evidence; blocked with each kind of evidence; Re-link pairs a hand-made heading and keeps its scores; backup → Restore and Duplicate Class keep heading ids; rubric criteria all feed the heading and score on their own; e2e on the Competencies tab.
 
@@ -120,7 +120,7 @@ Help: a section in `help/articles/create-a-class.md`, "Grade by Headings", with 
 ## For Colin to decide
 
 1. Approve heading-as-competency over a display mode.
-2. The Statistics 12 and Humanities 8 I Can samples above, and for headings of seven or more competencies: three statements up to 22 words (recommended), or up to five within the grade cap.
+2. The Statistics 12 and Humanities 8 I Can samples above.
 3. Whether Social Studies 8–9 gets a FullVision grouping (for example Inquiry and Historical Thinking) to cut Humanities 8 below 10 columns. It isn't the Ministry's, so the default is no.
 4. Nested courses (ADST and 62 others): folders (9 columns in ADST 8) or the top organizer (3).
 5. Build Phase 4 now, or wait until a teacher with scores asks; and its merge rule.
