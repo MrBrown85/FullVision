@@ -1,6 +1,6 @@
 # Grade by Headings
 
-Plan for Colin's approval, 2026-11-05. Mockups: the private canvas "FullVision: Grade by Headings". Nothing is built yet.
+Plan for Colin's approval, 2026-11-05. Mockups: the private canvas "FullVision: Grade by Headings" (https://claude.ai/artifact/MBpJNTdfftJFZveXrbptVZ). Nothing is built yet.
 
 ## The request
 
@@ -41,7 +41,7 @@ A course by headings has no folders, so its overall is the plain mean of its hea
 | Surface                           | Change                                                                                                                                                                                                                                                                                                                 |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Choose Courses                    | Each row reads "18 Competencies · 4 Headings".                                                                                                                                                                                                                                                                         |
-| Choose Competencies               | A Grade By control on each course card. Under Headings, one row per heading with its code, name and "Includes 5 Competencies" (open to read the Ministry wording); Clear unticks a heading. A live column preview under the cards (surprise 1).                                                                        |
+| Choose Competencies               | A Grade By control on each course card. Under Headings, one row per heading with its code, name and "Includes 5 Competencies" (open to read the Ministry wording); Clear unticks a heading. A live column preview above the cards (surprise 1).                                                                        |
 | Review                            | "Statistics 12 · By Headings · 4 Columns"; the Folders row reads as above.                                                                                                                                                                                                                                             |
 | Class Settings › Competencies     | The heading card shows Includes and the I Can statements; the course header offers Grade by Competencies / Grade by Headings while none of that course's competencies has evidence (scores, rubric links, observations, term-rating picks). With evidence: "Reasoning and Modelling has scores, so it stays as it is." |
 | Re-link                           | Builds candidates by headings or competencies to match the class, and pairs a hand-made "Reasoning and Modelling" with the bank heading (surprise 3).                                                                                                                                                                  |
@@ -77,7 +77,7 @@ Help: a section in `help/articles/create-a-class.md`, "Grade by Headings", with 
 
 ## Pleasant surprises
 
-1. **The wizard shows the gradebook before you build it.** Under the course cards, a strip of real gradebook column headers (codes and short names at their real size) that slides from 18 columns to 4 when Grade By flips: "Your gradebook: 4 columns."
+1. **The wizard shows the gradebook before you build it.** Above the course cards, a strip of real gradebook column headers (codes and short names at their real size) that slides from 18 columns to 4 when Grade By flips: "Your gradebook: 4 columns."
 2. **Detail on the handout, four columns in the gradebook.** "+ From Competency" on a heading can make one criterion per competency it includes, all feeding the heading. Students get five rows of feedback; the gradebook shows one level per heading (the lowest when mixed, as now).
 3. **Re-link finds her hand-made headings.** A class with a competency she typed as "Reasoning and Modelling" is offered the bank heading in Re-link: every score stays, and the Ministry wording, I Can statements and card path arrive.
 
