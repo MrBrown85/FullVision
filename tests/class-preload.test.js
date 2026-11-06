@@ -1,7 +1,7 @@
 /**
  * Every class is loaded at sign-in, not only the one the teacher opens with:
  * preloadClasses loads the rest one at a time, and loadClass shares one load
- * per class. Class Management shows a class's student count once it is in,
+ * per class. Class Settings shows a class's student count once it is in,
  * and a class picked before its data arrives shows "Loading this class…"
  * instead of an empty roster that could be edited.
  */
@@ -75,7 +75,7 @@ describe('loading every class', () => {
   });
 });
 
-describe('Class Management while classes load', () => {
+describe('Class Settings while classes load', () => {
   var main;
   var sidebar;
   var originalGetElementById;

@@ -127,7 +127,7 @@ The Grading tab's name for the Decay Weight.
 
 ### I Can Statements
 
-First-person statements of a curricular competency, each beginning "I can", written for every competency in the BC curriculum. They can be edited, added and deleted for each competency in Class Management, and printed reports can show them.
+First-person statements of a curricular competency, each beginning "I can", written for every competency in the BC curriculum. They can be edited, added and deleted for each competency in Class Settings, and printed reports can show them.
 
 ### IE
 
@@ -167,7 +167,7 @@ The third of the four BC proficiency levels, scored as 3: a complete understandi
 
 ### Reporting Terms
 
-A class's report dates, up to six, each with a label, a start date and an end date, set on the Reporting Terms tab in Class Management. Grades build all year: a report shows the year to date as of its term's end.
+A class's report dates, up to six, each with a label, a start date and an end date, set on the Reporting Terms tab in Class Settings. Grades build all year: a report shows the year to date as of its term's end.
 
 ### Total Points
 

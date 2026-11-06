@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-/* Class Management > Students > Add Student, in Demo Mode. */
+/* Class Settings > Students > Add Student, in Demo Mode. */
 
 const form = page => page.locator('#cm-add-student-form');
 

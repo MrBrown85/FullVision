@@ -27,7 +27,7 @@ const ARTICLES = join(HELP, 'articles');
 // What's New, …), shown under the line at the foot of the nav.
 export const SECTIONS = [
   'Getting Started',
-  'Class Management',
+  'Class Settings',
   'Assignments',
   'Gradebook',
   'Observations',

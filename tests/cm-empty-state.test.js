@@ -1,5 +1,5 @@
 /**
- * Class Management with no classes: the first screen offers Create a Class
+ * Class Settings with no classes: the first screen offers Create a Class
  * and, for a signed-in teacher, Try Demo Mode. Open Demo Mode says
  * what happens before it leaves for /login.html?demo=1, which clears this
  * device's FullVision data. In Demo Mode itself only Create a Class shows.

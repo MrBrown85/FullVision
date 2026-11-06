@@ -1225,7 +1225,7 @@ body.offline-active #app-dock {
 .tb-action-btn:active {
   transform: scale(0.97);
 }
-/* An outline action beside the blue one (Class Management, Print Grades,
+/* An outline action beside the blue one (Class Settings, Print Grades,
    Add from Another Class). */
 .tb-action-btn.tb-action-secondary {
   background: transparent;

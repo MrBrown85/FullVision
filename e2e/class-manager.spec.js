@@ -26,10 +26,10 @@ test.describe('Class Manager — Student CRUD', () => {
     expect(hasAddOrEmpty).toBeTruthy();
   });
 
-  test('can open class management panel', async ({ page }) => {
+  test('can open class settings panel', async ({ page }) => {
     await gotoApp(page, '/dashboard');
     const cmBtn = page
-      .locator('button:has-text("Class Management"), [data-action="cmOpen"], [data-action="cmToggle"]')
+      .locator('button:has-text("Class Settings"), [data-action="cmOpen"], [data-action="cmToggle"]')
       .first();
     if (await cmBtn.isVisible()) {
       await cmBtn.click();

@@ -185,8 +185,8 @@ var LearnerProfile = (function () {
             (o.cid
               ? '<a class="lp-link" role="link" tabindex="0" data-href="/dashboard?course=' +
                 esc(encodeURIComponent(o.cid)) +
-                '&amp;manage=questionnaires">Class Management › Questionnaires</a>'
-              : 'Class Management › Questionnaires') +
+                '&amp;manage=questionnaires">Class Settings › Questionnaires</a>'
+              : 'Class Settings › Questionnaires') +
             '.') +
         '</div></section>'
       );

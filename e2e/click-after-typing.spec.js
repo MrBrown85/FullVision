@@ -23,7 +23,7 @@ async function heldClick(page, locator) {
 
 test('one click on Save Categories saves, though a refresh was waiting on the weight', async ({ page }) => {
   await demo(page);
-  await page.locator('button', { hasText: 'Class Management' }).first().click();
+  await page.locator('button', { hasText: 'Class Settings' }).first().click();
   await page
     .locator('button', { hasText: /^Grading/ })
     .first()

@@ -163,7 +163,7 @@ window.PageDashboard = (function () {
 
   /* The student list beside the dashboard. It is rebuilt only when the
      class or its roster changed, so its search and scroll survive the
-     dashboard's own re-renders. Class Management hides it (dashboard.css). */
+     dashboard's own re-renders. Class Settings hides it (dashboard.css). */
   function _syncSidebar() {
     var mount = document.getElementById('sidebar-mount');
     if (!mount) return;
@@ -182,7 +182,7 @@ window.PageDashboard = (function () {
 
   /* ── Main render ────────────────────────────────────────── */
   function render() {
-    // Every grade on this page, Class Management's included, is the year so
+    // Every grade on this page, Class Settings' included, is the year so
     // far: a report's term from the Reports page never carries over (Colin,
     // 2026-11-03).
     if (activeCourse && typeof setActiveTerm === 'function') setActiveTerm(activeCourse, null);
@@ -1181,7 +1181,7 @@ window.PageDashboard = (function () {
       return;
     }
     // A "manage" link (the Term Questionnaire's "Questionnaires ›", the
-    // gradebook's Add Students): Class Management open on that tab.
+    // gradebook's Add Students): Class Settings open on that tab.
     else if (params && params.manage) openClassManager(params.manage, params.class);
 
     // Ensure page starts at top

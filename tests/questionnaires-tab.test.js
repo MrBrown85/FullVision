@@ -1,5 +1,5 @@
 /**
- * The Questionnaires tab in Class Management (docs/STUDENT-VOICE-PLAN.md,
+ * The Questionnaires tab in Class Settings (docs/STUDENT-VOICE-PLAN.md,
  * PR 5): teacher/questionnaires.js, teacher/cm-questionnaires.js and
  * teacher/qr-slips.js.
  *

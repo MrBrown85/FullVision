@@ -1,5 +1,5 @@
 /* shared/reporting-term-presets.js — Surrey secondary schools' reporting
-   periods, offered as one-click presets in Class Management
+   periods, offered as one-click presets in Class Settings
    (docs/DECISIONS.md, "Reporting periods"). Grandview Heights is the default.
 
    Every date comes from the school's published calendar on surreyschools.ca

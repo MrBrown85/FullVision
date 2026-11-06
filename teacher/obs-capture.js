@@ -1250,7 +1250,7 @@ window.ObsCapture = (function () {
       }
       state.menu = null;
       // With no starter to pick, nothing is highlighted, so Enter still adds
-      // the observation instead of leaving for Class Management.
+      // the observation instead of leaving for Class Settings.
       var index = (tok.kind === '/' && !items.length) || (items[0] && items[0].create) ? -1 : 0;
       state.suggest = { kind: tok.kind, query: tok.query, start: tok.start, end: tok.end, items: items, index: index };
       render();

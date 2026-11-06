@@ -104,13 +104,13 @@ test.describe('Breadcrumb on the dashboard child screens', () => {
     await expect(page.locator('.dash-toolbar [data-action="openClassManager"]')).toBeVisible();
   });
 
-  test('Class Management: Dashboard › Class Management, linking back', async ({ page }) => {
+  test('Class Settings: Dashboard › Class Settings, linking back', async ({ page }) => {
     await enterDemo(page);
     await page.goto('/dashboard');
     await page.locator('.dash-toolbar [data-action="openClassManager"]').click();
     const crumb = page.getByRole('navigation', { name: 'Breadcrumb' });
     await expect(crumb).toBeVisible();
-    await expect(crumb.locator('[aria-current="page"]')).toHaveText('Class Management');
+    await expect(crumb.locator('[aria-current="page"]')).toHaveText('Class Settings');
     await expect(page.locator('.tb-seg-link.tb-seg-active')).toHaveText('Dashboard');
     await expect(page.locator('.cm-layout')).toBeVisible();
 

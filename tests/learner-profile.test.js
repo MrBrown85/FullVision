@@ -286,7 +286,7 @@ describe('LearnerProfile', () => {
     // Where to turn it on is a link straight to that tab.
     o.cid = CID;
     const link = mount(LearnerProfile.aboutHtml(o)).querySelector('a.lp-link');
-    expect(link.textContent).toBe('Class Management › Questionnaires');
+    expect(link.textContent).toBe('Class Settings › Questionnaires');
     expect(link.getAttribute('data-href')).toBe('/dashboard?course=' + CID + '&manage=questionnaires');
   });
 

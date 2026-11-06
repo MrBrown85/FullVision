@@ -1,8 +1,8 @@
 /**
  * Late Work Policy is one saved value on the class (course.late_work_policy).
- * Class Management's Details tab edits it and the report's Score
+ * Class Settings' Details tab edits it and the report's Score
  * Distribution block prints it. The report used to read a device-only copy in
- * the course config, so a policy set in Class Management never printed.
+ * the course config, so a policy set in Class Settings never printed.
  */
 import './setup.js';
 import { beforeEach, describe, expect, it } from 'vitest';

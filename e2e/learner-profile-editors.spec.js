@@ -153,7 +153,7 @@ test("the student's chosen self-assessment step is a solid colour block", async 
   expect(look.color).toBe('rgb(255, 255, 255)');
 });
 
-test('About Me turned off links straight to Class Management › Questionnaires', async ({ page }) => {
+test('About Me turned off links straight to Class Settings › Questionnaires', async ({ page }) => {
   await openStudent(page, 'Liam');
   await page.evaluate(() => {
     const k = 'gb-questionnaires-sci8';
@@ -165,8 +165,8 @@ test('About Me turned off links straight to Class Management › Questionnaires'
     Questionnaires._reset();
     window.PageStudent.render();
   });
-  await page.locator('#lp-about').getByRole('link', { name: 'Class Management › Questionnaires' }).click();
-  // Class Management keeps its own address (/dashboard?manage=…) once open.
+  await page.locator('#lp-about').getByRole('link', { name: 'Class Settings › Questionnaires' }).click();
+  // Class Settings keeps its own address (/dashboard?manage=…) once open.
   await expect(page).toHaveURL(/\/dashboard\?manage=questionnaires$/);
   await expect(page.locator('[role=tab][aria-selected=true]')).toContainText('Questionnaires');
 });

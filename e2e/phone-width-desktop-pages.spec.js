@@ -58,11 +58,11 @@ for (const [path, tab] of [
   });
 }
 
-// Group 2 #41: Class Management's class list, New Class and Restore from
+// Group 2 #41: Class Settings' class list, New Class and Restore from
 // Backup can be used on a phone.
-test('Class Management class list works on a phone', async ({ page }) => {
+test('Class Settings class list works on a phone', async ({ page }) => {
   await openDesktop(page, '/dashboard');
-  await page.getByRole('button', { name: 'Class Management' }).first().click();
+  await page.getByRole('button', { name: 'Class Settings' }).first().click();
   const list = page.locator('.cm-sidebar');
   await expect(list).toBeVisible();
   expect((await list.boundingBox()).width).toBeGreaterThan(300);

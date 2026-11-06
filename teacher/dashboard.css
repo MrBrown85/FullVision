@@ -6,7 +6,7 @@
 .page-layout:not(.sidebar-hidden) .dash-course-select {
   display: none;
 }
-/* Class Management puts its class list where the student list goes
+/* Class Settings puts its class list where the student list goes
    (renderClassManager). It shows even when the student list is
    collapsed, so the sidebar button has nothing to do there. */
 #page-layout:has(.cm-toolbar) #sidebar-mount {
@@ -1760,7 +1760,7 @@ a.dash-ins-name:hover {
   border-color: var(--text-3);
   color: var(--text);
 }
-/* Class Management is settings, so it is a secondary (outline) button:
+/* Class Settings is settings, so it is a secondary (outline) button:
    solid blue is kept for a screen's main action (docs/DECISIONS.md). */
 .dash-toolbar-spacer {
   flex: 1;
@@ -2841,7 +2841,7 @@ a.dash-ins-name:hover {
   flex: 1;
 }
 
-/* Class Management segments (.seg) sit in a narrow column: they wrap
+/* Class Settings segments (.seg) sit in a narrow column: they wrap
    onto a second row instead of pushing the last segment out of view. */
 .cm-seg {
   flex-wrap: wrap;
@@ -6377,7 +6377,7 @@ label.cm-cr-row {
   }
 }
 
-/* Class Management below 1024 px: the student list's width is 0 there, so
+/* Class Settings below 1024 px: the student list's width is 0 there, so
    the class list kept 1 px and New Class and Restore Class from Backup
    couldn't be reached (Nov 3 sweep). It keeps its own width on a tablet
    and, on a phone, sits above the class as a short list of its own. */

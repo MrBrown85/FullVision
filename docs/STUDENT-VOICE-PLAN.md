@@ -31,7 +31,7 @@ Interview mode (teacher-led, on Observations and mobile) stays in the plan but i
 2. **Students rate Core Competencies, not the nine dispositions.** The teacher keeps rating dispositions on the Term Questionnaire; the two scales are not shown side by side.
 3. **One scrolling page per form,** with a progress bar, not one question per card. Answer boxes grow as the student types. Sentence starters under the repeated questions.
 4. **Goal Check-In rides on the reflection's slip** and is edited inside the November card on the Questionnaires tab, with its own On/Off.
-5. **Class Management gets a Questionnaires tab** (one card per questionnaire: status, dates, answered count, who hasn't answered, Print QR Slips, inline question editor, MyEd comment). The Students tab holds the full roster only.
+5. **Class Settings gets a Questionnaires tab** (one card per questionnaire: status, dates, answered count, who hasn't answered, Print QR Slips, inline question editor, MyEd comment). The Students tab holds the full roster only.
 6. **The Goals and Reflections tab is removed.** Its content moves onto the Learner Profile tab, which becomes one page: ID card, About Me, Goals, Reflections.
 7. **Student words are shown exactly as written,** never summarized, filtered or autocorrected. Blank answers show the question with "No answer". Answers in another language get a Translate link that never replaces the original.
 8. **Phone reports use the issued copy** and a birthday check, expire at a set date, and can be closed or reissued per student.
@@ -48,14 +48,14 @@ Interview mode (teacher-led, on Observations and mobile) stays in the plan but i
 - About Me, November Reflection (theme card, Personal Shield, how it helps, self-assessment with why), My Goals (September goal read-only, status, next step, Core Competency goal picker with one thing this week), Sent.
 - Demo Mode: the demo class code runs the form locally and writes nothing.
 
-### Class Management › Students: canvas screen 6
+### Class Settings › Students: canvas screen 6
 
 - Full roster, every field editable in place: Last, First, Preferred, Pronouns, Student Number, Date of Birth, Student Email, Parent Email, Parent Email 2 (the first two `guardian` rows), Designations (chips with ×, + opens the BC code picker), ELL (checkbox). About Me status is read-only.
 - Enter or ↓ moves down a column, ↑ up, Tab across, Esc leaves. Saves through the existing write path with no banners or toasts (sync dot only).
 - Sticky header and sticky Last/First columns; the table scrolls sideways. Alternating row shading; the hovered or focused row turns light blue. The tab's 900px and 1200px width caps are lifted for this tab only.
 - Toolbar: search, a one-line summary (students, designations, ELL, About Me answered, missing parent emails), Import Roster, Add Student. Bulk Edit is removed. A ⋯ menu per row: Open Student Page, Withdraw.
 
-### Class Management › Questionnaires: canvas screen 6b
+### Class Settings › Questionnaires: canvas screen 6b
 
 - One card per questionnaire with On/Off, description, status dot, dates, answered count and progress bar, and who hasn't answered.
 - Actions on the card: View Answers, Reopen for N Students, Print QR Slips, Hide/Show Questions, Change Dates.

@@ -53,7 +53,7 @@ teacher/dash-class-manager.js,576,6,innerHTML,REVIEWED,marked at the sink,,"pane
 teacher/dash-class-manager.js,1014,4,innerHTML,ESC_WRAPPED,concat,,"keep.innerHTML = '<span class=""cm-keep-copy-text""><strong>Keep a copy first</strong><span>A CSV of ' + esc(name) + '’s scores and observations in ' + esc((COURSES[cid] && COURSES[…"
 teacher/dash-class-manager.js,1760,4,innerHTML,ESC_WRAPPED,fn-return,,"picker.innerHTML = Object.keys(BC_DESIGNATIONS) .filter(function (code) { return have.indexOf(code) < 0; }) .map(function (code) { return ( '<button type=""button"" role=""menuitem"" …"
 teacher/dash-class-manager.js,2566,32,outerHTML,REVIEWED,helper:renderCmSidebar,,el.outerHTML = renderCmSidebar(Object.keys(COURSES))
-teacher/dash-class-manager.js,2714,6,innerHTML,REVIEWED,concat,,"toolbarMount.innerHTML = '<div class=""page-toolbar dash-toolbar cm-toolbar"">' + renderBreadcrumb('Dashboard', '/dashboard', 'Class Management', 'closeClassManager') + '<span class…"
+teacher/dash-class-manager.js,2714,6,innerHTML,REVIEWED,concat,,"toolbarMount.innerHTML = '<div class=""page-toolbar dash-toolbar cm-toolbar"">' + renderBreadcrumb('Dashboard', '/dashboard', 'Class Settings', 'closeClassManager') + '<span class…"
 teacher/dash-class-manager.js,2741,6,innerHTML,LITERAL,concat,,document.getElementById('main').innerHTML = html
 teacher/dash-class-manager.js,2746,19,innerHTML,REVIEWED,helper:renderCmSidebar,,sideMount.innerHTML = renderCmSidebar(courseIds)
 teacher/dash-class-manager.js,2770,4,innerHTML,LITERAL,,,document.getElementById('main').innerHTML = html

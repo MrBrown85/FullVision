@@ -28,7 +28,7 @@ After fix 1 the bank would print the labels in `curriculum_by_course.json`. Of i
 
 "Her strongest work is in Create Thoughtful Engaging" is not a sentence a teacher sends home. The grade 8 courses are mostly fine (Math 8: Logic and Patterns, Problem Solving; Socials 8: Evidence, Cause and Consequence); it is the 10–12 courses, 206 of the 223 in the file, that carry the cut labels. The printed Proficiency block has the same problem today.
 
-Fix: clean the labels for the 8–12 courses in the data file (a content job, benefits every report), and have the bank never rely on a label standing alone after "in". Teachers can rename competencies in Class Management, but they should not have to.
+Fix: clean the labels for the 8–12 courses in the data file (a content job, benefits every report), and have the bank never rely on a label standing alone after "in". Teachers can rename competencies in Class Settings, but they should not have to.
 
 ## 3. One bank for every subject
 

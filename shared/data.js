@@ -1412,7 +1412,7 @@ function _revalidateActiveClass() {
    Boot loads the class the teacher opens with; preloadClasses then loads the
    rest in the background, one at a time, so a class's roster, settings and
    competencies are on the page before the teacher opens it (the class
-   picker, Class Management, copying between classes). loadClass shares one
+   picker, Class Settings, copying between classes). loadClass shares one
    load per class, so a class picked while it is preloading waits for that
    same load. In Demo Mode and local-only use every class is already on this
    device. */
@@ -8982,7 +8982,7 @@ var _studentDispatchQueue = {}; // cid → Promise of the last diff being dispat
 /* Diff arr vs prev and translate to canonical RPC calls.
    - student.id matching UUID → already enrolled → update_enrollment + update_student
    - student.id local (uid) → new → enroll_student → patches local cache id to canonical
-   - prev student missing from arr → withdraw_student (Class Management
+   - prev student missing from arr → withdraw_student (Class Settings
      withdraws through withdrawStudent, which keeps the baseline in step) */
 function _persistStudentsToCanonical(cid, prev, arr) {
   var sb = getSupabase();
@@ -9272,7 +9272,7 @@ function saveCategories(cid, arr) {
 /* A category's Calculation (category.calc_mode): 'percent' averages each
    assessment's percent, 'points' (the default, and anything unset) pools
    points earned and possible. Takes a cache row (calcMode) or a server or
-   Class Management row (calc_mode). */
+   Class Settings row (calc_mode). */
 function categoryCalcMode(category) {
   var mode = category && (category.calcMode || category.calc_mode);
   return mode === 'percent' ? 'percent' : 'points';
@@ -12598,7 +12598,7 @@ function _studentWriteId(cid, sid) {
   return _isPendingLocalId(sid) ? sid : null;
 }
 
-/* Withdraw: the remove action in Class Management. Returns the entry (for
+/* Withdraw: the remove action in Class Settings. Returns the entry (for
    Undo), or null when the student isn't on the roster. */
 function withdrawStudent(cid, sid) {
   var students = getStudents(cid);

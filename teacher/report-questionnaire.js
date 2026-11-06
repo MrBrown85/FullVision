@@ -1691,7 +1691,7 @@ window.ReportQuestionnaire = (function () {
     return `<div class="qn-card qn-voice">
       <div class="qn-card-top">
         <span class="qn-card-title">${esc(first)}’s Voice</span>
-        <a role="link" tabindex="0" data-href="/dashboard?course=${esc(cid)}&manage=questionnaires" class="qn-card-link" title="Opens this class’s Questionnaires in Class Management, where you choose and send the questions students answer.">Questionnaires ›</a>
+        <a role="link" tabindex="0" data-href="/dashboard?course=${esc(cid)}&manage=questionnaires" class="qn-card-link" title="Opens this class’s Questionnaires in Class Settings, where you choose and send the questions students answer.">Questionnaires ›</a>
       </div>
       ${rows}
     </div>`;
@@ -3909,7 +3909,7 @@ window.ReportQuestionnaire = (function () {
     if (!text) return [];
     var ctx = _bankContext(_activeCourse, student, f);
     // The pronouns may have changed since the comment was written, with
-    // the questionnaire closed (Class Management, the Student Dashboard).
+    // the questionnaire closed (Class Settings, the Student Dashboard).
     var was = writtenWith(rating, f, text, student);
     _pronounsSeen[key] = (f && f.pronouns) || null;
     if (!was || rating.approvedAt) {

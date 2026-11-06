@@ -1,4 +1,4 @@
-/* Class Management → Questionnaires tab (docs/STUDENT-VOICE-PLAN.md, PR 5;
+/* Class Settings → Questionnaires tab (docs/STUDENT-VOICE-PLAN.md, PR 5;
    canvas screen 6b).
 
    One card per questionnaire: About Me at the start of the course, and the
