@@ -5934,22 +5934,29 @@ window.DashClassManager = (function () {
     adoptCategoriesFromServer(cid, camelRows);
   }
 
+  // Without a server (Demo Mode) the class's categories are the cached ones.
+  function _cmCatsLocalOnly() {
+    return !window.v2 || !window.v2.listCategories || !_useSupabase;
+  }
+  function _cmCatFillLocal(cid, st) {
+    st.loaded = true;
+    st.rows = (getCategories(cid) || []).map(function (c, i) {
+      return {
+        id: c.id,
+        name: c.name || '',
+        weight: Number(c.weight) || 0,
+        display_order: c.displayOrder != null ? Number(c.displayOrder) : i,
+        calc_mode: categoryCalcMode(c),
+      };
+    });
+  }
+
   function _cmLoadCategories(cid) {
     if (!cid) return;
     var st = _cmCatState(cid);
     if (st.loaded || st.loading) return;
-    // Without a server (Demo Mode) the class's categories are the cached ones.
-    if (!window.v2 || !window.v2.listCategories || !_useSupabase) {
-      st.loaded = true;
-      st.rows = (getCategories(cid) || []).map(function (c, i) {
-        return {
-          id: c.id,
-          name: c.name || '',
-          weight: Number(c.weight) || 0,
-          display_order: c.displayOrder != null ? Number(c.displayOrder) : i,
-          calc_mode: categoryCalcMode(c),
-        };
-      });
+    if (_cmCatsLocalOnly()) {
+      _cmCatFillLocal(cid, st);
       if (st.rows.length) renderClassManager();
       return;
     }
@@ -6034,6 +6041,9 @@ window.DashClassManager = (function () {
   function _cmRenderCategoriesField(cid) {
     if (!cid) return '';
     var st = _cmCatState(cid);
+    // Cached categories are read now, so opening Class Settings draws it
+    // once; a server's answer redraws it when it comes.
+    if (!st.loaded && !st.loading && _cmCatsLocalOnly()) _cmCatFillLocal(cid, st);
     if (!st.loaded && !st.loading)
       setTimeout(function () {
         _cmLoadCategories(cid);
@@ -9778,8 +9788,10 @@ window.DashClassManager = (function () {
     });
     if (lines[0] && !lines[0].ready && !_cmLevelsBankAsked && RubricPrint.loadBankLevels) {
       _cmLevelsBankAsked = true;
+      // Only the Competencies tab shows the Levels: on another tab the
+      // next draw picks them up, so opening Class Settings draws it once.
       RubricPrint.loadBankLevels().then(function (ok) {
-        if (ok) renderClassManager();
+        if (ok && classManagerOpen && cmMode === 'edit' && cmTab === 'competencies') renderClassManager();
       });
     }
     // The open form: { drafts: { level: text }, base: { level: text the field was filled with } }.
