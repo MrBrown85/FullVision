@@ -8488,6 +8488,16 @@ button.grader-member-name {
 .cr-card-btn:hover {
   background: rgba(118, 118, 128, 0.2);
 }
+/* A closed card's hidden actions sit over the end of its header; the icon
+   alone keeps them clear of the chips, so a click there opens the card. */
+.assess-card:not(.open) .cr-card-btn {
+  width: 30px;
+  padding: 0;
+  justify-content: center;
+}
+.assess-card:not(.open) .cr-card-label {
+  display: none;
+}
 .cr-card-btn.cr-is-open {
   box-shadow: inset 0 0 0 2px var(--active);
 }
