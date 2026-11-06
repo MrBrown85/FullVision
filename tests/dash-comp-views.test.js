@@ -142,7 +142,10 @@ describe('the views', () => {
 
       it('Level Mix: a count per level in the class order, the largest bold, "k of n" Proficient or above', () => {
         const el = dom(card({ compView: 'mix' }));
-        expect(texts(el, '.dash-comp-lab-mid span')).toEqual(['EXT', 'PRF', 'DEV', 'EMG']);
+        expect(texts(el, '.dash-comp-lv-long')).toEqual(['EXT', 'PRF', 'DEV', 'EMG']);
+        // On a narrow card one letter each (dashboard.css), the name in the title.
+        expect(texts(el, '.dash-comp-lv-short')).toEqual(['X', 'P', 'D', 'E']);
+        expect(el.querySelector('.dash-comp-lv-long').parentNode.getAttribute('title')).toBe('Extending');
         const rows = el.querySelectorAll('.dash-comp-row');
         expect(texts(rows[0], '.dash-comp-cell')).toEqual(['1', '1', '1', '–']);
         expect(texts(rows[1], '.dash-comp-cell')).toEqual(['–', '–', '1', '1']);
@@ -179,8 +182,8 @@ describe('the views', () => {
         expect(more.textContent).toBe('+2 more');
         expect(more.getAttribute('data-action')).toBe('studentView');
         expect(more.getAttribute('data-view')).toBe('grid');
-        // Every view keeps room for those eight rows.
-        expect(card({ compView: 'avg', allStudents: many, belowLists: lists })).toContain('--comp-rows:8');
+        // A view sizes to its own rows (plan F.1): no room kept for another's.
+        expect(card({ compView: 'avg', allStudents: many, belowLists: lists })).not.toContain('--comp-rows');
       });
 
       it('Change: a line per competency, the change, the months in the tip and the label row', () => {
@@ -228,6 +231,83 @@ describe('the views', () => {
     _cache.learningMaps[CID].sections[0].shortName = '<b>Inquiry</b>';
     clearProfCache();
     for (const view of ['avg', 'mix', 'below', 'trend']) expect(card({ compView: view })).not.toContain('<b>');
+  });
+});
+
+describe("the card's shape (plan F)", () => {
+  beforeEach(() => setClass('proficiency'));
+
+  // A class of n competencies, no scores needed for the shape.
+  function setCols(nCols) {
+    _cache.learningMaps[CID].sections = Array.from({ length: nCols }, (_, i) =>
+      sec('c' + i, 'Area ' + String.fromCharCode(65 + i), 'C' + (i + 1)),
+    );
+    clearProfCache();
+  }
+
+  it('sizes to the rows the view draws: roomy with four or fewer, no reserved room', () => {
+    let el = dom(card({ compView: 'avg' }));
+    const sect = el.querySelector('.dash-comp-card');
+    expect(sect.classList.contains('is-roomy')).toBe(true);
+    expect(sect.querySelector('.dash-comp-body').getAttribute('style')).toBeNull();
+    setCols(5);
+    el = dom(card({ compView: 'avg' }));
+    expect(el.querySelector('.dash-comp-card').classList.contains('is-roomy')).toBe(false);
+  });
+
+  it('past 12 rows the list scrolls inside the card, with "+N more" under it', () => {
+    setCols(12);
+    let el = dom(card({ compView: 'avg' }));
+    expect(el.querySelector('.dash-comp-rows.is-scroll')).toBeNull();
+    expect(el.querySelector('.dash-comp-moreline')).toBeNull();
+    setCols(13);
+    for (const view of ['avg', 'mix', 'trend']) {
+      el = dom(card({ compView: view }));
+      const list = el.querySelector('.dash-comp-scroll > .dash-comp-rows.is-scroll');
+      expect(list.querySelectorAll('.dash-comp-row')).toHaveLength(13);
+      expect(list.getAttribute('tabindex')).toBe('0');
+      const more = el.querySelector('.dash-comp-moreline');
+      expect(more.textContent).toBe('+1 more');
+      expect(more.getAttribute('data-action')).toBe('compMore');
+    }
+  });
+
+  it('Needs Support: a cell per column up to 8, which the card swaps for codes when narrow', () => {
+    const el = dom(card({ compView: 'below' }));
+    const sect = el.querySelector('.dash-comp-card');
+    expect(sect.classList.contains('ns-cols-2')).toBe(true);
+    expect(el.querySelectorAll('.dash-comp-labels.is-cells-form')).toHaveLength(1);
+    const chipsLabel = el.querySelector('.dash-comp-labels.is-chips-form');
+    expect(texts(chipsLabel, ':scope > span')).toEqual(['Student', 'Below on', 'Count']);
+    const ava = el.querySelector('.dash-comp-row.is-student');
+    expect(ava.querySelectorAll('.dash-comp-sq')).toHaveLength(2);
+    // Weakest first: Evidence (1) before Inquiry (2).
+    expect(texts(ava, '.dash-comp-bchip')).toEqual(['EV', 'IN']);
+    expect(ava.querySelector('.dash-comp-bchip').getAttribute('style')).toBe(
+      'background:var(--score-1-bg);color:var(--score-1-text)',
+    );
+    expect(ava.querySelector('.dash-comp-name').getAttribute('title')).toBe('Ava Chan');
+  });
+
+  it('Needs Support past 8 columns: only the codes, weakest first, four then "+N"', () => {
+    setCols(9);
+    const cols = DashInsights.columns(CID);
+    const lists = cols.map((col, i) => ({ col, ids: i < 6 ? ['s1'] : [], values: { s1: 1 + i / 10 } }));
+    const el = dom(card({ compView: 'below', belowLists: lists }));
+    expect(el.querySelector('.dash-comp-card').classList.contains('is-chipform')).toBe(true);
+    expect(el.querySelector('.dash-comp-labels.is-cells-form')).toBeNull();
+    expect(el.querySelector('.dash-comp-sq')).toBeNull();
+    const row = el.querySelector('.dash-comp-row.is-student');
+    const codes = DashInsights.columnCodes(CID);
+    expect(texts(row, '.dash-comp-bchip')).toEqual(cols.slice(0, 4).map(c => codes[c.key]));
+    expect(row.querySelectorAll('.dash-comp-bchip.is-extra')).toHaveLength(2);
+    expect(row.querySelector('.dash-comp-bmore.is-wide').textContent).toBe('+2');
+    expect(row.querySelector('.dash-comp-bmore.is-narrow').textContent).toBe('+4');
+  });
+
+  it('Level Mix headings carry one letter for a narrow card', () => {
+    const el = dom(card({ compView: 'mix' }));
+    expect(texts(el, '.dash-comp-lv-short')).toEqual(['X', 'P', 'D', 'E']);
   });
 });
 

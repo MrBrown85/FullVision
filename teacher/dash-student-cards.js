@@ -342,7 +342,9 @@ window.DashStudentCards = (function () {
           st.id +
           '&course=' +
           cid +
-          '" data-stop-prop="true">' +
+          '" data-stop-prop="true" title="' +
+          esc(displayNameWithLast(st)) +
+          '">' +
           esc(displayNameWithLast(st)) +
           '</a>' +
           ((st.designations || []).length > 0
@@ -390,6 +392,33 @@ window.DashStudentCards = (function () {
           esc(grade.text || '\u2014') +
           '</span>' +
           trendHtml(trend) +
+          '</div>';
+
+        html += stripHtml(cid, st.id, cols, focusKey, secById);
+
+        // The footer: the flag at the bottom left (plan F.6), the
+        // observation line, then Missing and the right-hand note.
+        var flagLabel = flagged ? 'Unflag student' : 'Flag student';
+        html +=
+          '<div class="dash-card-footer">' +
+          '<button type="button" class="dash-flag-btn' +
+          (flagged ? ' is-on' : '') +
+          '" data-action="toggleFlag" data-cid="' +
+          cid +
+          '" data-sid="' +
+          st.id +
+          '" data-stop-prop="true" title="' +
+          flagLabel +
+          '" aria-label="' +
+          flagLabel +
+          '" aria-pressed="' +
+          flagged +
+          '">' +
+          (flagged ? '\u2691' : '\u2690') +
+          '</button>' +
+          '<div class="dash-card-obs" data-student-tab="evidence">' +
+          obsText +
+          '</div>' +
           (missingCount > 0
             ? '<span class="dash-card-missing" title="' +
               missingCount +
@@ -397,26 +426,6 @@ window.DashStudentCards = (function () {
               missingCount +
               '</span>'
             : '') +
-          '<button class="dash-flag-btn' +
-          (flagged ? ' is-on' : '') +
-          '" data-action="toggleFlag" data-cid="' +
-          cid +
-          '" data-sid="' +
-          st.id +
-          '" data-stop-prop="true" title="Flag student" aria-label="Flag student" aria-pressed="' +
-          flagged +
-          '">' +
-          (flagged ? '\u2691' : '\u2690') +
-          '</button>' +
-          '</div>';
-
-        html += stripHtml(cid, st.id, cols, focusKey, secById);
-
-        html +=
-          '<div class="dash-card-footer">' +
-          '<div class="dash-card-obs" data-student-tab="evidence">' +
-          obsText +
-          '</div>' +
           footerRightHtml(cid, st.id, focusCol) +
           '</div>';
 

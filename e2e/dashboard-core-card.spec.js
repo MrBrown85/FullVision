@@ -77,6 +77,12 @@ test('the row tip lists the steps and who has not self-assessed yet', async ({ p
   await expect(tip).toBeVisible();
   await expect(tip).toContainText(/Leading \d+ · Confident \d+ · Growing \d+ · Beginning \d+/);
   await expect(tip).toContainText('Not yet:');
+  // It ends with the questionnaire, and the pointer can reach the link
+  // (plan F.7b).
+  const link = tip.getByRole('link', { name: 'Open the Questionnaire →' });
+  await expect(link).toHaveAttribute('data-href', '/dashboard?course=sci8&manage=questionnaires');
+  await link.hover();
+  await expect(tip).toBeVisible();
 });
 
 test('with no self-assessment this term the card offers Evidence and Set Up a Reflection', async ({ page }) => {

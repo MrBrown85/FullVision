@@ -51,6 +51,9 @@ test('the view menu works from the keyboard and the pick is remembered', async (
   expect(await page.evaluate(() => localStorage.getItem('fv-dash-comp-view:sci8'))).toBe('mix');
 });
 
+// Science 8 has six folders: every view draws six rows (Needs Support: the
+// students, which are more), so beside Core Competencies the card is the
+// same height in each.
 test('every view keeps the card one height', async ({ page }) => {
   await openDashboard(page);
   const heights = [];

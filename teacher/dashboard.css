@@ -56,29 +56,33 @@ body:has(.cm-toolbar) #app-dock [data-action='toggleSidebar'] {
 
 /* ── Class Overview Panel ──────────────────────────────────── */
 /* The top bar (Class Average, Missing and Late, Upcoming Birthdays); then
-   Needs Attention beside Curricular and Core Competencies, as tall as the
-   two of them, its list scrolling inside; then Observations across the
-   page. Below 1100px the second row stacks. */
+   Curricular and Core Competencies side by side; then the students; then
+   Observations across the page. */
 .dash-overview-row {
   display: grid;
   gap: 12px;
   align-items: stretch;
 }
-.dash-overview-main {
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+/* Curricular and Core Competencies side by side, always one height: the
+   grid row stretches both to the taller (Colin, Nov 5). Below 900px they
+   stack. */
+.dash-overview-cards {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   margin-top: 12px;
 }
-.dash-overview-side {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
+/* Both cards are at least 300 px; the taller sets the row (plan F.1), and
+   each card's rows share what it has (F.2). */
+.dash-overview-cards > .dash-overview-section {
+  min-height: 300px;
 }
+/* Observations, last on the page: #main is a flex column, so the card
+   must not shrink to fit it (its grid would be squeezed to nothing). */
 .page-dashboard .dash-ob2 {
+  flex-shrink: 0;
   margin-top: 12px;
 }
-@media (max-width: 1100px) {
-  .dash-overview-main {
+@media (max-width: 900px) {
+  .dash-overview-cards {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -109,14 +113,13 @@ body:has(.cm-toolbar) #app-dock [data-action='toggleSidebar'] {
 .dash-glance-cell:first-child {
   border-left: 0;
 }
-button.dash-glance-cell:not(:disabled) {
+/* Missing and Late opens the gradebook when anything is missing or late. */
+a.dash-glance-cell {
+  text-decoration: none;
   cursor: pointer;
 }
-button.dash-glance-cell:not(:disabled):hover {
+a.dash-glance-cell:hover {
   background: var(--overlay-hover);
-}
-button.dash-glance-cell:disabled {
-  cursor: default;
 }
 .dash-glance-cell:focus-visible {
   outline: 2px solid var(--active);
@@ -459,8 +462,9 @@ button.dash-glance-cell:disabled {
    square per student in the self-assessment blues (--self-1 … --self-4,
    never the level colours); Evidence, one per tagged assessment (dark) and
    observation (light). Rows in their groups beside a thin bar, no lines.
-   Every row is 28 px and the title row 24 px, so the card keeps one height
-   in every view and state. */
+   The rows share the card's height (plan F.2): each 26–40 px, the gaps
+   between groups 8–20 px, so the card fills beside Curricular
+   Competencies whatever its height. */
 .page-dashboard .dash-core-head {
   min-height: 24px;
   margin-bottom: 6px;
@@ -471,10 +475,24 @@ button.dash-glance-cell:disabled {
   font-weight: 400;
   color: var(--text-2);
 }
+.dash-core-list {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 8px;
+}
 .dash-core-group {
   display: flex;
   gap: 10px;
-  margin-top: 8px;
+  flex: var(--core-rows, 1) 1 0;
+  min-height: calc(var(--core-rows, 1) * 26px);
+  max-height: calc(var(--core-rows, 1) * 40px);
+}
+.dash-core-gap {
+  flex: 1 1 0;
+  min-height: 8px;
+  max-height: 20px;
 }
 .dash-core-gbar {
   flex: none;
@@ -485,14 +503,19 @@ button.dash-glance-cell:disabled {
 .dash-core-rows {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
+/* The squares stop at 200 px, so the names have room at 1440 (plan F.5). */
 .dash-core-row {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) minmax(0, 222px) 64px;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 200px) 64px;
   align-items: center;
   gap: 12px;
-  height: 28px;
+  flex: 1 1 0;
+  min-height: 26px;
+  max-height: 40px;
   margin: 0 -8px;
   padding: 0 8px;
   border-radius: 4px;
@@ -559,13 +582,14 @@ button.dash-glance-cell:disabled {
 .dash-core-val.is-amber {
   color: var(--score-2-text);
 }
-/* Under the row at the right; names and titles run long, so it wraps. */
+/* Under the row at the right, touching it, so the pointer can reach its
+   link; names and titles run long, so it wraps. */
 .dash-core-row .dash-core-tip {
   left: auto;
   right: 0;
   transform: none;
   top: 100%;
-  margin-top: 2px;
+  margin-top: 0;
   width: max-content;
   min-width: 200px;
   max-width: min(320px, calc(100vw - 48px));
@@ -584,13 +608,38 @@ button.dash-glance-cell:disabled {
   margin-top: 2px;
   color: var(--text-2);
 }
+.dash-core-tip-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--link);
+  text-decoration: none;
+  cursor: pointer;
+}
+.dash-core-tip-link:hover {
+  text-decoration: underline;
+}
 
 /* ── Class insights (dash-insights.js) ─────────────────────── */
 /* Curricular Competencies (DashOverview.competenciesCardHtml): four views
-   behind the view menu. Every view has the same 16 px label row and 20 px
-   rows; the row block is as tall as the most rows any view draws
-   (--comp-rows), so the card keeps one height. A row sets the page's
-   competency filter: it tints on hover, and the picked one stays tinted. */
+   behind the view menu, each with the same 16 px label row. The card is
+   as tall as Core Competencies beside it, or taller (plan F.1); the rows
+   share the height, 22–44 px each, 64 with four rows or fewer (is-roomy,
+   which is roomier all round). Past 12 rows the list scrolls inside the
+   card. A row sets the page's competency filter: it tints on hover, and
+   the picked one stays tinted. The card is a container, so Level Mix's
+   headings and Needs Support's form follow its width (plan F.4, F.5). */
+.page-dashboard .dash-comp-card {
+  container-type: inline-size;
+  position: relative;
+}
+/* Its pop-ups hang past the card, over what is below. */
+.page-dashboard .dash-comp-card:hover,
+.page-dashboard .dash-comp-card:focus-within {
+  z-index: 3;
+}
 .page-dashboard .dash-comp-head {
   min-height: 24px;
   margin-bottom: 6px;
@@ -603,14 +652,25 @@ button.dash-glance-cell:disabled {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dash-comp-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* The name column is half of what the count leaves, at least 150 px, so a
+   folder name like "Communicating and Representing" fits at 1440 at the
+   roomy 14 px (plan F.5 asked for 0.42fr beside a 1fr middle: 150 px at
+   1440, which still cut it). */
 .dash-comp-labels,
 .dash-comp-row {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) 64px;
+  grid-template-columns: minmax(150px, 1fr) minmax(0, 1fr) 64px;
   align-items: center;
   gap: 8px;
 }
 .dash-comp-labels {
+  flex: none;
   height: 16px;
   margin-bottom: 4px;
   font-family: var(--font-base);
@@ -636,6 +696,18 @@ button.dash-glance-cell:disabled {
 .dash-comp-lab-mid.is-ends {
   display: flex;
   justify-content: space-between;
+}
+/* Level Mix's headings: the level's code, or one letter on a narrow card. */
+.dash-comp-lv-short {
+  display: none;
+}
+@container (max-width: 340px) {
+  .dash-comp-lv-long {
+    display: none;
+  }
+  .dash-comp-lv-short {
+    display: inline;
+  }
 }
 .dash-comp-codes,
 .dash-comp-squares {
@@ -669,15 +741,16 @@ button.dash-glance-cell:disabled {
 .dash-comp-rows {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-height: calc(var(--comp-rows, 1) * 24px - 4px);
-  margin-bottom: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .dash-comp-row {
   position: relative;
   box-sizing: border-box;
+  flex: 1 1 0;
   width: calc(100% + 12px);
-  height: 20px;
+  min-height: 22px;
+  max-height: 44px;
   margin: 0 -6px;
   padding: 0 6px;
   border: 0;
@@ -699,7 +772,9 @@ button.dash-glance-cell:disabled {
 .dash-comp-row:focus-visible,
 .dash-comp-pick:focus-visible,
 .dash-comp-code:focus-visible,
-.dash-comp-more:focus-visible {
+.dash-comp-more:focus-visible,
+.dash-comp-moreline:focus-visible,
+.dash-comp-rows.is-scroll:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 1px;
 }
@@ -711,7 +786,7 @@ button.dash-glance-cell:disabled {
   text-overflow: ellipsis;
 }
 .dash-comp-pick {
-  height: 20px;
+  align-self: stretch;
   padding: 0;
   border: 0;
   background: transparent;
@@ -749,6 +824,7 @@ button.dash-glance-cell:disabled {
 .dash-comp-cell {
   display: grid;
   place-items: center;
+  min-width: 0;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -781,7 +857,13 @@ button.dash-comp-cell:hover {
   outline: 2px solid var(--link);
   outline-offset: 1px;
 }
-/* Needs Support: a cell per competency in the student's level colour. */
+/* Needs Support: a cell per competency in the student's level colour, or
+   (past 8 columns, or below 14 px a column) the codes of the columns the
+   student is below on, weakest first (plan F.4). */
+.dash-comp-mid {
+  display: block;
+  min-width: 0;
+}
 .dash-comp-squares {
   height: 16px;
 }
@@ -789,9 +871,193 @@ button.dash-comp-cell:hover {
   border-radius: 3px;
   background: var(--divider-medium);
 }
+.dash-comp-bchips {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+.dash-comp-bchip {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--overlay-hover);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.dash-comp-bmore {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.dash-comp-bmore.is-narrow {
+  display: none;
+}
+/* In the chip form the names are students' short names, so their column
+   can be narrower than a competency's 150 px. */
+.dash-comp-card.is-chipform .dash-comp-labels,
+.dash-comp-card.is-chipform .dash-comp-row {
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr) 64px;
+}
+/* On a narrow card, two codes and "+N" (four don't fit). */
+@container (max-width: 380px) {
+  .dash-comp-bchip.is-extra,
+  .dash-comp-bmore.is-wide {
+    display: none;
+  }
+  .dash-comp-bmore.is-narrow {
+    display: inline;
+  }
+}
+.dash-comp-labels.is-chips-form {
+  display: none;
+}
+.dash-comp-card.is-chipform .dash-comp-labels.is-chips-form {
+  display: grid;
+}
+.dash-comp-card.is-chipform .dash-comp-bchips {
+  display: flex;
+}
+/* With 8 columns or fewer, the chips take over when a column would be
+   under 14 px: the card's inner width at which that happens is 227 px +
+   17 px a column (the 150 px name, the 64 px count, the gaps). */
+@container (max-width: 244px) {
+  .ns-cols-1 .dash-comp-labels.is-cells-form,
+  .ns-cols-1 .dash-comp-squares {
+    display: none;
+  }
+  .ns-cols-1 .dash-comp-labels.is-chips-form {
+    display: grid;
+  }
+  .ns-cols-1 .dash-comp-labels,
+  .ns-cols-1 .dash-comp-row {
+    grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr) 64px;
+  }
+  .ns-cols-1 .dash-comp-bchips {
+    display: flex;
+  }
+}
+@container (max-width: 261px) {
+  .ns-cols-2 .dash-comp-labels.is-cells-form,
+  .ns-cols-2 .dash-comp-squares {
+    display: none;
+  }
+  .ns-cols-2 .dash-comp-labels.is-chips-form {
+    display: grid;
+  }
+  .ns-cols-2 .dash-comp-labels,
+  .ns-cols-2 .dash-comp-row {
+    grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr) 64px;
+  }
+  .ns-cols-2 .dash-comp-bchips {
+    display: flex;
+  }
+}
+@container (max-width: 278px) {
+  .ns-cols-3 .dash-comp-labels.is-cells-form,
+  .ns-cols-3 .dash-comp-squares {
+    display: none;
+  }
+  .ns-cols-3 .dash-comp-labels.is-chips-form {
+    display: grid;
+  }
+  .ns-cols-3 .dash-comp-labels,
+  .ns-cols-3 .dash-comp-row {
+    grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr) 64px;
+  }
+  .ns-cols-3 .dash-comp-bchips {
+    display: flex;
+  }
+}
+@container (max-width: 295px) {
+  .ns-cols-4 .dash-comp-labels.is-cells-form,
+  .ns-cols-4 .dash-comp-squares {
+    display: none;
+  }
+  .ns-cols-4 .dash-comp-labels.is-chips-form {
+    display: grid;
+  }
+  .ns-cols-4 .dash-comp-labels,
+  .ns-cols-4 .dash-comp-row {
+    grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr) 64px;
+  }
+  .ns-cols-4 .dash-comp-bchips {
+    display: flex;
+  }
+}
+@container (max-width: 312px) {
+  .ns-cols-5 .dash-comp-labels.is-cells-form,
+  .ns-cols-5 .dash-comp-squares {
+    display: none;
+  }
+  .ns-cols-5 .dash-comp-labels.is-chips-form {
+    display: grid;
+  }
+  .ns-cols-5 .dash-comp-labels,
+  .ns-cols-5 .dash-comp-row {
+    grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr) 64px;
+  }
+  .ns-cols-5 .dash-comp-bchips {
+    display: flex;
+  }
+}
+@container (max-width: 329px) {
+  .ns-cols-6 .dash-comp-labels.is-cells-form,
+  .ns-cols-6 .dash-comp-squares {
+    display: none;
+  }
+  .ns-cols-6 .dash-comp-labels.is-chips-form {
+    display: grid;
+  }
+  .ns-cols-6 .dash-comp-labels,
+  .ns-cols-6 .dash-comp-row {
+    grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr) 64px;
+  }
+  .ns-cols-6 .dash-comp-bchips {
+    display: flex;
+  }
+}
+@container (max-width: 346px) {
+  .ns-cols-7 .dash-comp-labels.is-cells-form,
+  .ns-cols-7 .dash-comp-squares {
+    display: none;
+  }
+  .ns-cols-7 .dash-comp-labels.is-chips-form {
+    display: grid;
+  }
+  .ns-cols-7 .dash-comp-labels,
+  .ns-cols-7 .dash-comp-row {
+    grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr) 64px;
+  }
+  .ns-cols-7 .dash-comp-bchips {
+    display: flex;
+  }
+}
+@container (max-width: 363px) {
+  .ns-cols-8 .dash-comp-labels.is-cells-form,
+  .ns-cols-8 .dash-comp-squares {
+    display: none;
+  }
+  .ns-cols-8 .dash-comp-labels.is-chips-form {
+    display: grid;
+  }
+  .ns-cols-8 .dash-comp-labels,
+  .ns-cols-8 .dash-comp-row {
+    grid-template-columns: minmax(120px, 1fr) minmax(0, 1fr) 64px;
+  }
+  .ns-cols-8 .dash-comp-bchips {
+    display: flex;
+  }
+}
 .dash-comp-more {
+  flex: none;
   align-self: flex-start;
-  height: 20px;
+  height: 22px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -803,10 +1069,69 @@ button.dash-comp-cell:hover {
 .dash-comp-more:hover {
   text-decoration: underline;
 }
+/* An empty view's one line sits in the middle of the card's space. */
 .dash-comp-none {
+  flex: none;
+  margin: auto 0;
+  padding: 0 12px;
   font-family: var(--font-base);
   font-size: var(--text-sm);
   color: var(--text-2);
+  text-align: center;
+}
+/* Past 12 rows: the list is 12 rows tall and scrolls; a fade at its foot
+   until the end, and "+N more" under it. The rows don't grow here, and a
+   row's pop-up hangs from the card (page-dashboard.js places it), so the
+   list doesn't cut it off. */
+.dash-comp-scroll {
+  position: relative;
+  flex: none;
+}
+.dash-comp-rows.is-scroll {
+  flex: none;
+  height: calc(12 * 22px);
+  margin: 0 -6px;
+  padding: 0 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.dash-comp-rows.is-scroll .dash-comp-row {
+  position: static;
+  flex: none;
+  height: 22px;
+}
+.dash-comp-scroll::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22px;
+  background: linear-gradient(to bottom, transparent, var(--surface));
+  pointer-events: none;
+}
+.dash-comp-scroll.is-end::after {
+  display: none;
+}
+.dash-comp-moreline {
+  flex: none;
+  align-self: flex-start;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-base);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--link);
+  cursor: pointer;
+}
+.dash-comp-moreline[hidden] {
+  visibility: hidden;
+  display: block;
+}
+.dash-comp-moreline:hover {
+  text-decoration: underline;
 }
 /* Change: the class average month by month, on one scale for every row. */
 .dash-comp-line {
@@ -820,9 +1145,9 @@ button.dash-comp-cell:hover {
   height: 18px;
   overflow: visible;
 }
-/* A row's pop-up: under it, from the bars' left edge. */
+/* A row's pop-up: under it, from where the name column ends. */
 .dash-comp-row .dash-comp-tip {
-  left: 162px;
+  left: max(164px, calc((100% - 92px) / 2 + 14px));
   right: auto;
   transform: none;
   top: 100%;
@@ -832,6 +1157,10 @@ button.dash-comp-cell:hover {
   max-width: min(320px, calc(100% - 170px));
   white-space: normal;
   cursor: default;
+}
+.dash-comp-rows.is-scroll .dash-comp-tip {
+  margin-top: 0;
+  max-width: 320px;
 }
 .dash-comp-row:hover .dash-comp-tip,
 .dash-comp-row:focus-visible .dash-comp-tip {
@@ -846,6 +1175,33 @@ button.dash-comp-cell:hover {
   font-size: var(--text-sm);
   line-height: 1.45;
   color: var(--text);
+}
+/* Four rows or fewer: roomier names, bars, counts and rows (plan F.2).
+   A row may grow to 64 px, not the plan's 52: three rows at 52 left a
+   62 px band under them in a 300 px card; at 64 it is about 26. */
+.dash-comp-card.is-roomy .dash-comp-row {
+  max-height: 64px;
+  font-size: var(--text-base);
+}
+.dash-comp-card.is-roomy .dash-comp-pick {
+  font-size: var(--text-base);
+}
+.dash-comp-card.is-roomy .dash-outcome-bar-track {
+  height: 10px;
+  border-radius: 5px;
+}
+.dash-comp-card.is-roomy .dash-comp-cells {
+  height: 22px;
+}
+.dash-comp-card.is-roomy .dash-comp-cell {
+  font-size: var(--text-sm);
+}
+.dash-comp-card.is-roomy .dash-comp-squares {
+  height: 18px;
+}
+.dash-comp-card.is-roomy .dash-comp-line,
+.dash-comp-card.is-roomy .dash-comp-spark {
+  height: 22px;
 }
 /* A new view's rows fade in (page-dashboard.js adds the class). */
 .dash-comp-body.is-fade-in {
@@ -961,14 +1317,8 @@ button.dash-comp-cell:hover {
   line-height: 1.4;
   color: var(--text);
 }
-.dash-mix-pop-next b,
-.dash-na-next b {
+.dash-mix-pop-next b {
   font-weight: 600;
-  color: var(--text);
-}
-/* A Needs Attention row's next step, on its own line under the facts. */
-.dash-na-next {
-  display: block;
   color: var(--text);
 }
 .dash-mix-pop-close {
@@ -1034,265 +1384,6 @@ a.dash-ins-name {
 a.dash-ins-name:hover {
   color: var(--link);
   text-decoration: underline;
-}
-
-/* Needs Attention: the rule, the filters, then one row per student. */
-.dash-na-card {
-  padding: 0;
-}
-.dash-na-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  padding: 14px 20px 10px;
-}
-.dash-na-title {
-  margin: 0;
-  font-family: var(--font-base);
-  font-size: var(--text-lg);
-  font-weight: 600;
-  color: var(--text);
-}
-.dash-na-count {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-2);
-}
-.dash-help-rule {
-  margin-left: auto;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-2);
-}
-.dash-help-rule-btn {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--link);
-  background: none;
-  border: 0;
-  border-radius: 6px;
-  padding: 4px 6px;
-  cursor: pointer;
-}
-.dash-help-rule-btn:hover {
-  background: var(--active-light);
-}
-.dash-help-rule-edit {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  padding: 8px 12px;
-  margin: 0 20px 10px;
-  border-radius: 8px;
-  background: var(--bg);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-2);
-}
-.dash-help-rule-edit label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.dash-na-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 10px;
-  padding: 0 20px 12px;
-}
-.dash-na-n {
-  margin-left: 5px;
-  font-size: var(--text-xs);
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-}
-.dash-na-compchip {
-  height: var(--chip-h, 24px);
-  padding: 0 10px;
-  border: 1px solid var(--active);
-  border-radius: 4px;
-  background: var(--active-light);
-  color: var(--link);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-/* As tall as the cards beside it: the list takes no height of its own and
-   fills what the row leaves, scrolling past that. */
-.dash-na-list {
-  flex: 1 1 auto;
-  height: 0;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  border-top: 1px solid var(--divider-medium);
-  border-radius: 0 0 12px 12px;
-}
-.dash-na-list:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: -2px;
-}
-@media (max-width: 1100px) {
-  .dash-na-list {
-    height: auto;
-    max-height: 480px;
-  }
-}
-.dash-na-row {
-  position: relative;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 136px) minmax(0, max-content) minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  min-height: 44px;
-  padding: 6px 20px;
-  border-bottom: 1px solid var(--divider-subtle);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-}
-.dash-na-row:hover,
-.dash-na-row:focus-within {
-  background: var(--overlay-hover);
-}
-.dash-na-rank {
-  font-size: var(--text-xs);
-  color: var(--text-2);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.dash-na-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: var(--text-base);
-}
-.dash-na-grade {
-  justify-self: start;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.dash-na-grade.is-none {
-  color: var(--text-2);
-}
-.dash-na-facts {
-  color: var(--text-2);
-  line-height: 1.5;
-}
-.dash-na-fact {
-  white-space: nowrap;
-}
-.dash-na-fact b {
-  color: var(--text);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.dash-na-fact .is-late,
-.dash-na-fact .is-late b {
-  color: var(--score-2-text);
-}
-.dash-na-sep {
-  margin: 0 2px;
-  color: var(--border);
-}
-.dash-na-glyph {
-  margin-right: 3px;
-}
-.dash-na-diamond {
-  display: inline-flex;
-  vertical-align: -1px;
-  margin-right: 4px;
-  color: var(--accent-purple);
-}
-/* + Observation and Gradebook show over the row's right end on hover or
-   focus, so the row never changes size. */
-.dash-na-act {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 6px;
-  padding-left: 28px;
-  /* The hovered row's own colour (the hover tint over the card), so the
-     fade blends into the row instead of showing a white block. */
-  background:
-    linear-gradient(90deg, transparent, var(--overlay-hover) 24px),
-    linear-gradient(90deg, transparent, var(--surface) 24px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s;
-}
-.dash-na-row:hover .dash-na-act,
-.dash-na-row:focus-within .dash-na-act {
-  opacity: 1;
-  pointer-events: auto;
-}
-@media (hover: none) {
-  .dash-na-act {
-    position: static;
-    transform: none;
-    grid-column: 2 / -1;
-    padding: 0;
-    background: none;
-    opacity: 1;
-    pointer-events: auto;
-  }
-}
-.dash-na-btn {
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  padding: 0 10px;
-  border: 1px solid var(--divider-strong);
-  border-radius: 6px;
-  background: var(--surface);
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text);
-  text-decoration: none;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.dash-na-btn:hover {
-  background: var(--bg);
-}
-.dash-na-row.is-class {
-  grid-template-columns: 18px minmax(0, 1fr) auto;
-  background: var(--bg);
-}
-.dash-na-classtext {
-  color: var(--text-2);
-}
-.dash-na-classlink {
-  font-weight: 500;
-  color: var(--link);
-  text-decoration: none;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.dash-na-classlink:hover {
-  text-decoration: underline;
-}
-.dash-na-empty {
-  padding: 20px;
-}
-
-/* Curricular Competencies: the line under the rows. */
-.dash-comp-foot {
-  margin: 0 -20px -16px;
-  padding: 10px 20px 14px;
-  border-top: 1px solid var(--divider-subtle);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-2);
 }
 
 /* Students heading: search, sort, Flagged and Cards | Grid. */
@@ -2140,20 +2231,22 @@ a.dash-ins-name:hover {
 /* ── Student Card Grid ──────────────────────────────────────── */
 .dash-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   padding: 0;
   /* The section above already sets the 12px between boxes. */
   margin-top: 0;
 }
+/* minmax(0, 1fr), not 1fr: a long name or a wide strip never widens its
+   column past the others (the stress test, Nov 5). */
 @media (max-width: 960px) {
   .dash-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 @media (max-width: 700px) {
   .dash-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 .dash-card {
@@ -2195,8 +2288,8 @@ a.dash-ins-name:hover {
   transform: translateY(-1px);
 }
 
-/* Card Header: avatar, name (designations on its line, pronouns and
-   student number under it), the overall grade, missing work, the flag. */
+/* Card Header: avatar, name (designations on its line), the overall grade
+   and its trend. The flag and missing work are in the footer (plan F.6). */
 .dash-card-header {
   display: flex;
   align-items: center;
@@ -2215,15 +2308,31 @@ a.dash-ins-name:hover {
   font-size: 11px;
   font-weight: 700;
 }
+/* The flag, at the footer's bottom left: 22 px square. */
 .dash-flag-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: -4px;
+  padding: 0;
   background: none;
   border: none;
+  border-radius: 4px;
   cursor: pointer;
   font-size: var(--text-md);
-  padding: 0 2px;
   line-height: 1;
   color: var(--text-3);
   transition: color 0.12s;
+}
+.dash-flag-btn:hover {
+  background: var(--overlay-hover);
+  color: var(--text-2);
+}
+.dash-flag-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
 }
 .dash-flag-btn.is-on {
   color: var(--priority);
@@ -2247,14 +2356,14 @@ a.dash-ins-name:hover {
   font-weight: 600;
   color: var(--text);
   text-decoration: none;
-  /* A long name wraps to a second line rather than being cut off (Colin,
-     Nov 5); two lines at most. */
+  /* A long name wraps to a second line at its spaces rather than being cut
+     off (Colin, Nov 5); two lines at most, the full name in its title. */
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   line-height: 1.25;
 }
 .dash-card-name:hover {
@@ -2274,9 +2383,12 @@ a.dash-ins-name:hover {
   color: var(--text-2);
 }
 .dash-card-missing {
+  font-family: var(--font-base);
   font-size: var(--text-xs);
+  font-weight: 600;
   color: var(--priority);
   flex-shrink: 0;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2384,6 +2496,11 @@ a.dash-ins-name:hover {
   font-weight: 400;
   line-height: 1.5;
 }
+/* A competency pointed at on Curricular Competencies: its chip is
+   outlined on every card, nothing else changes (plan F.7a). */
+.dash-card-seg.is-lit {
+  outline-color: var(--text);
+}
 /* A column in focus (part of the page's competency filter): it is outlined,
    the others fade (a mix with the card, so the pop-up stays solid). */
 .dash-card-strip.has-focus .dash-card-seg.is-focus {
@@ -2430,14 +2547,16 @@ a.dash-ins-name:hover {
   line-height: 1;
 }
 
-/* Card Footer: the observation line, and on the right "N not assessed"
-   or, with a column in focus, the student's level on it. */
+/* Card Footer: the flag, the observation line, missing work, and on the
+   right "N not assessed" or, with a column in focus, the student's level
+   on it. */
 .dash-card-footer {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px 12px;
+  gap: 6px;
+  padding: 0 12px 10px;
 }
+.dash-card-missing,
 .dash-card-unassessed,
 .dash-card-focus {
   flex-shrink: 0;
@@ -6855,29 +6974,9 @@ label.cm-cr-row {
   margin-bottom: 12px;
 }
 
-/* Needs Attention on a phone: the filter buttons wrap onto more lines and
-   each student's facts go under the name, so the card never runs past the
-   screen and the page never scrolls sideways (Nov 3 sweep). */
+/* On a phone the Observations card's flags wrap, so the card never runs
+   past the screen and the page never scrolls sideways (Nov 3 sweep). */
 @media (max-width: 600px) {
-  .dash-na-head,
-  .dash-na-filters {
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-  .dash-na-seg {
-    flex-wrap: wrap;
-    max-width: 100%;
-  }
-  .dash-na-row {
-    grid-template-columns: 18px minmax(0, 1fr) auto;
-    padding: 6px 12px;
-  }
-  .dash-na-facts {
-    grid-column: 2 / -1;
-  }
-  .dash-na-fact {
-    white-space: normal;
-  }
   .dash-ob2-flags {
     min-width: 0;
     max-width: 100%;

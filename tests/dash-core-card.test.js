@@ -210,6 +210,31 @@ describe('Core Competencies card', () => {
     }
   });
 
+  it("the groups share the card's height: each grows by its rows, a gap between them (plan F.2)", () => {
+    const html = card({ coreView: 'evidence' });
+    expect([...html.matchAll(/style="--core-rows:(\d)"/g)].map(m => m[1])).toEqual(['2', '2', '3']);
+    expect(count(html, /class="dash-core-gap"/g)).toBe(2);
+    // Every name keeps its full text in a title.
+    expect(html).toContain('<span class="dash-core-name" title="Personal Awareness &amp; Responsibility">');
+  });
+
+  it("the Self-Assessment tip ends with the questionnaire while anyone hasn't (plan F.7b)", () => {
+    setSelf({
+      s1: { T2: { COM: { level: 3 } } },
+      s2: { T2: { COM: { level: 2 } } },
+      s3: { T2: { COM: { level: 4 } } },
+    });
+    const html = card({ coreView: 'self' });
+    expect(row(html, 'COM')).not.toContain('Open the Questionnaire');
+    const ct = row(html, 'CT');
+    expect(ct).toContain(
+      '<a class="dash-core-tip-link" role="link" tabindex="0" data-href="/dashboard?course=' +
+        CID +
+        '&amp;manage=questionnaires">Open the Questionnaire →</a>',
+    );
+    expect(ct.indexOf('Not yet:')).toBeLessThan(ct.indexOf('Open the Questionnaire'));
+  });
+
   it('escapes names and titles', () => {
     setSelf({ s1: { T2: { COM: { level: 3 } } } });
     const html = DashOverview.coreCardHtml({
@@ -235,7 +260,6 @@ describe('Core Competencies card', () => {
       allTags: [],
       ccCounts: { COM: 1 },
       ccAssessments: { COM: ['Lab'] },
-      actionItems: [],
     });
     expect(html).toContain('dash-core-list dash-core-evidence');
     expect(row(html, 'COM')).toContain('<span class="dash-core-val">1</span>');

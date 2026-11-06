@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 /* The dashboard's Observations card (docs/DECISIONS.md, "Observations
-   (2026-10-18)", item 4) in Demo Mode on Science 8: its place, both tabs,
+   (2026-10-18)", item 4) in Demo Mode on Science 8: its place (last, under
+   the students since plan F), both tabs,
    flags, the "+" dialog, the week popover and the jump to the
    student page. The demo class has no competency gaps and no linked
    observations, so the tests make them through the data layer and read the
@@ -21,7 +22,7 @@ async function openDashboard(page) {
 const card = page => page.locator('#dash-obs-card');
 
 test.describe('Dashboard Observations card', () => {
-  test('the card spans the page under the competencies and never scrolls sideways', async ({ page }) => {
+  test('the card spans the page under the students and never scrolls sideways', async ({ page }) => {
     await enterDemo(page);
     for (const width of [800, 1024, 1280, 1600]) {
       await page.setViewportSize({ width, height: 900 });
@@ -31,7 +32,9 @@ test.describe('Dashboard Observations card', () => {
         await expect(card(page).getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true');
         const m = await page.evaluate(() => {
           const g = document.querySelector('.dash-glance').getBoundingClientRect();
-          const n = document.querySelector('#dash-na-card').getBoundingClientRect();
+          // Last on the page, under the student cards (plan F).
+          const cards = document.querySelectorAll('.dash-grid > .dash-card');
+          const n = cards[cards.length - 1].getBoundingClientRect();
           const o = document.querySelector('#dash-obs-card').getBoundingClientRect();
           return {
             left: Math.abs(o.left - g.left),
@@ -44,7 +47,7 @@ test.describe('Dashboard Observations card', () => {
         });
         expect(m.scrollW, `sideways scroll at ${width} on ${tab}`).toBeLessThanOrEqual(m.clientW);
         expect(m.cardRight).toBeLessThanOrEqual(m.clientW);
-        // As wide as the top bar, below Needs Attention.
+        // As wide as the top bar, below the students.
         expect(m.left).toBeLessThan(1);
         expect(m.right).toBeLessThan(1);
         expect(m.below, `overlaps at ${width} on ${tab}`).toBe(true);

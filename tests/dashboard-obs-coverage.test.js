@@ -260,10 +260,13 @@ describe('Observations card rendering', () => {
       assessedCCs: new Set(),
       ccCounts: {},
       ccAssessments: {},
-      actionItems: [],
     });
-    expect(html).toContain('id="dash-obs-card"');
-    expect(html).not.toContain('dash-obs-grid');
+    // The Observations card is drawn on its own, at the foot of the page
+    // (plan F), and keeps working without its state too.
+    expect(html).not.toContain('id="dash-obs-card"');
+    const obs = DashOverview.obsCardHtml({ cid: CID, allStudents: students });
+    expect(obs).toContain('id="dash-obs-card"');
+    expect(obs).not.toContain('dash-obs-grid');
     // Every opened element is closed inside the panel.
     const opens = (html.match(/<div\b/g) || []).length + (html.match(/<section\b/g) || []).length;
     const closes = (html.match(/<\/div>/g) || []).length + (html.match(/<\/section>/g) || []).length;

@@ -97,7 +97,6 @@ describe('class grade distribution', () => {
       ccAssessments: {},
       recentObsCount: 0,
       flagCount: 0,
-      actionItems: [],
     });
     return html.slice(html.indexOf('Class Average'), html.indexOf('Missing and Late'));
   }

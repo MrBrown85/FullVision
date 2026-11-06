@@ -75,6 +75,62 @@ describe('DashInsights.columnCode', () => {
   });
 });
 
+describe('DashInsights.columnCodes: unique in the class (plan F.3)', () => {
+  const CE = [
+    'Self-Assessment',
+    'Purpose & Community',
+    'Public Identity',
+    'Collaboration',
+    'Perspectives on Work',
+    'Workplace Safety',
+    'Goal Setting',
+    'Curriculum Choices',
+    'Networks & Mentors',
+    'Career Influences',
+    'Career Research',
+    'New Experiences',
+    'Decision-Making',
+  ];
+  const shortSec = (id, code, short) => ({
+    id,
+    name: short + ' (Ministry wording)',
+    shortName: short,
+    tags: [tag(id, code, short)],
+  });
+
+  it('Career Education 8: thirteen "CE" codes become the initials of each short name', () => {
+    setClass({ sections: CE.map((short, i) => shortSec('ce' + i, 'CE' + (i + 1), short)) });
+    const codes = Object.values(DashInsights.columnCodes(CID));
+    expect(codes).toEqual(['SA', 'PC', 'PI', 'COL', 'PW', 'WS', 'GS', 'CC', 'NM', 'CI', 'CR', 'NE', 'DM']);
+    expect(new Set(codes).size).toBe(13);
+    // columnCode agrees, one column at a time.
+    expect(DashInsights.columnCode(CID, DashInsights.columns(CID)[3])).toBe('COL');
+  });
+
+  it('Significance and Significance Claims: "SIG, SIG" become SIG and SC; the others keep theirs', () => {
+    setClass({
+      sections: [
+        shortSec('in', 'INQ', 'Inquiry'),
+        shortSec('s1', 'SIG1', 'Significance'),
+        shortSec('s2', 'SIG2', 'Significance Claims'),
+      ],
+    });
+    expect(Object.values(DashInsights.columnCodes(CID))).toEqual(['INQ', 'SIG', 'SC']);
+  });
+
+  it('initials that still collide take the number from their code, else their place', () => {
+    setClass({
+      sections: [
+        shortSec('a', 'CE1', 'Career Research'),
+        shortSec('b', 'CE2', 'Career Reflection'),
+        shortSec('c', 'XY', 'Alpha'),
+        shortSec('d', 'XY', 'Alpha'),
+      ],
+    });
+    expect(Object.values(DashInsights.columnCodes(CID))).toEqual(['CR1', 'CR2', 'ALP3', 'ALP4']);
+  });
+});
+
 describe('the card strip', () => {
   const many = n => Array.from({ length: n }, (_, i) => sec('s' + i, 'Area ' + i, { code: 'AR' + i }));
 
@@ -84,7 +140,9 @@ describe('the card strip', () => {
     expect(el.querySelector('.dash-card-strip').classList.contains('is-chips')).toBe(true);
     const chips = el.querySelectorAll('.dash-card-strip button.dash-card-seg');
     expect(chips).toHaveLength(8);
-    expect(chips[0].firstChild.textContent).toBe('AR');
+    // Eight "AR" codes would collide: each takes its short name's
+    // initials instead (Area 0 → A0; plan F.3).
+    expect(chips[0].firstChild.textContent).toBe('A0');
 
     setClass({ sections: many(9) });
     el = dom(render());
@@ -93,6 +151,18 @@ describe('the card strip', () => {
     const bars = el.querySelectorAll('.dash-card-strip span.dash-card-seg');
     expect(bars).toHaveLength(9);
     expect(bars[0].firstChild.className).toBe('dist-tip');
+  });
+
+  it("the flag sits at the footer's bottom left, before the observation line; the name keeps a title", () => {
+    setClass({ sections: many(3) });
+    const el = dom(render());
+    expect(el.querySelector('.dash-card-header .dash-flag-btn')).toBeNull();
+    const foot = el.querySelector('.dash-card-footer');
+    expect(foot.firstElementChild.classList.contains('dash-flag-btn')).toBe(true);
+    expect(foot.firstElementChild.getAttribute('data-action')).toBe('toggleFlag');
+    expect(foot.firstElementChild.getAttribute('aria-label')).toBe('Flag student');
+    expect(foot.firstElementChild.nextElementSibling.classList.contains('dash-card-obs')).toBe(true);
+    expect(el.querySelector('.dash-card-name').getAttribute('title')).toBe('Noor Khan');
   });
 
   it("the pop-up names the column, the level and word, and a folder's evidence", () => {

@@ -69,7 +69,7 @@ describe('dashboard card trend', () => {
     expect(html).toContain(UP);
   });
 
-  it('sits right after the grade badge, before the flag, with what it means', () => {
+  it('sits right after the grade badge, the last thing in the header, with what it means', () => {
     const html = card(
       [lvl('a'), lvl('b'), lvl('c'), lvl('d')],
       [sc('a', 2, '2026-09-01'), sc('b', 2, '2026-09-08'), sc('c', 3, '2026-09-15'), sc('d', 3, '2026-09-22')],
@@ -77,7 +77,10 @@ describe('dashboard card trend', () => {
     const head = afterBadge(html);
     const trendAt = head.indexOf('dash-card-trend');
     expect(trendAt).toBeGreaterThan(0);
-    expect(trendAt).toBeLessThan(head.indexOf('dash-flag-btn'));
+    // The header keeps the avatar, the name, the grade and the trend; the
+    // flag and missing work are in the footer (plan F.6).
+    expect(head).not.toContain('dash-flag-btn');
+    expect(head).not.toContain('dash-card-missing');
     // Nothing else between the badge and the arrow.
     expect(head.slice(head.indexOf('</span>'), trendAt)).not.toMatch(/dash-card-missing/);
     expect(head).toContain('aria-label="Rising: later work scores higher than earlier work"');

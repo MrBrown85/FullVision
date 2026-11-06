@@ -159,7 +159,7 @@ window.DashOverview = (function () {
     }
     html += '</div>';
 
-    html += DashInsights.missingGlanceHtml(opts.missing || []);
+    html += DashInsights.missingGlanceHtml(opts.missing || [], cid);
 
     var bdays = getUpcomingBirthdays(cid);
     html += '<div class="dash-glance-cell dash-glance-bdays"><span class="dash-glance-label">Upcoming Birthdays</span>';
@@ -206,24 +206,37 @@ window.DashOverview = (function () {
        trend  Change: the class average month by month
      A Letter class starts on Class Average, a Proficiency or Both class on
      Level Mix; the pick is remembered per class on this device
-     (page-dashboard.js). Every view has the same 16 px label row and the
-     row block is as tall as the most rows any view draws, so the card keeps
-     one height. A competency row (and a Needs Support column code) sets the
-     page's competency filter (data-action naComp; the same key again
-     clears it); a Level Mix count opens its students (mixSeg); a Needs
+     (page-dashboard.js). Every view has the same 16 px label row. The card
+     sits beside Core Competencies at one height, the taller's (plan F.1):
+     its rows share the height between a minimum and a maximum, roomier
+     with four rows or fewer (is-roomy), and past 12 rows the list scrolls
+     inside the card. A competency row (and a Needs Support column code)
+     sets the page's competency filter (data-action naComp; the same key
+     again clears it) and, while pointed at, lights its chip on every
+     student card; a Level Mix count opens its students (mixSeg); a Needs
      Support row opens the student.
 
-     opts: cid, allStudents, assessments, tagsWithEvidence, allTags,
-     compView, naComp, mixPop, helpRule, belowLists (DashInsights.belowLists
-     under the rule, when the caller has them), todayStr (tests). */
+     opts: cid, allStudents, compView, naComp, mixPop, helpRule, belowLists
+     (DashInsights.belowLists under the rule, when the caller has them),
+     todayStr (tests). */
   var COMP_VIEWS = [
     { key: 'avg', label: 'Class Average', hint: 'The class average on each competency' },
     { key: 'mix', label: 'Level Mix', hint: 'How many students are at each level' },
-    // The hint names the Needs Attention rule's level (_compViews).
+    // The hint names the Who Needs Help rule's level (_compViews).
     { key: 'below', label: 'Needs Support', hint: 'Students below {level} most often, and where' },
     { key: 'trend', label: 'Change', hint: 'The class average month by month' },
   ];
   var COMP_SUPPORT_ROWS = 7;
+  // Past this many rows the list scrolls inside the card (plan F.1).
+  var COMP_MAX_ROWS = 12;
+  // With this many rows or fewer the card is roomier (plan F.2).
+  var COMP_ROOMY_ROWS = 4;
+  // Needs Support draws a cell per column up to this many columns, and
+  // past it (or below 14 px a column, dashboard.css) each student's codes.
+  var COMP_SUPPORT_CELLS = 8;
+  var COMP_SUPPORT_CHIPS = 4;
+  // Level Mix's one-letter headings on a narrow card (plan F.5).
+  var LEVEL_LETTERS = { 1: 'E', 2: 'D', 3: 'P', 4: 'X' };
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
 
   // The views with the Needs Support hint in the rule's words.
@@ -396,11 +409,13 @@ window.DashOverview = (function () {
   function _supportPeople(cid, allStudents, lists) {
     var byId = {};
     allStudents.forEach(function (s) {
-      byId[s.id] = { student: s, cols: [] };
+      byId[s.id] = { student: s, cols: [], below: [] };
     });
     lists.forEach(function (l) {
       l.ids.forEach(function (sid) {
-        if (byId[sid]) byId[sid].cols.push(l.col);
+        if (!byId[sid]) return;
+        byId[sid].cols.push(l.col);
+        byId[sid].below.push({ col: l.col, value: l.values[sid] });
       });
     });
     return sortStudents(allStudents, 'lastName')
@@ -415,54 +430,95 @@ window.DashOverview = (function () {
       });
   }
 
-  function _compSupportRows(cid, cols, people, level) {
+  // A student's codes in Needs Support's chip form: the columns they are
+  // below on, weakest first, at most COMP_SUPPORT_CHIPS, then "+N". On a
+  // narrow card only the first two show, with their own "+N"
+  // (dashboard.css).
+  function _supportChips(cid, p, codes) {
+    var below = p.below.slice().sort(function (a, b) {
+      return a.value - b.value;
+    });
+    var html = below
+      .slice(0, COMP_SUPPORT_CHIPS)
+      .map(function (b, i) {
+        var r = _lvl(b.value);
+        return (
+          '<span class="dash-comp-bchip' +
+          (i >= 2 ? ' is-extra' : '') +
+          '"' +
+          (r ? ' style="background:var(--score-' + r + '-bg);color:var(--score-' + r + '-text)"' : '') +
+          ' title="' +
+          esc(b.col.title + ': ' + levelText(cid, b.value, 'Not assessed yet')) +
+          '">' +
+          esc(codes[b.col.key] || '') +
+          '</span>'
+        );
+      })
+      .join('');
+    var more = below.length - COMP_SUPPORT_CHIPS;
+    if (more > 0) html += '<span class="dash-comp-bmore is-wide">+' + more + '</span>';
+    if (below.length > 2) html += '<span class="dash-comp-bmore is-narrow">+' + (below.length - 2) + '</span>';
+    return '<span class="dash-comp-bchips">' + html + '</span>';
+  }
+
+  // cells: whether the rows carry a cell per column (8 columns or fewer;
+  // dashboard.css swaps in the chips below 14 px a column).
+  function _compSupportRows(cid, cols, people, level, codes, cells) {
     var html = '';
     people.slice(0, COMP_SUPPORT_ROWS).forEach(function (p) {
       var st = p.student;
       var name = DashObservations.rowName(st);
+      var full = displayNameWithLast(st);
       var names = p.cols
         .map(function (c) {
           return c.label;
         })
         .join(', ');
-      var cells = cols
-        .map(function (col) {
-          var v = col.which.groupId
-            ? getGroupProficiency(cid, st.id, col.which.groupId)
-            : getSectionProficiency(cid, st.id, col.which.sectionId);
-          var r = _lvl(v);
-          return (
-            '<span class="dash-comp-sq' +
-            (r ? '' : ' is-none') +
-            '"' +
-            (r ? ' style="background:var(--score-' + r + ')"' : '') +
-            ' title="' +
-            esc(col.label + ': ' + levelText(cid, v, 'Not assessed yet')) +
-            '"></span>'
-          );
-        })
-        .join('');
+      var squares = cells
+        ? '<span class="dash-comp-squares" style="--comp-cols:' +
+          cols.length +
+          '">' +
+          cols
+            .map(function (col) {
+              var v = col.which.groupId
+                ? getGroupProficiency(cid, st.id, col.which.groupId)
+                : getSectionProficiency(cid, st.id, col.which.sectionId);
+              var r = _lvl(v);
+              return (
+                '<span class="dash-comp-sq' +
+                (r ? '' : ' is-none') +
+                '"' +
+                (r ? ' style="background:var(--score-' + r + ')"' : '') +
+                ' title="' +
+                esc(col.label + ': ' + levelText(cid, v, 'Not assessed yet')) +
+                '"></span>'
+              );
+            })
+            .join('') +
+          '</span>'
+        : '';
       html +=
         '<a class="dash-comp-row is-student" role="link" tabindex="0" data-href="/student?id=' +
         esc(st.id) +
         '&course=' +
         esc(cid) +
         '&tab=comps" aria-label="' +
-        esc(name + ': below ' + level + ' on ' + p.cols.length + ' of ' + cols.length + ', ' + names) +
+        esc(full + ': below ' + level + ' on ' + p.cols.length + ' of ' + cols.length + ', ' + names) +
         '">' +
-        '<span class="dash-comp-name">' +
+        '<span class="dash-comp-name" title="' +
+        esc(full) +
+        '">' +
         esc(name) +
         '</span>' +
-        '<span class="dash-comp-squares" style="--comp-cols:' +
-        cols.length +
-        '">' +
-        cells +
+        '<span class="dash-comp-mid">' +
+        squares +
+        _supportChips(cid, p, codes) +
         '</span>' +
         '<span class="dash-comp-val">' +
         esc(p.cols.length + ' of ' + cols.length) +
         '</span>' +
         '<span class="dist-tip dash-comp-tip" aria-hidden="true"><span class="dist-tip-title">' +
-        esc(name) +
+        esc(full) +
         '</span><span class="dash-comp-tip-line">' +
         esc('Below on ' + names) +
         '</span></span></a>';
@@ -571,6 +627,7 @@ window.DashOverview = (function () {
     });
     var view = compView(cid, opts.compView);
     var cols = DashInsights.columns(cid);
+    var codes = DashInsights.columnCodes(cid, cols);
     var comp = opts.naComp || null;
     var rule = DashInsights.readRule(opts.helpRule);
     var level = DashInsights.ruleLevelName(rule);
@@ -579,72 +636,81 @@ window.DashOverview = (function () {
     lists.forEach(function (l) {
       belowBy[l.col.key] = l.ids;
     });
-    var people = _supportPeople(cid, allStudents, lists);
-    // The most rows any view draws: one per competency, or the students
-    // (with "+N more") in Needs Support.
-    var supportRows = Math.min(COMP_SUPPORT_ROWS, people.length) + (people.length > COMP_SUPPORT_ROWS ? 1 : 0);
-    var nRows = Math.max(1, cols.length, supportRows);
     var dists = cols.map(function (col) {
       return competencyDistribution(cid, ids, col.which);
     });
 
-    var html =
-      '<section class="dash-overview-section dash-comp-card" aria-labelledby="dash-comp-title" data-view="' +
-      view +
-      '">' +
-      '<div class="dash-section-title dash-comp-head"><span id="dash-comp-title">Curricular Competencies</span>' +
-      viewMenuHtml({ id: 'comp', label: 'Curricular Competencies view', views: _compViews(level), current: view }) +
-      '<a role="link" tabindex="0" data-href="/gradebook?course=' +
-      esc(cid) +
-      '">View Gradebook →</a></div>' +
-      '<div class="dash-comp-body" style="--comp-rows:' +
-      nRows +
-      '">';
-
     var labels;
     var rows;
+    // How many rows this view draws (the card's density follows it), and
+    // the card's classes for Needs Support's two forms.
+    var nRows = cols.length;
+    var cardCls = '';
     if (!cols.length) {
       labels = _compLabels('Competency', '', '', '', true);
       rows = '<div class="dash-comp-none">No competencies in this class yet.</div>';
+      nRows = 0;
     } else if (view === 'mix') {
       var heads = levelOrderFor(cid)
         .map(function (l) {
           // The level's short code (EXT, PRF …), as the student list's key
-          // shows it; the name is in the title.
-          return '<span title="' + esc(dists[0].bands[l - 1].label) + '">' + esc(levelCode(l)) + '</span>';
+          // shows it, or on a narrow card one letter; the name is in the
+          // title.
+          return (
+            '<span title="' +
+            esc(dists[0].bands[l - 1].label) +
+            '"><span class="dash-comp-lv-long">' +
+            esc(levelCode(l)) +
+            '</span><span class="dash-comp-lv-short">' +
+            esc(LEVEL_LETTERS[l]) +
+            '</span></span>'
+          );
         })
         .join('');
       labels = _compLabels('Competency', heads, 'Prof.+', 'is-cells', true);
       rows = _compMixRows(cid, cols, dists, comp, opts.mixPop, belowBy, level);
     } else if (view === 'below') {
-      var codes = cols
-        .map(function (col) {
-          var picked = comp === col.key;
-          return (
-            '<button type="button" class="dash-comp-code' +
-            (picked ? ' is-picked' : '') +
-            '" data-action="naComp" data-key="' +
-            esc(col.key) +
-            '" aria-pressed="' +
-            picked +
-            '" title="' +
-            esc(col.title) +
-            '" aria-label="' +
-            esc(col.title + ': show the class weakest first on it') +
-            '">' +
-            esc(DashInsights.columnCode(cid, col)) +
-            '</button>'
-          );
-        })
-        .join('');
+      var people = _supportPeople(cid, allStudents, lists);
+      var cells = cols.length <= COMP_SUPPORT_CELLS;
+      cardCls = cells ? ' ns-cols-' + cols.length : ' is-chipform';
+      var codeBtns = cells
+        ? cols
+            .map(function (col) {
+              var picked = comp === col.key;
+              return (
+                '<button type="button" class="dash-comp-code' +
+                (picked ? ' is-picked' : '') +
+                '" data-action="naComp" data-key="' +
+                esc(col.key) +
+                '" aria-pressed="' +
+                picked +
+                '" title="' +
+                esc(col.title) +
+                '" aria-label="' +
+                esc(col.title + ': show the class weakest first on it') +
+                '">' +
+                esc(codes[col.key]) +
+                '</button>'
+              );
+            })
+            .join('')
+        : '';
+      // Two label rows, one per form; dashboard.css shows the one in use.
       labels =
-        '<div class="dash-comp-labels"><span class="dash-comp-lab-name">Student</span>' +
-        '<span class="dash-comp-lab-mid dash-comp-codes" style="--comp-cols:' +
-        cols.length +
-        '">' +
-        codes +
-        '</span><span class="dash-comp-lab-val">Below</span></div>';
-      rows = _compSupportRows(cid, cols, people, level);
+        (cells
+          ? '<div class="dash-comp-labels is-cells-form"><span class="dash-comp-lab-name">Student</span>' +
+            '<span class="dash-comp-lab-mid dash-comp-codes" style="--comp-cols:' +
+            cols.length +
+            '">' +
+            codeBtns +
+            '</span><span class="dash-comp-lab-val">Below</span></div>'
+          : '') +
+        _compLabels('Student', '<span>Below on</span>', 'Count', '', true).replace(
+          'class="dash-comp-labels"',
+          'class="dash-comp-labels is-chips-form"',
+        );
+      rows = _compSupportRows(cid, cols, people, level, codes, cells);
+      nRows = Math.min(COMP_SUPPORT_ROWS, people.length) + (people.length > COMP_SUPPORT_ROWS ? 1 : 0);
     } else if (view === 'trend') {
       var t = _compTrendRows(
         cid,
@@ -668,25 +734,49 @@ window.DashOverview = (function () {
       labels = _compLabels('Competency', '', 'Average', '', true);
       rows = _compAvgRows(cid, cols, dists, comp);
     }
-    html += labels + '<div class="dash-comp-rows" aria-label="Curricular competencies">' + rows + '</div></div>';
+    // Past COMP_MAX_ROWS the list scrolls inside the card, a fade at its
+    // foot and "+N more" under it (page-dashboard.js keeps N current).
+    var scroll = view !== 'below' && nRows > COMP_MAX_ROWS;
+    var roomy = nRows > 0 && nRows <= COMP_ROOMY_ROWS;
 
-    var n = (opts.assessments || []).length;
-    html +=
-      '<div class="dash-comp-foot">' +
-      n +
-      ' assessment' +
-      (n === 1 ? '' : 's') +
-      ' · ' +
-      (opts.tagsWithEvidence || 0) +
-      ' of ' +
-      (opts.allTags || []).length +
-      ' competencies assessed</div>';
+    var html =
+      '<section class="dash-overview-section dash-comp-card' +
+      (roomy ? ' is-roomy' : '') +
+      cardCls +
+      '" aria-labelledby="dash-comp-title" data-view="' +
+      view +
+      '">' +
+      '<div class="dash-section-title dash-comp-head"><span id="dash-comp-title">Curricular Competencies</span>' +
+      viewMenuHtml({ id: 'comp', label: 'Curricular Competencies view', views: _compViews(level), current: view }) +
+      '<a role="link" tabindex="0" data-href="/gradebook?course=' +
+      esc(cid) +
+      '">View Gradebook →</a></div>' +
+      '<div class="dash-comp-body">' +
+      labels +
+      (scroll ? '<div class="dash-comp-scroll">' : '') +
+      '<div class="dash-comp-rows' +
+      (scroll ? ' is-scroll' : '') +
+      '" aria-label="Curricular competencies"' +
+      (scroll ? ' tabindex="0"' : '') +
+      '>' +
+      rows +
+      '</div>' +
+      (scroll
+        ? '</div><button type="button" class="dash-comp-moreline" data-action="compMore" aria-label="' +
+          esc('Scroll to the other ' + (nRows - COMP_MAX_ROWS) + ' competencies') +
+          '">+' +
+          (nRows - COMP_MAX_ROWS) +
+          ' more</button>'
+        : '') +
+      '</div>';
+    // No footer line (Colin, Nov 5): the view menu's hints and the row
+    // pop-ups say what the card shows.
     return html + '</section>';
   }
 
   /* The bar above the Students heading while a competency is picked: the
      chip that clears it, how the cards are ordered, an observation for the
-     students below the Needs Attention rule on it, and the gradebook on it.
+     students below the Who Needs Help rule on it, and the gradebook on it.
      col: a DashInsights.columns entry; belowIds: those students. */
   function compFilterHtml(cid, col, belowIds) {
     if (!col) return '';
@@ -828,7 +918,7 @@ window.DashOverview = (function () {
     return '<span class="dash-core-sq ' + cls + '" title="' + esc(title) + '"></span>';
   }
 
-  function _coreSelfRow(cc, students, ratings) {
+  function _coreSelfRow(cid, cc, students, ratings) {
     var n = students.length;
     var byLevel = { 1: [], 2: [], 3: [], 4: [] };
     var notYet = [];
@@ -865,7 +955,16 @@ window.DashOverview = (function () {
         '<div class="dash-core-tip-line">' +
         esc(mix) +
         '</div>' +
-        (notYetLine ? '<div class="dash-core-tip-line is-quiet">' + esc(notYetLine) + '</div>' : ''),
+        (notYetLine
+          ? '<div class="dash-core-tip-line is-quiet">' +
+            esc(notYetLine) +
+            '</div>' +
+            // Someone hasn't self-assessed: the questionnaire is one click
+            // away (plan F.7b).
+            '<a class="dash-core-tip-link" role="link" tabindex="0" data-href="' +
+            esc('/dashboard?course=' + cid + '&manage=questionnaires') +
+            '">Open the Questionnaire →</a>'
+          : ''),
     };
   }
 
@@ -930,23 +1029,33 @@ window.DashOverview = (function () {
       view +
       '">';
     var students = typeof sortStudents === 'function' ? sortStudents(opts.allStudents || [], 'lastName') : [];
-    _coreGroups().forEach(function (g) {
+    // The groups share the card's height with the gaps between them
+    // (plan F.2): each group grows by its number of rows, each gap
+    // between 8 and 20 px.
+    _coreGroups().forEach(function (g, gi) {
+      if (gi) html += '<span class="dash-core-gap" aria-hidden="true"></span>';
       html +=
-        '<div class="dash-core-group" role="group" aria-label="' +
+        '<div class="dash-core-group" role="group" style="--core-rows:' +
+        g.items.length +
+        '" aria-label="' +
         esc(g.name) +
         '"><span class="dash-core-gbar" title="' +
         esc(g.name) +
         '" aria-hidden="true"></span><div class="dash-core-rows">';
       g.items.forEach(function (cc) {
         var row =
-          view === 'self' ? _coreSelfRow(cc, students, opts.coreSelf.byCore[cc.id] || {}) : _coreEvidenceRow(cc, opts);
+          view === 'self'
+            ? _coreSelfRow(cid, cc, students, opts.coreSelf.byCore[cc.id] || {})
+            : _coreEvidenceRow(cc, opts);
         html +=
           '<div class="dash-core-row' +
           (row.empty ? ' is-empty' : '') +
           '" data-core="' +
           esc(cc.id) +
           '">' +
-          '<span class="dash-core-name">' +
+          '<span class="dash-core-name" title="' +
+          esc(cc.label) +
+          '">' +
           esc(cc.label) +
           '</span>' +
           '<span class="dash-core-squares" role="img" aria-label="' +
@@ -970,36 +1079,33 @@ window.DashOverview = (function () {
     return html + '</div></section>';
   }
 
-  /* The dashboard under the toolbar: the top bar; Needs Attention beside
-     Curricular and Core Competencies; then Observations across the page.
-     page-dashboard.js re-renders only the Observations card's inside for its
-     tab and flag clicks. */
+  /* The dashboard under the toolbar: the top bar, then Curricular and Core
+     Competencies side by side at one height (Colin, Nov 5: Needs Attention
+     is gone). The students follow (page-dashboard.js), and Observations
+     goes last (obsCardHtml) until Colin decides its place. */
   function renderOverviewPanel(opts) {
     var cid = opts.cid;
     var allStudents = opts.allStudents;
     var missing = DashInsights.missingItems(cid, allStudents);
-    var model = DashInsights.attentionModel(cid, allStudents, { rule: opts.helpRule });
     var html = '<div class="dash-section dash-overview">';
     html += glanceHtml(Object.assign({}, opts, { missing: missing }));
-    html += '<div class="dash-overview-row dash-overview-main">';
-    html += DashInsights.attentionCardHtml(cid, model, {
-      filter: opts.naFilter,
-      comp: opts.naComp,
-      ruleOpen: opts.helpRuleOpen,
-      classItems: opts.actionItems,
-    });
     html +=
-      '<div class="dash-overview-side">' +
-      competenciesCardHtml(Object.assign({}, opts, { belowLists: model.prof ? model.lists : null })) +
+      '<div class="dash-overview-row dash-overview-cards">' +
+      competenciesCardHtml(opts) +
       coreCardHtml(opts) +
       '</div>';
     html += '</div>';
-    html +=
-      '<section class="dash-overview-section dash-ob2" id="dash-obs-card" aria-labelledby="dash-ob2-title">' +
-      DashObservations.renderCard(cid, allStudents, opts.obs || {}) +
-      '</section>';
-    html += '</div>';
     return html;
+  }
+
+  /* The Observations card, at the foot of the page. page-dashboard.js
+     re-renders only its inside for its tab and flag clicks. */
+  function obsCardHtml(opts) {
+    return (
+      '<section class="dash-overview-section dash-ob2" id="dash-obs-card" aria-labelledby="dash-ob2-title">' +
+      DashObservations.renderCard(opts.cid, opts.allStudents, opts.obs || {}) +
+      '</section>'
+    );
   }
 
   /* ── Observation weeks and overdue ──────────────────────────
@@ -1100,6 +1206,7 @@ window.DashOverview = (function () {
     renderDashToolbar: renderDashToolbar,
     studentControlsHtml: studentControlsHtml,
     renderOverviewPanel: renderOverviewPanel,
+    obsCardHtml: obsCardHtml,
     glanceHtml: glanceHtml,
     viewMenuHtml: viewMenuHtml,
     competenciesCardHtml: competenciesCardHtml,

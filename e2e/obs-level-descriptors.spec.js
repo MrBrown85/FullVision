@@ -14,7 +14,8 @@ test('each level shows its descriptor for the competency picked', async ({ page 
   // The demo class seeds after the curriculum bank loads.
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
   await page.evaluate(() => RubricPrint.loadBankLevels());
-  await click(page, '.dash-na-row[data-sid] [data-action="obsAdd"]');
+  // The Observations card's "+" on a student's row.
+  await click(page, '#dash-obs-card [data-action="obsAdd"]');
   await click(page, '[data-obsc="menu"][data-value="link"]');
   await click(page, '.obsc-menu [data-value="competency"]');
   await page.evaluate(() => document.querySelector('[data-obsc="setCompetency"][data-value="PA4"]').click());

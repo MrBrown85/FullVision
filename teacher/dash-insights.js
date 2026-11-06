@@ -1,7 +1,8 @@
 /* dash-insights.js — the dashboard's class insights: the students at one
-   proficiency on a competency (the Level Mix pop-up), Needs Attention (the
-   Who Needs Help rule, observation gaps and missing work, one row per
-   student), Missing and Late, and the student grid. */
+   proficiency on a competency (the Level Mix pop-up), the Who Needs Help
+   rule (the Needs Support view, the cards' amber border and the competency
+   filter use it; the Needs Attention card is gone, plan F.8), Missing and
+   Late, and the student grid. */
 window.DashInsights = (function () {
   'use strict';
 
@@ -68,12 +69,10 @@ window.DashInsights = (function () {
     if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
     return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
   }
-  function columnCode(cid, col) {
-    if (!col) return '';
-    var byId = {};
-    getSections(cid).forEach(function (sec) {
-      byId[sec.id] = sec;
-    });
+  // A column's code on its own: a folder's common prefix of its
+  // competencies' codes, a competency's code without digits, else the
+  // initials of its name.
+  function _baseCode(col, byId) {
     var codes = (col.sectionIds || []).map(function (id) {
       var sec = byId[id];
       var tag = sec && sec.tags && sec.tags[0];
@@ -90,6 +89,84 @@ window.DashInsights = (function () {
       code = _codeLetters(col.which && col.which.groupId ? prefix.replace(/[^A-Za-z].*$/, '') : prefix);
     }
     return code || _nameInitials(col.title || col.label);
+  }
+
+  // The initials of a short name, 2–3 letters, small joining words left
+  // out: Self-Assessment → SA, Perspectives on Work → PW, Significance →
+  // SIG, Purpose & Community → PC.
+  var JOIN_WORDS = ['and', 'or', 'of', 'on', 'the', 'a', 'an', 'to', 'in', 'for', 'with', 'by', 'at'];
+  function _shortInitials(name) {
+    var words = String(name || '')
+      .split(/[^A-Za-z0-9]+/)
+      .filter(function (w) {
+        return w && JOIN_WORDS.indexOf(w.toLowerCase()) < 0;
+      });
+    if (!words.length) return '';
+    if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+    return words
+      .slice(0, 3)
+      .map(function (w) {
+        return w.charAt(0);
+      })
+      .join('')
+      .toUpperCase();
+  }
+
+  // The number in a column's code (CE12 → 12), or '' with none.
+  function _codeNumber(col, byId) {
+    var sec = byId[(col.sectionIds || [])[0]];
+    var tag = sec && sec.tags && sec.tags[0];
+    var m = String((tag && tag.code) || '').match(/(\d+)(?!.*\d)/);
+    return m ? m[1] : '';
+  }
+
+  function _dupes(codes) {
+    var seen = {};
+    codes.forEach(function (c) {
+      seen[c] = (seen[c] || 0) + 1;
+    });
+    return seen;
+  }
+
+  /* Every column's code, unique in the class (plan F.3): where two columns
+     would share a code, each of them takes the initials of its short name
+     instead; where those still collide, the column's number from its code
+     goes on the end (CE1, CE2), or its place in the class when it has none.
+     → { [col.key]: code } */
+  function columnCodes(cid, cols) {
+    cols = cols || columns(cid);
+    var byId = {};
+    getSections(cid).forEach(function (sec) {
+      byId[sec.id] = sec;
+    });
+    var codes = cols.map(function (col) {
+      return _baseCode(col, byId);
+    });
+    var count = _dupes(codes);
+    codes = codes.map(function (c, i) {
+      return count[c] > 1 ? _shortInitials(cols[i].label || cols[i].title) || c : c;
+    });
+    count = _dupes(codes);
+    codes = codes.map(function (c, i) {
+      return count[c] > 1 ? c + (_codeNumber(cols[i], byId) || String(i + 1)) : c;
+    });
+    var out = {};
+    cols.forEach(function (col, i) {
+      out[col.key] = codes[i];
+    });
+    return out;
+  }
+
+  /* One column's code, as columnCodes gives it for the class. */
+  function columnCode(cid, col) {
+    if (!col) return '';
+    var code = columnCodes(cid)[col.key];
+    if (code != null) return code;
+    var byId = {};
+    getSections(cid).forEach(function (sec) {
+      byId[sec.id] = sec;
+    });
+    return _baseCode(col, byId);
   }
 
   /* One student on one column under the Who Needs Help rule: their value is
@@ -207,10 +284,6 @@ window.DashInsights = (function () {
     return PROF_LABELS[readRule(rule).below];
   }
 
-  function _ruleText(rule) {
-    return 'Below ' + ruleLevelName(rule) + ' · At Least ' + rule.min + ' Score' + (rule.min === 1 ? '' : 's');
-  }
-
   /* Each competency with the students under the rule on it: their value is
      below the rule's proficiency and rests on at least `min` scores.
      → [{ col, ids, values }] in column order */
@@ -294,32 +367,41 @@ window.DashInsights = (function () {
   }
 
   /* The top bar's Missing and Late cell. Zero says so in a line; otherwise
-     the two counts, and a click shows those students in Needs Attention. */
-  function missingGlanceHtml(items) {
+     the two counts, and a click opens the class's gradebook (plan F.8). */
+  function missingGlanceHtml(items, cid) {
     var c = missingCounts(items);
-    var html =
-      '<button type="button" class="dash-glance-cell dash-glance-missing" data-action="naFilter" data-filter="missing"' +
-      (c.total ? '' : ' disabled') +
-      '>' +
+    var inner =
       '<span class="dash-glance-label">Missing and Late</span>' +
       '<span class="dash-glance-value">' +
       c.total +
       '</span>';
-    if (!c.total) return html + '<span class="dash-glance-sub">Nothing is missing or late.</span></button>';
+    if (!c.total)
+      return (
+        '<div class="dash-glance-cell dash-glance-missing">' +
+        inner +
+        '<span class="dash-glance-sub">Nothing is missing or late.</span></div>'
+      );
     return (
-      html +
+      '<a class="dash-glance-cell dash-glance-missing" role="link" tabindex="0" data-href="' +
+      esc('/gradebook?course=' + (cid || '')) +
+      '" aria-label="' +
+      esc(c.total + ' missing or late: open the gradebook') +
+      '">' +
+      inner +
       '<span class="dash-glance-sub">' +
       ['ns', 'late']
         .map(function (k) {
           return '<b>' + c[k] + '</b> ' + MISSING_KINDS[k].label;
         })
         .join(' · ') +
-      '</span></button>'
+      '</span></a>'
     );
   }
 
-  /* ── Needs Attention ────────────────────────────────────── */
-  /* One entry per student who needs something: competencies under the rule
+  /* ── The attention model ──────────────────────────────── */
+  /* (Once the Needs Attention card's; the card is gone, plan F.8. The
+     page's competency filter and Needs Support read its lists.)
+     One entry per student who needs something: competencies under the rule
      (not in a Letter class), no observation in 3+ weeks, no strength
      recorded in the Observations card's By week window, and missing or late
      work. Worst first.
@@ -411,28 +493,6 @@ window.DashInsights = (function () {
     return out;
   }
 
-  var DIAMOND =
-    '<svg viewBox="0 0 12 12" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M6 1.2 10.8 6 6 10.8 1.2 6Z"/></svg>';
-
-  // A competency value with its proficiency's shape and colour.
-  function _compFact(cid, col, value, prefix) {
-    var level = value > 0 ? Math.max(1, Math.min(4, Math.round(value))) : 0;
-    return (
-      (prefix ? prefix + ' ' : '') +
-      (level
-        ? '<span class="dash-na-glyph" style="color:var(--score-' +
-          level +
-          ')" aria-hidden="true">' +
-          GLYPHS[level] +
-          '</span>'
-        : '') +
-      esc(col.label) +
-      ' <b>' +
-      esc(formatLevel(cid, value)) +
-      '</b>'
-    );
-  }
-
   /* The curriculum bank's next step for one competency at a value's level
      (CompetencyWording.nextStep): '' for one with no bank id. */
   function _secNextStep(cid, secId, value) {
@@ -498,244 +558,6 @@ window.DashInsights = (function () {
   /* "Next step:" or, in a folder, "Next step (Data Patterns):". */
   function _nextHead(head, next) {
     return '<b>' + head + (next.label ? ' (' + esc(next.label) + ')' : '') + ':</b> ';
-  }
-
-  function _facts(cid, m, p, comp) {
-    var f = [];
-    // The competency the row names, for its next step.
-    var named = null;
-    if (comp) {
-      var hit = p.below.find(function (b) {
-        return b.col.key === comp;
-      });
-      if (hit) f.push(_compFact(cid, hit.col, hit.value));
-      named = hit || null;
-    } else if (p.below.length === 1) {
-      f.push(_compFact(cid, p.below[0].col, p.below[0].value));
-      named = p.below[0];
-    } else if (p.below.length > 1) {
-      var low = p.below.reduce(function (a, b) {
-        return b.value < a.value ? b : a;
-      });
-      f.push('Below ' + esc(PROF_LABELS[m.rule.below]) + ' on <b>' + p.below.length + '</b> of ' + m.lists.length);
-      f.push(_compFact(cid, low.col, low.value, 'Lowest'));
-      named = low;
-    }
-    if (p.overdue) {
-      f.push(
-        '<span class="is-late">' +
-          (p.daysSince == null ? 'No observations yet' : 'Not observed in <b>' + p.daysSince + '</b> days') +
-          '</span>',
-      );
-    }
-    if (p.noStrength) f.push('<span class="dash-na-diamond">' + DIAMOND + '</span>No strength recorded');
-    p.missing.slice(0, 2).forEach(function (it) {
-      f.push(
-        '<span class="is-late">' + MISSING_KINDS[it.kind].label + ':</span> ' + esc(it.assessment.title || 'Untitled'),
-      );
-    });
-    if (p.missing.length > 2) f.push(p.missing.length - 2 + ' more missing or late');
-    // The student's next step in that competency, on its own line (Nov 2 mockup).
-    var next = named ? _colNextStep(cid, named.col, named.value, p.student.id) : null;
-    return (
-      f
-        .map(function (x) {
-          return '<span class="dash-na-fact">' + x + '</span>';
-        })
-        .join(' <span class="dash-na-sep" aria-hidden="true">·</span> ') +
-      (next ? '<span class="dash-na-next">' + _nextHead('Next step', next) + esc(next.text) + '</span>' : '')
-    );
-  }
-
-  var NA_FILTERS = ['all', 'below', 'notobs', 'nostr', 'missing'];
-  var NA_EMPTY = {
-    all: 'No one needs attention right now.',
-    below: '',
-    notobs: 'Everyone has an observation in the last 3 weeks.',
-    nostr: 'Every observed student has a strength recorded.',
-    missing: 'Nothing is missing or late.',
-  };
-
-  function _matches(p, filter, comp) {
-    if (comp) {
-      return p.below.some(function (b) {
-        return b.col.key === comp;
-      });
-    }
-    if (filter === 'below') return p.below.length > 0;
-    if (filter === 'notobs') return p.overdue;
-    if (filter === 'nostr') return p.noStrength;
-    if (filter === 'missing') return p.missing.length > 0;
-    return true;
-  }
-
-  /* The Needs Attention card.
-       view: { filter, comp, ruleOpen, classItems: [{ text, link, linkText }] } */
-  function attentionCardHtml(cid, m, view) {
-    view = view || {};
-    var filter = NA_FILTERS.indexOf(view.filter) >= 0 ? view.filter : 'all';
-    if (!m.prof && filter === 'below') filter = 'all';
-    var comp = m.prof && view.comp ? view.comp : null;
-    var compCol = comp
-      ? (
-          m.lists.find(function (l) {
-            return l.col.key === comp;
-          }) || {}
-        ).col
-      : null;
-    if (comp && !compCol) comp = null;
-    var shown = m.people.filter(function (p) {
-      return _matches(p, filter, comp);
-    });
-    if (comp) {
-      shown.sort(function (a, b) {
-        var va = a.below.find(function (x) {
-          return x.col.key === comp;
-        }).value;
-        var vb = b.below.find(function (x) {
-          return x.col.key === comp;
-        }).value;
-        return va - vb;
-      });
-    }
-    var html =
-      '<section class="dash-overview-section dash-na-card" id="dash-na-card" aria-labelledby="dash-na-title">' +
-      '<div class="dash-na-head">' +
-      '<h2 class="dash-na-title" id="dash-na-title">Needs Attention</h2>' +
-      '<span class="dash-na-count">' +
-      shown.length +
-      ' student' +
-      (shown.length === 1 ? '' : 's') +
-      '</span>';
-    if (m.prof) {
-      html +=
-        '<span class="dash-help-rule">' +
-        esc(_ruleText(m.rule)) +
-        '</span>' +
-        '<button type="button" class="dash-help-rule-btn" data-action="helpRule" aria-expanded="' +
-        !!view.ruleOpen +
-        '">Change Rule</button>';
-    }
-    html += '</div>';
-    if (m.prof && view.ruleOpen) {
-      html +=
-        '<div class="dash-help-rule-edit">' +
-        '<label>Below <select data-action="helpRuleBelow" aria-label="Below">' +
-        [3, 2]
-          .map(function (l) {
-            return (
-              '<option value="' + l + '"' + (m.rule.below === l ? ' selected' : '') + '>' + PROF_LABELS[l] + '</option>'
-            );
-          })
-          .join('') +
-        '</select></label>' +
-        '<label>At Least <select data-action="helpRuleMin" aria-label="At least">' +
-        [1, 2, 3, 4, 5]
-          .map(function (n) {
-            return '<option value="' + n + '"' + (m.rule.min === n ? ' selected' : '') + '>' + n + '</option>';
-          })
-          .join('') +
-        '</select> Scores on the Competency</label>' +
-        '<button type="button" class="dash-help-rule-btn" data-action="helpRule">Done</button>' +
-        '</div>';
-    }
-    var labels = {
-      all: 'All',
-      below: 'Below ' + PROF_LABELS[m.rule.below],
-      notobs: 'Not Observed 3+ Weeks',
-      nostr: 'No Strength',
-      missing: 'Missing',
-    };
-    html += '<div class="dash-na-filters"><div class="seg seg-sm dash-na-seg" role="group" aria-label="Show students">';
-    NA_FILTERS.forEach(function (k) {
-      if (k === 'below' && !m.prof) return;
-      var on = !comp && filter === k;
-      html +=
-        '<button type="button" class="seg-btn" data-action="naFilter" data-filter="' +
-        k +
-        '" aria-pressed="' +
-        on +
-        '">' +
-        esc(labels[k]) +
-        '<span class="dash-na-n">' +
-        m.counts[k] +
-        '</span></button>';
-    });
-    html += '</div>';
-    if (compCol) {
-      html +=
-        '<button type="button" class="dash-na-compchip" data-action="naComp" data-key="" aria-label="' +
-        esc('Show everyone again, not only ' + compCol.title) +
-        '">' +
-        esc(compCol.label) +
-        ' <span aria-hidden="true">×</span></button>';
-    }
-    html += '</div><div class="dash-na-list" tabindex="-1">';
-    var classItems = !comp && filter === 'all' ? view.classItems || [] : [];
-    classItems.forEach(function (item) {
-      html +=
-        '<div class="dash-na-row is-class">' +
-        '<span class="dash-na-rank" aria-hidden="true">•</span>' +
-        '<span class="dash-na-classtext">' +
-        esc(item.text) +
-        '</span>' +
-        (item.link
-          ? '<a class="dash-na-classlink" role="link" tabindex="0" data-href="' +
-            item.link +
-            '">' +
-            esc(item.linkText) +
-            ' →</a>'
-          : '') +
-        '</div>';
-    });
-    if (!shown.length) {
-      var empty = comp
-        ? 'No one is below the rule on ' + compCol.title + '.'
-        : filter === 'below'
-          ? 'Every scored student is at ' + PROF_LABELS[m.rule.below] + ' or above.'
-          : NA_EMPTY[filter];
-      html += '<div class="dash-ins-empty dash-na-empty">' + esc(empty) + '</div>';
-    }
-    shown.forEach(function (p, i) {
-      var st = p.student;
-      var grade = studentGradeSummary(cid, st.id);
-      var word = levelWord(cid, getOverallProficiency(cid, st.id));
-      html +=
-        '<div class="dash-na-row" data-sid="' +
-        esc(st.id) +
-        '">' +
-        '<span class="dash-na-rank">' +
-        (i + 1) +
-        '</span>' +
-        '<a class="dash-ins-name dash-na-name" role="link" tabindex="0" data-href="' +
-        _studentHref(cid, st.id, p.below.length ? 'comps' : '') +
-        '">' +
-        esc(displayNameWithLast(st)) +
-        '</a>' +
-        (grade.text
-          ? '<span class="dash-na-grade" style="background:var(--score-' +
-            grade.level +
-            '-bg);color:var(--score-' +
-            grade.level +
-            '-text)">' +
-            esc(grade.text) +
-            (word ? ' <span class="dash-na-word">' + esc(word) + '</span>' : '') +
-            '</span>'
-          : '<span class="dash-na-grade is-none">\u2014</span>') +
-        '<span class="dash-na-facts">' +
-        _facts(cid, m, p, comp) +
-        '</span>' +
-        '<span class="dash-na-act">' +
-        '<button type="button" class="dash-na-btn" data-action="obsAdd" data-sid="' +
-        esc(st.id) +
-        '">+ Observation</button>' +
-        '<a class="dash-na-btn" role="link" tabindex="0" data-href="' +
-        _gradebookHref(cid, [st.id], compCol) +
-        '">Gradebook →</a>' +
-        '</span>' +
-        '</div>';
-    });
-    return html + '</div></section>';
   }
 
   /* ── Students: Cards | Grid ─────────────────────────────── */
@@ -949,6 +771,7 @@ window.DashInsights = (function () {
   return {
     columns: columns,
     columnCode: columnCode,
+    columnCodes: columnCodes,
     isBelowRule: isBelowRule,
     showsProficiency: showsProficiency,
     popHtml: popHtml,
@@ -961,7 +784,6 @@ window.DashInsights = (function () {
     missingCounts: missingCounts,
     missingGlanceHtml: missingGlanceHtml,
     attentionModel: attentionModel,
-    attentionCardHtml: attentionCardHtml,
     belowCounts: belowCounts,
     studentsHeaderHtml: studentsHeaderHtml,
     studentGridHtml: studentGridHtml,

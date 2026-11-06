@@ -28,15 +28,19 @@ window.PageDashboard = (function () {
 
   /* Class insights (dash-insights.js): Cards or Grid and the Who Needs Help
      rule follow the teacher to any device (getDashboardPrefs); an open
-     segment list does not. */
+     segment list does not. The rule has no editor since the Needs
+     Attention card went (plan F.8): it stays at its saved value or the
+     default. */
   var studentView = 'cards';
   var helpRule = null;
-  var helpRuleOpen = false;
   var mixPop = null; // { key, level } of the open proficiency segment
-  // Needs Attention: the filter and the competency picked from "N Below".
-  // Neither is remembered.
-  var naFilter = 'all';
+  // The page's competency filter (a Curricular Competencies row). Not
+  // remembered. The name is the old Needs Attention one; other code and
+  // the data-action use it.
   var naComp = null;
+  // The column whose chips are lit on every student card while the pointer
+  // is on its Curricular Competencies row (plan F.7a).
+  var _litKey = null;
 
   /* The cards' view menus (DashOverview.viewMenuHtml): the one open, by its
      id, and each menu's setter, which records the pick before the page
@@ -180,8 +184,8 @@ window.PageDashboard = (function () {
     activeCourse = cid;
     obsHighlight = null;
     mixPop = null;
-    naFilter = 'all';
     naComp = null;
+    _litKey = null;
     _obsNavKey = null;
     // Reset class manager state for new course
     CM.configure({ activeCourse: cid, onRender: render, onCourseChange: switchCourse });
@@ -280,8 +284,8 @@ window.PageDashboard = (function () {
         students = _gridSorted(cid, students);
     }
 
-    // The competency filter (naComp, from Curricular Competencies or Needs
-    // Attention): weakest first on it. The teacher's sort stays as it was
+    // The competency filter (naComp, from Curricular Competencies): weakest
+    // first on it. The teacher's sort stays as it was
     // for when the filter is cleared; choosing a sort (the sort menu or a
     // grid heading) clears the filter, so the sort always wins and is
     // never silently ignored.
@@ -328,29 +332,6 @@ window.PageDashboard = (function () {
         : 0;
     var classR = Math.round(classAvg);
 
-    // Tag coverage
-    var allTags = getAllTags(cid);
-    var tagsWithEvidence = 0;
-    var tagCoverageMap = {};
-    allTags.forEach(function (tag) {
-      var hasEvidence = allStudents.some(function (s) {
-        var scores = getTagScores(cid, s.id, tag.id);
-        return scores.some(function (sc) {
-          return sc.score > 0;
-        });
-      });
-      tagCoverageMap[tag.id] = hasEvidence;
-      if (hasEvidence) tagsWithEvidence++;
-    });
-    var tagCoveragePct = allTags.length > 0 ? Math.round((tagsWithEvidence / allTags.length) * 100) : 0;
-
-    // Core competency coverage
-    var assessedCCs = new Set();
-    assessments.forEach(function (a) {
-      (a.coreCompetencyIds || []).forEach(function (ccId) {
-        assessedCCs.add(ccId);
-      });
-    });
     var ccCounts = {};
     var ccAssessments = {};
     assessments.forEach(function (a) {
@@ -361,18 +342,11 @@ window.PageDashboard = (function () {
       });
     });
 
-    // Recent observations, and those tagged with each Core Competency
-    // (an observation's dims hold 'cc:<id>').
-    var weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    var weekAgoStr = weekAgo.toISOString().slice(0, 10);
-    var recentObsCount = 0;
+    // Observations tagged with each Core Competency (an observation's dims
+    // hold 'cc:<id>').
     var ccObs = {};
     allStudents.forEach(function (s) {
       var obs = getStudentQuickObs(cid, s.id);
-      recentObsCount += obs.filter(function (o) {
-        return o.date >= weekAgoStr;
-      }).length;
       obs.forEach(function (o) {
         (o.dims || []).forEach(function (d) {
           if (typeof d === 'string' && d.indexOf('cc:') === 0) ccObs[d.slice(3)] = (ccObs[d.slice(3)] || 0) + 1;
@@ -401,93 +375,6 @@ window.PageDashboard = (function () {
       }),
     );
 
-    // Action items
-    var actionItems = [];
-
-    var uncoveredTags = allTags.filter(function (t) {
-      return !tagCoverageMap[t.id];
-    });
-    if (uncoveredTags.length > 0) {
-      var secNames = [];
-      var secNameSet = new Set();
-      uncoveredTags.forEach(function (t) {
-        var sec = getSectionForTag(cid, t.id);
-        var name = sec ? sec.shortName || sec.name : '';
-        if (name && !secNameSet.has(name)) {
-          secNameSet.add(name);
-          secNames.push(name);
-        }
-      });
-      actionItems.push({
-        text:
-          uncoveredTags.length +
-          (uncoveredTags.length !== 1 ? ' competencies' : ' competency') +
-          ' not yet assessed (' +
-          secNames.join(', ') +
-          ')',
-        link: '/assignments?course=' + cid,
-        linkText: 'Plan',
-      });
-    }
-
-    var uncoveredCCs = CORE_COMPETENCIES.filter(function (cc) {
-      return !assessedCCs.has(cc.id);
-    });
-    if (uncoveredCCs.length > 0) {
-      actionItems.push({
-        text:
-          uncoveredCCs.length +
-          ' core competenc' +
-          (uncoveredCCs.length !== 1 ? 'ies' : 'y') +
-          ' not yet tagged: ' +
-          uncoveredCCs
-            .map(function (cc) {
-              return cc.label;
-            })
-            .join(', '),
-        link: '/assignments?course=' + cid,
-        linkText: 'Tag',
-      });
-    }
-
-    var lowCoverageStudents = allStudents.filter(function (s) {
-      return getCompletionPct(cid, s.id) < 50;
-    });
-    if (lowCoverageStudents.length > 0) {
-      actionItems.push({
-        text:
-          lowCoverageStudents.length +
-          ' student' +
-          (lowCoverageStudents.length !== 1 ? 's' : '') +
-          ' below 50% evidence coverage',
-        link: '',
-        linkText: '',
-      });
-    }
-
-    if (recentObsCount === 0) {
-      actionItems.push({
-        text: 'No observations recorded this week',
-        link: '/observations',
-        linkText: 'Observe',
-      });
-    }
-
-    var unobservedStudents = allStudents.filter(function (s) {
-      return getStudentQuickObs(cid, s.id).length === 0;
-    });
-    if (unobservedStudents.length > 0) {
-      actionItems.push({
-        text:
-          unobservedStudents.length +
-          ' student' +
-          (unobservedStudents.length !== 1 ? 's have' : ' has') +
-          ' no observations yet',
-        link: '/observations',
-        linkText: 'Observe',
-      });
-    }
-
     /* -- Toolbar (rendered to separate mount) -- */
     // html-safe: DashOverview.renderDashToolbar escapes class names; the rest is a count.
     document.getElementById('page-toolbar-mount').innerHTML = Overview.renderDashToolbar({
@@ -504,18 +391,12 @@ window.PageDashboard = (function () {
       assessments: assessments,
       classAvg: classAvg,
       classR: classR,
-      tagCoveragePct: tagCoveragePct,
-      tagsWithEvidence: tagsWithEvidence,
-      allTags: allTags,
-      tagCoverageMap: tagCoverageMap,
-      assessedCCs: assessedCCs,
       ccCounts: ccCounts,
       ccAssessments: ccAssessments,
       ccObs: ccObs,
       coreSelf: coreSelf,
       coreView: _readPref(CORE_VIEW_KEY + cid) === 'evidence' ? 'evidence' : 'self',
       compView: DashOverview.compView(cid, _readPref(COMP_VIEW_KEY + cid)),
-      actionItems: actionItems,
       obs: _obsState(),
       classChange: classGradeChange(
         cid,
@@ -525,8 +406,6 @@ window.PageDashboard = (function () {
       ),
       mixPop: mixPop,
       helpRule: helpRule,
-      helpRuleOpen: helpRuleOpen,
-      naFilter: naFilter,
       naComp: naComp,
     });
     obsHighlight = _lastObsState.highlight;
@@ -553,6 +432,9 @@ window.PageDashboard = (function () {
         rule: helpRule,
       });
 
+    // Observations goes last, under the students (Colin, Nov 5).
+    html += Overview.obsCardHtml({ cid: cid, allStudents: allStudents, obs: _lastObsState });
+
     // The open segment's students, placed under it once it is drawn.
     var popHtml = DashInsights.popHtml(cid, allStudents, mixPop);
     if (!popHtml) mixPop = null;
@@ -574,6 +456,11 @@ window.PageDashboard = (function () {
     _compFade = false;
     _afterObsRender(null, 0);
     _placeMixPop();
+    _syncCompScroll();
+    // A re-render drew the cards anew: light them again if the pointer is
+    // still on a competency.
+    if (_litKey && !naComp) _setLit(_litKey);
+    else _litKey = null;
 
     // Restore sort dropdown
     var sortSelect = document.querySelector('.dash-sort-select');
@@ -858,6 +745,84 @@ window.PageDashboard = (function () {
     if (t && t !== _popFor) _showPop(t);
     var seg = e.target.closest && e.target.closest('.dash-glance-dist .dist-seg');
     if (seg) _keepTipInside(seg);
+    _litFrom(e.target);
+    var row = e.target.closest && e.target.closest('.dash-comp-rows.is-scroll .dash-comp-row');
+    if (row) _placeScrollTip(row);
+  }
+
+  /* ── Pointing at a competency (plan F.7a) ───────────────── */
+  /* A Curricular Competencies row (or a Needs Support code) under the
+     pointer lights its chip on every student card: an outline only, no
+     re-sort and no faded chips. Nothing while the competency filter is
+     set: the filter already shows one column. */
+  var LIT_SOURCE = '.dash-comp-card [data-key]';
+  function _litKeyOf(target) {
+    var el = target && target.closest && target.closest(LIT_SOURCE);
+    var key = el ? el.getAttribute('data-key') : '';
+    return key || null;
+  }
+  function _litFrom(target) {
+    var key = naComp ? null : _litKeyOf(target);
+    if (key === _litKey) return;
+    _setLit(key);
+  }
+  function _setLit(key) {
+    _litKey = key;
+    var main = document.getElementById('main');
+    if (!main) return;
+    Array.prototype.forEach.call(main.querySelectorAll('.dash-card-seg.is-lit'), function (el) {
+      el.classList.remove('is-lit');
+    });
+    if (!key) return;
+    Array.prototype.forEach.call(
+      main.querySelectorAll('.dash-grid .dash-card-seg[data-key="' + _cssKey(key) + '"]'),
+      function (el) {
+        el.classList.add('is-lit');
+      },
+    );
+  }
+
+  /* ── The scrolling competency list (plan F.1) ────────────── */
+  /* Past 12 rows the Curricular Competencies list scrolls inside the card:
+     the fade at its foot goes at the end, and "+N more" counts the rows
+     still below. A row's pop-up hangs from the card, not the list, so the
+     list doesn't cut it off. */
+  function _syncCompScroll(list) {
+    list = list || document.querySelector('.dash-comp-rows.is-scroll');
+    if (!list) return;
+    var wrap = list.parentNode;
+    var more = document.querySelector('.dash-comp-moreline');
+    var bottom = list.scrollTop + list.clientHeight;
+    var below = 0;
+    Array.prototype.forEach.call(list.children, function (row) {
+      if (row.offsetTop + row.offsetHeight / 2 > bottom) below++;
+    });
+    var atEnd = bottom >= list.scrollHeight - 1;
+    if (wrap && wrap.classList) wrap.classList.toggle('is-end', atEnd);
+    if (more) {
+      more.hidden = below === 0;
+      more.textContent = '+' + below + ' more';
+      more.setAttribute('aria-label', 'Scroll to the other ' + below + ' competencies');
+    }
+  }
+  function _placeScrollTip(row) {
+    var tip = row.querySelector('.dash-comp-tip');
+    // The tip hangs from the list's wrapper, outside the part that scrolls.
+    var box = row.closest('.dash-comp-scroll');
+    if (!tip || !box) return;
+    var r = row.getBoundingClientRect();
+    var c = box.getBoundingClientRect();
+    var name = row.querySelector('.dash-comp-name');
+    var left = name ? name.getBoundingClientRect().right + 8 : r.left;
+    tip.style.left = Math.round(left - c.left) + 'px';
+    tip.style.top = Math.round(r.bottom - c.top + 2) + 'px';
+  }
+  function _compMore() {
+    var list = document.querySelector('.dash-comp-rows.is-scroll');
+    if (!list) return;
+    var by = Math.max(22, list.clientHeight - 22);
+    if (typeof list.scrollBy === 'function') list.scrollBy({ top: by, behavior: _reducedMotion() ? 'auto' : 'smooth' });
+    else list.scrollTop += by;
   }
   /* A proficiency segment's list sits centred under it; near either end of
      the bar that runs past the card (and under the sidebar or off the page),
@@ -873,6 +838,8 @@ window.PageDashboard = (function () {
     if (shift) tip.style.setProperty('--tip-shift', Math.round(shift) + 'px');
   }
   function _onMouseout(e) {
+    // Off the competency the chips were lit for.
+    if (_litKey && _litKeyOf(e.relatedTarget) !== _litKey) _setLit(null);
     var t = e.target.closest && e.target.closest(POP_TARGET);
     if (!t || t !== _popFor) return;
     if (e.relatedTarget && t.contains(e.relatedTarget)) return;
@@ -892,6 +859,7 @@ window.PageDashboard = (function () {
   }
 
   function _onScrollClose(e) {
+    if (e.target && e.target.classList && e.target.classList.contains('dash-comp-rows')) _syncCompScroll(e.target);
     if (!mixPop) return;
     var pop = document.getElementById('dash-mix-pop');
     if (pop && e.target && pop.contains && pop.contains(e.target)) return;
@@ -1099,19 +1067,10 @@ window.PageDashboard = (function () {
 
   /* ── Student Management ─────────────────────────────────── */
 
-  /* After a Needs Attention change: focus back on the control used, or, from
-     the top bar, bring the card into view and focus its list. */
-  function _focusNa(selector) {
+  // Focus back on the control used, when it is drawn again.
+  function _focusSel(selector) {
     var el = selector ? document.querySelector(selector) : null;
-    if (el) {
-      el.focus();
-      return;
-    }
-    var card = document.getElementById('dash-na-card');
-    if (!card) return;
-    card.scrollIntoView({ block: 'nearest' });
-    var list = card.querySelector('.dash-na-list');
-    if (list) list.focus({ preventScroll: true });
+    if (el) el.focus();
   }
 
   /* ── Delegated click handler ────────────────────────────── */
@@ -1185,21 +1144,10 @@ window.PageDashboard = (function () {
           was && document.querySelector('.dash-mix-seg[data-key="' + was.key + '"][data-level="' + was.level + '"]');
         if (seg) seg.focus();
       },
-      helpRule: function () {
-        helpRuleOpen = !helpRuleOpen;
-        render();
-      },
-      naFilter: function () {
-        naFilter = el.dataset.filter || 'all';
-        naComp = null;
-        var fromTop = !!el.closest('.dash-glance');
-        render();
-        _focusNa(fromTop ? null : '[data-action="naFilter"][data-filter="' + naFilter + '"]');
-      },
       // A competency picked on Curricular Competencies (a row, or a Needs
-      // Support column code), or cleared there, by the filter chip or by
-      // Needs Attention's chip. Focus goes back to the control used, or
-      // after the filter chip to the competency's control on the card.
+      // Support column code), or cleared there or by the filter chip. Focus
+      // goes back to the control used, or after the filter chip to the
+      // competency's control on the card.
       naComp: function () {
         var key = el.dataset.key || null;
         var was = naComp;
@@ -1213,12 +1161,14 @@ window.PageDashboard = (function () {
             ? '.dash-comp-row'
             : '.dash-comp-pick';
         render();
-        if (inCard) _focusNa('.dash-comp-card ' + ctl + '[data-key="' + _cssKey(key) + '"]');
+        if (inCard) _focusSel('.dash-comp-card ' + ctl + '[data-key="' + _cssKey(key) + '"]');
         else if (fromBar && was) _focusComp(was);
-        else _focusNa('[data-action="naFilter"][data-filter="' + naFilter + '"]');
       },
       compRecord: function () {
         openCompObsDialog(el.dataset.key);
+      },
+      compMore: function () {
+        _compMore();
       },
       // A grid heading: its column, or the other way round if it is already
       // the sort. Names start A→Z, Last Observed with the longest ago, the
@@ -1282,15 +1232,6 @@ window.PageDashboard = (function () {
       render();
       return;
     }
-    if (el.dataset.action === 'helpRuleBelow' || el.dataset.action === 'helpRuleMin') {
-      if (el.dataset.action === 'helpRuleBelow') helpRule.below = Number(el.value);
-      else helpRule.min = Number(el.value);
-      saveDashboardPrefs({ helpRule: { below: helpRule.below, min: helpRule.min } });
-      render();
-      var again = document.querySelector('[data-action="' + el.dataset.action + '"]');
-      if (again) again.focus();
-      return;
-    }
     // Delegate cm/cw change handlers
     CM.handleChange(el);
   }
@@ -1310,7 +1251,7 @@ window.PageDashboard = (function () {
     var popOpen = !!_popFor;
     if (_obsKeydown(e)) return;
     // Escape with nothing else open clears the competency filter.
-    if (e.key === 'Escape' && naComp && !popOpen && !CM.classManagerOpen && !helpRuleOpen && _escapeIsFree(e)) {
+    if (e.key === 'Escape' && naComp && !popOpen && !CM.classManagerOpen && _escapeIsFree(e)) {
       var key = naComp;
       e.preventDefault();
       naComp = null;
@@ -1452,10 +1393,9 @@ window.PageDashboard = (function () {
     var dashPrefs = getDashboardPrefs();
     studentView = dashPrefs.studentView === 'grid' ? 'grid' : 'cards';
     helpRule = DashInsights.readRule(dashPrefs.helpRule);
-    helpRuleOpen = false;
     mixPop = null;
-    naFilter = 'all';
     naComp = null;
+    _litKey = null;
     openMenu = null;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
