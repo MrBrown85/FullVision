@@ -505,3 +505,12 @@ Context: Download Class Backup (#325) wrote a file nothing could read back. Rest
 ## Class Settings (2026-11-05)
 
 A teacher reviewer read the Dashboard's "Class Management" button as behaviour management. It is now **Class Settings**, everywhere the screen is named: the button, the breadcrumb, the page title, links into it and the help pages. Its addresses (`/dashboard?manage=…`, the help panel's `/class-management` route) and code names (`openClassManager`, `cm-*`, `dash-class-manager.js`) stay as they are. Earlier entries that name the "Class Management redesign" keep the old name.
+
+## Browser tests on every pull request (2026-11-05)
+
+Replaces "Playwright runs on main after each merge, not on PRs." That rule came from the run time: two runners with two workers each took about twelve minutes, and running 957 tests locally before each merge was skipped as too slow. Main went red twice on Nov 5 from changes nobody had run in a browser.
+
+1. **Four workers per runner on CI** (`playwright.config.js`). A GitHub runner on a public repo has four cores; Playwright's default of half the cores ran two tests at a time.
+2. **Four shards, every fourth test location each** (`.github/workflows/ci.yml`), so the slow files still split evenly.
+3. **The e2e job runs on every pull request** as well as on main. It is not a required check: a red run shows on the PR before merging, but a flaky test doesn't block a merge. `test-and-format` stays the only required check.
+4. **The repo stays public** (Colin, 2026-11-05): Actions minutes are free, so the extra runners cost nothing. Outside pull requests need Colin's approval before CI runs on them.
