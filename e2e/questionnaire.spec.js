@@ -64,6 +64,8 @@ async function overflow(page) {
     document.querySelectorAll('.qn *, #gb-sidebar *, .report-toolbar *').forEach(el => {
       const cs = getComputedStyle(el);
       if (cs.display === 'none' || el.offsetParent === null) return;
+      // Text for screen readers only, clipped to nothing on purpose.
+      if (cs.position === 'absolute' && cs.clip === 'rect(0px, 0px, 0px, 0px)') return;
       // A line cut on purpose (a Work Habits name) ends in an ellipsis.
       if (cs.textOverflow === 'ellipsis' && cs.overflowX === 'hidden' && el.title === el.textContent) return;
       if (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1 && !['auto', 'scroll'].includes(cs.overflowX)) {
@@ -721,7 +723,7 @@ test.describe('the Sentences card', () => {
     await expect(rows(page)).toHaveCount(rowCount);
     await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
     await expect(rows(page).first().locator('.qn-req-source')).toContainText('from the year’s scores to this report');
-    await expect(rows(page).first().locator('[data-do="wording"]')).toHaveText('Other Wording ▾');
+    await expect(rows(page).first().locator('[data-do="wording"]')).toHaveText('Options ▾');
     await expect(page.locator('#tq-sentences .qn-sub')).toHaveText(
       'Reword, edit or drag to reorder. The comment above follows.',
     );

@@ -5830,14 +5830,23 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 12px;
   color: var(--text-2);
 }
+/* What a bank sentence says it from (the grade, the piece, the skill):
+   on hover over the sentence, and read by screen readers, not shown
+   under every row (Colin, Nov 6: distracting more often than helpful). */
+.qn-srow-facts {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 /* A thin part of the bank, under the row's source line (plan PR 13). */
 .qn-pron-note {
   display: block;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--score-2-text);
-}
-.qn-req-thin {
   font-size: 12px;
   line-height: 1.4;
   color: var(--score-2-text);
