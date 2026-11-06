@@ -121,7 +121,8 @@ window.DashStudentCards = (function () {
 
   /* What a chip's pop-up says: the column's full name, the level (with its
      word in a Proficiency or Both class) or "Not assessed yet", and for a
-     folder how many of its competencies have evidence. */
+     folder how many of its competencies have evidence and, when it isn't
+     counted as one, folderAverageNote. */
   function stripTipLines(cid, sid, col, value, secById) {
     var sec = !col.which.groupId && secById[col.which.sectionId];
     var lines = [sec ? standardTitle(sec) : col.title];
@@ -136,6 +137,8 @@ window.DashStudentCards = (function () {
         return getSectionEvidenceCount(cid, sid, secId) > 0;
       }).length;
       lines.push(withEvidence + ' of ' + col.sectionIds.length + ' competencies with evidence');
+      // How the folder counts (folderAverageNote), when it isn't counted as one.
+      if (col.note) lines.push(col.note);
     }
     return lines;
   }
@@ -171,13 +174,9 @@ window.DashStudentCards = (function () {
       var r = value > 0 ? Math.max(1, Math.min(4, Math.round(value))) : 0;
       var lines = stripTipLines(cid, sid, col, value, secById);
       var label = lines[0] + ': ' + lines.slice(1).join('. ');
-      var cls = 'dash-card-seg' + (r ? '' : ' is-none') + (focusKey === col.key ? ' is-focus' : '');
-      // Developing's amber needs dark text; the other levels take white.
-      var style =
-        '--chip-bg:' +
-        (r ? 'var(--score-' + r + ')' : 'var(--divider-medium)') +
-        ';--chip-fg:' +
-        (!r ? 'var(--text-2)' : r === 2 ? '#2b1a00' : '#fff');
+      // The level's colours (and a text colour that reads on it in each
+      // theme) come from .dash-card-seg.lv-N in dashboard.css.
+      var cls = 'dash-card-seg' + (r ? ' lv-' + r : ' is-none') + (focusKey === col.key ? ' is-focus' : '');
       if (chips) {
         html +=
           '<button type="button" class="' +
@@ -186,8 +185,6 @@ window.DashStudentCards = (function () {
           esc(col.key) +
           '" aria-label="' +
           esc(label) +
-          '" style="' +
-          style +
           '">' +
           esc(DashInsights.columnCode(cid, col)) +
           _tipHtml(lines) +
@@ -200,8 +197,6 @@ window.DashStudentCards = (function () {
           esc(col.key) +
           '" role="img" aria-label="' +
           esc(label) +
-          '" style="' +
-          style +
           '">' +
           _tipHtml(lines) +
           '</span>';

@@ -2286,7 +2286,13 @@ a.dash-ins-name:hover {
   gap: 3px;
   padding: 2px 12px 10px;
 }
+/* A segment's colours by the student's level (lv-1 … lv-4; is-none when
+   not assessed). The text colour passes 4.5:1 on its level in each theme:
+   white on Emerging, Proficient and Extending in light, dark on Developing's
+   amber; dark on every level in dark, where the level colours are bright. */
 .dash-card-seg {
+  --chip-bg: var(--divider-medium);
+  --chip-fg: var(--text-2);
   flex: 1;
   min-width: 0;
   height: 6px;
@@ -2298,6 +2304,30 @@ a.dash-ins-name:hover {
     background-color 200ms,
     color 200ms,
     outline-color 200ms;
+}
+.dash-card-seg.lv-1 {
+  --chip-bg: var(--score-1);
+  --chip-fg: #fff;
+}
+.dash-card-seg.lv-2 {
+  --chip-bg: var(--score-2);
+  --chip-fg: #2b1a00;
+}
+.dash-card-seg.lv-3 {
+  --chip-bg: var(--score-3);
+  --chip-fg: #fff;
+}
+.dash-card-seg.lv-4 {
+  --chip-bg: var(--score-4);
+  --chip-fg: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  .dash-card-seg.lv-1,
+  .dash-card-seg.lv-2,
+  .dash-card-seg.lv-3,
+  .dash-card-seg.lv-4 {
+    --chip-fg: #1d1d1f;
+  }
 }
 .dash-card-strip.is-chips .dash-card-seg {
   height: 14px;

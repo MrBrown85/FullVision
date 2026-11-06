@@ -219,11 +219,19 @@ window.DashOverview = (function () {
   var COMP_VIEWS = [
     { key: 'avg', label: 'Class Average', hint: 'The class average on each competency' },
     { key: 'mix', label: 'Level Mix', hint: 'How many students are at each level' },
-    { key: 'below', label: 'Needs Support', hint: 'Students below Proficient most often, and where' },
+    // The hint names the Needs Attention rule's level (_compViews).
+    { key: 'below', label: 'Needs Support', hint: 'Students below {level} most often, and where' },
     { key: 'trend', label: 'Change', hint: 'The class average month by month' },
   ];
   var COMP_SUPPORT_ROWS = 7;
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+
+  // The views with the Needs Support hint in the rule's words.
+  function _compViews(level) {
+    return COMP_VIEWS.map(function (v) {
+      return { key: v.key, label: v.label, hint: v.hint.replace('{level}', level) };
+    });
+  }
 
   /** The view a class's card shows: the saved one, else its grading style's. */
   function compView(cid, saved) {
@@ -309,7 +317,7 @@ window.DashOverview = (function () {
       .join('');
   }
 
-  function _compMixRows(cid, cols, dists, comp, pop, belowBy) {
+  function _compMixRows(cid, cols, dists, comp, pop, belowBy, level) {
     var order = levelOrderFor(cid);
     return cols
       .map(function (col, i) {
@@ -367,7 +375,7 @@ window.DashOverview = (function () {
           '" title="' +
           esc(_colTitle(col)) +
           '" aria-label="' +
-          esc(col.title + ': ' + nBelow + ' below Proficient. Show the class weakest first on it') +
+          esc(col.title + ': ' + nBelow + ' below ' + level + '. Show the class weakest first on it') +
           '">' +
           esc(col.label) +
           '</button>' +
@@ -407,7 +415,7 @@ window.DashOverview = (function () {
       });
   }
 
-  function _compSupportRows(cid, cols, people) {
+  function _compSupportRows(cid, cols, people, level) {
     var html = '';
     people.slice(0, COMP_SUPPORT_ROWS).forEach(function (p) {
       var st = p.student;
@@ -440,7 +448,7 @@ window.DashOverview = (function () {
         '&course=' +
         esc(cid) +
         '&tab=comps" aria-label="' +
-        esc(name + ': below Proficient on ' + p.cols.length + ' of ' + cols.length + ', ' + names) +
+        esc(name + ': below ' + level + ' on ' + p.cols.length + ' of ' + cols.length + ', ' + names) +
         '">' +
         '<span class="dash-comp-name">' +
         esc(name) +
@@ -453,7 +461,7 @@ window.DashOverview = (function () {
         '<span class="dash-comp-val">' +
         esc(p.cols.length + ' of ' + cols.length) +
         '</span>' +
-        '<span class="dist-tip dash-comp-tip"><span class="dist-tip-title">' +
+        '<span class="dist-tip dash-comp-tip" aria-hidden="true"><span class="dist-tip-title">' +
         esc(name) +
         '</span><span class="dash-comp-tip-line">' +
         esc('Below on ' + names) +
@@ -466,7 +474,10 @@ window.DashOverview = (function () {
         more +
         ' more</button>';
     if (!people.length)
-      html += '<div class="dash-comp-none">Everyone is at Proficient or above, or has too few scores to say.</div>';
+      html +=
+        '<div class="dash-comp-none">' +
+        esc('Everyone is at ' + level + ' or above, or has too few scores to say.') +
+        '</div>';
     return html;
   }
 
@@ -541,7 +552,7 @@ window.DashOverview = (function () {
             '">' +
             esc(val) +
             '</span>' +
-            '<span class="dist-tip dash-comp-tip"><span class="dist-tip-title">' +
+            '<span class="dist-tip dash-comp-tip" aria-hidden="true"><span class="dist-tip-title">' +
             esc(col.title) +
             '</span><span class="dash-comp-tip-line">' +
             esc(tipLine) +
@@ -561,7 +572,9 @@ window.DashOverview = (function () {
     var view = compView(cid, opts.compView);
     var cols = DashInsights.columns(cid);
     var comp = opts.naComp || null;
-    var lists = opts.belowLists || DashInsights.belowLists(cid, allStudents, DashInsights.readRule(opts.helpRule));
+    var rule = DashInsights.readRule(opts.helpRule);
+    var level = DashInsights.ruleLevelName(rule);
+    var lists = opts.belowLists || DashInsights.belowLists(cid, allStudents, rule);
     var belowBy = {};
     lists.forEach(function (l) {
       belowBy[l.col.key] = l.ids;
@@ -580,7 +593,7 @@ window.DashOverview = (function () {
       view +
       '">' +
       '<div class="dash-section-title dash-comp-head"><span id="dash-comp-title">Curricular Competencies</span>' +
-      viewMenuHtml({ id: 'comp', label: 'Curricular Competencies view', views: COMP_VIEWS, current: view }) +
+      viewMenuHtml({ id: 'comp', label: 'Curricular Competencies view', views: _compViews(level), current: view }) +
       '<a role="link" tabindex="0" data-href="/gradebook?course=' +
       esc(cid) +
       '">View Gradebook →</a></div>' +
@@ -602,7 +615,7 @@ window.DashOverview = (function () {
         })
         .join('');
       labels = _compLabels('Competency', heads, 'Prof.+', 'is-cells', true);
-      rows = _compMixRows(cid, cols, dists, comp, opts.mixPop, belowBy);
+      rows = _compMixRows(cid, cols, dists, comp, opts.mixPop, belowBy, level);
     } else if (view === 'below') {
       var codes = cols
         .map(function (col) {
@@ -631,7 +644,7 @@ window.DashOverview = (function () {
         '">' +
         codes +
         '</span><span class="dash-comp-lab-val">Below</span></div>';
-      rows = _compSupportRows(cid, cols, people);
+      rows = _compSupportRows(cid, cols, people, level);
     } else if (view === 'trend') {
       var t = _compTrendRows(
         cid,

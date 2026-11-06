@@ -201,8 +201,14 @@ window.DashInsights = (function () {
     };
   }
 
+  // The level the rule's students are below, by name ("Proficient",
+  // "Developing"), for any text that says who counts.
+  function ruleLevelName(rule) {
+    return PROF_LABELS[readRule(rule).below];
+  }
+
   function _ruleText(rule) {
-    return 'Below ' + PROF_LABELS[rule.below] + ' · At Least ' + rule.min + ' Score' + (rule.min === 1 ? '' : 's');
+    return 'Below ' + ruleLevelName(rule) + ' · At Least ' + rule.min + ' Score' + (rule.min === 1 ? '' : 's');
   }
 
   /* Each competency with the students under the rule on it: their value is
@@ -948,6 +954,7 @@ window.DashInsights = (function () {
     popHtml: popHtml,
     gradebookHref: _gradebookHref,
     readRule: readRule,
+    ruleLevelName: ruleLevelName,
     belowLists: belowLists,
     helpGroups: helpGroups,
     missingItems: missingItems,

@@ -281,8 +281,10 @@ window.PageDashboard = (function () {
     }
 
     // The competency filter (naComp, from Curricular Competencies or Needs
-    // Attention): weakest first on it, whatever the teacher's sort, which
-    // stays as it was for when the filter is cleared.
+    // Attention): weakest first on it. The teacher's sort stays as it was
+    // for when the filter is cleared; choosing a sort (the sort menu or a
+    // grid heading) clears the filter, so the sort always wins and is
+    // never silently ignored.
     var focusCol = naComp ? _gridColumn(cid, naComp) : null;
     if (naComp && !focusCol) naComp = null;
     var shownSort = focusCol ? 'col:' + focusCol.key + ':asc' : sortMode;
@@ -1223,6 +1225,8 @@ window.PageDashboard = (function () {
       // rest High→Low.
       gridSort: function () {
         var key = el.dataset.key;
+        // A sort clears the competency filter, so it is never ignored.
+        naComp = null;
         var cur = DashInsights.gridSortOf(sortMode);
         var dir = cur && cur.key === key ? (cur.dir === 'asc' ? 'desc' : 'asc') : key === 'name' ? 'asc' : 'desc';
         _slideCards = true;
@@ -1271,6 +1275,8 @@ window.PageDashboard = (function () {
       return;
     }
     if (el.dataset.action === 'dashSort') {
+      // A sort clears the competency filter, so it is never ignored.
+      naComp = null;
       sortMode = el.value;
       _slideCards = true;
       render();
@@ -1304,7 +1310,7 @@ window.PageDashboard = (function () {
     var popOpen = !!_popFor;
     if (_obsKeydown(e)) return;
     // Escape with nothing else open clears the competency filter.
-    if (e.key === 'Escape' && naComp && !popOpen && !CM.classManagerOpen && !helpRuleOpen) {
+    if (e.key === 'Escape' && naComp && !popOpen && !CM.classManagerOpen && !helpRuleOpen && _escapeIsFree(e)) {
       var key = naComp;
       e.preventDefault();
       naComp = null;
@@ -1314,6 +1320,21 @@ window.PageDashboard = (function () {
       return;
     }
     CM.handleKeydown(e);
+  }
+
+  // Whether an Escape is the page's to use: nothing handled it first (the
+  // account menu, the Demo Mode menu and the Help panel listen on the
+  // document and call preventDefault), it comes from the page itself and
+  // not from a menu, dialog, open control, text field or the observation
+  // box, and no menu in the top bar is open.
+  var ESC_BUSY = '[role="menu"], [role="dialog"], [aria-expanded="true"], textarea, input, .obsc, [id$="obs-capture"]';
+  function _escapeIsFree(e) {
+    if (e.defaultPrevented) return false;
+    var t = e.target;
+    var main = document.getElementById('main');
+    if (!main || !t || !t.closest || !main.contains(t)) return false;
+    if (t.closest(ESC_BUSY)) return false;
+    return !document.querySelector('#page-toolbar-mount [aria-expanded="true"], .tb-right [aria-expanded="true"]');
   }
 
   // Focus on a competency's control on the Curricular Competencies card,

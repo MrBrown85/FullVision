@@ -128,14 +128,35 @@ describe('the card strip', () => {
     expect(tip.textContent).toBe('Evaluating' + formatLevel(CID, 3));
   });
 
-  it('Developing chips take dark text, the others white', () => {
+  it('a folder not counted as one says so last in its tip', () => {
     setClass({
-      sections: [sec('a', 'Alpha', { code: 'A1' }), sec('b', 'Beta', { code: 'B1' })],
+      groups: [{ id: 'g1', name: 'Questioning and Predicting', sortOrder: 0, countsAsOne: false }],
+      sections: [
+        sec('QP1', 'Curiosity', { code: 'QP1', groupId: 'g1' }),
+        sec('QP2', 'Wonder', { code: 'QP2', groupId: 'g1' }),
+      ],
+      scores: [sc(1, 'QP1', 3)],
+    });
+    const folder = dom(render()).querySelector('.dash-card-seg');
+    const lines = [...folder.querySelectorAll('.dist-tip > span')].map(s => s.textContent);
+    expect(lines[lines.length - 1]).toBe('Each competency counts on its own.');
+    expect(folder.getAttribute('aria-label')).toMatch(/with evidence\. Each competency counts on its own\.$/);
+  });
+
+  it('a chip takes its level class for its colours, with no inline style', () => {
+    setClass({
+      sections: [
+        sec('a', 'Alpha', { code: 'A1' }),
+        sec('b', 'Beta', { code: 'B1' }),
+        sec('c', 'Gamma', { code: 'C1' }),
+      ],
       scores: [sc(1, 'a', 2), sc(2, 'b', 4)],
     });
-    const [dev, ext] = dom(render()).querySelectorAll('.dash-card-seg');
-    expect(dev.getAttribute('style')).toContain('--chip-bg:var(--score-2);--chip-fg:#2b1a00');
-    expect(ext.getAttribute('style')).toContain('--chip-bg:var(--score-4);--chip-fg:#fff');
+    const [dev, ext, none] = dom(render()).querySelectorAll('.dash-card-seg');
+    expect(dev.classList.contains('lv-2')).toBe(true);
+    expect(ext.classList.contains('lv-4')).toBe(true);
+    expect(none.classList.contains('is-none')).toBe(true);
+    [dev, ext, none].forEach(c => expect(c.hasAttribute('style')).toBe(false));
   });
 });
 

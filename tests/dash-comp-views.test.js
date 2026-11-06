@@ -403,6 +403,64 @@ describe('the page filter', () => {
     expect(doc.activeElement).toBe(pick('s:IN'));
   });
 
+  it('Escape leaves the filter when the account menu took it', () => {
+    click(pick('s:IN'));
+    doc.getElementById('page-toolbar-mount').innerHTML =
+      '<div class="tb-group tb-right"><div class="tb-user-menu open">' +
+      '<button type="button" class="tb-user-btn" aria-expanded="true">Account</button>' +
+      '<div class="tb-user-dropdown" role="menu"><button type="button" role="menuitem">Sign Out</button></div>' +
+      '</div></div>';
+    // The menu's own listener runs first: it closes and calls preventDefault.
+    const menuEsc = e => {
+      if (e.key !== 'Escape') return;
+      doc.querySelector('.tb-user-btn').setAttribute('aria-expanded', 'false');
+      e.preventDefault();
+    };
+    doc.addEventListener('keydown', menuEsc, true);
+    doc.querySelector('[role="menuitem"]').focus();
+    key('Escape');
+    doc.removeEventListener('keydown', menuEsc, true);
+    expect(doc.querySelector('.dash-comp-filter')).toBeTruthy();
+
+    // With the menu open and the focus still on the page, Escape is the menu's too.
+    doc.querySelector('.tb-user-btn').setAttribute('aria-expanded', 'true');
+    pick('s:IN').focus();
+    key('Escape');
+    expect(doc.querySelector('.dash-comp-filter')).toBeTruthy();
+
+    // Closed, Escape on the page clears it again.
+    doc.querySelector('.tb-user-btn').setAttribute('aria-expanded', 'false');
+    key('Escape');
+    expect(doc.querySelector('.dash-comp-filter')).toBeNull();
+  });
+
+  it('choosing a sort clears the filter, so the sort wins', () => {
+    click(doc.querySelector('[data-action="studentView"][data-view="cards"]'));
+    click(pick('s:IN'));
+    expect(cardOrder()).toEqual(['s1', 's2', 's3']);
+    const sel = doc.querySelector('.dash-sort-select');
+    sel.value = 'last-desc';
+    sel.dispatchEvent(new doc.defaultView.Event('change', { bubbles: true }));
+    expect(doc.querySelector('.dash-comp-filter')).toBeNull();
+    expect(cardOrder()).toEqual(['s3', 's2', 's1']);
+
+    click(doc.querySelector('[data-action="studentView"][data-view="grid"]'));
+    click(pick('s:IN'));
+    expect(doc.querySelector('.dash-comp-filter')).toBeTruthy();
+    const hadCSS = 'CSS' in globalThis;
+    const css = globalThis.CSS;
+    globalThis.CSS = { escape: x => x };
+    try {
+      click(doc.querySelector('.dash-sg-sort[data-key="name"]'));
+    } finally {
+      if (hadCSS) globalThis.CSS = css;
+      else delete globalThis.CSS;
+    }
+    expect(doc.querySelector('.dash-comp-filter')).toBeNull();
+    const rows = Array.from(doc.querySelectorAll('.dash-sg tbody .dash-sg-name')).map(r => r.textContent);
+    expect(rows).toEqual(['Ava C.', 'Ben D.', 'Cy E.']);
+  });
+
   it('"Record an Observation" opens the capture with the students below picked', () => {
     const calls = [];
     const open = ObsCapture.openDialog;
