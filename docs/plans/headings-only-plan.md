@@ -79,6 +79,27 @@ Sample for approval, Statistics 12 · Reasoning and Modelling (Extending first, 
 | Statistical Modelling (RM4)        | Tests the model against new data, explains where it breaks down and revises it to fit better     | Builds a model of a real situation, states its assumptions and explains how well it fits the data | Fits a model to a familiar situation and describes one way it matches the data      | Names the quantities in a real situation that a statistical model would describe       |
 | Problem Exploration (RM1, RM5)     | Invents a strategy for a new kind of problem and explains why it works beyond one case           | Chooses and adapts strategies for an unfamiliar problem and follows up on the questions it raises | Tries more than one strategy on a problem and asks a question about what stands out | Tries a modelled strategy on a puzzle or an unfamiliar problem                         |
 
+### Competency rubrics, the same standard (Colin, 2026-11-05)
+
+A course graded by competencies needs rubrics as good as a heading's. Today's are built by rule: the rubric draft wraps one I Can statement in stock phrases, and the printed Competency Rubric reads `data/bc-curriculum-proficiency.json`, whose four levels change only the qualifier ("is beginning to…", "consistently…"). That file was made on Nov 2 under delegated approval, without the sample round its plan called for, and the rubric draft was never wired to it. Both get replaced:
+
+1. **Four written cells for every competency**, to the heading rubric's rules: descriptor phrases, what the work looks like at each level in that course, Extending as depth and complexity, Emerging as what the work shows. About 5,029 rows and 20,000 cells, written in the same pass as the heading rubrics, after Colin approves samples across subjects.
+2. **Wired in:** "+ From Competency" drafts from the written cells instead of stock phrases, and the printed Competency Rubric reads them. A teacher's own wording still wins.
+3. **On the roadmap** until it ships, so it can't drop out of sight again.
+
+Sample for approval, Social Studies 8 (Emerging first, as grades 8–9 show it; 14 words or fewer):
+
+| Criterion                  | Emerging                                                                  | Developing                                                                               | Proficient                                                                                           | Extending                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Inquiry (INQ)              | Asks a question about the past and gathers some ideas from a given source | Asks a focused question, gathers ideas from more than one source and summarizes findings | Asks a focused question, analyzes ideas from several sources and communicates a supported conclusion | Refines the question as evidence builds and explains how the findings shaped a decision        |
+| Significance (SIG1)        | Names a person, place or event from the period and says why it mattered   | Explains why a person or event mattered, using one criterion such as impact              | Uses criteria such as impact and duration to assess how significant a development was                | Shows how a development's significance differed by time, place or group affected               |
+| Significance Claims (SIG2) | Points to what a source's creator chose to include or put first           | Identifies what a map or account treats as significant and points to one detail          | Explains what a creator saw as significant, citing what the source includes and omits                | Compares what two creators saw as significant and suggests why they differ                     |
+| Evidence (EVI)             | Tells a primary source from a secondary source and names who made it      | Judges one source's credibility using its author, date or purpose                        | Weighs the credibility of several sources and decides if the evidence supports a conclusion          | Explains which evidence is missing or contradictory and how it limits a conclusion             |
+| Continuity & Change (CHG)  | Describes some features of daily life or government in a past period      | Describes a period's main features and names a change that happened during it            | Characterizes a period, identifies progress and decline, and explains a key turning point            | Defends a turning point and shows how one group's progress was another's decline               |
+| Cause & Consequence (CAU)  | Names one cause and one consequence of a decision or event                | Lists several causes of an event and describes its short-term consequences               | Decides which causes mattered most and assesses short- and long-term consequences                    | Shows how consequences differed for groups involved, such as colonizers and Indigenous peoples |
+| Perspective (PER)          | Describes how one person or group in the past saw an event                | Describes two perspectives on an event and one value behind each                         | Explains several perspectives on an event and compares the values and beliefs behind them            | Compares worldviews across cultures and times, avoiding judging the past by present values     |
+| Ethical Judgment (ETH)     | Says whether a past action was fair or unfair and gives a reason          | Makes a judgment about a past action, supported by evidence from the period              | Judges a past action in context and names a limit of applying it today                               | Weighs competing judgments of a past action and explains which lessons transfer to today       |
+
 ### What Folders Count as One means afterwards
 
 A course by headings has no folders, so its overall is the plain mean of its headings: the same shape as Folders Count as One on, without the folder layer. A heading split back to its competencies is a folder again and follows its own Counts as One. The wizard's review and the Grading tab say "Graded by headings, so there are no folders" instead of showing a switch that does nothing. Each Course Counts Equally is unchanged. Rule 2: no formula in `calc.js` changes; the tests prove it.
@@ -141,7 +162,7 @@ Help: a section in `help/articles/create-a-class.md`, "Grade by Headings", with 
 ## For Colin to decide
 
 1. Approve heading-as-competency over a display mode.
-2. The Statistics 12 and Humanities 8 I Can samples and the Reasoning and Modelling rubric above.
+2. The Statistics 12 and Humanities 8 I Can samples, the Reasoning and Modelling rubric and the Social Studies 8 rubrics above.
 3. Whether a heading rubric's rows count as one piece of evidence or one each.
 4. Nested courses (ADST and 62 others): folders (9 columns in ADST 8) or the top organizer (3).
 5. Build Phase 4 now, or wait until a teacher with scores asks; and its merge rule.
