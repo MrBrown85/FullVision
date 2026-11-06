@@ -2233,25 +2233,18 @@ a.dash-ins-name:hover {
   font-weight: 600;
   color: var(--text);
   text-decoration: none;
-  display: block;
-  white-space: nowrap;
+  /* A long name wraps to a second line rather than being cut off (Colin,
+     Nov 5); two lines at most. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 .dash-card-name:hover {
   color: var(--link);
-}
-.dash-card-sub {
-  display: flex;
-  gap: 8px;
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-2);
-  white-space: nowrap;
-  overflow: hidden;
-}
-.dash-card-stunum {
-  font-variant-numeric: tabular-nums;
 }
 .dash-card-badge {
   flex-shrink: 0;

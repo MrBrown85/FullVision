@@ -378,12 +378,9 @@ window.DashStudentCards = (function () {
               })()
             : '') +
           '</div>' +
-          (st.pronouns || st.studentNumber
-            ? '<div class="dash-card-sub">' +
-              (st.pronouns ? '<span class="dash-card-pronouns">' + esc(st.pronouns) + '</span>' : '') +
-              (st.studentNumber ? '<span class="dash-card-stunum">#' + esc(st.studentNumber) + '</span>' : '') +
-              '</div>'
-            : '') +
+          // No pronouns or student number here (Colin, Nov 5): the card is
+          // the name, and a long name wraps to a second line instead of
+          // being cut off.
           '</div>' +
           '<span class="dash-card-badge' +
           (op ? '' : ' is-none') +
