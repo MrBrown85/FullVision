@@ -32,7 +32,7 @@ test('saves, then reopens keeping the shared settings', async ({ page }) => {
   if (mod) await page.selectOption('#af-module', mod);
   await page.locator('.af-scoremode-btn[data-mode="points"]').click();
   await page.fill('#af-maxpoints', '20');
-  await page.selectOption('#af-weight', '2');
+  await page.fill('#af-weight', '2');
   await page.fill('#af-date-assigned', '2026-11-03');
   await page.fill('#af-due', '2026-11-05');
   await openCompPicker(page);

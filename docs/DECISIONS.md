@@ -20,7 +20,8 @@ Context: `grading-compliance-plan.md`. All implemented; see its status table.
 
 Supersedes D2. Teachers asked for the multiplier back on points work (an assignment out of 6 counted 4 times), and Schoology has one ("Factor"). Colin: taking it out was an oversight.
 
-- **Every assessment has a Factor**, default 1x, chosen from 0.5x–5x under "Factor" on the assessment form for every kind of scoring.
+- **Every assessment has a Factor**, default 1×, under "Factor" on the assessment form for every kind of scoring. **Any value from 0.1 to 10, to one decimal** (2026-11-06; a CSL-expert teacher: "can I pick my exact factor? I often use 70% and 30%"): a stepper, typed or stepped by 0.5. A stored Factor is kept exactly until it is changed. It is written 2.3× everywhere (`formatFactor`).
+- **The share bar shows what a Factor means** (2026-11-06; Colin: the design speaks for itself, no explanatory text). Under the scoring, a bar split into the category's assessments, this one blue, with "≈ 70% of" and the category's name: its points × Factor over the category's in a Total Points category, its Factor over the sum of Factors in an Average of Percentages one (`assessmentCategoryShare`, read-only, the course %'s own weights with every assessment scored). It replaces the form's "Counts as … points" sentence; the grader keeps the sentence. No category reads "Not in the course %", a 0% category "Practice counts 0%"; a class with no % and DIBELS show none.
 - **In the course %, its points earned and possible are multiplied by it:** 5/6 at 4 counts as 20/24. Proficiency work (level out of 4) and rubric points are multiplied the same way.
 - **Toward competencies and level averages, it counts that many times:** competency proficiency, category averages and group grades.
 - A gradebook column and its Class Average still show the assessment's own points (5/6), not the multiplied ones.

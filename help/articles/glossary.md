@@ -107,7 +107,7 @@ The highest of the four BC proficiency levels, scored as 4: a sophisticated unde
 
 ### Factor
 
-An assessment's weight, chosen on the assessment form from 0.5x to 5x; the default is 1x (Normal). At 2x an assessment counts twice as much as work at 1x in the course % and under Mean, Mode and Decaying Average; Highest Score, Median and Most Recent Score ignore it.
+An assessment's weight, set on the assessment form to any value from 0.1× to 10×; the default is 1×. The bar under the scoring shows the assessment's share of its category. At 2× an assessment counts twice as much as work at 1× in the course % and under Mean, Mode and Decaying Average; Highest Score, Median and Most Recent Score ignore it.
 
 ### Folders Count as One
 

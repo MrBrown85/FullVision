@@ -2,8 +2,9 @@ import { test, expect } from '@playwright/test';
 
 /* Nov 3 sweep (step 4 group 3 #22): the Max Points quick pick stayed on 100
    after Create and Add Another kept 25, and the Counts As line read
-   "Counts as 4 points" for a Blank Rubric with two criteria. Demo Mode,
-   Science 8 switched to a Letter class so the line shows. */
+   "Counts as 4 points" for a Blank Rubric with two criteria. The line is
+   now the share bar (2026-11-06), which follows the rubric the same way.
+   Demo Mode, Science 8 switched to a Letter class so the bar shows. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function openForm(page) {
@@ -35,13 +36,26 @@ test('the lit Max Points pick follows what Create and Add Another kept', async (
   expect(await lit(page)).toEqual([]);
 });
 
-test('Counts As follows the Blank Rubric as criteria are added, and after it is saved', async ({ page }) => {
+// The share a new assessment worth `points` would have in Labs, as the page works it out.
+const labsShare = (page, points) =>
+  page.evaluate(
+    pts =>
+      formatShare(
+        assessmentCategoryShare('sci8', { scoreMode: 'points', maxPoints: pts, categoryId: 'sci8-cat-labs' }).share,
+        true,
+      ) + ' of',
+    points,
+  );
+
+test('the share bar follows the Blank Rubric as criteria are added, and after it is saved', async ({ page }) => {
   await openForm(page);
-  await expect(page.locator('#af-counts-as')).toHaveText('Counts as 4 points in Labs & Investigations (1 criterion).');
+  const pct = page.locator('#af-counts-as .af-share-pct');
+  await expect(page.locator('#af-counts-as .af-share-cat')).toHaveText('Labs & Investigations');
+  await expect(pct).toHaveText(await labsShare(page, 4));
   await page.locator('[data-action="geAddCrit"]').click();
-  await expect(page.locator('#af-counts-as')).toHaveText('Counts as 8 points in Labs & Investigations (2 criteria).');
+  await expect(pct).toHaveText(await labsShare(page, 8));
   await page.fill('#af-ge-name', 'Lab Rubric');
   await page.locator('[data-action="geSave"]').click();
   await expect(page.locator('#af-rubric')).not.toHaveValue('');
-  await expect(page.locator('#af-counts-as')).toHaveText('Counts as 8 points in Labs & Investigations (2 criteria).');
+  await expect(pct).toHaveText(await labsShare(page, 8));
 });

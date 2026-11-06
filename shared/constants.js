@@ -626,6 +626,13 @@ function formatPoints(n) {
   return String(Math.round(v * 100) / 100);
 }
 
+/* An assessment's Factor as the app writes it: 2.3×, 1×, 0.5×. Anything
+   that isn't more than 0 counts as 1 (getAssessmentWeight). */
+function formatFactor(w) {
+  var v = Number(w);
+  return (v > 0 && isFinite(v) ? formatPoints(v) : '1') + '\u00d7';
+}
+
 /* Category pill tint — soft pastel chip palette assigned by index.
    Categories rotate through CATEGORY_PALETTE in the order they were created
    (1st category → palette[0], 2nd → palette[1], …, 11th → palette[0] again).

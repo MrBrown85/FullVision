@@ -1362,7 +1362,8 @@ window.PageGradebook = (function () {
       if (isCompletionScored(a)) badges += '<span class="gb-assess-badge">\u2713/\u2717</span>';
       else if (a.scoreMode === 'points')
         badges += '<span class="gb-assess-badge">/ ' + (a.maxPoints || 100) + '</span>';
-      if (getAssessmentWeight(a) !== 1) badges += '<span class="gb-assess-badge">' + esc(a.weight) + 'x</span>';
+      if (getAssessmentWeight(a) !== 1)
+        badges += '<span class="gb-assess-badge">' + esc(formatFactor(getAssessmentWeight(a))) + '</span>';
       var _catId = _getAssessmentCategoryId(a);
       var _catIdx = _catId
         ? (getCategories(cid) || []).findIndex(function (c) {

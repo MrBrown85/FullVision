@@ -68,7 +68,7 @@ test('Category and Date Assigned have no hover-over', async ({ page }) => {
 test('Factor says what the multiplier does', async ({ page }) => {
   await openForm(page);
   await page.locator('#af-weight').hover();
-  await expect(tip(page)).toContainText('Factor 1x (Normal)');
+  await expect(tip(page)).toContainText('Factor 1\u00d7');
   await expect(tip(page)).toContainText('Counts once toward each competency it scores');
 });
 
@@ -105,7 +105,7 @@ test('a field focused below the fold keeps its tip as the page scrolls to it', a
   await expect(page.locator('#af-weight')).toBeFocused();
   await page.waitForTimeout(300);
   await expect(tip(page)).toBeVisible();
-  await expect(tip(page)).toContainText('Factor 1x (Normal)');
+  await expect(tip(page)).toContainText('Factor 1\u00d7');
 });
 
 test('a hover waits for a pause; passing over a field shows nothing', async ({ page }) => {
