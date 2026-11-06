@@ -67,7 +67,10 @@ test('Open Demo Mode, confirmed, takes a signed-in teacher into Demo Mode', asyn
   await toDemo;
   // mockAuth's init script blocks the sample-class seed on every page, so
   // this checks the hand-off: Demo Mode is on, the teacher back on the app.
-  await page.waitForFunction(() => location.pathname === '/dashboard' && isDemoMode());
+  // The app's scripts may still be loading when the address changes.
+  await page.waitForFunction(
+    () => location.pathname === '/dashboard' && typeof isDemoMode === 'function' && isDemoMode(),
+  );
 });
 
 test('Choose Courses: ticking a course never moves Next', async ({ page }) => {

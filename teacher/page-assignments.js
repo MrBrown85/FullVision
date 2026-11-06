@@ -6702,11 +6702,11 @@ window.PageAssignments = (function () {
   }
   function _classResultsButtonHtml(cid, a) {
     return (
-      '<button type="button" class="cr-card-btn"' +
+      '<button type="button" class="cr-card-btn" aria-label="Class Results"' +
       _classResultsAttrs(cid, a.id) +
       '>' +
       _CLASS_RESULTS_ICON +
-      'Class Results</button>'
+      '<span class="cr-card-label">Class Results</span></button>'
     );
   }
   function _classResultsLinkHtml(cid, aid) {
