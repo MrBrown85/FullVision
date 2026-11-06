@@ -83,11 +83,10 @@ test('Cancel closes the format panel and returns focus to Import Roster', async 
   await expect(page.locator('[data-action="cmImportRoster"]')).toBeFocused();
 });
 
-test('The roster has a key for its codes, and each code a tooltip', async ({ page }) => {
+test('Each code beside a name has a tooltip, and the roster has no key', async ({ page }) => {
   await enterDemo(page);
-  const legend = page.locator('#gb-roster-legend');
-  await expect(legend).toBeVisible();
-  await expect(legend).toHaveText('EXTExtendingPRFProficientDEVDevelopingEMGEmergingIEInsufficient Evidence');
+  await expect(page.locator('#gb-roster-list .student-row-prof').first()).toBeVisible();
+  await expect(page.locator('#gb-roster-legend')).toHaveCount(0);
   const titles = await page
     .locator('#gb-roster-list .student-row-prof')
     .evaluateAll(els => [...new Set(els.map(e => e.textContent + '=' + e.title))]);
@@ -103,8 +102,8 @@ test('The roster has a key for its codes, and each code a tooltip', async ({ pag
     const [code, title] = t.split('=');
     if (names[code]) expect(title).toBe(names[code]);
   }
-  // Show: None hides the codes, and the key with them.
+  // Show: None hides the codes.
   await page.locator('#sb-show-btn').click();
   await page.locator('#sb-show-menu [role="menuitemradio"]', { hasText: 'None' }).click();
-  await expect(legend).toBeHidden();
+  await expect(page.locator('#gb-roster-list .student-row-prof')).toHaveCount(0);
 });
