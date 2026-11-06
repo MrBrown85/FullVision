@@ -7412,13 +7412,20 @@ button.grader-member-name {
   gap: 8px;
   max-width: 100%;
 }
+/* The row never runs past its column: the other levels give way
+   (shortened names) before the chosen one and its − | + do. */
 .grsp-controls .grdl-seg {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 .grsp-controls .grdl-level {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
   height: 28px;
-  padding: 0 11px;
+  padding: 0 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: var(--text-sm);
 }
 .grsp-controls .grdl-pick {
