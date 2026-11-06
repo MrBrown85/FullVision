@@ -14,7 +14,6 @@ labels:
   - Teacher Comment
   - Undo
   - Sentences
-  - Other Wording
   - Options
   - Remove From Comment
   - Browse Sentences…
@@ -52,7 +51,7 @@ shots:
 
 ![The Teacher Comment with a generated draft and its rows under Sentences](img/generate-report-comments.jpg 'A draft for Cece Adeyemi after all six work habits are rated.')
 
-4. Under **Sentences**, each row shows one sentence and where it came from. **Other Wording** offers other bank sentences for the same part. On a typed sentence, **Options** offers **Remove From Comment**. Drag a row by its handle to move it.
+4. Under **Sentences**, each row shows one sentence. Hover over it to see what it comes from. **Options** offers other bank sentences for the same part and **Remove From Comment**. Drag a row by its handle to move it.
 5. To add a sentence, choose the plus button between two rows, or open **Browse Sentences…** and choose **Use** beside a sentence. Browse Sentences lists the sentences that fit the student, least used in the class first. **+ Write Your Own** adds a sentence in the teacher's own words.
 6. Choose **Approve and Next**.
 

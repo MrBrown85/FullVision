@@ -3127,6 +3127,10 @@ body.offline-active #app-dock {
 .sync-toast.success {
   background: var(--toast-success);
 }
+/* Download All My Data's progress line: dark in both themes, white text. */
+.sync-toast.export-all-toast {
+  background: #2b2f36;
+}
 .sync-toast-btn {
   background: none;
   border: 1px solid rgba(255, 255, 255, 0.3);

@@ -126,7 +126,7 @@ This README intentionally avoids hard-coding test counts because they drift freq
 
 ## Deployment
 
-Netlify publishes the static output in `dist/`.
+Netlify publishes the static output in `dist/` from the `production` branch. Work merges into `main` without deploying; a release is one pull request from `main` into `production`, which is one deploy.
 
 Relevant files:
 

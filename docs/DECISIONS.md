@@ -20,7 +20,8 @@ Context: `grading-compliance-plan.md`. All implemented; see its status table.
 
 Supersedes D2. Teachers asked for the multiplier back on points work (an assignment out of 6 counted 4 times), and Schoology has one ("Factor"). Colin: taking it out was an oversight.
 
-- **Every assessment has a Factor**, default 1x, chosen from 0.5x–5x under "Factor" on the assessment form for every kind of scoring.
+- **Every assessment has a Factor**, default 1×, under "Factor" on the assessment form for every kind of scoring. **Any value from 0.1 to 10, to one decimal** (2026-11-06; a CSL-expert teacher: "can I pick my exact factor? I often use 70% and 30%"): a stepper, typed or stepped by 0.5. A stored Factor is kept exactly until it is changed. It is written 2.3× everywhere (`formatFactor`).
+- **The share bar shows what a Factor means** (2026-11-06; Colin: the design speaks for itself, no explanatory text). Under the scoring, a bar split into the category's assessments, this one blue, with "≈ 70% of" and the category's name: its points × Factor over the category's in a Total Points category, its Factor over the sum of Factors in an Average of Percentages one (`assessmentCategoryShare`, read-only, the course %'s own weights with every assessment scored). It replaces the form's "Counts as … points" sentence; the grader keeps the sentence. No category reads "Not in the course %", a 0% category "Practice counts 0%"; a class with no % and DIBELS show none.
 - **In the course %, its points earned and possible are multiplied by it:** 5/6 at 4 counts as 20/24. Proficiency work (level out of 4) and rubric points are multiplied the same way.
 - **Toward competencies and level averages, it counts that many times:** competency proficiency, category averages and group grades.
 - A gradebook column and its Class Average still show the assessment's own points (5/6), not the multiplied ones.
@@ -538,3 +539,22 @@ Context: Colin wanted the gradebook's Class Average to answer "how did the class
 5. **Colour means a proficiency level, nothing else** (Colin, 2026-11-05). Other Classes, Earlier in <Category> and Feedback Written are neutral grey. No grey explainer lines, no standard deviation, no email or messaging, and no trend chart for rubric work beyond Earlier in <Category>.
 6. **Other Classes uses the link copies already carry** (`copy_group`, `AssessmentCopy.findCopies`). Work made with Duplicate in the same class is new work, not a copy, and is not listed. No database change.
 7. **One pull request, one merge**, for Netlify's deploy credits.
+
+## Releases from the production branch (2026-11-06)
+
+Context: every merge to `main` deployed the site, so ten merged pull requests cost ten Netlify deploys, and credits ran short on Nov 5 and 6.
+
+1. **Netlify deploys the `production` branch, not `main`** (Colin, 2026-11-06). `main` stays the branch every pull request merges into and that CI tests; merging there costs nothing. `production` holds what fullvision.ca runs.
+2. **A release is one pull request from `main` into `production`.** One deploy carries every merge since the last release. Release when Colin says to: at once for a bug teachers are hitting, otherwise batched.
+3. The `netlify.toml` ignore rule is unchanged: only the production context builds, and that context is now the `production` branch. Branches other than `production` are not deployed at all (Netlify's allowed branches).
+
+## Download All My Data (2026-11-06)
+
+Context: a teacher could export one class's scores as a CSV and print reports, but the writing (feedback, observations, report comments, questionnaire answers, goals) had no way out. Colin: no teacher should be trapped in the app, and the file has to make sense when it is opened.
+
+1. **One button, one file.** Download All My Data in the account menu saves one Excel workbook for every class that isn't deleted: Contents, Summary, a gradebook sheet per class, then Rubric Levels, Feedback, Observations, Reports, Questionnaires, Goals & Reflections and Grade Overrides. A sheet with nothing on it is left out.
+2. **Grades as shown.** Every figure comes from `calc.js` (`assessmentCellValue`, `studentGradeSummary`, `classColumnAverageText`, `formatLevel`) and follows the class's grading style. Missing and Excused are written in full; a late piece says so after its score.
+3. **Organized, if dense.** Headers and the student column are frozen, every header has a filter, long text wraps at 60 characters, dates are real dates, rows run class by class and then by last name, and no internal id appears.
+4. **Read-only.** There is no import from this file. Restoring a class is Class Settings → Class Actions → Download Class Backup and Restore from Backup, which carry one class as data.
+5. **Withdrawn students** are on the Summary sheet, marked. Their records stay behind Download Records in Class Settings, which already exists for them.
+6. **ExcelJS** (`vendor/exceljs.min.js`, MIT) writes the styles; it loads only when the button is clicked. `tests/export-all.test.js` fails when a new per-class reader in `shared/data.js` is neither exported nor listed with a reason.

@@ -1167,7 +1167,7 @@ function renderDock(activePage, rightHTML) {
       <span class="tb-user-name" id="tb-user-name"></span>
     </button>
     <div class="tb-user-dropdown">
-      <button class="tb-user-item tb-user-help" data-action="openHelpFromMenu">Help</button><button class="tb-user-item" data-action="openReportProblem">Report a Problem</button>${resetDemo}<button class="tb-user-signout" data-action="signOut">Sign Out</button>
+      <button class="tb-user-item tb-user-help" data-action="openHelpFromMenu">Help</button><button class="tb-user-item" data-action="openReportProblem">Report a Problem</button><button class="tb-user-item" data-action="exportAllData">Download All My Data</button>${resetDemo}<button class="tb-user-signout" data-action="signOut">Sign Out</button>
     </div>
   </div>`;
 
@@ -1811,7 +1811,6 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
       </div>${_sidebarTermNote(cid)}
     </div>
     <div id="gb-roster-list" role="list">${_sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick)}</div>
-    <div id="gb-roster-legend" class="sb-legend" aria-label="Key" hidden></div>
   </aside>`;
   // Auto-fill badges after caller mounts this HTML
   setTimeout(function () {
@@ -1925,8 +1924,9 @@ function _sidebarGradeBadge(part) {
   return `<span class="student-row-prof" style="color:${color};background:${tint}"${title}>${esc(part.text)}</span>`;
 }
 
-/* What each proficiency code beside a name means: its tooltip, and the key
-   under the roster. IE is BC's Insufficient Evidence: nothing scored yet. */
+/* What each proficiency code beside a name means, for its tooltip. IE is
+   BC's Insufficient Evidence: nothing scored yet. (No key under the roster:
+   Colin, Nov 6: teachers know the codes.) */
 const ROSTER_CODE_NAMES = (function () {
   const names = {};
   [4, 3, 2, 1].forEach(function (lv) {
@@ -1935,38 +1935,6 @@ const ROSTER_CODE_NAMES = (function () {
   names[PROF_CODES[0]] = 'Insufficient Evidence';
   return names;
 })();
-
-/* The key under the roster, while the codes show beside the names (not in a
-   Letter class, under Show: Percentage or None, with no students, or while a
-   page marks the roster for its own job). */
-// html-safe: codes and names come from ROSTER_CODE_NAMES; colours from PROF_COLORS / PROF_TINT.
-function _fillRosterLegend(cid) {
-  const el = document.getElementById('gb-roster-legend');
-  if (!el) return;
-  const show = _rosterShowMode(cid);
-  const on =
-    !_sidebarAnnotator &&
-    show !== 'none' &&
-    show !== 'percent' &&
-    courseGradeMode(cid) !== 'letter' &&
-    getStudents(cid).length > 0;
-  el.hidden = !on;
-  if (!on) {
-    el.innerHTML = '';
-    return;
-  }
-  el.innerHTML = [4, 3, 2, 1, 0]
-    .map(function (lv) {
-      const code = PROF_CODES[lv];
-      return (
-        '<span class="sb-legend-item">' +
-        _sidebarGradeBadge({ text: code, level: lv }) +
-        esc(ROSTER_CODE_NAMES[code]) +
-        '</span>'
-      );
-    })
-    .join('');
-}
 
 /* After a score changes: redraw only the grade beside one student (`sid`),
    or beside every student, and leave the names and the roster's scroll as
@@ -2012,7 +1980,6 @@ function _sidebarBadgesHtml(cid, sid) {
 /** Fill sidebar grade badges asynchronously after sidebar is mounted. */
 function fillSidebarBadges(cid) {
   requestAnimationFrame(function () {
-    _fillRosterLegend(cid);
     if (_sidebarAnnotator) {
       applySidebarAnnotations();
       return;
@@ -2036,7 +2003,6 @@ function setSidebarAnnotator(fn) {
   const had = !!_sidebarAnnotator;
   _sidebarAnnotator = fn || null;
   applySidebarAnnotations();
-  _fillRosterLegend(typeof activeCourse !== 'undefined' ? activeCourse : getActiveCourse());
   if (had && !_sidebarAnnotator)
     fillSidebarBadges(typeof activeCourse !== 'undefined' ? activeCourse : getActiveCourse());
 }
@@ -2532,6 +2498,16 @@ document.addEventListener('click', function (e) {
     },
     openReportProblem: function () {
       openReportProblem();
+    },
+    // Download All My Data: one Excel file with every class (teacher/export-all.js).
+    exportAllData: function () {
+      var menu = el.closest('.tb-user-menu');
+      if (menu) {
+        menu.classList.remove('open');
+        var b = menu.querySelector('.tb-user-btn');
+        if (b) b.setAttribute('aria-expanded', 'false');
+      }
+      if (window.ExportAll) ExportAll.run();
     },
     // Under 600 px Help is in the account menu (styles.css).
     openHelpFromMenu: function () {

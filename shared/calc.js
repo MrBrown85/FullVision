@@ -842,6 +842,73 @@ function assessmentCourseWorth(cid, assessment) {
   return { kind: 'points', points: base * factor, base: base, criteria: criteria, factor: factor, category: name };
 }
 
+/* One assessment's share of its category, as the course % counts it, for
+   the share bar under the assessment form's scoring. Read-only: it uses the
+   same weights getAssessmentGroupPercentage gives each assessment, assuming
+   every one is scored.
+     Total Points category (or a class with no categories): its points times
+       its Factor over the category's total (assessmentCourseWorth's points).
+     Average of Percentages category: its Factor over the sum of Factors.
+   assessment is the form's live values; one with an id stands in for the
+   saved assessment with that id. Returns
+     { kind: 'share', share, category, mode, parts }
+        share 0–1; category the category's name, or null in a class with no
+        categories; parts [{ id, title, share, self }], this one first, then
+        the others in the class's order, leaving out any that count nothing.
+   or assessmentCourseWorth's { kind: 'uncategorized' } / { kind: 'zero' },
+   or null when no % is shown or the work counts toward no grade. */
+function assessmentCategoryShare(cid, assessment) {
+  var worth = assessmentCourseWorth(cid, assessment);
+  if (!worth || (worth.kind !== 'points' && worth.kind !== 'percent')) return worth;
+  var averaged = worth.kind === 'percent';
+  var hasCategories = ((typeof getCategories === 'function' && getCategories(cid)) || []).length > 0;
+  var categoryId = assessment.categoryId || assessment.category_id || null;
+  var selfId = assessment.id || null;
+  var weightOf = function (a, w) {
+    if (averaged) return getAssessmentWeight(a);
+    return w && w.kind === 'points' ? w.points : 0;
+  };
+  var parts = [{ id: selfId, title: assessment.title || '', weight: weightOf(assessment, worth), self: true }];
+  ((typeof getAssessments === 'function' && getAssessments(cid)) || []).forEach(function (a) {
+    if (!a || (selfId && a.id === selfId) || isDibelsScored(a)) return;
+    if (hasCategories && (a.categoryId || a.category_id || null) !== categoryId) return;
+    parts.push({
+      id: a.id,
+      title: a.title || '',
+      weight: weightOf(a, averaged ? null : assessmentCourseWorth(cid, a)),
+      self: false,
+    });
+  });
+  var total = parts.reduce(function (sum, p) {
+    return sum + (p.weight > 0 ? p.weight : 0);
+  }, 0);
+  var shown = parts
+    .filter(function (p) {
+      return p.self || p.weight > 0;
+    })
+    .map(function (p) {
+      return { id: p.id, title: p.title, share: total > 0 && p.weight > 0 ? p.weight / total : 0, self: p.self };
+    });
+  return {
+    kind: 'share',
+    share: shown[0].share,
+    category: worth.category,
+    mode: averaged ? 'percent' : 'points',
+    parts: shown,
+  };
+}
+
+/* A share (0–1) as a whole percent: "70%", "< 1%" for a sliver. approx puts
+   "≈ " before a share the whole number only rounds to (69.7% is "≈ 70%";
+   50% stays "50%"). */
+function formatShare(share, approx) {
+  var pct = Number(share) * 100;
+  if (!(pct > 0)) return '0%';
+  if (pct < 0.5) return '< 1%';
+  var whole = Math.round(pct);
+  return (approx && Math.abs(pct - whole) > 1e-9 ? '\u2248 ' : '') + whole + '%';
+}
+
 // A category's Calculation (shared/data.js categoryCalcMode); points when
 // the data layer isn't loaded.
 function _categoryMode(category) {

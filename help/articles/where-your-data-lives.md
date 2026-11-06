@@ -9,6 +9,7 @@ pages:
 demo: /dashboard
 labels:
   - Sign Out
+  - Download All My Data
   - Class Settings
   - Class Actions
   - Download Class Backup
@@ -41,6 +42,10 @@ Demo Mode keeps everything on the device it runs on. Nothing in Demo Mode is sen
 ## Error Reports
 
 When an error occurs, it sends a report to Sentry, which stores reports in Germany. A report holds the error message, where in the code it happened, the page and the browser type. Before it is sent, FullVision removes log messages, form contents and the part of the page address that identifies a student, and masks email addresses, ids, dates and student numbers. No IP address is sent.
+
+## Download All My Data
+
+Choose **Download All My Data** from the account menu at the top right. FullVision loads every class and saves one Excel file: a Summary of every student's course grade, a gradebook sheet for each class, and sheets for rubric levels, feedback, observations, report comments, questionnaire answers, goals and reflections. Grades read exactly as FullVision shows them. The file is for reading and keeping; it cannot be loaded back in. To restore a class, use a class backup.
 
 ## Download a Class Backup
 

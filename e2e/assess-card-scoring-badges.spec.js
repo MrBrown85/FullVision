@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
    only in the gradebook. Demo Mode, Science 8. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test('a card names its scoring and a Factor other than 1x', async ({ page }) => {
+test('a card names its scoring and a Factor other than 1×', async ({ page }) => {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.waitForFunction(() => getAssessments('sci8').length > 0);
@@ -21,7 +21,7 @@ test('a card names its scoring and a Factor other than 1x', async ({ page }) => 
   });
   await page.evaluate(() => window.Router.navigate('/assignments?course=sci8'));
   const ptsMeta = page.locator(`#ac-${ids.pts} .assess-meta .score-badge`);
-  await expect(ptsMeta).toHaveText(['20 Points', 'Factor 2x']);
+  await expect(ptsMeta).toHaveText(['20 Points', 'Factor 2\u00d7']);
   // A rubric card's rubric chip already says how it is scored.
   await expect(page.locator(`#ac-${ids.rub} .assess-meta .score-badge`)).toHaveCount(0);
   await expect(page.locator(`#ac-${ids.rub} .assess-meta .rubric-badge`)).toHaveCount(1);

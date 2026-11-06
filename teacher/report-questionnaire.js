@@ -3318,20 +3318,18 @@ window.ReportQuestionnaire = (function () {
 
   /* The parts a sentence is labelled with, each the draft's steps it
      covers (CommentBank.DRAFT_STEPS). Browse Sentences is split the same
-     way (the Browse Sentences mockup). `word`: the part in a thin-part
-     line ("Only 4 habit sentences fit …"). */
+     way (the Browse Sentences mockup). */
   var PARTS = [
     { id: 'grade', label: 'Grade', steps: ['grade'] },
-    { id: 'bestPiece', label: 'Best Piece', word: 'best piece', steps: ['example'] },
-    { id: 'strengths', label: 'Strengths', word: 'strength', steps: ['opening', 'overall', 'growth'] },
+    { id: 'bestPiece', label: 'Best Piece', steps: ['example'] },
+    { id: 'strengths', label: 'Strengths', steps: ['opening', 'overall', 'growth'] },
     {
       id: 'habits',
       label: 'Habits',
-      word: 'habit',
       steps: ['habits', 'habitsMore', 'habitsBuild', 'attendance', 'strongHabits'],
     },
     { id: 'notHandedIn', label: 'Not Handed In', steps: ['notHandedIn', 'lateWork'] },
-    { id: 'nextStep', label: 'Next Step', word: 'next step', steps: ['nextStep', 'goWords', 'home'] },
+    { id: 'nextStep', label: 'Next Step', steps: ['nextStep', 'goWords', 'home'] },
     { id: 'support', label: 'Support', steps: ['support'] },
     { id: 'closing', label: 'Closing', steps: ['closer'] },
   ];
@@ -4623,7 +4621,7 @@ window.ReportQuestionnaire = (function () {
     });
   }
 
-  /* ── Other Wording ───────────────────────────────────────── */
+  /* ── Options: other wording (was "Other Wording", Nov 6) ─── */
 
   /* How many classmates have each bank sentence this report. */
   function _usage(cid, student) {
@@ -4949,53 +4947,6 @@ window.ReportQuestionnaire = (function () {
     return bits.join(' · ') || 'A general sentence. It states no fact about ' + first + '.';
   }
 
-  /* ── Thin parts of the bank (plan PR 13) ─────────────────── */
-
-  /* The class's bank strength (CommentBank.bankStrength), worked out once
-     per drawing of the page and again when a habit rating changes. */
-  var _strength = null;
-  function _bankStrength(cid) {
-    var termId = getTermId();
-    var students = getTqStudents();
-    var key =
-      cid +
-      '|' +
-      termId +
-      '|' +
-      students
-        .map(function (s) {
-          return s.id + ':' + JSON.stringify((getStudentTermRating(cid, s.id, termId) || {}).habits || {});
-        })
-        .join('|');
-    if (!_strength || _strength.key !== key) {
-      _strength = { key: key, r: CommentBank.bankStrength(cid, { termId: termId, students: students }) };
-    }
-    return _strength.r;
-  }
-
-  /* Under a row's source line, when its part of the bank is thin for this
-     student (the class warnings mockup): how many sentences fit how many
-     students, and a link to Browse Sentences on that part. A sentence the
-     teacher edited is their own, so it has none. */
-  function thinLine(st, part) {
-    return (
-      'Only ' +
-      st.sentences +
-      ' ' +
-      part.word +
-      (st.sentences === 1 ? ' sentence fits ' : ' sentences fit ') +
-      st.students +
-      ' students, so some will repeat.'
-    );
-  }
-  function _thinHtml(cid, student, row, i) {
-    if (row.edited || !row.step || !row.s) return '';
-    var part = partOf(row.step);
-    var st = (_bankStrength(cid).byStudent[student.id] || {})[row.step];
-    if (!part || !part.word || !st || !st.thin) return '';
-    return `<span class="qn-req-thin">${esc(thinLine(st, part))} <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="all" data-row="${i}" title="Opens Browse Sentences on ${esc(part.label)}, where you can pick another sentence for this part.">Write one of your own</button> to add more.</span>`;
-  }
-
   /* ── The card ────────────────────────────────────────────── */
 
   var DOTS_ICON =
@@ -5069,7 +5020,7 @@ window.ReportQuestionnaire = (function () {
     // Comment), the InsertRows mockup.
     var wordingBtn =
       row.step && row.s
-        ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="${edited ? 'Go back to the bank’s wording, pick another, or remove the sentence.' : 'Shows other ways to say this sentence. Pick one to use it, or remove the sentence.'}">Other Wording ▾</button>`
+        ? `<button type="button" class="qn-line-menu${open ? ' on' : ''}" data-action="tqSentences" data-do="wording" data-row="${i}" aria-haspopup="menu" aria-expanded="${open}" title="${edited ? 'Go back to the bank’s wording, pick another, or remove the sentence.' : 'Other ways to say this sentence, every sentence for this part, or remove it.'}">Options ▾</button>`
         : '';
     // An edited bank sentence keeps Other Wording, so it can go back to a
     // bank wording (Nov 3 sweep).
@@ -5091,22 +5042,17 @@ window.ReportQuestionnaire = (function () {
         return r.text;
       })
       .join(' ');
-    var thin = unit
-      .map(function (r) {
-        return _thinHtml(cid, student, r, i);
-      })
-      .join('');
     var source = _unitSource(unit, cid, student, f, ctx) + (added ? ' · added just now' : '');
     var pron = _pronounCheckFor(student, f);
     return `<div class="qn-req-row qn-srow${tint}${open ? ' has-menu' : ''}${low && !_isChecked(student.id, 'low') ? ' flag' : ''}"${_rowAttr(i)}>
       ${handle}<div class="qn-req-part"><span class="qn-req-label">${esc(rowLabel(row, path))}</span></div>
-      <div class="qn-req-body"><span class="qn-req-text">${esc(text)}</span><span class="qn-req-source">${esc(source)}</span>${
+      <div class="qn-req-body"><span class="qn-req-text" title="${esc(source)}">${esc(text)}</span><span class="qn-req-source qn-srow-facts">${esc(source)}</span>${
         unit.some(function (r) {
           return pronounNote(r, pron);
         })
           ? `<span class="qn-pron-note" title="The student’s pronouns changed after you wrote this sentence. Check its pronouns.">Pronouns changed · <button type="button" class="qn-thin-link" data-action="tqSentences" data-do="pronounOk" data-row="${i}" title="Keeps this sentence as written and takes this note away.">Dismiss</button></span>`
           : ''
-      }${thin}${ownBox}</div>
+      }${ownBox}</div>
       ${act}
       ${low ? _checkHtml(student.id, 'low') : ''}
       ${open ? (typed || earlier ? _optionsMenuHtml(i, earlier) : _wordingMenuHtml(cid, student, ctx, rows, i)) : ''}
@@ -8329,7 +8275,6 @@ window.ReportQuestionnaire = (function () {
     // The pronouns may have changed (Edit Student) since the rows were drawn.
     _syncPronouns(cid, student, f);
     // Marks may have changed since the page was last drawn.
-    _strength = null;
     _shared = null;
     _staleCache = {};
     _claimCache = {};
@@ -8613,7 +8558,6 @@ window.ReportQuestionnaire = (function () {
     browseCase: browseCase,
     browseOwn: browseOwn,
     rowSource: rowSource,
-    thinLine: thinLine,
     sheetHeight: sheetHeight,
     linesOpen: linesOpen,
     clickOutside: clickOutside,

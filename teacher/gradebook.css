@@ -1498,6 +1498,10 @@ th.gb-group-alt {
   align-items: center;
   border-top: 1px solid var(--border);
 }
+/* The class's overall, at the foot of the Overall column. */
+.gb-grid-rowhead-stats .gb-class-overall {
+  margin-left: auto;
+}
 /* Competencies data table — rows must match Q3 height exactly */
 .gb-grid-comp .gb-table {
   border-collapse: collapse;

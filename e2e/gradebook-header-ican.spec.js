@@ -79,9 +79,15 @@ test('header keys stay on the headers: Home and End, the grid keeps its place an
   const last = heads.last();
   await expect(last).toBeFocused();
   const cells = page.locator('#gb-data tbody tr').first().locator('td.gb-score');
-  const hb = await last.boundingBox();
-  const cb = await cells.last().boundingBox();
-  expect(Math.abs(hb.x - cb.x)).toBeLessThan(3);
+  // The scores follow the headers on the next scroll event, a frame later:
+  // wait for them to line up rather than measuring mid-scroll.
+  await expect
+    .poll(async () => {
+      const hb = await last.boundingBox();
+      const cb = await cells.last().boundingBox();
+      return Math.abs(hb.x - cb.x);
+    })
+    .toBeLessThan(3);
   await page.keyboard.press('Home');
   await expect(heads.first()).toBeFocused();
 });

@@ -7,6 +7,7 @@ keywords:
   - Class Management
 checked: 2026-11-05
 labels:
+  - Download All My Data
   - Class Results
   - View Class Results
   - Class Average
@@ -40,6 +41,10 @@ next:
   - add-your-students
 ---
 
+## Nov 6, 2026: Download All My Data
+
+**Download All My Data** in the account menu saves one Excel file with every class: a Summary, a gradebook sheet per class, and sheets for rubric levels, feedback, observations, reports, questionnaires and goals.
+
 ## Nov 6, 2026: Class Results
 
 Hover over a Class Average in the Gradebook to see the spread of the class's results. Select it, or choose **View Class Results** in the column's menu, to open **Class Results**: the results by level, criterion and competency, who is below Proficient or Missing, feedback and observations on the work, and the same assessment in your other classes. Each assessment on the Assignments page has a **Class Results** button too.
@@ -58,7 +63,7 @@ A **Help** button at the top right opens a panel beside the page. It lists the h
 
 ## Nov 5, 2026: Roster Import and Codes
 
-**Import Roster** first lists the columns a roster file can hold, with **Download Template** and **Choose File**. A key under the student list explains its codes; hovering over IE shows Insufficient Evidence. Screens that called a competency a standard or a tag now say competency.
+**Import Roster** first lists the columns a roster file can hold, with **Download Template** and **Choose File**. Hovering over a code beside a student's name, such as IE, shows what it means. Screens that called a competency a standard or a tag now say competency.
 
 ## Nov 5, 2026: Demo Mode Label
 

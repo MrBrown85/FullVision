@@ -256,6 +256,7 @@ load('teacher/dash-student-cards.js');
 load('teacher/dash-insights.js');
 load('teacher/assign-collab.js');
 load('teacher/assessment-copy.js');
+load('teacher/factor-field.js');
 load('teacher/rubric-guard.js');
 load('teacher/obs-capture.js');
 load('teacher/obs-card.js');

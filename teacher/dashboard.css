@@ -3326,6 +3326,11 @@ a.dash-ins-name:hover {
   .cm-grade-body {
     flex-direction: column;
   }
+  /* Full width, not its widest line, so the Points and Proficiency ruler
+     scrolls inside its card on a phone. */
+  .cm-grade-lanes {
+    width: 100%;
+  }
   .cm-check {
     width: 100%;
     flex: none;
@@ -5666,32 +5671,6 @@ a.dash-ins-name:hover {
   display: flex;
   gap: 8px;
 }
-/* The key under the roster: each proficiency code beside a name, and its
-   word. Drawn like the gradebook's key under the grid. */
-.sb-legend {
-  flex-shrink: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px 10px;
-  padding: 10px 16px 12px;
-  border-top: 1px solid var(--divider-subtle);
-  font-family: var(--font-base);
-  font-size: 12px;
-  color: var(--text-2);
-}
-.sb-legend[hidden] {
-  display: none;
-}
-.sb-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-.sb-legend-item:last-child {
-  grid-column: 1 / -1;
-}
-
 /* Import Roster's format panel, shown before the file picker */
 .cm-import-format {
   display: flex;
@@ -6502,64 +6481,222 @@ label.cm-cr-row {
 .cm-folder-count-off {
   margin: 0 0 12px;
 }
+/* Points and Proficiency as one 0–100% ruler (_cmRenderPointsScale):
+   Counts As markers above, Points to Proficiency bands and their handles
+   below. Under 420px wide the ruler scrolls sideways in its card. Nothing
+   on it animates. */
 .cm-pts-scale {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
+  min-width: 0;
   gap: 8px;
   border-top: 1px solid var(--divider-subtle);
   padding-top: 12px;
   margin-top: 12px;
 }
-.cm-pts-rows {
+.cm-pts-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Room for a marker at 0% or 100% and for the picked ring. */
+  padding: 6px 18px 2px;
+}
+.cm-pts-ruler {
+  --cm-pts-top: 42px;
+  position: relative;
+  min-width: 420px;
+  height: calc(var(--cm-pts-top) + 82px);
+}
+.cm-pts-ruler.is-two-rows {
+  --cm-pts-top: 66px;
+}
+.cm-pts-marker {
+  --chip-bg: var(--score-0);
+  --chip-fg: #fff;
+  position: absolute;
+  top: 0;
+  z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-.cm-pts-row {
-  display: grid;
-  grid-template-columns: 84px 170px auto;
   align-items: center;
-  column-gap: 12px;
-  font-size: var(--text-sm);
+  transform: translateX(-50%);
 }
-.cm-pts-head {
-  color: var(--text-2);
+.cm-pts-marker.is-low {
+  top: 24px;
+}
+.cm-pts-marker.is-on {
+  z-index: 3;
+}
+/* The text passes 4.5:1 on its level in each theme, as the dashboard
+   chips do (.dash-card-seg): white on Emerging, Proficient and Extending
+   in light, dark on Developing's amber; dark on every level in dark. */
+.cm-pts-marker.lv-1 {
+  --chip-bg: var(--score-1);
+}
+.cm-pts-marker.lv-2 {
+  --chip-bg: var(--score-2);
+  --chip-fg: #2b1a00;
+}
+.cm-pts-marker.lv-3 {
+  --chip-bg: var(--score-3);
+}
+.cm-pts-marker.lv-4 {
+  --chip-bg: var(--score-4);
+}
+@media (prefers-color-scheme: dark) {
+  .cm-pts-marker {
+    --chip-fg: #1d1d1f;
+  }
+}
+.cm-pts-pill {
+  min-width: 28px;
+  height: 20px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--chip-bg);
+  color: var(--chip-fg);
+  font-family: var(--font-base);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: grab;
+  touch-action: none;
+}
+.cm-pts-stem {
+  width: 1.5px;
+  height: calc(var(--cm-pts-top) - 20px);
+  background: var(--chip-bg);
+  opacity: 0.6;
+}
+.cm-pts-marker.is-low .cm-pts-stem {
+  height: calc(var(--cm-pts-top) - 44px);
+}
+.cm-pts-bands {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--cm-pts-top);
+  height: 34px;
+  display: flex;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cm-pts-band {
+  flex: none;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
   font-weight: 600;
+  line-height: 34px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.cm-pts-cell {
+.cm-pts-band.lv-1 {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
+.cm-pts-band.lv-2 {
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+.cm-pts-band.lv-3 {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+.cm-pts-band.lv-4 {
+  background: var(--score-4-bg);
+  color: var(--score-4-text);
+}
+.cm-pts-edge {
+  position: absolute;
+  top: calc(var(--cm-pts-top) - 4px);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+}
+.cm-pts-edge-line {
+  width: 3px;
+  height: 42px;
+  border-radius: 2px;
+  background: var(--text-2);
+}
+.cm-pts-edge.is-on .cm-pts-edge-line {
+  background: var(--text);
+}
+.cm-pts-handle {
+  height: 20px;
+  margin-top: 2px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-base);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: grab;
+  touch-action: none;
+}
+.cm-pts-pill.is-on {
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--text);
+}
+.cm-pts-handle.is-on {
+  box-shadow: 0 0 0 2px var(--text);
+}
+.cm-pts-pill:focus-visible,
+.cm-pts-handle:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 3px;
+}
+.cm-pts-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--cm-pts-top) + 66px);
+  height: 14px;
+  color: var(--text-2);
+  font-size: 11px;
+  line-height: 14px;
+}
+.cm-pts-ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.cm-pts-edit {
+  min-height: 30px;
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 0 18px;
+  font-size: var(--text-sm);
 }
-.cm-pts-name {
-  color: var(--text);
-}
-.cm-pts-min {
-  width: 64px;
-  text-align: center;
-}
-/* Wide enough for "100.0" and a one-decimal value beside the number
-   arrows ("83.3" was clipped to "83." at 64px). */
-.cm-pts-slot {
-  width: 80px;
-  flex-shrink: 0;
-  text-align: center;
-}
-.cm-pts-subhead {
-  font-weight: 500;
-  margin-top: -4px;
-}
-.cm-pts-unit,
-.cm-pts-below {
+.cm-pts-edit-label {
   color: var(--text-2);
 }
-.cm-pts-warn {
-  color: var(--score-1-text);
+.cm-pts-edit-name {
+  color: var(--text);
   font-weight: 600;
-  white-space: nowrap;
+}
+/* Wide enough for "100.0" beside the number arrows. */
+.cm-pts-input {
+  width: 80px;
+  text-align: center;
+}
+.cm-pts-unit {
+  color: var(--text-2);
 }
 .cm-pts-error {
+  padding: 0 18px;
   color: var(--score-1-text);
   font-size: var(--text-sm);
 }

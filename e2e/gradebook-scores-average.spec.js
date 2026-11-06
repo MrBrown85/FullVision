@@ -22,8 +22,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('Scores shows a Class Average row under its columns', async ({ page }) => {
-  await expect(page.locator('.gb-scores-stats-head')).toHaveText('Class Average');
+  await expect(page.locator('.gb-scores-stats-head')).toContainText('Class Average');
   await expect(page.locator('#gb-data tr.gb-scores-stats td').first()).toHaveText('3.5');
+  // The class's overall sits at the foot of the Overall column.
+  await expect(page.locator('.gb-scores-stats-head .gb-class-overall')).toHaveText('3.5');
   // The head and the row line up.
   const [head, row] = await page.evaluate(() => [
     document.querySelector('.gb-scores-stats-head').getBoundingClientRect().top,
