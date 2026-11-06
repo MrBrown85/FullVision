@@ -10,7 +10,7 @@ Statistics 12 has 18 competencies under four Ministry headings (Reasoning and Mo
 
 ## Recommendation
 
-**A per-course choice in the New Class wizard, Grade By: Competencies | Headings. Under Headings, each Ministry heading becomes one ordinary competency.** It carries its own bank id, a code from the heading's stem (RM, UND, CM, CN), its competencies' Ministry wording as its wording and one I Can statement from each of them. No display mode, no hidden rows, no grade math change, no database migration for the first three phases.
+**A per-course choice in the New Class wizard, Grade By: Competencies | Headings. Under Headings, each Ministry heading becomes one ordinary competency.** It carries its own bank id, a code from the heading's stem (RM, UND, CM, CN), its competencies' Ministry wording as its wording, and two or three I Can statements written for it that name the skills its competencies assess. No display mode, no hidden rows, no grade math change, no database migration for the first three phases.
 
 ### Why this and not a display mode
 
@@ -27,10 +27,30 @@ A display mode keeps the busy part, 18 tags on every assessment, and scores one 
 ### The data
 
 - **Heading ids live in the bank.** `scripts/bc_curriculum_derive.py` gives every folder category with two or more competencies a `heading: { id, code }`: id `bc.<course>.hd.<stem>` (`bc.stat12.hd.rm`), code the stem its competency codes already use (RM1–RM5 → RM). Frozen once published, like codes; a lock file and test stop them changing. 1,035 headings in 204 courses. Social Studies (20 courses) and Career Education 8–9 (2) have no headings; one-competency headings are already one column.
-- **The heading's wording** (`tag.text`, `source_text`) is its competencies' Ministry wording, one per line, in order. Its I Can statements are the first statement of each competency (4–6). It keeps `tag.bank_id`, so the competency card says "BC Curriculum · Statistics 12 · Reasoning and Modelling", Duplicate Class, backups and Restore carry it as they do now (`duplicate_course`, `import_json_restore` already copy `bank_id`), and Re-link matches on it.
+- **The heading's wording** (`tag.text`, `source_text`) is its competencies' Ministry wording, one per line, in order. Its I Can statements are written for it (below). It keeps `tag.bank_id`, so the competency card says "BC Curriculum · Statistics 12 · Reasoning and Modelling", Duplicate Class, backups and Restore carry it as they do now (`duplicate_course`, `import_json_restore` already copy `bank_id`), and Re-link matches on it.
 - **Per course, per heading.** A course is the unit of choice (Humanities 8 can take ELA 8 by Headings, 2 columns, beside SS 8's 8 competencies). Each heading can also be split back to its competencies in the wizard ("Use Its 5 Competencies"). The class needs no new setting: a tag whose bank id has `.hd.` is a heading.
 - **ADST and nested courses.** The heading is the bank's folder (Defining, Ideating…), not the top organizer (Applied Design), so ADST 8 gives 9 columns, not 3. **Colin decides:** keep folders (consistent with codes and the card's path), or offer the top level for the 63 nested courses.
 - **Grade 7** has no bank courses, so the choice never shows; a custom class already takes four hand-made competencies.
+
+### The heading's I Can statements (Colin, 2026-11-05)
+
+Two or three per heading, written from that course's own competencies, never generic heading words: Statistics 12's Reasoning and Modelling talks about statistical models and estimation, Mathematics 8's about mathematical ones. The rules:
+
+1. **Together they name every skill the heading's competencies assess.** Each statement records the competency ids it covers (`covers: [...]`), and CI fails a heading with an uncovered competency.
+2. **In the course's context.** Written from the Ministry wording and the competencies' own I Can statements, keeping their subject words (variables, data, First Peoples communities), so a student reads what they actually do in that course.
+3. **The competency I Can rules apply:** "I can" and a lower-case word, no end punctuation, the banned words, the word cap (14 at grade 8, 17 at 9–10, 22 at 11–12), and a hash of the competencies' Ministry text so a revision flags the heading.
+4. **Written as the bank's were:** one exemplar per heading name and subject (56) for Colin to approve, every other course adapted from it, changing only what its competencies change, then an independent review. 1,035 headings, about 2,600 statements, in `data/bc-curriculum-heading-ican.json`.
+
+The rubric draft takes at most three I Can statements, so a heading's criterion draws from all of them. The heading's comment phrase, descriptors and course sets are then written from these statements, as the competencies' were from theirs.
+
+Sample for approval, Statistics 12:
+
+- **Reasoning and Modelling:** I can use reasoning, estimation and technology to analyze and apply statistical ideas · I can build a statistical model of a real situation and explain how it fits · I can explore a problem or puzzle with curiosity and try creative thinking strategies to solve it
+- **Understanding and Solving:** I can explain how and why a statistical idea works and choose an approach that fits the question · I can use graphs and other visuals to explore variation within and between variables · I can keep investigating a research question, including questions that matter to local First Peoples communities and my own community
+- **Communicating and Representing:** I can explain and justify my statistical decisions in more than one way · I can represent a statistical idea with materials, pictures and symbols · I can use statistical vocabulary to share my ideas in class discussion, even when I am unsure
+- **Connecting and Reflecting:** I can reflect on my statistical thinking and use my mistakes to improve my next attempt · I can connect statistical ideas to each other, to other subjects and to my own interests · I can connect statistics to First Peoples worldviews, perspectives, knowledge and practices
+
+**The hard case:** 142 headings hold seven or more competencies (ELA's Comprehend and Connect has 13; Arts' Explore and Create up to 9). At grade 8, three statements of 14 words must cover 13 skills, which pushes toward vague wording. Colin decides: keep three and group related skills, or allow a fourth statement for headings of seven or more.
 
 ### What Folders Count as One means afterwards
 
@@ -57,7 +77,7 @@ A course by headings has no folders, so its overall is the plain mean of its hea
 
 ### Which course-set sentence a heading uses
 
-None of its competencies' sets alone: any one of them would claim a specific skill ("can justify statistical decisions with reasons") from a judgement about the whole heading. Phase 3 writes **heading sets**: 79 clusters (subject × heading × grade band: PHE 19, ADST 18, Science 12, Career 10, Arts 8, Math 8, ELA 4), split into sets where courses' wording asks for different things, each with the full course-set shape (phrase, next steps at four levels, strengths, next-step sentences, at-home line), plus four proficiency descriptors and a comment-file phrase. Written and reviewed by `docs/course-sets/WRITE-BRIEF.md` and `REVIEW-BRIEF.md`, checked by `scripts/check-course-sets.mjs`, built by `scripts/build-course-sets.mjs`. Colin approves one sample first, as on Nov 4.
+None of its competencies' sets alone: any one of them would claim a specific skill ("can justify statistical decisions with reasons") from a judgement about the whole heading. Phase 3 writes **heading sets** from the heading's I Can statements: 79 groups (subject × heading × grade band: PHE 19, ADST 18, Science 12, Career 10, Arts 8, Math 8, ELA 4), split into sets where courses' wording asks for different things (likely 150–250 sets; the competencies' 697 groups became 1,706), each with the full course-set shape (phrase, next steps at four levels, strengths, next-step sentences, at-home line), plus four proficiency descriptors and a comment-file phrase. Written and reviewed by `docs/course-sets/WRITE-BRIEF.md` and `REVIEW-BRIEF.md`, checked by `scripts/check-course-sets.mjs`, built by `scripts/build-course-sets.mjs`. Colin approves one sample first, as on Nov 4.
 
 ## Switching an existing class
 
@@ -83,7 +103,7 @@ Help: a section in `help/articles/create-a-class.md`, "Grade by Headings", with 
 
 ## Build plan
 
-**Phase 1: headings in the bank and the wizard.** Derive script and lock file, `build-curriculum-bank.mjs` emits `heading`, `buildLearningMapFromTags(tags, { headings })`, the Grade By control, Includes rows, column preview, Review and Folders row wording, `_cmBankPlace` for heading ids. Tests: every multi-competency folder has a unique heading id and code; the lock file holds; Stats 12 builds 4 sections, no groups, wording and I Cans as specified; Humanities 8 mixes 2 headings with SS 8; ADST 8 nested; a headings class's overall equals the plain mean of its headings with Folders Count as One on and off; Generate's output for a heading class equals the same class with `bank_id` null; e2e: wizard Stats 12 by Headings → 4 gradebook columns, 4 dashboard chips; Demo Mode: the wizard builds Science 8 by Headings (6 columns), and the seed class is unchanged.
+**Phase 1: headings in the bank and the wizard.** The heading I Can statements are written and approved first (data only, no app change), then land with this phase. Derive script and lock file, `build-curriculum-bank.mjs` emits `heading`, `buildLearningMapFromTags(tags, { headings })`, the Grade By control, Includes rows, column preview, Review and Folders row wording, `_cmBankPlace` for heading ids. Tests: every multi-competency folder has a unique heading id and code; the lock file holds; every heading has two or three I Can statements that pass the I Can checks and cover each of its competencies; Stats 12 builds 4 sections, no groups, wording and I Cans as specified; Humanities 8 mixes 2 headings with SS 8; ADST 8 nested; a headings class's overall equals the plain mean of its headings with Folders Count as One on and off; Generate's output for a heading class equals the same class with `bank_id` null; e2e: wizard Stats 12 by Headings → 4 gradebook columns, 4 dashboard chips; Demo Mode: the wizard builds Science 8 by Headings (6 columns), and the seed class is unchanged.
 
 **Phase 2: Class Settings, Re-link, rubric, Browse.** The Competencies tab's switch and its evidence check, Includes on the card, heading-aware Re-link and name matching, One per Competency in It, Browse's sentences under a heading, the Proficiency block's hint, the help section. Tests: switching both ways with no evidence; blocked with each kind of evidence; Re-link pairs a hand-made heading and keeps its scores; backup → Restore and Duplicate Class keep heading ids; rubric criteria all feed the heading and score on their own; e2e on the Competencies tab.
 
@@ -94,6 +114,7 @@ Help: a section in `help/articles/create-a-class.md`, "Grade by Headings", with 
 ## For Colin to decide
 
 1. Approve heading-as-competency over a display mode.
-2. Nested courses (ADST and 62 others): folders (9 columns in ADST 8) or the top organizer (3).
-3. Build Phase 4 now, or wait until a teacher with scores asks; and its merge rule.
-4. Phases 1 and 2 as one merge or two.
+2. The Statistics 12 I Can sample above, and three or four statements for headings of seven or more competencies.
+3. Nested courses (ADST and 62 others): folders (9 columns in ADST 8) or the top organizer (3).
+4. Build Phase 4 now, or wait until a teacher with scores asks; and its merge rule.
+5. Phases 1 and 2 as one merge or two.
