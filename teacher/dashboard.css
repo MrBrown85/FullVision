@@ -1797,7 +1797,8 @@ a.dash-ins-name:hover {
   border: 1px solid var(--divider-strong);
   border-radius: 12px;
   box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  /* Not overflow: hidden, so a chip's pop-up can run past the card. */
+  position: relative;
   transition:
     box-shadow 0.18s var(--ease-out),
     transform 0.18s var(--ease-out);
@@ -1806,6 +1807,16 @@ a.dash-ins-name:hover {
 .dash-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+}
+/* The card under the pointer or the keyboard sits above its neighbours, so
+   its chip pop-up isn't drawn under the next row. */
+.dash-card:hover,
+.dash-card:focus-within {
+  z-index: 2;
+}
+/* With a competency in focus, a student below Proficient on it. */
+.dash-card.is-focus-below {
+  border-color: color-mix(in srgb, var(--score-2) 55%, var(--divider-strong));
 }
 .dash-card.flagged {
   box-shadow:
@@ -1911,8 +1922,11 @@ a.dash-ins-name:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* One thin segment per competency, tinted by its proficiency. */
+/* One segment per competency or folder, tinted by the student's level:
+   labelled chips up to eight columns, thin bars past that. A segment's
+   pop-up (.dist-tip) spans the card under the strip. */
 .dash-card-strip {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 3px;
@@ -1923,25 +1937,100 @@ a.dash-ins-name:hover {
   min-width: 0;
   height: 6px;
   border-radius: 2px;
+  background: var(--chip-bg);
+}
+.dash-card-strip.is-chips .dash-card-seg {
+  height: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  color: var(--chip-fg);
+  font-family: var(--font-base);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: visible;
+  cursor: pointer;
+}
+.dash-card-strip.is-chips .dash-card-seg:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.dash-card-seg:hover .dist-tip,
+.dash-card-seg:focus-within .dist-tip,
+.dash-card-seg:focus-visible .dist-tip {
+  display: block;
+}
+.dash-card-strip .dist-tip {
+  left: 8px;
+  right: 8px;
+  top: 100%;
+  transform: none;
+  margin-top: 0;
+  min-width: 0;
+  max-width: none;
+  white-space: normal;
+  text-align: left;
+  letter-spacing: normal;
+  cursor: default;
+}
+.dash-card-strip .dist-tip-title,
+.dash-card-strip .dist-tip-name {
+  display: block;
+}
+.dash-card-strip .dist-tip-title {
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  color: var(--text);
+}
+.dash-card-strip .dist-tip-name {
+  font-weight: 400;
+  line-height: 1.5;
+}
+/* A column in focus (part of the page's competency filter): it is outlined,
+   the others fade (a mix with the card, so the pop-up stays solid). */
+.dash-card-strip.has-focus .dash-card-seg.is-focus {
+  outline: 2px solid var(--text);
+  outline-offset: 1px;
+}
+.dash-card-strip.has-focus .dash-card-seg:not(.is-focus) {
+  background: color-mix(in srgb, var(--chip-bg) 35%, var(--surface));
+  color: color-mix(in srgb, var(--chip-fg) 35%, var(--surface));
 }
 
-/* Card Footer */
+/* The grade badge's trend arrow. */
+.dash-card-trend {
+  flex-shrink: 0;
+  font-size: 0.9375rem;
+  line-height: 1;
+}
+
+/* Card Footer: the observation line, and on the right "N not assessed"
+   or, with a column in focus, the student's level on it. */
 .dash-card-footer {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 0 12px 12px;
 }
-.dash-card-meta {
+.dash-card-unassessed,
+.dash-card-focus {
+  flex-shrink: 0;
+  margin-left: auto;
   font-family: var(--font-base);
   font-size: var(--text-xs);
+  font-weight: 600;
   color: var(--text-2);
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  flex-shrink: 0;
-  margin-left: 6px;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+.dash-card-focus {
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .dash-card-obs {
   /* On a narrow card the observation line takes its own row rather than

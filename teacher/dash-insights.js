@@ -50,6 +50,58 @@ window.DashInsights = (function () {
     return out;
   }
 
+  /* A column's short code for a chip or a column head, 2–3 letters: a
+     folder's common letter prefix of its competencies' codes (QP1, QP2 →
+     QP), a competency's code without digits (QP1 → QP), else the initials of
+     the first two words of its name (Continuity & Change → CC). */
+  function _codeLetters(code) {
+    return String(code || '')
+      .replace(/[^A-Za-z]/g, '')
+      .toUpperCase()
+      .slice(0, 3);
+  }
+  function _nameInitials(name) {
+    var words = String(name || '')
+      .split(/[^A-Za-z0-9]+/)
+      .filter(Boolean);
+    if (!words.length) return '';
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+  }
+  function columnCode(cid, col) {
+    if (!col) return '';
+    var byId = {};
+    getSections(cid).forEach(function (sec) {
+      byId[sec.id] = sec;
+    });
+    var codes = (col.sectionIds || []).map(function (id) {
+      var sec = byId[id];
+      var tag = sec && sec.tags && sec.tags[0];
+      return (tag && tag.code) || '';
+    });
+    var code = '';
+    if (codes.length && codes.every(Boolean)) {
+      var prefix = codes.reduce(function (common, c) {
+        var i = 0;
+        while (i < common.length && i < c.length && common.charAt(i) === c.charAt(i)) i++;
+        return common.slice(0, i);
+      });
+      // A folder's shared prefix, letters only; a competency's own code.
+      code = _codeLetters(col.which && col.which.groupId ? prefix.replace(/[^A-Za-z].*$/, '') : prefix);
+    }
+    return code || _nameInitials(col.title || col.label);
+  }
+
+  /* One student on one column under the Who Needs Help rule: their value is
+     below the rule's proficiency and rests on at least `min` scores. */
+  function isBelowRule(cid, col, sid, value, rule) {
+    if (!(value > 0) || Math.round(value) >= rule.below) return false;
+    var evidence = col.sectionIds.reduce(function (n, secId) {
+      return n + getSectionEvidenceCount(cid, sid, secId);
+    }, 0);
+    return evidence >= rule.min;
+  }
+
   function showsProficiency(cid) {
     return courseGradeMode(cid) !== 'letter';
   }
@@ -239,12 +291,7 @@ window.DashInsights = (function () {
     return columns(cid).map(function (col) {
       var dist = competencyDistribution(cid, ids, col.which);
       var below = ids.filter(function (sid) {
-        var v = dist.values[sid];
-        if (!(v > 0) || Math.round(v) >= rule.below) return false;
-        var evidence = col.sectionIds.reduce(function (n, secId) {
-          return n + getSectionEvidenceCount(cid, sid, secId);
-        }, 0);
-        return evidence >= rule.min;
+        return isBelowRule(cid, col, sid, dist.values[sid], rule);
       });
       return { col: col, ids: below, values: dist.values };
     });
@@ -973,6 +1020,8 @@ window.DashInsights = (function () {
 
   return {
     columns: columns,
+    columnCode: columnCode,
+    isBelowRule: isBelowRule,
     showsProficiency: showsProficiency,
     mixListHtml: mixListHtml,
     mixLegendHtml: mixLegendHtml,

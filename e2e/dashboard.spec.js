@@ -121,3 +121,25 @@ test.describe('Dashboard observation coverage', () => {
     await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
   });
 });
+
+/* Demo Mode's Science 8 has six Ministry folders, so each card's strip is
+   six labelled chips, and hovering one shows its pop-up at once. */
+test.describe('Dashboard student cards', () => {
+  test('a card shows competency chips with codes and the pop-up on hover', async ({ page }) => {
+    await page.goto('/login.html');
+    await page.locator('#demo-mode-btn').click();
+    await page.waitForURL(/\/dashboard/);
+    const card = page.locator('.dash-grid .dash-card').first();
+    const chips = card.locator('.dash-card-strip.is-chips button.dash-card-seg');
+    await expect(chips).toHaveCount(6);
+    const codes = await chips.evaluateAll(els => els.map(el => el.firstChild.textContent));
+    expect(codes).toEqual(['QP', 'PC', 'PA', 'EV', 'AP', 'CM']);
+    const tip = chips.first().locator('.dist-tip');
+    await expect(tip).toBeHidden();
+    await chips.first().hover();
+    await expect(tip).toBeVisible();
+    await expect(tip.locator('.dist-tip-title')).toHaveText('Questioning and Predicting');
+    await expect(tip).toContainText(/competencies with evidence/);
+    await expect(card.locator('.dash-card-meta')).toHaveCount(0);
+  });
+});
