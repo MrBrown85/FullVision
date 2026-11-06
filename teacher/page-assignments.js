@@ -1730,6 +1730,7 @@ window.PageAssignments = (function () {
                 ' and feedback">' +
                 _GRADER_PRINTER +
                 'Print Scores</button>') +
+        _classResultsButtonHtml(cid, a) +
         '<button class="assess-header-action-btn" data-action="editAssess" data-aid="' +
         a.id +
         '" title="Edit" aria-label="Edit assessment">' +
@@ -2496,6 +2497,7 @@ window.PageAssignments = (function () {
       if (keptFocus && keptFocus.isConnected) keptFocus.focus({ preventScroll: true });
     }
     document.querySelectorAll('#main .ldg-grid').forEach(refreshLedgerSummary);
+    _refreshClassResultsSoon();
 
     // Show/hide descriptor bar
     var hasActiveRubricView = false;
@@ -6688,6 +6690,41 @@ window.PageAssignments = (function () {
     );
   }
 
+  /* Class Results (teacher/class-results.js) opens from a card's header and
+     from the class line under its scores; class-results.js listens for
+     data-action="classResults". */
+  var _CLASS_RESULTS_ICON =
+    '<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 16v-3"/><path d="M8 16v-6"/><path d="M12 16v-9"/><path d="M16 16V4"/></svg>';
+  function _classResultsAttrs(cid, aid) {
+    return (
+      ' data-action="classResults" data-cid="' + esc(cid) + '" data-aid="' + esc(aid) + '" title="View Class Results"'
+    );
+  }
+  function _classResultsButtonHtml(cid, a) {
+    return (
+      '<button type="button" class="rubric-print-btn cr-card-btn"' +
+      _classResultsAttrs(cid, a.id) +
+      '>' +
+      _CLASS_RESULTS_ICON +
+      'Class Results</button>'
+    );
+  }
+  function _classResultsLinkHtml(cid, aid) {
+    return (
+      '<button type="button" class="ldg-name cr-ldg-link"' + _classResultsAttrs(cid, aid) + '>Class Results</button>'
+    );
+  }
+  // The open panel follows the page's changes, once per frame.
+  var _crRefreshQueued = false;
+  function _refreshClassResultsSoon() {
+    if (_crRefreshQueued || !window.ClassResults || !ClassResults.isOpen()) return;
+    _crRefreshQueued = true;
+    requestAnimationFrame(function () {
+      _crRefreshQueued = false;
+      if (window.ClassResults && ClassResults.isOpen()) ClassResults.refresh();
+    });
+  }
+
   // Counts read from the rows on screen, so they follow every click without a re-render.
   function refreshLedgerSummary(grid) {
     if (!grid) return;
@@ -6702,7 +6739,7 @@ window.PageAssignments = (function () {
         else if (r.querySelector('.cmp-incomplete.active')) n.i++;
         else n.u++;
       });
-      // html-safe: the three counts are numbers
+      // html-safe: the three counts are numbers; the class and assessment ids are escaped
       tally.innerHTML =
         '<span><b>' +
         n.c +
@@ -6710,7 +6747,9 @@ window.PageAssignments = (function () {
         n.i +
         '</b> Incomplete</span><span><b>' +
         n.u +
-        '</b> Unmarked</span>';
+        '</b> Unmarked</span>' +
+        (grid.dataset.aid ? _classResultsLinkHtml(activeCourse, grid.dataset.aid) : '');
+      _refreshClassResultsSoon();
       return;
     }
     var max = parseFloat(grid.dataset.max) || 100;
@@ -6746,8 +6785,12 @@ window.PageAssignments = (function () {
       var mid = medianOf(counted);
       html += '<span>Average <b>' + Math.round(((sum / counted.length) * 100) / max) + '%</b></span>';
       if (stats)
+        // html-safe: figures from formatPoints; the class and assessment ids are escaped
         stats.innerHTML =
-          '<span class="ldg-name">Class</span><span>Median <b>' +
+          (grid.dataset.aid
+            ? _classResultsLinkHtml(activeCourse, grid.dataset.aid)
+            : '<span class="ldg-name">Class</span>') +
+          '<span>Median <b>' +
           formatPoints(mid) +
           ' / ' +
           max +
@@ -6762,6 +6805,7 @@ window.PageAssignments = (function () {
           '</b></span>';
     } else if (stats) stats.innerHTML = '';
     tally.innerHTML = html;
+    _refreshClassResultsSoon();
   }
 
   function renderCompletionGrid(cid, a, students) {
@@ -12790,6 +12834,27 @@ window.PageAssignments = (function () {
     // Reset all state
     activeCourse = (params && params.course) || getActiveCourse();
     setActiveCourse(activeCourse);
+    // What Class Results' buttons do here: Grade This Assessment opens the
+    // card's grading list (or goes to it when open); a change redraws.
+    if (window.ClassResults)
+      ClassResults.setPage(function () {
+        return {
+          grade: function (aid) {
+            var card = document.getElementById('ac-' + aid);
+            if (!card || !card.classList.contains('open')) toggleAssess(aid);
+            card = document.getElementById('ac-' + aid);
+            if (card) {
+              card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+              var first = card.querySelector('.assess-body input, .assess-body button, .assess-body [tabindex="0"]');
+              if (first) first.focus({ preventScroll: true });
+            }
+          },
+          onChange: function () {
+            clearProfCache();
+            render();
+          },
+        };
+      });
     openAssessIds = new Set();
     focusStudentParam = (params && params.student) || null;
     focusStudentId = focusStudentParam || null;
@@ -12963,6 +13028,7 @@ window.PageAssignments = (function () {
   function destroy() {
     _hideChipTip();
     closeColorPop();
+    if (window.ClassResults) ClassResults.setPage(null);
     // Remove all tracked listeners
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);

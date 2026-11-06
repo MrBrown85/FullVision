@@ -439,3 +439,30 @@ describe('assessmentCourseShare', () => {
     expect(assessmentCourseShare(CID, points('q1', 20))).toBeNull();
   });
 });
+
+describe('ClassResults.cardHtml (the Class Average card)', () => {
+  it('shows the average, the counts, the median and range and the status chips, escaped', () => {
+    const a = level('lv', { title: '<b>Lab</b>' });
+    seed({
+      gradingSystem: 'letter',
+      assessments: [a],
+      scores: { s1: [entry('lv', 3)], s2: [entry('lv', 2)], s3: [entry('lv', 4)], s4: [], s5: [] },
+      statuses: { 's4:lv': 'NS', 's5:lv': 'EXC', 's2:lv': 'LATE' },
+    });
+    const html = ClassResults.cardHtml(CID, STUDENTS, a);
+    expect(html).toContain('Class Average');
+    expect(html).toContain('3 of 5 scored');
+    expect(html).toContain('Median');
+    expect(html).toContain('1 missing');
+    expect(html).toContain('1 excused');
+    expect(html).toContain('1 late');
+    expect(html).toContain('View Class Results');
+    expect(html).not.toContain('<b>Lab</b>');
+  });
+
+  it('is empty for DIBELS work', () => {
+    const d = { id: 'dib', title: 'DIBELS', scoreMode: 'dibels', tagIds: [] };
+    seed({ assessments: [d] });
+    expect(ClassResults.cardHtml(CID, STUDENTS, d)).toBe('');
+  });
+});
