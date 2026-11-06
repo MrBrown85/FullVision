@@ -7,7 +7,7 @@ Live at fullvision.ca. Owner: Colin Brown, a Surrey (SD36) teacher. Read `docs/R
 ## Stack
 
 - **Database:** Supabase project `gradebook-prod` (`novsfeqjhbleyyaztmlh`, `ca-central-1`). Every write goes through a `public` RPC; RLS is on every table through `fv_owns_course` / `fv_owns_enrollment` / `fv_owns_assessment` / `fv_owns_term_rating`. The anon role can run no functions (`migrations/20261013_revoke_anon_function_execute.sql`). Student data must stay in Canada.
-- **Front end:** plain JavaScript, no bundler. Browser-global IIFE modules loaded by `<script>` tags. Deployed as a static site on Netlify; `netlify/edge-functions/inject-env.js` injects the Supabase URL and key and sets a per-request CSP nonce.
+- **Front end:** plain JavaScript, no bundler. Browser-global IIFE modules loaded by `<script>` tags. Deployed as a static site on Netlify from the `production` branch (merging to `main` deploys nothing); `netlify/edge-functions/inject-env.js` injects the Supabase URL and key and sets a per-request CSP nonce.
 - **Errors:** Sentry (`shared/sentry-init.js`).
 
 ## Where things live
@@ -52,7 +52,7 @@ Demo Mode (`login.html` → Try Demo Mode, or `/login.html?demo=1`) runs local-o
 5. **Sync failures show only on the sync dot.** No banners, toasts or failed-item lists for sync problems.
 6. **Client ids:** `createCourse` and friends return a local id (`c` + base36 timestamp) and re-key to the server UUID when the RPC resolves. A local-shaped id reaching the database is a bug.
 7. **Every write RPC is idempotent** through `p_idempotency_key` (`fv_idem_check`). Keep that when adding one.
-8. **One PR per change.** `test-and-format` (vitest, the innerHTML audit, the database drift check, Prettier) must pass before merge; it is the only required check. Playwright runs on every PR and again on main after each merge (about four minutes); it is not required, so check the PR's e2e result before merging, and after merging check main's e2e run: if it's red, fixing it is the next PR. End commit messages with the attribution line the session gives you.
+8. **One PR per change; a release is a separate step.** `test-and-format` (vitest, the innerHTML audit, the database drift check, Prettier) must pass before merge; it is the only required check. Playwright runs on every PR and again on main after each merge (about five minutes); it is not required, so wait for every check, the browser tests included, before merging, and after merging check main's e2e run: if it's red, fixing it is the next PR. Merging to `main` costs nothing and deploys nothing. Netlify deploys the `production` branch only: a release is one pull request from `main` into `production` (`gh pr create --base production --head main`), one deploy, carrying every merge since the last release. Release only when Colin says to; each release spends a Netlify credit. End commit messages with the attribution line the session gives you.
 9. **Plain language in the UI:** Title Case for labels, headings, buttons and tabs; plain sentences for hints and messages. No jargon without a legend, no all-caps prompts.
 10. **Don't touch** `fullvision-user-inputs.xlsx`, `fullvision-documentation-inventory.xlsx`, or the gradebook site's CSS from classroom-content work.
 

@@ -240,7 +240,7 @@ Demo Mode is the only sample data. `shared/seed-data.js` builds the Science 8 sa
 ### Build and publish
 
 - `scripts/build.sh` copies the public app into `dist/`
-- Netlify publishes `dist/`
+- Netlify publishes `dist/` from the `production` branch; a release is one pull request from `main` into `production`, and merging to `main` deploys nothing
 - `netlify/edge-functions/inject-env.js` injects `SUPABASE_URL` and `SUPABASE_KEY` into HTML responses
 - the same edge function sets a per-request CSP nonce
 

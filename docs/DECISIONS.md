@@ -538,3 +538,11 @@ Context: Colin wanted the gradebook's Class Average to answer "how did the class
 5. **Colour means a proficiency level, nothing else** (Colin, 2026-11-05). Other Classes, Earlier in <Category> and Feedback Written are neutral grey. No grey explainer lines, no standard deviation, no email or messaging, and no trend chart for rubric work beyond Earlier in <Category>.
 6. **Other Classes uses the link copies already carry** (`copy_group`, `AssessmentCopy.findCopies`). Work made with Duplicate in the same class is new work, not a copy, and is not listed. No database change.
 7. **One pull request, one merge**, for Netlify's deploy credits.
+
+## Releases from the production branch (2026-11-06)
+
+Context: every merge to `main` deployed the site, so ten merged pull requests cost ten Netlify deploys, and credits ran short on Nov 5 and 6.
+
+1. **Netlify deploys the `production` branch, not `main`** (Colin, 2026-11-06). `main` stays the branch every pull request merges into and that CI tests; merging there costs nothing. `production` holds what fullvision.ca runs.
+2. **A release is one pull request from `main` into `production`.** One deploy carries every merge since the last release. Release when Colin says to: at once for a bug teachers are hitting, otherwise batched.
+3. The `netlify.toml` ignore rule is unchanged: only the production context builds, and that context is now the `production` branch. Branches other than `production` are not deployed at all (Netlify's allowed branches).
