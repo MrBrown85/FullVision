@@ -35,7 +35,7 @@ const PROF_LABELS_USES = {
   'teacher/comment-personal.js': 1,
   // The level word as a line's label ("Developing: …").
   'teacher/competency-wording.js': 1,
-  'teacher/dash-class-manager.js': 4,
+  'teacher/dash-class-manager.js': 2,
   'teacher/dash-insights.js': 7,
   'teacher/dash-observations.js': 1,
   'teacher/page-assignments.js': 27, // + Edit My Wording's level labels (rubric rows), Nov 2; + the compact rubric editor's column heads, cell hints and points labels (rubric starts PR 5)

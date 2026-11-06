@@ -162,21 +162,65 @@ describe('switching the calculation method', () => {
   });
 });
 
-describe('points to proficiency on the Grading tab', () => {
+describe('Points and Proficiency as one scale on the Grading tab', () => {
   var originalGetElementById;
+  var originalConfirm;
   var main;
-  var inputs;
+  var confirms;
+
+  // A marker's or handle's button as the browser hands it to the handlers.
+  function button(kind, value) {
+    var dataset =
+      kind === 'step' ? { action: 'cmPtsPick', kind, key: value } : { action: 'cmPtsPick', kind, level: value };
+    var el = { tagName: 'BUTTON', dataset };
+    el.closest = sel => (sel === '.cm-pts-scale' || sel === '[data-action="cmPtsPick"]' ? el : null);
+    return el;
+  }
+  function pick(kind, value) {
+    DashClassManager.handleAction('cmPtsPick', button(kind, value));
+  }
+  function key(target, k, extra) {
+    var prevented = false;
+    var handled = DashClassManager.handleKeydown(
+      Object.assign({ key: k, target, preventDefault: () => (prevented = true) }, extra || {}),
+    );
+    return handled && prevented;
+  }
+  function type(value) {
+    DashClassManager.handleChange({ id: 'cm-pts-input', value, dataset: { actionChange: 'cmPointsScale' } });
+  }
+  function input() {
+    var el = { id: 'cm-pts-input', tagName: 'INPUT', value: '', dataset: {} };
+    el.closest = sel => (sel === '.cm-pts-scale' ? el : null);
+    return el;
+  }
+  function markerLeft(k) {
+    var m = main.innerHTML.match(new RegExp('data-key="' + k.replace('+', '\\+') + '" style="left:([0-9.]+)%"'));
+    return m ? Number(m[1]) : null;
+  }
+  function marker(k) {
+    var m = main.innerHTML.match(
+      new RegExp('<div class="cm-pts-marker[^"]*" data-key="' + k.replace('+', '\\+') + '"[^>]*>'),
+    );
+    return m ? m[0] : '';
+  }
+  function editLine() {
+    var m = main.innerHTML.match(/<div class="cm-pts-edit">(.*?)<\/div>/);
+    return m ? m[1] : null;
+  }
 
   beforeEach(() => {
     localStorage.clear();
     seedClass();
     main = { innerHTML: '' };
-    inputs = {};
+    confirms = [];
+    originalConfirm = globalThis.showConfirm;
+    globalThis.showConfirm = function (title, message, okLabel, okStyle, onConfirm) {
+      confirms.push({ title, run: onConfirm });
+    };
     originalGetElementById = document.getElementById;
     document.getElementById = function (id) {
-      if (id === 'main') return main;
-      if (inputs[id]) return inputs[id];
-      return originalGetElementById(id);
+      return id === 'main' ? main : originalGetElementById(id);
     };
     DashClassManager.resetState();
     DashClassManager.configure({ activeCourse: CID, onRender() {}, onCourseChange() {} });
@@ -186,27 +230,111 @@ describe('points to proficiency on the Grading tab', () => {
 
   afterEach(() => {
     document.getElementById = originalGetElementById;
+    globalThis.showConfirm = originalConfirm;
   });
 
-  it('shows the default percents with the BC proficiency names', () => {
-    expect(main.innerHTML).toContain('Points to Proficiency');
-    expect(main.innerHTML).toMatch(
-      /Extending<\/span><span class="cm-pts-cell"><input[^>]*id="cm-pts-min-0"[^>]*value="86"/,
-    );
-    expect(main.innerHTML).toMatch(/id="cm-pts-min-1"[^>]*value="73"/);
-    expect(main.innerHTML).toMatch(/id="cm-pts-min-2"[^>]*value="50"/);
-    expect(main.innerHTML).toContain('Below 50%');
+  it('draws Points to Proficiency as four bands split at the class’s starts', () => {
+    expect(main.innerHTML).toContain('Points and Proficiency');
+    expect(main.innerHTML).toContain('<span class="cm-pts-band lv-1" data-lv="1" style="width:50%">Emerging</span>');
+    expect(main.innerHTML).toContain('<span class="cm-pts-band lv-2" data-lv="2" style="width:23%">Developing</span>');
+    expect(main.innerHTML).toContain('<span class="cm-pts-band lv-3" data-lv="3" style="width:13%">Proficient</span>');
+    expect(main.innerHTML).toContain('<span class="cm-pts-band lv-4" data-lv="4" style="width:14%">Extending</span>');
+    expect(main.innerHTML).toMatch(/data-level="2" style="left:50%"/);
+    expect(main.innerHTML).toMatch(/aria-label="Proficient starts at 73%"[^>]*>73%<\/button>/);
+    expect(main.innerHTML).toMatch(/data-level="4" style="left:86%"/);
+    [0, 25, 50, 75, 100].forEach(t => expect(main.innerHTML).toContain('style="left:' + t + '%">' + t + '%</span>'));
   });
 
-  it('saves new percents and keeps any saved labels', () => {
+  it('puts a Counts As marker for every step at the percent it counts as', () => {
+    expect(markerLeft('1')).toBe(25);
+    expect(markerLeft('1+')).toBeCloseTo(33.33, 2);
+    expect(markerLeft('2-')).toBeCloseTo(41.67, 2);
+    expect(markerLeft('3')).toBe(75);
+    expect(markerLeft('3+')).toBeCloseTo(83.33, 2);
+    expect(markerLeft('4')).toBe(100);
+    expect(main.innerHTML).toMatch(/aria-label="3\+ counts as 83.3%"[^>]*>3\+<\/button>/);
+    expect(main.innerHTML).toContain('>2−</button>');
+    expect(marker('2')).toContain('lv-2');
+    // Level ÷ 4 is 8.3 apart: one row.
+    expect(main.innerHTML).not.toContain('is-low');
+    expect(main.innerHTML).not.toContain('is-two-rows');
+    // Nothing is picked, so nothing is written under the scale.
+    expect(editLine()).toBe('');
+  });
+
+  it('staggers markers that sit close together on two rows', () => {
+    DashClassManager.handleAction('cmPointsScaleBc', { dataset: {} });
+    expect(main.innerHTML).toContain('cm-pts-ruler is-two-rows');
+    expect(markerLeft('1')).toBe(45);
+    expect(markerLeft('1+')).toBe(50);
+    expect(markerLeft('3+')).toBe(86);
+    // 45 and 50 are a pill apart: 1+ drops; 55 is clear of 45 and stays up.
+    expect(marker('1')).not.toContain('is-low');
+    expect(marker('1+')).toContain('is-low');
+    expect(marker('2-')).not.toContain('is-low');
+    expect(marker('2+')).toContain('is-low');
+  });
+
+  it('flags a whole level that reads back as another, in its name', () => {
+    pick('step', '3');
+    type('70');
+    expect(main.innerHTML).toContain('aria-label="3 counts as 70%, which shows as Developing"');
+    expect(main.innerHTML).toContain('aria-label="4 counts as 100%"');
+  });
+
+  it('shows one line to edit what is picked, and lets go when it is clicked again', () => {
+    pick('step', '3+');
+    expect(editLine()).toContain('<span class="cm-pts-edit-name">3+</span> counts as</label>');
+    expect(editLine()).toMatch(/id="cm-pts-input"[^>]*step="0.1"[^>]*value="83.3"/);
+    expect(main.innerHTML).toMatch(/id="cm-pts-step-3p"[^>]*aria-pressed="true"/);
+    pick('edge', '3');
+    expect(editLine()).toContain('<span class="cm-pts-edit-name">Proficient</span> starts at</label>');
+    expect(editLine()).toMatch(/id="cm-pts-input"[^>]*value="73"/);
+    expect(main.innerHTML).toMatch(/id="cm-pts-step-3p"[^>]*aria-pressed="false"/);
+    expect(main.innerHTML).toMatch(/id="cm-pts-edge-3"[^>]*aria-pressed="true"/);
+    pick('edge', '3');
+    expect(editLine()).toBe('');
+  });
+
+  it('saves a typed Counts As through the same scale, and the marker moves', () => {
+    pick('step', '3+');
+    type('85');
+    expect(getGradingScale(CID).percents).toEqual({ 4: 100, 3: 75, 2: 50, 1: 25, '3+': 85 });
+    expect(markerLeft('3+')).toBe(85);
+    expect(editLine()).toMatch(/value="85"/);
+  });
+
+  it('cites the class’s Proficient in the course % rule', () => {
+    expect(main.innerHTML).toContain('Proficient counts as 75% now.');
+    pick('step', '3');
+    type('80');
+    expect(getGradingScale(CID).percents).toEqual({ 4: 100, 3: 80, 2: 50, 1: 25 });
+    expect(main.innerHTML).toContain('Proficient counts as 80% now.');
+  });
+
+  it('leaves a + or − in between when it is typed at that value or cleared', () => {
+    pick('step', '3-');
+    type('66.7');
+    expect(getGradingScale(CID).percents).toEqual({ 4: 100, 3: 75, 2: 50, 1: 25 });
+    pick('step', '3+');
+    type('86');
+    expect(getGradingScale(CID).percents['3+']).toBe(86);
+    type('');
+    expect(getGradingScale(CID).percents).toEqual({ 4: 100, 3: 75, 2: 50, 1: 25 });
+    expect(markerLeft('3+')).toBeCloseTo(83.33, 2);
+  });
+
+  it('saves where a proficiency starts and keeps any saved labels', () => {
     _cache.courseConfigs[CID].gradingScale = {
       boundaries: structuredClone(DEFAULT_GRADING_SCALE.boundaries),
       labels: [null, null, 'Meeting', null],
     };
-    inputs['cm-pts-min-0'] = { value: '90' };
-    inputs['cm-pts-min-1'] = { value: '75' };
-    inputs['cm-pts-min-2'] = { value: '55' };
-    DashClassManager.handleChange({ dataset: { actionChange: 'cmPointsScale' } });
+    pick('edge', '4');
+    type('90');
+    pick('edge', '3');
+    type('75');
+    pick('edge', '2');
+    type('55');
     expect(getGradingScale(CID)).toEqual({
       boundaries: [
         { min: 90, proficiency: 4 },
@@ -217,40 +345,97 @@ describe('points to proficiency on the Grading tab', () => {
       percents: { 4: 100, 3: 75, 2: 50, 1: 25 },
       labels: [null, null, 'Meeting', null],
     });
-    expect(main.innerHTML).toContain('Below 55%');
+    expect(main.innerHTML).toContain('<span class="cm-pts-band lv-1" data-lv="1" style="width:55%">Emerging</span>');
   });
 
-  it('shows Counts As at the defaults and saves new percents', () => {
-    expect(main.innerHTML).toContain('Counts As');
-    expect(main.innerHTML).toMatch(/id="cm-pts-pct-3"[^>]*value="75"/);
-    inputs['cm-pts-pct-4'] = { value: '98' };
-    inputs['cm-pts-pct-3'] = { value: '84' };
-    inputs['cm-pts-pct-2'] = { value: '62' };
-    inputs['cm-pts-pct-1'] = { value: '50' };
-    DashClassManager.handleChange({ dataset: { actionChange: 'cmPointsScale' } });
-    expect(getGradingScale(CID).percents).toEqual({ 4: 98, 3: 84, 2: 62, 1: 50 });
+  it('refuses a step out of order and shows what was typed', () => {
+    pick('step', '3');
+    type('100');
+    expect(getGradingScale(CID).percents).toEqual({ 4: 100, 3: 75, 2: 50, 1: 25 });
+    expect(main.innerHTML).toContain(
+      '<div class="cm-pts-error" id="cm-pts-error" role="alert">Each step must count for more than the one below it.</div>',
+    );
+    expect(editLine()).toMatch(/value="100"[^>]*aria-invalid="true"/);
+    // A good value clears it.
+    type('76');
+    expect(main.innerHTML).not.toContain('cm-pts-error');
+    expect(getGradingScale(CID).percents[3]).toBe(76);
   });
 
-  it('refuses Counts As out of order', () => {
-    inputs['cm-pts-pct-3'] = { value: '100' };
-    DashClassManager.handleChange({ dataset: { actionChange: 'cmPointsScale' } });
-    expect(getGradingScale(CID).percents || DEFAULT_GRADING_SCALE.percents).toEqual({ 4: 100, 3: 75, 2: 50, 1: 25 });
+  it('refuses a proficiency that starts at or below the one under it', () => {
+    pick('edge', '3');
+    type('90');
+    expect(getGradingScale(CID).boundaries).toEqual(DEFAULT_GRADING_SCALE.boundaries);
+    expect(main.innerHTML).toContain('Each proficiency must start higher than the one below it.');
+    pick('edge', '2');
+    type('0');
+    expect(getGradingScale(CID).boundaries).toEqual(DEFAULT_GRADING_SCALE.boundaries);
+    expect(main.innerHTML).toContain('Each proficiency must start higher than the one below it.');
+  });
+
+  it('nudges a marker by 0.1, or 1 with Shift, and saves', () => {
+    var btn = button('step', '3+');
+    expect(key(btn, 'ArrowRight')).toBe(true);
+    expect(getGradingScale(CID).percents['3+']).toBe(83.4);
+    // The nudge picks it.
+    expect(editLine()).toMatch(/value="83.4"/);
+    key(btn, 'ArrowLeft', { shiftKey: true });
+    expect(getGradingScale(CID).percents['3+']).toBe(82.4);
+    expect(markerLeft('3+')).toBe(82.4);
+  });
+
+  it('nudges a handle by 1, or 5 with Shift, and saves', () => {
+    var btn = button('edge', '3');
+    key(btn, 'ArrowRight');
+    expect(getGradingScale(CID).boundaries[1]).toEqual({ min: 74, proficiency: 3 });
+    key(btn, 'ArrowRight', { shiftKey: true });
+    expect(getGradingScale(CID).boundaries[1]).toEqual({ min: 79, proficiency: 3 });
+    key(btn, 'ArrowLeft');
+    expect(main.innerHTML).toMatch(/aria-label="Proficient starts at 78%"/);
+  });
+
+  it('won’t nudge a marker past the next step', () => {
+    pick('step', '4-');
+    type('99.9');
+    key(button('step', '4-'), 'ArrowRight');
+    expect(getGradingScale(CID).percents['4-']).toBe(99.9);
     expect(main.innerHTML).toContain('Each step must count for more than the one below it.');
   });
 
+  it('saves with Enter in the box and lets go with Escape', () => {
+    pick('step', '2+');
+    var box = input();
+    box.value = '60';
+    expect(key(box, 'Enter')).toBe(true);
+    expect(getGradingScale(CID).percents['2+']).toBe(60);
+    expect(key(box, 'Escape')).toBe(true);
+    expect(editLine()).toBe('');
+    expect(main.innerHTML).toMatch(/id="cm-pts-step-2p"[^>]*aria-pressed="false"/);
+  });
+
+  it('asks first when a Counts As change moves a term that has ended', () => {
+    _cache.courseConfigs[CID].reportingTerms = [
+      { ordinal: 1, label: 'Term 1', starts_on: '2020-09-01', ends_on: '2020-11-30' },
+    ];
+    pick('step', '3+');
+    type('86');
+    expect(confirms.map(c => c.title)).toEqual(['Change the Course %?']);
+    expect(getGradingScale(CID).percents['3+']).toBeUndefined();
+    confirms[0].run();
+    expect(getGradingScale(CID).percents['3+']).toBe(86);
+    // Where a proficiency starts doesn't move the course %: no question.
+    pick('edge', '4');
+    type('88');
+    expect(confirms).toHaveLength(1);
+    expect(getGradingScale(CID).boundaries[0]).toEqual({ min: 88, proficiency: 4 });
+  });
+
   it('sets the BC Letter Bands and leaves Points to Proficiency alone', () => {
+    pick('step', '3+');
     DashClassManager.handleAction('cmPointsScaleBc', { dataset: {} });
     expect(getGradingScale(CID).percents).toEqual(BC_LETTER_BAND_PERCENTS);
     expect(getGradingScale(CID).boundaries).toEqual(DEFAULT_GRADING_SCALE.boundaries);
-    expect(main.innerHTML).toMatch(/id="cm-pts-pct-3p"[^>]*value="86"/);
-  });
-
-  it('keeps a + or − typed in, and leaves an untouched one in between', () => {
-    expect(main.innerHTML).toMatch(/id="cm-pts-pct-3p"[^>]*value="83.3"[^>]*data-derived="83.3"/);
-    inputs['cm-pts-pct-3p'] = { value: '86', dataset: { derived: '83.3' } };
-    inputs['cm-pts-pct-3m'] = { value: '66.7', dataset: { derived: '66.7' } };
-    DashClassManager.handleChange({ dataset: { actionChange: 'cmPointsScale' } });
-    expect(getGradingScale(CID).percents).toEqual({ 4: 100, 3: 75, 2: 50, 1: 25, '3+': 86 });
+    expect(editLine()).toMatch(/value="86"/);
   });
 
   it('starts a new grade 10–12 class on the BC Letter Bands', () => {
@@ -270,6 +455,7 @@ describe('points to proficiency on the Grading tab', () => {
     };
     DashClassManager.handleAction('cmPointsScaleMatch', { dataset: {} });
     expect(getGradingScale(CID).percents).toEqual({ 4: 98, 3: 84, 2: 62, 1: 50 });
+    expect(markerLeft('3')).toBe(84);
   });
 
   it('resets to the defaults', () => {
@@ -280,10 +466,17 @@ describe('points to proficiency on the Grading tab', () => {
         { min: 60, proficiency: 2 },
         { min: 0, proficiency: 1 },
       ],
+      percents: BC_LETTER_BAND_PERCENTS,
       labels: null,
     };
     DashClassManager.handleAction('cmPointsScaleReset', { dataset: {} });
     expect(getGradingScale(CID)).toEqual(DEFAULT_GRADING_SCALE);
+    expect(markerLeft('3+')).toBeCloseTo(83.33, 2);
+  });
+
+  it('shows the scale in a Proficiency class too', () => {
+    expect(COURSES[CID].gradingSystem).toBe('proficiency');
+    expect(main.innerHTML).toContain('id="cm-pts-ruler"');
   });
 
   it('offers a class backup from Class Actions', () => {
