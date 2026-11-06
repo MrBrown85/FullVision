@@ -6,6 +6,10 @@ export default defineConfig({
   // One retry on CI: a test that fails twice is real breakage and fails the
   // run; one that passes on the retry is reported as flaky.
   retries: process.env.CI ? 1 : 0,
+  // A GitHub runner has 4 cores; Playwright's default (half the cores) ran
+  // only 2 tests at a time there. Locally the default already uses half
+  // the Mac's cores.
+  workers: process.env.CI ? 4 : undefined,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: 'http://localhost:8347',

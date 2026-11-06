@@ -587,10 +587,19 @@ body.offline-active #app-dock {
 }
 
 /* The phone app's pill sits after the class name in each tab's first
-   screen; a tap opens the Demo Mode sheet (teacher-mobile/shell.js). */
+   screen; a tap opens the Demo Mode sheet (teacher-mobile/shell.js).
+   44 px to a finger, as every phone control is, and 30 px to the eye:
+   transparent bands above and below take taps, the background stays inside
+   them, and the negative margins keep the nav bar's height. */
 .m-demo-pill {
   flex-shrink: 0;
   margin-left: 8px;
+  height: 44px;
+  margin-block: -7px;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  background-clip: padding-box;
+  border-radius: 15px / 22px;
 }
 /* The Reset button of the phone's in-sheet confirm, red like the
    desktop's danger confirm. */
