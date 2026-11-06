@@ -7,6 +7,8 @@ keywords:
   - Class Management
 checked: 2026-11-05
 labels:
+  - Class Results
+  - View Class Results
   - Class Average
   - Level Mix
   - Needs Support
@@ -37,6 +39,10 @@ next:
   - create-a-class
   - add-your-students
 ---
+
+## Nov 6, 2026: Class Results
+
+Hover over a Class Average in the Gradebook to see the spread of the class's results. Select it, or choose **View Class Results** in the column's menu, to open **Class Results**: the results by level, criterion and competency, who is below Proficient or Missing, feedback and observations on the work, and the same assessment in your other classes. Each assessment on the Assignments page has a **Class Results** button too.
 
 ## Nov 5, 2026: Dashboard Cards
 

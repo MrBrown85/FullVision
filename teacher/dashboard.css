@@ -2386,7 +2386,8 @@ a.dash-ins-name:hover {
   font-family: var(--font-base);
   font-size: var(--text-xs);
   font-weight: 600;
-  color: var(--priority);
+  /* --priority is 3.6:1 on white; small text needs 4.5:1. */
+  color: var(--score-1-text);
   flex-shrink: 0;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;

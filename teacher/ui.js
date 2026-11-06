@@ -736,6 +736,8 @@ function _helpSync() {
 
 function setHelpOpen(open, focusButton) {
   _helpOpen = !!open;
+  // Help and Class Results share the side of the page: one at a time.
+  if (_helpOpen && window.ClassResults && ClassResults.isOpen()) ClassResults.close();
   try {
     localStorage.setItem(HELP_OPEN_KEY, _helpOpen ? '1' : '0');
   } catch (e) {
