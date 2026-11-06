@@ -1,7 +1,7 @@
-/* dash-insights.js — the dashboard's class insights: the proficiency mix on
-   each competency, Needs Attention (the Who Needs Help rule, observation
-   gaps and missing work, one row per student), Missing and Late, and the
-   student grid. */
+/* dash-insights.js — the dashboard's class insights: the students at one
+   proficiency on a competency (the Level Mix pop-up), Needs Attention (the
+   Who Needs Help rule, observation gaps and missing work, one row per
+   student), Missing and Late, and the student grid. */
 window.DashInsights = (function () {
   'use strict';
 
@@ -140,85 +140,6 @@ window.DashInsights = (function () {
     );
   }
 
-  /* ── Proficiency mix (Curricular Competencies) ─────────────
-     One thin bar per competency, a segment per proficiency. A segment opens
-     the list of its students (popHtml). "N Below" shows the competency's
-     students under the Needs Attention rule in that list (data-action
-     naComp); `below` maps a column key to that count. */
-  function mixListHtml(cid, allStudents, pop, below, comp) {
-    var ids = _ids(allStudents);
-    below = below || {};
-    var html = '<div class="dash-mix-list" aria-label="Curricular competencies">';
-    columns(cid).forEach(function (col) {
-      var dist = competencyDistribution(cid, ids, col.which);
-      var scored = dist.bands.reduce(function (n, b) {
-        return n + b.ids.length;
-      }, 0);
-      var n = below[col.key] || 0;
-      html +=
-        '<div class="dash-mix-row' +
-        (comp === col.key ? ' is-picked' : '') +
-        '">' +
-        '<span class="dash-mix-label" title="' +
-        esc(col.title + (col.note ? '\n' + col.note : '')) +
-        '">' +
-        esc(col.label) +
-        '</span>' +
-        '<div class="dash-mix-bar">';
-      if (!scored) html += '<span class="dash-mix-empty">Not Scored</span>';
-      dist.bands.forEach(function (b) {
-        if (!b.ids.length) return;
-        var on = pop && pop.key === col.key && pop.level === b.level;
-        html +=
-          '<button type="button" class="dash-mix-seg' +
-          (on ? ' active' : '') +
-          '" data-action="mixSeg" data-key="' +
-          esc(col.key) +
-          '" data-level="' +
-          b.level +
-          '" aria-expanded="' +
-          on +
-          '" aria-label="' +
-          esc(col.title + ': ' + b.ids.length + ' ' + b.label) +
-          '" style="flex:' +
-          b.ids.length +
-          ' 1 0;--seg:var(--score-' +
-          b.level +
-          ')"></button>';
-      });
-      html +=
-        '</div>' +
-        '<span class="dash-mix-avg">' +
-        esc(scored ? formatLevel(cid, dist.avg) : '\u2014') +
-        '</span>' +
-        (n
-          ? '<button type="button" class="dash-mix-below" data-action="naComp" data-key="' +
-            esc(col.key) +
-            '" aria-pressed="' +
-            (comp === col.key) +
-            '" aria-label="' +
-            esc(n + ' below on ' + col.title) +
-            '"><b>' +
-            n +
-            '</b> Below</button>'
-          : '<span class="dash-mix-below is-none">None Below</span>') +
-        '</div>';
-    });
-    return html + '</div>';
-  }
-
-  function mixLegendHtml(cid) {
-    return (
-      '<div class="dash-mix-legend">' +
-      levelOrderFor(cid)
-        .map(function (l) {
-          return '<span><i style="background:var(--score-' + l + ')"></i>' + esc(PROF_LABELS[l]) + '</span>';
-        })
-        .join('') +
-      '</div>'
-    );
-  }
-
   /* The students on one segment, for the popover page-dashboard.js places
      under it. '' when the segment is gone (another term, a removed score). */
   function popHtml(cid, allStudents, pop) {
@@ -258,12 +179,13 @@ window.DashInsights = (function () {
     );
   }
 
+  /* The gradebook on some students (all of them when `ids` is empty) and,
+     for a single competency, scrolled to it. */
   function _gradebookHref(cid, ids, col) {
     return (
       '/gradebook?course=' +
       cid +
-      '&students=' +
-      ids.join(',') +
+      (ids && ids.length ? '&students=' + ids.join(',') : '') +
       (col && col.sectionIds.length === 1 ? '&section=' + col.sectionIds[0] : '')
     );
   }
@@ -1023,9 +945,8 @@ window.DashInsights = (function () {
     columnCode: columnCode,
     isBelowRule: isBelowRule,
     showsProficiency: showsProficiency,
-    mixListHtml: mixListHtml,
-    mixLegendHtml: mixLegendHtml,
     popHtml: popHtml,
+    gradebookHref: _gradebookHref,
     readRule: readRule,
     belowLists: belowLists,
     helpGroups: helpGroups,

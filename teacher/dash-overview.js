@@ -196,60 +196,511 @@ window.DashOverview = (function () {
     return html + '</section>';
   }
 
-  /* Curricular Competencies: the proficiency mix with "N Below" in a
-     Proficiency or Both class, each competency's average in a Letter class;
-     a line with the assessments and standards assessed under it. */
+  /* ── Curricular Competencies ────────────────────────────────
+     Four views behind the view menu (docs/plans/dashboard-cards-plan.md,
+     part B), in every grading style:
+       avg    Class Average: a bar and the class average per competency
+       mix    Level Mix: how many students are at each level
+       below  Needs Support: the students below Proficient (the Who Needs
+              Help rule) on the most competencies, and where
+       trend  Change: the class average month by month
+     A Letter class starts on Class Average, a Proficiency or Both class on
+     Level Mix; the pick is remembered per class on this device
+     (page-dashboard.js). Every view has the same 16 px label row and the
+     row block is as tall as the most rows any view draws, so the card keeps
+     one height. A competency row (and a Needs Support column code) sets the
+     page's competency filter (data-action naComp; the same key again
+     clears it); a Level Mix count opens its students (mixSeg); a Needs
+     Support row opens the student.
+
+     opts: cid, allStudents, assessments, tagsWithEvidence, allTags,
+     compView, naComp, mixPop, helpRule, belowLists (DashInsights.belowLists
+     under the rule, when the caller has them), todayStr (tests). */
+  var COMP_VIEWS = [
+    { key: 'avg', label: 'Class Average', hint: 'The class average on each competency' },
+    { key: 'mix', label: 'Level Mix', hint: 'How many students are at each level' },
+    { key: 'below', label: 'Needs Support', hint: 'Students below Proficient most often, and where' },
+    { key: 'trend', label: 'Change', hint: 'The class average month by month' },
+  ];
+  var COMP_SUPPORT_ROWS = 7;
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'June', 'July', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+
+  /** The view a class's card shows: the saved one, else its grading style's. */
+  function compView(cid, saved) {
+    var keys = COMP_VIEWS.map(function (v) {
+      return v.key;
+    });
+    if (keys.indexOf(saved) >= 0) return saved;
+    return DashInsights.showsProficiency(cid) ? 'mix' : 'avg';
+  }
+
+  function _monthName(ym) {
+    return MONTHS[Number(String(ym).slice(5, 7)) - 1] || '';
+  }
+
+  function _lvl(value) {
+    return value > 0 ? Math.max(1, Math.min(4, Math.round(value))) : 0;
+  }
+
+  function _colTitle(col) {
+    return col.title + (col.note ? '\n' + col.note : '');
+  }
+
+  // The label row: the name column, the middle (cells or plain text), the value column.
+  function _compLabels(left, mid, right, midCls, hidden) {
+    return (
+      '<div class="dash-comp-labels"' +
+      (hidden ? ' aria-hidden="true"' : '') +
+      '><span class="dash-comp-lab-name">' +
+      esc(left) +
+      '</span><span class="dash-comp-lab-mid' +
+      (midCls ? ' ' + midCls : '') +
+      '">' +
+      mid +
+      '</span><span class="dash-comp-lab-val">' +
+      esc(right) +
+      '</span></div>'
+    );
+  }
+
+  // A competency row: a button that sets the filter, or (Level Mix, whose
+  // counts are buttons) a row whose name is that button.
+  function _compRowOpen(col, picked, aria, inner) {
+    return (
+      '<button type="button" class="dash-comp-row' +
+      (picked ? ' is-picked' : '') +
+      '" data-action="naComp" data-key="' +
+      esc(col.key) +
+      '" aria-pressed="' +
+      picked +
+      '" aria-label="' +
+      esc(aria) +
+      '">' +
+      inner +
+      '</button>'
+    );
+  }
+
+  function _compName(col) {
+    return '<span class="dash-comp-name" title="' + esc(_colTitle(col)) + '">' + esc(col.label) + '</span>';
+  }
+
+  function _compAvgRows(cid, cols, dists, comp) {
+    return cols
+      .map(function (col, i) {
+        var avg = dists[i].avg;
+        var r = _lvl(avg);
+        var text = formatLevel(cid, avg);
+        return _compRowOpen(
+          col,
+          comp === col.key,
+          col.title + ': class average ' + (avg > 0 ? text : 'not scored yet'),
+          _compName(col) +
+            '<span class="dash-outcome-bar-track"><span class="dash-outcome-bar-fill" style="width:' +
+            levelBarPercent(cid, avg) +
+            '%;background:' +
+            (r ? 'var(--score-' + r + ')' : 'var(--divider-subtle)') +
+            '"></span></span>' +
+            '<span class="dash-comp-val">' +
+            esc(text) +
+            '</span>',
+        );
+      })
+      .join('');
+  }
+
+  function _compMixRows(cid, cols, dists, comp, pop, belowBy) {
+    var order = levelOrderFor(cid);
+    return cols
+      .map(function (col, i) {
+        var dist = dists[i];
+        var counts = dist.bands.map(function (b) {
+          return b.ids.length;
+        });
+        var scored = counts.reduce(function (a, b) {
+          return a + b;
+        }, 0);
+        var top = Math.max.apply(null, counts);
+        var k = counts[2] + counts[3];
+        var picked = comp === col.key;
+        var nBelow = (belowBy[col.key] || []).length;
+        var cells = order
+          .map(function (l) {
+            var b = dist.bands[l - 1];
+            var n = b.ids.length;
+            if (!n) return '<span class="dash-comp-cell is-empty" title="' + esc('No one ' + b.label) + '">–</span>';
+            var on = !!(pop && pop.key === col.key && pop.level === l);
+            return (
+              '<button type="button" class="dash-mix-seg dash-comp-cell' +
+              (n === top ? ' is-top' : '') +
+              (on ? ' active' : '') +
+              '" data-action="mixSeg" data-key="' +
+              esc(col.key) +
+              '" data-level="' +
+              l +
+              '" aria-expanded="' +
+              on +
+              '" aria-label="' +
+              esc(col.title + ': ' + n + ' ' + b.label) +
+              '" style="--cell-bg:var(--score-' +
+              l +
+              '-bg);--cell-fg:var(--score-' +
+              l +
+              '-text)">' +
+              n +
+              '</button>'
+            );
+          })
+          .join('');
+        return (
+          '<div class="dash-comp-row is-mix' +
+          (picked ? ' is-picked' : '') +
+          '" data-action="naComp" data-key="' +
+          esc(col.key) +
+          '">' +
+          '<button type="button" class="dash-comp-name dash-comp-pick" data-action="naComp" data-key="' +
+          esc(col.key) +
+          '" data-below="' +
+          nBelow +
+          '" aria-pressed="' +
+          picked +
+          '" title="' +
+          esc(_colTitle(col)) +
+          '" aria-label="' +
+          esc(col.title + ': ' + nBelow + ' below Proficient. Show the class weakest first on it') +
+          '">' +
+          esc(col.label) +
+          '</button>' +
+          '<span class="dash-comp-cells">' +
+          cells +
+          '</span>' +
+          '<span class="dash-comp-val" title="' +
+          esc(scored ? k + ' of ' + scored + ' scored students are Proficient or above' : 'Not scored yet') +
+          '">' +
+          esc(scored ? k + ' of ' + scored : '—') +
+          '</span></div>'
+        );
+      })
+      .join('');
+  }
+
+  // The students below the rule on at least one competency, most first.
+  function _supportPeople(cid, allStudents, lists) {
+    var byId = {};
+    allStudents.forEach(function (s) {
+      byId[s.id] = { student: s, cols: [] };
+    });
+    lists.forEach(function (l) {
+      l.ids.forEach(function (sid) {
+        if (byId[sid]) byId[sid].cols.push(l.col);
+      });
+    });
+    return sortStudents(allStudents, 'lastName')
+      .map(function (s) {
+        return byId[s.id];
+      })
+      .filter(function (p) {
+        return p.cols.length > 0;
+      })
+      .sort(function (a, b) {
+        return b.cols.length - a.cols.length;
+      });
+  }
+
+  function _compSupportRows(cid, cols, people) {
+    var html = '';
+    people.slice(0, COMP_SUPPORT_ROWS).forEach(function (p) {
+      var st = p.student;
+      var name = DashObservations.rowName(st);
+      var names = p.cols
+        .map(function (c) {
+          return c.label;
+        })
+        .join(', ');
+      var cells = cols
+        .map(function (col) {
+          var v = col.which.groupId
+            ? getGroupProficiency(cid, st.id, col.which.groupId)
+            : getSectionProficiency(cid, st.id, col.which.sectionId);
+          var r = _lvl(v);
+          return (
+            '<span class="dash-comp-sq' +
+            (r ? '' : ' is-none') +
+            '"' +
+            (r ? ' style="background:var(--score-' + r + ')"' : '') +
+            ' title="' +
+            esc(col.label + ': ' + levelText(cid, v, 'Not assessed yet')) +
+            '"></span>'
+          );
+        })
+        .join('');
+      html +=
+        '<a class="dash-comp-row is-student" role="link" tabindex="0" data-href="/student?id=' +
+        esc(st.id) +
+        '&course=' +
+        esc(cid) +
+        '&tab=comps" aria-label="' +
+        esc(name + ': below Proficient on ' + p.cols.length + ' of ' + cols.length + ', ' + names) +
+        '">' +
+        '<span class="dash-comp-name">' +
+        esc(name) +
+        '</span>' +
+        '<span class="dash-comp-squares" style="--comp-cols:' +
+        cols.length +
+        '">' +
+        cells +
+        '</span>' +
+        '<span class="dash-comp-val">' +
+        esc(p.cols.length + ' of ' + cols.length) +
+        '</span>' +
+        '<span class="dist-tip dash-comp-tip"><span class="dist-tip-title">' +
+        esc(name) +
+        '</span><span class="dash-comp-tip-line">' +
+        esc('Below on ' + names) +
+        '</span></span></a>';
+    });
+    var more = people.length - COMP_SUPPORT_ROWS;
+    if (more > 0)
+      html +=
+        '<button type="button" class="dash-comp-more" data-action="studentView" data-view="grid">+' +
+        more +
+        ' more</button>';
+    if (!people.length)
+      html += '<div class="dash-comp-none">Everyone is at Proficient or above, or has too few scores to say.</div>';
+    return html;
+  }
+
+  function _compTrendRows(cid, cols, series, comp) {
+    // Every row on one time line (the months any competency has) and one
+    // vertical scale, so the lines can be compared.
+    var months = [];
+    var lo = Infinity;
+    var hi = -Infinity;
+    series.forEach(function (s) {
+      s.forEach(function (m) {
+        if (months.indexOf(m.month) < 0) months.push(m.month);
+        var y = levelBarPercent(cid, m.avg);
+        lo = Math.min(lo, y);
+        hi = Math.max(hi, y);
+      });
+    });
+    months.sort();
+    if (hi - lo < 10) {
+      var mid = (hi + lo) / 2;
+      lo = mid - 5;
+      hi = mid + 5;
+    }
+    var span = Math.max(1, months.length - 1);
+    var round1 = function (n) {
+      return Math.round(n * 10) / 10;
+    };
+    var rows = cols
+      .map(function (col, i) {
+        var s = series[i];
+        var picked = comp === col.key;
+        var tipLine;
+        var line = '';
+        var val = '—';
+        var cls = '';
+        if (s.length < 2) {
+          tipLine = 'Not enough months yet';
+        } else {
+          tipLine = s
+            .map(function (m) {
+              return _monthName(m.month) + ' ' + formatLevel(cid, m.avg);
+            })
+            .join(' · ');
+          var move = levelMoveText(cid, s[0].avg, s[s.length - 1].avg);
+          var up = !move || move.dir >= 0;
+          val = move ? move.text : '—';
+          cls = up ? ' is-up' : ' is-down';
+          var pts = s
+            .map(function (m) {
+              var x = months.length > 1 ? (months.indexOf(m.month) / span) * 100 : 50;
+              var y = 16 - ((levelBarPercent(cid, m.avg) - lo) / (hi - lo)) * 14;
+              return round1(x) + ',' + round1(y);
+            })
+            .join(' ');
+          line =
+            '<svg class="dash-comp-spark" viewBox="0 0 100 18" preserveAspectRatio="none" aria-hidden="true" focusable="false"><polyline points="' +
+            pts +
+            '" fill="none" stroke="' +
+            (up ? 'var(--score-3)' : 'var(--score-1)') +
+            '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>';
+        }
+        return _compRowOpen(
+          col,
+          picked,
+          col.title + ': ' + tipLine,
+          _compName(col) +
+            '<span class="dash-comp-line">' +
+            line +
+            '</span>' +
+            '<span class="dash-comp-val' +
+            cls +
+            '">' +
+            esc(val) +
+            '</span>' +
+            '<span class="dist-tip dash-comp-tip"><span class="dist-tip-title">' +
+            esc(col.title) +
+            '</span><span class="dash-comp-tip-line">' +
+            esc(tipLine) +
+            '</span></span>',
+        );
+      })
+      .join('');
+    return { rows: rows, first: months[0], last: months[months.length - 1] };
+  }
+
   function competenciesCardHtml(opts) {
     var cid = opts.cid;
+    var allStudents = opts.allStudents || [];
+    var ids = allStudents.map(function (s) {
+      return s.id;
+    });
+    var view = compView(cid, opts.compView);
+    var cols = DashInsights.columns(cid);
+    var comp = opts.naComp || null;
+    var lists = opts.belowLists || DashInsights.belowLists(cid, allStudents, DashInsights.readRule(opts.helpRule));
+    var belowBy = {};
+    lists.forEach(function (l) {
+      belowBy[l.col.key] = l.ids;
+    });
+    var people = _supportPeople(cid, allStudents, lists);
+    // The most rows any view draws: one per competency, or the students
+    // (with "+N more") in Needs Support.
+    var supportRows = Math.min(COMP_SUPPORT_ROWS, people.length) + (people.length > COMP_SUPPORT_ROWS ? 1 : 0);
+    var nRows = Math.max(1, cols.length, supportRows);
+    var dists = cols.map(function (col) {
+      return competencyDistribution(cid, ids, col.which);
+    });
+
     var html =
-      '<section class="dash-overview-section dash-comp-card" aria-labelledby="dash-comp-title">' +
-      '<div class="dash-section-title"><span id="dash-comp-title">Curricular Competencies</span>' +
+      '<section class="dash-overview-section dash-comp-card" aria-labelledby="dash-comp-title" data-view="' +
+      view +
+      '">' +
+      '<div class="dash-section-title dash-comp-head"><span id="dash-comp-title">Curricular Competencies</span>' +
+      viewMenuHtml({ id: 'comp', label: 'Curricular Competencies view', views: COMP_VIEWS, current: view }) +
       '<a role="link" tabindex="0" data-href="/gradebook?course=' +
-      cid +
-      '">View Gradebook \u2192</a></div>';
-    if (DashInsights.showsProficiency(cid)) {
-      html +=
-        DashInsights.mixLegendHtml(cid) +
-        DashInsights.mixListHtml(cid, opts.allStudents, opts.mixPop, opts.belowCounts, opts.naComp);
+      esc(cid) +
+      '">View Gradebook →</a></div>' +
+      '<div class="dash-comp-body" style="--comp-rows:' +
+      nRows +
+      '">';
+
+    var labels;
+    var rows;
+    if (!cols.length) {
+      labels = _compLabels('Competency', '', '', '', true);
+      rows = '<div class="dash-comp-none">No competencies in this class yet.</div>';
+    } else if (view === 'mix') {
+      var heads = levelOrderFor(cid)
+        .map(function (l) {
+          // The level's short code (EXT, PRF …), as the student list's key
+          // shows it; the name is in the title.
+          return '<span title="' + esc(dists[0].bands[l - 1].label) + '">' + esc(levelCode(l)) + '</span>';
+        })
+        .join('');
+      labels = _compLabels('Competency', heads, 'Prof.+', 'is-cells', true);
+      rows = _compMixRows(cid, cols, dists, comp, opts.mixPop, belowBy);
+    } else if (view === 'below') {
+      var codes = cols
+        .map(function (col) {
+          var picked = comp === col.key;
+          return (
+            '<button type="button" class="dash-comp-code' +
+            (picked ? ' is-picked' : '') +
+            '" data-action="naComp" data-key="' +
+            esc(col.key) +
+            '" aria-pressed="' +
+            picked +
+            '" title="' +
+            esc(col.title) +
+            '" aria-label="' +
+            esc(col.title + ': show the class weakest first on it') +
+            '">' +
+            esc(DashInsights.columnCode(cid, col)) +
+            '</button>'
+          );
+        })
+        .join('');
+      labels =
+        '<div class="dash-comp-labels"><span class="dash-comp-lab-name">Student</span>' +
+        '<span class="dash-comp-lab-mid dash-comp-codes" style="--comp-cols:' +
+        cols.length +
+        '">' +
+        codes +
+        '</span><span class="dash-comp-lab-val">Below</span></div>';
+      rows = _compSupportRows(cid, cols, people);
+    } else if (view === 'trend') {
+      var t = _compTrendRows(
+        cid,
+        cols,
+        cols.map(function (col) {
+          return competencyMonthlyAverages(cid, ids, col.which, opts.todayStr);
+        }),
+        comp,
+      );
+      labels = _compLabels(
+        'Competency',
+        t.first && t.last && t.first !== t.last
+          ? '<span>' + esc(_monthName(t.first)) + '</span><span>' + esc(_monthName(t.last)) + '</span>'
+          : '',
+        'Change',
+        'is-ends',
+        true,
+      );
+      rows = t.rows;
     } else {
-      html += '<div class="dash-outcome-list" aria-label="Curricular competencies">';
-      opts.sectionClassAvgs.forEach(function (item) {
-        var sec = item.section;
-        var avg = item.avg;
-        var r = Math.round(avg);
-        html +=
-          '<div class="dash-outcome-row">' +
-          '<span class="dash-outcome-label" title="' +
-          esc((sec.name || sec.shortName || '') + (sec.note ? '\n' + sec.note : '')) +
-          '">' +
-          esc(sec.shortName || sec.name) +
-          '</span>' +
-          '<div class="dash-outcome-bar-track">' +
-          '<div class="dash-outcome-bar-fill" style="width:' +
-          levelBarPercent(cid, avg) +
-          '%;background:' +
-          (avg > 0 ? 'var(--score-' + r + ')' : 'var(--divider-subtle)') +
-          '"></div>' +
-          '</div>' +
-          '<span class="dash-outcome-val">' +
-          esc(formatLevel(cid, avg)) +
-          '</span>' +
-          '</div>';
-      });
-      html += '</div>';
+      labels = _compLabels('Competency', '', 'Average', '', true);
+      rows = _compAvgRows(cid, cols, dists, comp);
     }
-    var n = opts.assessments.length;
+    html += labels + '<div class="dash-comp-rows" aria-label="Curricular competencies">' + rows + '</div></div>';
+
+    var n = (opts.assessments || []).length;
     html +=
       '<div class="dash-comp-foot">' +
       n +
       ' assessment' +
       (n === 1 ? '' : 's') +
       ' · ' +
-      opts.tagsWithEvidence +
+      (opts.tagsWithEvidence || 0) +
       ' of ' +
-      opts.allTags.length +
+      (opts.allTags || []).length +
       ' competencies assessed</div>';
     return html + '</section>';
+  }
+
+  /* The bar above the Students heading while a competency is picked: the
+     chip that clears it, how the cards are ordered, an observation for the
+     students below the Needs Attention rule on it, and the gradebook on it.
+     col: a DashInsights.columns entry; belowIds: those students. */
+  function compFilterHtml(cid, col, belowIds) {
+    if (!col) return '';
+    var n = (belowIds || []).length;
+    return (
+      '<div class="dash-comp-filter" role="group" aria-label="' +
+      esc('Filtered to ' + col.title) +
+      '">' +
+      '<button type="button" class="dash-comp-chip" data-action="naComp" data-key="" aria-label="' +
+      esc('Clear the ' + col.label + ' filter') +
+      '">' +
+      esc(col.label) +
+      '<span aria-hidden="true">×</span></button>' +
+      '<span class="dash-comp-filter-note">Weakest first</span>' +
+      (n
+        ? '<button type="button" class="dash-comp-record" data-action="compRecord" data-key="' +
+          esc(col.key) +
+          '">' +
+          esc('Record an Observation for the ' + n + ' Below') +
+          '</button>'
+        : '') +
+      '<a class="dash-comp-gb" role="link" tabindex="0" data-href="' +
+      esc(DashInsights.gradebookHref(cid, [], col)) +
+      '">' +
+      esc('View ' + col.label + ' in Gradebook →') +
+      '</a></div>'
+    );
   }
 
   /* ── The view menu ─────────────────────────────────────────
@@ -526,7 +977,7 @@ window.DashOverview = (function () {
     });
     html +=
       '<div class="dash-overview-side">' +
-      competenciesCardHtml(Object.assign({}, opts, { belowCounts: DashInsights.belowCounts(model) })) +
+      competenciesCardHtml(Object.assign({}, opts, { belowLists: model.prof ? model.lists : null })) +
       coreCardHtml(opts) +
       '</div>';
     html += '</div>';
@@ -638,6 +1089,9 @@ window.DashOverview = (function () {
     renderOverviewPanel: renderOverviewPanel,
     glanceHtml: glanceHtml,
     viewMenuHtml: viewMenuHtml,
+    competenciesCardHtml: competenciesCardHtml,
+    compView: compView,
+    compFilterHtml: compFilterHtml,
     coreCardHtml: coreCardHtml,
     coreView: coreView,
     renderBirthdayWidget: renderBirthdayWidget,

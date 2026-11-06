@@ -323,24 +323,7 @@ button.dash-glance-cell:disabled {
   text-decoration: underline;
 }
 
-/* Outcome bars */
-.dash-outcome-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.dash-outcome-label {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--text);
-  width: 110px;
-  flex-shrink: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* A competency's bar (Curricular Competencies, Class Average). */
 .dash-outcome-bar-track {
   flex: 1;
   height: 8px;
@@ -355,47 +338,6 @@ button.dash-glance-cell:disabled {
   transition: width 0.3s var(--ease-out);
   min-width: 2px;
 }
-.dash-outcome-val {
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  width: 28px;
-  text-align: right;
-  flex-shrink: 0;
-}
-.dash-outcome-evidence {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  width: 20px;
-  text-align: right;
-  flex-shrink: 0;
-}
-
-/* At least six competencies show (6 × (18px row + 6px gap)); the list
-   takes whatever height the row has beside the Observations card and
-   scrolls past that. */
-.dash-outcome-list {
-  flex: 1 1 0;
-  min-height: 144px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  margin-right: -8px;
-  padding-right: 8px;
-}
-.dash-comp-card .dash-outcome-list {
-  flex: none;
-  min-height: 0;
-  overflow: visible;
-  margin: 0 0 12px;
-  padding: 0;
-}
-.dash-outcome-list:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
 /* The view menu (DashOverview.viewMenuHtml): a pill naming the view in use
    beside a card's title, and a menu of the views with a hint under each.
    Shared by every card with views. */
@@ -446,6 +388,15 @@ button.dash-glance-cell:disabled {
 }
 .dash-view-menu[hidden] {
   display: none;
+}
+.dash-view-menu:not([hidden]) {
+  animation: dash-view-in 100ms var(--ease-out);
+}
+@keyframes dash-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
 }
 .dash-view-item {
   display: grid;
@@ -623,113 +574,348 @@ button.dash-glance-cell:disabled {
 }
 
 /* ── Class insights (dash-insights.js) ─────────────────────── */
-/* Curricular Competencies: a bar per competency, a segment per proficiency
-   with its count. A segment opens its students (.dash-mix-pop). */
-.dash-mix-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
+/* Curricular Competencies (DashOverview.competenciesCardHtml): four views
+   behind the view menu. Every view has the same 16 px label row and 20 px
+   rows; the row block is as tall as the most rows any view draws
+   (--comp-rows), so the card keeps one height. A row sets the page's
+   competency filter: it tints on hover, and the picked one stays tinted. */
+.page-dashboard .dash-comp-head {
+  min-height: 24px;
   margin-bottom: 6px;
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-2);
+  white-space: nowrap;
 }
-.dash-mix-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+/* The widest view name leaves the link less room: it shortens, never runs
+   past the card. */
+.page-dashboard .dash-comp-head a {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.dash-mix-legend i {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-}
-.dash-mix-row {
+.dash-comp-labels,
+.dash-comp-row {
   display: grid;
-  grid-template-columns: minmax(0, 112px) minmax(0, 1fr) 40px 92px;
+  grid-template-columns: 150px minmax(0, 1fr) 64px;
   align-items: center;
-  gap: 12px;
-  min-height: 36px;
-  margin: 0 -20px;
-  padding: 0 20px;
-  border-top: 1px solid var(--divider-subtle);
+  gap: 8px;
 }
-.dash-mix-row.is-picked {
+.dash-comp-labels {
+  height: 16px;
+  margin-bottom: 4px;
+  font-family: var(--font-base);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.dash-comp-lab-name,
+.dash-comp-lab-mid span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-comp-lab-val {
+  text-align: right;
+}
+.dash-comp-lab-mid.is-cells {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  text-align: center;
+}
+.dash-comp-lab-mid.is-ends {
+  display: flex;
+  justify-content: space-between;
+}
+.dash-comp-codes,
+.dash-comp-squares {
+  display: grid;
+  grid-template-columns: repeat(var(--comp-cols), minmax(0, 1fr));
+  gap: 3px;
+}
+.dash-comp-code {
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  font-family: var(--font-base);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--text-2);
+  text-align: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+.dash-comp-code:hover {
+  background: var(--overlay-hover);
+  color: var(--text);
+}
+.dash-comp-code.is-picked {
+  background: var(--active-light);
+  color: var(--text);
+}
+.dash-comp-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: calc(var(--comp-rows, 1) * 24px - 4px);
+  margin-bottom: 14px;
+}
+.dash-comp-row {
+  position: relative;
+  box-sizing: border-box;
+  width: calc(100% + 12px);
+  height: 20px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.dash-comp-row:hover {
+  background: var(--overlay-hover);
+}
+.dash-comp-row.is-picked {
   background: var(--active-light);
 }
-.dash-mix-label {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  color: var(--text);
+.dash-comp-row:focus-visible,
+.dash-comp-pick:focus-visible,
+.dash-comp-code:focus-visible,
+.dash-comp-more:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.dash-comp-name {
+  min-width: 0;
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* A thin bar; each segment is a full-height button so it is easy to hit. */
-.dash-mix-bar {
-  display: flex;
-  gap: 2px;
-  height: 24px;
-  min-width: 0;
-}
-.dash-mix-seg {
-  min-width: 6px;
-  border: 0;
-  border-radius: 2px;
+.dash-comp-pick {
+  height: 20px;
   padding: 0;
-  background: linear-gradient(var(--seg), var(--seg)) center / 100% 8px no-repeat;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-align: left;
   cursor: pointer;
 }
-.dash-mix-seg:hover {
-  background-size: 100% 12px;
+.dash-comp-val {
+  text-align: right;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.dash-mix-seg.active {
-  background-size: 100% 12px;
-  box-shadow: inset 0 0 0 2px var(--surface);
+.dash-comp-val.is-up {
+  color: var(--score-3-text);
+}
+.dash-comp-val.is-down {
+  color: var(--score-1-text);
+}
+.dash-comp-row .dash-outcome-bar-track {
+  display: block;
+}
+.dash-comp-row .dash-outcome-bar-fill {
+  display: block;
+}
+/* Level Mix: a count per level, tinted by it; the row's largest is bold. */
+.dash-comp-cells {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  height: 18px;
+}
+.dash-comp-cell {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--cell-bg);
+  color: var(--cell-fg);
+  font-family: var(--font-base);
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.dash-comp-cell.is-top {
+  font-weight: 700;
+}
+.dash-comp-cell.is-empty {
+  background: var(--overlay-hover);
+  color: var(--text-3);
+  cursor: default;
+}
+button.dash-comp-cell:hover {
+  box-shadow: inset 0 0 0 1px var(--cell-fg);
+}
+.dash-comp-cell.active {
   outline: 2px solid var(--text);
-  outline-offset: -4px;
+  outline-offset: 1px;
 }
-.dash-mix-seg:focus-visible {
+.dash-comp-cell:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 1px;
 }
-.dash-mix-avg {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 600;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+/* Needs Support: a cell per competency in the student's level colour. */
+.dash-comp-squares {
+  height: 16px;
 }
-.dash-mix-below {
-  justify-self: end;
+.dash-comp-sq {
+  border-radius: 3px;
+  background: var(--divider-medium);
+}
+.dash-comp-more {
+  align-self: flex-start;
+  height: 20px;
+  padding: 0;
   border: 0;
-  border-radius: 6px;
-  background: none;
-  padding: 4px 6px;
+  background: transparent;
   font-family: var(--font-base);
   font-size: var(--text-sm);
   color: var(--link);
-  white-space: nowrap;
   cursor: pointer;
 }
-button.dash-mix-below:hover,
-.dash-mix-below[aria-pressed='true'] {
-  background: var(--active-light);
+.dash-comp-more:hover {
+  text-decoration: underline;
 }
-.dash-mix-below b {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.dash-mix-below.is-none {
+.dash-comp-none {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
   color: var(--text-2);
+}
+/* Change: the class average month by month, on one scale for every row. */
+.dash-comp-line {
+  display: block;
+  min-width: 0;
+  height: 18px;
+}
+.dash-comp-spark {
+  display: block;
+  width: 100%;
+  height: 18px;
+  overflow: visible;
+}
+/* A row's pop-up: under it, from the bars' left edge. */
+.dash-comp-row .dash-comp-tip {
+  left: 162px;
+  right: auto;
+  transform: none;
+  top: 100%;
+  margin-top: 2px;
+  width: max-content;
+  min-width: 0;
+  max-width: min(320px, calc(100% - 170px));
+  white-space: normal;
   cursor: default;
 }
-.dash-mix-empty {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  align-self: center;
+.dash-comp-row:hover .dash-comp-tip,
+.dash-comp-row:focus-visible .dash-comp-tip {
+  display: block;
 }
+.dash-comp-tip .dist-tip-title,
+.dash-comp-tip-line {
+  display: block;
+}
+.dash-comp-tip-line {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text);
+}
+/* A new view's rows fade in (page-dashboard.js adds the class). */
+.dash-comp-body.is-fade-in {
+  animation: dash-comp-fade 150ms var(--ease-out);
+}
+@keyframes dash-comp-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The competency filter, above the Students heading: the chip that clears
+   it, how the cards are ordered, an observation for those below, and the
+   gradebook on the competency. */
+.dash-comp-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  margin-top: 12px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+}
+.dash-comp-filter + .dash-students-head {
+  margin-top: 8px;
+}
+.dash-comp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid color-mix(in srgb, var(--active) 45%, transparent);
+  border-radius: 14px;
+  background: var(--active-light);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.dash-comp-chip span {
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-2);
+}
+.dash-comp-chip:hover span {
+  color: var(--text);
+}
+.dash-comp-filter-note {
+  color: var(--text-2);
+}
+.dash-comp-record {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--divider-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.dash-comp-record:hover {
+  background: var(--overlay-hover);
+}
+.dash-comp-chip:focus-visible,
+.dash-comp-record:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.page-dashboard .dash-comp-gb {
+  font-weight: 500;
+  color: var(--link);
+  text-decoration: none;
+  cursor: pointer;
+}
+.page-dashboard .dash-comp-gb:hover {
+  text-decoration: underline;
+}
+
+/* The students at one level on a competency (a Level Mix count). */
 .dash-mix-pop {
   position: fixed;
   z-index: var(--z-fab);
@@ -1085,8 +1271,7 @@ a.dash-ins-name:hover {
   padding: 20px;
 }
 
-/* Curricular Competencies: the legend, a row per competency, and the line
-   under them. */
+/* Curricular Competencies: the line under the rows. */
 .dash-comp-foot {
   margin: 0 -20px -16px;
   padding: 10px 20px 14px;
@@ -1966,7 +2151,8 @@ a.dash-ins-name:hover {
   position: relative;
   transition:
     box-shadow 0.18s var(--ease-out),
-    transform 0.18s var(--ease-out);
+    transform 0.18s var(--ease-out),
+    border-color 200ms;
   cursor: pointer;
 }
 .dash-card:hover {
@@ -2103,6 +2289,12 @@ a.dash-ins-name:hover {
   height: 6px;
   border-radius: 2px;
   background: var(--chip-bg);
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+  transition:
+    background-color 200ms,
+    color 200ms,
+    outline-color 200ms;
 }
 .dash-card-strip.is-chips .dash-card-seg {
   height: 14px;
@@ -2164,6 +2356,34 @@ a.dash-ins-name:hover {
 .dash-card-strip.has-focus .dash-card-seg:not(.is-focus) {
   background: color-mix(in srgb, var(--chip-bg) 35%, var(--surface));
   color: color-mix(in srgb, var(--chip-fg) 35%, var(--surface));
+}
+
+/* The competency filter's motion (page-dashboard.js _slideCardsFrom): a
+   card is put back where it was, in its old look, with no transition
+   (is-placing), then slides to its new place as its chips and border
+   change (is-sliding). */
+.dash-card.is-placing,
+.dash-card.is-placing .dash-card-seg {
+  transition: none;
+}
+.dash-card.is-sliding {
+  transition:
+    transform 250ms var(--ease-out),
+    border-color 200ms,
+    box-shadow 0.18s var(--ease-out);
+}
+/* Less motion asked for: nothing slides, fades or grows. */
+@media (prefers-reduced-motion: reduce) {
+  .dash-card,
+  .dash-card.is-sliding,
+  .dash-card-seg,
+  .dash-outcome-bar-fill {
+    transition: none;
+  }
+  .dash-comp-body.is-fade-in,
+  .dash-view-menu:not([hidden]) {
+    animation: none;
+  }
 }
 
 /* The grade badge's trend arrow. */

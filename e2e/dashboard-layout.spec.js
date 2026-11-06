@@ -49,7 +49,9 @@ test('below 1100px the competency cards go under Needs Attention, which keeps a 
   expect(m.height).toBeGreaterThan(200);
 });
 
-test('the filters, "N Below" and the Missing and Late cell pick who Needs Attention shows', async ({ page }) => {
+test('the filters, a picked competency and the Missing and Late cell pick who Needs Attention shows', async ({
+  page,
+}) => {
   await openDashboard(page);
   const card = page.locator('#dash-na-card');
   const rows = card.locator('.dash-na-row:not(.is-class)');
@@ -59,9 +61,10 @@ test('the filters, "N Below" and the Missing and Late cell pick who Needs Attent
   const nostr = await rows.count();
   expect(nostr).toBeLessThan(all);
   expect(await card.locator('.dash-na-diamond').count()).toBe(nostr);
-  // A competency's "N Below" shows its students and a chip to clear it.
-  const below = page.locator('.dash-mix-below[data-key]').first();
-  const n = Number(await below.locator('b').textContent());
+  // Picking a competency on Curricular Competencies (a Level Mix row, which
+  // took over from "N Below") shows its students below and a chip to clear it.
+  const below = page.locator('.dash-comp-pick[data-below]:not([data-below="0"])').first();
+  const n = Number(await below.getAttribute('data-below'));
   await below.click();
   await expect(rows).toHaveCount(n);
   await expect(card.locator('.dash-na-compchip')).toBeVisible();

@@ -2670,6 +2670,97 @@ function competencyDistribution(cid, studentIds, which) {
   return { bands: bands, values: values, avg: count ? total / count : 0 };
 }
 
+/* ── A competency month by month (the dashboard's Change view) ──────────
+   GRADE MATH (docs/plans/dashboard-cards-plan.md, B.2; for Colin's review).
+   competencyMonthlyAverages(cid, studentIds, which, todayStr) averages the
+   raw evidence, not the competency level: for each calendar month up to
+   today's (todayStr, 'YYYY-MM-DD', defaults to today), each student's mean
+   of their counted scores that month (getCountedTagScores: Excused work and
+   work that doesn't count toward grades left out, a + or − worth a third of
+   a level, points work as its level; scores of 0 left out) on the column's
+   competencies (`which.sectionId`, or every section in `which.groupId`),
+   then the mean of those students' means, each student counting once. A
+   score's month is its own date, else its assessment's; undated scores and
+   scores dated after today are left out. Months in which nobody has a
+   score are skipped, so the class's first month is its first counted score.
+   It is never a grade: the calculation method (average, most recent, decay)
+   does not apply, only the month's mean.
+   → [{ month: 'YYYY-MM', avg: level 1–4, students: n }] oldest first */
+function competencyMonthlyAverages(cid, studentIds, which, todayStr) {
+  var today = String(todayStr || (typeof getTodayStr === 'function' ? getTodayStr() : '')).slice(0, 10);
+  var thisMonth = today.slice(0, 7);
+  var sections = [];
+  if (which && which.groupId) {
+    var gi = getGroupedSections(cid).groups.find(function (g) {
+      return g.group.id === which.groupId;
+    });
+    sections = gi ? gi.sections : [];
+  } else if (which && which.sectionId) {
+    var sec = _getSectionById(cid, which.sectionId);
+    if (sec) sections = [sec];
+  }
+  var tagIds = [];
+  sections.forEach(function (s) {
+    (s.tags || []).forEach(function (t) {
+      if (tagIds.indexOf(t.id) < 0) tagIds.push(t.id);
+    });
+  });
+  var assessMap = _getAssessMap(cid);
+  var byMonth = {}; // month -> [student means]
+  (studentIds || []).forEach(function (sid) {
+    var sums = {}; // month -> { total, n }
+    tagIds.forEach(function (tid) {
+      getCountedTagScores(cid, sid, tid).forEach(function (sc) {
+        var v = Number(sc.score);
+        if (!(v > 0)) return;
+        var d = String(sc.date || _assessmentDate(assessMap.get(sc.assessmentId)) || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || (today && d > today)) return;
+        var m = d.slice(0, 7);
+        if (thisMonth && m > thisMonth) return;
+        var s = sums[m] || (sums[m] = { total: 0, n: 0 });
+        s.total += v;
+        s.n++;
+      });
+    });
+    Object.keys(sums).forEach(function (m) {
+      (byMonth[m] = byMonth[m] || []).push(sums[m].total / sums[m].n);
+    });
+  });
+  return Object.keys(byMonth)
+    .sort()
+    .map(function (m) {
+      var list = byMonth[m];
+      return {
+        month: m,
+        avg:
+          list.reduce(function (a, b) {
+            return a + b;
+          }, 0) / list.length,
+        students: list.length,
+      };
+    });
+}
+
+/* How far a competency's class average moved from one level to another, as
+   the Change view prints it: points of a percent in a Letter or Both class
+   ("↑ 12", each level's percent rounded first, as formatLevel prints it),
+   levels to one decimal in a Proficiency class ("↓ 0.4"); "→ 0" when it
+   rounds to nothing. { text, dir: 1 | 0 | -1 }; null when either side has
+   no level. */
+function levelMoveText(cid, first, last) {
+  if (!(first > 0 && last > 0)) return null;
+  var d, amount;
+  if (courseGradeMode(cid) === 'proficiency') {
+    d = Math.round(last * 10) - Math.round(first * 10);
+    amount = (Math.abs(d) / 10).toFixed(1);
+  } else {
+    d = Math.round(levelToPercent(cid, last)) - Math.round(levelToPercent(cid, first));
+    amount = String(Math.abs(d));
+  }
+  var dir = d > 0 ? 1 : d < 0 ? -1 : 0;
+  return { text: (dir > 0 ? '↑ ' : dir < 0 ? '↓ ' : '→ ') + amount, dir: dir };
+}
+
 /* A classColumnAverage result as the class reads it: a level through
    formatLevel, points work as "7.4/10 \u00B7 74%", Complete/Incomplete work as
    its %. "\u2014" when nobody counts. */
