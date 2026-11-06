@@ -173,4 +173,21 @@ describe('the best piece names its skill', () => {
     const lower = withWork([2.4, 2.4, 2]);
     expect(CommentBank.verify(d, lower, {}).replaced.map(x => x.sentenceId)).toContain('bp12');
   });
+
+  it('a true sentence over 20 words, picked from Other Wording, is not flagged as no longer matching (Nov 6)', () => {
+    const f = withWork([3.8, 3, 2], true, 'Three Scenes from 1900 Part');
+    const ctx = CommentBank.context(f, {});
+    const s = COMMENT_BANK.sentences.find(x => x.id === 'bp11');
+    const text = CommentBank.fill(s, ctx);
+    const prov = CommentBank.provenance(s, ctx);
+    expect(CommentRealiser.wordCount(text)).toBeGreaterThan(20);
+    const d = { text, sentences: [{ id: 'bp11', step: 'example', text }], provenance: [prov] };
+    expect(CommentBank.verify(d, f, {}).replaced).toEqual([{ sentenceId: 'bp11', failed: ['length'], by: null }]);
+    const meta = CommentBank.draftMeta([{ id: 'bp11', step: 'example', text, raw: s, prov }], f, {});
+    expect(CommentBank.staleness(meta, f, {}, {})).toBeNull();
+    // Once the piece no longer shows that skill, it is flagged.
+    expect(
+      CommentBank.staleness(meta, withWork([2.4, 2.4, 2], true, 'Three Scenes from 1900 Part'), {}, {}),
+    ).not.toBeNull();
+  });
 });
