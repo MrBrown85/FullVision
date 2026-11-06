@@ -1,0 +1,3729 @@
+{
+ "sci-accuracy-precision": {
+  "old": {
+   "phrase": "check procedures and data for accuracy and precision",
+   "next_steps": {
+    "emerging": "record measurements with the correct significant figures",
+    "developing": "state the uncertainty in a measurement or result",
+    "proficient": "explain what makes a result accurate and precise"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-accuracy-precision--senior-sciences",
+    "courses": [
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.chem11.cc.7",
+     "bc.earth11.cc.7",
+     "bc.envsci11.cc.7",
+     "bc.ls11sci.cc.7",
+     "bc.phys11.cc.7",
+     "bc.sfc11.cc.7",
+     "bc.anat12.cc.7",
+     "bc.chem12.cc.7",
+     "bc.envsci12.cc.7",
+     "bc.geo12.cc.7",
+     "bc.phys12.cc.7",
+     "bc.spsci12.cc.7"
+    ],
+    "ministry": "Apply the concepts of accuracy and precision to experimental procedures and data",
+    "bands": {
+     "all": {
+      "phrase": "apply the ideas of accuracy and precision to lab procedures and data",
+      "next_steps": {
+       "emerging": "record each measurement with the right number of significant figures",
+       "developing": "state the uncertainty in each measurement and result",
+       "proficient": "make a habit of carrying significant figures and uncertainty through a calculation",
+       "extending": "judge whether a procedure limits the accuracy or the precision of a result"
+      },
+      "strength": [
+       "{He} [records|record] measurements with the number of significant figures the instrument allows.",
+       "{He} [explains|explain] how accuracy differs from precision, using {his} own results."
+      ],
+      "next": {
+       "developing": "{His} next step is to practise writing very large and very small results in scientific notation.",
+       "proficient": "Next, {he} can practise stating how much uncertainty a final result carries after a calculation.",
+       "extending": "To go further, {he} can judge which step in a procedure most limits the precision of the result."
+      },
+      "home": "When you measure something at home, ask {him} how sure {he} [is|are] of the last digit."
+     }
+    }
+   }
+  ]
+ },
+ "sci-assumptions-bias": {
+  "old": {
+   "phrase": "question information and spot bias in sources",
+   "next_steps": {
+    "emerging": "ask where a piece of information came from",
+    "developing": "name the assumptions in a source or piece of work",
+    "proficient": "identify bias in sources and in a personal investigation"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-assumptions-bias--all-sciences",
+    "courses": [
+     "Science 8",
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.18",
+     "bc.sci9.cc.17",
+     "bc.sci10.cc.17",
+     "bc.chem11.cc.17",
+     "bc.earth11.cc.17",
+     "bc.envsci11.cc.17",
+     "bc.ls11sci.cc.17",
+     "bc.phys11.cc.17",
+     "bc.sfc11.cc.17",
+     "bc.anat12.cc.17",
+     "bc.chem12.cc.17",
+     "bc.envsci12.cc.17",
+     "bc.geo12.cc.17",
+     "bc.phys12.cc.17",
+     "bc.spsci12.cc.17"
+    ],
+    "ministry": "Demonstrate an awareness of assumptions and bias in their own work and secondary sources / Demonstrate an awareness of assumptions, question information given, and identify bias in their own work and secondary sources / Demonstrate an awareness of assumptions, question information given, and identify bias in their own work and in primary and secondary sources",
+    "bands": {
+     "8-9": {
+      "phrase": "spot assumptions and bias in science sources and in investigations",
+      "next_steps": {
+       "emerging": "name one thing a source takes for granted",
+       "developing": "ask who made a source and what they wanted readers to think",
+       "proficient": "check {his} own investigation for an assumption that shaped the results",
+       "extending": "explain how a bias in a source could change what readers believe"
+      },
+      "strength": [
+       "{He} [notices|notice] when a source states an opinion as if it were a fact.",
+       "{He} can name something {he} took for granted when planning {his} own investigation."
+      ],
+      "next": {
+       "developing": "A good next step is to ask who wrote a source and why, each time {he} [uses|use] one.",
+       "proficient": "{He} [is|are] ready to question whether the information {he} [is|are] given tells the whole story.",
+       "extending": "From here, {he} can practise explaining how one assumption changed the results of {his} investigation."
+      },
+      "home": "When you see an ad together, ask {him} what the ad wants people to believe."
+     },
+     "10-12": {
+      "phrase": "question the information given and identify assumptions and bias in primary and secondary sources",
+      "next_steps": {
+       "emerging": "practise asking what evidence supports the information a source gives",
+       "developing": "identify the assumptions built into a study's design or a source's claims",
+       "proficient": "make a habit of checking lab conclusions for bias before sharing them",
+       "extending": "weigh how assumptions and bias in primary and secondary sources affect their conclusions"
+      },
+      "strength": [
+       "{He} [questions|question] information {he} [is|are] given instead of accepting it as true right away.",
+       "{He} [separates|separate] what a primary source measured from what a secondary source says it means."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise asking what each claim in a secondary source takes for granted.",
+       "proficient": "It would help {him} to test {his} own conclusions for bias as {he} [writes|write] them.",
+       "extending": "To go further, {he} can judge how far a source's bias weakens the conclusion it reaches."
+      },
+      "home": "When you hear a news story about health, ask {him} who did the study and who gains from the result."
+     }
+    }
+   }
+  ]
+ },
+ "sci-cause-effect": {
+  "old": {
+   "phrase": "explain how a cause leads to an effect",
+   "next_steps": {
+    "emerging": "name a cause and an effect in a science situation",
+    "developing": "explain how one cause leads to an effect",
+    "proficient": "explain how several causes combine to produce an effect"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-cause-effect--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.13",
+     "bc.sci10.cc.13",
+     "bc.chem11.cc.13",
+     "bc.earth11.cc.13",
+     "bc.envsci11.cc.13",
+     "bc.ls11sci.cc.13",
+     "bc.phys11.cc.13",
+     "bc.sfc11.cc.13",
+     "bc.anat12.cc.13",
+     "bc.chem12.cc.13",
+     "bc.envsci12.cc.13",
+     "bc.geo12.cc.13",
+     "bc.phys12.cc.13",
+     "bc.spsci12.cc.13"
+    ],
+    "ministry": "Analyze cause-and-effect relationships",
+    "bands": {
+     "8-9": {
+      "phrase": "explain how a cause leads to an effect in science",
+      "next_steps": {
+       "emerging": "name the cause and the effect in a science situation",
+       "developing": "explain each step between a cause and its effect",
+       "proficient": "check whether one thing truly causes another or just happens at the same time",
+       "extending": "explain how several causes can work together to produce one effect"
+      },
+      "strength": [
+       "{He} can name the cause and the effect when {he} [describes|describe] what happened in an investigation.",
+       "{He} [explains|explain] the steps that link a cause to its effect in plain words."
+      ],
+      "next": {
+       "developing": "{His} goal now is to explain the steps between a cause and its effect, not just name both.",
+       "proficient": "One thing to practise is asking whether two events are linked or just happen together.",
+       "extending": "{He} could try showing how two causes combine to produce a single effect."
+      },
+      "home": "At home, ask {him} what makes bread go stale, and how {he} would test it."
+     },
+     "10-12": {
+      "phrase": "analyze cause-and-effect relationships in investigations and in nature",
+      "next_steps": {
+       "emerging": "identify the cause and the effect in an investigation's results",
+       "developing": "explain the mechanism that links a cause to its effect",
+       "proficient": "make a habit of testing whether a correlation in data shows cause",
+       "extending": "analyze how several causes interact to produce one effect"
+      },
+      "strength": [
+       "{He} [separates|separate] a true cause from a pattern that appears by chance in data.",
+       "{He} [traces|trace] a chain of causes and effects through a system with several parts."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to name the evidence that shows a link is causal.",
+       "proficient": "Next, {he} can practise checking for a hidden third factor behind two linked results.",
+       "extending": "{He} [is|are] ready to judge which of several causes has the largest effect, and explain how {he} [knows|know]."
+      },
+      "home": "At home, ask {him} why a houseplant might wilt, and how {he} would know the true cause."
+     }
+    }
+   }
+  ]
+ },
+ "sci-changing-knowledge": {
+  "old": {
+   "phrase": "explain how new tools changed scientific knowledge",
+   "next_steps": {
+    "emerging": "describe how one science idea has changed over time",
+    "developing": "name the tool or technology behind a change in knowledge",
+    "proficient": "explain how new technologies changed what scientists know"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-changing-knowledge--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.18",
+     "bc.sci10.cc.18",
+     "bc.chem11.cc.18",
+     "bc.earth11.cc.18",
+     "bc.envsci11.cc.18",
+     "bc.ls11sci.cc.18",
+     "bc.phys11.cc.18",
+     "bc.sfc11.cc.18",
+     "bc.anat12.cc.18",
+     "bc.chem12.cc.18",
+     "bc.envsci12.cc.18",
+     "bc.geo12.cc.18",
+     "bc.phys12.cc.18",
+     "bc.spsci12.cc.18"
+    ],
+    "ministry": "Consider the changes in knowledge over time as tools and technologies have developed",
+    "bands": {
+     "8-9": {
+      "phrase": "describe how scientific knowledge has changed as new tools were invented",
+      "next_steps": {
+       "emerging": "describe how one science idea changed over time",
+       "developing": "name the tool or technology that led to a change in an idea",
+       "proficient": "explain what scientists could see or measure after a new tool arrived",
+       "extending": "explain why science ideas can change when new tools appear"
+      },
+      "strength": [
+       "{He} can describe how an idea in science changed once people could observe more.",
+       "{He} [connects|connect] a new discovery to the tool that made it possible."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise explaining what a new tool let scientists observe for the first time.",
+       "proficient": "{His} next step is to describe what people believed before a tool changed their thinking.",
+       "extending": "A good next step is to explain why scientists accept that today's ideas may change too."
+      },
+      "home": "At home, ask {him} about an idea scientists once believed that they now know is wrong."
+     },
+     "10-12": {
+      "phrase": "analyze how new tools and technologies have changed scientific knowledge over time",
+      "next_steps": {
+       "emerging": "identify the technology behind a shift in scientific knowledge",
+       "developing": "explain how a new technology produced evidence that changed an accepted idea",
+       "proficient": "practise tracing how one idea in the field developed as instruments improved",
+       "extending": "evaluate how the limits of current technology shape what scientists can claim today"
+      },
+      "strength": [
+       "{He} [explains|explain] how new instruments produced evidence that changed an accepted scientific idea.",
+       "{He} [describes|describe] how scientists revised a model as measurements became more exact."
+      ],
+      "next": {
+       "developing": "One thing to practise is linking each change in an idea to the evidence a new technology gave.",
+       "proficient": "It would help {him} to describe how scientists reacted when new evidence challenged an older idea.",
+       "extending": "From here, {he} can judge which current ideas might change as technology develops."
+      },
+      "home": "At home, ask {him} which piece of technology {he} [thinks|think] has changed science the most."
+     }
+    }
+   }
+  ]
+ },
+ "sci-contributing-to-care": {
+  "old": {
+   "phrase": "take part in caring for the community and environment",
+   "next_steps": {
+    "emerging": "describe one action that cares for the environment",
+    "developing": "plan an action with a group to care for the community",
+    "proficient": "follow a plan to care for the community or world"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-contributing-to-care--all-sciences",
+    "courses": [
+     "Science 8",
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.22",
+     "bc.sci9.cc.23",
+     "bc.sci10.cc.23",
+     "bc.chem11.cc.24",
+     "bc.earth11.cc.24",
+     "bc.envsci11.cc.24",
+     "bc.ls11sci.cc.24",
+     "bc.phys11.cc.24",
+     "bc.sfc11.cc.24",
+     "bc.anat12.cc.24",
+     "bc.chem12.cc.24",
+     "bc.envsci12.cc.24",
+     "bc.geo12.cc.24",
+     "bc.phys12.cc.24",
+     "bc.spsci12.cc.24"
+    ],
+    "ministry": "Contribute to care for self, others, community, and world through personal or collaborative approaches / Contribute to care for self, others, community, and world through individual or collaborative approaches",
+    "bands": {
+     "8-9": {
+      "phrase": "take part in caring for self, others, the community and the world",
+      "next_steps": {
+       "emerging": "name one way science learning can help care for people or places",
+       "developing": "plan one personal action that cares for well-being or the environment",
+       "proficient": "work with a group to plan and complete a caring action",
+       "extending": "explain how a caring action helps both people and the land"
+      },
+      "strength": [
+       "{He} [uses|use] what {he} [learns|learn] in science to make choices that care for people and places.",
+       "{He} [joins|join] group efforts to care for the school or the community."
+      ],
+      "next": {
+       "developing": "{He} [is|are] ready to plan a small action that cares for someone else.",
+       "proficient": "To go further, {he} can practise sharing the work fairly when a group plans a caring action.",
+       "extending": "Next, {he} can explain how one caring action can help both people and the land."
+      },
+      "home": "At home, ask {him} to suggest one small way your family could care for your neighbourhood."
+     },
+     "10-12": {
+      "phrase": "contribute to caring for self, others, community and world, alone or with others",
+      "next_steps": {
+       "emerging": "identify a need in the community or environment that science can help with",
+       "developing": "plan an individual action that responds to a local need",
+       "proficient": "build a group plan that shares roles and sets a clear goal",
+       "extending": "evaluate how well an action met the need it was meant to address"
+      },
+      "strength": [
+       "{He} [connects|connect] what {he} [learns|learn] in science to the needs of {his} community.",
+       "{He} [plans|plan] actions with others that care for people and the environment."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to choose one local need and plan a response to it.",
+       "proficient": "{His} goal now is to help a group plan an action with clear roles and one shared aim.",
+       "extending": "{He} could now judge how well an action helped, using evidence from before and after."
+      },
+      "home": "At home, talk with {him} about one need in your community and who is caring for it."
+     }
+    }
+   }
+  ]
+ },
+ "sci-data-collection": {
+  "old": {
+   "phrase": "collect and record accurate data with the right units",
+   "next_steps": {
+    "emerging": "record data in an organized table",
+    "developing": "use the right units and equipment for each measurement",
+    "proficient": "collect data systematically so results can be repeated"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-data-collection--science-9-10",
+    "courses": [
+     "Science 9",
+     "Science 10"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.6",
+     "bc.sci10.cc.6"
+    ],
+    "ministry": "Select and use appropriate equipment, including digital technologies, to systematically and accurately collect and record data",
+    "bands": {
+     "8-9": {
+      "phrase": "choose and use the right equipment to collect and record data carefully",
+      "next_steps": {
+       "emerging": "record each measurement in an organized table as it is taken",
+       "developing": "choose equipment that suits each measurement",
+       "proficient": "keep the same steps each time data is collected",
+       "extending": "use a digital tool to collect data more often or more exactly"
+      },
+      "strength": [
+       "{He} [chooses|choose] equipment that suits the measurement {he} [needs|need] to make.",
+       "{He} [records|record] data in an organized table while the investigation is happening."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise repeating each measurement the same way every time.",
+       "proficient": "{He} could try timing or measuring one step with a digital tool instead of by hand.",
+       "extending": "To go further, {he} can practise explaining why {he} chose each piece of equipment."
+      },
+      "home": "When you cook, ask {him} which tool in the kitchen gives the most exact measurement."
+     },
+     "10-12": {
+      "phrase": "select and use suitable equipment, including digital tools, to collect data systematically",
+      "next_steps": {
+       "emerging": "practise organizing a data table before collecting any data",
+       "developing": "select equipment that matches the size and type of each measurement",
+       "proficient": "follow a systematic routine so every trial is recorded the same way",
+       "extending": "compare digital and hand methods to see which gives more trustworthy data"
+      },
+      "strength": [
+       "{He} [selects|select] equipment, including digital tools, that fits the size and type of each measurement.",
+       "{He} [collects|collect] data in a fixed order so each trial can be checked later."
+      ],
+      "next": {
+       "developing": "One thing to practise is planning the data table before the first measurement is taken.",
+       "proficient": "A good next step is to record the equipment and settings used, so others could repeat the work.",
+       "extending": "From here, {he} can test whether a digital tool improves the data {he} [collects|collect]."
+      },
+      "home": "At home, ask {him} how {he} would measure the time it takes water to boil, and with what."
+     }
+    }
+   },
+   {
+    "id": "sci-data-collection--senior-sciences",
+    "courses": [
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.chem11.cc.6",
+     "bc.earth11.cc.6",
+     "bc.envsci11.cc.6",
+     "bc.ls11sci.cc.6",
+     "bc.phys11.cc.6",
+     "bc.sfc11.cc.6",
+     "bc.anat12.cc.6",
+     "bc.chem12.cc.6",
+     "bc.envsci12.cc.6",
+     "bc.geo12.cc.6",
+     "bc.phys12.cc.6",
+     "bc.spsci12.cc.6"
+    ],
+    "ministry": "Use appropriate SI units and appropriate equipment, including digital technologies, to systematically and accurately collect and record data",
+    "bands": {
+     "all": {
+      "phrase": "collect and record data systematically, using SI units and suitable equipment",
+      "next_steps": {
+       "emerging": "record every measurement with its SI unit",
+       "developing": "choose equipment and digital tools that match each measurement's range",
+       "proficient": "make a habit of recording data in a planned, repeatable order",
+       "extending": "evaluate how the choice of equipment limits the data an investigation can collect"
+      },
+      "strength": [
+       "{He} [records|record] every value with the correct SI unit and symbol.",
+       "{He} [uses|use] digital tools to collect data that would be hard to gather by hand."
+      ],
+      "next": {
+       "developing": "{His} next step is to match each instrument to the range of values {he} [expects|expect].",
+       "proficient": "It would help {him} to log the equipment and settings for each trial so the data can be repeated.",
+       "extending": "{He} [is|are] ready to explain how equipment choices limit what the data can show."
+      },
+      "home": "At home, ask {him} which SI units your family uses every day without noticing."
+     }
+    }
+   }
+  ]
+ },
+ "sci-data-patterns": {
+  "old": {
+   "phrase": "find patterns and trends in data",
+   "next_steps": {
+    "emerging": "describe one pattern in a data table or graph",
+    "developing": "describe the relationship between two variables",
+    "proficient": "use calculations to analyze data and point out results that don't fit"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-data-patterns--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.14"
+    ],
+    "ministry": "Seek patterns and connections in data from their own investigations and secondary sources",
+    "bands": {
+     "all": {
+      "phrase": "find patterns and connections in data from investigations and other sources",
+      "next_steps": {
+       "emerging": "describe one pattern in a table or graph",
+       "developing": "say how two sets of data are connected",
+       "proficient": "compare patterns in investigation data with data from a source",
+       "extending": "explain what might cause a pattern in the data"
+      },
+      "strength": [
+       "{He} [describes|describe] the pattern {he} [sees|see] in a table of results.",
+       "{He} [connects|connect] data from {his} own investigation to data from a book or website."
+      ],
+      "next": {
+       "developing": "{His} next step is to describe how one set of numbers changes as another changes.",
+       "proficient": "Next, {he} can try checking whether a pattern in {his} data also appears in a source.",
+       "extending": "A good next step is to suggest a reason for the pattern {he} [finds|find]."
+      },
+      "home": "At home, ask {him} to spot a pattern in the weather over the past week."
+     }
+    }
+   },
+   {
+    "id": "sci-data-patterns--science-9-10",
+    "courses": [
+     "Science 9",
+     "Science 10"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.10",
+     "bc.sci10.cc.10"
+    ],
+    "ministry": "Seek and analyze patterns, trends, and connections in data, including describing relationships between variables (dependent and independent) and identifying inconsistencies",
+    "bands": {
+     "8-9": {
+      "phrase": "analyze patterns and trends in data and spot results that do not fit",
+      "next_steps": {
+       "emerging": "name the variable that was changed and the variable that was measured",
+       "developing": "describe how the measured variable responds when the changed variable increases",
+       "proficient": "mark the data points that do not fit a trend and suggest why",
+       "extending": "explain a trend using the relationship between the two variables"
+      },
+      "strength": [
+       "{He} [describes|describe] how one variable changes when the other variable is increased.",
+       "{He} [spots|spot] data points that do not fit the trend and [marks|mark] them."
+      ],
+      "next": {
+       "developing": "{He} [is|are] ready to describe a trend in a full sentence that names both variables.",
+       "proficient": "Next, {he} can practise asking what went wrong when a data point sits far from the trend.",
+       "extending": "To go further, {he} can practise describing the shape of a trend, not just its direction."
+      },
+      "home": "At home, ask {him} how the time of sunset changes from week to week."
+     },
+     "10-12": {
+      "phrase": "analyze trends and relationships between variables, and identify inconsistencies in data",
+      "next_steps": {
+       "emerging": "identify which variable was changed and which was measured",
+       "developing": "describe the relationship between variables in exact terms",
+       "proficient": "practise explaining what an inconsistency in the data might mean",
+       "extending": "judge whether a relationship in the data holds across the full range tested"
+      },
+      "strength": [
+       "{He} [identifies|identify] the relationship between the changed and the measured variable in a data set.",
+       "{He} [notices|notice] inconsistencies in data and [asks|ask] what might have caused them."
+      ],
+      "next": {
+       "developing": "One thing to practise is stating the relationship between variables with numbers from the data.",
+       "proficient": "A next step for {him} is to decide whether an odd result is an error or a true effect.",
+       "extending": "From here, {he} can test whether a trend continues across every part of the data."
+      },
+      "home": "At home, ask {him} whether doubling the water always makes a plant grow twice as much."
+     }
+    }
+   },
+   {
+    "id": "sci-data-patterns--senior-sciences",
+    "courses": [
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.chem11.cc.10",
+     "bc.earth11.cc.10",
+     "bc.envsci11.cc.10",
+     "bc.ls11sci.cc.10",
+     "bc.phys11.cc.10",
+     "bc.sfc11.cc.10",
+     "bc.anat12.cc.10",
+     "bc.chem12.cc.10",
+     "bc.envsci12.cc.10",
+     "bc.geo12.cc.10",
+     "bc.phys12.cc.10",
+     "bc.spsci12.cc.10"
+    ],
+    "ministry": "Seek and analyze patterns, trends, and connections in data, including describing relationships between variables, performing calculations, and identifying inconsistencies",
+    "bands": {
+     "all": {
+      "phrase": "analyze patterns, trends and relationships in data, using calculations to support the analysis",
+      "next_steps": {
+       "emerging": "describe the trend in a data set in words",
+       "developing": "perform calculations, such as averages or rates, to describe a trend",
+       "proficient": "practise using calculations to judge whether an inconsistent result should be kept",
+       "extending": "analyze connections across several data sets and explain what links them"
+      },
+      "strength": [
+       "{He} [performs|perform] calculations on {his} data to describe trends with numbers.",
+       "{He} [explains|explain] how inconsistencies in the data affect the trend {he} [reports|report]."
+      ],
+      "next": {
+       "developing": "It would help {him} to show each calculation step so a reader can follow the analysis.",
+       "proficient": "{His} goal now is to give a reason before removing any result that does not fit.",
+       "extending": "To go further, {he} can connect trends across two or more data sets."
+      },
+      "home": "At home, ask {him} how {he} would calculate the average daily temperature over a week."
+     }
+    }
+   }
+  ]
+ },
+ "sci-data-recording": {
+  "old": {
+   "phrase": "measure and record data accurately with equipment",
+   "next_steps": {
+    "emerging": "record measurements in a table as they are taken",
+    "developing": "measure accurately and record units each time",
+    "proficient": "record both observations and measurements with precision"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-data-recording--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.8"
+    ],
+    "ministry": "Observe, measure, and record data (qualitative and quantitative), using equipment, including digital technologies, with accuracy and precision",
+    "bands": {
+     "all": {
+      "phrase": "observe, measure and record both descriptions and numbers, using equipment carefully",
+      "next_steps": {
+       "emerging": "record observations in words, such as colour, shape or texture",
+       "developing": "check a measuring tool's scale carefully and record the unit each time",
+       "proficient": "repeat measurements to check that they agree",
+       "extending": "use a digital tool to measure something more exactly"
+      },
+      "strength": [
+       "{He} [records|record] what {he} [observes|observe] in words, such as colour, shape or texture.",
+       "{He} [reads|read] measuring tools carefully and [records|record] the unit with each number."
+      ],
+      "next": {
+       "developing": "{His} next step is to take each measurement twice and check that the two agree.",
+       "proficient": "Next, {he} can practise using both words and numbers to record the same observation.",
+       "extending": "{He} could try measuring with a digital tool to see how exact {he} can be."
+      },
+      "home": "When you cook together, ask {him} to describe the food using colour, smell and texture."
+     }
+    }
+   }
+  ]
+ },
+ "sci-data-representation": {
+  "old": {
+   "phrase": "show data patterns in tables, graphs and models",
+   "next_steps": {
+    "emerging": "put data into a labelled table",
+    "developing": "make a graph that shows a pattern in data",
+    "proficient": "choose a model, key or graph that suits the data"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-data-representation--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.13"
+    ],
+    "ministry": "Construct and use a range of methods to represent patterns or relationships in data, including tables, graphs, keys, models, and digital technologies as appropriate",
+    "bands": {
+     "all": {
+      "phrase": "show patterns in data using tables, graphs, keys, models and digital tools",
+      "next_steps": {
+       "emerging": "put data into a table with labelled columns",
+       "developing": "make a graph with a title, labelled axes and units",
+       "proficient": "choose the type of graph or model that suits the data",
+       "extending": "use a key or model to show how parts of the data are related"
+      },
+      "strength": [
+       "{He} [builds|build] tables with labelled columns and units for {his} data.",
+       "{He} [makes|make] graphs that make the pattern in {his} results easy to see."
+      ],
+      "next": {
+       "developing": "A good next step is to decide whether a bar graph or a line graph fits the data.",
+       "proficient": "{He} [is|are] ready to add a key or legend so a reader can follow each part of a graph.",
+       "extending": "To go further, {he} can practise showing the same data in two ways and explaining which works more clearly."
+      },
+      "home": "At home, ask {him} how {he} would show a week of temperatures on a graph, and why."
+     }
+    }
+   }
+  ]
+ },
+ "sci-drawing-conclusions": {
+  "old": {
+   "phrase": "draw conclusions that fit the evidence",
+   "next_steps": {
+    "emerging": "state what the results of an investigation show",
+    "developing": "draw a conclusion that matches the evidence",
+    "proficient": "use science concepts to explain why a conclusion fits"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-drawing-conclusions--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.15"
+    ],
+    "ministry": "Use scientific understandings to identify relationships and draw conclusions",
+    "bands": {
+     "all": {
+      "phrase": "use science ideas to find relationships and draw conclusions",
+      "next_steps": {
+       "emerging": "state what the results of an investigation show",
+       "developing": "name a relationship between two things in the results",
+       "proficient": "use a science idea to explain a conclusion",
+       "extending": "explain how a conclusion connects to a bigger science idea"
+      },
+      "strength": [
+       "{He} [states|state] what {his} results show in a clear sentence.",
+       "{He} [connects|connect] {his} results to science ideas {he} [has|have] learned in class."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise naming the relationship between two things that changed in the results.",
+       "proficient": "{His} next step is to explain {his} conclusion using a science idea {he} [has|have] learned.",
+       "extending": "It would help {him} to link {his} conclusion to a bigger idea {he} learned in science."
+      },
+      "home": "At home, ask {him} what clues tell {him} that a plant needs water."
+     }
+    }
+   },
+   {
+    "id": "sci-drawing-conclusions--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.12",
+     "bc.sci10.cc.12",
+     "bc.chem11.cc.12",
+     "bc.earth11.cc.12",
+     "bc.envsci11.cc.12",
+     "bc.ls11sci.cc.12",
+     "bc.phys11.cc.12",
+     "bc.sfc11.cc.12",
+     "bc.anat12.cc.12",
+     "bc.chem12.cc.12",
+     "bc.envsci12.cc.12",
+     "bc.geo12.cc.12",
+     "bc.phys12.cc.12",
+     "bc.spsci12.cc.12"
+    ],
+    "ministry": "Use knowledge of scientific concepts to draw conclusions that are consistent with evidence",
+    "bands": {
+     "8-9": {
+      "phrase": "draw conclusions that match the evidence, using science ideas",
+      "next_steps": {
+       "emerging": "say what the evidence shows before drawing a conclusion",
+       "developing": "check that a conclusion matches every piece of evidence",
+       "proficient": "explain a conclusion using a science idea",
+       "extending": "explain which evidence would change the conclusion"
+      },
+      "strength": [
+       "{He} [draws|draw] conclusions that match the evidence {he} collected.",
+       "{He} [uses|use] what {he} [knows|know] about science to explain why {his} conclusion makes sense."
+      ],
+      "next": {
+       "developing": "One thing to practise is checking each conclusion against all of the evidence, not just part.",
+       "proficient": "A next step for {him} is to name the science idea that explains {his} result.",
+       "extending": "{He} could now ask what new evidence would make {him} change {his} conclusion."
+      },
+      "home": "At home, ask {him} what clues tell you that it rained overnight."
+     },
+     "10-12": {
+      "phrase": "draw conclusions that are supported by the evidence and by scientific concepts",
+      "next_steps": {
+       "emerging": "state a conclusion that the evidence supports",
+       "developing": "explain a conclusion using the relevant scientific concept",
+       "proficient": "make a habit of stating the limits of a conclusion",
+       "extending": "weigh competing conclusions and explain which the evidence supports more"
+      },
+      "strength": [
+       "{He} [writes|write] conclusions that the data can support, without claiming more.",
+       "{He} [explains|explain] results with the scientific concept that accounts for them."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise citing specific data in every conclusion.",
+       "proficient": "{He} [is|are] ready to state how sure {he} can be of a conclusion, and why.",
+       "extending": "To go further, {he} can practise weighing two possible conclusions against the same evidence."
+      },
+      "home": "At home, ask {him} how sure {he} [is|are] about a claim in the news, and what would change {his} mind."
+     }
+    }
+   }
+  ]
+ },
+ "sci-evidence": {
+  "old": {
+   "phrase": "use evidence to support science ideas",
+   "next_steps": {
+    "emerging": "sort evidence into measured and observed types",
+    "developing": "use evidence to support a science idea",
+    "proficient": "explain why evidence matters in reaching a science conclusion"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-evidence--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.19"
+    ],
+    "ministry": "Demonstrate an understanding and appreciation of evidence (qualitative and quantitative)",
+    "bands": {
+     "all": {
+      "phrase": "understand and value evidence, both measured and described in words",
+      "next_steps": {
+       "emerging": "sort evidence into numbers and descriptions",
+       "developing": "use both kinds of evidence to support an idea",
+       "proficient": "explain why science ideas need evidence",
+       "extending": "judge which evidence gives the most support for an idea"
+      },
+      "strength": [
+       "{He} [sorts|sort] evidence into what was measured and what was described in words.",
+       "{He} [uses|use] evidence to support {his} ideas instead of just giving an opinion."
+      ],
+      "next": {
+       "developing": "{His} goal now is to use both numbers and descriptions to support one idea.",
+       "proficient": "Next, {he} can practise explaining why a scientist would want evidence before believing a claim.",
+       "extending": "From here, {he} can judge which piece of evidence gives the most support for an idea."
+      },
+      "home": "At home, ask {him} how {he} would show that a plant needs light."
+     }
+    }
+   }
+  ]
+ },
+ "sci-finding-solutions": {
+  "old": {
+   "phrase": "use inquiry to help solve local or global problems",
+   "next_steps": {
+    "emerging": "describe a local or global problem that needs a solution",
+    "developing": "use inquiry findings to suggest a solution to a problem",
+    "proficient": "explain how inquiry findings support a proposed solution"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-finding-solutions--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.26",
+     "bc.sci10.cc.26",
+     "bc.chem11.cc.26",
+     "bc.earth11.cc.26",
+     "bc.envsci11.cc.26",
+     "bc.ls11sci.cc.26",
+     "bc.phys11.cc.26",
+     "bc.sfc11.cc.26",
+     "bc.anat12.cc.26",
+     "bc.chem12.cc.26",
+     "bc.envsci12.cc.26",
+     "bc.geo12.cc.26",
+     "bc.phys12.cc.26",
+     "bc.spsci12.cc.26"
+    ],
+    "ministry": "Contribute to finding solutions to problems at a local and/or global level through inquiry",
+    "bands": {
+     "8-9": {
+      "phrase": "use inquiry to help find solutions to local or global problems",
+      "next_steps": {
+       "emerging": "describe a local or global problem that needs a solution",
+       "developing": "use inquiry findings to suggest a solution",
+       "proficient": "explain how the findings support a suggested solution",
+       "extending": "compare two solutions and say which the findings support more"
+      },
+      "strength": [
+       "{He} [describes|describe] a problem in {his} community that science could help solve.",
+       "{He} [uses|use] what {his} inquiry showed to suggest a way to solve a problem."
+      ],
+      "next": {
+       "developing": "{He} [is|are] ready to connect each part of a solution to something {his} inquiry found.",
+       "proficient": "It would help {him} to ask who a solution helps and who it leaves out.",
+       "extending": "From here, {he} can practise testing whether a suggested solution would work at a larger scale."
+      },
+      "home": "At home, ask {him} what problem in your area {he} would most like science to help solve."
+     },
+     "10-12": {
+      "phrase": "contribute to solving local or global problems through inquiry",
+      "next_steps": {
+       "emerging": "define a local or global problem in terms inquiry can address",
+       "developing": "link inquiry findings to a specific, workable solution",
+       "proficient": "practise weighing the trade-offs of a proposed solution",
+       "extending": "evaluate how a solution would work locally and at a global scale"
+      },
+      "strength": [
+       "{He} [defines|define] a problem clearly enough that an inquiry can address it.",
+       "{He} [links|link] {his} findings to a workable solution and [explains|explain] the connection."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to name the evidence each part of a solution depends on.",
+       "proficient": "One thing to practise is weighing costs and benefits before recommending a solution.",
+       "extending": "{His} next step is to judge how a local solution might change at a global scale."
+      },
+      "home": "At home, talk with {him} about a problem in your community and what evidence would help fix it."
+     }
+    }
+   }
+  ]
+ },
+ "sci-graphs-models": {
+  "old": {
+   "phrase": "make and interpret graphs, models and diagrams",
+   "next_steps": {
+    "emerging": "make a labelled graph, model or diagram",
+    "developing": "describe how the parts of a graph or model relate",
+    "proficient": "explain what a graph or model shows and why"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-graphs-models--science-9-10",
+    "courses": [
+     "Science 9",
+     "Science 10"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.11",
+     "bc.sci10.cc.11"
+    ],
+    "ministry": "Construct, analyze and interpret graphs (including interpolation and extrapolation), models and/or diagrams / Construct, analyze, and interpret graphs (including interpolation and extrapolation), models, and/or diagrams",
+    "bands": {
+     "8-9": {
+      "phrase": "make and read graphs, models and diagrams, and estimate values from a graph",
+      "next_steps": {
+       "emerging": "make a graph with labelled axes and a title",
+       "developing": "describe how the parts of a graph or diagram relate",
+       "proficient": "estimate a value between two data points on a graph",
+       "extending": "extend a trend line to predict a value beyond the data"
+      },
+      "strength": [
+       "{He} [makes|make] graphs and diagrams with clear labels and a title.",
+       "{He} [reads|read] values from a graph, including points between the measured ones."
+      ],
+      "next": {
+       "developing": "{He} could try explaining what a graph shows in one or two sentences.",
+       "proficient": "To go further, {he} can practise extending a line on a graph to predict a new value.",
+       "extending": "A next step for {him} is to explain when a prediction from a graph might be wrong."
+      },
+      "home": "At home, look at a weather chart together and ask {him} what it shows."
+     },
+     "10-12": {
+      "phrase": "construct, analyze and interpret graphs, models and diagrams, including interpolation and extrapolation",
+      "next_steps": {
+       "emerging": "practise choosing a scale that fits all the data on a graph",
+       "developing": "analyze how the parts of a model or diagram relate to each other",
+       "proficient": "interpolate and extrapolate values and say how far they can be trusted",
+       "extending": "judge when extrapolation beyond the data is no longer justified"
+      },
+      "strength": [
+       "{He} [interpolates|interpolate] values from a graph and [explains|explain] how {he} found them.",
+       "{He} [interprets|interpret] a model or diagram by explaining what each part stands for."
+      ],
+      "next": {
+       "developing": "{His} next step is to choose scales and axes that make a trend easy to analyze.",
+       "proficient": "A good next step is to state how far an extrapolated value can be trusted.",
+       "extending": "{He} [is|are] ready to choose between a graph, a model and a diagram, and explain which shows an idea best."
+      },
+      "home": "At home, ask {him} what a graph in the news is trying to show, and whether it is fair."
+     }
+    }
+   },
+   {
+    "id": "sci-graphs-models--senior-sciences",
+    "courses": [
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.chem11.cc.11",
+     "bc.earth11.cc.11",
+     "bc.envsci11.cc.11",
+     "bc.ls11sci.cc.11",
+     "bc.phys11.cc.11",
+     "bc.sfc11.cc.11",
+     "bc.anat12.cc.11",
+     "bc.chem12.cc.11",
+     "bc.envsci12.cc.11",
+     "bc.geo12.cc.11",
+     "bc.phys12.cc.11",
+     "bc.spsci12.cc.11"
+    ],
+    "ministry": "Construct, analyze, and interpret graphs, models, and/or diagrams / Construct, analyze, and interpret graphs, models, and diagrams",
+    "bands": {
+     "all": {
+      "phrase": "construct, analyze and interpret graphs, models and diagrams to explain scientific ideas",
+      "next_steps": {
+       "emerging": "construct a graph or diagram with correct labels, units and scale",
+       "developing": "analyze how the variables or parts in a model relate",
+       "proficient": "make a habit of explaining what a graph's slope or shape means",
+       "extending": "interpret complex graphs or models and explain what they leave out"
+      },
+      "strength": [
+       "{He} [constructs|construct] graphs and diagrams with correct scales, units and labels.",
+       "{He} [explains|explain] what the slope or shape of a graph means in scientific terms."
+      ],
+      "next": {
+       "developing": "One thing to practise is describing how each part of a model affects the others.",
+       "proficient": "It would help {him} to explain what a graph does not show as well as what it does.",
+       "extending": "From here, {he} can interpret graphs with more than one variable and explain the connections."
+      },
+      "home": "At home, ask {him} to explain what a chart or diagram in the news shows."
+     }
+    }
+   }
+  ]
+ },
+ "sci-hypotheses": {
+  "old": {
+   "phrase": "suggest more than one hypothesis and possible outcome",
+   "next_steps": {
+    "emerging": "make one hypothesis for a science question",
+    "developing": "form more than one hypothesis for a question",
+    "proficient": "explain the reasoning behind each hypothesis and outcome"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-hypotheses--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.4"
+    ],
+    "ministry": "Formulate alternative “If…then…” hypotheses based on their questions",
+    "bands": {
+     "all": {
+      "phrase": "form different “If…then…” hypotheses based on a question",
+      "next_steps": {
+       "emerging": "write one hypothesis in “If…then…” form",
+       "developing": "write a second hypothesis that gives a different answer",
+       "proficient": "explain the reasoning behind each hypothesis",
+       "extending": "plan a test that could show which hypothesis fits the results"
+      },
+      "strength": [
+       "{He} [writes|write] hypotheses in “If…then…” form that link to {his} question.",
+       "{He} [thinks|think] of more than one possible answer before testing."
+      ],
+      "next": {
+       "developing": "{His} goal now is to write a second hypothesis that gives a different possible answer.",
+       "proficient": "{He} [is|are] ready to give a reason for each hypothesis {he} [writes|write].",
+       "extending": "To go further, {he} can plan a test that would show which hypothesis fits the results."
+      },
+      "home": "At home, ask {him} to give two possible reasons why a houseplant is drooping."
+     }
+    }
+   },
+   {
+    "id": "sci-hypotheses--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.3",
+     "bc.sci10.cc.3",
+     "bc.chem11.cc.3",
+     "bc.earth11.cc.3",
+     "bc.envsci11.cc.3",
+     "bc.ls11sci.cc.3",
+     "bc.phys11.cc.3",
+     "bc.sfc11.cc.3",
+     "bc.anat12.cc.3",
+     "bc.chem12.cc.3",
+     "bc.envsci12.cc.3",
+     "bc.geo12.cc.3",
+     "bc.phys12.cc.3",
+     "bc.spsci12.cc.3"
+    ],
+    "ministry": "Formulate multiple hypotheses and predict multiple outcomes",
+    "bands": {
+     "8-9": {
+      "phrase": "form more than one hypothesis and predict more than one outcome",
+      "next_steps": {
+       "emerging": "write a hypothesis that answers the question",
+       "developing": "form a second hypothesis that explains things differently",
+       "proficient": "predict the outcome each hypothesis would lead to",
+       "extending": "explain which result would support each hypothesis"
+      },
+      "strength": [
+       "{He} [forms|form] more than one hypothesis for the same question.",
+       "{He} [predicts|predict] what would happen if each hypothesis were true."
+      ],
+      "next": {
+       "developing": "Next, {he} can try predicting a different outcome for each hypothesis.",
+       "proficient": "A next step for {him} is to explain the science reasoning behind each prediction.",
+       "extending": "One thing to practise is naming the result that would rule out a hypothesis."
+      },
+      "home": "At home, ask {him} to predict two different things that could happen to a puddle by evening."
+     },
+     "10-12": {
+      "phrase": "formulate multiple hypotheses and predict the outcomes each one would produce",
+      "next_steps": {
+       "emerging": "state a testable hypothesis linked to the question",
+       "developing": "formulate competing hypotheses that rest on different explanations",
+       "proficient": "practise predicting the measurable outcome each hypothesis implies",
+       "extending": "design a test whose results would separate competing hypotheses"
+      },
+      "strength": [
+       "{He} [formulates|formulate] competing hypotheses based on different scientific explanations.",
+       "{He} [predicts|predict] measurable outcomes that would follow if each hypothesis held."
+      ],
+      "next": {
+       "developing": "It would help {him} to make each hypothesis testable with a measurable outcome.",
+       "proficient": "{His} next step is to explain the scientific reasoning that supports each hypothesis.",
+       "extending": "{He} could now design a test whose results would favour one hypothesis over another."
+      },
+      "home": "At home, ask {him} to suggest two explanations for something odd you both noticed this week."
+     }
+    }
+   }
+  ]
+ },
+ "sci-idea-generation": {
+  "old": {
+   "phrase": "suggest new ideas when solving a problem",
+   "next_steps": {
+    "emerging": "share one idea to help solve a problem",
+    "developing": "suggest a new idea when solving a problem",
+    "proficient": "refine an idea to improve a solution"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-idea-generation--science-8-10",
+    "courses": [
+     "Science 8",
+     "Science 9",
+     "Science 10"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.25",
+     "bc.sci9.cc.25",
+     "bc.sci10.cc.25"
+    ],
+    "ministry": "Generate and introduce new or refined ideas when problem solving",
+    "bands": {
+     "8-9": {
+      "phrase": "suggest new or improved ideas when solving a problem",
+      "next_steps": {
+       "emerging": "share one idea when a group is solving a problem",
+       "developing": "suggest a new idea when the first plan does not work",
+       "proficient": "improve an idea by changing one part of it",
+       "extending": "explain how a new idea makes a solution work more smoothly"
+      },
+      "strength": [
+       "{He} [offers|offer] new ideas when a group is stuck on a problem.",
+       "{He} [improves|improve] an idea by changing one part and testing the result."
+      ],
+      "next": {
+       "developing": "{His} next step is to suggest a second idea when the first one does not work.",
+       "proficient": "Next, {he} can try asking which part of an idea could be changed to improve it.",
+       "extending": "It would help {him} to explain how {his} change made a solution work more smoothly."
+      },
+      "home": "At home, ask {him} how {he} would fix a small problem in the house, like a squeaky door."
+     },
+     "10-12": {
+      "phrase": "generate and introduce new or refined ideas when solving a problem",
+      "next_steps": {
+       "emerging": "practise putting forward an idea during group problem solving",
+       "developing": "refine an idea using evidence from a test",
+       "proficient": "introduce an idea with a clear reason it could improve the solution",
+       "extending": "generate several approaches and refine the most promising one"
+      },
+      "strength": [
+       "{He} [generates|generate] several possible approaches before choosing one to test.",
+       "{He} [refines|refine] ideas using what the results of a test showed."
+      ],
+      "next": {
+       "developing": "One thing to practise is explaining the reason behind each idea {he} [introduces|introduce].",
+       "proficient": "A good next step is to refine an idea with evidence before suggesting it to the group.",
+       "extending": "To go further, {he} can practise building an idea from parts of other people's suggestions."
+      },
+      "home": "At home, ask {him} how {he} would improve a daily routine, such as the morning before school."
+     }
+    }
+   }
+  ]
+ },
+ "sci-implications": {
+  "old": {
+   "phrase": "explain how findings affect people and the environment",
+   "next_steps": {
+    "emerging": "describe how a finding could affect the environment",
+    "developing": "explain how findings could affect society",
+    "proficient": "identify ethical questions raised by a set of findings"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-implications--all-sciences",
+    "courses": [
+     "Science 8",
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.21",
+     "bc.sci9.cc.21",
+     "bc.sci10.cc.21",
+     "bc.chem11.cc.21",
+     "bc.earth11.cc.21",
+     "bc.envsci11.cc.21",
+     "bc.ls11sci.cc.21",
+     "bc.phys11.cc.21",
+     "bc.sfc11.cc.21",
+     "bc.anat12.cc.21",
+     "bc.chem12.cc.21",
+     "bc.envsci12.cc.21",
+     "bc.geo12.cc.21",
+     "bc.phys12.cc.21",
+     "bc.spsci12.cc.21"
+    ],
+    "ministry": "Consider social, ethical, and environmental implications of the findings from their own and others’ investigations",
+    "bands": {
+     "8-9": {
+      "phrase": "think about how findings could affect people, fairness and the environment",
+      "next_steps": {
+       "emerging": "describe how a finding could affect the environment",
+       "developing": "explain how a finding could affect people's lives",
+       "proficient": "ask whether using a finding would be fair to everyone",
+       "extending": "explain how one finding could help some people and harm others"
+      },
+      "strength": [
+       "{He} [explains|explain] how the results of an investigation could affect plants, animals or land.",
+       "{He} [asks|ask] whether using a science finding would be fair to everyone involved."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to describe how a finding could change people's daily lives.",
+       "proficient": "{He} [is|are] ready to ask who might be harmed if a finding were used.",
+       "extending": "{He} could try weighing the good and the harm a finding could cause."
+      },
+      "home": "When science is in the news, ask {him} who the discovery could help or harm."
+     },
+     "10-12": {
+      "phrase": "consider the social, ethical and environmental implications of investigation findings",
+      "next_steps": {
+       "emerging": "identify an environmental implication of a set of findings",
+       "developing": "explain the social implications of findings for different groups",
+       "proficient": "identify the ethical questions that findings from others' investigations raise",
+       "extending": "practise weighing social, ethical and environmental implications against each other"
+      },
+      "strength": [
+       "{He} [identifies|identify] the ethical questions that findings raise, such as who decides how they are used.",
+       "{He} [considers|consider] how findings from others' investigations could affect communities and ecosystems."
+      ],
+      "next": {
+       "developing": "{His} goal now is to explain how one set of findings could affect different groups differently.",
+       "proficient": "From here, {he} can practise weighing environmental costs against social benefits.",
+       "extending": "To go further, {he} can judge which implication should matter most and defend that choice."
+      },
+      "home": "At home, ask {him} how a new discovery in the news could affect people and the environment."
+     }
+    }
+   }
+  ]
+ },
+ "sci-informed-skepticism": {
+  "old": {
+   "phrase": "check claims in sources against scientific evidence",
+   "next_steps": {
+    "emerging": "ask for evidence before accepting a science claim",
+    "developing": "evaluate a claim in a source using science knowledge",
+    "proficient": "plan a simple investigation to test a claim"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-informed-skepticism--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.20"
+    ],
+    "ministry": "Exercise a healthy, informed skepticism and use scientific knowledge and findings from their own investigations to evaluate claims in secondary sources",
+    "bands": {
+     "all": {
+      "phrase": "use science knowledge and personal findings to question claims in sources",
+      "next_steps": {
+       "emerging": "ask what evidence supports a claim before accepting it",
+       "developing": "check a claim in a source against what is known in science",
+       "proficient": "use investigation results to test a claim in a source",
+       "extending": "explain why a claim should or should not be trusted"
+      },
+      "strength": [
+       "{He} [asks|ask] what evidence supports a claim before {he} [accepts|accept] it.",
+       "{He} [uses|use] results from {his} own investigations to judge claims {he} [reads|read] or [hears|hear]."
+      ],
+      "next": {
+       "developing": "{He} could try checking claims in ads or on websites against what science shows.",
+       "proficient": "{His} next step is to explain which part of a claim {he} [doubts|doubt], and why.",
+       "extending": "A good next step is to design a simple test of a claim {he} [has|have] seen."
+      },
+      "home": "When a product promises a big result, ask {him} what proof would convince {him}."
+     }
+    }
+   },
+   {
+    "id": "sci-informed-skepticism--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.20",
+     "bc.sci10.cc.20",
+     "bc.chem11.cc.20",
+     "bc.earth11.cc.20",
+     "bc.envsci11.cc.20",
+     "bc.ls11sci.cc.20",
+     "bc.phys11.cc.20",
+     "bc.sfc11.cc.20",
+     "bc.anat12.cc.20",
+     "bc.chem12.cc.20",
+     "bc.envsci12.cc.20",
+     "bc.geo12.cc.20",
+     "bc.phys12.cc.20",
+     "bc.spsci12.cc.20"
+    ],
+    "ministry": "Exercise a healthy, informed skepticism, and use scientific knowledge and findings to form their own investigations and to evaluate claims in secondary sources / Exercise a healthy, informed skepticism and use scientific knowledge and findings to form their own investigations and to evaluate claims in secondary sources / Exercise a healthy, informed skepticism and use scientific knowledge and findings to form their own investigations to evaluate claims in primary and secondary sources / Exercise a healthy, informed skepticism, and use scientific knowledge and findings to form their own investigations to evaluate claims in primary and secondary sources",
+    "bands": {
+     "8-9": {
+      "phrase": "question claims in sources and plan investigations to test them",
+      "next_steps": {
+       "emerging": "ask what evidence a claim is based on",
+       "developing": "use science knowledge to judge a claim in a source",
+       "proficient": "plan an investigation that could test a claim",
+       "extending": "explain whether test results support or weaken a claim"
+      },
+      "strength": [
+       "{He} [questions|question] claims in sources and [asks|ask] what evidence supports them.",
+       "{He} [plans|plan] a simple investigation to test whether a claim holds."
+      ],
+      "next": {
+       "developing": "One thing to practise is using science knowledge to explain why a claim seems doubtful.",
+       "proficient": "It would help {him} to plan a fair test for a claim {he} [finds|find] in a source.",
+       "extending": "To go further, {he} can practise explaining what {his} test results mean for the claim."
+      },
+      "home": "At home, ask {him} how {he} would test a claim printed on a cereal box."
+     },
+     "10-12": {
+      "phrase": "apply informed skepticism to claims in primary and secondary sources, using investigation",
+      "next_steps": {
+       "emerging": "practise asking how a claim in a source was tested",
+       "developing": "evaluate a claim using scientific knowledge and published findings",
+       "proficient": "design an investigation that could challenge a claim in a source",
+       "extending": "judge how far a claim's evidence justifies its conclusion"
+      },
+      "strength": [
+       "{He} [evaluates|evaluate] claims in primary and secondary sources against scientific knowledge.",
+       "{He} [designs|design] investigations to test claims rather than accepting them on trust."
+      ],
+      "next": {
+       "developing": "Next, {he} can compare how a claim is reported with what the primary source found.",
+       "proficient": "{He} [is|are] ready to design a test that could prove a claim wrong.",
+       "extending": "From here, {he} can weigh how much the evidence supports a claim before forming a view."
+      },
+      "home": "At home, ask {him} which online health claim {he} would trust least, and why."
+     }
+    }
+   }
+  ]
+ },
+ "sci-inquiry-questions": {
+  "old": {
+   "phrase": "pick a question science can answer",
+   "next_steps": {
+    "emerging": "describe a problem science could help solve",
+    "developing": "write a clear question to answer by investigation",
+    "proficient": "choose a question that a fair test can answer"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-inquiry-questions--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.3"
+    ],
+    "ministry": "Identify a question to answer or a problem to solve through scientific inquiry",
+    "bands": {
+     "all": {
+      "phrase": "identify a question to answer or a problem to solve through scientific inquiry",
+      "next_steps": {
+       "emerging": "describe a problem science could help solve",
+       "developing": "write a question that an investigation can answer",
+       "proficient": "narrow a broad question into one that can be tested",
+       "extending": "explain why a question can or cannot be answered by science"
+      },
+      "strength": [
+       "{He} [asks|ask] questions that an investigation in class could answer.",
+       "{He} [describes|describe] everyday problems that science could help solve."
+      ],
+      "next": {
+       "developing": "{His} next step is to change a broad question so it can be tested.",
+       "proficient": "Next, {he} can practise naming what {he} would measure to answer {his} question.",
+       "extending": "A good next step is to explain why some questions cannot be answered by science."
+      },
+      "home": "At home, ask {him} what {he} [wonders|wonder] about something {he} [sees|see] every day."
+     }
+    }
+   }
+  ]
+ },
+ "sci-investigation-plans": {
+  "old": {
+   "phrase": "plan an investigation that collects reliable data",
+   "next_steps": {
+    "emerging": "follow a planned method to collect data",
+    "developing": "choose a lab or field method that suits the question",
+    "proficient": "plan methods that collect both measured and observed data reliably"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-investigation-plans--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.6"
+    ],
+    "ministry": "Collaboratively plan a range of investigation types, including field work and experiments, to answer their questions or solve problems they have identified",
+    "bands": {
+     "all": {
+      "phrase": "plan different kinds of investigations, such as field work and experiments, with others",
+      "next_steps": {
+       "emerging": "follow a group plan to help with an investigation",
+       "developing": "suggest steps for a group investigation plan",
+       "proficient": "choose whether field work or an experiment suits a question",
+       "extending": "plan an investigation from start to finish with a group"
+      },
+      "strength": [
+       "{He} [helps|help] {his} group plan the steps of an investigation.",
+       "{He} [chooses|choose] between field work and an experiment depending on the question."
+      ],
+      "next": {
+       "developing": "{He} [is|are] ready to suggest a step that the group's plan is missing.",
+       "proficient": "A next step for {him} is to explain why field work or an experiment suits a question.",
+       "extending": "Next, {he} can practise planning an investigation that answers a question {he} chose."
+      },
+      "home": "At home, ask {him} how {he} would plan a test to see which window gets the most sun."
+     }
+    }
+   },
+   {
+    "id": "sci-investigation-plans--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.4",
+     "bc.sci10.cc.4",
+     "bc.chem11.cc.4",
+     "bc.earth11.cc.4",
+     "bc.envsci11.cc.4",
+     "bc.ls11sci.cc.4",
+     "bc.phys11.cc.4",
+     "bc.sfc11.cc.4",
+     "bc.anat12.cc.4",
+     "bc.chem12.cc.4",
+     "bc.envsci12.cc.4",
+     "bc.geo12.cc.4",
+     "bc.phys12.cc.4",
+     "bc.spsci12.cc.4"
+    ],
+    "ministry": "Collaboratively and individually plan, select, and use appropriate investigation methods, including field work and lab experiments, to collect reliable data (qualitative and quantitative)",
+    "bands": {
+     "8-9": {
+      "phrase": "plan and choose investigation methods, alone or with others, to collect reliable data",
+      "next_steps": {
+       "emerging": "follow a planned method step by step",
+       "developing": "choose a lab or field method that suits the question",
+       "proficient": "plan how to collect both numbers and observations",
+       "extending": "plan a method that others could repeat and get similar results"
+      },
+      "strength": [
+       "{He} [chooses|choose] a lab or field method that fits the question being asked.",
+       "{He} [plans|plan] to collect both measurements and written observations."
+      ],
+      "next": {
+       "developing": "{His} goal now is to list materials, steps and measurements in every plan {he} [writes|write].",
+       "proficient": "{He} could try planning repeated trials so {his} data can be trusted.",
+       "extending": "To go further, {he} can try planning an investigation on {his} own from start to finish."
+      },
+      "home": "At home, ask {him} how {he} would test which paper towel soaks up the most water."
+     },
+     "10-12": {
+      "phrase": "plan, select and use field and lab methods to collect reliable data",
+      "next_steps": {
+       "emerging": "use a planned method to collect qualitative and quantitative data",
+       "developing": "select methods that collect reliable data for a specific question",
+       "proficient": "practise planning controls and repeated trials into a method",
+       "extending": "justify the choice of method against other possible methods"
+      },
+      "strength": [
+       "{He} [selects|select] methods that produce reliable data, both qualitative and quantitative.",
+       "{He} [plans|plan] investigations on {his} own and with others, sharing the work fairly."
+      ],
+      "next": {
+       "developing": "It would help {him} to explain why {his} method gives reliable data.",
+       "proficient": "One thing to practise is building controls and repeated trials into every plan.",
+       "extending": "{He} could now justify {his} method by explaining why other methods would work less well."
+      },
+      "home": "At home, ask {him} how {he} would plan a fair test of two brands of something your family uses."
+     }
+    }
+   }
+  ]
+ },
+ "sci-local-environment": {
+  "old": {
+   "phrase": "explore and explain the local environment",
+   "next_steps": {
+    "emerging": "describe what is noticed outdoors in the local area",
+    "developing": "explain an observation from the local environment",
+    "proficient": "connect observations of the local environment to science ideas"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-local-environment--local-environment",
+    "courses": [
+     "Science 8",
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.11",
+     "bc.sci9.cc.8",
+     "bc.sci10.cc.8",
+     "bc.chem11.cc.8",
+     "bc.earth11.cc.8",
+     "bc.envsci11.cc.8",
+     "bc.ls11sci.cc.8",
+     "bc.phys11.cc.8",
+     "bc.anat12.cc.8",
+     "bc.chem12.cc.8",
+     "bc.envsci12.cc.8",
+     "bc.geo12.cc.8",
+     "bc.phys12.cc.8",
+     "bc.spsci12.cc.8"
+    ],
+    "ministry": "Experience and interpret the local environment",
+    "bands": {
+     "8-9": {
+      "phrase": "explore the local environment first-hand and explain what is noticed",
+      "next_steps": {
+       "emerging": "describe what is noticed outdoors in the local area",
+       "developing": "explain one thing observed in the local environment",
+       "proficient": "connect an outdoor observation to a science idea",
+       "extending": "notice changes in a local place over time and explain them"
+      },
+      "strength": [
+       "{He} [describes|describe] what {he} [notices|notice] when exploring outdoors in the local area.",
+       "{He} [explains|explain] an outdoor observation using a science idea."
+      ],
+      "next": {
+       "developing": "{He} could try asking a question about something {he} [notices|notice] outdoors.",
+       "proficient": "One thing to practise is returning to the same place to see what has changed.",
+       "extending": "To go further, {he} can practise explaining why a local place changes with the seasons."
+      },
+      "home": "On a walk together, ask {him} what {he} [notices|notice] about the plants, water or sky."
+     },
+     "10-12": {
+      "phrase": "experience the local environment directly and interpret it using scientific ideas",
+      "next_steps": {
+       "emerging": "record first-hand observations of a local place",
+       "developing": "interpret local observations using scientific concepts",
+       "proficient": "make a habit of linking local observations to larger systems",
+       "extending": "interpret how human activity has shaped a local environment over time"
+      },
+      "strength": [
+       "{He} [interprets|interpret] what {he} [observes|observe] in a local place using scientific concepts.",
+       "{He} [connects|connect] what {he} [sees|see] in the local area to larger systems in nature."
+      ],
+      "next": {
+       "developing": "{His} next step is to record observations from a local place in more detail.",
+       "proficient": "{He} [is|are] ready to explain how one local observation fits a larger system.",
+       "extending": "A good next step is to interpret how people have shaped a local place over time."
+      },
+      "home": "On a walk, ask {him} how the area might have looked before houses and roads were here."
+     }
+    }
+   },
+   {
+    "id": "sci-local-environment--science-for-citizens",
+    "courses": [
+     "Science for Citizens 11"
+    ],
+    "competency_ids": [
+     "bc.sfc11.cc.8"
+    ],
+    "ministry": "Use local knowledge to experience and interpret the local environment",
+    "bands": {
+     "all": {
+      "phrase": "use local knowledge to experience and interpret the local environment",
+      "next_steps": {
+       "emerging": "ask people who know an area what they have noticed there",
+       "developing": "combine local knowledge with personal observations of a place",
+       "proficient": "interpret a local environment using both science and local knowledge",
+       "extending": "explain how local knowledge adds to a scientific picture of a place"
+      },
+      "strength": [
+       "{He} [uses|use] what local people know about an area to guide {his} observations.",
+       "{He} [combines|combine] local knowledge with scientific ideas to interpret a place."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise asking local people what changes they have seen over time.",
+       "proficient": "{His} goal now is to show where local knowledge and {his} observations agree.",
+       "extending": "To go further, {he} can explain how local knowledge gives a fuller picture of an area."
+      },
+      "home": "At home, share what you know about how your area has changed, and ask what {he} [notices|notice] now."
+     }
+    }
+   }
+  ]
+ },
+ "sci-method-evaluation": {
+  "old": {
+   "phrase": "judge a method and find possible sources of error",
+   "next_steps": {
+    "emerging": "describe one thing that could have affected the results",
+    "developing": "identify sources of error or uncertainty in a method",
+    "proficient": "suggest other explanations for a set of results"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-method-evaluation--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.14",
+     "bc.sci10.cc.14",
+     "bc.chem11.cc.14",
+     "bc.earth11.cc.14",
+     "bc.envsci11.cc.14",
+     "bc.ls11sci.cc.14",
+     "bc.phys11.cc.14",
+     "bc.sfc11.cc.14",
+     "bc.anat12.cc.14",
+     "bc.chem12.cc.14",
+     "bc.envsci12.cc.14",
+     "bc.geo12.cc.14",
+     "bc.phys12.cc.14",
+     "bc.spsci12.cc.14"
+    ],
+    "ministry": "Evaluate their methods and experimental conditions, including identifying sources of error or uncertainty, confounding variables, and possible alternative explanations and conclusions",
+    "bands": {
+     "8-9": {
+      "phrase": "judge an investigation method and find possible sources of error",
+      "next_steps": {
+       "emerging": "describe one thing that could have affected the results",
+       "developing": "identify sources of error in a method",
+       "proficient": "name a variable that was not controlled",
+       "extending": "suggest another explanation for the results"
+      },
+      "strength": [
+       "{He} [names|name] things in {his} method that could have changed the results.",
+       "{He} [suggests|suggest] other explanations for {his} results before deciding on one."
+      ],
+      "next": {
+       "developing": "A good next step is to name a variable that changed when it should have stayed the same.",
+       "proficient": "{He} could try explaining how a source of error pushed the results up or down.",
+       "extending": "{He} [is|are] ready to suggest a second conclusion that the same results might support."
+      },
+      "home": "At home, ask {him} what could make a recipe turn out differently each time."
+     },
+     "10-12": {
+      "phrase": "evaluate methods and conditions, including error, uncertainty, confounding variables and other explanations",
+      "next_steps": {
+       "emerging": "identify sources of error and uncertainty in a method",
+       "developing": "explain how each source of uncertainty affects the final result",
+       "proficient": "practise identifying confounding variables that could explain a result",
+       "extending": "evaluate alternative explanations and conclusions the data could support"
+      },
+      "strength": [
+       "{He} [identifies|identify] confounding variables that could explain a result another way.",
+       "{He} [describes|describe] the conditions of an investigation that could have shaped {his} results."
+      ],
+      "next": {
+       "developing": "{His} next step is to estimate how much each source of error could shift a result.",
+       "proficient": "It would help {him} to ask what else, besides the variable tested, could explain the results.",
+       "extending": "From here, {he} can weigh alternative conclusions and explain which the evidence supports."
+      },
+      "home": "When a news story reports a link between two things, ask {him} what else could explain it."
+     }
+    }
+   }
+  ]
+ },
+ "sci-method-improvement": {
+  "old": {
+   "phrase": "suggest specific ways to improve a method",
+   "next_steps": {
+    "emerging": "name one part of a method that could be improved",
+    "developing": "describe a specific change that would improve a method",
+    "proficient": "explain how each change would improve the quality of the data"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-method-improvement--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.15",
+     "bc.sci10.cc.15",
+     "bc.chem11.cc.15",
+     "bc.earth11.cc.15",
+     "bc.envsci11.cc.15",
+     "bc.ls11sci.cc.15",
+     "bc.phys11.cc.15",
+     "bc.sfc11.cc.15",
+     "bc.anat12.cc.15",
+     "bc.chem12.cc.15",
+     "bc.envsci12.cc.15",
+     "bc.geo12.cc.15",
+     "bc.phys12.cc.15",
+     "bc.spsci12.cc.15"
+    ],
+    "ministry": "Describe specific ways to improve their investigation methods and the quality of the data / Describe specific ways to improve their investigation methods and the quality of their data",
+    "bands": {
+     "8-9": {
+      "phrase": "suggest specific ways to improve an investigation method and its data",
+      "next_steps": {
+       "emerging": "name one part of a method that could be improved",
+       "developing": "describe a specific change that would improve a method",
+       "proficient": "explain how a change would make the data more trustworthy",
+       "extending": "suggest several changes and rank them by how much they would help"
+      },
+      "strength": [
+       "{He} [suggests|suggest] specific changes to {his} method, such as more trials.",
+       "{He} [names|name] the step in {his} method that caused the most trouble with the data."
+      ],
+      "next": {
+       "developing": "{He} [is|are] ready to replace general suggestions with specific changes to the method.",
+       "proficient": "To go further, {he} can practise explaining how each change would improve the data.",
+       "extending": "One thing to practise is deciding which improvement would help the most."
+      },
+      "home": "At home, ask {him} how {he} would compare two paper airplanes so the result can be trusted."
+     },
+     "10-12": {
+      "phrase": "describe specific changes that would improve an investigation's methods and data",
+      "next_steps": {
+       "emerging": "identify the step in a method that most limits the data",
+       "developing": "describe a specific, practical change to a method",
+       "proficient": "practise explaining how each change would reduce error or uncertainty",
+       "extending": "propose improvements and predict their effect on the data"
+      },
+      "strength": [
+       "{He} [describes|describe] practical changes to a method that would reduce error.",
+       "{He} [links|link] each suggested improvement to the problem in the data it would fix."
+      ],
+      "next": {
+       "developing": "Next, {he} can try naming the step that most limited {his} data.",
+       "proficient": "A next step for {him} is to explain how each change would reduce uncertainty.",
+       "extending": "From here, {he} can predict how much each improvement would change the results."
+      },
+      "home": "At home, ask {him} how {he} would time a walk around the block more exactly."
+     }
+    }
+   }
+  ]
+ },
+ "sci-method-reflection": {
+  "old": {
+   "phrase": "reflect on how well an investigation was done",
+   "next_steps": {
+    "emerging": "describe the steps of an investigation in order",
+    "developing": "check whether the variables were controlled",
+    "proficient": "judge the quality of the data and what affected it"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-method-reflection--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.16"
+    ],
+    "ministry": "Reflect on their investigation methods, including the adequacy of controls on variables (dependent and independent) and the quality of the data collected",
+    "bands": {
+     "all": {
+      "phrase": "reflect on investigation methods, including control of variables and the data collected",
+      "next_steps": {
+       "emerging": "describe the steps of an investigation in order",
+       "developing": "check whether the variables were controlled",
+       "proficient": "judge how trustworthy the data was and why",
+       "extending": "explain what in the method affected the data"
+      },
+      "strength": [
+       "{He} [reflects|reflect] on whether {his} method kept every variable but one the same.",
+       "{He} [judges|judge] whether {his} data can be trusted, and [explains|explain] why."
+      ],
+      "next": {
+       "developing": "{His} next step is to check each variable that should have stayed the same.",
+       "proficient": "It would help {him} to explain how one part of the method affected the data.",
+       "extending": "{He} could now judge whether {he} collected enough data to be sure."
+      },
+      "home": "After a family project, ask {him} what went right and what {he} would change."
+     }
+    }
+   }
+  ]
+ },
+ "sci-method-risks": {
+  "old": {
+   "phrase": "assess the risks and ethics of a planned method",
+   "next_steps": {
+    "emerging": "name the risks of a planned method",
+    "developing": "plan how to reduce the risks of a method",
+    "proficient": "plan how to address ethical or environmental issues a method raises"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-method-risks--science-9-10",
+    "courses": [
+     "Science 9",
+     "Science 10"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.5",
+     "bc.sci10.cc.5"
+    ],
+    "ministry": "Assess risks and address ethical, cultural and/or environmental issues associated with their proposed methods and those of others / Assess risks and address ethical, cultural, and/or environmental issues associated with their proposed methods and those of others",
+    "bands": {
+     "8-9": {
+      "phrase": "assess risks and plan for ethical, cultural and environmental issues in methods",
+      "next_steps": {
+       "emerging": "name the risks of a planned method",
+       "developing": "plan a way to reduce each risk",
+       "proficient": "plan for an ethical, cultural or environmental issue a method raises",
+       "extending": "assess the risks and issues in a method someone else proposes"
+      },
+      "strength": [
+       "{He} [names|name] the safety risks in a method before starting.",
+       "{He} [checks|check] whether a method could harm living things or the land."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise asking what could go wrong at each step of a method.",
+       "proficient": "{His} goal now is to ask whether a method respects people's beliefs and cultures.",
+       "extending": "To go further, {he} can practise assessing the risks in methods that others propose."
+      },
+      "home": "At home, ask {him} what could go wrong in a household task and how to prevent it."
+     },
+     "10-12": {
+      "phrase": "assess risks and address ethical, cultural and environmental issues in proposed methods, including others'",
+      "next_steps": {
+       "emerging": "identify the risks and issues a proposed method raises",
+       "developing": "address each risk with a specific change to the method",
+       "proficient": "practise weighing ethical and cultural concerns when choosing a method",
+       "extending": "review another person's proposed method for risks they missed"
+      },
+      "strength": [
+       "{He} [assesses|assess] the risks in a proposed method and [plans|plan] specific ways to reduce them.",
+       "{He} [considers|consider] cultural and ethical concerns when deciding how to collect data."
+      ],
+      "next": {
+       "developing": "A good next step is to explain how a method could affect the environment, and how to prevent it.",
+       "proficient": "{He} [is|are] ready to review another person's method and suggest safer choices.",
+       "extending": "One thing to practise is weighing a method's benefits against its ethical costs."
+      },
+      "home": "At home, ask {him} how {he} [weighs|weigh] a task's benefits against its risks before starting it."
+     }
+    }
+   },
+   {
+    "id": "sci-method-risks--senior-sciences",
+    "courses": [
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.chem11.cc.5",
+     "bc.earth11.cc.5",
+     "bc.envsci11.cc.5",
+     "bc.ls11sci.cc.5",
+     "bc.phys11.cc.5",
+     "bc.sfc11.cc.5",
+     "bc.anat12.cc.5",
+     "bc.chem12.cc.5",
+     "bc.envsci12.cc.5",
+     "bc.geo12.cc.5",
+     "bc.phys12.cc.5",
+     "bc.spsci12.cc.5"
+    ],
+    "ministry": "Assess risks and address ethical, cultural, and/or environmental issues associated with their proposed methods",
+    "bands": {
+     "all": {
+      "phrase": "assess risks and address ethical, cultural and environmental issues in proposed methods",
+      "next_steps": {
+       "emerging": "practise listing the hazards in a proposed method",
+       "developing": "plan controls that reduce each identified risk",
+       "proficient": "address cultural and ethical issues as part of method design",
+       "extending": "justify a method by showing how its risks and impacts were weighed"
+      },
+      "strength": [
+       "{He} [identifies|identify] hazards in a proposed method and [plans|plan] controls for each one.",
+       "{He} [addresses|address] environmental impacts, such as waste disposal, when planning a method."
+      ],
+      "next": {
+       "developing": "It would help {him} to explain why each control lowers the risk it targets.",
+       "proficient": "{His} next step is to include cultural and ethical issues in every method {he} [proposes|propose].",
+       "extending": "From here, {he} can justify a method by explaining how its risks were weighed."
+      },
+      "home": "At home, ask {him} which hazards {he} would plan for before a household repair, and how."
+     }
+    }
+   }
+  ]
+ },
+ "sci-model-limitations": {
+  "old": {
+   "phrase": "judge how well a model fits what it shows",
+   "next_steps": {
+    "emerging": "describe what a model or analogy represents",
+    "developing": "explain which parts of a model fit the real thing",
+    "proficient": "explain where a model or analogy does not fit, and why"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-model-limitations--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.16",
+     "bc.sci10.cc.16",
+     "bc.chem11.cc.16",
+     "bc.earth11.cc.16",
+     "bc.envsci11.cc.16",
+     "bc.ls11sci.cc.16",
+     "bc.phys11.cc.16",
+     "bc.sfc11.cc.16",
+     "bc.anat12.cc.16",
+     "bc.chem12.cc.16",
+     "bc.envsci12.cc.16",
+     "bc.geo12.cc.16",
+     "bc.phys12.cc.16",
+     "bc.spsci12.cc.16"
+    ],
+    "ministry": "Evaluate the validity and limitations of a model or analogy in relation to the phenomenon modelled",
+    "bands": {
+     "8-9": {
+      "phrase": "judge how well a model or comparison fits the thing it shows",
+      "next_steps": {
+       "emerging": "describe what a model or analogy stands for",
+       "developing": "explain which parts of a model match the real thing",
+       "proficient": "explain where a model does not match the real thing",
+       "extending": "suggest a change that would make a model fit more closely"
+      },
+      "strength": [
+       "{He} [explains|explain] which parts of a model match the real thing it shows.",
+       "{He} [notices|notice] where an analogy stops working and [says|say] why."
+      ],
+      "next": {
+       "developing": "{He} [is|are] ready to name one way a model differs from the real thing.",
+       "proficient": "Next, {he} can explain why scientists use models even when they are not exact.",
+       "extending": "A next step for {him} is to suggest a change that would make a model fit more closely."
+      },
+      "home": "At home, ask {him} how a map is like the real place and how it is different."
+     },
+     "10-12": {
+      "phrase": "evaluate the validity and limitations of a model or analogy for the phenomenon modelled",
+      "next_steps": {
+       "emerging": "identify the features of a phenomenon a model represents",
+       "developing": "explain which parts of a model are valid and why",
+       "proficient": "practise identifying where a model or analogy breaks down",
+       "extending": "evaluate when a model's limitations make another model more useful"
+      },
+      "strength": [
+       "{He} [evaluates|evaluate] which features of a phenomenon a model represents and which it leaves out.",
+       "{He} [explains|explain] the point at which an analogy no longer fits the phenomenon."
+      ],
+      "next": {
+       "developing": "{His} goal now is to explain why the valid parts of a model work.",
+       "proficient": "One thing to practise is describing the conditions under which a model stops giving correct predictions.",
+       "extending": "To go further, {he} can practise choosing between two models for a given purpose."
+      },
+      "home": "At home, ask {him} how a toy car is like a real car, and where the comparison fails."
+     }
+    }
+   }
+  ]
+ },
+ "sci-observation": {
+  "old": {
+   "phrase": "observe the natural world and ask questions about it",
+   "next_steps": {
+    "emerging": "describe what is noticed during an observation",
+    "developing": "turn an observation into a question to investigate",
+    "proficient": "ask questions that go beyond what can be seen"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-observation--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.2"
+    ],
+    "ministry": "Make observations aimed at identifying their own questions about the natural world",
+    "bands": {
+     "all": {
+      "phrase": "observe nature closely to find questions to investigate",
+      "next_steps": {
+       "emerging": "describe what is noticed during an observation",
+       "developing": "ask a question about something observed",
+       "proficient": "use the senses and tools to notice small details",
+       "extending": "choose an observation that leads to a testable question"
+      },
+      "strength": [
+       "{He} [describes|describe] what {he} [sees|see], [hears|hear] and [feels|feel] during an observation.",
+       "{He} [asks|ask] {his} own questions about what {he} [notices|notice] in nature."
+      ],
+      "next": {
+       "developing": "{His} next step is to write a question for each thing {he} [notices|notice].",
+       "proficient": "{He} could try noticing small details that are easy to miss.",
+       "extending": "Next, {he} can sort {his} questions into ones a test could answer and ones it could not."
+      },
+      "home": "On a walk, ask {him} what {he} [wonders|wonder] about something in nature."
+     }
+    }
+   },
+   {
+    "id": "sci-observation--science-9-10",
+    "courses": [
+     "Science 9",
+     "Science 10"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.2",
+     "bc.sci10.cc.2"
+    ],
+    "ministry": "Make observations aimed at identifying their own questions, including increasingly complex ones, about the natural world",
+    "bands": {
+     "8-9": {
+      "phrase": "make observations that lead to new and more complex questions about nature",
+      "next_steps": {
+       "emerging": "practise describing an observation in a few clear sentences",
+       "developing": "ask a question that goes past what is first seen",
+       "proficient": "ask how or why questions about an observation",
+       "extending": "ask questions that connect several observations together"
+      },
+      "strength": [
+       "{He} [asks|ask] how and why questions about what {he} [observes|observe].",
+       "{He} [connects|connect] two observations to ask a more complex question."
+      ],
+      "next": {
+       "developing": "One thing to practise is asking a how or why question instead of a yes or no question.",
+       "proficient": "{He} [is|are] ready to ask questions about what causes the changes {he} [sees|see].",
+       "extending": "A good next step is to ask a question that would need more than one investigation to answer."
+      },
+      "home": "At home, ask {him} what {he} would like to know about how the weather changes."
+     },
+     "10-12": {
+      "phrase": "make observations that raise increasingly complex questions about nature",
+      "next_steps": {
+       "emerging": "record observations in enough detail to raise questions",
+       "developing": "form questions that link an observation to a cause",
+       "proficient": "make a habit of asking questions that involve several variables",
+       "extending": "pose complex questions that could guide an extended investigation"
+      },
+      "strength": [
+       "{He} [records|record] observations in enough detail to raise questions about causes.",
+       "{He} [poses|pose] complex questions that involve more than one variable."
+      ],
+      "next": {
+       "developing": "Next, {he} can try asking what causes each thing {he} [observes|observe].",
+       "proficient": "{His} goal now is to ask questions that involve two or more variables.",
+       "extending": "To go further, {he} can practise writing a question that would guide a longer investigation."
+      },
+      "home": "When you notice something unusual outside, ask {him} what {he} would want to measure."
+     }
+    }
+   },
+   {
+    "id": "sci-observation--senior-sciences",
+    "courses": [
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.chem11.cc.2",
+     "bc.earth11.cc.2",
+     "bc.envsci11.cc.2",
+     "bc.ls11sci.cc.2",
+     "bc.phys11.cc.2",
+     "bc.sfc11.cc.2",
+     "bc.anat12.cc.2",
+     "bc.chem12.cc.2",
+     "bc.envsci12.cc.2",
+     "bc.geo12.cc.2",
+     "bc.phys12.cc.2",
+     "bc.spsci12.cc.2"
+    ],
+    "ministry": "Make observations aimed at identifying their own questions, including increasingly abstract ones, about the natural world",
+    "bands": {
+     "all": {
+      "phrase": "make observations that lead to increasingly abstract questions about nature",
+      "next_steps": {
+       "emerging": "practise recording observations without adding explanations",
+       "developing": "ask questions about processes that cannot be seen directly",
+       "proficient": "form abstract questions that connect observations to theory",
+       "extending": "pose questions that test the limits of a scientific idea"
+      },
+      "strength": [
+       "{He} [asks|ask] questions about processes that cannot be seen directly.",
+       "{He} [notices|notice] small details in an observation that raise new and harder questions."
+      ],
+      "next": {
+       "developing": "It would help {him} to separate what {he} [observes|observe] from what {he} [infers|infer].",
+       "proficient": "A next step for {him} is to link {his} questions to the theory that might answer them.",
+       "extending": "From here, {he} can practise asking questions that test where a scientific idea stops working."
+      },
+      "home": "At home, ask {him} about something in nature that cannot be seen but can be measured."
+     }
+    }
+   }
+  ]
+ },
+ "sci-place-perspectives": {
+  "old": {
+   "phrase": "share and reflect on different views of a place",
+   "next_steps": {
+    "emerging": "describe a personal experience of a place",
+    "developing": "share different points of view about a place",
+    "proficient": "reflect on how different worldviews shape the meaning of a place"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-place-perspectives--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.27"
+    ],
+    "ministry": "Express and reflect on a variety of experiences and perspectives of place",
+    "bands": {
+     "all": {
+      "phrase": "share and reflect on different experiences and views of a place",
+      "next_steps": {
+       "emerging": "describe a personal experience of a place",
+       "developing": "listen to and share different views of a place",
+       "proficient": "reflect on why people see the same place differently",
+       "extending": "explain how a person's experiences shape what a place means to them"
+      },
+      "strength": [
+       "{He} [shares|share] {his} own experiences of a place with care.",
+       "{He} [listens|listen] to how others experience a place and [reflects|reflect] on the differences."
+      ],
+      "next": {
+       "developing": "{He} [is|are] ready to describe how someone else might see a place {he} [knows|know].",
+       "proficient": "Next, {he} can explain why two people might see the same place differently.",
+       "extending": "{His} next step is to reflect on how a place has shaped {his} own thinking."
+      },
+      "home": "At home, share a place that matters to your family and ask what it means to {him}."
+     }
+    }
+   },
+   {
+    "id": "sci-place-perspectives--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.30",
+     "bc.sci10.cc.30",
+     "bc.chem11.cc.31",
+     "bc.earth11.cc.31",
+     "bc.envsci11.cc.31",
+     "bc.ls11sci.cc.31",
+     "bc.phys11.cc.31",
+     "bc.sfc11.cc.31",
+     "bc.anat12.cc.31",
+     "bc.chem12.cc.31",
+     "bc.envsci12.cc.31",
+     "bc.geo12.cc.31",
+     "bc.phys12.cc.31",
+     "bc.spsci12.cc.31"
+    ],
+    "ministry": "Express and reflect on a variety of experiences, perspectives, and worldviews through place",
+    "bands": {
+     "8-9": {
+      "phrase": "share and reflect on experiences, perspectives and worldviews connected to place",
+      "next_steps": {
+       "emerging": "share a personal experience connected to a place",
+       "developing": "describe how another person's worldview shapes their view of a place",
+       "proficient": "reflect on how different worldviews give a place different meanings",
+       "extending": "connect perspectives of a place to how people care for it"
+      },
+      "strength": [
+       "{He} [describes|describe] how a person's worldview can shape the way they see a place.",
+       "{He} [reflects|reflect] on what {his} own connection to a place means to {him}."
+      ],
+      "next": {
+       "developing": "From here, {he} can practise describing a place from a perspective different from {his} own.",
+       "proficient": "One thing to practise is connecting a worldview to how people care for the land.",
+       "extending": "It would help {him} to reflect on how {his} own view of a place has changed."
+      },
+      "home": "At home, tell {him} about a place that was important to you growing up."
+     },
+     "10-12": {
+      "phrase": "express and reflect on varied experiences, perspectives and worldviews through place",
+      "next_steps": {
+       "emerging": "practise expressing a personal connection to a place in words",
+       "developing": "explain how different worldviews shape relationships with the same place",
+       "proficient": "reflect on how science and other worldviews understand a place",
+       "extending": "explain how perspectives of a place affect decisions about its future"
+      },
+      "strength": [
+       "{He} [expresses|express] {his} relationship with a place and the experiences behind it.",
+       "{He} [explains|explain] how different worldviews lead people to value a place in different ways."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to describe how science and another worldview see the same place.",
+       "proficient": "{His} goal now is to explain how worldviews shape decisions about a place's future.",
+       "extending": "To go further, {he} can practise reflecting on how {his} own experiences shape the way {he} [sees|see] a place."
+      },
+      "home": "At home, ask {him} which place in your area {he} would most want to protect, and why."
+     }
+    }
+   }
+  ]
+ },
+ "sci-predictions": {
+  "old": {
+   "phrase": "make a prediction and explain the reason for it",
+   "next_steps": {
+    "emerging": "make a prediction before an investigation starts",
+    "developing": "give a reason for each prediction",
+    "proficient": "explain why a prediction makes sense, using science ideas"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-predictions--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.5"
+    ],
+    "ministry": "Make predictions about the findings of their inquiry",
+    "bands": {
+     "all": {
+      "phrase": "make predictions about what an inquiry will find and explain the reason",
+      "next_steps": {
+       "emerging": "make a prediction before an investigation starts",
+       "developing": "give a reason for each prediction",
+       "proficient": "use a science idea to explain a prediction",
+       "extending": "compare a prediction with the results and explain any difference"
+      },
+      "strength": [
+       "{He} [makes|make] a prediction before starting an investigation.",
+       "{He} [gives|give] a reason for {his} prediction based on what {he} already [knows|know]."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain each prediction with a because statement.",
+       "proficient": "Next, {he} can use a science idea to support {his} prediction.",
+       "extending": "To go further, {he} can practise explaining why a result did not match {his} prediction."
+      },
+      "home": "Before you cook something new, ask {him} to predict how it will turn out, and why."
+     }
+    }
+   }
+  ]
+ },
+ "sci-project-design": {
+  "old": {
+   "phrase": "design a group project with local or global uses",
+   "next_steps": {
+    "emerging": "share an idea while a group plans a project",
+    "developing": "build on others' ideas to design a project together",
+    "proficient": "explain how a project applies to the community or the world"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-project-design--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.23"
+    ],
+    "ministry": "Co-operatively design projects",
+    "bands": {
+     "all": {
+      "phrase": "work with a group to design a science project",
+      "next_steps": {
+       "emerging": "share an idea while a group plans a project",
+       "developing": "add to another person's idea during group planning",
+       "proficient": "help a group agree on a project plan",
+       "extending": "help a group divide the work so everyone has a role"
+      },
+      "strength": [
+       "{He} [shares|share] ideas while {his} group plans a project.",
+       "{He} [adds|add] to other people's ideas to make the group's plan more complete."
+      ],
+      "next": {
+       "developing": "{He} could try adding to another person's idea instead of starting a new one.",
+       "proficient": "Next, {he} can practise listening to every idea before the group chooses one.",
+       "extending": "A good next step is to help the group give everyone a clear role."
+      },
+      "home": "At home, plan a small family project together and ask {him} to suggest the steps."
+     }
+    }
+   },
+   {
+    "id": "sci-project-design--senior-sciences",
+    "courses": [
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.chem11.cc.25",
+     "bc.earth11.cc.25",
+     "bc.envsci11.cc.25",
+     "bc.ls11sci.cc.25",
+     "bc.phys11.cc.25",
+     "bc.sfc11.cc.25",
+     "bc.anat12.cc.25",
+     "bc.chem12.cc.25",
+     "bc.envsci12.cc.25",
+     "bc.geo12.cc.25",
+     "bc.phys12.cc.25",
+     "bc.spsci12.cc.25"
+    ],
+    "ministry": "Cooperatively design projects with local and/or global connections and applications / Co-operatively design projects with local and/or global connections and applications",
+    "bands": {
+     "all": {
+      "phrase": "co-operatively design projects with local and global connections and applications",
+      "next_steps": {
+       "emerging": "contribute ideas to a group project design",
+       "developing": "develop a group's ideas into a workable project plan",
+       "proficient": "connect a project's design to a local or global application",
+       "extending": "lead a group design that answers a community need"
+      },
+      "strength": [
+       "{He} [contributes|contribute] ideas that help a group shape its project design.",
+       "{He} [explains|explain] how {his} group's project connects to a need in the community or the world."
+      ],
+      "next": {
+       "developing": "{His} goal now is to help {his} group shape early ideas into a workable plan.",
+       "proficient": "One thing to practise is linking each project choice to a local or global use.",
+       "extending": "{He} [is|are] ready to guide a group design toward a need in the community."
+      },
+      "home": "At home, ask {him} about a local problem a science project could help with."
+     }
+    }
+   }
+  ]
+ },
+ "sci-risk-assessment": {
+  "old": {
+   "phrase": "assess risks to personal safety and to others",
+   "next_steps": {
+    "emerging": "name the safety risks in a procedure",
+    "developing": "assess how a risk could affect other people",
+    "proficient": "explain the social responsibility involved in a choice about risk"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-risk-assessment--senior-sciences",
+    "courses": [
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.chem11.cc.23",
+     "bc.earth11.cc.23",
+     "bc.envsci11.cc.23",
+     "bc.ls11sci.cc.23",
+     "bc.phys11.cc.23",
+     "bc.sfc11.cc.23",
+     "bc.anat12.cc.23",
+     "bc.chem12.cc.23",
+     "bc.envsci12.cc.23",
+     "bc.geo12.cc.23",
+     "bc.phys12.cc.23",
+     "bc.spsci12.cc.23"
+    ],
+    "ministry": "Assess risks in the context of personal safety and social responsibility",
+    "bands": {
+     "all": {
+      "phrase": "assess risks in terms of personal safety and social responsibility",
+      "next_steps": {
+       "emerging": "name the safety risks in a procedure or situation",
+       "developing": "assess how a risk could affect other people and the community",
+       "proficient": "practise explaining the social responsibility behind a choice about risk",
+       "extending": "weigh personal and community risks when deciding how to act"
+      },
+      "strength": [
+       "{He} [assesses|assess] the risks to {his} own safety before starting a procedure.",
+       "{He} [considers|consider] how {his} choices about risk could affect other people."
+      ],
+      "next": {
+       "developing": "Next, {he} can name who else a risk could affect.",
+       "proficient": "It would help {him} to explain {his} responsibility to others when making a choice about risk.",
+       "extending": "From here, {he} can weigh personal and community risks before deciding on an action."
+      },
+      "home": "At home, talk with {him} about a choice that is safe for one person but risky for others."
+     }
+    }
+   }
+  ]
+ },
+ "sci-role-of-scientists": {
+  "old": {
+   "phrase": "explain the role scientists play in innovation",
+   "next_steps": {
+    "emerging": "name an innovation and the science behind it",
+    "developing": "describe how a scientist's work led to an innovation",
+    "proficient": "explain the role scientists played in several innovations"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-role-of-scientists--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.27",
+     "bc.sci10.cc.27",
+     "bc.chem11.cc.28",
+     "bc.earth11.cc.28",
+     "bc.envsci11.cc.28",
+     "bc.ls11sci.cc.28",
+     "bc.phys11.cc.28",
+     "bc.sfc11.cc.28",
+     "bc.anat12.cc.28",
+     "bc.chem12.cc.28",
+     "bc.envsci12.cc.28",
+     "bc.geo12.cc.28",
+     "bc.phys12.cc.28",
+     "bc.spsci12.cc.28"
+    ],
+    "ministry": "Consider the role of scientists in innovation",
+    "bands": {
+     "8-9": {
+      "phrase": "explain the part scientists play in new inventions and ideas",
+      "next_steps": {
+       "emerging": "name an innovation and the science behind it",
+       "developing": "describe how a scientist's work led to an innovation",
+       "proficient": "explain how many scientists' work combined to make an innovation",
+       "extending": "explain how innovation depends on scientists asking new questions"
+      },
+      "strength": [
+       "{He} [names|name] innovations and the science that made them possible.",
+       "{He} [describes|describe] how a scientist's work led to something new that people use."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain the steps between a discovery and an invention.",
+       "proficient": "A good next step is to describe how many scientists' work adds up to one innovation.",
+       "extending": "{He} could try explaining how a scientist's question led to an invention."
+      },
+      "home": "At home, pick an object you use every day and ask {him} what science made it possible."
+     },
+     "10-12": {
+      "phrase": "consider the role of scientists in innovation, from discovery to application",
+      "next_steps": {
+       "emerging": "identify the scientific work behind an innovation",
+       "developing": "describe the path from a discovery to an applied innovation",
+       "proficient": "practise explaining how teams of scientists contribute to innovation",
+       "extending": "evaluate the responsibilities scientists carry when their work leads to innovation"
+      },
+      "strength": [
+       "{He} [traces|trace] the path from a scientific discovery to an innovation people use.",
+       "{He} [explains|explain] how scientists, engineers and others work together to innovate."
+      ],
+      "next": {
+       "developing": "One thing to practise is naming the scientific evidence an innovation was built from.",
+       "proficient": "Next, {he} can explain how collaboration among scientists speeds innovation.",
+       "extending": "To go further, {he} can consider what responsibilities scientists have for how innovations are used."
+      },
+      "home": "At home, ask {him} which recent invention {he} [thinks|think] has helped people most, and who made it possible."
+     }
+    }
+   }
+  ]
+ },
+ "sci-safety-ethics": {
+  "old": {
+   "phrase": "follow safety and ethical guidelines in investigations",
+   "next_steps": {
+    "emerging": "name the safety rules for an investigation",
+    "developing": "follow each safety rule during an investigation",
+    "proficient": "explain the ethical guidelines that apply to an investigation"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-safety-ethics--science-8-10",
+    "courses": [
+     "Science 8",
+     "Science 9",
+     "Science 10"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.10",
+     "bc.sci9.cc.7",
+     "bc.sci10.cc.7"
+    ],
+    "ministry": "Ensure that safety and ethical guidelines are followed in their investigations",
+    "bands": {
+     "8-9": {
+      "phrase": "follow safety and ethical guidelines in investigations",
+      "next_steps": {
+       "emerging": "name the safety rules for an investigation",
+       "developing": "follow each safety rule without reminders",
+       "proficient": "explain why each safety rule matters",
+       "extending": "explain the ethical guidelines that apply to an investigation"
+      },
+      "strength": [
+       "{He} [follows|follow] safety rules during investigations without needing reminders.",
+       "{He} [explains|explain] why each safety rule protects people in the room."
+      ],
+      "next": {
+       "developing": "{He} [is|are] ready to explain the reason behind each safety rule {he} [follows|follow].",
+       "proficient": "Next, {he} can practise noticing unsafe actions and responding calmly.",
+       "extending": "A next step for {him} is to explain why living things must be treated ethically in an investigation."
+      },
+      "home": "At home, ask {him} which safety rule from the science room would be useful in your kitchen."
+     },
+     "10-12": {
+      "phrase": "ensure safety and ethical guidelines are followed throughout investigations",
+      "next_steps": {
+       "emerging": "identify the safety guidelines that apply to an investigation",
+       "developing": "practise checking a plan against safety guidelines before starting",
+       "proficient": "explain the ethical guidelines that apply to a specific investigation",
+       "extending": "help a group meet safety and ethical guidelines throughout an investigation"
+      },
+      "strength": [
+       "{He} [checks|check] {his} plans against safety guidelines before an investigation begins.",
+       "{He} [explains|explain] the ethical guidelines that apply when an investigation involves living things or people."
+      ],
+      "next": {
+       "developing": "A good next step is to name the guideline that applies to each step of a plan.",
+       "proficient": "{His} next step is to make sure everyone in {his} group meets the guidelines.",
+       "extending": "It would help {him} to explain why ethical guidelines exist, not just what they say."
+      },
+      "home": "At home, ask {him} why scientists need rules when they study people or animals."
+     }
+    }
+   }
+  ]
+ },
+ "sci-science-careers": {
+  "old": {
+   "phrase": "connect science work in class to science careers",
+   "next_steps": {
+    "emerging": "name a science career linked to a class topic",
+    "developing": "connect a class investigation to a science career",
+    "proficient": "describe how a science career uses skills from an investigation"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-science-careers--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.19",
+     "bc.sci10.cc.19",
+     "bc.chem11.cc.19",
+     "bc.earth11.cc.19",
+     "bc.envsci11.cc.19",
+     "bc.ls11sci.cc.19",
+     "bc.phys11.cc.19",
+     "bc.sfc11.cc.19",
+     "bc.anat12.cc.19",
+     "bc.chem12.cc.19",
+     "bc.envsci12.cc.19",
+     "bc.geo12.cc.19",
+     "bc.phys12.cc.19",
+     "bc.spsci12.cc.19"
+    ],
+    "ministry": "Connect scientific explorations to careers in science",
+    "bands": {
+     "8-9": {
+      "phrase": "connect science investigations to careers in science",
+      "next_steps": {
+       "emerging": "name a science career linked to a class investigation",
+       "developing": "describe what a person in a science career does each day",
+       "proficient": "connect skills from an investigation to a science career",
+       "extending": "explain how a science career uses several skills from class"
+      },
+      "strength": [
+       "{He} [names|name] science careers that use the skills from a class investigation.",
+       "{He} [describes|describe] what a person in a science career might do on a typical day."
+      ],
+      "next": {
+       "developing": "Next, {he} can describe the tools and methods a scientist in that career might use.",
+       "proficient": "{He} could try connecting a skill {he} [uses|use] in investigations to a job.",
+       "extending": "{His} goal now is to explain how one investigation uses the same skills as a science career."
+      },
+      "home": "At home, ask {him} which science job {he} would like to try for a day, and why."
+     },
+     "10-12": {
+      "phrase": "connect scientific explorations to the work and skills of science careers",
+      "next_steps": {
+       "emerging": "identify careers that use the methods from a scientific exploration",
+       "developing": "describe how a career uses skills like those in an exploration",
+       "proficient": "practise comparing the skills two science careers require",
+       "extending": "explain how a scientific exploration reflects the work done in a science field"
+      },
+      "strength": [
+       "{He} [connects|connect] methods from {his} explorations to the work of people in science careers.",
+       "{He} [explains|explain] which of {his} own skills match a science career {he} [finds|find] interesting."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to describe the daily tasks of a science career linked to {his} work.",
+       "proficient": "One thing to practise is comparing how two careers use the same scientific skill.",
+       "extending": "From here, {he} can explain how {his} explorations reflect the work done in a science field."
+      },
+      "home": "At home, ask {him} which science careers {he} [has|have] heard of and which interest {him}."
+     }
+    }
+   }
+  ]
+ },
+ "sci-scientific-argument": {
+  "old": {
+   "phrase": "build a science argument from evidence for an audience",
+   "next_steps": {
+    "emerging": "share science information using correct terms",
+    "developing": "build an argument from scientific evidence",
+    "proficient": "suggest a course of action backed by scientific evidence"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-scientific-argument--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.29",
+     "bc.sci10.cc.29",
+     "bc.chem11.cc.30",
+     "bc.earth11.cc.30",
+     "bc.envsci11.cc.30",
+     "bc.ls11sci.cc.30",
+     "bc.phys11.cc.30",
+     "bc.sfc11.cc.30",
+     "bc.anat12.cc.30",
+     "bc.chem12.cc.30",
+     "bc.envsci12.cc.30",
+     "bc.geo12.cc.30",
+     "bc.phys12.cc.30",
+     "bc.spsci12.cc.30"
+    ],
+    "ministry": "Communicate scientific ideas, claims, information, and perhaps a suggested course of action, for a specific purpose and audience, constructing evidence-based arguments and using appropriate scientific language, conventions, and representations / Communicate scientific ideas and information, and perhaps a suggested course of action, for a specific purpose and audience, constructing evidence-based arguments and using appropriate scientific language, conventions, and representations",
+    "bands": {
+     "8-9": {
+      "phrase": "share science ideas and build arguments from evidence for a purpose and audience",
+      "next_steps": {
+       "emerging": "use correct science words when sharing ideas",
+       "developing": "build an argument that uses evidence from an investigation",
+       "proficient": "choose words and visuals that suit the audience",
+       "extending": "suggest a course of action supported by evidence"
+      },
+      "strength": [
+       "{He} [uses|use] correct science words and symbols when sharing ideas.",
+       "{He} [supports|support] {his} claims with evidence from investigations."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain how each piece of data supports the point {he} [is|are] making.",
+       "proficient": "To go further, {he} can practise changing how {he} [explains|explain] an idea for a different audience.",
+       "extending": "It would help {him} to suggest an action and explain how the evidence supports it."
+      },
+      "home": "At home, ask {him} to convince you of something using evidence instead of opinion."
+     },
+     "10-12": {
+      "phrase": "communicate scientific ideas and evidence-based arguments for a specific purpose and audience",
+      "next_steps": {
+       "emerging": "practise using scientific language, conventions and representations correctly",
+       "developing": "construct an argument that links each claim to evidence",
+       "proficient": "adapt the language and representations of an argument to its audience",
+       "extending": "recommend a course of action and justify it with scientific evidence"
+      },
+      "strength": [
+       "{He} [constructs|construct] arguments in which every claim is linked to scientific evidence.",
+       "{He} [adapts|adapt] {his} language and diagrams to suit the purpose and the audience."
+      ],
+      "next": {
+       "developing": "{He} [is|are] ready to answer counter-arguments with evidence.",
+       "proficient": "Next, {he} can use scientific conventions, such as units and symbols, without errors.",
+       "extending": "A good next step is to recommend a course of action and defend it with evidence."
+      },
+      "home": "At home, ask {him} to explain a science idea to you as if you had never heard of it."
+     }
+    }
+   }
+  ]
+ },
+ "sci-sharing-findings": {
+  "old": {
+   "phrase": "share findings clearly, using science words and visuals",
+   "next_steps": {
+    "emerging": "describe findings using a few science words",
+    "developing": "use a visual, such as a chart, to share findings",
+    "proficient": "choose words, visuals and tools that suit the audience"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-sharing-findings--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.26"
+    ],
+    "ministry": "Communicate ideas, findings, and solutions to problems, using scientific language, representations, and digital technologies as appropriate",
+    "bands": {
+     "all": {
+      "phrase": "share ideas, findings and solutions using science words, visuals and digital tools",
+      "next_steps": {
+       "emerging": "describe findings using a few science words",
+       "developing": "use a visual, such as a chart, to share findings",
+       "proficient": "choose words, visuals and tools that suit the audience",
+       "extending": "explain a solution so someone outside the class could follow it"
+      },
+      "strength": [
+       "{He} [explains|explain] {his} findings using science words in the right way.",
+       "{He} [uses|use] charts, diagrams or digital tools to make {his} findings easy to follow."
+      ],
+      "next": {
+       "developing": "{His} goal now is to add a labelled visual to each set of findings {he} [shares|share].",
+       "proficient": "Next, {he} can choose the digital tool that suits what {he} [is|are] sharing.",
+       "extending": "To go further, {he} can practise explaining a solution so a younger student could follow it."
+      },
+      "home": "At home, ask {him} to explain a recent science finding to you in {his} own words."
+     }
+    }
+   }
+  ]
+ },
+ "sci-solution-strategies": {
+  "old": {
+   "phrase": "use more than one strategy to solve a problem",
+   "next_steps": {
+    "emerging": "use one strategy to solve a real-life problem",
+    "developing": "choose a strategy that suits each kind of problem",
+    "proficient": "use more than one strategy to solve a conceptual problem"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-solution-strategies--senior-sciences",
+    "courses": [
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.chem11.cc.27",
+     "bc.earth11.cc.27",
+     "bc.envsci11.cc.27",
+     "bc.ls11sci.cc.27",
+     "bc.phys11.cc.27",
+     "bc.sfc11.cc.27",
+     "bc.anat12.cc.27",
+     "bc.chem12.cc.27",
+     "bc.envsci12.cc.27",
+     "bc.geo12.cc.27",
+     "bc.phys12.cc.27",
+     "bc.spsci12.cc.27"
+    ],
+    "ministry": "Implement multiple strategies to solve problems in real-life, applied, and conceptual situations",
+    "bands": {
+     "all": {
+      "phrase": "use more than one strategy to solve real-life, applied and conceptual problems",
+      "next_steps": {
+       "emerging": "use one strategy to solve a real-life problem",
+       "developing": "choose a strategy that suits each type of problem",
+       "proficient": "solve a conceptual problem using more than one strategy",
+       "extending": "compare strategies and explain which works more efficiently"
+      },
+      "strength": [
+       "{He} [uses|use] more than one strategy when the first does not solve a problem.",
+       "{He} [applies|apply] strategies to conceptual problems as well as real-life ones."
+      ],
+      "next": {
+       "developing": "{He} could now try solving the same problem two ways and checking that the answers agree.",
+       "proficient": "{His} next step is to explain why a strategy suits a given problem.",
+       "extending": "One thing to practise is choosing a strategy for an unfamiliar problem and explaining the choice."
+      },
+      "home": "At home, ask {him} to solve an everyday problem, like planning a trip, in two different ways."
+     }
+    }
+   }
+  ]
+ },
+ "sci-source-validity": {
+  "old": {
+   "phrase": "judge whether science information in a source is valid",
+   "next_steps": {
+    "emerging": "name where a piece of science information came from",
+    "developing": "analyze whether information in a source is valid",
+    "proficient": "compare the approaches people used to solve the same problem"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-source-validity--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.22",
+     "bc.sci10.cc.22",
+     "bc.chem11.cc.22",
+     "bc.earth11.cc.22",
+     "bc.envsci11.cc.22",
+     "bc.ls11sci.cc.22",
+     "bc.phys11.cc.22",
+     "bc.sfc11.cc.22",
+     "bc.anat12.cc.22",
+     "bc.chem12.cc.22",
+     "bc.envsci12.cc.22",
+     "bc.geo12.cc.22",
+     "bc.phys12.cc.22",
+     "bc.spsci12.cc.22"
+    ],
+    "ministry": "Critically analyze the validity of information in secondary sources and evaluate the approaches used to solve problems / Critically analyze the validity of information in primary and secondary sources and evaluate the approaches used to solve problems",
+    "bands": {
+     "8-9": {
+      "phrase": "judge whether science information in a source is valid, and evaluate problem-solving approaches",
+      "next_steps": {
+       "emerging": "name the source of a piece of science information",
+       "developing": "check who made a source and whether they are an expert",
+       "proficient": "judge whether the evidence in a source supports its claims",
+       "extending": "evaluate how well two approaches solved the same problem"
+      },
+      "strength": [
+       "{He} [checks|check] who wrote a source and whether they know the subject.",
+       "{He} [compares|compare] different ways people tried to solve the same problem."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise checking the date and author of every source {he} [uses|use].",
+       "proficient": "A next step for {him} is to judge whether a source gives evidence for its claims.",
+       "extending": "{He} [is|are] ready to judge how well an approach to a problem worked, using evidence."
+      },
+      "home": "When you find information online together, ask {him} how {he} would decide if it is trustworthy."
+     },
+     "10-12": {
+      "phrase": "critically analyze the validity of primary and secondary sources and evaluate approaches to problems",
+      "next_steps": {
+       "emerging": "identify whether a source is primary or secondary",
+       "developing": "analyze a source's methods and evidence to judge its validity",
+       "proficient": "practise evaluating the strengths and limits of an approach to a problem",
+       "extending": "compare approaches to a problem and justify which is most valid"
+      },
+      "strength": [
+       "{He} [analyzes|analyze] the methods behind a primary source to judge whether its results are valid.",
+       "{He} [evaluates|evaluate] approaches to a problem by weighing what each one achieved."
+      ],
+      "next": {
+       "developing": "{His} goal now is to check whether a secondary source reports the primary findings fairly.",
+       "proficient": "It would help {him} to name the limits of each approach to a problem.",
+       "extending": "From here, {he} can practise justifying which approach to a problem is most valid."
+      },
+      "home": "At home, ask {him} how {he} [decides|decide] whether a news report about science can be trusted."
+     }
+    }
+   }
+  ]
+ },
+ "sci-sources-of-error": {
+  "old": {
+   "phrase": "find sources of error and suggest improvements",
+   "next_steps": {
+    "emerging": "name one thing that could have affected the results",
+    "developing": "identify possible sources of error in an investigation",
+    "proficient": "suggest a specific change to the method for each error"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-sources-of-error--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.17"
+    ],
+    "ministry": "Identify possible sources of error and suggest improvements to their investigation methods",
+    "bands": {
+     "all": {
+      "phrase": "identify possible sources of error and suggest ways to improve investigation methods",
+      "next_steps": {
+       "emerging": "name one thing that could have affected the results",
+       "developing": "identify possible sources of error in an investigation",
+       "proficient": "suggest a specific change to the method for each error",
+       "extending": "explain how each change would make the results more trustworthy"
+      },
+      "strength": [
+       "{He} [names|name] things that could have caused errors in {his} results.",
+       "{He} [suggests|suggest] specific changes that would improve {his} method."
+      ],
+      "next": {
+       "developing": "{His} next step is to name a source of error for each problem in the results.",
+       "proficient": "A good next step is to suggest a change that fixes each source of error {he} [finds|find].",
+       "extending": "Next, {he} can explain how a change to the method would make the results easier to trust."
+      },
+      "home": "At home, ask {him} why two people timing the same race might get different times."
+     }
+    }
+   }
+  ]
+ },
+ "sci-sustained-inquiry": {
+  "old": {
+   "phrase": "explore a science topic of interest over time",
+   "next_steps": {
+    "emerging": "ask questions about a science topic of interest",
+    "developing": "keep exploring one science topic over several weeks",
+    "proficient": "explain why a science problem matters locally or globally"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-sustained-inquiry--science-8-10",
+    "courses": [
+     "Science 8",
+     "Science 9",
+     "Science 10"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.1",
+     "bc.sci9.cc.1",
+     "bc.sci10.cc.1"
+    ],
+    "ministry": "Demonstrate a sustained intellectual curiosity about a scientific topic or problem of personal interest",
+    "bands": {
+     "8-9": {
+      "phrase": "stay curious about a science topic or problem of personal interest over time",
+      "next_steps": {
+       "emerging": "ask questions about a science topic of interest",
+       "developing": "keep asking follow-up questions about a science idea worth exploring",
+       "proficient": "keep a record of questions and new learning about a topic",
+       "extending": "use new answers to ask harder questions about a topic"
+      },
+      "strength": [
+       "{He} [asks|ask] questions about science topics that interest {him}.",
+       "{He} [keeps|keep] exploring a science question long after the lesson ends."
+      ],
+      "next": {
+       "developing": "{He} could try keeping a list of questions about a topic {he} [enjoys|enjoy].",
+       "proficient": "Next, {he} can use each new answer to ask a new question.",
+       "extending": "A next step for {him} is to share what {he} [has|have] learned about a topic over time."
+      },
+      "home": "At home, ask {him} what science question {he} [has|have] been wondering about lately."
+     },
+     "10-12": {
+      "phrase": "show sustained curiosity about a scientific topic or problem of personal interest",
+      "next_steps": {
+       "emerging": "practise noting questions about a topic as they arise",
+       "developing": "follow a scientific question with new questions as the evidence builds",
+       "proficient": "make a habit of following the new questions an answer raises",
+       "extending": "develop a personal inquiry that grows more focused over time"
+      },
+      "strength": [
+       "{He} [pursues|pursue] a scientific question over weeks, adding new questions as {he} [learns|learn].",
+       "{He} [connects|connect] {his} personal interests to scientific topics and problems."
+      ],
+      "next": {
+       "developing": "{His} goal now is to keep a record of how {his} questions change over time.",
+       "proficient": "To go further, {he} can practise narrowing a broad interest into a focused question.",
+       "extending": "{He} [is|are] ready to plan a longer inquiry into a question that matters to {him}."
+      },
+      "home": "At home, ask {him} which science topic {he} could talk about for an hour."
+     }
+    }
+   },
+   {
+    "id": "sci-sustained-inquiry--senior-sciences",
+    "courses": [
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.chem11.cc.1",
+     "bc.earth11.cc.1",
+     "bc.envsci11.cc.1",
+     "bc.ls11sci.cc.1",
+     "bc.phys11.cc.1",
+     "bc.sfc11.cc.1",
+     "bc.anat12.cc.1",
+     "bc.chem12.cc.1",
+     "bc.envsci12.cc.1",
+     "bc.geo12.cc.1",
+     "bc.phys12.cc.1",
+     "bc.spsci12.cc.1"
+    ],
+    "ministry": "Demonstrate a sustained intellectual curiosity about a scientific topic or problem of personal, local, or global interest",
+    "bands": {
+     "all": {
+      "phrase": "sustain curiosity about a scientific topic or problem of personal, local or global interest",
+      "next_steps": {
+       "emerging": "ask questions about a scientific problem that matters locally or globally",
+       "developing": "explain why a chosen science problem matters to people",
+       "proficient": "practise following one question across sources and investigations over time",
+       "extending": "connect a personal inquiry to a local or global problem"
+      },
+      "strength": [
+       "{He} [explains|explain] why a science problem {he} [follows|follow] matters locally or globally.",
+       "{He} [returns|return] to a scientific question over time and [deepens|deepen] {his} understanding."
+      ],
+      "next": {
+       "developing": "It would help {him} to explain why {his} chosen problem matters to people near and far.",
+       "proficient": "One thing to practise is tracking one question across several sources over time.",
+       "extending": "From here, {he} can connect {his} personal inquiry to a problem facing {his} community."
+      },
+      "home": "At home, ask {him} which science problem in the world {he} would most like to see solved."
+     }
+    }
+   }
+  ]
+ },
+ "sci-theoretical-models": {
+  "old": {
+   "phrase": "build a model that explains how something works",
+   "next_steps": {
+    "emerging": "describe a phenomenon using a simple drawing or model",
+    "developing": "build a physical model of a phenomenon",
+    "proficient": "explain a mental model of how a phenomenon works"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-theoretical-models--science-9-to-12",
+    "courses": [
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci9.cc.28",
+     "bc.sci10.cc.28",
+     "bc.chem11.cc.29",
+     "bc.earth11.cc.29",
+     "bc.envsci11.cc.29",
+     "bc.ls11sci.cc.29",
+     "bc.phys11.cc.29",
+     "bc.sfc11.cc.29",
+     "bc.anat12.cc.29",
+     "bc.chem12.cc.29",
+     "bc.envsci12.cc.29",
+     "bc.geo12.cc.29",
+     "bc.phys12.cc.29",
+     "bc.spsci12.cc.29"
+    ],
+    "ministry": "Formulate physical or mental theoretical models to describe a phenomenon",
+    "bands": {
+     "8-9": {
+      "phrase": "create physical or mental models to describe how something in nature works",
+      "next_steps": {
+       "emerging": "describe a phenomenon using a simple drawing",
+       "developing": "build a physical model of a phenomenon",
+       "proficient": "explain how each part of a model matches the real thing",
+       "extending": "describe a mental model of something that cannot be seen"
+      },
+      "strength": [
+       "{He} [builds|build] physical models that show how a phenomenon works.",
+       "{He} [describes|describe] a picture in {his} mind of how something too small to see behaves."
+      ],
+      "next": {
+       "developing": "Next, {he} can practise labelling each part of a model with what it stands for.",
+       "proficient": "{His} next step is to explain how {his} model shows something changing over time.",
+       "extending": "It would help {him} to describe a mental model of something that cannot be seen."
+      },
+      "home": "At home, ask {him} to describe a model {he} made in science and what each part stood for."
+     },
+     "10-12": {
+      "phrase": "formulate physical or mental theoretical models to describe a phenomenon",
+      "next_steps": {
+       "emerging": "represent a phenomenon with a labelled model",
+       "developing": "explain the rules a mental model uses to describe a phenomenon",
+       "proficient": "practise testing a model's predictions against data",
+       "extending": "revise a theoretical model when new evidence does not fit"
+      },
+      "strength": [
+       "{He} [formulates|formulate] theoretical models that explain why a phenomenon behaves as it does.",
+       "{He} [uses|use] {his} model to make predictions that can be tested."
+      ],
+      "next": {
+       "developing": "A good next step is to state the assumptions behind a model.",
+       "proficient": "{He} [is|are] ready to test a model's predictions against measured data.",
+       "extending": "To go further, {he} can practise revising a model when evidence does not fit it."
+      },
+      "home": "At home, ask {him} which model from science helps {him} picture something invisible."
+     }
+    }
+   }
+  ]
+ },
+ "sci-transfer-of-learning": {
+  "old": {
+   "phrase": "apply science learning to new situations",
+   "next_steps": {
+    "emerging": "connect a new situation to something learned before",
+    "developing": "apply a science idea to a new situation",
+    "proficient": "apply several ideas together to explain an unfamiliar situation"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-transfer-of-learning--science-8-10",
+    "courses": [
+     "Science 8",
+     "Science 9",
+     "Science 10"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.24",
+     "bc.sci9.cc.24",
+     "bc.sci10.cc.24"
+    ],
+    "ministry": "Transfer and apply learning to new situations",
+    "bands": {
+     "8-9": {
+      "phrase": "use what has been learned in science in new situations",
+      "next_steps": {
+       "emerging": "connect a new situation to something learned before",
+       "developing": "use a science idea to explain something new",
+       "proficient": "explain how an idea from one topic helps in another",
+       "extending": "combine two ideas to explain an unfamiliar situation"
+      },
+      "strength": [
+       "{He} [connects|connect] new problems to ideas {he} learned earlier in science.",
+       "{He} [uses|use] a science idea to explain something {he} [sees|see] outside of class."
+      ],
+      "next": {
+       "developing": "{His} goal now is to name the earlier idea that helps with a new problem.",
+       "proficient": "{He} could try using an idea from one topic to explain something in another.",
+       "extending": "Next, {he} can combine two ideas to explain something unfamiliar."
+      },
+      "home": "At home, ask {him} where {he} [notices|notice] something from science class in daily life."
+     },
+     "10-12": {
+      "phrase": "transfer and apply science learning to new and unfamiliar situations",
+      "next_steps": {
+       "emerging": "practise naming the concept that fits a new situation",
+       "developing": "apply a concept learned in one context to a different one",
+       "proficient": "combine several concepts to analyze an unfamiliar problem",
+       "extending": "explain the limits of applying a concept to a new situation"
+      },
+      "strength": [
+       "{He} [applies|apply] concepts from one context to problems in a different one.",
+       "{He} [combines|combine] several concepts to analyze situations {he} [has|have] not seen before."
+      ],
+      "next": {
+       "developing": "A next step for {him} is to explain why a concept fits a new situation.",
+       "proficient": "One thing to practise is analyzing an unfamiliar problem with two or more concepts.",
+       "extending": "To go further, {he} can practise explaining when a concept does not apply to a new case."
+      },
+      "home": "At home, ask {him} to use a science idea to explain why a household problem happens."
+     }
+    }
+   }
+  ]
+ },
+ "sci-unit-conversions": {
+  "old": {
+   "phrase": "use the right units and convert between them",
+   "next_steps": {
+    "emerging": "label each measurement with the right unit",
+    "developing": "convert a measurement from one metric unit to another",
+    "proficient": "choose units that suit each measurement and check conversions"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-unit-conversions--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.9"
+    ],
+    "ministry": "Use appropriate SI units and perform simple unit conversions",
+    "bands": {
+     "all": {
+      "phrase": "use SI units and convert between them",
+      "next_steps": {
+       "emerging": "label each measurement with the right SI unit",
+       "developing": "convert a measurement from one SI unit to another",
+       "proficient": "check each conversion by thinking about whether the answer makes sense",
+       "extending": "choose the SI unit that suits the size of a measurement"
+      },
+      "strength": [
+       "{He} [labels|label] every measurement with the right SI unit.",
+       "{He} [converts|convert] between units, such as millimetres and centimetres, correctly."
+      ],
+      "next": {
+       "developing": "{His} next step is to check each conversion by asking whether the new number makes sense.",
+       "proficient": "Next, {he} can choose a unit that suits the size of what {he} [measures|measure].",
+       "extending": "{He} [is|are] ready to convert between units that are several steps apart, like millilitres and litres."
+      },
+      "home": "At home, ask {him} how many millilitres are in a two-litre bottle, and how {he} [knows|know]."
+     }
+    }
+   }
+  ]
+ },
+ "sci-variable-control": {
+  "old": {
+   "phrase": "run a fair test by controlling variables",
+   "next_steps": {
+    "emerging": "name the variable being changed in a test",
+    "developing": "identify the independent and dependent variables in a test",
+    "proficient": "keep every other variable the same while changing one"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-variable-control--science-8",
+    "courses": [
+     "Science 8"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.7"
+    ],
+    "ministry": "Measure and control variables (dependent and independent) through fair tests",
+    "bands": {
+     "all": {
+      "phrase": "measure and control variables in a fair test",
+      "next_steps": {
+       "emerging": "name the variable being changed in a test",
+       "developing": "identify the variable that is changed and the variable that is measured",
+       "proficient": "keep every other variable the same while changing one",
+       "extending": "explain how an uncontrolled variable could change the results"
+      },
+      "strength": [
+       "{He} [identifies|identify] the variable {he} [changes|change] and the variable {he} [measures|measure].",
+       "{He} [keeps|keep] the other variables the same so the test is fair."
+      ],
+      "next": {
+       "developing": "{He} could try listing every variable that must stay the same before starting a test.",
+       "proficient": "A good next step is to explain why changing two things at once makes a test unfair.",
+       "extending": "To go further, {he} can practise explaining how an uncontrolled variable could change the results."
+      },
+      "home": "At home, ask {him} how to make a fair test of which spot in the house dries laundry fastest."
+     }
+    }
+   }
+  ]
+ },
+ "sci-ways-of-knowing": {
+  "old": {
+   "phrase": "use First Peoples and local knowledge in science",
+   "next_steps": {
+    "emerging": "gather information from local knowledge in the community",
+    "developing": "apply First Peoples knowledge to a science question",
+    "proficient": "use other ways of knowing to answer a science question"
+   }
+  },
+  "sets": [
+   {
+    "id": "sci-ways-of-knowing--all-sciences",
+    "courses": [
+     "Science 8",
+     "Science 9",
+     "Science 10",
+     "Chemistry 11",
+     "Earth Sciences 11",
+     "Environmental Science 11",
+     "Life Sciences 11",
+     "Physics 11",
+     "Science for Citizens 11",
+     "Anatomy and Physiology 12",
+     "Chemistry 12",
+     "Environmental Science 12",
+     "Geology 12",
+     "Physics 12",
+     "Specialized Science 12"
+    ],
+    "competency_ids": [
+     "bc.sci8.cc.12",
+     "bc.sci9.cc.9",
+     "bc.sci10.cc.9",
+     "bc.chem11.cc.9",
+     "bc.earth11.cc.9",
+     "bc.envsci11.cc.9",
+     "bc.ls11sci.cc.9",
+     "bc.phys11.cc.9",
+     "bc.sfc11.cc.9",
+     "bc.anat12.cc.9",
+     "bc.chem12.cc.9",
+     "bc.envsci12.cc.9",
+     "bc.geo12.cc.9",
+     "bc.phys12.cc.9",
+     "bc.spsci12.cc.9"
+    ],
+    "ministry": "Apply First Peoples perspectives and knowledge, other ways of knowing, and local knowledge as sources of information",
+    "bands": {
+     "8-9": {
+      "phrase": "use First Peoples, local and other ways of knowing as sources of information",
+      "next_steps": {
+       "emerging": "listen to local knowledge shared in the community",
+       "developing": "use First Peoples knowledge to help answer a science question",
+       "proficient": "explain what a First Peoples perspective adds to a science topic",
+       "extending": "use more than one way of knowing to understand a place or process"
+      },
+      "strength": [
+       "{He} [listens|listen] with respect to knowledge shared by Elders and community members.",
+       "{He} [uses|use] First Peoples knowledge as a source of information in {his} science work."
+      ],
+      "next": {
+       "developing": "{His} next step is to explain what a First Peoples perspective adds to {his} understanding.",
+       "proficient": "Next, {he} can practise using local knowledge alongside {his} own observations.",
+       "extending": "It would help {him} to explain how two ways of knowing can both inform a science question."
+      },
+      "home": "At home, share what your family knows about the land, plants or seasons where you live."
+     },
+     "10-12": {
+      "phrase": "apply First Peoples perspectives and local knowledge as sources of scientific information",
+      "next_steps": {
+       "emerging": "identify local and First Peoples knowledge that relates to a topic",
+       "developing": "apply First Peoples knowledge as a source of information in an investigation",
+       "proficient": "practise explaining how different ways of knowing inform the same question",
+       "extending": "integrate several ways of knowing into one explanation that honours each source"
+      },
+      "strength": [
+       "{He} [applies|apply] First Peoples perspectives as a source of information when {he} [investigates|investigate] a question.",
+       "{He} [explains|explain] how local knowledge and scientific data can each inform an understanding of a place."
+      ],
+      "next": {
+       "developing": "A good next step is to name the source of the local knowledge {he} [uses|use], with respect.",
+       "proficient": "{He} [is|are] ready to explain how different ways of knowing answer the same question.",
+       "extending": "From here, {he} can practise bringing several ways of knowing into one explanation."
+      },
+      "home": "At home, talk with {him} about knowledge your family has passed down about nature or the seasons."
+     }
+    }
+   }
+  ]
+ }
+}
