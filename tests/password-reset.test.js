@@ -13,6 +13,7 @@ import { runInThisContext } from 'vm';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(resolve(root, 'login.html'), 'utf-8');
+const device = readFileSync(resolve(root, 'shared/device.js'), 'utf-8');
 const shared = readFileSync(resolve(root, 'shared/sign-in.js'), 'utf-8');
 const script = readFileSync(resolve(root, 'login-auth.js'), 'utf-8');
 const USER = { email: 'teacher@example.com', user_metadata: { portal: 'teacher' } };
@@ -65,6 +66,7 @@ function load({ search = '', hash = '', session = USER, updateError = null } = {
     },
     rpc: async () => ({ data: null, error: null }),
   });
+  runInThisContext(device, { filename: 'shared/device.js' });
   runInThisContext(shared, { filename: 'shared/sign-in.js' });
   runInThisContext(script, { filename: 'login-auth.js' });
   return { document, location, calls };

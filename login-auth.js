@@ -15,8 +15,6 @@
  * live in shared/sign-in.js, which the phone sign-in screen uses too. */
 function portalRedirect(user) {
   var portal = getPortal(user);
-  var preferMobile =
-    portal === 'teacher' && window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop';
 
   switch (portal) {
     case 'student':
@@ -25,7 +23,7 @@ function portalRedirect(user) {
       return (window.location.href = '/parent/');
     case 'teacher':
     default:
-      return (window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard');
+      return (window.location.href = teacherAppPath());
   }
 }
 
@@ -124,8 +122,7 @@ async function handleResetSubmit(e) {
   // Useful for testing and for sharing a "just works" local link.
   if (new URLSearchParams(location.search).get('demo') === '1') {
     startDemoMode();
-    var preferMobile = window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop';
-    window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard';
+    window.location.href = teacherAppPath();
     return;
   }
   // Dev mode: only skip login on localhost when explicitly opted in with ?dev=1
@@ -260,9 +257,8 @@ document.addEventListener('click', function (e) {
 /* ── Demo mode — bypass Supabase auth, run local-only with seeded data ── */
 function enterDemoMode() {
   if (!startDemoMode({ confirm: true })) return;
-  // Respect any td-mobile-pref override; otherwise the viewport picks.
-  var preferMobile = window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop';
-  window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard';
+  // A phone opens the phone app; anything bigger, the desktop app.
+  window.location.href = teacherAppPath();
 }
 
 /* ── Forgot password ───────────────────────────────────────── */
