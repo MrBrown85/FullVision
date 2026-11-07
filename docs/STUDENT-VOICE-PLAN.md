@@ -43,7 +43,7 @@ Interview mode (teacher-led, on Observations and mobile) stays in the plan but i
 
 ### Student phone (no login): canvas screens 1–5
 
-- `/s/` at the site root, built from `teacher-mobile` components and tokens: slim header with class and progress, cards, segmented scale buttons, footer buttons. No navigation, no other students, no grades.
+- `/s/` at the site root, built from `teacher-mobile` components and tokens: slim header with class and progress, cards, segmented scale buttons, footer buttons. No navigation, no other students, no grades. (A class can turn on My Learning, which shows the student's own levels and grade; see `DECISIONS.md`, "My Learning on the student page", 2026-11-07.)
 - Scan screen: avatar, "Hi Cece!", what they're about to answer and how long it takes, Yes / No That's Not Me, and the typed-code fallback.
 - About Me, November Reflection (theme card, Personal Shield, how it helps, self-assessment with why), My Goals (September goal read-only, status, next step, Core Competency goal picker with one thing this week), Sent.
 - Demo Mode: the demo class code runs the form locally and writes nothing.

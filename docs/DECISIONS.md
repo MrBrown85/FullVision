@@ -165,7 +165,7 @@ Colin chose option A on Kanban card t4. Microsoft Teams Assignments requires a c
 
 ## Product shape (2026-10-17)
 
-- **Teacher-only.** No student or parent logins. Printed reports are the family surface. A no-login student form for self-reflection is planned (see `STUDENT-VOICE-PLAN.md`), not a portal.
+- **Teacher-only.** No student or parent logins. Printed reports are the family surface. A no-login student form for self-reflection is planned (see `STUDENT-VOICE-PLAN.md`), not a portal. A class can now turn on My Learning; see "My Learning on the student page" (2026-11-07).
 - **Flat learning map:** one section per competency, grouped by subject and competency group. Not a duplication to be cleaned up.
 - **Demo Mode is the only sample data.** No Welcome Class.
 - **Manual archive; delete only after archive; soft delete with a 30-day purge.**
@@ -189,6 +189,18 @@ Context: `STUDENT-VOICE-PLAN.md`.
 7. **The teacher's term questionnaire stays as is** until phase 5.
 8. **Backend:** no anon-callable database functions. One Supabase Edge Function in `ca-central-1` fronts the student form, calling `student_submit` schema functions granted to the service role only; short-lived tokens, rate limiting, append-only responses.
 9. **UI:** the student page reuses the teacher mobile app's stylesheets and components; reuse is one-way.
+
+## My Learning on the student page (2026-11-07)
+
+Context: the student page designed on Nov 6–7 (photo submissions, feedback, reflections) on a Claude Design artboard. Nothing is built yet.
+
+1. **The student page can show My Learning** (Colin, 2026-11-07): the student's own skill levels, their grade and how it changes over the term. It is a per-class switch, Show My Learning in Class Settings › Student Page, off until the teacher turns it on.
+2. **This reverses two earlier lines for a class that turns it on:** "no grades" on the student page (`STUDENT-VOICE-PLAN.md`, Screens) and "not a portal" (Product shape). A class with the switch off keeps both.
+3. **Only returned work counts.** A student never sees a level before the teacher returns that piece.
+4. **Grades as shown.** Every level, letter and % comes from `shared/calc.js` and follows the class's grading style.
+5. **Next steps come from the comment bank; I Can statements from the curriculum bank.** Nothing is written for the student page alone.
+6. **No class averages and no comparisons** with other students.
+7. **Preview as Student shows exactly what one student sees.**
 
 ## Phone-report birthday tries (2026-11-03)
 
