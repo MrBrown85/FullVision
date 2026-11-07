@@ -197,6 +197,14 @@ The Nov 3 bug sweep found that a phone-report slip has no lifetime limit on wron
 1. **Phone reports keep the session and 15-minute limits, with no lifetime lock** (Colin: "keep as is"). Students reopen a phone report as often as they like.
 2. `privacy.html` says so.
 
+## Reports on phones are read-only (2026-11-07)
+
+A phone report had a Reply to Report: once per student, proud of, surprised by, keep or change the goal, one thing before the next report, anything for the teacher (`20261025_phone_reports.sql`). Colin: "it's a report." Students aren't arguing with a grade or asking questions through it; they can reflect in class.
+
+1. **No reply.** The student opens the report with their birthday and reads it; nothing on it sends anything. Sent to Phones shows who opened it, not who replied. Nothing about a report reaches the Learner Profile.
+2. A reflection on the report may come back later as its own thing, if Colin wants one. It isn't planned.
+3. `migrations/20261107_no_report_reply.sql` drops the reply questionnaire, its template and `phone_report.reply_questionnaire_id`. On 2026-11-07 production had one phone report, its reply closed, and no replies.
+
 ## Year-to-date grading (2026-11-03)
 
 Context: the term-scoping audit (Nov 3) found that picking a term restarted every grade from zero: every report card, Generate comment, Quick Report and phone report was a term-only grade, and the gradebook, dashboard and student page became term-only once a term was picked there. Colin's calls that evening (decisions 15–18 and 20):

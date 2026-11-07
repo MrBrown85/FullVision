@@ -149,7 +149,7 @@ test('Demo Mode answers About Me with no request', async ({ page }) => {
   expect(posts).toHaveLength(0);
 });
 
-test('a report slip: birthday, the report as sent, a reply', async ({ page }) => {
+test('a report slip: birthday, then the report as sent, to read', async ({ page }) => {
   const posts = [];
   await page.route('**/functions/v1/student-submit**', async route => {
     const req = route.request();
@@ -181,23 +181,7 @@ test('a report slip: birthday, the report as sent, a reply', async ({ page }) =>
           overall: { mode: 'proficiency', text: '3.0', level: 3, word: 'Proficient' },
           comment: ['Cece is curious.'],
         },
-        reply: {
-          id: 'rq',
-          kind: 'report_reply',
-          title: 'Reply to Report 1',
-          questions: [
-            {
-              id: '44444444-0000-4000-8000-000000000001',
-              kind: 'text',
-              prompt: 'What are you most proud of?',
-              options: {},
-              core_ids: [],
-            },
-          ],
-        },
-        replied_at: null,
       },
-      submit: { ok: true, submitted_at: '2026-11-22T18:00:00Z' },
     };
     return route.fulfill({
       status: 200,
@@ -213,11 +197,7 @@ test('a report slip: birthday, the report as sent, a reply', async ({ page }) =>
   await page.getByRole('button', { name: 'Open My Report' }).tap();
   await expect(page.locator('.pr-big')).toHaveText('Proficient');
   expect(posts[1]).toEqual({ route: 'check', token: 'c'.repeat(64), birthday: '2012-05-15' });
-  await page.getByRole('button', { name: 'Reply to Your Report' }).tap();
-  await page.getByLabel('What are you most proud of?').fill('my biodiversity journal');
-  await page.getByRole('button', { name: 'Send to My Teacher' }).tap();
-  await expect(page.getByText('Your next step is saved with your goal.')).toBeVisible();
-  expect(posts[2].answers).toEqual({ '44444444-0000-4000-8000-000000000001': 'my biodiversity journal' });
-  await page.getByRole('button', { name: 'Back to My Report' }).tap();
-  await expect(page.getByText('You replied on Nov 22. Thanks.')).toBeVisible();
+  await expect(page.getByText('Cece is curious.')).toBeVisible();
+  await expect(page.getByRole('button', { name: /reply|send/i })).toHaveCount(0);
+  expect(posts).toHaveLength(2);
 });

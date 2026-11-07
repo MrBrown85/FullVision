@@ -725,45 +725,5 @@ const QUESTIONNAIRE_TEMPLATES = [
       }
     ],
     "year": 2026
-  },
-  {
-    "id": "report-reply",
-    "kind": "report_reply",
-    "grade": null,
-    "period": null,
-    "title": "Reply to Your Report",
-    "theme": null,
-    "core_heading": null,
-    "myed_comment": null,
-    "questions": [
-      {
-        "prompt": "What are you most proud of?",
-        "kind": "text"
-      },
-      {
-        "prompt": "Was anything a surprise?",
-        "kind": "text"
-      },
-      {
-        "prompt": "Your goal: keep it or change it?",
-        "kind": "choice",
-        "options": {
-          "choices": [
-            "Keep It",
-            "Change It"
-          ],
-          "multiple": false
-        }
-      },
-      {
-        "prompt": "One thing you will do before the next report",
-        "kind": "text"
-      },
-      {
-        "prompt": "Anything you want your teacher to know?",
-        "kind": "text"
-      }
-    ],
-    "year": 2026
   }
 ];
