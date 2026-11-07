@@ -13,6 +13,7 @@ const PRECACHE_URLS = [
   '/login-auth.js',
   '/manifest.json',
   '/favicon.svg',
+  '/assets/icons/apple-touch-icon.png',
   '/vendor/supabase.min.js',
   '/curriculum_by_course.json',
   // Shared modules
