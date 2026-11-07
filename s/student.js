@@ -300,10 +300,17 @@ var StudentPage = (function () {
     );
   }
 
+  // The desktop's loading screen with lines for students
+  // (shared/loading-screen.js); paint() starts the lines turning.
   function renderLoading() {
+    var body = window.FVLoading
+      ? window.FVLoading.html('student', 'Opening your page', true)
+      : '<p class="sp-lead sp-msg-calm" role="status">Opening your page\u2026</p>';
     return (
       header('Student Questions', 'FullVision') +
-      '<main class="sp-main sp-main-center sp-main-middle"><p class="sp-lead sp-msg-calm" role="status">Opening your questions\u2026</p></main>'
+      '<main class="sp-main sp-main-center sp-main-middle">' +
+      body +
+      '</main>'
     );
   }
 
@@ -1228,6 +1235,7 @@ var StudentPage = (function () {
     if (!root) return;
     // html-safe: this file's render (the name is shared): every screen escapes server and typed text with esc; q.id is a question uuid; PhoneReportView.html escapes the report.
     root.innerHTML = render(S);
+    if (S.screen === 'loading' && window.FVLoading) window.FVLoading.start(root, 'student');
     root.querySelectorAll('textarea.sp-text').forEach(grow);
     rovingRadios(root);
     var f = focusSel ? root.querySelector(focusSel) : null;
