@@ -103,6 +103,18 @@
           />
           <button class="m-auth-submit" type="submit" id="m-su-submit">Create Account</button>
         </form>
+
+        <!-- Demo mode — no auth, seeded sample data, local-only (same as login.html) -->
+        <div class="m-auth-demo">
+          <div class="m-auth-demo-divider"><span>or</span></div>
+          <button class="m-auth-demo-btn" type="button" id="m-demo-mode-btn" data-action="m-enter-demo-mode">
+            Try Demo Mode
+          </button>
+          <p class="m-auth-demo-hint">
+            Skip sign-in and explore with the Science 8 sample class. Data stays on this device only.
+          </p>
+        </div>
+        <p class="m-auth-demo-hint"><a href="../privacy.html">Privacy Policy</a></p>
       </div>
     </div>
 
@@ -190,6 +202,7 @@
     </script>
     <script src="../vendor/supabase.min.js"></script>
     <script src="../shared/supabase.js"></script>
+    <script src="../shared/sign-in.js"></script>
     <script src="../shared/constants.js"></script>
     <script src="../shared/data.js"></script>
     <script src="../shared/offline-queue.js"></script>
