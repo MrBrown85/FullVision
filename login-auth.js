@@ -11,10 +11,8 @@
  * To add a new portal: create the directory, add its entry in the switch below,
  * and set the corresponding portal value when creating accounts.
  * ─────────────────────────────────────────────────────────────────────────── */
-function getPortal(user) {
-  return (user && user.user_metadata && user.user_metadata.portal) || 'teacher';
-}
-
+/* getPortal, startDemoMode, promptRestoreAccount and resetPasswordRedirect
+ * live in shared/sign-in.js, which the phone sign-in screen uses too. */
 function portalRedirect(user) {
   var portal = getPortal(user);
   var preferMobile =
@@ -31,94 +29,8 @@ function portalRedirect(user) {
   }
 }
 
-/* Local HTML-entity escaper. login-auth.js does not load shared/data.js
- * (which defines the canonical esc()), so we duplicate the one-line helper
- * here rather than widen the login page's dependency set. */
-/* Generate the companion token stored alongside gb-demo-mode. The token
- * itself is not secret — it lives in localStorage where any DevTools-capable
- * user can read it. What it proves is that demo mode was entered through a
- * legitimate code path (this file), not by flipping a single flag in
- * DevTools from the signed-out state. signOut() in shared/supabase.js
- * wipes every gb-* key, so both flags die together on sign-out. */
-function _demoToken() {
-  try {
-    return crypto.randomUUID();
-  } catch (e) {
-    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
-  }
-}
-
-function formatDeletionDeadline(deletedAt) {
-  var ts = Date.parse(deletedAt || '');
-  if (!isFinite(ts)) return '30 days from now';
-  return new Intl.DateTimeFormat('en-CA', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(new Date(ts + 30 * 24 * 60 * 60 * 1000));
-}
-
-function showRestoreAccountPrompt(deletionDate) {
-  return new Promise(function (resolve) {
-    var overlay = document.createElement('div');
-    overlay.className = 'confirm-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-labelledby', 'restore-account-title');
-    overlay.innerHTML = `<div class="confirm-card">
-      <div class="confirm-title" id="restore-account-title">Restore Account</div>
-      <div class="confirm-message">Your account is scheduled for deletion on ${esc(deletionDate)}. Restore it now?</div>
-      <div class="confirm-actions">
-        <button class="confirm-cancel" id="restore-continue-btn">Continue deletion</button>
-        <button class="confirm-ok primary" id="restore-confirm-btn">Restore</button>
-      </div>
-    </div>`;
-    document.body.appendChild(overlay);
-
-    function close(result) {
-      overlay.remove();
-      resolve(result);
-    }
-
-    overlay.querySelector('#restore-confirm-btn').focus();
-    overlay.querySelector('#restore-confirm-btn').onclick = function () {
-      close(true);
-    };
-    overlay.querySelector('#restore-continue-btn').onclick = function () {
-      close(false);
-    };
-  });
-}
-
-async function maybePromptRestoreAccount(user) {
-  if (getPortal(user) !== 'teacher') return true;
-  var sb = getSupabase();
-  if (!sb) return true;
-
-  var bootRes = await sb.rpc('bootstrap_teacher', {
-    p_email: (user && user.email) || '',
-    p_display_name: (user && user.user_metadata && user.user_metadata.display_name) || null,
-  });
-  if (bootRes.error) throw bootRes.error;
-
-  var teacher = bootRes.data || {};
-  if (!teacher.deleted_at) return true;
-
-  var shouldRestore = await showRestoreAccountPrompt(formatDeletionDeadline(teacher.deleted_at));
-  if (!shouldRestore) {
-    try {
-      await sb.auth.signOut();
-    } catch (e) {
-      /* best effort */
-    }
-    showSuccess('Account deletion left in place. Sign in again within 30 days to restore it.');
-    return false;
-  }
-
-  var restoreRes = await sb.rpc('restore_teacher', {});
-  if (restoreRes.error) throw restoreRes.error;
-  showSuccess('Account restored. Redirecting…');
-  return true;
+function maybePromptRestoreAccount(user) {
+  return promptRestoreAccount(user, showSuccess);
 }
 
 /* ── Password reset ────────────────────────────────────────────
@@ -211,15 +123,7 @@ async function handleResetSubmit(e) {
   // flag, and drops the user at the dashboard with Science 8 auto-seeded.
   // Useful for testing and for sharing a "just works" local link.
   if (new URLSearchParams(location.search).get('demo') === '1') {
-    Object.keys(localStorage)
-      .filter(function (k) {
-        return k.indexOf('gb-') === 0;
-      })
-      .forEach(function (k) {
-        localStorage.removeItem(k);
-      });
-    localStorage.setItem('gb-demo-mode', '1');
-    localStorage.setItem('gb-demo-mode-token', _demoToken());
+    startDemoMode();
     var preferMobile = window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop';
     window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard';
     return;
@@ -355,36 +259,8 @@ document.addEventListener('click', function (e) {
 
 /* ── Demo mode — bypass Supabase auth, run local-only with seeded data ── */
 function enterDemoMode() {
-  // P7.7: confirm before wiping. Skip the prompt only when this device has no
-  // existing gb-* state to lose (fresh install or already-cleared session).
-  var hasExistingState = Object.keys(localStorage).some(function (k) {
-    return k.indexOf('gb-') === 0 && k !== 'gb-demo-mode' && k !== 'gb-demo-mode-token';
-  });
-  if (hasExistingState) {
-    var ok = window.confirm(
-      'Demo Mode will erase the FullVision data on this device and load a sample class.\n\n' +
-        'Anything not synced to your account will be lost. Continue?',
-    );
-    if (!ok) return;
-  }
-  // Wipe any existing gb-* state so seedIfNeeded gets a clean slate.
-  // The seed only fires when COURSES is empty AND the wiped flag isn't set,
-  // so prior real-account data would otherwise block it.
-  Object.keys(localStorage)
-    .filter(function (k) {
-      return k.indexOf('gb-') === 0;
-    })
-    .forEach(function (k) {
-      localStorage.removeItem(k);
-    });
-  // Set the demo flag the rest of the app reads to skip auth + sync.
-  // Cleared on sign-out (which also wipes all gb-* keys per FOIPPA).
-  // The companion token proves demo mode was entered through this code path,
-  // not by flipping a single flag in DevTools on a shared computer.
-  localStorage.setItem('gb-demo-mode', '1');
-  localStorage.setItem('gb-demo-mode-token', _demoToken());
-  // Mobile pref: respect any existing td-mobile-pref override; otherwise let
-  // viewport choose desktop vs mobile entry.
+  if (!startDemoMode({ confirm: true })) return;
+  // Respect any td-mobile-pref override; otherwise the viewport picks.
   var preferMobile = window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop';
   window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard';
 }
@@ -401,7 +277,7 @@ async function handleForgot() {
     var sb = getSupabase();
     // The link comes back to this page, which shows Choose a New Password.
     var result = await sb.auth.resetPasswordForEmail(email, {
-      redirectTo: location.origin + '/login.html?reset=1',
+      redirectTo: resetPasswordRedirect(),
     });
     if (result.error) throw result.error;
     showSuccess('Password reset email sent. Check your inbox.');

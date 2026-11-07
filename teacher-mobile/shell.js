@@ -323,6 +323,12 @@
         e.preventDefault();
         _handleForgot();
       }
+
+      if (action === 'm-enter-demo-mode') {
+        e.preventDefault();
+        // Same steps as login.html's Try Demo Mode; this page boots into it.
+        if (startDemoMode({ confirm: true })) location.reload();
+      }
     });
 
     // Sign In form
@@ -356,7 +362,14 @@
     btn.disabled = true;
     btn.textContent = 'Signing in...';
     try {
-      await signIn(email.trim(), password);
+      var result = await signIn(email.trim(), password);
+      // An account set to be deleted asks Restore Account first, as on login.html.
+      var goOn = await promptRestoreAccount(result && result.user, _authSuccess);
+      if (!goOn) {
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+        return;
+      }
       _hideAuth();
       _resetHistory();
       await _bootApp();
@@ -404,7 +417,7 @@
     }
     try {
       var sb = getSupabase();
-      var result = await sb.auth.resetPasswordForEmail(email.trim());
+      var result = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: resetPasswordRedirect() });
       if (result.error) throw result.error;
       _authSuccess('Password reset email sent. Check your inbox.');
     } catch (err) {
