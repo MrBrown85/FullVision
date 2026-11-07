@@ -21,6 +21,8 @@ const PRECACHE_URLS = [
   '/shared/link-nav.js',
   '/shared/supabase.js',
   '/shared/sign-in.js',
+  '/shared/device.js',
+  '/launch.html',
   '/shared/constants.js',
   '/shared/reporting-term-presets.js',
   '/shared/data.js',

@@ -1,7 +1,6 @@
 /* shared/sign-in.js — what the two sign-in screens share.
  *
- * login.html (desktop) and teacher-mobile/index.html (phone and the
- * home-screen app, whose start_url is /teacher-mobile/) each draw their own
+ * login.html (desktop) and teacher-mobile/index.html (phone) each draw their own
  * sign-in card. The steps behind it live here so the two can't drift:
  * Try Demo Mode, the Restore Account prompt for an account set to be
  * deleted, and where a password reset link lands.

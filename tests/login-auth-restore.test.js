@@ -115,6 +115,9 @@ describe('login restore-account prompt', () => {
     };
     globalThis.Intl = originalIntl;
 
+    runInThisContext(readFileSync(resolve(root, 'shared/device.js'), 'utf-8'), {
+      filename: 'shared/device.js',
+    });
     runInThisContext(readFileSync(resolve(root, 'shared/sign-in.js'), 'utf-8'), {
       filename: 'shared/sign-in.js',
     });
