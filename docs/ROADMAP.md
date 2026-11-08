@@ -29,7 +29,6 @@ Without these, no feature set will hold a $120 price.
 ## 3. Work alongside the district tools, don't replace them
 
 1. **Import scores from Teams, Google Classroom and Schoology.** There's already an unused `import_teams_class` RPC. The pitch becomes "keep assigning in Teams, report in FullVision." That turns your strongest competitor into a source of data.
-2. **Don't build an LMS.** No assignment submission, no content pages, no discussions. Every hour spent there is spent losing to free tools.
 
 ## 4. What the school tier needs
 
