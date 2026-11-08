@@ -2,7 +2,7 @@
 
 Written 2026-10-17. Follows the Schoology/Teams comparison (2026-10-17) and the pricing discussion (Teacher $120/yr, School $69/teacher, District $5–6/student).
 
-FullVision won't win by matching Schoology or Teams feature for feature. Both are free to a teacher and already approved by the district. It wins by being the tool that writes BC reports better than anything else, while teachers keep the district LMS for assignments. Everything below either removes a reason not to pay, or makes that one job much better.
+FullVision won't win by matching Schoology or Teams feature for feature. Both are free to a teacher and already approved by the district. It wins by being the tool that writes BC reports better than anything else, with the student work behind them in the same place: students send it, the teacher grades and returns it, and it lands on the report. Everything below either removes a reason not to pay, or makes that work much better.
 
 ## 1. Remove the reasons not to pay
 
@@ -26,9 +26,9 @@ Without these, no feature set will hold a $120 price.
 7. **Reporting for students on IEPs.** Designations are already on the roster. Let a teacher report a student against their IEP goals instead of the course competencies, with the right wording on the report. No mainstream tool handles this well, and resource and inclusion teachers would buy for it alone.
 8. **The BC curriculum, exactly as the Ministry wrote it.** Done 2026-11-02 (`DECISIONS.md`, "The BC curriculum bank"): every grade 8–12 course except second languages, copied word for word from the Ministry's files, with Ministry folders, readable codes and I Can statements for all 5,029 competencies, and a New Class wizard that shows the wording before import. Still to do: the Province's written permission to reproduce the text (requested), a field test of the I Can statements with a few ELA and SS teachers, a re-fetch each June, showing Big Ideas and Content, and retiring the old bank's shape once classes have moved.
 
-## 3. Work alongside the district tools, don't replace them
+## 3. Bring teachers over from the district tools
 
-1. **Import scores from Teams, Google Classroom and Schoology.** There's already an unused `import_teams_class` RPC. The pitch becomes "keep assigning in Teams, report in FullVision." That turns your strongest competitor into a source of data.
+1. **Import scores from Teams, Google Classroom and Schoology.** There's already an unused `import_teams_class` RPC. Teachers who still assign there can bring their scores in on day one and move their assignments over when they're ready. That turns your strongest competitor into a source of data instead of a reason to stay.
 
 ## 4. What the school tier needs
 
