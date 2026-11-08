@@ -228,4 +228,29 @@ describe('login restore-account prompt', () => {
     ]);
     expect(elements['auth-success'].textContent).toMatch(/within 30 days/);
   });
+
+  // Nov 7 2026: a teacher record left by a deleted sign-in account held the
+  // email, bootstrap_teacher failed with 23505, and the page said nothing.
+  it('turns a failed bootstrap into a plain message, not the database error', async () => {
+    var dbError = { code: '23505', message: 'duplicate key value violates unique constraint "teacher_email_key"' };
+    globalThis.getSupabase = function () {
+      return {
+        auth: {
+          getSession() {
+            return Promise.resolve({ data: { session: null } });
+          },
+        },
+        rpc() {
+          return Promise.resolve({ data: null, error: dbError });
+        },
+      };
+    };
+
+    var err = await maybePromptRestoreAccount(USER).catch(e => e);
+
+    expect(err.code).toBe('account_open_failed');
+    expect(err.message).toMatch(/You're signed in, but FullVision couldn't open your account/);
+    expect(err.message).not.toMatch(/duplicate key/);
+    expect(err.cause).toBe(dbError);
+  });
 });

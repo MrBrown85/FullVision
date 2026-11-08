@@ -36,6 +36,9 @@ create table teacher (
   created_at   timestamptz not null default now(),
   deleted_at   timestamptz                                         -- soft-delete (Q29); purged after 30d by fv_retention_cleanup
 );
+-- teacher.id has no foreign key to auth.users. Deleting a sign-in account
+-- soft-deletes its teacher (trigger below), and a first sign-in frees the
+-- email from a teacher left without one (20261108_teacher_outlives_sign_in).
 
 create table teacher_preference (
   teacher_id          uuid  not null primary key references teacher(id) on delete cascade,
@@ -768,6 +771,7 @@ create table support_report (
 -- `category_weight_sum_check(_update)` deferred constraint triggers on category → fv_check_category_weight_sum()
 -- `score_audit_trigger`         after  update on score          → _score_audit_diff(...)
 -- `term_rating_audit_trigger`   after  update on term_rating    → _term_rating_audit_field(...)
+-- `fv_teacher_sign_in_deleted`  after  delete on auth.users     → _fv_teacher_sign_in_deleted() (soft-deletes the teacher)
 
 -- ─── Publications ───────────────────────────────────────────────────────────
 -- `course_sync_cursor` is the intended narrow Realtime surface for v2 course invalidation:

@@ -1021,6 +1021,14 @@ export async function mockPersistentAuthFlow(
     }
 
     function fakeRpc(name, params) {
+      // e2e-bootstrap-fails in localStorage: bootstrap_teacher refuses, as
+      // it did when a teacher record left by a deleted sign-in held the email.
+      if (name === 'bootstrap_teacher' && localStorage.getItem('e2e-bootstrap-fails')) {
+        return noopPromise({
+          data: null,
+          error: { code: '23505', message: 'duplicate key value violates unique constraint "teacher_email_key"' },
+        });
+      }
       if (name === 'bootstrap_teacher') {
         const record =
           loadCurrentUserRecord() || resolveTeacherRecord(params && params.p_email, params && params.p_display_name);

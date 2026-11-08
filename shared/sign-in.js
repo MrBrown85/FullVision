@@ -120,6 +120,20 @@ async function ensureDisplayName(user) {
   }
 }
 
+/* Signed in, but bootstrap_teacher failed, so there is no account to open.
+ * The sign-in screens show this rather than the database's own message, and
+ * never stay silent: before Nov 8, a teacher record left by a deleted sign-in
+ * account kept its email and left the teacher on Sign In with no word. */
+var ACCOUNT_OPEN_FAILED =
+  "You're signed in, but FullVision couldn't open your account. Try again in a minute. If it keeps happening, email colin.brown04@gmail.com.";
+
+function accountOpenError(cause) {
+  var err = new Error(ACCOUNT_OPEN_FAILED);
+  err.code = 'account_open_failed';
+  err.cause = cause;
+  return err;
+}
+
 /* After sign-in: if the teacher's account is set to be deleted, ask whether
  * to restore it. Returns true to go on into the app, false to stay on the
  * sign-in screen (the teacher chose Continue deletion and is signed out).
@@ -133,7 +147,7 @@ async function promptRestoreAccount(user, showSuccess) {
     p_email: (user && user.email) || '',
     p_display_name: (user && user.user_metadata && user.user_metadata.display_name) || null,
   });
-  if (bootRes.error) throw bootRes.error;
+  if (bootRes.error) throw accountOpenError(bootRes.error);
 
   var teacher = bootRes.data || {};
   if (!teacher.deleted_at) return true;
