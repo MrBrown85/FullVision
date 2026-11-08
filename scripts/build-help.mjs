@@ -582,6 +582,7 @@ function page({ title, description, articles, current, mainHtml, indexJson }) {
 <title>${esc(title)}</title>
 <meta name="theme-color" content="#0071e3" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
 <script src="/shared/sentry-init.js"></script>
 <style>${STYLE}</style>
 </head>
