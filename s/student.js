@@ -85,7 +85,7 @@ var StudentPage = (function () {
 
   function freshState() {
     return {
-      screen: 'start', // start | loading | confirm | notme | part | sent; reports: rcheck | report | reply | rsent
+      screen: 'start', // start | loading | confirm | notme | part | sent; reports: rcheck | report
       code: '',
       typed: '',
       data: null, // {token, student, course, parts, context}
@@ -94,13 +94,10 @@ var StudentPage = (function () {
       message: '',
       sending: false,
       demo: false,
-      birthday: '', // a phone report's birthday, kept to open again if the session runs out
       ident: null, // what matched on a questionnaire slip, kept to open again if the session runs out
       number: '', // the student number or slip password as typed
       bday: { m: '', d: '', y: '' }, // the pickers as chosen
       report: null, // the report as the teacher sent it
-      reply: null, // the Reply to Report questions, until replied
-      repliedAt: null,
     };
   }
 
@@ -921,64 +918,10 @@ var StudentPage = (function () {
   }
 
   function renderReport(state) {
-    var foot = state.reply
-      ? '<button type="button" class="sp-btn sp-btn-primary sp-reply-btn" data-act="reply">Reply to Your Report</button>'
-      : state.repliedAt
-        ? '<p class="pr-fine">' +
-          esc('You replied on ' + fmtDate(state.repliedAt, { month: 'short', day: 'numeric' }) + '. Thanks.') +
-          '</p>'
-        : '';
     return (
       '<div class="pr-view">' +
-      (typeof PhoneReportView !== 'undefined' ? PhoneReportView.html(state.report, foot) : '') +
+      (typeof PhoneReportView !== 'undefined' ? PhoneReportView.html(state.report) : '') +
       '</div>'
-    );
-  }
-
-  function replyQuestion(q, state) {
-    var goal = state.report && state.report.goal && state.report.goal.text;
-    if (q.kind === 'choice' && /goal/i.test(q.prompt || '') && goal) {
-      return Object.assign({}, q, { prompt: 'Your goal: ' + goal });
-    }
-    return q;
-  }
-
-  function renderReply(state) {
-    var d = state.data;
-    var part = d.parts[0];
-    var course = d.course.name;
-    var body = '';
-    (part.questions || []).forEach(function (q) {
-      body += questionCard(replyQuestion(q, state), state.answers[q.id], part, course);
-    });
-    return (
-      header('Reply to Your Report', [course, reportSub(d), 'Only your teacher sees this'].join(' \u00b7 ')) +
-      '<main class="sp-main">' +
-      body +
-      '</main><footer class="sp-foot">' +
-      (state.message ? '<p class="sp-msg" role="alert">' + esc(state.message) + '</p>' : '') +
-      '<div class="sp-foot-row"><button type="button" class="sp-btn sp-btn-quiet" data-act="to-report">Back</button>' +
-      '<button type="button" class="sp-btn sp-btn-primary" data-act="send"' +
-      (state.sending ? ' disabled' : '') +
-      '>' +
-      (state.sending ? 'Sending\u2026' : 'Send to My Teacher') +
-      '</button></div></footer>'
-    );
-  }
-
-  function renderRSent(state) {
-    var d = state.data;
-    var first = (d.student && d.student.first_name) || '';
-    return (
-      header(className(d.course), reportSub(d)) +
-      '<main class="sp-main sp-main-center sp-main-middle">' +
-      '<section class="sp-card sp-hello"><div class="sp-avatar sp-avatar-done" aria-hidden="true">' +
-      '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"></path></svg></div>' +
-      '<h1 class="sp-big">Sent to Your Teacher</h1><p class="sp-lead">' +
-      esc('Thanks' + (first ? ', ' + first : '') + '. Your next step is saved with your goal.') +
-      '</p>' +
-      (state.demo ? '<p class="sp-note">This was Demo Mode. Nothing was sent.</p>' : '') +
-      '</section><button type="button" class="sp-btn sp-btn-line" data-act="to-report">Back to My Report</button></main>'
     );
   }
 
@@ -1000,10 +943,6 @@ var StudentPage = (function () {
         return renderRCheck(state);
       case 'report':
         return renderReport(state);
-      case 'reply':
-        return renderReply(state);
-      case 'rsent':
-        return renderRSent(state);
       default:
         return renderStart(state);
     }
@@ -1196,21 +1135,6 @@ var StudentPage = (function () {
     };
   }
 
-  function demoReplyPart() {
-    var t = (typeof QUESTIONNAIRE_TEMPLATES !== 'undefined' ? QUESTIONNAIRE_TEMPLATES : []).find(function (x) {
-      return x.id === 'report-reply';
-    });
-    if (!t) return null;
-    return {
-      id: 'demo-reply',
-      kind: 'report_reply',
-      title: t.title,
-      questions: t.questions.map(function (q, i) {
-        return Object.assign({ id: 'demo-reply-' + i, core_ids: [], options: {} }, q);
-      }),
-    };
-  }
-
   function loadDemoTemplates(done) {
     if (typeof QUESTIONNAIRE_TEMPLATES !== 'undefined') return done();
     var s = document.createElement('script');
@@ -1330,13 +1254,8 @@ var StudentPage = (function () {
       paint();
       return Promise.resolve();
     }
-    var isReport = S.data && S.data.kind === 'report';
     if (S.demo) {
-      S.screen = isReport ? 'rsent' : 'sent';
-      if (isReport) {
-        S.reply = null;
-        S.repliedAt = new Date().toISOString();
-      }
+      S.screen = 'sent';
       S.message = '';
       paint();
       return Promise.resolve();
@@ -1354,16 +1273,12 @@ var StudentPage = (function () {
             if (!again || !again.ok) return again;
             S.data.token = again.token;
             // A slip that asks who you are asks again on the new session.
-            if (!isReport && again.check && S.ident) {
+            if (again.check && S.ident) {
               return call(Object.assign({ route: 'verify', token: again.token }, S.ident)).then(function (ok) {
                 return ok && ok.ok ? attempt(true) : ok;
               });
             }
-            // A report reply needs the birthday check on the new session too.
-            if (!isReport) return attempt(true);
-            return call({ route: 'check', token: again.token, birthday: S.birthday }).then(function (ok) {
-              return ok && ok.ok ? attempt(true) : ok;
-            });
+            return attempt(true);
           });
         }
         return res;
@@ -1371,13 +1286,7 @@ var StudentPage = (function () {
     }
     return attempt(false).then(function (res) {
       S.sending = false;
-      if (res && res.ok && isReport) {
-        clearDraft();
-        S.screen = 'rsent';
-        S.message = '';
-        S.reply = null;
-        S.repliedAt = res.submitted_at || new Date().toISOString();
-      } else if (res && res.ok) {
+      if (res && res.ok) {
         clearDraft();
         S.screen = 'sent';
         S.message = '';
@@ -1487,14 +1396,11 @@ var StudentPage = (function () {
     }
     S.bday = { m: m, d: dd, y: y };
     var birthday = y + '-' + String(m).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
-    S.birthday = birthday;
     S.message = '';
     var done = function (res) {
       S.sending = false;
       if (res && res.ok) {
         S.report = res.report || {};
-        S.reply = res.reply || null;
-        S.repliedAt = res.replied_at || null;
         S.screen = 'report';
         paint();
         window.scrollTo(0, 0);
@@ -1510,7 +1416,7 @@ var StudentPage = (function () {
       paint();
     };
     if (S.demo) {
-      return Promise.resolve(done({ ok: true, report: demoReport(), reply: demoReplyPart(), replied_at: null }));
+      return Promise.resolve(done({ ok: true, report: demoReport() }));
     }
     S.sending = true;
     paint();
@@ -1584,19 +1490,6 @@ var StudentPage = (function () {
       send();
     } else if (act === 'rcheck') {
       checkBirthday();
-    } else if (act === 'reply') {
-      S.data.parts = [S.reply];
-      S.answers = {};
-      loadDraft();
-      S.message = '';
-      S.screen = 'reply';
-      paint();
-      window.scrollTo(0, 0);
-    } else if (act === 'to-report') {
-      S.message = '';
-      S.screen = 'report';
-      paint();
-      window.scrollTo(0, 0);
     } else if (act === 'choice' && q) {
       toggleChoice(S, q, el.dataset.value);
       saveDraft();
@@ -1716,22 +1609,18 @@ var StudentPage = (function () {
     var h = String(hash || '').replace(/^#/, '');
     if (/^demo-report$/i.test(h)) {
       S.demo = true;
-      S.screen = 'loading';
+      var until = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
+      S.data = {
+        ok: true,
+        kind: 'report',
+        token: 'demo',
+        student: { first_name: 'Cece' },
+        course: { name: 'Science 8', block: 'B' },
+        report: { title: 'Report 1', expires_on: until },
+        has_birthday: true,
+      };
+      S.screen = 'rcheck';
       paint();
-      loadDemoTemplates(function () {
-        var until = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
-        S.data = {
-          ok: true,
-          kind: 'report',
-          token: 'demo',
-          student: { first_name: 'Cece' },
-          course: { name: 'Science 8', block: 'B' },
-          report: { title: 'Report 1', expires_on: until },
-          has_birthday: true,
-        };
-        S.screen = 'rcheck';
-        paint();
-      });
       return;
     }
     if (/^demo(-about)?$/i.test(h)) {

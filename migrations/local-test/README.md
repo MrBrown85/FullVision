@@ -119,3 +119,16 @@ PGPORT=54331 PGDATABASE=fv_tq python3 term_rating_reapprove.py
 Result on 2026-11-01 (Postgres 16.2, local): 9 of 9 pass; before the
 migration 7 of 9 (the changed-narrative re-approve kept the old date).
 `term_rating_habits.py` still passes 37 of 37.
+
+## Reports are read-only (2026-11-07)
+
+`20261107_no_report_reply.sql` was tested on `gradebook-prod` inside a
+transaction that always rolls back (it ends by raising an error): the four
+teacher functions, `student_submit.check` and `student_submit.submit` were
+replaced, the reply questionnaire and template deleted, the column dropped
+and both kind checks rebuilt. `_phone_report_json` came back without
+`reply_questionnaire_id` or `replied_at`, no function still named the
+column, a `report_reply` template insert failed the check, and an unknown
+token to `submit` still returned `expired`. A read afterwards showed nothing
+had changed. `phone_reports.py` and `questionnaires.py` test the Oct 25
+migrations as they were and still expect the reply.
