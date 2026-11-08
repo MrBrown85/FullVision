@@ -32,10 +32,11 @@ test.describe('Regression smoke (P1.2)', () => {
     await page.locator('#su-confirm').fill(password);
     await page.locator('#form-signup button[type="submit"]').click();
 
-    await expect(page.locator('#auth-success')).toContainText('Check your email for a confirmation link.');
+    await expect(page.locator('#panel-inbox')).toBeVisible();
+    await expect(page.locator('#inbox-email')).toHaveText(email);
 
-    await page.locator('#tab-signin').click();
-    await page.locator('#si-email').fill(email);
+    await page.locator('[data-action="inbox-signin"]').click();
+    await expect(page.locator('#si-email')).toHaveValue(email);
     await page.locator('#si-password').fill(password);
     await page.locator('#form-signin button[type="submit"]').click();
 

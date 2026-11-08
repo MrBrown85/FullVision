@@ -262,3 +262,77 @@ body {
   color: var(--text-3);
   line-height: 1.4;
 }
+
+/* ── Check Your Inbox (after Create Account) ───────────────── */
+.auth-inbox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+.auth-inbox[hidden],
+.auth-opening[hidden] {
+  display: none;
+}
+.auth-inbox-icon {
+  width: 56px;
+  height: 56px;
+  padding: 14px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--active-light);
+  color: var(--active);
+}
+.auth-inbox-text {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--text);
+  line-height: 1.5;
+}
+.auth-inbox-text strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.auth-inbox-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.auth-inbox .auth-demo-btn {
+  margin-top: 4px;
+}
+.auth-inbox .auth-demo-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.auth-inbox-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-top: 2px;
+}
+.auth-inbox-links button {
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--active);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.auth-inbox-links button:hover {
+  text-decoration: underline;
+}
+.auth-opening {
+  margin: 8px 0;
+  text-align: center;
+  font-size: var(--text-md);
+  color: var(--text-2);
+}
+.auth-inbox .auth-reset-title:focus {
+  outline: none;
+}

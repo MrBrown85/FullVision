@@ -13,6 +13,7 @@ const PRECACHE_URLS = [
   '/login-auth.js',
   '/manifest.json',
   '/favicon.svg',
+  '/assets/icons/apple-touch-icon.png',
   '/vendor/supabase.min.js',
   '/curriculum_by_course.json',
   // Shared modules
@@ -32,6 +33,8 @@ const PRECACHE_URLS = [
   '/shared/rubric-draft.js',
   '/shared/rubric-checks.js',
   '/shared/core-self.js',
+  '/shared/loading-screen.js',
+  '/shared/loading-screen.css',
   // Teacher desktop
   '/teacher/app.html',
   '/teacher/styles.css?v=3',

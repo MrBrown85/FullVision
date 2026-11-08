@@ -94,9 +94,9 @@ test.describe('desktop', () => {
     await page.locator('#su-password').fill('test1234!');
     await page.locator('#su-confirm').fill('test1234!');
     await page.locator('#form-signup button[type="submit"]').click();
-    await expect(page.locator('#auth-success')).toBeVisible();
-    await page.locator('#tab-signin').click();
-    await page.locator('#si-email').fill(email);
+    await expect(page.locator('#panel-inbox')).toBeVisible();
+    await page.locator('[data-action="inbox-signin"]').click();
+    await expect(page.locator('#si-email')).toHaveValue(email);
     await page.locator('#si-password').fill('test1234!');
     await page.locator('#form-signin button[type="submit"]').click();
     await page.waitForURL(/\/dashboard/);
