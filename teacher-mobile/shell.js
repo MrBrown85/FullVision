@@ -245,7 +245,7 @@
   function _hideLoader() {
     var el = document.getElementById('m-loading');
     if (!el || el.style.display === 'none') return;
-    el.classList.add('m-loading-fade');
+    el.classList.add('is-done');
     setTimeout(function () {
       el.style.display = 'none';
     }, 250);
