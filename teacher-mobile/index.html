@@ -8,8 +8,12 @@
     <meta name="description" content="TeacherDashboard Mobile — quick student lookup, observations, and grading" />
     <title>FullVision</title>
     <link rel="manifest" href="../manifest.json" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="FullVision" />
     <meta name="theme-color" content="#F2F2F7" />
     <link rel="stylesheet" href="../teacher/styles.css?v=3" />
+    <link rel="stylesheet" href="../shared/loading-screen.css" />
     <link rel="stylesheet" href="../teacher/obs-capture.css" />
     <link rel="stylesheet" href="../teacher-mobile/styles.css" />
     <script src="../shared/sentry-init.js"></script>
@@ -103,6 +107,46 @@
           />
           <button class="m-auth-submit" type="submit" id="m-su-submit">Create Account</button>
         </form>
+
+        <!-- Check Your Inbox: replaces the forms after Create Account (as on login.html) -->
+        <section class="m-auth-inbox" id="m-panel-inbox" hidden aria-labelledby="m-inbox-title">
+          <svg
+            class="m-auth-inbox-icon"
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="3" y="5" width="18" height="14" rx="2.5" />
+            <path d="m3.5 7 8.5 6 8.5-6" />
+          </svg>
+          <h2 class="m-auth-inbox-title" id="m-inbox-title" tabindex="-1">Check Your Inbox</h2>
+          <p class="m-auth-inbox-text">
+            We sent a link to <strong id="m-inbox-email"></strong>. Open it on any device and you'll go straight to your
+            gradebook.
+          </p>
+          <p class="m-auth-inbox-hint">Nothing after a minute? Check your spam folder or send it again.</p>
+          <button class="m-auth-demo-btn" type="button" id="m-inbox-resend">Resend Email</button>
+          <div class="m-auth-inbox-links">
+            <button type="button" data-action="m-inbox-change-email">Use a Different Email</button>
+            <button type="button" data-action="m-inbox-signin">Back to Sign In</button>
+          </div>
+        </section>
+
+        <!-- Demo mode — no auth, seeded sample data, local-only (same as login.html) -->
+        <div class="m-auth-demo">
+          <div class="m-auth-demo-divider"><span>or</span></div>
+          <button class="m-auth-demo-btn" type="button" id="m-demo-mode-btn" data-action="m-enter-demo-mode">
+            Try Demo Mode
+          </button>
+          <p class="m-auth-demo-hint">
+            Skip sign-in and explore with the Science 8 sample class. Data stays on this device only.
+          </p>
+        </div>
+        <p class="m-auth-demo-hint"><a href="../privacy.html">Privacy Policy</a></p>
       </div>
     </div>
 
@@ -167,13 +211,15 @@
       </nav>
     </div>
 
-    <!-- Loading spinner (visible during boot, hidden by shell.js) -->
-    <div id="m-loading" class="m-loading-overlay" role="status" aria-live="polite">
-      <div class="u-text-center">
-        <div class="m-loading-spinner"></div>
-        <div class="m-loading-text">Loading...</div>
-      </div>
-    </div>
+    <!-- Shown during boot, the same screen as the desktop's; shell.js hides it. -->
+    <div
+      id="m-loading"
+      class="app-loading"
+      role="status"
+      aria-label="Loading your classes"
+      data-fv-loading="teacher"
+    ></div>
+    <script src="../shared/loading-screen.js"></script>
 
     <!-- Offline banner -->
     <div id="m-offline-banner" class="m-offline-banner u-hidden" role="alert" aria-live="assertive">
@@ -190,6 +236,7 @@
     </script>
     <script src="../vendor/supabase.min.js"></script>
     <script src="../shared/supabase.js"></script>
+    <script src="../shared/sign-in.js"></script>
     <script src="../shared/constants.js"></script>
     <script src="../shared/data.js"></script>
     <script src="../shared/offline-queue.js"></script>

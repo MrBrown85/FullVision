@@ -247,6 +247,7 @@ load('teacher/cm-questionnaires.js');
 load('teacher/student-voice.js');
 load('teacher/learner-profile.js');
 load('shared/phone-report-view.js');
+load('shared/loading-screen.js');
 load('teacher/phone-reports.js');
 load('shared/backup-restore.js');
 load('teacher/dash-class-manager.js');

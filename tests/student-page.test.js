@@ -506,22 +506,6 @@ describe('student page: a report on the phone', () => {
     report: { title: 'Report 1', expires_on: '2027-01-31' },
     has_birthday: true,
   };
-  const REPLY = {
-    id: 'rq',
-    kind: 'report_reply',
-    title: 'Reply to Report 1',
-    questions: [
-      { id: 'r1', kind: 'text', prompt: 'What are you most proud of?', options: {}, core_ids: [] },
-      {
-        id: 'r3',
-        kind: 'choice',
-        prompt: 'Your goal: keep it or change it?',
-        options: { choices: ['Keep It', 'Change It'], multiple: false },
-        core_ids: [],
-      },
-      { id: 'r4', kind: 'text', prompt: 'One thing you will do before the next report', options: {}, core_ids: [] },
-    ],
-  };
   const COPY = {
     name: 'Cece Okafor',
     first: 'Cece',
@@ -576,76 +560,33 @@ describe('student page: a report on the phone', () => {
       "That birthday doesn't match. Check the month, day and year. 3 tries left.",
     );
     expect(root.querySelector('#sp-bm').value).toBe('5');
-    replies.push({ ok: true, report: COPY, reply: REPLY, replied_at: null });
+    replies.push({ ok: true, report: COPY });
     click('[data-act="rcheck"]');
     for (let i = 0; i < 3; i++) await tick();
     expect(root.querySelector('.pr-big').textContent).toBe('Proficient');
-    expect(root.querySelector('[data-act="reply"]').textContent).toBe('Reply to Your Report');
   });
 
-  it('the reply names their goal, sends once, and leads back to the report', async () => {
+  it('a report is for reading: nothing on it to send back', async () => {
     replies.push(REPORT_OPEN);
     T.start(root, '#K7M4QX');
     await tick();
     pickBirthday();
-    replies.push({ ok: true, report: COPY, reply: REPLY, replied_at: null });
+    replies.push({ ok: true, report: COPY });
     click('[data-act="rcheck"]');
     for (let i = 0; i < 3; i++) await tick();
-    click('[data-act="reply"]');
-    expect(root.querySelector('.sp-head-sub').textContent).toBe('Science 8 · Report 1 · Only your teacher sees this');
-    expect(root.textContent).toContain('Your goal: Hand in labs on time.');
-    type('[data-q="r1"][data-kind="text"]', 'my biodiversity journal');
-    click('[data-act="choice"][data-q="r3"][data-value="Keep It"]');
-    type('[data-q="r4"][data-kind="text"]', 'start the data table at lunch');
-    replies.push({ ok: true, submitted_at: '2026-11-22T18:00:00Z' });
-    click('[data-act="send"]');
-    for (let i = 0; i < 3; i++) await tick();
-    expect(calls[2].body).toEqual({
-      route: 'submit',
-      token: 'a'.repeat(64),
-      answers: { r1: 'my biodiversity journal', r3: ['Keep It'], r4: 'start the data table at lunch' },
-    });
-    expect(root.textContent).toContain('Your next step is saved with your goal.');
-    click('[data-act="to-report"]');
-    expect(root.querySelector('[data-act="reply"]')).toBeNull();
-    expect(root.textContent).toContain('You replied on Nov 22. Thanks.');
+    expect(root.querySelector('.pr-big').textContent).toBe('Proficient');
+    expect(root.querySelector('[data-act="send"]')).toBeNull();
+    expect(root.textContent).not.toMatch(/reply/i);
   });
 
-  it('a session that ran out while they wrote opens again, checks the birthday again, then sends', async () => {
-    replies.push(REPORT_OPEN);
-    T.start(root, '#K7M4QX');
-    await tick();
-    pickBirthday();
-    replies.push({ ok: true, report: COPY, reply: REPLY, replied_at: null });
-    click('[data-act="rcheck"]');
-    for (let i = 0; i < 3; i++) await tick();
-    click('[data-act="reply"]');
-    type('[data-q="r1"][data-kind="text"]', 'proud');
-    replies.push(
-      { ok: false, error: 'expired' },
-      Object.assign({}, REPORT_OPEN, { token: 'b'.repeat(64) }),
-      { ok: true, report: COPY, reply: REPLY },
-      { ok: true },
-    );
-    click('[data-act="send"]');
-    for (let i = 0; i < 8; i++) await tick();
-    expect(calls.slice(2).map(c => c.body.route)).toEqual(['submit', 'open', 'check', 'submit']);
-    expect(calls[4].body).toEqual({ route: 'check', token: 'b'.repeat(64), birthday: '2012-05-15' });
-    expect(root.textContent).toContain('Sent to Your Teacher');
-  });
-
-  it('Demo Mode shows a sample report and reply with no request', async () => {
+  it('Demo Mode shows a sample report with no request', async () => {
     T.start(root, '#demo-report');
     await tick();
     pickBirthday();
     click('[data-act="rcheck"]');
     await tick();
     expect(root.querySelector('.pr-name').textContent).toBe('Cece Adeyemi');
-    click('[data-act="reply"]');
-    type('textarea[data-kind="text"]', 'my journal');
-    click('[data-act="send"]');
-    await tick();
+    expect(root.querySelector('[data-act="send"]')).toBeNull();
     expect(calls).toHaveLength(0);
-    expect(root.textContent).toContain('This was Demo Mode. Nothing was sent.');
   });
 });

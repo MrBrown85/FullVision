@@ -620,8 +620,8 @@ create table guardian (
 );
 
 -- Student questionnaires (20261025_questionnaires_tables_and_functions / _templates).
-create table questionnaire_template (                                 -- read-only; 18 seeded forms
-  id text primary key,                                                -- core-<grade>-<period> | about-me | goal-checkin | report-reply
+create table questionnaire_template (                                 -- read-only; 17 seeded forms
+  id text primary key,                                                -- core-<grade>-<period> | about-me | goal-checkin
   kind text not null, grade integer, period integer, year integer not null default 2026,
   title text not null, theme text, core_heading text, myed_comment text,
   questions jsonb not null default '[]',                              -- [{prompt, kind, options, core_ids, repeated_key, teacher_only}]
@@ -632,7 +632,7 @@ create table questionnaire (                                          -- RLS fv_
   id uuid primary key default gen_random_uuid(),
   course_id uuid not null references course(id) on delete cascade,
   template_id text references questionnaire_template(id) on delete set null,
-  kind text not null,                                                 -- about_me | core_reflection | goal_checkin | curricular_self_assessment | report_reply
+  kind text not null,                                                 -- about_me | core_reflection | goal_checkin | curricular_self_assessment
   title text not null, theme text, report_period integer,
   parent_id uuid references questionnaire(id) on delete set null,     -- a Goal Check-In rides on its reflection's slip
   opens_on date, closes_on date, is_on boolean not null default true, myed_comment text,
@@ -700,13 +700,13 @@ create table student_submit.attempt (                                 -- rate li
 
 -- Reports on students' phones (20261025_phone_reports). The teacher's copy of
 -- each student's report, fixed until updated; codes in student_access_code
--- (phone_report_id) open it after a birthday check. RLS through the course.
+-- (phone_report_id) open it after a birthday check. Read-only: no reply
+-- (20261107_no_report_reply). RLS through the course.
 create table phone_report (
   id uuid primary key default gen_random_uuid(),
   course_id uuid not null references course(id) on delete cascade,
   term integer not null,                                              -- 1..6
   term_label text,
-  reply_questionnaire_id uuid references questionnaire(id) on delete set null, -- its Reply to Report
   issued_at timestamptz not null default now(), updated_at timestamptz not null default now(),
   expires_on date not null,                                           -- links work through this day
   closed_at timestamptz,                                              -- Close All Links

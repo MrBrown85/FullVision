@@ -523,7 +523,6 @@ table public.phone_report (rls on)
   course_id uuid not null
   term integer not null
   term_label text
-  reply_questionnaire_id uuid
   issued_at timestamp with time zone not null default now()
   updated_at timestamp with time zone not null default now()
   expires_on date not null
@@ -532,13 +531,11 @@ table public.phone_report (rls on)
   constraint phone_report_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
   constraint phone_report_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.teacher(id) ON DELETE SET NULL
   constraint phone_report_pkey PRIMARY KEY (id)
-  constraint phone_report_reply_questionnaire_id_fkey FOREIGN KEY (reply_questionnaire_id) REFERENCES public.questionnaire(id) ON DELETE SET NULL
   constraint phone_report_term_check CHECK (((term >= 1) AND (term <= 6)))
   constraint phone_report_term_label_check CHECK (((term_label IS NULL) OR (char_length(term_label) <= 80)))
   CREATE INDEX phone_report_course ON public.phone_report USING btree (course_id, issued_at DESC)
   CREATE INDEX phone_report_created_by_idx ON public.phone_report USING btree (created_by)
   CREATE UNIQUE INDEX phone_report_pkey ON public.phone_report USING btree (id)
-  CREATE INDEX phone_report_reply_questionnaire_id_idx ON public.phone_report USING btree (reply_questionnaire_id)
   policy phone_report_via_course for all to public using (public.fv_owns_course(course_id)) with check (public.fv_owns_course(course_id))
 table public.phone_report_student (rls on)
   report_id uuid not null
@@ -601,7 +598,7 @@ table public.questionnaire (rls on)
   updated_at timestamp with time zone not null default now()
   constraint questionnaire_check CHECK (((opens_on IS NULL) OR (closes_on IS NULL) OR (opens_on <= closes_on)))
   constraint questionnaire_course_id_fkey FOREIGN KEY (course_id) REFERENCES public.course(id) ON DELETE CASCADE
-  constraint questionnaire_kind_check CHECK ((kind = ANY (ARRAY['about_me'::text, 'core_reflection'::text, 'goal_checkin'::text, 'curricular_self_assessment'::text, 'report_reply'::text])))
+  constraint questionnaire_kind_check CHECK ((kind = ANY (ARRAY['about_me'::text, 'core_reflection'::text, 'goal_checkin'::text, 'curricular_self_assessment'::text])))
   constraint questionnaire_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.questionnaire(id) ON DELETE SET NULL
   constraint questionnaire_pkey PRIMARY KEY (id)
   constraint questionnaire_report_period_check CHECK (((report_period IS NULL) OR ((report_period >= 1) AND (report_period <= 6))))
@@ -625,7 +622,7 @@ table public.questionnaire_template (rls on)
   questions jsonb not null default '[]'::jsonb
   updated_at timestamp with time zone not null default now()
   constraint questionnaire_template_grade_check CHECK (((grade IS NULL) OR ((grade >= 8) AND (grade <= 12))))
-  constraint questionnaire_template_kind_check CHECK ((kind = ANY (ARRAY['about_me'::text, 'core_reflection'::text, 'goal_checkin'::text, 'curricular_self_assessment'::text, 'report_reply'::text])))
+  constraint questionnaire_template_kind_check CHECK ((kind = ANY (ARRAY['about_me'::text, 'core_reflection'::text, 'goal_checkin'::text, 'curricular_self_assessment'::text])))
   constraint questionnaire_template_period_check CHECK (((period IS NULL) OR ((period >= 1) AND (period <= 3))))
   constraint questionnaire_template_pkey PRIMARY KEY (id)
   constraint questionnaire_template_questions_check CHECK ((jsonb_typeof(questions) = 'array'::text))
@@ -1293,6 +1290,7 @@ function public.reorder_subjects(p_ids uuid[]) returns void
 function public.reorder_tags(p_ids uuid[]) returns void
 function public.restore_section(p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.restore_teacher() returns void
+function public.rls_auto_enable() returns event_trigger security definer
 function public.save_assessment_tags(p_id uuid, p_tag_ids uuid[]) returns void
 function public.save_categories(p_course_id uuid, p_categories jsonb) returns uuid[]
 function public.save_collab(p_id uuid, p_mode text, p_config jsonb) returns void

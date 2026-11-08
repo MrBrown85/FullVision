@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FullVision</title>
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#007AFF" />
+    <!-- The home-screen app starts here (manifest.json start_url) and goes on
+         to the phone app on a phone, the desktop app on an iPad or computer.
+         Each app shows its own sign-in when no one is signed in. -->
+    <script src="/shared/device.js"></script>
+    <script>
+      location.replace(teacherAppPath());
+    </script>
+  </head>
+  <body></body>
+</html>

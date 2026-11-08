@@ -3593,7 +3593,7 @@ textarea.studio-text {
 }
 .pp-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2.4fr) 120px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 120px;
   column-gap: 14px;
   align-items: center;
   padding: 0 16px;
@@ -3636,18 +3636,6 @@ textarea.studio-text {
   border-radius: 4px;
   display: inline-block;
   flex-shrink: 0;
-}
-.pp-reply {
-  color: var(--text);
-  line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.pp-none {
-  color: var(--text-3);
 }
 .pp-acts {
   display: flex;
@@ -3702,9 +3690,6 @@ textarea.studio-text {
   }
   .pp-head {
     display: none;
-  }
-  .pp-reply {
-    grid-column: 1 / -1;
   }
 }
 

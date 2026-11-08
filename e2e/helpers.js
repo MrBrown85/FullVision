@@ -1151,6 +1151,10 @@ export async function mockPersistentAuthFlow(
           return noopPromise({ error: null });
         },
         resetPasswordForEmail: () => noopPromise({ data: {}, error: null }),
+        resend: args => {
+          window.__e2eResends = (window.__e2eResends || []).concat([clone(args)]);
+          return noopPromise({ data: {}, error: null });
+        },
         refreshSession: () => {
           const session = loadSession();
           if (!session) return noopPromise({ data: { session: null }, error: { message: 'No session' } });
@@ -1162,7 +1166,11 @@ export async function mockPersistentAuthFlow(
           const normalizedEmail = normalizeEmail(email);
           const db = loadDb();
           if (db.users[normalizedEmail]) {
-            return noopPromise({ data: null, error: { message: 'User already exists' } });
+            // As Supabase does: no error and no email, a user with no identities.
+            return noopPromise({
+              data: { user: { id: 'obfuscated', email: normalizedEmail, identities: [] }, session: null },
+              error: null,
+            });
           }
           const record = {
             id: teacherIdFor(normalizedEmail),

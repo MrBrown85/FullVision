@@ -179,9 +179,8 @@ var PhoneReportView = (function () {
   }
 
   /* The report's body: the sticky header and every card that has
-     something to say. `foot` is HTML the caller adds after the cards (the
-     Reply button on the phone). */
-  function html(d, foot) {
+     something to say. */
+  function html(d) {
     d = d || {};
     return (
       header(d) +
@@ -192,7 +191,6 @@ var PhoneReportView = (function () {
       goal(d) +
       self(d) +
       attendance(d) +
-      (foot || '') +
       '<p class="pr-fine">Show this to your family. Your official report card is in MyEd.</p></main>'
     );
   }
