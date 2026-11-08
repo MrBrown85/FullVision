@@ -1290,6 +1290,7 @@ function public.reorder_subjects(p_ids uuid[]) returns void
 function public.reorder_tags(p_ids uuid[]) returns void
 function public.restore_section(p_id uuid, p_idempotency_key uuid) returns jsonb
 function public.restore_teacher() returns void
+function public.rls_auto_enable() returns event_trigger security definer
 function public.save_assessment_tags(p_id uuid, p_tag_ids uuid[]) returns void
 function public.save_categories(p_course_id uuid, p_categories jsonb) returns uuid[]
 function public.save_collab(p_id uuid, p_mode text, p_config jsonb) returns void
