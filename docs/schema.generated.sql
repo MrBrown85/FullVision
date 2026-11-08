@@ -1173,6 +1173,8 @@ table student_submit.session (rls on)
   CREATE UNIQUE INDEX session_pkey ON student_submit.session USING btree (id)
   CREATE UNIQUE INDEX session_token_hash_key ON student_submit.session USING btree (token_hash)
 function public._access_code_hash(p_code text, p_salt text) returns text
+function public._fv_release_orphan_teacher_email() returns void security definer
+function public._fv_teacher_sign_in_deleted() returns trigger security definer
 function public._issue_access_code(p_enrollment_id uuid, p_questionnaire_id uuid, p_expires_at timestamp with time zone) returns text security definer
 function public._issue_report_code(p_enrollment_id uuid, p_report_id uuid, p_expires_at timestamp with time zone) returns text security definer
 function public._new_access_code() returns text
