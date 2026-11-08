@@ -1189,6 +1189,61 @@ export async function mockPersistentAuthFlow(
           saveDb(db);
           return noopPromise({ data: { user: publicUser(record), session: null }, error: null });
         },
+        // Continue with Google, as if the teacher picked an account at Google:
+        // back to redirectTo signed in, with Google's name as full_name, not
+        // display_name. window.__e2eGoogleCancel comes back with the error
+        // Google gives when the teacher cancels. Calls are kept in
+        // localStorage (e2e-oauth-calls) because the page navigates away.
+        signInWithOAuth: ({ provider, options }) => {
+          const calls = JSON.parse(localStorage.getItem('e2e-oauth-calls') || '[]');
+          calls.push(clone({ provider, options }));
+          localStorage.setItem('e2e-oauth-calls', JSON.stringify(calls));
+          const back = options && options.redirectTo;
+          if (window.__e2eGoogleCancel) {
+            window.location.assign(back + '#error=access_denied&error_description=The+user+denied+access');
+            return noopPromise({ data: {}, error: null });
+          }
+          const email = normalizeEmail(window.__e2eGoogleEmail || 'google.teacher@example.com');
+          const db = loadDb();
+          let record = db.users[email];
+          if (!record) {
+            record = {
+              id: teacherIdFor(email),
+              email: email,
+              password: null,
+              display_name: null,
+              created_at: new Date().toISOString(),
+              deleted_at: null,
+              appState: null,
+            };
+            record.appState = buildAppState(record);
+            db.users[email] = record;
+            saveDb(db);
+          }
+          applyAppState(record.appState);
+          const session = buildSession(record);
+          const meta = session.user.user_metadata;
+          if (!meta.display_name) delete meta.display_name;
+          meta.full_name = window.__e2eGoogleName || 'Avery Chen';
+          meta.name = meta.full_name;
+          persistSession(session);
+          window.location.assign(back + '#access_token=' + session.access_token + '&token_type=bearer');
+          return noopPromise({ data: { provider, url: back }, error: null });
+        },
+        updateUser: attrs => {
+          const session = loadSession();
+          if (!session) return noopPromise({ data: { user: null }, error: { message: 'No session' } });
+          const data = (attrs && attrs.data) || {};
+          session.user.user_metadata = Object.assign({}, session.user.user_metadata, data);
+          persistSession(session);
+          const db = loadDb();
+          const record = db.users[normalizeEmail(session.user.email)];
+          if (record && data.display_name) {
+            record.display_name = data.display_name;
+            saveDb(db);
+          }
+          return noopPromise({ data: { user: clone(session.user) }, error: null });
+        },
         signInWithPassword: ({ email, password }) => {
           const normalizedEmail = normalizeEmail(email);
           const db = loadDb();

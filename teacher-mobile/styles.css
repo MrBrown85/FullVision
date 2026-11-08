@@ -2673,6 +2673,49 @@ body.fv-switching-course::after {
   -webkit-tap-highlight-color: transparent;
 }
 /* Try Demo Mode and the Privacy Policy link, as on login.html */
+.m-auth-google {
+  margin-bottom: 4px;
+}
+.m-auth-google-btn {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #747775;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1f1f1f;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-auth-google-btn:active {
+  background: #f2f2f2;
+}
+.m-auth-google-btn:disabled {
+  opacity: 0.7;
+}
+.m-auth-google-logo {
+  flex: none;
+}
+.m-auth-google .m-auth-demo-divider {
+  margin: 16px 0;
+}
+@media (prefers-color-scheme: dark) {
+  .m-auth-google-btn {
+    background: #131314;
+    color: #e3e3e3;
+    border-color: #8e918f;
+  }
+  .m-auth-google-btn:active {
+    background: #202124;
+  }
+}
 .m-auth-demo {
   margin-top: 24px;
 }
