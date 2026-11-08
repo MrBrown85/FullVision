@@ -3,7 +3,8 @@
  * login.html (desktop) and teacher-mobile/index.html (phone) each draw their own
  * sign-in card. The steps behind it live here so the two can't drift:
  * Try Demo Mode, the Restore Account prompt for an account set to be
- * deleted, and where a password reset link lands.
+ * deleted, where a password reset link lands, and Check Your Inbox after
+ * Create Account.
  *
  * Plain browser globals, like login-auth.js. Needs shared/html.js (esc) and
  * shared/supabase.js (getSupabase) at call time. */
@@ -134,4 +135,91 @@ async function promptRestoreAccount(user, showSuccess) {
   if (restoreRes.error) throw restoreRes.error;
   showSuccess('Account restored. Redirecting…');
   return true;
+}
+
+/* ── After Create Account ──────────────────────────────────────
+ * Sign-up ends one of three ways. With email confirmation on (the usual
+ * case), Supabase sends a link and the screen shows Check Your Inbox; the
+ * link signs the teacher in and opens login.html?confirmed=1, which goes on
+ * into the gradebook. With confirmation off, sign-up returns a session and
+ * the teacher goes straight in. An address that already has an account
+ * comes back with no identities (Supabase sends no email then), so the
+ * screen offers Sign In instead of waiting for a link that won't come. */
+function signUpOutcome(data) {
+  if (data && data.session) return 'signed-in';
+  var user = data && data.user;
+  if (user && Array.isArray(user.identities) && user.identities.length === 0) return 'exists';
+  return 'confirm';
+}
+
+/* Sign-in refused because the address was never confirmed. */
+function isEmailNotConfirmed(err) {
+  return !!err && (err.code === 'email_not_confirmed' || /email not confirmed/i.test(err.message || ''));
+}
+
+/* Check Your Inbox: shows the address, runs Resend Email with a cooldown
+ * (Supabase allows one email a minute), and goes on into the app if the
+ * link is opened in another tab of this browser, which shares the session.
+ * Returns a function that stops watching. */
+var RESEND_WAIT_SECONDS = 60;
+
+function startCheckInbox(opts) {
+  opts.emailEl.textContent = opts.email;
+  var btn = opts.resendBtn;
+  var label = btn.textContent;
+  var timer = null;
+
+  function cooldown(seconds) {
+    clearInterval(timer);
+    btn.disabled = true;
+    btn.textContent = 'Resend Email (' + seconds + ')';
+    timer = setInterval(function () {
+      seconds -= 1;
+      if (seconds > 0) {
+        btn.textContent = 'Resend Email (' + seconds + ')';
+        return;
+      }
+      clearInterval(timer);
+      btn.disabled = false;
+      btn.textContent = label;
+    }, 1000);
+  }
+
+  btn.onclick = async function () {
+    opts.clearMessages();
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    try {
+      await resendSignUpEmail(opts.email);
+      opts.showSuccess('Sent. Check your inbox again, including the spam folder.');
+      cooldown(RESEND_WAIT_SECONDS);
+    } catch (err) {
+      var wait = /(\d+)\s*seconds?/.exec((err && err.message) || '');
+      if (wait) {
+        opts.showError('Wait a moment before sending another email.');
+        cooldown(Number(wait[1]) || RESEND_WAIT_SECONDS);
+      } else {
+        opts.showError((err && err.message) || 'Could not send the email. Please try again.');
+        btn.disabled = false;
+        btn.textContent = label;
+      }
+    }
+  };
+  if (opts.justSent) cooldown(RESEND_WAIT_SECONDS);
+
+  var sub = null;
+  var sb = getSupabase();
+  if (sb) {
+    sub = sb.auth.onAuthStateChange(function (event, session) {
+      if (event === 'SIGNED_IN' && session) opts.onSignedIn(session.user);
+    }).data.subscription;
+  }
+
+  return function stop() {
+    clearInterval(timer);
+    btn.disabled = false;
+    btn.textContent = label;
+    btn.onclick = null;
+    if (sub) sub.unsubscribe();
+  };
 }

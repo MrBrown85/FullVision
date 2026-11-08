@@ -563,9 +563,12 @@
       </footer>
     </div>
     <script>
-      // A password reset link that lands here (the site's default address)
-      // goes on to the sign-in page, which shows Choose a New Password.
-      if (/(^|[#&])(type=recovery|error_code=)/.test(location.hash)) {
+      // A sign-up confirmation link that lands here (the site's default
+      // address) goes on to the sign-in page, which opens the gradebook.
+      // A password reset link goes there too, to Choose a New Password.
+      if (/(^|[#&])type=signup(&|$)/.test(location.hash)) {
+        location.replace('/login.html?confirmed=1' + location.hash);
+      } else if (/(^|[#&])(type=recovery|error_code=)/.test(location.hash)) {
         location.replace('/login.html?reset=1' + location.hash);
       }
     </script>

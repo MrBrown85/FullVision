@@ -44,7 +44,8 @@ function isResetLink() {
   return new URLSearchParams(location.search).get('reset') === '1' || /(^|[#&])type=recovery(&|$)/.test(location.hash);
 }
 
-function resetLinkError() {
+/* The error Supabase puts in the address for a used or expired link. */
+function linkError() {
   var hash = new URLSearchParams(location.hash.replace(/^#/, ''));
   var query = new URLSearchParams(location.search);
   return hash.get('error') || hash.get('error_code') || query.get('error') || query.get('error_code') || null;
@@ -68,7 +69,7 @@ function resetLinkFailed() {
 }
 
 async function startPasswordReset(sb) {
-  if (resetLinkError()) return resetLinkFailed();
+  if (linkError()) return resetLinkFailed();
   var result = await sb.auth.getSession();
   if (!result.data.session) return resetLinkFailed();
   // The tokens have been read; keep them out of the address bar and history.
@@ -102,6 +103,81 @@ async function handleResetSubmit(e) {
   }
 }
 
+/* ── Email confirmation ────────────────────────────────────────
+   The link in the sign-up email signs the teacher in and opens
+   login.html?confirmed=1 (or the front page, which sends it here). The
+   page says Opening your gradebook… while the client reads the link's
+   tokens, then goes on into the app like any signed-in visit. */
+var CONFIRM_EXPIRED =
+  "This link has expired or was already used. Sign in below; if your email isn't confirmed yet, we'll offer to send a new link.";
+
+function isConfirmLink() {
+  return (
+    new URLSearchParams(location.search).get('confirmed') === '1' || /(^|[#&])type=signup(&|$)/.test(location.hash)
+  );
+}
+
+function setFormsHidden(hidden) {
+  document.querySelector('.auth-tabs').hidden = hidden;
+  document.querySelector('.auth-demo').hidden = hidden;
+  if (hidden) {
+    document.getElementById('form-signin').hidden = true;
+    document.getElementById('form-signup').hidden = true;
+  }
+}
+
+function showOpening() {
+  setFormsHidden(true);
+  document.getElementById('auth-opening').hidden = false;
+}
+
+function confirmLinkFailed() {
+  history.replaceState(null, '', location.pathname);
+  document.getElementById('auth-opening').hidden = true;
+  setFormsHidden(false);
+  switchTab('signin');
+  showError(CONFIRM_EXPIRED);
+}
+
+/* Check Your Inbox, after Create Account or a sign-in the server refused
+   because the address isn't confirmed yet. */
+var stopInbox = null;
+var inboxEmail = '';
+
+function showInbox(email, justSent) {
+  inboxEmail = email;
+  setFormsHidden(true);
+  var panel = document.getElementById('panel-inbox');
+  panel.hidden = false;
+  if (stopInbox) stopInbox();
+  stopInbox = startCheckInbox({
+    email: email,
+    justSent: justSent,
+    emailEl: document.getElementById('inbox-email'),
+    resendBtn: document.getElementById('inbox-resend'),
+    showSuccess: showSuccess,
+    showError: showError,
+    clearMessages: hideMessages,
+    onSignedIn: goIn,
+  });
+  var title = document.getElementById('inbox-title');
+  title.tabIndex = -1;
+  title.focus();
+}
+
+function leaveInbox(tab) {
+  if (stopInbox) stopInbox();
+  stopInbox = null;
+  document.getElementById('panel-inbox').hidden = true;
+  setFormsHidden(false);
+  switchTab(tab);
+}
+
+/* Into the app, after the Restore Account question if the account is set to be deleted. */
+async function goIn(user) {
+  if (await maybePromptRestoreAccount(user)) portalRedirect(user);
+}
+
 /* ── Redirect if already logged in ─────────────────────────── */
 (async function () {
   if (isResetLink()) {
@@ -132,6 +208,9 @@ async function handleResetSubmit(e) {
     window.location.href = '/dashboard';
     return;
   }
+  var confirming = isConfirmLink();
+  if (confirming && linkError()) return confirmLinkFailed();
+  if (confirming) showOpening();
   try {
     var sb = getSupabase();
     if (sb) {
@@ -139,14 +218,23 @@ async function handleResetSubmit(e) {
       var session = result.data.session;
       if (session) {
         var shouldRedirect = await maybePromptRestoreAccount(session.user);
-        if (!shouldRedirect) return;
-        portalRedirect(session.user);
+        if (shouldRedirect) {
+          portalRedirect(session.user);
+          return;
+        }
+        if (confirming) {
+          history.replaceState(null, '', location.pathname);
+          document.getElementById('auth-opening').hidden = true;
+          setFormsHidden(false);
+          switchTab('signin');
+        }
         return;
       }
     }
   } catch (e) {
     /* not logged in, stay on page */
   }
+  if (confirming) confirmLinkFailed();
 })();
 
 /* ── Tab switching ─────────────────────────────────────────── */
@@ -187,8 +275,8 @@ async function handleSignIn(e) {
   var btn = document.getElementById('si-submit');
   btn.disabled = true;
   btn.textContent = 'Signing in...';
+  var email = document.getElementById('si-email').value.trim();
   try {
-    var email = document.getElementById('si-email').value.trim();
     var password = document.getElementById('si-password').value;
     var result = await signIn(email, password);
     var shouldRedirect = await maybePromptRestoreAccount(result.user);
@@ -199,9 +287,14 @@ async function handleSignIn(e) {
     }
     portalRedirect(result.user);
   } catch (err) {
-    showError(err.message || 'Sign in failed. Please try again.');
     btn.disabled = false;
     btn.textContent = 'Sign In';
+    if (isEmailNotConfirmed(err)) {
+      showInbox(email, false);
+      showError("Your email isn't confirmed yet. Open the link we sent, or send a new one.");
+      return;
+    }
+    showError(err.message || 'Sign in failed. Please try again.');
   }
 }
 
@@ -221,13 +314,24 @@ async function handleSignUp(e) {
   try {
     var name = document.getElementById('su-name').value.trim();
     var email = document.getElementById('su-email').value.trim();
-    await signUp(email, password, name);
-    showSuccess('Check your email for a confirmation link.');
-    btn.textContent = 'Account Created';
-    setTimeout(function () {
-      btn.disabled = false;
-      btn.textContent = 'Create Account';
-    }, 4000);
+    var data = await signUp(email, password, name);
+    var outcome = signUpOutcome(data);
+    btn.disabled = false;
+    btn.textContent = 'Create Account';
+    if (outcome === 'signed-in') {
+      await goIn(data.user);
+      return;
+    }
+    if (outcome === 'exists') {
+      switchTab('signin');
+      document.getElementById('si-email').value = email;
+      document.getElementById('si-password').focus();
+      showError('You already have an account with this email. Sign in below.');
+      return;
+    }
+    document.getElementById('su-password').value = '';
+    document.getElementById('su-confirm').value = '';
+    showInbox(email, true);
   } catch (err) {
     showError(err.message || 'Sign up failed. Please try again.');
     btn.disabled = false;
@@ -246,6 +350,15 @@ document.addEventListener('click', function (e) {
     case 'forgot-password':
       e.preventDefault();
       handleForgot();
+      break;
+    case 'inbox-change-email':
+      leaveInbox('signup');
+      document.getElementById('su-email').select();
+      break;
+    case 'inbox-signin':
+      leaveInbox('signin');
+      document.getElementById('si-email').value = inboxEmail;
+      document.getElementById('si-password').focus();
       break;
     case 'enter-demo-mode':
       e.preventDefault();
