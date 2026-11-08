@@ -272,7 +272,7 @@ body.fv-switching-course::after {
   .m-pull-indicator,
   .m-screen-content.m-pull-settle,
   .m-sheet-backdrop,
-  .m-loading-overlay {
+  #m-loading {
     transition: none !important;
     animation: none !important;
   }
@@ -2604,6 +2604,74 @@ body.fv-switching-course::after {
 .m-auth-success.visible {
   display: block;
 }
+/* Check Your Inbox, after Create Account (as on login.html) */
+.m-auth-tabs[hidden],
+.m-auth-demo[hidden],
+.m-auth-inbox[hidden] {
+  display: none;
+}
+.m-auth-inbox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+.m-auth-inbox-icon {
+  width: 60px;
+  height: 60px;
+  padding: 15px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--active-light);
+  color: var(--active);
+}
+.m-auth-inbox-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  outline: none;
+}
+.m-auth-inbox-text {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text);
+  line-height: 1.45;
+}
+.m-auth-inbox-text strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.m-auth-inbox-hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.m-auth-inbox .m-auth-demo-btn {
+  margin-top: 4px;
+}
+.m-auth-inbox .m-auth-demo-btn:disabled {
+  opacity: 0.55;
+}
+.m-auth-inbox-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.m-auth-inbox-links button {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  min-height: 44px;
+  color: var(--link);
+  background: none;
+  border: 0;
+  padding: 0 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 /* Try Demo Mode and the Privacy Policy link, as on login.html */
 .m-auth-demo {
   margin-top: 24px;
@@ -2696,33 +2764,10 @@ body.fv-switching-course::after {
 /* ═══════════════════════════════════════════════════════════════
    PULL TO REFRESH
    ═══════════════════════════════════════════════════════════════ */
-.m-loading-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg);
+/* The boot screen is shared/loading-screen.css's; on the phone it sits
+   above the tab bar and sheets. */
+#m-loading {
   z-index: var(--z-loading);
-  transition: opacity 0.25s ease-out;
-}
-.m-loading-overlay.m-loading-fade {
-  opacity: 0;
-  pointer-events: none;
-}
-.m-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border);
-  border-top-color: var(--active);
-  border-radius: 50%;
-  animation: m-spin 0.6s linear infinite;
-  margin: 0 auto 12px;
-}
-.m-loading-text {
-  font-size: 15px;
-  color: var(--text-3);
-  font-weight: 500;
 }
 
 .m-pull-indicator {

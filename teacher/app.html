@@ -9,8 +9,12 @@
     />
     <title>FullVision</title>
     <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="FullVision" />
     <meta name="theme-color" content="#007AFF" />
     <link rel="stylesheet" href="/teacher/styles.css?v=3" />
+    <link rel="stylesheet" href="/shared/loading-screen.css" />
     <link rel="stylesheet" href="/teacher/dashboard.css" />
     <link rel="stylesheet" href="/teacher/assignments.css" />
     <link rel="stylesheet" href="/teacher/student.css" />
@@ -31,55 +35,14 @@
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
     <!-- Shown from the first paint until the first page is drawn (router.js). -->
-    <div id="app-loading" class="app-loading" role="status" aria-label="Loading your classes">
-      <div class="app-loading-mark" aria-hidden="true">
-        <svg class="app-loading-logo" viewBox="0 0 64 64">
-          <rect width="64" height="64" rx="15" fill="#0071e3" />
-          <rect class="app-loading-bar" x="13" y="38" width="8" height="10" rx="2" fill="#fff" opacity="0.55" />
-          <rect class="app-loading-bar" x="23" y="31" width="8" height="17" rx="2" fill="#fff" opacity="0.7" />
-          <rect class="app-loading-bar" x="33" y="24" width="8" height="24" rx="2" fill="#fff" opacity="0.85" />
-          <rect class="app-loading-bar" x="43" y="17" width="8" height="31" rx="2" fill="#fff" />
-        </svg>
-        <div class="app-loading-shadow"></div>
-      </div>
-      <div class="app-loading-title" aria-hidden="true">FullVision</div>
-      <div class="app-loading-text" id="app-loading-text" aria-hidden="true">Sharpening the pencils…</div>
-    </div>
-    <script>
-      // A new loading line every couple of seconds until router.js removes the screen.
-      (function () {
-        var lines = [
-          'Sharpening the pencils…',
-          'Taking attendance…',
-          'Counting heads twice…',
-          'Finding the missing permission slips…',
-          'Hunting for a whiteboard marker that works…',
-          'Unjamming the photocopier…',
-          'Collecting the late work…',
-          'Putting the date on the board…',
-          'Rounding up the stragglers from recess…',
-          'Topping up the coffee…',
-          'Untangling the projector cable…',
-          'Waiting for the bell…',
-          'Shushing the back row…',
-          'Handing out the name tags…',
-          'Checking under the desks for gum…',
-          'Stacking the chairs…',
-        ];
-        var el = document.getElementById('app-loading-text');
-        var i = Math.floor(Math.random() * lines.length);
-        el.textContent = lines[i];
-        var timer = setInterval(function () {
-          if (!el.isConnected) return clearInterval(timer);
-          el.classList.add('is-swapping');
-          setTimeout(function () {
-            i = (i + 1) % lines.length;
-            el.textContent = lines[i];
-            el.classList.remove('is-swapping');
-          }, 200);
-        }, 2200);
-      })();
-    </script>
+    <div
+      id="app-loading"
+      class="app-loading"
+      role="status"
+      aria-label="Loading your classes"
+      data-fv-loading="teacher"
+    ></div>
+    <script src="/shared/loading-screen.js"></script>
     <div id="gb-tooltip" class="u-hidden"></div>
     <div id="dock-mount"></div>
     <div class="page-layout" id="page-layout">

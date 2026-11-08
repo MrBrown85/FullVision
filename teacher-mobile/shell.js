@@ -245,7 +245,7 @@
   function _hideLoader() {
     var el = document.getElementById('m-loading');
     if (!el || el.style.display === 'none') return;
-    el.classList.add('m-loading-fade');
+    el.classList.add('is-done');
     setTimeout(function () {
       el.style.display = 'none';
     }, 250);
@@ -307,21 +307,23 @@
       var action = target.getAttribute('data-action');
 
       if (action === 'm-auth-tab') {
-        var tab = target.getAttribute('data-tab');
-        var isSignIn = tab === 'signin';
-        document.getElementById('m-form-signin').hidden = !isSignIn;
-        document.getElementById('m-form-signup').hidden = isSignIn;
-        document.querySelectorAll('.m-auth-tabs .m-seg-btn').forEach(function (btn) {
-          var active = btn.getAttribute('data-tab') === tab;
-          btn.classList.toggle('m-seg-active', active);
-          btn.setAttribute('aria-selected', active ? 'true' : 'false');
-        });
-        _authClearMessages();
+        _authShowTab(target.getAttribute('data-tab'));
       }
 
       if (action === 'm-auth-forgot') {
         e.preventDefault();
         _handleForgot();
+      }
+
+      if (action === 'm-inbox-change-email') {
+        _leaveInbox('signup');
+        document.getElementById('m-su-email').select();
+      }
+
+      if (action === 'm-inbox-signin') {
+        _leaveInbox('signin');
+        document.getElementById('m-si-email').value = _inboxEmail;
+        document.getElementById('m-si-password').focus();
       }
 
       if (action === 'm-enter-demo-mode') {
@@ -350,6 +352,71 @@
     }
   }
 
+  function _authShowTab(tab) {
+    var isSignIn = tab === 'signin';
+    document.getElementById('m-form-signin').hidden = !isSignIn;
+    document.getElementById('m-form-signup').hidden = isSignIn;
+    document.querySelectorAll('.m-auth-tabs .m-seg-btn').forEach(function (btn) {
+      var active = btn.getAttribute('data-tab') === tab;
+      btn.classList.toggle('m-seg-active', active);
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    _authClearMessages();
+  }
+
+  /* Check Your Inbox, after Create Account or a sign-in refused because the
+   * address isn't confirmed yet. The steps live in shared/sign-in.js. */
+  var _stopInbox = null;
+  var _inboxEmail = '';
+
+  function _setAuthFormsHidden(hidden) {
+    document.querySelector('.m-auth-tabs').hidden = hidden;
+    document.querySelector('.m-auth-demo').hidden = hidden;
+    if (hidden) {
+      document.getElementById('m-form-signin').hidden = true;
+      document.getElementById('m-form-signup').hidden = true;
+    }
+  }
+
+  function _showInbox(email, justSent) {
+    _inboxEmail = email;
+    _setAuthFormsHidden(true);
+    document.getElementById('m-panel-inbox').hidden = false;
+    if (_stopInbox) _stopInbox();
+    _stopInbox = startCheckInbox({
+      email: email,
+      justSent: justSent,
+      emailEl: document.getElementById('m-inbox-email'),
+      resendBtn: document.getElementById('m-inbox-resend'),
+      showSuccess: _authSuccess,
+      showError: _authError,
+      clearMessages: _authClearMessages,
+      onSignedIn: _enterApp,
+    });
+    document.getElementById('m-inbox-title').focus();
+  }
+
+  function _leaveInbox(tab) {
+    if (_stopInbox) _stopInbox();
+    _stopInbox = null;
+    document.getElementById('m-panel-inbox').hidden = true;
+    _setAuthFormsHidden(false);
+    _authShowTab(tab);
+  }
+
+  /* Into the app once signed in. An account set to be deleted asks Restore
+   * Account first, as on login.html. Returns false if the teacher stays out. */
+  async function _enterApp(user) {
+    var goOn = await promptRestoreAccount(user, _authSuccess);
+    if (!goOn) return false;
+    if (_stopInbox) _stopInbox();
+    _stopInbox = null;
+    _hideAuth();
+    _resetHistory();
+    await _bootApp();
+    return true;
+  }
+
   async function _handleSignIn() {
     _authClearMessages();
     var btn = document.getElementById('m-si-submit');
@@ -363,20 +430,19 @@
     btn.textContent = 'Signing in...';
     try {
       var result = await signIn(email.trim(), password);
-      // An account set to be deleted asks Restore Account first, as on login.html.
-      var goOn = await promptRestoreAccount(result && result.user, _authSuccess);
-      if (!goOn) {
+      if (!(await _enterApp(result && result.user))) {
         btn.disabled = false;
         btn.textContent = 'Sign In';
-        return;
       }
-      _hideAuth();
-      _resetHistory();
-      await _bootApp();
     } catch (err) {
-      _authError(err.message || 'Sign in failed. Please try again.');
       btn.disabled = false;
       btn.textContent = 'Sign In';
+      if (isEmailNotConfirmed(err)) {
+        _showInbox(email.trim(), false);
+        _authError("Your email isn't confirmed yet. Open the link we sent, or send a new one.");
+        return;
+      }
+      _authError(err.message || 'Sign in failed. Please try again.');
     }
   }
 
@@ -394,13 +460,25 @@
     try {
       var name = (document.getElementById('m-su-name') || {}).value || '';
       var email = (document.getElementById('m-su-email') || {}).value || '';
-      await signUp(email.trim(), password, name.trim());
-      _authSuccess('Check your email for a confirmation link.');
-      btn.textContent = 'Account Created';
-      setTimeout(function () {
-        btn.disabled = false;
-        btn.textContent = 'Create Account';
-      }, 4000);
+      email = email.trim();
+      var data = await signUp(email, password, name.trim());
+      var outcome = signUpOutcome(data);
+      btn.disabled = false;
+      btn.textContent = 'Create Account';
+      if (outcome === 'signed-in') {
+        await _enterApp(data.user);
+        return;
+      }
+      if (outcome === 'exists') {
+        _authShowTab('signin');
+        document.getElementById('m-si-email').value = email;
+        document.getElementById('m-si-password').focus();
+        _authError('You already have an account with this email. Sign in below.');
+        return;
+      }
+      document.getElementById('m-su-password').value = '';
+      document.getElementById('m-su-confirm').value = '';
+      _showInbox(email, true);
     } catch (err) {
       _authError(err.message || 'Sign up failed. Please try again.');
       btn.disabled = false;

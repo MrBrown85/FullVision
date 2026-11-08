@@ -108,11 +108,33 @@
       password,
       options: {
         data: { display_name: displayName },
+        emailRedirectTo: _confirmEmailRedirect(),
       },
     });
     if (error) throw error;
     return data;
   };
+
+  /**
+   * Sends the sign-up confirmation email again.
+   * @param {string} email - The address the account was created with
+   */
+  window.resendSignUpEmail = async function (email) {
+    const sb = getSupabase();
+    if (!sb) throw new Error('Supabase not initialized');
+    const { error } = await sb.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: _confirmEmailRedirect() },
+    });
+    if (error) throw error;
+  };
+
+  // The confirmation email's link signs the teacher in and opens
+  // login.html?confirmed=1, which goes on into the gradebook.
+  function _confirmEmailRedirect() {
+    return location.origin + '/login.html?confirmed=1';
+  }
 
   /**
    * Signs in with email and password.
