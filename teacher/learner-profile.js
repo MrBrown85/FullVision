@@ -127,7 +127,6 @@ var LearnerProfile = (function () {
     var comp = o.compRefl || { count: 0, last: null };
     var reflAt = refl ? refl.at : null;
     if (comp.last && (!reflAt || String(comp.last) > String(reflAt))) reflAt = comp.last;
-    var reflNew = refl && o.newReply && reflAt === refl.at;
     var html =
       '<div class="id-card"><div class="id-band"><span>' +
       esc(o.classLabel) +
@@ -147,10 +146,8 @@ var LearnerProfile = (function () {
       '<a href="#lp-goals" data-action="lpJump" data-target="lp-goals">Goals <span>' +
       esc(o.goalCount + ' set') +
       '</span></a>' +
-      '<a href="#lp-refl" data-action="lpJump" data-target="lp-refl">Reflections <span' +
-      (reflNew ? ' class="lp-new-text"' : '') +
-      '>' +
-      esc(reflAt ? (reflNew ? 'New · ' : '') + day(reflAt) : 'Not yet') +
+      '<a href="#lp-refl" data-action="lpJump" data-target="lp-refl">Reflections <span>' +
+      esc(reflAt ? day(reflAt) : 'Not yet') +
       '</span></a></nav></div>';
     var note = a && text(a.note && a.note.v);
     if (note) {
@@ -216,37 +213,19 @@ var LearnerProfile = (function () {
 
   /* ── The student's own goals ──────────────────────────────── */
 
-  /* The goal's next steps, newest first: from a Goal Check-In or from a
-     reply to a report. */
-  function nextSteps(o) {
-    var out = [];
-    var c = o.model.checkin;
-    var r = o.model.reply;
-    if (c && c.next && text(c.next.v)) out.push({ text: text(c.next.v), at: c.at, from: 'Check-in' });
-    if (r && r.next && text(r.next.v)) {
-      out.push({ text: text(r.next.v), at: r.at, from: 'From the ' + r.title.replace(/^Reply to /, '') + ' reply' });
-    }
-    return out.sort(function (x, y) {
-      return String(y.at || '').localeCompare(String(x.at || ''));
-    });
-  }
-
   function courseGoalHtml(o) {
     var a = o.model.about;
     var c = o.model.checkin;
-    var r = o.model.reply;
-    var steps = nextSteps(o);
-    if (!(a && a.goal) && !(c && c.status) && !steps.length) return '';
+    // The goal's next step, from the latest Goal Check-In.
+    var next = c && c.next && text(c.next.v);
+    if (!(a && a.goal) && !(c && c.status) && !next) return '';
     var status = c && c.status && c.status.v ? text(c.status.v) : '';
-    var choice = r && r.choice && r.choice.v ? text(r.choice.v) : '';
-    var kept = choice ? (/change/i.test(choice) ? ' · changed ' : ' · kept ') + day(r.at) : '';
     var html =
       '<div class="qw-group"><h3>' +
       esc(o.courseName + ' Goal') +
       '</h3><div class="gl-card"><div class="gl-top"><span class="gl-meta">' +
       src('them', o.first) +
       (a ? ' Set ' + esc(day(a.at)) : '') +
-      esc(kept) +
       (a && a.goal ? AGAIN : '') +
       '</span>' +
       (status
@@ -258,19 +237,13 @@ var LearnerProfile = (function () {
         : '') +
       '</div>';
     if (a && a.goal) html += qa(a.goal.q.prompt.replace(/\bthis class\b/g, o.courseName), a.goal.v);
-    if (steps.length) {
+    if (next) {
       html +=
         '<figure class="qw gl-check"><figcaption class="qw-q">Next step <span class="gl-meta">' +
-        esc(steps[0].from + ' · ' + day(steps[0].at)) +
+        esc('Check-in · ' + day(c.at)) +
         '</span></figcaption>' +
-        bubble(steps[0].text) +
+        bubble(next) +
         '</figure>';
-      if (steps[1]) {
-        html +=
-          '<div class="lp-hist">' +
-          esc('Earlier next step · ' + day(steps[1].at) + ': “' + steps[1].text + '”') +
-          '</div>';
-      }
     }
     return html + '</div></div>';
   }
@@ -374,25 +347,6 @@ var LearnerProfile = (function () {
     return html;
   }
 
-  /* A reply to a report, as the student wrote it; marked while it's new to you. */
-  function replyHtml(o, e) {
-    var isNew = o.newReply && o.newReply === e.rid;
-    var html =
-      '<div class="qw-group lp-reply' +
-      (isNew ? ' lp-new' : '') +
-      '"><h3>' +
-      esc(e.title) +
-      ' <span class="gl-meta">' +
-      esc(day(e.at) + ' · after reading the report on their phone') +
-      '</span>' +
-      (isNew ? ' <span class="lp-new-tag">New</span>' : '') +
-      '</h3><div class="qw-pair">';
-    e.items.forEach(function (it) {
-      html += qa(it.q.prompt, it.v);
-    });
-    return html + '</div></div>';
-  }
-
   function reflectionsHtml(o) {
     var list = o.model.reflections;
     var latest = list[0];
@@ -423,10 +377,6 @@ var LearnerProfile = (function () {
       );
     }
     list.forEach(function (e) {
-      if (e.kind === 'report_reply') {
-        html += replyHtml(o, e);
-        return;
-      }
       if (list.length > 1) {
         html +=
           '<div class="lp-older"><h3>' +

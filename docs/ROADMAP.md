@@ -1,19 +1,19 @@
 # FullVision: what it needs to be worth paying for
 
-Written 2026-10-17. Follows the Schoology/Teams comparison (2026-10-17) and the pricing discussion (Teacher $120/yr, School $69/teacher, District $5–6/student).
+Written 2026-10-17. Follows the Schoology/Teams comparison (2026-10-17).
 
-FullVision won't win by matching Schoology or Teams feature for feature. Both are free to a teacher and already approved by the district. It wins by being the tool that writes BC reports better than anything else, while teachers keep the district LMS for assignments. Everything below either removes a reason not to pay, or makes that one job much better.
+FullVision won't win by matching Schoology or Teams feature for feature. Both are free to a teacher and already approved by the district. It wins by being the tool that writes BC reports better than anything else, with the student work behind them in the same place: students send it, the teacher grades and returns it, and it lands on the report. Everything below either removes a reason not to pay, or makes that work much better.
 
 ## 1. Remove the reasons not to pay
 
-Without these, no feature set will hold a $120 price.
+Without these, no feature set will be worth paying for.
 
 1. **Roster import from MyEducation BC.** Schoology and Teams get rosters automatically. A teacher typing 150 students by hand will quit on day one. Accept MyEd BC's class-list export as is: map its columns, match on student number, and add students who are already in another class without making duplicate records. Done 2026-10-22 (#312): the Students tab's import review matches on student number, then name.
 2. **Reporting periods.** Done 2026-10-17 (`docs/DECISIONS.md`, "Reporting periods"): up to six dated terms per class in Class Settings, and reports that follow Report N. Since 2026-11-03 a report's grade is the year to date as of its term's end, and the gradebook, dashboard and student pages have no term picker: they show the year so far. Still to do: the mobile grade filter's "term" means the last 90 days, not a real term.
 3. **Safe student handling.** Districts and parents will ask "what happens to my child's record?" Done 2026-10-19 (`docs/DECISIONS.md`): removing a student withdraws them, with a Withdrawn list, Re-enrol and a permanent delete as a second step. Still to do: Restore for deleted classes.
 4. **Rolling over to next year.** Duplicate Class copies the class settings, categories and weights, learning map and sentence starters, but not reporting terms, rubrics or assessments (2026-10-18). Assessments (2026-10-18), rubrics (Rubric Bank, 2026-10-18) and the grading setup ("Copy grading setup…", Teams' Import settings, 2026-10-18) can each be copied to another class.
 5. **Trust basics:** closed signup or SSO, a real privacy page, and full data export. A teacher paying personally needs to know they can leave with their data. Privacy page done 2026-10-14 (#135); Download Class Backup in Class Settings done 2026-10-22 (#325); Restore Class from Backup done 2026-11-01. Still to do: closed signup or SSO, and an export of everything at once.
-6. **The first ten minutes:** bigger type, a legend for every code (CRT, QAP, NS…), phones sent to the mobile app, and three first-run tips. If the app feels hard on day one, $120 feels like too much.
+6. **The first ten minutes:** bigger type, a legend for every code (CRT, QAP, NS…), phones sent to the mobile app, and three first-run tips. If the app feels hard on day one, no price will feel worth it.
 
 ## 2. Make the core job far better than anyone else
 
@@ -26,10 +26,9 @@ Without these, no feature set will hold a $120 price.
 7. **Reporting for students on IEPs.** Designations are already on the roster. Let a teacher report a student against their IEP goals instead of the course competencies, with the right wording on the report. No mainstream tool handles this well, and resource and inclusion teachers would buy for it alone.
 8. **The BC curriculum, exactly as the Ministry wrote it.** Done 2026-11-02 (`DECISIONS.md`, "The BC curriculum bank"): every grade 8–12 course except second languages, copied word for word from the Ministry's files, with Ministry folders, readable codes and I Can statements for all 5,029 competencies, and a New Class wizard that shows the wording before import. Still to do: the Province's written permission to reproduce the text (requested), a field test of the I Can statements with a few ELA and SS teachers, a re-fetch each June, showing Big Ideas and Content, and retiring the old bank's shape once classes have moved.
 
-## 3. Work alongside the district tools, don't replace them
+## 3. Bring teachers over from the district tools
 
-1. **Import scores from Teams, Google Classroom and Schoology.** There's already an unused `import_teams_class` RPC. The pitch becomes "keep assigning in Teams, report in FullVision." That turns your strongest competitor into a source of data.
-2. **Don't build an LMS.** No assignment submission, no content pages, no discussions. Every hour spent there is spent losing to free tools.
+1. **Import scores from Teams, Google Classroom and Schoology.** There's already an unused `import_teams_class` RPC. Teachers who still assign there can bring their scores in on day one and move their assignments over when they're ready. That turns your strongest competitor into a source of data instead of a reason to stay.
 
 ## 4. What the school tier needs
 
@@ -50,4 +49,4 @@ Six calculation methods, the per-assessment weight, the decay slider, and severa
 
 ## How to know it's worth the money
 
-Time it. Have three colleagues write one round of Learning Updates in FullVision and in their current tool. If FullVision saves each of them several hours, $120 a year is an easy sell, and that time saving is the line to lead your pricing page with.
+Time it. Have three colleagues write one round of Learning Updates in FullVision and in their current tool. If FullVision saves each of them several hours, that time saving is the line to lead with.

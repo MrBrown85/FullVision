@@ -4,7 +4,7 @@ Written 2026-10-17. Revised 2026-10-24 to match the approved mockups on the desi
 
 ## What this adds
 
-Students answer short questionnaires on their own phones by scanning a QR slip, with no accounts. Their answers, goals and reflections live on the Learner Profile next to the teacher's evidence, and feed the report comment. Two related features use the same plumbing: the November report sent to students' phones (with a reply), and missing-work reminders for families.
+Students answer short questionnaires on their own phones by scanning a QR slip, with no accounts. Their answers, goals and reflections live on the Learner Profile next to the teacher's evidence, and feed the report comment. Two related features use the same plumbing: the November report sent to students' phones (to read), and missing-work reminders for families.
 
 Instruments, all optional per class:
 
@@ -12,7 +12,8 @@ Instruments, all optional per class:
 2. **Core Competency Reflection** (each reporting period): the grade-by-period theme from the Brainstorm file, its activity as prompts, and a self-assessment on that period's Core Competencies on the scale already live in `core_self_assessment`: Beginning, Growing, Confident, Leading, each with a one-sentence why.
 3. **Goal Check-In** (same slip as the reflection): how the Science 8 goal is going (Not Started, Working On It, Mostly There, Done), what's next, and one Core Competency goal with one thing to do this week.
 4. **Curricular Self-Assessment** (optional, off by default): the class's I-can statements on the same four-step scale.
-5. **Reply to Report** (after a report is sent to phones): proud of, surprised by, keep or change the goal plus one thing before the next report, anything for the teacher.
+
+A fifth, Reply to Report, was built with PR 9 and removed on 2026-11-07: a report on a phone is for reading (DECISIONS, "Reports on phones are read-only").
 
 Interview mode (teacher-led, on Observations and mobile) stays in the plan but is not in this build.
 
@@ -43,7 +44,7 @@ Interview mode (teacher-led, on Observations and mobile) stays in the plan but i
 
 ### Student phone (no login): canvas screens 1–5
 
-- `/s/` at the site root, built from `teacher-mobile` components and tokens: slim header with class and progress, cards, segmented scale buttons, footer buttons. No navigation, no other students, no grades.
+- `/s/` at the site root, built from `teacher-mobile` components and tokens: slim header with class and progress, cards, segmented scale buttons, footer buttons. No navigation, no other students, no grades. (A class can turn on My Learning, which shows the student's own levels and grade; see `DECISIONS.md`, "My Learning on the student page", 2026-11-07.)
 - Scan screen: avatar, "Hi Cece!", what they're about to answer and how long it takes, Yes / No That's Not Me, and the typed-code fallback.
 - About Me, November Reflection (theme card, Personal Shield, how it helps, self-assessment with why), My Goals (September goal read-only, status, next step, Core Competency goal picker with one thing this week), Sent.
 - Demo Mode: the demo class code runs the form locally and writes nothing.
@@ -68,19 +69,18 @@ Letter, 2 × 4 slips, dashed grey cut lines, black and white: name, class, quest
 
 ### Student page › Learner Profile: canvas screen 9d
 
-- Five tabs on the student page (Goals and Reflections removed). The Learner Profile tab stat shows goal count or a new reply.
+- Five tabs on the student page (Goals and Reflections removed). The Learner Profile tab stat shows the goal count.
 - Sticky ID card: band with class and grade, avatar, how to say the name with the stressed syllable in bold, pronouns, languages, learns best, jump links (About Me, Goals, Reflections with dates or counts). Private note card under it: "Only you see this."
 - About Me: As a Learner (good at, hard right now) and Outside School, each answer in a speech bubble under its question. Repeated questions carry a ↻ Jan · Jun tag.
 - Goals: the course goal (full text once, status as a dot plus text, latest next step with its source), the Core Competency goal, then competency goals (cards for those with a goal; a "No Goal Yet" list with + Goal / + Reflection).
-- Reflections, newest first: replies to reports, the reporting-period reflection (Personal Shield as bubbles, how it helps), self-assessments with the four-step control.
+- Reflections, newest first: the reporting-period reflection (Personal Shield as bubbles, how it helps), self-assessments with the four-step control.
 - Below Reflections, the page keeps what the Learner Profile tab already had: the disposition timelines from observation tags ("Seen in Observations") and the Core Competency self-assessment table by term (Colin, 2026-10-25). The Translate link waits: sending a student's words to a translation service needs its own privacy decision.
 - Hierarchy rules from the audit: section 18px bold, group 14px bold, question 13px grey, answer 16px for every answer; bubbles only for student words; "From Cece" or "Set by you" wherever student and teacher entries sit together; headings in the teacher's voice; answers capped near 68 characters a line with line breaks kept; no filler text.
 
 ### Report to phones: canvas screens R1–R4, T1, T2
 
-- Student: birthday check → the issued report (sticky name, class, report and issue date; overall on the four-level scale with one plain sentence; each competency with a student-friendly line; the teacher's comment; their goal and self-assessment; attendance) → Reply to Your Report → Sent. A line says the official report is in MyEd.
-- Teacher, Reports › Progress Reports › Sent to Phones: issue date and expiry, Print QR Slips, Update Issued Copy, Close All Links; counts for opened, replied, changed goal, not opened; a filterable list with reply previews and New Slip for students who haven't opened.
-- A reply lands at the top of Reflections on the Learner Profile, highlighted while new; a kept or changed goal and the new next step update the Goals card, with the earlier step kept underneath.
+- Student: birthday check → the issued report (sticky name, class, report and issue date; overall on the four-level scale with one plain sentence; each competency with a student-friendly line; the teacher's comment; their goal and self-assessment; attendance). Nothing to send back. A line says the official report is in MyEd.
+- Teacher, Reports › Progress Reports › Sent to Phones: issue date and expiry, Print QR Slips, Update Issued Copy, Close All Links; counts for opened and not opened; a filterable list with Read Report, and New Slip for students who haven't opened.
 
 - As built (PR 9, 2026-10-25): the phone copy is its own record (`phone_report`, `phone_report_student`), not a column on `report_issue`, which holds the printed sheets' HTML and needs a paper issue first. The teacher's browser builds each copy with the app's grade helpers, so it follows the class's grading style. Report codes are reusable until the last day the teacher sets; five wrong birthdays lock a session. A shared school address no longer locks a class out: the per-address limit on open is 60 code misses in 15 minutes, and wrong birthdays don't count toward it.
 
@@ -98,7 +98,7 @@ Additive. Existing tables keep working.
 questionnaire_template  id, kind, grade (8–12 or null), period (1 Nov | 2 Mar | 3 Jun | null),
                         year, theme, myed_comment, questions jsonb     -- seeded from the Brainstorm file
 questionnaire           id, course_id, template_id (nullable), kind
-                        (about_me | core_reflection | goal_checkin | curricular_self_assessment | report_reply),
+                        (about_me | core_reflection | goal_checkin | curricular_self_assessment),
                         title, theme, report_period (1–6, null for about_me), parent_id (goal_checkin → its
                         core_reflection, same slip), opens_at, closes_at, is_on, created_at
 question                id, questionnaire_id, display_order, prompt, prompt_translations jsonb,
@@ -115,7 +115,6 @@ reflection              add recorded_at and a response_id; keep the latest-per-s
 
 - Self-assessment answers also upsert `core_self_assessment` for that term, so the existing readers keep working.
 - Goal Check-In answers update `goal` (status, next step) and keep the earlier next step as history.
-- Report replies are a `response` on a `report_reply` questionnaire tied to the `report_issue`.
 - Parent emails are `guardian` rows. The roster's Parent Email and Parent Email 2 columns are the first two by created_at.
 - `get_class_bundle` gains `questionnaires`, `responses` and `guardians`; the bundle schema version bumps.
 
@@ -153,7 +152,7 @@ Each PR is checked element by element against its canvas screen before merge. Mi
 | 6   | **Security:** `student-submit` edge function, `student_submit` schema, hashed codes, tokens, rate limits, SQL and function tests, privacy page section. Reviewed on its own, no UI in the same PR                                               | 4                              | Medium–large |
 | 7   | **Student phone page `/s/`:** scan screen, About Me, November Reflection with Goal Check-In, Sent, Demo Mode, Playwright at the mobile preset                                                                                                   | 6                              | Medium       |
 | 8   | **Learner Profile:** ID card, About Me, Goals, Reflections in one page; Goals and Reflections tab removed; hierarchy rules; Translate link                                                                                                      | 4 (shows answers once 7 lands) | Medium       |
-| 9   | **Report to phones:** report codes on `report_issue`, birthday check route, phone report page, Reply to Report, Sent to Phones on Progress Reports, replies on the Learner Profile                                                              | 6, 7, 8                        | Medium–large |
+| 9   | **Report to phones:** report codes on `report_issue`, birthday check route, phone report page, Sent to Phones on Progress Reports (Reply to Report built, then removed 2026-11-07)                                                              | 6, 7, 8                        | Medium–large |
 | 10  | **Missing-work reminders:** gradebook entry point, per-student preview, `mailto:` drafts, Copy Email, Draft opened tracking                                                                                                                     | 2                              | Small–medium |
 
 PRs 2, 3 and 10 touch no new backend and can start right away. PR 6 is the critical path for everything students touch.

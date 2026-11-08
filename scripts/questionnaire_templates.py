@@ -1,7 +1,6 @@
 """The student questionnaire templates, from the Core Competency Reflecting
 Brainstorm (Nov 2024): one activity per grade per reporting period, turned
-into questions a phone form can ask, plus About Me, Goal Check-In and Reply
-to Report.
+into questions a phone form can ask, plus About Me and Goal Check-In.
 
   python3 scripts/questionnaire_templates.py --sql   # the seed in migrations/20261025_questionnaires_templates.sql
   python3 scripts/questionnaire_templates.py --js    # shared/questionnaire-templates.js (Demo Mode's copy)
@@ -135,19 +134,6 @@ rows.append({
         text('One thing I will do this week'),
     ],
 })
-rows.append({
-    'id': 'report-reply', 'kind': 'report_reply', 'grade': None, 'period': None, 'title': 'Reply to Your Report',
-    'theme': None, 'core_heading': None, 'myed_comment': None,
-    'questions': [
-        text('What are you most proud of?'),
-        text('Was anything a surprise?'),
-        {'prompt': 'Your goal: keep it or change it?', 'kind': 'choice',
-         'options': {'choices': ['Keep It', 'Change It'], 'multiple': False}},
-        text('One thing you will do before the next report'),
-        text('Anything you want your teacher to know?'),
-    ],
-})
-
 def lit(v):
     if v is None:
         return 'null'

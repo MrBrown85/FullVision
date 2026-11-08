@@ -272,7 +272,7 @@ body.fv-switching-course::after {
   .m-pull-indicator,
   .m-screen-content.m-pull-settle,
   .m-sheet-backdrop,
-  .m-loading-overlay {
+  #m-loading {
     transition: none !important;
     animation: none !important;
   }
@@ -2604,6 +2604,163 @@ body.fv-switching-course::after {
 .m-auth-success.visible {
   display: block;
 }
+/* Check Your Inbox, after Create Account (as on login.html) */
+.m-auth-tabs[hidden],
+.m-auth-demo[hidden],
+.m-auth-inbox[hidden] {
+  display: none;
+}
+.m-auth-inbox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+.m-auth-inbox-icon {
+  width: 60px;
+  height: 60px;
+  padding: 15px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: var(--active-light);
+  color: var(--active);
+}
+.m-auth-inbox-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  outline: none;
+}
+.m-auth-inbox-text {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text);
+  line-height: 1.45;
+}
+.m-auth-inbox-text strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.m-auth-inbox-hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.m-auth-inbox .m-auth-demo-btn {
+  margin-top: 4px;
+}
+.m-auth-inbox .m-auth-demo-btn:disabled {
+  opacity: 0.55;
+}
+.m-auth-inbox-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.m-auth-inbox-links button {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  min-height: 44px;
+  color: var(--link);
+  background: none;
+  border: 0;
+  padding: 0 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Try Demo Mode and the Privacy Policy link, as on login.html */
+.m-auth-google {
+  margin-bottom: 4px;
+}
+.m-auth-google-btn {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #747775;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1f1f1f;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-auth-google-btn:active {
+  background: #f2f2f2;
+}
+.m-auth-google-btn:disabled {
+  opacity: 0.7;
+}
+.m-auth-google-logo {
+  flex: none;
+}
+.m-auth-google .m-auth-demo-divider {
+  margin: 16px 0;
+}
+@media (prefers-color-scheme: dark) {
+  .m-auth-google-btn {
+    background: #131314;
+    color: #e3e3e3;
+    border-color: #8e918f;
+  }
+  .m-auth-google-btn:active {
+    background: #202124;
+  }
+}
+.m-auth-demo {
+  margin-top: 24px;
+}
+.m-auth-demo-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+.m-auth-demo-divider::before,
+.m-auth-demo-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.m-auth-demo-btn {
+  width: 100%;
+  padding: 13px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-auth-demo-btn:active {
+  background: var(--divider-subtle);
+}
+.m-auth-demo-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.m-auth-demo-hint a {
+  color: var(--link);
+}
 /* Transition: auth screen fades out, app fades in */
 .m-auth.m-auth-exit {
   animation: m-auth-fade-out 0.3s ease-out forwards;
@@ -2650,33 +2807,10 @@ body.fv-switching-course::after {
 /* ═══════════════════════════════════════════════════════════════
    PULL TO REFRESH
    ═══════════════════════════════════════════════════════════════ */
-.m-loading-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg);
+/* The boot screen is shared/loading-screen.css's; on the phone it sits
+   above the tab bar and sheets. */
+#m-loading {
   z-index: var(--z-loading);
-  transition: opacity 0.25s ease-out;
-}
-.m-loading-overlay.m-loading-fade {
-  opacity: 0;
-  pointer-events: none;
-}
-.m-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border);
-  border-top-color: var(--active);
-  border-radius: 50%;
-  animation: m-spin 0.6s linear infinite;
-  margin: 0 auto 12px;
-}
-.m-loading-text {
-  font-size: 15px;
-  color: var(--text-3);
-  font-weight: 500;
 }
 
 .m-pull-indicator {

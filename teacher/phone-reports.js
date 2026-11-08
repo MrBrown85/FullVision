@@ -6,8 +6,9 @@
    Proficiency / Letter / Both setting). Send makes the report on the server
    (create_phone_report) with every student's copy and prints the slips;
    Update Issued Copy rebuilds the copies; Close All Links stops them. The
-   list shows who opened it (passed the birthday check) and who replied,
-   with the start of each reply.
+   list shows who opened it (passed the birthday check). A report is for
+   reading: students don't reply to it (DECISIONS, "Reports on phones are
+   read-only").
 
    Demo Mode keeps the reports on this device (gb-phone-reports-<cid>) and
    makes up slip codes; nothing reaches a phone. */
@@ -16,7 +17,7 @@ var PhoneReports = (function () {
 
   var _byCourse = {}; // cid -> [report], newest first
   var _loading = {};
-  var _filter = 'all'; // all | replied | unopened
+  var _filter = 'all'; // all | unopened
   var _msg = '';
   var _busy = false;
   var DAYS_OPEN = 60;
@@ -322,7 +323,7 @@ var PhoneReports = (function () {
               expires_on: expiresOn,
               closed_at: null,
               students: students.map(function (s) {
-                return { enrollment_id: s.enrollment_id, data: s.data, opened_at: null, replied_at: null };
+                return { enrollment_id: s.enrollment_id, data: s.data, opened_at: null };
               }),
             },
           };
@@ -389,38 +390,6 @@ var PhoneReports = (function () {
 
   /* ── The panel ─────────────────────────────────────────────── */
 
-  /* A student's reply as one line: what they're proud of and their next step. */
-  function replyLine(cid, report, sid) {
-    if (typeof StudentVoice === 'undefined' || !report.reply_questionnaire_id) return '';
-    var e = StudentVoice.entries(cid, sid).find(function (x) {
-      return x.qid === report.reply_questionnaire_id;
-    });
-    if (!e) return '';
-    var parts = [];
-    var next = '';
-    e.items.forEach(function (it) {
-      var t = it.v && (it.v.text || (Array.isArray(it.v.json) ? it.v.json.join(', ') : ''));
-      if (!t) return;
-      if (/before the next report/i.test(it.q.prompt)) next = t;
-      else if (it.q.kind === 'text') parts.push(t);
-    });
-    if (next) parts.push('Next: ' + next);
-    return parts.join(' · ');
-  }
-
-  function changedGoal(cid, report, sid) {
-    if (typeof StudentVoice === 'undefined' || !report.reply_questionnaire_id) return false;
-    var e = StudentVoice.entries(cid, sid).find(function (x) {
-      return x.qid === report.reply_questionnaire_id;
-    });
-    return !!(
-      e &&
-      e.items.some(function (it) {
-        return it.q.kind === 'choice' && it.v && /change/i.test(it.v.text || '');
-      })
-    );
-  }
-
   // html-safe: report label, dates, student names and message all esc()'d; the rest is fixed markup
   function _sendHtml(cid, ctx) {
     var label = ctx.termLabel || 'this report';
@@ -430,7 +399,7 @@ var PhoneReports = (function () {
     return (
       '<section class="tq-panel pp-panel" aria-labelledby="pp-send-h"><h1 id="pp-send-h" class="pp-title">' +
       esc('Send ' + label + ' to Students’ Phones') +
-      '</h1><p class="pp-sub">Each student gets a slip. They open their report with their birthday and can reply to you once. You can update the copy or close the links any time.</p>' +
+      '</h1><p class="pp-sub">Each student gets a slip. They open their report with their birthday. You can update the copy or close the links any time.</p>' +
       '<label class="pp-field"><span class="cm-label">Links Work Until</span><input type="date" class="cm-input" id="pp-until" value="' +
       esc(_addDays(_today(), DAYS_OPEN)) +
       '" min="' +
@@ -456,24 +425,18 @@ var PhoneReports = (function () {
     );
   }
 
-  // html-safe: student name, days and reply line esc()'d; ids esc()'d or encodeURIComponent'd; dot colours are fixed tokens
+  // html-safe: student name and days esc()'d; ids esc()'d or encodeURIComponent'd; dot colours are fixed tokens
   function _row(cid, report, st, sRow, i) {
     var opened = sRow && sRow.opened_at;
-    var replied = sRow && sRow.replied_at;
-    var line = replied ? replyLine(cid, report, st.id) : '';
-    var act = replied
-      ? '<button type="button" class="cm-add-link" data-action="ppReadReply" data-sid="' +
+    var act = opened
+      ? '<button type="button" class="cm-add-link" data-action="ppReadReport" data-sid="' +
         esc(st.id) +
-        '">Read Reply</button>'
-      : opened
-        ? '<button type="button" class="cm-add-link" data-action="ppReadReport" data-sid="' +
+        '">Read Report</button>'
+      : report.closed_at
+        ? ''
+        : '<button type="button" class="cm-add-link" data-action="ppNewSlip" data-sid="' +
           esc(st.id) +
-          '">Read Report</button>'
-        : report.closed_at
-          ? ''
-          : '<button type="button" class="cm-add-link" data-action="ppNewSlip" data-sid="' +
-            esc(st.id) +
-            '">New Slip</button>';
+          '">New Slip</button>';
     return (
       '<div class="pp-grid pp-row' +
       (i % 2 ? ' pp-alt' : '') +
@@ -487,14 +450,6 @@ var PhoneReports = (function () {
       (opened ? 'var(--score-3)' : 'var(--score-2)') +
       '"></span>' +
       esc(opened ? _day(opened) : 'Not yet') +
-      '</span><span class="pp-st"><span class="pp-dot" style="background:' +
-      (replied ? 'var(--score-3)' : 'var(--border-2, var(--text-3))') +
-      '"></span>' +
-      esc(replied ? _day(replied) : '—') +
-      '</span><span class="pp-reply' +
-      (line ? '' : ' pp-none') +
-      '">' +
-      esc(line || (replied ? 'Replied' : 'No reply')) +
       '</span><span class="pp-acts">' +
       act +
       '</span></div>'
@@ -514,14 +469,7 @@ var PhoneReports = (function () {
     var opened = students.filter(function (st) {
       return rows[st.id].opened_at;
     });
-    var replied = students.filter(function (st) {
-      return rows[st.id].replied_at;
-    });
-    var changed = replied.filter(function (st) {
-      return changedGoal(cid, report, st.id);
-    }).length;
     var shown = students.filter(function (st) {
-      if (_filter === 'replied') return rows[st.id].replied_at;
       if (_filter === 'unopened') return !rows[st.id].opened_at;
       return true;
     });
@@ -566,11 +514,7 @@ var PhoneReports = (function () {
       opened.length +
       ' <span>of ' +
       n +
-      '</span></strong><span>Opened</span></div><div class="pp-stat"><strong>' +
-      replied.length +
-      '</strong><span>Replied</span></div><div class="pp-stat"><strong>' +
-      changed +
-      '</strong><span>Changed their goal</span></div><div class="pp-stat"><strong class="' +
+      '</span></strong><span>Opened</span></div><div class="pp-stat"><strong class="' +
       (n - opened.length ? 'pp-warn-n' : '') +
       '">' +
       (n - opened.length) +
@@ -578,9 +522,8 @@ var PhoneReports = (function () {
       '<section class="tq-panel pp-panel pp-list" aria-labelledby="pp-who"><div class="pp-list-head"><h2 id="pp-who" class="tq-panel-title">Students</h2>' +
       '<div class="seg seg-sm" role="radiogroup" aria-label="Show">' +
       seg('all', 'All ' + n) +
-      seg('replied', 'Replied ' + replied.length) +
       seg('unopened', 'Not Opened ' + (n - opened.length)) +
-      '</div></div><div class="pp-grid pp-head" aria-hidden="true"><span>Student</span><span>Opened</span><span>Replied</span><span>Reply</span><span></span></div>' +
+      '</div></div><div class="pp-grid pp-head" aria-hidden="true"><span>Student</span><span>Opened</span><span></span></div>' +
       shown
         .map(function (st, i) {
           return _row(cid, report, st, rows[st.id], i);
@@ -661,9 +604,7 @@ var PhoneReports = (function () {
         if (!report) return true;
         showConfirm(
           'Close All Links',
-          'Students will no longer be able to open ' +
-            (report.term_label || 'this report') +
-            ' on their phones or reply. Replies already sent stay on their Learner Profiles.',
+          'Students will no longer be able to open ' + (report.term_label || 'this report') + ' on their phones.',
           'Close All Links',
           'danger',
           function () {
@@ -677,13 +618,6 @@ var PhoneReports = (function () {
         return true;
       case 'ppReadReport':
         if (report) _preview(cid, report, el.dataset.sid);
-        return true;
-      case 'ppReadReply':
-        if (typeof Router !== 'undefined' && Router.navigate) {
-          Router.navigate(
-            '/student?id=' + encodeURIComponent(el.dataset.sid) + '&course=' + encodeURIComponent(cid) + '&tab=profile',
-          );
-        }
         return true;
     }
     return false;
@@ -709,7 +643,6 @@ var PhoneReports = (function () {
     close: close,
     printSlips: printSlips,
     panelHtml: panelHtml,
-    replyLine: replyLine,
     handleAction: handleAction,
     _reset: _reset,
   };

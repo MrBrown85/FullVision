@@ -11,14 +11,10 @@
  * To add a new portal: create the directory, add its entry in the switch below,
  * and set the corresponding portal value when creating accounts.
  * ─────────────────────────────────────────────────────────────────────────── */
-function getPortal(user) {
-  return (user && user.user_metadata && user.user_metadata.portal) || 'teacher';
-}
-
+/* getPortal, startDemoMode, promptRestoreAccount and resetPasswordRedirect
+ * live in shared/sign-in.js, which the phone sign-in screen uses too. */
 function portalRedirect(user) {
   var portal = getPortal(user);
-  var preferMobile =
-    portal === 'teacher' && window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop';
 
   switch (portal) {
     case 'student':
@@ -27,98 +23,12 @@ function portalRedirect(user) {
       return (window.location.href = '/parent/');
     case 'teacher':
     default:
-      return (window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard');
+      return (window.location.href = teacherAppPath());
   }
 }
 
-/* Local HTML-entity escaper. login-auth.js does not load shared/data.js
- * (which defines the canonical esc()), so we duplicate the one-line helper
- * here rather than widen the login page's dependency set. */
-/* Generate the companion token stored alongside gb-demo-mode. The token
- * itself is not secret — it lives in localStorage where any DevTools-capable
- * user can read it. What it proves is that demo mode was entered through a
- * legitimate code path (this file), not by flipping a single flag in
- * DevTools from the signed-out state. signOut() in shared/supabase.js
- * wipes every gb-* key, so both flags die together on sign-out. */
-function _demoToken() {
-  try {
-    return crypto.randomUUID();
-  } catch (e) {
-    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
-  }
-}
-
-function formatDeletionDeadline(deletedAt) {
-  var ts = Date.parse(deletedAt || '');
-  if (!isFinite(ts)) return '30 days from now';
-  return new Intl.DateTimeFormat('en-CA', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(new Date(ts + 30 * 24 * 60 * 60 * 1000));
-}
-
-function showRestoreAccountPrompt(deletionDate) {
-  return new Promise(function (resolve) {
-    var overlay = document.createElement('div');
-    overlay.className = 'confirm-overlay';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-labelledby', 'restore-account-title');
-    overlay.innerHTML = `<div class="confirm-card">
-      <div class="confirm-title" id="restore-account-title">Restore Account</div>
-      <div class="confirm-message">Your account is scheduled for deletion on ${esc(deletionDate)}. Restore it now?</div>
-      <div class="confirm-actions">
-        <button class="confirm-cancel" id="restore-continue-btn">Continue deletion</button>
-        <button class="confirm-ok primary" id="restore-confirm-btn">Restore</button>
-      </div>
-    </div>`;
-    document.body.appendChild(overlay);
-
-    function close(result) {
-      overlay.remove();
-      resolve(result);
-    }
-
-    overlay.querySelector('#restore-confirm-btn').focus();
-    overlay.querySelector('#restore-confirm-btn').onclick = function () {
-      close(true);
-    };
-    overlay.querySelector('#restore-continue-btn').onclick = function () {
-      close(false);
-    };
-  });
-}
-
-async function maybePromptRestoreAccount(user) {
-  if (getPortal(user) !== 'teacher') return true;
-  var sb = getSupabase();
-  if (!sb) return true;
-
-  var bootRes = await sb.rpc('bootstrap_teacher', {
-    p_email: (user && user.email) || '',
-    p_display_name: (user && user.user_metadata && user.user_metadata.display_name) || null,
-  });
-  if (bootRes.error) throw bootRes.error;
-
-  var teacher = bootRes.data || {};
-  if (!teacher.deleted_at) return true;
-
-  var shouldRestore = await showRestoreAccountPrompt(formatDeletionDeadline(teacher.deleted_at));
-  if (!shouldRestore) {
-    try {
-      await sb.auth.signOut();
-    } catch (e) {
-      /* best effort */
-    }
-    showSuccess('Account deletion left in place. Sign in again within 30 days to restore it.');
-    return false;
-  }
-
-  var restoreRes = await sb.rpc('restore_teacher', {});
-  if (restoreRes.error) throw restoreRes.error;
-  showSuccess('Account restored. Redirecting…');
-  return true;
+function maybePromptRestoreAccount(user) {
+  return promptRestoreAccount(user, showSuccess);
 }
 
 /* ── Password reset ────────────────────────────────────────────
@@ -134,7 +44,8 @@ function isResetLink() {
   return new URLSearchParams(location.search).get('reset') === '1' || /(^|[#&])type=recovery(&|$)/.test(location.hash);
 }
 
-function resetLinkError() {
+/* The error Supabase puts in the address for a used or expired link. */
+function linkError() {
   var hash = new URLSearchParams(location.hash.replace(/^#/, ''));
   var query = new URLSearchParams(location.search);
   return hash.get('error') || hash.get('error_code') || query.get('error') || query.get('error_code') || null;
@@ -142,6 +53,7 @@ function resetLinkError() {
 
 function showResetForm() {
   document.querySelector('.auth-tabs').hidden = true;
+  document.querySelector('.auth-google').hidden = true;
   document.getElementById('form-signin').hidden = true;
   document.getElementById('form-signup').hidden = true;
   document.querySelector('.auth-demo').hidden = true;
@@ -158,7 +70,7 @@ function resetLinkFailed() {
 }
 
 async function startPasswordReset(sb) {
-  if (resetLinkError()) return resetLinkFailed();
+  if (linkError()) return resetLinkFailed();
   var result = await sb.auth.getSession();
   if (!result.data.session) return resetLinkFailed();
   // The tokens have been read; keep them out of the address bar and history.
@@ -192,6 +104,90 @@ async function handleResetSubmit(e) {
   }
 }
 
+/* ── Email confirmation ────────────────────────────────────────
+   The link in the sign-up email signs the teacher in and opens
+   login.html?confirmed=1 (or the front page, which sends it here). The
+   page says Opening your gradebook… while the client reads the link's
+   tokens, then goes on into the app like any signed-in visit. */
+var CONFIRM_EXPIRED =
+  "This link has expired or was already used. Sign in below; if your email isn't confirmed yet, we'll offer to send a new link.";
+
+function isConfirmLink() {
+  return (
+    new URLSearchParams(location.search).get('confirmed') === '1' || /(^|[#&])type=signup(&|$)/.test(location.hash)
+  );
+}
+
+/* Continue with Google comes back to login.html?signin=google: with tokens
+   when the teacher went ahead, with an error when they cancelled. */
+var GOOGLE_FAILED = "Google sign-in didn't finish. Try again, or use your email and password below.";
+
+function isGoogleReturn() {
+  return new URLSearchParams(location.search).get('signin') === 'google';
+}
+
+function setFormsHidden(hidden) {
+  document.querySelector('.auth-tabs').hidden = hidden;
+  document.querySelector('.auth-google').hidden = hidden;
+  document.querySelector('.auth-demo').hidden = hidden;
+  if (hidden) {
+    document.getElementById('form-signin').hidden = true;
+    document.getElementById('form-signup').hidden = true;
+  }
+}
+
+function showOpening() {
+  setFormsHidden(true);
+  document.getElementById('auth-opening').hidden = false;
+}
+
+function confirmLinkFailed(message) {
+  history.replaceState(null, '', location.pathname);
+  document.getElementById('auth-opening').hidden = true;
+  setFormsHidden(false);
+  switchTab('signin');
+  showError(message || CONFIRM_EXPIRED);
+}
+
+/* Check Your Inbox, after Create Account or a sign-in the server refused
+   because the address isn't confirmed yet. */
+var stopInbox = null;
+var inboxEmail = '';
+
+function showInbox(email, justSent) {
+  inboxEmail = email;
+  setFormsHidden(true);
+  var panel = document.getElementById('panel-inbox');
+  panel.hidden = false;
+  if (stopInbox) stopInbox();
+  stopInbox = startCheckInbox({
+    email: email,
+    justSent: justSent,
+    emailEl: document.getElementById('inbox-email'),
+    resendBtn: document.getElementById('inbox-resend'),
+    showSuccess: showSuccess,
+    showError: showError,
+    clearMessages: hideMessages,
+    onSignedIn: goIn,
+  });
+  var title = document.getElementById('inbox-title');
+  title.tabIndex = -1;
+  title.focus();
+}
+
+function leaveInbox(tab) {
+  if (stopInbox) stopInbox();
+  stopInbox = null;
+  document.getElementById('panel-inbox').hidden = true;
+  setFormsHidden(false);
+  switchTab(tab);
+}
+
+/* Into the app, after the Restore Account question if the account is set to be deleted. */
+async function goIn(user) {
+  if (await maybePromptRestoreAccount(user)) portalRedirect(user);
+}
+
 /* ── Redirect if already logged in ─────────────────────────── */
 (async function () {
   if (isResetLink()) {
@@ -211,17 +207,8 @@ async function handleResetSubmit(e) {
   // flag, and drops the user at the dashboard with Science 8 auto-seeded.
   // Useful for testing and for sharing a "just works" local link.
   if (new URLSearchParams(location.search).get('demo') === '1') {
-    Object.keys(localStorage)
-      .filter(function (k) {
-        return k.indexOf('gb-') === 0;
-      })
-      .forEach(function (k) {
-        localStorage.removeItem(k);
-      });
-    localStorage.setItem('gb-demo-mode', '1');
-    localStorage.setItem('gb-demo-mode-token', _demoToken());
-    var preferMobile = window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop';
-    window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard';
+    startDemoMode();
+    window.location.href = teacherAppPath();
     return;
   }
   // Dev mode: only skip login on localhost when explicitly opted in with ?dev=1
@@ -231,21 +218,36 @@ async function handleResetSubmit(e) {
     window.location.href = '/dashboard';
     return;
   }
+  var fromGoogle = isGoogleReturn();
+  var confirming = isConfirmLink() || fromGoogle;
+  var failedMessage = fromGoogle ? GOOGLE_FAILED : CONFIRM_EXPIRED;
+  if (confirming && linkError()) return confirmLinkFailed(failedMessage);
+  if (confirming) showOpening();
   try {
     var sb = getSupabase();
     if (sb) {
       var result = await sb.auth.getSession();
       var session = result.data.session;
       if (session) {
-        var shouldRedirect = await maybePromptRestoreAccount(session.user);
-        if (!shouldRedirect) return;
-        portalRedirect(session.user);
+        var user = fromGoogle ? await ensureDisplayName(session.user) : session.user;
+        var shouldRedirect = await maybePromptRestoreAccount(user);
+        if (shouldRedirect) {
+          portalRedirect(user);
+          return;
+        }
+        if (confirming) {
+          history.replaceState(null, '', location.pathname);
+          document.getElementById('auth-opening').hidden = true;
+          setFormsHidden(false);
+          switchTab('signin');
+        }
         return;
       }
     }
   } catch (e) {
     /* not logged in, stay on page */
   }
+  if (confirming) confirmLinkFailed(failedMessage);
 })();
 
 /* ── Tab switching ─────────────────────────────────────────── */
@@ -286,8 +288,8 @@ async function handleSignIn(e) {
   var btn = document.getElementById('si-submit');
   btn.disabled = true;
   btn.textContent = 'Signing in...';
+  var email = document.getElementById('si-email').value.trim();
   try {
-    var email = document.getElementById('si-email').value.trim();
     var password = document.getElementById('si-password').value;
     var result = await signIn(email, password);
     var shouldRedirect = await maybePromptRestoreAccount(result.user);
@@ -298,9 +300,14 @@ async function handleSignIn(e) {
     }
     portalRedirect(result.user);
   } catch (err) {
-    showError(err.message || 'Sign in failed. Please try again.');
     btn.disabled = false;
     btn.textContent = 'Sign In';
+    if (isEmailNotConfirmed(err)) {
+      showInbox(email, false);
+      showError("Your email isn't confirmed yet. Open the link we sent, or send a new one.");
+      return;
+    }
+    showError(err.message || 'Sign in failed. Please try again.');
   }
 }
 
@@ -320,17 +327,44 @@ async function handleSignUp(e) {
   try {
     var name = document.getElementById('su-name').value.trim();
     var email = document.getElementById('su-email').value.trim();
-    await signUp(email, password, name);
-    showSuccess('Check your email for a confirmation link.');
-    btn.textContent = 'Account Created';
-    setTimeout(function () {
-      btn.disabled = false;
-      btn.textContent = 'Create Account';
-    }, 4000);
+    var data = await signUp(email, password, name);
+    var outcome = signUpOutcome(data);
+    btn.disabled = false;
+    btn.textContent = 'Create Account';
+    if (outcome === 'signed-in') {
+      await goIn(data.user);
+      return;
+    }
+    if (outcome === 'exists') {
+      switchTab('signin');
+      document.getElementById('si-email').value = email;
+      document.getElementById('si-password').focus();
+      showError('You already have an account with this email. Sign in below.');
+      return;
+    }
+    document.getElementById('su-password').value = '';
+    document.getElementById('su-confirm').value = '';
+    showInbox(email, true);
   } catch (err) {
     showError(err.message || 'Sign up failed. Please try again.');
     btn.disabled = false;
     btn.textContent = 'Create Account';
+  }
+}
+
+/* ── Continue with Google ──────────────────────────────────── */
+/* The page leaves for Google; the teacher comes back to ?signin=google. */
+async function handleGoogle(btn) {
+  hideMessages();
+  var label = btn.querySelector('span');
+  btn.disabled = true;
+  label.textContent = 'Opening Google…';
+  try {
+    await signInWithGoogle();
+  } catch (err) {
+    btn.disabled = false;
+    label.textContent = 'Continue with Google';
+    showError((err && err.message) || "Couldn't open Google sign-in. Please try again.");
   }
 }
 
@@ -346,6 +380,18 @@ document.addEventListener('click', function (e) {
       e.preventDefault();
       handleForgot();
       break;
+    case 'google-sign-in':
+      handleGoogle(btn);
+      break;
+    case 'inbox-change-email':
+      leaveInbox('signup');
+      document.getElementById('su-email').select();
+      break;
+    case 'inbox-signin':
+      leaveInbox('signin');
+      document.getElementById('si-email').value = inboxEmail;
+      document.getElementById('si-password').focus();
+      break;
     case 'enter-demo-mode':
       e.preventDefault();
       enterDemoMode();
@@ -355,38 +401,9 @@ document.addEventListener('click', function (e) {
 
 /* ── Demo mode — bypass Supabase auth, run local-only with seeded data ── */
 function enterDemoMode() {
-  // P7.7: confirm before wiping. Skip the prompt only when this device has no
-  // existing gb-* state to lose (fresh install or already-cleared session).
-  var hasExistingState = Object.keys(localStorage).some(function (k) {
-    return k.indexOf('gb-') === 0 && k !== 'gb-demo-mode' && k !== 'gb-demo-mode-token';
-  });
-  if (hasExistingState) {
-    var ok = window.confirm(
-      'Demo Mode will erase the FullVision data on this device and load a sample class.\n\n' +
-        'Anything not synced to your account will be lost. Continue?',
-    );
-    if (!ok) return;
-  }
-  // Wipe any existing gb-* state so seedIfNeeded gets a clean slate.
-  // The seed only fires when COURSES is empty AND the wiped flag isn't set,
-  // so prior real-account data would otherwise block it.
-  Object.keys(localStorage)
-    .filter(function (k) {
-      return k.indexOf('gb-') === 0;
-    })
-    .forEach(function (k) {
-      localStorage.removeItem(k);
-    });
-  // Set the demo flag the rest of the app reads to skip auth + sync.
-  // Cleared on sign-out (which also wipes all gb-* keys per FOIPPA).
-  // The companion token proves demo mode was entered through this code path,
-  // not by flipping a single flag in DevTools on a shared computer.
-  localStorage.setItem('gb-demo-mode', '1');
-  localStorage.setItem('gb-demo-mode-token', _demoToken());
-  // Mobile pref: respect any existing td-mobile-pref override; otherwise let
-  // viewport choose desktop vs mobile entry.
-  var preferMobile = window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop';
-  window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard';
+  if (!startDemoMode({ confirm: true })) return;
+  // A phone opens the phone app; anything bigger, the desktop app.
+  window.location.href = teacherAppPath();
 }
 
 /* ── Forgot password ───────────────────────────────────────── */
@@ -401,7 +418,7 @@ async function handleForgot() {
     var sb = getSupabase();
     // The link comes back to this page, which shows Choose a New Password.
     var result = await sb.auth.resetPasswordForEmail(email, {
-      redirectTo: location.origin + '/login.html?reset=1',
+      redirectTo: resetPasswordRedirect(),
     });
     if (result.error) throw result.error;
     showSuccess('Password reset email sent. Check your inbox.');

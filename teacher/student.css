@@ -3504,39 +3504,6 @@ button.stu-bd-row:focus-visible {
   }
 }
 
-/* Replies to phone reports (canvas T2) */
-.lp-hist {
-  font-size: var(--text-sm);
-  color: var(--text-3);
-  padding-left: 14px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.lp-reply h3 {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
-}
-.lp-new {
-  background: var(--active-light);
-  border-radius: var(--radius);
-  padding: 12px;
-  margin: 0 -12px;
-}
-.lp-new-tag {
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  background: var(--link);
-  border-radius: 999px;
-  padding: 1px 8px;
-}
-.id-jump a span.lp-new-text {
-  color: var(--link);
-  font-weight: 600;
-}
-
 /* The student page's toolbar on a phone (Nov 3 sweep): at 375 px ‹ › sat
    on the breadcrumb, which had shrunk to nothing, and the term picker ran
    260 px past the edge, so the page scrolled sideways. Under 600 px the

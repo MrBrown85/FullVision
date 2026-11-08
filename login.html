@@ -10,6 +10,8 @@
     <title>Sign In — FullVision</title>
     <link rel="manifest" href="manifest.json" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="FullVision" />
     <meta name="theme-color" content="#007AFF" />
     <link rel="stylesheet" href="teacher/styles.css?v=3" />
     <link rel="stylesheet" href="login.css" />
@@ -51,6 +53,32 @@
       <!-- Error / success messages -->
       <div class="auth-error" id="auth-error" role="alert" aria-live="assertive"></div>
       <div class="auth-success" id="auth-success" role="status" aria-live="polite"></div>
+
+      <!-- Continue with Google: signs in, or makes an account the first time -->
+      <div class="auth-google">
+        <button class="auth-google-btn" type="button" id="google-btn" data-action="google-sign-in">
+          <svg class="auth-google-logo" aria-hidden="true" viewBox="0 0 48 48" width="18" height="18">
+            <path
+              fill="#EA4335"
+              d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+            />
+            <path
+              fill="#4285F4"
+              d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+            />
+            <path
+              fill="#34A853"
+              d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+            />
+          </svg>
+          <span>Continue with Google</span>
+        </button>
+        <div class="auth-demo-divider"><span>or use your email</span></div>
+      </div>
 
       <!-- Sign In form -->
       <form class="auth-form" id="form-signin" role="tabpanel" aria-labelledby="tab-signin">
@@ -124,6 +152,37 @@
         <button class="auth-submit" type="submit" id="su-submit">Create Account</button>
       </form>
 
+      <!-- Check Your Inbox: replaces the forms after Create Account -->
+      <section class="auth-inbox" id="panel-inbox" hidden aria-labelledby="inbox-title">
+        <svg
+          class="auth-inbox-icon"
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="3" y="5" width="18" height="14" rx="2.5" />
+          <path d="m3.5 7 8.5 6 8.5-6" />
+        </svg>
+        <h2 class="auth-reset-title" id="inbox-title">Check Your Inbox</h2>
+        <p class="auth-inbox-text">
+          We sent a link to <strong id="inbox-email"></strong>. Open it on any device and you'll go straight to your
+          gradebook.
+        </p>
+        <p class="auth-inbox-hint">Nothing after a minute? Check your spam folder or send it again.</p>
+        <button class="auth-demo-btn" type="button" id="inbox-resend">Resend Email</button>
+        <div class="auth-inbox-links">
+          <button type="button" data-action="inbox-change-email">Use a Different Email</button>
+          <button type="button" data-action="inbox-signin">Back to Sign In</button>
+        </div>
+      </section>
+
+      <!-- A confirmation link landed here: shown while it signs the teacher in -->
+      <p class="auth-opening" id="auth-opening" hidden role="status">Opening your gradebook…</p>
+
       <!-- Choose a New Password: shown when a password reset link opens this page -->
       <form class="auth-form" id="form-reset" hidden aria-labelledby="reset-title">
         <h2 class="auth-reset-title" id="reset-title">Choose a New Password</h2>
@@ -175,6 +234,8 @@
     </script>
     <script src="vendor/supabase.min.js"></script>
     <script src="shared/supabase.js"></script>
+    <script src="shared/device.js"></script>
+    <script src="shared/sign-in.js"></script>
     <script src="login-auth.js"></script>
 
     <script>

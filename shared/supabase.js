@@ -108,11 +108,33 @@
       password,
       options: {
         data: { display_name: displayName },
+        emailRedirectTo: _confirmEmailRedirect(),
       },
     });
     if (error) throw error;
     return data;
   };
+
+  /**
+   * Sends the sign-up confirmation email again.
+   * @param {string} email - The address the account was created with
+   */
+  window.resendSignUpEmail = async function (email) {
+    const sb = getSupabase();
+    if (!sb) throw new Error('Supabase not initialized');
+    const { error } = await sb.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: _confirmEmailRedirect() },
+    });
+    if (error) throw error;
+  };
+
+  // The confirmation email's link signs the teacher in and opens
+  // login.html?confirmed=1, which goes on into the gradebook.
+  function _confirmEmailRedirect() {
+    return location.origin + '/login.html?confirmed=1';
+  }
 
   /**
    * Signs in with email and password.
@@ -127,6 +149,24 @@
     if (error) throw error;
     _leaveDemoMode();
     return data;
+  };
+
+  /**
+   * Signs in with Google, or makes an account the first time. The browser
+   * leaves for Google and comes back to login.html?signin=google, which goes
+   * on into the app like a confirmation link. A teacher who already has an
+   * email account with the same address gets that account: Supabase links a
+   * verified address to the existing user.
+   */
+  window.signInWithGoogle = async function () {
+    const sb = getSupabase();
+    if (!sb) throw new Error('Supabase not initialized');
+    _leaveDemoMode();
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: location.origin + '/login.html?signin=google' },
+    });
+    if (error) throw error;
   };
 
   /* A real sign-in ends Demo Mode. requireAuth() checks the demo flags before

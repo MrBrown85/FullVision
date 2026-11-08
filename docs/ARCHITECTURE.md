@@ -69,16 +69,17 @@ Shared runtime modules load before desktop or mobile page modules, in this order
 1. `shared/sentry-init.js`
 2. `shared/html.js` (`esc`, the one escape helper)
 3. `shared/link-nav.js`
-4. Supabase SDK (`vendor/supabase.min.js`)
-5. `shared/supabase.js`
-6. `shared/constants.js`
-7. `shared/reporting-term-presets.js`
-8. `shared/data.js`
-9. `shared/offline-queue.js`
-10. `shared/auto-update.js`
-11. `shared/calc.js`
-12. `shared/rubric-draft.js`
-13. `shared/rubric-checks.js`
+4. `shared/loading-screen.js` (the loading screen, right after its empty `#app-loading`; the phone and the student page load it too)
+5. Supabase SDK (`vendor/supabase.min.js`)
+6. `shared/supabase.js`
+7. `shared/constants.js`
+8. `shared/reporting-term-presets.js`
+9. `shared/data.js`
+10. `shared/offline-queue.js`
+11. `shared/auto-update.js`
+12. `shared/calc.js`
+13. `shared/rubric-draft.js`
+14. `shared/rubric-checks.js`
 
 The phone loads the same list without `link-nav.js`, `reporting-term-presets.js` and `rubric-draft.js`.
 

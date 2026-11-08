@@ -96,8 +96,11 @@ test('the rubric lists its criteria and how often it is used', async ({ page }) 
 });
 
 test('a field focused below the fold keeps its tip as the page scrolls to it', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 560 });
+  // Shorten the window once the form is open. Shortened before, Demo Mode
+  // would open the phone app: Playwright makes the screen the window's size,
+  // and a screen under 600 tall is a phone (shared/device.js).
   await openForm(page);
+  await page.setViewportSize({ width: 1440, height: 560 });
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.locator('#af-weight').focus();
   await page.keyboard.press('Shift+Tab');
