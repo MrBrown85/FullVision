@@ -190,6 +190,50 @@ body {
   text-decoration: underline;
 }
 
+/* ── Continue with Google ──────────────────────────────────── */
+/* Google's own button: white with a grey border and the four-colour G,
+   dark grey in dark mode (developers.google.com/identity/branding-guidelines). */
+.auth-google-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px;
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: #1f1f1f;
+  background: #ffffff;
+  border: 1px solid #747775;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.auth-google-btn:hover {
+  background: #f2f2f2;
+}
+.auth-google-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.auth-google-logo {
+  flex: none;
+}
+.auth-google .auth-demo-divider {
+  margin: 16px 0;
+}
+@media (prefers-color-scheme: dark) {
+  .auth-google-btn {
+    color: #e3e3e3;
+    background: #131314;
+    border-color: #8e918f;
+  }
+  .auth-google-btn:hover {
+    background: #202124;
+  }
+}
+
 /* ── Messages ──────────────────────────────────────────────── */
 .auth-error {
   display: none;

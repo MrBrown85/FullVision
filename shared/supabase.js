@@ -151,6 +151,24 @@
     return data;
   };
 
+  /**
+   * Signs in with Google, or makes an account the first time. The browser
+   * leaves for Google and comes back to login.html?signin=google, which goes
+   * on into the app like a confirmation link. A teacher who already has an
+   * email account with the same address gets that account: Supabase links a
+   * verified address to the existing user.
+   */
+  window.signInWithGoogle = async function () {
+    const sb = getSupabase();
+    if (!sb) throw new Error('Supabase not initialized');
+    _leaveDemoMode();
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: location.origin + '/login.html?signin=google' },
+    });
+    if (error) throw error;
+  };
+
   /* A real sign-in ends Demo Mode. requireAuth() checks the demo flags before
    * the session, so flags left from Try Demo Mode kept a signed-in teacher in
    * the sample class and their own classes never loaded. enterDemoMode()

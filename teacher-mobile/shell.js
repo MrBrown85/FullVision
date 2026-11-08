@@ -315,6 +315,10 @@
         _handleForgot();
       }
 
+      if (action === 'm-google-sign-in') {
+        _handleGoogle(target);
+      }
+
       if (action === 'm-inbox-change-email') {
         _leaveInbox('signup');
         document.getElementById('m-su-email').select();
@@ -371,6 +375,7 @@
 
   function _setAuthFormsHidden(hidden) {
     document.querySelector('.m-auth-tabs').hidden = hidden;
+    document.querySelector('.m-auth-google').hidden = hidden;
     document.querySelector('.m-auth-demo').hidden = hidden;
     if (hidden) {
       document.getElementById('m-form-signin').hidden = true;
@@ -415,6 +420,23 @@
     _resetHistory();
     await _bootApp();
     return true;
+  }
+
+  /* Continue with Google leaves for Google and comes back to
+   * login.html?signin=google, which signs the teacher in and opens this app
+   * again on a phone. */
+  async function _handleGoogle(btn) {
+    _authClearMessages();
+    var label = btn.querySelector('span');
+    btn.disabled = true;
+    label.textContent = 'Opening Google…';
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      btn.disabled = false;
+      label.textContent = 'Continue with Google';
+      _authError((err && err.message) || "Couldn't open Google sign-in. Please try again.");
+    }
   }
 
   async function _handleSignIn() {

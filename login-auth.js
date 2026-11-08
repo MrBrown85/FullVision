@@ -53,6 +53,7 @@ function linkError() {
 
 function showResetForm() {
   document.querySelector('.auth-tabs').hidden = true;
+  document.querySelector('.auth-google').hidden = true;
   document.getElementById('form-signin').hidden = true;
   document.getElementById('form-signup').hidden = true;
   document.querySelector('.auth-demo').hidden = true;
@@ -117,8 +118,17 @@ function isConfirmLink() {
   );
 }
 
+/* Continue with Google comes back to login.html?signin=google: with tokens
+   when the teacher went ahead, with an error when they cancelled. */
+var GOOGLE_FAILED = "Google sign-in didn't finish. Try again, or use your email and password below.";
+
+function isGoogleReturn() {
+  return new URLSearchParams(location.search).get('signin') === 'google';
+}
+
 function setFormsHidden(hidden) {
   document.querySelector('.auth-tabs').hidden = hidden;
+  document.querySelector('.auth-google').hidden = hidden;
   document.querySelector('.auth-demo').hidden = hidden;
   if (hidden) {
     document.getElementById('form-signin').hidden = true;
@@ -131,12 +141,12 @@ function showOpening() {
   document.getElementById('auth-opening').hidden = false;
 }
 
-function confirmLinkFailed() {
+function confirmLinkFailed(message) {
   history.replaceState(null, '', location.pathname);
   document.getElementById('auth-opening').hidden = true;
   setFormsHidden(false);
   switchTab('signin');
-  showError(CONFIRM_EXPIRED);
+  showError(message || CONFIRM_EXPIRED);
 }
 
 /* Check Your Inbox, after Create Account or a sign-in the server refused
@@ -208,8 +218,10 @@ async function goIn(user) {
     window.location.href = '/dashboard';
     return;
   }
-  var confirming = isConfirmLink();
-  if (confirming && linkError()) return confirmLinkFailed();
+  var fromGoogle = isGoogleReturn();
+  var confirming = isConfirmLink() || fromGoogle;
+  var failedMessage = fromGoogle ? GOOGLE_FAILED : CONFIRM_EXPIRED;
+  if (confirming && linkError()) return confirmLinkFailed(failedMessage);
   if (confirming) showOpening();
   try {
     var sb = getSupabase();
@@ -217,9 +229,10 @@ async function goIn(user) {
       var result = await sb.auth.getSession();
       var session = result.data.session;
       if (session) {
-        var shouldRedirect = await maybePromptRestoreAccount(session.user);
+        var user = fromGoogle ? await ensureDisplayName(session.user) : session.user;
+        var shouldRedirect = await maybePromptRestoreAccount(user);
         if (shouldRedirect) {
-          portalRedirect(session.user);
+          portalRedirect(user);
           return;
         }
         if (confirming) {
@@ -234,7 +247,7 @@ async function goIn(user) {
   } catch (e) {
     /* not logged in, stay on page */
   }
-  if (confirming) confirmLinkFailed();
+  if (confirming) confirmLinkFailed(failedMessage);
 })();
 
 /* ── Tab switching ─────────────────────────────────────────── */
@@ -339,6 +352,22 @@ async function handleSignUp(e) {
   }
 }
 
+/* ── Continue with Google ──────────────────────────────────── */
+/* The page leaves for Google; the teacher comes back to ?signin=google. */
+async function handleGoogle(btn) {
+  hideMessages();
+  var label = btn.querySelector('span');
+  btn.disabled = true;
+  label.textContent = 'Opening Google…';
+  try {
+    await signInWithGoogle();
+  } catch (err) {
+    btn.disabled = false;
+    label.textContent = 'Continue with Google';
+    showError((err && err.message) || "Couldn't open Google sign-in. Please try again.");
+  }
+}
+
 /* ── Delegated click handler ───────────────────────────────── */
 document.addEventListener('click', function (e) {
   var btn = e.target.closest('[data-action]');
@@ -350,6 +379,9 @@ document.addEventListener('click', function (e) {
     case 'forgot-password':
       e.preventDefault();
       handleForgot();
+      break;
+    case 'google-sign-in':
+      handleGoogle(btn);
       break;
     case 'inbox-change-email':
       leaveInbox('signup');

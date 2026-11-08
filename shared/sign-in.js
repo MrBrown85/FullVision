@@ -3,8 +3,8 @@
  * login.html (desktop) and teacher-mobile/index.html (phone) each draw their own
  * sign-in card. The steps behind it live here so the two can't drift:
  * Try Demo Mode, the Restore Account prompt for an account set to be
- * deleted, where a password reset link lands, and Check Your Inbox after
- * Create Account.
+ * deleted, where a password reset link lands, Check Your Inbox after
+ * Create Account, and the teacher's name after a Google sign-in.
  *
  * Plain browser globals, like login-auth.js. Needs shared/html.js (esc) and
  * shared/supabase.js (getSupabase) at call time. */
@@ -100,6 +100,24 @@ function showRestoreAccountPrompt(deletionDate) {
       close(false);
     };
   });
+}
+
+/* The app reads the teacher's name from user_metadata.display_name, which the
+ * sign-up form sets. Google fills full_name and name instead, so copy the
+ * name across once after a Google sign-in. Returns the user, updated when the
+ * copy worked; a failed copy only means the name shows as the email for now. */
+async function ensureDisplayName(user) {
+  var meta = (user && user.user_metadata) || {};
+  if (meta.display_name) return user;
+  var name = meta.full_name || meta.name;
+  var sb = getSupabase();
+  if (!name || !sb) return user;
+  try {
+    var res = await sb.auth.updateUser({ data: { display_name: name } });
+    return (res && !res.error && res.data && res.data.user) || user;
+  } catch (e) {
+    return user;
+  }
 }
 
 /* After sign-in: if the teacher's account is set to be deleted, ask whether
