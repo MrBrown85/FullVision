@@ -194,7 +194,7 @@ Context: `STUDENT-VOICE-PLAN.md`.
 
 Supersedes Student voice 2's one single-use code per student per questionnaire, for the planned student page (photo submissions, feedback, reflections, My Learning) once it is built. Nothing is built yet. With a slip per questionnaire or phone report, students would sign in for nearly every assignment. Colin: "one card per term."
 
-1. **One card per student per term.** The same code opens assignments, sending work, feedback, questionnaires and reports until a date the teacher sets; the default is the end of the reporting term.
+1. **One card per student per term.** The same code opens assignments, sending work, feedback, questionnaires and reports until a date the teacher sets; the default is the end of the reporting term. _The default became the end of the course on 2026-11-08; see "Grades, photos and sign-in on the student page" 9._
 2. **The identity check stays as it is today:** birthday or student number, or the card's password when neither is on file (`student.slip_password`), with the same wrong-try locks.
 3. **Teachers print cards** eight to a letter page, like the questionnaire slips. They can Unlock a locked card or Reissue a lost one; reissuing stops the old code at once and keeps everything the student sent.
 4. **Single-use slips stay only for one-offs,** such as a phone report for a student with no card.
@@ -210,6 +210,24 @@ Context: the student page designed on Nov 6–7 (photo submissions, feedback, re
 5. **Next steps come from the comment bank; I Can statements from the curriculum bank.** Nothing is written for the student page alone.
 6. **No class averages and no comparisons** with other students.
 7. **Preview as Student shows exactly what one student sees.**
+
+## Grades, photos and sign-in on the student page (2026-11-08)
+
+Context: the student page and photo submissions designed on the "Photo Submissions" artboard (version 109). Nothing is built yet. Colin made these calls one at a time on Nov 8, before any building. Every grade is Draft or Returned; every number comes from one `calc.js` function fed all scores or returned scores only; every grading action goes through one grader, and the server rejects invalid writes.
+
+1. **Return Grades defaults to When I Return Them,** per class in Class Settings › Student Page. A grade is a draft only the teacher sees until Return, Return and Next or Return N Graded. The other choice is As Soon As I Save. A change to a returned grade follows the same setting: under When I Return Them it waits as a draft until returned again; the student then sees it marked Updated.
+2. **Scores entered before Draft and Returned ship become Returned.** Reports, MyEd filling and the gradebook keep working as they do; students see past grades only once a class turns on the student page.
+3. **Printing progress reports with drafts asks first:** it names the draft grades and offers Return Them, Then Print; Print Without Them; Cancel. A report shows grades to families, so drafts never print silently.
+4. **Mark Up shows to students when the work is returned.** It is saved as drawing data over the photo, never burned in, so the teacher can erase any mark before returning.
+5. **Keep Photos Until defaults to End of Year** (after June report cards), with End of Term offered, per class. A reminder comes a week before. Grades, comments and Mark Up stay; the photos and files are deleted.
+6. **No second copy of submitted photos** (Colin chose this over a nightly copy kept 30 days). Database backups don't include stored files, so a deleted photo can't come back. Keep Photos Until, Unsend, purging a class and deleting a student must say plainly that photos go for good.
+7. **Supabase's spend cap goes off before photo submissions launch,** with usage alerts at about 70% of each quota, so FullVision is never limited mid-semester. The pilot (about 22 teachers and 3,000 students) is estimated at 35–50 GB a semester, inside Pro's 100 GB.
+8. **Photos and PDFs only.** A Word or PowerPoint file gets "Save it as a PDF first", with how in Word, PowerPoint and Google, so every submission can be marked up. Every photo is made smaller in the browser before it uploads, on every path (about 2000 px, 300–500 KB a page; iPhone HEIC becomes JPEG; a thumbnail at the same time); PDFs upload as they are, up to 20 MB; the server refuses a photo over 2 MB.
+9. **A student card lasts the course by default** (the class's last reporting date), with End of Term offered. Supersedes Student cards 1's term default. The identity check, the lock after five wrong tries and Reissue cover a lost card, and teachers print once per course.
+10. **A graded revision's new grade replaces the old one** when it is returned; the first version and its grade stay as history (the student's Before and After). This changes what counts in the grade math and gets Colin's review in the PR that builds it.
+11. **"Followed it" is the student's word.** When a student sends work they say whether they followed their plan from last time (Yes, Partly, Not This Time). It is shown and reused labelled as theirs ("Jordan says…"); no teacher confirmation.
+12. **The student page's tab is Questionnaires,** the same word teachers use, not Questions, which reads as asking the teacher something.
+13. **Cards for the pilot, built account-ready.** Semester 2 (from late January 2027) uses cards; a student with several FullVision teachers adds each card (Switching Classes). The student's session belongs to the student, not the card, so Microsoft sign-in and one account across teachers can come later without rework.
 
 ## Phone-report birthday tries (2026-11-03)
 
