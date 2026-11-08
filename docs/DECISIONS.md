@@ -181,7 +181,7 @@ Colin chose option A on Kanban card t4. Microsoft Teams Assignments requires a c
 Context: `STUDENT-VOICE-PLAN.md`.
 
 1. **Two forms:** a core competency reflection from the grade-by-period templates (three prompts plus the nine-dimension rating) and an optional curricular self-assessment from the course's I-can statements. Neither over ten minutes.
-2. **Codes:** one single-use code per student per questionnaire, expiring at the close date, stored hashed. Since 2026-11-01 the code alone opens only "who are you?": the student gives their birthday or student number, or, with neither on file, a four-digit password printed on the same slip (`student.slip_password`). Colin chose the slip over a separate card: it stops code guessing, not someone holding the slip. `migrations/20261101_questionnaire_identity_check.sql`. A password printed before a roster import added a birthday or number still works; five wrong tries in all lock a slip (`20261101_questionnaire_slip_fixes.sql`).
+2. **Codes:** one single-use code per student per questionnaire, expiring at the close date, stored hashed. Since 2026-11-01 the code alone opens only "who are you?": the student gives their birthday or student number, or, with neither on file, a four-digit password printed on the same slip (`student.slip_password`). Colin chose the slip over a separate card: it stops code guessing, not someone holding the slip. `migrations/20261101_questionnaire_identity_check.sql`. A password printed before a roster import added a birthday or number still works; five wrong tries in all lock a slip (`20261101_questionnaire_slip_fixes.sql`). _For the planned student page, superseded 2026-11-07 by Student cards below, once it is built._
 3. **Previous answers** are shown only for the three repeated questions.
 4. **Repeated questions:** "What am I good at as a learner?" · "What is hard for me right now?" · "What do I want to get better at, and how?" (September, January, June).
 5. **English first;** translations stored as data on each question.
@@ -189,6 +189,15 @@ Context: `STUDENT-VOICE-PLAN.md`.
 7. **The teacher's term questionnaire stays as is** until phase 5.
 8. **Backend:** no anon-callable database functions. One Supabase Edge Function in `ca-central-1` fronts the student form, calling `student_submit` schema functions granted to the service role only; short-lived tokens, rate limiting, append-only responses.
 9. **UI:** the student page reuses the teacher mobile app's stylesheets and components; reuse is one-way.
+
+## Student cards (2026-11-07)
+
+Supersedes Student voice 2's one single-use code per student per questionnaire, for the planned student page (photo submissions, feedback, reflections, My Learning) once it is built. Nothing is built yet. With a slip per questionnaire or phone report, students would sign in for nearly every assignment. Colin: "one card per term."
+
+1. **One card per student per term.** The same code opens assignments, sending work, feedback, questionnaires and reports until a date the teacher sets; the default is the end of the reporting term.
+2. **The identity check stays as it is today:** birthday or student number, or the card's password when neither is on file (`student.slip_password`), with the same wrong-try locks.
+3. **Teachers print cards** eight to a letter page, like the questionnaire slips. They can Unlock a locked card or Reissue a lost one; reissuing stops the old code at once and keeps everything the student sent.
+4. **Single-use slips stay only for one-offs,** such as a phone report for a student with no card.
 
 ## Phone-report birthday tries (2026-11-03)
 
