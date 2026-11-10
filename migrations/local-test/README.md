@@ -577,11 +577,11 @@ checks on the starting point became two, and one on the result was added).
 On a database with the score paths alone `score_rpcs.py` is unchanged, and `make-score-tables.py` still
 writes `score-tables.sql` byte for byte.
 
-## S0-M4b: three known limits of Batch A's grade_return (2026-11-10)
+## S0-M4b: three known limits of Batch A's grade_return, and DIBELS (2026-11-10)
 
 `../2026110905_grade_return_limits.sql` applies right after Batch A. It
-closes the three limits the last verify pass named, and makes two changes
-the owner ruled on Nov 10:
+closes the three limits the last verify pass named, and makes three changes
+the owner ruled on:
 
 - (a) the repair is a function now (`grade_return_repair()`), and adds a row
   for a graded cell that has none, as a save through the triggers would have
@@ -593,7 +593,15 @@ the owner ruled on Nov 10:
   pg_cron job where pg_cron is installed, removes the rows a delete with
   triggers off leaves behind;
 - (d) `student_submit.page` sends each assessment's `created_at`;
-- (e) `list_course_grade_returns` no longer sends `seen_at`.
+- (e) `list_course_grade_returns` no longer sends `seen_at`;
+- (f) DIBELS work has no Draft and no Returned (ruling 15: "A benchmark is a
+  reading record, not a grade that is returned"): a save to a DIBELS piece
+  makes no `grade_return` row and changes none, a piece whose scoring is
+  changed to DIBELS loses its rows and one changed back gets them as a first
+  save would leave them, and `return_grades`, `course_draft_count`,
+  `list_course_grade_returns` and `student_submit.seen` pass over a DIBELS
+  piece. The repair removes any row it finds for one, so the file's last
+  statement removes the rows Batch A's backfill made.
 
 ```bash
 MIG4B="../2026110901_score_rows_same_class.sql ../2026110902_grade_return.sql ../2026110903_student_card.sql \
@@ -609,19 +617,26 @@ triggers-off grade without a row; the restore leaves a draft in an As Soon
 As I Save class; `truncate enrollment cascade`, `truncate assessment
 cascade` and `truncate course cascade` each leave orphan rows, and so does
 a delete with the trigger off; the teacher's list sends `seen_at`; the page
-sends no `created_at`. It checks the guards (no Batch A; a `page()` or a
-restore helper that is not Batch A's), applies the file where pg_cron is
-missing and where a stand-in for it exists (one job, scheduled once), and
-then shows each closed. On a database with the file loaded it runs the
-nightly procedure as the job does, on its own connection.
+sends no `created_at`; a comment saved on a DIBELS piece waits as a Draft,
+is counted and can be returned. It checks the guards (no Batch A; a
+`page()`, a restore helper or a score-table trigger function that is not
+Batch A's), applies the file where pg_cron is missing and where a stand-in
+for it exists (one job, scheduled once), and then shows each closed. On a
+database with the file loaded it runs the nightly procedure as the job
+does, on its own connection.
+
+`tests/fixtures/grade-state-cases.json` has one more case, the last, for
+(f): `"work": "dibels"`. `grade_return.py` runs it where this file is
+loaded; on a database with Batch A alone it pins what happens today (the
+comment waits as a draft) in one check instead.
 
 Result on 2026-11-10, on Postgres 18.6 (port 54329) and on Postgres 17.11
-(port 54331), the same on both: `grade_return_limits.py` 51 of 51 on Batch A
-alone and 36 of 36 with the file loaded. Every Batch A suite on top of the
-file is unchanged: `grade_return.py` 280, `student_page.py` 216,
-`score_rpcs.py` 234, `student_submit.py` 79, `questionnaire_identity.py` 47,
-`phone_reports.py` 37, `questionnaires.py` 42, `batch_a_apply.py` 82,
-`grade_return_race.py` 435 (the same nine RPCs collide with saves, no
-other, and no `grade_return` row is wrong after any run). One check in
-`student_page.py` was edited: it asserted the exact keys of a page
-assessment and now allows `created_at`.
+(port 54331), the same on both: `grade_return_limits.py` 70 of 70 on Batch A
+alone and 52 of 52 with the file loaded. The Batch A suites on top of the
+file: `grade_return.py` 284 (the 280, and four for the DIBELS case; 281 on
+Batch A alone), `student_page.py` 216, `score_rpcs.py` 236,
+`student_submit.py` 79, `questionnaire_identity.py` 47, `phone_reports.py`
+37, `questionnaires.py` 42, `batch_a_apply.py` 84, `grade_return_race.py`
+435 (the same nine RPCs collide with saves, no other, and no `grade_return`
+row is wrong after any run). One check in `student_page.py` was edited: it
+asserted the exact keys of a page assessment and now allows `created_at`.

@@ -84,11 +84,19 @@ def do(step, e, a, K):
 doc = json.load(open(os.path.join(HERE, '..', '..', 'tests', 'fixtures', 'grade-state-cases.json')))
 ok('the cases file is format 1 and has cases', doc.get('format') == 1 and len(doc['cases']) >= 40, len(doc['cases']))
 STUDENT = {'s1': ENR1, 's2': ENR2}
+# 2026110905 (S0-M4b) leaves DIBELS work out of Draft and Returned. Batch A
+# alone treats it like any grade, so without that file the DIBELS case is
+# pinned as it is today instead of run.
+LIMITS = one("select to_regprocedure('public.grade_return_repair()') is not null")
 for case in doc['cases']:
     set_class(case['class']['student_page'], case['class']['return_grades'])
     K = build_class()   # a class of its own, so a case can delete from it
     SYMBOL = {K[n]: n for n in ('t1', 't2', 'c1', 'c2', 'k1', 'k2')}
     a = new_assessment(K, case['work'])
+    if case['work'] == 'dibels' and not LIMITS:
+        do(case['steps'][0], ENR1, a, K)
+        ok('today (Batch A without 2026110905): a comment saved on a DIBELS piece waits as a draft, like any grade', state(ENR1, a) == 'draft', state(ENR1, a))
+        continue
     n = 0; last_returned = {}
     for step in case['steps']:
         e = STUDENT[step.get('student', 's1')] if 'do' in step else STUDENT[step['expect'].get('for', 's1')]

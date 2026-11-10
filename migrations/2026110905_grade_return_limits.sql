@@ -1,5 +1,6 @@
 -- Closes three known limits of Batch A's grade_return, sends created_at on
--- the student's page, and keeps seen_at from the teacher (2026-11-10). S0-M4b.
+-- the student's page, keeps seen_at from the teacher, and leaves DIBELS work
+-- out of Draft and Returned (2026-11-10). S0-M4b.
 --
 -- Apply right after Batch A (2026110901 to 2026110904). The owner chose to
 -- apply Batch A exactly as it was verified and close these behind it. The
@@ -36,6 +37,15 @@
 --    page only: "3 Things Since You Last Looked" and the Updated mark. It is
 --    not shown to teachers, and it is kept only as long as the grade itself.
 --    Batch A's list_course_grade_returns sent it to the teacher's browser.
+-- f. (New: the owner's ruling 15, "DIBELS numbers show at once. A benchmark
+--    is a reading record, not a grade that is returned.") A benchmark's
+--    numbers are in dibels_score, which Batch A's triggers do not watch, so
+--    the numbers were never held. But a DIBELS piece can still hold a row in
+--    the score tables (an Overall Comment saved on it, or a grade from
+--    before its scoring was changed to DIBELS), and Batch A treated that
+--    like any grade: the backfill made a grade_return row for it, a save to
+--    it made a Draft in a class that holds grades, the settings screen
+--    counted the draft, and Return returned it.
 --
 -- ── What it adds ────────────────────────────────────────────────────────────
 -- 1. _grade_return_repair_class(p_course_id) and grade_return_repair():
@@ -51,7 +61,8 @@
 --    grade_return_repair() does every class, then the rows with neither a
 --    student nor an assessment left (no class to lock; nothing else can
 --    reach such a row). It returns what it did:
---      { classes, orphans_removed, rows_added, working_copies_fixed }.
+--      { classes, orphans_removed, dibels_rows_removed, rows_added,
+--        working_copies_fixed }.
 --    This file runs it once, last. On a database where every write went
 --    through the triggers it finds nothing to do.
 -- 2. A trigger AFTER TRUNCATE on enrollment and on assessment
@@ -91,23 +102,61 @@
 --    a grade, so after a save in an As Soon As I Save class it must take
 --    previous_copy and updated_at from the server instead of working them
 --    out.
+-- 7. DIBELS work (assessment.score_mode = 'dibels') has no Draft and no
+--    Returned: no grade_return row at all.
+--      _grade_return_on_change (Batch A's trigger function on the four score
+--        tables), patched in place: a save to a DIBELS piece makes no row
+--        and changes none.
+--      A trigger on assessment (grade_return_mode) for a piece whose scoring
+--        is changed. To DIBELS: its grade_return rows are removed. From
+--        DIBELS: each graded cell gets the row a save would have left (a
+--        Draft in a class that holds grades, Returned at once in any other).
+--        So a piece changed to DIBELS and back starts again: in a class that
+--        holds grades its grades wait to be returned again.
+--      return_grades, course_draft_count, list_course_grade_returns and
+--        student_submit.seen, patched in place: each passes over a DIBELS
+--        piece. A row that got there with the triggers switched off is not
+--        returned, counted, listed or marked as seen.
+--      The restore's helper removes any row it made for a DIBELS piece.
+--      The repair (1) removes any it finds and adds none. This file's last
+--        statement is the repair, so it removes the rows Batch A's backfill
+--        made for DIBELS pieces, and says how many (dibels_rows_removed).
+--    No score, level, comment or DIBELS number changes, and dibels_score is
+--    not touched.
 --
 -- No function this file adds can be called through the API: all are for the
 -- database owner and the nightly job.
 --
 -- ── What it does to existing rows ───────────────────────────────────────────
--- Applied straight after Batch A: nothing. Batch A's backfill has just made
--- a row for every graded cell, so the repair finds no orphan, no missing
--- row and no working copy to fix. Later runs change only grade_return, and
--- only as described in 1. No score, level, comment or tick ever changes.
+-- Applied straight after Batch A: one thing. Batch A's backfill has just
+-- made a row for every graded cell, so the repair finds no orphan, no
+-- missing row and no working copy to fix; it removes the grade_return rows
+-- of DIBELS pieces (7), if there are any. To count them before applying
+-- Batch A (no row comes back if there are none):
+--   select x.tbl, count(*) as score_rows, count(distinct (x.enrollment_id, x.assessment_id)) as cells
+--     from (select 'score' as tbl, enrollment_id, assessment_id from public.score
+--            where value is not null or nullif(btrim(comment), '') is not null
+--           union all select 'tag_score', enrollment_id, assessment_id from public.tag_score
+--            where value is not null or nullif(btrim(comment), '') is not null
+--           union all select 'rubric_score', enrollment_id, assessment_id from public.rubric_score
+--            where value is not null or nullif(btrim(comment), '') is not null or nullif(btrim(beyond), '') is not null
+--           union all select 'rubric_check_score', enrollment_id, assessment_id from public.rubric_check_score) x
+--     join public.assessment a on a.id = x.assessment_id and a.score_mode = 'dibels'
+--    group by x.tbl;
+-- Later runs change only grade_return, and only as described in 1 and 7. No
+-- score, level, comment or tick ever changes.
 --
 -- ── Guards ──────────────────────────────────────────────────────────────────
--- The three functions patched in place are Batch A's own, so their expected
+-- The seven functions patched in place are Batch A's own, so their expected
 -- fingerprints are what Batch A's files create (md5 of pg_get_functiondef),
 -- not something read from the live database:
---   fv_private.restore_grade_returns(jsonb)   c43618c73751e036a2735ad246b35966
---   student_submit.page(text,uuid,text)       7af33e2114372833d7ad7fb97b56ebae
---   public.list_course_grade_returns(uuid)    6ccab9528aef0c2d6ec8bea1964edf81
+--   fv_private.restore_grade_returns(jsonb)      c43618c73751e036a2735ad246b35966
+--   student_submit.page(text,uuid,text)          7af33e2114372833d7ad7fb97b56ebae
+--   public.list_course_grade_returns(uuid)       6ccab9528aef0c2d6ec8bea1964edf81
+--   public._grade_return_on_change()             c24d422823677e947f9d595a91ac5b1d
+--   public.return_grades(uuid,uuid[],uuid)       1a403efc836b8d28b0fb56baf7b0926e
+--   public.course_draft_count(uuid)              bcdfdc2537478ebe69f14ed9a893d7ad
+--   student_submit.seen(text,uuid,uuid[],text)   dd6c76bf02bc627abcef5134a677288f
 -- Anything else stops the file, unless the function already carries this
 -- file's patch (a second run).
 --
@@ -140,7 +189,11 @@ begin
         select * from (values
             ('fv_private.restore_grade_returns(jsonb)', 'c43618c73751e036a2735ad246b35966', '(2026110905)'),
             ('student_submit.page(text,uuid,text)',     '7af33e2114372833d7ad7fb97b56ebae', $s$'created_at', a.created_at$s$),
-            ('public.list_course_grade_returns(uuid)',  '6ccab9528aef0c2d6ec8bea1964edf81', '(2026110905)')
+            ('public.list_course_grade_returns(uuid)',  '6ccab9528aef0c2d6ec8bea1964edf81', '(2026110905)'),
+            ('public._grade_return_on_change()',        'c24d422823677e947f9d595a91ac5b1d', '(2026110905)'),
+            ('public.return_grades(uuid,uuid[],uuid)',  '1a403efc836b8d28b0fb56baf7b0926e', '(2026110905)'),
+            ('public.course_draft_count(uuid)',         'bcdfdc2537478ebe69f14ed9a893d7ad', '(2026110905)'),
+            ('student_submit.seen(text,uuid,uuid[],text)', 'dd6c76bf02bc627abcef5134a677288f', '(2026110905)')
         ) as v(fn, was, mark)
     loop
         _def := pg_get_functiondef(_f.fn::regprocedure);
@@ -163,6 +216,7 @@ create or replace function public._grade_return_repair_class(p_course_id uuid)
 as $function$
 declare
     _orphans integer := 0;
+    _dibels  integer := 0;
     _added   integer := 0;
     _fixed   integer := 0;
     _c       record;
@@ -170,6 +224,13 @@ declare
 begin
     -- The class's lock first: grade_return is written only under it.
     perform _grade_return_lock(p_course_id);
+
+    -- A DIBELS benchmark is a reading record, not a grade that is returned:
+    -- it has no row.
+    delete from grade_return g
+     using assessment a
+     where a.id = g.assessment_id and a.course_id = p_course_id and a.score_mode = 'dibels';
+    get diagnostics _dibels = row_count;
 
     -- Rows whose student or assessment is gone. The one that is left says
     -- which class the row was in.
@@ -189,7 +250,7 @@ begin
                 union all select enrollment_id, assessment_id from rubric_score
                 union all select enrollment_id, assessment_id from rubric_check_score) x
           join enrollment e on e.id = x.enrollment_id and e.course_id = p_course_id
-          join assessment a on a.id = x.assessment_id and a.course_id = p_course_id
+          join assessment a on a.id = x.assessment_id and a.course_id = p_course_id and a.score_mode <> 'dibels'
          where not exists (select 1 from grade_return g
                             where g.enrollment_id = x.enrollment_id and g.assessment_id = x.assessment_id)
          order by 1, 2
@@ -211,7 +272,8 @@ begin
        and g.working_copy is distinct from _grade_copy(g.enrollment_id, g.assessment_id);
     get diagnostics _fixed = row_count;
 
-    return jsonb_build_object('orphans_removed', _orphans, 'rows_added', _added, 'working_copies_fixed', _fixed);
+    return jsonb_build_object('orphans_removed', _orphans, 'dibels_rows_removed', _dibels,
+                              'rows_added', _added, 'working_copies_fixed', _fixed);
 end;
 $function$;
 revoke all on function public._grade_return_repair_class(uuid) from public, anon, authenticated;
@@ -248,6 +310,7 @@ declare
     _r       jsonb;
     _classes integer := 0;
     _orphans integer := 0;
+    _dibels  integer := 0;
     _added   integer := 0;
     _fixed   integer := 0;
 begin
@@ -255,11 +318,12 @@ begin
         _r := _grade_return_repair_class(_course);
         _classes := _classes + 1;
         _orphans := _orphans + (_r->>'orphans_removed')::int;
+        _dibels  := _dibels  + (_r->>'dibels_rows_removed')::int;
         _added   := _added   + (_r->>'rows_added')::int;
         _fixed   := _fixed   + (_r->>'working_copies_fixed')::int;
     end loop;
     _orphans := _orphans + _grade_return_repair_lost();
-    return jsonb_build_object('classes', _classes, 'orphans_removed', _orphans,
+    return jsonb_build_object('classes', _classes, 'orphans_removed', _orphans, 'dibels_rows_removed', _dibels,
                               'rows_added', _added, 'working_copies_fixed', _fixed);
 end;
 $function$;
@@ -286,6 +350,55 @@ create trigger grade_return_truncate after truncate on public.enrollment
 drop trigger if exists grade_return_truncate on public.assessment;
 create trigger grade_return_truncate after truncate on public.assessment
     for each statement execute function public._grade_return_truncated();
+
+-- ── 2b. A piece's scoring is changed to DIBELS, or from it ──────────────────
+-- Under the class's lock, like every other write to grade_return. To
+-- DIBELS: the piece's rows go. From DIBELS: each graded cell gets the row a
+-- save through the triggers would have left, as the repair adds one.
+create or replace function public._grade_return_mode_changed()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+declare
+    _e   uuid;
+    _now jsonb;
+begin
+    -- import_json_restore sets the state itself when its rows are in.
+    if current_setting('fv.restoring', true) = 'on' then return null; end if;
+    perform _grade_return_lock(new.course_id);
+    if new.score_mode = 'dibels' then
+        delete from grade_return where assessment_id = new.id;
+        return null;
+    end if;
+    for _e in
+        select distinct x.enrollment_id
+          from (select enrollment_id from score where assessment_id = new.id
+                union all select enrollment_id from tag_score where assessment_id = new.id
+                union all select enrollment_id from rubric_score where assessment_id = new.id
+                union all select enrollment_id from rubric_check_score where assessment_id = new.id) x
+          join enrollment e on e.id = x.enrollment_id and e.course_id = new.course_id
+         where not exists (select 1 from grade_return g
+                            where g.enrollment_id = x.enrollment_id and g.assessment_id = new.id)
+         order by 1
+    loop
+        _now := _grade_copy(_e, new.id);
+        continue when _now is null;
+        perform _grade_return_apply(_e, new.id, null, _now);
+        update grade_return set working_copy = _now
+         where enrollment_id = _e and assessment_id = new.id;
+    end loop;
+    return null;
+end;
+$function$;
+revoke all on function public._grade_return_mode_changed() from public, anon, authenticated;
+drop trigger if exists grade_return_mode on public.assessment;
+create trigger grade_return_mode
+    after update of score_mode on public.assessment
+    for each row
+    when (old.score_mode is distinct from new.score_mode and (old.score_mode = 'dibels' or new.score_mode = 'dibels'))
+    execute function public._grade_return_mode_changed();
 
 -- ── 3. Once a day, without anyone remembering to ────────────────────────────
 -- A procedure, so it can commit after each class: a class is locked only
@@ -321,11 +434,11 @@ begin
 end
 $cron$;
 
--- ── 4, 5 and 6. The restore's helper, the student's page and the teacher's list, patched in place ──
+-- ── 4 to 7. Batch A's functions, patched in place ───────────────────────────
 do $patch$
 declare
     _edits text[][] := array[
-      -- function, a line only the patch adds, text to find (exactly once), replacement
+      -- function, text only this edit leaves behind, text to find (exactly once), replacement
       array['fv_private.restore_grade_returns(jsonb)',
             '(2026110905)',
 $s$      where g.is_draft and c.teacher_id = (select auth.uid())
@@ -338,6 +451,15 @@ $s$      where g.is_draft and c.teacher_id = (select auth.uid())
              -- or a class the payload names a grade or a state in (2026110905)
              or c.id in (select e2.course_id from enrollment e2 where e2.id = any (_es)))
         and not (c.student_page_enabled and c.return_grades is not distinct from 'on_return');$s$],
+      array['fv_private.restore_grade_returns(jsonb)',
+            $s$a.score_mode = 'dibels' and g.assessment_id = any (_as)$s$,
+$s$    -- And the working copy the next save to each is compared with.$s$,
+$s$    -- A DIBELS benchmark has no Draft or Returned: no row (2026110905).
+    delete from grade_return g
+     using assessment a
+     where a.id = g.assessment_id and a.score_mode = 'dibels' and g.assessment_id = any (_as);
+
+    -- And the working copy the next save to each is compared with.$s$],
       array['student_submit.page(text,uuid,text)',
             $s$'created_at', a.created_at$s$,
             $s$'rubric_id', a.rubric_id,$s$,
@@ -351,8 +473,40 @@ $s$      where g.is_draft and c.teacher_id = (select auth.uid())
 $s$               -- a row with nothing to say (a grade cleared, a save in flight) is left out
                and (g.is_draft or g.returned_at is not null or g.seen_at is not null)$s$,
 $s$               -- a row with nothing to say (a grade cleared, a save in flight) is left out.
-               -- seen_at is the student's own and is not sent to the teacher (2026110905).
-               and (g.is_draft or g.returned_at is not null)$s$]
+               -- seen_at is the student's own and is not sent to the teacher, and a DIBELS
+               -- benchmark is not a grade that is returned (2026110905).
+               and (g.is_draft or g.returned_at is not null)
+               and a.score_mode <> 'dibels'$s$],
+      array['public._grade_return_on_change()',
+            '(2026110905)',
+$s$        continue when not exists (select 1 from enrollment e where e.id = _c.enrollment_id)
+                   or not exists (select 1 from assessment a where a.id = _c.assessment_id);$s$,
+$s$        -- Or it is a DIBELS benchmark: a reading record, not a grade that is
+        -- returned. A save to it makes no row and changes none (2026110905).
+        continue when not exists (select 1 from enrollment e where e.id = _c.enrollment_id)
+                   or not exists (select 1 from assessment a where a.id = _c.assessment_id and a.score_mode <> 'dibels');$s$],
+      array['public.return_grades(uuid,uuid[],uuid)',
+            '(2026110905)',
+$s$           and e.course_id = _course
+           and g.is_draft
+         order by g.enrollment_id$s$,
+$s$           and e.course_id = _course
+           and g.is_draft
+           -- a DIBELS benchmark is not a grade that is returned (2026110905)
+           and not exists (select 1 from assessment a where a.id = g.assessment_id and a.score_mode = 'dibels')
+         order by g.enrollment_id$s$],
+      array['public.course_draft_count(uuid)',
+            '(2026110905)',
+$s$     where e.course_id = p_course_id and g.is_draft;$s$,
+$s$     where e.course_id = p_course_id and g.is_draft
+       -- a DIBELS benchmark is not a grade that is returned (2026110905)
+       and a.score_mode <> 'dibels';$s$],
+      array['student_submit.seen(text,uuid,uuid[],text)',
+            '(2026110905)',
+$s$     where a.id = any (coalesce(p_assessment_ids, '{}')) and a.course_id = (_in->>'course_id')::uuid$s$,
+$s$     where a.id = any (coalesce(p_assessment_ids, '{}')) and a.course_id = (_in->>'course_id')::uuid
+       -- a DIBELS benchmark is a reading record: nothing is returned, so nothing is seen (2026110905)
+       and a.score_mode <> 'dibels'$s$]
     ];
     _def  text;
     _hits int;

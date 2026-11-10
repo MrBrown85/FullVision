@@ -1,6 +1,7 @@
 """Exercise migrations/2026110905_grade_return_limits.sql (S0-M4b): the three
 known limits of Batch A's grade_return, created_at on the student's page,
-and seen_at kept from the teacher's list.
+seen_at kept from the teacher's list, and DIBELS work left out of Draft and
+Returned.
 
 Run it against a database with Batch A loaded. It shows each limit as it is
 with Batch A alone (checks named "today:"), applies the migration inside its
@@ -27,6 +28,9 @@ def apply():
     for s in statements(): c.run(s)
 def md5(fn): return one("select md5(pg_get_functiondef('%s'::regprocedure))" % fn)
 def kept_copy(e, a): return one('select working_copy from grade_return where enrollment_id = :e and assessment_id = :a', e=e, a=a)
+def n_rows_of(a): return one('select count(*) from grade_return where assessment_id = :a', a=a)
+def drafts(): return rpc(A, 'course_draft_count(:c)', c=COURSE_A)
+def give_back(a, e=ENR1): return rpc(A, 'return_grades(:a, :ids::uuid[], :k)', a=a, ids='{%s}' % e, k=key())['returned']
 def triggers_off(sql, **kw):
     """A write the triggers do not see, as a superuser can make one."""
     as_owner(); c.run("set local session_replication_role = replica"); c.run(sql, **kw); c.run("set local session_replication_role = origin")
@@ -104,6 +108,14 @@ if not LOADED:
     ok('today (c): an owner-level delete with the trigger off leaves the row, for a direct read to find',
        one(ORPHANS) == 1 and one('select count(*) from grade_return where assessment_id = :a', a=p1) == 1)
     back()
+    # f. A DIBELS piece is treated like any grade.
+    sp()
+    df = new_assessment(K, 'dibels')
+    rpc(A, 'save_score_comment(:e, :a, :t)', e=ENR1, a=df, t='Read with expression')
+    was = (state(ENR1, df), drafts())
+    ok('today (f): a comment saved on a DIBELS piece waits as a Draft, the settings screen counts it, and Return returns it',
+       was == ('draft', 1) and give_back(df) == 1 and state(ENR1, df) == 'returned', was)
+    back()
 
     # ── The guards ─────────────────────────────────────────────────────
     c.run('savepoint guard'); as_owner(); c.run('alter table public.grade_return rename to grade_return_elsewhere')
@@ -121,14 +133,25 @@ if not LOADED:
     assert d.count('_n      integer := 0;') == 1
     c.run(d.replace('_n      integer := 0;', '_n     integer := 0;'))
     expect_error("a restore helper that is not the one Batch A makes stops the file", apply, 'is not the definition this migration was written against')
+    c.run('rollback to savepoint guard'); as_owner()
+    d = one("select pg_get_functiondef('public._grade_return_on_change()'::regprocedure)")
+    assert d.count('_before jsonb;') == 1
+    c.run(d.replace('_before jsonb;', '_before  jsonb;'))
+    expect_error("a score-table trigger function that is not the one Batch A makes stops the file", apply, 'is not the definition this migration was written against')
     c.run('rollback to savepoint guard')
     ok('(back to Batch A as it was)', md5('fv_private.restore_grade_returns(jsonb)') == restore0 and md5('student_submit.page(text,uuid,text)') == page_md5)
 
     # ── The migration: first where there is no pg_cron, then with a stand-in for its table and function ──
     c.run('savepoint nocron')
+    dz = new_assessment(K, 'dibels')
+    rpc(A, 'save_score_comment(:e, :a, :t)', e=ENR1, a=dz, t='Read with expression')   # Batch A makes a row for it, as its backfill does
+    others = rows('select * from grade_return where assessment_id <> :a order by 1, 2', a=dz); scores0 = score_fingerprint()
     apply()
     ok('where pg_cron is not installed the file applies and schedules nothing',
        one("select to_regprocedure('public.grade_return_repair()') is not null and to_regclass('cron.job') is null"))
+    ok("the file's last statement removes the row Batch A made for a DIBELS piece; no other row changes, and no score or comment",
+       len(others) > 0 and n_rows_of(dz) == 0 and rows('select * from grade_return order by 1, 2') == others and score_fingerprint() == scores0
+       and one('select comment from score where enrollment_id = :e and assessment_id = :a', e=ENR1, a=dz) == 'Read with expression')
     c.run('rollback to savepoint nocron')
     as_owner()
     c.run('create schema cron')
@@ -141,13 +164,16 @@ if not LOADED:
        rows('select * from grade_return order by 1, 2') == before_rows and score_fingerprint() == before_scores)
     ok('the nightly job is scheduled once, at 10:47 UTC, to call the procedure',
        rows('select jobname, schedule, command from cron.job') == [['fv_grade_return_repair_daily', '47 10 * * *', 'call public.grade_return_repair_nightly()']])
-    FNS = ('fv_private.restore_grade_returns(jsonb)', 'student_submit.page(text,uuid,text)', 'public.grade_return_repair()', 'public.list_course_grade_returns(uuid)')
+    FNS = ('fv_private.restore_grade_returns(jsonb)', 'student_submit.page(text,uuid,text)', 'public.grade_return_repair()', 'public.list_course_grade_returns(uuid)',
+           'public._grade_return_on_change()', 'public.return_grades(uuid,uuid[],uuid)', 'public.course_draft_count(uuid)',
+           'student_submit.seen(text,uuid,uuid[],text)', 'public._grade_return_mode_changed()')
     snap = [md5(f) for f in FNS]
     apply()
     ok('a second run changes nothing and schedules nothing more',
        snap == [md5(f) for f in FNS]
        and one('select count(*) from cron.job') == 1
-       and one("select count(*) from pg_trigger where tgname = 'grade_return_truncate'") == 2)
+       and one("select count(*) from pg_trigger where tgname = 'grade_return_truncate'") == 2
+       and one("select count(*) from pg_trigger where tgname = 'grade_return_mode'") == 1)
     as_owner(); c.run('drop schema cron cascade')
 
 # ── d. The student's page sends created_at ─────────────────────────────
@@ -186,7 +212,8 @@ set_class(True, 'on_return')
 
 # ── a. The repair adds the missing row, as a save would have left it ───
 ok('before anything is broken the repair finds nothing to do',
-   {k: v for k, v in one('select public.grade_return_repair()').items() if k != 'classes'} == {'orphans_removed': 0, 'rows_added': 0, 'working_copies_fixed': 0})
+   {k: v for k, v in one('select public.grade_return_repair()').items() if k != 'classes'}
+   == {'orphans_removed': 0, 'dibels_rows_removed': 0, 'rows_added': 0, 'working_copies_fixed': 0})
 hold = new_assessment(K, 'points')
 triggers_off('insert into score (enrollment_id, assessment_id, value) values (:e, :a, 6)', e=ENR1, a=hold)
 triggers_off("insert into score (enrollment_id, assessment_id, status) values (:e, :a, 'NS')", e=ENR2, a=hold)   # a status alone is not a grade
@@ -249,13 +276,70 @@ ok('the read RPCs skip them', soon not in rpc(A, 'list_course_grade_returns(:c)'
 r = one('select public.grade_return_repair()')
 ok('the repair removes both', r['orphans_removed'] == 2 and one(ORPHANS) == 0, r)
 
+# ── f. DIBELS work has no Draft and no Returned ────────────────────────
+set_class(True, 'on_return')
+total = one('select count(*) from grade_return'); drafts0 = drafts()
+db = new_assessment(K, 'dibels', title='Fall Benchmark', date_assigned='2026-10-02')
+rpc(A, 'save_score_comment(:e, :a, :t)', e=ENR1, a=db, t='Read with expression')
+as_owner(); c.run("insert into dibels_score (enrollment_id, assessment_id, period, orf_wrc, orf_errors) values (:e, :a, 'boy', 112, 3)", e=ENR1, a=db)
+ok('a save to a DIBELS piece, its comment or its numbers, makes no grade_return row and changes none',
+   n_rows_of(db) == 0 and one('select count(*) from grade_return') == total and state(ENR1, db) == 'none')
+ok('the comment and the numbers are saved all the same',
+   one('select comment from score where enrollment_id = :e and assessment_id = :a', e=ENR1, a=db) == 'Read with expression'
+   and one('select orf_wrc from dibels_score where enrollment_id = :e and assessment_id = :a', e=ENR1, a=db) == 112)
+ok('it is not a draft: the settings screen counts none, and Return returns nothing', drafts() == drafts0 and give_back(db) == 0 and n_rows_of(db) == 0)
+ok('the teacher\'s list leaves it out', db not in rpc(A, 'list_course_grade_returns(:c)', c=COURSE_A))
+ok('a student who opens it leaves no row either', svc("student_submit.seen(:t, :e, :ids::uuid[], 'ip-1')", t=token, e=ENR1, ids='{%s}' % db) == {'ok': True, 'seen': 0}
+   and n_rows_of(db) == 0)
+sent = [a for a in page()['assessments'] if a['id'] == db]
+ok('today: the student\'s page still lists the piece, with no grade and none of its numbers (the page code leaves DIBELS pieces out)',
+   len(sent) == 1 and sent[0]['score_mode'] == 'dibels' and sent[0]['grade'] is None
+   and not any('orf' in k or 'dibels' in k or 'maze' in k for k in sent[0]), sent)
+# A row that got there with the triggers off is passed over by every reader, and the repair removes it.
+triggers_off('insert into grade_return (enrollment_id, assessment_id, is_draft) values (:e, :a, true)', e=ENR1, a=db)
+ok('a row planted with the triggers off is not counted, listed or returned',
+   n_rows_of(db) == 1 and drafts() == drafts0 and db not in rpc(A, 'list_course_grade_returns(:c)', c=COURSE_A)
+   and give_back(db) == 0 and state(ENR1, db) == 'draft')
+r = one('select public.grade_return_repair()')
+ok('and the repair removes it', r['dibels_rows_removed'] == 1 and r['orphans_removed'] == 0 and n_rows_of(db) == 0, r)
+# The piece's scoring is changed to DIBELS, and back.
+pm = new_assessment(K, 'points')
+rpc(A, 'upsert_score(:e, :a, 8)', e=ENR1, a=pm); give_back(pm); rpc(A, 'upsert_score(:e, :a, 5)', e=ENR2, a=pm)
+ok('(a points piece with one returned grade and one draft)', (state(ENR1, pm), state(ENR2, pm)) == ('returned', 'draft'))
+scores0 = score_fingerprint()
+rpc(A, "update_assessment(:a, :p::jsonb)", a=pm, p=json.dumps({'score_mode': 'dibels'}))
+ok('a piece whose scoring is changed to DIBELS loses its rows, and none of its scores', n_rows_of(pm) == 0 and score_fingerprint() == scores0 and drafts() == drafts0)
+rpc(A, "update_assessment(:a, :p::jsonb)", a=pm, p=json.dumps({'title': 'Renamed'}))
+ok('another change to it makes none', n_rows_of(pm) == 0)
+rpc(A, "update_assessment(:a, :p::jsonb)", a=pm, p=json.dumps({'score_mode': 'points'}))
+ok('changed back in a class that holds grades, each graded cell is a Draft again, as a first save would leave it',
+   (state(ENR1, pm), state(ENR2, pm)) == ('draft', 'draft') and returned_grade(ENR1, pm)['grade'] is None
+   and kept_copy(ENR1, pm) == working_copy(ENR1, pm) and kept_copy(ENR2, pm) == working_copy(ENR2, pm) and drafts() == drafts0 + 2,
+   (state(ENR1, pm), state(ENR2, pm), drafts()))
+ok('and Return gives them to the students', give_back(pm) == 1 and returned_grade(ENR1, pm)['grade']['value'] == 8)
+rpc(A, "update_assessment(:a, :p::jsonb)", a=pm, p=json.dumps({'score_mode': 'complete'}))
+ok('a change between two kinds that are not DIBELS touches no row', (state(ENR1, pm), state(ENR2, pm)) == ('returned', 'draft'))
+rpc(A, "update_assessment(:a, :p::jsonb)", a=pm, p=json.dumps({'score_mode': 'points'}))
+give_back(pm, ENR2)
+set_class(True, 'on_save')
+rpc(A, "update_assessment(:a, :p::jsonb)", a=pm, p=json.dumps({'score_mode': 'dibels'}))
+rpc(A, "update_assessment(:a, :p::jsonb)", a=pm, p=json.dumps({'score_mode': 'points'}))
+ok('changed back in a class on As Soon As I Save, each is Returned at once', (state(ENR1, pm), state(ENR2, pm)) == ('returned', 'returned')
+   and returned_grade(ENR2, pm)['grade']['value'] == 5)
+# A restore that names a state for a DIBELS piece leaves no row.
+payload = {'scores': [{'enrollment_id': ENR2, 'assessment_id': db, 'value': None, 'comment': 'Steady'}],
+           'grade_returns': [{'enrollment_id': ENR2, 'assessment_id': db, 'is_draft': True}]}
+rpc(A, 'import_json_restore(:p::jsonb, :k)', p=json.dumps(payload), k=key())
+ok('a restore that names a state for a DIBELS piece leaves no row for it', n_rows_of(db) == 0)
+set_class(True, 'on_return')
+
 # ── Who can run what ───────────────────────────────────────────────────
 as_owner()
 ok('none of the new functions, nor the procedure, can be run by a teacher or anon',
    one("""select count(*) from pg_proc p where p.pronamespace = 'public'::regnamespace
-             and p.proname in ('grade_return_repair', '_grade_return_repair_class', '_grade_return_repair_lost', '_grade_return_truncated', 'grade_return_repair_nightly')
+             and p.proname in ('grade_return_repair', '_grade_return_repair_class', '_grade_return_repair_lost', '_grade_return_truncated', 'grade_return_repair_nightly', '_grade_return_mode_changed')
              and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute'))""") == 0
-   and one("select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname in ('grade_return_repair', '_grade_return_repair_class', '_grade_return_repair_lost', '_grade_return_truncated', 'grade_return_repair_nightly')") == 5)
+   and one("select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname in ('grade_return_repair', '_grade_return_repair_class', '_grade_return_repair_lost', '_grade_return_truncated', 'grade_return_repair_nightly', '_grade_return_mode_changed')") == 6)
 def as_teacher_call():
     as_teacher(A); c.run('select public.grade_return_repair()')
 expect_error('a teacher who calls the repair is refused', as_teacher_call, 'permission denied')

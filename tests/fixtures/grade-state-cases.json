@@ -2901,6 +2901,55 @@
           }
         }
       ]
+    },
+    {
+      "name": "A DIBELS benchmark is a reading record, not a grade that is returned: a comment saved on it is never a draft, Return does nothing, and the student is given no grade for it",
+      "class": {
+        "student_page": true,
+        "return_grades": "on_return"
+      },
+      "work": "dibels",
+      "steps": [
+        {
+          "do": "comment",
+          "text": "Read with expression"
+        },
+        {
+          "expect": {
+            "state": "none",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "return"
+        },
+        {
+          "expect": {
+            "state": "none",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        },
+        {
+          "do": "class",
+          "student_page": true,
+          "return_grades": "on_save"
+        },
+        {
+          "expect": {
+            "state": "none",
+            "student": null,
+            "status": null,
+            "previous": null,
+            "updated": false
+          }
+        }
+      ]
     }
   ]
 }

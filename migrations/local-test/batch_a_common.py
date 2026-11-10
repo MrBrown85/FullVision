@@ -71,12 +71,12 @@ def build_class(course=COURSE_A):
     return k
 
 def new_assessment(k, work, course=COURSE_A, title=None, date_assigned=None):
-    """An assessment of one of the cases' kinds: competencies, rubric or points."""
+    """An assessment of one of the cases' kinds: competencies, rubric, points or dibels."""
     as_owner()
     a = new_id()
     c.run("""insert into assessment (id, course_id, title, score_mode, max_points, rubric_id, date_assigned)
              values (:a, :c, :t, :m, :p, :r, :d)""",
-          a=a, c=course, t=title or (work.capitalize() + ' work'), m='points' if work == 'points' else 'proficiency',
+          a=a, c=course, t=title or (work.capitalize() + ' work'), m=work if work in ('points', 'dibels') else 'proficiency',
           p=10 if work == 'points' else None, r=k['r1'] if work == 'rubric' else None, d=date_assigned)
     if work == 'competencies':
         c.run('insert into assessment_tag (assessment_id, tag_id) values (:a, :t1), (:a, :t2)', a=a, t1=k['t1'], t2=k['t2'])
