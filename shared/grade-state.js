@@ -5,8 +5,9 @@
  * stays in the scores, as always. Beside it, one row per student per
  * assessment says what the student has been given. This file is the rule
  * that keeps that row, as plain functions: no DOM, no network, and nothing
- * read from the data layer but in afterSave, stateOf and draftsWaiting at
- * the bottom.
+ * read from the data layer but in the functions for the screens at the
+ * bottom (stateOf, the counts of drafts, who a Return returns and the
+ * words that say so).
  *
  * The server keeps the same rule in database triggers. One file of worked
  * cases (tests/fixtures/grade-state-cases.json) runs through both, so the
@@ -496,6 +497,97 @@ window.GradeState = (function () {
     });
   }
 
+  /* ── Who a Return returns, and the words that say so (S1-T5) ───
+     The gradebook, the phone and the Assignments page read these, so the
+     same class shows the same N and the same names on each. They write
+     nothing: a screen returns through Grader.returnGrades. */
+
+  /* Who a Return of `sids` on `aid` returns: each of them, and with a
+     member of a pair or group the members still graded with them, as the
+     grader dialog's Return does (groupGradingUnits). */
+  function returnTogether(cid, aid, sids) {
+    var piece =
+      (getAssessments(cid) || []).find(function (a) {
+        return a && a.id === aid;
+      }) || null;
+    var units = groupGradingUnits(
+      cid,
+      piece,
+      sortStudents(getStudents(cid), 'lastName').map(function (s) {
+        return s.id;
+      }),
+    );
+    if (!units) return sids;
+    var out = sids.slice();
+    sids.forEach(function (sid) {
+      var unit = units.find(function (u) {
+        return u.linked && u.linked.indexOf(sid) >= 0;
+      });
+      (unit ? unit.linked : []).forEach(function (m) {
+        if (out.indexOf(m) < 0) out.push(m);
+      });
+    });
+    return out;
+  }
+
+  /* The drafts a Return of `sids` on `aid` returns: their own, and the
+     drafts of the pair or group members still graded with one of them, on
+     screen or not. It is the one answer a button's N, the names beside it,
+     the question and the action all read. So a column's N can be more than
+     its dashed cells when a search hides a partner: the pair is returned
+     together, and the count and the names say so. A partner whose piece is
+     already returned is not in it. Empty when none of `sids` has a draft. */
+  function draftsReturned(cid, aid, sids) {
+    var own = draftsIn(cid, aid, sids);
+    return own.length ? draftsIn(cid, aid, returnTogether(cid, aid, own)) : [];
+  }
+
+  // The first names of `sids`, A to Z. A student not on the roster has none.
+  function draftNames(cid, sids) {
+    var roster = getStudents(cid);
+    return sids
+      .map(function (sid) {
+        var st = roster.find(function (s) {
+          return s.id === sid;
+        });
+        return st ? displayNameFirst(st) : '';
+      })
+      .filter(Boolean)
+      .sort(function (a, b) {
+        return a.localeCompare(b);
+      });
+  }
+
+  /* "3 drafts: Avery, Mia and Sam can’t see them yet." for the students in
+     `sids`, by first name; past three, "Avery, Mia, Sam and 2 others". */
+  function draftsSentence(cid, sids) {
+    var names = draftNames(cid, sids);
+    var n = sids.length;
+    var extra = n - 3;
+    var who =
+      names.length !== n
+        ? ''
+        : n === 1
+          ? names[0]
+          : n <= 3
+            ? names.slice(0, -1).join(', ') + ' and ' + names[n - 1]
+            : names.slice(0, 3).join(', ') + ' and ' + extra + (extra === 1 ? ' other' : ' others');
+    var cant = n === 1 ? ' can’t see it yet.' : ' can’t see them yet.';
+    return n + (n === 1 ? ' draft' : ' drafts') + ': ' + (who || (n === 1 ? 'the student' : 'the students')) + cant;
+  }
+
+  /* What a Return of `n` drafts asks before it returns more than the one
+     grade on screen (Colin, 2026-11-10): "Return 3 Grades Now?", "Return 1
+     Grade Now?". The drafts line is its message. */
+  function returnQuestion(n) {
+    return 'Return ' + n + (n === 1 ? ' Grade' : ' Grades') + ' Now?';
+  }
+
+  // The button that returns `n` drafts, and the question's own: "Return 3 Graded".
+  function returnNGraded(n) {
+    return 'Return ' + n + ' Graded';
+  }
+
   /* A grade was saved for student `sid` on assessment `aid`; `what` names
      the kind of save ('level', 'points', 'status' …). shared/data.js has
      applied the rule by now; this answers with the state the piece is in.
@@ -553,5 +645,11 @@ window.GradeState = (function () {
     stateOf: stateOf,
     draftsIn: draftsIn,
     draftsWaiting: draftsWaiting,
+    returnTogether: returnTogether,
+    draftsReturned: draftsReturned,
+    draftNames: draftNames,
+    draftsSentence: draftsSentence,
+    returnQuestion: returnQuestion,
+    returnNGraded: returnNGraded,
   };
 })();
