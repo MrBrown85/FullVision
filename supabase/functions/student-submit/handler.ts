@@ -75,6 +75,74 @@ function reply(status: number, body: unknown, origin: string | null): Response {
   });
 }
 
+function ipv4(s: string): number[] | null {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s);
+  if (!m) return null;
+  const parts = m.slice(1).map(Number);
+  return parts.every(n => n <= 255) ? parts : null;
+}
+
+// An IPv6 address as its eight 16-bit groups, or null when it is not one.
+function ipv6(s: string): number[] | null {
+  let tail: number[] | null = null;
+  if (s.includes('.')) {
+    // The last 32 bits written as an IPv4 address, as in ::ffff:203.0.113.7.
+    const at = s.lastIndexOf(':');
+    const v4 = ipv4(s.slice(at + 1));
+    if (at < 0 || !v4) return null;
+    tail = [(v4[0] << 8) | v4[1], (v4[2] << 8) | v4[3]];
+    s = s.slice(0, at + 1) + '0:0';
+  }
+  const halves = s.split('::');
+  if (halves.length > 2) return null;
+  const groups = (h: string) => (h === '' ? [] : h.split(':'));
+  const head = groups(halves[0]);
+  const rest = halves.length === 2 ? groups(halves[1]) : [];
+  const given = head.length + rest.length;
+  if (halves.length === 2 ? given > 7 : given !== 8) return null;
+  if (![...head, ...rest].every(g => /^[0-9a-f]{1,4}$/.test(g))) return null;
+  const hex = (g: string) => parseInt(g, 16);
+  const all = [...head.map(hex), ...Array(8 - given).fill(0), ...rest.map(hex)];
+  return tail ? [...all.slice(0, 6), ...tail] : all;
+}
+
+/* What an address counts as for the rate limits.
+   - An IPv4 address counts whole, as it always has.
+   - An IPv6 address counts as its /64, the first four groups. A home or a
+     school network is handed a whole /64 or more, and any device on it can
+     pick a new address within it at will, so counting each full address let
+     one connection have as many "addresses" as it wanted.
+   - An IPv4 address written as IPv6 (::ffff:203.0.113.7) counts as that IPv4
+     address, so one connection has one key however it is written.
+   Brackets, a port and a zone id (fe80::1%en0) are dropped first. Anything
+   that is not an address counts as 'unknown', the one key a missing address
+   has always had, so made-up text is one bucket and not a new one each time. */
+export function addressKey(address: string | null | undefined): string {
+  let s = String(address || '')
+    .trim()
+    .toLowerCase();
+  if (!s || s.length > 100) return 'unknown';
+  const bracketed = /^\[([^\]]*)\](?::\d{1,5})?$/.exec(s);
+  if (bracketed) s = bracketed[1];
+  else if (/^[\d.]+:\d{1,5}$/.test(s)) s = s.slice(0, s.indexOf(':'));
+  const zone = s.indexOf('%');
+  if (zone >= 0) s = s.slice(0, zone);
+
+  const v4 = ipv4(s);
+  if (v4) return v4.join('.');
+  const v6 = ipv6(s);
+  if (!v6) return 'unknown';
+  if (v6.slice(0, 5).every(g => g === 0) && v6[5] === 0xffff) {
+    return [v6[6] >> 8, v6[6] & 255, v6[7] >> 8, v6[7] & 255].join('.');
+  }
+  return (
+    v6
+      .slice(0, 4)
+      .map(g => g.toString(16))
+      .join(':') + '::/64'
+  );
+}
+
 /* The caller's address as a keyed hash: the same phone on the same network
    hashes the same way for the rate limits, and the address itself is never
    stored or logged. The address comes from cf-connecting-ip, which Supabase's
@@ -82,10 +150,11 @@ function reply(status: number, body: unknown, origin: string | null): Response {
    sends one. The first X-Forwarded-For entry is whatever the caller sent, so
    a made-up one per request got around the per-address limit (Nov 3 bug
    sweep). Without cf-connecting-ip, as when served locally, the last entry is
-   the one the nearest proxy added. */
+   the one the nearest proxy added. What is hashed is addressKey's answer: an
+   IPv4 address whole, an IPv6 address by its /64. */
 export async function ipHash(req: Request, key: string): Promise<string> {
   const fwd = (req.headers.get('x-forwarded-for') || '').split(',');
-  const ip = (req.headers.get('cf-connecting-ip') || fwd[fwd.length - 1] || '').trim() || 'unknown';
+  const ip = addressKey(req.headers.get('cf-connecting-ip') || fwd[fwd.length - 1]);
   const k = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(key),
