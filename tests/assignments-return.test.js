@@ -22,7 +22,17 @@
  *      UPDATE_ASSIGNMENTS_SNAPSHOT=1 npx vitest run tests/assignments-return.test.js
  *    Run that only on code from before a change the page is meant to keep
  *    out; never to make a failing comparison pass.
- * 2. With the switch on and When I Return Them: see the blocks below.
+ * 2. With the switch on and When I Return Them, on the page: the toolbar's
+ *    "N to return" and its filter; a card's chips and Return N Graded, which
+ *    asks first; the Draft or Returned mark on every kind of row; grading in
+ *    place; one student's Return beside the Draft mark; pair work; Missing
+ *    and Excused; and that no number moves. In the grader dialog: Show and
+ *    its counts, what the arrows step through, and Return N Graded.
+ *
+ * Every count is read through GradeState.draftsIn and draftsWaiting, and
+ * every question's words through GradeState's shared helpers (S1-T5);
+ * tests/assignments-return-counts.test.js holds the page, the gradebook and
+ * the phone together on one class.
  */
 import './setup.js';
 import { createHash } from 'node:crypto';
@@ -35,6 +45,8 @@ import {
   seedClass,
   clearClass,
   click,
+  fire,
+  key,
   typeAndLeave,
   openAssignments,
   openGrader,
@@ -384,5 +396,770 @@ describe('with the build switch off the Assignments page is what it was', () => 
     } finally {
       session.signOut();
     }
+  });
+});
+
+/* ── With the switch on and When I Return Them ─────────────────────────── */
+const HELD = { student_page_enabled: true, return_grades: 'on_return' };
+const EVERYONE = [AVA, BEN, CARA, DEV, ELI];
+const WORK = [ESSAY, QUIZ, LAB, EXIT, JOURNAL, CLAIM, TALK, BENCH];
+const text = el => (el ? el.textContent.replace(/\s+/g, ' ').trim() : null);
+const today = () => formatShortDate('2026-11-10T18:00:00.000Z');
+const openPage = (params, more) => openAssignments(seedWith({ config: HELD, ...more }), CID, params);
+const openCard = aid => openPage({ open: aid });
+const pill = () => document.querySelector('.assess-to-return-btn');
+const pillCount = () => (pill() ? parseInt(pill().textContent, 10) : 0);
+const toReturnChip = aid => text(inCard(aid, '.assess-to-return'));
+const returnedChip = aid => text(inCard(aid, '.assess-returned'));
+const cardReturn = aid => inCard(aid, '.assess-return-btn');
+const mark = (aid, sid) => text(inCard(aid, '.ret-mark[data-ret-sids*="' + sid + '"]'));
+const inlineRow = aid => inCard(aid, '.grader-return-inline');
+const inlineReturn = aid => inCard(aid, '[data-action="returnOne"]');
+const confirmDialog = () => document.querySelector('.confirm-overlay');
+const asks = () => ({
+  title: text(confirmDialog().querySelector('.confirm-title')),
+  message: text(confirmDialog().querySelector('.confirm-message')),
+  buttons: Array.from(confirmDialog().querySelectorAll('button')).map(text),
+});
+const confirmOk = () => document.getElementById('confirm-ok-btn').onclick();
+const confirmCancel = () => document.getElementById('confirm-cancel-btn').onclick();
+const listed = () => Array.from(document.querySelectorAll('#main .assess-card')).map(c => c.id.replace('ac-', ''));
+const drafts = (aid, ids = EVERYONE) => GradeState.draftsIn(CID, aid, ids);
+// Five drafts on the Essay (one a changed returned grade), one on the Quiz,
+// the pair's two, and a benchmark, which has no state.
+function grade() {
+  [BEN, CARA, DEV].forEach((sid, i) => Grader.setLevel(CID, sid, ESSAY, QUESTION, 2 + i, 0));
+  Grader.setStatus(CID, CARA, ESSAY, null);
+  Grader.setLevel(CID, CARA, ESSAY, QUESTION, 3, 0);
+  Grader.setLevel(CID, AVA, ESSAY, QUESTION, 4, 0);
+  Grader.setLevel(CID, ELI, ESSAY, PLAN, 2, 0);
+  Grader.setPoints(CID, BEN, QUIZ, 6);
+  Grader.setLevel(CID, AVA, TALK, QUESTION, 4, 0);
+  Grader.setDibels(CID, AVA, BENCH, 'boy', { orfWrc: 90 });
+}
+// Opens the page on a class with the drafts above already saved.
+function openGraded(params) {
+  return openAssignments(
+    () => {
+      seedWith({ config: HELD })();
+      grade();
+    },
+    CID,
+    params,
+  );
+}
+
+describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the Assignments page', () => {
+  it('a class with nothing waiting shows no count and no Return; grades from before are Returned with no date', async () => {
+    openPage();
+    await settled();
+    expect(pill()).toBe(null);
+    expect(document.querySelector('.assess-to-return-slot')).not.toBe(null);
+    expect(document.querySelector('#main .assess-to-return')).toBe(null);
+    expect(document.querySelector('#main .assess-return-btn')).toBe(null);
+    // Ava and Eli have an Essay grade from before the switch came on.
+    expect(returnedChip(ESSAY)).toBe('2 returned');
+    expect(returnedChip(QUIZ)).toBe('1 returned');
+    expect(returnedChip(TALK)).toBe('2 returned');
+    expandAll();
+    await settled();
+    expect(mark(ESSAY, AVA)).toBe('Returned');
+    expect(mark(ESSAY, ELI)).toBe('Returned');
+    expect(mark(ESSAY, BEN)).toBe('');
+    // Missing with nothing in is not a grade.
+    expect(mark(ESSAY, CARA)).toBe('');
+    expect(mark(QUIZ, AVA)).toBe('Returned');
+    expect(mark(TALK, AVA)).toBe('Returned');
+  });
+
+  it('counts the drafts on the toolbar and on each card, as GradeState does', async () => {
+    openGraded();
+    await settled();
+    expect(text(pill())).toBe('8 to return');
+    expect(pillCount()).toBe(GradeState.draftsWaiting(CID));
+    expect(pill().getAttribute('aria-pressed')).toBe('false');
+    expect(pill().getAttribute('title')).toBe('Show only the assessments with a draft to return.');
+    WORK.forEach(aid => {
+      const n = drafts(aid).length;
+      expect(toReturnChip(aid), aid).toBe(n ? n + ' to return' : null);
+      expect(cardReturn(aid) ? text(cardReturn(aid)) : null, aid).toBe(n ? 'Return ' + n + ' Graded' : null);
+    });
+    expect(toReturnChip(ESSAY)).toBe('5 to return');
+    expect(toReturnChip(QUIZ)).toBe('1 to return');
+    expect(toReturnChip(TALK)).toBe('2 to return');
+    // Returned counts the students whose grade is given and not waiting.
+    expect(returnedChip(ESSAY)).toBe(null);
+    expect(returnedChip(QUIZ)).toBe('1 returned');
+    expect(returnedChip(LAB)).toBe('1 returned');
+    // A DIBELS benchmark has no state: no chips, no slot, no button.
+    expect(card(BENCH).querySelector('.assess-returns, .assess-return-slot, .ret-mark')).toBe(null);
+    // The button names who in its hover line and the work for a screen reader.
+    expect(cardReturn(ESSAY).getAttribute('title')).toBe('5 drafts: Ava, Ben, Cara and 2 others can’t see them yet.');
+    expect(cardReturn(ESSAY).getAttribute('aria-label')).toBe('Return 5 Graded, Essay');
+    expect(cardReturn(QUIZ).getAttribute('title')).toBe('1 draft: Ben can’t see it yet.');
+    expect(cardReturn(ESSAY).tagName).toBe('BUTTON');
+    expect(pill().tagName).toBe('BUTTON');
+  });
+
+  it('marks each row: Draft while a grade waits, Returned once given, nothing for a status alone', async () => {
+    openGraded();
+    expandAll();
+    await settled();
+    EVERYONE.forEach(sid => expect(mark(ESSAY, sid), sid).toBe('Draft'));
+    // The ledger rows.
+    expect(mark(QUIZ, BEN)).toBe('Draft');
+    expect(mark(QUIZ, AVA)).toBe('Returned');
+    // Excused and Late with nothing in.
+    expect(mark(QUIZ, DEV)).toBe('');
+    expect(mark(QUIZ, ELI)).toBe('');
+    expect(mark(EXIT, AVA)).toBe('Returned');
+    // A ledger's name keeps its cell; the mark sits in it.
+    const name = card(QUIZ).querySelector('.ldg-row[data-status-student="' + BEN + '"] .ldg-name');
+    expect(name.className).toBe('ldg-name ldg-name-ret');
+    expect(text(name.querySelector('.ldg-name-text'))).toBe('Ben Brown');
+    // Pair work is one row for the pair, and one mark.
+    expect(card(TALK).querySelectorAll('.ret-mark').length).toBe(4);
+    expect(mark(TALK, AVA)).toBe('Draft');
+    expect(mark(TALK, BEN)).toBe('Draft');
+    expect(inCard(TALK, '.ret-mark[data-ret-sids="' + AVA + ',' + BEN + '"]')).not.toBe(null);
+    // An Advanced rubric with a second grid draws the mark once per student.
+    expect(card(LAB).querySelectorAll('.ret-mark[data-ret-sids="' + AVA + '"]').length).toBe(1);
+  });
+
+  it('a Missing or Excused piece is never a draft, and Late is only a label', async () => {
+    openGraded({ open: ESSAY });
+    await settled();
+    expect(toReturnChip(ESSAY)).toBe('5 to return');
+    // Missing set over Dev's draft: the mark and the counts drop it.
+    const statuses = getAssignmentStatuses(CID);
+    statuses[DEV + ':' + ESSAY] = 'NS';
+    statuses[BEN + ':' + ESSAY] = 'EXC';
+    saveAssignmentStatuses(CID, statuses);
+    window.PageAssignments.render();
+    await settled();
+    expect(mark(ESSAY, DEV)).toBe('');
+    expect(mark(ESSAY, BEN)).toBe('');
+    // Eli's Essay is Late and graded: a draft like any other.
+    expect(mark(ESSAY, ELI)).toBe('Draft');
+    expect(toReturnChip(ESSAY)).toBe('3 to return');
+    expect(text(cardReturn(ESSAY))).toBe('Return 3 Graded');
+    expect(cardReturn(ESSAY).getAttribute('title')).toBe('3 drafts: Ava, Cara and Eli can’t see them yet.');
+    expect(pillCount()).toBe(GradeState.draftsWaiting(CID));
+    expect(pillCount()).toBe(6);
+  });
+
+  it('grading in place brings the mark, the chips, the button and the count up to date without a redraw', async () => {
+    openCard(ESSAY);
+    await settled();
+    const seen = card(ESSAY);
+    expect(pill()).toBe(null);
+    expect(mark(ESSAY, BEN)).toBe('');
+    click(levelOf(tagRow(ESSAY, BEN, QUESTION), 3));
+    await settled();
+    expect(card(ESSAY)).toBe(seen);
+    expect(mark(ESSAY, BEN)).toBe('Draft');
+    expect(toReturnChip(ESSAY)).toBe('1 to return');
+    expect(returnedChip(ESSAY)).toBe('2 returned');
+    expect(text(cardReturn(ESSAY))).toBe('Return 1 Graded');
+    expect(text(pill())).toBe('1 to return');
+    // A returned grade changed is a draft again; put back, it is not.
+    click(levelOf(tagRow(ESSAY, AVA, QUESTION), 4));
+    await settled();
+    expect(mark(ESSAY, AVA)).toBe('Draft');
+    expect(toReturnChip(ESSAY)).toBe('2 to return');
+    expect(returnedChip(ESSAY)).toBe('1 returned');
+    expect(text(pill())).toBe('2 to return');
+    click(levelOf(tagRow(ESSAY, AVA, QUESTION), 3));
+    await settled();
+    expect(mark(ESSAY, AVA)).toBe('Returned');
+    expect(text(pill())).toBe('1 to return');
+    // The same level clicked again clears it: nothing is left to return.
+    click(levelOf(tagRow(ESSAY, BEN, QUESTION), 3));
+    await settled();
+    expect(mark(ESSAY, BEN)).toBe('');
+    expect(cardReturn(ESSAY)).toBe(null);
+    expect(pill()).toBe(null);
+    expect(card(ESSAY)).toBe(seen);
+    if (typeof dismissUndoToast === 'function') dismissUndoToast();
+  });
+
+  it('points typed in a ledger and a comment saved off its timer are drafts too', async () => {
+    openCard(QUIZ);
+    await settled();
+    typeAndLeave(pointsBox(QUIZ, CARA), '6');
+    await settled();
+    expect(mark(QUIZ, CARA)).toBe('Draft');
+    expect(text(pill())).toBe('1 to return');
+    // The Overall Comment saves 800 ms after the last key, with no event.
+    const box = inCard(QUIZ, '.rsg-overall-comment[data-sid="' + BEN + '"]');
+    box.value = 'Check question 4.';
+    fire(box, 'input');
+    await settled();
+    expect(mark(QUIZ, BEN)).toBe('');
+    await new Promise(r => setTimeout(r, 900));
+    expect(GradeState.stateOf(CID, BEN, QUIZ)).toBe('draft');
+    expect(mark(QUIZ, BEN)).toBe('Draft');
+    expect(text(pill())).toBe('2 to return');
+  });
+
+  it('Return N Graded on a card asks first, naming who gets their grade; Cancel returns nothing', async () => {
+    openGraded({ open: ESSAY });
+    await settled();
+    const returns = vi.spyOn(Grader, 'returnGrades');
+    const button = cardReturn(ESSAY);
+    click(button);
+    expect(asks()).toEqual({
+      title: 'Return 5 Grades Now?',
+      message: '5 drafts: Ava, Ben, Cara and 2 others can’t see them yet.',
+      buttons: ['Cancel', 'Return 5 Graded'],
+    });
+    confirmCancel();
+    await settled();
+    expect(confirmDialog()).toBe(null);
+    expect(returns).not.toHaveBeenCalled();
+    expect(drafts(ESSAY).length).toBe(5);
+    expect(document.activeElement).toBe(button);
+    expect(text(pill())).toBe('8 to return');
+
+    click(cardReturn(ESSAY));
+    confirmOk();
+    await settled();
+    expect(returns).toHaveBeenCalledTimes(1);
+    expect(returns.mock.calls[0]).toEqual([CID, ESSAY, EVERYONE]);
+    expect(drafts(ESSAY)).toEqual([]);
+    EVERYONE.forEach(sid => expect(mark(ESSAY, sid), sid).toBe('Returned ' + today()));
+    expect(cardReturn(ESSAY)).toBe(null);
+    expect(toReturnChip(ESSAY)).toBe(null);
+    expect(returnedChip(ESSAY)).toBe('5 returned');
+    expect(text(pill())).toBe('3 to return');
+    expect(pillCount()).toBe(GradeState.draftsWaiting(CID));
+    // The button went with the drafts: the card's next button has the focus.
+    expect(document.activeElement).toBe(inCard(ESSAY, '.assess-header-actions button'));
+    returns.mockRestore();
+  });
+
+  it('one draft asks too: the button names nobody', async () => {
+    openGraded({ open: QUIZ });
+    await settled();
+    click(cardReturn(QUIZ));
+    expect(asks()).toEqual({
+      title: 'Return 1 Grade Now?',
+      message: '1 draft: Ben can’t see it yet.',
+      buttons: ['Cancel', 'Return 1 Graded'],
+    });
+    confirmOk();
+    await settled();
+    expect(GradeState.stateOf(CID, BEN, QUIZ)).toBe('returned');
+    expect(mark(QUIZ, BEN)).toBe('Returned ' + today());
+  });
+
+  it('the drafts are counted again when the question is answered', async () => {
+    openGraded({ open: ESSAY });
+    await settled();
+    const returns = vi.spyOn(Grader, 'returnGrades');
+    click(cardReturn(ESSAY));
+    expect(asks().title).toBe('Return 5 Grades Now?');
+    // Two are returned from another screen while the question is up.
+    returns.mockClear();
+    Grader.returnGrades(CID, ESSAY, [BEN, CARA]);
+    returns.mockClear();
+    confirmOk();
+    await settled();
+    expect(returns.mock.calls).toEqual([[CID, ESSAY, [AVA, DEV, ELI]]]);
+    expect(drafts(ESSAY)).toEqual([]);
+    returns.mockRestore();
+  });
+
+  it('pair work is returned together, and the count and names say so', async () => {
+    openGraded({ open: TALK });
+    await settled();
+    const returns = vi.spyOn(Grader, 'returnGrades');
+    expect(toReturnChip(TALK)).toBe('2 to return');
+    click(cardReturn(TALK));
+    expect(asks()).toEqual({
+      title: 'Return 2 Grades Now?',
+      message: '2 drafts: Ava and Ben can’t see them yet.',
+      buttons: ['Cancel', 'Return 2 Graded'],
+    });
+    confirmOk();
+    await settled();
+    expect(returns.mock.calls[0][2].slice().sort()).toEqual([AVA, BEN]);
+    expect(GradeState.stateOf(CID, AVA, TALK)).toBe('returned');
+    expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
+    expect(mark(TALK, AVA)).toBe('Returned ' + today());
+    returns.mockRestore();
+  });
+
+  it('“N to return” pressed leaves only the assessments with a draft; the last one returned turns it off', async () => {
+    openGraded();
+    await settled();
+    expect(listed().length).toBe(8);
+    click(pill());
+    await settled();
+    expect(listed().sort()).toEqual([ESSAY, QUIZ, TALK].sort());
+    expect(pill().getAttribute('aria-pressed')).toBe('true');
+    expect(pill().className).toContain('active');
+    expect(text(pill())).toBe('8 to return ×');
+    expect(pill().getAttribute('title')).toBe(
+      'Showing only the assessments with a draft to return. Click to show everything.',
+    );
+    // The pill keeps the keyboard.
+    expect(document.activeElement).toBe(pill());
+    // A card with nothing left to return leaves the list.
+    click(cardReturn(QUIZ));
+    confirmOk();
+    await settled();
+    expect(listed().sort()).toEqual([ESSAY, TALK].sort());
+    expect(text(pill())).toBe('7 to return ×');
+    click(pill());
+    await settled();
+    expect(listed().length).toBe(8);
+    expect(pill().getAttribute('aria-pressed')).toBe('false');
+    // On again; returning the last drafts turns it off and shows everything.
+    click(pill());
+    await settled();
+    click(cardReturn(ESSAY));
+    confirmOk();
+    await settled();
+    click(cardReturn(TALK));
+    confirmOk();
+    await settled();
+    expect(GradeState.draftsWaiting(CID)).toBe(0);
+    expect(pill()).toBe(null);
+    expect(listed().length).toBe(8);
+  });
+
+  it('the count follows the Filter menu and the search: it is the drafts on screen', async () => {
+    openGraded();
+    await settled();
+    const box = document.querySelector('.assess-search-input');
+    box.value = 'quiz';
+    fire(box, 'input');
+    await new Promise(r => setTimeout(r, 400));
+    expect(listed()).toEqual([QUIZ]);
+    expect(text(pill())).toBe('1 to return');
+  });
+
+  describe('with one student open', () => {
+    it('Return sits beside the Draft mark under each grader, and is one click', async () => {
+      openGraded({ student: CARA });
+      await settled();
+      const returns = vi.spyOn(Grader, 'returnGrades');
+      // The count is this student's drafts; the cards offer no Return N Graded.
+      expect(text(pill())).toBe('1 to return');
+      expect(document.querySelector('#main .assess-return-btn')).toBe(null);
+      expect(toReturnChip(ESSAY)).toBe('1 to return');
+      expect(returnedChip(ESSAY)).toBe(null);
+      expect(document.querySelector('#main .assess-returned')).toBe(null);
+      const row = inlineRow(ESSAY);
+      expect(text(row.querySelector('.grader-draft-mark'))).toBe('Draft');
+      expect(text(row.querySelector('.grader-draft-text'))).toBe('Saved. Not returned yet.');
+      expect(row.querySelector('.grader-draft-still')).toBe(null);
+      expect(text(inlineReturn(ESSAY))).toBe('Return');
+      expect(inlineReturn(ESSAY).getAttribute('aria-label')).toBe('Return, Essay');
+      expect(inlineReturn(ESSAY).tagName).toBe('BUTTON');
+      // Nothing in: Return is there, greyed out. A status alone: no row.
+      expect(inlineReturn(LAB).disabled).toBe(true);
+      expect(inlineRow(BENCH)).toBe(null);
+
+      click(inlineReturn(ESSAY));
+      await settled();
+      expect(confirmDialog()).toBe(null);
+      expect(returns.mock.calls).toEqual([[CID, ESSAY, [CARA]]]);
+      expect(text(inlineRow(ESSAY))).toBe('Returned ' + today());
+      expect(inlineReturn(ESSAY)).toBe(null);
+      expect(pill()).toBe(null);
+      expect(toReturnChip(ESSAY)).toBe(null);
+      returns.mockRestore();
+    });
+
+    it('a changed returned grade says what the student still sees', async () => {
+      openPage({ student: AVA });
+      await settled();
+      expect(text(inlineRow(ESSAY))).toBe('Returned');
+      click(graderTagLevel(card(ESSAY), QUESTION, 4));
+      await settled();
+      const row = inlineRow(ESSAY);
+      expect(text(row.querySelector('.grader-draft-mark'))).toBe('Draft');
+      expect(text(row.querySelector('.grader-draft-still'))).toBe('Ava still sees the grade you returned.');
+      expect(text(pill())).toBe('1 to return');
+      // Returned, then changed again: the line has the date.
+      click(inlineReturn(ESSAY));
+      await settled();
+      expect(text(inlineRow(ESSAY))).toBe('Returned ' + today());
+      vi.setSystemTime(new Date('2026-11-12T18:00:00.000Z'));
+      click(graderTagLevel(card(ESSAY), QUESTION, 2));
+      await settled();
+      expect(text(inlineRow(ESSAY).querySelector('.grader-draft-still'))).toBe(
+        'Ava still sees the grade you returned ' + today() + '.',
+      );
+    });
+
+    it('a status with nothing in shows no row, and Missing over a draft hides it', async () => {
+      openGraded({ student: DEV });
+      await settled();
+      // Excused on the Quiz with nothing in.
+      expect(inlineRow(QUIZ).hidden).toBe(true);
+      expect(text(inlineRow(QUIZ))).toBe('');
+      expect(text(inlineRow(ESSAY).querySelector('.grader-draft-mark'))).toBe('Draft');
+    });
+
+    it('on pair work a partner’s draft goes too, so Return asks first and names both', async () => {
+      openGraded({ student: BEN });
+      await settled();
+      const returns = vi.spyOn(Grader, 'returnGrades');
+      expect(toReturnChip(TALK)).toBe('1 to return');
+      const button = inlineReturn(TALK);
+      click(button);
+      expect(asks()).toEqual({
+        title: 'Return 2 Grades Now?',
+        message: '2 drafts: Ava and Ben can’t see them yet.',
+        buttons: ['Cancel', 'Return 2 Graded'],
+      });
+      confirmCancel();
+      expect(returns).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(button);
+      click(inlineReturn(TALK));
+      confirmOk();
+      await settled();
+      expect(returns.mock.calls[0][2].slice().sort()).toEqual([AVA, BEN]);
+      expect(GradeState.stateOf(CID, AVA, TALK)).toBe('returned');
+      expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
+      // Ben's Essay and Quiz drafts are untouched.
+      expect(GradeState.stateOf(CID, BEN, ESSAY)).toBe('draft');
+      expect(text(pill())).toBe('2 to return');
+      returns.mockRestore();
+    });
+
+    it('a partner already returned is not asked about: one click', async () => {
+      openGraded({ student: BEN });
+      await settled();
+      Grader.returnGrades(CID, TALK, [AVA]);
+      const returns = vi.spyOn(Grader, 'returnGrades');
+      click(inlineReturn(TALK));
+      await settled();
+      expect(confirmDialog()).toBe(null);
+      expect(returns).toHaveBeenCalledTimes(1);
+      expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
+      returns.mockRestore();
+    });
+  });
+
+  it('no number on the page moves because a grade is a draft', async () => {
+    const numbers = () => ({
+      roster: roster(),
+      tallies: Array.from(document.querySelectorAll('#main .ldg-tally, #main .ldg-stats')).map(text),
+    });
+    openAssignments(() => {
+      seedWith({ config: HELD })();
+      grade();
+    }, CID);
+    expandAll();
+    await settled();
+    const held = numbers();
+    expect(GradeState.draftsWaiting(CID)).toBe(8);
+    closePages();
+    clearClass(CID);
+    openAssignments(() => {
+      seedWith({ config: {} })();
+      grade();
+    }, CID);
+    expandAll();
+    await settled();
+    expect(GradeState.draftsWaiting(CID)).toBe(0);
+    expect(numbers()).toEqual(held);
+  });
+
+  it('in a class moved to As Soon As I Save nothing is drawn and every new action does nothing', async () => {
+    openGraded();
+    await settled();
+    expect(pillCount()).toBe(8);
+    saveCourseConfig(CID, Object.assign({}, getCourseConfig(CID), { return_grades: 'on_save' }));
+    window.PageAssignments.render();
+    await settled();
+    expect(toolbar() + main()).not.toMatch(/to return|returned|ret-mark|assess-return|Draft|grader-return/);
+    const returns = vi.spyOn(Grader, 'returnGrades');
+    // A made-up button for each new action: nothing is returned or drawn.
+    ['toggleToReturn', 'returnDrafts', 'returnOne'].forEach(action => {
+      const btn = document.createElement('button');
+      btn.setAttribute('data-action', action);
+      btn.setAttribute('data-aid', ESSAY);
+      btn.setAttribute('data-sid', BEN);
+      card(ESSAY).appendChild(btn);
+      click(btn);
+      btn.remove();
+    });
+    await settled();
+    expect(returns).not.toHaveBeenCalled();
+    expect(confirmDialog()).toBe(null);
+    expect(listed().length).toBe(8);
+    returns.mockRestore();
+  });
+});
+
+describe.skipIf(UPDATE)('with the build switch on and When I Return Them: the grader dialog', () => {
+  const at = selector => overlay().querySelector(selector);
+  const bar = () => at('.grader-show');
+  const seg = which => at('.grader-show [data-show="' + which + '"]');
+  const segs = () => Array.from(overlay().querySelectorAll('.grader-show .seg-btn')).map(text);
+  const pressed = () =>
+    Array.from(overlay().querySelectorAll('.grader-show .seg-btn'))
+      .filter(b => b.getAttribute('aria-pressed') === 'true')
+      .map(b => b.getAttribute('data-show'));
+  const returnAll = () => at('.grader-return-all');
+  const name = () => text(at('.grader-student'));
+  const prev = () => at('[data-grader="prev"]');
+  const next = () => at('[data-grader="next"]');
+  // The dialog over the gradebook on a class with the drafts saved.
+  function open(aid, sid, opts) {
+    openGrader(
+      () => {
+        seedWith({ config: HELD })();
+        grade();
+      },
+      CID,
+      aid,
+      sid,
+    );
+    if (opts) {
+      window.PageAssignments.closeGrader();
+      window.PageAssignments.openGrader(CID, aid, sid, opts);
+    }
+    return overlay();
+  }
+
+  it('a bar under the title has Show with its counts and Return N Graded', async () => {
+    open(ESSAY, AVA);
+    await settled();
+    expect(bar().previousElementSibling.className).toBe('grader-toolbar');
+    expect(bar().nextElementSibling.className).toBe('grader-scroll');
+    expect(at('.grader-show-seg').getAttribute('role')).toBe('group');
+    expect(at('.grader-show-seg').getAttribute('aria-label')).toBe('Show');
+    expect(segs()).toEqual(['To Return 5', 'Returned 0', 'All 5']);
+    expect(pressed()).toEqual(['all']);
+    // Nothing is returned yet: that choice is greyed out.
+    expect(seg('returned').disabled).toBe(true);
+    expect(seg('toreturn').disabled).toBe(false);
+    expect(text(returnAll())).toBe('Return 5 Graded');
+    expect(returnAll().getAttribute('title')).toBe('5 drafts: Ava, Ben, Cara and 2 others can’t see them yet.');
+    expect(returnAll().tagName).toBe('BUTTON');
+    // The counts are GradeState's.
+    expect(drafts(ESSAY).length).toBe(5);
+  });
+
+  it('the counts follow each save and each return, without the bar being redrawn when nothing changed', async () => {
+    open(QUIZ, AVA);
+    await settled();
+    expect(segs()).toEqual(['To Return 1', 'Returned 1', 'All 5']);
+    const same = seg('toreturn');
+    click(at('.grader-dialog'));
+    await settled();
+    expect(seg('toreturn')).toBe(same);
+    // Ava's returned score changed: a draft again.
+    typeAndLeave(at('.grdp-input'), '9');
+    await settled();
+    expect(segs()).toEqual(['To Return 2', 'Returned 0', 'All 5']);
+    expect(text(returnAll())).toBe('Return 2 Graded');
+    click(at('[data-grader="return"]'));
+    await settled();
+    expect(segs()).toEqual(['To Return 1', 'Returned 1', 'All 5']);
+    expect(text(returnAll())).toBe('Return 1 Graded');
+  });
+
+  it('there is no bar with one student, on a DIBELS benchmark, or in a class that holds no grades', async () => {
+    open(ESSAY, AVA, { studentIds: [AVA] });
+    await settled();
+    expect(bar()).toBe(null);
+    closePages();
+    clearClass(CID);
+    open(BENCH, AVA);
+    await settled();
+    expect(bar()).toBe(null);
+    closePages();
+    clearClass(CID);
+    openGrader(seedWith({ config: { student_page_enabled: true, return_grades: 'on_save' } }), CID, ESSAY, AVA);
+    click(graderTagLevel(overlay(), QUESTION, 4));
+    await settled();
+    expect(bar()).toBe(null);
+    expect(overlay().outerHTML).not.toMatch(/grader-show|Return \d+ Graded|To Return/);
+  });
+
+  it('To Return is what the arrows step through; the student on screen stays until a step', async () => {
+    open(QUIZ, AVA);
+    Grader.setPoints(CID, DEV, QUIZ, null);
+    Grader.setStatus(CID, DEV, QUIZ, null);
+    Grader.setPoints(CID, DEV, QUIZ, 4);
+    await settled();
+    // Drafts: Ben and Dev. Ava is Returned.
+    expect(segs()).toEqual(['To Return 2', 'Returned 1', 'All 5']);
+    click(seg('toreturn'));
+    await settled();
+    expect(pressed()).toEqual(['toreturn']);
+    // Ava is not one of them: the first draft opens.
+    expect(name()).toBe('Ben Brown');
+    expect(prev().disabled).toBe(true);
+    expect(next().disabled).toBe(false);
+    // The pressed choice keeps the keyboard.
+    expect(document.activeElement).toBe(seg('toreturn'));
+    click(next());
+    await settled();
+    // Cara has no draft: the step goes past her to Dev.
+    expect(name()).toBe('Dev Dhillon');
+    expect(next().disabled).toBe(true);
+    expect(prev().disabled).toBe(false);
+    // The arrow keys step the same way (from the points box, as the hint says).
+    expect(document.activeElement.className).toContain('grdp-input');
+    key(document.activeElement, 'ArrowLeft');
+    await settled();
+    expect(name()).toBe('Ben Brown');
+    // Returning the grade on screen leaves the student there.
+    click(at('[data-grader="return"]'));
+    await settled();
+    expect(name()).toBe('Ben Brown');
+    expect(segs()).toEqual(['To Return 1', 'Returned 2', 'All 5']);
+    expect(pressed()).toEqual(['toreturn']);
+    expect(next().disabled).toBe(false);
+    click(next());
+    await settled();
+    expect(name()).toBe('Dev Dhillon');
+    // The last one returned: Show goes back to All and every student steps.
+    click(at('[data-grader="return"]'));
+    await settled();
+    expect(pressed()).toEqual(['all']);
+    expect(seg('toreturn').disabled).toBe(true);
+    expect(name()).toBe('Dev Dhillon');
+    expect(next().disabled).toBe(false);
+    click(prev());
+    await settled();
+    expect(name()).toBe('Cara Chen');
+  });
+
+  it('Returned steps through the students whose grade is given; All steps through everyone', async () => {
+    open(QUIZ, BEN);
+    Grader.returnGrades(CID, QUIZ, [BEN]);
+    click(at('.grader-dialog'));
+    await settled();
+    expect(segs()).toEqual(['To Return 0', 'Returned 2', 'All 5']);
+    click(seg('returned'));
+    await settled();
+    expect(name()).toBe('Ben Brown');
+    expect(next().disabled).toBe(true);
+    click(prev());
+    await settled();
+    expect(name()).toBe('Ava Adams');
+    expect(prev().disabled).toBe(true);
+    click(seg('all'));
+    await settled();
+    expect(pressed()).toEqual(['all']);
+    expect(name()).toBe('Ava Adams');
+    click(next());
+    await settled();
+    expect(name()).toBe('Ben Brown');
+    click(next());
+    await settled();
+    expect(name()).toBe('Cara Chen');
+  });
+
+  it('Return N Graded asks first when it returns more than the grade on screen', async () => {
+    open(ESSAY, BEN);
+    await settled();
+    const returns = vi.spyOn(Grader, 'returnGrades');
+    const button = returnAll();
+    click(button);
+    expect(asks()).toEqual({
+      title: 'Return 5 Grades Now?',
+      message: '5 drafts: Ava, Ben, Cara and 2 others can’t see them yet.',
+      buttons: ['Cancel', 'Return 5 Graded'],
+    });
+    confirmCancel();
+    await settled();
+    expect(returns).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(button);
+    click(returnAll());
+    confirmOk();
+    await settled();
+    expect(returns.mock.calls).toEqual([[CID, ESSAY, EVERYONE]]);
+    expect(drafts(ESSAY)).toEqual([]);
+    expect(returnAll()).toBe(null);
+    expect(segs()).toEqual(['To Return 0', 'Returned 5', 'All 5']);
+    expect(text(at('.grader-returned'))).toBe('Returned ' + today());
+    returns.mockRestore();
+  });
+
+  it('with only the grade on screen waiting, Return 1 Graded is one click, as the dialog’s Return is', async () => {
+    open(QUIZ, BEN);
+    await settled();
+    const returns = vi.spyOn(Grader, 'returnGrades');
+    expect(text(returnAll())).toBe('Return 1 Graded');
+    click(returnAll());
+    await settled();
+    expect(confirmDialog()).toBe(null);
+    expect(returns.mock.calls).toEqual([[CID, QUIZ, [BEN]]]);
+    expect(GradeState.stateOf(CID, BEN, QUIZ)).toBe('returned');
+    returns.mockRestore();
+  });
+
+  it('one draft that is not the student on screen asks, and names them', async () => {
+    open(QUIZ, AVA);
+    await settled();
+    click(returnAll());
+    expect(asks()).toEqual({
+      title: 'Return 1 Grade Now?',
+      message: '1 draft: Ben can’t see it yet.',
+      buttons: ['Cancel', 'Return 1 Graded'],
+    });
+    confirmCancel();
+  });
+
+  it('pair work: the pair on screen is returned in one click; a partner a search hides is counted and named', async () => {
+    open(TALK, AVA);
+    await settled();
+    expect(name()).toBe('Pair 1');
+    // Students, as the gradebook and the phone count: the pair is two.
+    expect(segs()).toEqual(['To Return 2', 'Returned 0', 'All 5']);
+    expect(text(returnAll())).toBe('Return 2 Graded');
+    const returns = vi.spyOn(Grader, 'returnGrades');
+    click(returnAll());
+    await settled();
+    expect(confirmDialog()).toBe(null);
+    expect(returns.mock.calls[0][2].slice().sort()).toEqual([AVA, BEN]);
+    expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
+    returns.mockRestore();
+    closePages();
+    clearClass(CID);
+
+    // The gradebook's rows are Ben and Cara: Ava is hidden by a search.
+    open(TALK, CARA, { studentIds: [BEN, CARA] });
+    await settled();
+    expect(segs()).toEqual(['To Return 1', 'Returned 0', 'All 2']);
+    expect(text(returnAll())).toBe('Return 2 Graded');
+    expect(returnAll().getAttribute('title')).toBe('2 drafts: Ava and Ben can’t see them yet.');
+    click(returnAll());
+    expect(asks().title).toBe('Return 2 Grades Now?');
+    confirmOk();
+    await settled();
+    expect(GradeState.stateOf(CID, AVA, TALK)).toBe('returned');
+    expect(GradeState.stateOf(CID, BEN, TALK)).toBe('returned');
+  });
+
+  it('pair work: To Return steps to the pair', async () => {
+    open(TALK, DEV);
+    await settled();
+    click(seg('toreturn'));
+    await settled();
+    expect(name()).toBe('Pair 1');
+    expect(prev().disabled).toBe(true);
+    expect(next().disabled).toBe(true);
+  });
+
+  it('Missing or Excused over a draft is on no count', async () => {
+    open(ESSAY, AVA);
+    const statuses = getAssignmentStatuses(CID);
+    statuses[DEV + ':' + ESSAY] = 'NS';
+    saveAssignmentStatuses(CID, statuses);
+    click(at('.grader-dialog'));
+    await settled();
+    expect(segs()).toEqual(['To Return 4', 'Returned 0', 'All 5']);
+    expect(text(returnAll())).toBe('Return 4 Graded');
   });
 });
