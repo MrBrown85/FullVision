@@ -61,11 +61,16 @@
 --    teacher's Note for the Report, never shown to the student).
 --
 -- 4. Triggers on the four score tables keep grade_return right for any
---    writer: the RPCs, an old cached client, the grade-scans skill. Each
---    fires once per statement, works out each touched cell's copy BEFORE the
---    statement (from the rows it changed) and NOW, and does nothing when they
---    are equal: a save that changes nothing, or the same save sent twice, is
---    not a draft. Otherwise, for that student and assessment:
+--    writer: the RPCs, an old cached client, the grade-scans skill. A row
+--    trigger BEFORE each change keeps the cell's copy as it was (in
+--    grade_return_before, a scratch table) the first time a transaction
+--    touches the cell; a statement trigger AFTER compares it with the copy
+--    NOW. The copy before is taken before anything is deleted, so it does not
+--    depend on the order cascades run in: deleting a criterion that has a
+--    ticked box takes its levels and its ticks, and the student still keeps
+--    both until the teacher returns the grade. Equal copies do nothing: a
+--    save that changes nothing, or the same save sent twice, is not a draft.
+--    Otherwise, for that student and assessment:
 --
 --    The class holds grades (student_page_enabled and return_grades =
 --    'on_return'):
@@ -98,6 +103,13 @@
 --    enrollment is being deleted is left alone. While import_json_restore
 --    runs (fv.restoring) the triggers stand aside and the restore sets the
 --    state itself (7).
+--
+--    Two saves at once: the BEFORE trigger and return_grades take one lock
+--    per class (_grade_return_lock, an advisory lock held to the end of the
+--    transaction) before they read a grade, so the second waits and sees
+--    what the first did. Without it a save could compare against a grade
+--    another save was halfway through changing, and settle a draft as
+--    Returned. migrations/local-test/grade_return_race.py runs that race.
 --
 -- 5. return_grades(p_assessment_id, p_enrollment_ids, p_idempotency_key):
 --    Return, Return and Next, Return N Graded. For each listed student whose
@@ -194,7 +206,7 @@ create or replace function public._grade_copy_of(
  returns jsonb
  language sql
  immutable
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
     select case
         when p_value is null and nullif(btrim(p_comment), '') is null
@@ -219,7 +231,7 @@ create or replace function public._grade_copy_entry(p_value integer, p_modifier 
  returns jsonb
  language sql
  immutable
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
     select case
         when p_value is null and nullif(btrim(p_comment), '') is null and nullif(btrim(p_beyond), '') is null then null
@@ -238,7 +250,7 @@ create or replace function public._grade_copy(p_enrollment_id uuid, p_assessment
  returns jsonb
  language sql
  stable security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
     select _grade_copy_of(
         (select s.value from score s where s.enrollment_id = p_enrollment_id and s.assessment_id = p_assessment_id),
@@ -262,7 +274,7 @@ create or replace function public._grade_return_holds(p_enrollment_id uuid)
  returns boolean
  language sql
  stable security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
     select coalesce((select c.student_page_enabled and c.return_grades = 'on_return'
                        from enrollment e join course c on c.id = e.course_id
@@ -270,36 +282,123 @@ as $function$
 $function$;
 
 -- ── 4. The rule ─────────────────────────────────────────────────────────────
+-- The copy a cell had before it was first changed in this transaction,
+-- taken by a BEFORE trigger and used once by the statement trigger that
+-- follows. It is what makes the rule independent of the order things
+-- happen in: deleting a criterion removes its levels and its ticks through
+-- two cascades whose order Postgres does not promise, and the copy the
+-- student keeps must be the grade as it was before either. A row is deleted
+-- when it is used; one left by a write that changed nothing is overwritten
+-- by the next transaction and goes with its student or assessment. Nobody
+-- can read or write this table but the triggers.
+create table if not exists public.grade_return_before (
+    enrollment_id uuid   not null references public.enrollment(id) on delete cascade,
+    assessment_id uuid   not null references public.assessment(id) on delete cascade,
+    txid          bigint not null,
+    copy          jsonb,
+    primary key (enrollment_id, assessment_id)
+);
+create index if not exists grade_return_before_assessment_idx on public.grade_return_before (assessment_id);
+alter table public.grade_return_before enable row level security;
+revoke all on table public.grade_return_before from public, anon, authenticated;
+
+-- One lock per class for everything that reads a grade and then writes its
+-- state: two saves to one class at once take turns, so the second sees what
+-- the first did. (Every score write already queues behind the class's
+-- course_sync_cursor row, but only at the end of its statement; this does
+-- not lean on that.) Held to the end of the transaction.
+create or replace function public._grade_return_lock(p_course_id uuid)
+ returns void
+ language sql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+    select pg_advisory_xact_lock(hashtextextended('fv.grade_return:' || p_course_id::text, 0));
+$function$;
+
+-- Before a row of a score table changes: keep the cell's copy as it is now,
+-- the first time this transaction touches the cell. tg_argv[0] is the part
+-- of a copy the table holds ('score', 'tags', 'criteria' or 'checks').
+create or replace function public._grade_return_before()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+declare
+    _part   text := tg_argv[0];
+    _o      jsonb := case when tg_op <> 'INSERT' then to_jsonb(old) end;
+    _n      jsonb := case when tg_op <> 'DELETE' then to_jsonb(new) end;
+    _skip   constant text[] := array['updated_at', 'scored_at', 'created_at', 'status', 'report_note'];
+    _cell   record;
+    _course uuid;
+begin
+    -- import_json_restore sets the state itself when its rows are in.
+    if current_setting('fv.restoring', true) = 'on' then
+        return coalesce(new, old);
+    end if;
+    -- Nothing a copy holds is changing: a status, a Note for the Report, a
+    -- timestamp, or a score row that only carries those.
+    if tg_op = 'UPDATE' and (_o - _skip) = (_n - _skip) then
+        return new;
+    end if;
+    if _part = 'score' and tg_op <> 'UPDATE'
+       and coalesce(_o, _n)->>'value' is null and nullif(btrim(coalesce(_o, _n)->>'comment'), '') is null then
+        return coalesce(new, old);
+    end if;
+
+    for _cell in
+        select distinct (r->>'enrollment_id')::uuid as e, (r->>'assessment_id')::uuid as a
+          from (values (_o), (_n)) v(r) where r is not null
+    loop
+        continue when exists (select 1 from grade_return_before b
+                               where b.enrollment_id = _cell.e and b.assessment_id = _cell.a and b.txid = txid_current());
+        -- Inside a delete of the assessment, the student or the class: the
+        -- cell is going, and grade_return's own cascade takes its row.
+        select e.course_id into _course from enrollment e where e.id = _cell.e;
+        continue when _course is null or not exists (select 1 from assessment where id = _cell.a);
+        perform _grade_return_lock(_course);
+        -- A statement of its own, after the lock: it reads the cell as the
+        -- last save to this class left it.
+        insert into grade_return_before (enrollment_id, assessment_id, txid, copy)
+        values (_cell.e, _cell.a, txid_current(), _grade_copy(_cell.e, _cell.a))
+        on conflict (enrollment_id, assessment_id) do update set txid = excluded.txid, copy = excluded.copy;
+    end loop;
+    return coalesce(new, old);
+end;
+$function$;
+
 -- One cell's working copy went from p_before to _now.
 create or replace function public._grade_return_apply(
     p_enrollment_id uuid, p_assessment_id uuid, p_before jsonb, _now jsonb)
  returns void
  language plpgsql
  security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
 declare
-    _g   grade_return%rowtype;
-    _at  timestamptz := clock_timestamp();
+    _g       grade_return%rowtype;
+    _has     boolean;
+    _changed boolean := _now is distinct from p_before;
+    _at      timestamptz := clock_timestamp();
 begin
-    if _now is not distinct from p_before then
-        return;  -- a save that changed nothing
-    end if;
-
     select * into _g from grade_return
      where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id
        for update;
+    _has := found;
 
     if _grade_return_holds(p_enrollment_id) then
-        -- When I Return Them: the change waits as a draft.
-        if not found then
-            if _now is not null then
+        -- When I Return Them: a change waits as a draft.
+        if not _has then
+            if _changed and _now is not null then
                 insert into grade_return (enrollment_id, assessment_id, is_draft)
                 values (p_enrollment_id, p_assessment_id, true)
                 on conflict (enrollment_id, assessment_id) do nothing;
             end if;
         elsif not _g.is_draft then
-            if _g.returned_at is not null and p_before is not null then
+            if not _changed then
+                null;  -- a save that changed nothing
+            elsif _g.returned_at is not null and p_before is not null then
                 update grade_return set is_draft = true, returned_copy = p_before
                  where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
             else
@@ -308,19 +407,24 @@ begin
                  where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
             end if;
         elsif _g.returned_copy is not null then
+            -- A draft on a returned grade: put back, it is Returned again.
             if _now is not distinct from _g.returned_copy then
                 update grade_return set is_draft = false, returned_copy = null
                  where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
             end if;
         elsif _now is null then
+            -- A draft never returned, with nothing left in it.
             update grade_return set is_draft = false
              where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
         end if;
         return;
     end if;
 
-    -- Any other class: the save is returned at once.
-    if not found then
+    -- Any other class: a save that changes the grade is returned at once.
+    if not _changed then
+        return;
+    end if;
+    if not _has then
         if _now is not null then
             insert into grade_return (enrollment_id, assessment_id, is_draft, returned_at)
             values (p_enrollment_id, p_assessment_id, false, _at)
@@ -356,168 +460,118 @@ begin
 end;
 $function$;
 
--- The statement trigger, one function for the four tables. tg_argv[0] says
--- which part of a copy the table holds ('score', 'tags', 'criteria' or
--- 'checks'); tg_argv[1] names the column that keys it. For every cell the
--- statement touched it works out the copy before: the copy now, with the
--- statement's new rows taken out and its old rows put back.
+-- After a statement on a score table: for every cell it touched, the copy
+-- kept before against the copy now. A cell with no kept copy was not
+-- changed, or was already settled by an earlier trigger of the same delete.
 create or replace function public._grade_return_on_change()
  returns trigger
  language plpgsql
  security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
 declare
-    _part   text := tg_argv[0];
-    _idcol  text := tg_argv[1];
-    _old    jsonb := '[]'::jsonb;
-    _new    jsonb := '[]'::jsonb;
-    _c      record;
-    _now    jsonb;
-    _before jsonb;
+    _cells jsonb := '[]'::jsonb;
+    _more  jsonb;
+    _c     record;
+    _b     grade_return_before%rowtype;
 begin
-    -- import_json_restore sets the state itself when its rows are in.
     if current_setting('fv.restoring', true) = 'on' then return null; end if;
 
     -- old_rows exists on UPDATE and DELETE, new_rows on INSERT and UPDATE.
     if tg_op <> 'INSERT' then
-        select coalesce(jsonb_agg(to_jsonb(o)), '[]'::jsonb) into _old from old_rows o;
+        select coalesce(jsonb_agg(distinct jsonb_build_array(o.enrollment_id, o.assessment_id)), '[]'::jsonb)
+          into _cells from old_rows o;
     end if;
     if tg_op <> 'DELETE' then
-        select coalesce(jsonb_agg(to_jsonb(n)), '[]'::jsonb) into _new from new_rows n;
+        select coalesce(jsonb_agg(distinct jsonb_build_array(n.enrollment_id, n.assessment_id)), '[]'::jsonb)
+          into _more from new_rows n;
+        _cells := _cells || _more;
     end if;
 
     for _c in
-        select x.enrollment_id, x.assessment_id,
-               coalesce(array_agg(x.key) filter (where not x.was), '{}') as new_keys,
-               coalesce(array_agg(x.key) filter (where x.was), '{}') as old_keys,
-               coalesce(jsonb_object_agg(coalesce(x.key, ''), x.entry) filter (where x.was and x.entry is not null),
-                        '{}'::jsonb) as old_entries,
-               (jsonb_agg(x.r) filter (where x.was)) -> 0 as old_row
-          from (-- An old row is filed under the id it has now, so a row that
-                -- was only pointed at another criterion is the same grade
-                -- before and after.
-                select (o.r->>'enrollment_id')::uuid as enrollment_id, (o.r->>'assessment_id')::uuid as assessment_id,
-                       true as was, coalesce(n.key, o.r->>_idcol) as key,
-                       case _part
-                           when 'tags' then _grade_copy_entry((o.r->>'value')::int, (o.r->>'modifier')::int,
-                                                              o.r->>'comment', null, false)
-                           when 'criteria' then _grade_copy_entry((o.r->>'value')::int, (o.r->>'modifier')::int,
-                                                                  o.r->>'comment', o.r->>'beyond', true)
-                       end as entry,
-                       o.r
-                  from jsonb_array_elements(_old) o(r)
-                  left join (select m.r->>'id' as id, m.r->>'enrollment_id' as e, m.r->>'assessment_id' as a,
-                                    m.r->>_idcol as key
-                               from jsonb_array_elements(_new) m(r)) n
-                    on n.id = o.r->>'id' and n.e = o.r->>'enrollment_id' and n.a = o.r->>'assessment_id'
-                union all
-                select (m.r->>'enrollment_id')::uuid, (m.r->>'assessment_id')::uuid, false, m.r->>_idcol, null, null
-                  from jsonb_array_elements(_new) m(r)) x
-         group by x.enrollment_id, x.assessment_id
+        select distinct (x->>0)::uuid as e, (x->>1)::uuid as a
+          from jsonb_array_elements(_cells) x
+         order by 1, 2
     loop
-        -- Inside a delete of the assessment, the student or the class: the
-        -- cell is going, and grade_return's own cascade takes its row.
-        continue when not exists (select 1 from assessment where id = _c.assessment_id)
-                   or not exists (select 1 from enrollment where id = _c.enrollment_id);
-        -- A tick holds nothing but its checkbox, so an UPDATE that leaves a
-        -- cell with as many ticks as it had only re-pointed them
-        -- (_grade_return_repoint has moved the ids in the stored copies).
-        continue when _part = 'checks' and tg_op = 'UPDATE'
-                  and cardinality(_c.new_keys) = cardinality(_c.old_keys);
-
-        _now := _grade_copy(_c.enrollment_id, _c.assessment_id);
-        _before := case _part
-            when 'score' then _grade_copy_of(
-                (_c.old_row->>'value')::numeric, (_c.old_row->>'modifier')::int, _c.old_row->>'comment',
-                _now->'tags', _now->'criteria', _now->'checks')
-            when 'tags' then _grade_copy_of(
-                (_now->>'value')::numeric, (_now->>'modifier')::int, _now->>'comment',
-                (coalesce(_now->'tags', '{}'::jsonb) - _c.new_keys) || _c.old_entries, _now->'criteria', _now->'checks')
-            when 'criteria' then _grade_copy_of(
-                (_now->>'value')::numeric, (_now->>'modifier')::int, _now->>'comment',
-                _now->'tags', (coalesce(_now->'criteria', '{}'::jsonb) - _c.new_keys) || _c.old_entries, _now->'checks')
-            else _grade_copy_of(
-                (_now->>'value')::numeric, (_now->>'modifier')::int, _now->>'comment',
-                _now->'tags', _now->'criteria',
-                (coalesce(_now->'checks', '[]'::jsonb) - _c.new_keys) || to_jsonb(_c.old_keys))
-        end;
-        perform _grade_return_apply(_c.enrollment_id, _c.assessment_id, _before, _now);
+        delete from grade_return_before b
+         where b.enrollment_id = _c.e and b.assessment_id = _c.a and b.txid = txid_current()
+        returning * into _b;
+        continue when not found;
+        continue when not exists (select 1 from assessment where id = _c.a)
+                   or not exists (select 1 from enrollment where id = _c.e);
+        perform _grade_return_apply(_c.e, _c.a, _b.copy, _grade_copy(_c.e, _c.a));
     end loop;
     return null;
 end;
 $function$;
 
--- A row pointed at another competency, criterion or checkbox: the ids inside
--- the stored copies follow it (move_rubric_scores). tg_argv[0] is the copy's
--- part, tg_argv[1] the id column.
-create or replace function public._grade_return_repoint()
- returns trigger
- language plpgsql
- security definer
- set search_path to 'public'
-as $function$
-declare
-    _part text := tg_argv[0];
-    _old  text := to_jsonb(old) ->> tg_argv[1];
-    _new  text := to_jsonb(new) ->> tg_argv[1];
-begin
-    if current_setting('fv.restoring', true) = 'on' or _old = _new
-       or old.enrollment_id <> new.enrollment_id or old.assessment_id <> new.assessment_id then
-        return null;
-    end if;
-    if _part = 'checks' then
-        update grade_return g
-           set returned_copy = case when g.returned_copy -> 'checks' ? _old
-                                    then _grade_copy_of((g.returned_copy->>'value')::numeric, (g.returned_copy->>'modifier')::int,
-                                             g.returned_copy->>'comment', g.returned_copy->'tags', g.returned_copy->'criteria',
-                                             (g.returned_copy->'checks') - _old || to_jsonb(_new))
-                                    else g.returned_copy end,
-               previous_copy = case when g.previous_copy -> 'checks' ? _old
-                                    then _grade_copy_of((g.previous_copy->>'value')::numeric, (g.previous_copy->>'modifier')::int,
-                                             g.previous_copy->>'comment', g.previous_copy->'tags', g.previous_copy->'criteria',
-                                             (g.previous_copy->'checks') - _old || to_jsonb(_new))
-                                    else g.previous_copy end
-         where g.enrollment_id = new.enrollment_id and g.assessment_id = new.assessment_id
-           and (g.returned_copy -> 'checks' ? _old or g.previous_copy -> 'checks' ? _old);
-    else
-        update grade_return g
-           set returned_copy = case when g.returned_copy -> _part ? _old
-                                    then jsonb_set(g.returned_copy #- array[_part, _old], array[_part, _new], g.returned_copy -> _part -> _old)
-                                    else g.returned_copy end,
-               previous_copy = case when g.previous_copy -> _part ? _old
-                                    then jsonb_set(g.previous_copy #- array[_part, _old], array[_part, _new], g.previous_copy -> _part -> _old)
-                                    else g.previous_copy end
-         where g.enrollment_id = new.enrollment_id and g.assessment_id = new.assessment_id
-           and (g.returned_copy -> _part ? _old or g.previous_copy -> _part ? _old);
-    end if;
-    return null;
-end;
-$function$;
-
--- move_rubric_scores calls this once its rows have moved: the copies kept
--- for students follow, also for a criterion or checkbox the working copy no
--- longer has a row for (a level cleared in a draft). Maps are
--- { "<old id>": "<new id>" }, as move_rubric_scores takes them.
-create or replace function public._grade_copy_remap(p_copy jsonb, p_criterion_map jsonb, p_check_map jsonb)
+-- A copy with ids renamed: p_criterion_map and p_check_map are
+-- { "<old id>": "<new id>" }, as move_rubric_scores takes them; p_tag_map
+-- the same for competencies.
+create or replace function public._grade_copy_remap(p_copy jsonb, p_criterion_map jsonb, p_check_map jsonb, p_tag_map jsonb default '{}'::jsonb)
  returns jsonb
  language sql
  immutable
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
     select case when p_copy is null then null else _grade_copy_of(
-        (p_copy->>'value')::numeric, (p_copy->>'modifier')::int, p_copy->>'comment', p_copy->'tags',
+        (p_copy->>'value')::numeric, (p_copy->>'modifier')::int, p_copy->>'comment',
+        (select coalesce(jsonb_object_agg(coalesce(p_tag_map->>e.key, e.key), e.value), '{}'::jsonb)
+           from jsonb_each(coalesce(p_copy->'tags', '{}'::jsonb)) e),
         (select coalesce(jsonb_object_agg(coalesce(p_criterion_map->>e.key, e.key), e.value), '{}'::jsonb)
            from jsonb_each(coalesce(p_copy->'criteria', '{}'::jsonb)) e),
         (select coalesce(jsonb_agg(coalesce(p_check_map->>x, x)), '[]'::jsonb)
            from jsonb_array_elements_text(coalesce(p_copy->'checks', '[]'::jsonb)) x)) end;
 $function$;
 
+-- A row pointed at another competency, criterion or checkbox
+-- (move_rubric_scores): the grade is the same grade, so the ids inside the
+-- stored copies, and inside the copy kept before, follow it. tg_argv[0] is
+-- the copy's part, tg_argv[1] the id column.
+create or replace function public._grade_return_repoint()
+ returns trigger
+ language plpgsql
+ security definer
+ set search_path to 'public', 'pg_temp'
+as $function$
+declare
+    _old  text := to_jsonb(old) ->> tg_argv[1];
+    _new  text := to_jsonb(new) ->> tg_argv[1];
+    _map  jsonb;
+    _none constant jsonb := '{}'::jsonb;
+begin
+    if current_setting('fv.restoring', true) = 'on' or _old = _new
+       or old.enrollment_id <> new.enrollment_id or old.assessment_id <> new.assessment_id then
+        return null;
+    end if;
+    _map := jsonb_build_object(_old, _new);
+    update grade_return g
+       set returned_copy = _grade_copy_remap(g.returned_copy, case when tg_argv[0] = 'criteria' then _map else _none end,
+                               case when tg_argv[0] = 'checks' then _map else _none end,
+                               case when tg_argv[0] = 'tags' then _map else _none end),
+           previous_copy = _grade_copy_remap(g.previous_copy, case when tg_argv[0] = 'criteria' then _map else _none end,
+                               case when tg_argv[0] = 'checks' then _map else _none end,
+                               case when tg_argv[0] = 'tags' then _map else _none end)
+     where g.enrollment_id = new.enrollment_id and g.assessment_id = new.assessment_id
+       and (g.returned_copy is not null or g.previous_copy is not null);
+    update grade_return_before b
+       set copy = _grade_copy_remap(b.copy, case when tg_argv[0] = 'criteria' then _map else _none end,
+                      case when tg_argv[0] = 'checks' then _map else _none end,
+                      case when tg_argv[0] = 'tags' then _map else _none end)
+     where b.enrollment_id = new.enrollment_id and b.assessment_id = new.assessment_id
+       and b.txid = txid_current() and b.copy is not null;
+    return null;
+end;
+$function$;
+
+-- move_rubric_scores calls this once its rows have moved: the copies kept
+-- for students follow, also for a criterion or checkbox the working copy no
+-- longer has a row for (a level cleared in a draft).
 create or replace function public._grade_return_remap(p_assessment_id uuid, p_criterion_map jsonb, p_check_map jsonb)
  returns void
  language plpgsql
  security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
 begin
     -- move_rubric_scores is SECURITY INVOKER, so teachers can call this:
@@ -530,7 +584,7 @@ begin
        and (g.returned_copy is not null or g.previous_copy is not null);
 end;
 $function$;
-revoke all on function public._grade_copy_remap(jsonb, jsonb, jsonb) from public, anon, authenticated;
+revoke all on function public._grade_copy_remap(jsonb, jsonb, jsonb, jsonb) from public, anon, authenticated;
 revoke all on function public._grade_return_remap(uuid, jsonb, jsonb) from public, anon;
 grant execute on function public._grade_return_remap(uuid, jsonb, jsonb) to authenticated, service_role;
 
@@ -539,35 +593,41 @@ revoke all on function public._grade_copy_of(numeric, integer, text, jsonb, json
 revoke all on function public._grade_copy_entry(integer, integer, text, text, boolean) from public, anon, authenticated;
 revoke all on function public._grade_copy(uuid, uuid) from public, anon, authenticated;
 revoke all on function public._grade_return_holds(uuid) from public, anon, authenticated;
+revoke all on function public._grade_return_lock(uuid) from public, anon, authenticated;
+revoke all on function public._grade_return_before() from public, anon, authenticated;
 revoke all on function public._grade_return_apply(uuid, uuid, jsonb, jsonb) from public, anon, authenticated;
 revoke all on function public._grade_return_on_change() from public, anon, authenticated;
 revoke all on function public._grade_return_repoint() from public, anon, authenticated;
 
--- A trigger with transition tables takes one event, so three per table.
+-- On each of the four tables: one row trigger before, and three statement
+-- triggers after (a trigger with transition tables takes one event).
 do $triggers$
 declare
     _t record;
 begin
     for _t in
         select * from (values
-            ('score',              'score',    'id'),
-            ('tag_score',          'tags',     'tag_id'),
-            ('rubric_score',       'criteria', 'criterion_id'),
-            ('rubric_check_score', 'checks',   'check_id')
-        ) as v(tbl, part, idcol)
+            ('score',              'score'),
+            ('tag_score',          'tags'),
+            ('rubric_score',       'criteria'),
+            ('rubric_check_score', 'checks')
+        ) as v(tbl, part)
     loop
+        execute format('drop trigger if exists grade_return_before on public.%I', _t.tbl);
         execute format('drop trigger if exists grade_return_insert on public.%I', _t.tbl);
         execute format('drop trigger if exists grade_return_update on public.%I', _t.tbl);
         execute format('drop trigger if exists grade_return_delete on public.%I', _t.tbl);
+        execute format('create trigger grade_return_before before insert or update or delete on public.%I '
+                       'for each row execute function public._grade_return_before(%L)', _t.tbl, _t.part);
         execute format('create trigger grade_return_insert after insert on public.%I '
                        'referencing new table as new_rows for each statement '
-                       'execute function public._grade_return_on_change(%L, %L)', _t.tbl, _t.part, _t.idcol);
+                       'execute function public._grade_return_on_change()', _t.tbl);
         execute format('create trigger grade_return_update after update on public.%I '
                        'referencing old table as old_rows new table as new_rows for each statement '
-                       'execute function public._grade_return_on_change(%L, %L)', _t.tbl, _t.part, _t.idcol);
+                       'execute function public._grade_return_on_change()', _t.tbl);
         execute format('create trigger grade_return_delete after delete on public.%I '
                        'referencing old table as old_rows for each statement '
-                       'execute function public._grade_return_on_change(%L, %L)', _t.tbl, _t.part, _t.idcol);
+                       'execute function public._grade_return_on_change()', _t.tbl);
     end loop;
 end
 $triggers$;
@@ -591,7 +651,7 @@ create or replace function public.return_grades(
  returns jsonb
  language plpgsql
  security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
 declare
     _cached jsonb;
@@ -610,6 +670,8 @@ begin
     if _cached is not null then return _cached; end if;
 
     select a.course_id into _course from assessment a where a.id = p_assessment_id;
+    -- Wait for any save to this class that is under way, then read.
+    perform _grade_return_lock(_course);
     for _g in
         select g.* from grade_return g
           join enrollment e on e.id = g.enrollment_id
@@ -653,7 +715,7 @@ create or replace function public.list_course_grade_returns(p_course_id uuid)
  returns jsonb
  language sql
  stable
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
     select coalesce(jsonb_object_agg(x.assessment_id::text, x.students), '{}'::jsonb)
       from (select g.assessment_id,
@@ -663,6 +725,8 @@ as $function$
               from grade_return g
               join enrollment e on e.id = g.enrollment_id
              where e.course_id = p_course_id
+               -- a row with nothing to say (a grade cleared, a save in flight) is left out
+               and (g.is_draft or g.returned_at is not null or g.seen_at is not null)
              group by g.assessment_id) x;
 $function$;
 revoke all on function public.list_course_grade_returns(uuid) from public, anon;
@@ -812,7 +876,7 @@ create or replace function public._restore_grade_returns(p_payload jsonb)
  returns integer
  language plpgsql
  security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
 declare
     _at timestamptz := clock_timestamp();

@@ -3,10 +3,12 @@
 
 - the teacher's card RPCs as Teacher A, Teacher B, no JWT and anon;
 - card, verify_card, page, seen and done as the edge function calls them
-  (service_role): the identity check, five wrong tries, Unlock, Reissue (the
-  old code stops at once and the student's work stays), Cards Work Until,
-  one session holding two classes, midnight in the class's time zone, Done,
-  the rate limits, and what the log keeps;
+  (service_role): the identity check, five wrong tries in a row, Unlock and
+  Unlock All, Reissue (the old code stops at once and the student's work
+  stays), Cards Work Until, a fresh session from the start screen and Add
+  Another Card joining one, midnight in the class's time zone, Done, the
+  per-address limit (a slip's code does not count toward it), housekeeping,
+  and what the log keeps;
 - a draft never comes back from page: by hand, then for a seeded random run
   of saves, edits, clears, returns and setting changes, page always gives
   the grade at the last return;
@@ -32,8 +34,10 @@ c.run("update course set student_page_enabled = true, return_grades = 'on_return
 today = one("select (now() at time zone 'America/Vancouver')::date::text")
 
 def card(code, ip='ip-1'): return svc('student_submit.card(:c, :i)', c=code, i=ip)
-def verify(code, birthday=None, number=None, password=None, token=None, ip='ip-1'):
-    return svc('student_submit.verify_card(:c, :b, :n, :p, :t, :i)', c=code, b=birthday, n=number, p=password, t=token, i=ip)
+def verify(code, birthday=None, number=None, password=None, token=None, ip='ip-1', add=False):
+    return svc('student_submit.verify_card(:c, :b, :n, :p, :t, :i, :a)', c=code, b=birthday, n=number, p=password, t=token, i=ip, a=add)
+def live(token):
+    return one("select count(*) from student_submit.device_session where token_hash = encode(sha256(convert_to(:t, 'UTF8')), 'hex') and expires_at > now()", t=token) == 1
 def page(token, e): return svc("student_submit.page(:t, :e, 'ip-1')", t=token, e=e)
 def cards(course=COURSE_A): return {x['enrollment_id']: x for x in rpc(A, 'list_student_cards(:c)', c=course)}
 
@@ -48,13 +52,20 @@ ok('the student path checks a salted hash, the same way a slip does',
    one('select bool_and(code_hash = _access_code_hash(code, salt) and length(salt) = 32) from student_card'))
 ok('a student with a birthday is checked by identity and prints no password', mine[ENR1]['check'] == 'identity' and mine[ENR1]['password'] is None, mine[ENR1])
 ok('a student with no birthday or number gets a four-digit card password', mine[ENR2]['check'] == 'password' and re.fullmatch(r'\d{4}', mine[ENR2]['password'] or ''), mine[ENR2])
-ok('a card works until June 30 of the school year when the class has no reporting terms', mine[ENR1]['works_until'] in ('2027-06-30',) or mine[ENR1]['works_until'].endswith('-06-30'), mine[ENR1])
+june30 = one("""select make_date(extract(year from d)::int + case when d > make_date(extract(year from d)::int, 6, 30) then 1 else 0 end, 6, 30)::text
+                   from (select (now() at time zone 'America/Vancouver')::date as d) x""")
+ok('with no reporting terms a card works until the next June 30', mine[ENR1]['works_until'] == june30, (mine[ENR1], june30))
+ok('and that date is written on the card, so it does not move with the calendar',
+   one('select bool_and(works_until = :d::date) from student_card', d=june30))
 r2 = rpc(A, 'issue_student_cards(:c, null, :k)', c=COURSE_A, k=k1)
 ok('a replay with the same key issues nothing new', r2['issued'] == 2 and one('select count(*) from student_card') == 2, r2)
 r3 = rpc(A, 'issue_student_cards(:c, null, :k)', c=COURSE_A, k=key())
 ok('issuing again keeps every card: printing never stops one', r3['issued'] == 0 and cards()[ENR1]['code'] == code1, r3)
 as_owner(); c.run("""update course set reporting_terms = '[{"ordinal":1,"label":"Term 1","starts_on":"2026-09-08","ends_on":"2026-11-20"},{"ordinal":2,"label":"Term 2","starts_on":"2026-11-23","ends_on":"2027-01-29"}]'::jsonb where id = :c""", c=COURSE_A)
-ok("with reporting terms, a card works until the class's last reporting date", cards()[ENR1]['works_until'] == '2027-01-29', cards()[ENR1])
+ok('a card already made keeps its date when the class gets reporting terms', cards()[ENR1]['works_until'] == june30, cards()[ENR1])
+r = rpc(A, 'set_cards_work_until(:c, null, :k)', c=COURSE_A, k=key())
+ok("Cards Work Until set to the default writes the class's last reporting date on every card",
+   r == {'works_until': '2027-01-29'} and cards()[ENR1]['works_until'] == '2027-01-29' and cards()[ENR2]['works_until'] == '2027-01-29', r)
 r = rpc(A, "set_cards_work_until(:c, '2026-11-20', :k)", c=COURSE_A, k=key())
 ok('set_cards_work_until sets the date for the class', r == {'works_until': '2026-11-20'} and cards()[ENR2]['works_until'] == '2026-11-20', r)
 r = rpc(A, 'set_cards_work_until(:c, null, :k)', c=COURSE_A, k=key())
@@ -75,6 +86,7 @@ TEACHER_CALLS = [
     ('list_student_cards', 'list_student_cards(:c)', dict(c=COURSE_A)),
     ('issue_student_cards', 'issue_student_cards(:c, null, :k)', dict(c=COURSE_A, k=key())),
     ('unlock_student_card', 'unlock_student_card(:i, :k)', dict(i=card1, k=key())),
+    ('unlock_all_student_cards', 'unlock_all_student_cards(:c, :k)', dict(c=COURSE_A, k=key())),
     ('reissue_student_card', 'reissue_student_card(:i, :k)', dict(i=card1, k=key())),
     ('set_cards_work_until', "set_cards_work_until(:c, '2027-01-01', :k)", dict(c=COURSE_A, k=key())),
 ]
@@ -93,13 +105,21 @@ def anon_read():
 expect_error('anon cannot read student_card', anon_read, 'permission denied')
 for what, sql in (('insert into', "insert into student_card (enrollment_id, code, code_hash, salt) values ('%s', 'AAA-AAA', 'x', 'y')" % ENR1),
                   ('update', "update student_card set wrong_tries = 0"), ('delete from', 'delete from student_card')):
+    pass
+def dup_code():
+    as_owner(); e = new_id()
+    c.run('insert into enrollment (id, student_id, course_id) values (:e, :s, :c)', e=e, s=STU2, c=COURSE_A2)
+    c.run("insert into student_card (enrollment_id, code, code_hash, salt, works_until) values (:e, :c, 'h', 's', current_date)", e=e, c=code1)
+expect_error('no two live cards can read the same: the table refuses a second', dup_code, 'student_card_live_code')
+for what, sql in (('insert into', "insert into student_card (enrollment_id, code, code_hash, salt) values ('%s', 'AAA-AAA', 'x', 'y')" % ENR1),
+                  ('update', "update student_card set wrong_tries = 0"), ('delete from', 'delete from student_card')):
     def direct():
         as_teacher(A); c.run(sql)
     expect_error('a teacher cannot %s student_card directly' % what, direct, 'permission denied')
 
 # ── Who can reach the student's side ────────────────────────────────────
 for role in ('anon', 'authenticated'):
-    for name, sql in (('card', "student_submit.card('AAA-AAA', 'x')"), ('verify_card', "student_submit.verify_card('AAA-AAA', null, null, null, null, 'x')"),
+    for name, sql in (('card', "student_submit.card('AAA-AAA', 'x')"), ('verify_card', "student_submit.verify_card('AAA-AAA', null, null, null, null, 'x', false)"),
                       ('page', "student_submit.page('x', '%s', 'x')" % ENR1), ('seen', "student_submit.seen('x', '%s', '{}', 'x')" % ENR1),
                       ('done', "student_submit.done('x', 'x')"), ('_returned_grade', "student_submit._returned_grade('%s', '%s')" % (ENR1, ENR1))):
         def call():
@@ -145,6 +165,20 @@ ok('the Student Cards list shows the lock and the count', cards()[ENR1]['locked_
 ok('no session was opened by any of that', one('select count(*) from student_submit.device_session') == 0)
 r = rpc(A, 'unlock_student_card(:i, :k)', i=card1, k=key())
 ok('Unlock clears the lock and the count', r['locked_at'] is None and r['wrong_tries'] == 0 and r['code'] == code1, r)
+for n in range(4): verify(code1, birthday='2000-01-01')
+ok('four wrong tries, then a right one: the count goes back to zero', verify(code1, birthday='2012-05-15').get('ok') is True and cards()[ENR1]['wrong_tries'] == 0, cards()[ENR1])
+for n in range(4): verify(code1, birthday='2000-01-01')
+ok('so the next four wrong tries do not lock it: only five in a row do',
+   cards()[ENR1]['locked_at'] is None and verify(code1, birthday='2000-01-01') == {'ok': False, 'error': 'card_locked'})
+for n in range(5): verify(code2, password='not it')
+ok('two cards locked', cards()[ENR1]['locked_at'] is not None and cards()[ENR2]['locked_at'] is not None)
+ku = key()
+r = rpc(A, 'unlock_all_student_cards(:c, :k)', c=COURSE_A, k=ku)
+ok('Unlock All unlocks every locked card in the class and says how many',
+   r == {'unlocked': 2} and all(x['locked_at'] is None and x['wrong_tries'] == 0 for x in cards().values()), r)
+ok('a replay of Unlock All returns the first answer', rpc(A, 'unlock_all_student_cards(:c, :k)', c=COURSE_A, k=ku) == {'unlocked': 2})
+ok('with nothing locked it unlocks none', rpc(A, 'unlock_all_student_cards(:c, :k)', c=COURSE_A, k=key()) == {'unlocked': 0})
+as_owner(); c.run('delete from student_submit.device_session')
 r = verify(code1, birthday='2012-05-15')
 tok = r.get('session_token')
 ok('the right birthday opens a session', r.get('ok') is True and r['enrollment_id'] == ENR1 and re.fullmatch(r'[0-9a-f]{64}', tok or ''), r)
@@ -178,6 +212,8 @@ ok('page gives the student, the class and what the page needs to show a grade',
 titles = [x['title'] for x in p['assessments']]
 ok('it lists the assignments already assigned, undated first', titles[0] == 'Density Lab' and set(titles) >= {'Quiz 1', 'Density Lab', 'Lab Report'}, titles)
 ok('an assignment dated tomorrow is not listed', 'Pop Quiz' not in titles, titles)
+ok('an assessment with no assigned date is on the list as soon as it exists (Colin, Nov 9)',
+   one('select date_assigned is null from assessment where id = :a', a=a_comp) and 'Density Lab' in titles)
 row = {x['id']: x for x in p['assessments']}
 ok('an assignment carries its dates, kind, competencies and rubric',
    set(row[a_comp]) == {'id', 'title', 'date', 'due_date', 'score_mode', 'max_points', 'weight', 'rubric_id', 'tag_ids',
@@ -232,15 +268,29 @@ set_class(True, 'on_return')
 
 # ── One session, two classes ────────────────────────────────────────────
 sessions = one('select count(*) from student_submit.device_session')
-r = verify(code_a2, birthday='2012-05-15', token=tok)
+r = verify(code_a2, birthday='2012-05-15', token=tok, add=True)
 ok('Add Another Card: a second class joins the session the device has',
    r.get('ok') is True and r['session_token'] is None and [x['course']['name'] for x in r['classes']] == ['Science 8', 'Socials 8'], r)
 ok('no new session was made', one('select count(*) from student_submit.device_session') == sessions
    and one("select count(*) from student_submit.device_session_enrollment x join student_submit.device_session d on d.id = x.session_id where d.token_hash = encode(sha256(convert_to(:t, 'UTF8')), 'hex')", t=tok) == 2)
 ok('page opens either class with the one token', page(tok, ENR1).get('ok') is True and page(tok, ENR_A2)['course'] == dict(page(tok, ENR_A2)['course'], name='Socials 8', block='B'))
 ok('each page lists both classes for switching', [x['enrollment_id'] for x in page(tok, ENR_A2)['classes']] == [ENR1, ENR_A2])
-r = verify(code2, password=pw, token=tok)
-ok('another student can share the device: their class joins too', r.get('ok') is True and len(r['classes']) == 3, r)
+r = verify(code2, password=pw, token=tok, add=True)
+ok("Add Another Card takes another student's card too", r.get('ok') is True and len(r['classes']) == 3, r)
+
+# ── The start screen always starts fresh ────────────────────────────────
+first = verify(code1, birthday='2012-05-15')['session_token']
+second = verify(code2, password=pw, token=first)
+ok('a card checked from the start screen, with the last session still on the device, starts a new session',
+   second.get('ok') is True and re.fullmatch(r'[0-9a-f]{64}', second['session_token'] or '') and second['session_token'] != first, second)
+ok('the new session holds only the new card', [x['enrollment_id'] for x in second['classes']] == [ENR2], second['classes'])
+ok('and the last student is signed out: their token is over', not live(first) and page(first, ENR1) == {'ok': False, 'error': 'signed_out'})
+ok("the new student cannot open the last student's class", page(second['session_token'], ENR1) == {'ok': False, 'error': 'not_found'})
+wrong = verify(code1, birthday='2000-01-01', token=second['session_token'])
+ok('a wrong answer from the start screen ends nobody: the session on the device stays', wrong.get('error') == 'wrong_identity' and live(second['session_token']))
+rpc(A, 'unlock_all_student_cards(:c, :k)', c=COURSE_A, k=key()); verify(code1, birthday='2012-05-15')
+r = verify(code_a2, birthday='2012-05-15', token='f' * 64, add=True)
+ok('Add Another Card with no live session starts one', r.get('ok') is True and re.fullmatch(r'[0-9a-f]{64}', r['session_token'] or ''), r)
 
 # ── Midnight, in the class's time zone ──────────────────────────────────
 sp(); as_owner()
@@ -251,7 +301,7 @@ r = verify(code_a2, birthday='2012-05-15')
 ok("a session started in a class in another time zone ends at that zone's midnight",
    one("select :x::timestamptz = (((now() at time zone :z)::date + 1)::timestamp at time zone :z)", x=r['expires_at'], z=other_tz), r['expires_at'])
 vancouver = one("select (((now() at time zone 'America/Vancouver')::date + 1)::timestamp at time zone 'America/Vancouver')")
-both = verify(code1, birthday='2012-05-15', token=r['session_token'])
+both = verify(code1, birthday='2012-05-15', token=r['session_token'], add=True)
 ok('with classes in two zones the session ends at the earlier midnight',
    one("select :x::timestamptz = least(:v::timestamptz, (((now() at time zone :z)::date + 1)::timestamp at time zone :z))", x=both['expires_at'], v=vancouver, z=other_tz), both['expires_at'])
 back()
@@ -285,7 +335,7 @@ ok("everything the student has stays: their scores and returned grades are as th
    rows("""select (select count(*) from score where enrollment_id = :e), (select count(*) from grade_return where enrollment_id = :e),
                   (select value from score where enrollment_id = :e and assessment_id = :a)""", e=ENR1, a=a_pts) == work_before)
 ok('the old card is kept, stopped', one('select stopped_at is not null from student_card where id = :i', i=card1) and one('select count(*) from student_card where enrollment_id = :e and stopped_at is null', e=ENR1) == 1)
-r = verify(new['code'], birthday='2012-05-15', token=tok)
+r = verify(new['code'], birthday='2012-05-15', token=tok, add=True)
 ok('the new card opens the same page, grades and all', r.get('ok') is True and result(tok, ENR1, a_pts)['grade']['value'] == 10, r)
 ok('a replay of the reissue with the same key returns the same new card', rpc(A, 'reissue_student_card(:i, :k)', i=card1, k=kr) == new)
 expect_error('a card already reissued cannot be reissued again', lambda: rpc(A, 'reissue_student_card(:i, :k)', i=card1, k=key()), 'already reissued')
@@ -295,6 +345,8 @@ code1, card1 = new['code'], new['id']
 r = verify(code_a2, birthday='2012-05-15')
 t3 = r['session_token']
 ok('Done ends the session', svc("student_submit.done(:t, 'ip-1')", t=t3) == {'ok': True} and page(t3, ENR_A2) == {'ok': False, 'error': 'signed_out'})
+ok('and its row is gone, with the classes it had opened',
+   one("select count(*) from student_submit.device_session where token_hash = encode(sha256(convert_to(:t, 'UTF8')), 'hex')", t=t3) == 0)
 ok('Done on a session that is already over, or on nonsense, is still ok', svc("student_submit.done(:t, 'ip-1')", t=t3) == {'ok': True} and svc("student_submit.done('nope', 'ip-1')") == {'ok': True})
 ok('the other device is still signed in', page(tok, ENR_A2).get('ok') is True)
 
@@ -376,8 +428,98 @@ ok('another address is unaffected', card(code1, ip='ip-other').get('ok') is True
 ok("a slip's open() from the locked address still answers: the two keep separate counts",
    svc("student_submit.open('ZZZ-ZZZ', 'ip-guess')") == {'ok': False, 'error': 'not_found'})
 back(); sp(); as_owner()
-c.run("insert into student_submit.attempt (route, outcome, ip_hash) select 'card', 'not_found', 'ip-' || g from generate_series(1, 500) g")
-ok('500 unknown codes across everyone in ten minutes pause the card route', card(code1, ip='ip-fresh') == {'ok': False, 'error': 'busy'})
+c.run("insert into student_submit.attempt (route, outcome, ip_hash) select 'card', 'not_found', 'ip-' || g from generate_series(1, 5000) g")
+ok('there is no everyone-is-busy stop on the card route: 5,000 unknown codes from other addresses stop nobody (Colin, Nov 9)',
+   card(code1, ip='ip-fresh').get('ok') is True and verify(code1, birthday='2012-05-15', ip='ip-fresh').get('ok') is True)
+back()
+
+# ── A slip's code where a card goes ─────────────────────────────────────
+sp()
+q = rpc(A, "upsert_questionnaire(:c, 'core_reflection', 'November Reflection', 'core-8-1', p_report_period => 1, p_opens_on => (:d::date - 1), p_closes_on => (:d::date + 7), p_idempotency_key => :k)",
+        c=COURSE_A, d=today, k=key())
+slip = rpc(A, 'issue_access_codes(:q, null, :k)', q=q['id'], k=key())[0]['code']
+ok("card() knows a live slip's code and says so, with nothing about whose it is", card(slip, ip='ip-school') == {'ok': True, 'kind': 'slip'})
+for n in range(70): card(slip, ip='ip-school')
+ok('70 slip scans from one address do not count toward the card limit: a good card still opens',
+   card(code1, ip='ip-school').get('ok') is True and verify(code1, birthday='2012-05-15', ip='ip-school').get('ok') is True)
+ok('they are logged as slips, not as unknown codes',
+   one("select count(*) from student_submit.attempt where route = 'card' and ip_hash = 'ip-school' and outcome = 'slip'") == 71
+   and one("select count(*) from student_submit.attempt where route = 'card' and ip_hash = 'ip-school' and outcome in ('not_found', 'bad_format', 'ambiguous')") == 0)
+ok("the slip still opens with open(), as before", svc("student_submit.open(:c, 'ip-school')", c=slip).get('kind') == 'questionnaire')
+ok("verify_card does not take a slip's code", verify(slip, birthday='2012-05-15', ip='ip-school') == {'ok': False, 'error': 'not_found'})
+back()
+
+# ── A card password outlives a birthday added later ─────────────────────
+sp()
+ok('before: the card with nothing else on file asks for its password', card(code2)['check'] == 'password')
+as_owner(); c.run("update student set date_of_birth = '2011-01-02' where id = :s", s=STU2)
+r = card(code2)
+ok('a birthday is added: the card asks for it, and still offers the password', r['check'] == 'identity' and r['also_password'] is True, r)
+as_owner(); c.run('insert into enrollment (id, student_id, course_id) values (gen_random_uuid(), :s, :c)', s=STU2, c=COURSE_A2)
+rpc(A, 'issue_student_cards(:c, null, :k)', c=COURSE_A2, k=key())           # another card for the same student
+q = rpc(A, "upsert_questionnaire(:c, 'core_reflection', 'December Reflection', 'core-8-1', p_report_period => 1, p_opens_on => (:d::date - 1), p_closes_on => (:d::date + 7), p_idempotency_key => :k)",
+        c=COURSE_A, d=today, k=key())
+rpc(A, 'issue_access_codes(:q, null, :k)', q=q['id'], k=key())               # and a slip, which clears student.slip_password
+ok("the student's slip password is gone, as slips do once a birthday is on file", one('select slip_password from student where id = :s', s=STU2) is None)
+ok('the password printed on the first card still works (the Nov 3 slip fix, for cards)', verify(code2, password=pw).get('ok') is True)
+ok('and so does the birthday', verify(code2, birthday='2011-01-02').get('ok') is True)
+ok('the card made after the birthday prints no password', [x['password'] for x in rpc(A, 'list_student_cards(:c)', c=COURSE_A2) if x['enrollment_id'] != ENR_A2] == [None])
+back()
+
+# ── Nothing on file ─────────────────────────────────────────────────────
+sp(); as_owner()
+c.run('update student_card set password = null where enrollment_id = :e', e=ENR2)
+ok('a card with nothing on file to check says reprint', card(code2) == {'ok': False, 'error': 'reprint'})
+got = [verify(code2, password=pw) for n in range(6)]
+ok('verify_card says the same and counts no wrong try, so it never locks', all(x == {'ok': False, 'error': 'reprint'} for x in got)
+   and rows('select wrong_tries, locked_at from student_card where enrollment_id = :e and stopped_at is null', e=ENR2) == [[0, None]], got[:2])
+back()
+
+# ── Nothing a teacher saved makes the student's route fail ──────────────
+for label, tz in (('an empty time zone', ''), ('a time zone Postgres does not know', 'Mars/Olympus')):
+    sp()
+    rpc(A, 'update_course(:c, :p::jsonb)', c=COURSE_A, p=json.dumps({'timezone': tz}))
+    got = [card(code1).get('ok'), verify(code1, birthday='2012-05-15').get('ok'), page(tok, ENR1).get('ok'),
+           len(rpc(A, 'list_student_cards(:c)', c=COURSE_A)) > 0, rpc(A, 'set_cards_work_until(:c, null, :k)', c=COURSE_A, k=key()).get('works_until') is not None]
+    ok('%s on the class: card, verify_card, page, the cards list and Cards Work Until all still answer' % label, got == [True] * 5, got)
+    back()
+sp(); as_owner()
+c.run("""update course set cards_work_until = null, reporting_terms = '[{"ordinal":1,"label":"T1","starts_on":"2026-09-08","ends_on":"2026-11-20"},{"ordinal":2,"label":"T2","starts_on":"2026-11-23","ends_on":"2027-02-30"}]'::jsonb where id = :c""", c=COURSE_A)
+r = rpc(A, 'set_cards_work_until(:c, null, :k)', c=COURSE_A, k=key())
+ok('a reporting term that ends on a date that does not exist (Feb 30) is left out, not an error', r == {'works_until': '2026-11-20'} and card(code1).get('ok') is True, r)
+back()
+
+# ── Housekeeping on the card path ───────────────────────────────────────
+sp(); as_owner()
+c.run("insert into student_submit.attempt (at, route, outcome, ip_hash) values (now() - interval '31 days', 'card', 'not_found', 'old'), (now() - interval '29 days', 'card', 'not_found', 'recent')")
+c.run("insert into student_submit.device_session (token_hash, expires_at) values ('expired', now() - interval '1 minute'), ('alive', now() + interval '1 hour')")
+card('ZZZ-ZZZ', ip='ip-sweep')
+ok('a card scan removes log rows older than 30 days and keeps newer ones',
+   rows("select ip_hash from student_submit.attempt where ip_hash in ('old', 'recent')") == [['recent']])
+ok('and every session past its midnight, with the classes it had opened',
+   rows("select token_hash from student_submit.device_session where token_hash in ('expired', 'alive')") == [['alive']])
+back()
+
+# ── A competency taken off the class ────────────────────────────────────
+sp()
+gone = new_assessment(K, 'competencies', title='Before the removal', date_assigned=today)
+rpc(A, 'upsert_tag_score(:e, :a, :t, 3)', e=ENR1, a=gone, t=T1); rpc(A, 'upsert_tag_score(:e, :a, :t, 2)', e=ENR1, a=gone, t=T2)
+rpc(A, 'return_grades(:a, :ids::uuid[], :k)', a=gone, ids='{%s}' % ENR1, k=key())
+as_owner()
+sect2 = new_id()
+c.run("insert into section (id, course_id, subject_id, name) values (:x, :c, :s, 'Planning')", x=sect2, c=COURSE_A, s=K['subj'])
+c.run('update tag set section_id = :x where id = :t', x=sect2, t=T2)
+ok('before: both competencies are on the page and in the returned grade',
+   sorted(result(tok, ENR1, gone)['tag_ids']) == sorted([T1, T2]) and set(result(tok, ENR1, gone)['grade']['tags']) == {T1, T2})
+as_owner(); c.run('update section set removed_at = now() where id = :x', x=sect2)
+got = result(tok, ENR1, gone)
+ok("a competency removed from the class after the return is left out of tag_ids, of the page's tags and of the returned grade",
+   got['tag_ids'] == [T1] and set(got['grade']['tags']) == {T1} and T2 not in page(tok, ENR1)['tags'], got)
+ok('the teacher still has the level: nothing was deleted and nothing became a draft',
+   set(working_copy(ENR1, gone)['tags']) == {T1, T2} and state(ENR1, gone) == 'returned')
+as_owner(); c.run('update tag set section_id = :x where id = :t', x=sect2, t=T1)
+got = result(tok, ENR1, gone)
+ok('with every competency removed the grade is null, and the piece still shows as returned', got['grade'] is None and got['returned_at'] is not None and got['tag_ids'] == [], got)
 back()
 
 # ── What the log keeps ──────────────────────────────────────────────────
@@ -399,6 +541,19 @@ ok('student_submit has %d functions; only _returned_grade names a score table, a
 ok("page reaches a grade only through it", '_returned_grade(' in src['page'] and 'grade_return' not in code_only(src['page']))
 ok("today's slip functions (open, verify, check, submit and their helpers) read no score table at all: a phone report is a copy the teacher's browser sent",
    not [n for n in ('open', 'verify', 'check', 'submit', '_payload', '_preview', '_part', '_clean_answer', '_closed_reason', '_log', '_norm') if NAMES.search(code_only(src[n]))])
+as_owner()
+NEW = rows(r"""select p.oid::regprocedure::text, coalesce(array_to_string(p.proconfig, ','), '') from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+               where (n.nspname = 'public' and (p.proname like any (array['\_grade\_%', '\_cards\_%', '\_student\_card%', '\_issue\_student\_card', '\_fv\_timezone', '\_fv\_date',
+                          '\_restore\_grade\_returns', 'return\_grades', 'list\_course\_grade\_returns', '%student\_card%', 'set\_cards\_work\_until', 'fv\_owns\_%\_cell']))
+                   or (n.nspname = 'student_submit' and p.proname in ('card', 'verify_card', 'page', 'seen', 'done', '_returned_grade', '_on_class', '_midnight',
+                          '_device_session', '_session_classes', '_card_refusal', '_card_lookup', '_session_class')))""")
+ok('all %d functions Batch A adds name pg_temp last in their search_path, so a temporary table cannot stand in for a real one' % len(NEW),
+   len(NEW) >= 40 and all(cfg.endswith('pg_temp') for name, cfg in NEW), [n for n, cfg in NEW if not cfg.endswith('pg_temp')])
+sp(); as_teacher(B)
+c.run('create temporary table course (id uuid, teacher_id uuid, deleted_at timestamptz, name text)')
+c.run('insert into course select id, :b, null, name from public.course', b=B)
+expect_error("a temporary table named course does not get Teacher B into Teacher A's cards", lambda: rpc(B, 'list_student_cards(:c)', c=COURSE_A), 'not found')
+back()
 ok('every function in the schema is SECURITY DEFINER with its search_path set, or reads nothing',
    one("""select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'student_submit' and p.proname not in ('_norm', '_midnight')

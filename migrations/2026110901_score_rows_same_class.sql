@@ -85,11 +85,14 @@
 -- transaction.
 
 -- ── The helpers, in the style of fv_owns_enrollment ─────────────────────────
+-- pg_temp is named last in each search_path, so a temporary table called
+-- `course` or `enrollment` cannot stand in for the real one (the older
+-- fv_owns_* helpers lack this; see the PR).
 create or replace function public.fv_owns_score_cell(eid uuid, aid uuid)
  returns boolean
  language sql
  stable security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
     select exists (select 1 from enrollment e
                      join course c on c.id = e.course_id
@@ -103,7 +106,7 @@ create or replace function public.fv_owns_tag_score_cell(eid uuid, aid uuid, tid
  returns boolean
  language sql
  stable security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
     select exists (select 1 from enrollment e
                      join course c on c.id = e.course_id
@@ -119,7 +122,7 @@ create or replace function public.fv_owns_rubric_score_cell(eid uuid, aid uuid, 
  returns boolean
  language sql
  stable security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
     select exists (select 1 from enrollment e
                      join course c on c.id = e.course_id
@@ -135,7 +138,7 @@ create or replace function public.fv_owns_rubric_check_cell(eid uuid, aid uuid, 
  returns boolean
  language sql
  stable security definer
- set search_path to 'public'
+ set search_path to 'public', 'pg_temp'
 as $function$
     select exists (select 1 from enrollment e
                      join course c on c.id = e.course_id
