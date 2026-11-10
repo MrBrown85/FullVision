@@ -86,7 +86,7 @@ test.describe('Scoring an Advanced Rubric', () => {
   test('ticking every box of a level writes that level; unticking clears it', async ({ page }) => {
     const safety = row(page, 'stu-001', 'crit-safe');
     const btn = safety.locator('.rsg-checks-btn');
-    await expect(btn).toHaveText('0/4');
+    await expect(btn).toHaveText('Checklist');
     // Checklists show by default.
     await expect(btn).toHaveAttribute('aria-expanded', 'true');
     const panel = page.locator('.rsg-checklist[data-sid="stu-001"][data-critid="crit-safe"]');
@@ -100,8 +100,10 @@ test.describe('Scoring an Advanced Rubric', () => {
     await panel.getByLabel('Cleans the station').check();
     await expect(safety.locator('.rsg-level.active .rsg-level-name')).toHaveText('Proficient');
     await expect(row(page, 'stu-001', 'crit-safe').locator('.rsg-checklist-head')).toHaveText('Suggested: Proficient');
+    // The level matches the ticks, so there is no hint line under it.
+    await expect(row(page, 'stu-001', 'crit-safe').locator('.rsg-checklist-hint')).toHaveCount(0);
     await expect(panel.locator('.rsg-checklist-col.is-chosen')).toHaveAttribute('data-level', '3');
-    await expect(safety.locator('.rsg-checks-btn')).toHaveText('2/4');
+    await expect(safety.locator('.rsg-checks-btn')).toHaveText('2');
     const stored = await page.evaluate(cid => getRubricCheckIds(cid, 'stu-001', 'assess-adv').sort(), TEST_COURSE.id);
     expect(stored).toEqual(['k3a', 'k3b']);
 

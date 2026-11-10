@@ -54,10 +54,10 @@ test('the whole-class rubric grid scores, fine-tunes and sets a status', async (
     'Add an overall comment for Alice',
   );
 
-  // − | + sit inside the chosen level; the comment button ends the row.
+  // − | + sit inside the chosen level; the comment button sits under the name.
   const hyp = alice.locator('.rsg-criterion-row[data-criterion="crit-hyp"]');
   await expect(hyp.locator('.rsg-mod')).toHaveCount(0);
-  await expect(hyp.locator('.rsg-criterion-main .rsg-crit-comment')).toHaveText('Comment');
+  await expect(hyp.locator('.rsg-criterion-side .rsg-crit-tools .rsg-crit-comment')).toHaveText('Comment');
   await hyp.locator('.rsg-level.l3').click();
   await expect(hyp.locator('.rsg-level.active .rsg-level-name')).toHaveText('Proficient');
   await expect(hyp.locator('.rsg-level.active .rsg-mod')).toHaveCount(2);

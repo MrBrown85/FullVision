@@ -161,10 +161,10 @@ test('Missing | Excused | Late everywhere; the dialog prints Print Rubrics', asy
   await expect(ptsDialog.locator('.grader-print')).toHaveText('Print Scores');
 });
 
-test('rubric class view: one hover prompt; the bar starts after the student list', async ({ page }) => {
+test('rubric class view: no hover prompt; the bar starts after the student list', async ({ page }) => {
   await demo(page, '/assignments?course=sci8');
   const card = await openCard(page, 'sci8a3');
-  await expect(card.locator('.rsg-header-hint')).toHaveText('Hover a level to see its wording');
+  await expect(card.locator('.rsg-header-hint')).toHaveCount(0);
   const bar = page.locator('#rsg-descriptor-bar');
   await expect(bar).toBeHidden();
   await expect(page.getByText('Hover a rubric level to see its descriptor')).toHaveCount(0);
