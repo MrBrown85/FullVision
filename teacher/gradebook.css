@@ -2139,11 +2139,12 @@ th.gb-group-alt {
 }
 /* Return N Graded under a Competencies header. */
 .gb-return-drafts {
-  display: block;
-  max-width: 100%;
-  margin: 4px auto 0;
+  display: inline-block;
+  /* "Return 3 Graded" fits the narrowest header (120px) whole: the button
+     reaches 4px into the header's padding on each side. */
+  max-width: calc(100% + 8px);
+  margin: 4px -4px 0;
   height: 22px;
-  /* "Return 3 Graded" fits the narrowest header (120px) whole. */
   padding: 0 6px;
   border: none;
   border-radius: 11px;
