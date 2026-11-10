@@ -171,15 +171,17 @@ PGPORT=54329 PGDATABASE=fv_score python3 score_rpcs.py
 
 Result on 2026-11-09 (Postgres 18.6, local; production is 17): 176 of 176.
 Against a database with Batch A loaded (below) the same script finds it and
-expects the two gaps Batch A closes to be refused: 234 of 234.
+expects the one gap Batch A closes to be refused: 234 of 234.
 
-Checks named "today:" pin a gap as it is. Batch A closes two and its
-database flips their checks to "refused": `set_score_status` takes Missing
-on scored work; and row security on the score tables checks the enrollment
-only, so a teacher can save a score for their own student against another
-teacher's assessment, competency or criterion by id. The others it found,
-left as they are:
+Checks named "today:" pin a gap as it is. Batch A closes one and its
+database flips those checks to "refused": row security on the score tables
+checks the enrollment only, so a teacher can save a score for their own
+student against another teacher's assessment, competency or criterion by
+id. The others it found, left as they are:
 
+- `set_score_status` takes Missing on work that has a score. Batch A leaves
+  it: the shipped app sends Missing on cells the server still holds a score
+  for, and a refused write is a dead letter for a teacher.
 - `upsert_rubric_score` takes a criterion that is not on the assessment's
   rubric. Batch A leaves it: the outbox can send a score ahead of the rubric
   change it belongs to, so a refusal would lose real grades.
@@ -205,15 +207,29 @@ Four migrations, tested here only (no Supabase branch, never
 `2026110902_grade_return.sql`, `2026110903_student_card.sql`,
 `2026110904_student_sessions_page.sql`.
 
-Two more files build what they need on top of the score paths:
+Three more files build what they need on top of the score paths:
 
-- `batch-a-tables.sql`: six more tables from the live snapshot
+- `batch-a-tables.sql`: seven more tables from the live snapshot
   (`python3 make-score-tables.py batch-a`).
 - `batch-a-prelude.sql`: `update_course`, `import_json_restore`,
   `create_course`, `duplicate_course` and `duplicate_assessment`. No one
   migration holds any of them whole; each is the migration that last wrote
   it in full plus every later in-place patch, in order.
   `live-function-md5.txt` proves each result is the live function.
+- `class-writers-prelude.sql`: the other 21 RPCs that write a class's
+  tables, for `grade_return_race.py`: assessments (`create_`, `update_`,
+  `delete_assessment`, `save_assessment_tags`), rubrics (`upsert_rubric`,
+  `delete_rubric`), subjects, folders, sections and competencies (an
+  `upsert_` and a `delete_` each, `remove_section`, `restore_section`) and
+  students (`create_student_and_enroll`, `update_enrollment`,
+  `withdraw_student`, `reenrol_student`, `delete_withdrawn_student`). Each is
+  copied whole and unchanged from the migration that last defined it.
+  **Four have no migration** (`delete_assessment`, `save_assessment_tags`,
+  `delete_rubric`, `update_enrollment`): those are from
+  `docs/backend-design/write-paths.sql`, the April design. **None of the 21
+  is checked against `gradebook-prod`**: they are not in
+  `live-function-md5.txt`. To fingerprint them, run the query at the top of
+  that file with these 21 names.
 
 Two databases, one without the four migrations (for `batch_a_apply.py`,
 which applies them itself) and one with:
@@ -224,7 +240,8 @@ BASE="harness.sql score-prelude.sql score-tables.sql student-submit-prelude.sql 
   ../20261025_student_submit.sql ../20261025_student_submit_phone.sql \
   ../20261025_student_submit_token_80.sql ../20261025_phone_reports.sql \
   ../20261101_questionnaire_identity_check.sql ../20261101_questionnaire_slip_fixes.sql \
-  ../20261103_slip_password_kept_for_live_slips.sql batch-a-tables.sql batch-a-prelude.sql"
+  ../20261103_slip_password_kept_for_live_slips.sql batch-a-tables.sql batch-a-prelude.sql \
+  class-writers-prelude.sql"
 PGPORT=54329 PGDATABASE=fv_a_pre python3 run.py $BASE
 PGPORT=54329 PGDATABASE=fv_a python3 run.py $BASE ../2026110901_score_rows_same_class.sql \
   ../2026110902_grade_return.sql ../2026110903_student_card.sql ../2026110904_student_sessions_page.sql
@@ -233,7 +250,8 @@ PGPORT=54329 PGDATABASE=fv_a_pre python3 batch_a_apply.py
 PGPORT=54329 PGDATABASE=fv_a python3 grade_return.py
 PGPORT=54329 PGDATABASE=fv_a python3 student_page.py
 PGPORT=54329 PGDATABASE=fv_a python3 score_rpcs.py
-PGPORT=54329 PGDATABASE=fv_a python3 grade_return_race.py
+PGPORT=54329 PGDATABASE=fv_a python3 grade_return_race.py        # about four minutes
+PGPORT=54329 PGDATABASE=fv_a_pre python3 grade_return_race.py    # the baseline: the same calls with no Batch A
 ```
 
 What each covers:
@@ -249,8 +267,9 @@ What each covers:
   Grades choice; a second run of all four files changes nothing.
 - `grade_return.py` runs every case in `tests/fixtures/grade-state-cases.json`
   through the score RPCs, the triggers and `student_submit._returned_grade`
-  (the same file runs through `shared/grade-state.js`). Then: the two server
-  check on Missing, against what shipped clients send; `return_grades`; the class
+  (the same file runs through `shared/grade-state.js`). Then: Missing on
+  scored work accepted as before and hidden from the student, and what is
+  sent for an Overall level on each kind of work; `return_grades`; the class
   settings, and a class leaving When I Return Them returning what was
   waiting; each bulk path by name (the restore from a new backup, an old one
   and a 30 by 40 class, `move_rubric_scores`, Duplicate Class, Copy
@@ -258,9 +277,13 @@ What each covers:
   box in each order the cascades can run, a checkbox, a competency, a rubric
   and a student; a statement that adds and changes rows of one grade; an id
   re-pointed by hand; what a student is sent when the work's scoring has
-  changed; a planted scratch row that must not be trusted, and the scratch
-  table empty between statements; a restore over a class that exists; then
-  who can reach what.
+  changed; the working copy `grade_return` keeps (what a save changed is
+  read from it, a write with the triggers off leaves it behind, the
+  migration's last two statements repair it); the class's sync-cursor row
+  made when it is missing; `grade_return`'s rows going with their student,
+  assessment or class though it has no foreign keys; a restore over a class
+  that exists; then who can reach what. At several points and at the end
+  every `grade_return` row must hold the grade as the score tables have it.
 - `student_page.py` runs the card RPCs and `card`, `verify_card`, `page`,
   `seen` and `done` as the edge function calls them: five wrong tries in a
   row and the slow lock (fifteen in 7 days), Unlock and Unlock All, Reissue
@@ -279,16 +302,21 @@ What each covers:
   another class of Teacher A's own.
 - `grade_return_race.py` uses several connections and commits (it cleans up
   after itself). Two saves on one grade: the second waits and the draft
-  stays a draft. 150 saves on each of two students against 150 returns: no
-  call fails. The same with setting changes, rubric fills and card calls:
-  no call fails; as a control, with the release trigger renamed so it fires
-  after the sync-cursor trigger, the run deadlocks. A level saved for a
-  criterion while it is being deleted, 150 times: no deadlock.
+  stays a draft. A Return and a tick both waiting on a level being saved:
+  the student is given the level, whichever goes first. Then the matrix:
+  each of 45 RPCs, 300 calls on its own connection aimed at the rows the
+  others are using, against two connections of score saves, against two of
+  `return_grades`, and against both; then all of them at once. The delete
+  scenarios work down a pool of 300 rows while the saves and returns follow
+  on the same rows. After every run each `grade_return` row must hold the
+  grade as the score tables have it, in a state the table allows, with its
+  student and assessment still there, and no draft may be left in a class
+  that does not hold grades.
 
 Result on 2026-11-09 (Postgres 18.6, local; production is 17):
-`batch_a_apply.py` 82 of 82, `grade_return.py` 282 of 282, `student_page.py`
+`batch_a_apply.py` 82 of 82, `grade_return.py` 280 of 280, `student_page.py`
 216 of 216, `score_rpcs.py` 234 of 234 (176 of 176 without Batch A),
-`grade_return_race.py` 9 of 9 (three runs). With Batch A loaded the earlier suites pass
+`grade_return_race.py` 414 of 414; each three times. With Batch A loaded the earlier suites pass
 as before: `student_submit.py` 79 of 79, `questionnaire_identity.py` 47 of
 47, `phone_reports.py` 37 of 37, `questionnaires.py` 42 of 42.
 
@@ -297,6 +325,100 @@ in 15 minutes to 300, as for cards (one number in `student_submit.open`,
 patched in place). `student_submit.py` reads which is loaded: its two checks
 on that limit run with 299 misses and miss number 300 on a Batch A database,
 and with 59 and 60 on one without.
+
+### The matrix: deadlocks per RPC, three runs added up
+
+One lock per class: the class's `course_sync_cursor` row, which every writer
+already takes through the sync-cursor triggers after its statement's rows.
+Batch A takes it in that position and nowhere earlier, and reads and writes
+`grade_return` only while holding it (`2026110902_grade_return.sql`, header,
+4). Each cell is deadlocks (calls that died with 40P01) of calls made. The
+last column is the same calls on the database without the four migrations.
+
+| RPC                                           | against saves  | against returns | against both    | today, no Batch A (saves) |
+| --------------------------------------------- | -------------- | --------------- | --------------- | ------------------------- |
+| `upsert_score`                                | 0 of 2,810     | 0 of 2,823      | 0 of 3,677      | 0 of 2,743                |
+| `upsert_tag_score`                            | 0 of 2,650     | 0 of 2,869      | 0 of 3,503      | 0 of 2,572                |
+| `upsert_rubric_score`                         | 0 of 2,678     | 0 of 2,817      | 0 of 3,479      | 0 of 2,540                |
+| `set_rubric_check`                            | 0 of 2,135     | 0 of 2,399      | 0 of 2,538      | 0 of 2,480                |
+| `save_score_comment`                          | 0 of 2,662     | 0 of 2,734      | 0 of 3,474      | 0 of 2,606                |
+| `save_score_report_note`                      | 0 of 2,420     | 0 of 2,760      | 0 of 3,675      | 0 of 2,647                |
+| `set_score_status`                            | 0 of 2,403     | 0 of 2,745      | 0 of 3,778      | 0 of 2,631                |
+| `clear_score`                                 | 14 of 2,707    | 0 of 2,820      | 12 of 3,585     | 3 of 2,738                |
+| `clear_row_scores`                            | 12 of 2,380    | 0 of 2,314      | 11 of 2,636     | 10 of 2,791               |
+| `clear_column_scores`                         | 4 of 2,351     | 0 of 2,291      | 3 of 2,618      | 3 of 2,552                |
+| `fill_rubric`                                 | 38 of 2,942    | 0 of 2,756      | 38 of 3,781     | 14 of 2,925               |
+| `return_grades`                               | 0 of 2,580     | 0 of 2,713      | 0 of 3,964      | -                         |
+| `update_course`                               | 0 of 2,555     | 0 of 2,739      | 0 of 3,667      | 0 of 2,433                |
+| `create_assessment`                           | 0 of 3,845     | 0 of 4,978      | 0 of 4,966      | 0 of 4,878                |
+| `update_assessment`                           | 0 of 2,436     | 0 of 2,735      | 0 of 3,748      | 0 of 2,669                |
+| `save_assessment_tags`                        | 0 of 2,346     | 0 of 2,745      | 0 of 3,839      | 0 of 2,674                |
+| `duplicate_assessment`                        | 0 of 3,736     | 0 of 4,735      | 0 of 4,893      | 0 of 4,923                |
+| `delete_assessment`                           | 0 of 2,988     | 0 of 2,855      | 0 of 4,542      | 0 of 2,803                |
+| `upsert_rubric (nothing removed)`             | 0 of 2,777     | 0 of 2,701      | 0 of 3,037      | 0 of 2,932                |
+| `upsert_rubric (criteria and boxes removed)`  | 73 of 3,706    | 0 of 4,189      | 78 of 4,929     | 57 of 4,680               |
+| `delete_rubric`                               | 157 of 2,851   | 0 of 2,750      | 305 of 3,805    | 86 of 2,761               |
+| `update_assessment + move_rubric_scores`      | 60 of 4,073    | 0 of 4,989      | 63 of 5,119     | 28 of 3,741               |
+| `upsert_subject`                              | 0 of 2,622     | 0 of 3,121      | 0 of 3,810      | 0 of 2,921                |
+| `upsert_competency_group`                     | 0 of 2,686     | 0 of 3,225      | 0 of 4,116      | 0 of 2,923                |
+| `upsert_section`                              | 0 of 2,650     | 0 of 3,208      | 0 of 4,067      | 0 of 2,969                |
+| `upsert_tag`                                  | 0 of 2,409     | 0 of 2,768      | 0 of 3,709      | 0 of 3,453                |
+| `remove_section`                              | 0 of 2,394     | 0 of 2,752      | 0 of 3,923      | 0 of 2,543                |
+| `delete_tag`                                  | 0 of 3,501     | 0 of 3,126      | 0 of 5,107      | 0 of 3,056                |
+| `delete_section`                              | 229 of 3,080   | 0 of 3,004      | 339 of 3,781    | 84 of 2,829               |
+| `delete_subject`                              | 278 of 3,100   | 0 of 2,985      | 363 of 3,723    | 100 of 2,886              |
+| `delete_competency_group`                     | 0 of 2,254     | 0 of 2,682      | 0 of 3,503      | 0 of 2,546                |
+| `create_student_and_enroll`                   | 0 of 2,216     | 0 of 2,974      | 0 of 3,536      | 0 of 2,743                |
+| `update_enrollment`                           | 0 of 2,424     | 0 of 2,714      | 0 of 3,618      | 0 of 2,371                |
+| `withdraw_student`                            | 0 of 2,387     | 0 of 2,720      | 0 of 3,797      | 0 of 2,545                |
+| `delete_withdrawn_student`                    | 0 of 3,223     | 0 of 2,670      | 0 of 4,878      | 0 of 3,281                |
+| `import_json_restore`                         | 0 of 3,961     | 0 of 4,091      | 0 of 4,938      | 0 of 4,329                |
+| `issue_student_cards`                         | 0 of 1,700     | 0 of 2,452      | 0 of 1,582      | -                         |
+| `set_cards_work_until`                        | 0 of 2,376     | 0 of 2,727      | 0 of 3,912      | -                         |
+| `mark_student_cards_printed`                  | 0 of 2,076     | 0 of 3,238      | 0 of 1,951      | -                         |
+| `unlock_student_card`                         | 0 of 2,123     | 0 of 3,052      | 0 of 1,945      | -                         |
+| `unlock_all_student_cards`                    | 0 of 1,418     | 0 of 1,969      | 0 of 1,399      | -                         |
+| `reissue_student_card`                        | 0 of 2,244     | 0 of 3,012      | 0 of 2,083      | -                         |
+| `student: seen`                               | 0 of 2,383     | 0 of 2,777      | 0 of 3,590      | -                         |
+| `student: page`                               | 0 of 4,720     | 0 of 8,233      | 0 of 4,712      | -                         |
+| `student: card and verify_card`               | 0 of 1,719     | 0 of 2,482      | 0 of 1,730      | -                         |
+| **all that are clean against saves, at once** |                |                 | 273 of 128,843  | 260 of 54,721             |
+| **all at once**                               |                |                 | 1032 of 138,056 | 843 of 97,374             |
+| **total**                                     | 865 of 121,697 | 0 of 139,439    | 2517 of 429,562 | 1488 of 257,209           |
+
+After every one of the 411 runs, deadlocks included, every `grade_return`
+row was right: 0 rows wrong.
+
+Every RPC is clean against returns alone. Thirty-six of the 45 are clean
+against saves. **Nine are not, with or without Batch A**: the three clears,
+`fill_rubric`, a rubric save that removes a criterion or a checkbox,
+`delete_rubric`, `move_rubric_scores`, `delete_section` and
+`delete_subject`. A save locks its score row and then the class's cursor
+row. Each of the nine already holds the cursor row when it goes for a score
+row a save has, because the cursor triggers fire after every statement and
+after the first level of a cascade. Batch A changes none of the nine and
+adds no lock they could meet in a new order: no dead call was waiting on a
+`grade_return` row in any run, and every one of the 3,382 deadlocks the
+server logged was between live RPCs (a Return or a card call appears in a
+few only as a third call waiting in line). It does make them collide more
+often under this load, about twice as often here: a save holds the cursor
+row about a third longer (an `upsert_score` call took 0.30 ms before and
+0.41 ms after), and a delete's own trigger work adds to what waits behind
+it. Ending them means the cursor triggers firing at
+commit instead of after each statement, on all 38 tables that have one;
+that is a change to the live schema outside this batch.
+
+The two all-at-once rows also pit the RPCs against each other, and some of
+those pairs deadlock today too (`update_assessment` and
+`save_assessment_tags` both rewrite one assessment's links), so the row of
+RPCs that are clean against saves is not clean against itself.
+
+A Return or a student's `seen()` waiting in line when two such calls collide
+could be the one Postgres stops; it holds nothing they want, so it waits
+again (`_grade_return_lock_first`). In these runs no Return died.
+
+The 21 RPCs in `class-writers-prelude.sql` are from the repo, not checked
+against the live database; four of them from the April design file.
 
 Timing: a rubric fill for 30 students with 5 criteria (30 `fill_rubric`
 calls, 150 rows) took about 15 ms before the batch, 20 ms with the

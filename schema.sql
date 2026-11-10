@@ -333,49 +333,43 @@ create table rubric_check_score (
 
 -- Draft or Returned, per student per assessment: what the student has been
 -- given (2026110902_grade_return; plan 1.2). The teacher's working copy stays
--- in score, tag_score, rubric_score and rubric_check_score. Triggers on those
--- four keep this table right for any writer: a row trigger before each change
--- keeps the grade as it was (grade_return_before), a statement trigger after
--- compares it with the grade now. return_grades returns drafts; a class
--- leaving When I Return Them returns what was waiting (a trigger on course);
--- the restore sets the backup's state. Teachers read their own rows; nobody
--- writes it directly. A copy is { v, value, modifier, comment, tags {tag id:
--- {value, modifier, comment}}, criteria {criterion id: {value, modifier,
--- comment, beyond}}, checks [check ids] }; status and report_note are never
--- in one. Students are sent only the part of a copy the work's scoring uses
--- now (_grade_copy_in_use), and nothing while the piece is Missing or Excused.
+-- in score, tag_score, rubric_score and rubric_check_score. Statement triggers
+-- on those four keep this table right for any writer: after each change they
+-- take the class lock (the class's course_sync_cursor row, after the
+-- statement's rows, as the sync-cursor triggers do), compare working_copy with
+-- the grade now, and write the grade back. return_grades returns drafts; a
+-- class leaving When I Return Them returns what was waiting (a trigger on
+-- course); the restore sets the backup's state. Teachers read their own rows;
+-- nobody writes it directly. A copy is { v, value, modifier, comment, tags
+-- {tag id: {value, modifier, comment}}, criteria {criterion id: {value,
+-- modifier, comment, beyond}}, checks [check ids] }; status and report_note
+-- are never in one. Students are sent only the part of a copy the work's
+-- scoring uses now (_grade_copy_in_use), and nothing while the piece is
+-- Missing or Excused.
+-- No foreign keys, on purpose: a row is read for update, written or deleted
+-- only by a transaction that holds the class lock, and a cascade or a
+-- foreign-key check would take a lock in the other order. A trigger on
+-- enrollment and on assessment deletes the rows (grade_return_gone); the
+-- migration's last two statements are the repair and can be run again.
 create table grade_return (
-  enrollment_id uuid        not null references enrollment(id) on delete cascade,
-  assessment_id uuid        not null references assessment(id) on delete cascade,
+  enrollment_id uuid        not null,                               -- enrollment(id), kept by trigger
+  assessment_id uuid        not null,                               -- assessment(id), kept by trigger
   is_draft      boolean     not null default false,                -- the working copy holds something the student has not been given
   returned_at   timestamptz,                                        -- last returned; null = never
   returned_copy jsonb,                                              -- the grade as last returned, kept only while a draft sits on a returned grade
   previous_copy jsonb,                                              -- the grade the student had before the newest return
   updated_at    timestamptz,                                        -- when a returned grade last changed for the student
   seen_at       timestamptz,                                        -- when the student last opened this piece
+  working_copy  jsonb,                                              -- the grade as the last save left it: what the next save is compared with
   primary key (enrollment_id, assessment_id),
   check ((returned_copy is not null) = (is_draft and returned_at is not null))
 );
 -- RLS: select only, fv_owns_enrollment(enrollment_id).
 
--- Scratch for the triggers: the copy a cell had before a transaction first
--- changed it. A row is trusted only with its own transaction's id and start
--- time and is gone when its statement ends, so the table is empty between
--- transactions. No access for any API role.
-create table grade_return_before (
-  enrollment_id uuid        not null references enrollment(id) on delete cascade,
-  assessment_id uuid        not null references assessment(id) on delete cascade,
-  txid          bigint      not null,
-  at            timestamptz not null,
-  tbl           text        not null,
-  copy          jsonb,
-  primary key (enrollment_id, assessment_id)
-);
-
 -- Schema fv_private (2026110902_grade_return): helpers that SECURITY INVOKER
 -- RPCs call, so signed-in teachers can run them, kept out of the API (the API
 -- serves schema public only): restore_grade_returns (import_json_restore),
--- grade_return_remap (move_rubric_scores), work_is_scored (set_score_status).
+-- grade_return_remap (move_rubric_scores).
 -- docs/schema.generated.sql does not list this schema.
 
 -- Row security on score, tag_score, rubric_score, rubric_check_score and
@@ -877,11 +871,10 @@ create table support_report (
 -- `category_weight_sum_check(_update)` deferred constraint triggers on category → fv_check_category_weight_sum()
 -- `score_audit_trigger`         after  update on score          → _score_audit_diff(...)
 -- `term_rating_audit_trigger`   after  update on term_rating    → _term_rating_audit_field(...)
--- `grade_return_before`        before insert, update or delete (row) on score, tag_score, rubric_score, rubric_check_score → _grade_return_before(part)
--- `grade_return_insert|update|delete` after each statement on those four → _grade_return_on_change()
+-- `grade_return_insert|update|delete` after each statement on score, tag_score, rubric_score, rubric_check_score → _grade_return_on_change(): the class lock, then working_copy against the grade now
+-- `grade_return_gone`           after  delete (row) on enrollment, assessment → _grade_return_gone(): the class lock, then its grade_return rows go
 -- `grade_return_repoint`        after  update (row) on tag_score, rubric_score, rubric_check_score when its tag, criterion or check id changes → _grade_return_repoint(part, id column); acts only inside move_rubric_scores
--- `a_grade_return_release`      after  update of student_page_enabled, return_grades on course, when the class stops holding grades → _grade_return_release(); named to fire before the sync-cursor trigger (lock order)
--- `grade_return_lock`           before delete (statement) on rubric, criterion, criterion_check, tag → _grade_return_lock_mine(): the caller's class locks, before any row
+-- `grade_return_release`        after  update of student_page_enabled, return_grades on course, when the class stops holding grades → _grade_return_release()
 -- `fv_teacher_sign_in_deleted`  after  delete on auth.users     → _fv_teacher_sign_in_deleted() (soft-deletes the teacher)
 
 -- ─── Publications ───────────────────────────────────────────────────────────
